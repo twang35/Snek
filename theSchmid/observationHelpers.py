@@ -2,8 +2,8 @@ import copy
 
 from Snake import *
 
-DEATH_REWARD = -200000
-TRAPPED_REWARD = -100000
+DEATH_REWARD = -2000000
+TRAPPED_REWARD = -1000000
 GROUP_REWARD = -50000
 DOUBLE_PATH_REWARD = -3000
 FOOD_REWARD = 9000
@@ -12,7 +12,7 @@ FOOD_REWARD = 9000
 # 15: 73.1 * with groups (-1000) 59.4, 66.8
 # 15: 54.4 * with groups (-2000) 66.0
 # 15: 67.5 * with lanes  (-2000) 83.0, 95.4, 86.7
-# 15: 90.4 even food reward 90.6, 90.6 *136PR
+# 15: 90.4 even food reward 90.6, 90.6 *136PR, 83.1
 MAX_SEARCH_DEPTH = 15
 
 DIRECTIONS = ["up", "down", "left", "right"]
@@ -115,20 +115,16 @@ def populate_group(group_set, tile_pos, grid, remaining_spaces):
             populate_group(group_set, new_tile_pos, grid, remaining_spaces)
 
 
-# based on how many open tiles don't have perpendicular openings
+# a double path allows for snek to enter and exit from the same gap
 def get_double_path_score(action, grid):
     not_double_path_positions = 0
 
-    # for each open block, check if it has a path to get in and out
+    # for each open block, check if it has a path to get in and another open block to get out
     for i in range(grid.shape[0] - 1):
         for j in range(grid.shape[1] - 1):
             if is_open((i, j), grid):
                 if not has_double_path_opening((i, j), grid):
                     not_double_path_positions += 1
-
-    # something is still wrong with corners
-    # if not_double_path_positions > 0:
-    #     print("not_double_path_positions: ", not_double_path_positions, " ", action)
 
     return DOUBLE_PATH_REWARD * not_double_path_positions
 
@@ -222,7 +218,7 @@ def calc_trapped(action, snake, total_steps):
     most_steps = 0
 
     directions = [0, 1, 2, 3]
-    # random.shuffle(random_directions)
+    random.shuffle(directions)
 
     for choice in directions:
         copy_snek = copy.deepcopy(snake)
