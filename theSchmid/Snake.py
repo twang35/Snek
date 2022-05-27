@@ -8,7 +8,7 @@ import math
 
 # ---------- constants ---------- #
 # screen that game appears on 0 or 1
-SCREEN_TO_DISPLAY = 1
+SCREEN_TO_DISPLAY = 0
 
 # size of each grid
 TILE_SIZE = (10, 10)

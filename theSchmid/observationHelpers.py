@@ -2,18 +2,21 @@ import copy
 
 from Snake import *
 
-DEATH_REWARD = -2000000
+DEATH_REWARD = -20000000
 TRAPPED_REWARD = -1000000
-GROUP_REWARD = -50000
+GROUP_REWARD = -5000
 DOUBLE_PATH_REWARD = -3000
-FOOD_REWARD = 9000
+FOOD_REWARD = 15000
 # 10: 39.1
 # 15: 48.8
 # 15: 73.1 * with groups (-1000) 59.4, 66.8
 # 15: 54.4 * with groups (-2000) 66.0
 # 15: 67.5 * with lanes  (-2000) 83.0, 95.4, 86.7
 # 15: 90.4 even food reward 90.6, 90.6 *136PR, 83.1
-MAX_SEARCH_DEPTH = 15
+MAX_SEARCH_DEPTH = 5
+# first perfect game: 249 but also first infinite loop
+# 161.1, 173.3, 148.4, 166.4, 188.1
+HEAD_AND_TAIL_GROUP_REWARD = 10000000
 
 DIRECTIONS = ["up", "down", "left", "right"]
 TRANSFORM_MAP = {'left': {'across': (1, 0), 'diag': {(1, -1), (1, 1)}},
@@ -41,17 +44,24 @@ def calculate_score(action, kitchen_sink):
     updated_grid = update_grid(action, kitchen_sink.head.tilepos, kitchen_sink.tail.tilepos,
                                copy.deepcopy(kitchen_sink.game_grid))
 
-    group_score = get_open_groups(updated_grid)
+    group_score, groups = get_open_groups(updated_grid)
 
-    double_path_score = get_double_path_score(action, updated_grid)
+    new_tail_pos = kitchen_sink.tail.front_segment.tilepos
+    head_with_tail_score = get_head_with_tail_score(updated_grid, groups, head, new_tail_pos)
+
+    # double_path_score = get_double_path_score(action, updated_grid)
+    double_path_score = 0
 
     # going to be trapped?
-    trapped_score = get_steps_til_trapped(action, kitchen_sink)
+    # trapped_score = get_steps_til_trapped(action, kitchen_sink)
+    trapped_score = 0
 
     # food!
     food_score = get_food_score(grid_number, head, kitchen_sink.current_food)
 
-    return trapped_score + food_score + group_score + double_path_score, double_path_score < 0
+    variance = random.randint(0, 20)
+
+    return trapped_score + food_score + group_score + double_path_score + head_with_tail_score + variance, double_path_score < 0
 
 
 def get_grid_number(coord, grid):
@@ -71,7 +81,7 @@ def get_open_groups(grid):
     groups = count_groups(grid)
 
     # return score based on # of groups
-    return GROUP_REWARD * (groups - 1)
+    return GROUP_REWARD * (len(groups) - 1), groups
 
 
 def update_grid(action, head_pos, tail_pos, grid):
@@ -82,6 +92,27 @@ def update_grid(action, head_pos, tail_pos, grid):
 
 def set_number(grid, tile_pos, number):
     grid[tile_pos[1] + 1][tile_pos[0] + 1] = number
+
+
+def get_head_with_tail_score(grid, groups, head_pos, tail_pos):
+    head_groups = get_adjacent_groups(grid, groups, head_pos)
+    tail_groups = get_adjacent_groups(grid, groups, tail_pos)
+    if len(head_groups & tail_groups) > 0:
+        return HEAD_AND_TAIL_GROUP_REWARD
+    return 0
+
+
+def get_adjacent_groups(grid, groups, tile_pos):
+    group_set = set()
+    for direction in DIRECTIONS:
+        direction_pos = get_pos(direction, tile_pos)
+        grid_number = get_grid_number(direction_pos, grid)
+        if grid_number == 0 or grid_number == 1:
+            for i in range(len(groups)):
+                if tuple(direction_pos) in groups[i]:
+                    group_set.add(i)
+
+    return group_set
 
 
 def count_groups(grid):
@@ -100,7 +131,7 @@ def count_groups(grid):
         groups.append(set())
         populate_group(groups[-1], remaining_spaces.pop(), grid, remaining_spaces)
 
-    return len(groups)
+    return groups
 
 
 def populate_group(group_set, tile_pos, grid, remaining_spaces):
