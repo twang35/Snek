@@ -92,48 +92,34 @@ class snake_segment(pygame.sprite.Sprite):
         self.front_segment = None
         self.behind_segment = None
 
-        self.movedir = 'left'
-
-    # this function adds a segment at the end of the snake
-    def add_segment(self, tail):
-        x = tail.tilepos[0]
-        y = tail.tilepos[1]
-        if tail.movedir == 'left':
-            x += 1
-        elif tail.movedir == 'right':
-            x -= 1
-        elif tail.movedir == 'up':
-            y += 1
-        elif tail.movedir == 'down':
-            y -= 1
-        tail.behind_segment = snake_segment((x, y), tail.segment_groups)
-        tail.behind_segment.movedir = tail.movedir
-
+        self.movedir = 'right'
+        self.last_move_dir = 'right'
 
     def update(self):
         pass
 
     def move(self):
-        # todo: reformat to move only head and tail
         self.tilepos = (
             self.tilepos[0] + MOVE_VECTORS[self.movedir][0],
             self.tilepos[1] + MOVE_VECTORS[self.movedir][1]
         )
         self.rect.move_ip(MOVE_VECTORS_PIXELS[self.movedir])
+        self.last_move_dir = self.movedir
         if self.behind_segment != None:
             self.behind_segment.move()
             self.behind_segment.movedir = self.movedir
 
 
-class snake_head(snake_segment):
+class SnakeHead(snake_segment):
     def __init__(self, tilepos, movedir, segment_groups):
         snake_segment.__init__(self, tilepos, segment_groups, color=SNAKE_HEAD_COLOR, radius=SNAKE_HEAD_RADIUS)
         self.movedir = movedir
+        self.last_move_dir = movedir
         self.movecount = 0
 
     def update(self):
         self.move()
-        self.movecount = 0
+        self.movecount += 1
 
     def get_positions(self):
         seg = self
@@ -192,6 +178,8 @@ class KitchenSink:
 
 class Game():
     def __init__(self):
+        self.head = None
+        self.tail = None
         pygame.init()
 
     def reset(self):
@@ -211,7 +199,7 @@ class Game():
         column = SCREENSIZE[0] / TILE_SIZE[0]
         row = SCREENSIZE[1] / TILE_SIZE[1]
         self.grid = np.zeros((int(row), int(column)))
-        self.snake = snake_head(START_TILE, 'right', [self.snakegroup, self.all, self.takenupgroup])
+        self.snake = SnakeHead(START_TILE, 'right', [self.snakegroup, self.all, self.takenupgroup])
         self.snakeheadgroup.add(self.snake)
         self.head = self.snake
         self.tail = self.snake
@@ -233,12 +221,24 @@ class Game():
         self.clock = pygame.time.Clock()
         self.lose = False
 
-
+    # this function adds a segment at the end of the snake
     def add_segment(self):
-        self.snake.add_segment(self.tail)
+        # get tile_pos for new segment
+        x = self.tail.tilepos[0]
+        y = self.tail.tilepos[1]
+        if self.tail.last_move_dir == 'left':
+            x += 1
+        elif self.tail.last_move_dir == 'right':
+            x -= 1
+        elif self.tail.last_move_dir == 'up':
+            y += 1
+        elif self.tail.last_move_dir == 'down':
+            y -= 1
+        # set up new tail segment
+        self.tail.behind_segment = snake_segment((x, y), self.tail.segment_groups)
+        self.tail.behind_segment.movedir = self.tail.last_move_dir
         self.tail.behind_segment.front_segment = self.tail
         self.tail = self.tail.behind_segment
-
 
     def step(self, direction):
         currentmovedir = self.snake.movedir
@@ -280,17 +280,18 @@ class Game():
 
         BodyPositions = self.snake.get_positions()
 
-        # 2 is food
+        # 1 is food
         self.grid[self.currentfood.position[1] + 1, self.currentfood.position[0] + 1] = 1
 
         for i in range(0, len(BodyPositions)):
-            # 3 is body part
             position = BodyPositions[i]
             if i == 0:
-                # head
+                # 2 is head
                 self.grid[position[1] + 1, position[0] + 1] = 2
             else:
-                self.grid[position[1] + 1, position[0] + 1] = 3
+                if not (position[1] < 0 or position[0] < 0):
+                    # 3 is body part
+                    self.grid[position[1] + 1, position[0] + 1] = 3
 
         # checks out of bounds
         pos = self.snake.rect.topleft
@@ -308,7 +309,7 @@ class Game():
             self.lose = True
 
         # collisions
-        # head -> tail
+        # head -> body
         col = pygame.sprite.groupcollide(self.snakeheadgroup, self.snakegroup, False, False)
         for head in col:
             for body_part in col[head]:
@@ -335,7 +336,7 @@ class Game():
             pygame.display.flip()
             pygame.time.wait(2000)
 
-        return self.getKitchenSink()
+        return self.get_kitchen_sink()
 
     def render(self):
         # score
@@ -362,8 +363,8 @@ class Game():
         # waiting
         self.clock.tick(FPS)
         # print("\n", self.grid, "\n")
-        return self.getKitchenSink()
+        return self.get_kitchen_sink()
 
-    def getKitchenSink(self):
+    def get_kitchen_sink(self):
         return KitchenSink(self.snakegroup, self.snake, self.head, self.tail, self.currentfood, self.currentscore,
                            self.grid, self.lose)

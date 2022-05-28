@@ -47,7 +47,9 @@ def calculate_score(action, kitchen_sink):
     group_score, groups = get_open_groups(updated_grid)
 
     new_tail_pos = kitchen_sink.tail.front_segment.tilepos
-    head_with_tail_score = get_head_with_tail_score(updated_grid, groups, head, new_tail_pos)
+    old_tail_pos = kitchen_sink.tail.tilepos
+    head_with_tail_score = \
+        get_head_with_tail_score(updated_grid, groups, head, new_tail_pos, old_tail_pos)
 
     # double_path_score = get_double_path_score(action, updated_grid)
     double_path_score = 0
@@ -61,7 +63,7 @@ def calculate_score(action, kitchen_sink):
 
     variance = random.randint(0, 20)
 
-    return trapped_score + food_score + group_score + double_path_score + head_with_tail_score + variance, double_path_score < 0
+    return trapped_score + food_score + group_score + double_path_score + head_with_tail_score + variance, head_with_tail_score == 0
 
 
 def get_grid_number(coord, grid):
@@ -94,10 +96,11 @@ def set_number(grid, tile_pos, number):
     grid[tile_pos[1] + 1][tile_pos[0] + 1] = number
 
 
-def get_head_with_tail_score(grid, groups, head_pos, tail_pos):
+def get_head_with_tail_score(grid, groups, head_pos, tail_pos, old_tail_pos):
     head_groups = get_adjacent_groups(grid, groups, head_pos)
     tail_groups = get_adjacent_groups(grid, groups, tail_pos)
-    if len(head_groups & tail_groups) > 0:
+
+    if len(head_groups & tail_groups) > 0 or tuple(head_pos) == old_tail_pos:
         return HEAD_AND_TAIL_GROUP_REWARD
     return 0
 

@@ -33,8 +33,8 @@ def run_game():
                     action_scores.put((-1*score, (action, to_check)))
                 chosen_action = action_scores.get()
 
-            # if chosen_action[1][1]:
-            #     print('its happening!')
+            if chosen_action[1][1]:
+                print('its happening!')
 
             kitchen_sink = env.step(chosen_action[1][0])
 
