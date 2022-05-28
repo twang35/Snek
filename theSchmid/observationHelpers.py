@@ -100,7 +100,9 @@ def get_head_with_tail_score(grid, groups, head_pos, tail_pos, old_tail_pos):
     head_groups = get_adjacent_groups(grid, groups, head_pos)
     tail_groups = get_adjacent_groups(grid, groups, tail_pos)
 
-    if len(head_groups & tail_groups) > 0 or tuple(head_pos) == old_tail_pos:
+    if tuple(head_pos) == old_tail_pos:
+        return HEAD_AND_TAIL_GROUP_REWARD / 2
+    if len(head_groups & tail_groups) > 0:
         return HEAD_AND_TAIL_GROUP_REWARD
     return 0
 
