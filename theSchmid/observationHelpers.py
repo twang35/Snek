@@ -28,16 +28,16 @@ FAR_DIAGONALS = [[(-1, -1), (1, 1)], [(-1, 1), (1, -1)]]
 
 
 def calculate_score(action, kitchen_sink):
-    head = get_pos(action, kitchen_sink.snake.tilepos)
+    new_head = get_pos(action, kitchen_sink.snake.tilepos)
 
     # collides with walls
-    if head[0] < 0 or head[0] >= SCREENTILES[0] + 1 or head[1] < 0 or head[1] >= SCREENTILES[1] + 1:
+    if new_head[0] < 0 or new_head[0] >= SCREENTILES[0] + 1 or new_head[1] < 0 or new_head[1] >= SCREENTILES[1] + 1:
         return DEATH_REWARD, False
 
-    grid_number = get_grid_number(head, kitchen_sink.game_grid)
+    grid_number = get_grid_number(new_head, kitchen_sink.game_grid)
 
     # collides with body
-    if grid_number == 3:
+    if grid_number == 3 and not tuple(new_head) == kitchen_sink.tail.tilepos:
         return DEATH_REWARD, False
 
     # move on grid
@@ -49,7 +49,7 @@ def calculate_score(action, kitchen_sink):
     new_tail_pos = kitchen_sink.tail.front_segment.tilepos
     old_tail_pos = kitchen_sink.tail.tilepos
     head_with_tail_score = \
-        get_head_with_tail_score(updated_grid, groups, head, new_tail_pos, old_tail_pos)
+        get_head_with_tail_score(updated_grid, groups, new_head, new_tail_pos, old_tail_pos)
 
     # double_path_score = get_double_path_score(action, updated_grid)
     double_path_score = 0
@@ -59,7 +59,7 @@ def calculate_score(action, kitchen_sink):
     trapped_score = 0
 
     # food!
-    food_score = get_food_score(grid_number, head, kitchen_sink.current_food)
+    food_score = get_food_score(grid_number, new_head, kitchen_sink.current_food)
 
     variance = random.randint(0, 20)
 
