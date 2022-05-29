@@ -4,19 +4,23 @@ from Snake import *
 
 DEATH_REWARD = -20000000
 TRAPPED_REWARD = -1000000
-GROUP_REWARD = -5000
-DOUBLE_PATH_REWARD = -3000
+GROUP_REWARD = -500
+DOUBLE_PATH_REWARD = -1000
 FOOD_REWARD = 15000
 # 10: 39.1
 # 15: 48.8
-# 15: 73.1 * with groups (-1000) 59.4, 66.8
 # 15: 54.4 * with groups (-2000) 66.0
 # 15: 67.5 * with lanes  (-2000) 83.0, 95.4, 86.7
 # 15: 90.4 even food reward 90.6, 90.6 *136PR, 83.1
 MAX_SEARCH_DEPTH = 5
-# first perfect game: 249 but also first infinite loop
+# lucky high score: 249 but also first infinite loop
 # 161.1, 173.3, 148.4, 166.4, 188.1
 HEAD_AND_TAIL_GROUP_REWARD = 10000000
+# after bug fixes
+# score: steps
+# 238.6: 13928
+# first perfect game w/double_path_reward
+
 
 DIRECTIONS = ["up", "down", "left", "right"]
 TRANSFORM_MAP = {'left': {'across': (1, 0), 'diag': {(1, -1), (1, 1)}},
@@ -62,6 +66,7 @@ def calculate_score(action, kitchen_sink):
     food_score = get_food_score(grid_number, new_head, kitchen_sink.current_food)
 
     variance = random.randint(0, 20)
+    # variance = 0
 
     return trapped_score + food_score + group_score + double_path_score + head_with_tail_score + variance, head_with_tail_score == 0
 

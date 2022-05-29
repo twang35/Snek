@@ -12,6 +12,7 @@ max_moves = 69000
 
 def run_game():
     average_score = 0
+    average_steps = 0
     for _ in range(num_runs):
         env = Game()
         env.reset()
@@ -41,9 +42,11 @@ def run_game():
             if kitchen_sink.game_over or max_moves-1 == step:
                 print('Score: ', kitchen_sink.current_score, ' steps: ', step)
                 average_score += kitchen_sink.current_score
+                average_steps += step
                 break
 
     print('Average score: ', average_score / num_runs)
+    print('Average steps: ', average_steps / num_runs)
 
 
 if __name__ == "__main__":

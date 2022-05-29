@@ -271,7 +271,7 @@ class Game():
         # updates snake position
         self.all.update()
 
-        if self.currentfood == 'no food':
+        if self.currentfood == 'no food' and not self.perfect_game():
             self.currentfood = food(self.takenupgroup)
             self.foodgroup.add(self.currentfood)
             self.takenupgroup.add(self.currentfood)
@@ -333,17 +333,30 @@ class Game():
         self.current_step += 1
 
         # game over
-        if self.lose is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
+        if self.perfect_game():
             self.lose = True
             f = pygame.font.Font(None, 100)
-            failmessage = f.render('FAIL', True, (0, 0, 0))
-            failrect = failmessage.get_rect()
-            failrect.center = SCREENRECT.center
-            self.screen.blit(failmessage, failrect)
+            fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
+            fail_rect = fail_message.get_rect()
+            fail_rect.center = SCREENRECT.center
+            self.screen.blit(fail_message, fail_rect)
+            pygame.display.flip()
+            pygame.time.wait(5000)
+
+        elif self.lose is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
+            self.lose = True
+            f = pygame.font.Font(None, 100)
+            fail_message = f.render('FAIL', True, (0, 0, 0))
+            fail_rect = fail_message.get_rect()
+            fail_rect.center = SCREENRECT.center
+            self.screen.blit(fail_message, fail_rect)
             pygame.display.flip()
             pygame.time.wait(2000)
 
         return self.get_kitchen_sink()
+
+    def perfect_game(self):
+        return (self.currentscore + START_SEGMENTS + 1) == (SCREENTILES[0] * SCREENTILES[1])
 
     def render(self):
         # score
@@ -368,7 +381,8 @@ class Game():
         pygame.display.update(dirty)
 
         # waiting
-        self.clock.tick(FPS)
+        # self.clock.tick(FPS)
+
         # print("\n", self.grid, "\n")
         return self.get_kitchen_sink()
 

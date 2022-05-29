@@ -11,3 +11,5 @@
 # size of groups (groups of 1 are impossible to fix)
 # odd or even grid positions
 # number of steps
+# food in same group as tail
+
