@@ -39,7 +39,7 @@ def run_game():
             kitchen_sink = env.step(chosen_action[1][0])
 
             if kitchen_sink.game_over or max_moves-1 == step:
-                print('Score: ', kitchen_sink.current_score)
+                print('Score: ', kitchen_sink.current_score, ' steps: ', step)
                 average_score += kitchen_sink.current_score
                 break
 

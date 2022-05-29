@@ -9,5 +9,5 @@
 # size of snake
 # head and tail in same group
 # size of groups (groups of 1 are impossible to fix)
-#
-#
+# odd or even grid positions
+# number of steps

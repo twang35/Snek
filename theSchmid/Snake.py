@@ -32,6 +32,8 @@ SNAKE_HEAD_RADIUS = 13
 SNAKE_SEGMENT_RADIUS = 17
 FOOD_RADIUS = SNAKE_SEGMENT_RADIUS
 
+MAX_STEPS_BEFORE_STARVE = 1000
+
 CAPTION = 'MiniSnake'
 FPS = 15
 
@@ -180,6 +182,8 @@ class Game():
     def __init__(self):
         self.head = None
         self.tail = None
+        self.current_step = 0
+        self.lose = False
         pygame.init()
 
     def reset(self):
@@ -211,7 +215,8 @@ class Game():
         self.currentfood = 'no food'
 
         self.currentscore = 0
-        self.currentstep = 0
+        self.current_step = 0
+        self.last_food_step = 0
 
         # turn screen to white
         pygame.display.flip()
@@ -323,11 +328,13 @@ class Game():
             self.currentfood = 'no food'
             self.add_segment()
             self.currentscore += 1
+            self.last_food_step = self.current_step
 
-        self.currentstep += 1
+        self.current_step += 1
 
         # game over
-        if self.lose is True:
+        if self.lose is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
+            self.lose = True
             f = pygame.font.Font(None, 100)
             failmessage = f.render('FAIL', True, (0, 0, 0))
             failrect = failmessage.get_rect()
@@ -347,7 +354,7 @@ class Game():
         # steps
         d3 = self.screen.blit(self.bg, STEP_POS, pygame.Rect(STEP_POS, (50, 100)))
         f = pygame.font.Font(None, 12)
-        stepimage = f.render(STEP_PREFIX + str(self.currentstep), True, STEP_COLOR)
+        stepimage = f.render(STEP_PREFIX + str(self.current_step), True, STEP_COLOR)
         d4 = self.screen.blit(stepimage, STEP_POS)
 
         # drawing
