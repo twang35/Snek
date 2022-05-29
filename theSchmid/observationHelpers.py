@@ -16,10 +16,16 @@ MAX_SEARCH_DEPTH = 5
 # lucky high score: 249 but also first infinite loop
 # 161.1, 173.3, 148.4, 166.4, 188.1
 HEAD_AND_TAIL_GROUP_REWARD = 10000000
+FOOD_AND_TAIL_GROUP_REWARD = 10000
 # after bug fixes
 # score: steps
 # 238.6: 13928
-# first perfect game w/double_path_reward
+# first perfect game w/double_path
+# 248.6: 12926 w/food_and_tail_group and no variance and regular perfect games
+# 247.4: 12502 w/* and double_path
+# 243.1: 12667
+# 248.4: 12473
+# 247.0: 13018
 
 
 DIRECTIONS = ["up", "down", "left", "right"]
@@ -55,8 +61,10 @@ def calculate_score(action, kitchen_sink):
     head_with_tail_score = \
         get_head_with_tail_score(updated_grid, groups, new_head, new_tail_pos, old_tail_pos)
 
-    # double_path_score = get_double_path_score(action, updated_grid)
-    double_path_score = 0
+    food_with_tail_score = get_food_with_tail_score(updated_grid, groups, kitchen_sink.current_food, new_tail_pos)
+
+    double_path_score = get_double_path_score(action, updated_grid)
+    # double_path_score = 0
 
     # going to be trapped?
     # trapped_score = get_steps_til_trapped(action, kitchen_sink)
@@ -65,10 +73,16 @@ def calculate_score(action, kitchen_sink):
     # food!
     food_score = get_food_score(grid_number, new_head, kitchen_sink.current_food)
 
-    variance = random.randint(0, 20)
-    # variance = 0
+    # variance = random.randint(0, 20)
+    variance = 0
 
-    return trapped_score + food_score + group_score + double_path_score + head_with_tail_score + variance, head_with_tail_score == 0
+    return trapped_score \
+        + food_score + group_score \
+        + double_path_score \
+        + head_with_tail_score \
+        + food_with_tail_score \
+        + variance, \
+        head_with_tail_score == 0
 
 
 def get_grid_number(coord, grid):
@@ -105,10 +119,22 @@ def get_head_with_tail_score(grid, groups, head_pos, tail_pos, old_tail_pos):
     head_groups = get_adjacent_groups(grid, groups, head_pos)
     tail_groups = get_adjacent_groups(grid, groups, tail_pos)
 
+    # punishes following directly behind the tail. Would rather push bubbles around.
     if tuple(head_pos) == old_tail_pos:
         return HEAD_AND_TAIL_GROUP_REWARD / 2
     if len(head_groups & tail_groups) > 0:
         return HEAD_AND_TAIL_GROUP_REWARD
+    return 0
+
+
+def get_food_with_tail_score(grid, groups, current_food, tail_pos):
+    if hasattr(current_food, 'position'):
+        food_pos = current_food.position
+        food_groups = get_adjacent_groups(grid, groups, food_pos)
+        tail_groups = get_adjacent_groups(grid, groups, tail_pos)
+
+        if len(food_groups & tail_groups) > 0:
+            return FOOD_AND_TAIL_GROUP_REWARD
     return 0
 
 

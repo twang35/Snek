@@ -35,6 +35,7 @@ FOOD_RADIUS = SNAKE_SEGMENT_RADIUS
 MAX_STEPS_BEFORE_STARVE = 1000
 
 CAPTION = 'MiniSnake'
+SCORE_SLOW_THRESHOLD = 250
 FPS = 15
 
 MOVE_RATE = 1  # how many frame per move
@@ -335,7 +336,7 @@ class Game():
         # game over
         if self.perfect_game():
             self.lose = True
-            f = pygame.font.Font(None, 100)
+            f = pygame.font.Font(None, 25)
             fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
@@ -356,7 +357,7 @@ class Game():
         return self.get_kitchen_sink()
 
     def perfect_game(self):
-        return (self.currentscore + START_SEGMENTS + 1) == (SCREENTILES[0] * SCREENTILES[1])
+        return (self.currentscore + START_SEGMENTS + 1) == ((SCREENTILES[0]+1) * (SCREENTILES[1]+1))
 
     def render(self):
         # score
@@ -380,8 +381,9 @@ class Game():
         # updating screen
         pygame.display.update(dirty)
 
-        # waiting
-        # self.clock.tick(FPS)
+        # slow down when close to finished
+        if self.currentscore >= SCORE_SLOW_THRESHOLD:
+            self.clock.tick(FPS)
 
         # print("\n", self.grid, "\n")
         return self.get_kitchen_sink()

@@ -12,4 +12,5 @@
 # odd or even grid positions
 # number of steps
 # food in same group as tail
-
+# food in same group as head
+#   coordinate with double_path reward when head can't see food to keep a path clear?
