@@ -1,5 +1,5 @@
 from queue import PriorityQueue
-from time import sleep
+from time import sleep, time
 from observationHelpers import *
 
 
@@ -9,6 +9,8 @@ time_delay = 0.2
 num_runs = 10
 max_moves = 69000
 
+move_speed_interval = 500
+render_interval = 10
 
 def run_game():
     average_score = 0
@@ -17,12 +19,14 @@ def run_game():
         env = Game()
         env.reset()
         chosen_action = -1
+        start_time = time()
 
         for step in range(max_moves):
             pygame.event.get()
             if slow_mode:
                 sleep(time_delay)
-            kitchen_sink = env.render()
+            if step % render_interval == 0:
+                kitchen_sink = env.render()
 
             if chosen_action == -1:
                 # select random first action because grid is not yet rendered
@@ -38,6 +42,11 @@ def run_game():
                 print('its happening!')
 
             kitchen_sink = env.step(chosen_action[1][0])
+
+            if step % move_speed_interval == 0:
+                step_per_second = move_speed_interval / (time() - start_time)
+                print('Steps: {0}, Steps/sec: {1}'.format(step, step_per_second))
+                start_time = time()
 
             if kitchen_sink.game_over or max_moves-1 == step:
                 print('Score: ', kitchen_sink.current_score, ' steps: ', step)

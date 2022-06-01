@@ -11,7 +11,6 @@ TILE_SIZE = (10, 10)
 
 # number of grid of the screen
 SCREENTILES = (15, 15)
-# SCREENTILES = (4, 4)
 
 TILE_RECT = pygame.Rect(0, 0, TILE_SIZE[0], TILE_SIZE[1])
 SCREENSIZE = ((SCREENTILES[0] + 1) * TILE_SIZE[0], (SCREENTILES[1] + 1) * TILE_SIZE[1])
@@ -20,7 +19,7 @@ SCREENRECT = pygame.Rect(0, 0, SCREENSIZE[0], SCREENSIZE[1])
 # position of snake at start
 # START_TILE = (5, 5)
 START_TILE = (5, 3)
-# lenght of snake at start
+# length of snake at start
 START_SEGMENTS = 4
 # START_SEGMENTS = 20
 
@@ -262,7 +261,10 @@ class Game():
         if not currentmovedir == dontmove:
             self.snake.movedir = tomove
 
-        # update all sprites positions
+        # clearing
+        self.all.clear(self.screen, self.bg)
+
+        # updates snake position
         self.all.update()
 
         if self.currentfood == 'no food' and not self.perfect_game():
@@ -353,9 +355,6 @@ class Game():
         return (self.currentscore + START_SEGMENTS + 1) == ((SCREENTILES[0]+1) * (SCREENTILES[1]+1))
 
     def render(self):
-        # clearing
-        self.all.clear(self.screen, self.bg)
-
         # score
         d = self.screen.blit(self.bg, SCORE_POS, pygame.Rect(SCORE_POS, (50, 100)))
         f = pygame.font.Font(None, 12)
