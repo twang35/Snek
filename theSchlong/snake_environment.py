@@ -1,7 +1,4 @@
-import copy
 from abc import ABCMeta
-
-import numpy as np
 
 from Snake import *
 
@@ -28,8 +25,10 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         return BoundedArraySpec((), np.int32, minimum=0, maximum=3, name='action')
 
     def observation_spec(self):
-        # 0: manhattan distance to food
-        return BoundedArraySpec((1,), np.float32)
+        food_obs = 8                # closer to and on top of food in each direction
+        body_and_wall_obs = 1       # body and wall collisions
+        return BoundedArraySpec((food_obs
+                                 + body_and_wall_obs,), np.float32)
 
     def _reset(self):
         self._game.reset()

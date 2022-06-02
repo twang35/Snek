@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 import imageio
 import matplotlib.pyplot as plt
+import pyformulas as pf
 import numpy as np
 import PIL.Image
 import reverb
@@ -35,6 +36,23 @@ def compute_avg_return(environment, policy, num_episodes=10):
 
     avg_return = total_return / num_episodes
     return avg_return.numpy()[0]
+
+
+def display_progress(num_iterations, eval_interval, returns, screen):
+    fig = plt.figure()
+    iterations = range(0, num_iterations + 1, eval_interval)
+    plt.clf()
+    plt.plot(iterations, returns)
+    plt.ylabel('Average Return')
+    plt.xlabel('Iterations')
+    # plt.ylim(top=250)
+
+    fig.canvas.draw()
+
+    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    screen.update(image)
 
 
 def create_policy_eval_video(eval_py_env, eval_env, policy, filename, num_episodes=5, fps=30):

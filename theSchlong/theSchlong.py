@@ -19,7 +19,7 @@ from tf_agents.replay_buffers import reverb_utils
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
-num_iterations = 20000
+num_iterations = 200000
 
 initial_collect_steps = 1000
 collect_steps_per_iteration = 1
@@ -31,6 +31,7 @@ log_interval = 200
 
 num_eval_episodes = 10
 eval_interval = 1000
+display_progress_interval = eval_interval * 2
 
 env = SnakeEnvironment()
 env.reset()
@@ -163,8 +164,10 @@ collect_driver = py_driver.PyDriver(
     [rb_observer],
     max_steps=collect_steps_per_iteration)
 
+screen = pf.screen(np.zeros((480, 640)), 'Training results')
+
 print('Begin training:')
-for _ in range(num_iterations):
+for i in range(num_iterations):
     # Collect a few steps and save to replay buffer.
     time_step, _ = collect_driver.run(time_step)
 
@@ -182,14 +185,8 @@ for _ in range(num_iterations):
         print('step = {0}: avg_return = {1}'.format(step, avg_return))
         returns.append(avg_return)
 
-iterations = range(0, num_iterations + 1, eval_interval)
-plt.clf()
-plt.plot(iterations, returns)
-plt.ylabel('Average Return')
-plt.xlabel('Iterations')
-# plt.ylim(top=250)
-
-plt.show()
+    if step % display_progress_interval == 0:
+        display_progress(i+1, eval_interval, returns, screen)
 
 # todo: fix video creation by using the display surface
 # print(create_policy_eval_video(agent.policy, "trained-agent"))

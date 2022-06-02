@@ -1,74 +1,8 @@
-import pygame
 import random
 import numpy as np
 
+from snake_constants import *
 from state_helpers import *
-
-# ---------- constants ---------- #
-# screen that game appears on 0 or 1
-SCREEN_TO_DISPLAY = 0
-
-# size of each grid
-TILE_SIZE = (10, 10)
-
-# number of grid of the screen
-SCREENTILES = (15, 15)
-
-TILE_RECT = pygame.Rect(0, 0, TILE_SIZE[0], TILE_SIZE[1])
-SCREENSIZE = ((SCREENTILES[0] + 1) * TILE_SIZE[0], (SCREENTILES[1] + 1) * TILE_SIZE[1])
-SCREENRECT = pygame.Rect(0, 0, SCREENSIZE[0], SCREENSIZE[1])
-
-# position of snake at start
-# START_TILE = (5, 5)
-START_TILE = (5, 3)
-# length of snake at start
-START_SEGMENTS = 4
-# START_SEGMENTS = 20
-
-SNAKE_HEAD_RADIUS = 13
-SNAKE_SEGMENT_RADIUS = 17
-FOOD_RADIUS = SNAKE_SEGMENT_RADIUS
-
-MAX_STEPS_BEFORE_STARVE = 1000
-
-CAPTION = 'MiniSnake'
-SCORE_SLOW_THRESHOLD = 250
-FPS = 15
-
-MOVE_RATE = 1  # how many frame per move
-DIFFICULTY_INCREASE_RATE = 0
-MOVE_THRESHOLD = 1  # when moverate counts up to this the snake moves
-BLOCK_SPAWN_RATE = 2
-
-SCREENTILES = (
-    (SCREENSIZE[0] / TILE_SIZE[0]) - 1,
-    (SCREENSIZE[1] / TILE_SIZE[1]) - 1
-)
-
-BACKGROUND_COLOR = (255, 255, 255)
-SNAKE_HEAD_COLOR = (150, 0, 0)
-SNAKE_SEGMENT_COLOR = (255, 0, 0)
-FOOD_COLOR = (0, 255, 0)
-BLOCK_COLOR = (0, 0, 150)
-COLORKEY_COLOR = (255, 255, 0)
-
-SCORE_COLOR = (0, 0, 0)
-SCORE_POS = (20, 20)
-SCORE_PREFIX = 'Score: '
-STEP_COLOR = (0, 0, 0)
-STEP_POS = (20, 40)
-STEP_PREFIX = 'Steps: '
-
-MOVE_VECTORS = {'left': (-1, 0),
-                'right': (1, 0),
-                'up': (0, -1),
-                'down': (0, 1)
-                }
-MOVE_VECTORS_PIXELS = {'left': (-TILE_SIZE[0], 0),
-                       'right': (TILE_SIZE[0], 0),
-                       'up': (0, -TILE_SIZE[1]),
-                       'down': (0, TILE_SIZE[1])
-                       }
 
 
 # ----------- game objects ----------- #
@@ -169,6 +103,7 @@ class Game():
         # show screen
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
 
+        self.current_score = 0
         self.head = None
         self.tail = None
         self.current_step = 0
@@ -202,7 +137,7 @@ class Game():
         # weird but true
         self.currentfood = 'no food'
 
-        self.currentscore = 0
+        self.current_score = 0
         self.current_step = 0
         self.last_food_step = 0
 
@@ -215,10 +150,10 @@ class Game():
         self.perfect_game = False
 
     def get_observation(self):
-        observations = np.array([])
-        observations = np.append(observations, get_food_score(self.head.tilepos, self.currentfood))
-
-        return observations
+        observations = []
+        observations.extend(food_observations(self.grid, self.head.tilepos, self.tail.tilepos, self.currentfood))
+        observations.extend(body_and_wall_collisions(self.grid, self.head.tilepos))
+        return np.array(observations)
 
     # this function adds a segment at the end of the snake
     def add_segment(self):
@@ -322,7 +257,7 @@ class Game():
         if len(col) > 0:
             self.currentfood = 'no food'
             self.add_segment()
-            self.currentscore += 1
+            self.current_score += 1
             self.last_food_step = self.current_step
             reward = 1.0
 
@@ -339,11 +274,14 @@ class Game():
         return self.finished, reward
 
     def check_perfect_game(self):
-        return (self.currentscore + START_SEGMENTS + 1) == ((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1))
+        return (self.current_score + START_SEGMENTS + 1) == ((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1))
 
     def render(self):
         if not self.display:
             return
+
+        # unfreezes the window if stuck
+        pygame.event.pump()
 
         if self.perfect_game:
             f = pygame.font.Font(None, 25)
@@ -362,14 +300,14 @@ class Game():
             fail_rect.center = SCREENRECT.center
             self.screen.blit(fail_message, fail_rect)
             pygame.display.flip()
-            pygame.time.wait(200)
+            pygame.time.wait(10)
             return
 
         # score
         d = self.screen.blit(self.bg, SCORE_POS, pygame.Rect(SCORE_POS, (50, 100)))
         f = pygame.font.Font(None, 12)
-        scoreimage = f.render(SCORE_PREFIX + str(self.currentscore), True, SCORE_COLOR)
-        d2 = self.screen.blit(scoreimage, SCORE_POS)
+        score_image = f.render(SCORE_PREFIX + str(self.current_score), True, SCORE_COLOR)
+        d2 = self.screen.blit(score_image, SCORE_POS)
         # steps
         d3 = self.screen.blit(self.bg, STEP_POS, pygame.Rect(STEP_POS, (50, 100)))
         f = pygame.font.Font(None, 12)
@@ -387,5 +325,5 @@ class Game():
         pygame.display.update(dirty)
 
         # slow down when close to finished
-        if self.currentscore >= SCORE_SLOW_THRESHOLD:
+        if self.current_score >= SCORE_SLOW_THRESHOLD:
             self.clock.tick(FPS)
