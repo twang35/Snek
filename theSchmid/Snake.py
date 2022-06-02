@@ -219,7 +219,6 @@ class Game():
         pygame.display.flip()
 
         # mainloop
-        self.quit = False
         self.clock = pygame.time.Clock()
         self.lose = False
 
@@ -295,16 +294,12 @@ class Game():
         # checks out of bounds
         pos = self.snake.rect.topleft
         if pos[0] < 0:
-            quit.lose = True
             self.lose = True
         if pos[0] >= SCREENSIZE[0]:
-            quit.lose = True
             self.lose = True
         if pos[1] < 0:
-            quit.lose = True
             self.lose = True
         if pos[1] >= SCREENSIZE[1]:
-            quit.lose = True
             self.lose = True
 
         # collisions
@@ -314,7 +309,6 @@ class Game():
             for body_part in col[head]:
                 # self.snake is actually snake_head sprite (which resembles a LinkedList)
                 if not body_part is self.snake:
-                    self.quit = True
                     self.lose = True
         # head -> food
         col = pygame.sprite.groupcollide(self.snakeheadgroup, self.foodgroup, False, True)

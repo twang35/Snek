@@ -2,6 +2,8 @@ import pygame
 import random
 import numpy as np
 
+from state_helpers import *
+
 # ---------- constants ---------- #
 # screen that game appears on 0 or 1
 SCREEN_TO_DISPLAY = 0
@@ -162,29 +164,20 @@ class food(pygame.sprite.Sprite):
                 break  # no collision, food can go here
 
 
-class KitchenSink:
-    def __init__(self, snake_group, snake, head, tail, current_food, current_score, game_grid, game_over):
-        self.snake_group = snake_group
-        self.snake = snake
-        self.head = head
-        self.tail = tail
-        self.current_food = current_food
-        self.current_score = current_score
-        self.game_grid = game_grid
-        self.game_over = game_over
-
-
 class Game():
-    def __init__(self):
+    def __init__(self, display=True):
+        # show screen
+        self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
+
         self.head = None
         self.tail = None
         self.current_step = 0
-        self.lose = False
+        self.finished = False
+        self.perfect_game = False
+        self.display = display
         pygame.init()
 
     def reset(self):
-        # show screen
-        self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
         pygame.display.set_caption(CAPTION)
         self.bg = pygame.Surface(SCREENSIZE).convert()
         self.bg.fill(BACKGROUND_COLOR)
@@ -207,7 +200,6 @@ class Game():
             self.add_segment()
 
         # weird but true
-
         self.currentfood = 'no food'
 
         self.currentscore = 0
@@ -218,9 +210,15 @@ class Game():
         pygame.display.flip()
 
         # mainloop
-        self.quit = False
         self.clock = pygame.time.Clock()
-        self.lose = False
+        self.finished = False
+        self.perfect_game = False
+
+    def get_observation(self):
+        observations = np.array([])
+        observations = np.append(observations, get_food_score(self.head.tilepos, self.currentfood))
+
+        return observations
 
     # this function adds a segment at the end of the snake
     def add_segment(self):
@@ -242,6 +240,7 @@ class Game():
         self.tail = self.tail.behind_segment
 
     def step(self, direction):
+        reward = 0.0
         currentmovedir = self.snake.movedir
         if direction == "up":
             tomove = 'up'
@@ -267,7 +266,7 @@ class Game():
         # updates snake position
         self.all.update()
 
-        if self.currentfood == 'no food' and not self.perfect_game():
+        if self.currentfood == 'no food' and not self.perfect_game:
             self.currentfood = food(self.takenupgroup)
             self.foodgroup.add(self.currentfood)
             self.takenupgroup.add(self.currentfood)
@@ -297,17 +296,17 @@ class Game():
         # checks out of bounds
         pos = self.snake.rect.topleft
         if pos[0] < 0:
-            quit.lose = True
-            self.lose = True
+            self.finished = True
+            reward = -1.0
         if pos[0] >= SCREENSIZE[0]:
-            quit.lose = True
-            self.lose = True
+            self.finished = True
+            reward = -1.0
         if pos[1] < 0:
-            quit.lose = True
-            self.lose = True
+            self.finished = True
+            reward = -1.0
         if pos[1] >= SCREENSIZE[1]:
-            quit.lose = True
-            self.lose = True
+            self.finished = True
+            reward = -1.0
 
         # collisions
         # head -> body
@@ -316,8 +315,8 @@ class Game():
             for body_part in col[head]:
                 # self.snake is actually snake_head sprite (which resembles a LinkedList)
                 if not body_part is self.snake:
-                    self.quit = True
-                    self.lose = True
+                    self.finished = True
+                    reward = -1.0
         # head -> food
         col = pygame.sprite.groupcollide(self.snakeheadgroup, self.foodgroup, False, True)
         if len(col) > 0:
@@ -325,12 +324,28 @@ class Game():
             self.add_segment()
             self.currentscore += 1
             self.last_food_step = self.current_step
+            reward = 1.0
 
         self.current_step += 1
 
         # game over
-        if self.perfect_game():
-            self.lose = True
+        if self.check_perfect_game():
+            self.finished = True
+            self.perfect_game = True
+
+        elif self.finished is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
+            self.finished = True
+
+        return self.finished, reward
+
+    def check_perfect_game(self):
+        return (self.currentscore + START_SEGMENTS + 1) == ((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1))
+
+    def render(self):
+        if not self.display:
+            return
+
+        if self.perfect_game:
             f = pygame.font.Font(None, 25)
             fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
@@ -338,23 +353,18 @@ class Game():
             self.screen.blit(fail_message, fail_rect)
             pygame.display.flip()
             pygame.time.wait(5000)
+            return
 
-        elif self.lose is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
-            self.lose = True
+        if self.finished:
             f = pygame.font.Font(None, 100)
             fail_message = f.render('FAIL', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
             self.screen.blit(fail_message, fail_rect)
             pygame.display.flip()
-            pygame.time.wait(2000)
+            pygame.time.wait(200)
+            return
 
-        return self.get_kitchen_sink()
-
-    def perfect_game(self):
-        return (self.currentscore + START_SEGMENTS + 1) == ((SCREENTILES[0]+1) * (SCREENTILES[1]+1))
-
-    def render(self):
         # score
         d = self.screen.blit(self.bg, SCORE_POS, pygame.Rect(SCORE_POS, (50, 100)))
         f = pygame.font.Font(None, 12)
@@ -379,10 +389,3 @@ class Game():
         # slow down when close to finished
         if self.currentscore >= SCORE_SLOW_THRESHOLD:
             self.clock.tick(FPS)
-
-        # print("\n", self.grid, "\n")
-        return self.get_kitchen_sink()
-
-    def get_kitchen_sink(self):
-        return KitchenSink(self.snakegroup, self.snake, self.head, self.tail, self.currentfood, self.currentscore,
-                           self.grid, self.lose)
