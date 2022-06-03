@@ -6,7 +6,7 @@ from snake_constants import *
 
 
 # Returns moving closer and on food for each direction.
-# First number is 1 or 0 for closer. Second number is 1 or 0 for on top of food.
+# First number is 1 or 0 for closer or not. Second number is 1 or 0 for on top of food or not.
 def food_observations(grid, head_pos, tail_pos, current_food):
     if current_food == 'no food':
         return [0, 0, 0, 0, 0, 0, 0, 0]
@@ -15,13 +15,12 @@ def food_observations(grid, head_pos, tail_pos, current_food):
     observations = []
 
     for action in DIRECTIONS:
-        new_grid = update_grid(action, head_pos, tail_pos, copy.deepcopy(grid))
         new_head_pos = get_pos(action, head_pos)
-        grid_value = get_grid_value(new_head_pos, new_grid)
+        grid_value = get_grid_value(new_head_pos, grid)
         if grid_value == 1:
             # on top of food
             observations.extend([1, 1])
-        elif grid_value == 0:
+        elif grid_value == 0 or new_head_pos == tail_pos:
             if distance_to_food(new_head_pos, food_pos) < starting_distance:
                 # closer to food
                 observations.extend([1, 0])
@@ -31,6 +30,20 @@ def food_observations(grid, head_pos, tail_pos, current_food):
         else:
             # hit a wall or body
             observations.extend([0, 0])
+
+    return observations
+
+
+# Returns 0 for no collision, 1 for collision in each direction
+def body_and_wall_collisions(grid, head_pos, tail_pos):
+    observations = []
+    for action in DIRECTIONS:
+        new_head_pos = get_pos(action, head_pos)
+        grid_value = get_grid_value(new_head_pos, grid)
+        if grid_value == 1 or grid_value == 0 or new_head_pos == tail_pos:
+            observations.extend([0])
+        else:
+            observations.extend([1])
 
     return observations
 
@@ -66,8 +79,4 @@ def get_grid_value(tile_pos, grid):
 
 
 def get_pos(action, tile_pos):
-    return np.add(tile_pos, MOVE_VECTORS[action])
-
-
-def body_and_wall_collisions(grid, head_pos):
-    return [0]
+    return tuple(np.add(tile_pos, MOVE_VECTORS[action]))

@@ -26,7 +26,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
 
     def observation_spec(self):
         food_obs = 8                # closer to and on top of food in each direction
-        body_and_wall_obs = 1       # body and wall collisions
+        body_and_wall_obs = 4       # body and wall collisions
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs,), np.float32)
 

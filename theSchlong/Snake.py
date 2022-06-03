@@ -152,7 +152,7 @@ class Game():
     def get_observation(self):
         observations = []
         observations.extend(food_observations(self.grid, self.head.tilepos, self.tail.tilepos, self.currentfood))
-        observations.extend(body_and_wall_collisions(self.grid, self.head.tilepos))
+        observations.extend(body_and_wall_collisions(self.grid, self.head.tilepos, self.tail.tilepos))
         return np.array(observations)
 
     # this function adds a segment at the end of the snake
@@ -175,6 +175,11 @@ class Game():
         self.tail = self.tail.behind_segment
 
     def step(self, direction):
+        if self.currentfood != 'no food' and self.current_score < 30:
+            old_moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
+        else:
+            old_moves_to_food = 0
+
         reward = 0.0
         currentmovedir = self.snake.movedir
         if direction == "up":
@@ -232,16 +237,16 @@ class Game():
         pos = self.snake.rect.topleft
         if pos[0] < 0:
             self.finished = True
-            reward = -1.0
+            reward = DEATH_REWARD
         if pos[0] >= SCREENSIZE[0]:
             self.finished = True
-            reward = -1.0
+            reward = DEATH_REWARD
         if pos[1] < 0:
             self.finished = True
-            reward = -1.0
+            reward = DEATH_REWARD
         if pos[1] >= SCREENSIZE[1]:
             self.finished = True
-            reward = -1.0
+            reward = DEATH_REWARD
 
         # collisions
         # head -> body
@@ -251,7 +256,7 @@ class Game():
                 # self.snake is actually snake_head sprite (which resembles a LinkedList)
                 if not body_part is self.snake:
                     self.finished = True
-                    reward = -1.0
+                    reward = DEATH_REWARD
         # head -> food
         col = pygame.sprite.groupcollide(self.snakeheadgroup, self.foodgroup, False, True)
         if len(col) > 0:
@@ -259,7 +264,7 @@ class Game():
             self.add_segment()
             self.current_score += 1
             self.last_food_step = self.current_step
-            reward = 1.0
+            reward = FOOD_REWARD
 
         self.current_step += 1
 
@@ -270,6 +275,16 @@ class Game():
 
         elif self.finished is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
             self.finished = True
+
+        if self.currentfood != 'no food' and self.current_score < 30:
+            moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
+            if moves_to_food < old_moves_to_food:
+                reward += FOOD_DISTANCE_REWARD
+            else:
+                reward -= FOOD_DISTANCE_REWARD
+            # reward += (GRID_LENGTH - moves_to_food)/50
+        if self.current_score > 30:
+            print('no way, the score is more than 30...... this is going to blow up my console')
 
         return self.finished, reward
 
@@ -295,7 +310,7 @@ class Game():
 
         if self.finished:
             f = pygame.font.Font(None, 100)
-            fail_message = f.render('FAIL', True, (0, 0, 0))
+            fail_message = f.render('DED', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
             self.screen.blit(fail_message, fail_rect)

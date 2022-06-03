@@ -3,7 +3,8 @@ from __future__ import absolute_import, division, print_function
 from snake_environment import SnakeEnvironment
 from under_the_hood import *
 
-import matplotlib.pyplot as plt
+from time import time
+
 import reverb
 
 import tensorflow as tf
@@ -19,25 +20,30 @@ from tf_agents.replay_buffers import reverb_utils
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
-num_iterations = 200000
+num_iterations = 100000000  # 100,000,000
 
-initial_collect_steps = 1000
+initial_collect_steps = 5000
 collect_steps_per_iteration = 1
-replay_buffer_max_length = 100000
+replay_buffer_max_length = 1000000
 
 batch_size = 64
+# batch_size = 128
 learning_rate = 1e-3
-log_interval = 200
+# learning_rate = 0.5
+epsilon_greedy = 0.1
+discount = 0.99
+display_training = True
 
+log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
-display_progress_interval = eval_interval * 2
+display_progress_interval = eval_interval
 
 env = SnakeEnvironment()
 env.reset()
 
-train_py_env = SnakeEnvironment(display=False)
-eval_py_env = SnakeEnvironment(display=True)
+train_py_env = SnakeEnvironment(discount=discount, display=display_training)
+eval_py_env = SnakeEnvironment(discount=discount, display=True)
 
 train_py_env.reset()
 eval_py_env.reset()
@@ -46,6 +52,7 @@ train_env = tf_py_environment.TFPyEnvironment(train_py_env)
 eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 
 fc_layer_params = (100, 50)
+# fc_layer_params = (20, 10)
 action_tensor_spec = tensor_spec.from_spec(env.action_spec())
 num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
 
@@ -80,6 +87,7 @@ agent = dqn_agent.DqnAgent(
     train_env.time_step_spec(),
     train_env.action_spec(),
     q_network=q_net,
+    epsilon_greedy=epsilon_greedy,
     optimizer=optimizer,
     td_errors_loss_fn=common.element_wise_squared_loss,
     train_step_counter=train_step_counter)
@@ -91,8 +99,6 @@ collect_policy = agent.collect_policy
 
 random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(),
                                                 train_env.action_spec())
-
-# print(compute_avg_return(eval_env, random_policy, num_eval_episodes))
 
 # Replay buffer
 
@@ -167,6 +173,7 @@ collect_driver = py_driver.PyDriver(
 screen = pf.screen(np.zeros((480, 640)), 'Training results')
 
 print('Begin training:')
+start_time = time()
 for i in range(num_iterations):
     # Collect a few steps and save to replay buffer.
     time_step, _ = collect_driver.run(time_step)
@@ -178,7 +185,9 @@ for i in range(num_iterations):
     step = agent.train_step_counter.numpy()
 
     if step % log_interval == 0:
-        print('step = {0}: loss = {1}'.format(step, train_loss))
+        steps_per_second = log_interval / (time() - start_time)
+        print('step = {0}: loss = {1}, steps/second = {2}'.format(step, train_loss, steps_per_second))
+        start_time = time()
 
     if step % eval_interval == 0:
         avg_return = compute_avg_return(eval_env, agent.policy, num_eval_episodes)

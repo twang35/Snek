@@ -53,6 +53,7 @@ def display_progress(num_iterations, eval_interval, returns, screen):
     image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
     screen.update(image)
+    plt.close(fig)
 
 
 def create_policy_eval_video(eval_py_env, eval_env, policy, filename, num_episodes=5, fps=30):
