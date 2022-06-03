@@ -276,15 +276,13 @@ class Game():
         elif self.finished is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
             self.finished = True
 
-        if self.currentfood != 'no food' and self.current_score < 30:
+        if self.currentfood != 'no food':
             moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
             if moves_to_food < old_moves_to_food:
                 reward += FOOD_DISTANCE_REWARD
             else:
                 reward -= FOOD_DISTANCE_REWARD
             # reward += (GRID_LENGTH - moves_to_food)/50
-        if self.current_score > 30:
-            print('no way, the score is more than 30...... this is going to blow up my console')
 
         return self.finished, reward
 

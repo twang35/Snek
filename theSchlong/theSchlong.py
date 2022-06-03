@@ -22,25 +22,24 @@ from tf_agents.utils import common
 
 num_iterations = 100000000  # 100,000,000
 
-initial_collect_steps = 5000
+initial_collect_steps = 1000
 collect_steps_per_iteration = 1
-replay_buffer_max_length = 1000000
+replay_buffer_max_length = 100000
 
+learning_rate = 1e-5
+# learning_rate = 5e-2
+
+epsilon_greedy = 0.1
 batch_size = 64
 # batch_size = 128
-learning_rate = 1e-3
-# learning_rate = 0.5
-epsilon_greedy = 0.1
-discount = 0.99
+# discount = 1.0
+discount = 1.0
 display_training = True
 
 log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
 display_progress_interval = eval_interval
-
-env = SnakeEnvironment()
-env.reset()
 
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
 eval_py_env = SnakeEnvironment(discount=discount, display=True)
@@ -53,7 +52,7 @@ eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 
 fc_layer_params = (100, 50)
 # fc_layer_params = (20, 10)
-action_tensor_spec = tensor_spec.from_spec(env.action_spec())
+action_tensor_spec = tensor_spec.from_spec(train_py_env.action_spec())
 num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
 
 
