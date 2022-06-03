@@ -26,8 +26,12 @@ initial_collect_steps = 1000
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 100000
 
-learning_rate = 1e-5
-# learning_rate = 5e-2
+# Theory: this runaway loss that then leads to poor returns is due to rewards being so largely different
+# 1e-4: runaway loss at 2k
+# 5e-5: immediately learned, but then runaway loss at 4k
+# 2e-5: learned slowly, but fighting loss at 12k, runaway at 15k
+# 1e-5: very slow learning, still stuck at bottom at 20k
+learning_rate = 2e-5
 
 epsilon_greedy = 0.1
 batch_size = 64
