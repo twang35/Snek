@@ -5,11 +5,28 @@ import numpy as np
 from snake_constants import *
 
 
+def get_observations(old_grid,
+                     head_pos,
+                     tail_pos,
+                     current_food,
+                     current_step,
+                     last_food_step,
+                     snake_len):
+    observations = []
+    observations.extend(food_observations(old_grid, head_pos, tail_pos, current_food))
+    observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos))
+    observations.extend(head_with_tail(old_grid, head_pos, tail_pos))
+    observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
+    return observations
+
+
 # Returns moving closer and on food for each direction.
-# First number is 1 or 0 for closer or not. Second number is 1 or 0 for on top of food or not.
+# First number is 1 or 0 for closer or not
+# Second number is 1 or 0 for on top of food or not
+# Third number is distance to food
 def food_observations(grid, head_pos, tail_pos, current_food):
     if current_food == 'no food':
-        return [0, 0, 0, 0, 0, 0, 0, 0]
+        return [0, 0, 0, 0, 0, 0, 0, 0, GRID_LENGTH, GRID_LENGTH, GRID_LENGTH, GRID_LENGTH]
     food_pos = current_food.position
     starting_distance = distance_to_food(head_pos, food_pos)
     observations = []
@@ -17,19 +34,20 @@ def food_observations(grid, head_pos, tail_pos, current_food):
     for action in DIRECTIONS:
         new_head_pos = get_pos(action, head_pos)
         grid_value = get_grid_value(new_head_pos, grid)
+        to_food_steps = distance_to_food(new_head_pos, food_pos)
         if grid_value == 1:
             # on top of food
-            observations.extend([1, 1])
+            observations.extend([1, 1, 0])
         elif grid_value == 0 or new_head_pos == tail_pos:
-            if distance_to_food(new_head_pos, food_pos) < starting_distance:
+            if to_food_steps < starting_distance:
                 # closer to food
-                observations.extend([1, 0])
+                observations.extend([1, 0, to_food_steps])
             else:
                 # further away from food
-                observations.extend([0, 0])
+                observations.extend([0, 0, to_food_steps])
         else:
             # hit a wall or body
-            observations.extend([0, 0])
+            observations.extend([0, 0, to_food_steps])
 
     return observations
 
@@ -46,6 +64,88 @@ def body_and_wall_collisions(grid, head_pos, tail_pos):
             observations.extend([1])
 
     return observations
+
+
+# Returns 1 for with tail or 0 for no tail groups in each direction
+def head_with_tail(old_grid, head_pos, tail_pos):
+    observations = []
+    for action in DIRECTIONS:
+        grid = update_grid(action, head_pos, tail_pos, copy.deepcopy(old_grid))
+        new_head_pos = get_pos(action, head_pos)
+
+        groups = count_groups(grid)
+
+        head_groups = get_adjacent_groups(grid, groups, new_head_pos)
+        tail_groups = get_adjacent_groups(grid, groups, tail_pos)
+
+        if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tail_pos:
+            observations.extend([1])
+        else:
+            observations.extend([0])
+
+    return observations
+
+
+# Returns number of remaining steps until starving to death
+def steps_until_starve(current_step, last_food_step, snake_len):
+    return [max(100, (snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER)) - (current_step - last_food_step)]
+
+
+def count_groups(grid):
+    remaining_spaces = set()
+    # maybe groups is not needed? or big groups are ok?
+    groups = []
+
+    for i in range(grid.shape[0] - 1):
+        for j in range(grid.shape[1] - 1):
+            # if is 0, add to remaining_spaces.
+            if is_open((i, j), grid):
+                remaining_spaces.add((i, j))
+
+    # for each grid element, recurse and try to connect
+    while len(remaining_spaces) > 0:
+        groups.append(set())
+        populate_group(groups[-1], remaining_spaces.pop(), grid, remaining_spaces)
+
+    return groups
+
+
+def populate_group(group_set, tile_pos, grid, remaining_spaces):
+    group_set.add((tile_pos[0], tile_pos[1]))
+
+    for action in DIRECTIONS:
+        new_tile_pos = get_pos(action, tile_pos)
+        pos_tuple = (new_tile_pos[0], new_tile_pos[1])
+
+        if pos_tuple in remaining_spaces and is_open(new_tile_pos, grid):
+            remaining_spaces.remove(pos_tuple)
+            populate_group(group_set, new_tile_pos, grid, remaining_spaces)
+
+
+def is_open(tile_pos, grid):
+    grid_num = get_grid_number(tile_pos, grid)
+    return grid_num == 0 or grid_num == 1
+
+
+def get_adjacent_groups(grid, groups, tile_pos):
+    group_set = set()
+    for direction in DIRECTIONS:
+        direction_pos = get_pos(direction, tile_pos)
+        grid_number = get_grid_number(direction_pos, grid)
+        if grid_number == 0 or grid_number == 1:
+            for i in range(len(groups)):
+                if tuple(direction_pos) in groups[i]:
+                    group_set.add(i)
+
+    return group_set
+
+
+def get_grid_number(coord, grid):
+    if coord[0] > SCREENTILES[0] + 1 or coord[1] > SCREENTILES[1] + 1:
+        return 4
+    if coord[0] < 0 or coord[1] < 0:
+        return 4
+    return grid[coord[1] + 1][coord[0] + 1]
 
 
 def distance_to_food(start_pos, food_pos):

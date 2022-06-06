@@ -99,7 +99,9 @@ class food(pygame.sprite.Sprite):
 
 
 class Game():
-    def __init__(self, display=True):
+    def __init__(self, display=True, limit_fps=False):
+        self.display = display
+        self.limit_fps = limit_fps
         # show screen
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
 
@@ -107,9 +109,11 @@ class Game():
         self.head = None
         self.tail = None
         self.current_step = 0
+        self.last_food_step = 0
+
         self.finished = False
+        self.starved = False
         self.perfect_game = False
-        self.display = display
         pygame.init()
 
     def reset(self):
@@ -147,13 +151,17 @@ class Game():
         # mainloop
         self.clock = pygame.time.Clock()
         self.finished = False
+        self.starved = False
         self.perfect_game = False
 
     def get_observation(self):
-        observations = []
-        observations.extend(food_observations(self.grid, self.head.tilepos, self.tail.tilepos, self.currentfood))
-        observations.extend(body_and_wall_collisions(self.grid, self.head.tilepos, self.tail.tilepos))
-        return np.array(observations)
+        return np.array(get_observations(self.grid,
+                                         self.head.tilepos,
+                                         self.tail.tilepos,
+                                         self.currentfood,
+                                         self.current_step,
+                                         self.last_food_step,
+                                         len(self.snakegroup)))
 
     # this function adds a segment at the end of the snake
     def add_segment(self):
@@ -175,7 +183,7 @@ class Game():
         self.tail = self.tail.behind_segment
 
     def step(self, direction):
-        if self.currentfood != 'no food' and self.current_score < 30:
+        if self.currentfood != 'no food':
             old_moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
         else:
             old_moves_to_food = 0
@@ -273,15 +281,19 @@ class Game():
             self.finished = True
             self.perfect_game = True
 
-        elif self.finished is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
+        elif not self.finished and steps_until_starve(self.current_step,
+                                                      self.last_food_step,
+                                                      len(self.snakegroup))[0] <= 0:
             self.finished = True
+            self.starved = True
+            reward = STARVE_REWARD
 
-        if self.currentfood != 'no food':
-            moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
-            if moves_to_food < old_moves_to_food:
-                reward += FOOD_DISTANCE_REWARD
-            else:
-                reward -= FOOD_DISTANCE_REWARD
+        # if self.currentfood != 'no food':
+        #     moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
+        #     if moves_to_food < old_moves_to_food:
+        #         reward += FOOD_DISTANCE_REWARD
+        #     else:
+        #         reward -= FOOD_DISTANCE_REWARD
             # reward += (GRID_LENGTH - moves_to_food)/50
 
         return self.finished, reward
@@ -297,6 +309,7 @@ class Game():
         pygame.event.pump()
 
         if self.perfect_game:
+            print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111!!!!!!!!')
             f = pygame.font.Font(None, 25)
             fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
@@ -307,8 +320,13 @@ class Game():
             return
 
         if self.finished:
-            f = pygame.font.Font(None, 100)
-            fail_message = f.render('DED', True, (0, 0, 0))
+            if self.starved:
+                f = pygame.font.Font(None, 60)
+                death_reason = 'NO FUD'
+            else:
+                death_reason = 'DED'
+                f = pygame.font.Font(None, 100)
+            fail_message = f.render(death_reason, True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
             self.screen.blit(fail_message, fail_rect)
@@ -337,6 +355,9 @@ class Game():
         # updating screen
         pygame.display.update(dirty)
 
+        if self.limit_fps:
+            self.clock.tick(FPS_LIMIT)
+
         # slow down when close to finished
         if self.current_score >= SCORE_SLOW_THRESHOLD:
-            self.clock.tick(FPS)
+            self.clock.tick(SCORE_THRESHOLD_FPS)

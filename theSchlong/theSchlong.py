@@ -20,33 +20,36 @@ from tf_agents.replay_buffers import reverb_utils
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
-num_iterations = 100000000  # 100,000,000
+num_iterations = 1000000000  # 1,000,000,000
 
-initial_collect_steps = 1000
+initial_collect_steps = 100
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 100000
-
-# Theory: this runaway loss that then leads to poor returns is due to rewards being so largely different
-# 1e-4: runaway loss at 2k
-# 5e-5: immediately learned, but then runaway loss at 4k
-# 2e-5: learned slowly, but fighting loss at 12k, runaway at 15k
-# 1e-5: very slow learning, still stuck at bottom at 20k
-learning_rate = 2e-5
-
-epsilon_greedy = 0.1
-batch_size = 64
-# batch_size = 128
-# discount = 1.0
-discount = 1.0
-display_training = True
 
 log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
 display_progress_interval = eval_interval
 
+# 5e-5: -1 at 10k, slowly stops dying
+# 1e-5: -8 at 10k, consistently improving, -4 at 25k dying by moving towards food
+#       -3 at 35k still dying too often with walls
+learning_rate = 5e-5  # next 5e-5
+
+epsilon_greedy = 0.1  # actually set in get_updated_epsilon
+# batch_size = 64
+batch_size = 256
+# discount = 1.0
+discount = 0.99
+# agent_target_update_period = 1
+agent_target_update_period = log_interval * 2
+display_training = False
+display_eval = True
+# eval_limit_fps = True
+eval_limit_fps = False
+
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
-eval_py_env = SnakeEnvironment(discount=discount, display=True)
+eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps)
 
 train_py_env.reset()
 eval_py_env.reset()
@@ -54,8 +57,8 @@ eval_py_env.reset()
 train_env = tf_py_environment.TFPyEnvironment(train_py_env)
 eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 
+# fc_layer_params = (100, 50)
 fc_layer_params = (100, 50)
-# fc_layer_params = (20, 10)
 action_tensor_spec = tensor_spec.from_spec(train_py_env.action_spec())
 num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
 
@@ -79,21 +82,20 @@ q_values_layer = tf.keras.layers.Dense(
     activation=None,
     kernel_initializer=tf.keras.initializers.RandomUniform(
         minval=-0.03, maxval=0.03),
-    bias_initializer=tf.keras.initializers.Constant(-0.2))
+    # bias_initializer=tf.keras.initializers.Constant(-0.2))
+    bias_initializer=tf.keras.initializers.Constant(0.0))
 q_net = sequential.Sequential(dense_layers + [q_values_layer])
-
-optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
-train_step_counter = tf.Variable(0)
 
 agent = dqn_agent.DqnAgent(
     train_env.time_step_spec(),
     train_env.action_spec(),
     q_network=q_net,
-    epsilon_greedy=epsilon_greedy,
-    optimizer=optimizer,
-    td_errors_loss_fn=common.element_wise_squared_loss,
-    train_step_counter=train_step_counter)
+    epsilon_greedy=train_py_env.get_updated_epsilon,
+    optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+    # td_errors_loss_fn=common.element_wise_squared_loss,
+    td_errors_loss_fn=common.element_wise_huber_loss,
+    target_update_period=agent_target_update_period,
+    train_step_counter=tf.Variable(0))
 
 agent.initialize()
 
@@ -112,7 +114,7 @@ replay_buffer_signature = tensor_spec.add_outer_dim(replay_buffer_signature)
 table = reverb.Table(
     table_name,
     max_size=replay_buffer_max_length,
-    sampler=reverb.selectors.Uniform(),
+    sampler=reverb.selectors.Prioritized(priority_exponent=0.8),
     remover=reverb.selectors.Fifo(),
     rate_limiter=reverb.rate_limiters.MinSize(1),
     signature=replay_buffer_signature
@@ -194,8 +196,11 @@ for i in range(num_iterations):
 
     if step % eval_interval == 0:
         avg_return = compute_avg_return(eval_env, agent.policy, num_eval_episodes)
+        print('train_py_env high score: ', train_py_env.high_score)
         print('step = {0}: avg_return = {1}'.format(step, avg_return))
         returns.append(avg_return)
+        # restart time because compute_avg_return() takes a while and messes up the timing
+        start_time = time()
 
     if step % display_progress_interval == 0:
         display_progress(i+1, eval_interval, returns, screen)
