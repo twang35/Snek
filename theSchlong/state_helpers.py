@@ -26,7 +26,7 @@ def get_observations(old_grid,
 # Third number is distance to food
 def food_observations(grid, head_pos, tail_pos, current_food):
     if current_food == 'no food':
-        return [0, 0, 0, 0, 0, 0, 0, 0, GRID_LENGTH, GRID_LENGTH, GRID_LENGTH, GRID_LENGTH]
+        return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     food_pos = current_food.position
     starting_distance = distance_to_food(head_pos, food_pos)
     observations = []

@@ -215,7 +215,7 @@ class Game():
         self.all.update()
 
         if self.currentfood == 'no food' and not self.perfect_game:
-            self.currentfood = food(self.takenupgroup)
+            self.currentfood = food(self.takenupgroup)  # check that score was updated
             self.foodgroup.add(self.currentfood)
             self.takenupgroup.add(self.currentfood)
             self.all.add(self.currentfood)
@@ -268,7 +268,7 @@ class Game():
         # head -> food
         col = pygame.sprite.groupcollide(self.snakeheadgroup, self.foodgroup, False, True)
         if len(col) > 0:
-            self.currentfood = 'no food'
+            self.currentfood = 'no food'  # check that score was updated and persists
             self.add_segment()
             self.current_score += 1
             self.last_food_step = self.current_step

@@ -24,17 +24,22 @@ num_iterations = 1000000000  # 1,000,000,000
 
 initial_collect_steps = 100
 collect_steps_per_iteration = 1
-replay_buffer_max_length = 100000
+replay_buffer_max_length = 10000
 
 log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
 display_progress_interval = eval_interval
 
-# 5e-5: -1 at 10k, slowly stops dying
-# 1e-5: -8 at 10k, consistently improving, -4 at 25k dying by moving towards food
-#       -3 at 35k still dying too often with walls
-learning_rate = 5e-5  # next 5e-5
+# lr: avg return: steps
+# 1e-3: lr too high, learns then forgets, stuck at -9: 30k
+# 1e-4: -7: 10k, jagged learning, but too high lr, -5: 20k, -4: 30k, -5: 40k, -6: 50k
+# 5e-5: -1:  10k, slowly stops dying
+#       -7: 10k, lr might be too high?
+# 1e-5: -9: 10k, more consistent learning but slow, -7: 14k, -5: 20k, -3: 24k, -1: 55k
+#     : -8: 10k, consistent learning but slow, -4: 20k, -2: 30k, -1: 40k, -3: 50k
+# 1e-6: -10: 10k, lr too low, -10 at 20k and 30k
+learning_rate = 1e-5  # next 5e-6
 
 epsilon_greedy = 0.1  # actually set in get_updated_epsilon
 # batch_size = 64
@@ -42,8 +47,9 @@ batch_size = 256
 # discount = 1.0
 discount = 0.99
 # agent_target_update_period = 1
-agent_target_update_period = log_interval * 2
-display_training = False
+agent_target_update_period = 4
+# display_training = False
+display_training = True
 display_eval = True
 # eval_limit_fps = True
 eval_limit_fps = False
@@ -135,7 +141,6 @@ rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
     sequence_length=2
 )
 
-# get some random play for the replay buffer
 print('Random play to populate replay buffer')
 py_driver.PyDriver(
     train_py_env,
@@ -171,7 +176,7 @@ time_step = train_py_env.reset()
 collect_driver = py_driver.PyDriver(
     train_py_env,
     py_tf_eager_policy.PyTFEagerPolicy(
-        agent.collect_policy, use_tf_function=True),
+        agent.collect_policy, use_tf_function=False),
     [rb_observer],
     max_steps=collect_steps_per_iteration)
 
@@ -181,6 +186,7 @@ print('Begin training:')
 start_time = time()
 for i in range(num_iterations):
     # Collect a few steps and save to replay buffer.
+    # To view q_values, breakpoint at line 160 in tf_agents/policies/q_policy.py
     time_step, _ = collect_driver.run(time_step)
 
     # Sample a batch of data from the buffer and update the agent's network.

@@ -21,6 +21,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         self._game = Game(display=display, limit_fps=limit_fps)
         self._discount = np.asarray(discount)
         self._observations = None
+        self._total_steps = 0
         self.high_score = 0
 
     def action_spec(self):
@@ -45,6 +46,8 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         if self._game.finished:
             return self.reset()
 
+        self._total_steps += 1
+
         is_final, reward = self._game.step(SnakeEnvironment.ACTIONS[action.item()])
         self._observations = self._game.get_observation()
         self._game.render()
@@ -67,7 +70,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
             self.high_score = self._game.current_score
             print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ', self.high_score)
         if self.high_score < 10:
-            return 0.7
+            return 0.5
         elif self.high_score < 20:
             return 0.3
         else:
