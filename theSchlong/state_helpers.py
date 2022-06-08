@@ -11,12 +11,14 @@ def get_observations(old_grid,
                      current_food,
                      current_step,
                      last_food_step,
-                     snake_len):
+                     snake_len,
+                     game_finished):
     observations = []
     observations.extend(food_observations(old_grid, head_pos, tail_pos, current_food))
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos))
     observations.extend(head_with_tail(old_grid, head_pos, tail_pos))
     observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
+    observations.extend([1] if game_finished else [0])
     return observations
 
 

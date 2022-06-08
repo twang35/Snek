@@ -10,7 +10,7 @@ num_runs = 10
 max_moves = 69000
 
 move_speed_interval = 500
-render_interval = 10
+render_interval = 1
 
 def run_game():
     average_score = 0

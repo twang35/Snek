@@ -32,10 +32,12 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         body_and_wall_obs = 4       # body and wall is_collision
         head_with_tail_obs = 4      # head is in same group as tail
         steps_until_starve_obs = 1  # only steps until starve
+        game_over_obs = 1           # if game is over
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
                                  + head_with_tail_obs
-                                 + steps_until_starve_obs,), np.float32)
+                                 + steps_until_starve_obs
+                                 + game_over_obs,), np.float32)
 
     def _reset(self):
         self._game.reset()
@@ -70,9 +72,9 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
             self.high_score = self._game.current_score
             print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ', self.high_score)
         if self.high_score < 10:
-            return 0.5
+            return 0.4
         elif self.high_score < 20:
-            return 0.3
+            return 0.2
         else:
             return 0.1
 

@@ -41,13 +41,13 @@ display_progress_interval = eval_interval
 # 1e-6: -10: 10k, lr too low, -10 at 20k and 30k
 learning_rate = 1e-5  # next 5e-6
 
-epsilon_greedy = 0.1  # actually set in get_updated_epsilon
-# batch_size = 64
-batch_size = 256
+batch_size = 64
+# batch_size = 256
 # discount = 1.0
 discount = 0.99
 # agent_target_update_period = 1
 agent_target_update_period = 4
+initial_priority = 0.5
 # display_training = False
 display_training = True
 display_eval = True
@@ -138,6 +138,7 @@ replay_buffer = reverb_replay_buffer.ReverbReplayBuffer(
 rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
     replay_buffer.py_client,
     table_name,
+    priority=initial_priority,
     sequence_length=2
 )
 
@@ -190,14 +191,17 @@ for i in range(num_iterations):
     time_step, _ = collect_driver.run(time_step)
 
     # Sample a batch of data from the buffer and update the agent's network.
-    experience, unused_info = next(iterator)
-    train_loss = agent.train(experience).loss
+    experience, sample_info = next(iterator)
+    loss_info = agent.train(experience)
+
+    replay_buffer.update_priorities([element[0] for element in sample_info.key],
+                                    tf.cast(loss_info.extra.td_loss, tf.float64))
 
     step = agent.train_step_counter.numpy()
 
     if step % log_interval == 0:
         steps_per_second = log_interval / (time() - start_time)
-        print('step = {0}: loss = {1}, steps/second = {2}'.format(step, train_loss, steps_per_second))
+        print('step = {0}: loss = {1}, steps/second = {2}'.format(step, loss_info.loss, steps_per_second))
         start_time = time()
 
     if step % eval_interval == 0:
@@ -209,7 +213,7 @@ for i in range(num_iterations):
         start_time = time()
 
     if step % display_progress_interval == 0:
-        display_progress(i+1, eval_interval, returns, screen)
+        display_progress(i + 1, eval_interval, returns, screen)
 
 # todo: fix video creation by using the display surface
 # print(create_policy_eval_video(agent.policy, "trained-agent"))

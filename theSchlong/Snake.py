@@ -161,7 +161,8 @@ class Game():
                                          self.currentfood,
                                          self.current_step,
                                          self.last_food_step,
-                                         len(self.snakegroup)))
+                                         len(self.snakegroup),
+                                         self.finished))
 
     # this function adds a segment at the end of the snake
     def add_segment(self):
