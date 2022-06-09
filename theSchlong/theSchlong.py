@@ -20,6 +20,23 @@ from tf_agents.replay_buffers import reverb_utils
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
+# --------------------------------------------- Constants ---------------------------------------------
+learning_rate = 1e-5  # next 1e-4
+
+batch_size = 64
+# batch_size = 256
+# discount = 1.0
+discount = 0.99
+# agent_target_update_period = 1
+agent_target_update_period = 4
+initial_priority = 1.0
+display_training = False
+# display_training = True
+display_eval = True
+# eval_limit_fps = True
+eval_limit_fps = False
+
+trailing_avg_window = 5
 num_iterations = 1000000000  # 1,000,000,000
 
 initial_collect_steps = 100
@@ -31,31 +48,9 @@ num_eval_episodes = 10
 eval_interval = 1000
 display_progress_interval = eval_interval
 
-# lr: avg return: steps
-# 1e-3: lr too high, learns then forgets, stuck at -9: 30k
-# 1e-4: -7: 10k, jagged learning, but too high lr, -5: 20k, -4: 30k, -5: 40k, -6: 50k
-# 5e-5: -1:  10k, slowly stops dying
-#       -7: 10k, lr might be too high?
-# 1e-5: -9: 10k, more consistent learning but slow, -7: 14k, -5: 20k, -3: 24k, -1: 55k
-#     : -8: 10k, consistent learning but slow, -4: 20k, -2: 30k, -1: 40k, -3: 50k
-# 1e-6: -10: 10k, lr too low, -10 at 20k and 30k
-learning_rate = 1e-5  # next 5e-6
-
-batch_size = 64
-# batch_size = 256
-# discount = 1.0
-discount = 0.99
-# agent_target_update_period = 1
-agent_target_update_period = 4
-initial_priority = 0.5
-# display_training = False
-display_training = True
-display_eval = True
-# eval_limit_fps = True
-eval_limit_fps = False
-
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
 eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps)
+# ------------------------------------------- End Constants -------------------------------------------
 
 train_py_env.reset()
 eval_py_env.reset()
@@ -168,6 +163,7 @@ agent.train_step_counter.assign(0)
 # Evaluate the agent's policy once before training
 avg_return = compute_avg_return(eval_env, agent.policy, num_eval_episodes)
 returns = [avg_return]
+trailing_avg = []
 print('before training return: ', returns)
 
 # Reset the environment.
@@ -194,6 +190,7 @@ for i in range(num_iterations):
     experience, sample_info = next(iterator)
     loss_info = agent.train(experience)
 
+    # check that loss_info.extra.td_loss is different for each key
     replay_buffer.update_priorities([element[0] for element in sample_info.key],
                                     tf.cast(loss_info.extra.td_loss, tf.float64))
 
@@ -201,13 +198,19 @@ for i in range(num_iterations):
 
     if step % log_interval == 0:
         steps_per_second = log_interval / (time() - start_time)
-        print('step = {0}: loss = {1}, steps/second = {2}'.format(step, loss_info.loss, steps_per_second))
+        print('step = {0}: loss = {1}, steps/second = {2}'.format(step,
+                                                                  round(loss_info.loss.numpy(), 4),
+                                                                  round(steps_per_second, 2)))
         start_time = time()
 
     if step % eval_interval == 0:
         avg_return = compute_avg_return(eval_env, agent.policy, num_eval_episodes)
+        trailing_avg.append(avg_return)
+        if len(trailing_avg) > trailing_avg_window:
+            trailing_avg.pop(0)
         print('train_py_env high score: ', train_py_env.high_score)
-        print('step = {0}: avg_return = {1}'.format(step, avg_return))
+        print('step = {0}: avg_return = {1}, trailing_avg = {2}'
+              .format(step, avg_return, compute_trailing_avg_return(trailing_avg)))
         returns.append(avg_return)
         # restart time because compute_avg_return() takes a while and messes up the timing
         start_time = time()

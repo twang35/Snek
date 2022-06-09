@@ -3,10 +3,10 @@ import pygame
 # screen that game appears on 0 or 1
 SCREEN_TO_DISPLAY = 0
 
-FOOD_REWARD = 1
+FOOD_REWARD = 1.0
 FOOD_DISTANCE_REWARD = 0.1
-DEATH_REWARD = -2
-STARVE_REWARD = -1
+DEATH_REWARD = -1.0
+STARVE_REWARD = -0.5
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
 
 # size of each grid

@@ -38,6 +38,13 @@ def compute_avg_return(environment, policy, num_episodes=10):
     return avg_return.numpy()[0]
 
 
+def compute_trailing_avg_return(trailing_avg_returns):
+    total = 0.0
+    for avg in trailing_avg_returns:
+        total += avg
+    return total / len(trailing_avg_returns)
+
+
 def display_progress(num_iterations, eval_interval, returns, screen):
     fig = plt.figure()
     iterations = range(0, num_iterations + 1, eval_interval)

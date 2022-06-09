@@ -1,4 +1,5 @@
 import copy
+import math
 
 import numpy as np
 
@@ -25,7 +26,7 @@ def get_observations(old_grid,
 # Returns moving closer and on food for each direction.
 # First number is 1 or 0 for closer or not
 # Second number is 1 or 0 for on top of food or not
-# Third number is distance to food
+# Third number is log2 distance to food
 def food_observations(grid, head_pos, tail_pos, current_food):
     if current_food == 'no food':
         return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -39,31 +40,29 @@ def food_observations(grid, head_pos, tail_pos, current_food):
         to_food_steps = distance_to_food(new_head_pos, food_pos)
         if grid_value == 1:
             # on top of food
-            observations.extend([1, 1, 0])
-        elif grid_value == 0 or new_head_pos == tail_pos:
+            observations.extend([1, 1, 1])  # log2plus1(0) = 1
+        else:
             if to_food_steps < starting_distance:
                 # closer to food
-                observations.extend([1, 0, to_food_steps])
+                observations.extend([1, 0, log2plus1(to_food_steps)])
             else:
                 # further away from food
-                observations.extend([0, 0, to_food_steps])
-        else:
-            # hit a wall or body
-            observations.extend([0, 0, to_food_steps])
+                observations.extend([0, 0, log2plus1(to_food_steps)])
 
     return observations
 
 
-# Returns 0 for no collision, 1 for collision in each direction
+# Returns 1 for no collision, 0 for collision in each direction
+# Reverse to help snek learn what is safe
 def body_and_wall_collisions(grid, head_pos, tail_pos):
     observations = []
     for action in DIRECTIONS:
         new_head_pos = get_pos(action, head_pos)
         grid_value = get_grid_value(new_head_pos, grid)
         if grid_value == 1 or grid_value == 0 or new_head_pos == tail_pos:
-            observations.extend([0])
-        else:
             observations.extend([1])
+        else:
+            observations.extend([0])
 
     return observations
 
@@ -88,9 +87,14 @@ def head_with_tail(old_grid, head_pos, tail_pos):
     return observations
 
 
-# Returns number of remaining steps until starving to death
+# Returns log2 number of remaining steps until starving to death
 def steps_until_starve(current_step, last_food_step, snake_len):
-    return [max(100, (snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER)) - (current_step - last_food_step)]
+    return [log2plus1(max(100,
+                          (snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER)) - (current_step - last_food_step))]
+
+
+def log2plus1(num):
+    return math.log2(num + 1)
 
 
 def count_groups(grid):

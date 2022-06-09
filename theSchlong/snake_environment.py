@@ -4,7 +4,6 @@ from Snake import *
 
 from tf_agents.environments import py_environment
 from tf_agents.specs import BoundedArraySpec
-from tf_agents.specs import ArraySpec
 from tf_agents.trajectories.time_step import StepType
 from tf_agents.trajectories.time_step import TimeStep
 from tensorflow import convert_to_tensor
@@ -77,4 +76,3 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
             return 0.2
         else:
             return 0.1
-
