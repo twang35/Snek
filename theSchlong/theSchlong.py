@@ -1,9 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
 from snake_environment import SnakeEnvironment
-from under_the_hood import *
-
-from time import time
+from training import *
 
 import reverb
 
@@ -14,7 +12,6 @@ from tf_agents.drivers import py_driver
 from tf_agents.environments import tf_py_environment
 from tf_agents.networks import sequential
 from tf_agents.policies import py_tf_eager_policy
-from tf_agents.policies import random_tf_policy
 from tf_agents.replay_buffers import reverb_replay_buffer
 from tf_agents.replay_buffers import reverb_utils
 from tf_agents.specs import tensor_spec
@@ -30,27 +27,23 @@ discount = 0.99
 # agent_target_update_period = 1
 agent_target_update_period = 4
 initial_priority = 1.0
+
 display_training = False
 # display_training = True
 display_eval = True
 # eval_limit_fps = True
 eval_limit_fps = False
 
-trailing_avg_window = 5
 num_iterations = 1000000000  # 1,000,000,000
 
 initial_collect_steps = 100
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 10000
+# ------------------------------------------- End Constants -------------------------------------------
 
-log_interval = 200
-num_eval_episodes = 10
-eval_interval = 1000
-display_progress_interval = eval_interval
 
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
 eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps)
-# ------------------------------------------- End Constants -------------------------------------------
 
 train_py_env.reset()
 eval_py_env.reset()
@@ -62,16 +55,6 @@ eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 fc_layer_params = (100, 50)
 action_tensor_spec = tensor_spec.from_spec(train_py_env.action_spec())
 num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
-
-
-# Define a helper function to create Dense layers configured with the right
-# activation and kernel initializer.
-def dense_layer(num_units):
-    return tf.keras.layers.Dense(
-        num_units,
-        activation=tf.keras.activations.relu,
-        kernel_initializer=tf.keras.initializers.VarianceScaling(
-            scale=2.0, mode='fan_in', distribution='truncated_normal'))
 
 
 # QNetwork consists of a sequence of Dense layers followed by a dense layer
@@ -102,9 +85,6 @@ agent.initialize()
 
 eval_policy = agent.policy
 collect_policy = agent.collect_policy
-
-random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(),
-                                                train_env.action_spec())
 
 # Replay buffer
 
@@ -137,13 +117,7 @@ rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
     sequence_length=2
 )
 
-print('Random play to populate replay buffer')
-py_driver.PyDriver(
-    train_py_env,
-    py_tf_eager_policy.PyTFEagerPolicy(
-        random_policy, use_tf_function=True),
-    [rb_observer],
-    max_steps=initial_collect_steps).run(train_py_env.reset())
+random_play(train_env, train_py_env, rb_observer, initial_collect_steps)
 
 dataset = replay_buffer.as_dataset(
     num_parallel_calls=3,
@@ -151,23 +125,6 @@ dataset = replay_buffer.as_dataset(
     num_steps=2).prefetch(3)
 
 iterator = iter(dataset)
-
-# Training the agent
-
-# (Optional) Optimize by wrapping some of the code in a graph using TF function.
-agent.train = common.function(agent.train)
-
-# Reset the train step.
-agent.train_step_counter.assign(0)
-
-# Evaluate the agent's policy once before training
-avg_return = compute_avg_return(eval_env, agent.policy, num_eval_episodes)
-returns = [avg_return]
-trailing_avg = []
-print('before training return: ', returns)
-
-# Reset the environment.
-time_step = train_py_env.reset()
 
 # Create a driver to collect experience.
 collect_driver = py_driver.PyDriver(
@@ -177,46 +134,7 @@ collect_driver = py_driver.PyDriver(
     [rb_observer],
     max_steps=collect_steps_per_iteration)
 
-screen = pf.screen(np.zeros((480, 640)), 'Training results')
-
-print('Begin training:')
-start_time = time()
-for i in range(num_iterations):
-    # Collect a few steps and save to replay buffer.
-    # To view q_values, breakpoint at line 160 in tf_agents/policies/q_policy.py
-    time_step, _ = collect_driver.run(time_step)
-
-    # Sample a batch of data from the buffer and update the agent's network.
-    experience, sample_info = next(iterator)
-    loss_info = agent.train(experience)
-
-    # check that loss_info.extra.td_loss is different for each key
-    replay_buffer.update_priorities([element[0] for element in sample_info.key],
-                                    tf.cast(loss_info.extra.td_loss, tf.float64))
-
-    step = agent.train_step_counter.numpy()
-
-    if step % log_interval == 0:
-        steps_per_second = log_interval / (time() - start_time)
-        print('step = {0}: loss = {1}, steps/second = {2}'.format(step,
-                                                                  round(loss_info.loss.numpy(), 4),
-                                                                  round(steps_per_second, 2)))
-        start_time = time()
-
-    if step % eval_interval == 0:
-        avg_return = compute_avg_return(eval_env, agent.policy, num_eval_episodes)
-        trailing_avg.append(avg_return)
-        if len(trailing_avg) > trailing_avg_window:
-            trailing_avg.pop(0)
-        print('train_py_env high score: ', train_py_env.high_score)
-        print('step = {0}: avg_return = {1}, trailing_avg = {2}'
-              .format(step, avg_return, compute_trailing_avg_return(trailing_avg)))
-        returns.append(avg_return)
-        # restart time because compute_avg_return() takes a while and messes up the timing
-        start_time = time()
-
-    if step % display_progress_interval == 0:
-        display_progress(i + 1, eval_interval, returns, screen)
+train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterator, replay_buffer)
 
 # todo: fix video creation by using the display surface
 # print(create_policy_eval_video(agent.policy, "trained-agent"))

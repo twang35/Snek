@@ -22,7 +22,17 @@ from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
 
-def compute_avg_return(environment, policy, num_episodes=10):
+# Define a helper function to create Dense layers configured with the right
+# activation and kernel initializer.
+def dense_layer(num_units):
+    return tf.keras.layers.Dense(
+        num_units,
+        activation=tf.keras.activations.relu,
+        kernel_initializer=tf.keras.initializers.VarianceScaling(
+            scale=2.0, mode='fan_in', distribution='truncated_normal'))
+
+
+def compute_avg_return(environment, policy, metrics, num_episodes=10):
     total_return = 0.0
     for _ in range(num_episodes):
         time_step = environment.reset()
@@ -32,6 +42,12 @@ def compute_avg_return(environment, policy, num_episodes=10):
             action_step = policy.action(time_step)
             time_step = environment.step(action_step.action)
             episode_return += time_step.reward
+
+        if metrics.min_score > episode_return:
+            metrics.min_score = episode_return
+        if metrics.max_score < episode_return:
+            metrics.max_score = episode_return
+
         total_return += episode_return
 
     avg_return = total_return / num_episodes
@@ -45,11 +61,11 @@ def compute_trailing_avg_return(trailing_avg_returns):
     return total / len(trailing_avg_returns)
 
 
-def display_progress(num_iterations, eval_interval, returns, screen):
+def display_progress(steps, eval_interval, returns, screen):
     fig = plt.figure()
-    iterations = range(0, num_iterations + 1, eval_interval)
+    steps = range(0, steps + 1, eval_interval)
     plt.clf()
-    plt.plot(iterations, returns)
+    plt.plot(steps, returns)
     plt.ylabel('Average Return')
     plt.xlabel('Iterations')
     # plt.ylim(top=250)
