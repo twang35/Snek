@@ -89,8 +89,8 @@ def head_with_tail(old_grid, head_pos, tail_pos):
 
 # Returns log2 number of remaining steps until starving to death
 def steps_until_starve(current_step, last_food_step, snake_len):
-    # cap max at 1000
-    max_steps_until_starve = min(snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER, 1000)
+    # cap max at 500
+    max_steps_until_starve = min(snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER, 500)
     return [log2plus1(max(100, max_steps_until_starve) - (current_step - last_food_step))]
 
 

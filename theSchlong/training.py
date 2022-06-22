@@ -1,5 +1,11 @@
-from time import time
+import time
 from under_the_hood import *
+
+from tf_agents.drivers import py_driver
+from tf_agents.policies import py_tf_eager_policy
+from tf_agents.policies import random_tf_policy
+from tf_agents.utils import common
+import pyformulas as pf
 
 trailing_avg_window = 5
 log_interval = 200
@@ -37,7 +43,7 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
 
     screen = pf.screen(np.zeros((480, 640)), 'Training results')
 
-    print('Begin training:')
+    print('Begin training: ', time.strftime("%H:%M:%S", time.localtime()))
 
     # Reset the environment.
     time_step = train_py_env.reset()
@@ -68,15 +74,15 @@ class TrainingMetrics:
         self.step_counter = step_counter
         self.returns = []
         self.trailing_avg = []
-        self.steps_start_time = time()
-        self.training_start_time = time()
-        self.eval_start_time = time()
+        self.steps_start_time = time.time()
+        self.training_start_time = time.time()
+        self.eval_start_time = time.time()
         self.min_score = 1000
         self.max_score = 0
 
     def reset(self):
-        self.steps_start_time = time()
-        self.training_start_time = time()
+        self.steps_start_time = time.time()
+        self.training_start_time = time.time()
         self.min_score = 1000
         self.max_score = -1000
 
@@ -84,16 +90,16 @@ class TrainingMetrics:
 def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, screen):
     step = metrics.step_counter.numpy()
     if step % log_interval == 0:
-        steps_per_second = log_interval / (time() - metrics.steps_start_time)
+        steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
         print('step = {0}: loss = {1}, steps/second = {2}'.format(step,
                                                                   str(round(loss_info.loss.numpy(), 4)),
                                                                   round(steps_per_second, 2)))
-        metrics.steps_start_time = time()
+        metrics.steps_start_time = time.time()
 
     if step % eval_interval == 0:
         print('training time: ', get_time(metrics.training_start_time))
         print('train_py_env high score: ', train_py_env.high_score)
-        metrics.eval_start_time = time()
+        metrics.eval_start_time = time.time()
         avg_return = compute_avg_return(eval_env, agent.policy, metrics, num_eval_episodes)
         print('eval time: ', get_time(metrics.eval_start_time))
 
@@ -116,7 +122,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, scr
 
 
 def get_time(start_time):
-    total_time = time() - start_time
+    total_time = time.time() - start_time
     if total_time > 60:
         return str(round(total_time / 60.0, 2)) + ' min'
     return str(round(total_time, 1)) + 's'

@@ -1,5 +1,4 @@
 import random
-import numpy as np
 
 from snake_constants import *
 from state_helpers import *
@@ -108,6 +107,7 @@ class Game():
         self.current_score = 0
         self.head = None
         self.tail = None
+        self.total_steps = 0
         self.current_step = 0
         self.last_food_step = 0
 
@@ -276,6 +276,7 @@ class Game():
             reward = FOOD_REWARD
 
         self.current_step += 1
+        self.total_steps += 1
 
         # game over
         if self.check_perfect_game():
@@ -289,13 +290,12 @@ class Game():
             self.starved = True
             reward = STARVE_REWARD
 
-        # if self.currentfood != 'no food':
-        #     moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
-        #     if moves_to_food < old_moves_to_food:
-        #         reward += FOOD_DISTANCE_REWARD
-        #     else:
-        #         reward -= FOOD_DISTANCE_REWARD
-            # reward += (GRID_LENGTH - moves_to_food)/50
+        if self.currentfood != 'no food' and self.total_steps < CLOSER_TO_FOOD_REWARD_STEP_LIMIT:
+            moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
+            if moves_to_food < old_moves_to_food:
+                reward += FOOD_DISTANCE_REWARD
+            else:
+                reward -= FOOD_DISTANCE_REWARD
 
         return self.finished, reward
 

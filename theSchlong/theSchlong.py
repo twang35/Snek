@@ -5,8 +5,6 @@ from training import *
 
 import reverb
 
-import tensorflow as tf
-
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.drivers import py_driver
 from tf_agents.environments import tf_py_environment
