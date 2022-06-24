@@ -9,6 +9,7 @@ DEATH_REWARD = -2.0  # might help always make "trapped" food negative (where eat
 STARVE_REWARD = -0.5
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
 
+CLOSER_TO_FOOD_REWARD_SCORE_LIMIT = 10
 CLOSER_TO_FOOD_REWARD_STEP_LIMIT = 20000
 
 # size of each grid

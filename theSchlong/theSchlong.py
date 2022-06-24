@@ -18,8 +18,8 @@ from tf_agents.utils import common
 # --------------------------------------------- Constants ---------------------------------------------
 learning_rate = 1e-5  # next 1e-4
 
-batch_size = 64
-# batch_size = 256
+# batch_size = 64
+batch_size = 256
 # discount = 1.0
 discount = 0.99
 # agent_target_update_period = 1
