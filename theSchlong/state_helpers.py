@@ -3,7 +3,9 @@ import math
 
 import numpy as np
 
-from snake_constants import *
+from theSchlong.snake_constants import *
+
+from time import time
 
 
 def get_observations(old_grid,
@@ -15,12 +17,24 @@ def get_observations(old_grid,
                      snake_len,
                      game_finished):
     observations = []
+    start_time = time()
+    start_time = restart_and_print_time('start observations ==============================', start_time)
     observations.extend(food_observations(old_grid, head_pos, tail_pos, current_food))
+    start_time = restart_and_print_time('food', start_time)
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos))
+    start_time = restart_and_print_time('body and wall collision', start_time)
     observations.extend(head_with_tail(old_grid, head_pos, tail_pos))
+    start_time = restart_and_print_time('head with tail', start_time)
     observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
+    start_time = restart_and_print_time('steps until starve', start_time)
     observations.extend([1] if game_finished else [0])
+    restart_and_print_time('game finished', start_time)
     return observations
+
+
+def restart_and_print_time(name, start):
+    print(name, ', ', time()-start)
+    return time()
 
 
 # Returns moving closer and on food for each direction.
@@ -103,8 +117,8 @@ def count_groups(grid):
     # maybe groups is not needed? or big groups are ok?
     groups = []
 
-    for i in range(grid.shape[0] - 1):
-        for j in range(grid.shape[1] - 1):
+    for i in range(grid.shape[1] - 1):
+        for j in range(grid.shape[0] - 1):
             # if is 0, add to remaining_spaces.
             if is_open((i, j), grid):
                 remaining_spaces.add((i, j))

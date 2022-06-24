@@ -184,6 +184,7 @@ class Game():
         self.tail = self.tail.behind_segment
 
     def step(self, direction):
+        start_time = time()
         if self.currentfood != 'no food':
             old_moves_to_food = distance_to_food(self.head.tilepos, self.currentfood.position)
         else:
@@ -296,6 +297,8 @@ class Game():
                 reward += FOOD_DISTANCE_REWARD
             else:
                 reward -= FOOD_DISTANCE_REWARD
+
+        restart_and_print_time('game step', start_time)
 
         return self.finished, reward
 

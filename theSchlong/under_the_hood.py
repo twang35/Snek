@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 import tensorflow as tf
 
@@ -19,6 +20,8 @@ def dense_layer(num_units):
 
 def compute_avg_return(environment, policy, metrics, num_episodes=10):
     total_return = 0.0
+    total_steps = 0
+    start_time = time.time()
     for _ in range(num_episodes):
         time_step = environment.reset()
         episode_return = 0.0
@@ -27,6 +30,7 @@ def compute_avg_return(environment, policy, metrics, num_episodes=10):
             action_step = policy.action(time_step)
             time_step = environment.step(action_step.action)
             episode_return += time_step.reward
+            total_steps += 1
 
         if metrics.min_score > episode_return:
             metrics.min_score = episode_return
@@ -34,6 +38,8 @@ def compute_avg_return(environment, policy, metrics, num_episodes=10):
             metrics.max_score = episode_return
 
         total_return += episode_return
+
+    print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
 
     avg_return = total_return / num_episodes
     return avg_return.numpy()[0]
