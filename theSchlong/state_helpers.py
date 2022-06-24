@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from theSchlong.snake_constants import *
+from snake_constants import *
 
 from time import time
 
@@ -33,7 +33,7 @@ def get_observations(old_grid,
 
 
 def restart_and_print_time(name, start):
-    print(name, ', ', time()-start)
+    # print(name, ', ', time()-start)
     return time()
 
 
