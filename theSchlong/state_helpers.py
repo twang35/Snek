@@ -117,9 +117,10 @@ def count_groups(grid):
     # maybe groups is not needed? or big groups are ok?
     groups = []
 
-    for i in range(grid.shape[1] - 1):
-        for j in range(grid.shape[0] - 1):
-            # if is 0, add to remaining_spaces.
+    # don't need to check the boundaries which are always value 4
+    for i in range(grid.shape[1] - 2):
+        for j in range(grid.shape[0] - 2):
+            # if is 0 or 1, add to remaining_spaces.
             if is_open((i, j), grid):
                 remaining_spaces.add((i, j))
 
