@@ -18,10 +18,10 @@ from tf_agents.utils import common
 # --------------------------------------------- Constants ---------------------------------------------
 learning_rate = 1e-5  # next 1e-4
 
-# batch_size = 64
-batch_size = 256
+batch_size = 64
+# batch_size = 256
 # discount = 1.0
-discount = 0.99
+discount = 0.95
 # agent_target_update_period = 1
 agent_target_update_period = 4
 initial_priority = 1.0
@@ -39,6 +39,8 @@ collect_steps_per_iteration = 1
 replay_buffer_max_length = 10000
 # ------------------------------------------- End Constants -------------------------------------------
 
+print(tf.config.list_physical_devices('GPU'))
+print('learning_rate: {0}, discount: {1}'.format(learning_rate, discount))
 
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
 eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps)

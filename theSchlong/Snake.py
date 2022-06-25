@@ -299,8 +299,7 @@ class Game:
             self.starved = True
             reward = STARVE_REWARD
 
-        if self.current_food != 'no food' and self.total_steps < CLOSER_TO_FOOD_REWARD_STEP_LIMIT \
-                and self.current_score < CLOSER_TO_FOOD_REWARD_SCORE_LIMIT:
+        if self.current_food != 'no food' and self.current_score < CLOSER_TO_FOOD_REWARD_SCORE_LIMIT:
             moves_to_food = distance_to_food(self.head.tile_pos, self.current_food.position)
             if moves_to_food < old_moves_to_food:
                 reward += FOOD_DISTANCE_REWARD
