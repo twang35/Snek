@@ -41,7 +41,7 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
     training_metrics.returns.append(avg_return)
     print('before training return: ', training_metrics.returns)
 
-    screen = pf.screen(np.zeros((480, 640)), 'Training results')
+    screen = pf.screen(np.zeros((480, 560)), 'Training results')
 
     print('Begin training: ', time.strftime("%H:%M:%S", time.localtime()))
 

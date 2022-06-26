@@ -168,6 +168,7 @@ class Game:
         return np.array(get_observations(self.grid,
                                          self.head.tile_pos,
                                          self.tail.tile_pos,
+                                         self.head.move_dir,
                                          self.current_food,
                                          self.current_step,
                                          self.last_food_step,
@@ -193,32 +194,16 @@ class Game:
         self.tail.behind_segment.front_segment = self.tail
         self.tail = self.tail.behind_segment
 
-    def step(self, direction):
-        start_time = time()
+    def step(self, relative_direction):
         if self.current_food != 'no food':
             old_moves_to_food = distance_to_food(self.head.tile_pos, self.current_food.position)
         else:
             old_moves_to_food = 0
 
         reward = 0.0
-        current_move_dir = self.snake.move_dir
-        if direction == "up":
-            to_move = 'up'
-            dont_move = 'down'
-        elif direction == "down":
-            to_move = 'down'
-            dont_move = 'up'
-        elif direction == "left":
-            to_move = 'left'
-            dont_move = 'right'
-        elif direction == "right":
-            to_move = 'right'
-            dont_move = 'left'
-        else:
-            to_move = current_move_dir
-            dont_move = 'left'
-        if not current_move_dir == dont_move:
-            self.snake.move_dir = to_move
+
+        # remap relative direction to cardinal directions
+        self.snake.move_dir = CURRENT_DIRECTION_MAPS[self.snake.move_dir][relative_direction]
 
         # clearing
         self.all.clear(self.screen, self.bg)
@@ -305,8 +290,6 @@ class Game:
                 reward += FOOD_DISTANCE_REWARD
             else:
                 reward -= FOOD_DISTANCE_REWARD
-
-        restart_and_print_time('game step', start_time)
 
         return self.finished, reward
 

@@ -10,10 +10,6 @@ from tensorflow import convert_to_tensor
 
 
 class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
-    ACTIONS = {0: 'left',
-               1: 'right',
-               2: 'up',
-               3: 'down'}
 
     def __init__(self, discount=1.0, display=True, limit_fps=False):
         super().__init__()
@@ -24,12 +20,13 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         self.high_score = 0
 
     def action_spec(self):
-        return BoundedArraySpec((), np.int32, minimum=0, maximum=3, name='action')
+        # left, right, and forward
+        return BoundedArraySpec((), np.int32, minimum=0, maximum=2, name='action')
 
     def observation_spec(self):
-        food_obs = 12               # closer to, on top of food, distance to food
-        body_and_wall_obs = 4       # body and wall is_collision
-        head_with_tail_obs = 4      # head is in same group as tail
+        food_obs = 9                # closer to, on top of food, distance to food
+        body_and_wall_obs = 3       # body and wall is_collision
+        head_with_tail_obs = 3      # head is in same group as tail
         steps_until_starve_obs = 1  # only steps until starve
         game_over_obs = 1           # if game is over
         return BoundedArraySpec((food_obs
@@ -49,7 +46,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
 
         self._total_steps += 1
 
-        is_final, reward = self._game.step(SnakeEnvironment.ACTIONS[action.item()])
+        is_final, reward = self._game.step(TF_ACTION_TO_ACTIONS[action.item()])
         self._observations = self._game.get_observation()
         self._game.render()
         step_type = StepType.MID

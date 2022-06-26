@@ -69,3 +69,31 @@ MOVE_VECTORS_PIXELS = {'left': (-TILE_SIZE[0], 0),
                        'up': (0, -TILE_SIZE[1]),
                        'down': (0, TILE_SIZE[1])
                        }
+
+TF_ACTION_TO_ACTIONS = {0: 'left',
+                        1: 'right',
+                        2: 'forward'}
+ACTIONS = ['left', 'right', 'forward']
+# Used to map relative direction -> cardinal direction
+CURRENT_DIRECTION_MAPS = {
+    'left': {
+        'forward': 'left',
+        'left': 'down',
+        'right': 'up'
+    },
+    'right': {
+        'forward': 'right',
+        'left': 'up',
+        'right': 'down'
+    },
+    'up': {
+        'forward': 'up',
+        'left': 'left',
+        'right': 'right'
+    },
+    'down': {
+        'forward': 'down',
+        'left': 'right',
+        'right': 'left'
+    }
+}
