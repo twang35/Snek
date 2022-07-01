@@ -4,7 +4,7 @@ import pygame
 SCREEN_TO_DISPLAY = 0
 
 FOOD_REWARD = 1.0
-FOOD_DISTANCE_REWARD = 0.1
+FOOD_DISTANCE_REWARD = 0.001
 DEATH_REWARD = -2.0  # might help always make "trapped" food negative (where eat then die next step)
 STARVE_REWARD = -0.5
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10

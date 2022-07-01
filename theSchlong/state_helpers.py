@@ -20,17 +20,19 @@ def get_observations(old_grid,
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos, head_move_dir))
     observations.extend(head_with_tail(old_grid, head_pos, tail_pos, head_move_dir))
     observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
+    # remaining spaces
+    # observations.extend([((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1)) - (snake_len + START_SEGMENTS + 1)])
+    # end of game
     observations.extend([1] if game_finished else [0])
     return observations
 
 
 # Returns moving closer and on food for each action.
 # First number is 1 or 0 for closer or not
-# Second number is 1 or 0 for on top of food or not
-# Third number is log2 distance to food
+# Second number is log2 distance to food
 def food_observations(grid, head_pos, current_food, head_move_dir):
     if current_food == 'no food':
-        return [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        return [0, 0, 0, 0, 0, 0]
     food_pos = current_food.position
     starting_distance = distance_to_food(head_pos, food_pos)
     observations = []
@@ -40,15 +42,16 @@ def food_observations(grid, head_pos, current_food, head_move_dir):
         grid_value = get_grid_value(new_head_pos, grid)
         if grid_value == 1:
             # on top of food
-            observations.extend([1, 1, 1])  # log2plus1(0) = 1
+            observations.extend([1, 1])  # log2plus1(0) = 1
         else:
             to_food_steps = distance_to_food(new_head_pos, food_pos)
+            reversed_distance_obs = 1 / (to_food_steps + 1)
             if to_food_steps < starting_distance:
                 # closer to food
-                observations.extend([1, 0, log2plus1(to_food_steps)])
+                observations.extend([1, reversed_distance_obs])
             else:
                 # further away from food
-                observations.extend([0, 0, log2plus1(to_food_steps)])
+                observations.extend([0, reversed_distance_obs])
 
     return observations
 

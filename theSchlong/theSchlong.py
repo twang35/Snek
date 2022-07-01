@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
+from snake_constants import *
 from snake_environment import SnakeEnvironment
 from training import *
 
@@ -28,6 +29,8 @@ initial_priority = 1.0
 
 display_training = False
 # display_training = True
+initialize_with_schmid = False
+
 display_eval = True
 # eval_limit_fps = True
 eval_limit_fps = False
@@ -36,13 +39,22 @@ num_iterations = 1000000000  # 1,000,000,000
 
 initial_collect_steps = 100
 collect_steps_per_iteration = 1
-replay_buffer_max_length = 10000
+replay_buffer_max_length = 100000
 # ------------------------------------------- End Constants -------------------------------------------
 
+# TODO: remove moves til starve obs, the negative food distance should be enough to prevent loops
+print('learning_rate: {0}, discount: {1}, replay_buffer_max_length: {2}, initialize_with_schmid: {3}, '
+      'steps_left: False, always_food_distance_reward: True, FOOD_DISTANCE_REWARD: {4}'
+      .format(learning_rate, discount, replay_buffer_max_length, initialize_with_schmid, FOOD_DISTANCE_REWARD))
 print(tf.config.list_physical_devices('GPU'))
-print('learning_rate: {0}, discount: {1}'.format(learning_rate, discount))
 
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
+schmid_py_env = None
+schmid_env = None
+if initialize_with_schmid:
+    schmid_py_env = SnakeEnvironment(discount=discount, display=True)
+    schmid_py_env.reset()
+    schmid_env = tf_py_environment.TFPyEnvironment(schmid_py_env)
 eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps)
 
 train_py_env.reset()
@@ -52,7 +64,7 @@ train_env = tf_py_environment.TFPyEnvironment(train_py_env)
 eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 
 # fc_layer_params = (100, 50)
-fc_layer_params = (100, 50)
+fc_layer_params = (50, 100, 50)
 action_tensor_spec = tensor_spec.from_spec(train_py_env.action_spec())
 num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
 
@@ -66,7 +78,6 @@ q_values_layer = tf.keras.layers.Dense(
     activation=None,
     kernel_initializer=tf.keras.initializers.RandomUniform(
         minval=-0.03, maxval=0.03),
-    # bias_initializer=tf.keras.initializers.Constant(-0.2))
     bias_initializer=tf.keras.initializers.Constant(0.0))
 q_net = sequential.Sequential(dense_layers + [q_values_layer])
 
@@ -76,7 +87,6 @@ agent = dqn_agent.DqnAgent(
     q_network=q_net,
     epsilon_greedy=train_py_env.get_updated_epsilon,
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-    # td_errors_loss_fn=common.element_wise_squared_loss,
     td_errors_loss_fn=common.element_wise_huber_loss,
     target_update_period=agent_target_update_period,
     train_step_counter=tf.Variable(0))
@@ -117,7 +127,13 @@ rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
     sequence_length=2
 )
 
-random_play(train_env, train_py_env, rb_observer, initial_collect_steps)
+initial_populate_replay_buffer(initialize_with_schmid,
+                               train_env.time_step_spec(),
+                               train_env.action_spec(),
+                               train_py_env,
+                               schmid_py_env,
+                               rb_observer,
+                               initial_collect_steps)
 
 dataset = replay_buffer.as_dataset(
     num_parallel_calls=3,

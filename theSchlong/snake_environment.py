@@ -24,15 +24,17 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         return BoundedArraySpec((), np.int32, minimum=0, maximum=2, name='action')
 
     def observation_spec(self):
-        food_obs = 9                # closer to, on top of food, distance to food
+        food_obs = 6                # closer to, and distance to food
         body_and_wall_obs = 3       # body and wall is_collision
         head_with_tail_obs = 3      # head is in same group as tail
-        steps_until_starve_obs = 1  # only steps until starve
+        steps_until_starve_obs = 1  # only steps until starve, capped at log2(500)
+        remaining_spaces = 0        # open spaces left on grid
         game_over_obs = 1           # if game is over
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
                                  + head_with_tail_obs
                                  + steps_until_starve_obs
+                                 + remaining_spaces
                                  + game_over_obs,), np.float32)
 
     def _reset(self):

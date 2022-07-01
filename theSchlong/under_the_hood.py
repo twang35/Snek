@@ -53,7 +53,7 @@ def compute_trailing_avg_return(trailing_avg_returns):
 
 
 def display_progress(steps, eval_interval, returns, screen):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(7.3, 4.5))
     steps = range(0, steps + 1, eval_interval)
     plt.clf()
     plt.plot(steps, returns)

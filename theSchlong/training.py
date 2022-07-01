@@ -1,5 +1,6 @@
 import time
 from under_the_hood import *
+from schmid_policy import *
 
 from tf_agents.drivers import py_driver
 from tf_agents.policies import py_tf_eager_policy
@@ -14,16 +15,41 @@ eval_interval = 1000
 display_progress_interval = eval_interval
 
 
-def random_play(train_env, train_py_env, rb_observer, initial_collect_steps):
+def initial_populate_replay_buffer(use_theschmid_bot,
+                                   time_step_spec,
+                                   action_spec,
+                                   train_py_env,
+                                   schmid_py_env,
+                                   rb_observer,
+                                   initial_collect_steps):
+    if not use_theschmid_bot:
+        random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps)
+    else:
+        schmid_play(time_step_spec, action_spec, schmid_py_env, rb_observer, initial_collect_steps)
+
+
+def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
     print('Random play to populate replay buffer')
 
-    random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(),
-                                                    train_env.action_spec())
+    random_policy = random_tf_policy.RandomTFPolicy(time_step_spec, action_spec)
 
     py_driver.PyDriver(
         train_py_env,
         py_tf_eager_policy.PyTFEagerPolicy(
             random_policy, use_tf_function=True),
+        [rb_observer],
+        max_steps=initial_collect_steps).run(train_py_env.reset())
+
+
+def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
+    print('theSchmid play to populate replay buffer')
+
+    schmid_policy = TheSchmidPolicy(time_step_spec, action_spec)
+
+    py_driver.PyDriver(
+        train_py_env,
+        py_tf_eager_policy.PyTFEagerPolicy(
+            schmid_policy, use_tf_function=True),
         [rb_observer],
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
@@ -48,7 +74,7 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
     # Reset the environment.
     time_step = train_py_env.reset()
 
-    for i in range(num_iterations):
+    for _ in range(num_iterations):
         # Collect a few steps and save to replay buffer.
         # To view q_values, breakpoint at line 160 in tf_agents/policies/q_policy.py
         time_step, _ = collect_driver.run(time_step)
