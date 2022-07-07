@@ -37,15 +37,15 @@ eval_limit_fps = False
 
 num_iterations = 1000000000  # 1,000,000,000
 
-initial_collect_steps = 100
+initial_populate_replay_buffer_steps = 1000
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 100000
 # ------------------------------------------- End Constants -------------------------------------------
 
-# TODO: remove moves til starve obs, the negative food distance should be enough to prevent loops
-print('learning_rate: {0}, discount: {1}, replay_buffer_max_length: {2}, initialize_with_schmid: {3}, '
-      'steps_left: False, always_food_distance_reward: True, FOOD_DISTANCE_REWARD: {4}'
-      .format(learning_rate, discount, replay_buffer_max_length, initialize_with_schmid, FOOD_DISTANCE_REWARD))
+print('learning_rate: {0}, discount: {1}, initialize_with_schmid: {2}, steps_left: False, FOOD_DISTANCE_REWARD: {3}, '
+      'initial_populate_replay_buffer_steps: {4}, total_groups_obs: True, DEATH_REWARD: {5}'
+      .format(learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
+              initial_populate_replay_buffer_steps, DEATH_REWARD))
 print(tf.config.list_physical_devices('GPU'))
 
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
@@ -133,7 +133,7 @@ initial_populate_replay_buffer(initialize_with_schmid,
                                train_py_env,
                                schmid_py_env,
                                rb_observer,
-                               initial_collect_steps)
+                               initial_populate_replay_buffer_steps)
 
 dataset = replay_buffer.as_dataset(
     num_parallel_calls=3,

@@ -1,6 +1,6 @@
 import time
 from under_the_hood import *
-from schmid_policy import *
+from schmid_policy import TheSchmidPolicy
 
 from tf_agents.drivers import py_driver
 from tf_agents.policies import py_tf_eager_policy
@@ -129,6 +129,8 @@ def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, scr
         avg_return = compute_avg_return(eval_env, agent.policy, metrics, num_eval_episodes)
         print('eval time: ', get_time(metrics.eval_start_time))
 
+        maybe_update_epsilon(avg_return, train_py_env)
+
         metrics.trailing_avg.append(avg_return)
         if len(metrics.trailing_avg) > trailing_avg_window:
             metrics.trailing_avg.pop(0)
@@ -152,3 +154,16 @@ def get_time(start_time):
     if total_time > 60:
         return str(round(total_time / 60.0, 2)) + ' min'
     return str(round(total_time, 1)) + 's'
+
+
+def maybe_update_epsilon(avg_return, train_py_env):
+    if train_py_env.epsilon > 0.2 and avg_return > 40:
+        train_py_env.epsilon = 0.2
+    elif train_py_env.epsilon > 0.1 and avg_return > 60:
+        train_py_env.epsilon = 0.1
+    elif train_py_env.epsilon > 0.05 and avg_return > 80:
+        train_py_env.epsilon = 0.05
+    elif train_py_env.epsilon > 0.01 and avg_return > 100:
+        train_py_env.epsilon = 0.01
+    elif avg_return > 140:
+        train_py_env.epsilon = 0.001

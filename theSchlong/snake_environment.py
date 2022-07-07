@@ -18,21 +18,28 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         self._observations = None
         self._total_steps = 0
         self.high_score = 0
+        self.epsilon = 0.4
 
     def action_spec(self):
         # left, right, and forward
         return BoundedArraySpec((), np.int32, minimum=0, maximum=2, name='action')
 
     def observation_spec(self):
-        food_obs = 6                # closer to, and distance to food
+        food_obs = 6                # closer to, and lg(distance) to food
         body_and_wall_obs = 3       # body and wall is_collision
+        # group obs are mixed by action
         head_with_tail_obs = 3      # head is in same group as tail
-        steps_until_starve_obs = 1  # only steps until starve, capped at log2(500)
+        head_with_food_obs = 3      # head is in same group as food
+        total_groups_obs = 3        # lg(num_groups) for each action
+        # end group obs
+        steps_until_starve_obs = 1  # steps until starve, capped at log2(500)
         remaining_spaces = 0        # open spaces left on grid
         game_over_obs = 1           # if game is over
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
                                  + head_with_tail_obs
+                                 + head_with_food_obs
+                                 + total_groups_obs
                                  + steps_until_starve_obs
                                  + remaining_spaces
                                  + game_over_obs,), np.float32)
@@ -64,14 +71,10 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                         discount=convert_to_tensor(self._discount, dtype=np.float32),
                         observation=convert_to_tensor(observations, dtype=np.float32))
 
-    # Used to update the epsilon in the agent
+    # Used to get the updated epsilon in the agent
     def get_updated_epsilon(self):
         if self.high_score < self._game.current_score:
             self.high_score = self._game.current_score
             print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ', self.high_score)
-        if self.high_score < 10:
-            return 0.4
-        elif self.high_score < 20:
-            return 0.2
-        else:
-            return 0.1
+
+        return self.epsilon

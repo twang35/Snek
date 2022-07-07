@@ -18,7 +18,11 @@ def get_observations(old_grid,
     observations = []
     observations.extend(food_observations(old_grid, head_pos, current_food, head_move_dir))
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos, head_move_dir))
-    observations.extend(head_with_tail(old_grid, head_pos, tail_pos, head_move_dir))
+    observations.extend(group_obs(old_grid,
+                                  head_pos,
+                                  tail_pos,
+                                  current_food if current_food == 'no food' else current_food.position,
+                                  head_move_dir))
     observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
     # remaining spaces
     # observations.extend([((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1)) - (snake_len + START_SEGMENTS + 1)])
@@ -71,8 +75,9 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
     return observations
 
 
-# Returns 1 for with tail or 0 for no tail groups in each action
-def head_with_tail(old_grid, head_pos, tail_pos, head_move_dir):
+# head_with_tail: returns 1 for with tail or 0 for no tail groups in each action
+# total_group_obs: returns number of groups
+def group_obs(old_grid, head_pos, tail_pos, current_food_pos, head_move_dir):
     observations = []
     for action in ACTIONS:
         grid = update_grid(action, head_pos, tail_pos, copy.deepcopy(old_grid), head_move_dir)
@@ -80,14 +85,23 @@ def head_with_tail(old_grid, head_pos, tail_pos, head_move_dir):
 
         groups = count_groups(grid)
 
+        head_with_tail = 0
+        head_with_food = 0
+        num_groups = log2plus1(len(groups))
+
         head_groups = get_adjacent_groups(grid, groups, new_head_pos)
         tail_groups = get_adjacent_groups(grid, groups, tail_pos)
-
-        # move second check above count_groups
-        if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tail_pos:
-            observations.extend([1])
+        if current_food_pos == 'no food':
+            head_with_food = 0
         else:
-            observations.extend([0])
+            food_groups = get_adjacent_groups(grid, groups, current_food_pos)
+            if len(head_groups & food_groups) > 0 or tuple(new_head_pos) == current_food_pos:
+                head_with_food = 1
+
+        if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tail_pos:
+            head_with_tail = 1
+
+        observations.extend([head_with_tail, head_with_food, num_groups])
 
     return observations
 
@@ -166,8 +180,9 @@ def distance_to_food(start_pos, food_pos):
 
 
 def update_grid(action, head_pos, tail_pos, grid, head_move_dir):
-    set_number(grid, get_relative_pos(action, head_pos, head_move_dir), 2)
-    set_number(grid, tail_pos, 0)
+    # add test for this: when move eats a food, the tail doesn't move, could add food pos here for that
+    # set_number(grid, tail_pos, 0)
+    set_number(grid, get_relative_pos(action, head_pos, head_move_dir), 3)
     return grid
 
 

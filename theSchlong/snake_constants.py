@@ -5,7 +5,7 @@ SCREEN_TO_DISPLAY = 0
 
 FOOD_REWARD = 1.0
 FOOD_DISTANCE_REWARD = 0.001
-DEATH_REWARD = -2.0  # might help always make "trapped" food negative (where eat then die next step)
+DEATH_REWARD = -10.0  # maybe avoid deaths more?
 STARVE_REWARD = -0.5
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
 
@@ -17,6 +17,7 @@ TILE_SIZE = (10, 10)
 
 # number of grid of the screen
 GRID_LENGTH = 15
+# GRID_LENGTH = 7
 SCREENTILES = (GRID_LENGTH, GRID_LENGTH)
 
 TILE_RECT = pygame.Rect(0, 0, TILE_SIZE[0], TILE_SIZE[1])
