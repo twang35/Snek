@@ -276,6 +276,7 @@ class Game:
         if self.check_perfect_game():
             self.finished = True
             self.perfect_game = True
+            reward = PERFECT_GAME_REWARD
 
         elif not self.finished and steps_until_starve(self.current_step,
                                                       self.last_food_step,

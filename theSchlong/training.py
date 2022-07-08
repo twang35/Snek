@@ -157,13 +157,27 @@ def get_time(start_time):
 
 
 def maybe_update_epsilon(avg_return, train_py_env):
-    if train_py_env.epsilon > 0.2 and avg_return > 40:
+    # For grid length 15
+    # if train_py_env.epsilon > 0.2 and avg_return > 40:
+    #     train_py_env.epsilon = 0.2
+    # elif train_py_env.epsilon > 0.1 and avg_return > 60:
+    #     train_py_env.epsilon = 0.1
+    # elif train_py_env.epsilon > 0.05 and avg_return > 80:
+    #     train_py_env.epsilon = 0.05
+    # elif train_py_env.epsilon > 0.01 and avg_return > 100:
+    #     train_py_env.epsilon = 0.01
+    # elif avg_return > 140:
+    #     train_py_env.epsilon = 0.001
+    # For grid length 9
+    if train_py_env.epsilon > 0.2 and avg_return > 5:
         train_py_env.epsilon = 0.2
-    elif train_py_env.epsilon > 0.1 and avg_return > 60:
+    elif train_py_env.epsilon > 0.1 and avg_return > 10:
         train_py_env.epsilon = 0.1
-    elif train_py_env.epsilon > 0.05 and avg_return > 80:
+    elif train_py_env.epsilon > 0.05 and avg_return > 20:
         train_py_env.epsilon = 0.05
-    elif train_py_env.epsilon > 0.01 and avg_return > 100:
+    elif train_py_env.epsilon > 0.01 and avg_return > 30:
         train_py_env.epsilon = 0.01
-    elif avg_return > 140:
+    elif train_py_env.epsilon > 0.001 and avg_return > 40:
         train_py_env.epsilon = 0.001
+    elif avg_return > 100:
+        train_py_env.epsilon = 0.0
