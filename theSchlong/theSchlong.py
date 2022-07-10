@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
+import sys
+
 from snake_constants import *
 from snake_environment import SnakeEnvironment
 from training import *
@@ -35,16 +37,24 @@ display_eval = True
 # eval_limit_fps = True
 eval_limit_fps = False
 
+eval_only = False
+# eval_only = True
+
 num_iterations = 1000000000  # 1,000,000,000
 
 initial_populate_replay_buffer_steps = 1000
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 100000
+
+policy_name = 'checking'
 # ------------------------------------------- End Constants -------------------------------------------
 
-print('learning_rate: {0}, discount: {1}, initialize_with_schmid: {2}, steps_left: False, FOOD_DISTANCE_REWARD: {3}, '
-      'initial_populate_replay_buffer_steps: {4}, total_groups_obs: True, DEATH_REWARD: {5}'
-      .format(learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
+if len(sys.argv) > 1:
+    policy_name = sys.argv[1]
+
+print('policy_name: {0}, learning_rate: {1}, discount: {2}, initialize_with_schmid: {3}, steps_left: False, '
+      'FOOD_DISTANCE_REWARD: {4}, initial_populate_replay_buffer_steps: {5}, total_groups_obs: True, DEATH_REWARD: {6}'
+      .format(policy_name, learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
               initial_populate_replay_buffer_steps, DEATH_REWARD))
 print(tf.config.list_physical_devices('GPU'))
 
@@ -68,6 +78,8 @@ fc_layer_params = (50, 100, 50)
 action_tensor_spec = tensor_spec.from_spec(train_py_env.action_spec())
 num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
 
+global_step = tf.compat.v1.train.get_or_create_global_step()
+# step = tf.Variable(0, trainable=False, dtype=tf.int32)
 
 # QNetwork consists of a sequence of Dense layers followed by a dense layer
 # with `num_actions` units to generate one q_value per available action as
@@ -89,7 +101,7 @@ agent = dqn_agent.DqnAgent(
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
     td_errors_loss_fn=common.element_wise_huber_loss,
     target_update_period=agent_target_update_period,
-    train_step_counter=tf.Variable(0))
+    train_step_counter=global_step)
 
 agent.initialize()
 
@@ -150,7 +162,20 @@ collect_driver = py_driver.PyDriver(
     [rb_observer],
     max_steps=collect_steps_per_iteration)
 
-train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterator, replay_buffer)
+train_checkpointer = common.Checkpointer(
+    ckpt_dir=POLICY_DIR + policy_name,
+    max_to_keep=1000,
+    agent=agent,
+    policy=agent.policy,
+    replay_buffer=replay_buffer,
+    global_step=global_step
+)
+
+train_checkpointer.initialize_or_restore()
+global_step = tf.compat.v1.train.get_global_step()
+
+train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterator, replay_buffer, train_checkpointer,
+      global_step, eval_only)
 
 # todo: fix video creation by using the display surface
 # print(create_policy_eval_video(agent.policy, "trained-agent"))

@@ -336,8 +336,8 @@ class Game:
         # steps
         d3 = self.screen.blit(self.bg, STEP_POS, pygame.Rect(STEP_POS, (50, 100)))
         f = pygame.font.Font(None, 12)
-        stepimage = f.render(STEP_PREFIX + str(self.current_step), True, STEP_COLOR)
-        d4 = self.screen.blit(stepimage, STEP_POS)
+        step_image = f.render(STEP_PREFIX + str(self.current_step), True, STEP_COLOR)
+        d4 = self.screen.blit(step_image, STEP_POS)
 
         # drawing
         dirty = self.all.draw(self.screen)

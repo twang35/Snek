@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
+from snake_constants import *
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,9 +20,10 @@ def dense_layer(num_units):
             scale=2.0, mode='fan_in', distribution='truncated_normal'))
 
 
-def compute_avg_return(environment, policy, metrics, num_episodes=10):
+def compute_avg_return(environment, policy, metrics, eval_only, num_episodes=10):
     total_return = 0.0
     total_steps = 0
+    perfect_games = 0
     start_time = time.time()
     for _ in range(num_episodes):
         time_step = environment.reset()
@@ -37,9 +40,15 @@ def compute_avg_return(environment, policy, metrics, num_episodes=10):
         if metrics.max_score < episode_return:
             metrics.max_score = episode_return
 
+        if time_step.reward == PERFECT_GAME_REWARD:
+            perfect_games += 1
+
         total_return += episode_return
 
     print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
+
+    if eval_only:
+        metrics.append_perfect_percent(perfect_games / num_episodes)
 
     avg_return = total_return / num_episodes
     return avg_return.numpy()[0]
@@ -52,9 +61,9 @@ def compute_trailing_avg_return(trailing_avg_returns):
     return total / len(trailing_avg_returns)
 
 
-def display_progress(steps, eval_interval, returns, screen):
+def display_progress(starting_step, steps, eval_interval, returns, screen):
     fig = plt.figure(figsize=(7.3, 4.5))
-    steps = range(0, steps + 1, eval_interval)
+    steps = range(starting_step, steps + 1, eval_interval)
     plt.clf()
     plt.plot(steps, returns)
     plt.ylabel('Average Return')
