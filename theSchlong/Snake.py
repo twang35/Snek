@@ -1,4 +1,5 @@
 import random
+import snake_constants
 
 from state_helpers import *
 
@@ -149,8 +150,10 @@ class Game:
         for index in range(START_SEGMENTS):
             self.add_segment()
 
-        # weird but true
-        self.current_food = 'no food'
+        self.current_food = Food(self.taken_up_group)  # check that score was updated
+        self.food_group.add(self.current_food)
+        self.taken_up_group.add(self.current_food)
+        self.all.add(self.current_food)
 
         self.current_score = 0
         self.current_step = 0
@@ -211,6 +214,18 @@ class Game:
         # updates snake position
         self.all.update()
 
+        # head -> food
+        col = pygame.sprite.groupcollide(self.snake_head_group, self.food_group, False, True)
+        if len(col) > 0:
+            self.current_food = 'no food'
+            self.add_segment()
+            self.current_score += 1
+            self.last_food_step = self.current_step
+            reward = FOOD_REWARD
+            if self.check_perfect_game():
+                self.finished = True
+                self.perfect_game = True
+                reward = snake_constants.PERFECT_GAME_REWARD
         if self.current_food == 'no food' and not self.perfect_game:
             self.current_food = Food(self.taken_up_group)  # check that score was updated
             self.food_group.add(self.current_food)
@@ -226,7 +241,8 @@ class Game:
         body_positions = self.snake.get_positions()
 
         # 1 is food
-        self.grid[self.current_food.position[1] + 1, self.current_food.position[0] + 1] = 1
+        if self.current_food != 'no food':
+            self.grid[self.current_food.position[1] + 1, self.current_food.position[0] + 1] = 1
 
         for i in range(0, len(body_positions)):
             position = body_positions[i]
@@ -260,14 +276,6 @@ class Game:
         if len(collisions.get(self.head)) > 1:
             self.finished = True
             reward = DEATH_REWARD
-        # head -> food
-        col = pygame.sprite.groupcollide(self.snake_head_group, self.food_group, False, True)
-        if len(col) > 0:
-            self.current_food = 'no food'  # check that score was updated and persists
-            self.add_segment()
-            self.current_score += 1
-            self.last_food_step = self.current_step
-            reward = FOOD_REWARD
 
         self.current_step += 1
         self.total_steps += 1
@@ -276,8 +284,7 @@ class Game:
         if self.check_perfect_game():
             self.finished = True
             self.perfect_game = True
-            reward = PERFECT_GAME_REWARD
-
+            reward = snake_constants.PERFECT_GAME_REWARD
         elif not self.finished and steps_until_starve(self.current_step,
                                                       self.last_food_step,
                                                       len(self.snake_group))[0] <= 0:
@@ -293,7 +300,7 @@ class Game:
         return self.finished, reward
 
     def check_perfect_game(self):
-        return (self.current_score + START_SEGMENTS + 1) == ((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1))
+        return (self.current_score + START_SEGMENTS + 1) == PERFECT_SCORE
 
     def render(self):
         if not self.display:
@@ -310,7 +317,7 @@ class Game:
             fail_rect.center = SCREENRECT.center
             self.screen.blit(fail_message, fail_rect)
             pygame.display.flip()
-            pygame.time.wait(5000)
+            pygame.time.wait(snake_constants.PERFECT_GAME_WAIT_MS)
             return
 
         if self.finished:

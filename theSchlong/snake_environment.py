@@ -29,9 +29,10 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         body_and_wall_obs = 3       # body and wall is_collision
         # group obs are mixed by action
         head_with_tail_obs = 3      # head is in same group as tail
-        head_with_food_obs = 3      # head is in same group as food
+        head_with_food_obs = 0      # head is in same group as food
         total_groups_obs = 3        # lg(num_groups) for each action
         # end group obs
+        perfect_game_move_obs = 3   # move results in a perfect game
         steps_until_starve_obs = 1  # steps until starve, capped at log2(500)
         remaining_spaces = 0        # open spaces left on grid
         game_over_obs = 1           # if game is over
@@ -40,6 +41,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                                  + head_with_tail_obs
                                  + head_with_food_obs
                                  + total_groups_obs
+                                 + perfect_game_move_obs
                                  + steps_until_starve_obs
                                  + remaining_spaces
                                  + game_over_obs,), np.float32)
@@ -56,8 +58,8 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         self._total_steps += 1
 
         is_final, reward = self._game.step(TF_ACTION_TO_ACTIONS[action.item()])
-        self._observations = self._game.get_observation()
         self._game.render()
+        self._observations = self._game.get_observation()
         step_type = StepType.MID
 
         if is_final:

@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
+import snake_constants
 from snake_constants import *
 
 import imageio
@@ -40,7 +41,7 @@ def compute_avg_return(environment, policy, metrics, eval_only, num_episodes=10)
         if metrics.max_score < episode_return:
             metrics.max_score = episode_return
 
-        if time_step.reward == PERFECT_GAME_REWARD:
+        if time_step.reward == snake_constants.PERFECT_GAME_REWARD:
             perfect_games += 1
 
         total_return += episode_return

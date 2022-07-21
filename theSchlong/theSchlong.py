@@ -2,11 +2,11 @@ from __future__ import absolute_import, division, print_function
 
 import sys
 
-from snake_constants import *
 from snake_environment import SnakeEnvironment
 from training import *
 
 import reverb
+import os
 
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.drivers import py_driver
@@ -21,12 +21,13 @@ from tf_agents.utils import common
 # --------------------------------------------- Constants ---------------------------------------------
 learning_rate = 1e-5  # next 1e-4
 
-batch_size = 64
-# batch_size = 256
+# batch_size = 64
+batch_size = 128
 # discount = 1.0
 discount = 0.99
-# agent_target_update_period = 1
-agent_target_update_period = 4
+# agent_target_update_period = 4
+agent_target_update_period = 8
+# target_update_tau = 0.01
 initial_priority = 1.0
 
 display_training = False
@@ -46,17 +47,32 @@ initial_populate_replay_buffer_steps = 1000
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 100000
 
-policy_name = 'checking'
+policy_name = 'eval'
+# policy_name = 'debug'
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # turns off GPU
+
 # ------------------------------------------- End Constants -------------------------------------------
 
 if len(sys.argv) > 1:
     policy_name = sys.argv[1]
 
+if policy_name == 'eval':
+    eval_only = True
+    initial_populate_replay_buffer_steps = 10
+    snake_constants.PERFECT_GAME_REWARD = 10000
+    snake_constants.PERFECT_GAME_WAIT_MS = 500
+
 print('policy_name: {0}, learning_rate: {1}, discount: {2}, initialize_with_schmid: {3}, steps_left: False, '
-      'FOOD_DISTANCE_REWARD: {4}, initial_populate_replay_buffer_steps: {5}, total_groups_obs: True, DEATH_REWARD: {6}'
+      'FOOD_DISTANCE_REWARD: {4}, initial_populate_replay_buffer_steps: {5}, total_groups_obs: True, '
+      'DEATH_REWARD: {6}, agent_target_update_period: {7}'
       .format(policy_name, learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
-              initial_populate_replay_buffer_steps, DEATH_REWARD))
+              initial_populate_replay_buffer_steps, DEATH_REWARD, agent_target_update_period))
 print(tf.config.list_physical_devices('GPU'))
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    tf.config.experimental.set_virtual_device_configuration(
+        gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=500)])
 
 train_py_env = SnakeEnvironment(discount=discount, display=display_training)
 schmid_py_env = None
@@ -93,7 +109,7 @@ q_values_layer = tf.keras.layers.Dense(
     bias_initializer=tf.keras.initializers.Constant(0.0))
 q_net = sequential.Sequential(dense_layers + [q_values_layer])
 
-agent = dqn_agent.DqnAgent(
+agent = dqn_agent.DdqnAgent(
     train_env.time_step_spec(),
     train_env.action_spec(),
     q_network=q_net,
@@ -101,6 +117,7 @@ agent = dqn_agent.DqnAgent(
     optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
     td_errors_loss_fn=common.element_wise_huber_loss,
     target_update_period=agent_target_update_period,
+    # target_update_tau=target_update_tau,
     train_step_counter=global_step)
 
 agent.initialize()
