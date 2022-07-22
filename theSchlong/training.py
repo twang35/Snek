@@ -63,13 +63,13 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
     # Reset the train step.
     # agent.train_step_counter.assign(0)
 
+    screen = pf.screen(np.zeros((480, 560)), 'Training results')
+
     # Evaluate the agent's policy once before training
     training_metrics = TrainingMetrics(agent.train_step_counter)
     avg_return = compute_avg_return(eval_env, agent.policy, training_metrics, eval_only, num_eval_episodes)
     training_metrics.returns.append(avg_return)
     print('before training return: ', training_metrics.returns)
-
-    screen = pf.screen(np.zeros((480, 560)), 'Training results')
 
     print('Begin training: ', time.strftime("%d/%m %H:%M:%S", time.localtime()))
 
