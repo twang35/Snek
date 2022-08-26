@@ -10,7 +10,7 @@ SCREEN_TO_DISPLAY = 0
 TILE_SIZE = (10, 10)
 
 # number of grid of the screen
-SCREENTILES = (15, 15)
+SCREENTILES = (9, 9)
 # SCREENTILES = (4, 4)
 
 TILE_RECT = pygame.Rect(0, 0, TILE_SIZE[0], TILE_SIZE[1])
@@ -329,7 +329,7 @@ class Game():
             fail_rect.center = SCREENRECT.center
             self.screen.blit(fail_message, fail_rect)
             pygame.display.flip()
-            pygame.time.wait(5000)
+            pygame.time.wait(2000)
 
         elif self.lose is True or (self.current_step - self.last_food_step) > MAX_STEPS_BEFORE_STARVE:
             self.lose = True
