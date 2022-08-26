@@ -59,6 +59,7 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
+    initial_step = np.copy(step)
 
     # Reset the train step.
     # agent.train_step_counter.assign(0)
@@ -93,7 +94,7 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, agent, train_py_env, screen, train_checkpointer,
-                              global_step, step, eval_only)
+                              global_step, step, eval_only, initial_step)
 
 
 class TrainingMetrics:
@@ -123,7 +124,7 @@ class TrainingMetrics:
 
 
 def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, screen, train_checkpointer, global_step,
-                          step, eval_only):
+                          step, eval_only, initial_step):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -159,7 +160,8 @@ def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, scr
                     metrics.min_score,
                     metrics.max_score)
         if eval_only:
-            eval_str += ', perfect_percent = ' + str(round(metrics.perfect_percentage, 3))
+            eval_str += ', perfect_percent = {0}, initial_step = {1}'\
+                .format(str(round(metrics.perfect_percentage, 3)), initial_step)
         print(eval_str)
 
         metrics.returns.append(avg_return)
