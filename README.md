@@ -8,12 +8,12 @@ Random movements to learn how to control the snek.
 Human-coded agent that tries. ~20% perfect game rate.
 
 
-https://user-images.githubusercontent.com/5852883/186811442-f5e34924-3b68-4adf-985a-2333a989d671.mp4
+![theSchmid](https://user-images.githubusercontent.com/5852883/214492458-7fef1c79-1abb-4907-a2bb-cb3ddd4fdd7a.gif)
 
 
 ## TheSchlong
 Reinforcement learning agent. ~76% perfect game rate.
 
 
-https://user-images.githubusercontent.com/5852883/186811459-d79b6c17-6e87-43d4-bd25-c8dcf87bfad2.mp4
+![theSchlong](https://user-images.githubusercontent.com/5852883/214492576-f493ec8a-afc0-4e86-9ed5-35e7c6b8be19.gif)
 
