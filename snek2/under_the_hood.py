@@ -113,26 +113,29 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
     return episode_rewards, episode_scores, last_rewards, total_steps
 
 
-def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen, policy_name):
+def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen):
     fig, score_axis = plt.subplots(figsize=(3.65, 2.25))
     steps = range(starting_step, steps + 1, eval_interval)
 
-    fig.suptitle(policy_name)
+    label_size = 6
+    tick_size = 5
 
     score_color = 'tab:blue'
     score_axis.plot(steps, scores, color=score_color)
-    score_axis.set_ylabel('Average Score', color=score_color)
-    score_axis.set_xlabel('Iterations')
-    score_axis.tick_params(axis='y', labelcolor=score_color)
+    score_axis.set_ylabel('Average Score', color=score_color, fontsize=label_size)
+    score_axis.set_xlabel('Iterations', fontsize=label_size)
+    score_axis.tick_params(axis='y', labelcolor=score_color, labelsize=tick_size)
+    score_axis.tick_params(axis='x', labelsize=tick_size)
     # score_axis.set_ylim(top=250)
 
     percent_color = 'tab:red'
     percent_axis = score_axis.twinx()
     percent_axis.plot(steps, [percent * 100 for percent in perfect_percents], color=percent_color)
-    percent_axis.set_ylabel('Perfect Game %', color=percent_color)
-    percent_axis.tick_params(axis='y', labelcolor=percent_color)
+    percent_axis.set_ylabel('Perfect Game %', color=percent_color, fontsize=label_size)
+    percent_axis.tick_params(axis='y', labelcolor=percent_color, labelsize=tick_size)
     percent_axis.set_ylim(bottom=0, top=100)
 
+    fig.tight_layout()
     fig.canvas.draw()
 
     image = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]

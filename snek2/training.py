@@ -64,7 +64,7 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
     # Reset the train step.
     # agent.train_step_counter.assign(0)
 
-    screen = pf.screen(np.zeros((480, 560)), 'Training results')
+    screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
 
     # Evaluate the agent's policy once before training
     training_metrics = TrainingMetrics(agent.train_step_counter)
@@ -92,7 +92,7 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                              train_checkpointer, global_step, step, eval_only, initial_step, policy_name)
+                              train_checkpointer, global_step, step, eval_only, initial_step)
 
 
 class TrainingMetrics:
@@ -128,7 +128,7 @@ class TrainingMetrics:
 
 
 def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                          train_checkpointer, global_step, step, eval_only, initial_step, policy_name):
+                          train_checkpointer, global_step, step, eval_only, initial_step):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -184,7 +184,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
 
     if step % display_progress_interval == 0:
         display_progress(metrics.starting_step, step + 1, eval_interval, metrics.scores, metrics.perfect_percents,
-                         screen, policy_name)
+                         screen)
 
 
 def get_time(start_time):
