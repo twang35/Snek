@@ -28,9 +28,33 @@ usefulness:
 
 1. **last-5-eval average** — much lower variance than a single eval.
 2. **mean over the whole curve** — rewards learning early and holding on.
-3. **max drawdown** — biggest drop from a running peak. This is the direct
-   measurement of catastrophic forgetting and the thing this investigation is
-   mainly chasing.
+3. **max drawdown** — how much score the policy gave back after peaking. Borrowed
+   from finance: track the best avg_score seen so far, and record the largest gap
+   between that running peak and a later eval.
+
+   ```python
+   peak, worst = float('-inf'), 0.0
+   for row in eval_rows:
+       peak = max(peak, row['avg_score'])
+       worst = max(worst, peak - row['avg_score'])
+   ```
+
+   Units are avg_score, i.e. food eaten. `b1a-base` peaked at 78.6 and later read
+   59.5, so its max drawdown is 19.1 — it lost 19 food off its best. High drawdown
+   is meant to mean "learned something and then lost it", which is the
+   catastrophic-forgetting symptom this investigation is chasing.
+
+   **Two known flaws, so don't lean on it alone:**
+   - It can't tell steady oscillation around a *high* plateau from a genuine
+     collapse. `b1b-tgt200` scores worse than the baseline on it purely for
+     bouncing around while sitting at a similar level.
+   - It's an absolute number, so a run that reaches higher scores has further to
+     fall and is penalised for being good. Comparing drawdown across arms that
+     plateaued at very different heights is close to meaningless.
+
+   A better version would be the largest **sustained** drop — one that persists
+   across several consecutive evals rather than a single bad one — ideally as a
+   fraction of the peak. Not implemented yet.
 4. **steps to first reach score N** — for comparing learning speed.
 
 ---
@@ -115,6 +139,12 @@ Each run continuously writes to `snek2/runs/`:
 <policy>_evals.json   full eval series; this is what later sessions analyse
 ```
 
+When embedding a graph in *this* file, the path needs the `runs/` prefix
+(`![name](runs/name.png)`) because this file lives in `snek2/` while the artifacts
+live in `snek2/runs/`. The auto-generated `runs/<policy>.md` files link without a
+prefix, since they sit in the same directory. Easy to get wrong — check that links
+resolve after editing.
+
 **Never delete anything in `snek2/runs/`** (see `CLAUDE.md`). Re-running the same
 policy name continues its graph and draws a dashed line at the resume step, so a
 promising run can be extended later just by launching it again with the same name.
@@ -182,12 +212,100 @@ These are already established; don't re-litigate them without new evidence.
 
 ## Completed runs
 
-Nothing yet under this protocol. Batch 1 is the first. Earlier ad-hoc results are
-summarized under prior findings above; their raw logs were not kept.
+### Batch 1 — interim, all still running
 
-| policy | key change | steps | last-5 avg | max drawdown | verdict |
+Compared at **matched step 68000**, because wall-clock progress is not comparable
+between arms (see the eval-cost confound below).
+
+| policy | key change | last-5 | curve mean | max drawdown | peak |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| `b1a-base` | none (control) | **70.5** | 49.1 | 19.1 | 78.6 |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 59.3 | **51.6** | 27.4 | 76.9 |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 32.6 | 13.9 | **13.0** | 38.1 |
+
+Graphs update live as the runs progress. Paths are relative to this file, which
+sits in `snek2/` while the artifacts are in `snek2/runs/`.
+
+**b1a-base** (control) — steady climb to a ~70 plateau, perfect games from 44k:
+
+![b1a-base](runs/b1a-base.png)
+
+**b1b-tgt200** — faster early rise, noisier plateau, perfect games from 33k:
+
+![b1b-tgt200](runs/b1b-tgt200.png)
+
+**b1c-nstep3** — slower throughout, no perfect games even by 165k:
+
+![b1c-nstep3](runs/b1c-nstep3.png)
+
+**Everything below is n=1 and this domain is very noisy. Treat as hypotheses to
+test, not conclusions.** The single most useful next action is repeating the
+baseline, because nothing here can be interpreted without knowing its spread.
+
+#### The big surprise: perfect games arrive ~20x earlier than expected
+
+The premise of this investigation was that perfect games need ~1M iterations to
+reach ~50%. `b1a-base` produced its **first 10% perfect-game eval at ~44k steps**,
+and `b1b-tgt200` at **~33k**. Both plateau in avg_score around 65-75 out of 95 by
+40k.
+
+That is a large enough discrepancy to be worth chasing before tuning anything
+else, since it changes what "good" means. Candidate explanations, untested:
+
+1. The code changed materially since the 1M-iteration experience was formed — the
+   replay buffer is now cpprb prioritized rather than `PyUniformReplayBuffer`, and
+   the collect policy runs under `tf.function`. Neither *should* change learning
+   per step, but PER changes the sample distribution, so it might.
+2. Lucky seed. Entirely plausible at n=1 given the documented 62.5-vs-18.0 spread.
+3. The human's long-running `train` policy carries 1.3M steps of history under the
+   older code, so its trajectory isn't directly comparable to a fresh run.
+
+Worth asking the human whether ~10% perfect at 44k is genuinely faster than they
+have seen, since they have the historical context that these logs don't.
+
+#### `TARGET_UPDATE_PERIOD=200`: hypothesis not supported, but interesting anyway
+
+The prediction was smoother curves and smaller drawdowns. It got the **opposite**
+on the drawdown metric (27.4 vs 19.1) and a lower last-5. What it did do is learn
+**much faster early** — roughly score 55 by 15k steps where the baseline needed
+~25k — and reach its first perfect game sooner.
+
+So the frequent-target-update theory of catastrophic forgetting looks wrong, at
+least at this horizon, while "less frequent target updates learn faster early"
+looks worth pursuing. Try 50 and 500 to see whether there's a trend or this is
+noise.
+
+#### `N_STEP_UPDATE=3`: clearly slower per step
+
+Much worse at matched steps, and even after running to 161k (last-5 50.6, peak
+66.3) it stayed below where the baseline was at 68k. It did have the lowest
+drawdown, but that is mostly an artefact of never getting high enough to fall far.
+Deprioritize n-step; if revisited, try n=2 rather than 3.
+
+#### Neither arm actually showed catastrophic forgetting
+
+At this horizon both arms oscillate roughly +/-10 around a high plateau rather
+than collapsing. That is qualitatively different from the collapses seen in the
+earlier short 30k runs, which in hindsight were probably the rising phase plus
+seed variance rather than forgetting.
+
+This also exposes a **flaw in the max-drawdown metric**: it cannot tell noisy
+oscillation around a good plateau apart from a genuine collapse. `b1b` scores
+worse on it purely for oscillating at a high level. A better forgetting metric
+would be something like the largest sustained drop — a drawdown that persists over
+several consecutive evals rather than one bad eval. Worth implementing before
+leaning on drawdown again.
+
+#### Confound found: eval cost scales with policy quality
+
+A better policy eats more food, so its episodes are longer, so its 10-episode eval
+takes longer in wall-clock. `b1c-nstep3` reached 161k steps while the other two
+were at ~68k in the same elapsed time, purely because it was worse and its evals
+were cheap.
+
+Consequences: never compare arms by wall-clock or by "where they got to"; always
+compare at matched steps. And a batch of arms will drift apart in step count, so
+plan to stop them by step count rather than by time.
 
 ---
 
@@ -214,11 +332,16 @@ commitment.
    Expect: earlier onset of learning (relevant to the "nothing until 40k" effect)
    and better late-game behaviour.
 
-### Batch 2 candidates (pick based on batch 1)
+### Batch 2 — revised after batch 1's interim results
 
-4. **Winner of batch 1, repeated 2-3x.** Mandatory before believing anything,
-   given the 62.5-vs-18.0 noise.
-5. **`tgt200 + nstep3` combined**, if both help individually.
+4. **`b2a-base2` / `b2b-base3`: repeat the baseline 2-3x.** Now the top priority,
+   not an afterthought. Batch 1 says the baseline reaches ~70 avg score and 10%
+   perfect games by ~44k, which contradicts the premise of the whole exercise.
+   Until the baseline's spread is known, no arm can be judged against it. These
+   also test whether the early perfect games reproduce.
+5. **`TARGET_UPDATE_PERIOD=50` and `=500`.** Batch 1 hinted that longer periods
+   learn faster early even though they didn't reduce drawdown. Two more points
+   establish whether that's a trend or noise.
 6. **`LEARNING_RATE=1e-4`** *only after* the target-update fix. Currently 1e-5 is
    very conservative; the in-code comment already suggests 1e-4. With a stable
    target it may train several times faster. On its own with `TARGET_UPDATE_PERIOD=8`
