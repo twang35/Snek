@@ -98,9 +98,10 @@ class Food(pygame.sprite.Sprite):
 
 
 class Game:
-    def __init__(self, display=True, limit_fps=False):
+    def __init__(self, display=True, limit_fps=False, policy_name=''):
         self.display = display
         self.limit_fps = limit_fps
+        self.policy_name = policy_name
         # show screen
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
 
@@ -350,6 +351,11 @@ class Game:
         f = pygame.font.Font(None, 12)
         step_image = f.render(STEP_PREFIX + str(self.current_step), True, STEP_COLOR)
         d4 = self.screen.blit(step_image, STEP_POS)
+        # policy name
+        d5 = self.screen.blit(self.bg, POLICY_POS, pygame.Rect(POLICY_POS, (50, 100)))
+        f = pygame.font.Font(None, 12)
+        policy_image = f.render(POLICY_PREFIX + self.policy_name, True, POLICY_COLOR)
+        d6 = self.screen.blit(policy_image, POLICY_POS)
 
         # drawing
         dirty = self.all.draw(self.screen)
@@ -357,6 +363,8 @@ class Game:
         dirty.append(d2)
         dirty.append(d3)
         dirty.append(d4)
+        dirty.append(d5)
+        dirty.append(d6)
 
         # updating screen
         pygame.display.update(dirty)

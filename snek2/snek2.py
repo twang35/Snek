@@ -74,14 +74,15 @@ def main(argv):
         tf.config.experimental.set_virtual_device_configuration(
             gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=500)])
 
-    train_py_env = SnakeEnvironment(discount=discount, display=display_training)
+    train_py_env = SnakeEnvironment(discount=discount, display=display_training, policy_name=policy_name)
     schmid_py_env = None
     schmid_env = None
     if initialize_with_schmid:
-        schmid_py_env = SnakeEnvironment(discount=discount, display=True)
+        schmid_py_env = SnakeEnvironment(discount=discount, display=True, policy_name=policy_name)
         schmid_py_env.reset()
         schmid_env = tf_py_environment.TFPyEnvironment(schmid_py_env)
-    eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps)
+    eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps,
+                                   policy_name=policy_name)
 
     train_py_env.reset()
     eval_py_env.reset()
@@ -96,7 +97,7 @@ def main(argv):
     if num_parallel_eval_envs > 0:
         def make_headless_eval_env():
             os.environ['SDL_VIDEODRIVER'] = 'dummy'
-            return SnakeEnvironment(discount=discount, display=False)
+            return SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
 
         eval_parallel_env = tf_py_environment.TFPyEnvironment(
             parallel_py_environment.ParallelPyEnvironment(
@@ -187,7 +188,7 @@ def main(argv):
     global_step = tf.compat.v1.train.get_global_step()
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, global_step, eval_only)
+          train_checkpointer, global_step, eval_only, policy_name)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

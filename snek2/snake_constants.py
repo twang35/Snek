@@ -69,6 +69,9 @@ SCORE_PREFIX = 'Score: '
 STEP_COLOR = (0, 0, 0)
 STEP_POS = (20, 40)
 STEP_PREFIX = 'Steps: '
+POLICY_COLOR = (0, 0, 0)
+POLICY_POS = (20, 60)
+POLICY_PREFIX = 'Policy: '
 
 DIRECTIONS = ['left', 'right', 'up', 'down']
 MOVE_VECTORS = {'left': (-1, 0),

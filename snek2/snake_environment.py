@@ -11,9 +11,9 @@ from tensorflow import convert_to_tensor
 
 class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
 
-    def __init__(self, discount=1.0, display=True, limit_fps=False):
+    def __init__(self, discount=1.0, display=True, limit_fps=False, policy_name=''):
         super().__init__()
-        self._game = Game(display=display, limit_fps=limit_fps)
+        self._game = Game(display=display, limit_fps=limit_fps, policy_name=policy_name)
         self._discount = np.asarray(discount)
         self._observations = None
         self._total_steps = 0

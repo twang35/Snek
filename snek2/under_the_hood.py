@@ -113,9 +113,11 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
     return episode_rewards, episode_scores, last_rewards, total_steps
 
 
-def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen):
+def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen, policy_name):
     fig, score_axis = plt.subplots(figsize=(3.65, 2.25))
     steps = range(starting_step, steps + 1, eval_interval)
+
+    fig.suptitle(policy_name)
 
     score_color = 'tab:blue'
     score_axis.plot(steps, scores, color=score_color)
