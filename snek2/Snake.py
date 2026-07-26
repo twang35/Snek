@@ -128,6 +128,9 @@ class Game:
         self.clock = pygame.time.Clock()
         pygame.init()
 
+    def set_display(self, enabled):
+        self.display = enabled
+
     def reset(self):
         pygame.display.set_caption(CAPTION)
         self.bg = pygame.Surface(SCREENSIZE).convert()

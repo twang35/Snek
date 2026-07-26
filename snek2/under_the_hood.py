@@ -26,7 +26,18 @@ def compute_avg_return(environment, policy, metrics, eval_only, num_episodes=10)
     total_steps = 0
     perfect_games = 0
     start_time = time.time()
+
+    py_env = environment.pyenv
+    if hasattr(py_env, 'envs'):
+        py_env = py_env.envs[0]
+    py_env.set_display(True)
+
     for _ in range(num_episodes):
+        # only switch to headless between episodes, so a run in progress
+        # when the threshold is crossed gets to finish displayed
+        if time.time() - start_time > EVAL_HEADLESS_AFTER_SECONDS:
+            py_env.set_display(False)
+
         time_step = environment.reset()
         episode_return = 0.0
 
