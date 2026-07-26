@@ -114,7 +114,7 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
 
 
 def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen):
-    fig, score_axis = plt.subplots(figsize=(7.3, 4.5))
+    fig, score_axis = plt.subplots(figsize=(3.65, 2.25))
     steps = range(starting_step, steps + 1, eval_interval)
 
     score_color = 'tab:blue'
