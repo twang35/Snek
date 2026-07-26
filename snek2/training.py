@@ -157,8 +157,8 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
             .format(step,
                     str(round(avg_return, 3)),
                     str(round(compute_trailing_avg_return(metrics.trailing_avg), 3)),
-                    metrics.min_score,
-                    metrics.max_score,
+                    round(metrics.min_score, 2),
+                    round(metrics.max_score, 2),
                     str(round(metrics.last_eval_perfect_percent, 3)))
         if eval_only:
             eval_str += ', cumulative_perfect_percent = {0}, initial_step = {1}'\
