@@ -45,8 +45,8 @@ initial_populate_replay_buffer_steps = 1000
 collect_steps_per_iteration = 1
 replay_buffer_max_length = 100000
 
-policy_name = 'eval'
-# policy_name = 'debug'
+# policy_name = 'eval'
+policy_name = 'train'
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # turns off GPU
 
