@@ -1,8 +1,9 @@
 # Hyperparameter tuning protocol
 
-Long-running, resumable investigation into what makes snek2 learn **consistently**
-with **minimal catastrophic forgetting**, and eventually reach a higher
-perfect-game percentage.
+Long-running, resumable investigation into what makes snek2 reach the **highest
+possible perfect-game percentage**, and get there by **learning consistently**.
+Those two are the objective. Catastrophic forgetting matters as one of the things
+that breaks consistency, not as a target in its own right.
 
 This file is the handoff document. A fresh Claude Code session should be able to
 read it and continue without any other context. Keep it current: it is more
@@ -26,36 +27,21 @@ needs roughly **1M iterations / 4-5 hours** of training and then plateaus around
 Because of that, avoid the final eval as a metric. Prefer, in rough order of
 usefulness:
 
-1. **last-5-eval average** — much lower variance than a single eval.
-2. **mean over the whole curve** — rewards learning early and holding on.
-3. **max drawdown** — how much score the policy gave back after peaking. Borrowed
-   from finance: track the best avg_score seen so far, and record the largest gap
-   between that running peak and a later eval.
-
-   ```python
-   peak, worst = float('-inf'), 0.0
-   for row in eval_rows:
-       peak = max(peak, row['avg_score'])
-       worst = max(worst, peak - row['avg_score'])
-   ```
-
-   Units are avg_score, i.e. food eaten. `b1a-base` peaked at 78.6 and later read
-   59.5, so its max drawdown is 19.1 — it lost 19 food off its best. High drawdown
-   is meant to mean "learned something and then lost it", which is the
-   catastrophic-forgetting symptom this investigation is chasing.
-
-   **Two known flaws, so don't lean on it alone:**
-   - It can't tell steady oscillation around a *high* plateau from a genuine
-     collapse. `b1b-tgt200` scores worse than the baseline on it purely for
-     bouncing around while sitting at a similar level.
-   - It's an absolute number, so a run that reaches higher scores has further to
-     fall and is penalised for being good. Comparing drawdown across arms that
-     plateaued at very different heights is close to meaningless.
-
-   A better version would be the largest **sustained** drop — one that persists
-   across several consecutive evals rather than a single bad one — ideally as a
-   fraction of the peak. Not implemented yet.
-4. **steps to first reach score N** — for comparing learning speed.
+1. **perfect-game % over the last N evals** — the objective. Use a trailing window,
+   never a single eval: one eval is 10 episodes, so a single perfect game reads as
+   10% and the metric is extremely coarse.
+2. **steps to the first perfect game** — how fast a config gets into the region
+   that matters at all.
+3. **last-5-eval average score** — the leading indicator, and the workhorse for
+   comparing configs. Needed because perfect-game % sits at 0 for tens of
+   thousands of steps, so early on it cannot tell two configs apart while score
+   already can.
+4. **mean over the whole curve** — rewards learning early and holding on.
+5. **steps to first reach score N** — for comparing learning speed.
+6. **max drawdown** — biggest drop from a running peak. A diagnostic for
+   inconsistency rather than an objective: useful for explaining *why* a config is
+   erratic, but a config with a large drawdown that reaches a high perfect-game
+   rate still wins.
 
 ---
 
@@ -214,14 +200,19 @@ These are already established; don't re-litigate them without new evidence.
 
 ### Batch 1 — interim, all still running
 
-Compared at **matched step 68000**, because wall-clock progress is not comparable
-between arms (see the eval-cost confound below).
+Compared at **matched step 83000**, because wall-clock progress is not comparable
+between arms (see the eval-cost confound below). Objective metrics first.
 
-| policy | key change | last-5 | curve mean | max drawdown | peak |
-|---|---|---|---|---|---|
-| `b1a-base` | none (control) | **70.5** | 49.1 | 19.1 | 78.6 |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 59.3 | **51.6** | 27.4 | 76.9 |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 32.6 | 13.9 | **13.0** | 38.1 |
+| policy | key change | trailing-20 perfect % | 1st perfect | last-5 score | curve mean | max drawdown | peak |
+|---|---|---|---|---|---|---|---|
+| `b1a-base` | none (control) | **1.5** | 44000 | **66.0** | 52.4 | 19.2 | 78.6 |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 0.5 | **33000** | 59.2 | **53.4** | 27.4 | 76.9 |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 0.0 | never | 26.3 | 16.5 | 18.6 | 38.1 |
+
+Perfect-game rate is still tiny and very coarse at this horizon — a trailing-20
+average of 1.5% is three perfect games across 200 episodes. It is not yet a
+reliable way to separate these arms, which is exactly why score is the workhorse
+metric this early. Do not pick a winner on perfect % at 83k steps.
 
 Graphs update live as the runs progress. Paths are relative to this file, which
 sits in `snek2/` while the artifacts are in `snek2/runs/`.

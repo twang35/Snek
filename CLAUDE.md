@@ -62,8 +62,9 @@ iteration instead of continuing.
 
 ## Hyperparameter tuning
 
-There is an ongoing, resumable investigation into configs that learn consistently
-without catastrophic forgetting, aiming at a higher perfect-game percentage. The
+There is an ongoing, resumable investigation into configs that reach the highest
+possible perfect-game percentage while learning consistently. Reducing
+catastrophic forgetting is a means to that end, not the goal itself. The
 protocol, prior findings, what is currently running, and the queue of planned
 experiments all live in **`snek2/hyperparamTuning.md`**.
 
