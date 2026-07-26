@@ -20,11 +20,28 @@ need to see live/incremental output, invoke the env's python binary directly
 instead, e.g.:
 
 ```
-/opt/miniconda3/envs/snek/bin/python -u snek2.py train > log 2>&1 &
+/opt/miniconda3/envs/snek/bin/python -u snek2.py smoke > log 2>&1 &
 ```
 
 Reserve `conda run` for short one-shot commands where only the final
 exit/output matters.
+
+## Smoke tests
+
+`policy_name` (the arg to `snek2.py`, e.g. `python snek2.py train`) doubles as
+the checkpoint directory name under `snek2/savedPolicies/`. The user runs real
+training under `train` — never delete or overwrite `snek2/savedPolicies/train/`.
+
+When running a smoke test (verifying a code change doesn't crash, timing
+startup, etc.), always pass `smoke` as the policy name:
+
+```
+/opt/miniconda3/envs/snek/bin/python -u snek2.py smoke > log 2>&1 &
+```
+
+This keeps smoke-test checkpoints isolated in `snek2/savedPolicies/smoke/`,
+which is safe to `rm -rf` before/after a test. Never run `rm -rf
+snek2/savedPolicies/` wholesale — target the `smoke/` subdirectory only.
 
 ## Active development
 
