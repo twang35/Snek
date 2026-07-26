@@ -24,6 +24,26 @@ needs roughly **1M iterations / 4-5 hours** of training and then plateaus around
   iterations and then the slope turns steep. A config that looks dead at 20k may
   not be. Do not judge a config on a short run alone.
 
+### When to keep a run going, and when to stop it
+
+Judge on **trajectory, not absolute level**. A run is worth continuing while
+*either* its perfect-game rate *or* its average score is still climbing — both are
+valuable, and a config that is behind but rising may overtake one that plateaued.
+Check both: they can disagree, and have.
+
+Concretely, compare a trailing window against the window before it (last 20 evals
+vs the previous 20 for score, last 30 vs previous 30 for the coarser perfect-game
+rate). Stop an arm when neither is rising, or when its remaining question is
+already answered.
+
+Cap a promising-but-slow run at roughly **4 hours**, then stop it and record it as
+**"promising but too slow"** rather than as a failure — that is a genuinely
+different verdict from "does not learn", and worth keeping distinct.
+
+Stopping is cheap and reversible: relaunching the same policy name continues its
+graph and checkpoint. Always re-supply the same `SNEK_*` overrides when resuming,
+or the config silently changes mid-run.
+
 Because of that, avoid the final eval as a metric. Prefer, in rough order of
 usefulness:
 
@@ -149,10 +169,12 @@ know what is in flight and might have been terminated.
 
 | policy | config change | started | status |
 |---|---|---|---|
-| `train` | human-started, committed defaults | before this work | **running, do not touch** |
-| `b1a-base` | control: committed defaults | 2026-07-26 14:15 | running, target ~120k steps |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 2026-07-26 14:15 | running, target ~120k steps |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 2026-07-26 14:15 | running, target ~120k steps |
+| `train` | human-started, committed defaults | before this work | **stopped by the human ~15:15**, freeing a slot. Do not restart it; it is theirs |
+| `b1a-base` | control: committed defaults | 14:15 | running. Score flat at ~69 since ~50k, but perfect-game rate is still climbing (1.7 -> 3.3), so keep going |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 14:15 | running. Slowest arm but the only one with strong score momentum (+10.3 over last 20 evals at 201k). Cap ~18:15, then label "promising but too slow" if still short of the others |
+| `b2a-base2` | baseline repeat #2 | 15:10 | running. Needed to establish baseline spread |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 15:16 | running. Took the slot the human freed. Launched now rather than later so it shares machine conditions with `b1c-nstep3` (n=3) and the two are directly comparable |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 14:15 | **stopped 15:10 at ~104k.** Score rising only slowly (+1.8), perfect rate flat (1.0 -> 1.0), and its hypothesis was already answered. Resume with `SNEK_TARGET_UPDATE_PERIOD=200` if worth revisiting |
 
 That is 4 trainers, i.e. the budget is full — do not launch more until one stops.
 Logs for this batch are in `/Users/tony_wang/.claude/jobs/f3cb1855/tmp/b1{a,b,c}.log`,
@@ -225,7 +247,8 @@ sits in `snek2/` while the artifacts are in `snek2/runs/`.
 
 ![b1b-tgt200](runs/b1b-tgt200.png)
 
-**b1c-nstep3** — slower throughout, no perfect games even by 165k:
+**b1c-nstep3** — slowest to rise and no perfect games yet, but still climbing
+steadily at 200k when the others had flattened:
 
 ![b1c-nstep3](runs/b1c-nstep3.png)
 
@@ -266,12 +289,34 @@ least at this horizon, while "less frequent target updates learn faster early"
 looks worth pursuing. Try 50 and 500 to see whether there's a trend or this is
 noise.
 
-#### `N_STEP_UPDATE=3`: clearly slower per step
+#### `N_STEP_UPDATE=3`: slower per step, but the best trajectory of the batch
 
-Much worse at matched steps, and even after running to 161k (last-5 50.6, peak
-66.3) it stayed below where the baseline was at 68k. It did have the lowest
-drawdown, but that is mostly an artefact of never getting high enough to fall far.
-Deprioritize n-step; if revisited, try n=2 rather than 3.
+At matched steps it looks like the clear loser, and an early read of this batch
+called it exactly that. Judged on trajectory instead it is the most interesting arm
+in the batch. Score by 40k-step block:
+
+| steps | mean score | max |
+|---|---|---|
+| 0-40k | 5.1 | 16.2 |
+| 40-80k | 26.9 | 38.1 |
+| 80-120k | 26.8 | 35.4 |
+| 120-160k | 37.4 | 66.3 |
+| 160-200k | 49.7 | 70.1 |
+| 200-240k | 57.3 | 67.5 |
+
+Near-monotonic, and at 201k it was still gaining +10.3 per 20 evals while
+`b1a-base` had gone flat at ~69. It has produced no perfect game yet, which is the
+one real mark against it.
+
+So n-step is not "worse", it is **slower but more consistently improving** — which
+is arguably closer to what this investigation wants than a config that sprints to a
+plateau. Whether it overtakes the baseline is an open question; that is what the
+4-hour cap is for. If it plateaus below ~70 it is merely slow; if it keeps climbing
+past that it is the most promising lead so far.
+
+Lesson recorded: **do not judge an arm at matched steps alone.** Matched-step
+comparison is right for fairness but blind to momentum, and momentum was the
+signal that mattered here.
 
 #### Neither arm actually showed catastrophic forgetting
 
@@ -330,7 +375,12 @@ commitment.
    perfect games by ~44k, which contradicts the premise of the whole exercise.
    Until the baseline's spread is known, no arm can be judged against it. These
    also test whether the early perfect games reproduce.
-5. **`TARGET_UPDATE_PERIOD=50` and `=500`.** Batch 1 hinted that longer periods
+5. **`N_STEP_UPDATE=2`** — running now as `b2b-nstep2`. n=3 is the batch's best
+   trajectory but too slow to reach a perfect game; n=2 tests whether the stability
+   survives at a faster rate. If n=2 lands between n=1 and n=3 on both speed and
+   steadiness, that is a clean monotonic trend and the knob is real rather than
+   noise. Worth trying n=5 afterwards to find where it turns over.
+6. **`TARGET_UPDATE_PERIOD=50` and `=500`.** Batch 1 hinted that longer periods
    learn faster early even though they didn't reduce drawdown. Two more points
    establish whether that's a trend or noise.
 6. **`LEARNING_RATE=1e-4`** *only after* the target-update fix. Currently 1e-5 is
