@@ -53,6 +53,8 @@ SCREENTILES = (
 )
 
 PERFECT_SCORE = (SCREENTILES[0] + 1) * (SCREENTILES[1] + 1)
+# highest food-eaten count reachable before a perfect game triggers
+MAX_POSSIBLE_SCORE = PERFECT_SCORE - START_SEGMENTS - 1
 
 BACKGROUND_COLOR = (255, 255, 255)
 SNAKE_HEAD_COLOR = (150, 0, 0)

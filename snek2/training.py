@@ -8,6 +8,7 @@ from tf_agents.policies import random_tf_policy
 from tf_agents.utils import common
 import pyformulas as pf
 
+trailing_avg_window = 5
 log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
@@ -70,6 +71,7 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
     avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, training_metrics,
                                                eval_only, num_eval_episodes)
     training_metrics.scores.append(avg_score)
+    training_metrics.perfect_percents.append(training_metrics.last_eval_perfect_percent)
     print('before training score: ', training_metrics.scores)
 
     print('Begin training: ', time.strftime("%d/%m %H:%M:%S", time.localtime()))
@@ -98,6 +100,8 @@ class TrainingMetrics:
         self.starting_step = step_counter.numpy()
         self.step_counter = step_counter
         self.scores = []
+        self.perfect_percents = []
+        self.trailing_avg_scores = []
         self.steps_start_time = time.time()
         self.training_start_time = time.time()
         self.eval_start_time = time.time()
@@ -150,12 +154,20 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
             print('saving checkpoint')
             train_checkpointer.save(global_step)
 
-        eval_str = 'step = {0}: avg_score = {1}, min_score = {2}, max_score = {3}, avg_reward = {4}, ' \
-                   'min_reward = {5}, max_reward = {6}, perfect_percent = {7}'\
+        metrics.trailing_avg_scores.append(avg_score)
+        if len(metrics.trailing_avg_scores) > trailing_avg_window:
+            metrics.trailing_avg_scores.pop(0)
+        trailing_avg_score = sum(metrics.trailing_avg_scores) / len(metrics.trailing_avg_scores)
+
+        eval_str = 'step = {0}: avg_score = {1}, trailing_avg_score = {2}, min_score = {3}, ' \
+                   'max_score = {4}/{5}, avg_reward = {6}, min_reward = {7}, max_reward = {8}, ' \
+                   'perfect_percent = {9}'\
             .format(step,
                     round(avg_score, 2),
+                    round(trailing_avg_score, 2),
                     int(round(metrics.min_score)),
                     int(round(metrics.max_score)),
+                    int(snake_constants.MAX_POSSIBLE_SCORE),
                     round(avg_reward, 3),
                     round(metrics.min_reward, 2),
                     round(metrics.max_reward, 2),
@@ -166,11 +178,13 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
         print(eval_str)
 
         metrics.scores.append(avg_score)
+        metrics.perfect_percents.append(metrics.last_eval_perfect_percent)
         # restart time because compute_avg_return() takes a while and messes up the timing
         metrics.reset()
 
     if step % display_progress_interval == 0:
-        display_progress(metrics.starting_step, step + 1, eval_interval, metrics.scores, screen)
+        display_progress(metrics.starting_step, step + 1, eval_interval, metrics.scores, metrics.perfect_percents,
+                         screen)
 
 
 def get_time(start_time):

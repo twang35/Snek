@@ -113,14 +113,23 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
     return episode_rewards, episode_scores, last_rewards, total_steps
 
 
-def display_progress(starting_step, steps, eval_interval, scores, screen):
-    fig = plt.figure(figsize=(7.3, 4.5))
+def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen):
+    fig, score_axis = plt.subplots(figsize=(7.3, 4.5))
     steps = range(starting_step, steps + 1, eval_interval)
-    plt.clf()
-    plt.plot(steps, scores)
-    plt.ylabel('Average Score')
-    plt.xlabel('Iterations')
-    # plt.ylim(top=250)
+
+    score_color = 'tab:blue'
+    score_axis.plot(steps, scores, color=score_color)
+    score_axis.set_ylabel('Average Score', color=score_color)
+    score_axis.set_xlabel('Iterations')
+    score_axis.tick_params(axis='y', labelcolor=score_color)
+    # score_axis.set_ylim(top=250)
+
+    percent_color = 'tab:red'
+    percent_axis = score_axis.twinx()
+    percent_axis.plot(steps, [percent * 100 for percent in perfect_percents], color=percent_color)
+    percent_axis.set_ylabel('Perfect Game %', color=percent_color)
+    percent_axis.tick_params(axis='y', labelcolor=percent_color)
+    percent_axis.set_ylim(bottom=0, top=100)
 
     fig.canvas.draw()
 
