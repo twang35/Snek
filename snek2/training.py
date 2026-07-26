@@ -159,10 +159,10 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
                     str(round(compute_trailing_avg_return(metrics.trailing_avg), 3)),
                     round(metrics.min_score, 2),
                     round(metrics.max_score, 2),
-                    str(round(metrics.last_eval_perfect_percent, 3)))
+                    '{0}%'.format(round(metrics.last_eval_perfect_percent * 100)))
         if eval_only:
             eval_str += ', cumulative_perfect_percent = {0}, initial_step = {1}'\
-                .format(str(round(metrics.perfect_percentage, 3)), initial_step)
+                .format('{0}%'.format(round(metrics.perfect_percentage * 100)), initial_step)
         print(eval_str)
 
         metrics.returns.append(avg_return)
