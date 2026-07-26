@@ -19,14 +19,15 @@ EVAL_COLUMNS = [
     ('epsilon', 'epsilon'),
 ]
 
-# Showing every eval would make a long run's table unreadable, so keep the first
-# few and the most recent ones.
+# A million-step run has a thousand evals, which is unreadable inline and bloats
+# the file. The full series lives in <policy>_evals.json; the table shows the
+# opening rows and the recent ones.
 HEAD_ROWS = 3
-TAIL_ROWS = 25
+TAIL_ROWS = 12
 
 
 def history_path(runs_dir, policy_name):
-    return os.path.join(runs_dir, '{0}_history.json'.format(policy_name))
+    return os.path.join(runs_dir, '{0}_evals.json'.format(policy_name))
 
 
 def load_history(path):
@@ -92,6 +93,8 @@ def write_run_report(path, policy_name, run_config, eval_rows, graph_filename, r
     lines.append('')
 
     lines += ['## Evals', '']
+    lines += ['{0} evals so far. Full series in [`{1}_evals.json`]({1}_evals.json).'.format(
+        len(eval_rows), policy_name), '']
     lines += ['| ' + ' | '.join(label for _, label in EVAL_COLUMNS) + ' |']
     lines += ['|' + '---|' * len(EVAL_COLUMNS)]
     for row in _elided(eval_rows):

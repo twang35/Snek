@@ -60,6 +60,26 @@ Note that deleting `<policy_name>_history.json` also throws away the graph's
 history for that policy, so its next run restarts the curve from the current
 iteration instead of continuing.
 
+## Hyperparameter tuning
+
+There is an ongoing, resumable investigation into configs that learn consistently
+without catastrophic forgetting, aiming at a higher perfect-game percentage. The
+protocol, prior findings, what is currently running, and the queue of planned
+experiments all live in **`snek2/hyperparamTuning.md`**.
+
+Read that file before starting or judging any tuning run, and update it as runs
+start, finish, or get killed — it is the handoff between sessions. Two rules from
+it are easy to get wrong:
+
+- **Never run more than 4 snek trainers at once**, counting human-started ones.
+  Check with `ps -eo pid,command | grep "[s]nek2.py" | grep -v spawn_main`.
+- **This domain is very noisy** — the same config has produced final scores of
+  62.5 and 18.0. Never conclude anything from a single run; repeat promising
+  configs 2-3 times.
+
+Hyperparameters are overridden with `SNEK_*` env vars (see `tuned()` in
+`snek2.py`), so variants run side by side without editing files.
+
 ## Active development
 
 `snek2/` is the only directory that should be edited going forward. It's a

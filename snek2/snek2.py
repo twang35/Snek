@@ -17,18 +17,35 @@ from tf_agents.system import system_multiprocessing
 from tf_agents.utils import common
 
 
+def tuned(name, default, cast=float):
+    """Reads a hyperparameter from SNEK_<NAME>, falling back to the default.
+
+    Hyperparameter sweeps run several policies side by side from this one file, so
+    the values that vary between them come from the environment rather than edits.
+    Everything read here lands in run_config, so runs/<policy_name>.md always
+    records what the run actually used. See snek2/hyperparamTuning.md.
+    """
+    raw = os.environ.get('SNEK_' + name)
+    if raw is None:
+        return default
+    value = cast(raw)
+    print('hyperparameter override: {0} = {1} (default {2})'.format(name, value, default))
+    return value
+
+
 def main(argv):
     # --------------------------------------------- Constants ---------------------------------------------
-    learning_rate = 1e-5  # next 1e-4
+    learning_rate = tuned('LEARNING_RATE', 1e-5)
 
     # batch_size = 64
-    batch_size = 128
+    batch_size = tuned('BATCH_SIZE', 128, int)
     # discount = 1.0
-    discount = 0.99
+    discount = tuned('DISCOUNT', 0.99)
     # agent_target_update_period = 4
-    agent_target_update_period = 8
-    # target_update_tau = 0.01
-    initial_epsilon = 0.4
+    agent_target_update_period = tuned('TARGET_UPDATE_PERIOD', 8, int)
+    target_update_tau = tuned('TARGET_UPDATE_TAU', 1.0)
+    gradient_clipping = tuned('GRADIENT_CLIPPING', 0.0)
+    initial_epsilon = tuned('INITIAL_EPSILON', 0.4)
 
     display_training = False
     # display_training = True
@@ -43,9 +60,10 @@ def main(argv):
 
     num_iterations = 1000000000  # 1,000,000,000
 
-    initial_populate_replay_buffer_steps = 1000
+    initial_populate_replay_buffer_steps = tuned('INITIAL_POPULATE_STEPS', 1000, int)
     collect_steps_per_iteration = 1
-    replay_buffer_max_length = 100000
+    replay_buffer_max_length = tuned('REPLAY_BUFFER_MAX_LENGTH', 100000, int)
+    n_step_update = tuned('N_STEP_UPDATE', 1, int)
 
     # Prioritized replay. 0.8 was what the reverb setup used, but it paired that
     # with Huber loss as the priority, which works out to a far more aggressive
@@ -53,9 +71,9 @@ def main(argv):
     # beta corrects the sampling bias prioritizing introduces and anneals to 1.0,
     # which the reverb version never did -- it prioritized with no importance
     # sampling at all.
-    priority_exponent = 0.6
-    initial_importance_sampling_beta = 0.4
-    beta_anneal_steps = 1000000
+    priority_exponent = tuned('PRIORITY_EXPONENT', 0.6)
+    initial_importance_sampling_beta = tuned('IS_BETA', 0.4)
+    beta_anneal_steps = tuned('BETA_ANNEAL_STEPS', 1000000, int)
 
     # policy_name = 'eval'
     policy_name = 'train'
@@ -114,7 +132,8 @@ def main(argv):
                 [make_headless_eval_env] * num_parallel_eval_envs))
 
     # fc_layer_params = (100, 50)
-    fc_layer_params = (50, 100, 50)
+    fc_layer_params = tuned('FC_LAYERS', (50, 100, 50),
+                            lambda raw: tuple(int(width) for width in raw.split(',')))
     action_tensor_spec = tensor_spec.from_spec(train_py_env.action_spec())
     num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
 
@@ -147,7 +166,9 @@ def main(argv):
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         td_errors_loss_fn=common.element_wise_huber_loss,
         target_update_period=agent_target_update_period,
-        # target_update_tau=target_update_tau,
+        target_update_tau=target_update_tau,
+        gradient_clipping=gradient_clipping or None,
+        n_step_update=n_step_update,
         train_step_counter=global_step)
 
     agent.initialize()
@@ -164,7 +185,9 @@ def main(argv):
         capacity=replay_buffer_max_length,
         alpha=priority_exponent,
         initial_beta=initial_importance_sampling_beta,
-        beta_anneal_steps=beta_anneal_steps
+        beta_anneal_steps=beta_anneal_steps,
+        # n_step_update=n needs n+1 consecutive steps per sampled item.
+        sequence_length=n_step_update + 1
     )
 
     def rb_observer(traj):
@@ -214,6 +237,9 @@ def main(argv):
         'batch_size': batch_size,
         'discount': discount,
         'target_update_period': agent_target_update_period,
+        'target_update_tau': target_update_tau,
+        'gradient_clipping': gradient_clipping or 'none',
+        'n_step_update': n_step_update,
         'initial_epsilon': initial_epsilon,
         'fc_layer_params': fc_layer_params,
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),

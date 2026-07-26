@@ -15,6 +15,7 @@ but resets priorities to the max. They re-learn within a few thousand steps as
 TD errors come back, so a restart costs a little sample efficiency, not
 correctness.
 """
+import collections
 import os
 
 import numpy as np
@@ -46,34 +47,38 @@ def normalize_is_weights(weights):
 class TrajectoryPrioritizedReplayBuffer:
 
     def __init__(self, data_spec, capacity, alpha=0.6, initial_beta=0.4, final_beta=1.0,
-                 beta_anneal_steps=1000000):
+                 beta_anneal_steps=1000000, sequence_length=2):
         self._data_spec = data_spec
         self._capacity = capacity
         self._initial_beta = initial_beta
         self._final_beta = final_beta
         self._beta_anneal_steps = beta_anneal_steps
+        self._sequence_length = sequence_length
 
         # cpprb is keyed by flat field name, so mirror tf.nest's flatten order and
         # rebuild the Trajectory with pack_sequence_as on the way out. Each field
-        # carries a leading time dimension of 2 to hold the trajectory pair.
+        # carries a leading time dimension holding the trajectory window: 2 for
+        # single-step DQN, n+1 when the agent uses n_step_update=n.
         flat_specs = tf.nest.flatten(data_spec)
         self._field_names = ['field{0}'.format(i) for i in range(len(flat_specs))]
         env_dict = {}
         for name, spec in zip(self._field_names, flat_specs):
-            env_dict[name] = {'shape': (2,) + tuple(spec.shape), 'dtype': spec.dtype}
+            env_dict[name] = {'shape': (sequence_length,) + tuple(spec.shape), 'dtype': spec.dtype}
 
         self._buffer = PrioritizedReplayBuffer(capacity, env_dict, alpha=alpha)
-        # The previous trajectory, held back so it can be paired with the next one.
-        self._previous = None
+        # Trailing window of trajectories, held back so each stored item is a run
+        # of consecutive steps. maxlen makes the window slide one step at a time.
+        self._window = collections.deque(maxlen=sequence_length)
 
     def add(self, traj):
-        """Observer for PyDriver. Stores (previous, current) once a pair exists."""
-        current = tf.nest.flatten(traj)
-        if self._previous is not None:
-            item = {name: np.stack([previous, latest])
-                    for name, previous, latest in zip(self._field_names, self._previous, current)}
-            self._buffer.add(**item)
-        self._previous = current
+        """Observer for PyDriver. Stores one window per step once it's full."""
+        self._window.append(tf.nest.flatten(traj))
+        if len(self._window) < self._sequence_length:
+            return
+        item = {}
+        for index, name in enumerate(self._field_names):
+            item[name] = np.stack([frame[index] for frame in self._window])
+        self._buffer.add(**item)
 
     def sample(self, batch_size, train_step):
         """Returns (experience, indexes, is_weights) for agent.train()."""
