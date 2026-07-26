@@ -1,0 +1,181 @@
+# Hyperparameter tuning protocol
+
+Long-running, resumable investigation into what makes snek2 reach the **highest
+possible perfect-game percentage**, and get there by **learning consistently**.
+Those two are the objective. Catastrophic forgetting matters as one of the things
+that breaks consistency, not as a target in its own right.
+
+These files are the handoff. A fresh Claude Code session should be able to read
+them and continue with no other context. Keep them current: they are worth more
+than any single run.
+
+| file | contents | changes |
+|---|---|---|
+| `hyperparamTuning.md` (this file) | the protocol: goals, metrics, stop criteria, how to launch, available knobs | rarely |
+| [`runs.md`](runs.md) | what is running, prior findings, results, planned queue | constantly |
+| [`charts.md`](charts.md) | progress graph for every arm, with captions | when charts are refreshed |
+| `charts/` | snapshot copies of the graphs | via `refresh_charts.sh` |
+
+**Start with [`runs.md`](runs.md)** if you are picking this up mid-flight — it says
+what is in progress and what to do next. Read this file for how the machinery
+works.
+
+---
+
+## The goal, and why it's hard
+
+The end target is perfect-game percentage. With the config as committed that
+needs roughly **1M iterations / 4-5 hours** of training and then plateaus around
+**50%**. Two things make tuning awkward:
+
+- **High noise.** Two runs of the identical config reached final avg_score 62.5
+  and 18.0 at 30k steps. Any single-run comparison is meaningless. Promising
+  configs must be repeated **2-3 times**.
+- **Non-linear trajectories.** Sometimes nothing much happens until ~40k
+  iterations and then the slope turns steep. A config that looks dead at 20k may
+  not be. Do not judge a config on a short run alone.
+
+### When to keep a run going, and when to stop it
+
+Judge on **trajectory, not absolute level**. A run is worth continuing while
+*either* its perfect-game rate *or* its average score is still climbing — both are
+valuable, and a config that is behind but rising may overtake one that plateaued.
+Check both: they can disagree, and have.
+
+Concretely, compare a trailing window against the window before it (last 20 evals
+vs the previous 20 for score, last 30 vs previous 30 for the coarser perfect-game
+rate). Stop an arm when neither is rising, or when its remaining question is
+already answered.
+
+Cap a promising-but-slow run at roughly **4 hours**, then stop it and record it as
+**"promising but too slow"** rather than as a failure — that is a genuinely
+different verdict from "does not learn", and worth keeping distinct.
+
+Stopping is cheap and reversible: relaunching the same policy name continues its
+graph and checkpoint. Always re-supply the same `SNEK_*` overrides when resuming,
+or the config silently changes mid-run.
+
+Because of that, avoid the final eval as a metric. Prefer, in rough order of
+usefulness:
+
+1. **perfect-game % over the last N evals** — the objective. Use a trailing window,
+   never a single eval: one eval is 10 episodes, so a single perfect game reads as
+   10% and the metric is extremely coarse.
+2. **steps to the first perfect game** — how fast a config gets into the region
+   that matters at all.
+3. **last-5-eval average score** — the leading indicator, and the workhorse for
+   comparing configs. Needed because perfect-game % sits at 0 for tens of
+   thousands of steps, so early on it cannot tell two configs apart while score
+   already can.
+4. **mean over the whole curve** — rewards learning early and holding on.
+5. **steps to first reach score N** — for comparing learning speed.
+6. **max drawdown** — biggest drop from a running peak. A diagnostic for
+   inconsistency rather than an objective: useful for explaining *why* a config is
+   erratic, but a config with a large drawdown that reaches a high perfect-game
+   rate still wins.
+
+---
+
+## Running the experiments
+
+### Slot budget
+
+**Never exceed 4 snek trainers at once, including any the human started.** Each
+one spawns 9 headless eval workers on top of its main process, so 4 runs is ~40
+processes on 14 cores. Check first:
+
+```
+ps -eo pid,etime,command | grep "[s]nek2.py" | grep -v spawn_main
+```
+
+A human-started `python snek2.py train` counts against the budget. Leave it
+alone; never touch `snek2/savedPolicies/train*`.
+
+### Launching a run
+
+Hyperparameters are overridden through `SNEK_*` environment variables, read by
+`tuned()` in `snek2.py`. No file edits are needed to vary a config, so several
+policies can run side by side from the same code.
+
+```
+cd snek2
+SNEK_TARGET_UPDATE_PERIOD=200 \
+  PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -u snek2.py b1b-tgt200 \
+  > /tmp/b1b.log 2>&1 &
+```
+
+Notes that matter:
+
+- Use the env's python binary directly, **not `conda run`** — it buffers stdout
+  and makes a healthy run look hung. See `CLAUDE.md`.
+- Do **not** set `SDL_VIDEODRIVER=dummy` for real tuning runs. The human wants
+  one visible eval env plus the headless parallel ones so training can be
+  watched. `display_eval` is already `True` by default; just leave it.
+- The policy name is the graph window title, so name it so it's identifiable at a
+  glance while running.
+- Every override prints a `hyperparameter override:` line at startup. Grep for it
+  to confirm a run really got the config you intended — this has already caught
+  one silently-misconfigured control arm.
+
+### Available knobs
+
+| env var | default | notes |
+|---|---|---|
+| `SNEK_LEARNING_RATE` | 1e-5 | in-code comment suggests trying 1e-4 |
+| `SNEK_BATCH_SIZE` | 128 | |
+| `SNEK_DISCOUNT` | 0.99 | horizon ~100 steps; perfect games are much longer |
+| `SNEK_TARGET_UPDATE_PERIOD` | 8 | very frequent for DQN; prime suspect for forgetting |
+| `SNEK_TARGET_UPDATE_TAU` | 1.0 | 1.0 = hard copy; <1 = soft/Polyak updates |
+| `SNEK_GRADIENT_CLIPPING` | 0.0 (off) | norm clip; 0 disables |
+| `SNEK_N_STEP_UPDATE` | 1 | n-step returns; buffer window is n+1 automatically |
+| `SNEK_INITIAL_EPSILON` | 0.4 | |
+| `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
+| `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
+| `SNEK_PRIORITY_EXPONENT` | 0.6 | 0.0 disables prioritization |
+| `SNEK_IS_BETA` | 0.4 | |
+| `SNEK_BETA_ANNEAL_STEPS` | 1000000 | |
+| `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
+
+Rewards (`snake_constants.py`) are deliberately **held fixed** so `avg_score` stays
+comparable across every run. Changing them invalidates comparison with everything
+already recorded here.
+
+### Naming
+
+`b<batch><letter>-<change>`, e.g. `b1b-tgt200`. The batch prefix keeps runs from
+the same machine-load conditions grouped, which matters because throughput and
+therefore contention differ between batches.
+
+### Artifacts, and resuming
+
+Each run continuously writes to `snek2/runs/`:
+
+```
+<policy>.png          graph, whole history across all runs of that policy
+<policy>.md           graph + config table + recent evals
+<policy>_evals.json   full eval series; this is what later sessions analyse
+```
+
+Those are the **live** files, rewritten on every eval. The tuning docs must never
+link to them directly: if `runs/` is ever cleaned out, every chart in `charts.md`
+would silently vanish. Instead `charts/` holds snapshot **copies**, refreshed with:
+
+```
+snek2/hyperparamTuning/refresh_charts.sh
+```
+
+which re-copies each graph and prints the step it is at, so captions in
+`charts.md` can be updated to match. Add new charts there, not in this file or
+`runs.md`.
+
+**Never delete anything in `snek2/runs/`** (see `CLAUDE.md`). Re-running the same
+policy name continues its graph and draws a dashed line at the resume step, so a
+promising run can be extended later just by launching it again with the same name.
+That is the intended way to answer "does the slope keep going up?".
+
+Runs are expected to be killed and restarted. `kill -9` is safe: the graph, report
+and evals json are all written via write-then-rename, and the agent checkpoints
+every eval.
+
+---
+

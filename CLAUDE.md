@@ -64,13 +64,19 @@ iteration instead of continuing.
 
 There is an ongoing, resumable investigation into configs that reach the highest
 possible perfect-game percentage while learning consistently. Reducing
-catastrophic forgetting is a means to that end, not the goal itself. The
-protocol, prior findings, what is currently running, and the queue of planned
-experiments all live in **`snek2/hyperparamTuning.md`**.
+catastrophic forgetting is a means to that end, not the goal itself. Everything
+lives in **`snek2/hyperparamTuning/`**:
 
-Read that file before starting or judging any tuning run, and update it as runs
-start, finish, or get killed — it is the handoff between sessions. Two rules from
-it are easy to get wrong:
+- `hyperparamTuning.md` — the protocol: metrics, stop criteria, how to launch,
+  available knobs. Read this for how the machinery works.
+- `runs.md` — what is running, prior findings, results, planned queue. **Start
+  here** when picking the task up mid-flight.
+- `charts.md` + `charts/` — progress graph per arm; snapshot copies, refreshed
+  with `refresh_charts.sh`.
+
+Read those before starting or judging any tuning run, and update them as runs
+start, finish, or get killed — they are the handoff between sessions. Two rules
+are easy to get wrong:
 
 - **Never run more than 4 snek trainers at once**, counting human-started ones.
   Check with `ps -eo pid,command | grep "[s]nek2.py" | grep -v spawn_main`.
