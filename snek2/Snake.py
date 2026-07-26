@@ -306,6 +306,9 @@ class Game:
         return (self.current_score + START_SEGMENTS + 1) == PERFECT_SCORE
 
     def render(self):
+        if self.perfect_game:
+            print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111!!!!!!!!')
+
         if not self.display:
             return
 
@@ -313,7 +316,6 @@ class Game:
         pygame.event.pump()
 
         if self.perfect_game:
-            print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111!!!!!!!!')
             f = pygame.font.Font(None, 25)
             fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()

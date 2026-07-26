@@ -61,8 +61,9 @@ def compute_avg_return(environment, parallel_environment, policy, metrics, eval_
 
     print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
 
+    metrics.last_eval_perfect_percent = perfect_games / num_episodes
     if eval_only:
-        metrics.append_perfect_percent(perfect_games / num_episodes)
+        metrics.append_perfect_percent(metrics.last_eval_perfect_percent)
 
     return sum(episode_returns) / num_episodes
 

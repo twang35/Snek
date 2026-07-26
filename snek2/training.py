@@ -105,6 +105,7 @@ class TrainingMetrics:
         self.eval_start_time = time.time()
         self.min_score = 1000
         self.max_score = 0
+        self.last_eval_perfect_percent = 0.0
         self.perfect_percentage = 0.0
         self.num_of_percents = 0
 
@@ -151,14 +152,16 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
         if len(metrics.trailing_avg) > trailing_avg_window:
             metrics.trailing_avg.pop(0)
 
-        eval_str = 'step = {0}: avg_return = {1}, trailing_avg = {2}, min_score = {3}, max_score = {4}'\
+        eval_str = 'step = {0}: avg_return = {1}, trailing_avg = {2}, min_score = {3}, max_score = {4}, ' \
+                   'perfect_percent = {5}'\
             .format(step,
                     str(round(avg_return, 3)),
                     str(round(compute_trailing_avg_return(metrics.trailing_avg), 3)),
                     metrics.min_score,
-                    metrics.max_score)
+                    metrics.max_score,
+                    str(round(metrics.last_eval_perfect_percent, 3)))
         if eval_only:
-            eval_str += ', perfect_percent = {0}, initial_step = {1}'\
+            eval_str += ', cumulative_perfect_percent = {0}, initial_step = {1}'\
                 .format(str(round(metrics.perfect_percentage, 3)), initial_step)
         print(eval_str)
 
