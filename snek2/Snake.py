@@ -307,7 +307,7 @@ class Game:
 
     def render(self):
         if self.perfect_game:
-            print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111!!!!!!!!')
+            print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1!!!1!!1!!!!11111!!!!111!!!!!!!!')
 
         if not self.display:
             return
