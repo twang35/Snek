@@ -29,6 +29,7 @@ def main(argv):
     # agent_target_update_period = 4
     agent_target_update_period = 8
     # target_update_tau = 0.01
+    initial_epsilon = 0.4
 
     display_training = False
     # display_training = True
@@ -111,6 +112,12 @@ def main(argv):
     global_step = tf.compat.v1.train.get_or_create_global_step()
     # step = tf.Variable(0, trainable=False, dtype=tf.int32)
 
+    # Epsilon has to be a Variable rather than a Python callable: the collect
+    # policy runs inside a tf.function (use_tf_function=True below), which would
+    # bake a plain float in as a constant at trace time and freeze the decay in
+    # maybe_update_epsilon(). A Variable is read on every call instead.
+    epsilon = tf.Variable(initial_epsilon, dtype=tf.float32, trainable=False, name='epsilon')
+
     # QNetwork consists of a sequence of Dense layers followed by a dense layer
     # with `num_actions` units to generate one q_value per available action as
     # its output.
@@ -127,7 +134,7 @@ def main(argv):
         train_env.time_step_spec(),
         train_env.action_spec(),
         q_network=q_net,
-        epsilon_greedy=train_py_env.get_updated_epsilon,
+        epsilon_greedy=epsilon,
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         td_errors_loss_fn=common.element_wise_huber_loss,
         target_update_period=agent_target_update_period,
@@ -171,7 +178,7 @@ def main(argv):
     collect_driver = py_driver.PyDriver(
         train_py_env,
         py_tf_eager_policy.PyTFEagerPolicy(
-            agent.collect_policy, use_tf_function=False),
+            agent.collect_policy, use_tf_function=True),
         [rb_observer],
         max_steps=collect_steps_per_iteration)
 
@@ -199,7 +206,7 @@ def main(argv):
     global_step = tf.compat.v1.train.get_global_step()
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, replay_buffer_checkpointer, global_step, eval_only, policy_name)
+          train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, eval_only, policy_name)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

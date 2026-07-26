@@ -18,7 +18,6 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         self._observations = None
         self._total_steps = 0
         self.high_score = 0
-        self.epsilon = 0.4
 
     def action_spec(self):
         # left, right, and forward
@@ -68,6 +67,10 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         self._observations = self._game.get_observation()
         step_type = StepType.MID
 
+        if self.high_score < self._game.current_score:
+            self.high_score = self._game.current_score
+            print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ', self.high_score)
+
         if is_final:
             step_type = StepType.LAST
 
@@ -78,11 +81,3 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                         reward=convert_to_tensor(reward, dtype=np.float32),
                         discount=convert_to_tensor(self._discount, dtype=np.float32),
                         observation=convert_to_tensor(observations, dtype=np.float32))
-
-    # Used to get the updated epsilon in the agent
-    def get_updated_epsilon(self):
-        if self.high_score < self._game.current_score:
-            self.high_score = self._game.current_score
-            print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ', self.high_score)
-
-        return self.epsilon

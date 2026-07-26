@@ -55,7 +55,7 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 
 def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, replay_buffer_checkpointer, global_step, eval_only, policy_name):
+          train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, eval_only, policy_name):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -92,7 +92,7 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                              train_checkpointer, replay_buffer_checkpointer, global_step, step, eval_only,
+                              train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, step, eval_only,
                               initial_step)
 
 
@@ -129,7 +129,8 @@ class TrainingMetrics:
 
 
 def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                          train_checkpointer, replay_buffer_checkpointer, global_step, step, eval_only, initial_step):
+                          train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, step, eval_only,
+                          initial_step):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -149,7 +150,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
                                                    num_eval_episodes)
         print('eval time: ', get_time(metrics.eval_start_time))
 
-        maybe_update_epsilon(avg_reward, train_py_env)
+        maybe_update_epsilon(avg_reward, epsilon)
 
         if not eval_only:
             print('saving checkpoint')
@@ -163,7 +164,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
 
         eval_str = 'step = {0}: avg_score = {1}, trailing_avg_score = {2}, min_score = {3}, ' \
                    'max_score = {4}/{5}, avg_reward = {6}, min_reward = {7}, max_reward = {8}, ' \
-                   'perfect_percent = {9}'\
+                   'perfect_percent = {9}, epsilon = {10}'\
             .format(step,
                     round(avg_score, 2),
                     round(trailing_avg_score, 2),
@@ -173,7 +174,8 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
                     round(avg_reward, 3),
                     round(metrics.min_reward, 2),
                     round(metrics.max_reward, 2),
-                    '{0}%'.format(round(metrics.last_eval_perfect_percent * 100)))
+                    '{0}%'.format(round(metrics.last_eval_perfect_percent * 100)),
+                    round(float(epsilon.numpy()), 4))
         if eval_only:
             eval_str += ', cumulative_perfect_percent = {0}, initial_step = {1}'\
                 .format('{0}%'.format(round(metrics.perfect_percentage * 100)), initial_step)
@@ -196,7 +198,7 @@ def get_time(start_time):
     return str(round(total_time, 1)) + 's'
 
 
-def maybe_update_epsilon(avg_reward, train_py_env):
+def maybe_update_epsilon(avg_reward, epsilon):
     # For grid length 15
     # if train_py_env.epsilon > 0.2 and avg_return > 40:
     #     train_py_env.epsilon = 0.2
@@ -209,15 +211,20 @@ def maybe_update_epsilon(avg_reward, train_py_env):
     # elif avg_return > 140:
     #     train_py_env.epsilon = 0.001
     # For grid length 9
-    if train_py_env.epsilon > 0.2 and avg_reward > 5:
-        train_py_env.epsilon = 0.2
-    elif train_py_env.epsilon > 0.1 and avg_reward > 10:
-        train_py_env.epsilon = 0.1
-    elif train_py_env.epsilon > 0.05 and avg_reward > 20:
-        train_py_env.epsilon = 0.05
-    elif train_py_env.epsilon > 0.01 and avg_reward > 40:
-        train_py_env.epsilon = 0.01
-    elif train_py_env.epsilon > 0.001 and avg_reward > 60:
-        train_py_env.epsilon = 0.001
+    # Round-trip through float32 makes the stored value slightly larger than the
+    # literal (0.2 comes back as 0.20000000298), so comparing it directly would
+    # re-match the first branch forever and pin epsilon at 0.2. Rounding restores
+    # the exact comparisons the ladder relies on to step down one level per eval.
+    current = round(float(epsilon.numpy()), 6)
+    if current > 0.2 and avg_reward > 5:
+        epsilon.assign(0.2)
+    elif current > 0.1 and avg_reward > 10:
+        epsilon.assign(0.1)
+    elif current > 0.05 and avg_reward > 20:
+        epsilon.assign(0.05)
+    elif current > 0.01 and avg_reward > 40:
+        epsilon.assign(0.01)
+    elif current > 0.001 and avg_reward > 60:
+        epsilon.assign(0.001)
     elif avg_reward > 100:
-        train_py_env.epsilon = 0.0
+        epsilon.assign(0.0)
