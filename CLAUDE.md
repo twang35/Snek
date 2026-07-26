@@ -50,3 +50,18 @@ working copy of `theSchlong/`.
 
 All other directories (`theSchlong/`, `theSchlongCardinalDirs/`, `humanPlayer/`,
 etc.) are kept as-is for posterity — do not edit files in them.
+
+## Git workflow
+
+Leave finished work uncommitted. Do not run `git commit` or `git push` until the
+user has explicitly approved that specific change — "push" or "commit this" from
+the user is the go-ahead, and it applies only to the change in front of you, not
+to later ones.
+
+The reason is review: the user reads diffs in their editor, and committing moves
+the change out of the working tree where it's no longer visible there. Staging
+has the same problem, so don't `git add` either.
+
+So the loop is: make the edit, describe what changed, then stop and wait. It's
+fine to run read-only git commands (`status`, `diff`, `log`, `show`) at any
+point — the restriction is only on commands that write history or the index.
