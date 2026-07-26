@@ -13,6 +13,7 @@ log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
 display_progress_interval = eval_interval
+buffer_save_interval = 10 * eval_interval
 
 
 def initial_populate_replay_buffer(use_theschmid_bot,
@@ -54,8 +55,8 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
 
-def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, eval_only, policy_name):
+def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -85,15 +86,22 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
         time_step, _ = collect_driver.run(time_step)
 
         # Sample a batch of data from the buffer and update the agent's network.
-        experience = next(iterator)
         loss_info = 0
         if not eval_only:
-            loss_info = agent.train(experience)
+            experience, indexes, is_weights = replay_buffer.sample(batch_size, step)
+            # is_weights undo the bias that sampling by priority introduces.
+            loss_info = agent.train(experience, weights=is_weights)
+            # Transitions the network is worst at get sampled more often next time.
+            # td_error, not td_loss: td_loss is Huber, which is quadratic below
+            # |e|=1 and so shrinks small errors, making its spread wider than the
+            # raw error's. Feeding it in gave an effective exponent near |e|^1.6
+            # instead of |e|^0.6 and measurably hurt learning.
+            replay_buffer.update_priorities(indexes, loss_info.extra.td_error.numpy())
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                              train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, step, eval_only,
-                              initial_step)
+                              train_checkpointer, replay_buffer, replay_buffer_dir, global_step, epsilon, step,
+                              eval_only, initial_step)
 
 
 class TrainingMetrics:
@@ -129,8 +137,8 @@ class TrainingMetrics:
 
 
 def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                          train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, step, eval_only,
-                          initial_step):
+                          train_checkpointer, replay_buffer, replay_buffer_dir, global_step, epsilon, step,
+                          eval_only, initial_step):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -155,7 +163,10 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
         if not eval_only:
             print('saving checkpoint')
             train_checkpointer.save(global_step)
-            replay_buffer_checkpointer.save(global_step)
+            # The buffer is ~20 MB and only warm-starts the next run, so it saves
+            # far less often than the agent to keep disk churn down.
+            if step % buffer_save_interval == 0:
+                replay_buffer.save(replay_buffer_dir)
 
         metrics.trailing_avg_scores.append(avg_score)
         if len(metrics.trailing_avg_scores) > trailing_avg_window:

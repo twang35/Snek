@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
+from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
 from snake_environment import SnakeEnvironment
 from training import *
 
@@ -11,11 +12,9 @@ from tf_agents.environments import parallel_py_environment
 from tf_agents.environments import tf_py_environment
 from tf_agents.networks import sequential
 from tf_agents.policies import py_tf_eager_policy
-from tf_agents.replay_buffers import py_uniform_replay_buffer
 from tf_agents.specs import tensor_spec
 from tf_agents.system import system_multiprocessing
 from tf_agents.utils import common
-from tf_agents.utils import nest_utils
 
 
 def main(argv):
@@ -47,6 +46,16 @@ def main(argv):
     initial_populate_replay_buffer_steps = 1000
     collect_steps_per_iteration = 1
     replay_buffer_max_length = 100000
+
+    # Prioritized replay. 0.8 was what the reverb setup used, but it paired that
+    # with Huber loss as the priority, which works out to a far more aggressive
+    # exponent than intended; 0.6 against the raw TD error is the usual choice.
+    # beta corrects the sampling bias prioritizing introduces and anneals to 1.0,
+    # which the reverb version never did -- it prioritized with no importance
+    # sampling at all.
+    priority_exponent = 0.6
+    initial_importance_sampling_beta = 0.4
+    beta_anneal_steps = 1000000
 
     # policy_name = 'eval'
     policy_name = 'train'
@@ -147,18 +156,19 @@ def main(argv):
     collect_policy = agent.collect_policy
 
     # Replay buffer
-    # Note: reverb has no macOS wheel, so this uses tf_agents' local
-    # PyUniformReplayBuffer instead of reverb's prioritized ReverbReplayBuffer.
-    # This means experience is sampled uniformly rather than by TD-error priority.
-
+    # reverb has no macOS wheel, so prioritized replay comes from cpprb's C++ sum
+    # tree instead of reverb's ReverbReplayBuffer. See prioritized_replay_buffer.py.
     replay_buffer_data_spec = tensor_spec.to_nest_array_spec(agent.collect_data_spec)
-    replay_buffer = py_uniform_replay_buffer.PyUniformReplayBuffer(
+    replay_buffer = TrajectoryPrioritizedReplayBuffer(
         data_spec=replay_buffer_data_spec,
-        capacity=replay_buffer_max_length
+        capacity=replay_buffer_max_length,
+        alpha=priority_exponent,
+        initial_beta=initial_importance_sampling_beta,
+        beta_anneal_steps=beta_anneal_steps
     )
 
     def rb_observer(traj):
-        replay_buffer.add_batch(nest_utils.batch_nested_array(traj))
+        replay_buffer.add(traj)
 
     initial_populate_replay_buffer(initialize_with_schmid,
                                    train_env.time_step_spec(),
@@ -168,12 +178,6 @@ def main(argv):
                                    rb_observer,
                                    initial_populate_replay_buffer_steps)
 
-    dataset = replay_buffer.as_dataset(
-        sample_batch_size=batch_size,
-        num_steps=2).prefetch(3)
-
-    iterator = iter(dataset)
-
     # Create a driver to collect experience.
     collect_driver = py_driver.PyDriver(
         train_py_env,
@@ -182,11 +186,11 @@ def main(argv):
         [rb_observer],
         max_steps=collect_steps_per_iteration)
 
-    # The replay buffer's 100k transitions serialize to ~10 MB, which dwarfs the
-    # ~180 KB of agent weights, so keeping it in the 1000-deep history meant
-    # ~10 GB per policy. Only the newest buffer is useful (it just warm-starts
-    # the next run), so it gets its own single-slot checkpointer. The agent
-    # history stays 1000 deep for replaying earlier iterations.
+    # The replay buffer holds 100k transitions, far more than the ~180 KB of agent
+    # weights, so keeping it in the 1000-deep history would mean gigabytes per
+    # policy. It lives outside the checkpointer in its own single file, which only
+    # ever needs the newest copy to warm-start the next run. The agent history
+    # stays 1000 deep for replaying earlier iterations.
     train_checkpointer = common.Checkpointer(
         ckpt_dir=POLICY_DIR + policy_name,
         max_to_keep=1000,
@@ -195,18 +199,15 @@ def main(argv):
         global_step=global_step
     )
 
-    replay_buffer_checkpointer = common.Checkpointer(
-        ckpt_dir=os.path.join(POLICY_DIR + policy_name, 'replay_buffer'),
-        max_to_keep=1,
-        replay_buffer=replay_buffer
-    )
+    replay_buffer_dir = os.path.join(POLICY_DIR + policy_name, 'replay_buffer')
 
     train_checkpointer.initialize_or_restore()
-    replay_buffer_checkpointer.initialize_or_restore()
     global_step = tf.compat.v1.train.get_global_step()
+    if replay_buffer.restore(replay_buffer_dir):
+        print('restored replay buffer:', replay_buffer.size, 'transitions')
 
-    train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, replay_buffer_checkpointer, global_step, epsilon, eval_only, policy_name)
+    train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))
