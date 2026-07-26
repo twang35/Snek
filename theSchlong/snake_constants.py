@@ -1,3 +1,4 @@
+import os
 import pygame
 
 # screen that game appears on 0 or 1
@@ -39,7 +40,7 @@ SNAKE_HEAD_RADIUS = 13
 SNAKE_SEGMENT_RADIUS = 17
 FOOD_RADIUS = SNAKE_SEGMENT_RADIUS
 
-POLICY_DIR = '/home/tony/PycharmProjects/Snek/theSchlong/savedPolicies/'
+POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'savedPolicies') + '/'
 
 CAPTION = 'MiniSnake'
 FPS_LIMIT = 15

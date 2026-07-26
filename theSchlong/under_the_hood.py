@@ -73,8 +73,7 @@ def display_progress(starting_step, steps, eval_interval, returns, screen):
 
     fig.canvas.draw()
 
-    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    image = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
 
     screen.update(image)
     plt.close(fig)

@@ -83,14 +83,10 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
         time_step, _ = collect_driver.run(time_step)
 
         # Sample a batch of data from the buffer and update the agent's network.
-        experience, sample_info = next(iterator)
+        experience = next(iterator)
         loss_info = 0
         if not eval_only:
             loss_info = agent.train(experience)
-
-            # check that loss_info.extra.td_loss is different for each key
-            replay_buffer.update_priorities([element[0] for element in sample_info.key],
-                                            tf.cast(loss_info.extra.td_loss, tf.float64))
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, agent, train_py_env, screen, train_checkpointer,

@@ -5,7 +5,6 @@ import sys
 from snake_environment import SnakeEnvironment
 from training import *
 
-import reverb
 import os
 
 from tf_agents.agents.dqn import dqn_agent
@@ -13,10 +12,10 @@ from tf_agents.drivers import py_driver
 from tf_agents.environments import tf_py_environment
 from tf_agents.networks import sequential
 from tf_agents.policies import py_tf_eager_policy
-from tf_agents.replay_buffers import reverb_replay_buffer
-from tf_agents.replay_buffers import reverb_utils
+from tf_agents.replay_buffers import py_uniform_replay_buffer
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
+from tf_agents.utils import nest_utils
 
 # --------------------------------------------- Constants ---------------------------------------------
 learning_rate = 1e-5  # next 1e-4
@@ -28,7 +27,6 @@ discount = 0.99
 # agent_target_update_period = 4
 agent_target_update_period = 8
 # target_update_tau = 0.01
-initial_priority = 1.0
 
 display_training = False
 # display_training = True
@@ -126,35 +124,19 @@ eval_policy = agent.policy
 collect_policy = agent.collect_policy
 
 # Replay buffer
+# Note: reverb has no macOS wheel, so this uses tf_agents' local
+# PyUniformReplayBuffer instead of reverb's prioritized ReverbReplayBuffer.
+# This means experience is sampled uniformly rather than by TD-error priority.
 
-table_name = 'uniform_table'
-replay_buffer_signature = tensor_spec.from_spec(agent.collect_data_spec)
-replay_buffer_signature = tensor_spec.add_outer_dim(replay_buffer_signature)
-
-table = reverb.Table(
-    table_name,
-    max_size=replay_buffer_max_length,
-    sampler=reverb.selectors.Prioritized(priority_exponent=0.8),
-    remover=reverb.selectors.Fifo(),
-    rate_limiter=reverb.rate_limiters.MinSize(1),
-    signature=replay_buffer_signature
+replay_buffer_data_spec = tensor_spec.to_nest_array_spec(agent.collect_data_spec)
+replay_buffer = py_uniform_replay_buffer.PyUniformReplayBuffer(
+    data_spec=replay_buffer_data_spec,
+    capacity=replay_buffer_max_length
 )
 
-reverb_server = reverb.Server([table])
 
-replay_buffer = reverb_replay_buffer.ReverbReplayBuffer(
-    agent.collect_data_spec,
-    table_name=table_name,
-    sequence_length=2,
-    local_server=reverb_server
-)
-
-rb_observer = reverb_utils.ReverbAddTrajectoryObserver(
-    replay_buffer.py_client,
-    table_name,
-    priority=initial_priority,
-    sequence_length=2
-)
+def rb_observer(traj):
+    replay_buffer.add_batch(nest_utils.batch_nested_array(traj))
 
 initial_populate_replay_buffer(initialize_with_schmid,
                                train_env.time_step_spec(),
@@ -165,7 +147,6 @@ initial_populate_replay_buffer(initialize_with_schmid,
                                initial_populate_replay_buffer_steps)
 
 dataset = replay_buffer.as_dataset(
-    num_parallel_calls=3,
     sample_batch_size=batch_size,
     num_steps=2).prefetch(3)
 
