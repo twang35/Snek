@@ -8,7 +8,6 @@ from tf_agents.policies import random_tf_policy
 from tf_agents.utils import common
 import pyformulas as pf
 
-trailing_avg_window = 5
 log_interval = 200
 num_eval_episodes = 10
 eval_interval = 1000
@@ -68,10 +67,10 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
 
     # Evaluate the agent's policy once before training
     training_metrics = TrainingMetrics(agent.train_step_counter)
-    avg_return = compute_avg_return(eval_env, eval_parallel_env, agent.policy, training_metrics, eval_only,
-                                    num_eval_episodes)
-    training_metrics.returns.append(avg_return)
-    print('before training return: ', training_metrics.returns)
+    avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, training_metrics,
+                                               eval_only, num_eval_episodes)
+    training_metrics.scores.append(avg_score)
+    print('before training score: ', training_metrics.scores)
 
     print('Begin training: ', time.strftime("%d/%m %H:%M:%S", time.localtime()))
 
@@ -98,11 +97,12 @@ class TrainingMetrics:
     def __init__(self, step_counter):
         self.starting_step = step_counter.numpy()
         self.step_counter = step_counter
-        self.returns = []
-        self.trailing_avg = []
+        self.scores = []
         self.steps_start_time = time.time()
         self.training_start_time = time.time()
         self.eval_start_time = time.time()
+        self.min_reward = 1000
+        self.max_reward = 0
         self.min_score = 1000
         self.max_score = 0
         self.last_eval_perfect_percent = 0.0
@@ -112,6 +112,8 @@ class TrainingMetrics:
     def reset(self):
         self.steps_start_time = time.time()
         self.training_start_time = time.time()
+        self.min_reward = 1000
+        self.max_reward = -1000
         self.min_score = 1000
         self.max_score = -1000
 
@@ -138,39 +140,37 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
         print('training time: ', get_time(metrics.training_start_time))
         print('train_py_env high score: ', train_py_env.high_score)
         metrics.eval_start_time = time.time()
-        avg_return = compute_avg_return(eval_env, eval_parallel_env, agent.policy, metrics, eval_only,
-                                        num_eval_episodes)
+        avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, metrics, eval_only,
+                                                   num_eval_episodes)
         print('eval time: ', get_time(metrics.eval_start_time))
 
-        maybe_update_epsilon(avg_return, train_py_env)
+        maybe_update_epsilon(avg_reward, train_py_env)
 
         if not eval_only:
             print('saving checkpoint')
             train_checkpointer.save(global_step)
 
-        metrics.trailing_avg.append(avg_return)
-        if len(metrics.trailing_avg) > trailing_avg_window:
-            metrics.trailing_avg.pop(0)
-
-        eval_str = 'step = {0}: avg_return = {1}, trailing_avg = {2}, min_score = {3}, max_score = {4}, ' \
-                   'perfect_percent = {5}'\
+        eval_str = 'step = {0}: avg_score = {1}, min_score = {2}, max_score = {3}, avg_reward = {4}, ' \
+                   'min_reward = {5}, max_reward = {6}, perfect_percent = {7}'\
             .format(step,
-                    str(round(avg_return, 3)),
-                    str(round(compute_trailing_avg_return(metrics.trailing_avg), 3)),
-                    round(metrics.min_score, 2),
-                    round(metrics.max_score, 2),
+                    round(avg_score, 2),
+                    int(round(metrics.min_score)),
+                    int(round(metrics.max_score)),
+                    round(avg_reward, 3),
+                    round(metrics.min_reward, 2),
+                    round(metrics.max_reward, 2),
                     '{0}%'.format(round(metrics.last_eval_perfect_percent * 100)))
         if eval_only:
             eval_str += ', cumulative_perfect_percent = {0}, initial_step = {1}'\
                 .format('{0}%'.format(round(metrics.perfect_percentage * 100)), initial_step)
         print(eval_str)
 
-        metrics.returns.append(avg_return)
+        metrics.scores.append(avg_score)
         # restart time because compute_avg_return() takes a while and messes up the timing
         metrics.reset()
 
     if step % display_progress_interval == 0:
-        display_progress(metrics.starting_step, step + 1, eval_interval, metrics.returns, screen)
+        display_progress(metrics.starting_step, step + 1, eval_interval, metrics.scores, screen)
 
 
 def get_time(start_time):
@@ -180,7 +180,7 @@ def get_time(start_time):
     return str(round(total_time, 1)) + 's'
 
 
-def maybe_update_epsilon(avg_return, train_py_env):
+def maybe_update_epsilon(avg_reward, train_py_env):
     # For grid length 15
     # if train_py_env.epsilon > 0.2 and avg_return > 40:
     #     train_py_env.epsilon = 0.2
@@ -193,15 +193,15 @@ def maybe_update_epsilon(avg_return, train_py_env):
     # elif avg_return > 140:
     #     train_py_env.epsilon = 0.001
     # For grid length 9
-    if train_py_env.epsilon > 0.2 and avg_return > 5:
+    if train_py_env.epsilon > 0.2 and avg_reward > 5:
         train_py_env.epsilon = 0.2
-    elif train_py_env.epsilon > 0.1 and avg_return > 10:
+    elif train_py_env.epsilon > 0.1 and avg_reward > 10:
         train_py_env.epsilon = 0.1
-    elif train_py_env.epsilon > 0.05 and avg_return > 20:
+    elif train_py_env.epsilon > 0.05 and avg_reward > 20:
         train_py_env.epsilon = 0.05
-    elif train_py_env.epsilon > 0.01 and avg_return > 40:
+    elif train_py_env.epsilon > 0.01 and avg_reward > 40:
         train_py_env.epsilon = 0.01
-    elif train_py_env.epsilon > 0.001 and avg_return > 60:
+    elif train_py_env.epsilon > 0.001 and avg_reward > 60:
         train_py_env.epsilon = 0.001
-    elif avg_return > 100:
+    elif avg_reward > 100:
         train_py_env.epsilon = 0.0

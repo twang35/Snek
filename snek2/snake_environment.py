@@ -49,6 +49,9 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
     def set_display(self, enabled):
         self._game.set_display(enabled)
 
+    def get_score(self):
+        return self._game.current_score
+
     def _reset(self):
         self._game.reset()
         self._observations = self._game.get_observation()

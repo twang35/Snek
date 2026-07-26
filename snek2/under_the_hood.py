@@ -32,30 +32,38 @@ def compute_avg_return(environment, parallel_environment, policy, metrics, eval_
     py_env.set_display(True)
 
     time_step = environment.reset()
-    episode_return = 0.0
+    episode_reward = 0.0
     while not time_step.is_last():
         action_step = policy.action(time_step)
         time_step = environment.step(action_step.action)
-        episode_return += time_step.reward.numpy()[0]
+        episode_reward += time_step.reward.numpy()[0]
         total_steps += 1
 
-    episode_returns = [episode_return]
+    episode_rewards = [episode_reward]
+    episode_scores = [py_env.get_score()]
     last_rewards = [time_step.reward.numpy()[0]]
 
     # remaining episodes: run in parallel, headless
     num_parallel = num_episodes - 1
     if num_parallel > 0 and parallel_environment is not None:
-        parallel_returns, parallel_last_rewards, parallel_steps = run_parallel_eval_episodes(
+        parallel_rewards, parallel_scores, parallel_last_rewards, parallel_steps = run_parallel_eval_episodes(
             parallel_environment, policy, num_parallel)
-        episode_returns.extend(parallel_returns.tolist())
+        episode_rewards.extend(parallel_rewards.tolist())
+        episode_scores.extend(parallel_scores.tolist())
         last_rewards.extend(parallel_last_rewards.tolist())
         total_steps += parallel_steps
 
-    for episode_return in episode_returns:
-        if metrics.min_score > episode_return:
-            metrics.min_score = episode_return
-        if metrics.max_score < episode_return:
-            metrics.max_score = episode_return
+    for episode_reward in episode_rewards:
+        if metrics.min_reward > episode_reward:
+            metrics.min_reward = episode_reward
+        if metrics.max_reward < episode_reward:
+            metrics.max_reward = episode_reward
+
+    for episode_score in episode_scores:
+        if metrics.min_score > episode_score:
+            metrics.min_score = episode_score
+        if metrics.max_score < episode_score:
+            metrics.max_score = episode_score
 
     perfect_games = sum(1 for reward in last_rewards if reward == snake_constants.PERFECT_GAME_REWARD)
 
@@ -65,12 +73,17 @@ def compute_avg_return(environment, parallel_environment, policy, metrics, eval_
     if eval_only:
         metrics.append_perfect_percent(metrics.last_eval_perfect_percent)
 
-    return sum(episode_returns) / num_episodes
+    avg_reward = sum(episode_rewards) / num_episodes
+    avg_score = sum(episode_scores) / num_episodes
+    return avg_reward, avg_score
 
 
 def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
+    worker_envs = parallel_environment.pyenv.envs
+
     time_step = parallel_environment.reset()
-    episode_returns = np.zeros(num_parallel, dtype=np.float32)
+    episode_rewards = np.zeros(num_parallel, dtype=np.float32)
+    episode_scores = np.zeros(num_parallel, dtype=np.float32)
     last_rewards = np.zeros(num_parallel, dtype=np.float32)
     done = np.zeros(num_parallel, dtype=bool)
     total_steps = 0
@@ -82,31 +95,30 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
         is_last = time_step.is_last().numpy()
 
         active = ~done
-        episode_returns[active] += rewards[active]
+        episode_rewards[active] += rewards[active]
         total_steps += int(np.sum(active))
 
         # an already-finished worker auto-resets into a new episode on its
-        # next step; `active` keeps that from being double-counted
+        # next step; `active` keeps that from being double-counted. Scores
+        # must be fetched now, before that reset overwrites current_score.
         newly_done = active & is_last
-        last_rewards[newly_done] = rewards[newly_done]
+        if np.any(newly_done):
+            finished_indices = np.flatnonzero(newly_done)
+            score_promises = [worker_envs[i].call('get_score') for i in finished_indices]
+            for i, promise in zip(finished_indices, score_promises):
+                episode_scores[i] = promise()
+            last_rewards[newly_done] = rewards[newly_done]
         done = done | newly_done
 
-    return episode_returns, last_rewards, total_steps
+    return episode_rewards, episode_scores, last_rewards, total_steps
 
 
-def compute_trailing_avg_return(trailing_avg_returns):
-    total = 0.0
-    for avg in trailing_avg_returns:
-        total += avg
-    return total / len(trailing_avg_returns)
-
-
-def display_progress(starting_step, steps, eval_interval, returns, screen):
+def display_progress(starting_step, steps, eval_interval, scores, screen):
     fig = plt.figure(figsize=(7.3, 4.5))
     steps = range(starting_step, steps + 1, eval_interval)
     plt.clf()
-    plt.plot(steps, returns)
-    plt.ylabel('Average Return')
+    plt.plot(steps, scores)
+    plt.ylabel('Average Score')
     plt.xlabel('Iterations')
     # plt.ylim(top=250)
 
