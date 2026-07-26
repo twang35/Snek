@@ -175,20 +175,31 @@ def main(argv):
         [rb_observer],
         max_steps=collect_steps_per_iteration)
 
+    # The replay buffer's 100k transitions serialize to ~10 MB, which dwarfs the
+    # ~180 KB of agent weights, so keeping it in the 1000-deep history meant
+    # ~10 GB per policy. Only the newest buffer is useful (it just warm-starts
+    # the next run), so it gets its own single-slot checkpointer. The agent
+    # history stays 1000 deep for replaying earlier iterations.
     train_checkpointer = common.Checkpointer(
         ckpt_dir=POLICY_DIR + policy_name,
         max_to_keep=1000,
         agent=agent,
         policy=agent.policy,
-        replay_buffer=replay_buffer,
         global_step=global_step
     )
 
+    replay_buffer_checkpointer = common.Checkpointer(
+        ckpt_dir=os.path.join(POLICY_DIR + policy_name, 'replay_buffer'),
+        max_to_keep=1,
+        replay_buffer=replay_buffer
+    )
+
     train_checkpointer.initialize_or_restore()
+    replay_buffer_checkpointer.initialize_or_restore()
     global_step = tf.compat.v1.train.get_global_step()
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, global_step, eval_only, policy_name)
+          train_checkpointer, replay_buffer_checkpointer, global_step, eval_only, policy_name)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

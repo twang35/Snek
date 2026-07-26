@@ -55,7 +55,7 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 
 def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
-          train_checkpointer, global_step, eval_only, policy_name):
+          train_checkpointer, replay_buffer_checkpointer, global_step, eval_only, policy_name):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -92,7 +92,8 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                              train_checkpointer, global_step, step, eval_only, initial_step)
+                              train_checkpointer, replay_buffer_checkpointer, global_step, step, eval_only,
+                              initial_step)
 
 
 class TrainingMetrics:
@@ -128,7 +129,7 @@ class TrainingMetrics:
 
 
 def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                          train_checkpointer, global_step, step, eval_only, initial_step):
+                          train_checkpointer, replay_buffer_checkpointer, global_step, step, eval_only, initial_step):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -153,6 +154,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
         if not eval_only:
             print('saving checkpoint')
             train_checkpointer.save(global_step)
+            replay_buffer_checkpointer.save(global_step)
 
         metrics.trailing_avg_scores.append(avg_score)
         if len(metrics.trailing_avg_scores) > trailing_avg_window:
