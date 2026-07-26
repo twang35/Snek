@@ -1,5 +1,8 @@
 theSchlong/savedPolicies/
 snek2/savedPolicies/
+# Graph history is local state, like savedPolicies. The .md and .png beside it
+# are the documentation and are meant to be committed.
+snek2/runs/*_history.json
 __pycache__/
 *.pyc
 .idea/

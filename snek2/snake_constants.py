@@ -42,6 +42,9 @@ FOOD_RADIUS = SNAKE_SEGMENT_RADIUS
 
 POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'savedPolicies') + '/'
 
+# Progress graphs are written here, one per policy name, rewritten each eval.
+RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
+
 CAPTION = 'MiniSnake'
 FPS_LIMIT = 15
 SCORE_SLOW_THRESHOLD = 248

@@ -206,8 +206,32 @@ def main(argv):
     if replay_buffer.restore(replay_buffer_dir):
         print('restored replay buffer:', replay_buffer.size, 'transitions')
 
+    # Recorded verbatim into runs/<policy_name>.md, so the write-up can't drift
+    # away from the values that actually produced the run.
+    run_config = {
+        'policy_name': policy_name,
+        'learning_rate': learning_rate,
+        'batch_size': batch_size,
+        'discount': discount,
+        'target_update_period': agent_target_update_period,
+        'initial_epsilon': initial_epsilon,
+        'fc_layer_params': fc_layer_params,
+        'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
+        'priority_exponent (alpha)': priority_exponent,
+        'importance_sampling_beta': '{0} -> 1.0 over {1} steps'.format(
+            initial_importance_sampling_beta, beta_anneal_steps),
+        'initial_populate_steps': initial_populate_replay_buffer_steps,
+        'initialize_with_schmid': initialize_with_schmid,
+        'eval': '{0} episodes every {1} steps'.format(num_eval_episodes, eval_interval),
+        'grid': '{0}x{0}, max possible score {1}'.format(GRID_LENGTH, int(MAX_POSSIBLE_SCORE)),
+        'DEATH_REWARD': DEATH_REWARD,
+        'FOOD_REWARD': FOOD_REWARD,
+        'FOOD_DISTANCE_REWARD': FOOD_DISTANCE_REWARD,
+        'eval_only': eval_only,
+    }
+
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name)
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name, run_config)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

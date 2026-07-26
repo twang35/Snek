@@ -50,3 +50,29 @@ python snek2.py train3
 python snek2.py train4
 ```
 
+### Run documentation
+
+Every eval refreshes the live graph window and also writes three files to
+`snek2/runs/`, named after the policy:
+
+```
+snek2/runs/train.png             the graph, same image as the window
+snek2/runs/train.md              graph, config, and eval table
+snek2/runs/train_history.json    graph data, so restarts continue the curve
+```
+
+The graph covers the policy's whole history rather than just the current run.
+Stopping and restarting `train` picks the curve back up where it left off and
+draws a dashed vertical line at the step where training resumed, so a dip after a
+restart is easy to tell apart from the policy getting worse.
+
+The `.md` config table is generated from the values the run actually used, so it
+can't drift. `_history.json` is local state and is gitignored; the `.png` and
+`.md` are the documentation and can be committed.
+
+To run without any windows (over ssh, or to avoid the graph stealing focus):
+
+```
+SDL_VIDEODRIVER=dummy python snek2.py <policy_name>
+```
+

@@ -43,6 +43,23 @@ This keeps smoke-test checkpoints isolated in `snek2/savedPolicies/smoke/`,
 which is safe to `rm -rf` before/after a test. Never run `rm -rf
 snek2/savedPolicies/` wholesale — target the `smoke/` subdirectory only.
 
+## Run artifacts
+
+Every eval writes `snek2/runs/<policy_name>.{png,md}` plus
+`<policy_name>_history.json`. **Never delete anything in `snek2/runs/`** — not
+even throwaway smoke output like `snek2/runs/smoke.*`. The user reviews these by
+hand, so they have to survive after a run finishes, and a deleted graph can't be
+recovered without re-running the training that produced it.
+
+This is the opposite of the checkpoint rule above: `savedPolicies/smoke/` is
+scratch space and is fine to clear, `runs/` is output to keep. Letting a later run
+of the same policy overwrite these files is expected and fine; removing them is
+not.
+
+Note that deleting `<policy_name>_history.json` also throws away the graph's
+history for that policy, so its next run restarts the curve from the current
+iteration instead of continuing.
+
 ## Active development
 
 `snek2/` is the only directory that should be edited going forward. It's a

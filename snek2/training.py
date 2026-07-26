@@ -1,5 +1,7 @@
+import os
 import time
 from under_the_hood import *
+from run_report import history_path, load_history, merge_eval_row, save_history, write_run_report
 from schmid_policy import TheSchmidPolicy
 
 from tf_agents.drivers import py_driver
@@ -56,7 +58,7 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 
 def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name):
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name, run_config):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -66,14 +68,30 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
     # agent.train_step_counter.assign(0)
 
     screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
+    # Every eval refreshes the window and these three files, so a run always leaves
+    # behind its own graph and write-up without anyone having to screenshot it.
+    graph_path = os.path.join(snake_constants.RUNS_DIR, '{0}.png'.format(policy_name))
+    report_path = os.path.join(snake_constants.RUNS_DIR, '{0}.md'.format(policy_name))
+    graph_history_path = history_path(snake_constants.RUNS_DIR, policy_name)
 
     # Evaluate the agent's policy once before training
     training_metrics = TrainingMetrics(agent.train_step_counter)
+
+    # Carry the graph over from earlier runs of this policy so resuming continues
+    # the same curve instead of starting again at the current iteration.
+    training_metrics.eval_rows, training_metrics.resume_steps = load_history(graph_history_path)
+    if training_metrics.eval_rows:
+        print('resuming graph from {0} earlier evals (through step {1})'.format(
+            len(training_metrics.eval_rows), training_metrics.eval_rows[-1]['step']))
+        if initial_step not in training_metrics.resume_steps:
+            training_metrics.resume_steps.append(int(initial_step))
+            training_metrics.resume_steps.sort()
+
     avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, training_metrics,
                                                eval_only, num_eval_episodes)
-    training_metrics.scores.append(avg_score)
-    training_metrics.perfect_percents.append(training_metrics.last_eval_perfect_percent)
-    print('before training score: ', training_metrics.scores)
+    merge_eval_row(training_metrics.eval_rows,
+                   build_eval_row(int(initial_step), avg_score, avg_score, avg_reward, training_metrics, epsilon))
+    print('before training score: ', round(avg_score, 2))
 
     print('Begin training: ', time.strftime("%d/%m %H:%M:%S", time.localtime()))
 
@@ -100,17 +118,20 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                              train_checkpointer, replay_buffer, replay_buffer_dir, global_step, epsilon, step,
-                              eval_only, initial_step)
+                              graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
+                              replay_buffer_dir, global_step, epsilon, step, eval_only, initial_step, policy_name,
+                              run_config)
 
 
 class TrainingMetrics:
     def __init__(self, step_counter):
         self.starting_step = step_counter.numpy()
         self.step_counter = step_counter
-        self.scores = []
-        self.perfect_percents = []
         self.trailing_avg_scores = []
+        # Plotted history for this policy across every run of it, plus the steps
+        # at which training was resumed. Both are loaded from disk in train().
+        self.eval_rows = []
+        self.resume_steps = []
         self.steps_start_time = time.time()
         self.training_start_time = time.time()
         self.eval_start_time = time.time()
@@ -136,9 +157,24 @@ class TrainingMetrics:
         self.num_of_percents += 1
 
 
-def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
-                          train_checkpointer, replay_buffer, replay_buffer_dir, global_step, epsilon, step,
-                          eval_only, initial_step):
+def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, epsilon):
+    """One row of the run report, and one point on the graph."""
+    return {
+        'step': int(step),
+        'avg_score': round(avg_score, 2),
+        'trailing_avg_score': round(trailing_avg_score, 2),
+        'min_score': int(round(metrics.min_score)),
+        'max_score': '{0}/{1}'.format(int(round(metrics.max_score)),
+                                      int(snake_constants.MAX_POSSIBLE_SCORE)),
+        'avg_reward': round(avg_reward, 3),
+        'perfect_percent': round(metrics.last_eval_perfect_percent * 100),
+        'epsilon': round(float(epsilon.numpy()), 4),
+    }
+
+
+def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen, graph_path,
+                          report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
+                          global_step, epsilon, step, eval_only, initial_step, policy_name, run_config):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -192,14 +228,17 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
                 .format('{0}%'.format(round(metrics.perfect_percentage * 100)), initial_step)
         print(eval_str)
 
-        metrics.scores.append(avg_score)
-        metrics.perfect_percents.append(metrics.last_eval_perfect_percent)
+        # Built before reset() clears the min/max trackers below.
+        merge_eval_row(metrics.eval_rows,
+                       build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, epsilon))
+        save_history(graph_history_path, metrics.eval_rows, metrics.resume_steps)
         # restart time because compute_avg_return() takes a while and messes up the timing
         metrics.reset()
 
     if step % display_progress_interval == 0:
-        display_progress(metrics.starting_step, step + 1, eval_interval, metrics.scores, metrics.perfect_percents,
-                         screen)
+        display_progress(metrics.eval_rows, metrics.resume_steps, screen, graph_path)
+        write_run_report(report_path, policy_name, run_config, metrics.eval_rows, os.path.basename(graph_path),
+                         metrics.resume_steps)
 
 
 def get_time(start_time):

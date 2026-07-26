@@ -6,6 +6,7 @@ from snake_constants import *
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import time
 
 import tensorflow as tf
@@ -113,9 +114,17 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
     return episode_rewards, episode_scores, last_rewards, total_steps
 
 
-def display_progress(starting_step, steps, eval_interval, scores, perfect_percents, screen):
+def display_progress(eval_rows, resume_steps, screen, graph_path=None):
+    """Draws the whole history of a policy, across however many runs made it.
+
+    Takes explicit (step, score, percent) rows rather than assuming evenly spaced
+    evals from a starting step, because a resumed policy's history has gaps
+    wherever it was stopped and restarted.
+    """
     fig, score_axis = plt.subplots(figsize=(3.65, 2.25))
-    steps = range(starting_step, steps + 1, eval_interval)
+    steps = [row['step'] for row in eval_rows]
+    scores = [row['avg_score'] for row in eval_rows]
+    perfect_percents = [row['perfect_percent'] for row in eval_rows]
 
     label_size = 6
     tick_size = 5
@@ -130,10 +139,15 @@ def display_progress(starting_step, steps, eval_interval, scores, perfect_percen
 
     percent_color = 'tab:red'
     percent_axis = score_axis.twinx()
-    percent_axis.plot(steps, [percent * 100 for percent in perfect_percents], color=percent_color)
+    percent_axis.plot(steps, perfect_percents, color=percent_color)
     percent_axis.set_ylabel('Perfect Game %', color=percent_color, fontsize=label_size)
     percent_axis.tick_params(axis='y', labelcolor=percent_color, labelsize=tick_size)
     percent_axis.set_ylim(bottom=0, top=100)
+
+    # One dashed line per point where training was picked back up, so a dip or
+    # jump can be tied to a restart rather than to the policy itself.
+    for resume_step in resume_steps:
+        score_axis.axvline(resume_step, color='gray', linestyle='--', linewidth=0.6)
 
     fig.tight_layout()
     fig.canvas.draw()
@@ -141,6 +155,14 @@ def display_progress(starting_step, steps, eval_interval, scores, perfect_percen
     image = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
 
     screen.update(image)
+    if graph_path is not None:
+        # Same array that goes to the window, so the file always matches what's
+        # on screen. Written beside the target and renamed so anything reading it
+        # mid-eval never sees a half-written PNG.
+        os.makedirs(os.path.dirname(graph_path), exist_ok=True)
+        partial = graph_path + '.partial.png'
+        imageio.imwrite(partial, image)
+        os.replace(partial, graph_path)
     plt.close(fig)
 
 
