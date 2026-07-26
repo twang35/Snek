@@ -47,10 +47,6 @@ FPS_LIMIT = 15
 SCORE_SLOW_THRESHOLD = 248
 SCORE_THRESHOLD_FPS = 10
 
-# after this many seconds of wall-clock time, switch eval to headless
-# (the episode in progress when this is exceeded is allowed to finish first)
-EVAL_HEADLESS_AFTER_SECONDS = 10
-
 SCREENTILES = (
     (SCREENSIZE[0] / TILE_SIZE[0]) - 1,
     (SCREENSIZE[1] / TILE_SIZE[1]) - 1

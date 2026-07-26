@@ -54,8 +54,8 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
 
-def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterator, replay_buffer, train_checkpointer,
-          global_step, eval_only):
+def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, iterator, replay_buffer,
+          train_checkpointer, global_step, eval_only):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -68,7 +68,8 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
 
     # Evaluate the agent's policy once before training
     training_metrics = TrainingMetrics(agent.train_step_counter)
-    avg_return = compute_avg_return(eval_env, agent.policy, training_metrics, eval_only, num_eval_episodes)
+    avg_return = compute_avg_return(eval_env, eval_parallel_env, agent.policy, training_metrics, eval_only,
+                                    num_eval_episodes)
     training_metrics.returns.append(avg_return)
     print('before training return: ', training_metrics.returns)
 
@@ -89,8 +90,8 @@ def train(num_iterations, eval_env, train_py_env, agent, collect_driver, iterato
             loss_info = agent.train(experience)
 
         step += 1
-        log_messages_and_eval(training_metrics, loss_info, eval_env, agent, train_py_env, screen, train_checkpointer,
-                              global_step, step, eval_only, initial_step)
+        log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
+                              train_checkpointer, global_step, step, eval_only, initial_step)
 
 
 class TrainingMetrics:
@@ -119,8 +120,8 @@ class TrainingMetrics:
         self.num_of_percents += 1
 
 
-def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, screen, train_checkpointer, global_step,
-                          step, eval_only, initial_step):
+def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
+                          train_checkpointer, global_step, step, eval_only, initial_step):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -136,7 +137,8 @@ def log_messages_and_eval(metrics, loss_info, eval_env, agent, train_py_env, scr
         print('training time: ', get_time(metrics.training_start_time))
         print('train_py_env high score: ', train_py_env.high_score)
         metrics.eval_start_time = time.time()
-        avg_return = compute_avg_return(eval_env, agent.policy, metrics, eval_only, num_eval_episodes)
+        avg_return = compute_avg_return(eval_env, eval_parallel_env, agent.policy, metrics, eval_only,
+                                        num_eval_episodes)
         print('eval time: ', get_time(metrics.eval_start_time))
 
         maybe_update_epsilon(avg_return, train_py_env)
