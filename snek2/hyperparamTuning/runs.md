@@ -9,17 +9,40 @@ the protocol rarely does.
 Update this section whenever runs start or stop — a future session reads it to
 know what is in flight and might have been terminated.
 
-Status as of 21:35. **Batch 3 is running**; batches 1 and 2 are finished.
+Status as of 00:05. **Batch 4 is running**, targeting sampling and buffer diversity
+after batch 3 falsified the epsilon hypothesis.
 
-| policy | config change | steps | best perfect-30 | perfect, latest block | note |
-|---|---|---|---|---|---|
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 313k | **11.0%** | 6.4% | **best batch-3 arm.** Floor active since 267k |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 310k | 8.3% | 3.6% | floor active since 147k — now inside the collapse window |
-| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 293k | 5.7% | 4.5% | **went to epsilon 0.0 at 282k** — accidentally the batch's best test |
-| `b2a-base2` | baseline repeat #2 | 762k | 7.0% | 2.9% ↑ | recovering from a long trough; not decaying after all |
+| policy | config change | started | what it tests |
+|---|---|---|---|
+| `b4a-uniform` | `PRIORITY_EXPONENT=0.0` | 00:03 | PER off entirely. Prime suspect: already beat PER at 30k, and `theSchlong` prioritized far more weakly than this code does |
+| `b4b-unifbuf500k` | `PRIORITY_EXPONENT=0.0` + `REPLAY_BUFFER_MAX_LENGTH=500000` | 00:04 | the two levers with evidence behind them, together |
+| `b4c-schlongper` | `PRIORITY_EXPONENT=0.8`, `PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0` | 00:04 | `theSchlong`'s exact PER setup, never tested past 30k |
+| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 19:03 | **kept from batch 3** as the reference for the buffer lever alone |
 
-All four are **still running** — a progress check never stops an arm (see
-`CLAUDE.md`). None has yet earned a verdict.
+Resume any of these by relaunching with the same policy name **and the same `SNEK_*`
+overrides** — they are not persisted in the checkpoint, so relaunching without them
+silently changes the config mid-run and invalidates the arm.
+
+**Judge these on consistency, not peak.** The goal is a perfect-game rate that rises
+and *keeps* rising; the 76% `theSchlong` reached was, per the human, "very lucky and
+not consistent at all", so a high spike is not the target.
+
+### The systemic finding batch 4 is chasing
+
+**Every arm observed so far peaks between 236k and 312k and then degrades.** Five
+configs, three epsilon regimes, two buffer sizes, same shape every time:
+
+| policy | peak score (at) | best perfect-30 | where it ended |
+|---|---|---|---|
+| `b1a-base` | 87.5 (135k) | **16.7%** | collapsed 265k, 2.3% at 503k |
+| `b3a-epsfloor` | 83.5 (236k) | 11.0% | 61.4 / 1.3% at 538k |
+| `b3b-epsfloor2` | 85.8 (305k) | 8.3% | 52.0 / 3.3% at 541k |
+| `b3c-buf500k` | 85.7 (312k) | 5.7% | 66.5 / 2.1% at 514k — **shallowest decline** |
+| `b2a-base2` | 83.8 (293k) | 7.0% | 64.3 / 1.1% at 992k |
+
+Degradation is therefore **systemic, not config-specific** — a bigger finding than any
+individual arm's result, and the reason batch 4 targets the sampling machinery rather
+than another scalar.
 
 Logs are in `/Users/tony_wang/.claude/jobs/f3cb1855/tmp/b3{a,b,c}.log`, which is
 job-scoped and will not survive; the durable record is `runs/<policy>_evals.json`,
@@ -30,6 +53,139 @@ Resume any of these by relaunching with the same policy name **and the same
 relaunching without them silently changes the config mid-run and invalidates the
 arm. For batch 3 that means `SNEK_MIN_EPSILON=0.001` for `b3a`/`b3b` and
 `SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` for `b3c`.
+
+## Hypothesis A is falsified: epsilon 0.0 is not what causes the collapse
+
+This was the batch's whole point, and the answer is no. Three independent lines of
+evidence, all now past the horizon where they mean something:
+
+| arm | epsilon regime | outcome |
+|---|---|---|
+| `b3b-epsfloor2` | **floored at 0.001** from 147k | peaked 305k, then declined 71 → 52 and 7.0% → 3.3% |
+| `b3a-epsfloor` | **floored at 0.001** from 267k | peaked ~300k, then declined 74 → 61 and 8.6% → 1.3% |
+| `b3c-buf500k` | **fully greedy at 0.0** from 282k | **did not break**; shallowest decline of any arm, and set its best score at 312k *after* going greedy |
+
+The prediction was explicit and it failed in both directions: flooring epsilon was
+supposed to prevent the degradation and did not, while the arm left fully greedy was
+supposed to break around 430-460k and instead is the healthiest thing running at 491k.
+
+**What the original correlation actually was.** `b1a-base` reaching epsilon 0.0 and
+`b1a-base` collapsing were both consequences of it being the strongest run, not cause
+and effect. The confound was noted at the time — "only strong runs reach the last
+rung" — and it turned out to be the entire signal. Worth remembering how convincing
+the correlation looked: one arm at 0.0, one arm collapsed, same arm, and a clean
+mechanism to explain it.
+
+**`MIN_EPSILON` stays in the code** — it defaults to 0.0 and changes nothing unless
+set, and knowing epsilon 0.0 is *safe* is a useful result. But the epsilon ladder is
+no longer a suspect, and the "make the threshold tunable" follow-up is not worth doing.
+
+## Hypothesis B is supported: buffer diversity is the live lever
+
+`b3c-buf500k` is the only arm that has held up, and it is the only arm with a 5x
+buffer:
+
+| steps | `b3c-buf500k` (500k buffer) | `b2a-base2` (100k buffer) |
+|---|---|---|
+| 250-300k | 70.7 | 68.7 |
+| 350-400k | 68.1 | 68.7 |
+| 450-500k | **66.5** | 68.7 |
+| 500-550k | — | 64.9 |
+
+It is not immune — score drifts from 70.7 to 66.5 and its perfect rate is the batch's
+lowest — but it degrades far more gently than the floored arms (which lost 13 and 19
+points of score over the same span) and it held through the exact window where it was
+predicted to break. Its chart is visibly the flattest in the investigation.
+
+The mechanism still fits: the buffer holds *transitions*, and episodes get longer as
+the policy improves, so a 100k buffer spans fewer and fewer distinct episodes exactly
+when the policy is at its best. A 5x buffer slows that squeeze without eliminating it.
+
+**Next test follows directly**: push further (`REPLAY_BUFFER_MAX_LENGTH=1000000`) and
+pair it with `PRIORITY_EXPONENT=0.0`, since prioritized sampling from a large buffer
+partly defeats the diversity the larger buffer buys.
+
+## What `theSchlong` did differently — three PER changes, none validated
+
+`theSchlong` (the 2022 code in the repo root, read-only) once reached a **76%
+perfect-game rate**. Diffing it against `snek2` is more informative than any
+hyperparameter sweep, because it is a working reference rather than a guess.
+
+**First, the metric is not the same**, so the comparison needs care:
+
+| | `theSchlong` | `snek2` |
+|---|---|---|
+| what it printed | `perfect_percentage`, a **cumulative mean over the whole run** | `last_eval_perfect_percent`, **this eval only** (10 episodes) |
+
+`snek2` still computes the cumulative figure, it just isn't displayed. Measured the
+same way, the arms here are at **0.08% to 5.89%** cumulative, best being `b1a-base`
+at 5.89%. So the gap is real however it is measured, but "76% vs 16.7%" was comparing
+two different quantities and the honest framing is 76% vs ~6%.
+
+**Rewards, grid size, network shape and the epsilon ladder are byte-identical**, so
+scores compare directly. `Snake.py` and `snake_environment.py` differ only
+cosmetically (a policy-name overlay, a moved print, `set_display`/`get_score`
+helpers). What actually changed is the replay buffer, and it changed in **three ways
+at once**:
+
+| aspect | `theSchlong` (76%) | `snek2` (~6% cumulative) | why it was changed |
+|---|---|---|---|
+| alpha | **0.8** | 0.6 | "0.6 against raw TD error is the usual choice" |
+| priority signal | **`td_loss`** (element-wise Huber) | `abs(td_error)` | Huber shrinks small errors, widening spread → effective exponent ~1.6 |
+| IS weights | **none at all** | mean-normalized, beta 0.4→1.0 | prioritizing without IS correction is biased |
+
+Every one of those three is defensible in isolation, and *every one of them was
+validated only at 30k steps* — below the ~250k line this document now says nothing can
+be judged at. The measurement that justified them (alpha 0.6 beating 0.8-with-Huber)
+is therefore worthless for this question.
+
+There is also a mechanical interaction worth noting: **IS weights partially cancel
+prioritization.** High-priority samples get downweighted gradients, so
+`alpha=0.6 + IS` is a much gentler intervention than `alpha=0.8 + no IS`. The three
+changes all push the same direction — less effective prioritization — which is why
+they are worth testing together as well as separately.
+
+Two knobs now make the old behaviour reachable: `SNEK_PRIORITY_SIGNAL`
+(`td_error`|`td_loss`) and `SNEK_IS_WEIGHTS` (`1`|`0`). Both default to current
+behaviour, so nothing else changes.
+
+**Caveat from the human, and it matters:** the 76% was "very lucky and not consistent
+at all." So `theSchlong`'s config is not a known-good target to reproduce — it is
+evidence about *variance*, and it may simply have had a higher ceiling and a wider
+spread. The goal remains **consistent learning and a consistently rising perfect
+rate**, not chasing 76%.
+
+## The baseline does not reach 50% perfect at 1M steps — it reaches ~1%
+
+`b2a-base2` has now passed **967k steps** with the committed config, which is the
+horizon and wall-clock where the premise of this whole investigation says to expect
+**~50% perfect games**. Actual:
+
+| steps | score mean | perfect mean |
+|---|---|---|
+| 150-200k | 69.6 | **5.2** (its best) |
+| 500-550k | 64.9 | 3.8 |
+| 750-800k | 66.6 | 3.0 |
+| 950-1000k | 64.3 | **1.1** |
+
+Its best perfect-game window in the entire run was 7.0%, and it is at 1.1% now. No arm
+in this investigation has exceeded `b1a-base`'s 16.7%. That is a **factor of ~7 below
+the premise at best, and ~45x below it at 1M steps.**
+
+So one of these is true, and it matters which:
+
+1. **The current code learns materially worse than the code the 50% figure came
+   from.** The buffer changed to cpprb prioritized replay and the collect policy now
+   runs under `tf.function`. Prioritized replay is the obvious suspect: it was already
+   measured *worse* than uniform at 30k steps over 3 seeds (46.7 vs 60.1), and the
+   only defence was "it might pay off at 1M". At 967k it has not.
+2. The 50% figure came from a run with a much longer history — the human's `train`
+   policy carries ~1.3M steps under the older code — and is not comparable to a fresh
+   run.
+
+Either way, **`PRIORITY_EXPONENT=0.0` at long horizon is now the highest-value
+experiment available**, ahead of everything else in the queue. It is the one change
+that both explains the gap and is already known to help at short horizon.
 
 ### Matched-step comparison, 250-300k block
 
@@ -67,6 +223,12 @@ arm. For batch 3 that means `SNEK_MIN_EPSILON=0.001` for `b3a`/`b3b` and
 `SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` for `b3c`.
 
 ### Stopped, with verdicts
+
+| policy | stopped at | verdict |
+|---|---|---|
+| `b3a-epsfloor` | 538k, 00:02 | Batch 3's best perfect rate (11.0% window) but degraded anyway to 1.3%. Hypothesis A falsified |
+| `b3b-epsfloor2` | 541k, 00:02 | Longest floor exposure (from 147k) and the clearest refutation: rounded arc, score 71 → 52 |
+| `b2a-base2` | 992k, 00:02 | The 1M-step reference. Answered its question: **2.64% cumulative perfect at ~1M**, best window 7.0% |
 
 | policy | config change | stopped at | verdict |
 |---|---|---|---|
@@ -225,11 +387,14 @@ The lesson is the one this document keeps relearning, now at a fourth timescale:
 not call a trend from the most recent window.** Two premature calls in a row here came
 from doing exactly that.
 
-## Leading hypothesis for the collapse: epsilon reaches exactly 0.0
+## ~~Leading hypothesis for the collapse: epsilon reaches exactly 0.0~~ — FALSIFIED
 
-This is the most actionable thing found so far. The epsilon ladder in
-`maybe_update_epsilon()` is a one-way ratchet ending in `epsilon.assign(0.0)` once
-`avg_reward > 100`. Tracing when each arm stepped down:
+**This hypothesis is dead; see "Hypothesis A is falsified" above.** The section is kept
+because the reasoning was sound given what was known, and because it is a clean example
+of a correlation that was entirely confound. The evidence and mechanism as they stood:
+
+The epsilon ladder in `maybe_update_epsilon()` is a one-way ratchet ending in
+`epsilon.assign(0.0)` once `avg_reward > 100`. Tracing when each arm stepped down:
 
 | policy | reached 0.001 | reached **0.0** | collapsed? |
 |---|---|---|---|
@@ -251,21 +416,22 @@ partial recovery also fits — a closed loop can wander back as easily as it wan
 off, which is exactly the oscillating-instability signature rather than a
 one-way failure.
 
-Note this was anticipated by the batch-2 queue's "longer epsilon exploration" item
-("if forgetting correlates with epsilon getting small, a floor is worth testing")
-before there was any evidence for it. There is now.
+**The caveat recorded at the time turned out to be the whole story.** It read: reaching
+0.0 requires `avg_reward > 100`, i.e. only *strong* runs get there, so "reached 0.0"
+and "was good enough to collapse from a height" are entangled and the correlation
+cannot separate them. That is exactly what happened — `b3c-buf500k` later ran fully
+greedy from 282k without breaking, and both floored arms degraded anyway.
 
-**Caveats, because this is n=1 and confounded.** Reaching 0.0 requires
-`avg_reward > 100`, i.e. only *strong* runs get there — so "reached 0.0" and "was
-good enough to collapse from a height" are entangled, and this correlation cannot
-separate them. `b2a-base2` is stable partly because it never got good enough to
-zero out its exploration; it is stuck at ~4% perfect where `b1a` reached 14%. The
-uncomfortable reading is that the ladder's last rung is both what enables the best
-performance *and* what destroys it.
+Two things worth carrying forward from how this played out:
 
-The test is cheap and settles it: floor epsilon at 0.001 and never let it hit zero.
-That needs a knob (`SNEK_MIN_EPSILON`), which does not exist yet — a small change to
-`maybe_update_epsilon()`. This is now the top of the queue.
+- **The correlation was as strong as this domain ever produces** — one arm at 0.0, one
+  arm collapsed, the same arm, a specific mechanism, and a timing that fit. It was
+  still wrong. With n=1 arms and a stated confound, a mechanism that "fits the timing"
+  adds no evidence.
+- **The test was worth running anyway.** It cost one knob and three arms that were
+  going to run regardless, and it converted the leading hypothesis into a closed
+  question while incidentally producing the batch's best arm (`b3a`, 11.0%) and the
+  natural experiment that settled it (`b3c` going greedy).
 
 ## n-step returns: closed, negative
 
@@ -463,31 +629,56 @@ that is worth remembering:
   terminal and extremely sparse, so credit has to crawl back one step per gradient
   update; n-step returns propagate it ~3x faster.
 
-### Batch 3 — reprioritized around the collapse (do these next)
+### Batch 4 — running now, and what follows it
 
-The collapse at ~265k is now the main obstacle to a high perfect rate, so the
-queue leads with things that plausibly prevent it. **Every one of these needs to
-run past 300k to mean anything**, so expect ~3-4 hours per arm and plan slots
-accordingly.
+Batch 3 killed the epsilon hypothesis and pointed at sampling and buffer diversity
+instead. **Every arm needs to run past ~350k to mean anything** — degradation starts at
+236-312k in every arm observed so far — so expect 4+ hours each.
+
+| priority | change | status |
+|---|---|---|
+| **1** | `PRIORITY_EXPONENT=0.0` | **running** as `b4a-uniform` |
+| **2** | `PRIORITY_EXPONENT=0.0` + 500k buffer | **running** as `b4b-unifbuf500k` |
+| **3** | `theSchlong` PER: alpha 0.8, `td_loss`, no IS | **running** as `b4c-schlongper` |
+| 4 | whichever of 1-3 looks best, **repeated 2-3x** | queued — mandatory before believing any of it |
+| 5 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | queued, if the buffer lever holds up |
+| 6 | `DISCOUNT=0.995` | queued; untested, high-prior — the perfect-game bonus is discounted to near-nothing at 0.99 |
+| 7 | `GRADIENT_CLIPPING=10` | queued; cheap, independent of the above |
+
+The three running arms deliberately span the whole prioritization axis — none (`b4a`),
+none-plus-diversity (`b4b`), and maximum (`b4c`) — so the result is interpretable even
+if all three are worse than the default. That is a better use of three slots than three
+repeats of one guess, given nothing here has a strong prior yet.
+
+Dropped: the LR schedule (no evidence of optimization instability — degradation is
+gradual in every arm, not spiky) and making the epsilon threshold tunable (the ladder is
+no longer a suspect).
+
+### Batch 3 — reprioritized around the collapse (completed)
+
+The collapse at ~265k was thought to be the main obstacle, so this batch led with
+things that plausibly prevented it. **Result: A falsified, B supported.**
 
 | item | change | status |
 |---|---|---|
-| A | floor epsilon at 0.001 | **running** as `b3a-epsfloor`, `b3b-epsfloor2` |
-| B | `REPLAY_BUFFER_MAX_LENGTH=500000` | **running** as `b3c-buf500k` |
-| C | `PRIORITY_EXPONENT=0.0` at long horizon | queued |
-| D | `GRADIENT_CLIPPING=10` | queued |
-| E | third baseline repeat | queued |
-| F | LR schedule | queued, needs a new knob |
+| A | floor epsilon at 0.001 | **run and FALSIFIED** as `b3a-epsfloor`, `b3b-epsfloor2` |
+| B | `REPLAY_BUFFER_MAX_LENGTH=500000` | **run and SUPPORTED** as `b3c-buf500k` |
+| C | `PRIORITY_EXPONENT=0.0` at long horizon | **promoted to batch 4 priority 1** |
+| D | `GRADIENT_CLIPPING=10` | still queued |
+| E | third baseline repeat | effectively done — `b3a` spent 267k steps as one |
+| F | LR schedule | **dropped**, see above |
 
-#### A. Floor epsilon at 0.001 — never 0.0 ▶ LAUNCHED
+#### A. Floor epsilon at 0.001 — never 0.0 ▶ RUN, FALSIFIED
 
-Top priority, on the evidence in "Leading hypothesis for the collapse" above: the
-one arm that reached epsilon 0.0 is the one arm that collapsed, and at 0.0 the
-buffer becomes a closed policy-data feedback loop. The `SNEK_MIN_EPSILON` knob now
-exists (defaults to 0.0, so the ladder is unchanged for every other run). Expect:
-reaches the same 14%-class perfect rate as `b1a-base` did but holds it past 300k.
-Run **twice**, because a single non-collapsing run proves nothing — `b2a-base2`
-didn't collapse either.
+Top priority at the time, on the evidence in the epsilon-ladder section: the one arm
+that reached epsilon 0.0 was the one arm that collapsed, and at 0.0 the buffer becomes
+a closed policy-data feedback loop. Expected: the same 14%-class perfect rate as
+`b1a-base` but held past 300k. Run **twice**, because a single non-collapsing run would
+prove nothing.
+
+**Outcome: both floored arms degraded anyway, and the arm left fully greedy held up
+best.** The prediction below about how to read the arm was also the wrong worry — the
+risk was never that flooring would cap the ceiling.
 
 **Read the arm against `b1a-base`, not against `b2a-base2`.** `b2a-base2` sat at
 0.001 for its whole life because it never crossed `avg_reward > 100`, so it is

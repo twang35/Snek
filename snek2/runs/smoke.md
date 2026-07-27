@@ -6,7 +6,7 @@ Blue is average score (food eaten) on the left axis, red is perfect-game percent
 
 Latest eval: step 13000, avg score 16.1, perfect games 0%.
 
-Training was resumed at step 6000, 11000 (the dashed lines on the graph).
+Training was resumed at step 0, 6000, 11000 (the dashed lines on the graph).
 
 ## Config
 
@@ -17,11 +17,16 @@ Training was resumed at step 6000, 11000 (the dashed lines on the graph).
 | batch_size | 128 |
 | discount | 0.99 |
 | target_update_period | 8 |
+| target_update_tau | 1.0 |
+| gradient_clipping | none |
+| n_step_update | 1 |
 | initial_epsilon | 0.4 |
+| min_epsilon | 0.0 |
 | fc_layer_params | (50, 100, 50) |
 | replay_buffer | cpprb prioritized, capacity 100000 |
-| priority_exponent (alpha) | 0.6 |
-| importance_sampling_beta | 0.4 -> 1.0 over 1000000 steps |
+| priority_exponent (alpha) | 0.8 |
+| priority_signal | td_loss |
+| importance_sampling_beta | disabled |
 | initial_populate_steps | 1000 |
 | initialize_with_schmid | False |
 | eval | 10 episodes every 1000 steps |
@@ -33,19 +38,21 @@ Training was resumed at step 6000, 11000 (the dashed lines on the graph).
 
 ## Evals
 
+14 evals so far. Full series in [`smoke_evals.json`](smoke_evals.json).
+
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
-| 0 | 0.1 | 0.1 | 0 | 1/95 | -4.901 | 0 | 0.4 |
-| 1000 | 0.6 | 0.6 | 0 | 4/95 | -4.438 | 0 | 0.4 |
-| 2000 | 7.6 | 4.1 | 1 | 18/95 | 2.566 | 0 | 0.4 |
-| 3000 | 0.7 | 2.97 | 0 | 2/95 | -4.35 | 0 | 0.4 |
-| 4000 | 0.4 | 2.32 | 0 | 3/95 | -0.155 | 0 | 0.4 |
-| 5000 | 0.3 | 1.92 | 0 | 1/95 | -0.251 | 0 | 0.4 |
-| 6000 | 0.4 | 0.4 | 0 | 2/95 | -0.611 | 0 | 0.4 |
-| 7000 | 1.6 | 1.6 | 0 | 6/95 | 1.017 | 0 | 0.4 |
-| 8000 | 6.0 | 3.8 | 2 | 17/95 | 4.023 | 0 | 0.4 |
-| 9000 | 5.5 | 4.37 | 2 | 12/95 | 2.686 | 0 | 0.4 |
-| 10000 | 6.4 | 4.88 | 2 | 18/95 | 4.477 | 0 | 0.4 |
-| 11000 | 11.4 | 11.4 | 8 | 18/95 | 6.804 | 0 | 0.2 |
+| 0 | 0.0 | 0.0 | 0 | 0/95 | -5.001 | 0 | 0.4 |
+| 1000 | 0.0 | 0.0 | 0 | 0/95 | -5.005 | 0 | 0.4 |
+| 2000 | 0.0 | 0.0 | 0 | 0/95 | -5.002 | 0 | 0.4 |
+| 3000 | 0.1 | 0.03 | 0 | 1/95 | -4.014 | 0 | 0.4 |
+| 4000 | 0.4 | 0.12 | 0 | 2/95 | -3.739 | 0 | 0.4 |
+| 5000 | 1.5 | 0.4 | 0 | 5/95 | -2.68 | 0 | 0.4 |
+| 6000 | 0.8 | 0.56 | 0 | 3/95 | 0.245 | 0 | 0.4 |
+| 7000 | 1.1 | 0.78 | 0 | 3/95 | 0.543 | 0 | 0.4 |
+| 8000 | 11.1 | 2.98 | 7 | 15/95 | 6.031 | 0 | 0.2 |
+| 9000 | 11.3 | 5.16 | 9 | 14/95 | 6.247 | 0 | 0.2 |
+| 10000 | 5.0 | 5.86 | 2 | 10/95 | -0.02 | 0 | 0.2 |
+| 11000 | 4.8 | 6.66 | 1 | 8/95 | -0.224 | 0 | 0.2 |
 | 12000 | 12.7 | 12.7 | 8 | 22/95 | 8.076 | 0 | 0.2 |
 | 13000 | 16.1 | 14.4 | 10 | 22/95 | 11.015 | 0 | 0.1 |

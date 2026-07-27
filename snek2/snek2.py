@@ -79,6 +79,17 @@ def main(argv):
     priority_exponent = tuned('PRIORITY_EXPONENT', 0.6)
     initial_importance_sampling_beta = tuned('IS_BETA', 0.4)
     beta_anneal_steps = tuned('BETA_ANNEAL_STEPS', 1000000, int)
+    # theSchlong -- the version that reached a far higher perfect-game rate than
+    # anything measured here -- differed from this file on three PER details at
+    # once: alpha 0.8, Huber td_loss as the priority signal, and no importance
+    # sampling whatsoever. Each was "corrected" when the buffer was ported, and
+    # the corrections were never validated past 30k steps. These two knobs make
+    # the old behaviour reachable so the three can be tested rather than assumed.
+    priority_signal = tuned('PRIORITY_SIGNAL', 'td_error', str)
+    if priority_signal not in ('td_error', 'td_loss'):
+        raise ValueError('SNEK_PRIORITY_SIGNAL must be td_error or td_loss, got ' + priority_signal)
+    # 0 reproduces theSchlong, which applied no IS correction at all.
+    use_is_weights = bool(tuned('IS_WEIGHTS', 1, int))
 
     # policy_name = 'eval'
     policy_name = 'train'
@@ -250,8 +261,9 @@ def main(argv):
         'fc_layer_params': fc_layer_params,
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
         'priority_exponent (alpha)': priority_exponent,
+        'priority_signal': priority_signal,
         'importance_sampling_beta': '{0} -> 1.0 over {1} steps'.format(
-            initial_importance_sampling_beta, beta_anneal_steps),
+            initial_importance_sampling_beta, beta_anneal_steps) if use_is_weights else 'disabled',
         'initial_populate_steps': initial_populate_replay_buffer_steps,
         'initialize_with_schmid': initialize_with_schmid,
         'eval': '{0} episodes every {1} steps'.format(num_eval_episodes, eval_interval),
@@ -263,7 +275,8 @@ def main(argv):
     }
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name, run_config)
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
+          run_config, priority_signal, use_is_weights)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

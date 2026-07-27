@@ -139,8 +139,10 @@ Notes that matter:
 | `SNEK_MIN_EPSILON` | 0.0 | floor for the ladder. 0.0 = the historical behaviour, a fully greedy collect policy at the end |
 | `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
-| `SNEK_PRIORITY_EXPONENT` | 0.6 | 0.0 disables prioritization |
-| `SNEK_IS_BETA` | 0.4 | |
+| `SNEK_PRIORITY_EXPONENT` | 0.6 | alpha; 0.0 disables prioritization |
+| `SNEK_PRIORITY_SIGNAL` | `td_error` | or `td_loss` (element-wise Huber), which is what `theSchlong` used |
+| `SNEK_IS_WEIGHTS` | 1 | 0 disables importance sampling entirely, as `theSchlong` did |
+| `SNEK_IS_BETA` | 0.4 | ignored when `IS_WEIGHTS=0` |
 | `SNEK_BETA_ANNEAL_STEPS` | 1000000 | |
 | `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
 

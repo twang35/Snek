@@ -59,7 +59,7 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
-          run_config):
+          run_config, priority_signal='td_error', use_is_weights=True):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -109,13 +109,17 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
         if not eval_only:
             experience, indexes, is_weights = replay_buffer.sample(batch_size, step)
             # is_weights undo the bias that sampling by priority introduces.
-            loss_info = agent.train(experience, weights=is_weights)
+            # theSchlong applied none at all, so use_is_weights=False reproduces it.
+            loss_info = agent.train(experience, weights=is_weights if use_is_weights else None)
             # Transitions the network is worst at get sampled more often next time.
-            # td_error, not td_loss: td_loss is Huber, which is quadratic below
-            # |e|=1 and so shrinks small errors, making its spread wider than the
-            # raw error's. Feeding it in gave an effective exponent near |e|^1.6
-            # instead of |e|^0.6 and measurably hurt learning.
-            replay_buffer.update_priorities(indexes, loss_info.extra.td_error.numpy())
+            # td_error by default, not td_loss: td_loss is Huber, which is quadratic
+            # below |e|=1 and so shrinks small errors, making its spread wider than
+            # the raw error's. Feeding it in gives an effective exponent near
+            # |e|^1.6 instead of |e|^0.6 and measured worse at 30k steps -- but
+            # theSchlong used td_loss, so it is selectable and under test.
+            extra = loss_info.extra
+            signal = extra.td_error if priority_signal == 'td_error' else extra.td_loss
+            replay_buffer.update_priorities(indexes, signal.numpy())
 
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,

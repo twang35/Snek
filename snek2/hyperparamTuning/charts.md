@@ -24,26 +24,26 @@ snek2/hyperparamTuning/refresh_charts.sh
 That re-copies every `runs/*.png` into `charts/` and prints the step each one is
 at, so captions can be updated to match.
 
-Snapshot refreshed 21:35, at the steps noted below.
+Snapshot refreshed 23:25, at the steps noted below.
 
 ## Every arm at a glance
 
 | policy | change | steps | peak score (at) | best perfect-30 | verdict |
 |---|---|---|---|---|---|
 | `b1a-base` | none (control) | 503k | **87.5** (135k) | **16.7%** | collapsed at 265k; score recovered, skill did not |
-| `b2a-base2` | none (repeat) | 763k | 83.8 (293k) | 7.0% | no collapse; long oscillation, recovering from a trough |
+| `b2a-base2` | none (repeat) | 968k | 83.8 (293k) | 7.0% | no collapse; long drift down, 1.1% perfect at 1M |
 | `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | stopped early, verdict weak |
 | `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 76.0 (255k) | 1.7% | dead end |
 | `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | dead end |
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 314k | 83.5 (236k) | **11.0%** | **running**; best batch-3 arm, floored since 267k |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 311k | 85.8 (305k) | 8.3% | **running**; floored since 147k, inside the collapse window |
-| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 294k | 81.3 (144k) | 5.7% | **running**; went to epsilon 0.0 at 282k — key test |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 515k | 83.5 (236k) | **11.0%** | **running**; best perfect rate of batch 3, now declining |
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 516k | 85.8 (305k) | 8.3% | **running**; declined despite the floor — falsifies hypothesis A |
+| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 492k | **85.7** (312k) | 5.7% | **running**; greedy since 282k and still holding — best durability |
 
-**The comparison to take from this table:** `b1a-base` still holds the best
-perfect-game window at 16.7%, but `b3a-epsfloor` has closed most of that gap at 11.0%
-and has not collapsed. The n-step arms sit far below everything else at 0.7-1.7%. No
-arm has yet been both good *and* durable across a full run, which is what batch 3 is
-trying to break.
+**The comparison to take from this table:** every arm peaks between 236k and 312k and
+then degrades — four configs, three epsilon regimes, two buffer sizes, same shape. The
+best perfect-game window anyone has managed is `b1a-base`'s 16.7%, against a premise of
+~50%. `b3c-buf500k`, the only 5x-buffer arm, degrades most gently despite running fully
+greedy, which is why buffer diversity and sampling are what batch 4 targets.
 
 ---
 
@@ -103,18 +103,23 @@ that simply runs out" looks like, and it is only visible at this horizon.
 
 ### b2a-base2 — baseline repeat
 
-Step 763k · peak score 83.8 (at 293k) · trailing-30 perfect 2.7% · best perfect-30 7.0%
+Step 968k · peak score 83.8 (at 293k) · trailing-30 perfect **0.7%** · best perfect-30 7.0%
 
 The counterpart to `b1a-base` and the reason repeats matter. Same config, and it ran
 **well past the 265k step where its twin collapsed** without ever breaking — no cliff
 anywhere on this curve.
 
-The useful feature of this chart is its **very long wavelength**. Score dips from ~70
-to a trough around 575k and comes back to ~66 by 760k; the red trace thins to almost
-nothing through 550-650k and then returns. At 680k this looked like slow terminal
-decay and was written up as such — 80k steps later it is clearly an oscillation
-instead. A trough here spans ~100k steps, which is longer than many whole runs, so
-snapshots taken 150k steps apart give opposite verdicts.
+**This is also the reference run for the premise of the whole investigation, and it
+misses badly.** At 967k steps — the horizon where ~50% perfect games was expected —
+its 950-1000k block is 64.3 score and **1.1% perfect**. Its best window all run was
+7.0%. See "The baseline does not reach 50% perfect at 1M steps" in `runs.md`.
+
+The chart's other useful feature is its **very long wavelength**: score dips to a
+trough near 575k, recovers to ~66 by 760k, then drifts down again. At 680k this looked
+like terminal decay and was written up as such; 80k steps later it looked like a
+recovery; by 967k it is a shallow downward drift with big slow swings. A trough spans
+~100k steps, so snapshots 150k apart give opposite verdicts — hence the rule against
+calling trends from the most recent window.
 
 Also worth noting: it never triggered the last epsilon rung, its `avg_reward` peaking
 at 99.1 against the threshold of 100.
@@ -137,58 +142,62 @@ the n-step direction.
 
 ---
 
-## Batch 3 — in progress
+## Batch 3 — the epsilon hypothesis, settled
 
-All three are past 290k and their epsilon treatments have all now engaged, but none
-has enough exposure yet for a verdict. Charts are here so the trajectories can be
-watched, not judged.
+All three arms are past 490k, all three epsilon treatments engaged long ago, and the
+verdict is in: **the two floored arms degraded and the fully greedy arm did not.**
+Compare the three charts below in order — they are the clearest evidence in this
+investigation, because the prediction was specific and it failed both ways.
 
 ### b3a-epsfloor — `MIN_EPSILON=0.001`, floored since 267k
 
-Step 314k · peak score 83.5 (at 236k) · **best perfect-30 11.0%** · latest block 6.4%
+Step 515k · peak score 83.5 (at 236k) · **best perfect-30 11.0%** · latest block 61.4 / 1.3%
 
-**The strongest batch-3 arm and the best non-`b1a` result in the investigation.** Its
-perfect rate climbed 2.6 → 4.4 → 6.2 → **8.6** across the 50k blocks to 300k, and the
-250-300k block also has the highest score mean of any arm at any point (74.4) with a
-floor of 58.2.
+**Batch 3's best perfect rate, and it still degraded.** Its perfect rate climbed
+2.6 → 4.4 → 6.2 → **8.6** across the 50k blocks to 300k, with the 250-300k block
+holding the highest score mean of any arm at any point (74.4, floor 58.2).
 
-It crossed `avg_reward > 100` at 267k, so the floor has only been engaged for ~46k
-steps — everything above was achieved at 0.001 anyway, before the treatment could
-matter. That makes this chart mostly evidence about the *baseline* config being better
-than `b2a-base2` suggested, not yet evidence for the floor.
+Then it turned: 8.6% → 6.8 → 2.6 → 3.6 → 3.4 → **1.3**, with score sliding 74.4 → 61.4.
+The floor was engaged from 267k, i.e. for the entire decline, so it did not prevent
+anything.
 
 ![b3a-epsfloor](charts/b3a-epsfloor.png)
 
 ### b3b-epsfloor2 — `MIN_EPSILON=0.001`, floored since 147k
 
-Step 311k · peak score **85.8** (at 305k) · best perfect-30 8.3% · latest block 3.6%
+Step 516k · peak score **85.8** (at 305k) · best perfect-30 8.3% · latest block 52.0 / 3.3%
 
-The arm with the longest treatment exposure: it crossed `avg_reward > 100` at 147k,
-where an unfloored run would have ratcheted permanently to 0.0, so it has been
-diverging from the default for 163k steps.
+The arm with the longest treatment exposure — floored from 147k, 369k steps of it — and
+**the clearest single refutation of hypothesis A.**
 
-It set its highest score of the run at 305k, but the red trace has thinned over the
-last ~30 evals (7.0% in the 250-300k block down to 3.6%) and score has come off that
-peak. **This is exactly the window that matters**: `b1a-base` collapsed 173k steps
-after its own divergence, which maps to ~320k here. Whether the current dip is that
-event starting or ordinary oscillation is the single open question in this batch.
+The chart is a rounded arc: up to a peak at ~305k, then a decline that both deepens and
+widens, with the blue trace's troughs reaching into the 30s by 500k where earlier lows
+were in the 50s. Growing variance alongside a falling mean is the signature to
+recognise. Its worst eval in the 500-550k block is 28.2, against 52.2 in the 250-300k
+block. Zero exploration was never involved.
 
 ![b3b-epsfloor2](charts/b3b-epsfloor2.png)
 
 ### b3c-buf500k — `REPLAY_BUFFER_MAX_LENGTH=500000`
 
-Step 294k · peak score 81.3 (at 144k) · best perfect-30 5.7% · latest block 4.5%
+Step 492k · peak score **85.7** (at 312k) · best perfect-30 5.7% · latest block 66.5 / 2.1%
 
-**The smoothest curve in this document, and now the batch's most informative arm.**
-The blue trace holds a tight band from 40k on, and its worst eval in the 250-300k block
-was 60.8 — the highest floor any arm has managed. A bigger buffer does buy stability,
-which is the part of hypothesis B that looks right. Its perfect rate is the batch's
-lowest but has been climbing steadily (0.8 → 3.6 → 4.5).
+**The arm that settled the batch, and the flattest curve in the investigation.** It
+crossed `avg_reward > 100` at 282k with `MIN_EPSILON` at its 0.0 default, so it has been
+running **fully greedy since 282k** — the condition that was supposed to destroy it.
 
-**It crossed `avg_reward > 100` at 282k with `MIN_EPSILON` at its 0.0 default, so it is
-now running fully greedy with a 5x buffer** — the head-to-head between the two
-hypotheses that nothing was designed to test. If zero exploration is what drives the
-collapse, this arm should break around 430-460k regardless of buffer size; if buffer
-diversity is what matters, the smooth curve should hold. Watch this one.
+The prediction was that it would break around 430-460k regardless of buffer size. **It
+did not.** It set its best score of the whole run at 312k, *after* going greedy, and at
+492k its 450-500k block is 66.5 against 70.7 at 250-300k — a 4-point slide where the
+floored arms lost 13 and 19. Its trailing-30 perfect rate is also the only one currently
+rising (0.7% → 2.7%).
+
+Compare this chart with `b3b`'s directly: same time span, same peak height, but this one
+has no arc and no variance growth. The one config difference that matters is the 5x
+buffer.
+
+Not immune, though — the slide is real and its perfect rate is the batch's lowest. A
+bigger buffer slows the squeeze rather than removing it, which is why batch 4 pushes on
+both buffer size and sampling.
 
 ![b3c-buf500k](charts/b3c-buf500k.png)
