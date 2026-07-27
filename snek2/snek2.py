@@ -46,6 +46,11 @@ def main(argv):
     target_update_tau = tuned('TARGET_UPDATE_TAU', 1.0)
     gradient_clipping = tuned('GRADIENT_CLIPPING', 0.0)
     initial_epsilon = tuned('INITIAL_EPSILON', 0.4)
+    # Floor for the decay ladder in maybe_update_epsilon(). The ladder's last rung
+    # is 0.0, i.e. a fully greedy collect policy, which makes the replay buffer a
+    # closed loop on the policy's own behaviour. Raise this to keep a trickle of
+    # exploration forever. See hyperparamTuning/runs.md.
+    min_epsilon = tuned('MIN_EPSILON', 0.0)
 
     display_training = False
     # display_training = True
@@ -241,6 +246,7 @@ def main(argv):
         'gradient_clipping': gradient_clipping or 'none',
         'n_step_update': n_step_update,
         'initial_epsilon': initial_epsilon,
+        'min_epsilon': min_epsilon,
         'fc_layer_params': fc_layer_params,
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
         'priority_exponent (alpha)': priority_exponent,
@@ -257,7 +263,7 @@ def main(argv):
     }
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name, run_config)
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name, run_config)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

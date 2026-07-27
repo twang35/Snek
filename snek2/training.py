@@ -58,7 +58,8 @@ def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 
 def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, eval_only, policy_name, run_config):
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
+          run_config):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -119,8 +120,8 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
-                              replay_buffer_dir, global_step, epsilon, step, eval_only, initial_step, policy_name,
-                              run_config)
+                              replay_buffer_dir, global_step, epsilon, min_epsilon, step, eval_only, initial_step,
+                              policy_name, run_config)
 
 
 class TrainingMetrics:
@@ -174,7 +175,7 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
 
 def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
-                          global_step, epsilon, step, eval_only, initial_step, policy_name, run_config):
+                          global_step, epsilon, min_epsilon, step, eval_only, initial_step, policy_name, run_config):
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
 
@@ -194,7 +195,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
                                                    num_eval_episodes)
         print('eval time: ', get_time(metrics.eval_start_time))
 
-        maybe_update_epsilon(avg_reward, epsilon)
+        maybe_update_epsilon(avg_reward, epsilon, min_epsilon)
 
         if not eval_only:
             print('saving checkpoint')
@@ -248,7 +249,7 @@ def get_time(start_time):
     return str(round(total_time, 1)) + 's'
 
 
-def maybe_update_epsilon(avg_reward, epsilon):
+def maybe_update_epsilon(avg_reward, epsilon, min_epsilon=0.0):
     # For grid length 15
     # if train_py_env.epsilon > 0.2 and avg_return > 40:
     #     train_py_env.epsilon = 0.2
@@ -267,14 +268,28 @@ def maybe_update_epsilon(avg_reward, epsilon):
     # the exact comparisons the ladder relies on to step down one level per eval.
     current = round(float(epsilon.numpy()), 6)
     if current > 0.2 and avg_reward > 5:
-        epsilon.assign(0.2)
+        target = 0.2
     elif current > 0.1 and avg_reward > 10:
-        epsilon.assign(0.1)
+        target = 0.1
     elif current > 0.05 and avg_reward > 20:
-        epsilon.assign(0.05)
+        target = 0.05
     elif current > 0.01 and avg_reward > 40:
-        epsilon.assign(0.01)
+        target = 0.01
     elif current > 0.001 and avg_reward > 60:
-        epsilon.assign(0.001)
+        target = 0.001
     elif avg_reward > 100:
-        epsilon.assign(0.0)
+        target = 0.0
+    else:
+        return
+
+    # The last rung is 0.0, which makes the collect policy fully greedy and turns
+    # the replay buffer into a closed loop on the policy's own behaviour — the
+    # leading suspect for the collapses documented in hyperparamTuning/runs.md.
+    # min_epsilon keeps a trickle of exploration instead; it defaults to 0.0, which
+    # leaves the ladder exactly as it was.
+    target = max(target, min_epsilon)
+    # The rungs above descend one per eval because each is guarded on `current`.
+    # Clamping can push a target back up to where it already is, so only ever move
+    # down; otherwise a floor above a rung would make the ladder oscillate.
+    if target < current:
+        epsilon.assign(target)

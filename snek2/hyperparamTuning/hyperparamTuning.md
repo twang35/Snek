@@ -66,7 +66,10 @@ usefulness:
 3. **last-5-eval average score** — the leading indicator, and the workhorse for
    comparing configs. Needed because perfect-game % sits at 0 for tens of
    thousands of steps, so early on it cannot tell two configs apart while score
-   already can.
+   already can. **But it stops being a proxy for the objective late in a run:**
+   `b1a-base` recovered from a collapse to its old score while its perfect rate
+   kept falling to a fifth of its peak. Past ~250k steps, or after any collapse,
+   read (1) directly and treat score as context only.
 4. **mean over the whole curve** — rewards learning early and holding on.
 5. **steps to first reach score N** — for comparing learning speed.
 6. **max drawdown** — biggest drop from a running peak. A diagnostic for
@@ -128,7 +131,8 @@ Notes that matter:
 | `SNEK_TARGET_UPDATE_TAU` | 1.0 | 1.0 = hard copy; <1 = soft/Polyak updates |
 | `SNEK_GRADIENT_CLIPPING` | 0.0 (off) | norm clip; 0 disables |
 | `SNEK_N_STEP_UPDATE` | 1 | n-step returns; buffer window is n+1 automatically |
-| `SNEK_INITIAL_EPSILON` | 0.4 | |
+| `SNEK_INITIAL_EPSILON` | 0.4 | where the decay ladder starts |
+| `SNEK_MIN_EPSILON` | 0.0 | floor for the ladder. 0.0 = the historical behaviour, a fully greedy collect policy at the end |
 | `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
 | `SNEK_PRIORITY_EXPONENT` | 0.6 | 0.0 disables prioritization |
@@ -139,6 +143,20 @@ Notes that matter:
 Rewards (`snake_constants.py`) are deliberately **held fixed** so `avg_score` stays
 comparable across every run. Changing them invalidates comparison with everything
 already recorded here.
+
+One behaviour worth understanding before reading any run: `maybe_update_epsilon()`
+in `training.py` ratchets epsilon down a fixed ladder (0.2, 0.1, 0.05, 0.01, 0.001,
+then `SNEK_MIN_EPSILON`) as `avg_reward` rises, one rung per eval, and never back
+up. The rungs are driven by reward thresholds, so **only strong runs reach the
+bottom** — the last rung needs `avg_reward > 100`. That makes "which rung did it
+reach" a proxy for how good a run got, and a confound when comparing arms.
+
+Historically the last rung was hard-coded to 0.0, i.e. a fully greedy collect
+policy; `SNEK_MIN_EPSILON` now floors it and defaults to 0.0, preserving that.
+Each eval row records the current epsilon in `runs/<policy>_evals.json`, which is
+how to tell after the fact which rung a run was on — worth checking, because
+reaching the last rung is the leading suspect for the collapse (see
+[`runs.md`](runs.md)).
 
 ### Naming
 

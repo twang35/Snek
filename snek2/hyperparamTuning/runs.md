@@ -9,26 +9,170 @@ the protocol rarely does.
 Update this section whenever runs start or stop — a future session reads it to
 know what is in flight and might have been terminated.
 
+Status as of 19:05. **Batch 3 is running**; batches 1 and 2 are finished.
+
 | policy | config change | started | status |
 |---|---|---|---|
-| `train` | human-started, committed defaults | before this work | **stopped by the human ~15:15**, freeing a slot. Do not restart it; it is theirs |
-| `b1a-base` | control: committed defaults | 14:15 | running. Score flat at ~69 since ~50k, but perfect-game rate is still climbing (1.7 -> 3.3), so keep going |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 14:15 | running. Slowest arm but the only one with strong score momentum (+10.3 over last 20 evals at 201k). Cap ~18:15, then label "promising but too slow" if still short of the others |
-| `b2a-base2` | baseline repeat #2 | 15:10 | running. Needed to establish baseline spread |
-| `b2b-nstep2` | `N_STEP_UPDATE=2` | 15:16 | running. Took the slot the human freed. Launched now rather than later so it shares machine conditions with `b1c-nstep3` (n=3) and the two are directly comparable |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 14:15 | **stopped 15:10 at ~104k.** Score rising only slowly (+1.8), perfect rate flat (1.0 -> 1.0), and its hypothesis was already answered. Resume with `SNEK_TARGET_UPDATE_PERIOD=200` if worth revisiting |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 19:01 | **running.** Tests the leading collapse hypothesis. Watch for: does it reach `b1a-base`'s 14%-class perfect rate, and does it still hold it past 300k? |
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 19:02 | **running.** Deliberate repeat of `b3a` — collapse is stochastic, so one non-collapsing run would prove nothing on its own |
+| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 19:03 | **running.** Independent mechanism, same target: keeps old experience from being evicted rather than keeping it being generated |
+| `b2a-base2` | baseline repeat #2 | 15:10 | **still running, 435k**, kept deliberately as the live control for batch 3. Has now survived 170k steps past where its twin collapsed: 10.9-point drop from an 83.8 peak, score trend +0.7, perfect 4.7% and inching up. Stable but stuck — never above 7% in any 30-eval window |
 
 That is 4 trainers, i.e. the budget is full — do not launch more until one stops.
-Logs for this batch are in `/Users/tony_wang/.claude/jobs/f3cb1855/tmp/b1{a,b,c}.log`,
-which is job-scoped and will not survive; the durable record is
-`runs/<policy>_evals.json`, so analyse from there.
+Logs are in `/Users/tony_wang/.claude/jobs/f3cb1855/tmp/b3{a,b,c}.log`, which is
+job-scoped and will not survive; the durable record is `runs/<policy>_evals.json`,
+so analyse from there.
 
-If these were killed before ~120k steps, they can be resumed simply by relaunching
-with the same policy name and the same `SNEK_*` overrides (the overrides are *not*
-persisted in the checkpoint — relaunching without them silently changes the config
-mid-run, which would invalidate the arm).
+Resume any of these by relaunching with the same policy name **and the same
+`SNEK_*` overrides** — the overrides are *not* persisted in the checkpoint, so
+relaunching without them silently changes the config mid-run and invalidates the
+arm. For batch 3 that means `SNEK_MIN_EPSILON=0.001` for `b3a`/`b3b` and
+`SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` for `b3c`.
+
+### Stopped, with verdicts
+
+| policy | config change | stopped at | verdict |
+|---|---|---|---|
+| `b1a-base` | control: committed defaults | 497k, 19:00 | **The key run of the investigation.** Collapsed at ~265k after peaking at a 14% perfect rate, recovered in score to ~65 but only 2.3% perfect. Question it was kept alive for is answered: recovery is real but score-only |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.12M, 19:00 | **Dead end.** Peaked 76 at 255k, then declined for 850k steps to a flat ~28. Zero perfect games since ~300k |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 568k, 19:00 | **Dead end**, same shape as n=3: peaked 74.6 at 140k, down to ~35, trailing-30 perfect 0.0%. Two arms ordered by n giving the same result is a trend, not noise |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 104k, 15:10 | Score rising only slowly (+1.8), perfect rate flat (1.0 -> 1.0), hypothesis already answered. Stopped early to free a slot, so it never reached the ~250k horizon where anything is judgeable — **its verdict is weaker than the others here**. Resume with `SNEK_TARGET_UPDATE_PERIOD=200` |
+| `train` | human-started, committed defaults | ~15:15 | Stopped by the human, freeing a slot. Do not restart it; it is theirs |
 
 ---
+
+## Catastrophic forgetting confirmed — and it is the whole ballgame
+
+**This supersedes the earlier note that no arm showed forgetting.** That note was
+written at 83k steps, which turns out to be far too early to see it.
+
+`b1a-base`, the plain committed config, by 50k-step block:
+
+| steps | score mean | score max | score min | perfect mean | perfect max |
+|---|---|---|---|---|---|
+| 0-50k | 41.8 | 76.1 | 0.0 | 0.4 | 10 |
+| 50-100k | 68.9 | 81.6 | 56.6 | 3.0 | 30 |
+| 100-150k | 75.0 | **87.5** | 60.6 | 7.8 | 30 |
+| 150-200k | 76.2 | 85.0 | 62.0 | 10.2 | 30 |
+| 200-250k | 71.9 | 83.1 | 55.9 | **14.0** | **40** |
+| 250-300k | 45.8 | 76.4 | 10.7 | 8.2 | 40 |
+| 300-350k | 37.1 | 61.6 | 20.4 | 5.0 | 20 |
+| 350-400k | 63.6 | 80.6 | 31.5 | 6.2 | 20 |
+| 400-450k | 65.1 | 78.7 | 54.8 | **2.9** | 20 |
+
+It held a broad plateau from 30k to ~260k, peaked at **14% mean perfect rate with
+40% spikes** in the 200-250k block, and then **collapsed** — score from a 87.5 peak
+down to 23 by 343k, a 64-point drawdown, with the perfect rate falling 14 -> 8.2 ->
+4.5. See the chart in [`charts.md`](charts.md); the break at ~265k is stark.
+
+Three things follow, and they reshape the investigation:
+
+1. **The collapse happens right after the best perfect rate.** `b1a-base` was on
+   track for a genuinely good perfect rate and then threw it away. Preventing the
+   collapse is therefore not a side quest — it is plausibly the single
+   highest-value intervention available for the stated objective. Everything in
+   the queue should be re-prioritized around "does it still hold at 300k".
+2. **It is stochastic, not deterministic for the config.** `b2a-base2` is the same
+   config and at 275k has *not* collapsed: peak 83.0, latest 74.0, a drop of only
+   9.0, with its perfect rate still drifting up. Two runs of one config diverge
+   completely after 250k. So the noise this protocol worries about is not just an
+   early-phase effect — it extends to *whether a run collapses at all*, which is a
+   much bigger deal.
+3. **Nothing can be judged below ~250k steps.** Every comparison made so far in
+   this document is on the wrong side of that line. Arms need to reach ~300k before
+   their verdict means anything, which is expensive and needs planning for.
+
+## The collapse is recoverable in score but not in skill
+
+`b1a-base` was left running specifically to see whether the collapse was permanent.
+It isn't — but the recovery is the interesting part, because it is **only half a
+recovery**:
+
+| steps | score mean | perfect mean |
+|---|---|---|
+| 200-250k (pre-collapse peak) | 71.9 | **14.0** |
+| 300-350k (trough) | 37.1 | 5.0 |
+| 350-400k | 63.6 | 6.2 |
+| 400-450k | **65.1** | **2.9** |
+
+Average score climbed back from 37 to ~65 with no intervention, while the
+perfect-game rate kept *falling* and is now at a fifth of its pre-collapse level.
+So the run relearned how to play competently and did **not** relearn how to finish.
+
+Two things follow, and the second is a change to the protocol:
+
+- **Score and perfect rate decouple after a collapse.** The protocol lists last-5
+  score as the workhorse leading indicator, which is right early — but here score
+  says "recovered" while the objective says "much worse than before". Late in a
+  run, score alone will mislead. Judge post-collapse arms on the perfect rate
+  directly.
+- **A collapse costs the good result permanently, even though the curve comes
+  back.** Riding out a collapse and hoping is not a strategy; the 14% perfect rate
+  never returned across 150k further steps. That strengthens the case for
+  *preventing* collapse rather than tolerating it.
+
+## Leading hypothesis for the collapse: epsilon reaches exactly 0.0
+
+This is the most actionable thing found so far. The epsilon ladder in
+`maybe_update_epsilon()` is a one-way ratchet ending in `epsilon.assign(0.0)` once
+`avg_reward > 100`. Tracing when each arm stepped down:
+
+| policy | reached 0.001 | reached **0.0** | collapsed? |
+|---|---|---|---|
+| `b1a-base` | 37k | **92k** | **yes, at ~265k** |
+| `b2a-base2` | 25k | never (still 0.001) | no, through 348k |
+| `b1c-nstep3` | 158k | never | declining, no collapse event |
+| `b2b-nstep2` | 102k | never | declining, no collapse event |
+
+**The only arm that ever reached epsilon 0.0 is the only arm that collapsed.**
+
+The mechanism is plausible and specific: at epsilon 0.0 the collect policy is fully
+greedy, so the replay buffer's contents become entirely determined by the current
+policy. With a 100k-transition buffer and ~800-step episodes at high skill, all
+exploratory data is flushed out within ~100-200k steps of the switch — and the
+collapse landed at 265k, ~173k steps after the switch, which is consistent with
+that ordering. From then on it is a closed feedback loop: the policy trains only on
+what it already does, so a drift has nothing to correct it. The later
+partial recovery also fits — a closed loop can wander back as easily as it wandered
+off, which is exactly the oscillating-instability signature rather than a
+one-way failure.
+
+Note this was anticipated by the batch-2 queue's "longer epsilon exploration" item
+("if forgetting correlates with epsilon getting small, a floor is worth testing")
+before there was any evidence for it. There is now.
+
+**Caveats, because this is n=1 and confounded.** Reaching 0.0 requires
+`avg_reward > 100`, i.e. only *strong* runs get there — so "reached 0.0" and "was
+good enough to collapse from a height" are entangled, and this correlation cannot
+separate them. `b2a-base2` is stable partly because it never got good enough to
+zero out its exploration; it is stuck at ~4% perfect where `b1a` reached 14%. The
+uncomfortable reading is that the ladder's last rung is both what enables the best
+performance *and* what destroys it.
+
+The test is cheap and settles it: floor epsilon at 0.001 and never let it hit zero.
+That needs a knob (`SNEK_MIN_EPSILON`), which does not exist yet — a small change to
+`maybe_update_epsilon()`. This is now the top of the queue.
+
+## n-step returns: closed, negative
+
+Both n-step arms have run long enough to judge, and they agree:
+
+| policy | steps | peak score (at) | latest | trailing-30 perfect | 1st perfect |
+|---|---|---|---|---|---|
+| `b1c-nstep3` | 858k | 76.0 (255k) | 31.0 | **0.0%** | 206k |
+| `b2b-nstep2` | 414k | 74.6 (140k) | 48.9 | **0.0%** | 121k |
+
+Both peak *below* either baseline, both then decline for hundreds of thousands of
+steps, and both are at zero perfect games in the trailing window. n=3 has produced
+no perfect game at all since 250k and has been flat at ~30 for 200k steps; n=2 is
+the same shape one step milder, which is a clean monotonic trend in the wrong
+direction rather than noise.
+
+This **overturns the batch-1 read** that n=3 had "the best trajectory of the
+batch". That was true through 200k and false afterwards — the momentum that made it
+look promising simply ran out at 255k. The lesson from that section ("do not judge
+an arm at matched steps alone") survives; the verdict it produced does not. Do not
+plan an n=5 arm.
 
 ## Prior findings carried in from earlier sessions
 
@@ -147,12 +291,16 @@ Lesson recorded: **do not judge an arm at matched steps alone.** Matched-step
 comparison is right for fairness but blind to momentum, and momentum was the
 signal that mattered here.
 
-#### Neither arm actually showed catastrophic forgetting
+#### Neither arm showed catastrophic forgetting *by 83k* — since overturned
 
-At this horizon both arms oscillate roughly +/-10 around a high plateau rather
-than collapsing. That is qualitatively different from the collapses seen in the
-earlier short 30k runs, which in hindsight were probably the rising phase plus
-seed variance rather than forgetting.
+At 83k both arms oscillated roughly +/-10 around a high plateau rather than
+collapsing, and this section originally concluded that forgetting wasn't happening
+at all. **That was wrong, and only because the horizon was too short:**
+`b1a-base` collapsed hard at ~265k. See the section above.
+
+The lesson worth keeping is about horizon, not about forgetting: a conclusion drawn
+at 83k about a phenomenon that appears at 265k is worthless, and there was nothing
+in the 83k data to indicate that.
 
 This also exposes a **flaw in the max-drawdown metric**: it cannot tell noisy
 oscillation around a good plateau apart from a genuine collapse. `b1b` scores
@@ -197,45 +345,120 @@ commitment.
    Expect: earlier onset of learning (relevant to the "nothing until 40k" effect)
    and better late-game behaviour.
 
-### Batch 2 — revised after batch 1's interim results
+### Batch 3 — reprioritized around the collapse (do these next)
+
+The collapse at ~265k is now the main obstacle to a high perfect rate, so the
+queue leads with things that plausibly prevent it. **Every one of these needs to
+run past 300k to mean anything**, so expect ~3-4 hours per arm and plan slots
+accordingly.
+
+| item | change | status |
+|---|---|---|
+| A | floor epsilon at 0.001 | **running** as `b3a-epsfloor`, `b3b-epsfloor2` |
+| B | `REPLAY_BUFFER_MAX_LENGTH=500000` | **running** as `b3c-buf500k` |
+| C | `PRIORITY_EXPONENT=0.0` at long horizon | queued |
+| D | `GRADIENT_CLIPPING=10` | queued |
+| E | third baseline repeat | queued |
+| F | LR schedule | queued, needs a new knob |
+
+#### A. Floor epsilon at 0.001 — never 0.0 ▶ LAUNCHED
+
+Top priority, on the evidence in "Leading hypothesis for the collapse" above: the
+one arm that reached epsilon 0.0 is the one arm that collapsed, and at 0.0 the
+buffer becomes a closed policy-data feedback loop. The `SNEK_MIN_EPSILON` knob now
+exists (defaults to 0.0, so the ladder is unchanged for every other run). Expect:
+reaches the same 14%-class perfect rate as `b1a-base` did but holds it past 300k.
+Run **twice**, because a single non-collapsing run proves nothing — `b2a-base2`
+didn't collapse either.
+
+**Read the arm against `b1a-base`, not against `b2a-base2`.** `b2a-base2` sat at
+0.001 for its whole life because it never crossed `avg_reward > 100`, so it is
+already a de facto epsilon-floored run — and it is *stable but stuck* at ~4-7%
+perfect. That makes it a weak comparator for this hypothesis and raises the
+uncomfortable alternative: the last rung may be what enables `b1a`'s 14% *and* what
+destroys it, in which case flooring buys stability at the cost of the ceiling and
+`b3a`/`b3b` will look like `b2a-base2`. If they plateau at ~5% perfect without
+collapsing, that is the answer, and the next move is a *lower* floor (1e-4) rather
+than a higher one.
+
+#### B. `REPLAY_BUFFER_MAX_LENGTH=500000` ▶ LAUNCHED
+
+The strongest hypothesis that needs no code change, and it addresses the same
+mechanism from the other side. The buffer holds 100k *transitions*, not episodes,
+and episode length grows with skill: at score 5 an episode is ~50 steps so the
+buffer spans ~2000 episodes, but at score 80 it is ~800+ steps so the buffer spans
+only ~125. Experience diversity therefore *shrinks as the policy improves*, which is
+exactly the setup for late-stage overfitting and collapse — and it fits the timing,
+since the collapse arrives well after the policy gets good. Expect: later or no
+collapse.
+
+A and B are complementary, not redundant: **A keeps exploratory data being
+*generated*, B keeps it from being *evicted*.**
+
+#### C. `PRIORITY_EXPONENT=0.0` at long horizon
+
+Once the policy is strong, most transitions have small TD error, so prioritization
+increasingly samples rare outliers — plausibly destabilizing precisely late in
+training. This also finally settles the 30k-step finding that uniform beat PER, at
+the horizon that actually matters. Pairs naturally with B.
+
+#### D. `GRADIENT_CLIPPING=10`
+
+Cheap insurance if the collapse is driven by a few exploding updates. Weaker prior
+than the above but nearly free.
+
+#### E. A third baseline repeat
+
+Two runs of one config, one collapsing and one not, is a sample size of two on the
+most important question in this document. A third would say whether collapse is the
+common case or the exception. Lower priority now that A gives the baseline arms a
+specific thing to be compared against, but still the cheapest way to firm up the
+denominator.
+
+#### F. Lower learning rate late, or an LR schedule
+
+If the collapse is an optimization instability rather than a data-diversity problem,
+this addresses it directly. No LR-schedule knob exists yet — would need adding.
+
+### Batch 2 — revised after batch 1's interim results (superseded by batch 3)
 
 4. **`b2a-base2` / `b2b-base3`: repeat the baseline 2-3x.** Now the top priority,
    not an afterthought. Batch 1 says the baseline reaches ~70 avg score and 10%
    perfect games by ~44k, which contradicts the premise of the whole exercise.
    Until the baseline's spread is known, no arm can be judged against it. These
    also test whether the early perfect games reproduce.
-5. **`N_STEP_UPDATE=2`** — running now as `b2b-nstep2`. n=3 is the batch's best
-   trajectory but too slow to reach a perfect game; n=2 tests whether the stability
-   survives at a faster rate. If n=2 lands between n=1 and n=3 on both speed and
-   steadiness, that is a clean monotonic trend and the knob is real rather than
-   noise. Worth trying n=5 afterwards to find where it turns over.
+5. ~~**`N_STEP_UPDATE=2`**~~ — **done and closed, negative.** See "n-step returns:
+   closed, negative" above. The planned n=5 follow-up is cancelled: n=2 and n=3 both
+   peak below baseline and then decline, so the trend already points the wrong way.
 6. **`TARGET_UPDATE_PERIOD=50` and `=500`.** Batch 1 hinted that longer periods
    learn faster early even though they didn't reduce drawdown. Two more points
    establish whether that's a trend or noise.
-6. **`LEARNING_RATE=1e-4`** *only after* the target-update fix. Currently 1e-5 is
+7. **`LEARNING_RATE=1e-4`** *only after* the target-update fix. Currently 1e-5 is
    very conservative; the in-code comment already suggests 1e-4. With a stable
    target it may train several times faster. On its own with `TARGET_UPDATE_PERIOD=8`
    it would probably make instability worse, so the order matters.
-7. **`DISCOUNT=0.995` or `0.999`.** At 0.99 the effective horizon is ~100 steps,
+8. **`DISCOUNT=0.995` or `0.999`.** At 0.99 the effective horizon is ~100 steps,
    but a perfect game is several hundred steps long, so the terminal bonus is
    discounted into near-irrelevance. Raising it should make the perfect-game reward
    actually reachable by the value function — plausibly the single most relevant
    change for the *stated* end goal, though also a known source of instability, so
    it pairs naturally with the target-update fix.
-8. **Soft target updates**, `TARGET_UPDATE_TAU=0.005` with
+9. **Soft target updates**, `TARGET_UPDATE_TAU=0.005` with
    `TARGET_UPDATE_PERIOD=1`. An alternative to (2) that some find smoother still.
-9. **`PRIORITY_EXPONENT=0.0` at long horizon.** Confirms or overturns the 30k-step
-   finding at the scale that actually matters.
-10. **`GRADIENT_CLIPPING=10`.** Cheap insurance against the loss spikes that tend
+10. **`PRIORITY_EXPONENT=0.0` at long horizon.** Confirms or overturns the 30k-step
+    finding at the scale that actually matters.
+11. **`GRADIENT_CLIPPING=10`.** Cheap insurance against the loss spikes that tend
     to accompany forgetting events.
-11. **`FC_LAYERS=128,128`.** Capacity. Lower prior: 20 inputs and 3 actions is a
+12. **`FC_LAYERS=128,128`.** Capacity. Lower prior: 20 inputs and 3 actions is a
     small problem, so capacity is unlikely to be the binding constraint before the
     stability issues above are fixed.
-12. **Longer epsilon exploration.** The decay ladder in `maybe_update_epsilon()` is
-    driven by reward thresholds and steps down once per eval, reaching 0.1 fairly
-    early. If forgetting correlates with epsilon getting small, a floor is worth
-    testing. Note this schedule is coupled to `eval_interval`, which is a latent
-    confound if that interval is ever changed.
+13. **Longer epsilon exploration.** **Promoted to batch 3 item A** — the "if
+    forgetting correlates with epsilon getting small" conjecture now has evidence
+    behind it. The remaining untested part of this item is the *shape* of the
+    ladder rather than its floor: it is driven by reward thresholds and steps down
+    once per eval, so it is coupled to `eval_interval` — a latent confound if that
+    interval is ever changed, and a reason a slower or step-count-based decay is
+    worth trying after A lands.
 
 ### Explicitly not planned
 
