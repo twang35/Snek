@@ -2,7 +2,8 @@
 
 Progress graphs for every tuning arm. Companion to
 [`hyperparamTuning.md`](hyperparamTuning.md) (the protocol) and
-[`runs.md`](runs.md) (status, results, queue).
+[`runs.md`](runs.md) (what is running), [`completedRuns.md`](completedRuns.md)
+(per-arm verdicts) and [`findings.md`](findings.md) (conclusions).
 
 In every chart: **blue is average score** (food eaten, out of a possible 95) on the
 left axis, **red is perfect-game percentage** on the right. Grey dashed vertical
@@ -73,8 +74,8 @@ the wrong late-run metric.
 This happened *after* its best perfect rate — the run was on track for a good
 result and destroyed it. `b2a-base2` below is the identical config and has not
 collapsed, so this is stochastic rather than inherent to the config. It is also the
-only arm that ever drove epsilon to exactly 0.0 (at 92k), which is the leading
-suspect; see `runs.md`.
+only arm that ever drove epsilon to exactly 0.0 (at 92k), which was the leading
+suspect for a long time — since falsified, see [`findings.md`](findings.md).
 
 ![b1a-base](charts/b1a-base.png)
 
@@ -119,7 +120,8 @@ anywhere on this curve.
 **This is also the reference run for the premise of the whole investigation, and it
 misses badly.** At 967k steps — the horizon where ~50% perfect games was expected —
 its 950-1000k block is 64.3 score and **1.1% perfect**. Its best window all run was
-7.0%. See "The baseline does not reach 50% perfect at 1M steps" in `runs.md`.
+7.0%. See "The committed config reaches ~1% at 1M steps" in
+[`findings.md`](findings.md).
 
 The chart's other useful feature is its **very long wavelength**: score dips to a
 trough near 575k, recovers to ~66 by 760k, then drifts down again. At 680k this looked
@@ -232,7 +234,7 @@ all reverted together.
 
 Its checkpoint at 869k was reloaded and evaluated over 100 greedy episodes: **51.0%
 perfect (95% CI 41.3-60.6%), median score 95 of 95.** It wins more than half the games it
-plays. See "Measured" in [`runs.md`](runs.md) for all four checkpoint measurements.
+plays. See [`findings.md`](findings.md) for all four checkpoint measurements.
 
 The red trace is unmistakable against every other chart in this file: sustained 40-60%
 spikes from 700k onward, **41 separate evals at >=50%**, and a peak of 80% at 970k. No

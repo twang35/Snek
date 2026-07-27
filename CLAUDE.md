@@ -67,12 +67,22 @@ possible perfect-game percentage while learning consistently. Reducing
 catastrophic forgetting is a means to that end, not the goal itself. Everything
 lives in **`snek2/hyperparamTuning/`**:
 
-- `hyperparamTuning.md` — the protocol: metrics, stop criteria, how to launch,
-  available knobs. Read this for how the machinery works.
-- `runs.md` — what is running, prior findings, results, planned queue. **Start
-  here** when picking the task up mid-flight.
+- `runs.md` — what is running and what to run next. **Start here** when picking
+  the task up mid-flight. Kept short on purpose.
+- `hyperparamTuning.md` — the protocol: metrics, stop criteria, how to judge, how
+  to launch, available knobs. Read this for how the machinery works.
+- `findings.md` — what is established and what has been falsified. Read before
+  proposing an experiment, so a closed question doesn't get reopened.
+- `completedRuns.md` — every finished arm: config, final numbers, verdict.
+- `failureModes.md` — the four ways a policy degrades here and how to tell them
+  apart. They look alike in a single trailing window.
 - `charts.md` + `charts/` — progress graph per arm; snapshot copies, refreshed
   with `refresh_charts.sh`.
+
+Keep the split clean: `runs.md` is current state and forward plan only. Results go
+to `completedRuns.md`, conclusions to `findings.md`, and anything about *how to
+measure or judge* to `hyperparamTuning.md`. The reason is that `runs.md` grew to 950
+lines of interleaved status, results and conclusions and stopped being usable.
 
 Read those before starting or judging any tuning run, and update them as runs
 start, finish, or get killed — they are the handoff between sessions.

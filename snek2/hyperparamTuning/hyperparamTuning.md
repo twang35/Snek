@@ -11,14 +11,18 @@ than any single run.
 
 | file | contents | changes |
 |---|---|---|
-| `hyperparamTuning.md` (this file) | the protocol: goals, metrics, stop criteria, how to launch, available knobs | rarely |
-| [`runs.md`](runs.md) | what is running, prior findings, results, planned queue | constantly |
+| `hyperparamTuning.md` (this file) | the protocol: goals, metrics, stop criteria, how to judge, how to launch, available knobs | rarely |
+| [`runs.md`](runs.md) | what is running, what to run next | constantly |
+| [`completedRuns.md`](completedRuns.md) | every finished arm: config, final numbers, verdict | when an arm finishes |
+| [`findings.md`](findings.md) | what is established, what has been falsified | when something is learned |
+| [`failureModes.md`](failureModes.md) | the four ways a policy degrades, and how to tell them apart | rarely |
 | [`charts.md`](charts.md) | progress graph for every arm, with captions | when charts are refreshed |
 | `charts/` | snapshot copies of the graphs | via `refresh_charts.sh` |
 
 **Start with [`runs.md`](runs.md)** if you are picking this up mid-flight — it says
-what is in progress and what to do next. Read this file for how the machinery
-works.
+what is in progress and what to do next. Read this file for how the machinery works,
+and [`findings.md`](findings.md) before proposing an experiment, so a closed question
+doesn't get reopened.
 
 ---
 
@@ -31,16 +35,22 @@ that rises and keeps rising, not a lucky spike.
 (config: alpha 0.8, `td_loss` priorities, no IS weights). That is the number to beat, and
 it matches the ~50%-at-1M figure the investigation started from — the committed config
 reaches ~1%, and the gap was three PER changes made during the cpprb port. See
-[`runs.md`](runs.md).
+[`findings.md`](findings.md).
 
-Two things make tuning awkward:
+Three things make tuning awkward, and each has cost this investigation a wrong
+conclusion:
 
 - **High noise.** Two runs of the identical config reached final avg_score 62.5
   and 18.0 at 30k steps. Any single-run comparison is meaningless. Promising
-  configs must be repeated **2-3 times**.
+  configs must be repeated **2-3 times**. The noise extends to *whether a run
+  collapses at all* — see [`failureModes.md`](failureModes.md).
 - **Non-linear trajectories.** Sometimes nothing much happens until ~40k
   iterations and then the slope turns steep. A config that looks dead at 20k may
   not be. Do not judge a config on a short run alone.
+- **Nothing is judgeable below ~250k steps, and the best arm peaked at 875k.**
+  Degradation begins somewhere between 236k and 312k in nearly every arm observed,
+  so a verdict formed earlier is measuring the pre-degradation phase only. The
+  investigation's own stop criteria would have killed its best arm at 300k.
 
 ### When to keep a run going, and when to stop it
 
@@ -109,7 +119,31 @@ Three of the run-comparison metrics above need care:
   collapse, read perfect % directly and treat score as context only.
 - **A large drawdown is not disqualifying.** A config that swings wildly but reaches
   a high perfect-game rate beats a placid one that plateaus low — `b1a-base` versus
-  `b2a-base2` is exactly that contrast.
+  `b2a-base2` is exactly that contrast. `b4c-schlongper` is the extreme case: it
+  collapsed to score ~19 and went on to be the best arm in the investigation.
+
+### Comparing arms fairly
+
+**Always compare at matched step counts, never by wall-clock or by "where they got
+to".** Two confounds make elapsed time useless:
+
+- **Eval cost scales with policy quality.** A better policy eats more food, so its
+  episodes are longer, so its 10-episode eval takes longer. `b1c-nstep3` reached 161k
+  steps while its batch mates were at ~68k in the same elapsed time — purely because it
+  was worse and its evals were cheap.
+- **The same confound runs in reverse for a dead policy.** Score 0 means episodes end
+  instantly, so evals become nearly free: `b3c-buf500k` raced to 4.81M steps while its
+  batch mates did ~1.2M, because it had died. **A step count far ahead of its batch
+  mates is a symptom to investigate, not progress.**
+
+Matched-step comparison is right for fairness but **blind to momentum**. An arm that is
+behind at matched steps may still be the one improving. Check the trajectory as well as
+the level — this cost one wrong verdict, on `b1c-nstep3`, in both directions.
+
+**Never call a trend from the most recent window.** `b2a-base2` oscillates with a
+~100k-step wavelength, which produced two contradictory write-ups 80k steps apart. A
+20-30 eval trailing window cannot see that; only the 50k-block table can. See
+[`failureModes.md`](failureModes.md).
 
 ---
 
