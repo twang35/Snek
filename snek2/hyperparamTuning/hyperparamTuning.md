@@ -24,9 +24,16 @@ works.
 
 ## The goal, and why it's hard
 
-The end target is perfect-game percentage. With the config as committed that
-needs roughly **1M iterations / 4-5 hours** of training and then plateaus around
-**50%**. Two things make tuning awkward:
+The end target is perfect-game percentage, reached by learning **consistently** — a rate
+that rises and keeps rising, not a lucky spike.
+
+**Current best: 51% measured over 100 episodes**, from `b4c-schlongper` checkpoint 869000
+(config: alpha 0.8, `td_loss` priorities, no IS weights). That is the number to beat, and
+it matches the ~50%-at-1M figure the investigation started from — the committed config
+reaches ~1%, and the gap was three PER changes made during the cpprb port. See
+[`runs.md`](runs.md).
+
+Two things make tuning awkward:
 
 - **High noise.** Two runs of the identical config reached final avg_score 62.5
   and 18.0 at 30k steps. Any single-run comparison is meaningless. Promising
@@ -67,7 +74,30 @@ usefulness:
 | 5 | **steps to first reach score N** | learning speed | — |
 | 6 | **max drawdown** | diagnostic for *why* a config is erratic | can't tell noisy-but-high from collapsed |
 
-Three of these need care:
+### Measuring a policy properly: `eval_checkpoints.py`
+
+Everything above is for comparing *runs*. To measure what a specific **policy** actually
+does, reload its checkpoint and evaluate it over hundreds of episodes:
+
+```
+cd snek2
+EVAL_EPISODES=100 EVAL_WORKERS=7 EVAL_OUT_SUFFIX=_869000 \
+  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper 869000
+```
+
+Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
+confidence interval. Several copies can run at once on different checkpoints — give each
+its own `EVAL_OUT_SUFFIX` or they overwrite each other, then merge. Four 100-episode
+evals in parallel take about 3 minutes.
+
+**Never quote a graph peak as a policy's perfect-game rate.** A graph point is 10
+episodes, and picking the highest one selects for luck: of four checkpoints chosen by
+best smoothed graph rate, three measured *worse* than the graph implied, by up to 24
+points (the winner's curse). Single evals understate just as badly in the other
+direction — two checkpoints reading 10% on the graph measured 25% and 29%. Use the graph
+for trajectory and `eval_checkpoints.py` for numbers.
+
+Three of the run-comparison metrics above need care:
 
 - **Always use a trailing window for perfect %, never a single eval.** One eval is
   10 episodes, so the metric moves in 10-point jumps. Use the last 30 for a coarse
@@ -175,9 +205,10 @@ therefore contention differ between batches.
 Each run continuously writes to `snek2/runs/`:
 
 ```
-<policy>.png          graph, whole history across all runs of that policy
-<policy>.md           graph + config table + recent evals
-<policy>_evals.json   full eval series; this is what later sessions analyse
+<policy>.png                     graph, whole history across all runs of that policy
+<policy>.md                      graph + config table + recent evals
+<policy>_evals.json              full eval series; this is what later sessions analyse
+<policy>_checkpoint_evals.json   100-episode measurements, written by eval_checkpoints.py
 ```
 
 Those are the **live** files, rewritten on every eval. The tuning docs must never

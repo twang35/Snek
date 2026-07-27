@@ -1,0 +1,67 @@
+{
+  "policy_name": "b4c-schlongper",
+  "episodes_per_checkpoint": 100,
+  "note": "100-episode greedy evals of saved checkpoints; see eval_checkpoints.py",
+  "results": [
+    {
+      "step": 869000,
+      "episodes": 100,
+      "perfect_games": 51,
+      "perfect_percent": 51.0,
+      "perfect_ci95": [
+        41.3,
+        60.6
+      ],
+      "avg_score": 83.37,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 130.65
+    },
+    {
+      "step": 942000,
+      "episodes": 100,
+      "perfect_games": 29,
+      "perfect_percent": 29.0,
+      "perfect_ci95": [
+        21.0,
+        38.5
+      ],
+      "avg_score": 74.32,
+      "median_score": 84.0,
+      "min_score": 17.0,
+      "max_score": 95.0,
+      "avg_reward": 98.83
+    },
+    {
+      "step": 775000,
+      "episodes": 100,
+      "perfect_games": 25,
+      "perfect_percent": 25.0,
+      "perfect_ci95": [
+        17.5,
+        34.3
+      ],
+      "avg_score": 75.41,
+      "median_score": 76.5,
+      "min_score": 17.0,
+      "max_score": 95.0,
+      "avg_reward": 95.71
+    },
+    {
+      "step": 162000,
+      "episodes": 100,
+      "perfect_games": 22,
+      "perfect_percent": 22.0,
+      "perfect_ci95": [
+        15.0,
+        31.1
+      ],
+      "avg_score": 51.88,
+      "median_score": 67.5,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 70.2
+    }
+  ]
+}

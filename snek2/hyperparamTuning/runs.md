@@ -9,23 +9,135 @@ the protocol rarely does.
 Update this section whenever runs start or stop — a future session reads it to
 know what is in flight and might have been terminated.
 
-Status as of 00:05. **Batch 4 is running**, targeting sampling and buffer diversity
-after batch 3 falsified the epsilon hypothesis.
+Status as of 09:20. **Nothing is running** — all arms stopped at the human's request
+after batch 4 produced a clear winner.
 
-| policy | config change | started | what it tests |
-|---|---|---|---|
-| `b4a-uniform` | `PRIORITY_EXPONENT=0.0` | 00:03 | PER off entirely. Prime suspect: already beat PER at 30k, and `theSchlong` prioritized far more weakly than this code does |
-| `b4b-unifbuf500k` | `PRIORITY_EXPONENT=0.0` + `REPLAY_BUFFER_MAX_LENGTH=500000` | 00:04 | the two levers with evidence behind them, together |
-| `b4c-schlongper` | `PRIORITY_EXPONENT=0.8`, `PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0` | 00:04 | `theSchlong`'s exact PER setup, never tested past 30k |
-| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 19:03 | **kept from batch 3** as the reference for the buffer lever alone |
+| policy | config change | steps | best 30-eval perfect | best single eval | cumulative | verdict |
+|---|---|---|---|---|---|---|
+| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | **34.0%** | **80%** | **11.06%** | **winner — best checkpoint measures 51% over 100 episodes** |
+| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 9.3% | 40% | 4.03% | steady but low; no collapse |
+| `b4a-uniform` | alpha 0 | 1.25M | 8.7% | 40% | 3.50% | peaked ~575k, drifted down |
+| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 5.7% | 30% | 0.27% | **died at ~750k**, score 0.0 for 4M steps |
+
+For reference, the best any earlier arm managed was `b1a-base` at a 16.7% window and a
+40% single eval.
+
+All four are resumable by relaunching with the same policy name **and the same `SNEK_*`
+overrides** — they are not persisted in the checkpoint, so relaunching without them
+silently changes the config mid-run:
+
+| policy | overrides needed to resume |
+|---|---|
+| `b4c-schlongper` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` |
+| `b4b-unifbuf500k` | `SNEK_PRIORITY_EXPONENT=0.0 SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` |
+| `b4a-uniform` | `SNEK_PRIORITY_EXPONENT=0.0` |
+| `b3c-buf500k` | `SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` (dead; not worth resuming) |
 
 Resume any of these by relaunching with the same policy name **and the same `SNEK_*`
 overrides** — they are not persisted in the checkpoint, so relaunching without them
-silently changes the config mid-run and invalidates the arm.
+silently changes the config mid-run and invalidates the arm. For batch 4 that is
+`SNEK_PRIORITY_EXPONENT=0.0` (`b4a`), the same plus
+`SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` (`b4b`), and
+`SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` (`b4c`).
 
-**Judge these on consistency, not peak.** The goal is a perfect-game rate that rises
-and *keeps* rising; the 76% `theSchlong` reached was, per the human, "very lucky and
-not consistent at all", so a high spike is not the target.
+## Measured: `b4c-schlongper`'s best checkpoint is a genuine **51%** perfect-game policy
+
+The graph plots one 10-episode eval per point, which moves in 10-point jumps and cannot
+distinguish a good policy from a lucky one. So the four best `b4c-schlongper` checkpoints
+were reloaded and evaluated over **100 greedy episodes each** with
+[`eval_checkpoints.py`](../eval_checkpoints.py). Full results in
+`runs/b4c-schlongper_checkpoint_evals.json`.
+
+| checkpoint | perfect % over 100 eps | 95% CI | mean score | median score |
+|---|---|---|---|---|
+| **869000** | **51.0%** | **41.3-60.6%** | 83.4 | **95.0** |
+| 942000 | 29.0% | 21.0-38.5% | 74.3 | 84.0 |
+| 775000 | 25.0% | 17.5-34.3% | 75.4 | 76.5 |
+| 162000 | 22.0% | 15.0-31.1% | 51.9 | 67.5 |
+
+**Checkpoint 869000 wins more than half the games it plays.** Its median score is 95 of a
+possible 95 — over half of its episodes are perfect wins, and the mean of 83.4 is dragged
+down by a minority of early deaths (min 13). This is the first hard number in the
+investigation that is not a 10-episode estimate.
+
+It also **vindicates the original premise.** The brief said the config should reach ~50%
+perfect games around 1M iterations, and `runs.md` previously recorded that the committed
+config reached ~1% instead. With `theSchlong`'s PER restored, 51% arrives at 869k steps.
+The premise was right; the three PER "corrections" were the regression.
+
+### Selecting checkpoints by peak graph rate overestimates — badly
+
+These four were chosen by highest 5-eval smoothed perfect rate. Comparing what the graph
+suggested against what 100 episodes actually measured:
+
+| checkpoint | single eval | smoothed(5) | **true (100 eps)** |
+|---|---|---|---|
+| 162000 | 30% | 46% | **22.0%** |
+| 775000 | 10% | 38% | **25.0%** |
+| 869000 | 70% | 44% | **51.0%** |
+| 942000 | 10% | 38% | **29.0%** |
+
+The smoothed estimate overshot on **three of four**, by up to 24 points. That is not a bug
+in smoothing, it is the **winner's curse**: these checkpoints were picked for having the
+highest value of a noisy statistic, so their true rates regress downward. Any "best
+checkpoint" chosen off the graph should be expected to measure worse when evaluated
+properly.
+
+Two practical consequences:
+
+- **Never quote a graph peak as a policy's perfect rate.** Quote a 100-episode eval. The
+  graph is for trajectory; it is not a measurement of a policy.
+- **Single evals can also *under*state badly** — 775000 and 942000 both read 10% on the
+  graph and measured 25% and 29%. The noise runs both ways, so a low single eval is not
+  evidence a checkpoint is bad either.
+
+## `b4c-schlongper`: restoring `theSchlong`'s PER roughly doubles the perfect rate
+
+The three "corrections" made when the buffer was ported to cpprb were, together, the
+regression. Reverting all three — alpha 0.8, Huber `td_loss` priorities, no importance
+sampling — produces the best arm by a wide margin on every measure:
+
+| measure | `b4c-schlongper` | best of everything else | `theSchlong` |
+|---|---|---|---|
+| best single eval | **80%** | 40% (`b1a-base`, `b4a`, `b4b`) | 76% (one lucky checkpoint) |
+| best 30-eval window | **34.0%** (851-880k) | 16.7% (`b1a-base`) | — |
+| cumulative over run | **11.06%** | 5.89% (`b1a-base`) | — |
+| peak avg score | **92.0** of 95 | 87.5 (`b1a-base`) | — |
+| evals at >=50% perfect | **41** | 0 | — |
+
+**It has beaten the `theSchlong` number it was built to reproduce**, and unlike a lucky
+checkpoint it held 50-60% repeatedly across 700k-1000k: 41 separate evals at >=50%,
+where no other arm in this investigation has ever produced one.
+
+The block trajectory shows both why it wins and why it is not yet a solved problem:
+
+| steps | score mean | perfect mean |
+|---|---|---|
+| 100-150k | 74.2 | 12.8 |
+| 150-300k | 40.3 → 19.3 | **severe collapse**, score to ~19 |
+| 350-400k | 70.4 | 11.0 |
+| 700-750k | 75.5 | 13.2 |
+| 800-850k | 80.0 | 26.2 |
+| 850-900k | **79.0** | **32.2** |
+| 950-1000k | 74.2 | 23.2 |
+| 1000-1050k | 65.7 | 11.2 |
+
+So it is **higher-performing and higher-variance** — it survived a near-total collapse
+around 250k, recovered, and then climbed for 600k steps to a level nothing else has
+approached. That matches the human's description of `theSchlong` as "very lucky and not
+consistent at all": this config has a much higher ceiling and a much wider spread.
+
+**This needs repeating 2-3x before it is believed.** It is n=1, this domain has produced
+62.5-vs-18.0 from one config, and this arm's own history contains a collapse deep enough
+to have ended the run if it had been judged at 300k.
+
+### Consistency is now the open problem, not ceiling
+
+The goal is a perfect rate that rises and keeps rising. `b4c` gets much higher but is
+not yet consistent: a collapse at 250k, a peak at 875k, and a dip to 0% at ~1046k that
+it is currently recovering from (71.4 score / 20% at 1058k). The productive next question
+is which of its three changes drives the gain and which drives the variance — they were
+reverted together, so that is still unseparated.
 
 ### The systemic finding batch 4 is chasing
 
@@ -80,7 +192,40 @@ mechanism to explain it.
 set, and knowing epsilon 0.0 is *safe* is a useful result. But the epsilon ladder is
 no longer a suspect, and the "make the threshold tunable" follow-up is not worth doing.
 
-## Hypothesis B is supported: buffer diversity is the live lever
+## `b3c-buf500k` died completely — which retracts the section below
+
+**Retraction.** The section below called `b3c-buf500k` the most durable arm and read it
+as support for hypothesis B. Run further, **it collapsed to score 0.0 at ~750k and never
+recovered across the next 4 million steps.** Its cumulative perfect rate is 0.27%, the
+worst of any arm that ever learned to play.
+
+| steps | score mean | perfect mean |
+|---|---|---|
+| 250-300k | 70.7 | 4.2 |
+| 650-700k | 58.9 | 0.4 |
+| 700-750k | 34.3 | 0.0 |
+| 750-800k | **0.6** | 0.0 |
+| 800k-4.81M | ~0.0-3.2 | **0.0** |
+
+Score 0 means the snake dies almost immediately, so this is total policy destruction, not
+a dip — a **fourth failure mode**, and the most severe: irrecoverable.
+
+Two things to take from it:
+
+- **The "flattest curve in the investigation" praise was premature**, for the same
+  reason as every other premature call here: it was a snapshot at 500k of a run that had
+  another 4M steps of information in it. The flatness was real and then it died.
+- **A dead policy is fast**, which is a trap. Score 0 means episodes end instantly, so
+  evals become nearly free and throughput explodes — this arm raced from 523k to 4.81M
+  steps in a few hours while the others did ~700k. Rapid step accumulation is a *symptom
+  of failure*, the eval-cost confound in reverse. Do not read step count as progress.
+
+Hypothesis B is therefore **not settled**: `b4b-unifbuf500k` (uniform + 500k buffer) is
+healthy at 1.23M and steadily rising, while `b3c-buf500k` (PER + 500k buffer) died. The
+difference between them is prioritization, not buffer size, which points the same way as
+`b4c`.
+
+## ~~Hypothesis B is supported: buffer diversity is the live lever~~ — see retraction above
 
 `b3c-buf500k` is the only arm that has held up, and it is the only arm with a 5x
 buffer:
@@ -111,16 +256,20 @@ partly defeats the diversity the larger buffer buys.
 perfect-game rate**. Diffing it against `snek2` is more informative than any
 hyperparameter sweep, because it is a working reference rather than a guess.
 
-**First, the metric is not the same**, so the comparison needs care:
+**What the 76% was**, since this has been got wrong twice: per the human, **a single
+checkpoint that got very lucky** — not a mean over a run, and not a sustained level.
+An earlier version of this section guessed it was `theSchlong`'s cumulative
+`perfect_percentage` metric and compared it against ~6%; that was wrong.
 
-| | `theSchlong` | `snek2` |
-|---|---|---|
-| what it printed | `perfect_percentage`, a **cumulative mean over the whole run** | `last_eval_perfect_percent`, **this eval only** (10 episodes) |
+The right comparison is therefore **best single eval**, and on that measure `snek2` has
+now surpassed it: `b4c-schlongper` hit **80%** at step 970k, against 76%. The three
+numbers worth tracking, for every arm:
 
-`snek2` still computes the cumulative figure, it just isn't displayed. Measured the
-same way, the arms here are at **0.08% to 5.89%** cumulative, best being `b1a-base`
-at 5.89%. So the gap is real however it is measured, but "76% vs 16.7%" was comparing
-two different quantities and the honest framing is 76% vs ~6%.
+| measure | what it answers |
+|---|---|
+| best single eval | the ceiling — comparable to the 76% |
+| best 30-eval window | whether the ceiling is *held*, which is the actual goal |
+| cumulative over run | how much of the run was spent playing well |
 
 **Rewards, grid size, network shape and the epsilon ladder are byte-identical**, so
 scores compare directly. `Snake.py` and `snake_environment.py` differ only
@@ -150,10 +299,13 @@ Two knobs now make the old behaviour reachable: `SNEK_PRIORITY_SIGNAL`
 behaviour, so nothing else changes.
 
 **Caveat from the human, and it matters:** the 76% was "very lucky and not consistent
-at all." So `theSchlong`'s config is not a known-good target to reproduce — it is
-evidence about *variance*, and it may simply have had a higher ceiling and a wider
-spread. The goal remains **consistent learning and a consistently rising perfect
-rate**, not chasing 76%.
+at all." So `theSchlong`'s config was never a known-good target — it is evidence about
+*variance*, and the prediction that it had a higher ceiling with a wider spread is
+exactly what `b4c-schlongper` then showed. The goal remains **consistent learning and a
+consistently rising perfect rate**, not chasing a spike.
+
+**Outcome: this diff was the most productive thing in the investigation.** Reverting all
+three changes doubled the best sustained perfect rate. See `b4c-schlongper` above.
 
 ## The baseline does not reach 50% perfect at 1M steps — it reaches ~1%
 
@@ -637,18 +789,28 @@ instead. **Every arm needs to run past ~350k to mean anything** — degradation 
 
 | priority | change | status |
 |---|---|---|
-| **1** | `PRIORITY_EXPONENT=0.0` | **running** as `b4a-uniform` |
-| **2** | `PRIORITY_EXPONENT=0.0` + 500k buffer | **running** as `b4b-unifbuf500k` |
-| **3** | `theSchlong` PER: alpha 0.8, `td_loss`, no IS | **running** as `b4c-schlongper` |
-| 4 | whichever of 1-3 looks best, **repeated 2-3x** | queued — mandatory before believing any of it |
-| 5 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | queued, if the buffer lever holds up |
-| 6 | `DISCOUNT=0.995` | queued; untested, high-prior — the perfect-game bonus is discounted to near-nothing at 0.99 |
-| 7 | `GRADIENT_CLIPPING=10` | queued; cheap, independent of the above |
+| **1** | `PRIORITY_EXPONENT=0.0` | **running** as `b4a-uniform` — modest, 8.7% window |
+| **2** | `PRIORITY_EXPONENT=0.0` + 500k buffer | **running** as `b4b-unifbuf500k` — steady, 9.3% window |
+| **3** | `theSchlong` PER: alpha 0.8, `td_loss`, no IS | **running** as `b4c-schlongper` — **34.0% window, the clear winner** |
 
-The three running arms deliberately span the whole prioritization axis — none (`b4a`),
-none-plus-diversity (`b4b`), and maximum (`b4c`) — so the result is interpretable even
-if all three are worse than the default. That is a better use of three slots than three
-repeats of one guess, given nothing here has a strong prior yet.
+Spanning the whole prioritization axis — none (`b4a`), none-plus-diversity (`b4b`),
+maximum (`b4c`) — paid off: the answer was at the end nobody expected. Uniform sampling
+was the prior favourite and came in at a third of `b4c`'s rate.
+
+### Batch 5 — the obvious follow-ups
+
+| priority | change | why |
+|---|---|---|
+| **1** | `b4c` config, **repeated 2-3x** | it is n=1 with a collapse in its own history. Nothing else matters until this holds |
+| **2** | alpha 0.8 + `td_loss` + **IS weights ON** | of `b4c`'s three reverted changes, this isolates the IS one — the most likely single cause, since IS weights directly cancel prioritization |
+| **3** | alpha 0.8 + `abs(td_error)` + no IS | isolates the priority-signal change |
+| 4 | `b4c` config + 500k buffer | `b4b` beat `b4a` slightly, so diversity may stack on top of the winner |
+| 5 | `DISCOUNT=0.995` | still untested and still high-prior; the perfect-game bonus is discounted to near-nothing at 0.99 |
+| 6 | `GRADIENT_CLIPPING=10` | cheap, independent, and `b4c`'s variance is what needs taming |
+
+Priorities 2 and 3 matter because `b4c` reverted **three** things at once. Knowing which
+one carries the gain is worth more than another point on any scalar knob, and the knobs to
+separate them already exist.
 
 Dropped: the LR schedule (no evidence of optimization instability — degradation is
 gradual in every arm, not spiky) and making the epsilon threshold tunable (the ladder is
