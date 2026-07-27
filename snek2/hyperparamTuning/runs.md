@@ -9,14 +9,45 @@ the protocol rarely does.
 Update this section whenever runs start or stop — a future session reads it to
 know what is in flight and might have been terminated.
 
-Status as of 19:05. **Batch 3 is running**; batches 1 and 2 are finished.
+Status as of 20:20. **Batch 3 is running**; batches 1 and 2 are finished.
 
-| policy | config change | started | status |
-|---|---|---|---|
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 19:01 | **running.** Tests the leading collapse hypothesis. Watch for: does it reach `b1a-base`'s 14%-class perfect rate, and does it still hold it past 300k? |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 19:02 | **running.** Deliberate repeat of `b3a` — collapse is stochastic, so one non-collapsing run would prove nothing on its own |
-| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 19:03 | **running.** Independent mechanism, same target: keeps old experience from being evicted rather than keeping it being generated |
-| `b2a-base2` | baseline repeat #2 | 15:10 | **still running, 435k**, kept deliberately as the live control for batch 3. Has now survived 170k steps past where its twin collapsed: 10.9-point drop from an 83.8 peak, score trend +0.7, perfect 4.7% and inching up. Stable but stuck — never above 7% in any 30-eval window |
+| policy | config change | steps | last-30 perfect | score trend | note |
+|---|---|---|---|---|---|
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 230k | **6.7%** ↑ | **+3.4** | **best arm.** Treatment is genuinely active (see below) |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 238k | 5.0% | −2.3 | treatment has **not fired yet** — currently a de facto baseline repeat |
+| `b3c-buf500k` | `REPLAY_BUFFER_MAX_LENGTH=500000` | 213k | 2.0% ↑ | +1.9 | smoothest curve ever recorded here; also the lowest ceiling |
+| `b2a-base2` | baseline repeat #2 | 680k | 1.3% ↓ | −2.2 | **now slowly decaying** — a second, distinct failure mode |
+
+Logs are in `/Users/tony_wang/.claude/jobs/f3cb1855/tmp/b3{a,b,c}.log`, which is
+job-scoped and will not survive; the durable record is `runs/<policy>_evals.json`,
+so analyse from there.
+
+Resume any of these by relaunching with the same policy name **and the same
+`SNEK_*` overrides** — the overrides are *not* persisted in the checkpoint, so
+relaunching without them silently changes the config mid-run and invalidates the
+arm. For batch 3 that means `SNEK_MIN_EPSILON=0.001` for `b3a`/`b3b` and
+`SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` for `b3c`.
+
+### Matched-step comparison at the 200-250k block
+
+Every arm has now passed 200k, so this is the first comparison in this document that
+sits on the right side of the ~250k judgeability line.
+
+| policy | score mean | score min | perfect mean | epsilon |
+|---|---|---|---|---|
+| `b1a-base` | 71.9 | 55.9 | **14.0** | **0.0** |
+| `b3a-epsfloor` | **72.2** | 53.9 | 6.2 | 0.001 |
+| `b3b-epsfloor2` | 71.6 | 52.1 | 6.8 | 0.001 (floored) |
+| `b3c-buf500k` | 70.8 | **64.1** | 3.6 | 0.001 |
+| `b2a-base2` | 67.0 | 52.0 | 3.0 | 0.001 |
+
+All four 0.001-epsilon arms land in a tight 67-72 score band and a 3-7% perfect band,
+while `b1a-base` — the only arm at epsilon 0.0 — sits at **double the best of them**
+on the objective. That is the opposite of what hypothesis A predicted, and it is now
+the second piece of evidence that the last rung raises the ceiling rather than
+lowering it. It is still confounded the same way (only strong runs reach it), and
+`b1a-base` then collapsed, so this does not vindicate 0.0 — it sharpens the
+trade-off.
 
 That is 4 trainers, i.e. the budget is full — do not launch more until one stops.
 Logs are in `/Users/tony_wang/.claude/jobs/f3cb1855/tmp/b3{a,b,c}.log`, which is
@@ -82,6 +113,45 @@ Three things follow, and they reshape the investigation:
    this document is on the wrong side of that line. Arms need to reach ~300k before
    their verdict means anything, which is expensive and needs planning for.
 
+## Design flaw in batch 3: the epsilon floor almost never fires
+
+**Read this before drawing anything from `b3a`/`b3b`.** `MIN_EPSILON` only changes
+behaviour at the ladder's last rung, which requires `avg_reward > 100`. That
+threshold turns out to be *rarely reached*:
+
+| policy | evals with `avg_reward > 100` | evals 95-100 | floor active? |
+|---|---|---|---|
+| `b1a-base` | **18** (first at 92k) | 12 | n/a — ran at 0.0 |
+| `b3b-epsfloor2` | **1** (at 147k) | 2 | **yes, from 147k** |
+| `b3a-epsfloor` | 0 | 1 | **no — inert so far** |
+| `b3c-buf500k` | 0 | 0 | n/a (floor is 0.0 anyway) |
+| `b2a-base2` | 0 | 4 | n/a |
+
+So of the two arms meant to test hypothesis A, only **`b3b-epsfloor2` is a real
+treatment arm.** `b3a-epsfloor` has never crossed the threshold, so its epsilon sits
+at 0.001 exactly where an unfloored run's would — it is currently an accidental
+third baseline repeat (which is queue item E, so not wasted, just not what it was
+launched for).
+
+**One crossing is enough, though, and that is the saving grace.** The ladder is a
+one-way ratchet: a single eval over 100 permanently zeroes epsilon, and score
+dropping afterwards never raises it back. So `b1a-base` needed only its 92k crossing
+to spend the rest of its life fully greedy, and `b3b-epsfloor2`'s single crossing at
+147k means it has been *diverging from the default since 147k*. That makes `b3b` a
+valid test, just an n=1 one.
+
+Two consequences for reading this batch:
+
+- **`b3b` needs to reach ~320k before it says anything.** `b1a-base` collapsed 173k
+  steps after its own divergence (92k → 265k). `b3b` diverged at 147k, so the
+  equivalent exposure window ends around 320k. It is at 230k.
+- **The threshold, not the floor, is the real knob.** Testing this hypothesis
+  properly needs the last rung to be *reliably reachable*, which means making the
+  `avg_reward > 100` threshold tunable rather than tuning the floor beneath it. That
+  is a better next code change than another `MIN_EPSILON` value, and it would also
+  let a treatment arm be *forced* to 0.0 early to test the mechanism directly rather
+  than waiting on a lucky eval.
+
 ## The collapse is recoverable in score but not in skill
 
 `b1a-base` was left running specifically to see whether the collapse was permanent.
@@ -110,6 +180,30 @@ Two things follow, and the second is a change to the protocol:
   back.** Riding out a collapse and hoping is not a strategy; the 14% perfect rate
   never returned across 150k further steps. That strengthens the case for
   *preventing* collapse rather than tolerating it.
+
+## Slow decay is a second failure mode, distinct from collapse
+
+`b2a-base2` was the "stable" arm. Run out to 680k it is not stable, it is **slowly
+degrading** — and it never had a collapse event:
+
+| steps | score mean | perfect mean |
+|---|---|---|
+| 150-200k | 69.6 | **5.2** |
+| 300-350k | 69.8 | 3.8 |
+| 450-500k | 68.7 | 4.4 |
+| 550-600k | 62.8 | 1.0 |
+| 650-700k | 63.2 | **1.3** |
+
+Score drifts 70 → 63 and the perfect rate falls 5.2 → 1.3, with no break anywhere on
+the curve. So there are **two ways to lose a good policy**, not one: the sharp
+collapse `b1a-base` had, and this slow bleed. Max drawdown catches the first and is
+nearly blind to the second (18.1 here, mostly from ordinary oscillation).
+
+This matters for the queue, because an intervention that only prevents sharp
+collapses would still lose to slow decay over a 1M-step run. It also means
+**`b2a-base2` should no longer be described as the stable counter-example** — the
+honest summary is that it traded a cliff for a slope, and both arms ended up well
+below their own peak perfect rate.
 
 ## Leading hypothesis for the collapse: epsilon reaches exactly 0.0
 
