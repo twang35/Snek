@@ -26,6 +26,23 @@ at, so captions can be updated to match.
 
 Snapshot refreshed 18:12, at the steps noted below.
 
+## Every arm at a glance
+
+| policy | change | steps | peak score (at) | best perfect-30 | verdict |
+|---|---|---|---|---|---|
+| `b1a-base` | none (control) | 497k | **87.5** (135k) | **16.7%** | collapsed at 265k; score recovered, skill did not |
+| `b2a-base2` | none (repeat) | 435k | 83.8 (293k) | 7.0% | never collapsed; stable but stuck |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | stopped early, verdict weak |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.12M | 76.0 (255k) | 1.7% | dead end |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 568k | 74.6 (140k) | 0.7% | dead end |
+
+Batch 3 (`b3a-epsfloor`, `b3b-epsfloor2`, `b3c-buf500k`) is still running; charts go
+in below once they reach a judgeable horizon.
+
+**The one comparison to take from this table:** `b1a-base` reached more than double
+any other arm's perfect rate and is the only one that collapsed. Nothing so far has
+been both good and stable.
+
 ---
 
 ## Batch 1

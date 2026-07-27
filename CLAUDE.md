@@ -87,6 +87,28 @@ are easy to get wrong:
 Hyperparameters are overridden with `SNEK_*` env vars (see `tuned()` in
 `snek2.py`), so variants run side by side without editing files.
 
+## Writing the docs
+
+**Lead with a table, then explain underneath.** Any time a section covers a *set* of
+comparable things — run statuses, queued experiments, config options, ranked
+metrics — open with a compact table, one row per item and only columns that carry
+signal, then put the rationale in `####` subsections or paragraphs below it. Keep
+cells to a few words and push anything longer down into the prose. The point is
+that the state of things should be readable at a glance without reading paragraphs
+to reconstruct facts that belong in a grid.
+
+Two markdown traps that look fine in the source and render wrong:
+
+- **`A.`/`a.` are not list markers** — only digits and `-`/`*` are. Lettered items
+  collapse into one run-together paragraph. Use `#### A. Thing` headings when the
+  letters are cross-referenced elsewhere.
+- **Duplicate numbers in one list renumber silently** — two items both written `6.`
+  render as 6 and 7, shifting everything after them and breaking any prose that
+  refers to "item 12". Cross-reference items by name, not number.
+
+Worth a grep for `^[A-Za-z]\.\s` and a duplicate-number check after editing any md
+file here, since the user reads these rendered rather than as source.
+
 ## Active development
 
 `snek2/` is the only directory that should be edited going forward. It's a

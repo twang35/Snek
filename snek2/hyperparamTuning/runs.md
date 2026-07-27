@@ -327,23 +327,27 @@ plan to stop them by step count rather than by time.
 Ordered by expected value. Revise freely as results land — this is a plan, not a
 commitment.
 
-### Batch 1 (first, 3 slots, target ~120k steps)
+### Batch 1 — the original plan, for the record
 
-1. **`b1a-base`** — committed defaults, as a control under the same machine load
-   as its batch mates. Not expected to be good; expected to be the *reference*.
-   Needed because throughput and contention vary between batches, so cross-batch
-   comparison is weaker than within-batch.
-2. **`b1b-tgt200`** — `TARGET_UPDATE_PERIOD=200`. **Highest-prior change.** The
-   default of 8 gradient steps between target-network syncs is extremely frequent;
-   standard DQN uses hundreds to thousands. A target that chases the online
-   network is a classic cause of oscillation and forgetting, which is exactly the
-   reported symptom. Expect: visibly smoother curve and smaller drawdowns, even if
-   peak score is similar.
-3. **`b1c-nstep3`** — `N_STEP_UPDATE=3`. The food reward is immediate but the
-   perfect-game bonus is terminal and extremely sparse, so credit has to crawl
-   back one step per gradient update. n-step returns propagate it ~3x faster.
-   Expect: earlier onset of learning (relevant to the "nothing until 40k" effect)
-   and better late-game behaviour.
+| policy | change | expected | actual |
+|---|---|---|---|
+| `b1a-base` | none (control) | a *reference*, not a winner | became the key run: collapsed at 265k |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | smoother curve, smaller drawdown | faster early, *larger* drawdown |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | earlier learning onset, better late game | slowest to rise, then declined for 850k steps |
+
+The reasoning at the time, kept because two of the three predictions were wrong and
+that is worth remembering:
+
+- **`b1a-base`** — a control run under the same machine load as its batch mates,
+  since throughput and contention vary between batches and make cross-batch
+  comparison weaker than within-batch.
+- **`b1b-tgt200`** — the highest-prior change of the batch. 8 gradient steps between
+  target-network syncs is extremely frequent where standard DQN uses hundreds to
+  thousands, and a target that chases the online network is a classic cause of
+  oscillation and forgetting, which was exactly the reported symptom.
+- **`b1c-nstep3`** — the food reward is immediate but the perfect-game bonus is
+  terminal and extremely sparse, so credit has to crawl back one step per gradient
+  update; n-step returns propagate it ~3x faster.
 
 ### Batch 3 — reprioritized around the collapse (do these next)
 
@@ -420,45 +424,52 @@ denominator.
 If the collapse is an optimization instability rather than a data-diversity problem,
 this addresses it directly. No LR-schedule knob exists yet — would need adding.
 
-### Batch 2 — revised after batch 1's interim results (superseded by batch 3)
+### Batch 2 and beyond — the standing backlog
 
-4. **`b2a-base2` / `b2b-base3`: repeat the baseline 2-3x.** Now the top priority,
-   not an afterthought. Batch 1 says the baseline reaches ~70 avg score and 10%
-   perfect games by ~44k, which contradicts the premise of the whole exercise.
-   Until the baseline's spread is known, no arm can be judged against it. These
-   also test whether the early perfect games reproduce.
-5. ~~**`N_STEP_UPDATE=2`**~~ — **done and closed, negative.** See "n-step returns:
-   closed, negative" above. The planned n=5 follow-up is cancelled: n=2 and n=3 both
-   peak below baseline and then decline, so the trend already points the wrong way.
-6. **`TARGET_UPDATE_PERIOD=50` and `=500`.** Batch 1 hinted that longer periods
-   learn faster early even though they didn't reduce drawdown. Two more points
-   establish whether that's a trend or noise.
-7. **`LEARNING_RATE=1e-4`** *only after* the target-update fix. Currently 1e-5 is
-   very conservative; the in-code comment already suggests 1e-4. With a stable
-   target it may train several times faster. On its own with `TARGET_UPDATE_PERIOD=8`
-   it would probably make instability worse, so the order matters.
-8. **`DISCOUNT=0.995` or `0.999`.** At 0.99 the effective horizon is ~100 steps,
-   but a perfect game is several hundred steps long, so the terminal bonus is
-   discounted into near-irrelevance. Raising it should make the perfect-game reward
-   actually reachable by the value function — plausibly the single most relevant
-   change for the *stated* end goal, though also a known source of instability, so
-   it pairs naturally with the target-update fix.
-9. **Soft target updates**, `TARGET_UPDATE_TAU=0.005` with
-   `TARGET_UPDATE_PERIOD=1`. An alternative to (2) that some find smoother still.
-10. **`PRIORITY_EXPONENT=0.0` at long horizon.** Confirms or overturns the 30k-step
-    finding at the scale that actually matters.
-11. **`GRADIENT_CLIPPING=10`.** Cheap insurance against the loss spikes that tend
-    to accompany forgetting events.
-12. **`FC_LAYERS=128,128`.** Capacity. Lower prior: 20 inputs and 3 actions is a
-    small problem, so capacity is unlikely to be the binding constraint before the
-    stability issues above are fixed.
-13. **Longer epsilon exploration.** **Promoted to batch 3 item A** — the "if
-    forgetting correlates with epsilon getting small" conjecture now has evidence
-    behind it. The remaining untested part of this item is the *shape* of the
-    ladder rather than its floor: it is driven by reward thresholds and steps down
-    once per eval, so it is coupled to `eval_interval` — a latent confound if that
-    interval is ever changed, and a reason a slower or step-count-based decay is
-    worth trying after A lands.
+Batch 3 leads because it targets the collapse. Everything still untested lives here,
+ordered by expected value. Rationale for the entries that need it is below the table.
+
+| change | targets | prior | status |
+|---|---|---|---|
+| `DISCOUNT=0.995` / `0.999` | perfect-game reward being reachable at all | **high** | queued |
+| `LEARNING_RATE=1e-4` | training speed | high, but ordered after a stability fix | queued |
+| `TARGET_UPDATE_PERIOD=50` / `500` | early learning speed | medium — 2 points to test a hinted trend | queued |
+| `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium | queued |
+| `FC_LAYERS=128,128` | capacity | low | queued |
+| epsilon ladder *shape* (not floor) | exploration schedule | low | partly promoted to 3A |
+| baseline repeat 2-3x | knowing the spread at all | — | **done**: `b1a`, `b2a` |
+| `N_STEP_UPDATE=2` | credit propagation | — | **closed, negative** |
+| `PRIORITY_EXPONENT=0.0` | late-stage sampling noise | — | **promoted to 3C** |
+| `GRADIENT_CLIPPING=10` | loss spikes | — | **promoted to 3D** |
+
+#### `DISCOUNT=0.995` or `0.999` — the most under-rated item here
+
+At 0.99 the effective horizon is ~100 steps, but a perfect game is several hundred
+steps long, so the terminal bonus is discounted into near-irrelevance. Raising it
+should make the perfect-game reward actually reachable by the value function —
+plausibly the single most relevant change for the *stated* end goal. It is also a
+known source of instability, so it pairs naturally with a stability fix rather than
+going first.
+
+#### `LEARNING_RATE=1e-4` — only after a stability fix
+
+1e-5 is very conservative and the in-code comment already suggests 1e-4. With a
+stable target it may train several times faster; on its own with
+`TARGET_UPDATE_PERIOD=8` it would probably make instability worse. The order
+matters.
+
+#### `TARGET_UPDATE_PERIOD=50` and `=500`
+
+Batch 1 hinted that longer periods learn faster early even though they didn't reduce
+drawdown. Two more points establish whether that is a trend or noise. Note `b1b-tgt200`
+was stopped at 104k, well short of the ~250k horizon, so that hint is weak evidence.
+
+#### Epsilon ladder shape
+
+The floor is now batch 3 item A. What remains untested is the *shape*: the ladder is
+driven by reward thresholds and steps down once per eval, so it is coupled to
+`eval_interval` — a latent confound if that interval is ever changed, and a reason a
+slower or step-count-based decay is worth trying after A lands.
 
 ### Explicitly not planned
 

@@ -58,24 +58,28 @@ or the config silently changes mid-run.
 Because of that, avoid the final eval as a metric. Prefer, in rough order of
 usefulness:
 
-1. **perfect-game % over the last N evals** — the objective. Use a trailing window,
-   never a single eval: one eval is 10 episodes, so a single perfect game reads as
-   10% and the metric is extremely coarse.
-2. **steps to the first perfect game** — how fast a config gets into the region
-   that matters at all.
-3. **last-5-eval average score** — the leading indicator, and the workhorse for
-   comparing configs. Needed because perfect-game % sits at 0 for tens of
-   thousands of steps, so early on it cannot tell two configs apart while score
-   already can. **But it stops being a proxy for the objective late in a run:**
-   `b1a-base` recovered from a collapse to its old score while its perfect rate
-   kept falling to a fifth of its peak. Past ~250k steps, or after any collapse,
-   read (1) directly and treat score as context only.
-4. **mean over the whole curve** — rewards learning early and holding on.
-5. **steps to first reach score N** — for comparing learning speed.
-6. **max drawdown** — biggest drop from a running peak. A diagnostic for
-   inconsistency rather than an objective: useful for explaining *why* a config is
-   erratic, but a config with a large drawdown that reaches a high perfect-game
-   rate still wins.
+| rank | metric | what it tells you | when it lies |
+|---|---|---|---|
+| 1 | **perfect % over last N evals** | the objective itself | very coarse early — one perfect game reads as 10% |
+| 2 | **steps to first perfect game** | how fast a config gets into the region that matters | nothing about the ceiling |
+| 3 | **last-5-eval avg score** | leading indicator; the workhorse for comparisons | **decouples from the objective past ~250k** |
+| 4 | **mean over the whole curve** | rewards learning early *and* holding on | punishes slow starters that end high |
+| 5 | **steps to first reach score N** | learning speed | — |
+| 6 | **max drawdown** | diagnostic for *why* a config is erratic | can't tell noisy-but-high from collapsed |
+
+Three of these need care:
+
+- **Always use a trailing window for perfect %, never a single eval.** One eval is
+  10 episodes, so the metric moves in 10-point jumps. Use the last 30 for a coarse
+  read, and compare it against the previous 30 rather than an absolute threshold.
+- **Score stops proxying the objective late in a run.** `b1a-base` recovered from a
+  collapse to its old score while its perfect rate kept falling to a fifth of its
+  peak. Score is right early, when perfect % sits at 0 for tens of thousands of
+  steps and cannot separate two configs at all. Past ~250k steps, or after any
+  collapse, read perfect % directly and treat score as context only.
+- **A large drawdown is not disqualifying.** A config that swings wildly but reaches
+  a high perfect-game rate beats a placid one that plateaus low — `b1a-base` versus
+  `b2a-base2` is exactly that contrast.
 
 ---
 
