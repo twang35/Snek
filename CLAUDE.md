@@ -75,8 +75,26 @@ lives in **`snek2/hyperparamTuning/`**:
   with `refresh_charts.sh`.
 
 Read those before starting or judging any tuning run, and update them as runs
-start, finish, or get killed — they are the handoff between sessions. Two rules
-are easy to get wrong:
+start, finish, or get killed — they are the handoff between sessions.
+
+### "Progress update" means look, don't touch
+
+When the user asks for a progress update or to check on progress, that is
+**read-only with respect to running processes**: analyse the evals, refresh the
+charts, update the docs, report. **Do not kill, stop, or restart any arm** — not
+even one that looks finished, is past the 4-hour cap, or is clearly failing.
+
+Deciding a run is done is the user's call, not a side effect of asking how it's
+going. A long run may still be producing the late-horizon data that makes it
+worth something, and judging an arm dead has already been wrong here more than
+once. If a run looks finished and no slot is needed, say so in the report as a
+recommendation and let the user decide.
+
+Stop an arm only when the user asks, or when they ask for something that
+plainly needs a free slot ("start the next batch" with the budget full) — and
+then say which ones are stopping and why.
+
+Two other rules are easy to get wrong:
 
 - **Never run more than 4 snek trainers at once**, counting human-started ones.
   Check with `ps -eo pid,command | grep "[s]nek2.py" | grep -v spawn_main`.
