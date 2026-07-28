@@ -10,10 +10,12 @@ section before proposing an epsilon or buffer experiment.
 
 | finding | status |
 |---|---|
-| `b6b-alpha06` (alpha 0.6, `td_loss`, no IS) is the best *bet*: 24.5% over 1000 eps, survived | **measured**, n=1 seed |
-| `b4c` has the best *ceiling*: 31.8% over 400 eps, but survives only 1 of 3 | **measured** |
-| Best single checkpoint: 51% over 100 episodes (`b4c` @869k) | **measured** — top of a distribution, not a level |
-| Adjacent checkpoints differ by up to 20 points at 100 eps each | **established** |
+| `b6b-alpha06` (alpha 0.6, `td_loss`, no IS) is the best *bet*: 24.5% over 1000 eps, survived | **measured**, n=1 seed, and an **underestimate** |
+| `b4c` has the best *ceiling*: ~31%, but survives only 1 of 3 | **measured**, 1400 eps |
+| A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs -0.40 |
+| Policy quality changes materially within 1000 training steps | **established**, 3 of 3 clusters, up to 27 points |
+| `b4c`'s best checkpoint is 851000 (~40%), not 869000 | **measured** |
+| The published "51% at 869000" was the high draw of three measurements; pooled 41.7% | **corrected** |
 | Restoring `theSchlong`'s PER roughly triples the perfect rate | **retracted** — did not replicate, 0 of 2 |
 | That config is a coin flip: 1 of 3 seeds survives, the rest die permanently | **established**, n=3 |
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — it is arithmetic |
@@ -68,6 +70,96 @@ ranking flips:
 is n=1, so that number is soft and the next thing to do is seed it 2-3 more times. But this
 is the first config here that looks both good *and* repeatable, and repeatability has been
 the binding constraint all along.
+
+## A high single eval is signal, not luck — and smoothing destroys it
+
+This is the most useful measurement result in the investigation, and it **falsified the
+assumption `eval_checkpoints.py` was originally built on**. The script ranked checkpoints
+by perfect rate smoothed over a centred 10-eval window, on the reasoning that a single
+10-episode eval reaching 70-80% must be a lucky draw. Measuring both selections against
+the truth says otherwise:
+
+| selection rule | pooled measured | 95% CI | episodes |
+|---|---|---|---|
+| **raw single eval** ("lucky") | **41.3%** | 35.9-47.0% | 300 |
+| smoothed region rate | 27.1% | 24.0-30.6% | 700 |
+
+Non-overlapping: the checkpoints picked for a high single eval are **14 points better**,
+not worse. Correlation against the 100-episode measurement across the ten checkpoints:
+
+| predictor | correlation with true rate |
+|---|---|
+| raw single 10-episode eval | **+0.64** |
+| smoothed region rate | **-0.40** |
+
+Smoothing is not merely weaker here, it is **anti-predictive**. The binomial says why: if a
+policy's true rate were 27%, the chance a 10-episode eval shows 7+ perfect games is
+**0.006**. A high single eval is strong evidence about *that checkpoint*. Averaging it with
+its neighbours describes the *region* instead — and as the next section shows, the region
+is a poor proxy for the checkpoint.
+
+**Consequence: `b6b-alpha06` and `b6a-alpha04` were measured with the smoothed-heavy
+selector and are therefore underestimates.** Their 24.5% and 8.1% should be re-measured
+before being compared to anything.
+
+## Policy quality changes materially within 1000 training steps
+
+Evaluating each high-single-eval checkpoint **together with the checkpoints immediately
+either side of it** — 100 episodes each — settles whether "this checkpoint is good" can be
+distinguished from "this part of the run is good". It can:
+
+| cluster | centre | neighbours at +/-1000 | centre advantage |
+|---|---|---|---|
+| 851000 | **40.0%** | 28.5% | **+11.5 points** |
+| 869000 | **32.0%** | 23.0% | **+9.0 points** |
+| 970000 | **35.0%** | 7.5% | **+27.5 points** |
+
+Pooled, centres measure 35.7% (CI 30.5-41.2) against neighbours' 19.7% (CI 16.7-23.0) —
+non-overlapping, and the effect is in the same direction in **3 of 3** clusters.
+
+The 970000 cluster is the extreme case: **969000 measures 8%, 970000 measures 35%, 971000
+measures 7%.** Those are 100-episode measurements, so **1000 training steps can gain or
+lose 27 points of perfect-game rate.** Training is far more non-stationary at the
+checkpoint level than this investigation previously assumed, and adjacent checkpoints are
+not interchangeable samples of one policy.
+
+## Two measurement caveats that change how numbers here should be read
+
+#### Pooled rates only compare when the selection rule matches
+
+`b4c-schlongper` measured three ways:
+
+| selection | pooled | note |
+|---|---|---|
+| 4 hand-picked | 31.8% /400 | the original measurement |
+| 3 lucky + 7 smoothed | 31.4% /1000 | agrees closely |
+| 3 clusters of 3 + 1 | **26.2%** /1000 | *lower by construction* |
+
+The cluster run is not a disagreement — 6 of its 10 picks are deliberately the weaker
+neighbours, so it measures the spike-vs-neighbour gap rather than the config's level.
+**`b4c`'s level is ~31%.** Never compare pooled numbers produced by different selection
+rules.
+
+#### 100 episodes is a weaker instrument than its interval implies
+
+Checkpoint 869000 — frozen weights, greedy policy — has been measured three separate
+times:
+
+| run | rate | 95% CI |
+|---|---|---|
+| 4-ckpt hand-picked | **51%** | 41.3-60.6 |
+| lucky+smoothed | 42% | 32.8-51.8 |
+| clusters | **32%** | 23.7-41.7 |
+| **pooled** | **41.7%** | **36.2-47.3** |
+
+A 19-point spread on identical weights, roughly 2.8 sigma at the extremes — more than
+binomial noise comfortably explains, so either the Wilson interval understates the real
+variance or something differs between runs that has not been identified. Either way:
+
+- **The published 51% was the high draw of three.** Use **41.7% over 300 episodes**.
+- **The best checkpoint found is 851000, not 869000** (40-44% across two measurements).
+- Prefer several hundred episodes, or repeat a measurement, before treating any single
+  100-episode figure as settled.
 
 ## Checkpoint-to-checkpoint variance is large, and it is not sampling noise
 

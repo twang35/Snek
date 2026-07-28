@@ -1,0 +1,186 @@
+{
+  "policy_name": "b4c-schlongper",
+  "episodes_per_checkpoint": 100,
+  "results": [
+    {
+      "step": 160000,
+      "selected_by": "best-in-region",
+      "cluster": null,
+      "offset": null,
+      "episodes": 100,
+      "perfect_games": 37,
+      "perfect_percent": 37.0,
+      "perfect_ci95": [
+        28.2,
+        46.8
+      ],
+      "avg_score": 64.43,
+      "median_score": 88.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 98.06
+    },
+    {
+      "step": 850000,
+      "selected_by": "adjacent",
+      "cluster": 851000,
+      "offset": -1000,
+      "episodes": 100,
+      "perfect_games": 25,
+      "perfect_percent": 25.0,
+      "perfect_ci95": [
+        17.5,
+        34.3
+      ],
+      "avg_score": 80.21,
+      "median_score": 86.5,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 100.56
+    },
+    {
+      "step": 851000,
+      "selected_by": "lucky",
+      "cluster": 851000,
+      "offset": 0,
+      "episodes": 100,
+      "perfect_games": 40,
+      "perfect_percent": 40.0,
+      "perfect_ci95": [
+        30.9,
+        49.8
+      ],
+      "avg_score": 82.25,
+      "median_score": 90.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 118.07
+    },
+    {
+      "step": 852000,
+      "selected_by": "adjacent",
+      "cluster": 851000,
+      "offset": 1000,
+      "episodes": 100,
+      "perfect_games": 32,
+      "perfect_percent": 32.0,
+      "perfect_ci95": [
+        23.7,
+        41.7
+      ],
+      "avg_score": 81.69,
+      "median_score": 89.0,
+      "min_score": 7.0,
+      "max_score": 95.0,
+      "avg_reward": 109.14
+    },
+    {
+      "step": 868000,
+      "selected_by": "adjacent",
+      "cluster": 869000,
+      "offset": -1000,
+      "episodes": 100,
+      "perfect_games": 29,
+      "perfect_percent": 29.0,
+      "perfect_ci95": [
+        21.0,
+        38.5
+      ],
+      "avg_score": 80.83,
+      "median_score": 86.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 105.28
+    },
+    {
+      "step": 869000,
+      "selected_by": "lucky",
+      "cluster": 869000,
+      "offset": 0,
+      "episodes": 100,
+      "perfect_games": 32,
+      "perfect_percent": 32.0,
+      "perfect_ci95": [
+        23.7,
+        41.7
+      ],
+      "avg_score": 82.45,
+      "median_score": 89.0,
+      "min_score": 19.0,
+      "max_score": 95.0,
+      "avg_reward": 109.94
+    },
+    {
+      "step": 870000,
+      "selected_by": "adjacent",
+      "cluster": 869000,
+      "offset": 1000,
+      "episodes": 100,
+      "perfect_games": 17,
+      "perfect_percent": 17.0,
+      "perfect_ci95": [
+        10.9,
+        25.5
+      ],
+      "avg_score": 74.66,
+      "median_score": 80.5,
+      "min_score": 15.0,
+      "max_score": 95.0,
+      "avg_reward": 86.63
+    },
+    {
+      "step": 969000,
+      "selected_by": "adjacent",
+      "cluster": 970000,
+      "offset": -1000,
+      "episodes": 100,
+      "perfect_games": 8,
+      "perfect_percent": 8.0,
+      "perfect_ci95": [
+        4.1,
+        15.0
+      ],
+      "avg_score": 68.45,
+      "median_score": 72.5,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 71.13
+    },
+    {
+      "step": 970000,
+      "selected_by": "lucky",
+      "cluster": 970000,
+      "offset": 0,
+      "episodes": 100,
+      "perfect_games": 35,
+      "perfect_percent": 35.0,
+      "perfect_ci95": [
+        26.4,
+        44.7
+      ],
+      "avg_score": 76.05,
+      "median_score": 88.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 106.82
+    },
+    {
+      "step": 971000,
+      "selected_by": "adjacent",
+      "cluster": 970000,
+      "offset": 1000,
+      "episodes": 100,
+      "perfect_games": 7,
+      "perfect_percent": 7.0,
+      "perfect_ci95": [
+        3.4,
+        13.7
+      ],
+      "avg_score": 65.97,
+      "median_score": 73.0,
+      "min_score": 11.0,
+      "max_score": 95.0,
+      "avg_reward": 67.72
+    }
+  ]
+}

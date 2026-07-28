@@ -103,18 +103,29 @@ EVAL_OUT_SUFFIX=_top10 \
   PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top10
 ```
 
-`top10` (or `top`, `top:N`) is the normal way to close out an arm: it reads the arm's eval
-history, ranks checkpoints by perfect rate **smoothed over a centred 10-eval window**, and
-evaluates the best N that still exist. Smoothing matters — ranking on single evals would
-just select the luckiest 10-episode reads, which is the winner's curse itself. Explicit
-steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is the
-question.
+`top10` (or `top`, `top:N`) is the normal way to close out an arm. It takes the **3
+checkpoints with the highest single 10-episode eval** as cluster centres, adds the
+checkpoint **either side of each** (±1000 steps), and fills the remaining slot(s) with the
+**best single eval inside the best smoothed region**. Explicit steps still work
+(`... b4c-schlongper 869000 871000`) when a specific checkpoint is the question.
 
-**10 checkpoints x 100 episodes, ~8 minutes per arm.** Adjacent steps are allowed through
-on purpose: checkpoints 1000 train steps apart *should* score alike, so when they don't,
-that spread is the checkpoint-to-checkpoint variance, which is worth measuring rather than
-designing around. Ten nearby checkpoints also give a much better estimate of a region's
-true rate than one lucky pick from it.
+**Selection is ranked on the raw single eval, not the smoothed one, and that is a measured
+choice rather than an assumption.** An earlier version ranked by smoothed rate on the
+reasoning that a 70-80% single eval must be a lucky draw. Measuring both ways showed the
+opposite: raw single eval correlates **+0.64** with the true 100-episode rate while the
+smoothed region rate correlates **-0.40**, and the raw-selected pool measured 41.3%
+against the smoothed pool's 27.1%. If a policy's true rate were 27%, a 10-episode eval
+showing 7+ perfect games has probability 0.006 — the spike is evidence about that
+checkpoint, and smoothing averages it away into a statement about the region. See
+[`findings.md`](findings.md).
+
+**The clusters exist because 1000 training steps is not a small distance.** Centres beat
+their immediate neighbours in 3 of 3 clusters, by 9, 11.5 and **27.5** points; one cluster
+runs 8% / 35% / 7% across three consecutive checkpoints. Clustering is what separates "this
+checkpoint is good" from "this part of the run is good", which no single checkpoint can do.
+
+**10 checkpoints x 100 episodes, ~30 minutes on an idle machine** (~50 for four arms in
+parallel — good policies play long episodes and 40 workers oversubscribe 14 cores).
 
 Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
 confidence interval. Several copies can run at once on different arms — give each its own
@@ -149,17 +160,28 @@ a whole number of rounds for this reason. The first published measurement (51% a
 `b4c-schlongper` 869000) used the truncating version, so it is if anything an
 underestimate.
 
-**Never quote a graph peak as a policy's perfect-game rate.** A graph point is 10
-episodes, and picking the highest one selects for luck: of four checkpoints chosen by
-best smoothed graph rate, three measured *worse* than the graph implied, by up to 24
-points (the winner's curse). Single evals understate just as badly in the other
-direction — two checkpoints reading 10% on the graph measured 25% and 29%. Use the graph
-for trajectory and `eval_checkpoints.py` for numbers.
+**Never quote a graph peak as a policy's perfect-game rate**, but do use it to *choose*
+what to measure. A graph point is only 10 episodes, so the number itself is unusable — a
+70% point measured 40%, and a 40-50% point measured 12-17%. What the spike reliably tells
+you is *which checkpoint is worth 100 episodes*, and there it beats every smoothed
+alternative (+0.64 vs -0.40 correlation). Use the graph to select, `eval_checkpoints.py`
+to quote.
 
-**Every batch ends with checkpoint evals.** When an arm finishes, run
-`eval_checkpoints.py <arm> top10` and compare *those* numbers across arms. It costs ~8
-minutes per arm and it is the only apples-to-apples comparison available — comparing graph
-peaks across arms compounds the winner's curse, once per arm.
+**Every arm ends with checkpoint evals.** Run `eval_checkpoints.py <arm> top10` and compare
+*those* numbers across arms. Comparing graph peaks across arms compounds the error once per
+arm, and it demonstrably misranks: `b5c-schlongIS` is 2nd of its batch by graph window and
+**last by measurement** (17.0% vs 2.1%).
+
+**Compare pooled rates only when the selection rule matches.** `b4c-schlongper` pools 31.4%
+under lucky+smoothed selection and 26.2% under cluster selection — not a contradiction,
+because 6 of the 10 cluster picks are deliberately the weaker neighbours. Its level is
+~31%. A pooled number is only meaningful alongside the rule that produced it.
+
+**Repeat a measurement before trusting it.** Checkpoint 869000, frozen weights and a greedy
+policy, measured 51%, 42% and 32% on three separate 100-episode runs — a 19-point spread,
+about 2.8 sigma, wider than binomial noise comfortably explains. Its pooled figure over 300
+episodes is 41.7%. Treat a lone 100-episode result as provisional even though its Wilson
+interval looks tight.
 Choose the candidates by trailing-window rate rather than by single-eval peak, and expect
 the measured value to come in below the window that selected it.
 

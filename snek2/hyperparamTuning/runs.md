@@ -12,12 +12,26 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-**Best bet: `b6b-alpha06` — 24.5% perfect over 1000 episodes**
-(`PRIORITY_EXPONENT=0.6`, `PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0`). Best *ceiling* is
-still `b4c-schlongper` at 31.8% over 400 episodes, but it survives only 1 of 3 seeds, so
-its expected value is ~10.6% against `b6b`'s ~24.5%. The headline 51% is a **single
-checkpoint**, and adjacent checkpoints vary by up to 20 points, so treat it as the top of a
-distribution rather than a level. See [`findings.md`](findings.md).
+**Best bet: `b6b-alpha06`** (`PRIORITY_EXPONENT=0.6`, `PRIORITY_SIGNAL=td_loss`,
+`IS_WEIGHTS=0`) — 24.5% over 1000 episodes, and that is an **underestimate**; it was
+measured with the old smoothed-first selector, since shown to pick worse checkpoints.
+**Best ceiling: `b4c-schlongper` at ~31%**, but it survives only 1 seed in 3, so its
+expected value is ~10.6%.
+
+Its best checkpoint is **851000 at ~40%**, not the widely-quoted 869000 — that checkpoint
+pools **41.7%** over 300 episodes, and the famous "51%" was the high draw of three
+measurements. See [`findings.md`](findings.md).
+
+### Do this first
+
+Re-measure `b6b-alpha06` and `b6a-alpha04` with the current selector before comparing them
+to anything. Both were measured before the selection rule was fixed, so both are biased low:
+
+```
+cd /Users/tony_wang/Projects/Snek/snek2
+PYTHONPATH=. EVAL_OUT_SUFFIX=_clusters \
+  /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b6b-alpha06 top10
+```
 
 ## Nothing is running
 
@@ -61,6 +75,11 @@ and is the only number worth comparing across arms:
 **`b6b` is 3x the next best arm with non-overlapping intervals.** Note how badly the graph
 ranked these: it put `b5c` second at 17.0%, and `b5c` measured **last at 2.1%**. Never rank
 arms by graph windows.
+
+**All four numbers are underestimates** — they were produced by the smoothed-first
+selector, which has since been shown to pick systematically worse checkpoints than raw
+single-eval selection. The ordering is probably still right, since every arm was
+disadvantaged the same way, but the levels are low. Re-measure before drawing on them.
 
 Raw results in `runs/<arm>_checkpoint_evals_top10.json`.
 

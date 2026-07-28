@@ -12,10 +12,18 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top[N]
 
-`top10` (or `top`, `top:10`) picks the N most promising checkpoints automatically, ranked
-by perfect rate smoothed over a centred 10-eval window rather than by a single eval,
-so the selection isn't just the luckiest 10-episode reads. **This is the normal way to
-close out an arm** — 10 checkpoints x 100 episodes, ~8 minutes.
+`top10` (or `top`, `top:10`) picks N checkpoints automatically, **split between two
+selection rules** so the results can be compared:
+
+- **30% "lucky"** — highest single 10-episode eval, ties broken toward the weakest
+  surrounding region. These are the spikes a graph reader would quote.
+- **70% "smoothed"** — highest perfect rate over a centred 10-eval window. These are
+  regions where the policy was genuinely good.
+
+Every result carries `selected_by`, and the run prints each group pooled. **The gap
+between the two pools is the winner's curse in percentage points** — if graph spikes
+overstate, the lucky pool measures lower. This is the normal way to close out an arm:
+10 checkpoints x 100 episodes, ~8 minutes on an idle machine.
 
 Adjacent steps are allowed through on purpose. Checkpoints 1000 train steps apart
 *should* score alike, so when they don't, that spread is the checkpoint-to-checkpoint
@@ -142,42 +150,102 @@ def evaluate(parallel_env, policy, num_episodes):
     return scores, perfect_flags, rewards
 
 
-def select_top_checkpoints(policy_name, available, count, window=10):
-    """The `count` most promising checkpoints, by smoothed perfect rate.
+def select_top_checkpoints(policy_name, available, count=10, window=10,
+                           num_lucky=3, neighbours=1):
+    """Clusters around the highest single-eval checkpoints, plus best-in-region picks.
 
-    Ranking on a single eval's perfect_percent would just pick the luckiest 10-episode
-    evals, which is the winner's curse in its purest form. Ranking on a centred window
-    finds regions where the policy was genuinely good and then evaluates the individual
-    checkpoints inside them.
+    Selection is built on a measured result rather than an assumption. Measuring `b4c`
+    both ways showed the **raw single 10-episode eval is the better predictor** of a
+    checkpoint's true rate, correlating +0.64 with the 100-episode measurement against
+    **-0.40** for the smoothed region rate. Smoothing is not just weaker here, it is
+    anti-predictive: adjacent checkpoints genuinely differ by ~20 points, so a window
+    describes the *region* while the thing being measured is the *checkpoint*.
 
-    Adjacent steps are allowed through deliberately. Neighbouring checkpoints are 1000
-    train steps apart and *should* behave alike, so when they don't, that spread is the
-    checkpoint-to-checkpoint variance — which is exactly what a 100-episode eval is for
-    measuring. Spacing the picks out would hide it.
+    The binomial makes this concrete. If a policy's true rate were 27%, a 10-episode eval
+    showing 7+ perfect games has probability 0.006 — a high single eval is evidence, not
+    noise. Treating those spikes as luck to be smoothed away discarded the signal.
+
+    So: take the top `num_lucky` checkpoints by raw single eval as cluster **centres**, and
+    add the `neighbours` checkpoints on each side of each centre. The centre-vs-neighbour
+    comparison measures how fast policy quality changes per 1000 train steps, which is the
+    open question the ~20-point spread raised.
+
+    Remaining budget goes to **best-in-region** picks: the highest single eval inside the
+    best smoothed region, then the next-best region, and so on. Clusters may overlap when
+    two lucky centres are close, which just leaves more budget for these.
     """
     path = os.path.join(RUNS_DIR, '{0}_evals.json'.format(policy_name))
     with open(path) as handle:
         evals = json.load(handle)['evals']
 
+    all_steps = [e['step'] for e in evals]
     rates = [e['perfect_percent'] for e in evals]
-    ranked = []
+    index_of = {step: i for i, step in enumerate(all_steps)}
+
+    candidates = []
     for index, entry in enumerate(evals):
         if entry['step'] not in available:
             continue
         lo = max(0, index - window // 2)
         smoothed = sum(rates[lo:lo + window]) / len(rates[lo:lo + window])
-        ranked.append((smoothed, entry['perfect_percent'], entry['step']))
+        candidates.append({'step': entry['step'],
+                           'single': entry['perfect_percent'],
+                           'smoothed': smoothed})
 
-    if not ranked:
+    if not candidates:
         raise SystemExit('no eval steps in {0} have checkpoints in savedPolicies'.format(path))
 
-    ranked.sort(reverse=True)
-    chosen = sorted(step for _, _, step in ranked[:count])
-    print('selected {0} of {1} available checkpoints by smoothed perfect rate:'.format(
-        len(chosen), len(ranked)))
-    for smoothed, single, step in sorted(ranked[:count], key=lambda r: r[2]):
-        print('    {0:>8}  smoothed {1:>5.1f}%  this eval {2:>5.1f}%'.format(step, smoothed, single))
-    return chosen
+    by_step = {c['step']: c for c in candidates}
+    chosen = {}
+
+    # Cluster centres: highest single eval first, best region breaking ties.
+    by_luck = sorted(candidates, key=lambda c: (-c['single'], -c['smoothed'], c['step']))
+    for centre in by_luck[:num_lucky]:
+        step = centre['step']
+        chosen.setdefault(step, {'selected_by': 'lucky', 'cluster': step, 'offset': 0})
+        home = index_of[step]
+        for distance in range(1, neighbours + 1):
+            for neighbour_index in (home - distance, home + distance):
+                if not 0 <= neighbour_index < len(all_steps):
+                    continue
+                neighbour = all_steps[neighbour_index]
+                if neighbour in available:
+                    chosen.setdefault(neighbour, {'selected_by': 'adjacent',
+                                                  'cluster': step,
+                                                  'offset': neighbour - step})
+
+    # Backfill: best single eval inside the best smoothed region, then the next region.
+    # Each region is consumed once so successive picks come from genuinely different parts
+    # of the run rather than repeatedly from the same peak.
+    consumed = set()
+    for entry in sorted(candidates, key=lambda c: (-c['smoothed'], -c['single'], c['step'])):
+        if len(chosen) >= count:
+            break
+        if entry['step'] in consumed:
+            continue
+        home = index_of[entry['step']]
+        lo = max(0, home - window // 2)
+        members = [all_steps[j] for j in range(lo, min(len(all_steps), lo + window))
+                   if all_steps[j] in available]
+        consumed.update(members)
+        best = max(members, key=lambda s: (by_step[s]['single'], by_step[s]['smoothed']))
+        chosen.setdefault(best, {'selected_by': 'best-in-region',
+                                 'cluster': None, 'offset': None})
+
+    groups = {}
+    for meta in chosen.values():
+        groups[meta['selected_by']] = groups.get(meta['selected_by'], 0) + 1
+    print('selected {0} of {1} available checkpoints ({2}):'.format(
+        len(chosen), len(candidates),
+        ', '.join('{0} {1}'.format(v, k) for k, v in sorted(groups.items()))))
+    for step in sorted(chosen):
+        meta = chosen[step]
+        tag = meta['selected_by']
+        if tag == 'adjacent':
+            tag = 'adjacent {0:+d}'.format(meta['offset'])
+        print('    {0:>8}  {1:<15}  region {2:>5.1f}%  its single eval {3:>5.1f}%'.format(
+            step, tag, by_step[step]['smoothed'], by_step[step]['single']))
+    return sorted(chosen), chosen
 
 
 def main(argv):
@@ -197,9 +265,11 @@ def main(argv):
     if argv[2].startswith('top'):
         rest = argv[2][len('top'):].lstrip(':=')
         count = int(rest) if rest else (int(argv[3]) if len(argv) > 3 else 10)
-        requested_steps = select_top_checkpoints(policy_name, available, count)
+        requested_steps, selected_by = select_top_checkpoints(policy_name, available, count)
     else:
         requested_steps = [int(a) for a in argv[2:]]
+        selected_by = {step: {'selected_by': 'explicit', 'cluster': None, 'offset': None}
+                       for step in requested_steps}
         missing = [s for s in requested_steps if s not in available]
         if missing:
             raise SystemExit('no checkpoint for step(s) {0} in {1}'.format(missing, ckpt_dir))
@@ -269,8 +339,12 @@ def main(argv):
         scores, perfect_flags, rewards = evaluate(parallel_env, agent.policy, num_episodes)
         perfect = sum(perfect_flags)
         low, high = wilson_interval(perfect, len(scores))
+        meta = selected_by.get(step, {'selected_by': 'explicit', 'cluster': None, 'offset': None})
         row = {
             'step': step,
+            'selected_by': meta['selected_by'],
+            'cluster': meta['cluster'],
+            'offset': meta['offset'],
             'episodes': len(scores),
             'perfect_games': perfect,
             'perfect_percent': round(100.0 * perfect / len(scores), 1),
@@ -296,11 +370,41 @@ def main(argv):
     os.replace(partial, out_path)
     print('\nwrote {0}'.format(out_path))
 
-    print('\n{0:>9}  {1:>8}  {2:>16}  {3:>9}'.format('step', 'perfect', '95% CI', 'avg score'))
+    print('\n{0:>9}  {1:>9}  {2:>8}  {3:>16}  {4:>9}'.format(
+        'step', 'chosen by', 'perfect', '95% CI', 'avg score'))
     for row in results:
-        print('{0:>9}  {1:>7}%  {2:>7}-{3:<7}  {4:>9}'.format(
-            row['step'], row['perfect_percent'], row['perfect_ci95'][0], row['perfect_ci95'][1],
-            row['avg_score']))
+        print('{0:>9}  {1:>9}  {2:>7}%  {3:>7}-{4:<7}  {5:>9}'.format(
+            row['step'], row['selected_by'], row['perfect_percent'],
+            row['perfect_ci95'][0], row['perfect_ci95'][1], row['avg_score']))
+
+    print()
+    for group in ('lucky', 'adjacent', 'best-in-region', 'explicit'):
+        rows = [r for r in results if r['selected_by'] == group]
+        if not rows:
+            continue
+        perfect = sum(r['perfect_games'] for r in rows)
+        episodes = sum(r['episodes'] for r in rows)
+        low, high = wilson_interval(perfect, episodes)
+        print('{0:>15} picks: {1}/{2} = {3:.1f}%  (95% CI {4:.1f}-{5:.1f}%)  over {6} checkpoints'.format(
+            group, perfect, episodes, 100.0 * perfect / episodes,
+            100.0 * low, 100.0 * high, len(rows)))
+
+    # Per cluster: does the lucky centre actually beat the checkpoints beside it? This is
+    # the point of the clustering — it separates "this checkpoint is good" from "this part
+    # of the run is good", which a single checkpoint cannot distinguish.
+    clusters = sorted({r['cluster'] for r in results if r['cluster'] is not None})
+    if clusters:
+        print('\ncluster                     centre   neighbours   centre advantage')
+        for centre in clusters:
+            rows = [r for r in results if r['cluster'] == centre]
+            hub = next((r for r in rows if r['offset'] == 0), None)
+            others = [r for r in rows if r['offset'] != 0]
+            if hub is None or not others:
+                continue
+            near = sum(r['perfect_games'] for r in others) / sum(r['episodes'] for r in others) * 100
+            print('{0:>8} (+/-{1})        {2:>5.1f}%       {3:>5.1f}%          {4:>+6.1f} points'.format(
+                centre, len(others), hub['perfect_percent'], near,
+                hub['perfect_percent'] - near))
     return 0
 
 
