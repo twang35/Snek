@@ -13,7 +13,9 @@ section before proposing an epsilon or buffer experiment.
 | Best measured policy: 51% perfect games over 100 episodes | **measured** |
 | Restoring `theSchlong`'s PER roughly triples the perfect rate | **retracted** — did not replicate, 0 of 2 |
 | That config is a coin flip: 1 of 3 seeds survives, the rest die permanently | **established**, n=3 |
-| `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 — that is the fragility | **strong mechanism**, untested |
+| `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — it is arithmetic |
+| Sharpness is a variance dial: higher ceiling *and* higher death risk | **supported**, 7 arms, n=1 per cell |
+| There is a stability "cliff" between eff 0.8 and 1.2 | **retracted** — `b6b` crossed it and thrived |
 | Reverting *either* factor alone survives the crisis | **established**, n=1 each |
 | The committed config reaches ~1% at 1M steps | **established** |
 | Degradation after 236-312k is systemic across configs | **established**, 5 arms |
@@ -66,48 +68,73 @@ test.** The nominal value and the effective value differ by 2x whenever
 `PRIORITY_SIGNAL=td_loss`, which makes every `td_loss` arm incomparable to its alpha
 label. Treat the effective-exponent column above as the real independent variable.
 
-### The dose-response curve, seven arms
+### Sharpness is a variance dial, not a quality dial
 
-The prediction was made before batch 6 ran: alpha 0.4 with `td_loss` (~0.8 effective)
-survives, alpha 0.6 (~1.2) is marginal. Both held.
+The prediction made before batch 6 ran was that alpha 0.4 with `td_loss` (~0.8 effective)
+survives and alpha 0.6 (~1.2) is marginal. The first half held. **The second half was
+wrong, and the correction is more interesting than the prediction.**
 
-| eff exponent | arms | outcome |
-|---|---|---|
-| ~0.8 | `b6a-alpha04`, `b5d-schlongTDE` | **healthy**, no collapse |
-| ~1.2 | `b6b-alpha06` | **crashed** at ~140k to trailing 0.3, recovered only to 10-19 |
-| ~1.6 | `b5a`, `b5b` | **dead** at 0.0, permanently |
-| ~1.6, IS-corrected | `b5c-schlongIS` | **healthy** — IS weights cancel the sharpness |
+Ranked by best 30-eval perfect rate, with the near-death-and-recovered count:
 
-Monotonic across three levels, with the IS-corrected arm landing where the correction
-predicts rather than where its nominal alpha does. **Status: strongly supported, not
-established** — one seed per batch-6 cell, and this project has now overturned three
-single-seed conclusions. It needs n=3 at ~0.8 and ~1.2 before it graduates.
+| arm | eff exp | best 30-eval pf | peak trailing | near-death recoveries | fate |
+|---|---|---|---|---|---|
+| `b4c-schlongper` | ~1.6 | **34.0%** @880k | 86.4 | 2 | survived, 51% measured |
+| `b6b-alpha06` | ~1.2 | **21.7%** @1467k | 81.3 | 3 | running, still oscillating |
+| `b5c-schlongIS` | ~1.6 corr | 17.0% @211k | 80.7 | 1 | running, declining 2M steps |
+| `b6a-alpha04` | ~0.8 | 14.3% @372k | 82.8 | 1 | running, flat and stable |
+| `b5d-schlongTDE` | ~0.8 | 10.7% @410k | 76.7 | 1 | running, stable |
+| `b5a-schlong` | ~1.6 | 10.0% @84k | 76.5 | 1 | **died** 272k |
+| `b5b-schlong2` | ~1.6 | 7.7% @129k | 74.7 | 1 | **died** 246k |
 
-The practical upshot is that prioritization sharpness is a **dial with a cliff between
-~0.8 and ~1.2**, not the lottery `b4c` made it look like. `b4c`'s 51% came from sitting
-past the cliff and getting lucky, which is not a strategy.
+Among arms that survived, the **ceiling rises monotonically with effective exponent**:
+~1.6 gives 34.0%, ~1.2 gives 21.7%, ~0.8 gives 14.3% and 10.7%. The **risk of permanent
+death rises with it too** — 2 of the 3 arms at ~1.6 died outright. And the top two arms
+are precisely the two with the most near-death excursions.
 
-### `b6b` proves near-death recovery is real
+So prioritization sharpness buys **variance**, and variance buys both the high ceiling and
+the absorbing failure. It is a risk/return dial:
 
-`b6b-alpha06` fell to trailing **0.3** in the 160-200k block — indistinguishable from the
-dead arms at the time — and climbed back to 10-19, where it has oscillated for 300k+
-steps. So a trailing score near zero is *not* by itself terminal.
+| eff exponent | behaviour | ceiling | death risk |
+|---|---|---|---|
+| ~0.8 | tame, flat, boring | ~10-14% | none seen |
+| ~1.2 | violent oscillation, always recovers | ~22% | none seen yet |
+| ~1.6 | oscillation that can become absorbing | ~34% | 2 of 3 |
+| ~1.6, IS-corrected | tame despite nominal sharpness | ~17% | none seen |
 
-| block | mean trailing | min |
-|---|---|---|
-| 80-120k | 73.3 | 68.7 |
-| 120-160k | 37.6 | 0.3 |
-| 160-200k | **2.5** | 0.3 |
-| 240-280k | 19.0 | 15.8 |
-| 520-560k | 13.4 | 10.7 |
+**Retracted from an earlier version of this section: the claim that there is a "cliff
+between ~0.8 and ~1.2."** There is no cliff. `b6b` at ~1.2 crossed the supposed cliff and
+became the second-best arm on record. What actually separates ~1.2 from ~1.6 is whether
+the oscillation's low excursions are absorbing, and that looks like a dice roll rather
+than a threshold.
 
-This is the strongest justification yet for the "don't judge early" rule, and it sharpens
-the death criterion: what distinguishes `b5a`/`b5b` is not that they *reached* 0.0 but
-that they **stayed** there for 1.7M+ steps. Pinned-at-exactly-0.0 for hundreds of
-thousands of steps is terminal; a dip to near-zero that moves at all is not.
+### Retracted: `b6b`'s crash was not permanent capability loss
 
-It also means `b6b` is not a clean "marginal" data point so much as a **crash with a
-permanent capability loss** — it never regained even a quarter of its 79.3 peak.
+An earlier version of this section said `b6b-alpha06` suffered a "crash with permanent
+capability loss" that "never regained a quarter of its 79.3 peak." **Both claims were
+wrong.** It has gone to near-zero and fully recovered *twice*:
+
+| block | mean trailing | min | mean perfect |
+|---|---|---|---|
+| 0-200k | 36.5 | **0.0** | 2.6% |
+| 200-400k | 14.5 | 4.4 | 0.0% |
+| 400-600k | 24.7 | 8.5 | 1.9% |
+| 600-800k | 60.3 | 39.4 | 6.2% |
+| 800-1000k | 71.3 | 61.6 | 10.4% |
+| 1000-1200k | 66.4 | 47.0 | 3.9% |
+| 1200-1400k | 23.7 | **0.9** | 2.8% |
+| 1400-1600k | 61.8 | 39.8 | 10.5% |
+| 1600-1800k | 61.3 | 32.1 | **13.3%** |
+
+It is a **very long-period oscillator** whose perfect-game trend is *rising* across the
+oscillations. Judging it required more than a million steps of patience, and every read
+before ~600k would have been wrong.
+
+Two rules come out of this. First, the death criterion is not "reached 0.0" — `b6b` hit
+0.0 in its first block and went on to 21.7%. It is **stayed pinned at 0.0 for hundreds of
+thousands of steps**, which is what `b5a`/`b5b` did for 1.7M+. Second, an oscillator's
+period can exceed 1M steps, so a several-hundred-thousand-step flat stretch is not
+evidence of a settled level. This is the fourth premature conclusion in this
+investigation and the third to involve reading a trough as an ending.
 
 ## Reverting either factor alone survives the crisis
 

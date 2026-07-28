@@ -100,6 +100,13 @@ to `completedRuns.md`, conclusions to `findings.md`, and anything about *how to
 measure or judge* to `hyperparamTuning.md`. The reason is that `runs.md` grew to 950
 lines of interleaved status, results and conclusions and stopped being usable.
 
+**Every running batch keeps its description in `runs.md`** — why the batch is shaped
+that way, what each arm isolates, and what each possible outcome would mean. Keep it
+there while *any* arm of the batch is still running, then move it to
+`completedRuns.md` when the last arm stops. Without the rationale, a future session
+can't tell whether a surprising result is informative or came from an arm that was
+never going to answer anything.
+
 Read those before starting or judging any tuning run, and update them as runs
 start, finish, or get killed — they are the handoff between sessions.
 

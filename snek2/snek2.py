@@ -225,14 +225,20 @@ def main(argv):
         [rb_observer],
         max_steps=collect_steps_per_iteration)
 
-    # The replay buffer holds 100k transitions, far more than the ~180 KB of agent
-    # weights, so keeping it in the 1000-deep history would mean gigabytes per
-    # policy. It lives outside the checkpointer in its own single file, which only
-    # ever needs the newest copy to warm-start the next run. The agent history
-    # stays 1000 deep for replaying earlier iterations.
+    # The replay buffer holds 100k transitions, far more than the ~188 KB of agent
+    # weights, so keeping it in the full history would mean gigabytes per policy. It
+    # lives outside the checkpointer in its own single file, which only ever needs the
+    # newest copy to warm-start the next run.
+    #
+    # History is 10000 deep because a checkpoint is written every 1000 steps, so 1000
+    # deep was a rolling 1M-step window that silently deleted the checkpoint behind an
+    # arm's best result: b5c-schlongIS's 17.0% peak at 211k became unmeasurable once the
+    # run passed 1.28M steps. At 188 KB each, 10000 is ~1.8 GB per policy, which buys a
+    # 10M-step window. Note the legacy train*/ dirs run 9.7 MB per checkpoint because
+    # they predate moving the replay buffer out; those would be ~97 GB at this depth.
     train_checkpointer = common.Checkpointer(
         ckpt_dir=POLICY_DIR + policy_name,
-        max_to_keep=1000,
+        max_to_keep=10000,
         agent=agent,
         policy=agent.policy,
         global_step=global_step

@@ -99,14 +99,42 @@ does, reload its checkpoint and evaluate it over hundreds of episodes:
 
 ```
 cd snek2
-EVAL_EPISODES=100 EVAL_WORKERS=7 EVAL_OUT_SUFFIX=_869000 \
-  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper 869000
+EVAL_OUT_SUFFIX=_top10 \
+  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top10
 ```
 
+`top10` (or `top`, `top:N`) is the normal way to close out an arm: it reads the arm's eval
+history, ranks checkpoints by perfect rate **smoothed over a centred 10-eval window**, and
+evaluates the best N that still exist. Smoothing matters — ranking on single evals would
+just select the luckiest 10-episode reads, which is the winner's curse itself. Explicit
+steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is the
+question.
+
+**10 checkpoints x 100 episodes, ~8 minutes per arm.** Adjacent steps are allowed through
+on purpose: checkpoints 1000 train steps apart *should* score alike, so when they don't,
+that spread is the checkpoint-to-checkpoint variance, which is worth measuring rather than
+designing around. Ten nearby checkpoints also give a much better estimate of a region's
+true rate than one lucky pick from it.
+
 Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
-confidence interval. Several copies can run at once on different checkpoints — give each
-its own `EVAL_OUT_SUFFIX` or they overwrite each other, then merge. Four 100-episode
-evals in parallel take a few minutes.
+confidence interval. Several copies can run at once on different arms — give each its own
+`EVAL_OUT_SUFFIX` or they overwrite each other, then merge.
+
+**Checkpoint retention bounds all of this.** A checkpoint is written every 1000 steps, so
+`max_to_keep` is a rolling window measured in millions of steps, and an arm run past that
+window **deletes the checkpoint behind its best number**.
+
+`max_to_keep` was 1000 — a 1M-step window — which cost real evidence: three of batch 5/6's
+four arms outran it, and `b5c-schlongIS`'s 17.0% peak at 211k became unmeasurable once the
+arm passed 1.28M steps, leaving a best surviving region worth only 7.0%. **It is now
+10000**, a 10M-step window, at ~188 KB per checkpoint (~1.8 GB per policy at full depth).
+The legacy `train*/` dirs run 9.7 MB per checkpoint because they predate moving the replay
+buffer out of the checkpointer, so they would be ~97 GB at this depth — do not resume those
+under the new setting without checking disk.
+
+Two habits still apply. Close an arm out at its horizon: past peak, the marginal training
+step is worth less than the checkpoint it evicts. And `top10` filters to surviving
+checkpoints, so it degrades gracefully instead of failing on a deleted step.
 
 **Each eval process opens one visible window** (worker 0 renders, the rest are
 headless), so four parallel evals give four games to watch. The rendering worker is
@@ -128,10 +156,10 @@ points (the winner's curse). Single evals understate just as badly in the other
 direction — two checkpoints reading 10% on the graph measured 25% and 29%. Use the graph
 for trajectory and `eval_checkpoints.py` for numbers.
 
-**Every batch ends with checkpoint evals.** When a batch finishes, pick each arm's best
-few checkpoints and measure them at 100 episodes, then compare *those* numbers across
-arms. It costs ~3 minutes per arm and it is the only apples-to-apples comparison
-available — comparing graph peaks across arms compounds the winner's curse, once per arm.
+**Every batch ends with checkpoint evals.** When an arm finishes, run
+`eval_checkpoints.py <arm> top10` and compare *those* numbers across arms. It costs ~8
+minutes per arm and it is the only apples-to-apples comparison available — comparing graph
+peaks across arms compounds the winner's curse, once per arm.
 Choose the candidates by trailing-window rate rather than by single-eval peak, and expect
 the measured value to come in below the window that selected it.
 

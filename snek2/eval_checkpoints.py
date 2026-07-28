@@ -10,6 +10,16 @@ Usage:
 
     cd snek2
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
+    PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top[N]
+
+`top10` (or `top`, `top:10`) picks the N most promising checkpoints automatically, ranked
+by perfect rate smoothed over a centred 10-eval window rather than by a single eval,
+so the selection isn't just the luckiest 10-episode reads. **This is the normal way to
+close out an arm** — 10 checkpoints x 100 episodes, ~8 minutes.
+
+Adjacent steps are allowed through on purpose. Checkpoints 1000 train steps apart
+*should* score alike, so when they don't, that spread is the checkpoint-to-checkpoint
+variance, which is worth measuring rather than designing around.
 
 Environment:
     EVAL_EPISODES     episodes per checkpoint, rounded up to a whole number of
@@ -132,21 +142,67 @@ def evaluate(parallel_env, policy, num_episodes):
     return scores, perfect_flags, rewards
 
 
+def select_top_checkpoints(policy_name, available, count, window=10):
+    """The `count` most promising checkpoints, by smoothed perfect rate.
+
+    Ranking on a single eval's perfect_percent would just pick the luckiest 10-episode
+    evals, which is the winner's curse in its purest form. Ranking on a centred window
+    finds regions where the policy was genuinely good and then evaluates the individual
+    checkpoints inside them.
+
+    Adjacent steps are allowed through deliberately. Neighbouring checkpoints are 1000
+    train steps apart and *should* behave alike, so when they don't, that spread is the
+    checkpoint-to-checkpoint variance — which is exactly what a 100-episode eval is for
+    measuring. Spacing the picks out would hide it.
+    """
+    path = os.path.join(RUNS_DIR, '{0}_evals.json'.format(policy_name))
+    with open(path) as handle:
+        evals = json.load(handle)['evals']
+
+    rates = [e['perfect_percent'] for e in evals]
+    ranked = []
+    for index, entry in enumerate(evals):
+        if entry['step'] not in available:
+            continue
+        lo = max(0, index - window // 2)
+        smoothed = sum(rates[lo:lo + window]) / len(rates[lo:lo + window])
+        ranked.append((smoothed, entry['perfect_percent'], entry['step']))
+
+    if not ranked:
+        raise SystemExit('no eval steps in {0} have checkpoints in savedPolicies'.format(path))
+
+    ranked.sort(reverse=True)
+    chosen = sorted(step for _, _, step in ranked[:count])
+    print('selected {0} of {1} available checkpoints by smoothed perfect rate:'.format(
+        len(chosen), len(ranked)))
+    for smoothed, single, step in sorted(ranked[:count], key=lambda r: r[2]):
+        print('    {0:>8}  smoothed {1:>5.1f}%  this eval {2:>5.1f}%'.format(step, smoothed, single))
+    return chosen
+
+
 def main(argv):
     if len(argv) < 3:
         print(__doc__)
         return 1
     policy_name = argv[1]
-    requested_steps = [int(a) for a in argv[2:]]
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     num_workers = int(os.environ.get('EVAL_WORKERS', 10))
 
     ckpt_dir = POLICY_DIR + policy_name
     available = {int(f[len('ckpt-'):].split('.')[0])
                  for f in os.listdir(ckpt_dir) if f.startswith('ckpt-') and f.endswith('.index')}
-    missing = [s for s in requested_steps if s not in available]
-    if missing:
-        raise SystemExit('no checkpoint for step(s) {0} in {1}'.format(missing, ckpt_dir))
+
+    # Spelled `top` rather than `--top`: tf_agents' handle_main routes argv through absl,
+    # which rejects any unregistered `--flag` before main() is reached.
+    if argv[2].startswith('top'):
+        rest = argv[2][len('top'):].lstrip(':=')
+        count = int(rest) if rest else (int(argv[3]) if len(argv) > 3 else 10)
+        requested_steps = select_top_checkpoints(policy_name, available, count)
+    else:
+        requested_steps = [int(a) for a in argv[2:]]
+        missing = [s for s in requested_steps if s not in available]
+        if missing:
+            raise SystemExit('no checkpoint for step(s) {0} in {1}'.format(missing, ckpt_dir))
 
     print('policy {0}: evaluating {1} checkpoints x {2} episodes on {3} workers'.format(
         policy_name, len(requested_steps), num_episodes, num_workers))

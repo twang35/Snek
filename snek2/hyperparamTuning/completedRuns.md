@@ -39,6 +39,44 @@ Two things this ranking makes visible that per-batch reading did not:
   (`MIN_EPSILON`, both n-step values, the 500k buffer with PER) all finished *below* an
   unmodified control. Most changes tried in this investigation made things worse.
 
+## Batch 5 — `b4c` repeat plus factor isolation
+
+**Started 10:05 2026-07-27, restarted 17:09 for visible windows, all arms stopped
+2026-07-28.** `b5a`/`b5b` stopped as dead; `b5c`/`b5d` stopped past peak.
+
+All four arms shared `PRIORITY_EXPONENT=0.8` and differed only in the other two PER
+factors, making the batch a replication attempt *and* a factor isolation at once:
+
+| policy | differs from `b4c` by | role | outcome |
+|---|---|---|---|
+| `b5a-schlong` | nothing | `b4c` repeat, seed 1 | **died** 272k |
+| `b5b-schlong2` | nothing | `b4c` repeat, seed 2 | **died** 246k |
+| `b5c-schlongIS` | IS weights back on | isolates IS weights | survived, 17.0% peak then 2M-step decline |
+| `b5d-schlongTDE` | `abs(td_error)` signal | isolates the priority signal | survived, stable, 10.7% ceiling |
+
+`b5c` and `b5d` each differ from the repeats by **exactly one factor**, so the design was
+meant to read three ways: all four high would give four seeds for the config plus the
+factor isolation free; only the repeats high would name the factor carrying the gain; none
+high would mean `b4c` was a lucky seed. That is the same information two sequential
+batches would give, in half the wall clock.
+
+**Outcome: the third reading, and the batch inverted its own premise.** Both exact repeats
+died permanently in the 200-270k window and stayed flat at 0.0 for 1.7-1.9M steps. Both
+single-factor arms survived. This retracted the "restoring `theSchlong`'s PER triples the
+perfect rate" finding and led to the effective-exponent mechanism — see
+[`findings.md`](findings.md).
+
+### Restarted at ~36-47k to add visible windows
+
+All four were killed and relaunched from their checkpoints so every arm renders a game
+as it trains. Their graphs continue rather than restarting, with a resume marker at the
+restart step. **Caveat: cpprb does not persist replay-buffer priorities across
+save/restore**, so the restart reset all priorities to uniform and they rebuilt as
+transitions were resampled. For a batch whose subject *is* prioritization that is a real
+perturbation, but it landed at ~5% of the planned run and hit all four arms about
+equally, so it should not bias the between-arm comparison. It is a reason not to restart
+an arm deep into a run.
+
 ## Batch 4 — the sampling machinery
 
 Three arms spanning the whole prioritization axis: none (`b4a`), none-plus-diversity
