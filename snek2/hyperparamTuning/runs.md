@@ -24,19 +24,39 @@ twice** — it is a ~1-in-3 lottery, not a better policy. See
 `PRIORITY_EXPONENT=0.8`; they differ only in the other two PER factors, so the batch is
 a repeat *and* a factor isolation at the same time. All four render a visible window.
 
-| policy | alpha | `PRIORITY_SIGNAL` | `IS_WEIGHTS` | step | trailing now | best 30-eval perfect | state |
-|---|---|---|---|---|---|---|---|
-| `b5c-schlongIS` | 0.8 | `td_loss` | **1** | 544k | 72.9 | **17.0%** @211k | **running**, strongest arm |
-| `b5d-schlongTDE` | 0.8 | **`td_error`** | 0 | 510k | 73.0 | 10.7% @410k | **running**, recovered from a dip |
-| `b6a-alpha04` | **0.4** | `td_loss` | 0 | just started | — | — | **running** (batch 6) |
-| `b6b-alpha06` | **0.6** | `td_loss` | 0 | just started | — | — | **running** (batch 6) |
-| `b5a-schlong` | 0.8 | `td_loss` | 0 | 1.94M | **0.0** | 10.0% @84k | **stopped** — dead since 272k |
-| `b5b-schlong2` | 0.8 | `td_loss` | 0 | 1.82M | **0.0** | 7.7% @129k | **stopped** — dead since 246k |
+| policy | alpha | signal | IS | eff exp | step | trailing now | best 30-eval pf | state |
+|---|---|---|---|---|---|---|---|---|
+| `b5c-schlongIS` | 0.8 | `td_loss` | **1** | ~1.6 corrected | 821k | 72.3 | **17.0%** @211k | **running**, healthy, past peak |
+| `b5d-schlongTDE` | 0.8 | **`td_error`** | 0 | ~0.8 | 763k | 63.4 | 10.7% @410k | **running**, healthy, easing off peak |
+| `b6a-alpha04` | **0.4** | `td_loss` | 0 | ~0.8 | 256k | 72.4 | 13.7% @243k | **running**, healthy, still climbing |
+| `b6b-alpha06` | **0.6** | `td_loss` | 0 | ~1.2 | 539k | 16.3 | 9.7% @101k | **running**, crashed then stuck low |
+| `b5a-schlong` | 0.8 | `td_loss` | 0 | ~1.6 | 2.05M | **0.0** | 10.0% @84k | **stopped** — dead since 272k |
+| `b5b-schlong2` | 0.8 | `td_loss` | 0 | ~1.6 | 1.92M | **0.0** | 7.7% @129k | **stopped** — dead since 246k |
 
 **The batch inverted its own premise.** Both exact `b4c` repeats died permanently in the
-200-270k window and have been flat at 0.0 for 1.6-1.7M steps since. Both arms that
+200-270k window and have been flat at 0.0 for 1.7-1.9M steps since. Both arms that
 reverted *one* factor are alive and healthy past that window, and `b5c`'s 17.0% is the
 second-best 30-eval window on record.
+
+### Matched-step comparison at 250k
+
+The only fair way to read arms that are at wildly different step counts. Every arm's
+state at ~250k, with what it eventually did:
+
+| arm | eff exp | trailing @250k | 30-eval pf @220-250k | eventual fate |
+|---|---|---|---|---|
+| `b5c-schlongIS` | ~1.6 corrected | 73.7 | 10.0% | alive at 821k |
+| `b6a-alpha04` | ~0.8 | 66.6 | **11.0%** | running, 256k |
+| `b5d-schlongTDE` | ~0.8 | 37.7 | 0.0% | alive at 763k |
+| `b4c-schlongper` | ~1.6 | 28.5 | 3.9% | survived, 51% measured |
+| `b6b-alpha06` | ~1.2 | 16.5 | 0.0% | crashed at ~140k, stuck low |
+| `b5a-schlong` | ~1.6 | 3.3 | 0.0% | died 272k |
+| `b5b-schlong2` | ~1.6 | 0.5 | 0.0% | died 246k |
+
+`b6a` has the **highest perfect rate of any arm at this step count** and has already
+cleared the step where `b5b` died. Note how little the 250k reading predicts the ending:
+`b4c` was at 28.5 here and went on to the best result on record, while `b5a` at 3.3 never
+came back. Read this table as "where each arm was," not as a leaderboard.
 
 The step-count spread is the eval-cost confound, not progress: a dead policy ends every
 episode instantly, so `b5a`/`b5b` burned ~4x the steps of the live arms in the same wall

@@ -66,12 +66,48 @@ test.** The nominal value and the effective value differ by 2x whenever
 `PRIORITY_SIGNAL=td_loss`, which makes every `td_loss` arm incomparable to its alpha
 label. Treat the effective-exponent column above as the real independent variable.
 
-### It also predicts where the stable point is
+### The dose-response curve, seven arms
 
-If effective exponent is what governs stability, then `td_loss` with alpha 0.4 lands at
-~0.8 — the same sharpness as `b5d`, which is alive. That is a falsifiable prediction and
-it is what batch 6 tests. If alpha 0.4 with `td_loss` survives and alpha 0.6 is
-marginal, the mechanism is confirmed and the knob becomes a dial rather than a lottery.
+The prediction was made before batch 6 ran: alpha 0.4 with `td_loss` (~0.8 effective)
+survives, alpha 0.6 (~1.2) is marginal. Both held.
+
+| eff exponent | arms | outcome |
+|---|---|---|
+| ~0.8 | `b6a-alpha04`, `b5d-schlongTDE` | **healthy**, no collapse |
+| ~1.2 | `b6b-alpha06` | **crashed** at ~140k to trailing 0.3, recovered only to 10-19 |
+| ~1.6 | `b5a`, `b5b` | **dead** at 0.0, permanently |
+| ~1.6, IS-corrected | `b5c-schlongIS` | **healthy** — IS weights cancel the sharpness |
+
+Monotonic across three levels, with the IS-corrected arm landing where the correction
+predicts rather than where its nominal alpha does. **Status: strongly supported, not
+established** — one seed per batch-6 cell, and this project has now overturned three
+single-seed conclusions. It needs n=3 at ~0.8 and ~1.2 before it graduates.
+
+The practical upshot is that prioritization sharpness is a **dial with a cliff between
+~0.8 and ~1.2**, not the lottery `b4c` made it look like. `b4c`'s 51% came from sitting
+past the cliff and getting lucky, which is not a strategy.
+
+### `b6b` proves near-death recovery is real
+
+`b6b-alpha06` fell to trailing **0.3** in the 160-200k block — indistinguishable from the
+dead arms at the time — and climbed back to 10-19, where it has oscillated for 300k+
+steps. So a trailing score near zero is *not* by itself terminal.
+
+| block | mean trailing | min |
+|---|---|---|
+| 80-120k | 73.3 | 68.7 |
+| 120-160k | 37.6 | 0.3 |
+| 160-200k | **2.5** | 0.3 |
+| 240-280k | 19.0 | 15.8 |
+| 520-560k | 13.4 | 10.7 |
+
+This is the strongest justification yet for the "don't judge early" rule, and it sharpens
+the death criterion: what distinguishes `b5a`/`b5b` is not that they *reached* 0.0 but
+that they **stayed** there for 1.7M+ steps. Pinned-at-exactly-0.0 for hundreds of
+thousands of steps is terminal; a dip to near-zero that moves at all is not.
+
+It also means `b6b` is not a clean "marginal" data point so much as a **crash with a
+permanent capability loss** — it never regained even a quarter of its 79.3 peak.
 
 ## Reverting either factor alone survives the crisis
 
