@@ -79,8 +79,11 @@ an arm deep into a run.
 Verify with:
 
 ```
-ps -eo pid,etime,command | grep "[s]nek2.py" | grep -v spawn_main
+pgrep -fl "python -u snek2.py"
 ```
+
+Not `grep "[s]nek2.py"` — git telemetry `curl` processes carry `snek2/snek2.py` in their
+payload and inflate the count for a few seconds at a time.
 
 Update this section whenever runs start or stop — a future session reads it to know
 what is in flight and might have been terminated.

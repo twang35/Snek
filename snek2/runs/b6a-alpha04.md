@@ -4,7 +4,7 @@
 
 Blue is average score (food eaten) on the left axis, red is perfect-game percentage on the right.
 
-Latest eval: step 389000, avg score 80.6, perfect games 10%.
+Latest eval: step 393000, avg score 69.9, perfect games 10%.
 
 ## Config
 
@@ -36,7 +36,7 @@ Latest eval: step 389000, avg score 80.6, perfect games 10%.
 
 ## Evals
 
-390 evals so far. Full series in [`b6a-alpha04_evals.json`](b6a-alpha04_evals.json).
+394 evals so far. Full series in [`b6a-alpha04_evals.json`](b6a-alpha04_evals.json).
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
@@ -44,10 +44,6 @@ Latest eval: step 389000, avg score 80.6, perfect games 10%.
 | 1000 | 0.0 | 0.0 | 0 | 0/95 | -5.053 | 0 | 0.4 |
 | 2000 | 0.0 | 0.0 | 0 | 0/95 | -1.001 | 0 | 0.4 |
 | ... | | | | | | | |
-| 378000 | 61.0 | 69.74 | 15 | 84/95 | 55.502 | 0 | 0.0 |
-| 379000 | 83.8 | 71.38 | 74 | 95/95 | 88.366 | 10 | 0.0 |
-| 380000 | 70.8 | 72.98 | 28 | 95/95 | 85.954 | 20 | 0.0 |
-| 381000 | 72.8 | 73.5 | 13 | 95/95 | 77.552 | 10 | 0.0 |
 | 382000 | 81.8 | 74.04 | 27 | 93/95 | 75.879 | 0 | 0.0 |
 | 383000 | 73.9 | 76.62 | 38 | 95/95 | 78.639 | 10 | 0.0 |
 | 384000 | 83.6 | 76.58 | 60 | 95/95 | 98.643 | 20 | 0.0 |
@@ -56,3 +52,7 @@ Latest eval: step 389000, avg score 80.6, perfect games 10%.
 | 387000 | 85.5 | 78.4 | 60 | 95/95 | 100.452 | 20 | 0.0 |
 | 388000 | 83.5 | 80.32 | 34 | 95/95 | 119.439 | 40 | 0.0 |
 | 389000 | 80.6 | 79.72 | 48 | 95/95 | 85.321 | 10 | 0.0 |
+| 390000 | 77.9 | 81.0 | 44 | 95/95 | 82.617 | 10 | 0.0 |
+| 391000 | 66.0 | 78.7 | 14 | 89/95 | 60.339 | 0 | 0.0 |
+| 392000 | 83.3 | 78.26 | 64 | 95/95 | 87.9 | 10 | 0.0 |
+| 393000 | 69.9 | 75.54 | 45 | 95/95 | 74.821 | 10 | 0.0 |

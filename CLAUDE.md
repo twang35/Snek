@@ -123,7 +123,11 @@ then say which ones are stopping and why.
 Two other rules are easy to get wrong:
 
 - **Never run more than 4 snek trainers at once**, counting human-started ones.
-  Check with `ps -eo pid,command | grep "[s]nek2.py" | grep -v spawn_main`.
+  Check with `pgrep -fl "python -u snek2.py"`. Do **not** count with
+  `grep "[s]nek2.py"` — Airbnb's git telemetry fires `curl` processes whose JSON
+  payload contains `snek2/snek2.py` as a git argument, so that pattern
+  intermittently over-counts by several processes for the few seconds each curl
+  lives. It read 6 trainers once when only 4 were running.
 - **This domain is very noisy** — the same config has produced final scores of
   62.5 and 18.0. Never conclude anything from a single run; repeat promising
   configs 2-3 times.

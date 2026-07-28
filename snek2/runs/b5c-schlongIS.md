@@ -4,7 +4,7 @@
 
 Blue is average score (food eaten) on the left axis, red is perfect-game percentage on the right.
 
-Latest eval: step 994000, avg score 75.8, perfect games 10%.
+Latest eval: step 998000, avg score 62.8, perfect games 0%.
 
 Training was resumed at step 40000 (the dashed lines on the graph).
 
@@ -38,7 +38,7 @@ Training was resumed at step 40000 (the dashed lines on the graph).
 
 ## Evals
 
-995 evals so far. Full series in [`b5c-schlongIS_evals.json`](b5c-schlongIS_evals.json).
+999 evals so far. Full series in [`b5c-schlongIS_evals.json`](b5c-schlongIS_evals.json).
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
@@ -46,10 +46,6 @@ Training was resumed at step 40000 (the dashed lines on the graph).
 | 1000 | 0.0 | 0.0 | 0 | 1/95 | -5.005 | 0 | 0.4 |
 | 2000 | 0.0 | 0.0 | 0 | 0/95 | -5.015 | 0 | 0.4 |
 | ... | | | | | | | |
-| 983000 | 58.5 | 64.74 | 31 | 81/95 | 53.047 | 0 | 0.0 |
-| 984000 | 65.9 | 65.78 | 15 | 93/95 | 60.458 | 0 | 0.0 |
-| 985000 | 74.4 | 67.54 | 56 | 95/95 | 79.28 | 10 | 0.0 |
-| 986000 | 63.0 | 67.06 | 23 | 86/95 | 57.514 | 0 | 0.0 |
 | 987000 | 59.8 | 64.32 | 14 | 95/95 | 64.779 | 10 | 0.0 |
 | 988000 | 61.5 | 64.92 | 35 | 88/95 | 56.034 | 0 | 0.0 |
 | 989000 | 59.9 | 63.72 | 30 | 87/95 | 54.509 | 0 | 0.0 |
@@ -58,3 +54,7 @@ Training was resumed at step 40000 (the dashed lines on the graph).
 | 992000 | 61.4 | 63.28 | 23 | 95/95 | 66.387 | 10 | 0.0 |
 | 993000 | 65.2 | 64.02 | 45 | 88/95 | 59.748 | 0 | 0.0 |
 | 994000 | 75.8 | 67.2 | 32 | 95/95 | 80.662 | 10 | 0.0 |
+| 995000 | 66.0 | 65.1 | 28 | 95/95 | 70.953 | 10 | 0.0 |
+| 996000 | 72.9 | 68.26 | 29 | 95/95 | 88.15 | 20 | 0.0 |
+| 997000 | 69.4 | 69.86 | 15 | 92/95 | 63.865 | 0 | 0.0 |
+| 998000 | 62.8 | 69.38 | 31 | 90/95 | 57.41 | 0 | 0.0 |

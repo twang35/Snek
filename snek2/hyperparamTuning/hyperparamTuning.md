@@ -184,8 +184,13 @@ one spawns 9 headless eval workers on top of its main process, so 4 runs is ~40
 processes on 14 cores. Check first:
 
 ```
-ps -eo pid,etime,command | grep "[s]nek2.py" | grep -v spawn_main
+pgrep -fl "python -u snek2.py"
 ```
+
+Do **not** count with `ps ... | grep "[s]nek2.py"`: git telemetry `curl` processes embed
+`snek2/snek2.py` in their JSON payload as a git argument and match it, inflating the
+count for the few seconds each curl lives. That pattern reported 6 trainers once when
+only 4 were running, which would have looked like the cap was already blown.
 
 A human-started `python snek2.py train` counts against the budget. Leave it
 alone; never touch `snek2/savedPolicies/train*`.
