@@ -14,21 +14,47 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 
 **Current best: 51% perfect games**, measured over 100 episodes from
 `b4c-schlongper` checkpoint 869000. Config: `PRIORITY_EXPONENT=0.8`,
-`PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0`. That is the number to beat — see
+`PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0`. **That config has since failed to replicate
+twice** — it is a ~1-in-3 lottery, not a better policy. See
 [`findings.md`](findings.md).
 
 ## Currently running
 
-**Batch 5, started 10:05.** All four arms share `PRIORITY_EXPONENT=0.8`; they differ
-only in the other two PER factors, so the batch is a repeat *and* a factor isolation at
-the same time.
+**Batch 5, started 10:05, restarted 17:09.** All four arms share
+`PRIORITY_EXPONENT=0.8`; they differ only in the other two PER factors, so the batch is
+a repeat *and* a factor isolation at the same time. All four render a visible window.
 
-| policy | `PRIORITY_SIGNAL` | `IS_WEIGHTS` | display | role |
-|---|---|---|---|---|
-| `b5a-schlong` | `td_loss` | 0 | **visible** | `b4c` repeat, seed 1 |
-| `b5b-schlong2` | `td_loss` | 0 | headless | `b4c` repeat, seed 2 |
-| `b5c-schlongIS` | `td_loss` | **1** | headless | isolates IS weights |
-| `b5d-schlongTDE` | **`td_error`** | 0 | headless | isolates the priority signal |
+| policy | alpha | `PRIORITY_SIGNAL` | `IS_WEIGHTS` | step | trailing now | best 30-eval perfect | state |
+|---|---|---|---|---|---|---|---|
+| `b5c-schlongIS` | 0.8 | `td_loss` | **1** | 544k | 72.9 | **17.0%** @211k | **running**, strongest arm |
+| `b5d-schlongTDE` | 0.8 | **`td_error`** | 0 | 510k | 73.0 | 10.7% @410k | **running**, recovered from a dip |
+| `b6a-alpha04` | **0.4** | `td_loss` | 0 | just started | — | — | **running** (batch 6) |
+| `b6b-alpha06` | **0.6** | `td_loss` | 0 | just started | — | — | **running** (batch 6) |
+| `b5a-schlong` | 0.8 | `td_loss` | 0 | 1.94M | **0.0** | 10.0% @84k | **stopped** — dead since 272k |
+| `b5b-schlong2` | 0.8 | `td_loss` | 0 | 1.82M | **0.0** | 7.7% @129k | **stopped** — dead since 246k |
+
+**The batch inverted its own premise.** Both exact `b4c` repeats died permanently in the
+200-270k window and have been flat at 0.0 for 1.6-1.7M steps since. Both arms that
+reverted *one* factor are alive and healthy past that window, and `b5c`'s 17.0% is the
+second-best 30-eval window on record.
+
+The step-count spread is the eval-cost confound, not progress: a dead policy ends every
+episode instantly, so `b5a`/`b5b` burned ~4x the steps of the live arms in the same wall
+clock. High step count on a dead arm means nothing.
+
+`b5c` and `b5d` are **not finished** — do not call them yet. `b3c-buf500k` looked like the
+batch's best arm and then died at 750k.
+
+#### Restarted at ~36-47k to add visible windows
+
+All four were killed and relaunched from their checkpoints so every arm renders a game
+as it trains. Their graphs continue rather than restarting, with a resume marker at the
+restart step. **Caveat: cpprb does not persist replay-buffer priorities across
+save/restore**, so the restart reset all priorities to uniform and they rebuilt as
+transitions were resampled. For a batch whose subject *is* prioritization that is a real
+perturbation, but it landed at ~5% of the planned run and hit all four arms about
+equally, so it should not bias the between-arm comparison. It is a reason not to restart
+an arm deep into a run.
 
 Verify with:
 
@@ -39,25 +65,16 @@ ps -eo pid,etime,command | grep "[s]nek2.py" | grep -v spawn_main
 Update this section whenever runs start or stop — a future session reads it to know
 what is in flight and might have been terminated.
 
-### Why this batch is shaped like this
-
-`b5c` and `b5d` each differ from `b5a`/`b5b` by **exactly one factor**, so they are
-also near-repeats of `b4c`. That means:
-
-- If `b4c`'s result is real, **all four should land high** — giving 4 seeds of evidence
-  for the config plus the factor isolation for free.
-- If only `b5a`/`b5b` land high, the factor that the low arm changed is the one
-  carrying the gain.
-- If none land high, `b4c` was a lucky seed and that is worth knowing before building
-  anything else on it.
-
-This is the same information two sequential batches would give, in half the wall-clock.
-
 ### Do not judge before ~850k steps
 
 `b4c-schlongper` did not reach its best level (32% perfect) until the 850-900k block,
 and it was **mid-collapse at 300k** — the horizon this protocol previously used would
 have killed it. Budget **~8 hours per arm**. Expect to check in rather than watch.
+
+The exception is **total death**: trailing score pinned at 0.0 for hundreds of thousands
+of steps is not a dip, and no arm has ever recovered from it (`b3c-buf500k` stayed dead
+for 4M steps). `b5a` and `b5b` qualify at 1.6M+ steps dead. Everything short of that
+gets the full horizon.
 
 ### Finish the batch with 100-episode evals
 
@@ -66,8 +83,8 @@ Comparing these arms by their graph peaks would be the winner's curse (see
 `eval_checkpoints.py` on each arm's best few checkpoints and compare *those* numbers.
 ~3 minutes per arm, and it is the only apples-to-apples comparison available.
 
-Only `b5a-schlong` has a visible window; the other three run with
-`SDL_VIDEODRIVER=dummy`.
+For batch 5 that means `b5c` around 211k and `b5d` around 410k, plus whatever late peak
+each reaches. `b5a`/`b5b` need no evals — a dead policy scores 0.
 
 ## Resuming a stopped arm
 
@@ -87,28 +104,51 @@ the config mid-run and invalidates the arm.
 | `b5a-schlong` / `b5b-schlong2` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` |
 | `b5c-schlongIS` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=1` |
 | `b5d-schlongTDE` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_error SNEK_IS_WEIGHTS=0` |
+| `b6a-alpha04` | `SNEK_PRIORITY_EXPONENT=0.4 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` |
+| `b6b-alpha06` | `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` |
 
 Per-run logs written to `$CLAUDE_JOB_DIR/tmp` are job-scoped and do not survive.
 The durable record is `runs/<policy>_evals.json`; analyse from there.
 
-## Batch 6 — after batch 5 reports
+## Batch 6 — the effective-exponent sweep
 
-Shape depends on what batch 5 says, so decide then rather than now:
+**Launched, running.** Both arms keep the `b4c` signature (`td_loss`, no IS) and dial
+alpha down, testing whether the effective exponent is what governs stability:
 
-| if batch 5 shows | then batch 6 should |
-|---|---|
-| all four high | the config is solid — move to stacking: `b4c` config + 500k buffer, and `DISCOUNT=0.995` |
-| only `td_loss` + no-IS high | the two factors interact; try alpha 0.6 and 1.0 with that pairing to find the peak |
-| one factor clearly responsible | vary that factor alone across 3-4 values |
-| none high | `b4c` was a lucky seed. Re-examine whether *anything* here beats the baseline reliably, and consider that arm-to-arm noise dominates every result in this document |
+| policy | alpha | effective exponent | prediction |
+|---|---|---|---|
+| `b6a-alpha04` | 0.4 | ~0.8 — matches live `b5d` | survives |
+| `b6b-alpha06` | 0.6 | ~1.2 — between `b5d` and the dead arms | marginal |
 
-Standing candidates regardless:
+Because `td_loss` squares the error before alpha is applied, `alpha=0.8` with `td_loss`
+is really ~1.6 on the `td_error` scale — see
+[`findings.md`](findings.md). So the alpha *label* has never matched what was tested, and
+these two arms are the first honest points on that axis.
 
-| change | why |
-|---|---|
-| `b4c` config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack on the winner |
-| `DISCOUNT=0.995` | untested, high-prior; the perfect-game bonus is discounted to near-nothing at 0.99 |
-| `GRADIENT_CLIPPING=10` | cheap, independent, and variance is what needs taming |
+Note `b6b`'s alpha 0.6 **is** the committed default, so that override is a no-op on that
+knob; `b6b` is precisely "committed alpha, `theSchlong`'s other two PER changes."
+
+Why this rather than more seeds of `b5c`: `b5c` is still running and unfinished, so
+replicating it now would be premature, and the alpha sweep is the only experiment that
+could recover `b4c`'s 51% without its 2-in-3 death rate. If both new arms survive the
+200-270k window, the lottery becomes a dial.
+
+**What would falsify the mechanism:** `b6a` dying anyway (something other than exponent
+sharpness kills these arms), or both surviving *and* scoring no better than baseline
+(sharpness was never where the gain came from either).
+
+### Batch 7 candidates
+
+| change | why | gate |
+|---|---|---|
+| 2 more seeds of the best batch-5/6 config | every single-seed result here has failed to replicate | after batch 6 |
+| `DISCOUNT=0.995` | untested, high-prior; the perfect-game bonus is discounted to near-nothing at 0.99 | anytime |
+| `GRADIENT_CLIPPING=10` | cheap, independent, and variance is what needs taming | anytime |
+| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after a stable base exists |
+
+**Seed count is now the binding constraint, not the number of knobs tried.** Three
+single-seed conclusions in this document have been overturned. Any config that looks good
+from here needs n=3 before it goes in `findings.md` as established.
 
 Launch commands are in
 [`hyperparamTuning.md`](hyperparamTuning.md#launching-a-run).

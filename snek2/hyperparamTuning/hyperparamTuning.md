@@ -207,11 +207,10 @@ Notes that matter:
 
 - Use the env's python binary directly, **not `conda run`** — it buffers stdout
   and makes a healthy run look hung. See `CLAUDE.md`.
-- **One visible arm per batch; the rest headless.** `display_eval` defaults to `True`,
-  so the first arm needs nothing. Prefix every *other* arm with
-  `SDL_VIDEODRIVER=dummy` — four pygame windows is not useful, and long runs are not
-  watched closely anyway. (Earlier guidance here said never to use `dummy` for tuning
-  runs; that applied when batches were short enough to watch.)
+- **Every arm gets a visible window.** `display_eval` defaults to `True`, so launch with
+  no `SDL_VIDEODRIVER` override at all. The user wants to see each arm as it runs; do
+  not add `SDL_VIDEODRIVER=dummy` to a tuning arm unless asked. (Earlier guidance here
+  suggested one visible arm per batch with the rest headless — superseded.)
 - The policy name is the graph window title, so name it so it's identifiable at a
   glance while running.
 - Every override prints a `hyperparameter override:` line at startup. Grep for it

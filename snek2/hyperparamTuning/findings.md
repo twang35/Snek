@@ -10,13 +10,86 @@ section before proposing an epsilon or buffer experiment.
 
 | finding | status |
 |---|---|
-| Restoring `theSchlong`'s PER roughly triples the perfect rate | **established**, n=1 |
 | Best measured policy: 51% perfect games over 100 episodes | **measured** |
+| Restoring `theSchlong`'s PER roughly triples the perfect rate | **retracted** — did not replicate, 0 of 2 |
+| That config is a coin flip: 1 of 3 seeds survives, the rest die permanently | **established**, n=3 |
+| `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 — that is the fragility | **strong mechanism**, untested |
+| Reverting *either* factor alone survives the crisis | **established**, n=1 each |
 | The committed config reaches ~1% at 1M steps | **established** |
 | Degradation after 236-312k is systemic across configs | **established**, 5 arms |
 | Epsilon reaching 0.0 causes the collapse | **falsified** |
 | A larger replay buffer prevents the collapse | **not settled** |
 | n-step returns help | **falsified**, n=2 and n=3 |
+
+---
+
+## Retracted: the `theSchlong` PER config is not reliably better — it is a coin flip
+
+`b4c-schlongper` (alpha 0.8, `td_loss`, no IS) produced the best result on record and
+this document previously called that config established. **Batch 5 ran it twice more and
+both repeats died permanently.**
+
+| arm | config | outcome | died at | best 30-eval perfect |
+|---|---|---|---|---|
+| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | **survived**, 51% measured | — (dipped to 10.1 @ 203k) | 34.0% |
+| `b5a-schlong` | identical | **dead** | 272k | 10.0% |
+| `b5b-schlong2` | identical | **dead** | 246k | 7.7% |
+
+All three hit a crisis in the same 200-270k window. `b4c` bottomed at trailing 10.1 and
+climbed back to 62+ by 320k; the other two flatlined at 0.0 and stayed there for 1.6M
+and 1.7M further steps. So the config does not produce a better policy — it produces a
+**~1-in-3 lottery ticket**, and the one time it paid out it paid out very well.
+
+This is the third premature conclusion in this investigation, and the pattern is now
+unmistakable: **every result here that rested on a single seed has failed to replicate.**
+
+## The mechanism: `td_loss` doubles the effective priority exponent
+
+`common.element_wise_huber_loss` uses delta 1.0, so for `|td_error| < 1` — which is
+most transitions once a policy is decent — `td_loss = 0.5 * td_error^2`. Priorities are
+then raised to alpha. Squaring inside and exponentiating outside **compounds**:
+
+| priority signal | alpha | effective exponent on `\|td_error\|` | arms | outcome |
+|---|---|---|---|---|
+| `td_loss` | 0.8 | **~1.6** | `b4c`, `b5a`, `b5b` | 1 of 3 survived |
+| `td_error` | 0.8 | ~0.8 | `b5d-schlongTDE` | alive, recovered from a 243k dip |
+| `td_loss` | 0.8, IS on | ~1.6, corrected | `b5c-schlongIS` | alive, barely dipped |
+
+The three "PER changes" recovered from `theSchlong` were never independent. `td_loss` and
+alpha 0.8 multiply into an extreme exponent, and dropping IS weights removes the only
+thing correcting the resulting bias. `b4c` was not running aggressive prioritization —
+it was running prioritization roughly twice as sharp as any alpha value anyone intended
+to test, uncorrected.
+
+That reframes the whole line of investigation: **alpha 0.8 was never the config under
+test.** The nominal value and the effective value differ by 2x whenever
+`PRIORITY_SIGNAL=td_loss`, which makes every `td_loss` arm incomparable to its alpha
+label. Treat the effective-exponent column above as the real independent variable.
+
+### It also predicts where the stable point is
+
+If effective exponent is what governs stability, then `td_loss` with alpha 0.4 lands at
+~0.8 — the same sharpness as `b5d`, which is alive. That is a falsifiable prediction and
+it is what batch 6 tests. If alpha 0.4 with `td_loss` survives and alpha 0.6 is
+marginal, the mechanism is confirmed and the knob becomes a dial rather than a lottery.
+
+## Reverting either factor alone survives the crisis
+
+Both single-factor variants are alive past the step where both exact repeats died:
+
+| arm | reverted | step | trailing now | worst dip in 180-300k | best 30-eval perfect |
+|---|---|---|---|---|---|
+| `b5c-schlongIS` | IS weights back on | 544k | 72.9 | 62.1 — barely noticed it | **17.0%** @211k |
+| `b5d-schlongTDE` | `abs(td_error)` signal | 510k | 73.0 | 22.8 — dipped and recovered | 10.7% @410k |
+
+`b5c`'s 17.0% is the second-best 30-eval window on record, behind only `b4c`'s 34.0%.
+Neither is finished, so neither number is final — `b3c-buf500k` looked like the best arm
+in the batch and then died at 750k.
+
+Note the ordering: **IS weights, which the original port added and which `theSchlong`
+lacked, look like the strongest stabilizer here.** `b5c` sailed through the window that
+killed two arms without dropping below 62. That inverts the earlier reading that IS
+weights were a mistake to have added.
 
 ---
 
