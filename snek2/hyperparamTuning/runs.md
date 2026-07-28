@@ -19,8 +19,18 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 
 ## Currently running
 
-**Nothing.** All arms stopped at the human's request after batch 4 produced a clear
-winner. Verify with:
+**Batch 5, started 10:05.** All four arms share `PRIORITY_EXPONENT=0.8`; they differ
+only in the other two PER factors, so the batch is a repeat *and* a factor isolation at
+the same time.
+
+| policy | `PRIORITY_SIGNAL` | `IS_WEIGHTS` | display | role |
+|---|---|---|---|---|
+| `b5a-schlong` | `td_loss` | 0 | **visible** | `b4c` repeat, seed 1 |
+| `b5b-schlong2` | `td_loss` | 0 | headless | `b4c` repeat, seed 2 |
+| `b5c-schlongIS` | `td_loss` | **1** | headless | isolates IS weights |
+| `b5d-schlongTDE` | **`td_error`** | 0 | headless | isolates the priority signal |
+
+Verify with:
 
 ```
 ps -eo pid,etime,command | grep "[s]nek2.py" | grep -v spawn_main
@@ -28,6 +38,36 @@ ps -eo pid,etime,command | grep "[s]nek2.py" | grep -v spawn_main
 
 Update this section whenever runs start or stop — a future session reads it to know
 what is in flight and might have been terminated.
+
+### Why this batch is shaped like this
+
+`b5c` and `b5d` each differ from `b5a`/`b5b` by **exactly one factor**, so they are
+also near-repeats of `b4c`. That means:
+
+- If `b4c`'s result is real, **all four should land high** — giving 4 seeds of evidence
+  for the config plus the factor isolation for free.
+- If only `b5a`/`b5b` land high, the factor that the low arm changed is the one
+  carrying the gain.
+- If none land high, `b4c` was a lucky seed and that is worth knowing before building
+  anything else on it.
+
+This is the same information two sequential batches would give, in half the wall-clock.
+
+### Do not judge before ~850k steps
+
+`b4c-schlongper` did not reach its best level (32% perfect) until the 850-900k block,
+and it was **mid-collapse at 300k** — the horizon this protocol previously used would
+have killed it. Budget **~8 hours per arm**. Expect to check in rather than watch.
+
+### Finish the batch with 100-episode evals
+
+Comparing these arms by their graph peaks would be the winner's curse (see
+[`hyperparamTuning.md`](hyperparamTuning.md)). When the batch ends, run
+`eval_checkpoints.py` on each arm's best few checkpoints and compare *those* numbers.
+~3 minutes per arm, and it is the only apples-to-apples comparison available.
+
+Only `b5a-schlong` has a visible window; the other three run with
+`SDL_VIDEODRIVER=dummy`.
 
 ## Resuming a stopped arm
 
@@ -44,30 +84,33 @@ the config mid-run and invalidates the arm.
 | `b3c-buf500k` | `SNEK_REPLAY_BUFFER_MAX_LENGTH=500000` (dead; not worth resuming) |
 | `b1b-tgt200` | `SNEK_TARGET_UPDATE_PERIOD=200` |
 | `b1a-base` / `b2a-base2` | none — committed defaults |
+| `b5a-schlong` / `b5b-schlong2` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` |
+| `b5c-schlongIS` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=1` |
+| `b5d-schlongTDE` | `SNEK_PRIORITY_EXPONENT=0.8 SNEK_PRIORITY_SIGNAL=td_error SNEK_IS_WEIGHTS=0` |
 
 Per-run logs written to `$CLAUDE_JOB_DIR/tmp` are job-scoped and do not survive.
 The durable record is `runs/<policy>_evals.json`; analyse from there.
 
-## Batch 5 — next up
+## Batch 6 — after batch 5 reports
 
-**Every arm needs to run past ~350k to mean anything** (degradation starts at
-236-312k in every arm observed so far), and `b4c` did not reach its best level until
-850k. Budget 4+ hours per arm, and do not judge before 350k.
+Shape depends on what batch 5 says, so decide then rather than now:
 
-| priority | change | why |
-|---|---|---|
-| **1** | `b4c` config, **repeated 2-3x** | it is n=1 with a collapse in its own history. Nothing else matters until this holds |
-| **2** | alpha 0.8 + `td_loss` + **IS weights ON** | isolates the IS change — the most likely single cause, since IS weights directly cancel prioritization |
-| **3** | alpha 0.8 + `abs(td_error)` + no IS | isolates the priority-signal change |
-| 4 | `b4c` config + 500k buffer | `b4b` beat `b4a` slightly, so diversity may stack on top of the winner |
-| 5 | `DISCOUNT=0.995` | untested and high-prior; the perfect-game bonus is discounted to near-nothing at 0.99 |
-| 6 | `GRADIENT_CLIPPING=10` | cheap, independent, and `b4c`'s variance is what needs taming |
+| if batch 5 shows | then batch 6 should |
+|---|---|
+| all four high | the config is solid — move to stacking: `b4c` config + 500k buffer, and `DISCOUNT=0.995` |
+| only `td_loss` + no-IS high | the two factors interact; try alpha 0.6 and 1.0 with that pairing to find the peak |
+| one factor clearly responsible | vary that factor alone across 3-4 values |
+| none high | `b4c` was a lucky seed. Re-examine whether *anything* here beats the baseline reliably, and consider that arm-to-arm noise dominates every result in this document |
 
-Priorities 2 and 3 matter because `b4c` reverted **three** things at once (see
-[`findings.md`](findings.md)). Knowing which one carries the gain is worth more than
-another point on any scalar knob, and the knobs to separate them already exist.
+Standing candidates regardless:
 
-Launch commands for these are in
+| change | why |
+|---|---|
+| `b4c` config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack on the winner |
+| `DISCOUNT=0.995` | untested, high-prior; the perfect-game bonus is discounted to near-nothing at 0.99 |
+| `GRADIENT_CLIPPING=10` | cheap, independent, and variance is what needs taming |
+
+Launch commands are in
 [`hyperparamTuning.md`](hyperparamTuning.md#launching-a-run).
 
 ## Standing backlog

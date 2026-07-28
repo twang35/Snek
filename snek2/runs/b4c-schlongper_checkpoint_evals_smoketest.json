@@ -1,0 +1,21 @@
+{
+  "policy_name": "b4c-schlongper",
+  "episodes_per_checkpoint": 6,
+  "results": [
+    {
+      "step": 869000,
+      "episodes": 6,
+      "perfect_games": 3,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        18.8,
+        81.2
+      ],
+      "avg_score": 90.17,
+      "median_score": 94.0,
+      "min_score": 71.0,
+      "max_score": 95.0,
+      "avg_reward": 136.23
+    }
+  ]
+}

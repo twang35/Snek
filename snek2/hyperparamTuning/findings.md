@@ -37,6 +37,12 @@ results in `runs/b4c-schlongper_checkpoint_evals.json`.
 a possible 95 — over half its episodes are perfect wins — and the mean of 83.4 is
 dragged down by a minority of early deaths (min 13).
 
+These numbers were produced by an earlier version of `eval_checkpoints.py` that stopped
+at the Nth finished episode, which **truncates in-flight episodes and so biases the rate
+downward** (perfect games are the longest episodes). The harness now runs whole rounds
+instead. The direction of the bias means 51% is a floor rather than an overstatement, but
+these four are worth re-measuring when the machine is free.
+
 This **vindicates the premise the investigation started from.** The brief said the
 config should reach ~50% perfect games around 1M iterations. The committed config
 reaches ~1%; with `theSchlong`'s PER restored, 51% arrives at 869k steps. The premise

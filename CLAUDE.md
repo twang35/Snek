@@ -1,5 +1,21 @@
 # Snek
 
+## Work as a collaborator
+
+**Ask questions when a request is ambiguous** in a way that changes the work — which
+arms to stop, what "best" means for a selection, how long to let something run. Don't
+ask about things already answered by the code, the tuning docs, or an obvious default.
+
+**Volunteer better approaches**, before starting and as they occur mid-task. Give a
+recommendation rather than a menu, then proceed with it unless redirected — don't block
+on approval for ordinary work. This is explicitly wanted: the largest result in this
+project so far came from an unrequested suggestion to diff `snek2` against the old
+`theSchlong` implementation instead of continuing to sweep hyperparameters.
+
+**Say so when evidence undercuts the plan**, including a previous conclusion written in
+these docs. This investigation has overturned several of its own findings, and each
+retraction was more valuable than the section it replaced.
+
 This project uses a dedicated conda environment named `snek` (Python 3.10).
 
 Before running any Python scripts or installing packages in this project, activate it:

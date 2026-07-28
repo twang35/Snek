@@ -12,13 +12,17 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
 
 Environment:
-    EVAL_EPISODES     episodes per checkpoint (default 100)
-    EVAL_WORKERS      parallel headless envs inside this process (default 10)
+    EVAL_EPISODES     episodes per checkpoint, rounded up to a whole number of
+                      rounds (default 100)
+    EVAL_WORKERS      parallel envs inside this process (default 10)
     EVAL_OUT_SUFFIX   appended to the output filename
 
-Everything runs headless. Results go to
-runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and can be
-compared across sessions.
+**Worker 0 renders a visible window**, so each eval process shows one game as it
+plays; the remaining workers are headless. Running four checkpoints in parallel
+therefore gives four windows to watch.
+
+Results go to runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and
+can be compared across sessions.
 
 Two levels of parallelism are available and they compose: EVAL_WORKERS spreads
 one checkpoint's episodes across worker envs, and several copies of this script
@@ -62,40 +66,65 @@ def wilson_interval(successes, trials, z=1.96):
     return max(0.0, centre - spread), min(1.0, centre + spread)
 
 
-def evaluate(parallel_env, policy, num_episodes):
-    """Runs num_episodes to completion across the parallel workers.
+def run_round(parallel_env, policy, worker_envs):
+    """One episode per worker, every worker run to completion.
 
-    Workers auto-reset when an episode ends, so a worker that finishes early
-    starts a fresh episode. Rather than fight that, this collects a fixed number
-    of *completed* episodes and stops reading a worker's later ones.
+    Deliberately *not* "collect N finished episodes and stop": stopping mid-flight
+    discards the episodes still running, and perfect games are the longest episodes
+    there are, so truncation drops them preferentially and biases the perfect rate
+    down. Running whole rounds costs a little idle time on the fast workers and
+    keeps the sample unbiased.
     """
-    worker_envs = parallel_env.pyenv.envs
     num_workers = len(worker_envs)
-
-    scores, perfect_flags, rewards = [], [], []
-    time_step = parallel_env.reset()
-    running_reward = np.zeros(num_workers, dtype=np.float64)
+    scores = np.zeros(num_workers, dtype=np.float64)
+    rewards = np.zeros(num_workers, dtype=np.float64)
+    perfect = np.zeros(num_workers, dtype=bool)
+    done = np.zeros(num_workers, dtype=bool)
     steps = 0
-    start = time.time()
 
-    while len(scores) < num_episodes:
+    time_step = parallel_env.reset()
+    while not np.all(done):
         action_step = policy.action(time_step)
         time_step = parallel_env.step(action_step.action)
         step_rewards = time_step.reward.numpy()
-        running_reward += step_rewards
-        steps += num_workers
+        is_last = time_step.is_last().numpy()
 
-        finished = np.flatnonzero(time_step.is_last().numpy())
-        if finished.size:
-            # get_score has to be read before the worker's auto-reset clears it
-            promises = [worker_envs[i].call('get_score') for i in finished]
-            for i, promise in zip(finished, promises):
-                if len(scores) >= num_episodes:
-                    break
-                scores.append(float(promise()))
-                perfect_flags.append(bool(step_rewards[i] == snake_constants.PERFECT_GAME_REWARD))
-                rewards.append(float(running_reward[i]))
-            running_reward[finished] = 0.0
+        active = ~done
+        rewards[active] += step_rewards[active]
+        steps += int(np.sum(active))
+
+        # A finished worker auto-resets on its next step, so read get_score now,
+        # before that reset overwrites current_score.
+        newly_done = active & is_last
+        if np.any(newly_done):
+            indices = np.flatnonzero(newly_done)
+            promises = [worker_envs[i].call('get_score') for i in indices]
+            for i, promise in zip(indices, promises):
+                scores[i] = promise()
+                perfect[i] = step_rewards[i] == snake_constants.PERFECT_GAME_REWARD
+        done |= is_last
+
+    return scores.tolist(), perfect.tolist(), rewards.tolist(), steps
+
+
+def evaluate(parallel_env, policy, num_episodes):
+    """Collects at least num_episodes, in whole rounds of one episode per worker."""
+    worker_envs = parallel_env.pyenv.envs
+    num_workers = len(worker_envs)
+    rounds = -(-num_episodes // num_workers)  # ceil
+
+    scores, perfect_flags, rewards = [], [], []
+    steps = 0
+    start = time.time()
+    for index in range(rounds):
+        round_scores, round_perfect, round_rewards, round_steps = run_round(
+            parallel_env, policy, worker_envs)
+        scores.extend(round_scores)
+        perfect_flags.extend(round_perfect)
+        rewards.extend(round_rewards)
+        steps += round_steps
+        print('    round {0}/{1}: {2} episodes, {3} perfect'.format(
+            index + 1, rounds, len(round_scores), sum(round_perfect)))
 
     elapsed = time.time() - start
     print('    {0} episodes in {1}s ({2} env steps/s)'.format(
@@ -150,12 +179,23 @@ def main(argv):
         train_step_counter=global_step)
     agent.initialize()
 
-    def make_worker():
+    def make_headless_worker():
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
         return SnakeEnvironment(discount=0.99, display=False, policy_name=policy_name)
 
+    def make_visible_worker():
+        # Each worker is its own process, so clearing the dummy driver here gives
+        # exactly one real window per eval process — several checkpoints evaluated
+        # in parallel each get their own window to watch.
+        os.environ.pop('SDL_VIDEODRIVER', None)
+        return SnakeEnvironment(discount=0.99, display=True, policy_name=policy_name)
+
+    # Worker 0 renders; the rest are headless. A rendering worker is slower, which
+    # only means it and its round-mates take a little longer — episodes are i.i.d.
+    # across workers, so which worker produced one carries no information.
+    constructors = [make_visible_worker] + [make_headless_worker] * (num_workers - 1)
     parallel_env = tf_py_environment.TFPyEnvironment(
-        parallel_py_environment.ParallelPyEnvironment([make_worker] * num_workers))
+        parallel_py_environment.ParallelPyEnvironment(constructors))
 
     # Mirrors the keys common.Checkpointer uses in snek2.py, so a specific
     # ckpt-<step> can be restored instead of only the latest.

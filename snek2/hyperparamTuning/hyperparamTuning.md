@@ -64,9 +64,17 @@ vs the previous 20 for score, last 30 vs previous 30 for the coarser perfect-gam
 rate). Stop an arm when neither is rising, or when its remaining question is
 already answered.
 
-Cap a promising-but-slow run at roughly **4 hours**, then stop it and record it as
-**"promising but too slow"** rather than as a failure — that is a genuinely
-different verdict from "does not learn", and worth keeping distinct.
+**The 4-hour cap this protocol used to recommend was too short.** `b4c-schlongper` was
+mid-collapse at 300k (~2.5h) and did not reach its best level until the 850-900k block
+(~8h). A 4-hour cap would have killed the best arm in the investigation. Budget **~8
+hours** for any arm whose config has a plausible shot, and treat a mid-run collapse as
+uninformative rather than terminal.
+
+That cost is real, so spend it deliberately: run arms overnight, prefer batches where
+every arm answers something even if it loses, and don't burn 8 hours on a config with no
+mechanism behind it. If an arm must be cut early, record it as **"promising but too
+slow"** rather than as a failure — that is a genuinely different verdict from "does not
+learn".
 
 Stopping is cheap and reversible: relaunching the same policy name continues its
 graph and checkpoint. Always re-supply the same `SNEK_*` overrides when resuming,
@@ -98,7 +106,20 @@ EVAL_EPISODES=100 EVAL_WORKERS=7 EVAL_OUT_SUFFIX=_869000 \
 Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
 confidence interval. Several copies can run at once on different checkpoints — give each
 its own `EVAL_OUT_SUFFIX` or they overwrite each other, then merge. Four 100-episode
-evals in parallel take about 3 minutes.
+evals in parallel take a few minutes.
+
+**Each eval process opens one visible window** (worker 0 renders, the rest are
+headless), so four parallel evals give four games to watch. The rendering worker is
+slower, which only means its round takes longer — episodes are i.i.d. across workers, so
+which worker produced one carries no information.
+
+**Episodes are collected in whole rounds**, one per worker, rather than by stopping at
+the Nth finished episode. Stopping mid-flight discards the episodes still running, and
+**perfect games are the longest episodes there are**, so truncation drops them
+preferentially and biases the measured rate *downward*. `EVAL_EPISODES` is rounded up to
+a whole number of rounds for this reason. The first published measurement (51% at
+`b4c-schlongper` 869000) used the truncating version, so it is if anything an
+underestimate.
 
 **Never quote a graph peak as a policy's perfect-game rate.** A graph point is 10
 episodes, and picking the highest one selects for luck: of four checkpoints chosen by
@@ -106,6 +127,13 @@ best smoothed graph rate, three measured *worse* than the graph implied, by up t
 points (the winner's curse). Single evals understate just as badly in the other
 direction — two checkpoints reading 10% on the graph measured 25% and 29%. Use the graph
 for trajectory and `eval_checkpoints.py` for numbers.
+
+**Every batch ends with checkpoint evals.** When a batch finishes, pick each arm's best
+few checkpoints and measure them at 100 episodes, then compare *those* numbers across
+arms. It costs ~3 minutes per arm and it is the only apples-to-apples comparison
+available — comparing graph peaks across arms compounds the winner's curse, once per arm.
+Choose the candidates by trailing-window rate rather than by single-eval peak, and expect
+the measured value to come in below the window that selected it.
 
 Three of the run-comparison metrics above need care:
 
@@ -179,9 +207,11 @@ Notes that matter:
 
 - Use the env's python binary directly, **not `conda run`** — it buffers stdout
   and makes a healthy run look hung. See `CLAUDE.md`.
-- Do **not** set `SDL_VIDEODRIVER=dummy` for real tuning runs. The human wants
-  one visible eval env plus the headless parallel ones so training can be
-  watched. `display_eval` is already `True` by default; just leave it.
+- **One visible arm per batch; the rest headless.** `display_eval` defaults to `True`,
+  so the first arm needs nothing. Prefix every *other* arm with
+  `SDL_VIDEODRIVER=dummy` — four pygame windows is not useful, and long runs are not
+  watched closely anyway. (Earlier guidance here said never to use `dummy` for tuning
+  runs; that applied when batches were short enough to watch.)
 - The policy name is the graph window title, so name it so it's identifiable at a
   glance while running.
 - Every override prints a `hyperparameter override:` line at startup. Grep for it
