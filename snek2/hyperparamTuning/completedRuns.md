@@ -14,30 +14,46 @@ is the mean perfect rate over its whole run. Both come from
 `runs/<policy>_evals.json`; see [`hyperparamTuning.md`](hyperparamTuning.md) for why a
 single eval is not usable as a measurement.
 
-| policy | config change | final steps | best perfect-30 | best single eval | cumulative | verdict |
+**Sort by the measured column where it exists.** It is a pooled 100-episode-per-checkpoint
+measurement; every other column is derived from 10-episode graph evals and systematically
+misranks arms (`b5c` is 2nd by graph, last by measurement).
+
+| policy | config change | final steps | **measured** | best perfect-30 | cumulative | verdict |
 |---|---|---|---|---|---|---|
-| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | **34.0%** | **80%** | **11.06%** | **winner.** Checkpoint 869k measures 51% over 100 episodes |
-| `b1a-base` | none (control) | 503k | 16.7% | 40% | 5.89% | collapsed at 265k; score recovered, skill did not |
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | 11.0% | 30% | 3.91% | best of batch 3, degraded anyway |
-| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 9.3% | 40% | 4.03% | steadiest arm, but a low ceiling |
-| `b4a-uniform` | alpha 0 | 1.25M | 8.7% | 40% | 3.50% | peaked ~575k, drifted down |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | 8.3% | 30% | 4.41% | declined despite the floor — falsified hypothesis A |
-| `b2a-base2` | none (repeat) | 999k | 7.0% | 30% | 2.64% | the 1M-step reference: no collapse, long oscillation, 1.1% at the end |
-| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 5.7% | 30% | 0.27% | **died at ~750k**, score 0.0 for 4M steps |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 1.7% | 10% | 0.08% | dead end |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 1.0% | 10% | 0.65% | stopped early, verdict weak |
-| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 0.7% | 10% | 0.10% | dead end |
+| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | **31.8%** /400 | **34.0%** | **11.06%** | best ceiling, but **1 of 3 seeds survive** |
+| `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | **24.5%** /1000 | 21.7% | — | **best bet.** Survived; ~2x `b4c` expected value |
+| `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | 8.1% /1000 | 14.3% | — | stable, never near death, low ceiling |
+| `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.07M | 6.6% /1000 | 10.7% | — | stable, low ceiling |
+| `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | 2.1% /1000 | 17.0% | — | IS correction cancels the benefit; peak ckpt evicted |
+| `b1a-base` | none (control) | 503k | — | 16.7% | 5.89% | collapsed at 265k; score recovered, skill did not |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | — | 11.0% | 3.91% | best of batch 3, degraded anyway |
+| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | — | 9.3% | 4.03% | steadiest arm, but a low ceiling |
+| `b4a-uniform` | alpha 0 | 1.25M | — | 8.7% | 3.50% | peaked ~575k, drifted down |
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | — | 8.3% | 4.41% | declined despite the floor — falsified hypothesis A |
+| `b2a-base2` | none (repeat) | 999k | — | 7.0% | 2.64% | the 1M-step reference: no collapse, long oscillation, 1.1% at the end |
+| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | — | 5.7% | 0.27% | **died at ~750k**, score 0.0 for 4M steps |
+| `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | 0% | 10.0% | — | **died at 272k**, `b4c` repeat |
+| `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | 0% | 7.7% | — | **died at 246k**, `b4c` repeat |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | — | 1.7% | 0.08% | dead end |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | — | 1.0% | 0.65% | stopped early, verdict weak |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | — | 0.7% | 0.10% | dead end |
 
 `train` was a human-started run on committed defaults, stopped by the human. Never
 touch `snek2/savedPolicies/train*`.
 
-Two things this ranking makes visible that per-batch reading did not:
+Four things this ranking makes visible that per-batch reading did not:
 
-- **`b4c-schlongper` is not a marginal win.** It is 2x the next best on the sustained
-  measure and 3x on cumulative.
-- **`b1a-base`, a plain baseline, is second.** Four deliberate interventions
-  (`MIN_EPSILON`, both n-step values, the 500k buffer with PER) all finished *below* an
-  unmodified control. Most changes tried in this investigation made things worse.
+- **The top two arms are the same three PER changes at different sharpness.** `b4c`
+  (eff ~1.6) and `b6b` (eff ~1.2) differ only in alpha. Nothing else tried comes close.
+- **Ceiling and reliability trade off.** `b4c` is higher when it lives but dies 2 of 3
+  times; `b6b` is lower and survived. Priced for the death rate, `b6b` wins ~24.5% to
+  ~10.6%.
+- **`b1a-base`, a plain baseline, outranks four deliberate interventions**
+  (`MIN_EPSILON`, both n-step values, the 500k buffer with PER). Most changes tried in
+  this investigation made things worse.
+- **The graph misranks arms badly.** `b5c-schlongIS` is 2nd of the batch-5/6 arms by best
+  perfect-30 (17.0%) and **last by measurement** (2.1%). Any ranking built on 10-episode
+  graph evals is unreliable; see [`hyperparamTuning.md`](hyperparamTuning.md).
 
 ## Batch 5 — `b4c` repeat plus factor isolation
 

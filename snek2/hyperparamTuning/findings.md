@@ -10,7 +10,10 @@ section before proposing an epsilon or buffer experiment.
 
 | finding | status |
 |---|---|
-| Best measured policy: 51% perfect games over 100 episodes | **measured** |
+| `b6b-alpha06` (alpha 0.6, `td_loss`, no IS) is the best *bet*: 24.5% over 1000 eps, survived | **measured**, n=1 seed |
+| `b4c` has the best *ceiling*: 31.8% over 400 eps, but survives only 1 of 3 | **measured** |
+| Best single checkpoint: 51% over 100 episodes (`b4c` @869k) | **measured** — top of a distribution, not a level |
+| Adjacent checkpoints differ by up to 20 points at 100 eps each | **established** |
 | Restoring `theSchlong`'s PER roughly triples the perfect rate | **retracted** — did not replicate, 0 of 2 |
 | That config is a coin flip: 1 of 3 seeds survives, the rest die permanently | **established**, n=3 |
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — it is arithmetic |
@@ -24,6 +27,67 @@ section before proposing an epsilon or buffer experiment.
 | n-step returns help | **falsified**, n=2 and n=3 |
 
 ---
+
+## Measured: `b6b-alpha06` is the best *bet*, `b4c` still has the best *ceiling*
+
+Every batch 5/6 arm was measured with `eval_checkpoints.py <arm> top10` — its ten best
+surviving checkpoints at 100 greedy episodes each, 1000 episodes per arm. Pooled:
+
+| arm | eff exp | pooled perfect (1000 eps) | 95% CI | best ckpt | worst ckpt | graph said |
+|---|---|---|---|---|---|---|
+| `b6b-alpha06` | ~1.2 | **24.5%** (245/1000) | 21.9-27.3% | 36% @1455k | 12% | 21.7% |
+| `b6a-alpha04` | ~0.8 | 8.1% (81/1000) | 6.6-10.0% | 13% @514k | 2% | 14.3% |
+| `b5d-schlongTDE` | ~0.8 | 6.6% (66/1000) | 5.2-8.3% | 12% @1160k | 2% | 10.7% |
+| `b5c-schlongIS` | ~1.6 corr | 2.1% (21/1000) | 1.4-3.2% | 6% @2239k | 0% | 17.0% |
+
+`b6b` is **3x the next best arm with non-overlapping intervals** — the first
+non-marginal separation since `b4c`.
+
+### But it did not beat `b4c`, and the honest comparison matters
+
+`b4c`'s earlier measurement used **4** checkpoints, so comparing its pooled number to
+`b6b`'s 10-checkpoint pool is unfair to `b6b` — a deeper pool reaches into weaker
+checkpoints. Taking each arm's **top 4 by the same a priori criterion** (smoothed graph
+rate, before any 100-episode measurement):
+
+| arm | top-4 pooled | 95% CI | best single checkpoint |
+|---|---|---|---|
+| `b4c-schlongper` | **31.8%** (127/400) | 27.4-36.5% | **51%** @869k |
+| `b6b-alpha06` | 21.8% (87/400) | 18.0-26.1% | 36% @1455k |
+
+So `b4c`'s config really does produce better policies **when it survives**. `b6b` did not
+beat it. What `b6b` beats it on is *reliability*, and once the death rate is priced in the
+ranking flips:
+
+| config | eff exp | ceiling when it survives | survival | expected value |
+|---|---|---|---|---|
+| `b4c` (alpha 0.8 `td_loss` no IS) | ~1.6 | 31.8% | 1 of 3 | **~10.6%** |
+| `b6b` (alpha 0.6 `td_loss` no IS) | ~1.2 | 24.5% | 1 of 1 | **~24.5%** |
+
+**`b6b`'s config is the better bet by roughly 2x, despite the lower ceiling.** Its survival
+is n=1, so that number is soft and the next thing to do is seed it 2-3 more times. But this
+is the first config here that looks both good *and* repeatable, and repeatability has been
+the binding constraint all along.
+
+## Checkpoint-to-checkpoint variance is large, and it is not sampling noise
+
+Within `b6b`'s 1455-1464k cluster — 9000 train steps end to end, checkpoints that should
+be nearly identical policies — measured rates at 100 episodes each:
+
+| ckpt | 1455k | 1456k | 1461k | 1462k | 1463k | 1464k |
+|---|---|---|---|---|---|---|
+| perfect % | **36** | 25 | 24 | **16** | 24 | 31 |
+
+**A 20-point spread across 9000 steps.** At 100 episodes each these are real differences,
+not sampling error. Consequences:
+
+- **One checkpoint does not characterise a policy region.** Evaluating a single checkpoint
+  from this cluster would have yielded anywhere from 16% to 36% depending on the draw.
+- **Pool across several checkpoints** for any number that gets compared across arms. This
+  is why `top10` deliberately allows adjacent picks: spacing them out hides exactly this.
+- The published **51% for `b4c` at 869000 is one checkpoint**, so it is the top of a
+  distribution like this one, not the config's level. `b4c`'s pooled 31.8% is the fairer
+  figure.
 
 ## Retracted: the `theSchlong` PER config is not reliably better — it is a coin flip
 
@@ -94,12 +158,19 @@ are precisely the two with the most near-death excursions.
 So prioritization sharpness buys **variance**, and variance buys both the high ceiling and
 the absorbing failure. It is a risk/return dial:
 
-| eff exponent | behaviour | ceiling | death risk |
+| eff exponent | behaviour | **measured** perfect rate | death risk |
 |---|---|---|---|
-| ~0.8 | tame, flat, boring | ~10-14% | none seen |
-| ~1.2 | violent oscillation, always recovers | ~22% | none seen yet |
-| ~1.6 | oscillation that can become absorbing | ~34% | 2 of 3 |
-| ~1.6, IS-corrected | tame despite nominal sharpness | ~17% | none seen |
+| ~0.8 | tame, flat, boring | 6.6-8.1% | none seen |
+| ~1.2 | violent oscillation, always recovers | **24.5%** | none seen yet |
+| ~1.6 | oscillation that can become absorbing | 31.8% | 2 of 3 |
+| ~1.6, IS-corrected | tame despite nominal sharpness | **2.1%** | none seen |
+
+The measured column (1000 episodes per arm, 400 for `b4c`) replaces the graph-derived
+figures an earlier version used, and it changes two things. The gap between ~0.8 and ~1.2
+is **3x, much larger than the graphs suggested**, and the IS-corrected arm came **last**,
+not mid-table — so "IS weights are the strongest stabilizer" is true about *stability* and
+false about *quality*. Stability bought by IS correction appears to cost most of the
+performance.
 
 **Retracted from an earlier version of this section: the claim that there is a "cliff
 between ~0.8 and ~1.2."** There is no cliff. `b6b` at ~1.2 crossed the supposed cliff and
@@ -140,19 +211,27 @@ investigation and the third to involve reading a trough as an ending.
 
 Both single-factor variants are alive past the step where both exact repeats died:
 
-| arm | reverted | step | trailing now | worst dip in 180-300k | best 30-eval perfect |
+| arm | reverted | final step | worst dip in 180-300k | best 30-eval pf | **measured** |
 |---|---|---|---|---|---|
-| `b5c-schlongIS` | IS weights back on | 544k | 72.9 | 62.1 — barely noticed it | **17.0%** @211k |
-| `b5d-schlongTDE` | `abs(td_error)` signal | 510k | 73.0 | 22.8 — dipped and recovered | 10.7% @410k |
+| `b5c-schlongIS` | IS weights back on | 2.31M | 62.1 — barely noticed it | 17.0% @211k | **2.1%** |
+| `b5d-schlongTDE` | `abs(td_error)` signal | 2.07M | 22.8 — dipped and recovered | 10.7% @410k | **6.6%** |
 
-`b5c`'s 17.0% is the second-best 30-eval window on record, behind only `b4c`'s 34.0%.
-Neither is finished, so neither number is final — `b3c-buf500k` looked like the best arm
-in the batch and then died at 750k.
+Both survived the window that killed the exact repeats, so reverting either factor does
+buy stability. **But neither policy is any good**, and `b5c` — the arm that sailed through
+the crisis most smoothly — measured **worst of all four arms at 2.1%**.
 
-Note the ordering: **IS weights, which the original port added and which `theSchlong`
-lacked, look like the strongest stabilizer here.** `b5c` sailed through the window that
-killed two arms without dropping below 62. That inverts the earlier reading that IS
-weights were a mistake to have added.
+So the earlier reading here, that IS weights "look like the strongest stabilizer" and that
+adding them during the port was not a mistake, needs splitting in two:
+
+- **About stability, it holds.** `b5c` never dropped below 62 in the crisis window.
+- **About quality, it is wrong.** IS correction cancels the prioritization it is correcting,
+  and with it most of the benefit. 2.1% is barely above the ~1% committed baseline.
+
+Caveat on `b5c`'s number specifically: it ran 2M steps past its peak, so its 17.0% peak
+checkpoint had already been evicted and only weak survivors remained to measure. Its true
+ceiling is somewhere above 2.1% and unrecoverable. That is a measurement failure caused by
+letting the arm run, not purely a property of the config — see
+[`runs.md`](runs.md) on checkpoint retention.
 
 ---
 

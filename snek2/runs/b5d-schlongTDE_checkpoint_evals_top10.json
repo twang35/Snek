@@ -1,0 +1,156 @@
+{
+  "policy_name": "b5d-schlongTDE",
+  "episodes_per_checkpoint": 100,
+  "results": [
+    {
+      "step": 1160000,
+      "episodes": 100,
+      "perfect_games": 12,
+      "perfect_percent": 12.0,
+      "perfect_ci95": [
+        7.0,
+        19.8
+      ],
+      "avg_score": 75.27,
+      "median_score": 76.5,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 82.13
+    },
+    {
+      "step": 1162000,
+      "episodes": 100,
+      "perfect_games": 4,
+      "perfect_percent": 4.0,
+      "perfect_ci95": [
+        1.6,
+        9.8
+      ],
+      "avg_score": 68.32,
+      "median_score": 74.0,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 66.84
+    },
+    {
+      "step": 1163000,
+      "episodes": 100,
+      "perfect_games": 9,
+      "perfect_percent": 9.0,
+      "perfect_ci95": [
+        4.8,
+        16.2
+      ],
+      "avg_score": 72.88,
+      "median_score": 75.5,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 76.6
+    },
+    {
+      "step": 1164000,
+      "episodes": 100,
+      "perfect_games": 10,
+      "perfect_percent": 10.0,
+      "perfect_ci95": [
+        5.5,
+        17.4
+      ],
+      "avg_score": 70.16,
+      "median_score": 72.5,
+      "min_score": 23.0,
+      "max_score": 95.0,
+      "avg_reward": 74.98
+    },
+    {
+      "step": 1165000,
+      "episodes": 100,
+      "perfect_games": 5,
+      "perfect_percent": 5.0,
+      "perfect_ci95": [
+        2.2,
+        11.2
+      ],
+      "avg_score": 70.38,
+      "median_score": 74.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 69.99
+    },
+    {
+      "step": 1166000,
+      "episodes": 100,
+      "perfect_games": 7,
+      "perfect_percent": 7.0,
+      "perfect_ci95": [
+        3.4,
+        13.7
+      ],
+      "avg_score": 71.29,
+      "median_score": 74.5,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 72.99
+    },
+    {
+      "step": 1167000,
+      "episodes": 100,
+      "perfect_games": 2,
+      "perfect_percent": 2.0,
+      "perfect_ci95": [
+        0.6,
+        7.0
+      ],
+      "avg_score": 68.84,
+      "median_score": 74.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 65.31
+    },
+    {
+      "step": 1168000,
+      "episodes": 100,
+      "perfect_games": 8,
+      "perfect_percent": 8.0,
+      "perfect_ci95": [
+        4.1,
+        15.0
+      ],
+      "avg_score": 70.59,
+      "median_score": 74.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 73.29
+    },
+    {
+      "step": 1171000,
+      "episodes": 100,
+      "perfect_games": 5,
+      "perfect_percent": 5.0,
+      "perfect_ci95": [
+        2.2,
+        11.2
+      ],
+      "avg_score": 66.93,
+      "median_score": 67.0,
+      "min_score": 12.0,
+      "max_score": 95.0,
+      "avg_reward": 66.55
+    },
+    {
+      "step": 1361000,
+      "episodes": 100,
+      "perfect_games": 4,
+      "perfect_percent": 4.0,
+      "perfect_ci95": [
+        1.6,
+        9.8
+      ],
+      "avg_score": 67.21,
+      "median_score": 74.5,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 65.85
+    }
+  ]
+}

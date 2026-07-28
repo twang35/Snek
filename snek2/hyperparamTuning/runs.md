@@ -12,11 +12,12 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-**Current best: 51% perfect games**, measured over 100 episodes from
-`b4c-schlongper` checkpoint 869000. Config: `PRIORITY_EXPONENT=0.8`,
-`PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0`. **That config has since failed to replicate
-twice** — it is a ~1-in-3 lottery, not a better policy. See
-[`findings.md`](findings.md).
+**Best bet: `b6b-alpha06` — 24.5% perfect over 1000 episodes**
+(`PRIORITY_EXPONENT=0.6`, `PRIORITY_SIGNAL=td_loss`, `IS_WEIGHTS=0`). Best *ceiling* is
+still `b4c-schlongper` at 31.8% over 400 episodes, but it survives only 1 of 3 seeds, so
+its expected value is ~10.6% against `b6b`'s ~24.5%. The headline 51% is a **single
+checkpoint**, and adjacent checkpoints vary by up to 20 points, so treat it as the top of a
+distribution rather than a level. See [`findings.md`](findings.md).
 
 ## Nothing is running
 
@@ -42,16 +43,26 @@ trajectory is the thing being continued.
 Note the `max_to_keep` increase to 10000 only takes effect on the next launch, so a
 resumed arm keeps its existing 1000-deep history and starts extending from there.
 
-### Where every arm ended up
+### Where every arm ended up, with measured rates
 
-| policy | batch | alpha | signal | IS | eff exp | final step | final trailing | best 30-eval pf |
+Every arm was closed out with `eval_checkpoints.py <arm> top10` — ten best surviving
+checkpoints, 100 greedy episodes each. The measured column is the pooled 1000-episode rate
+and is the only number worth comparing across arms:
+
+| policy | batch | alpha | signal | IS | eff exp | final step | best 30-eval pf | **measured** |
 |---|---|---|---|---|---|---|---|---|
-| `b6b-alpha06` | 6 | **0.6** | `td_loss` | 0 | ~1.2 | 1.80M | 30.6 (mid-dip) | **21.7%** @1467k |
-| `b5c-schlongIS` | 5 | 0.8 | `td_loss` | **1** | ~1.6 corr | 2.31M | 57.7 | 17.0% @211k |
-| `b6a-alpha04` | 6 | **0.4** | `td_loss` | 0 | ~0.8 | 1.41M | 73.3 | 14.3% @372k |
-| `b5d-schlongTDE` | 5 | 0.8 | **`td_error`** | 0 | ~0.8 | 2.07M | 72.4 | 10.7% @410k |
-| `b5a-schlong` | 5 | 0.8 | `td_loss` | 0 | ~1.6 | 2.05M | **0.0** | 10.0% @84k |
-| `b5b-schlong2` | 5 | 0.8 | `td_loss` | 0 | ~1.6 | 1.92M | **0.0** | 7.7% @129k |
+| `b6b-alpha06` | 6 | **0.6** | `td_loss` | 0 | ~1.2 | 1.80M | 21.7% @1467k | **24.5%** (CI 21.9-27.3) |
+| `b6a-alpha04` | 6 | **0.4** | `td_loss` | 0 | ~0.8 | 1.41M | 14.3% @372k | 8.1% (CI 6.6-10.0) |
+| `b5d-schlongTDE` | 5 | 0.8 | **`td_error`** | 0 | ~0.8 | 2.07M | 10.7% @410k | 6.6% (CI 5.2-8.3) |
+| `b5c-schlongIS` | 5 | 0.8 | `td_loss` | **1** | ~1.6 corr | 2.31M | 17.0% @211k | 2.1% (CI 1.4-3.2) |
+| `b5a-schlong` | 5 | 0.8 | `td_loss` | 0 | ~1.6 | 2.05M | 10.0% @84k | not measured — dead, scores 0 |
+| `b5b-schlong2` | 5 | 0.8 | `td_loss` | 0 | ~1.6 | 1.92M | 7.7% @129k | not measured — dead, scores 0 |
+
+**`b6b` is 3x the next best arm with non-overlapping intervals.** Note how badly the graph
+ranked these: it put `b5c` second at 17.0%, and `b5c` measured **last at 2.1%**. Never rank
+arms by graph windows.
+
+Raw results in `runs/<arm>_checkpoint_evals_top10.json`.
 
 All arms rendered a visible window. Step counts are **not** comparable across arms — a
 degraded policy ends episodes instantly and burns steps several times faster, so
@@ -214,18 +225,38 @@ could recover `b4c`'s 51% without its 2-in-3 death rate. If both new arms surviv
 sharpness kills these arms), or both surviving *and* scoring no better than baseline
 (sharpness was never where the gain came from either).
 
-### Batch 7 candidates
+## Batch 7 — seed the winner
+
+**Recommended: 3 fresh seeds of `b6b`'s config, one slot for something new.** `b6b`
+measured 24.5% and survived, but on **n=1**, and every single-seed result in this document
+has failed to replicate. Seeding it is worth more than any new knob.
+
+| policy | overrides | role |
+|---|---|---|
+| `b7a-a06seed2` | `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` | `b6b` seed 2 |
+| `b7b-a06seed3` | same | `b6b` seed 3 |
+| `b7c-a06seed4` | same | `b6b` seed 4 |
+| `b7d-discount995` | `... same three ... SNEK_DISCOUNT=0.995` | the one untested high-prior knob, on the best base |
+
+Three seeds answer the question that actually matters — is 24.5% the config's level or
+another lucky draw — and if all three survive, the ~1-in-3 death rate at eff ~1.6 is
+confirmed as specific to that sharpness rather than general.
+
+Use **fresh policy names, not resumes**: resuming resets cpprb priorities to uniform, which
+at 1.8M steps perturbs the mechanism under study.
+
+### Later candidates
 
 | change | why | gate |
 |---|---|---|
-| 2 more seeds of the best batch-5/6 config | every single-seed result here has failed to replicate | after batch 6 |
-| `DISCOUNT=0.995` | untested, high-prior; the perfect-game bonus is discounted to near-nothing at 0.99 | anytime |
-| `GRADIENT_CLIPPING=10` | cheap, independent, and variance is what needs taming | anytime |
+| eff exponent ~1.4 (`td_loss` alpha 0.7) | between `b6b` (24.5%, survived) and `b4c` (31.8%, 1-of-3) — the ceiling/risk frontier | after batch 7 |
+| `GRADIENT_CLIPPING=10` | cheap, independent, and variance is exactly what makes eff ~1.6 fatal | anytime |
 | best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after a stable base exists |
+| lower `IS_WEIGHTS` partially (beta < 1) | full IS correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |
 
-**Seed count is now the binding constraint, not the number of knobs tried.** Three
-single-seed conclusions in this document have been overturned. Any config that looks good
-from here needs n=3 before it goes in `findings.md` as established.
+**Seed count is the binding constraint, not the number of knobs tried.** Four single-seed
+conclusions in this document have been overturned. Nothing goes in
+[`findings.md`](findings.md) as established without n=3.
 
 Launch commands are in
 [`hyperparamTuning.md`](hyperparamTuning.md#launching-a-run).
