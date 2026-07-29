@@ -31,11 +31,14 @@ doesn't get reopened.
 The end target is perfect-game percentage, reached by learning **consistently** — a rate
 that rises and keeps rising, not a lucky spike.
 
-**Current best: 51% measured over 100 episodes**, from `b4c-schlongper` checkpoint 869000
-(config: alpha 0.8, `td_loss` priorities, no IS weights). That is the number to beat, and
-it matches the ~50%-at-1M figure the investigation started from — the committed config
-reaches ~1%, and the gap was three PER changes made during the cpprb port. See
-[`findings.md`](findings.md).
+**Best config level: ~31%** (`b4c-schlongper`, alpha 0.8 / `td_loss` / no IS, over 1400
+episodes), whose best checkpoint is **851000 at ~40%**. But that config **dies in 2 of 3
+seeds**, so its expected value is ~10.6%; `b6b-alpha06` (alpha 0.6, same otherwise) is the
+better bet at 24.5% and survived. The committed config reaches ~1%, and the whole gap was
+three PER changes made during the cpprb port. See [`findings.md`](findings.md).
+
+The often-quoted "51% at checkpoint 869000" is **superseded**: that checkpoint pools 41.7%
+over 300 episodes, and 51% was the high draw of three separate measurements.
 
 Three things make tuning awkward, and each has cost this investigation a wrong
 conclusion:
@@ -103,26 +106,29 @@ EVAL_OUT_SUFFIX=_top10 \
   PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top10
 ```
 
-`top10` (or `top`, `top:N`) is the normal way to close out an arm. It takes the **3
-checkpoints with the highest single 10-episode eval** as cluster centres, adds the
-checkpoint **either side of each** (±1000 steps), and fills the remaining slot(s) with the
-**best single eval inside the best smoothed region**. Explicit steps still work
+`top10` (or `top`, `top:N`) is the normal way to close out an arm. It picks the **N biggest
+single-eval outliers** — the highest 10-episode evals on the graph — using the surrounding
+perfect rate only to break ties among equal spikes. Explicit steps still work
 (`... b4c-schlongper 869000 871000`) when a specific checkpoint is the question.
 
-**Selection is ranked on the raw single eval, not the smoothed one, and that is a measured
-choice rather than an assumption.** An earlier version ranked by smoothed rate on the
-reasoning that a 70-80% single eval must be a lucky draw. Measuring both ways showed the
-opposite: raw single eval correlates **+0.64** with the true 100-episode rate while the
-smoothed region rate correlates **-0.40**, and the raw-selected pool measured 41.3%
-against the smoothed pool's 27.1%. If a policy's true rate were 27%, a 10-episode eval
-showing 7+ perfect games has probability 0.006 — the spike is evidence about that
-checkpoint, and smoothing averages it away into a statement about the region. See
-[`findings.md`](findings.md).
+**Outlier evals are not luck — those checkpoints really are better.** This was measured,
+not assumed, and it reversed an earlier version of this protocol that ranked by smoothed
+rate on the theory that a 70-80% single eval had to be a fluke:
 
-**The clusters exist because 1000 training steps is not a small distance.** Centres beat
-their immediate neighbours in 3 of 3 clusters, by 9, 11.5 and **27.5** points; one cluster
-runs 8% / 35% / 7% across three consecutive checkpoints. Clustering is what separates "this
-checkpoint is good" from "this part of the run is good", which no single checkpoint can do.
+| evidence | result |
+|---|---|
+| correlation with true 100-episode rate | raw single eval **+0.64**, smoothed **-0.40** |
+| pooled measurement by selection rule | raw **41.3%**, smoothed 27.1% (non-overlapping) |
+| outlier vs the checkpoints 1000 steps either side | outlier won **3 of 3**, by 9.0 / 11.5 / 27.5 points |
+| P(10-episode eval shows 7+ perfect \| true rate 27%) | **0.006** |
+
+So a spike is evidence about *that checkpoint*, and smoothing averages it into a statement
+about the *region* — which is a different and less useful thing. Ranking on the surrounding
+rate systematically picked worse checkpoints.
+
+**Adjacent steps are allowed through on purpose.** 1000 training steps is enough to move the
+perfect rate by tens of points — one measured triple reads 8% / 35% / 7% — so neighbouring
+checkpoints are separate policies rather than repeat samples of one.
 
 **10 checkpoints x 100 episodes, ~30 minutes on an idle machine** (~50 for four arms in
 parallel — good policies play long episodes and 40 workers oversubscribe 14 cores).
@@ -173,7 +179,7 @@ arm, and it demonstrably misranks: `b5c-schlongIS` is 2nd of its batch by graph 
 **last by measurement** (17.0% vs 2.1%).
 
 **Compare pooled rates only when the selection rule matches.** `b4c-schlongper` pools 31.4%
-under lucky+smoothed selection and 26.2% under cluster selection — not a contradiction,
+under outlier+smoothed selection and 26.2% under cluster selection — not a contradiction,
 because 6 of the 10 cluster picks are deliberately the weaker neighbours. Its level is
 ~31%. A pooled number is only meaningful alongside the rule that produced it.
 

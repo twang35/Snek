@@ -71,7 +71,12 @@ is n=1, so that number is soft and the next thing to do is seed it 2-3 more time
 is the first config here that looks both good *and* repeatable, and repeatability has been
 the binding constraint all along.
 
-## A high single eval is signal, not luck — and smoothing destroys it
+## An outlier eval is signal, not luck — and smoothing destroys it
+
+**Terminology:** these checkpoints were briefly called "lucky" in this document. That was
+wrong and the word is gone. They are **outliers**, and measurement shows they are genuinely
+better than their neighbours rather than lucky draws from the same policy.
+
 
 This is the most useful measurement result in the investigation, and it **falsified the
 assumption `eval_checkpoints.py` was originally built on**. The script ranked checkpoints
@@ -81,10 +86,10 @@ the truth says otherwise:
 
 | selection rule | pooled measured | 95% CI | episodes |
 |---|---|---|---|
-| **raw single eval** ("lucky") | **41.3%** | 35.9-47.0% | 300 |
+| **raw single eval** (outliers) | **41.3%** | 35.9-47.0% | 300 |
 | smoothed region rate | 27.1% | 24.0-30.6% | 700 |
 
-Non-overlapping: the checkpoints picked for a high single eval are **14 points better**,
+Non-overlapping: the checkpoints picked as outliers are **14 points better**,
 not worse. Correlation against the 100-episode measurement across the ten checkpoints:
 
 | predictor | correlation with true rate |
@@ -132,7 +137,7 @@ not interchangeable samples of one policy.
 | selection | pooled | note |
 |---|---|---|
 | 4 hand-picked | 31.8% /400 | the original measurement |
-| 3 lucky + 7 smoothed | 31.4% /1000 | agrees closely |
+| 3 outliers + 7 smoothed | 31.4% /1000 | agrees closely |
 | 3 clusters of 3 + 1 | **26.2%** /1000 | *lower by construction* |
 
 The cluster run is not a disagreement — 6 of its 10 picks are deliberately the weaker
@@ -148,7 +153,7 @@ times:
 | run | rate | 95% CI |
 |---|---|---|
 | 4-ckpt hand-picked | **51%** | 41.3-60.6 |
-| lucky+smoothed | 42% | 32.8-51.8 |
+| outliers+smoothed | 42% | 32.8-51.8 |
 | clusters | **32%** | 23.7-41.7 |
 | **pooled** | **41.7%** | **36.2-47.3** |
 
