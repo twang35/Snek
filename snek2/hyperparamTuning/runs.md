@@ -33,11 +33,30 @@ PYTHONPATH=. EVAL_OUT_SUFFIX=_clusters \
   /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b6b-alpha06 top10
 ```
 
-## Nothing is running
+## Currently running: batch 7
 
-All four arms were stopped deliberately at 1.4M-2.3M steps to free the machine. None
-died; none were finished. Checkpoints and replay buffers are intact, so any of them can
-be resumed.
+| policy | overrides beyond the shared three | role |
+|---|---|---|
+| `b7a-a06seed2` | none | `b6b` seed 2 |
+| `b7b-a06seed3` | none | `b6b` seed 3 |
+| `b7c-a06seed4` | none | `b6b` seed 4 |
+| `b7d-discount995` | `SNEK_DISCOUNT=0.995` | the one untested high-prior knob, on the best base |
+
+Shared by all four: `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss
+SNEK_IS_WEIGHTS=0`. All four render a visible window. Launched from scratch, not resumed,
+so cpprb priorities start clean.
+
+**Launch trap, cost one failed launch:** in zsh an unquoted `$VAR` holding
+`A=1 B=2 C=3` is **not** word-split, so `env $VAR cmd` passes it as a single malformed
+assignment. All four arms crashed with
+`ValueError: could not convert string to float: '0.6 SNEK_PRIORITY_SIGNAL=...'`. Write the
+assignments literally on each command line. The crash happened inside `tuned()` before any
+checkpoint was written, so nothing was corrupted — that validation earns its keep.
+
+### Batch 5/6 arms: stopped, resumable
+
+All four were stopped deliberately at 1.4M-2.3M steps. None died; none were finished.
+Checkpoints and replay buffers are intact, so any of them can be resumed.
 
 ### Which to resume, in priority order
 
@@ -244,25 +263,28 @@ could recover `b4c`'s 51% without its 2-in-3 death rate. If both new arms surviv
 sharpness kills these arms), or both surviving *and* scoring no better than baseline
 (sharpness was never where the gain came from either).
 
-## Batch 7 — seed the winner
+## Batch 7 — seeding the winner (running, see above)
 
-**Recommended: 3 fresh seeds of `b6b`'s config, one slot for something new.** `b6b`
-measured 24.5% and survived, but on **n=1**, and every single-seed result in this document
-has failed to replicate. Seeding it is worth more than any new knob.
+**Why three seeds of one config rather than three new knobs.** `b6b-alpha06` measured 24.5%
+and survived, but on **n=1**, and every single-seed result in this document has failed to
+replicate — four have been overturned outright. Seed count, not knob count, is the binding
+constraint, so three of the four slots go to repeats.
 
-| policy | overrides | role |
-|---|---|---|
-| `b7a-a06seed2` | `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` | `b6b` seed 2 |
-| `b7b-a06seed3` | same | `b6b` seed 3 |
-| `b7c-a06seed4` | same | `b6b` seed 4 |
-| `b7d-discount995` | `... same three ... SNEK_DISCOUNT=0.995` | the one untested high-prior knob, on the best base |
+What the batch can show:
 
-Three seeds answer the question that actually matters — is 24.5% the config's level or
-another lucky draw — and if all three survive, the ~1-in-3 death rate at eff ~1.6 is
-confirmed as specific to that sharpness rather than general.
+| outcome | reading |
+|---|---|
+| all 3 seeds survive and land ~20-25% | 24.5% is the config's level. First reliable result in the project |
+| all 3 survive but scatter widely | the config is stable but its *quality* is seed-dependent; needs more seeds still |
+| 1-2 die | eff ~1.2 is also a lottery, just a better-odds one than eff ~1.6's 1-in-3 |
+| all 3 die | `b6b` was the fluke, and nothing here beats the baseline reliably |
 
-Use **fresh policy names, not resumes**: resuming resets cpprb priorities to uniform, which
-at 1.8M steps perturbs the mechanism under study.
+`b7d` tests `DISCOUNT=0.995` on the best base. At 0.99 the effective horizon is ~100 steps
+while a perfect game runs several hundred, so the terminal bonus is discounted to
+near-irrelevance — plausibly the most relevant untested knob for the actual objective.
+
+**Judge with the outlier selector**, and note `b7d` is not comparable to the others on
+`avg_reward` since changing the discount changes the reward scale; compare perfect rates.
 
 ### Later candidates
 
