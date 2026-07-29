@@ -117,6 +117,22 @@ When the user asks for a progress update or to check on progress, that is
 charts, update the docs, report. **Do not kill, stop, or restart any arm** — not
 even one that looks finished, is past the 4-hour cap, or is clearly failing.
 
+A progress update means updating **`charts.md` as well as `runs.md`**. Running
+`refresh_charts.sh` only copies the PNGs — it does not add anything to `charts.md`,
+so a new arm silently ends up with an image and no entry. Every arm needs a row in
+the "Every arm at a glance" table and a `### <policy> — <change>` section with a
+stats line, a short reading of what the chart shows, and the `![...]` image. Check
+with:
+
+```
+ls snek2/hyperparamTuning/charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
+grep -o 'charts/[a-zA-Z0-9-]*\.png' snek2/hyperparamTuning/charts.md | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
+comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
+```
+
+This drifted once already: batches 5, 6 and 7 accumulated 12 arms with images and no
+sections, because `refresh_charts.sh` succeeding looked like the charts were handled.
+
 Deciding a run is done is the user's call, not a side effect of asking how it's
 going. A long run may still be producing the late-horizon data that makes it
 worth something, and judging an arm dead has already been wrong here more than

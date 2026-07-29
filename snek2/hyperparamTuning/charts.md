@@ -27,33 +27,64 @@ snek2/hyperparamTuning/refresh_charts.sh
 That re-copies every `runs/*.png` into `charts/` and prints the step each one is
 at, so captions can be updated to match.
 
-Snapshot refreshed 09:00, at the steps noted below.
+**The script does not touch this file.** It copies images only, so a new arm ends up with
+a PNG in `charts/` and no entry here unless one is written by hand. That drifted once —
+batches 5, 6 and 7 reached 12 undocumented arms because a successful `refresh_charts.sh`
+looked like the charts were handled. Check for the gap with:
+
+```
+ls charts/*.png | sed 's|charts/||;s|\.png||' | sort > /tmp/have
+grep -o 'charts/[a-zA-Z0-9-]*\.png' charts.md | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
+comm -23 /tmp/have /tmp/doc
+```
+
+Snapshot refreshed 2026-07-29, at the steps noted below.
 
 ## Every arm at a glance
 
-| policy | change | steps | peak score (at) | best perfect-30 | best single eval | verdict |
-|---|---|---|---|---|---|---|
-| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | **92.0** (869k) | **34.0%** | **80%** | **best arm by 2x**; high ceiling, high variance |
-| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 86.6 (743k) | 9.3% | 40% | steady, slowly rising |
-| `b4a-uniform` | alpha 0 | 1.25M | 85.9 (550k) | 8.7% | 40% | peaked ~575k, drifting down |
-| `b1a-base` | none (control) | 503k | 87.5 (135k) | 16.7% | 40% | collapsed at 265k; score recovered, skill did not |
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | 83.5 (236k) | 11.0% | 30% | best of batch 3, degraded anyway |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | 85.8 (305k) | 8.3% | 30% | declined despite the floor — falsified hypothesis A |
-| `b2a-base2` | none (repeat) | 999k | 83.8 (293k) | 7.0% | 30% | no collapse; long drift down, 1.1% perfect at 1M |
-| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 85.7 (312k) | 5.7% | 30% | **died at ~750k**, score 0.0 for 4M steps |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 76.0 (255k) | 1.7% | 10% | dead end |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | 10% | stopped early, verdict weak |
-| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | 10% | dead end |
+Sorted by **measured** perfect rate where it exists — the pooled 100-episode-per-checkpoint
+figure from `eval_checkpoints.py`. Graph-derived columns misrank arms badly (`b5c` is 2nd of
+its batch on best perfect-30 and last on measurement), so treat them as chart description
+rather than as ranking.
 
-**The comparison to take from this table:** `b4c-schlongper` — which reverts the three
-PER changes made when the buffer was ported — beats every other arm by roughly 2x on the
-sustained perfect rate and is the only arm that has ever produced an eval above 40%. It
-also holds the top score at 92.0 of a possible 95.
+| policy | change | steps | peak score (at) | best perfect-30 | **measured** | verdict |
+|---|---|---|---|---|---|---|
+| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | **44.0%** | **38.8%** | **best arm on record**, and it survived |
+| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
+| `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 29.5% | strong, survived |
+| `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | 89.6 (1712k) | 21.7% | 24.5% | old selector — an underestimate |
+| `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 88.7 (1242k) | 17.7% | 16.4% | survived, weakest of the three discount seeds |
+| `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 88.8 (1978k) | 15.0% | 12.0% | survived to 2M, low ceiling |
+| `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | 87.5 (356k) | 14.3% | 8.1% | tame, never near death, low ceiling |
+| `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.08M | 86.2 (500k) | 10.7% | 6.6% | stable, low ceiling |
+| `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | 87.8 (265k) | 17.0% | 2.1% | IS correction cancels the benefit |
+| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 86.6 (743k) | 9.3% | — | steady, slowly rising |
+| `b4a-uniform` | alpha 0 | 1.25M | 85.9 (550k) | 8.7% | — | peaked ~575k, drifting down |
+| `b1a-base` | none (control) | 503k | 87.5 (135k) | 16.7% | — | collapsed at 265k; score recovered, skill did not |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | 83.5 (236k) | 11.0% | — | best of batch 3, degraded anyway |
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | 85.8 (305k) | 8.3% | — | declined despite the floor — falsified hypothesis A |
+| `b2a-base2` | none (repeat) | 999k | 83.8 (293k) | 7.0% | — | no collapse; long drift down, 1.1% perfect at 1M |
+| `b7b-a06seed3` | alpha 0.6, `td_loss`, no IS | 1.78M | 83.8 (127k) | 7.7% | **0%** | **died at 1162k** |
+| `b7c-a06seed4` | alpha 0.6, `td_loss`, no IS | 1.74M | 82.6 (193k) | 9.7% | **0%** | **died at 573k** |
+| `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | 83.9 (59k) | 10.0% | **0%** | **died at 272k**, `b4c` repeat |
+| `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | 83.8 (69k) | 7.7% | **0%** | **died at 246k**, `b4c` repeat |
+| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 85.7 (312k) | 5.7% | **0%** | **died at ~750k**, score 0.0 for 4M steps |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 76.0 (255k) | 1.7% | — | dead end |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | — | stopped early, verdict weak |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | — | dead end |
+
+**What this table shows now that batches 5-7 are in it.** The top three arms all share one
+config family — alpha 0.6-0.8, `td_loss` priorities, no IS weights — and the two best carry
+`DISCOUNT=0.995` on top of it. Nothing outside that family has measured above 8.1%.
+
+**Five of the 23 arms died outright**, and four of those five ran the same PER config as the
+best arm. That is the central tension in these charts: `b4c` and `b7f` reach ~50% at their
+best checkpoints, while `b5a`, `b5b`, `b7b` and `b7c` — near-identical configs — went to
+0.0 and stayed there. `DISCOUNT=0.995` is the only change that has held the ceiling while
+avoiding the deaths, 3 seeds for 3.
 
 Uniform sampling (`b4a`, `b4b`) was the prior favourite and landed at about a third of
-`b4c`'s rate, so the axis mattered but the expected direction was wrong. Everything above
-`b4a` in this table degraded after peaking somewhere between 236k and 312k; `b4c` peaked
-at 875k instead, which is the first real break from that pattern.
+`b4c`'s rate, so the axis mattered but the expected direction was wrong.
 
 ---
 
@@ -282,3 +313,195 @@ prioritization.** So the relationship is not monotonic in "how much prioritizati
 is why isolating which of `b4c`'s three changes carries the gain is batch 5's priority.
 
 ![b4a-uniform](charts/b4a-uniform.png)
+
+---
+
+## Batch 5 — the `b4c` replication that failed
+
+Four arms, all at alpha 0.8. Two exact `b4c` repeats and two single-factor reverts. **Both
+exact repeats died**, which retracted the "restoring `theSchlong`'s PER triples the perfect
+rate" finding and started the effective-exponent line of investigation.
+
+### b5c-schlongIS — alpha 0.8, `td_loss`, **IS weights back on**
+
+Step 2.31M · peak score 87.8 (at 265k) · best 30-eval perfect 17.0% (at 211k) · **measured 2.1%**
+
+The most instructive chart in this file about **why graphs must not be used to rank arms.**
+Its red trace looks healthy through the first 400k and its 17.0% window was second-best in
+the batch, yet 100-episode measurement puts it **last of all four at 2.1%** — barely above
+the ~1% committed baseline.
+
+The blue trace explains the mechanism: IS correction makes the arm *stable* — it sailed
+through the 200-270k window that killed `b5a` and `b5b` without dropping below 62 — but it
+cancels the prioritization it is correcting, and most of the benefit with it. Stability
+bought at the cost of everything worth having.
+
+This arm also demonstrates the checkpoint-retention trap. It ran 2M steps past its peak, so
+by measurement time the 211k checkpoint behind that 17.0% had been evicted and only weak
+survivors remained. **Its true ceiling is unmeasurable.**
+
+![b5c-schlongIS](charts/b5c-schlongIS.png)
+
+### b5d-schlongTDE — alpha 0.8, **`abs(td_error)`** priorities, no IS
+
+Step 2.08M · peak score 86.2 (at 500k) · best 30-eval perfect 10.7% (at 410k) · **measured 6.6%**
+
+The other single-factor revert, and the other survivor. Reverting the priority *signal*
+instead of the IS weights lands the effective exponent at ~0.8 rather than ~1.6. Like `b5c`
+it survives, and like `b5c` it tops out low.
+
+The chart shows a real dip to ~23 around 243k — the same crisis window that killed the two
+repeats — followed by full recovery. So the crisis is a property of the config family, not
+of the two arms that died; what differs is whether it is absorbing.
+
+![b5d-schlongTDE](charts/b5d-schlongTDE.png)
+
+### b5a-schlong — exact `b4c` repeat, seed 1
+
+Step 2.05M · peak score 83.9 (at 59k) · best 30-eval perfect 10.0% (at 84k) · **died at 272k**
+
+This chart is the retraction. Identical config to `b4c` — the arm that measured ~50% at its
+best checkpoint — and it goes to **0.0 and stays there for 1.7M steps.** Note how much of
+the x-axis is flat: that is the eval-cost confound, since a dead policy ends every episode
+instantly and burns steps several times faster than a live one. High step count on this
+chart means nothing.
+
+Checking `b4c` afterwards showed it bottomed at trailing 10.1 in the same 200-270k window
+and recovered. So the config produces a **~1-in-3 lottery ticket** rather than a better
+policy.
+
+![b5a-schlong](charts/b5a-schlong.png)
+
+### b5b-schlong2 — exact `b4c` repeat, seed 2
+
+Step 1.92M · peak score 83.8 (at 69k) · best 30-eval perfect 7.7% (at 129k) · **died at 246k**
+
+The second exact repeat, and the confirmation. Same shape as `b5a` above: a healthy first
+130k, then the 200-270k crisis, then flat at 0.0 for 1.9M steps. Two independent seeds
+failing the same way is what makes this a retraction rather than one unlucky run.
+
+![b5b-schlong2](charts/b5b-schlong2.png)
+
+---
+
+## Batch 6 — the effective-exponent sweep
+
+Two arms testing a mechanism found by reading the code rather than sweeping: because
+`element_wise_huber_loss` squares errors below 1.0 before alpha is applied, `td_loss` with
+alpha 0.8 is really **~1.6** on the `td_error` scale. The alpha label had never matched what
+was being tested.
+
+### b6b-alpha06 — alpha 0.6, `td_loss`, no IS (eff ~1.2)
+
+Step 1.80M · peak score 89.6 (at 1712k) · best 30-eval perfect 21.7% (at 1467k) · **measured 24.5%**
+
+**The chart that most deserves study, because reading it wrongly cost this investigation its
+fourth retraction.** The trace crashes to near-zero twice — once around 140-600k and again
+near 1.2M, touching trailing 0.3 and 0.9 — and recovers fully both times, ending with its
+highest perfect rates of the whole run.
+
+At the first crash this arm was written off as "a crash with permanent capability loss" that
+"never regained a quarter of its peak". It then exceeded that peak. It is a **very
+long-period oscillator**, with a period over a million steps, and no read before ~600k would
+have been right.
+
+Its 24.5% was measured with the old smoothed-first selector, so it is an **underestimate**
+and is due a re-measure.
+
+![b6b-alpha06](charts/b6b-alpha06.png)
+
+### b6a-alpha04 — alpha 0.4, `td_loss`, no IS (eff ~0.8)
+
+Step 1.41M · peak score 87.5 (at 356k) · best 30-eval perfect 14.3% (at 372k) · **measured 8.1%**
+
+The mirror image of `b6b` and the flattest healthy chart in this file: trailing score sits
+near 73 for more than a million steps, never approaches death, and never gets much above its
+own average. The prediction made before launch — that eff ~0.8 survives — held.
+
+The pair together is the whole point: **`b6a` is safe and low, `b6b` is violent and high.**
+That produced the "sharpness is a variance dial" reading, later weakened when batch 7 seeded
+`b6b`'s config and lost 2 of 4 arms to late deaths.
+
+![b6a-alpha04](charts/b6a-alpha04.png)
+
+---
+
+## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
+
+Six arms in four slots. The batch set out to seed `b6b`'s config to n=3 and instead found
+the strongest result in the investigation in its spare slot.
+
+### b7f-disc995seed3 — alpha 0.6, `td_loss`, no IS, **`DISCOUNT=0.995`**
+
+Step 1.06M · peak score **92.6** (at 267k) · **best 30-eval perfect 44.0%** (at 699k) · **measured 38.8%, best checkpoint 51%**
+
+**The best arm on record.** Its 44.0% best 30-eval window beats `b4c`'s 34.0%, its peak score
+of 92.6 of 95 is the highest ever, and its best checkpoint measures **51%** over 100
+episodes — equal to `b4c`'s best, on a config whose three seeds all survived.
+
+The red trace is the clearest in this file: sustained 40-70% bands from 600k onward rather
+than isolated spikes. Ten measured checkpoints ran 27-51%, six of them above 38%, so the peak
+is a **region** rather than a lucky point.
+
+The chart also shows the honest limit of the result. Compare it to `b4c`'s and the ceilings
+are the same; what changed is that `b4c`'s config threw away two runs in three to get there.
+
+![b7f-disc995seed3](charts/b7f-disc995seed3.png)
+
+### b7e-disc995seed2 — alpha 0.6, `td_loss`, no IS, **`DISCOUNT=0.995`**
+
+Step 1.28M · peak score 92.3 (at 997k) · best 30-eval perfect 32.3% (at 318k) · **measured 29.5%**
+
+Second discount seed, and the one that opened fastest — trailing 75.3 within 179k steps, the
+strongest start of any arm here. It oscillates more than `b7f` and its best window comes
+early (318k), but it never approaches death across 1.28M steps.
+
+![b7e-disc995seed2](charts/b7e-disc995seed2.png)
+
+### b7d-discount995 — alpha 0.6, `td_loss`, no IS, **`DISCOUNT=0.995`**
+
+Step 1.60M · peak score 88.7 (at 1242k) · best 30-eval perfect 17.7% (at 1336k) · **measured 16.4%**
+
+The first discount arm and the weakest of the three, which is the useful part: at 16.4% it
+still beats every non-discount arm in its own batch, so **the worst of three discount seeds
+outperforms the best seed of the config it modifies.** Its best work comes late, around
+1.24-1.34M, unlike `b7e`'s early peak.
+
+![b7d-discount995](charts/b7d-discount995.png)
+
+### b7a-a06seed2 — alpha 0.6, `td_loss`, no IS (the seed that lived)
+
+Step 2.00M · peak score 88.8 (at 1978k) · best 30-eval perfect 15.0% (at 1835k) · **measured 12.0%**
+
+The one surviving `b6b` seed, and the direct control for the discount arms — same config,
+`DISCOUNT=0.99`. It runs healthy for a full 2M steps and still measures only 12.0%, against
+16.4-38.8% for its three discount siblings. Its peak score arrives at 1978k, right at the
+end, so it was still improving when stopped.
+
+![b7a-a06seed2](charts/b7a-a06seed2.png)
+
+### b7b-a06seed3 — `b6b` seed 3
+
+Step 1.78M · peak score 83.8 (at 127k) · best 30-eval perfect 7.7% · **died at 1162k**
+
+**The cautionary chart.** Its 200k blocks run 52.6 / 19.1 / 61.9 / 50.9 / 14.3 / 0.1: it
+climbed out of one deep trough, was called an oscillator on that basis, and then died from
+the next one. **A past recovery is not evidence of a future one** — telling an oscillation
+from a slow death needs the trend *after* the trough, not the resilience before it.
+
+![b7b-a06seed3](charts/b7b-a06seed3.png)
+
+### b7c-a06seed4 — `b6b` seed 4
+
+Step 1.74M · peak score 82.6 (at 193k) · best 30-eval perfect 9.7% · **died at 573k**
+
+The other seed failure. Together with `b7b` it took the config's survival from 3-of-4 to
+**2-of-4**, weakening the "lower sharpness is safer" reading — 50% survival against eff
+~1.6's 33% is not a real difference at these sample sizes.
+
+This arm was also the patience test: at 162k steps down it was deliberately left running
+because `b6b` had recovered from a similar trough, and it went on to sit at exactly 0.0 for
+**363 consecutive evals**. Both these deaths arrive far later than the eff ~1.6 deaths at
+246k and 272k, which suggests lower sharpness delays death rather than preventing it.
+
+![b7c-a06seed4](charts/b7c-a06seed4.png)
