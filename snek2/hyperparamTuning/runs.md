@@ -66,9 +66,26 @@ PYTHONPATH=. EVAL_OUT_SUFFIX=_outlier10 \
   /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b6b-alpha06 top10
 ```
 
-## Nothing is running
+## Currently running: batch 8
 
-Batch 7's arms were all stopped and measured. Design rationale and results are in
+**Launched 2026-07-29.** All four arms share
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
+verified in every log. Design rationale is in the Batch 8 section below.
+
+| policy | extra override | eff horizon | status |
+|---|---|---|---|
+| `b8a-disc999` | `DISCOUNT=0.999` | ~1000 steps | running |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | ~1000 steps | running |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | ~400 steps | running |
+| `b8d-disc995clip` | `DISCOUNT=0.995 GRADIENT_CLIPPING=10` | ~200 steps | running |
+
+**First batch to run under quiet logging and the fixed perfect-game pause.** Two things
+follow. Logs are ~1 line per 10 evals, so take status from the `summary` block in
+`runs/<policy>_evals.json` rather than by tailing. And these arms are **not wall-clock
+comparable to batches 1-7**, which paid a 5-second stall per winning eval — step-indexed
+comparisons are fine.
+
+Batch 7's arms were all stopped and measured; rationale and results in
 [`completedRuns.md`](completedRuns.md#batch-7--seeding-b6b-and-finding-discount0995).
 
 Verify with `pgrep -fl "python -u snek2.py"`. Not `grep "[s]nek2.py"` — git telemetry
