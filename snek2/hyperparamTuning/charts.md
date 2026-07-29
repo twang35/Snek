@@ -48,36 +48,52 @@ the ordering worth seeing at a glance.
 
 ## Every arm at a glance
 
-Sorted by **measured** perfect rate where it exists — the pooled 100-episode-per-checkpoint
-figure from `eval_checkpoints.py`. Graph-derived columns misrank arms badly (`b5c` is 2nd of
-its batch on best perfect-30 and last on measurement), so treat them as chart description
-rather than as ranking.
+Sorted by **best evaluated checkpoint** — the highest 100-episode measurement any single
+checkpoint of that arm produced, which is the closest thing here to "how good did this
+config ever get". **Pooled** is the average across its ten measured checkpoints, so it
+answers the different question of how good a *typical* good checkpoint is.
 
-| policy | change | steps | peak score (at) | best perfect-30 | **measured** | verdict |
-|---|---|---|---|---|---|---|
-| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | **44.0%** | **38.8%** | **best arm on record**, and it survived |
-| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
-| `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 29.5% | strong, survived |
-| `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | 89.6 (1712k) | 21.7% | 24.5% | old selector — an underestimate |
-| `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 88.7 (1242k) | 17.7% | 16.4% | survived, weakest of the three discount seeds |
-| `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 88.8 (1978k) | 15.0% | 12.0% | survived to 2M, low ceiling |
-| `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | 87.5 (356k) | 14.3% | 8.1% | tame, never near death, low ceiling |
-| `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.08M | 86.2 (500k) | 10.7% | 6.6% | stable, low ceiling |
-| `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | 87.8 (265k) | 17.0% | 2.1% | IS correction cancels the benefit |
-| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 86.6 (743k) | 9.3% | — | steady, slowly rising |
-| `b4a-uniform` | alpha 0 | 1.25M | 85.9 (550k) | 8.7% | — | peaked ~575k, drifting down |
-| `b1a-base` | none (control) | 503k | 87.5 (135k) | 16.7% | — | collapsed at 265k; score recovered, skill did not |
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | 83.5 (236k) | 11.0% | — | best of batch 3, degraded anyway |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | 85.8 (305k) | 8.3% | — | declined despite the floor — falsified hypothesis A |
-| `b2a-base2` | none (repeat) | 999k | 83.8 (293k) | 7.0% | — | no collapse; long drift down, 1.1% perfect at 1M |
-| `b7b-a06seed3` | alpha 0.6, `td_loss`, no IS | 1.78M | 83.8 (127k) | 7.7% | **0%** | **died at 1162k** |
-| `b7c-a06seed4` | alpha 0.6, `td_loss`, no IS | 1.74M | 82.6 (193k) | 9.7% | **0%** | **died at 573k** |
-| `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | 83.9 (59k) | 10.0% | **0%** | **died at 272k**, `b4c` repeat |
-| `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | 83.8 (69k) | 7.7% | **0%** | **died at 246k**, `b4c` repeat |
-| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 85.7 (312k) | 5.7% | **0%** | **died at ~750k**, score 0.0 for 4M steps |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 76.0 (255k) | 1.7% | — | dead end |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | — | stopped early, verdict weak |
-| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | — | dead end |
+Graph-derived columns misrank arms badly (`b5c` is 2nd of its batch on best perfect-30 and
+last on measurement), so read peak score and best perfect-30 as chart description, not as
+ranking.
+
+| policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
+|---|---|---|---|---|---|---|---|
+| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | **44.0%** | **51%** @860k | **38.8%** | **best arm on record**, and it survived |
+| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | **50%** @869k | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
+| `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 39% @334k | 29.5% | strong, survived |
+| `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | 89.6 (1712k) | 21.7% | 36% @1455k † | 24.5% † | old selector — an underestimate |
+| `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 88.7 (1242k) | 17.7% | 26% @1330k | 16.4% | survived, weakest of the three discount seeds |
+| `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 88.8 (1978k) | 15.0% | 19% @1822k | 12.0% | survived to 2M, low ceiling |
+| `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | 87.5 (356k) | 14.3% | 13% @514k † | 8.1% † | tame, never near death, low ceiling |
+| `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.08M | 86.2 (500k) | 10.7% | 12% @1160k † | 6.6% † | stable, low ceiling |
+| `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | 87.8 (265k) | 17.0% | 6% @2239k † | 2.1% † | IS correction cancels the benefit |
+| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 86.6 (743k) | 9.3% | not measured | — | steady, slowly rising |
+| `b4a-uniform` | alpha 0 | 1.25M | 85.9 (550k) | 8.7% | not measured | — | peaked ~575k, drifting down |
+| `b1a-base` | none (control) | 503k | 87.5 (135k) | 16.7% | not measured | — | collapsed at 265k; score recovered, skill did not |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | 83.5 (236k) | 11.0% | not measured | — | best of batch 3, degraded anyway |
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | 85.8 (305k) | 8.3% | not measured | — | declined despite the floor — falsified hypothesis A |
+| `b2a-base2` | none (repeat) | 999k | 83.8 (293k) | 7.0% | not measured | — | no collapse; long drift down, 1.1% perfect at 1M |
+| `b7b-a06seed3` | alpha 0.6, `td_loss`, no IS | 1.78M | 83.8 (127k) | 7.7% | **0%** (dead) | — | **died at 1162k** |
+| `b7c-a06seed4` | alpha 0.6, `td_loss`, no IS | 1.74M | 82.6 (193k) | 9.7% | **0%** (dead) | — | **died at 573k** |
+| `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | 83.9 (59k) | 10.0% | **0%** (dead) | — | **died at 272k**, `b4c` repeat |
+| `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | 83.8 (69k) | 7.7% | **0%** (dead) | — | **died at 246k**, `b4c` repeat |
+| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 85.7 (312k) | 5.7% | **0%** (dead) | — | **died at ~750k**, score 0.0 for 4M steps |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 76.0 (255k) | 1.7% | not measured | — | dead end |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | not measured | — | stopped early, verdict weak |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | not measured | — | dead end |
+
+**† measured with the superseded smoothed-first selector**, which has since been shown to
+pick systematically worse checkpoints than outlier selection (+0.64 vs -0.40 correlation
+with the true rate). Those five figures are **underestimates** and are not comparable to
+the unmarked rows; `b6b` in particular is probably well above 36%. Everything unmarked used
+the current outlier selector. Provenance is recorded per result in
+`runs/<arm>_checkpoint_evals*.json` as `selected_by` and `graph_single_eval`.
+
+One caveat on `b4c`'s 50%: that checkpoint has been measured four separate times, reading
+51%, 42%, 32% and 50%. Its pooled figure over 400 episodes is **41.7%**, which is the number
+to trust — the 50-51% readings are the high draws. No other arm has been measured more than
+once, so treat this column as "best single 100-episode reading" rather than a settled value.
 
 **What this table shows now that batches 5-7 are in it.** The top three arms all share one
 config family — alpha 0.6-0.8, `td_loss` priorities, no IS weights — and the two best carry
