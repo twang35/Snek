@@ -268,6 +268,11 @@ Notes that matter:
 
 - Use the env's python binary directly, **not `conda run`** — it buffers stdout
   and makes a healthy run look hung. See `CLAUDE.md`.
+- **Runs log quietly.** One compact line per 10 evals; `SNEK_DEBUG=1` restores the full
+  original output for debugging. Take status from the `summary` block in
+  `runs/<policy>_evals.json` rather than from the log — it precomputes step, trailing,
+  peak, best 30-eval perfect window and `dead_since`, which is everything a progress
+  check needs. `dead_since` is an onset, not a verdict; compare it to `step` for duration.
 - **Every arm gets a visible window.** `display_eval` defaults to `True`, so launch with
   no `SDL_VIDEODRIVER` override at all. The user wants to see each arm as it runs; do
   not add `SDL_VIDEODRIVER=dummy` to a tuning arm unless asked. (Earlier guidance here

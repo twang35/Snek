@@ -17,6 +17,12 @@ eval_interval = 1000
 display_progress_interval = eval_interval
 buffer_save_interval = 10 * eval_interval
 
+# Quiet mode prints one compact line per this many evals instead of ~5 lines per eval plus a
+# loss line every 200 steps. At 1000 steps per eval a 2M-step run goes from ~20000 lines to
+# ~200. Every number dropped from the console is still in <policy>_evals.json, so nothing is
+# lost — the file is the durable record and the console was only ever a live feed.
+quiet_eval_log_interval = 10
+
 
 def initial_populate_replay_buffer(use_theschmid_bot,
                                    time_step_spec,
@@ -32,7 +38,8 @@ def initial_populate_replay_buffer(use_theschmid_bot,
 
 
 def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
-    print('Random play to populate replay buffer')
+    if snake_constants.DEBUG_LOGGING:
+        print('Random play to populate replay buffer')
 
     random_policy = random_tf_policy.RandomTFPolicy(time_step_spec, action_spec)
 
@@ -45,7 +52,8 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 
 def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
-    print('theSchmid play to populate replay buffer')
+    if snake_constants.DEBUG_LOGGING:
+        print('theSchmid play to populate replay buffer')
 
     schmid_policy = TheSchmidPolicy(time_step_spec, action_spec)
 
@@ -92,7 +100,8 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
                                                eval_only, num_eval_episodes)
     merge_eval_row(training_metrics.eval_rows,
                    build_eval_row(int(initial_step), avg_score, avg_score, avg_reward, training_metrics, epsilon))
-    print('before training score: ', round(avg_score, 2))
+    if snake_constants.DEBUG_LOGGING:
+        print('before training score: ', round(avg_score, 2))
 
     print('Begin training: ', time.strftime("%d/%m %H:%M:%S", time.localtime()))
 
@@ -147,6 +156,7 @@ class TrainingMetrics:
         self.last_eval_perfect_percent = 0.0
         self.perfect_percentage = 0.0
         self.num_of_percents = 0
+        self.recent_steps_per_second = 0.0
 
     def reset(self):
         self.steps_start_time = time.time()
@@ -180,29 +190,36 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
 def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
                           global_step, epsilon, min_epsilon, step, eval_only, initial_step, policy_name, run_config):
+    debug = snake_constants.DEBUG_LOGGING
+
     if step % log_interval == 0:
         steps_per_second = log_interval / (time.time() - metrics.steps_start_time)
+        metrics.recent_steps_per_second = steps_per_second
 
-        if eval_only:
-            print('step = {0}: steps/second = {1}'.format(step, round(steps_per_second, 2)))
-        else:
-            print('step = {0}: loss = {1}, steps/second = {2}'.format(step,
-                                                                      str(round(loss_info.loss.numpy(), 4)),
-                                                                      round(steps_per_second, 2)))
+        if debug:
+            if eval_only:
+                print('step = {0}: steps/second = {1}'.format(step, round(steps_per_second, 2)))
+            else:
+                print('step = {0}: loss = {1}, steps/second = {2}'.format(step,
+                                                                         str(round(loss_info.loss.numpy(), 4)),
+                                                                         round(steps_per_second, 2)))
         metrics.steps_start_time = time.time()
 
     if step % eval_interval == 0:
-        print('training time: ', get_time(metrics.training_start_time))
-        print('train_py_env high score: ', train_py_env.high_score)
+        if debug:
+            print('training time: ', get_time(metrics.training_start_time))
+            print('train_py_env high score: ', train_py_env.high_score)
         metrics.eval_start_time = time.time()
         avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, metrics, eval_only,
                                                    num_eval_episodes)
-        print('eval time: ', get_time(metrics.eval_start_time))
+        if debug:
+            print('eval time: ', get_time(metrics.eval_start_time))
 
         maybe_update_epsilon(avg_reward, epsilon, min_epsilon)
 
         if not eval_only:
-            print('saving checkpoint')
+            if debug:
+                print('saving checkpoint')
             train_checkpointer.save(global_step)
             # The buffer is ~20 MB and only warm-starts the next run, so it saves
             # far less often than the agent to keep disk churn down.
@@ -231,12 +248,35 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
         if eval_only:
             eval_str += ', cumulative_perfect_percent = {0}, initial_step = {1}'\
                 .format('{0}%'.format(round(metrics.perfect_percentage * 100)), initial_step)
-        print(eval_str)
+        if debug:
+            print(eval_str)
 
         # Built before reset() clears the min/max trackers below.
         merge_eval_row(metrics.eval_rows,
                        build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, epsilon))
-        save_history(graph_history_path, metrics.eval_rows, metrics.resume_steps)
+        summary = save_history(graph_history_path, metrics.eval_rows, metrics.resume_steps)
+
+        if not debug:
+            # One line per quiet_eval_log_interval evals, plus the first eval of the run and
+            # any eval that sets a new best 30-eval perfect rate — so the log still shows
+            # when an arm is improving without a line for every point.
+            eval_index = step // eval_interval
+            # `> 0` matters: with no perfect games yet, best_perfect30 is 0.0 and its step
+            # field falls back to the current step, which would mark every single eval as a
+            # new best.
+            is_new_best = (summary['best_perfect30']['value'] > 0
+                           and summary['best_perfect30']['step'] == step)
+            if eval_index % quiet_eval_log_interval == 0 or is_new_best or eval_index <= 1:
+                print('{0:>8}  score {1:>5.1f}  trail {2:>5.1f}  pf {3:>3.0f}%  '
+                      'best30 {4:>4.1f}%  eps {5:<6}{6}'.format(
+                          step,
+                          round(avg_score, 1),
+                          round(trailing_avg_score, 1),
+                          metrics.last_eval_perfect_percent * 100,
+                          summary['best_perfect30']['value'],
+                          round(float(epsilon.numpy()), 4),
+                          '  <- best so far' if is_new_best else ''),
+                      flush=True)
         # restart time because compute_avg_return() takes a while and messes up the timing
         metrics.reset()
 

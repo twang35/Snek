@@ -158,6 +158,30 @@ Two other rules are easy to get wrong:
 Hyperparameters are overridden with `SNEK_*` env vars (see `tuned()` in
 `snek2.py`), so variants run side by side without editing files.
 
+### Logging: quiet by default, `SNEK_DEBUG=1` for everything
+
+Training runs **quiet**: one compact line per 10 evals, and nothing else after startup.
+`SNEK_DEBUG=1` restores the original output verbatim — per-200-step loss lines, the
+five-line eval block, `Saved checkpoint` per eval, perfect-game and high-score banners.
+Use it when a run is actually being debugged, not for status.
+
+**Read status from `runs/<policy>_evals.json`, not from the log.** Every history file
+carries a precomputed `summary` block:
+
+```
+step, evals, trailing_now, peak_trailing{value,step},
+best_perfect30{value,step}, recent_perfect30, max_single_eval, dead_since, epsilon
+```
+
+That is exactly what a progress check needs, so reading `summary` from each arm replaces
+scanning the eval series. `dead_since` is the onset of a sustained-zero stretch, **not a
+verdict** — arms have recovered from trailing 0.3, and one recovered after ~400k steps
+near zero. Compare `dead_since` against `step` to get the duration, and only call an arm
+dead after hundreds of thousands of steps pinned there.
+
+The one log line worth grepping is `hyperparameter override:` at startup, which confirms
+an arm got the config intended. That prints in both modes.
+
 ## Writing the docs
 
 **Lead with a table, then explain underneath.** Any time a section covers a *set* of

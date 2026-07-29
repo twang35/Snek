@@ -307,7 +307,7 @@ class Game:
         return (self.current_score + START_SEGMENTS + 1) == PERFECT_SCORE
 
     def render(self):
-        if self.perfect_game:
+        if self.perfect_game and snake_constants.DEBUG_LOGGING:
             print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1!!!1!!1!!!!11111!!!!111!!!!!!!!')
 
         if not self.display:

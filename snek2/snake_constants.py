@@ -1,6 +1,13 @@
 import os
 import pygame
 
+# Verbose logging. Off by default: a 2M-step run printed a loss line every 200 steps, five
+# lines per eval, and a banner per perfect game, which is tens of thousands of lines nobody
+# reads. `SNEK_DEBUG=1` restores all of it verbatim for when a run is actually being
+# debugged. Read from the environment rather than passed around because the noisiest prints
+# live in the game and environment classes, which run in separate worker processes.
+DEBUG_LOGGING = os.environ.get('SNEK_DEBUG', '0') not in ('0', '', 'false', 'False')
+
 # screen that game appears on 0 or 1
 SCREEN_TO_DISPLAY = 0
 

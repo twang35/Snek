@@ -1,5 +1,18 @@
 from __future__ import absolute_import, division, print_function
 
+import os as _os
+
+_QUIET = _os.environ.get('SNEK_DEBUG', '0') in ('0', '', 'false', 'False')
+if _QUIET:
+    _os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
+
+# The gym "unmaintained, upgrade to Gymnasium" block is deliberately left alone. It is a raw
+# print to stderr from gym's import, not a warnings.warn - it survives
+# warnings.filterwarnings('ignore') - so removing it would mean redirecting stderr around the
+# tf_agents import chain, which would also hide genuine import failures. It costs ~33 lines
+# once per launch, against absl's checkpoint line costing ~2000 per run, so it is not worth
+# that trade.
+
 from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
 from snake_environment import SnakeEnvironment
 from training import *
@@ -15,6 +28,7 @@ from tf_agents.policies import py_tf_eager_policy
 from tf_agents.specs import tensor_spec
 from tf_agents.system import system_multiprocessing
 from tf_agents.utils import common
+
 
 
 def tuned(name, default, cast=float):
@@ -34,6 +48,16 @@ def tuned(name, default, cast=float):
 
 
 def main(argv):
+    if _QUIET:
+        # Set here, not at import: handle_main() routes through absl's app.run(), which
+        # initialises absl logging to INFO after module import and would overwrite an earlier
+        # call. At INFO, common.Checkpointer logs one "Saved checkpoint" line *per eval* —
+        # ~2000 lines on a 2M-step run, the single largest source of log volume. WARNING and
+        # above still get through, so real problems surface.
+        from absl import logging as absl_logging
+        absl_logging.set_verbosity(absl_logging.WARNING)
+        tf.get_logger().setLevel('ERROR')
+
     # --------------------------------------------- Constants ---------------------------------------------
     learning_rate = tuned('LEARNING_RATE', 1e-5)
 
@@ -107,12 +131,18 @@ def main(argv):
         snake_constants.PERFECT_GAME_REWARD = 10000
         snake_constants.PERFECT_GAME_WAIT_MS = 500
 
-    print('policy_name: {0}, learning_rate: {1}, discount: {2}, initialize_with_schmid: {3}, steps_left: False, '
-          'FOOD_DISTANCE_REWARD: {4}, initial_populate_replay_buffer_steps: {5}, total_groups_obs: True, '
-          'DEATH_REWARD: {6}, agent_target_update_period: {7}'
-          .format(policy_name, learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
-                  initial_populate_replay_buffer_steps, DEATH_REWARD, agent_target_update_period))
-    print(tf.config.list_physical_devices('GPU'))
+    if snake_constants.DEBUG_LOGGING:
+        print('policy_name: {0}, learning_rate: {1}, discount: {2}, initialize_with_schmid: {3}, steps_left: False, '
+              'FOOD_DISTANCE_REWARD: {4}, initial_populate_replay_buffer_steps: {5}, total_groups_obs: True, '
+              'DEATH_REWARD: {6}, agent_target_update_period: {7}'
+              .format(policy_name, learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
+                      initial_populate_replay_buffer_steps, DEATH_REWARD, agent_target_update_period))
+        print(tf.config.list_physical_devices('GPU'))
+    else:
+        # The full config is in runs/<policy>.md; the console only needs enough to confirm
+        # the right arm started. Override lines are printed unconditionally by tuned().
+        print('{0}: lr {1}, discount {2}, quiet logging (SNEK_DEBUG=1 for full output)'.format(
+            policy_name, learning_rate, discount), flush=True)
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         tf.config.experimental.set_virtual_device_configuration(

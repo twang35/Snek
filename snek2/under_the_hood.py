@@ -68,7 +68,8 @@ def compute_avg_return(environment, parallel_environment, policy, metrics, eval_
 
     perfect_games = sum(1 for reward in last_rewards if reward == snake_constants.PERFECT_GAME_REWARD)
 
-    print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
+    if snake_constants.DEBUG_LOGGING:
+        print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
 
     metrics.last_eval_perfect_percent = perfect_games / num_episodes
     if eval_only:

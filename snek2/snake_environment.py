@@ -69,7 +69,9 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
 
         if self.high_score < self._game.current_score:
             self.high_score = self._game.current_score
-            print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ', self.high_score)
+            if snake_constants.DEBUG_LOGGING:
+                print('new high score!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ',
+                      self.high_score)
 
         if is_final:
             step_type = StepType.LAST

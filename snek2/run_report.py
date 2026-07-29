@@ -48,12 +48,67 @@ def load_history(path):
     return saved.get('evals', []), saved.get('resumes', [])
 
 
+def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1.0):
+    """Precomputed answers to the questions every progress check asks.
+
+    These were previously recalculated by hand from the full eval series each time an arm
+    was checked on — peak, best sustained perfect rate, whether it has died. Storing them
+    beside the rows means a status check is one read instead of a pass over thousands of
+    points, and it makes "is this arm dead" a single consistent definition rather than a
+    judgement re-made each time.
+
+    `dead_since` is the first step of the earliest window of `dead_window` consecutive evals
+    whose trailing score never reaches `dead_threshold`. Note it says *since*, not *dead*:
+    arms have recovered from trailing 0.3, and one recovered after 400k steps near zero, so
+    the field is the onset of a sustained-zero stretch and the length of that stretch is
+    what makes it a verdict. Compare against the last step to get the duration.
+    """
+    if not eval_rows:
+        return {}
+
+    trailing = [row['trailing_avg_score'] for row in eval_rows]
+    perfect = [row['perfect_percent'] for row in eval_rows]
+    last = eval_rows[-1]
+
+    peak_index = trailing.index(max(trailing))
+
+    best_perfect, best_perfect_step = 0.0, last['step']
+    if len(perfect) >= perfect_window:
+        for index in range(len(perfect) - perfect_window + 1):
+            window = sum(perfect[index:index + perfect_window]) / perfect_window
+            if window > best_perfect:
+                best_perfect = window
+                best_perfect_step = eval_rows[index + perfect_window - 1]['step']
+
+    dead_since = None
+    for index in range(len(trailing) - dead_window + 1):
+        if all(value < dead_threshold for value in trailing[index:index + dead_window]):
+            dead_since = eval_rows[index]['step']
+            break
+
+    recent = perfect[-perfect_window:]
+    return {
+        'step': last['step'],
+        'evals': len(eval_rows),
+        'trailing_now': round(trailing[-1], 2),
+        'peak_trailing': {'value': round(max(trailing), 2), 'step': eval_rows[peak_index]['step']},
+        'best_perfect30': {'value': round(best_perfect, 1), 'step': best_perfect_step},
+        'recent_perfect30': round(sum(recent) / len(recent), 1),
+        'max_single_eval': max(perfect),
+        'dead_since': dead_since,
+        'epsilon': last['epsilon'],
+    }
+
+
 def save_history(path, eval_rows, resume_steps):
+    """Writes the eval series plus a precomputed summary. Returns the summary."""
+    summary = build_summary(eval_rows)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     partial = path + '.partial'
     with open(partial, 'w') as handle:
-        json.dump({'evals': eval_rows, 'resumes': resume_steps}, handle)
+        json.dump({'summary': summary, 'evals': eval_rows, 'resumes': resume_steps}, handle)
     os.replace(partial, path)
+    return summary
 
 
 def merge_eval_row(eval_rows, row):
