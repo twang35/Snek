@@ -7,7 +7,9 @@ Progress graphs for every tuning arm. Companion to
 
 In every chart: **blue is average score** (food eaten, out of a possible 95) on the
 left axis, **red is perfect-game percentage** on the right. Grey dashed vertical
-lines mark points where training was resumed.
+lines mark points where training was resumed, and **faint red dashed horizontal lines
+mark 20/40/60/80% on the right axis** — the perfect rate is the objective and was
+unreadable by eye without them, since the left axis ticks are on a different scale.
 
 ## These are snapshots, on purpose
 

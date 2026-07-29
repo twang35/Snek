@@ -144,6 +144,18 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     percent_axis.tick_params(axis='y', labelcolor=percent_color, labelsize=tick_size)
     percent_axis.set_ylim(bottom=0, top=100)
 
+    # Horizontal guides at 20/40/60/80 on the perfect-game axis. Without them the red
+    # trace can't be read off the right-hand axis by eye — the left axis ticks are on a
+    # different scale and give no help. Faint, dashed and in the percent axis's colour so
+    # it is unambiguous which axis they belong to, and thin enough not to compete with
+    # either trace. zorder keeps them behind the red line they annotate.
+    # zorder 1 sits above the axes patch (0) and below both traces (2), so the guides
+    # never hide data. Alpha below ~0.4 is invisible at this figure size (3.65x2.25in).
+    percent_axis.set_yticks([0, 20, 40, 60, 80, 100])
+    for level in (20, 40, 60, 80):
+        percent_axis.axhline(level, color=percent_color, linestyle=(0, (4, 3)),
+                             linewidth=0.5, alpha=0.55, zorder=1)
+
     # One dashed line per point where training was picked back up, so a dip or
     # jump can be tied to a restart rather than to the policy itself.
     for resume_step in resume_steps:
