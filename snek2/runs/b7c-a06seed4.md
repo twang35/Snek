@@ -4,7 +4,7 @@
 
 Blue is average score (food eaten) on the left axis, red is perfect-game percentage on the right.
 
-Latest eval: step 4000, avg score 0.2, perfect games 0%.
+Latest eval: step 1743000, avg score 0.0, perfect games 0%.
 
 ## Config
 
@@ -36,12 +36,23 @@ Latest eval: step 4000, avg score 0.2, perfect games 0%.
 
 ## Evals
 
-5 evals so far. Full series in [`b7c-a06seed4_evals.json`](b7c-a06seed4_evals.json).
+1744 evals so far. Full series in [`b7c-a06seed4_evals.json`](b7c-a06seed4_evals.json).
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
 | 0 | 0.0 | 0.0 | 0 | 0/95 | -5.002 | 0 | 0.4 |
 | 1000 | 0.3 | 0.3 | 0 | 1/95 | -4.75 | 0 | 0.4 |
 | 2000 | 1.8 | 1.05 | 0 | 4/95 | -3.259 | 0 | 0.4 |
-| 3000 | 0.5 | 0.87 | 0 | 2/95 | -1.39 | 0 | 0.4 |
-| 4000 | 0.2 | 0.7 | 0 | 2/95 | -2.579 | 0 | 0.4 |
+| ... | | | | | | | |
+| 1732000 | 0.0 | 0.0 | 0 | 0/95 | -5.005 | 0 | 0.0 |
+| 1733000 | 0.1 | 0.02 | 0 | 1/95 | -4.905 | 0 | 0.0 |
+| 1734000 | 0.0 | 0.02 | 0 | 0/95 | -5.006 | 0 | 0.0 |
+| 1735000 | 0.0 | 0.02 | 0 | 0/95 | -5.005 | 0 | 0.0 |
+| 1736000 | 0.0 | 0.02 | 0 | 0/95 | -5.004 | 0 | 0.0 |
+| 1737000 | 0.0 | 0.02 | 0 | 0/95 | -5.007 | 0 | 0.0 |
+| 1738000 | 0.1 | 0.02 | 0 | 1/95 | -4.906 | 0 | 0.0 |
+| 1739000 | 0.0 | 0.02 | 0 | 0/95 | -5.005 | 0 | 0.0 |
+| 1740000 | 0.0 | 0.02 | 0 | 0/95 | -5.006 | 0 | 0.0 |
+| 1741000 | 0.0 | 0.02 | 0 | 0/95 | -5.006 | 0 | 0.0 |
+| 1742000 | 0.0 | 0.02 | 0 | 0/95 | -5.005 | 0 | 0.0 |
+| 1743000 | 0.0 | 0.0 | 0 | 0/95 | -5.006 | 0 | 0.0 |

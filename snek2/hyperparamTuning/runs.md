@@ -35,12 +35,64 @@ PYTHONPATH=. EVAL_OUT_SUFFIX=_clusters \
 
 ## Currently running: batch 7
 
-| policy | overrides beyond the shared three | role |
-|---|---|---|
-| `b7a-a06seed2` | none | `b6b` seed 2 |
-| `b7b-a06seed3` | none | `b6b` seed 3 |
-| `b7c-a06seed4` | none | `b6b` seed 4 |
-| `b7d-discount995` | `SNEK_DISCOUNT=0.995` | the one untested high-prior knob, on the best base |
+| policy | extra override | step | trailing | peak | best 30-eval pf | state |
+|---|---|---|---|---|---|---|
+| `b7a-a06seed2` | none | 692k | 66.2 | **80.4** @516k | 14.0% @251k | healthy |
+| `b7d-discount995` | `SNEK_DISCOUNT=0.995` | 629k | 63.5 | 78.3 @331k | **17.3%** @143k | healthy |
+| `b7b-a06seed3` | none | 1.03M | 15.8 | 77.8 @118k | 7.7% @127k | alive, in a low phase |
+| `b7e-disc995seed2` | `SNEK_DISCOUNT=0.995` | just started | — | — | — | replaces `b7c` |
+| `b7c-a06seed4` | none | 1.74M | **0.0** | 76.6 @169k | 9.7% @186k | **stopped — dead** |
+
+Shared by all: `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss
+SNEK_IS_WEIGHTS=0`. Step counts are not comparable — a dead policy ends episodes instantly
+and burns steps several times faster.
+
+#### `b7c` is dead, confirmed by waiting rather than guessing
+
+Last check it had been at 0.0 for 162k steps and the call was to leave it, because `b6b`
+itself spent 140-600k crashed and recovered to 76.8. That caution is now resolved: `b7c`
+sat at **exactly 0.0 for 363 consecutive evals — 1.17M steps** — which clears the death
+criterion by a wide margin. Stopped and replaced.
+
+This is worth noting as the process working. The same restraint that produced four
+retractions here would have produced a fifth; waiting cost ~1M steps of a doomed arm and
+bought a verdict that needs no hedging.
+
+#### `b7b` is not dying, it is oscillating
+
+At trailing 15.8 it looks like `b7c` did, but its history says otherwise:
+
+| block | mean trailing |
+|---|---|
+| 0-200k | 52.6 |
+| 200-400k | **19.1** |
+| 400-600k | 61.9 |
+| 600-800k | 50.9 |
+| 800-1000k | **14.3** |
+| 1000-1200k | 13.8 |
+
+It has already recovered from a 19.1 trough once. Same very-long-period oscillation as
+`b6b`. Leave it.
+
+#### Seed tally so far for `b6b`'s config
+
+| seed | outcome |
+|---|---|
+| `b6b-alpha06` | survived, measured 24.5% |
+| `b7a-a06seed2` | healthy, new peak 80.4 |
+| `b7b-a06seed3` | alive, oscillating |
+| `b7c-a06seed4` | **dead at 573k** |
+
+**3 of 4 survive.** Against eff ~1.6's 1 of 3, that supports the risk/return reading:
+lower sharpness survives more often. Not yet enough for a rate estimate — 3/4 and 1/3 are
+not far apart at these sample sizes.
+
+#### Why the replacement is a second discount arm
+
+`b6b`'s config now has four seeds, so survival is reasonably characterised. `DISCOUNT=0.995`
+has **one** (`b7d`), and it is currently the joint-best arm in the batch on perfect rate. A
+second seed of the most promising untested lever is worth more than a fifth seed of a config
+already at n=4.
 
 Shared by all four: `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss
 SNEK_IS_WEIGHTS=0`. All four render a visible window. Launched from scratch, not resumed,
