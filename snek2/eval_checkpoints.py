@@ -34,10 +34,30 @@ Environment:
                       rounds (default 100)
     EVAL_WORKERS      parallel envs inside this process (default 10)
     EVAL_OUT_SUFFIX   appended to the output filename
+    EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
+                      (default 400; the game default of 5000 stalls the whole round)
 
 **Worker 0 renders a visible window**, so each eval process shows one game as it
 plays; the remaining workers are headless. Running four checkpoints in parallel
 therefore gives four windows to watch.
+
+Two things about that window look like bugs and are not. Both are cosmetic: the
+recorded results are unaffected, because only each worker's *first* episode of a
+round is counted.
+
+1. **It stops mid-game and the window closes.** A round runs until every worker has
+   finished one episode. Workers that finish early keep being stepped by
+   ParallelPyEnvironment (it steps all envs together) and auto-reset into fresh
+   episodes that are *not* counted. So the visible worker is often part-way through a
+   throwaway episode when the round ends, and the process exits after the last
+   checkpoint, closing the window at whatever point it had reached.
+
+2. **It used to freeze for ~5s at a time.** snake_constants.PERFECT_GAME_WAIT_MS
+   defaults to 5000 so a human can see a win, and Snake.render() implements it with a
+   blocking pygame.time.wait(). In an eval that blocks the whole round — every other
+   worker waits on the parallel step — and with no event pumping during the wait macOS
+   marks the window unresponsive. This script now sets it to EVAL_PERFECT_WAIT_MS
+   (default 400ms) so wins are still visible without stalling.
 
 Results go to runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and
 can be compared across sessions.
@@ -210,6 +230,7 @@ def main(argv):
     policy_name = argv[1]
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     num_workers = int(os.environ.get('EVAL_WORKERS', 10))
+    perfect_wait_ms = int(os.environ.get('EVAL_PERFECT_WAIT_MS', 400))
 
     ckpt_dir = POLICY_DIR + policy_name
     available = {int(f[len('ckpt-'):].split('.')[0])
@@ -268,6 +289,13 @@ def main(argv):
         # exactly one real window per eval process — several checkpoints evaluated
         # in parallel each get their own window to watch.
         os.environ.pop('SDL_VIDEODRIVER', None)
+        # Snake.render() implements the perfect-game celebration with a *blocking*
+        # pygame.time.wait(), and the game default is 5000ms. Inside an eval that stalls
+        # the entire round, because parallel_env.step() does not return until every worker
+        # has stepped — so one visible win froze all 10 workers for 5 seconds, and with no
+        # event pumping during the wait the window also went unresponsive. On a 40%-perfect
+        # policy that is ~20s wasted per checkpoint and a window that looks hung.
+        snake_constants.PERFECT_GAME_WAIT_MS = perfect_wait_ms
         return SnakeEnvironment(discount=0.99, display=True, policy_name=policy_name)
 
     # Worker 0 renders; the rest are headless. A rendering worker is slower, which

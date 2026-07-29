@@ -24,6 +24,8 @@ section before proposing an epsilon or buffer experiment.
 | Sharpness is a variance dial: higher ceiling *and* higher death risk | **weakened** — eff 1.2 dies 2 of 4, eff 1.6 dies 2 of 3 |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds across two sharpness levels |
 | `DISCOUNT=0.995` is the current best lead | **promising**, n=2 healthy, n=3 running |
+| The 5s perfect-game pause slowed good arms ~40% and biased wall-clock comparisons | **fixed**, now 500ms |
+| Evals looked truncated but never were: 11 of 11 complete at 10 ckpts x 100 eps | **verified** |
 | There is a stability "cliff" between eff 0.8 and 1.2 | **retracted** — `b6b` crossed it and thrived |
 | Reverting *either* factor alone survives the crisis | **established**, n=1 each |
 | The committed config reaches ~1% at 1M steps | **established** |
@@ -627,6 +629,55 @@ the same shape is a trend, not noise.
 
 This overturned an earlier read that n=3 had "the best trajectory of the batch" — true
 through 200k, false afterwards. Do not plan an n=5 arm.
+
+## The perfect-game celebration was throttling the best arms
+
+`Snake.render()` marks a perfect game with a **blocking** `pygame.time.wait()`, and
+`PERFECT_GAME_WAIT_MS` defaulted to **5000**. Every training eval runs its first episode on
+the *displayed* environment, so any eval whose first episode was a win stalled for 5
+seconds — against roughly 5 seconds of actual training per 1000-step eval interval.
+
+The cost scaled with how good the arm was:
+
+| arm quality | share of evals stalling | wasted per eval | penalty |
+|---|---|---|---|
+| ~40% perfect (`b7f`) | ~40% | ~2.0s | **~40% slower** |
+| ~10% perfect | ~10% | ~0.5s | ~10% slower |
+| dead (0% perfect) | 0% | 0s | none |
+
+So the mechanism **penalised exactly the arms worth running** and rewarded nothing. Now
+`SNEK_PERFECT_WAIT_MS`, default 500ms, recorded in each run's `run_config`.
+
+**This partly explains the step-count gap previously attributed entirely to episode
+length.** Dead arms reaching 1.7-2M steps while good arms reached 1.0-1.3M in the same wall
+clock was read as "a dead policy ends episodes instantly". That is still the main effect,
+but a slice of it was the winner's 5-second pause. **Step-based comparisons are unaffected**
+— every arm's eval series is indexed by step, not time — but any wall-clock or steps/second
+comparison across arms of different quality was biased, and runs before this fix are not
+comparable on wall clock to runs after it.
+
+`eval_checkpoints.py` had the same problem, worse: it stalls the *whole round*, because
+`parallel_env.step()` does not return until every worker has stepped, so one visible win
+froze all 10 workers. Measured on a 45%-perfect checkpoint, 20 episodes took **92.0s at
+5000ms against 79.7s at 400ms** — 13% on a small run, more at full scale. It now defaults to
+`EVAL_PERFECT_WAIT_MS=400`.
+
+### The visible eval window looks broken and is not
+
+Two behaviours that look like a crashed eval, both cosmetic — **no eval has ever been
+truncated.** All 11 completed eval files hold exactly 10 checkpoints x 100 episodes and
+every log reaches its final `wrote` line, with the only exceptions being
+`OSError: Bad file descriptor` from multiprocessing connection cleanup *after* the results
+are written.
+
+- **The window stops mid-game and vanishes.** A round ends when every worker has finished
+  one episode. `ParallelPyEnvironment` steps all envs together, so a worker that finishes
+  early keeps being stepped and auto-resets into fresh episodes that are **not counted**.
+  The visible worker is therefore usually part-way through a throwaway game when the round
+  ends, and the process exits after the last checkpoint, closing the window wherever it had
+  got to.
+- **It used to freeze for seconds at a time.** The 5000ms blocking wait above, during which
+  no `pygame.event.pump()` runs, so macOS marks the window unresponsive.
 
 ## Engineering facts worth not rediscovering
 

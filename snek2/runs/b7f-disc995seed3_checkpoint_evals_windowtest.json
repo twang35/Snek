@@ -1,0 +1,24 @@
+{
+  "policy_name": "b7f-disc995seed3",
+  "episodes_per_checkpoint": 20,
+  "results": [
+    {
+      "step": 860000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 20,
+      "perfect_games": 9,
+      "perfect_percent": 45.0,
+      "perfect_ci95": [
+        25.8,
+        65.8
+      ],
+      "avg_score": 81.35,
+      "median_score": 84.5,
+      "min_score": 49.0,
+      "max_score": 95.0,
+      "avg_reward": 122.51
+    }
+  ]
+}

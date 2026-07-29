@@ -125,11 +125,17 @@ def main(argv):
     if len(argv) > 1:
         policy_name = argv[1]
 
+    # Snake.render() celebrates a perfect game with a *blocking* pygame.time.wait(), and the
+    # game default is 5000ms. Every eval runs its first episode on the displayed env, so at
+    # 5000ms an arm that wins ~40% of the time lost ~2s per eval — every 1000 steps, against
+    # ~5s of actual training. That penalised exactly the arms worth running and inflated the
+    # apparent step-count gap between good and dead arms. 500ms still shows the win.
+    snake_constants.PERFECT_GAME_WAIT_MS = tuned('PERFECT_WAIT_MS', 500, int)
+
     if policy_name == 'eval':
         eval_only = True
         initial_populate_replay_buffer_steps = 10
         snake_constants.PERFECT_GAME_REWARD = 10000
-        snake_constants.PERFECT_GAME_WAIT_MS = 500
 
     if snake_constants.DEBUG_LOGGING:
         print('policy_name: {0}, learning_rate: {1}, discount: {2}, initialize_with_schmid: {3}, steps_left: False, '
@@ -308,6 +314,7 @@ def main(argv):
         'FOOD_REWARD': FOOD_REWARD,
         'FOOD_DISTANCE_REWARD': FOOD_DISTANCE_REWARD,
         'eval_only': eval_only,
+        'perfect_game_wait_ms': snake_constants.PERFECT_GAME_WAIT_MS,
     }
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,

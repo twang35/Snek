@@ -35,6 +35,7 @@ Training was resumed at step 0, 6000, 11000, 13000, 31000 (the dashed lines on t
 | FOOD_REWARD | 1.0 |
 | FOOD_DISTANCE_REWARD | 0.001 |
 | eval_only | False |
+| perfect_game_wait_ms | 500 |
 
 ## Evals
 
@@ -42,9 +43,9 @@ Training was resumed at step 0, 6000, 11000, 13000, 31000 (the dashed lines on t
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
-| 0 | 0.1 | 0.1 | 0 | 1/95 | -4.902 | 0 | 0.4 |
-| 1000 | 0.2 | 0.2 | 0 | 1/95 | -4.801 | 0 | 0.4 |
-| 2000 | 0.7 | 0.45 | 0 | 1/95 | -4.302 | 0 | 0.4 |
+| 0 | 0.2 | 0.2 | 0 | 1/95 | -4.804 | 0 | 0.4 |
+| 1000 | 3.4 | 3.4 | 0 | 9/95 | -1.609 | 0 | 0.4 |
+| 2000 | 2.0 | 2.7 | 0 | 7/95 | 0.993 | 0 | 0.4 |
 | ... | | | | | | | |
 | 32000 | 55.7 | 55.7 | 0 | 77/95 | 52.753 | 0 | 0.01 |
 | 33000 | 57.5 | 56.6 | 19 | 80/95 | 55.274 | 0 | 0.01 |
