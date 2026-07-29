@@ -12,98 +12,67 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-**Best bet: `b6b-alpha06`** (`PRIORITY_EXPONENT=0.6`, `PRIORITY_SIGNAL=td_loss`,
-`IS_WEIGHTS=0`) — 24.5% over 1000 episodes, and that is an **underestimate**; it was
-measured with the old smoothed-first selector, since shown to pick worse checkpoints.
-**Best ceiling: `b4c-schlongper` at ~31%**, but it survives only 1 seed in 3, so its
-expected value is ~10.6%.
+## Current best: `DISCOUNT=0.995`
 
-Its best checkpoint is **851000 at ~40%**, not the widely-quoted 869000 — that checkpoint
-pools **41.7%** over 300 episodes, and the famous "51%" was the high draw of three
-measurements. See [`findings.md`](findings.md).
+```
+SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 SNEK_DISCOUNT=0.995
+```
+
+It **matches the best ceiling ever measured while surviving 3 of 3 seeds** instead of 1 of
+3. Every measurement below uses the same outlier-top10 selection rule, so the columns are
+comparable:
+
+| arm | discount | best ckpt | top-3 pooled | all-10 pooled | survived |
+|---|---|---|---|---|---|
+| `b7f-disc995seed3` | **0.995** | **51%** @860k | **48.0%** | 38.8% | yes |
+| `b4c-schlongper` | 0.99 | 50% @869k | 46.7% | 37.1% | 1 of 3 seeds |
+| `b7e-disc995seed2` | **0.995** | 39% @334k | 34.7% | 29.5% | yes |
+| `b7d-discount995` | **0.995** | 26% @1330k | 22.7% | 16.4% | yes |
+| `b7a-a06seed2` | 0.99 | 19% @1822k | 18.3% | 12.0% | yes |
+
+**The gain is reliability, not ceiling.** `b7f` at 51% and `b4c` at 50% are a dead heat, and
+their intervals nearly coincide. What changed is that `b4c`'s config threw away two runs in
+three to reach that level, and the discount arms reached it three times out of three.
+Weighting level by survival:
+
+| config | mean level across seeds | survival | expected |
+|---|---|---|---|
+| `DISCOUNT=0.995` | 28.2% | **3 of 3** | **28.2%** |
+| `b4c` config, eff ~1.6 | 37.1% | 1 of 3 | 12.4% |
+| same config at 0.99 (`b7a`) | 12.0% | 2 of 4 | 6.0% |
+
+**~2.3x the expected value of the best previous config.** This is the first change in the
+investigation to *remove* the ceiling/reliability tradeoff rather than move along it — and
+the mechanism was predicted in advance: at 0.99 the effective horizon is ~100 steps while a
+perfect game runs several hundred, so the terminal bonus was discounted into irrelevance.
+
+**Prefer top-3 pooled to best-checkpoint** when comparing arms. A best-of-10 is the maximum
+of a noisy statistic, upward-biased, and its ±10-point interval is wider than the gaps
+between arms. Top-3 pools 300 episodes, halves the interval, and still answers "how good
+does this config get". `b7f`'s top three are 51/47/46, so its peak is a real region rather
+than a lone spike.
+
+**Caveat on the 3-of-3:** `b7e` and `b7f` were stopped at 1.28M and 1.06M, while their 0.99
+siblings died at 1162k and 573k. Survival is therefore established only out to ~1.1M steps.
 
 ### Do this first
 
 Re-measure `b6b-alpha06` and `b6a-alpha04` with the current selector before comparing them
-to anything. Both were measured before the selection rule was fixed, so both are biased low:
+to anything. Both predate the selection fix and are biased low:
 
 ```
 cd /Users/tony_wang/Projects/Snek/snek2
-PYTHONPATH=. EVAL_OUT_SUFFIX=_clusters \
+PYTHONPATH=. EVAL_OUT_SUFFIX=_outlier10 \
   /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b6b-alpha06 top10
 ```
 
-## Currently running: batch 7
+## Nothing is running
 
-| policy | extra override | step | trailing | peak | best 30-eval pf | state |
-|---|---|---|---|---|---|---|
-| `b7a-a06seed2` | none | 692k | 66.2 | **80.4** @516k | 14.0% @251k | healthy |
-| `b7d-discount995` | `SNEK_DISCOUNT=0.995` | 629k | 63.5 | 78.3 @331k | **17.3%** @143k | healthy |
-| `b7b-a06seed3` | none | 1.03M | 15.8 | 77.8 @118k | 7.7% @127k | alive, in a low phase |
-| `b7e-disc995seed2` | `SNEK_DISCOUNT=0.995` | just started | — | — | — | replaces `b7c` |
-| `b7c-a06seed4` | none | 1.74M | **0.0** | 76.6 @169k | 9.7% @186k | **stopped — dead** |
+Batch 7's arms were all stopped and measured. Design rationale and results are in
+[`completedRuns.md`](completedRuns.md#batch-7--seeding-b6b-and-finding-discount0995).
 
-Shared by all: `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss
-SNEK_IS_WEIGHTS=0`. Step counts are not comparable — a dead policy ends episodes instantly
-and burns steps several times faster.
-
-#### `b7c` is dead, confirmed by waiting rather than guessing
-
-Last check it had been at 0.0 for 162k steps and the call was to leave it, because `b6b`
-itself spent 140-600k crashed and recovered to 76.8. That caution is now resolved: `b7c`
-sat at **exactly 0.0 for 363 consecutive evals — 1.17M steps** — which clears the death
-criterion by a wide margin. Stopped and replaced.
-
-This is worth noting as the process working. The same restraint that produced four
-retractions here would have produced a fifth; waiting cost ~1M steps of a doomed arm and
-bought a verdict that needs no hedging.
-
-#### `b7b` is not dying, it is oscillating
-
-At trailing 15.8 it looks like `b7c` did, but its history says otherwise:
-
-| block | mean trailing |
-|---|---|
-| 0-200k | 52.6 |
-| 200-400k | **19.1** |
-| 400-600k | 61.9 |
-| 600-800k | 50.9 |
-| 800-1000k | **14.3** |
-| 1000-1200k | 13.8 |
-
-It has already recovered from a 19.1 trough once. Same very-long-period oscillation as
-`b6b`. Leave it.
-
-#### Seed tally so far for `b6b`'s config
-
-| seed | outcome |
-|---|---|
-| `b6b-alpha06` | survived, measured 24.5% |
-| `b7a-a06seed2` | healthy, new peak 80.4 |
-| `b7b-a06seed3` | alive, oscillating |
-| `b7c-a06seed4` | **dead at 573k** |
-
-**3 of 4 survive.** Against eff ~1.6's 1 of 3, that supports the risk/return reading:
-lower sharpness survives more often. Not yet enough for a rate estimate — 3/4 and 1/3 are
-not far apart at these sample sizes.
-
-#### Why the replacement is a second discount arm
-
-`b6b`'s config now has four seeds, so survival is reasonably characterised. `DISCOUNT=0.995`
-has **one** (`b7d`), and it is currently the joint-best arm in the batch on perfect rate. A
-second seed of the most promising untested lever is worth more than a fifth seed of a config
-already at n=4.
-
-Shared by all four: `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss
-SNEK_IS_WEIGHTS=0`. All four render a visible window. Launched from scratch, not resumed,
-so cpprb priorities start clean.
-
-**Launch trap, cost one failed launch:** in zsh an unquoted `$VAR` holding
-`A=1 B=2 C=3` is **not** word-split, so `env $VAR cmd` passes it as a single malformed
-assignment. All four arms crashed with
-`ValueError: could not convert string to float: '0.6 SNEK_PRIORITY_SIGNAL=...'`. Write the
-assignments literally on each command line. The crash happened inside `tuned()` before any
-checkpoint was written, so nothing was corrupted — that validation earns its keep.
+Verify with `pgrep -fl "python -u snek2.py"`. Not `grep "[s]nek2.py"` — git telemetry
+`curl` processes carry `snek2/snek2.py` in their payload and inflate the count.
 
 ### Batch 5/6 arms: stopped, resumable
 
@@ -128,78 +97,10 @@ trajectory is the thing being continued.
 Note the `max_to_keep` increase to 10000 only takes effect on the next launch, so a
 resumed arm keeps its existing 1000-deep history and starts extending from there.
 
-### Where every arm ended up, with measured rates
-
-Every arm was closed out with `eval_checkpoints.py <arm> top10` — ten best surviving
-checkpoints, 100 greedy episodes each. The measured column is the pooled 1000-episode rate
-and is the only number worth comparing across arms:
-
-| policy | batch | alpha | signal | IS | eff exp | final step | best 30-eval pf | **measured** |
-|---|---|---|---|---|---|---|---|---|
-| `b6b-alpha06` | 6 | **0.6** | `td_loss` | 0 | ~1.2 | 1.80M | 21.7% @1467k | **24.5%** (CI 21.9-27.3) |
-| `b6a-alpha04` | 6 | **0.4** | `td_loss` | 0 | ~0.8 | 1.41M | 14.3% @372k | 8.1% (CI 6.6-10.0) |
-| `b5d-schlongTDE` | 5 | 0.8 | **`td_error`** | 0 | ~0.8 | 2.07M | 10.7% @410k | 6.6% (CI 5.2-8.3) |
-| `b5c-schlongIS` | 5 | 0.8 | `td_loss` | **1** | ~1.6 corr | 2.31M | 17.0% @211k | 2.1% (CI 1.4-3.2) |
-| `b5a-schlong` | 5 | 0.8 | `td_loss` | 0 | ~1.6 | 2.05M | 10.0% @84k | not measured — dead, scores 0 |
-| `b5b-schlong2` | 5 | 0.8 | `td_loss` | 0 | ~1.6 | 1.92M | 7.7% @129k | not measured — dead, scores 0 |
-
-**`b6b` is 3x the next best arm with non-overlapping intervals.** Note how badly the graph
-ranked these: it put `b5c` second at 17.0%, and `b5c` measured **last at 2.1%**. Never rank
-arms by graph windows.
-
-**All four numbers are underestimates** — they were produced by the smoothed-first
-selector, which has since been shown to pick systematically worse checkpoints than raw
-single-eval selection. The ordering is probably still right, since every arm was
-disadvantaged the same way, but the levels are low. Re-measure before drawing on them.
-
-Raw results in `runs/<arm>_checkpoint_evals_top10.json`.
-
-All arms rendered a visible window. Step counts are **not** comparable across arms — a
-degraded policy ends episodes instantly and burns steps several times faster, so
-`b5a`/`b5b`'s 2M totals reflect death, not progress.
-
-Verify nothing is running with `pgrep -fl "python -u snek2.py"`. Not
-`grep "[s]nek2.py"` — git telemetry `curl` processes carry `snek2/snek2.py` in their
-payload and inflate the count for a few seconds at a time.
-
-Update this section whenever runs start or stop — a future session reads it to know
-what is in flight and might have been terminated.
-
-### Batch 5 — moved to completedRuns.md
-
-All four arms stopped. Design rationale, per-arm roles and the outcome are in
-[`completedRuns.md`](completedRuns.md#batch-5--b4c-repeat-plus-factor-isolation). Only
-`b5d` is a resume candidate, and only if a slot is otherwise idle.
-
-### Batch 6 — the effective-exponent sweep
-
-**Both arms stopped, both worth resuming.** Started in the slots freed by stopping
-`b5a`/`b5b`. This description stays here rather than moving to `completedRuns.md` because
-the batch is paused, not finished.
-
-Both keep the `b4c` signature (`td_loss`, no IS) and dial alpha down, testing whether
-*effective* exponent governs stability. Because `td_loss` squares the error before alpha
-is applied, `alpha=0.8` with `td_loss` is really ~1.6 on the `td_error` scale — see
-[`findings.md`](findings.md) — so the alpha label has never matched what was tested, and
-these are the first honest points on that axis:
-
-| policy | alpha | eff exponent | prediction made before launch | outcome |
-|---|---|---|---|---|
-| `b6a-alpha04` | 0.4 | ~0.8, matches live `b5d` | survives | **held** — stable throughout |
-| `b6b-alpha06` | 0.6 | ~1.2, between `b5d` and the dead arms | marginal | **wrong** — see below |
-
-`b6b`'s alpha 0.6 **is** the committed default, so that override is a no-op on that knob;
-`b6b` is precisely "committed alpha, `theSchlong`'s other two PER changes."
-
-**`b6b` falsified the "marginal" call and is now the best active arm.** It crashed to
-trailing 0.3 early, which I read as permanent capability loss. It then recovered, exceeded
-its old peak, crashed to 0.9 a second time near 1.2M, recovered again, and now holds a
-**21.7% best 30-eval window — second-best on record behind only `b4c`'s 34.0%** — with a
-rising perfect-game trend (13.3% mean over its most recent 200k block). It is a very
-long-period oscillator, not a casualty.
-
-`b6a` is the mirror image: stable at ~73 trailing for over a million steps, never near
-death, and stuck at a 14.3% ceiling.
+All per-arm results now live in
+[`completedRuns.md`](completedRuns.md#all-arms-ranked-by-best-sustained-perfect-rate),
+including the cross-batch ranking. Batch 5, 6 and 7 descriptions moved there when their
+last arms stopped, per the bookkeeping rule below.
 
 ### Do not judge before ~850k steps
 
@@ -288,68 +189,38 @@ the config mid-run and invalidates the arm.
 Per-run logs written to `$CLAUDE_JOB_DIR/tmp` are job-scoped and do not survive.
 The durable record is `runs/<policy>_evals.json`; analyse from there.
 
-## Batch 6 — the effective-exponent sweep
+## Batch 8 — push the discount further
 
-**Launched, running.** Both arms keep the `b4c` signature (`td_loss`, no IS) and dial
-alpha down, testing whether the effective exponent is what governs stability:
+The obvious next question: if 0.995 helped this much, does more help more? A perfect game
+runs several hundred steps, so even 0.995 (~200-step horizon) may still under-weight the
+terminal bonus. All arms keep the winning base
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`:
 
-| policy | alpha | effective exponent | prediction |
+| policy | extra override | effective horizon | role |
 |---|---|---|---|
-| `b6a-alpha04` | 0.4 | ~0.8 — matches live `b5d` | survives |
-| `b6b-alpha06` | 0.6 | ~1.2 — between `b5d` and the dead arms | marginal |
+| `b8a-disc999` | `SNEK_DISCOUNT=0.999` | ~1000 steps | is more better, or unstable? |
+| `b8b-disc999seed2` | `SNEK_DISCOUNT=0.999` | ~1000 steps | second seed, since n=1 proves nothing here |
+| `b8c-disc9975` | `SNEK_DISCOUNT=0.9975` | ~400 steps | the midpoint, if 0.999 breaks |
+| `b8d-disc995clip` | `SNEK_DISCOUNT=0.995 SNEK_GRADIENT_CLIPPING=10` | ~200 steps | clipping on the known-good setting |
 
-Because `td_loss` squares the error before alpha is applied, `alpha=0.8` with `td_loss`
-is really ~1.6 on the `td_error` scale — see
-[`findings.md`](findings.md). So the alpha *label* has never matched what was tested, and
-these two arms are the first honest points on that axis.
-
-Note `b6b`'s alpha 0.6 **is** the committed default, so that override is a no-op on that
-knob; `b6b` is precisely "committed alpha, `theSchlong`'s other two PER changes."
-
-Why this rather than more seeds of `b5c`: `b5c` is still running and unfinished, so
-replicating it now would be premature, and the alpha sweep is the only experiment that
-could recover `b4c`'s 51% without its 2-in-3 death rate. If both new arms survive the
-200-270k window, the lottery becomes a dial.
-
-**What would falsify the mechanism:** `b6a` dying anyway (something other than exponent
-sharpness kills these arms), or both surviving *and* scoring no better than baseline
-(sharpness was never where the gain came from either).
-
-## Batch 7 — seeding the winner (running, see above)
-
-**Why three seeds of one config rather than three new knobs.** `b6b-alpha06` measured 24.5%
-and survived, but on **n=1**, and every single-seed result in this document has failed to
-replicate — four have been overturned outright. Seed count, not knob count, is the binding
-constraint, so three of the four slots go to repeats.
-
-What the batch can show:
-
-| outcome | reading |
-|---|---|
-| all 3 seeds survive and land ~20-25% | 24.5% is the config's level. First reliable result in the project |
-| all 3 survive but scatter widely | the config is stable but its *quality* is seed-dependent; needs more seeds still |
-| 1-2 die | eff ~1.2 is also a lottery, just a better-odds one than eff ~1.6's 1-in-3 |
-| all 3 die | `b6b` was the fluke, and nothing here beats the baseline reliably |
-
-`b7d` tests `DISCOUNT=0.995` on the best base. At 0.99 the effective horizon is ~100 steps
-while a perfect game runs several hundred, so the terminal bonus is discounted to
-near-irrelevance — plausibly the most relevant untested knob for the actual objective.
-
-**Judge with the outlier selector**, and note `b7d` is not comparable to the others on
-`avg_reward` since changing the discount changes the reward scale; compare perfect rates.
+Higher discounts are a **known source of instability** — bootstrapped targets grow as the
+horizon lengthens — so 0.999 may well be worse rather than better. That is why 0.9975 sits
+in the batch as a fallback midpoint and why `b8d` tests a stability aid on the setting that
+already works rather than on a riskier one.
 
 ### Later candidates
 
 | change | why | gate |
 |---|---|---|
-| eff exponent ~1.4 (`td_loss` alpha 0.7) | between `b6b` (24.5%, survived) and `b4c` (31.8%, 1-of-3) — the ceiling/risk frontier | after batch 7 |
-| `GRADIENT_CLIPPING=10` | cheap, independent, and variance is exactly what makes eff ~1.6 fatal | anytime |
+| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.995 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after batch 8 |
 | best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after a stable base exists |
-| lower `IS_WEIGHTS` partially (beta < 1) | full IS correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |
+| partial IS correction (beta < 1) | full correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |
+| `LEARNING_RATE=1e-4` | 1e-5 is very conservative; worth trying now that a stable base exists | after batch 8 |
 
-**Seed count is the binding constraint, not the number of knobs tried.** Four single-seed
-conclusions in this document have been overturned. Nothing goes in
-[`findings.md`](findings.md) as established without n=3.
+**Seed count is the binding constraint, not the number of knobs tried.** Five single-seed
+conclusions in this document have been overturned or weakened. Nothing goes in
+[`findings.md`](findings.md) as established without n=3 — which is why batch 8 spends two of
+four slots on the same value.
 
 Launch commands are in
 [`hyperparamTuning.md`](hyperparamTuning.md#launching-a-run).

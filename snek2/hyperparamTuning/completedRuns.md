@@ -18,42 +18,119 @@ single eval is not usable as a measurement.
 measurement; every other column is derived from 10-episode graph evals and systematically
 misranks arms (`b5c` is 2nd by graph, last by measurement).
 
-| policy | config change | final steps | **measured** | best perfect-30 | cumulative | verdict |
-|---|---|---|---|---|---|---|
-| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | **31.8%** /400 | **34.0%** | **11.06%** | best ceiling, but **1 of 3 seeds survive** |
-| `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | **24.5%** /1000 | 21.7% | — | **best bet.** Survived; ~2x `b4c` expected value |
-| `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | 8.1% /1000 | 14.3% | — | stable, never near death, low ceiling |
-| `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.07M | 6.6% /1000 | 10.7% | — | stable, low ceiling |
-| `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | 2.1% /1000 | 17.0% | — | IS correction cancels the benefit; peak ckpt evicted |
-| `b1a-base` | none (control) | 503k | — | 16.7% | 5.89% | collapsed at 265k; score recovered, skill did not |
-| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | — | 11.0% | 3.91% | best of batch 3, degraded anyway |
-| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | — | 9.3% | 4.03% | steadiest arm, but a low ceiling |
-| `b4a-uniform` | alpha 0 | 1.25M | — | 8.7% | 3.50% | peaked ~575k, drifted down |
-| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | — | 8.3% | 4.41% | declined despite the floor — falsified hypothesis A |
-| `b2a-base2` | none (repeat) | 999k | — | 7.0% | 2.64% | the 1M-step reference: no collapse, long oscillation, 1.1% at the end |
-| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | — | 5.7% | 0.27% | **died at ~750k**, score 0.0 for 4M steps |
-| `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | 0% | 10.0% | — | **died at 272k**, `b4c` repeat |
-| `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | 0% | 7.7% | — | **died at 246k**, `b4c` repeat |
-| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | — | 1.7% | 0.08% | dead end |
-| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | — | 1.0% | 0.65% | stopped early, verdict weak |
-| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | — | 0.7% | 0.10% | dead end |
+Arms measured with the **outlier-top10** rule carry a best-checkpoint and top-3 figure and
+are mutually comparable; older `measured` figures used other selection rules and are not.
+
+| policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
+|---|---|---|---|---|---|---|---|
+| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **51%** | **48.0%** | 38.8% /1000 | 44.0% | **best on record**, and survived |
+| `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 50% | 46.7% | 37.1% /1000 | 34.0% | ties `b7f` on ceiling, **1 of 3 seeds survive** |
+| `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 39% | 34.7% | 29.5% /1000 | 32.3% | strong, survived |
+| `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | — | — | 24.5% /1000 | 21.7% | old selector, **underestimate**; re-measure |
+| `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 26% | 22.7% | 16.4% /1000 | 17.7% | survived, weakest of the three discount seeds |
+| `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 19% | 18.3% | 12.0% /1000 | 15.0% | survived to 2M, low ceiling |
+| `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | — | — | 8.1% /1000 | 14.3% | stable, never near death, low ceiling |
+| `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.07M | — | — | 6.6% /1000 | 10.7% | stable, low ceiling |
+| `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | — | — | 2.1% /1000 | 17.0% | IS correction cancels the benefit; peak ckpt evicted |
+| `b7b-a06seed3` | alpha 0.6, `td_loss`, no IS | 1.78M | — | — | 0% | 7.7% | **died at 1162k** |
+| `b7c-a06seed4` | alpha 0.6, `td_loss`, no IS | 1.74M | — | — | 0% | 9.7% | **died at 573k** |
+| `b1a-base` | none (control) | 503k | — | — | — | 16.7% | collapsed at 265k; score recovered, skill did not |
+| `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | — | — | — | 11.0% | best of batch 3, degraded anyway |
+| `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | — | — | — | 9.3% | steadiest arm, but a low ceiling |
+| `b4a-uniform` | alpha 0 | 1.25M | — | — | — | 8.7% | peaked ~575k, drifted down |
+| `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | — | — | — | 8.3% | declined despite the floor — falsified hypothesis A |
+| `b2a-base2` | none (repeat) | 999k | — | — | — | 7.0% | the 1M-step reference: no collapse, long oscillation, 1.1% at the end |
+| `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | — | — | — | 5.7% | **died at ~750k**, score 0.0 for 4M steps |
+| `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | — | — | — | 10.0% | **died at 272k**, `b4c` repeat |
+| `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | — | — | — | 7.7% | **died at 246k**, `b4c` repeat |
+| `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | — | — | — | 1.7% | dead end |
+| `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | — | — | — | 1.0% | stopped early, verdict weak |
+| `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | — | — | — | 0.7% | dead end |
 
 `train` was a human-started run on committed defaults, stopped by the human. Never
 touch `snek2/savedPolicies/train*`.
 
 Four things this ranking makes visible that per-batch reading did not:
 
-- **The top two arms are the same three PER changes at different sharpness.** `b4c`
-  (eff ~1.6) and `b6b` (eff ~1.2) differ only in alpha. Nothing else tried comes close.
-- **Ceiling and reliability trade off.** `b4c` is higher when it lives but dies 2 of 3
-  times; `b6b` is lower and survived. Priced for the death rate, `b6b` wins ~24.5% to
-  ~10.6%.
+- **`DISCOUNT=0.995` ties the best ceiling and keeps it.** `b7f` (51%) and `b4c` (50%) are
+  a dead heat, but `b4c`'s config dies in 2 of 3 seeds while all three discount seeds lived.
+  Priced for survival that is 28.2% against 12.4% expected.
+- **Everything above ~12% shares one config family**: alpha 0.6-0.8, `td_loss` priorities,
+  no IS weights. The discount is the only addition that has helped on top of it.
 - **`b1a-base`, a plain baseline, outranks four deliberate interventions**
   (`MIN_EPSILON`, both n-step values, the 500k buffer with PER). Most changes tried in
   this investigation made things worse.
 - **The graph misranks arms badly.** `b5c-schlongIS` is 2nd of the batch-5/6 arms by best
   perfect-30 (17.0%) and **last by measurement** (2.1%). Any ranking built on 10-episode
   graph evals is unreliable; see [`hyperparamTuning.md`](hyperparamTuning.md).
+
+## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
+
+**Started 2026-07-28, all arms stopped 2026-07-29.** Six arms ran in four slots: three
+seeds of `b6b`'s config, then `DISCOUNT=0.995` seeded three times as the seeds died.
+
+All shared `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
+
+| policy | extra | final step | best ckpt | top-3 pooled | outcome |
+|---|---|---|---|---|---|
+| `b7f-disc995seed3` | `DISCOUNT=0.995` | 1.06M | **51%** @860k | **48.0%** | **best arm on record** |
+| `b7e-disc995seed2` | `DISCOUNT=0.995` | 1.28M | 39% @334k | 34.7% | strong, survived |
+| `b7d-discount995` | `DISCOUNT=0.995` | 1.60M | 26% @1330k | 22.7% | survived, weakest of the three |
+| `b7a-a06seed2` | none | 2.00M | 19% @1822k | 18.3% | survived to 2M |
+| `b7b-a06seed3` | none | 1.78M | — | — | **died at 1162k** |
+| `b7c-a06seed4` | none | 1.74M | — | — | **died at 573k** |
+
+**The batch was designed to answer a different question than the one it answered.** Its
+purpose was seeding `b6b`'s config to n=3, because every single-seed result in this project
+had failed to replicate. That question got answered — **2 of 4 seeds survive**, so eff ~1.2
+is not the reliable setting it looked like, and the "lower sharpness is safer" reading was
+weakened rather than confirmed.
+
+The useful result came from the fourth slot. `DISCOUNT=0.995` was included as the one
+untested high-prior knob, and after the first arm looked strong the two freed slots went to
+seeding it instead of `b6b`. That decision — replacing dead seeds of a mediocre config with
+seeds of a promising one, rather than completing the original design — is what produced the
+result. See [`findings.md`](findings.md).
+
+Both `b6b`-config deaths came **late** (573k, 1162k) compared to the eff ~1.6 deaths (246k,
+272k), which suggests lower sharpness delays death rather than preventing it. Any survival
+rate from here needs a step horizon attached.
+
+## Batch 6 — the effective-exponent sweep
+
+**Started 2026-07-27, both arms stopped 2026-07-28.** Both arms keep the `b4c` signature (`td_loss`, no IS) and dial
+alpha down, testing whether the effective exponent is what governs stability:
+
+| policy | alpha | effective exponent | prediction |
+|---|---|---|---|
+| `b6a-alpha04` | 0.4 | ~0.8 — matches live `b5d` | survives |
+| `b6b-alpha06` | 0.6 | ~1.2 — between `b5d` and the dead arms | marginal |
+
+Because `td_loss` squares the error before alpha is applied, `alpha=0.8` with `td_loss`
+is really ~1.6 on the `td_error` scale — see
+[`findings.md`](findings.md). So the alpha *label* has never matched what was tested, and
+these two arms are the first honest points on that axis.
+
+Note `b6b`'s alpha 0.6 **is** the committed default, so that override is a no-op on that
+knob; `b6b` is precisely "committed alpha, `theSchlong`'s other two PER changes."
+
+Why this rather than more seeds of `b5c`: `b5c` was still running at the time, and the alpha sweep is the only experiment that
+could recover `b4c`'s 51% without its 2-in-3 death rate. If both new arms survive the
+200-270k window, the lottery becomes a dial.
+
+**What would falsify the mechanism:** `b6a` dying anyway (something other than exponent
+sharpness kills these arms), or both surviving *and* scoring no better than baseline
+(sharpness was never where the gain came from either).
+
+**Outcome: the prediction half held and the correction mattered more.** `b6a` (eff ~0.8)
+stayed stable throughout and measured 8.1% — safe but a low ceiling. `b6b` (eff ~1.2) was
+called "marginal", crashed to near-zero twice, recovered both times, and measured 24.5% —
+the best arm at the time. That produced the "sharpness is a variance dial" reading in
+[`findings.md`](findings.md), later weakened when batch 7 seeded `b6b`'s config and lost 2
+of 4 to late deaths.
+
+Both arms were measured with the old smoothed-first selector, so **both figures are
+underestimates** and are due a re-measure.
 
 ## Batch 5 — `b4c` repeat plus factor isolation
 

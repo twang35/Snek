@@ -10,7 +10,9 @@ section before proposing an epsilon or buffer experiment.
 
 | finding | status |
 |---|---|
-| `b6b-alpha06` (alpha 0.6, `td_loss`, no IS) is the best *bet*: 24.5% over 1000 eps, survived | **measured**, n=1 seed, and an **underestimate** |
+| **`DISCOUNT=0.995` matches the best ceiling (51%) and survives 3 of 3 seeds** | **measured**, ~2.3x expected value |
+| Prefer top-3 pooled over best-of-10; the max of 10 noisy measurements is upward-biased | **established** |
+| `b6b-alpha06` (alpha 0.6, `td_loss`, no IS) is the best *bet* at 0.99: 24.5% over 1000 eps | **measured**, n=1 seed, and an **underestimate** |
 | `b4c` has the best *ceiling*: ~31%, but survives only 1 of 3 | **measured**, 1400 eps |
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs -0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, 3 of 3 clusters, up to 27 points |
@@ -19,7 +21,9 @@ section before proposing an epsilon or buffer experiment.
 | Restoring `theSchlong`'s PER roughly triples the perfect rate | **retracted** — did not replicate, 0 of 2 |
 | That config is a coin flip: 1 of 3 seeds survives, the rest die permanently | **established**, n=3 |
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — it is arithmetic |
-| Sharpness is a variance dial: higher ceiling *and* higher death risk | **supported**, 7 arms, n=1 per cell |
+| Sharpness is a variance dial: higher ceiling *and* higher death risk | **weakened** — eff 1.2 dies 2 of 4, eff 1.6 dies 2 of 3 |
+| No prioritization setting tested so far survives reliably | **established**, 7 seeds across two sharpness levels |
+| `DISCOUNT=0.995` is the current best lead | **promising**, n=2 healthy, n=3 running |
 | There is a stability "cliff" between eff 0.8 and 1.2 | **retracted** — `b6b` crossed it and thrived |
 | Reverting *either* factor alone survives the crisis | **established**, n=1 each |
 | The committed config reaches ~1% at 1M steps | **established** |
@@ -29,6 +33,58 @@ section before proposing an epsilon or buffer experiment.
 | n-step returns help | **falsified**, n=2 and n=3 |
 
 ---
+
+## `DISCOUNT=0.995` matches the best ceiling and removes the death risk
+
+The strongest result in the investigation, and the first one where the mechanism was
+predicted before the run rather than reconstructed after it.
+
+At `DISCOUNT=0.99` the effective horizon is ~100 steps, while a perfect game on the 9x9
+grid runs several hundred. The `PERFECT_GAME_REWARD` was therefore discounted into
+near-irrelevance — the value function could barely see the thing the whole project is
+optimising for. Raising the discount to 0.995 was listed as the top untested candidate for
+exactly that reason.
+
+Three seeds, all with `PRIORITY_EXPONENT=0.6 PRIORITY_SIGNAL=td_loss IS_WEIGHTS=0`, all
+measured with the outlier-top10 rule so every number below is comparable:
+
+| arm | discount | best ckpt | top-3 pooled | all-10 pooled | survived |
+|---|---|---|---|---|---|
+| `b7f-disc995seed3` | **0.995** | **51%** @860k | **48.0%** (42.4-53.6) | 38.8% | yes |
+| `b4c-schlongper` | 0.99 | 50% @869k | 46.7% (41.1-52.3) | 37.1% | **1 of 3 seeds** |
+| `b7e-disc995seed2` | **0.995** | 39% @334k | 34.7% (29.5-40.2) | 29.5% | yes |
+| `b7d-discount995` | **0.995** | 26% @1330k | 22.7% (18.3-27.7) | 16.4% | yes |
+| `b7a-a06seed2` | 0.99 | 19% @1822k | 18.3% (14.4-23.1) | 12.0% | yes |
+
+### The gain is reliability, and the ceiling claim would have been wrong
+
+`b7f` (51%) and `b4c` (50%) are a **dead heat** — overlapping intervals on best checkpoint
+*and* on top-3 pooled. So 0.995 did not raise the peak; it reproduced it. An earlier draft
+of this section was going to claim a new record by comparing `b7f`'s 38.8% against `b4c`'s
+previously published 31.4%. **That comparison was invalid**: the two used different
+selection rules, and re-measuring `b4c` under the matched rule moved it to 37.1%. The
+entire apparent 7-point gain was the selector, not the config. See the selection-rule
+caveat below — it caught a false headline within a day of being written down.
+
+What did change is the death rate:
+
+| config | mean level across seeds | survival | expected value |
+|---|---|---|---|
+| `DISCOUNT=0.995` | 28.2% | **3 of 3** | **28.2%** |
+| `b4c` config, eff ~1.6 | 37.1% | 1 of 3 | 12.4% |
+| same config at 0.99 (`b7a`) | 12.0% | 2 of 4 | 6.0% |
+
+**~2.3x the expected value of the best previous config**, purely from reaching the same
+ceiling without discarding two runs in three. Every earlier lever traded ceiling against
+reliability; this is the first to escape that tradeoff.
+
+Secondary evidence that the peak has headroom: at its best checkpoint `b7f` averages **88.8
+of a maximum 95**, against `b4c`'s 84.9. Even its failures end closer to a perfect game.
+
+**Two caveats.** Survival is established only to **~1.1M steps** — `b7e` and `b7f` were
+stopped at 1.28M and 1.06M while their 0.99 siblings died at 1162k and 573k, so they have
+not outlived the danger window by much. And `avg_reward` is **not comparable** across a
+discount change, since the discount rescales the reward; compare perfect rates only.
 
 ## Measured: `b6b-alpha06` is the best *bet*, `b4c` still has the best *ceiling*
 
@@ -230,6 +286,16 @@ test.** The nominal value and the effective value differ by 2x whenever
 label. Treat the effective-exponent column above as the real independent variable.
 
 ### Sharpness is a variance dial, not a quality dial
+
+> **Weakened by batch 7.** Seeding eff ~1.2 four times gave **2 deaths of 4** (`b7b` at
+> 1162k, `b7c` at 573k), against eff ~1.6's 2 of 3. At these sample sizes 50% and 33% are
+> not meaningfully different, so the claim that lower sharpness is *safer* no longer has
+> support. What survives is the narrower claim that eff ~1.6 has the higher **ceiling**.
+>
+> Both eff ~1.2 deaths arrived late — 573k and 1162k — well past where the eff ~1.6 arms
+> died (246k, 272k). So lower sharpness may **delay** death rather than prevent it, which
+> would make measured "survival" partly an artefact of how long an arm is run. Any future
+> survival rate quoted here needs a fixed step horizon attached.
 
 The prediction made before batch 6 ran was that alpha 0.4 with `td_loss` (~0.8 effective)
 survives and alpha 0.6 (~1.2) is marginal. The first half held. **The second half was

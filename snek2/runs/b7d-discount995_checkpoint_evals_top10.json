@@ -1,0 +1,186 @@
+{
+  "policy_name": "b7d-discount995",
+  "episodes_per_checkpoint": 100,
+  "results": [
+    {
+      "step": 116000,
+      "selected_by": "outlier",
+      "graph_single_eval": 50,
+      "graph_surrounding": 17.0,
+      "episodes": 100,
+      "perfect_games": 14,
+      "perfect_percent": 14.0,
+      "perfect_ci95": [
+        8.5,
+        22.1
+      ],
+      "avg_score": 68.74,
+      "median_score": 73.5,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 77.58
+    },
+    {
+      "step": 330000,
+      "selected_by": "outlier",
+      "graph_single_eval": 40,
+      "graph_surrounding": 23.0,
+      "episodes": 100,
+      "perfect_games": 17,
+      "perfect_percent": 17.0,
+      "perfect_ci95": [
+        10.9,
+        25.5
+      ],
+      "avg_score": 70.06,
+      "median_score": 80.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 82.01
+    },
+    {
+      "step": 332000,
+      "selected_by": "outlier",
+      "graph_single_eval": 40,
+      "graph_surrounding": 22.0,
+      "episodes": 100,
+      "perfect_games": 16,
+      "perfect_percent": 16.0,
+      "perfect_ci95": [
+        10.1,
+        24.4
+      ],
+      "avg_score": 71.52,
+      "median_score": 77.5,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 82.21
+    },
+    {
+      "step": 919000,
+      "selected_by": "outlier",
+      "graph_single_eval": 50,
+      "graph_surrounding": 15.0,
+      "episodes": 100,
+      "perfect_games": 22,
+      "perfect_percent": 22.0,
+      "perfect_ci95": [
+        15.0,
+        31.1
+      ],
+      "avg_score": 79.84,
+      "median_score": 87.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 96.81
+    },
+    {
+      "step": 922000,
+      "selected_by": "outlier",
+      "graph_single_eval": 40,
+      "graph_surrounding": 18.0,
+      "episodes": 100,
+      "perfect_games": 12,
+      "perfect_percent": 12.0,
+      "perfect_ci95": [
+        7.0,
+        19.8
+      ],
+      "avg_score": 74.77,
+      "median_score": 80.0,
+      "min_score": 32.0,
+      "max_score": 95.0,
+      "avg_reward": 81.39
+    },
+    {
+      "step": 965000,
+      "selected_by": "outlier",
+      "graph_single_eval": 50,
+      "graph_surrounding": 14.0,
+      "episodes": 100,
+      "perfect_games": 13,
+      "perfect_percent": 13.0,
+      "perfect_ci95": [
+        7.8,
+        21.0
+      ],
+      "avg_score": 76.52,
+      "median_score": 80.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 84.31
+    },
+    {
+      "step": 1242000,
+      "selected_by": "outlier",
+      "graph_single_eval": 50,
+      "graph_surrounding": 12.0,
+      "episodes": 100,
+      "perfect_games": 19,
+      "perfect_percent": 19.0,
+      "perfect_ci95": [
+        12.5,
+        27.8
+      ],
+      "avg_score": 76.87,
+      "median_score": 82.0,
+      "min_score": 7.0,
+      "max_score": 95.0,
+      "avg_reward": 90.82
+    },
+    {
+      "step": 1253000,
+      "selected_by": "outlier",
+      "graph_single_eval": 50,
+      "graph_surrounding": 17.0,
+      "episodes": 100,
+      "perfect_games": 5,
+      "perfect_percent": 5.0,
+      "perfect_ci95": [
+        2.2,
+        11.2
+      ],
+      "avg_score": 71.04,
+      "median_score": 76.0,
+      "min_score": 17.0,
+      "max_score": 95.0,
+      "avg_reward": 70.39
+    },
+    {
+      "step": 1326000,
+      "selected_by": "outlier",
+      "graph_single_eval": 50,
+      "graph_surrounding": 19.0,
+      "episodes": 100,
+      "perfect_games": 20,
+      "perfect_percent": 20.0,
+      "perfect_ci95": [
+        13.3,
+        28.9
+      ],
+      "avg_score": 76.63,
+      "median_score": 83.0,
+      "min_score": 7.0,
+      "max_score": 95.0,
+      "avg_reward": 91.32
+    },
+    {
+      "step": 1330000,
+      "selected_by": "outlier",
+      "graph_single_eval": 40,
+      "graph_surrounding": 19.0,
+      "episodes": 100,
+      "perfect_games": 26,
+      "perfect_percent": 26.0,
+      "perfect_ci95": [
+        18.4,
+        35.4
+      ],
+      "avg_score": 75.76,
+      "median_score": 82.0,
+      "min_score": 21.0,
+      "max_score": 95.0,
+      "avg_reward": 96.76
+    }
+  ]
+}
