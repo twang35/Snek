@@ -166,6 +166,15 @@ Two seeds failing this badly is what makes 0.999 falsified rather than unlucky.
 
 ![b8b-disc999seed2](charts/b8b-disc999seed2.png)
 
+### b8g-clipseed3 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 3
+
+Just started, in the slot freed by stopping `b8c`. Takes clipping to **n=3**, which is this
+project's bar for calling a config established — chosen over a third 0.9975 seed because
+0.9975 now stands at 1 of 2 and is already beaten by 0.995 on measured rate.
+
+![b8g-clipseed3](charts/b8g-clipseed3.png)
+
+
 ### b8e-clipseed2 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 2
 
 Just started. Seeds `b8d`'s config, which is the most promising thing in the batch and was

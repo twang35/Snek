@@ -72,14 +72,56 @@ PYTHONPATH=. EVAL_OUT_SUFFIX=_outlier10 \
 `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
 verified in every log. Design rationale is in the Batch 8 section below.
 
-| policy | extra override | step | trailing | best 30-eval pf | status |
-|---|---|---|---|---|---|
-| `b8d-disc995clip` | `DISCOUNT=0.995 GRADIENT_CLIPPING=10` | 560k | 62.4 | **36.0%** @163k | **running, standout** |
-| `b8c-disc9975` | `DISCOUNT=0.9975` | 359k | 59.2 | 14.7% @343k | running, healthy |
-| `b8e-clipseed2` | `DISCOUNT=0.995 GRADIENT_CLIPPING=10` | new | — | — | running, seeds `b8d` |
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | new | — | — | running, seeds `b8c` |
-| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | **stopped — dead 660k steps** |
-| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | **stopped — dead 1018k steps** |
+| policy | extra override | step | trailing | best 30-eval pf | recent-30 pf | status |
+|---|---|---|---|---|---|---|
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 931k | **71.3** | **36.0%** @163k | 14.0% | running, healthy |
+| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 412k | **76.2** | 19.0% @245k | 4.3% | running, healthy |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 478k | **73.1** | 22.0% @473k | **21.7%** | running, rising |
+| `b8g-clipseed3` | `0.995 + CLIPPING=10` | new | — | — | — | running, takes clipping to n=3 |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 10.3 | 14.7% @343k | 0.0% | **stopped — monotone decline** |
+| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | 0.0% | **stopped — dead** |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | 0.0% | **stopped — dead** |
+
+**Clipping now has two healthy seeds.** `b8d` at 931k and `b8e` at 412k are both at their
+strongest trailing scores yet (71.3 and 76.2), neither has been near death, and `b8d` has
+cleared the 200-600k window where most arms in this project break.
+
+**`b8f` is the arm to watch** — its recent-30 perfect rate of 21.7% is the highest of any
+live arm and is *higher* than its own best window's neighbourhood, so it is still climbing
+at 478k.
+
+#### `b8c-disc9975`: stopped after a long monotone decline
+
+Stopped at 1.75M with trailing 10.3, **13% of its 79.8 peak**, and **no perfect game for
+1.26M steps** (none since 491k). Its sibling `b8f` runs the identical config and is
+thriving, so this is seed variance rather than the config:
+
+| block | mean trailing | mean perfect |
+|---|---|---|
+| 200-400k | **71.1** | 8.8% |
+| 400-600k | 50.7 | 2.5% |
+| 600-800k | 20.4 | 0.0% |
+| 1000-1200k | 14.8 | 0.0% |
+| 1600-1800k | **11.2** | 0.0% |
+
+Never technically dead — trailing stayed near 10, not 0.0, and `zero_since` was null
+throughout — which is why it needed a different criterion from the `0.999` arms. **Every
+200k block was lower than the last, with no recovery in any of them.** That distinguishes
+the monotonic-decline mode from the oscillations `b6b` and `b7b` showed, where low blocks
+alternated with high ones. An arm that has produced nothing for 1.26M steps and is at 13% of
+peak is finished even without hitting zero.
+
+Replaced with `b8g-clipseed3` rather than a third 0.9975 seed: 0.9975 now stands at 1 of 2
+and is already beaten by 0.995 on measured rate, while clipping had two healthy seeds and
+n=3 is this project's bar for calling anything established.
+
+#### Field caveat: `zero_since` is missing on pre-change arms
+
+`b8c` and `b8d` were launched before `zero_since` was added to the summary block, so their
+running processes hold the old `run_report` and overwrite the backfill on every eval. Their
+`zero_since` has to be computed from the eval series until they restart. **Editing
+`run_report.py` does not affect already-running arms** — a general point, not specific to
+this field.
 
 #### `DISCOUNT=0.999` is falsified, 2 of 2 dead
 
