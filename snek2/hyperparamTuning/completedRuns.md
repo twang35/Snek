@@ -21,6 +21,12 @@ misranks arms (`b5c` is 2nd by graph, last by measurement).
 Arms measured with the **outlier-top10** rule carry a best-checkpoint and top-3 figure and
 are mutually comparable; older `measured` figures used other selection rules and are not.
 
+**From 2026-07-30 the `measured` column stops being comparable at all**, so the episode count
+is now spelled out per row (`/1000`, `/100`). The selector measures every checkpoint above 80%
+and none at or below 50%, so the checkpoint count varies per arm — `b8e` has 1, `b8f` has 16.
+Use **best ckpt**. `b8e` is the illustration: 32% best checkpoint reads mid-table, but having
+one checkpoint above the floor where the batch's best arm has sixteen is the actual result.
+
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **51%** | **48.0%** | 38.8% /1000 | 44.0% | **best on record**, and survived |
@@ -28,12 +34,17 @@ are mutually comparable; older `measured` figures used other selection rules and
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 39% | 34.7% | 29.5% /1000 | 32.3% | strong, survived |
 | `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | — | — | 24.5% /1000 | 21.7% | old selector, **underestimate**; re-measure |
 | `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 26% | 22.7% | 16.4% /1000 | 17.7% | survived, weakest of the three discount seeds |
+| `b8e-clipseed2` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | 1.16M | **32%** | — | 32% /100 | 21.3% | one good ckpt, **no good region** — 1 above the 50% floor |
 | `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 19% | 18.3% | 12.0% /1000 | 15.0% | survived to 2M, low ceiling |
 | `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | — | — | 8.1% /1000 | 14.3% | stable, never near death, low ceiling |
 | `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.07M | — | — | 6.6% /1000 | 10.7% | stable, low ceiling |
 | `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | — | — | 2.1% /1000 | 17.0% | IS correction cancels the benefit; peak ckpt evicted |
+| `b8c-disc9975` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 1.75M | — | — | not measured | 14.7% | monotone decline to a stop; `b8f`'s sibling |
+| `b8g-clipseed3` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | 3.43M | — | — | **none >50%** | 30.0% | **died, recovered after 1.2M, died again** |
 | `b7b-a06seed3` | alpha 0.6, `td_loss`, no IS | 1.78M | — | — | 0% | 7.7% | **died at 1162k** |
 | `b7c-a06seed4` | alpha 0.6, `td_loss`, no IS | 1.74M | — | — | 0% | 9.7% | **died at 573k** |
+| `b8a-disc999` | alpha 0.6, `td_loss`, no IS, **disc 0.999** | 1.11M | — | — | 0% | 0.7% | **died at 452k**, peak trailing only 63.1 |
+| `b8b-disc999seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.999** | 1.41M | — | — | 0% | 0.0% | **zero perfect games in 1.41M steps** |
 | `b1a-base` | none (control) | 503k | — | — | — | 16.7% | collapsed at 265k; score recovered, skill did not |
 | `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | — | — | — | 11.0% | best of batch 3, degraded anyway |
 | `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | — | — | — | 9.3% | steadiest arm, but a low ceiling |
@@ -63,6 +74,15 @@ Four things this ranking makes visible that per-batch reading did not:
 - **The graph misranks arms badly.** `b5c-schlongIS` is 2nd of the batch-5/6 arms by best
   perfect-30 (17.0%) and **last by measurement** (2.1%). Any ranking built on 10-episode
   graph evals is unreliable; see [`hyperparamTuning.md`](hyperparamTuning.md).
+- **Dying late is not the same as dying.** `b8g-clipseed3` sits below arms with a third of its
+  best perfect-30 because it ended dead, but it spent 1.2M steps at zero and *recovered* to
+  63.7 trailing before collapsing again. A ranking by endpoint hides that entirely — see
+  [`findings.md`](findings.md).
+
+Two batch-8 arms are **absent from this table because they are still running**:
+`b8f-disc9975seed2` (best-30 **47.7%**, 16 checkpoints above 80%) and `b8d-disc995clip`
+(**38.3%**, still improving at 2.08M). On graph metrics both would sit at the top. They are in
+[`runs.md`](runs.md) until they stop and can be measured.
 
 ## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
 

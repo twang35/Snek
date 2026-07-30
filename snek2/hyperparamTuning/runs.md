@@ -20,7 +20,9 @@ SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 SNEK_D
 
 It **matches the best ceiling ever measured while surviving 3 of 3 seeds** instead of 1 of
 3. Every measurement below uses the same outlier-top10 selection rule, so the columns are
-comparable:
+comparable with each other — but **not with anything measured after 2026-07-30**, when the
+>=80%/<=50% thresholds made the checkpoint count vary per arm. The `best ckpt` column stays
+comparable across both rules; the two pooled columns do not.
 
 | arm | discount | best ckpt | top-3 pooled | all-10 pooled | survived |
 |---|---|---|---|---|---|
@@ -55,40 +57,59 @@ than a lone spike.
 **Caveat on the 3-of-3:** `b7e` and `b7f` were stopped at 1.28M and 1.06M, while their 0.99
 siblings died at 1162k and 573k. Survival is therefore established only out to ~1.1M steps.
 
-### Do this first
+**This table may be superseded — `b8f-disc9975seed2` is unmeasured, not unimpressive.** On
+graph metrics it beats every arm here (47.7% best-30 vs `b7f`'s 44.0%, first-ever 90% points,
+16 checkpoints at >=80% vs `b7f`'s 1), but it is still running and its checkpoints have not
+been evaluated over 100 episodes, so it cannot go in a measured column yet. Measure it when it
+stops before treating `0.995` as settled.
 
-Re-measure `b6b-alpha06` and `b6a-alpha04` with the current selector before comparing them
-to anything. Both predate the selection fix and are biased low:
+### The `b6a`/`b6b` re-measurement is retired, not pending
 
-```
-cd /Users/tony_wang/Projects/Snek/snek2
-PYTHONPATH=. EVAL_OUT_SUFFIX=_outlier10 \
-  /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b6b-alpha06 top10
-```
+It was queued as "do this first" because both arms predate the selection fix and were biased
+low. The **50% floor added on 2026-07-30 closes it instead of answering it**:
+
+| arm | best graph point | checkpoints the selector now picks |
+|---|---|---|
+| `b6a-alpha04` | 50% @510k | **none** — selector exits with a message |
+| `b6b-alpha06` | 60% (2 points, both ~1.74M) | **2** |
+
+Neither has anything at >=80%, and `b6a` has nothing above the floor at all. Re-measuring
+`b6b` would produce a 2-checkpoint figure that is not comparable to a 10- or 16-checkpoint
+one, so the honest read is that **these two arms cannot be placed on the ranking table** and
+the alpha question stays where batch 7 left it. Do not re-add this task; if the alpha
+comparison matters, it needs new seeds, not new measurements of old ones.
 
 ## Currently running: batch 8
 
-**Launched 2026-07-29.** All four arms share
+**Launched 2026-07-29.** All arms share
 `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
 verified in every log. Design rationale is in the Batch 8 section below.
 
-| policy | extra override | step | trailing | best 30-eval pf | recent-30 pf | status |
-|---|---|---|---|---|---|---|
-| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 931k | **71.3** | **36.0%** @163k | 14.0% | running, healthy |
-| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 412k | **76.2** | 19.0% @245k | 4.3% | running, healthy |
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 478k | **73.1** | 22.0% @473k | **21.7%** | running, rising |
-| `b8g-clipseed3` | `0.995 + CLIPPING=10` | new | — | — | — | running, takes clipping to n=3 |
-| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 10.3 | 14.7% @343k | 0.0% | **stopped — monotone decline** |
-| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | 0.0% | **stopped — dead** |
-| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | 0.0% | **stopped — dead** |
+Status as of **2026-07-30**, two arms running:
 
-**Clipping now has two healthy seeds.** `b8d` at 931k and `b8e` at 412k are both at their
-strongest trailing scores yet (71.3 and 76.2), neither has been near death, and `b8d` has
-cleared the 200-600k window where most arms in this project break.
+| policy | extra override | step | trailing | best 30-eval pf | recent-30 pf | max pt | status |
+|---|---|---|---|---|---|---|---|
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 1.78M | **78.2** | **47.7%** @1625k | 23.3% | **90%** | running — **best arm on record** |
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 2.08M | **81.4** | **38.3%** @1910k | **32.0%** | 80% | running — still climbing |
+| `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | **0.1** | 30.0% @253k | 0.0% | 50% | **stopped — died, recovered, died** |
+| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 57.8 | 21.3% @515k | 1.7% | 60% | **stopped — flat, then faded** |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 10.3 | 14.7% @343k | 0.0% | 40% | **stopped — monotone decline** |
+| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | 0.0% | 10% | **stopped — dead** |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | 0.0% | 0% | **stopped — dead** |
 
-**`b8f` is the arm to watch** — its recent-30 perfect rate of 21.7% is the highest of any
-live arm and is *higher* than its own best window's neighbourhood, so it is still climbing
-at 478k.
+**`b8f` is the best arm the investigation has produced.** Its 47.7% best-30 window beats
+`b7f`'s 44.0%, its 89.4 peak trailing is the highest recorded, and it is the only arm ever to
+put a graph point at **90%** — three of them. It also has **16 checkpoints at >=80%**, against
+1 for `b7f` and 1 for `b4c`, so its strength is a broad region rather than a spike. Its
+last 300k block averages 34.8% perfect.
+
+**`b8d` is second and has not peaked**: peak trailing 86.9 at 2058k and best-30 at 1910k are
+both from its most recent 200k, and its block means rise monotonically from 600k
+(69.4 → 69.8 → 72.0 → 73.9 → 78.3 trailing, 8.5% → 24.8% perfect). Neither running arm
+should be stopped while both are still improving this late.
+
+**Both stopped arms were the clipping seeds, and that is the batch's negative result** — see
+below. Two slots are now free.
 
 #### `b8c-disc9975`: stopped after a long monotone decline
 
@@ -115,13 +136,21 @@ Replaced with `b8g-clipseed3` rather than a third 0.9975 seed: 0.9975 now stands
 and is already beaten by 0.995 on measured rate, while clipping had two healthy seeds and
 n=3 is this project's bar for calling anything established.
 
-#### Field caveat: `zero_since` is missing on pre-change arms
+#### Field caveat: `zero_since` is missing on `b8d`, and `.get()` hides it
 
 `b8c` and `b8d` were launched before `zero_since` was added to the summary block, so their
-running processes hold the old `run_report` and overwrite the backfill on every eval. Their
-`zero_since` has to be computed from the eval series until they restart. **Editing
-`run_report.py` does not affect already-running arms** — a general point, not specific to
-this field.
+running processes hold the old `run_report` and overwrite the backfill on every eval. Verified
+2026-07-30: `b8d`'s summary has **no** `zero_since` key, while `b8f`'s has it. **Editing
+`run_report.py` does not affect already-running arms** — a general point, not specific to this
+field.
+
+**The trap:** reading it with `summary.get('zero_since')` returns `None` for a missing key,
+which is indistinguishable from a computed `None` meaning "alive right now". A status check on
+`b8d` therefore reports "not dead" whatever the arm is actually doing. It happens to be
+correct here — recomputing from the eval series gives `None`, and trailing is 81.4 — but the
+answer was luck, not measurement. **Check the key is present before trusting it**, or recompute
+with `build_summary(rows['evals'])`, which agrees with the stored block on every other field
+for both arms.
 
 #### `DISCOUNT=0.999` is falsified, 2 of 2 dead
 
@@ -137,17 +166,75 @@ So the discount has an optimum rather than a monotone benefit. Known points:
 |---|---|---|
 | 0.99 | ~100 | 12.0% measured, dies 2 of 4 |
 | 0.995 | ~200 | **38.8% measured, 3 of 3 survived** |
-| 0.9975 | ~400 | alive at 359k, 14.7% best-30 so far |
+| 0.9975 | ~400 | **best-ever 47.7% best-30 (`b8f`), but 1 of 2** |
 | 0.999 | ~1000 | **dead 2 of 2** |
 
-#### `GRADIENT_CLIPPING=10` is the most promising thing in the batch
+**0.9975 is now the open question rather than a footnote.** `b8c` declined monotonically to a
+stop while `b8f` became the best arm on record, so the config is 1 of 2 on survival and 1 of 1
+on ceiling. Whether the optimum sits at 0.995 or 0.9975 is undecided and is the obvious target
+for the two free slots: a third and fourth 0.9975 seed would settle it, where more 0.995 seeds
+would only re-confirm something already at 3 of 3.
 
-`b8d` reached a **36.0% best-30 window by 163k steps** with a 70% single eval — for
-comparison `b7f`, the best arm on record, needed 699k to reach 44.0%. Far too early to
-call on n=1 and a graph window, which is why `b8e` now seeds it.
+#### `GRADIENT_CLIPPING=10` does not deliver the stability it was added for
 
-The two replacements go to the two configs still alive rather than to another 0.999 seed:
-0.999 is answered, while `b8c` and `b8d` were both n=1.
+This reverses the earlier reading in this file, which called clipping "the most promising
+thing in the batch" off `b8d` alone at 163k steps. At n=3 it is **1 of 3**:
+
+| arm | peak trailing | best 30-eval pf | best measured ckpt | outcome |
+|---|---|---|---|---|
+| `b8d-disc995clip` | **86.9** | **38.3%** | not yet measured | thriving at 2.08M |
+| `b8e-clipseed2` | 85.9 | 21.3% | **32.0%** (1 ckpt) | faded, stopped at 1.16M |
+| `b8g-clipseed3` | 77.0 | 30.0% | **none measurable** | dead, stopped at 3.43M |
+
+**Plain `0.995` without clipping was 3 of 3** (`b7d`/`b7e`/`b7f`), so on survival the
+clipping variant is worse than the config it was meant to stabilise, not better. The
+hypothesis was that clipping the 10.0 terminal reward's gradient would prevent the
+catastrophic drops; it did not prevent them in `b8e` or `b8g`.
+
+The honest caveat is that **`b8d` is the single best-behaved 0.995 arm ever run** — 2.08M
+steps still improving, where `b7f` was stopped at 1.06M. So clipping may raise the ceiling
+while lowering the survival rate, which is the ceiling/reliability tradeoff this project
+keeps rediscovering, and exactly what `0.995` itself was valued for *removing*. Do not
+adopt clipping on this evidence; if it gets another look, it needs seeds 4-6, and `b8d`'s
+best checkpoints should be measured first.
+
+#### `b8g-clipseed3`: died, recovered after 1.2M steps, then died permanently
+
+The most instructive failure in the batch. Its 300k block means:
+
+| block | mean trailing | mean perfect |
+|---|---|---|
+| 0-300k | 52.7 | 8.7% |
+| 600-900k | 1.7 | 0.0% |
+| 1200-1500k | 8.4 | 0.0% |
+| 1800-2100k | 46.9 | 2.5% |
+| **2100-2400k** | **63.7** | **4.3%** |
+| 2700-3000k | **0.0** | 0.0% |
+| 3300-3600k | 0.1 | 0.0% |
+
+**It was near zero from 600k to 1800k — 1.2M steps — and came back to 63.7 trailing.** That
+is by far the longest recovery on record and it stretches the "no arm recovers from sustained
+zero" rule further than any previous case. Then it collapsed again and stayed at 0.0 for its
+final 900k (`zero_since` 2625k).
+
+Both halves matter. A long dead stretch is **not** proof an arm is finished, which argues for
+patience. And a recovery is **not** proof of durability — the same lesson `b7b` taught, now
+with a much larger swing. The practical rule that survives both: judge on `zero_since` against
+current step, and 800k+ steps pinned at zero after a completed recovery arc is terminal.
+
+#### `b8e-clipseed2`: stopped flat rather than dead
+
+Stopped at 1.16M with trailing 57.8 — not dead, and it never was (`dead_since` and
+`zero_since` both null for the whole run). It was stopped because **it never got good**: no
+300k block averaged above 6.9% perfect, its best graph point in 1165 evals was a single 60%,
+and its recent-30 perfect had fallen to 1.7%.
+
+Its one measurable checkpoint (step 500k) came in at **32.0% (CI 23.7-41.7)**, which is
+*better* than its 21.3% graph window implied and comparable to `b7e`'s 39%. So the config can
+find a good policy; what it could not do is find more than one. Under the new >=80%/<=50%
+thresholds it yielded exactly 1 checkpoint against `b8f`'s 16 — the clearest illustration yet
+that **checkpoint count above the floor is itself the consistency metric** the project is
+after.
 
 **First batch to run under quiet logging and the fixed perfect-game pause.** Two things
 follow. Logs are ~1 line per 10 evals, so take status from the `summary` block in
@@ -203,27 +290,35 @@ gets the full horizon.
 ### Finish the batch with 100-episode evals
 
 Comparing arms by their graph peaks would be the winner's curse (see
-[`hyperparamTuning.md`](hyperparamTuning.md)). Use `top10`, which picks the ten most
-promising *surviving* checkpoints by smoothed perfect rate and measures each over 100
-episodes — the only apples-to-apples comparison available:
+[`hyperparamTuning.md`](hyperparamTuning.md)). Use `top10`, which ranks *surviving*
+checkpoints by their single 10-episode eval and measures each over 100 episodes:
 
 ```
 cd /Users/tony_wang/Projects/Snek/snek2
 PYTHONPATH=. EVAL_OUT_SUFFIX=_top10 \
-  /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b6b-alpha06 top10
+  /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b8d-disc995clip top10
 ```
 
 Spelled `top10`, not `--top 10`: `handle_main` routes argv through absl, which rejects
 unregistered `--flags` before `main()` runs.
 
+**The count is a target, not a quota** (added 2026-07-30). Everything at >=80% on its graph
+point is measured even if that exceeds ten, nothing at <=50% is measured at all, and the
+remaining slots come from the 60-70% band. Expect a variable number per arm — 16 for `b8f`,
+1 for `b8e`, and an outright refusal for an arm that never cleared 50%. **Compare arms on
+best checkpoint, not pooled rate**, because pooled now averages over different checkpoint
+counts and a truncated population.
+
 Budget **~50 minutes for four arms in parallel**, not the ~8 minutes a single arm takes.
 Good policies play long episodes and 40 eval workers oversubscribe 14 cores, so the
-parallel speedup is much less than 4x. `b5a`/`b5b` need no evals — a dead policy scores 0.
+parallel speedup is much less than 4x. Dead arms need no evals at all, and the selector now
+says so itself rather than spending 100 episodes proving it.
 
-#### Long runs delete their own best checkpoints
+#### Long runs used to delete their own best checkpoints
 
-`max_to_keep=1000` with a checkpoint every 1000 steps is a **rolling 1M-step window**.
-Three of the four live arms have already lost the checkpoint behind their best number:
+**Fixed: `max_to_keep` is now 10000**, a rolling 10M-step window at ~188 KB per checkpoint
+(~1.8 GB per policy at full depth). At the old value of 1000 it was a 1M-step window, and it
+cost real evidence — three of batch 5/6's four arms outran it:
 
 | arm | best 30-eval pf | that checkpoint | oldest surviving | best *surviving* smoothed pf |
 |---|---|---|---|---|
@@ -232,13 +327,14 @@ Three of the four live arms have already lost the checkpoint behind their best n
 | `b5d-schlongTDE` | 10.7% @410k | **gone** | 1052k | 14.0% |
 | `b5c-schlongIS` | 17.0% @211k | **gone** | 1282k | 7.0% |
 
-`b5c` is the painful one: its 17.0% peak is unmeasurable, and its best surviving region is
-worth only 7.0%. **Every additional 1000 steps on a past-peak arm destroys evidence.**
+`b5c` is the painful one: its 17.0% peak is permanently unmeasurable, and its best surviving
+region is worth only 7.0%. Those four rows cannot be recovered by raising the setting.
 
-Two consequences. Close an arm out at its horizon instead of letting it run — the marginal
-step is worth less than the checkpoint it evicts. And `top10` filters to surviving
-checkpoints automatically, so it degrades gracefully rather than failing on a deleted step.
-Raising `max_to_keep` would also work if long runs stay the norm.
+Two habits still apply. Close an arm out at its horizon — past peak, the marginal training
+step is worth less than the disk it consumes. And `top10` filters to surviving checkpoints
+automatically, so it degrades gracefully rather than failing on a deleted step. The legacy
+`train*/` dirs run 9.7 MB per checkpoint, so do not resume those at depth 10000 without
+checking disk first.
 
 ### Batch bookkeeping
 

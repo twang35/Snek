@@ -106,10 +106,36 @@ EVAL_OUT_SUFFIX=_top10 \
   PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top10
 ```
 
-`top10` (or `top`, `top:N`) is the normal way to close out an arm. It picks the **N biggest
-single-eval outliers** — the highest 10-episode evals on the graph — using the surrounding
-perfect rate only to break ties among equal spikes. Explicit steps still work
-(`... b4c-schlongper 869000 871000`) when a specific checkpoint is the question.
+`top10` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
+10-episode eval** from the graph, using the surrounding perfect rate only to break ties
+among equal spikes, and applies two thresholds:
+
+| rule | threshold | effect |
+|---|---|---|
+| always measure | single eval **>=80%** | every such checkpoint runs, even past N |
+| never measure | single eval **<=50%** | skipped entirely, however few slots are filled |
+| fill remaining slots | the band between | at 10-episode granularity this is 60% and 70% |
+
+**N is a target, not a quota.** A graph point is 10 episodes, so `perfect_percent` only takes
+values 0, 10, … 100 — which makes those thresholds coarser than they look. `>=80%` is the set
+{80, 90, 100} and the fill band is exactly {60, 70}. `b8f-disc9975seed2` has 16 checkpoints at
+>=80% and runs all 16; `b8e-clipseed2` has one point above 50% in 1151 evals and runs one.
+
+Explicit steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is
+the question, and they bypass both thresholds.
+
+**Most arms in this project have nothing above 50%,** so the selector now refuses them
+outright with a message naming their best graph point. That is the intended outcome — 22 of
+the 30 arms run so far never produced a single eval above 50%, and measuring their best 40%
+checkpoints buys a precise number for a policy that was never a candidate. It does mean
+`b6a-alpha04` can no longer be re-measured at all (best point 50%) and `b6b-alpha06` yields
+only 2 checkpoints, which retires a queued task rather than completing it.
+
+**This rule change breaks pooled-rate comparability**, on top of the earlier selector change.
+Pooled rate now averages over a checkpoint count that varies by arm (16 vs 7 vs 1) and over a
+population truncated at 50%, so a strong arm's pooled figure is no longer computed the same
+way as a weak one's. Compare **best checkpoint** across arms, which is what the thresholds are
+built to find, and treat pooled as a within-arm consistency read only.
 
 **Outlier evals are not luck — those checkpoints really are better.** This was measured,
 not assumed, and it reversed an earlier version of this protocol that ranked by smoothed
@@ -130,8 +156,9 @@ rate systematically picked worse checkpoints.
 perfect rate by tens of points — one measured triple reads 8% / 35% / 7% — so neighbouring
 checkpoints are separate policies rather than repeat samples of one.
 
-**10 checkpoints x 100 episodes, ~30 minutes on an idle machine** (~50 for four arms in
-parallel — good policies play long episodes and 40 workers oversubscribe 14 cores).
+**~10 checkpoints x 100 episodes, ~30 minutes on an idle machine** (~50 for four arms in
+parallel — good policies play long episodes and 40 workers oversubscribe 14 cores). Budget
+proportionally when an arm has many checkpoints at >=80%: `b8f` at 16 is ~50 minutes idle.
 
 Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
 confidence interval. Several copies can run at once on different arms — give each its own

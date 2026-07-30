@@ -59,29 +59,41 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
-| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | **44.0%** | **51%** @860k | **38.8%** | **best arm on record**, and it survived |
+| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 1.78M | 89.4 (1716k) | **47.7%** | ‡ running | — | **best graph metrics on record**; 16 ckpts at >=80% |
+| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | 2.08M | 86.9 (2058k) | **38.3%** | ‡ running | — | still climbing at 2.08M, latest block its best |
+| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | 44.0% | **51%** @860k | **38.8%** | best *measured* arm, and it survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | **50%** @869k | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 39% @334k | 29.5% | strong, survived |
 | `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | 89.6 (1712k) | 21.7% | 36% @1455k † | 24.5% † | old selector — an underestimate |
+| `b8e-clipseed2` | + `GRADIENT_CLIPPING=10`, disc 0.995 | 1.16M | 85.9 (504k) | 21.3% | **32%** @500k | 32% (1 ckpt) | one good checkpoint, no good region |
 | `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 88.7 (1242k) | 17.7% | 26% @1330k | 16.4% | survived, weakest of the three discount seeds |
 | `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 88.8 (1978k) | 15.0% | 19% @1822k | 12.0% | survived to 2M, low ceiling |
 | `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | 87.5 (356k) | 14.3% | 13% @514k † | 8.1% † | tame, never near death, low ceiling |
 | `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.08M | 86.2 (500k) | 10.7% | 12% @1160k † | 6.6% † | stable, low ceiling |
 | `b5c-schlongIS` | alpha 0.8, `td_loss`, **IS on** | 2.31M | 87.8 (265k) | 17.0% | 6% @2239k † | 2.1% † | IS correction cancels the benefit |
+| `b8c-disc9975` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 1.75M | 79.8 (305k) | 14.7% | not measured | — | monotone decline to a stop; `b8f`'s sibling |
 | `b4b-unifbuf500k` | alpha 0 + 500k buffer | 1.23M | 86.6 (743k) | 9.3% | not measured | — | steady, slowly rising |
 | `b4a-uniform` | alpha 0 | 1.25M | 85.9 (550k) | 8.7% | not measured | — | peaked ~575k, drifting down |
 | `b1a-base` | none (control) | 503k | 87.5 (135k) | 16.7% | not measured | — | collapsed at 265k; score recovered, skill did not |
 | `b3a-epsfloor` | `MIN_EPSILON=0.001` | 545k | 83.5 (236k) | 11.0% | not measured | — | best of batch 3, degraded anyway |
 | `b3b-epsfloor2` | `MIN_EPSILON=0.001` | 549k | 85.8 (305k) | 8.3% | not measured | — | declined despite the floor — falsified hypothesis A |
 | `b2a-base2` | none (repeat) | 999k | 83.8 (293k) | 7.0% | not measured | — | no collapse; long drift down, 1.1% perfect at 1M |
+| `b8g-clipseed3` | + `GRADIENT_CLIPPING=10`, disc 0.995 | 3.43M | 77.0 (99k) | 30.0% | **none >50%** | — | **died, recovered after 1.2M, died again** |
 | `b7b-a06seed3` | alpha 0.6, `td_loss`, no IS | 1.78M | 83.8 (127k) | 7.7% | **0%** (dead) | — | **died at 1162k** |
 | `b7c-a06seed4` | alpha 0.6, `td_loss`, no IS | 1.74M | 82.6 (193k) | 9.7% | **0%** (dead) | — | **died at 573k** |
 | `b5a-schlong` | alpha 0.8, `td_loss`, no IS | 2.05M | 83.9 (59k) | 10.0% | **0%** (dead) | — | **died at 272k**, `b4c` repeat |
 | `b5b-schlong2` | alpha 0.8, `td_loss`, no IS | 1.92M | 83.8 (69k) | 7.7% | **0%** (dead) | — | **died at 246k**, `b4c` repeat |
 | `b3c-buf500k` | 500k buffer, alpha 0.6 | 4.81M | 85.7 (312k) | 5.7% | **0%** (dead) | — | **died at ~750k**, score 0.0 for 4M steps |
+| `b8a-disc999` | alpha 0.6, `td_loss`, no IS, **disc 0.999** | 1.11M | 63.1 (94k) | 0.7% | **0%** (dead) | — | **died at 452k**, never got going |
+| `b8b-disc999seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.999** | 1.41M | **31.8** (63k) | 0.0% | **0%** (dead) | — | **zero perfect games in 1.41M steps** |
 | `b1c-nstep3` | `N_STEP_UPDATE=3` | 1.14M | 76.0 (255k) | 1.7% | not measured | — | dead end |
 | `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | not measured | — | stopped early, verdict weak |
 | `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | not measured | — | dead end |
+
+**‡ still running, so placed by graph metrics rather than by the sort column.** `b8f` and
+`b8d` lead every graph statistic in the table but have no 100-episode measurement yet.
+Sorting them to the bottom under "not measured" would bury the two best arms, so they sit at
+the top with the caveat attached. Measure them when they stop, then re-sort.
 
 **† measured with the superseded smoothed-first selector**, which has since been shown to
 pick systematically worse checkpoints than outlier selection (+0.64 vs -0.40 correlation
@@ -90,20 +102,35 @@ the unmarked rows; `b6b` in particular is probably well above 36%. Everything un
 the current outlier selector. Provenance is recorded per result in
 `runs/<arm>_checkpoint_evals*.json` as `selected_by` and `graph_single_eval`.
 
+**The pooled column is being retired.** From 2026-07-30 the selector measures every
+checkpoint above 80% and none at or below 50%, so the checkpoint count varies per arm — 16
+for `b8f`, 1 for `b8e`. A pooled average over 16 and over 1 are not the same statistic, so
+compare arms on **best eval'd ckpt** and read pooled only as a within-arm consistency check.
+`b8e` shows why this matters: its single measurable checkpoint reads 32%, which looks
+mid-table, but having *one* checkpoint above the floor where `b8f` has 16 is the finding.
+
 One caveat on `b4c`'s 50%: that checkpoint has been measured four separate times, reading
 51%, 42%, 32% and 50%. Its pooled figure over 400 episodes is **41.7%**, which is the number
 to trust — the 50-51% readings are the high draws. No other arm has been measured more than
 once, so treat this column as "best single 100-episode reading" rather than a settled value.
 
-**What this table shows now that batches 5-7 are in it.** The top three arms all share one
-config family — alpha 0.6-0.8, `td_loss` priorities, no IS weights — and the two best carry
-`DISCOUNT=0.995` on top of it. Nothing outside that family has measured above 8.1%.
+**What this table shows now that batch 8 is in it.** Every arm in the top six shares one
+config family — alpha 0.6-0.8, `td_loss` priorities, no IS weights — and all of them raise the
+discount above 0.99. Nothing outside that family has measured above 8.1%. The discount is the
+highest-leverage knob found so far, and it has an **optimum**: 0.995 and 0.9975 hold the top
+places while 0.999 produced the two worst charts in the file.
 
-**Five of the 23 arms died outright**, and four of those five ran the same PER config as the
-best arm. That is the central tension in these charts: `b4c` and `b7f` reach ~50% at their
-best checkpoints, while `b5a`, `b5b`, `b7b` and `b7c` — near-identical configs — went to
-0.0 and stayed there. `DISCOUNT=0.995` is the only change that has held the ceiling while
-avoiding the deaths, 3 seeds for 3.
+**Eight of the 30 arms died outright**, and six of those ran the same PER config as the best
+arm. That is the central tension in these charts: `b4c` and `b7f` reach ~50% at their best
+checkpoints, while `b5a`, `b5b`, `b7b`, `b7c` and `b8g` — near-identical configs — went to 0.0
+and stayed there. `DISCOUNT=0.995` remains the only change that has held the ceiling while
+avoiding the deaths at n=3.
+
+**Gradient clipping is the batch's negative result.** It was added as a cheap stability aid and
+read as "the most promising thing in the batch" off `b8d` at 163k steps. At n=3 it is 1 of 3 —
+`b8d` thriving, `b8e` faded, `b8g` dead — against 3 of 3 for plain 0.995. It may raise the
+ceiling (`b8d` is the best-behaved 0.995 arm ever run) while lowering survival, which is the
+tradeoff `0.995` was valued for removing.
 
 Uniform sampling (`b4a`, `b4b`) was the prior favourite and landed at about a third of
 `b4c`'s rate, so the axis mattered but the expected direction was wrong.
@@ -112,31 +139,111 @@ Uniform sampling (`b4a`, `b4b`) was the prior favourite and landed at about a th
 
 ## Batch 8 — the discount optimum, and gradient clipping
 
-Six arms in four slots. Set out to push the discount past 0.995 and found that 0.995 is
-near the optimum, while the batch's incidental fourth arm became its most promising.
+Seven arms in four slots. Set out to push the discount past 0.995 and found that the discount
+has an optimum: 0.999 is dead 2 of 2, while **0.9975 produced the best arm the investigation
+has run**. Gradient clipping, added as an incidental stability aid, was briefly the batch's
+headline and ended as its negative result.
+
+### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
+
+Step 1.78M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 47.7%** (at 1625k) · max single eval **90%**
+
+**The best chart in this file.** It beats `b7f`'s 44.0% best-30, records the highest peak
+trailing score of any arm, and is the only arm ever to put a graph point at **90%** — three of
+them. Its block means climb and then hold: 1.3% over the first 300k, 31.7% by 600-900k, and
+**34.8% across 1500-1800k**.
+
+The number that matters most is not on the chart: it has **16 checkpoints whose single eval
+reached >=80%**, against 1 for `b7f` and 1 for `b4c`. That makes its strength a broad region
+rather than a lone spike, which is the property this project has been chasing under the name
+"consistent". It is what motivated raising the eval selector's cap — see
+[`hyperparamTuning.md`](hyperparamTuning.md).
+
+Unmeasured so far, and still running, so the 47.7% is a graph window rather than a rate.
+
+![b8f-disc9975seed2](charts/b8f-disc9975seed2.png)
 
 ### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
 
-Step 564k (running) · peak score 85.4 (at 87k) · **best 30-eval perfect 36.0%** (at 163k) · max single eval 70%
+Step 2.08M (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 38.3%** (at 1910k) · max single eval 80%
 
-**The fastest riser on record.** It reached a 36.0% best-30 window by **163k steps**, where
-`b7f` — the best arm measured so far — needed 699k to reach 44.0%. Clipping was included as
-a cheap independent stability aid, not as a headline candidate.
+**The most patient riser on record, and it has not peaked.** Its peak trailing score and its
+best-30 window are both from its most recent 200k steps, after 2M steps of monotone improvement
+from the 300-600k trough:
 
-Read the chart with the caveat that it is n=1 and the 36.0% is a graph window, not a
-measurement; `b8e` is seeding the same config now. Note also its `dead_since` field reads
-275000: it had a sub-threshold stretch and recovered fully, which is why the summary block
-now carries `zero_since` for "is it dead *now*".
+| block | mean trailing | mean perfect |
+|---|---|---|
+| 300-600k | 22.4 | 0.4% |
+| 600-900k | 69.4 | 8.5% |
+| 1200-1500k | 72.0 | 11.2% |
+| 1500-1800k | 73.9 | 18.4% |
+| **1800-2100k** | **78.3** | **24.8%** |
+
+Earlier this file called it "the fastest riser on record" for reaching 36.0% by 163k steps.
+That reading was wrong in an interesting way: the 163k window was real but was followed by a
+near-total collapse (0.4% perfect across 300-600k), and everything durable came after 600k. A
+strong early window is not a head start.
+
+Its `dead_since` reads 275000 from that collapse while the arm went on to 38.3%, which is why
+the summary block carries `zero_since` for "is it dead *now*" — and note `b8d` predates that
+field, so its summary lacks the key entirely.
 
 ![b8d-disc995clip](charts/b8d-disc995clip.png)
 
+### b8e-clipseed2 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 2
+
+Step 1.16M · peak score 85.9 (at 504k) · best 30-eval perfect 21.3% (at 515k) · max single eval 60% · **stopped, flat**
+
+Never dead — `dead_since` and `zero_since` were null for the entire run — and never good. No
+300k block averaged above 6.9% perfect, and recent-30 had fallen to 1.7% when it was stopped.
+The chart is a broad hump peaking around 500k and slowly deflating.
+
+Its one checkpoint above the 50% floor (step 500k) measured **32.0% (CI 23.7-41.7)**, which is
+*better* than the 21.3% window implied and comparable to `b7e`'s 39%. So the config found a good
+policy once and could not find a second — 1 checkpoint above the floor against `b8f`'s 16.
+
+![b8e-clipseed2](charts/b8e-clipseed2.png)
+
+### b8g-clipseed3 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 3
+
+Step 3.43M · peak score 77.0 (at 99k) · best 30-eval perfect 30.0% (at 253k) · max single eval 50% · **stopped, dead**
+
+**The most instructive failure in the batch**, and a chart worth reading in full rather than
+from its endpoints:
+
+| block | mean trailing | mean perfect |
+|---|---|---|
+| 0-300k | 52.7 | 8.7% |
+| 600-900k | **1.7** | 0.0% |
+| 1200-1500k | 8.4 | 0.0% |
+| **2100-2400k** | **63.7** | **4.3%** |
+| 2700-3000k | **0.0** | 0.0% |
+| 3300-3600k | 0.1 | 0.0% |
+
+It sat near zero from 600k to 1800k — **1.2M steps** — and came back to 63.7 trailing. That is
+by far the longest recovery on record, and it stretches the "no arm recovers from sustained
+zero" rule further than any previous case. Then it collapsed for good, spending its final 900k
+at 0.0 (`zero_since` 2625k).
+
+Both halves are the lesson. A long dead stretch is not proof an arm is finished. And a recovery
+is not proof of durability — the same thing `b7b` taught, now with a far larger swing. It has
+**no checkpoint above the 50% floor** in 3429 evals, so the selector declines to measure it at
+all.
+
+![b8g-clipseed3](charts/b8g-clipseed3.png)
+
 ### b8c-disc9975 — `DISCOUNT=0.9975`
 
-Step 359k (running) · peak score 79.8 (at 305k) · best 30-eval perfect 14.7% (at 343k)
+Step 1.75M · peak score 79.8 (at 305k) · best 30-eval perfect 14.7% (at 343k) · **stopped, monotone decline**
 
-The midpoint arm, included as a fallback in case 0.999 broke — which it did. Healthy and
-rising steadily, with none of the volatility of the higher-discount arms. Its ~400-step
-effective horizon is the closest of any arm to actual perfect-game length.
+The midpoint arm, included as a fallback in case 0.999 broke — which it did. It looked healthy
+and rising at 359k, then declined without recovering: every 200k block lower than the last,
+ending at 13% of its peak with no perfect game for 1.26M steps.
+
+Never technically dead (trailing near 10, never 0.0), which is why it needed a different
+stopping criterion from the 0.999 arms. Its sibling `b8f` runs the identical config and became
+the best arm in the file, so this is seed variance, not the discount value — 0.9975 stands at
+1 of 2.
 
 ![b8c-disc9975](charts/b8c-disc9975.png)
 
@@ -165,29 +272,6 @@ perfect game across 1.41M steps** — no other arm here has failed to produce at
 Two seeds failing this badly is what makes 0.999 falsified rather than unlucky.
 
 ![b8b-disc999seed2](charts/b8b-disc999seed2.png)
-
-### b8g-clipseed3 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 3
-
-Just started, in the slot freed by stopping `b8c`. Takes clipping to **n=3**, which is this
-project's bar for calling a config established — chosen over a third 0.9975 seed because
-0.9975 now stands at 1 of 2 and is already beaten by 0.995 on measured rate.
-
-![b8g-clipseed3](charts/b8g-clipseed3.png)
-
-
-### b8e-clipseed2 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 2
-
-Just started. Seeds `b8d`'s config, which is the most promising thing in the batch and was
-running at n=1.
-
-![b8e-clipseed2](charts/b8e-clipseed2.png)
-
-### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
-
-Just started. Seeds `b8c`, the only discount value still open. Both replacements went to
-configs still alive rather than to another 0.999 seed, since that question is answered.
-
-![b8f-disc9975seed2](charts/b8f-disc9975seed2.png)
 
 ---
 

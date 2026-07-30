@@ -182,9 +182,17 @@ the earliest sustained-zero stretch and is history; `zero_since` is the start of
 `b8d-disc995clip` carried `dead_since=275000` while going on to a 36% best-30 window, so
 `dead_since` alone would have condemned the best arm in its batch.
 
-Neither is a verdict. Arms have recovered from trailing 0.3, and one recovered after ~400k
-steps near zero. Read `zero_since` against `step` for the duration, and only call an arm
-dead after hundreds of thousands of steps pinned there.
+Neither is a verdict. Arms have recovered from trailing 0.3, and `b8g-clipseed3` recovered from
+**1.2M steps** near zero — to 63.7 trailing — before collapsing for good. Read `zero_since`
+against `step` for the duration, and only call an arm dead after hundreds of thousands of steps
+pinned there *and* no recovery arc still in progress.
+
+**Check `zero_since` is actually present before trusting it.** Arms launched before the field
+was added keep overwriting the backfill from their old in-memory `run_report`, so the key is
+absent — and `summary.get('zero_since')` returns `None` for a missing key, which reads
+identically to "alive right now". That made a status check on `b8d-disc995clip` report "not
+dead" for a reason unrelated to the data. Use `'zero_since' in summary`, or recompute with
+`run_report.build_summary(rows['evals'])`.
 
 The one log line worth grepping is `hyperparameter override:` at startup, which confirms
 an arm got the config intended. That prints in both modes.

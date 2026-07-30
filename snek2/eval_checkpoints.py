@@ -15,10 +15,18 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top[N]
 
-`top10` (or `top`, `top:10`) picks the N biggest **single-eval outliers** — highest
-10-episode eval on the graph — using the surrounding perfect rate only to break ties.
-This is the normal way to close out an arm: 10 checkpoints x 100 episodes, ~30 minutes on
-an idle machine.
+`top10` (or `top`, `top:10`) is the normal way to close out an arm — ~10 checkpoints x 100
+episodes, ~30 minutes on an idle machine. It selects on the **single 10-episode eval** from
+the graph, using the surrounding perfect rate only to break ties, under three rules:
+
+- every checkpoint at **>=80%** is measured, even if that alone exceeds the N asked for
+- nothing at **<=50%** is measured at all
+- remaining slots go to the best of what is left, which given 10-episode granularity is
+  the 60-70% band
+
+So the count is a target, not a quota: a strong arm can run 13 checkpoints and a weak one
+4. Fewer than N is a normal outcome, and padding with sub-50% checkpoints would only
+depress the pooled rate without adding a candidate for best-checkpoint.
 
 Outliers are **not luck**. Measured against the checkpoints 1000 steps either side, they
 won 3 of 3 comparisons by 9.0, 11.5 and 27.5 points, and raw single-eval rate correlates
@@ -28,6 +36,11 @@ checkpoints.
 
 Adjacent steps are allowed through on purpose: 1000 train steps is enough to change the
 perfect rate by tens of points, so neighbours are separate policies, not repeat samples.
+
+**Pooled rates only compare across arms when the selection rule matches**, and this rule
+changed — figures produced before it are not comparable to figures produced after, because
+a variable checkpoint count and a 50% floor both move the pooled number on their own.
+Compare best-checkpoint instead, or re-measure both arms under the current rule.
 
 Environment:
     EVAL_EPISODES     episodes per checkpoint, rounded up to a whole number of
@@ -170,25 +183,47 @@ def evaluate(parallel_env, policy, num_episodes):
     return scores, perfect_flags, rewards
 
 
-def select_top_checkpoints(policy_name, available, count=10, window=10):
-    """The `count` biggest single-eval outliers, ties broken by surrounding perfect rate.
+# Selection thresholds, in single-eval (10-episode) percentage points.
+#
+# A graph point is 10 episodes, so perfect_percent only ever takes the values 0, 10,
+# ... 100. That makes these two numbers coarser than they look: ALWAYS_EVAL is the set
+# {80, 90, 100}, MIN_EVAL excludes everything up to and including 50, and the band left
+# over to fill remaining slots from is exactly {60, 70}.
+ALWAYS_EVAL_SINGLE = 80.0   # every checkpoint at or above this is measured, even past `count`
+MIN_EVAL_SINGLE = 50.0      # nothing at or below this is worth 100 episodes
 
-    Selection is built on a measured result rather than an assumption. Measuring `b4c`
-    both ways showed the **raw single 10-episode eval is the better predictor** of a
-    checkpoint's true rate, correlating +0.64 with the 100-episode measurement against
-    **-0.40** for the smoothed region rate. Smoothing is not merely weaker, it is
-    anti-predictive, because a window describes the *region* while the thing being measured
-    is the *checkpoint*.
+
+def select_top_checkpoints(policy_name, available, count=10, window=10):
+    """Every checkpoint at >=80% single eval, then the best of 60-70% up to `count` total.
+
+    Three rules, in order:
+
+    1. **Every** checkpoint whose single eval was `ALWAYS_EVAL_SINGLE` or better is
+       measured, even if that alone exceeds `count`. A 10-episode eval reading 8+ perfect
+       is the strongest signal available and there is no reason to drop one because a
+       tenth slot ran out.
+    2. **Nothing** at or below `MIN_EVAL_SINGLE` is measured at all. Below half, 100
+       episodes buys a precise number for a checkpoint that was never going to be the
+       arm's best, and it displaces a slot that could go to a real candidate.
+    3. Remaining slots go to the highest single evals in the 60-70% band, ties broken by
+       the surrounding perfect rate.
+
+    Fewer than `count` checkpoints is a normal outcome, not an error: a weak arm may have
+    only two or three points above half, and padding the list with 30% checkpoints would
+    only drag its pooled rate down while telling us nothing.
+
+    Ranking on the raw single eval rather than a smoothed region is a measured result, not
+    an assumption. Measuring `b4c` both ways showed the **raw single 10-episode eval is the
+    better predictor** of a checkpoint's true rate, correlating +0.64 with the 100-episode
+    measurement against **-0.40** for the smoothed region rate. Smoothing is not merely
+    weaker, it is anti-predictive, because a window describes the *region* while the thing
+    being measured is the *checkpoint*.
 
     An outlier eval is **not luck** — those checkpoints really are better than their
     neighbours. Measured against the checkpoints 1000 steps either side, outliers won 3 of
     3 comparisons by 9.0, 11.5 and 27.5 points, one of them reading 8% / 35% / 7% across
     three consecutive checkpoints. The binomial agrees: if a policy's true rate were 27%,
     a 10-episode eval showing 7+ perfect games has probability 0.006.
-
-    So rank on the single eval and use the surrounding rate only to break ties. Among
-    checkpoints that spiked equally, the one sitting in a stronger region is the better bet,
-    but the spike leads.
     """
     path = os.path.join(RUNS_DIR, '{0}_evals.json'.format(policy_name))
     with open(path) as handle:
@@ -209,16 +244,44 @@ def select_top_checkpoints(policy_name, available, count=10, window=10):
         raise SystemExit('no eval steps in {0} have checkpoints in savedPolicies'.format(path))
 
     # Primary: the single-eval spike. Secondary: the surrounding perfect rate.
-    ranked = sorted(candidates, key=lambda c: (-c['single'], -c['smoothed'], c['step']))
-    chosen = ranked[:count]
+    def rank(entry):
+        return (-entry['single'], -entry['smoothed'], entry['step'])
 
-    print('selected {0} of {1} available checkpoints, biggest single-eval outliers '
-          '(ties broken by surrounding rate):'.format(len(chosen), len(candidates)))
+    mandatory = sorted([c for c in candidates if c['single'] >= ALWAYS_EVAL_SINGLE], key=rank)
+    fill_pool = sorted([c for c in candidates
+                        if MIN_EVAL_SINGLE < c['single'] < ALWAYS_EVAL_SINGLE], key=rank)
+    excluded = len(candidates) - len(mandatory) - len(fill_pool)
+
+    for entry in mandatory:
+        entry['selected_by'] = 'threshold80'
+    fill = fill_pool[:max(0, count - len(mandatory))]
+    for entry in fill:
+        entry['selected_by'] = 'outlier'
+    chosen = mandatory + fill
+
+    if not chosen:
+        best = max(candidates, key=lambda c: c['single'])
+        raise SystemExit(
+            'no checkpoint in {0} evaluated above {1:.0f}% on its graph point (best was '
+            '{2:.0f}% at step {3}), so there is nothing worth measuring for this arm'.format(
+                path, MIN_EVAL_SINGLE, best['single'], best['step']))
+
+    print('selected {0} of {1} available checkpoints: {2} at >={3:.0f}% (all measured), '
+          '{4} filled from >{5:.0f}% and <{3:.0f}%, {6} skipped at <={5:.0f}%'.format(
+              len(chosen), len(candidates), len(mandatory), ALWAYS_EVAL_SINGLE,
+              len(fill), MIN_EVAL_SINGLE, excluded))
+    if len(chosen) < count:
+        print('    only {0} of {1} slots filled — everything else was at or below '
+              '{2:.0f}%, which is not worth 100 episodes'.format(
+                  len(chosen), count, MIN_EVAL_SINGLE))
+    if len(mandatory) > count:
+        print('    {0} checkpoints at >={1:.0f}% exceeds the {2}-slot target on purpose'.format(
+            len(mandatory), ALWAYS_EVAL_SINGLE, count))
     for entry in sorted(chosen, key=lambda c: c['step']):
-        print('    {0:>8}  single eval {1:>5.1f}%   surrounding {2:>5.1f}%'.format(
-            entry['step'], entry['single'], entry['smoothed']))
+        print('    {0:>8}  single eval {1:>5.1f}%   surrounding {2:>5.1f}%   {3}'.format(
+            entry['step'], entry['single'], entry['smoothed'], entry['selected_by']))
     return [c['step'] for c in sorted(chosen, key=lambda c: c['step'])], \
-        {c['step']: {'selected_by': 'outlier',
+        {c['step']: {'selected_by': c['selected_by'],
                      'single_eval': c['single'],
                      'surrounding': round(c['smoothed'], 1)} for c in chosen}
 

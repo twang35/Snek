@@ -164,8 +164,42 @@ its neighbours describes the *region* instead — and as the next section shows,
 is a poor proxy for the checkpoint.
 
 **Consequence: `b6b-alpha06` and `b6a-alpha04` were measured with the smoothed-heavy
-selector and are therefore underestimates.** Their 24.5% and 8.1% should be re-measured
-before being compared to anything.
+selector and are therefore underestimates.** Their 24.5% and 8.1% are not comparable to
+anything measured since.
+
+They also **cannot be fixed by re-measuring**. `b6a`'s best graph point in 1415 evals is 50%
+and `b6b` has exactly two above 50%, so under the current thresholds `b6a` yields nothing and
+`b6b` yields two checkpoints. The alpha comparison needs new seeds, not new measurements.
+
+### Refinement: a 50% floor and an 80% must-measure line
+
+The ranking above says *which* checkpoints to prefer. It says nothing about how far down the
+list to go, and the answer turns out to matter as much:
+
+| single eval | rule | why |
+|---|---|---|
+| **>=80%** | always measure, even past the 10-slot target | 8+ perfect in 10 is the strongest available signal; a slot limit is no reason to drop one |
+| **60-70%** | fill remaining slots, best first | the real candidate band for most arms |
+| **<=50%** | never measure | 100 episodes buys precision about a checkpoint that was never going to be the arm's best |
+
+Because a graph point is 10 episodes, `perfect_percent` only takes values 0, 10, … 100, so
+these thresholds are coarser than they read: `>=80%` is {80, 90, 100} and the fill band is
+exactly {60, 70}.
+
+**The distribution is extremely skewed, which is what makes the floor worth having.** Across
+all 30 arms run so far, 22 have **never produced a single eval above 50%** in thousands of
+evals. Effort concentrates on very few arms:
+
+| arm | evals | points at >=80% | points at 60-70% |
+|---|---|---|---|
+| `b8f-disc9975seed2` | 1757 | **16** (3 at 90%) | 101 |
+| `b8d-disc995clip` | 2065 | 4 | 50 |
+| `b7f-disc995seed3` | 1058 | 1 | 34 |
+| `b4c-schlongper` | 1097 | 1 | 18 |
+| 22 others | — | **0** | 0-3 |
+
+So the same 10-checkpoint budget was previously spending 10 evals on arms with no candidate
+at all, and capping `b8f` at 10 when it has 16 checkpoints that each cleared 80%.
 
 ## Policy quality changes materially within 1000 training steps
 
@@ -204,6 +238,13 @@ The cluster run is not a disagreement — 6 of its 10 picks are deliberately the
 neighbours, so it measures the spike-vs-neighbour gap rather than the config's level.
 **`b4c`'s level is ~31%.** Never compare pooled numbers produced by different selection
 rules.
+
+The 2026-07-30 thresholds make this worse, not better, and deliberately so: the checkpoint
+count itself now varies per arm (16 for `b8f`, 1 for `b8e`) and the population is truncated at
+50%. Pooling over 16 checkpoints and over 1 are not the same statistic. **Use best checkpoint
+for cross-arm comparison from here on**, and read pooled only as a within-arm consistency
+check — a config whose best and pooled figures are close is producing a strong *region*, which
+is the property the project is actually chasing.
 
 #### 100 episodes is a weaker instrument than its interval implies
 
@@ -642,7 +683,7 @@ first:
 |---|---|---|---|
 | 0.99 | ~100 | 88.8 | 12.0% measured, dies 2 of 4 seeds |
 | **0.995** | ~200 | 92.6 | **38.8% measured, 3 of 3 survived** |
-| 0.9975 | ~400 | 79.8 | alive at 359k, 14.7% best-30 so far |
+| **0.9975** | ~400 | **89.4** | **best-ever 47.7% best-30, but 1 of 2 seeds** |
 | 0.999 | ~1000 | 63.1 / 31.8 | **dead 2 of 2** (at 452k and 398k) |
 
 `b8b-disc999seed2` never produced a single perfect game across 1.41M steps. The prediction
@@ -656,8 +697,84 @@ episode length, so the value function is bootstrapping over a horizon longer tha
 and the targets stop being well conditioned. 0.995 sits close to actual episode length,
 which is the point.
 
-**Practical consequence: stop sweeping the discount upward.** 0.9975 is still open at n=1
-and is the only remaining value worth a seed; anything above it is answered.
+**Practical consequence: stop sweeping the discount upward.** Anything above 0.9975 is
+answered. But the optimum's *location* is now genuinely open between 0.995 and 0.9975, which
+was not the case when this section was written.
+
+### Update 2026-07-30: 0.9975 produced the best arm on record
+
+`b8f-disc9975seed2` beats every 0.995 arm on every graph statistic:
+
+| arm | discount | peak trailing | best 30-eval pf | ckpts at >=80% | max single eval |
+|---|---|---|---|---|---|
+| **`b8f-disc9975seed2`** | **0.9975** | **89.4** | **47.7%** | **16** | **90%** |
+| `b7f-disc995seed3` | 0.995 | 92.6 | 44.0% | 1 | 80% |
+| `b8d-disc995clip` | 0.995 + clip | 86.9 | 38.3% | 4 | 80% |
+| `b8c-disc9975` | 0.9975 | 79.8 | 14.7% | 0 | 40% |
+
+The **16-vs-1 gap in checkpoints above 80%** is the more important column than the best-30
+window. It says `b8f` sustains a strong region rather than spiking through one, which is the
+property "consistent perfect rate" actually names.
+
+Two things keep this from being a conclusion. `b8f` is **unmeasured** — no 100-episode
+evaluation yet — so 47.7% is a graph window, and graph windows have misranked arms badly before
+(`b5c` was 2nd of its batch on best-30 and last on measurement). And 0.9975 is **1 of 2**:
+`b8c` ran the identical config and declined monotonically to a stop. So 0.9975 has the better
+ceiling and the worse survival record, on one seed each way.
+
+**Next step is seeds 3 and 4 at 0.9975**, not more 0.995. 0.995 is already at 3 of 3 and more
+seeds would only re-confirm it, while 0.9975 could be either the new optimum or a coin flip and
+two seeds decide which.
+
+## Falsified: `GRADIENT_CLIPPING=10` does not buy stability
+
+Clipping went in as a cheap independent stability aid on top of `DISCOUNT=0.995`, on the
+reasoning that the 10.0 terminal reward produces occasional huge gradients and that clipping
+them would prevent the catastrophic drops. After three seeds it is **1 of 3**, against **3 of
+3** for plain 0.995:
+
+| arm | peak trailing | best 30-eval pf | ckpts >50% | outcome |
+|---|---|---|---|---|
+| `b8d-disc995clip` | **86.9** | **38.3%** | 54 | thriving at 2.08M |
+| `b8e-clipseed2` | 85.9 | 21.3% | **1** | faded; stopped at 1.16M |
+| `b8g-clipseed3` | 77.0 | 30.0% | **0** | dead; stopped at 3.43M |
+
+**It was briefly this file's headline, off `b8d` at 163k steps.** That reading — "the fastest
+riser on record", 36.0% best-30 by 163k against `b7f`'s 699k — was wrong twice over. `b8d`'s
+own early window was followed by a near-total collapse (0.4% mean perfect across 300-600k) and
+everything durable came after 600k, so it was not a head start. And the two seeds that followed
+did not reproduce it.
+
+The residual possibility worth stating: **`b8d` is the best-behaved 0.995 arm ever run**, still
+improving at 2.08M steps where `b7f` was stopped at 1.06M. So clipping may raise the ceiling
+while lowering survival. That is the ceiling/reliability tradeoff this investigation keeps
+rediscovering — and `DISCOUNT=0.995` was valued precisely for *removing* it, so trading it back
+is not obviously progress. **Do not adopt clipping**; measure `b8d`'s checkpoints when it stops,
+and if the ceiling claim survives measurement, seeds 4-6 decide it.
+
+## An arm recovered from 1.2M steps at zero — and then died anyway
+
+`b8g-clipseed3` sets both records at once, which is why it is worth its own section:
+
+| block | mean trailing | mean perfect |
+|---|---|---|
+| 0-300k | 52.7 | 8.7% |
+| 600-1800k | **1.7 - 14.7** | **0.0%** |
+| **2100-2400k** | **63.7** | **4.3%** |
+| 2700-3600k | **0.0** | 0.0% |
+
+**The recovery.** 1.2M steps near zero, then back to 63.7 trailing and a 4.3% perfect rate. The
+previous record was ~400k steps. Any stop rule that would have killed this arm at 1M steps —
+including the one this project used for most of its life — was wrong on this case.
+
+**The death.** It then collapsed and spent its final 900k pinned at 0.0. So the recovery bought
+nothing in the end, and an arm that has completed a recovery arc can still be finished.
+
+The rule that survives both halves: **read `zero_since` against the current step, and require
+both a long pinned stretch and no recovery in progress.** `b8g` would satisfy that at 2625k
+onward and would not at 1M. Two prior errors in this file — calling `b6b` permanently damaged
+and calling `b7b` merely oscillating — were the two directions of getting this wrong, and
+`b8g` is the case that contains both.
 
 ## The perfect-game celebration was throttling the best arms
 

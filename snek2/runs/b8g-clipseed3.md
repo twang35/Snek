@@ -4,7 +4,7 @@
 
 Blue is average score (food eaten) on the left axis, red is perfect-game percentage on the right.
 
-Latest eval: step 4000, avg score 0.8, perfect games 0%.
+Latest eval: step 3436000, avg score 0.2, perfect games 0%.
 
 ## Config
 
@@ -37,12 +37,23 @@ Latest eval: step 4000, avg score 0.8, perfect games 0%.
 
 ## Evals
 
-5 evals so far. Full series in [`b8g-clipseed3_evals.json`](b8g-clipseed3_evals.json).
+3437 evals so far. Full series in [`b8g-clipseed3_evals.json`](b8g-clipseed3_evals.json).
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
 | 0 | 0.0 | 0.0 | 0 | 0/95 | -5.002 | 0 | 0.4 |
 | 1000 | 6.4 | 6.4 | 0 | 9/95 | 4.928 | 0 | 0.4 |
 | 2000 | 3.6 | 5.0 | 0 | 7/95 | -1.41 | 0 | 0.4 |
-| 3000 | 0.4 | 3.47 | 0 | 2/95 | -1.488 | 0 | 0.4 |
-| 4000 | 0.8 | 2.8 | 0 | 3/95 | 0.243 | 0 | 0.4 |
+| ... | | | | | | | |
+| 3425000 | 0.0 | 0.04 | 0 | 0/95 | -5.002 | 0 | 0.0 |
+| 3426000 | 0.1 | 0.04 | 0 | 1/95 | -4.902 | 0 | 0.0 |
+| 3427000 | 0.1 | 0.04 | 0 | 1/95 | -4.902 | 0 | 0.0 |
+| 3428000 | 0.0 | 0.04 | 0 | 0/95 | -5.002 | 0 | 0.0 |
+| 3429000 | 0.0 | 0.04 | 0 | 0/95 | -5.002 | 0 | 0.0 |
+| 3430000 | 0.0 | 0.04 | 0 | 0/95 | -5.002 | 0 | 0.0 |
+| 3431000 | 0.1 | 0.04 | 0 | 1/95 | -4.902 | 0 | 0.0 |
+| 3432000 | 0.1 | 0.04 | 0 | 1/95 | -4.902 | 0 | 0.0 |
+| 3433000 | 0.0 | 0.04 | 0 | 0/95 | -5.002 | 0 | 0.0 |
+| 3434000 | 0.3 | 0.1 | 0 | 1/95 | -4.702 | 0 | 0.0 |
+| 3435000 | 0.0 | 0.1 | 0 | 0/95 | -5.002 | 0 | 0.0 |
+| 3436000 | 0.2 | 0.12 | 0 | 1/95 | -4.802 | 0 | 0.0 |

@@ -1,0 +1,24 @@
+{
+  "policy_name": "b8e-clipseed2",
+  "episodes_per_checkpoint": 4,
+  "results": [
+    {
+      "step": 500000,
+      "selected_by": "outlier",
+      "graph_single_eval": 60,
+      "graph_surrounding": 29.0,
+      "episodes": 4,
+      "perfect_games": 1,
+      "perfect_percent": 25.0,
+      "perfect_ci95": [
+        4.6,
+        69.9
+      ],
+      "avg_score": 82.5,
+      "median_score": 82.0,
+      "min_score": 71.0,
+      "max_score": 95.0,
+      "avg_reward": 102.03
+    }
+  ]
+}
