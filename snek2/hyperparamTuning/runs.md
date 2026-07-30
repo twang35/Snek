@@ -72,12 +72,40 @@ PYTHONPATH=. EVAL_OUT_SUFFIX=_outlier10 \
 `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
 verified in every log. Design rationale is in the Batch 8 section below.
 
-| policy | extra override | eff horizon | status |
-|---|---|---|---|
-| `b8a-disc999` | `DISCOUNT=0.999` | ~1000 steps | running |
-| `b8b-disc999seed2` | `DISCOUNT=0.999` | ~1000 steps | running |
-| `b8c-disc9975` | `DISCOUNT=0.9975` | ~400 steps | running |
-| `b8d-disc995clip` | `DISCOUNT=0.995 GRADIENT_CLIPPING=10` | ~200 steps | running |
+| policy | extra override | step | trailing | best 30-eval pf | status |
+|---|---|---|---|---|---|
+| `b8d-disc995clip` | `DISCOUNT=0.995 GRADIENT_CLIPPING=10` | 560k | 62.4 | **36.0%** @163k | **running, standout** |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | 359k | 59.2 | 14.7% @343k | running, healthy |
+| `b8e-clipseed2` | `DISCOUNT=0.995 GRADIENT_CLIPPING=10` | new | — | — | running, seeds `b8d` |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | new | — | — | running, seeds `b8c` |
+| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | **stopped — dead 660k steps** |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | **stopped — dead 1018k steps** |
+
+#### `DISCOUNT=0.999` is falsified, 2 of 2 dead
+
+Both seeds died, and neither got far first — peak trailing **63.1** and **31.8** against
+85.4 for `b8d`. `b8b` never produced a single perfect game in 1.41M steps. The hedge
+recorded before launch was that longer horizons grow bootstrapped targets and 0.999 might
+destabilise rather than help; that is what happened, and unusually for this project it was
+clean at n=2 with no ambiguity to wait out.
+
+So the discount has an optimum rather than a monotone benefit. Known points:
+
+| discount | eff horizon | outcome |
+|---|---|---|
+| 0.99 | ~100 | 12.0% measured, dies 2 of 4 |
+| 0.995 | ~200 | **38.8% measured, 3 of 3 survived** |
+| 0.9975 | ~400 | alive at 359k, 14.7% best-30 so far |
+| 0.999 | ~1000 | **dead 2 of 2** |
+
+#### `GRADIENT_CLIPPING=10` is the most promising thing in the batch
+
+`b8d` reached a **36.0% best-30 window by 163k steps** with a 70% single eval — for
+comparison `b7f`, the best arm on record, needed 699k to reach 44.0%. Far too early to
+call on n=1 and a graph window, which is why `b8e` now seeds it.
+
+The two replacements go to the two configs still alive rather than to another 0.999 seed:
+0.999 is answered, while `b8c` and `b8d` were both n=1.
 
 **First batch to run under quiet logging and the fixed perfect-game pause.** Two things
 follow. Logs are ~1 line per 10 evals, so take status from the `summary` block in

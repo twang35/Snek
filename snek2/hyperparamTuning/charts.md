@@ -40,7 +40,7 @@ comm -23 /tmp/have /tmp/doc
 
 Snapshot refreshed 2026-07-29, at the steps noted below.
 
-**Batches run newest first** — batch 7 at the top, batch 1 at the bottom — so the current
+**Batches run newest first** — the highest-numbered batch at the top, batch 1 at the bottom — so the current
 state of the investigation is what you see on opening the file, and the early dead ends stay
 available without being in the way. Add each new batch directly under the index table.
 Within a batch, arms are ordered **best result first** rather than by name, since that is
@@ -109,6 +109,79 @@ Uniform sampling (`b4a`, `b4b`) was the prior favourite and landed at about a th
 `b4c`'s rate, so the axis mattered but the expected direction was wrong.
 
 ---
+
+## Batch 8 — the discount optimum, and gradient clipping
+
+Six arms in four slots. Set out to push the discount past 0.995 and found that 0.995 is
+near the optimum, while the batch's incidental fourth arm became its most promising.
+
+### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
+
+Step 564k (running) · peak score 85.4 (at 87k) · **best 30-eval perfect 36.0%** (at 163k) · max single eval 70%
+
+**The fastest riser on record.** It reached a 36.0% best-30 window by **163k steps**, where
+`b7f` — the best arm measured so far — needed 699k to reach 44.0%. Clipping was included as
+a cheap independent stability aid, not as a headline candidate.
+
+Read the chart with the caveat that it is n=1 and the 36.0% is a graph window, not a
+measurement; `b8e` is seeding the same config now. Note also its `dead_since` field reads
+275000: it had a sub-threshold stretch and recovered fully, which is why the summary block
+now carries `zero_since` for "is it dead *now*".
+
+![b8d-disc995clip](charts/b8d-disc995clip.png)
+
+### b8c-disc9975 — `DISCOUNT=0.9975`
+
+Step 359k (running) · peak score 79.8 (at 305k) · best 30-eval perfect 14.7% (at 343k)
+
+The midpoint arm, included as a fallback in case 0.999 broke — which it did. Healthy and
+rising steadily, with none of the volatility of the higher-discount arms. Its ~400-step
+effective horizon is the closest of any arm to actual perfect-game length.
+
+![b8c-disc9975](charts/b8c-disc9975.png)
+
+### b8a-disc999 — `DISCOUNT=0.999`
+
+Step 1.11M · peak score 63.1 (at 94k) · best 30-eval perfect 0.7% · **died at 452k**
+
+A chart that never gets going. Unlike the batch-5 and batch-7 deaths, which peaked in the
+80s before collapsing, this one tops out at trailing **63.1** and manages a 0.7% best-30
+window before flatlining at 452k.
+
+That is the signature of a badly conditioned target rather than of catastrophic forgetting.
+At a ~1000-step effective horizon the value function bootstraps over a span longer than an
+episode, so the discount has an **optimum near 0.995 rather than a monotone benefit** — see
+[`findings.md`](findings.md). The prediction that 0.999 might destabilise was recorded
+before launch.
+
+![b8a-disc999](charts/b8a-disc999.png)
+
+### b8b-disc999seed2 — `DISCOUNT=0.999`, seed 2
+
+Step 1.41M · peak score **31.8** (at 63k) · best 30-eval perfect 0.0% · **died at 398k**
+
+The second 0.999 seed, and the worst chart in this file. Peak trailing 31.8, and **not one
+perfect game across 1.41M steps** — no other arm here has failed to produce at least one.
+Two seeds failing this badly is what makes 0.999 falsified rather than unlucky.
+
+![b8b-disc999seed2](charts/b8b-disc999seed2.png)
+
+### b8e-clipseed2 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 2
+
+Just started. Seeds `b8d`'s config, which is the most promising thing in the batch and was
+running at n=1.
+
+![b8e-clipseed2](charts/b8e-clipseed2.png)
+
+### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
+
+Just started. Seeds `b8c`, the only discount value still open. Both replacements went to
+configs still alive rather than to another 0.999 seed, since that question is answered.
+
+![b8f-disc9975seed2](charts/b8f-disc9975seed2.png)
+
+---
+
 
 ## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
 

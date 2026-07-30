@@ -169,14 +169,21 @@ Use it when a run is actually being debugged, not for status.
 carries a precomputed `summary` block:
 
 ```
-step, evals, trailing_now, peak_trailing{value,step},
-best_perfect30{value,step}, recent_perfect30, max_single_eval, dead_since, epsilon
+step, evals, trailing_now, peak_trailing{value,step}, best_perfect30{value,step},
+recent_perfect30, max_single_eval, dead_since, zero_since, epsilon
 ```
 
 That is exactly what a progress check needs, so reading `summary` from each arm replaces
-scanning the eval series. `dead_since` is the onset of a sustained-zero stretch, **not a
-verdict** — arms have recovered from trailing 0.3, and one recovered after ~400k steps
-near zero. Compare `dead_since` against `step` to get the duration, and only call an arm
+scanning the eval series.
+
+**Use `zero_since`, not `dead_since`, to ask whether an arm is dead now.** `dead_since` is
+the earliest sustained-zero stretch and is history; `zero_since` is the start of the
+*current* unbroken stretch and is `null` if the latest eval is above threshold.
+`b8d-disc995clip` carried `dead_since=275000` while going on to a 36% best-30 window, so
+`dead_since` alone would have condemned the best arm in its batch.
+
+Neither is a verdict. Arms have recovered from trailing 0.3, and one recovered after ~400k
+steps near zero. Read `zero_since` against `step` for the duration, and only call an arm
 dead after hundreds of thousands of steps pinned there.
 
 The one log line worth grepping is `hyperparameter override:` at startup, which confirms

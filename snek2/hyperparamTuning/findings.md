@@ -23,7 +23,9 @@ section before proposing an epsilon or buffer experiment.
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — it is arithmetic |
 | Sharpness is a variance dial: higher ceiling *and* higher death risk | **weakened** — eff 1.2 dies 2 of 4, eff 1.6 dies 2 of 3 |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds across two sharpness levels |
-| `DISCOUNT=0.995` is the current best lead | **promising**, n=2 healthy, n=3 running |
+| `DISCOUNT=0.995` is the current best lead | **measured**, 3 of 3 survived, 38.8% pooled |
+| Higher discount is monotonically better | **falsified** — 0.999 died 2 of 2 |
+| `GRADIENT_CLIPPING=10` on 0.995 reaches a good level much faster | **promising**, n=1, seeding now |
 | The 5s perfect-game pause slowed good arms ~40% and biased wall-clock comparisons | **fixed**, now 500ms |
 | Evals looked truncated but never were: 11 of 11 complete at 10 ckpts x 100 eps | **verified** |
 | There is a stability "cliff" between eff 0.8 and 1.2 | **retracted** — `b6b` crossed it and thrived |
@@ -629,6 +631,33 @@ the same shape is a trend, not noise.
 
 This overturned an earlier read that n=3 had "the best trajectory of the batch" — true
 through 200k, false afterwards. Do not plan an n=5 arm.
+
+## The discount has an optimum near 0.995, not a monotone benefit
+
+`DISCOUNT=0.995` was such a clear win over 0.99 that the obvious next move was more of it.
+**More is worse.** Both `DISCOUNT=0.999` seeds died, and neither reached a decent level
+first:
+
+| discount | eff horizon | peak trailing | outcome |
+|---|---|---|---|
+| 0.99 | ~100 | 88.8 | 12.0% measured, dies 2 of 4 seeds |
+| **0.995** | ~200 | 92.6 | **38.8% measured, 3 of 3 survived** |
+| 0.9975 | ~400 | 79.8 | alive at 359k, 14.7% best-30 so far |
+| 0.999 | ~1000 | 63.1 / 31.8 | **dead 2 of 2** (at 452k and 398k) |
+
+`b8b-disc999seed2` never produced a single perfect game across 1.41M steps. The prediction
+recorded before launch was that longer horizons grow bootstrapped targets and 0.999 might
+destabilise rather than help — that is what happened, and for once it was unambiguous at
+n=2 with nothing to wait out.
+
+The shape makes sense given the mechanism. At 0.99 the ~100-step horizon is shorter than a
+perfect game, so the terminal bonus is invisible; at 0.999 the ~1000-step horizon exceeds
+episode length, so the value function is bootstrapping over a horizon longer than the task
+and the targets stop being well conditioned. 0.995 sits close to actual episode length,
+which is the point.
+
+**Practical consequence: stop sweeping the discount upward.** 0.9975 is still open at n=1
+and is the only remaining value worth a seed; anything above it is answered.
 
 ## The perfect-game celebration was throttling the best arms
 

@@ -57,11 +57,17 @@ def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1
     points, and it makes "is this arm dead" a single consistent definition rather than a
     judgement re-made each time.
 
-    `dead_since` is the first step of the earliest window of `dead_window` consecutive evals
-    whose trailing score never reaches `dead_threshold`. Note it says *since*, not *dead*:
-    arms have recovered from trailing 0.3, and one recovered after 400k steps near zero, so
-    the field is the onset of a sustained-zero stretch and the length of that stretch is
-    what makes it a verdict. Compare against the last step to get the duration.
+    Two death fields, because one is not enough:
+
+    - `dead_since` — first step of the *earliest* window of `dead_window` consecutive evals
+      all below `dead_threshold`. History: this arm hit a wall at least once here.
+    - `zero_since` — start of the *current* unbroken sub-threshold stretch, or None if the
+      latest eval is above it. This is the one that answers "is it dead now".
+
+    Neither is a verdict on its own. Arms have recovered from trailing 0.3, one recovered
+    after ~400k steps near zero, and `b8d-disc995clip` carried `dead_since=275000` while
+    going on to a 36% best-30 window. Read `zero_since` against `step` for the duration of
+    the current stretch, and only call an arm dead after hundreds of thousands of steps.
     """
     if not eval_rows:
         return {}
@@ -86,6 +92,16 @@ def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1
             dead_since = eval_rows[index]['step']
             break
 
+    # The step the arm last dropped below threshold and never came back, or None if the most
+    # recent eval is above it. `dead_since` alone is not enough to answer "is it dead now":
+    # b8d-disc995clip had a sub-threshold stretch from 275k, recovered, and went on to a 36%
+    # best-30 window while still carrying dead_since=275000.
+    zero_since = None
+    for index in range(len(trailing) - 1, -1, -1):
+        if trailing[index] >= dead_threshold:
+            break
+        zero_since = eval_rows[index]['step']
+
     recent = perfect[-perfect_window:]
     return {
         'step': last['step'],
@@ -96,6 +112,7 @@ def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1
         'recent_perfect30': round(sum(recent) / len(recent), 1),
         'max_single_eval': max(perfect),
         'dead_since': dead_since,
+        'zero_since': zero_since,
         'epsilon': last['epsilon'],
     }
 
