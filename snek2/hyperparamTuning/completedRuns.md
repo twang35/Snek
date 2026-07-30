@@ -79,10 +79,17 @@ Four things this ranking makes visible that per-batch reading did not:
   63.7 trailing before collapsing again. A ranking by endpoint hides that entirely — see
   [`findings.md`](findings.md).
 
-Two batch-8 arms are **absent from this table because they are still running**:
-`b8f-disc9975seed2` (best-30 **47.7%**, 16 checkpoints above 80%) and `b8d-disc995clip`
-(**38.3%**, still improving at 2.08M). On graph metrics both would sit at the top. They are in
-[`runs.md`](runs.md) until they stop and can be measured.
+Two batch-8 arms are **absent from this table because they are still running**, and both would
+top it. Measured mid-run on 2026-07-30:
+
+| arm | ckpts | best ckpt | top-3 | pooled |
+|---|---|---|---|---|
+| `b8f-disc9975seed2` | 16 | **63.0%** @1618k | **60.3%** | 46.5% /1600 |
+| `b8d-disc995clip` | 10 | **62.0%** @1688k | 58.7% | **48.3%** /1000 |
+
+Both beat `b7f`'s 51% / 38.8% by ~10 points on pooled rate with non-overlapping intervals, and
+tie each other. They stay in [`runs.md`](runs.md) until they stop and get a close-out
+measurement.
 
 ## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
 

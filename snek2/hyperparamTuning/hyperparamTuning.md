@@ -137,6 +137,15 @@ population truncated at 50%, so a strong arm's pooled figure is no longer comput
 way as a weak one's. Compare **best checkpoint** across arms, which is what the thresholds are
 built to find, and treat pooled as a within-arm consistency read only.
 
+**Measure the whole >=80% tier; do not trust its order.** 26 high-eval checkpoints measured on
+2026-07-30 show the graph value carries no ranking signal once it is high — correlation with the
+true rate is **-0.09** across both arms, and it flips sign between them (+0.66 / -0.57). The
+three 90% points in that sample measured 39%, 21% and 44%, the worst three of `b8f`'s sixteen.
+Range restriction explains part of it (everything here is 70-90%), so this coexists with the
++0.64 below rather than replacing it. The practical consequence is the important part: **there is
+no way to tell in advance which >=80% checkpoint is the 63% and which is the 21%**, so measure
+all of them rather than truncating the list.
+
 **Outlier evals are not luck — those checkpoints really are better.** This was measured,
 not assumed, and it reversed an earlier version of this protocol that ranked by smoothed
 rate on the theory that a 70-80% single eval had to be a fluke:

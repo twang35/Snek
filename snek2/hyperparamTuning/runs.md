@@ -12,17 +12,39 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Current best: `DISCOUNT=0.995`
+## Current best: a two-way tie at ~62%, measured 2026-07-30
+
+Two arms measured mid-run, both **~10 points above the previous record on pooled rate**:
+
+| arm | config | ckpts | best ckpt | top-3 | pooled | 95% CI |
+|---|---|---|---|---|---|---|
+| `b8f-disc9975seed2` | **disc 0.9975** | 16 | **63.0%** @1618k | **60.3%** | 46.5% /1600 | 44.1-48.9 |
+| `b8d-disc995clip` | disc 0.995 + clip 10 | 10 | **62.0%** @1688k | 58.7% | **48.3%** /1000 | 45.2-51.4 |
+| `b7f-disc995seed3` | disc 0.995 | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
+| `b4c-schlongper` | disc 0.99 | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
+
+**Read the pooled column, not the best.** At 1000-1600 episodes its interval is ±3 points where
+a single best-checkpoint reading is ±9, and repeat measurements of one frozen checkpoint have
+spread 19 points here. On pooled, `b8d` and `b8f` overlap each other and both clear `b7f`
+decisively.
+
+**The two configs are statistically indistinguishable.** 63.0 vs 62.0 on best, overlapping
+pooled intervals. Do not read a winner out of this pair.
+
+**Both arms are still running**, so these are mid-run snapshots taken at 2.08M (`b8d`) and 1.78M
+(`b8f`). Files are suffixed `_midrun`; a close-out `_top10` run comes later.
+
+### Older `DISCOUNT=0.995` context
 
 ```
 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 SNEK_DISCOUNT=0.995
 ```
 
-It **matches the best ceiling ever measured while surviving 3 of 3 seeds** instead of 1 of
+It **matched the best ceiling then known while surviving 3 of 3 seeds** instead of 1 of
 3. Every measurement below uses the same outlier-top10 selection rule, so the columns are
-comparable with each other — but **not with anything measured after 2026-07-30**, when the
+comparable with each other — but **not with the two arms above**, measured after the
 >=80%/<=50% thresholds made the checkpoint count vary per arm. The `best ckpt` column stays
-comparable across both rules; the two pooled columns do not.
+comparable across both rules; the pooled columns do not.
 
 | arm | discount | best ckpt | top-3 pooled | all-10 pooled | survived |
 |---|---|---|---|---|---|
@@ -57,11 +79,8 @@ than a lone spike.
 **Caveat on the 3-of-3:** `b7e` and `b7f` were stopped at 1.28M and 1.06M, while their 0.99
 siblings died at 1162k and 573k. Survival is therefore established only out to ~1.1M steps.
 
-**This table may be superseded — `b8f-disc9975seed2` is unmeasured, not unimpressive.** On
-graph metrics it beats every arm here (47.7% best-30 vs `b7f`'s 44.0%, first-ever 90% points,
-16 checkpoints at >=80% vs `b7f`'s 1), but it is still running and its checkpoints have not
-been evaluated over 100 episodes, so it cannot go in a measured column yet. Measure it when it
-stops before treating `0.995` as settled.
+**Superseded 2026-07-30** by the measurements at the top of this file: `b8f` and `b8d` both
+measure ~62% best and ~47% pooled, against `b7f`'s 51% and 38.8%.
 
 ### The `b6a`/`b6b` re-measurement is retired, not pending
 
@@ -85,31 +104,29 @@ comparison matters, it needs new seeds, not new measurements of old ones.
 `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
 verified in every log. Design rationale is in the Batch 8 section below.
 
-Status as of **2026-07-30**, two arms running:
+Status as of **2026-07-30 11:45**, two arms running:
 
-| policy | extra override | step | trailing | best 30-eval pf | recent-30 pf | max pt | status |
+| policy | extra override | step | best 30-eval pf | **best measured ckpt** | pooled | max pt | status |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 1.78M | **78.2** | **47.7%** @1625k | 23.3% | **90%** | running — **best arm on record** |
-| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 2.08M | **81.4** | **38.3%** @1910k | **32.0%** | 80% | running — still climbing |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 2.12M | 47.7% @1625k | **63.0%** @1618k | 46.5% /1600 | **90%** | running, healthy |
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 2.34M | 38.3% @1910k | **62.0%** @1688k | 48.3% /1000 | 80% | running, healthy |
 | `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | **0.1** | 30.0% @253k | 0.0% | 50% | **stopped — died, recovered, died** |
 | `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 57.8 | 21.3% @515k | 1.7% | 60% | **stopped — flat, then faded** |
 | `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 10.3 | 14.7% @343k | 0.0% | 40% | **stopped — monotone decline** |
 | `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | 0.0% | 10% | **stopped — dead** |
 | `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | 0.0% | 0% | **stopped — dead** |
 
-**`b8f` is the best arm the investigation has produced.** Its 47.7% best-30 window beats
-`b7f`'s 44.0%, its 89.4 peak trailing is the highest recorded, and it is the only arm ever to
-put a graph point at **90%** — three of them. It also has **16 checkpoints at >=80%**, against
-1 for `b7f` and 1 for `b4c`, so its strength is a broad region rather than a spike. Its
-last 300k block averages 34.8% perfect.
+**Both arms are measured and effectively tied at the top of the project** — 63.0% and 62.0%
+best checkpoint, overlapping pooled intervals, both ~10 points above `b7f` on pooled. See the
+table at the top of this file.
 
-**`b8d` is second and has not peaked**: peak trailing 86.9 at 2058k and best-30 at 1910k are
-both from its most recent 200k, and its block means rise monotonically from 600k
-(69.4 → 69.8 → 72.0 → 73.9 → 78.3 trailing, 8.5% → 24.8% perfect). Neither running arm
-should be stopped while both are still improving this late.
+**Both are healthy and neither should be stopped on a single trailing reading.** `b8d` read
+trailing 42.6 at 2336k, which looks alarming and is not: its 50k block means over the last
+400k run 66.7-80.6, and its most recent block (2286-2336k) has the **highest perfect rate of
+its last 400k at 33.2%** with an 80% point. `b8f` similarly dipped to 9.0% mean perfect around
+1965-2015k and recovered to 29.6%. **Read blocks, not the latest eval.**
 
-**Both stopped arms were the clipping seeds, and that is the batch's negative result** — see
-below. Two slots are now free.
+**Both stopped arms were the clipping seeds** — see below. Two slots are free.
 
 #### `b8c-disc9975`: stopped after a long monotone decline
 
@@ -170,10 +187,10 @@ So the discount has an optimum rather than a monotone benefit. Known points:
 | 0.999 | ~1000 | **dead 2 of 2** |
 
 **0.9975 is now the open question rather than a footnote.** `b8c` declined monotonically to a
-stop while `b8f` became the best arm on record, so the config is 1 of 2 on survival and 1 of 1
-on ceiling. Whether the optimum sits at 0.995 or 0.9975 is undecided and is the obvious target
-for the two free slots: a third and fourth 0.9975 seed would settle it, where more 0.995 seeds
-would only re-confirm something already at 3 of 3.
+stop while `b8f` measured **63.0% best / 46.5% pooled**, the joint-best result in the project. So
+the config is 1 of 2 on survival and tied-best on ceiling. Whether the optimum sits at 0.995 or
+0.9975 is undecided and is the obvious target for the two free slots: a third and fourth 0.9975
+seed would settle it, where more 0.995 seeds would only re-confirm something already at 3 of 3.
 
 #### `GRADIENT_CLIPPING=10` does not deliver the stability it was added for
 
@@ -182,7 +199,7 @@ thing in the batch" off `b8d` alone at 163k steps. At n=3 it is **1 of 3**:
 
 | arm | peak trailing | best 30-eval pf | best measured ckpt | outcome |
 |---|---|---|---|---|
-| `b8d-disc995clip` | **86.9** | **38.3%** | not yet measured | thriving at 2.08M |
+| `b8d-disc995clip` | **86.9** | **38.3%** | **62.0%** (10 ckpts, 48.3% pooled) | thriving at 2.34M |
 | `b8e-clipseed2` | 85.9 | 21.3% | **32.0%** (1 ckpt) | faded, stopped at 1.16M |
 | `b8g-clipseed3` | 77.0 | 30.0% | **none measurable** | dead, stopped at 3.43M |
 
@@ -191,12 +208,13 @@ clipping variant is worse than the config it was meant to stabilise, not better.
 hypothesis was that clipping the 10.0 terminal reward's gradient would prevent the
 catastrophic drops; it did not prevent them in `b8e` or `b8g`.
 
-The honest caveat is that **`b8d` is the single best-behaved 0.995 arm ever run** — 2.08M
-steps still improving, where `b7f` was stopped at 1.06M. So clipping may raise the ceiling
-while lowering the survival rate, which is the ceiling/reliability tradeoff this project
-keeps rediscovering, and exactly what `0.995` itself was valued for *removing*. Do not
-adopt clipping on this evidence; if it gets another look, it needs seeds 4-6, and `b8d`'s
-best checkpoints should be measured first.
+**`b8d`'s 62% does not rescue clipping, and an interim read that said otherwise was wrong.**
+Partway through the measurement, with `b8d` at 62% and `b8f` unmeasured, the live hypothesis
+was "clipping raises the ceiling while lowering survival". `b8f` then measured **63.0%
+without clipping**, with overlapping pooled intervals. So clipping has **no ceiling advantage**
+either, and the verdict is simply: no measured benefit on ceiling, worse record on survival.
+**Do not adopt it.** The lesson for next time is not to grade a two-arm comparison off the arm
+that finished first.
 
 #### `b8g-clipseed3`: died, recovered after 1.2M steps, then died permanently
 

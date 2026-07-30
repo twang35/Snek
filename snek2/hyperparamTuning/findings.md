@@ -726,6 +726,82 @@ ceiling and the worse survival record, on one seed each way.
 seeds would only re-confirm it, while 0.9975 could be either the new optimum or a coin flip and
 two seeds decide which.
 
+## The record is ~62%, and two different configs reach it
+
+Measured 2026-07-30, both arms mid-run:
+
+| arm | config | ckpts | best ckpt | top-3 | pooled | 95% CI |
+|---|---|---|---|---|---|---|
+| `b8f-disc9975seed2` | disc **0.9975** | 16 | **63.0%** @1618k | **60.3%** | 46.5% /1600 | 44.1-48.9 |
+| `b8d-disc995clip` | disc 0.995 + clip | 10 | **62.0%** @1688k | 58.7% | **48.3%** /1000 | 45.2-51.4 |
+| `b7f-disc995seed3` | disc 0.995 | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
+| `b4c-schlongper` | disc 0.99 | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
+
+**The pooled column carries the claim.** A best-of-N is the maximum of a noisy statistic with a
+±9-point interval, and one frozen checkpoint here has read 51/42/32 across three measurements.
+Pooled over 1000-1600 episodes the interval is ±3, and both new arms clear `b7f` by ~10 points
+without overlapping it.
+
+**The two configs are indistinguishable from each other** — 63.0 vs 62.0, overlapping pooled
+intervals. This is a tie, not a ranking, and neither one beats the other on this evidence.
+
+### Both records come from checkpoints past 1.6M steps
+
+A pattern worth stating as a hypothesis, because it would change how arms are run:
+
+| arm | best ckpt step | arm stopped at |
+|---|---|---|
+| `b8f` | 1618k | still running (2.12M) |
+| `b8d` | 1688k | still running (2.34M) |
+| `b7f` | 860k | **1.06M** |
+| `b4c` | 869k | **1.06M** |
+
+**Both previous record-holders were stopped before reaching the range where the new records
+live.** No healthy `DISCOUNT>=0.995` arm had ever been allowed past ~1.3M steps.
+
+The counter-evidence is real, though: `b7d` ran to 1.60M at 0.995 and its best checkpoint was
+26% at 1330k, so late steps are not sufficient on their own. And `b7a` reached 2.00M with a 19%
+ceiling. The defensible version is narrow — **the horizon may have been truncating the best
+checkpoints of good arms**, which is cheap to test by simply not stopping healthy arms at ~1M.
+
+## Filter, not ranker: the graph eval does not order checkpoints within the high band
+
+The 26 checkpoints measured on 2026-07-30 are the first large sample of high-graph-eval
+checkpoints measured under one rule, and they say the graph value **stops carrying information
+once it is high**:
+
+| graph point | n | mean measured |
+|---|---|---|
+| 90% | 3 | **34.7%** |
+| 80% | 17 | 50.8% |
+| 70% | 6 | 43.2% |
+
+| correlation with measured rate | value |
+|---|---|
+| graph single eval, both arms pooled (n=26) | **-0.09** |
+| graph single eval, `b8d` alone | +0.66 |
+| graph single eval, `b8f` alone | **-0.57** |
+| surrounding rate, both arms pooled | -0.03 |
+| surrounding rate, `b8d` / `b8f` | -0.69 / +0.50 |
+
+`b8f`'s three 90% points measured 39%, 21% and 44% — **the worst three of its sixteen**. The
+sign of every correlation flips between the two arms, which is what no-signal looks like.
+
+**This does not overturn the +0.64 finding above, because of range restriction.** That
+correlation was measured across a wider spread of graph values; here every checkpoint is 70-90%,
+and truncating a predictor's range attenuates its correlation mechanically. The two results are
+compatible and the combined reading is:
+
+- **As a filter the graph eval works well.** All 26 measured 21-63%, far above what a randomly
+  chosen checkpoint of these arms would give. The >=80%/<=50% thresholds are doing their job.
+- **As a ranker inside the high band it is useless.** Do not treat the top of the selected list
+  as the best checkpoint, and do not skip the rest of the tier to save time — **measuring all of
+  the >=80% checkpoints is exactly the right policy**, because there is no way to tell in advance
+  which of them is the 63% and which is the 21%.
+
+That is a stronger argument for the "measure every checkpoint at >=80%" rule than the one it was
+introduced with.
+
 ## Falsified: `GRADIENT_CLIPPING=10` does not buy stability
 
 Clipping went in as a cheap independent stability aid on top of `DISCOUNT=0.995`, on the
@@ -733,11 +809,11 @@ reasoning that the 10.0 terminal reward produces occasional huge gradients and t
 them would prevent the catastrophic drops. After three seeds it is **1 of 3**, against **3 of
 3** for plain 0.995:
 
-| arm | peak trailing | best 30-eval pf | ckpts >50% | outcome |
+| arm | peak trailing | best 30-eval pf | best measured | outcome |
 |---|---|---|---|---|
-| `b8d-disc995clip` | **86.9** | **38.3%** | 54 | thriving at 2.08M |
-| `b8e-clipseed2` | 85.9 | 21.3% | **1** | faded; stopped at 1.16M |
-| `b8g-clipseed3` | 77.0 | 30.0% | **0** | dead; stopped at 3.43M |
+| `b8d-disc995clip` | **86.9** | **38.3%** | **62.0%** (48.3% pooled) | thriving at 2.34M |
+| `b8e-clipseed2` | 85.9 | 21.3% | 32.0% (1 ckpt) | faded; stopped at 1.16M |
+| `b8g-clipseed3` | 77.0 | 30.0% | **none >50%** | dead; stopped at 3.43M |
 
 **It was briefly this file's headline, off `b8d` at 163k steps.** That reading — "the fastest
 riser on record", 36.0% best-30 by 163k against `b7f`'s 699k — was wrong twice over. `b8d`'s
@@ -745,12 +821,14 @@ own early window was followed by a near-total collapse (0.4% mean perfect across
 everything durable came after 600k, so it was not a head start. And the two seeds that followed
 did not reproduce it.
 
-The residual possibility worth stating: **`b8d` is the best-behaved 0.995 arm ever run**, still
-improving at 2.08M steps where `b7f` was stopped at 1.06M. So clipping may raise the ceiling
-while lowering survival. That is the ceiling/reliability tradeoff this investigation keeps
-rediscovering — and `DISCOUNT=0.995` was valued precisely for *removing* it, so trading it back
-is not obviously progress. **Do not adopt clipping**; measure `b8d`'s checkpoints when it stops,
-and if the ceiling claim survives measurement, seeds 4-6 decide it.
+**The "raises the ceiling" escape hatch is now closed too.** `b8d` measured 62.0% best / 48.3%
+pooled, which looked like a unique ceiling gain — until `b8f` measured **63.0% / 46.5% without
+clipping**, with overlapping intervals. Clipping therefore shows **no measured ceiling benefit
+and a worse survival record**. Do not adopt it.
+
+Recording the process error, because it is the recurring one: that ceiling claim was written
+while `b8d` was measured and `b8f` was not, off the arm that happened to finish first. A
+two-arm comparison graded from one arm is not a comparison. Wait for both.
 
 ## An arm recovered from 1.2M steps at zero — and then died anyway
 
