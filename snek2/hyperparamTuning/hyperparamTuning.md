@@ -102,40 +102,68 @@ does, reload its checkpoint and evaluate it over hundreds of episodes:
 
 ```
 cd snek2
-EVAL_OUT_SUFFIX=_top10 \
-  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top10
+EVAL_OUT_SUFFIX=_top20 \
+  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top20
 ```
 
-`top10` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
-10-episode eval** from the graph, using the surrounding perfect rate only to break ties
-among equal spikes, and applies two thresholds:
+`top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
+10-episode eval** from the graph, using the surrounding perfect rate to order within an
+equal-eval tier, and applies two thresholds:
 
 | rule | threshold | effect |
 |---|---|---|
-| always measure | single eval **>=80%** | every such checkpoint runs, even past N |
-| never measure | single eval **<=50%** | skipped entirely, however few slots are filled |
-| fill remaining slots | the band between | at 10-episode granularity this is 60% and 70% |
+| always measure | single eval **>=90%** | every such checkpoint runs, even past N |
+| fill remaining slots | **>=60%**, best first | at 10-episode granularity this is {60, 70, 80} |
+| never measure | below **60%** | skipped entirely, however few slots are filled |
 
 **N is a target, not a quota.** A graph point is 10 episodes, so `perfect_percent` only takes
-values 0, 10, … 100 — which makes those thresholds coarser than they look. `>=80%` is the set
-{80, 90, 100} and the fill band is exactly {60, 70}. `b8f-disc9975seed2` has 16 checkpoints at
->=80% and runs all 16; `b8e-clipseed2` has one point above 50% in 1151 evals and runs one.
+values 0, 10, … 100 — which makes those thresholds coarser than they look. `>=90%` is the set
+{90, 100} and the fill band is exactly {60, 70, 80}. `b8f-disc9975seed2` has 32 checkpoints at
+>=90% and runs all 32; `b8e-clipseed2` has one point above the floor in 1165 evals and runs one.
 
 Explicit steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is
 the question, and they bypass both thresholds.
 
-**Most arms in this project have nothing above 50%,** so the selector now refuses them
-outright with a message naming their best graph point. That is the intended outcome — 22 of
-the 30 arms run so far never produced a single eval above 50%, and measuring their best 40%
-checkpoints buys a precise number for a policy that was never a candidate. It does mean
-`b6a-alpha04` can no longer be re-measured at all (best point 50%) and `b6b-alpha06` yields
-only 2 checkpoints, which retires a queued task rather than completing it.
+#### Why the thresholds moved from >=80%/cap 10 to >=90%/cap 20
 
-**This rule change breaks pooled-rate comparability**, on top of the earlier selector change.
-Pooled rate now averages over a checkpoint count that varies by arm (16 vs 7 vs 1) and over a
-population truncated at 50%, so a strong arm's pooled figure is no longer computed the same
-way as a weak one's. Compare **best checkpoint** across arms, which is what the thresholds are
-built to find, and treat pooled as a within-arm consistency read only.
+The first version measured **everything** at >=80% with no upper bound, which does not scale
+on a good arm. Once `b8f-disc9975seed2` reached 3M steps it presented **109** such checkpoints —
+about seven hours of evaluation — and it was still training:
+
+| arm | checkpoints picked now | under the old rule |
+|---|---|---|
+| `b8f-disc9975seed2` | **32** | 109 |
+| `b8d-disc995clip` | **20** | 33 |
+| `b7f-disc995seed3` | 20 | 10 |
+
+Measurement justified the narrowing: across 88 checkpoints, 90% and 80% graph points had
+**indistinguishable** mean true rates (57.9% vs 58.6%), so an unbounded 80% tier was buying
+volume rather than information. The 100% points were the only genuinely distinct group.
+
+Note the change is not uniformly cheaper. A **weak** arm now gets *more* attention — `b7f` goes
+from 10 to 20 — because the cap doubled and the fill band widened to include 80%. The saving is
+concentrated where the cost was: strong arms with hundreds of high checkpoints.
+
+**Most arms have nothing above the floor,** so the selector refuses them outright with a message
+naming their best graph point. That is the intended outcome: 22 of the 30 arms run so far never
+produced a single eval above 50%. It also means `b6a-alpha04` cannot be re-measured at all and
+`b6b-alpha06` yields only 2 checkpoints.
+
+**These rule changes break pooled-rate comparability.** Pooled now averages over a checkpoint
+count that varies by arm (32 vs 20 vs 1) and over a population truncated at 60%, so a strong
+arm's pooled figure is not computed the same way as a weak one's. Compare **best checkpoint**
+across arms, and treat pooled as a within-arm consistency read.
+
+#### Results are saved incrementally
+
+The output JSON is rewritten after **every** checkpoint, via `.partial` + `os.replace` so a
+reader never sees a half-written file. An interrupted run therefore keeps everything measured up
+to that point, and the payload carries `complete: false` until the final checkpoint lands —
+check that field before treating a file as an arm's full measurement.
+
+This matters because these runs are long: 20 checkpoints is over an hour, and a 63-checkpoint
+run took four. The earlier version wrote once at the end, so any interruption discarded all of
+it — the numbers would survive in the log, but nothing machine-readable.
 
 **Measure the whole >=80% tier; do not trust its order.** 26 high-eval checkpoints measured on
 2026-07-30 show the graph value carries no ranking signal once it is high — correlation with the
@@ -165,9 +193,12 @@ rate systematically picked worse checkpoints.
 perfect rate by tens of points — one measured triple reads 8% / 35% / 7% — so neighbouring
 checkpoints are separate policies rather than repeat samples of one.
 
-**~10 checkpoints x 100 episodes, ~30 minutes on an idle machine** (~50 for four arms in
-parallel — good policies play long episodes and 40 workers oversubscribe 14 cores). Budget
-proportionally when an arm has many checkpoints at >=80%: `b8f` at 16 is ~50 minutes idle.
+**Budget ~4 minutes per checkpoint**, so a 20-checkpoint run is ~80 minutes. That rate held for
+both a single arm at 10 workers and two arms in parallel at 20 workers each — **throughput is
+core-bound**, so raising `EVAL_WORKERS` past ~10 does not make a run faster, it only lets a
+second arm run alongside. Two arms in parallel is the real speedup; more workers is not.
+
+An arm whose mandatory tier exceeds the cap costs proportionally more: `b8f` at 32 is ~2 hours.
 
 Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
 confidence interval. Several copies can run at once on different arms — give each its own
@@ -186,7 +217,7 @@ buffer out of the checkpointer, so they would be ~97 GB at this depth — do not
 under the new setting without checking disk.
 
 Two habits still apply. Close an arm out at its horizon: past peak, the marginal training
-step is worth less than the checkpoint it evicts. And `top10` filters to surviving
+step is worth less than the checkpoint it evicts. And `top20` filters to surviving
 checkpoints, so it degrades gracefully instead of failing on a deleted step.
 
 **Each eval process opens one visible window** (worker 0 renders, the rest are
@@ -209,7 +240,7 @@ you is *which checkpoint is worth 100 episodes*, and there it beats every smooth
 alternative (+0.64 vs -0.40 correlation). Use the graph to select, `eval_checkpoints.py`
 to quote.
 
-**Every arm ends with checkpoint evals.** Run `eval_checkpoints.py <arm> top10` and compare
+**Every arm ends with checkpoint evals.** Run `eval_checkpoints.py <arm> top20` and compare
 *those* numbers across arms. Comparing graph peaks across arms compounds the error once per
 arm, and it demonstrably misranks: `b5c-schlongIS` is 2nd of its batch by graph window and
 **last by measurement** (17.0% vs 2.1%).

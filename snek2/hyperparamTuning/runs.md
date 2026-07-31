@@ -49,7 +49,7 @@ SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 SNEK_D
 It **matched the best ceiling then known while surviving 3 of 3 seeds** instead of 1 of
 3. Every measurement below uses the same outlier-top10 selection rule, so the columns are
 comparable with each other — but **not with the two arms above**, measured after the
->=80%/<=50% thresholds made the checkpoint count vary per arm. The `best ckpt` column stays
+threshold-tier selector made the checkpoint count vary per arm. The `best ckpt` column stays
 comparable across both rules; the pooled columns do not.
 
 | arm | discount | best ckpt | top-3 pooled | all-10 pooled | survived |
@@ -85,20 +85,20 @@ than a lone spike.
 **Caveat on the 3-of-3:** `b7e` and `b7f` were stopped at 1.28M and 1.06M, while their 0.99
 siblings died at 1162k and 573k. Survival is therefore established only out to ~1.1M steps.
 
-**Superseded 2026-07-30** by the measurements at the top of this file: `b8f` and `b8d` both
-measure ~62% best and ~47% pooled, against `b7f`'s 51% and 38.8%.
+**Superseded** by the measurements at the top of this file: `b8f` and `b8d` measure **88% and
+80%** best checkpoint and ~59% pooled, against `b7f`'s 51% and 38.8%.
 
 ### The `b6a`/`b6b` re-measurement is retired, not pending
 
 It was queued as "do this first" because both arms predate the selection fix and were biased
-low. The **50% floor added on 2026-07-30 closes it instead of answering it**:
+low. The **60% floor closes it instead of answering it**:
 
 | arm | best graph point | checkpoints the selector now picks |
 |---|---|---|
 | `b6a-alpha04` | 50% @510k | **none** — selector exits with a message |
 | `b6b-alpha06` | 60% (2 points, both ~1.74M) | **2** |
 
-Neither has anything at >=80%, and `b6a` has nothing above the floor at all. Re-measuring
+Neither has anything at >=90%, and `b6a` has nothing above the 60% floor at all. Re-measuring
 `b6b` would produce a 2-checkpoint figure that is not comparable to a 10- or 16-checkpoint
 one, so the honest read is that **these two arms cannot be placed on the ranking table** and
 the alpha question stays where batch 7 left it. Do not re-add this task; if the alpha
@@ -116,6 +116,11 @@ Status as of **2026-07-31 01:00**, two arms running:
 |---|---|---|---|---|---|---|---|
 | `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 3.02M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **100%** | running, past peak |
 | `b8d-disc995clip` | `0.995 + CLIPPING=10` | 3.48M | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | 100% | running, past peak |
+| `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | 50% | **stopped — died, recovered, died** |
+| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | 60% | **stopped — flat, then faded** |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | 40% | **stopped — monotone decline** |
+| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | 0.7% @82k | 0% (dead) | — | 10% | **stopped — dead** |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | 0.0% | 0% (dead) | — | 0% | **stopped — dead** |
 
 **Both arms have now peaked and are drifting down**, which is new since the morning check:
 
@@ -131,21 +136,13 @@ Neither is dead (`zero_since` null for both, trailing ~80).
 **The record checkpoints are already saved to [`../hallOfFame/`](../hallOfFame/README.md)**, so a
 further decline cannot cost the result. That removes the usual urgency about stopping a
 past-peak arm before `max_to_keep` evicts its best checkpoint.
-| `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | **0.1** | 30.0% @253k | 0.0% | 50% | **stopped — died, recovered, died** |
-| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 57.8 | 21.3% @515k | 1.7% | 60% | **stopped — flat, then faded** |
-| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 10.3 | 14.7% @343k | 0.0% | 40% | **stopped — monotone decline** |
-| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | 0.0% | 10% | **stopped — dead** |
-| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | 0.0% | 0% | **stopped — dead** |
-
-**Both arms are measured at 88.0% and 80.0% best checkpoint** and are tied on pooled rate. See
-the table at the top of this file.
 
 **Do not judge either on a single trailing reading.** `b8d` read trailing 42.6 at 2336k, which
 looked alarming and was not — its surrounding 50k blocks ran 66.7-80.6 and it went on to a 50.0%
 best-30 window at 2671k and an 80% measured checkpoint. `b8f` dipped to 9.0% mean perfect around
 1965-2015k and recovered to 56.8%. **Read blocks, not the latest eval.**
 
-**Both stopped arms were the clipping seeds** — see below. Two slots are free.
+**The two arms stopped on 2026-07-30 were both clipping seeds** — see below. Two slots are free.
 
 #### `b8c-disc9975`: stopped after a long monotone decline
 
@@ -327,24 +324,30 @@ gets the full horizon.
 ### Finish the batch with 100-episode evals
 
 Comparing arms by their graph peaks would be the winner's curse (see
-[`hyperparamTuning.md`](hyperparamTuning.md)). Use `top10`, which ranks *surviving*
+[`hyperparamTuning.md`](hyperparamTuning.md)). Use `top20`, which ranks *surviving*
 checkpoints by their single 10-episode eval and measures each over 100 episodes:
 
 ```
 cd /Users/tony_wang/Projects/Snek/snek2
-PYTHONPATH=. EVAL_OUT_SUFFIX=_top10 \
-  /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b8d-disc995clip top10
+PYTHONPATH=. EVAL_OUT_SUFFIX=_top20 \
+  /opt/miniconda3/envs/snek/bin/python -u eval_checkpoints.py b8d-disc995clip top20
 ```
 
-Spelled `top10`, not `--top 10`: `handle_main` routes argv through absl, which rejects
+Spelled `top20`, not `--top 20`: `handle_main` routes argv through absl, which rejects
 unregistered `--flags` before `main()` runs.
 
-**The count is a target, not a quota** (added 2026-07-30). Everything at >=80% on its graph
-point is measured even if that exceeds ten, nothing at <=50% is measured at all, and the
-remaining slots come from the 60-70% band. Expect a variable number per arm — 16 for `b8f`,
-1 for `b8e`, and an outright refusal for an arm that never cleared 50%. **Compare arms on
-best checkpoint, not pooled rate**, because pooled now averages over different checkpoint
-counts and a truncated population.
+**The count is a target, not a quota** (thresholds revised 2026-07-31). Everything at **>=90%**
+on its graph point is measured even if that exceeds twenty, remaining slots are filled from
+**>=60%** best-first, and nothing below 60% is measured. Expect a variable number per arm — 32
+for `b8f`, 20 for `b8d`, 1 for `b8e`, and an outright refusal for an arm that never cleared the
+floor. **Compare arms on best checkpoint, not pooled rate**, because pooled averages over
+different checkpoint counts and a truncated population.
+
+**Results are written after every checkpoint**, so an interrupted run keeps its measurements.
+Check `complete` in the JSON before treating a file as an arm's full result.
+
+Budget **~4 minutes per checkpoint**. Throughput is core-bound, so raising `EVAL_WORKERS` past
+~10 does not speed a run up — running two arms in parallel does.
 
 Budget **~50 minutes for four arms in parallel**, not the ~8 minutes a single arm takes.
 Good policies play long episodes and 40 eval workers oversubscribe 14 cores, so the
@@ -368,7 +371,7 @@ cost real evidence — three of batch 5/6's four arms outran it:
 region is worth only 7.0%. Those four rows cannot be recovered by raising the setting.
 
 Two habits still apply. Close an arm out at its horizon — past peak, the marginal training
-step is worth less than the disk it consumes. And `top10` filters to surviving checkpoints
+step is worth less than the disk it consumes. And `top20` filters to surviving checkpoints
 automatically, so it degrades gracefully rather than failing on a deleted step. The legacy
 `train*/` dirs run 9.7 MB per checkpoint, so do not resume those at depth 10000 without
 checking disk first.

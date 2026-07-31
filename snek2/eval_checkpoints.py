@@ -15,32 +15,38 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top[N]
 
-`top10` (or `top`, `top:10`) is the normal way to close out an arm — ~10 checkpoints x 100
-episodes, ~30 minutes on an idle machine. It selects on the **single 10-episode eval** from
-the graph, using the surrounding perfect rate only to break ties, under three rules:
+`top20` (or `top`, `top:20`) is the normal way to close out an arm. It selects on the
+**single 10-episode eval** from the graph, using the surrounding perfect rate to rank within
+a tier, under three rules:
 
-- every checkpoint at **>=80%** is measured, even if that alone exceeds the N asked for
-- nothing at **<=50%** is measured at all
-- remaining slots go to the best of what is left, which given 10-episode granularity is
-  the 60-70% band
+- every checkpoint at **>=90%** is measured, even if that alone exceeds the N asked for
+- remaining slots go to the best of the rest down to **>=60%**, up to N total
+- nothing below 60% is measured at all
 
-So the count is a target, not a quota: a strong arm can run 13 checkpoints and a weak one
-4. Fewer than N is a normal outcome, and padding with sub-50% checkpoints would only
-depress the pooled rate without adding a candidate for best-checkpoint.
+So the count is a target, not a quota: a strong arm runs N and a weak one may run 1 or 0.
+Fewer than N is a normal outcome, and padding with sub-60% checkpoints would only depress
+the pooled rate without adding a candidate for best-checkpoint.
 
-Outliers are **not luck**. Measured against the checkpoints 1000 steps either side, they
-won 3 of 3 comparisons by 9.0, 11.5 and 27.5 points, and raw single-eval rate correlates
-+0.64 with the true 100-episode rate where the smoothed region rate correlates -0.40.
-Selecting on smoothed rate, as an earlier version did, systematically picked worse
-checkpoints.
+Because a graph point is 10 episodes, `perfect_percent` only takes the values 0, 10, ... 100,
+so these thresholds are coarser than they look: the mandatory tier is {90, 100} and the fill
+band is exactly {60, 70, 80}.
+
+**Why these numbers.** An earlier version measured everything at >=80%, which on a strong arm
+meant 63 checkpoints and four hours. Restricting the mandatory tier to >=90% and capping the
+total at 20 covers the most promising checkpoints at a fraction of the cost — measurement
+showed 90% and 80% points have indistinguishable means (57.9% vs 58.6%), so an unbounded 80%
+tier bought volume rather than information.
 
 Adjacent steps are allowed through on purpose: 1000 train steps is enough to change the
 perfect rate by tens of points, so neighbours are separate policies, not repeat samples.
 
-**Pooled rates only compare across arms when the selection rule matches**, and this rule
-changed — figures produced before it are not comparable to figures produced after, because
-a variable checkpoint count and a 50% floor both move the pooled number on their own.
-Compare best-checkpoint instead, or re-measure both arms under the current rule.
+**Pooled rates only compare across arms when the selection rule matches**, and this rule has
+now changed twice. A variable checkpoint count, the 60% floor and the 20-checkpoint cap all
+move the pooled number on their own. Compare best-checkpoint instead, or re-measure both arms
+under the current rule.
+
+**Results are written after every checkpoint**, so an interrupted run keeps everything measured
+so far. The payload carries `complete: false` until the last checkpoint lands.
 
 Environment:
     EVAL_EPISODES     episodes per checkpoint, rounded up to a whole number of
@@ -186,38 +192,49 @@ def evaluate(parallel_env, policy, num_episodes):
 # Selection thresholds, in single-eval (10-episode) percentage points.
 #
 # A graph point is 10 episodes, so perfect_percent only ever takes the values 0, 10,
-# ... 100. That makes these two numbers coarser than they look: ALWAYS_EVAL is the set
-# {80, 90, 100}, MIN_EVAL excludes everything up to and including 50, and the band left
-# over to fill remaining slots from is exactly {60, 70}.
-ALWAYS_EVAL_SINGLE = 80.0   # every checkpoint at or above this is measured, even past `count`
-MIN_EVAL_SINGLE = 50.0      # nothing at or below this is worth 100 episodes
+# ... 100. That makes these two numbers coarser than they look: the mandatory tier is the
+# set {90, 100}, the fill band is exactly {60, 70, 80}, and everything at 50 or below is
+# excluded.
+ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, even past `count`
+MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
+DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
 
 
-def select_top_checkpoints(policy_name, available, count=10, window=10):
-    """Every checkpoint at >=80% single eval, then the best of 60-70% up to `count` total.
+def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=10):
+    """Every checkpoint at >=90% single eval, then the best of >=60% up to `count` total.
 
     Three rules, in order:
 
     1. **Every** checkpoint whose single eval was `ALWAYS_EVAL_SINGLE` or better is
-       measured, even if that alone exceeds `count`. A 10-episode eval reading 8+ perfect
-       is the strongest signal available and there is no reason to drop one because a
-       tenth slot ran out.
-    2. **Nothing** at or below `MIN_EVAL_SINGLE` is measured at all. Below half, 100
-       episodes buys a precise number for a checkpoint that was never going to be the
-       arm's best, and it displaces a slot that could go to a real candidate.
-    3. Remaining slots go to the highest single evals in the 60-70% band, ties broken by
-       the surrounding perfect rate.
+       measured, even if that alone exceeds `count`. A 10-episode eval reading 9+ perfect
+       is the strongest signal available and there is no reason to drop one because the
+       last slot ran out.
+    2. Remaining slots go to the highest single evals at or above `MIN_EVAL_SINGLE`,
+       ranked by the surrounding perfect rate within an equal-eval tier.
+    3. **Nothing** below `MIN_EVAL_SINGLE` is measured at all. Below 60%, 100 episodes buys
+       a precise number for a checkpoint that was never going to be the arm's best, and it
+       displaces a slot that could go to a real candidate.
 
     Fewer than `count` checkpoints is a normal outcome, not an error: a weak arm may have
-    only two or three points above half, and padding the list with 30% checkpoints would
-    only drag its pooled rate down while telling us nothing.
+    only two or three points above the floor, and padding the list with 30% checkpoints
+    would only drag its pooled rate down while telling us nothing.
+
+    **The tiers used to be >=80% mandatory with a cap of 10.** That made a strong arm
+    ruinously expensive to measure — `b8f-disc9975seed2` presented 63 checkpoints at >=80%,
+    four hours of evaluation — while measurement showed 90% and 80% points have
+    indistinguishable mean true rates (57.9% vs 58.6% over 88 checkpoints). So the wide
+    mandatory tier was buying volume, not information. Restricting it to >=90% and raising
+    the cap to 20 keeps every strongest signal and a deep fill band at a bounded cost.
 
     Ranking on the raw single eval rather than a smoothed region is a measured result, not
-    an assumption. Measuring `b4c` both ways showed the **raw single 10-episode eval is the
-    better predictor** of a checkpoint's true rate, correlating +0.64 with the 100-episode
-    measurement against **-0.40** for the smoothed region rate. Smoothing is not merely
-    weaker, it is anti-predictive, because a window describes the *region* while the thing
-    being measured is the *checkpoint*.
+    an assumption: raw correlates +0.64 with the 100-episode measurement where the smoothed
+    region rate correlates -0.40 *as a selector across the full range*.
+
+    Within the high band the picture reverses, which is why the surrounding rate is used to
+    order the fill tier rather than merely break exact ties. Across 88 checkpoints that had
+    all already cleared 80%, the surrounding rate correlated **+0.48** with the true rate
+    while the graph value itself managed only **+0.10**. Once a checkpoint has spiked, the
+    region it sits in is the better guide to whether the spike will hold up.
 
     An outlier eval is **not luck** — those checkpoints really are better than their
     neighbours. Measured against the checkpoints 1000 steps either side, outliers won 3 of
@@ -249,11 +266,11 @@ def select_top_checkpoints(policy_name, available, count=10, window=10):
 
     mandatory = sorted([c for c in candidates if c['single'] >= ALWAYS_EVAL_SINGLE], key=rank)
     fill_pool = sorted([c for c in candidates
-                        if MIN_EVAL_SINGLE < c['single'] < ALWAYS_EVAL_SINGLE], key=rank)
+                        if MIN_EVAL_SINGLE <= c['single'] < ALWAYS_EVAL_SINGLE], key=rank)
     excluded = len(candidates) - len(mandatory) - len(fill_pool)
 
     for entry in mandatory:
-        entry['selected_by'] = 'threshold80'
+        entry['selected_by'] = 'threshold90'
     fill = fill_pool[:max(0, count - len(mandatory))]
     for entry in fill:
         entry['selected_by'] = 'outlier'
@@ -262,21 +279,24 @@ def select_top_checkpoints(policy_name, available, count=10, window=10):
     if not chosen:
         best = max(candidates, key=lambda c: c['single'])
         raise SystemExit(
-            'no checkpoint in {0} evaluated above {1:.0f}% on its graph point (best was '
+            'no checkpoint in {0} reached {1:.0f}% on its graph point (best was '
             '{2:.0f}% at step {3}), so there is nothing worth measuring for this arm'.format(
                 path, MIN_EVAL_SINGLE, best['single'], best['step']))
 
     print('selected {0} of {1} available checkpoints: {2} at >={3:.0f}% (all measured), '
-          '{4} filled from >{5:.0f}% and <{3:.0f}%, {6} skipped at <={5:.0f}%'.format(
+          '{4} filled from the {5:.0f}-{6:.0f}% band, {7} skipped below {5:.0f}%'.format(
               len(chosen), len(candidates), len(mandatory), ALWAYS_EVAL_SINGLE,
-              len(fill), MIN_EVAL_SINGLE, excluded))
+              len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE - 10, excluded))
     if len(chosen) < count:
-        print('    only {0} of {1} slots filled — everything else was at or below '
-              '{2:.0f}%, which is not worth 100 episodes'.format(
+        print('    only {0} of {1} slots filled — everything else was below {2:.0f}%, '
+              'which is not worth 100 episodes'.format(
                   len(chosen), count, MIN_EVAL_SINGLE))
     if len(mandatory) > count:
         print('    {0} checkpoints at >={1:.0f}% exceeds the {2}-slot target on purpose'.format(
             len(mandatory), ALWAYS_EVAL_SINGLE, count))
+    if len(fill_pool) > len(fill):
+        print('    {0} more in the {1:.0f}-{2:.0f}% band were not measured (cap is {3})'.format(
+            len(fill_pool) - len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE - 10, count))
     for entry in sorted(chosen, key=lambda c: c['step']):
         print('    {0:>8}  single eval {1:>5.1f}%   surrounding {2:>5.1f}%   {3}'.format(
             entry['step'], entry['single'], entry['smoothed'], entry['selected_by']))
@@ -303,7 +323,7 @@ def main(argv):
     # which rejects any unregistered `--flag` before main() is reached.
     if argv[2].startswith('top'):
         rest = argv[2][len('top'):].lstrip(':=')
-        count = int(rest) if rest else (int(argv[3]) if len(argv) > 3 else 10)
+        count = int(rest) if rest else (int(argv[3]) if len(argv) > 3 else DEFAULT_COUNT)
         requested_steps, selected_by = select_top_checkpoints(policy_name, available, count)
     else:
         requested_steps = [int(a) for a in argv[2:]]
@@ -372,10 +392,37 @@ def main(argv):
     # ckpt-<step> can be restored instead of only the latest.
     checkpoint = tf.train.Checkpoint(agent=agent, policy=agent.policy, global_step=global_step)
 
+    suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
+    out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
+
+    def write_results(results, complete):
+        """Rewrites the whole file after every checkpoint.
+
+        A long run is expensive — 20 checkpoints x 100 episodes is well over an hour, and a
+        63-checkpoint run took four — so writing only at the end means any interruption
+        throws all of it away. The numbers would still be in the log, but nothing
+        machine-readable would survive. Rewriting is cheap next to a checkpoint's runtime.
+
+        `complete` distinguishes a finished run from a partial one, so a later reader does
+        not quietly treat 6 checkpoints as the arm's full measurement. The write goes via
+        .partial + os.replace, so a reader never sees a half-written file even if the
+        process dies mid-write.
+        """
+        payload = {'policy_name': policy_name,
+                   'episodes_per_checkpoint': num_episodes,
+                   'checkpoints_requested': len(requested_steps),
+                   'complete': complete,
+                   'results': results}
+        partial_path = out_path + '.partial'
+        with open(partial_path, 'w') as handle:
+            json.dump(payload, handle, indent=2)
+        os.replace(partial_path, out_path)
+
     results = []
     for step in requested_steps:
         path = os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))
-        print('\ncheckpoint {0}'.format(step))
+        print('\ncheckpoint {0} ({1} of {2})'.format(
+            step, len(results) + 1, len(requested_steps)))
         checkpoint.restore(path).expect_partial()
         restored = int(global_step.numpy())
         if restored != step:
@@ -401,18 +448,12 @@ def main(argv):
             'avg_reward': round(float(np.mean(rewards)), 2),
         }
         results.append(row)
+        write_results(results, complete=len(results) == len(requested_steps))
         print('    perfect {0}/{1} = {2}%  (95% CI {3}-{4}%)'.format(
             perfect, len(scores), row['perfect_percent'], row['perfect_ci95'][0], row['perfect_ci95'][1]))
         print('    score mean {0}  median {1}  min {2}  max {3}'.format(
             row['avg_score'], row['median_score'], row['min_score'], row['max_score']))
 
-    suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
-    out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
-    payload = {'policy_name': policy_name, 'episodes_per_checkpoint': num_episodes, 'results': results}
-    partial = out_path + '.partial'
-    with open(partial, 'w') as handle:
-        json.dump(payload, handle, indent=2)
-    os.replace(partial, out_path)
     print('\nwrote {0}'.format(out_path))
 
     print('\n{0:>9}  {1:>11}  {2:>11}  {3:>8}  {4:>16}  {5:>9}'.format(

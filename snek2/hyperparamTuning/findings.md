@@ -92,8 +92,8 @@ discount change, since the discount rescales the reward; compare perfect rates o
 
 ## Measured: `b6b-alpha06` is the best *bet*, `b4c` still has the best *ceiling*
 
-Every batch 5/6 arm was measured with `eval_checkpoints.py <arm> top10` — its ten best
-surviving checkpoints at 100 greedy episodes each, 1000 episodes per arm. Pooled:
+Every batch 5/6 arm was measured with the `top10` rule of the time — its ten best surviving
+checkpoints at 100 greedy episodes each, 1000 episodes per arm. Pooled:
 
 | arm | eff exp | pooled perfect (1000 eps) | 95% CI | best ckpt | worst ckpt | graph said |
 |---|---|---|---|---|---|---|
@@ -171,7 +171,12 @@ They also **cannot be fixed by re-measuring**. `b6a`'s best graph point in 1415 
 and `b6b` has exactly two above 50%, so under the current thresholds `b6a` yields nothing and
 `b6b` yields two checkpoints. The alpha comparison needs new seeds, not new measurements.
 
-### Refinement: a 50% floor and an 80% must-measure line
+### Refinement: a floor, and a must-measure line
+
+**Superseded 2026-07-31.** The thresholds described below were **>=80% mandatory with a cap of
+10**; they are now **>=90% mandatory with a cap of 20 and a 60% floor**. The reasoning in this
+section still explains *why* a two-tier rule exists; only the numbers moved. See "the tiers
+moved" at the end.
 
 The ranking above says *which* checkpoints to prefer. It says nothing about how far down the
 list to go, and the answer turns out to matter as much:
@@ -200,6 +205,29 @@ evals. Effort concentrates on very few arms:
 
 So the same 10-checkpoint budget was previously spending 10 evals on arms with no candidate
 at all, and capping `b8f` at 10 when it has 16 checkpoints that each cleared 80%.
+
+#### The tiers moved: >=90% mandatory, cap 20, 60% floor
+
+The >=80% rule was right in shape and wrong in scale, and the arms outgrew it within a day. Once
+`b8f` reached 3M steps it presented **109** checkpoints at >=80% — roughly seven hours of
+evaluation, on an arm that was still training:
+
+| arm | picked now (>=90%, cap 20) | under >=80%, cap 10 |
+|---|---|---|
+| `b8f-disc9975seed2` | **32** | 109 |
+| `b8d-disc995clip` | **20** | 33 |
+| `b7f-disc995seed3` | 20 | 10 |
+
+Two measured results justify the narrowing rather than mere cost. Across 88 checkpoints, **90%
+and 80% graph points had indistinguishable mean true rates** (57.9% vs 58.6%), so the wide
+mandatory tier was buying volume, not information — while the five **100%** points were the only
+group with a distinct and higher floor (64-73%). And within the high band the *surrounding* rate
+predicts better than the graph value (+0.48 vs +0.10), so a capped fill tier ordered by region
+rate loses little.
+
+**The change is not uniformly cheaper**, which is worth stating plainly: a weak arm now gets
+*more* attention (`b7f` 10 → 20) because the cap doubled and the fill band widened to include
+80%. The saving is concentrated where the cost actually was.
 
 ## Policy quality changes materially within 1000 training steps
 
@@ -301,7 +329,7 @@ not sampling error. Consequences:
 - **One checkpoint does not characterise a policy region.** Evaluating a single checkpoint
   from this cluster would have yielded anywhere from 16% to 36% depending on the draw.
 - **Pool across several checkpoints** for any number that gets compared across arms. This
-  is why `top10` deliberately allows adjacent picks: spacing them out hides exactly this.
+  is why `top20` deliberately allows adjacent picks: spacing them out hides exactly this.
 - The published **51% for `b4c` at 869000 is one checkpoint**, so it is the top of a
   distribution like this one, not the config's level. `b4c`'s pooled 31.8% is the fairer
   figure.
