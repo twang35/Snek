@@ -80,16 +80,21 @@ Four things this ranking makes visible that per-batch reading did not:
   [`findings.md`](findings.md).
 
 Two batch-8 arms are **absent from this table because they are still running**, and both would
-top it. Measured mid-run on 2026-07-30:
+top it by a wide margin. Measured mid-run late on 2026-07-30, at ~2.6-2.9M steps:
 
 | arm | ckpts | best ckpt | top-3 | pooled |
 |---|---|---|---|---|
-| `b8f-disc9975seed2` | 16 | **63.0%** @1618k | **60.3%** | 46.5% /1600 |
-| `b8d-disc995clip` | 10 | **62.0%** @1688k | 58.7% | **48.3%** /1000 |
+| `b8f-disc9975seed2` | 63 | **88.0%** @2581k | **82.7%** | **59.2%** /6300 |
+| `b8d-disc995clip` | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 |
 
-Both beat `b7f`'s 51% / 38.8% by ~10 points on pooled rate with non-overlapping intervals, and
-tie each other. They stay in [`runs.md`](runs.md) until they stop and get a close-out
-measurement.
+Both beat `b7f`'s 51% / 38.8% by ~20 points on pooled rate with non-overlapping intervals, and tie
+each other on pooled. Their record checkpoints are preserved in
+[`../hallOfFame/`](../hallOfFame/README.md).
+
+**Every arm in the table above was stopped before ~2.1M steps, and the top four at ~1.06M** — the
+two arms here measured 63% and 62% at that range and only reached 88% and 80% past 2.5M. So this
+ranking compares configs at a horizon where none of them had finished improving; see
+[`findings.md`](findings.md).
 
 ## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
 

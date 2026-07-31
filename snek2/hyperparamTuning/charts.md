@@ -59,8 +59,8 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 2.12M | 89.4 (1716k) | **47.7%** | **63%** @1618k | 46.5% /1600 | **joint best on record**; 16 ckpts at >=80% |
-| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | 2.34M | 86.9 (2058k) | 38.3% | **62%** @1688k | **48.3%** /1000 | **joint best on record**; ties `b8f`, clipping adds nothing |
+| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.02M | 89.4 (1716k) | **69.3%** | **88%** @2581k | **59.2%** /6300 | **project record**; 63 ckpts at >=80% |
+| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | 3.48M | 86.9 (2058k) | 50.0% | **80%** @2538k | 58.4% /2500 | second; ties `b8f` on pooled, clipping adds nothing |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | 44.0% | 51% @860k | 38.8% /1000 | best of batch 7, and it survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | **50%** @869k | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 39% @334k | 29.5% | strong, survived |
@@ -90,13 +90,17 @@ ranking.
 | `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | not measured | — | stopped early, verdict weak |
 | `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | not measured | — | dead end |
 
-**‡ still running; measured mid-run**, at step 2.08M (`b8d`) and 1.78M (`b8f`), so a later
-checkpoint could beat these figures. Results are in `runs/<arm>_checkpoint_evals_midrun.json`;
-a close-out `_top10` run follows when each arm stops.
+**‡ still running; measured mid-run** at 2.93M (`b8d`) and 2.65M (`b8f`). Results are in
+`runs/<arm>_checkpoint_evals_midrun2.json`. Both record checkpoints are preserved in
+[`../hallOfFame/`](../hallOfFame/README.md).
 
-**`b8f` and `b8d` are a tie, not a ranking.** 63% vs 62% best, and pooled intervals that overlap
-(44.1-48.9 vs 45.2-51.4). The row order between them carries no information. What is solid is
-that both clear `b7f` by ~10 points on pooled rate, where the intervals do not overlap.
+**These two rows moved 25 points in thirteen hours.** Measured earlier the same day at 63% and
+62% best / ~47% pooled, they re-measured at **88% and 80% best / ~59% pooled** after another ~860k
+training steps each. Every arm above them in this table was stopped at ~1.06M steps, before the
+region these records came from existed — see [`findings.md`](findings.md).
+
+**On pooled rate they remain tied** (57.9-60.4 vs 56.5-60.3, overlapping); `b8f` is ahead on best
+checkpoint. What is solid is that both clear `b7f` by ~20 points on pooled with no overlap.
 
 **† measured with the superseded smoothed-first selector**, which has since been shown to
 pick systematically worse checkpoints than outlier selection (+0.64 vs -0.40 correlation
@@ -122,6 +126,12 @@ config family — alpha 0.6-0.8, `td_loss` priorities, no IS weights — and all
 discount above 0.99. Nothing outside that family has measured above 8.1%. The discount is the
 highest-leverage knob found so far, and it has an **optimum**: 0.995 and 0.9975 hold the top
 places while 0.999 produced the two worst charts in the file.
+
+**The second-highest-leverage factor turned out to be the horizon, not a hyperparameter.** The two
+top arms measured 63% and 62% at ~1.8M steps and **88% and 80% at ~2.6M**. Every other arm in this
+table was stopped at or before 2.1M, and the four previous best were stopped at ~1.06M — so this
+table has been systematically comparing configs at a step count where none of them had finished
+improving. Do not stop a healthy arm at 1M steps.
 
 **Eight of the 30 arms died outright**, and six of those ran the same PER config as the best
 arm. That is the central tension in these charts: `b4c` and `b7f` reach ~50% at their best
@@ -149,38 +159,47 @@ headline and ended as its negative result.
 
 ### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
 
-Step 2.12M (running) · peak score **89.4** (at 1716k) · best 30-eval perfect 47.7% (at 1625k) · max single eval **90%** · **best measured checkpoint 63.0%**, pooled 46.5% /1600
+Step 3.02M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 88.0%**, pooled 59.2% /6300
 
-**Joint best arm on record.** Measured mid-run over 16 checkpoints: best **63.0%** at 1618k
-(CI 53.2-71.8), top-3 60.3%, pooled **46.5%** — about 8 points above `b7f`'s pooled 38.8%, with
-non-overlapping intervals. It ties `b8d` and beats everything else.
+**The project record.** Measured mid-run over 63 checkpoints: best **88.0%** at 2581k
+(CI 80.2-93.0), top-3 82.7%, pooled **59.2%** — 20 points above `b7f`'s 38.8% with no overlap.
+**35 of its 63 checkpoints measured >=60%.** The 2581k checkpoint is saved in
+[`../hallOfFame/`](../hallOfFame/README.md).
 
-It also leads every graph statistic: the highest peak trailing of any arm, and the only 90%
-graph points ever recorded — three of them. Its block means climb and then hold, 1.3% over the
-first 300k to **34.8% across 1500-1800k**.
+It leads every statistic in the file, graph and measured alike, and recorded the **first 100%
+single eval** in the project. Its block means climb from 1.3% over the first 300k to **56.8%
+across 2823-2923k**.
 
-**Its three 90% graph points measured 39%, 21% and 44% — the worst three of its sixteen.** That
-is the clearest single illustration of why the graph eval is a filter and not a ranker; see
-[`findings.md`](findings.md). Its best measured checkpoints came from 80% points.
+**It was measured twice, 13 hours apart, and the second run was 25 points higher** — 63.0% best /
+46.5% pooled at 1.78M, then 88.0% / 59.2% at 2.65M. The intervening 870k steps took it from 16
+checkpoints above 80% to 63.
 
-The 16 checkpoints at >=80% remain the reason this arm looked special before measurement, and
-measurement bore it out — but note `b8d` matched its ceiling with only 4 such checkpoints, so
-the count is not by itself the ranking metric an earlier version of this file called it.
+**Its 90% graph points measured 22-82%** — a ~60-point spread — while its 80% points produced the
+88% champion. The graph eval filters but does not rank; see [`findings.md`](findings.md).
+
+**Now past peak.** Its last three 100k blocks average 54.7% → 56.8% → 39.6% perfect against a
+69.3% best window at 2828k. One declining block is not conclusive for an arm that recovered from
+9.0% earlier, but the record is banked either way.
 
 ![b8f-disc9975seed2](charts/b8f-disc9975seed2.png)
 
 ### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
 
-Step 2.34M (running) · peak score 86.9 (at 2058k) · best 30-eval perfect 38.3% (at 1910k) · max single eval 80% · **best measured checkpoint 62.0%**, pooled 48.3% /1000
+Step 3.48M (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
 
-**Joint best arm on record, tied with `b8f`.** Measured mid-run over 10 checkpoints: best
-**62.0%** at 1688k (CI 52.2-70.9), top-3 58.7%, pooled **48.3%** — the highest pooled figure in
-the project, though its interval overlaps `b8f`'s. Seven of ten checkpoints measured >=40%, and
-four consecutive ones spanning 1688-1753k measured 49-62%, so the strength is a region.
+**Second best arm in the project, tied with `b8f` on pooled rate.** Measured mid-run over 25
+checkpoints: best **80.0%** at 2538k (CI 71.1-86.7), top-3 74.7%, pooled **58.4%** (CI 56.5-60.3),
+overlapping `b8f`'s interval. 13 of 25 checkpoints measured >=60%. The 2538k checkpoint is saved in
+[`../hallOfFame/`](../hallOfFame/README.md).
 
-**This does not vindicate gradient clipping.** `b8f` reached the same ceiling without it. An
-interim note in these docs, written while `b8d` was measured and `b8f` was not, claimed clipping
-raised the ceiling; `b8f`'s 63% closed that off.
+**This does not vindicate gradient clipping.** `b8f` beat it without clipping — 88% vs 80% on best,
+tied on pooled. An interim note in these docs, written while `b8d` was measured and `b8f` was not,
+claimed clipping raised the ceiling; both re-measurements closed that off.
+
+**Now clearly past peak**, and further along than `b8f`: its last 300k averages ~18% perfect
+against a 50.0% best window at 2671k. Unlike `b8f`, its measured quality did **not** improve with
+step count within the selected set (corr −0.11), and its 2.6-3.0M band measured worse than its
+2.2-2.6M band.
 
 Its chart is the most patient riser on record. Peak trailing and best-30 window are both from
 its most recent 200k steps, after 2M steps of monotone improvement from the 300-600k trough:

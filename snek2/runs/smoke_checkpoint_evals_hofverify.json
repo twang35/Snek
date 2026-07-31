@@ -1,0 +1,24 @@
+{
+  "policy_name": "smoke",
+  "episodes_per_checkpoint": 20,
+  "results": [
+    {
+      "step": 2581000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 20,
+      "perfect_games": 17,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        64.0,
+        94.8
+      ],
+      "avg_score": 90.15,
+      "median_score": 95.0,
+      "min_score": 38.0,
+      "max_score": 95.0,
+      "avg_reward": 172.67
+    }
+  ]
+}

@@ -72,6 +72,17 @@ scratch space and is fine to clear, `runs/` is output to keep. Letting a later r
 of the same policy overwrite these files is expected and fine; removing them is
 not.
 
+## `snek2/hallOfFame/` — record checkpoints, never delete
+
+Copies of the best policies produced so far, with a README covering how to run one by
+hand. They live outside `savedPolicies/` precisely so the `max_to_keep` rotation cannot
+delete them — a long run otherwise eventually evicts its own best checkpoint, which has
+already destroyed evidence once (`b5c-schlongIS`'s 17.0% peak).
+
+**Never delete anything here**, and add an entry whenever a run produces a checkpoint
+worth keeping. Each is two files, ~190 KB. The README documents the copy-in-and-evaluate
+procedure; both commands in it were verified working when written.
+
 Note that deleting `<policy_name>_history.json` also throws away the graph's
 history for that policy, so its next run restarts the curve from the current
 iteration instead of continuing.

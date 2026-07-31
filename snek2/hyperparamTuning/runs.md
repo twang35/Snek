@@ -12,27 +12,33 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Current best: a two-way tie at ~62%, measured 2026-07-30
+## Current best: **88% perfect games**, measured 2026-07-30 late
 
-Two arms measured mid-run, both **~10 points above the previous record on pooled rate**:
+Re-measured after both arms trained another ~860k steps. The record moved by **25 points** in
+thirteen hours:
 
 | arm | config | ckpts | best ckpt | top-3 | pooled | 95% CI |
 |---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | **disc 0.9975** | 16 | **63.0%** @1618k | **60.3%** | 46.5% /1600 | 44.1-48.9 |
-| `b8d-disc995clip` | disc 0.995 + clip 10 | 10 | **62.0%** @1688k | 58.7% | **48.3%** /1000 | 45.2-51.4 |
+| `b8f-disc9975seed2` | **disc 0.9975** | 63 | **88.0%** @2581k | **82.7%** | **59.2%** /6300 | 57.9-60.4 |
+| `b8d-disc995clip` | disc 0.995 + clip 10 | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 | 56.5-60.3 |
+| same two arms, 13h earlier | — | 16 / 10 | 63.0% / 62.0% | 60.3% | 46.5% / 48.3% | — |
 | `b7f-disc995seed3` | disc 0.995 | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
 | `b4c-schlongper` | disc 0.99 | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
 
-**Read the pooled column, not the best.** At 1000-1600 episodes its interval is ±3 points where
-a single best-checkpoint reading is ±9, and repeat measurements of one frozen checkpoint have
-spread 19 points here. On pooled, `b8d` and `b8f` overlap each other and both clear `b7f`
-decisively.
+**One checkpoint won 88 of 100 games.** It is preserved in
+[`../hallOfFame/`](../hallOfFame/README.md) along with `b8d`'s 80% checkpoint, outside the
+`max_to_keep` rotation that would eventually delete them.
 
-**The two configs are statistically indistinguishable.** 63.0 vs 62.0 on best, overlapping
-pooled intervals. Do not read a winner out of this pair.
+**Pooled rate is up 20 points on the record that stood the same morning** — 59.2% over 6300
+episodes with a ±1.3 interval, so this is not a lucky best-of-N. `b8f` has 35 of 63 checkpoints
+at >=60%.
 
-**Both arms are still running**, so these are mid-run snapshots taken at 2.08M (`b8d`) and 1.78M
-(`b8f`). Files are suffixed `_midrun`; a close-out `_top10` run comes later.
+**The two configs remain statistically tied on pooled** (56.5-60.3 vs 57.9-60.4, overlapping)
+while `b8f` is clearly ahead on best checkpoint. Gradient clipping still buys nothing; see below.
+
+**Both arms are still running**, so these are mid-run snapshots at 2.93M (`b8d`) and 2.65M
+(`b8f`). Files are suffixed `_midrun2`; the earlier `_midrun` set is kept for the repeat-measurement
+analysis in [`findings.md`](findings.md).
 
 ### Older `DISCOUNT=0.995` context
 
@@ -104,27 +110,40 @@ comparison matters, it needs new seeds, not new measurements of old ones.
 `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
 verified in every log. Design rationale is in the Batch 8 section below.
 
-Status as of **2026-07-30 11:45**, two arms running:
+Status as of **2026-07-31 01:00**, two arms running:
 
 | policy | extra override | step | best 30-eval pf | **best measured ckpt** | pooled | max pt | status |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 2.12M | 47.7% @1625k | **63.0%** @1618k | 46.5% /1600 | **90%** | running, healthy |
-| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 2.34M | 38.3% @1910k | **62.0%** @1688k | 48.3% /1000 | 80% | running, healthy |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 3.02M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **100%** | running, past peak |
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 3.48M | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | 100% | running, past peak |
+
+**Both arms have now peaked and are drifting down**, which is new since the morning check:
+
+| arm | best window | last 300k blocks (mean perfect) |
+|---|---|---|
+| `b8f` | 69.3% @2828k | 54.7% → 56.8% → **39.6%** |
+| `b8d` | 50.0% @2671k | 16.9% → 17.3% → 20.5% |
+
+`b8d` is clearly past it — its last 300k averages ~18% against a 50.0% window at 2671k. `b8f`'s
+decline is one block old and it has recovered from dips before, so it is not yet conclusive.
+Neither is dead (`zero_since` null for both, trailing ~80).
+
+**The record checkpoints are already saved to [`../hallOfFame/`](../hallOfFame/README.md)**, so a
+further decline cannot cost the result. That removes the usual urgency about stopping a
+past-peak arm before `max_to_keep` evicts its best checkpoint.
 | `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | **0.1** | 30.0% @253k | 0.0% | 50% | **stopped — died, recovered, died** |
 | `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 57.8 | 21.3% @515k | 1.7% | 60% | **stopped — flat, then faded** |
 | `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 10.3 | 14.7% @343k | 0.0% | 40% | **stopped — monotone decline** |
 | `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | **0.0** | 0.7% @82k | 0.0% | 10% | **stopped — dead** |
 | `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | **0.0** | 0.0% | 0.0% | 0% | **stopped — dead** |
 
-**Both arms are measured and effectively tied at the top of the project** — 63.0% and 62.0%
-best checkpoint, overlapping pooled intervals, both ~10 points above `b7f` on pooled. See the
-table at the top of this file.
+**Both arms are measured at 88.0% and 80.0% best checkpoint** and are tied on pooled rate. See
+the table at the top of this file.
 
-**Both are healthy and neither should be stopped on a single trailing reading.** `b8d` read
-trailing 42.6 at 2336k, which looks alarming and is not: its 50k block means over the last
-400k run 66.7-80.6, and its most recent block (2286-2336k) has the **highest perfect rate of
-its last 400k at 33.2%** with an 80% point. `b8f` similarly dipped to 9.0% mean perfect around
-1965-2015k and recovered to 29.6%. **Read blocks, not the latest eval.**
+**Do not judge either on a single trailing reading.** `b8d` read trailing 42.6 at 2336k, which
+looked alarming and was not — its surrounding 50k blocks ran 66.7-80.6 and it went on to a 50.0%
+best-30 window at 2671k and an 80% measured checkpoint. `b8f` dipped to 9.0% mean perfect around
+1965-2015k and recovered to 56.8%. **Read blocks, not the latest eval.**
 
 **Both stopped arms were the clipping seeds** — see below. Two slots are free.
 

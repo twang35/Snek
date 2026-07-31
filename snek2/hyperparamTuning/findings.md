@@ -267,6 +267,25 @@ variance or something differs between runs that has not been identified. Either 
 - Prefer several hundred episodes, or repeat a measurement, before treating any single
   100-episode figure as settled.
 
+### Update 2026-07-30: 20 repeat measurements say the instrument is fine
+
+The `b4c` @869000 case above now looks like the outlier rather than the rule. Twenty checkpoints
+were measured twice on the same day, at 100 episodes each:
+
+| arm | repeats | mean delta | mean abs delta | max abs delta |
+|---|---|---|---|---|
+| `b8f-disc9975seed2` | 16 | -1.2 | 5.1 | 11 |
+| `b8d-disc995clip` | 4 | +3.5 | 4.0 | 9 |
+
+**Mean absolute deviation 4.9 points, max 11** — comfortably inside the ±10 binomial interval,
+with no systematic bias in either direction. A third reading of the champion checkpoint during the
+hall-of-fame verification gave 85% over 20 episodes against 88% over 100, also consistent.
+
+So a single 100-episode figure is usable at ±10, and the earlier warning should be read as "one
+checkpoint once behaved strangely" rather than a property of the measurement. The practical advice
+that survives: prefer pooled figures over many checkpoints for *comparing configs*, because that
+is where the interval genuinely shrinks (±1.3 at 6300 episodes).
+
 ## Checkpoint-to-checkpoint variance is large, and it is not sampling noise
 
 Within `b6b`'s 1455-1464k cluster — 9000 train steps end to end, checkpoints that should
@@ -701,106 +720,118 @@ which is the point.
 answered. But the optimum's *location* is now genuinely open between 0.995 and 0.9975, which
 was not the case when this section was written.
 
-### Update 2026-07-30: 0.9975 produced the best arm on record
+### Update 2026-07-30: 0.9975 holds the record, measured
 
-`b8f-disc9975seed2` beats every 0.995 arm on every graph statistic:
+`b8f-disc9975seed2` leads on every column, and unlike the first version of this section the
+headline figures are now **measured** rather than graph windows:
 
-| arm | discount | peak trailing | best 30-eval pf | ckpts at >=80% | max single eval |
+| arm | discount | best measured ckpt | pooled | best 30-eval pf | ckpts at >=80% |
 |---|---|---|---|---|---|
-| **`b8f-disc9975seed2`** | **0.9975** | **89.4** | **47.7%** | **16** | **90%** |
-| `b7f-disc995seed3` | 0.995 | 92.6 | 44.0% | 1 | 80% |
-| `b8d-disc995clip` | 0.995 + clip | 86.9 | 38.3% | 4 | 80% |
-| `b8c-disc9975` | 0.9975 | 79.8 | 14.7% | 0 | 40% |
+| **`b8f-disc9975seed2`** | **0.9975** | **88.0%** | **59.2%** /6300 | **69.3%** | **63** |
+| `b8d-disc995clip` | 0.995 + clip | 80.0% | 58.4% /2500 | 50.0% | 25 |
+| `b7f-disc995seed3` | 0.995 | 51% | 38.8% /1000 | 44.0% | 1 |
+| `b8c-disc9975` | 0.9975 | not measured | — | 14.7% | 0 |
 
-The **16-vs-1 gap in checkpoints above 80%** is the more important column than the best-30
-window. It says `b8f` sustains a strong region rather than spiking through one, which is the
-property "consistent perfect rate" actually names.
+The **63-vs-1 gap in checkpoints above 80%** against `b7f` says `b8f` sustains a strong region
+rather than spiking through one, which is the property "consistent perfect rate" actually names.
+Its pooled 59.2% over 6300 episodes is the most solid number in the project.
 
-Two things keep this from being a conclusion. `b8f` is **unmeasured** — no 100-episode
-evaluation yet — so 47.7% is a graph window, and graph windows have misranked arms badly before
-(`b5c` was 2nd of its batch on best-30 and last on measurement). And 0.9975 is **1 of 2**:
-`b8c` ran the identical config and declined monotonically to a stop. So 0.9975 has the better
-ceiling and the worse survival record, on one seed each way.
+The one thing that keeps 0.9975 from being settled is **survival: it is 1 of 2**. `b8c` ran the
+identical config and declined monotonically to a stop. So 0.9975 has the best measured ceiling and
+an unproven survival record, on one seed each way.
 
 **Next step is seeds 3 and 4 at 0.9975**, not more 0.995. 0.995 is already at 3 of 3 and more
 seeds would only re-confirm it, while 0.9975 could be either the new optimum or a coin flip and
-two seeds decide which.
+two seeds decide which. Run them past 2.5M steps — that is where both records were found.
 
-## The record is ~62%, and two different configs reach it
+## The record is **88% perfect games**, and the horizon was the binding constraint
 
-Measured 2026-07-30, both arms mid-run:
+Measured 2026-07-30 late, both arms mid-run. The two rows in the middle are the *same two arms*
+measured thirteen hours and ~860k steps earlier, which is the whole story of this section:
 
 | arm | config | ckpts | best ckpt | top-3 | pooled | 95% CI |
 |---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | disc **0.9975** | 16 | **63.0%** @1618k | **60.3%** | 46.5% /1600 | 44.1-48.9 |
-| `b8d-disc995clip` | disc 0.995 + clip | 10 | **62.0%** @1688k | 58.7% | **48.3%** /1000 | 45.2-51.4 |
+| `b8f-disc9975seed2` | disc **0.9975** | 63 | **88.0%** @2581k | **82.7%** | **59.2%** /6300 | 57.9-60.4 |
+| `b8d-disc995clip` | disc 0.995 + clip | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 | 56.5-60.3 |
+| `b8f`, 13h earlier | disc 0.9975 | 16 | 63.0% @1618k | 60.3% | 46.5% /1600 | 44.1-48.9 |
+| `b8d`, 13h earlier | disc 0.995 + clip | 10 | 62.0% @1688k | 58.7% | 48.3% /1000 | 45.2-51.4 |
 | `b7f-disc995seed3` | disc 0.995 | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
 | `b4c-schlongper` | disc 0.99 | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
 
-**The pooled column carries the claim.** A best-of-N is the maximum of a noisy statistic with a
-±9-point interval, and one frozen checkpoint here has read 51/42/32 across three measurements.
-Pooled over 1000-1600 episodes the interval is ±3, and both new arms clear `b7f` by ~10 points
-without overlapping it.
+**The pooled column carries the claim.** 59.2% over 6300 episodes has a ±1.3 interval, so this is
+not a best-of-N artefact: it is 20 points above the pooled figure that stood the same morning and
+non-overlapping with it. `b8f` has 35 of 63 checkpoints at >=60%.
 
-**The two configs are indistinguishable from each other** — 63.0 vs 62.0, overlapping pooled
-intervals. This is a tie, not a ranking, and neither one beats the other on this evidence.
+**The two configs stay tied on pooled** (overlapping intervals) with `b8f` ahead on best. The
+champion checkpoint is preserved in [`../hallOfFame/`](../hallOfFame/README.md).
 
-### Both records come from checkpoints past 1.6M steps
+### The late-checkpoint hypothesis: confirmed for supply, mixed for quality
 
-A pattern worth stating as a hypothesis, because it would change how arms are run:
+The previous version of this section flagged as speculative that "the horizon may have been
+truncating the best checkpoints of good arms". Re-measurement supports it, but not uniformly, and
+the distinction matters:
 
-| arm | best ckpt step | arm stopped at |
+| | corr(step, measured) | 1.0-1.8M | 2.2-2.6M | 2.6-3.0M |
+|---|---|---|---|---|
+| `b8f` | **+0.61** | ~45% | **64.5%** | 63.6% |
+| `b8d` | **-0.11** | 59.5% | 60.3% | 54.0% |
+
+**What is solid is the supply of good checkpoints, not per-checkpoint quality.** In thirteen
+hours `b8f` went from 16 checkpoints at >=80% to **63**, and `b8d` from 4 to 25. Both arms' best
+checkpoints sit at ~2.55M, and every previous record-holder was stopped at 1.06M — before that
+region existed.
+
+**Per-checkpoint quality rises with steps for `b8f` (+0.61) and not for `b8d` (-0.11)**, whose
+late band is slightly worse. So "train longer" is not a law. Note also that this correlation is
+computed only over checkpoints that already cleared the 80% filter, which restricts the range and
+understates any true relationship.
+
+The counter-evidence from before still stands: `b7d` ran to 1.60M at 0.995 and peaked at 26%,
+`b7a` reached 2.00M with a 19% ceiling. Long runs do not rescue a mediocre arm.
+
+**Practical rule: do not stop a healthy arm at ~1M steps.** Both records came from territory the
+old horizon forbade. Both arms have since peaked and begun declining (`b8d` clearly, `b8f`
+tentatively), so the horizon is not unlimited either — around 2.5-2.9M is where these two topped
+out.
+
+## Filter, not ranker — but the *surrounding* rate does rank, at n=88
+
+The graph value **stops carrying information once it is high**, while the region rate around it
+turns out to carry quite a lot. From 88 checkpoints measured on 2026-07-30 (the largest sample in
+the project):
+
+| correlation with measured rate | n=88 | n=26 (earlier same day) |
 |---|---|---|
-| `b8f` | 1618k | still running (2.12M) |
-| `b8d` | 1688k | still running (2.34M) |
-| `b7f` | 860k | **1.06M** |
-| `b4c` | 869k | **1.06M** |
+| graph single eval | **+0.10** | -0.09 |
+| **surrounding rate** | **+0.48** | -0.03 |
 
-**Both previous record-holders were stopped before reaching the range where the new records
-live.** No healthy `DISCOUNT>=0.995` arm had ever been allowed past ~1.3M steps.
+| graph point | n | mean measured | range |
+|---|---|---|---|
+| **100%** | 5 | **67.2%** | **64-73** |
+| 90% | 16 | 57.9% | 22-82 |
+| 80% | 67 | 58.6% | 33-88 |
 
-The counter-evidence is real, though: `b7d` ran to 1.60M at 0.995 and its best checkpoint was
-26% at 1330k, so late steps are not sufficient on their own. And `b7a` reached 2.00M with a 19%
-ceiling. The defensible version is narrow — **the horizon may have been truncating the best
-checkpoints of good arms**, which is cheap to test by simply not stopping healthy arms at ~1M.
+Three separate readings, in order of how much weight they carry:
 
-## Filter, not ranker: the graph eval does not order checkpoints within the high band
+**The surrounding rate is a genuine ranking signal (+0.48).** This **reverses the -0.40 recorded
+above** and the "smoothing is anti-predictive" language that went with it. The reconciliation is
+that the two measurements answer different questions: the -0.40 compared *selecting* on smoothed
+rate against selecting on raw, across a wide range; the +0.48 asks whether, *among* checkpoints
+that already spiked to >=80%, the region rate predicts which is best. It does. The selector's
+existing surrounding-rate tiebreak is doing real work rather than breaking ties arbitrarily.
 
-The 26 checkpoints measured on 2026-07-30 are the first large sample of high-graph-eval
-checkpoints measured under one rule, and they say the graph value **stops carrying information
-once it is high**:
+**The graph value itself still does not rank (+0.10).** 90% and 80% points are indistinguishable
+(57.9% vs 58.6% mean), and both span ~50 points. So the filter/ranker split holds: use >=80% to
+decide *what* to measure, and do not trust the order. **Measuring the whole tier remains correct**
+— there is no way to know in advance which 80% point is the 88% and which is the 33%.
 
-| graph point | n | mean measured |
-|---|---|---|
-| 90% | 3 | **34.7%** |
-| 80% | 17 | 50.8% |
-| 70% | 6 | 43.2% |
+**A 100% graph point may be a different signal.** All five measured 64-73% — the tightest and
+highest-floored group in the sample, and the only one whose range excludes bad outcomes. n=5 is
+too small to act on, but if it holds, a 100% point is worth measuring first and worth many
+episodes.
 
-| correlation with measured rate | value |
-|---|---|
-| graph single eval, both arms pooled (n=26) | **-0.09** |
-| graph single eval, `b8d` alone | +0.66 |
-| graph single eval, `b8f` alone | **-0.57** |
-| surrounding rate, both arms pooled | -0.03 |
-| surrounding rate, `b8d` / `b8f` | -0.69 / +0.50 |
-
-`b8f`'s three 90% points measured 39%, 21% and 44% — **the worst three of its sixteen**. The
-sign of every correlation flips between the two arms, which is what no-signal looks like.
-
-**This does not overturn the +0.64 finding above, because of range restriction.** That
-correlation was measured across a wider spread of graph values; here every checkpoint is 70-90%,
-and truncating a predictor's range attenuates its correlation mechanically. The two results are
-compatible and the combined reading is:
-
-- **As a filter the graph eval works well.** All 26 measured 21-63%, far above what a randomly
-  chosen checkpoint of these arms would give. The >=80%/<=50% thresholds are doing their job.
-- **As a ranker inside the high band it is useless.** Do not treat the top of the selected list
-  as the best checkpoint, and do not skip the rest of the tier to save time — **measuring all of
-  the >=80% checkpoints is exactly the right policy**, because there is no way to tell in advance
-  which of them is the 63% and which is the 21%.
-
-That is a stronger argument for the "measure every checkpoint at >=80%" rule than the one it was
-introduced with.
+None of this overturns the +0.64 finding above, which was measured across a wider spread of graph
+values; range restriction attenuates every correlation computed here.
 
 ## Falsified: `GRADIENT_CLIPPING=10` does not buy stability
 
@@ -811,7 +842,7 @@ them would prevent the catastrophic drops. After three seeds it is **1 of 3**, a
 
 | arm | peak trailing | best 30-eval pf | best measured | outcome |
 |---|---|---|---|---|
-| `b8d-disc995clip` | **86.9** | **38.3%** | **62.0%** (48.3% pooled) | thriving at 2.34M |
+| `b8d-disc995clip` | **86.9** | **50.0%** | **80.0%** (58.4% pooled) | peaked ~2.7M, declining at 3.48M |
 | `b8e-clipseed2` | 85.9 | 21.3% | 32.0% (1 ckpt) | faded; stopped at 1.16M |
 | `b8g-clipseed3` | 77.0 | 30.0% | **none >50%** | dead; stopped at 3.43M |
 
@@ -823,8 +854,10 @@ did not reproduce it.
 
 **The "raises the ceiling" escape hatch is now closed too.** `b8d` measured 62.0% best / 48.3%
 pooled, which looked like a unique ceiling gain — until `b8f` measured **63.0% / 46.5% without
-clipping**, with overlapping intervals. Clipping therefore shows **no measured ceiling benefit
-and a worse survival record**. Do not adopt it.
+clipping**, with overlapping intervals. Re-measurement 13 hours later widened the gap the other
+way: **`b8f` 88.0% / 59.2% against `b8d` 80.0% / 58.4%**, still tied on pooled but with the
+non-clipped arm ahead on ceiling. Clipping shows **no measured benefit and a worse survival
+record**. Do not adopt it.
 
 Recording the process error, because it is the recurring one: that ceiling claim was written
 while `b8d` was measured and `b8f` was not, off the arm that happened to finish first. A
