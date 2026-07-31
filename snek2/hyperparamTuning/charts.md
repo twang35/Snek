@@ -38,7 +38,7 @@ grep -o 'charts/[a-zA-Z0-9-]*\.png' charts.md | sed 's|charts/||;s|\.png||' | so
 comm -23 /tmp/have /tmp/doc
 ```
 
-Snapshot refreshed 2026-07-29, at the steps noted below.
+Snapshot refreshed 2026-07-31, at the steps noted below.
 
 **Batches run newest first** — the highest-numbered batch at the top, batch 1 at the bottom — so the current
 state of the investigation is what you see on opening the file, and the early dead ends stay
@@ -59,8 +59,8 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.02M | 89.4 (1716k) | **69.3%** | **88%** @2581k | **59.2%** /6300 | **project record**; 63 ckpts at >=80% |
-| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | 3.48M | 86.9 (2058k) | 50.0% | **80%** @2538k | 58.4% /2500 | second; ties `b8f` on pooled, clipping adds nothing |
+| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.51M | 89.4 (1716k) | **69.3%** | **88%** @2581k | **59.2%** /6300 | **project record**; 63 ckpts at >=80% |
+| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | 4.24M | 86.9 (2058k) | 50.0% | **80%** @2538k | 58.4% /2500 | second; ties `b8f` on pooled, clipping adds nothing |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | 44.0% | 51% @860k | 38.8% /1000 | best of batch 7, and it survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | **50%** @869k | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 39% @334k | 29.5% | strong, survived |
@@ -90,9 +90,13 @@ ranking.
 | `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | not measured | — | stopped early, verdict weak |
 | `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | not measured | — | dead end |
 
-**‡ still running; measured mid-run** at 2.93M (`b8d`) and 2.65M (`b8f`). Results are in
+**‡ still running; measured mid-run** at 2.93M (`b8d`) and 2.65M (`b8f`), so both `best eval'd
+ckpt` figures are **stale by ~600-1300k steps**. Results are in
 `runs/<arm>_checkpoint_evals_midrun2.json`. Both record checkpoints are preserved in
 [`../hallOfFame/`](../hallOfFame/README.md).
+
+**A 2026-07-31 spot check of `b8f`'s four unmeasured 100% points found nothing above 83%**, so its
+88% at 2581k stands as the project record. 26 of its checkpoints at 90% are still unmeasured.
 
 **These two rows moved 25 points in thirteen hours.** Measured earlier the same day at 63% and
 62% best / ~47% pooled, they re-measured at **88% and 80% best / ~59% pooled** after another ~860k
@@ -159,7 +163,7 @@ headline and ended as its negative result.
 
 ### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
 
-Step 3.02M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 88.0%**, pooled 59.2% /6300
+Step 3.51M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 88.0%**, pooled 59.2% /6300
 
 **The project record.** Measured mid-run over 63 checkpoints: best **88.0%** at 2581k
 (CI 80.2-93.0), top-3 82.7%, pooled **59.2%** — 20 points above `b7f`'s 38.8% with no overlap.
@@ -177,15 +181,20 @@ checkpoints above 80% to 63.
 **Its 90% graph points measured 22-82%** — a ~60-point spread — while its 80% points produced the
 88% champion. The graph eval filters but does not rank; see [`findings.md`](findings.md).
 
-**Now past peak.** Its last three 100k blocks average 54.7% → 56.8% → 39.6% perfect against a
-69.3% best window at 2828k. One declining block is not conclusive for an arm that recovered from
-9.0% earlier, but the record is banked either way.
+**Past peak and oscillating rather than declining.** Its last four 100k blocks read 38.9% → 12.2%
+→ 37.4% → 9.2% mean perfect against a 69.3% best window at 2828k — high and low blocks alternating,
+with the high ones still producing **100% single evals**. That is the `b6b`/`b7b` pattern, and this
+file has twice mistaken one low block for a terminal decline.
+
+**Its four 100% graph points were spot-checked on 2026-07-31** and measured 80% (2806k), 83%
+(3145k), 81% (3149k) and 73% (3386k) — all top-decile, none beating the 88% champion at 2581k. 26
+checkpoints at 90% remain unmeasured. See [`runs.md`](runs.md).
 
 ![b8f-disc9975seed2](charts/b8f-disc9975seed2.png)
 
 ### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
 
-Step 3.48M (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
+Step 4.24M (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
 
 **Second best arm in the project, tied with `b8f` on pooled rate.** Measured mid-run over 25
 checkpoints: best **80.0%** at 2538k (CI 71.1-86.7), top-3 74.7%, pooled **58.4%** (CI 56.5-60.3),
@@ -196,8 +205,9 @@ overlapping `b8f`'s interval. 13 of 25 checkpoints measured >=60%. The 2538k che
 tied on pooled. An interim note in these docs, written while `b8d` was measured and `b8f` was not,
 claimed clipping raised the ceiling; both re-measurements closed that off.
 
-**Now clearly past peak**, and further along than `b8f`: its last 300k averages ~18% perfect
-against a 50.0% best window at 2671k. Unlike `b8f`, its measured quality did **not** improve with
+**In slow monotone decline**, and further along than `b8f`: no 100k block in its last 400k averaged
+above 24% perfect (23.7 → 15.2 → 19.5 → 15.3) and trailing has slid 65.8 → 52.2, now 1.5M steps past
+its peak. This is the shape `b8c` had when it was stopped, rather than `b8f`'s oscillation. Unlike `b8f`, its measured quality did **not** improve with
 step count within the selected set (corr −0.11), and its 2.6-3.0M band measured worse than its
 2.2-2.6M band.
 

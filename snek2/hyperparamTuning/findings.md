@@ -237,12 +237,20 @@ distinguished from "this part of the run is good". It can:
 
 | cluster | centre | neighbours at +/-1000 | centre advantage |
 |---|---|---|---|
-| 851000 | **40.0%** | 28.5% | **+11.5 points** |
-| 869000 | **32.0%** | 23.0% | **+9.0 points** |
-| 970000 | **35.0%** | 7.5% | **+27.5 points** |
+| 851000 (`b4c`) | **40.0%** | 28.5% | **+11.5 points** |
+| 869000 (`b4c`) | **32.0%** | 23.0% | **+9.0 points** |
+| 970000 (`b4c`) | **35.0%** | 7.5% | **+27.5 points** |
+| 2806000 (`b8f`) | **80.0%** | 74.0% | **+6.0 points** |
 
-Pooled, centres measure 35.7% (CI 30.5-41.2) against neighbours' 19.7% (CI 16.7-23.0) —
-non-overlapping, and the effect is in the same direction in **3 of 3** clusters.
+Pooled over the first three, centres measure 35.7% (CI 30.5-41.2) against neighbours' 19.7%
+(CI 16.7-23.0) — non-overlapping, and the effect is in the same direction in **4 of 4** clusters.
+
+The `b8f` cluster is the weakest confirmation and the most informative one. Its graph values read
+80% / **100%** / 70% and measured 74% / **80%** / 74%, so the centre still won — but by 6 points
+with overlapping intervals, on an arm where *every* checkpoint in the region is strong. **The
+advantage shrinks as the surrounding region improves**, which is what you would expect if the
+spike reflects a genuinely better policy rather than a measurement artefact: there is less room
+above a 74% neighbourhood than above a 7.5% one.
 
 The 970000 cluster is the extreme case: **969000 measures 8%, 970000 measures 35%, 971000
 measures 7%.** Those are 100-episode measurements, so **1000 training steps can gain or
@@ -853,10 +861,22 @@ existing surrounding-rate tiebreak is doing real work rather than breaking ties 
 decide *what* to measure, and do not trust the order. **Measuring the whole tier remains correct**
 — there is no way to know in advance which 80% point is the 88% and which is the 33%.
 
-**A 100% graph point may be a different signal.** All five measured 64-73% — the tightest and
-highest-floored group in the sample, and the only one whose range excludes bad outcomes. n=5 is
-too small to act on, but if it holds, a 100% point is worth measuring first and worth many
-episodes.
+**A 100% graph point is a different signal — now n=9 and it held.** A targeted run on 2026-07-31
+measured four more, at 80%, 83%, 81% and 73%:
+
+| graph point | n | measured range | mean |
+|---|---|---|---|
+| **100%** | **9** | **64-83%** | **72.5%** |
+| 90% | 16 | 22-82% | 57.9% |
+| 80% | 67 | 33-88% | 58.6% |
+
+**Every 100% point measured so far is at least 64%**, across two arms and nine checkpoints, while
+90% and 80% points both reach down into the 20s and 30s. That is the only graph value in this
+project with a usable floor, and it is 15 points above the next tier on the mean.
+
+**Act on it: measure 100% points first.** They are rare — `b8f` produced 9 in 3.5M steps — so this
+costs almost nothing and reliably finds a top-decile checkpoint. It does *not* find the best one:
+the 88% champion came from an 80% graph point, and the best of these four was 83%.
 
 None of this overturns the +0.64 finding above, which was measured across a wider spread of graph
 values; range restriction attenuates every correlation computed here.

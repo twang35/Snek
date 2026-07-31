@@ -110,32 +110,72 @@ comparison matters, it needs new seeds, not new measurements of old ones.
 `SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
 verified in every log. Design rationale is in the Batch 8 section below.
 
-Status as of **2026-07-31 01:00**, two arms running:
+Status as of **2026-07-31 08:47**, two arms running:
 
 | policy | extra override | step | best 30-eval pf | **best measured ckpt** | pooled | max pt | status |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 3.02M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **100%** | running, past peak |
-| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 3.48M | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | 100% | running, past peak |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 3.51M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **100%** | running, oscillating |
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 4.24M | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | 100% | running, declining |
 | `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | 50% | **stopped — died, recovered, died** |
 | `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | 60% | **stopped — flat, then faded** |
 | `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | 40% | **stopped — monotone decline** |
 | `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | 0.7% @82k | 0% (dead) | — | 10% | **stopped — dead** |
 | `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | 0.0% | 0% (dead) | — | 0% | **stopped — dead** |
 
-**Both arms have now peaked and are drifting down**, which is new since the morning check:
+**Both arms peaked around 2.7-2.8M, and they are failing differently.** Their last 400k in 100k
+blocks (mean perfect, and the best single eval in each block):
 
-| arm | best window | last 300k blocks (mean perfect) |
-|---|---|---|
-| `b8f` | 69.3% @2828k | 54.7% → 56.8% → **39.6%** |
-| `b8d` | 50.0% @2671k | 16.9% → 17.3% → 20.5% |
+| arm | best window | 4 blocks back | 3 back | 2 back | last block |
+|---|---|---|---|---|---|
+| `b8f` | 69.3% @2828k | 38.9% (**100%**) | 12.2% (60%) | 37.4% (**100%**) | 9.2% (70%) |
+| `b8d` | 50.0% @2671k | 23.7% (90%) | 15.2% (80%) | 19.5% (80%) | 15.3% (70%) |
 
-`b8d` is clearly past it — its last 300k averages ~18% against a 50.0% window at 2671k. `b8f`'s
-decline is one block old and it has recovered from dips before, so it is not yet conclusive.
-Neither is dead (`zero_since` null for both, trailing ~80).
+**`b8f` is oscillating, not declining** — high and low blocks alternate, and the high ones still
+produce 100% single evals. That is the pattern `b6b` and `b7b` showed before recovering, and this
+file has twice been wrong by reading one low block as terminal. Its current trailing of 44.3 is a
+dip inside that oscillation, not a trend.
+
+**`b8d` is in slow monotone decline**: no block in 400k above 24%, trailing sliding 65.8 → 52.2,
+and it is 1.5M steps past its peak. This is the pattern `b8c` showed before being stopped.
+
+Neither is dead (`zero_since` null for both).
 
 **The record checkpoints are already saved to [`../hallOfFame/`](../hallOfFame/README.md)**, so a
 further decline cannot cost the result. That removes the usual urgency about stopping a
 past-peak arm before `max_to_keep` evicts its best checkpoint.
+
+### Targeted re-measurement of `b8f`, 2026-07-31: the 88% record stands
+
+A 6-checkpoint spot check of the four unmeasured 100% graph points plus the two neighbours of
+2806000 — 30 minutes instead of the ~3 hours a full 47-checkpoint re-measurement would cost:
+
+| step | graph | measured | 95% CI | avg score |
+|---|---|---|---|---|
+| 3145000 | 100% | **83.0%** | 74.5-89.1 | 92.4 |
+| 3149000 | 100% | 81.0% | 72.2-87.5 | 90.6 |
+| 2806000 | **100%** | 80.0% | 71.1-86.7 | 88.1 |
+| 2805000 | 80% | 74.0% | 64.6-81.6 | 88.0 |
+| 2807000 | 70% | 74.0% | 64.6-81.6 | 90.4 |
+| 3386000 | 100% | 73.0% | 63.6-80.7 | 89.0 |
+
+**Nothing beat the 88% champion at 2581000**, so the hall-of-fame entry stands. This file predicted
+2806000 was "the most promising unmeasured checkpoint in the project" because it was a 100% point
+inside the arm's peak window; it measured **80%**, third of the six. The prediction was directionally
+right — all six are top-decile — and wrong about the ranking.
+
+**Pooled 77.5% over 600 episodes**, which is *not* comparable to the 59.2% from the 63-checkpoint
+run: this set was chosen to be exceptional, so it measures how good `b8f`'s best region is rather
+than how good the arm is on average.
+
+Two findings sharpened, both in [`findings.md`](findings.md): 100% graph points are now **9 for 9
+above 64%** with a mean of 72.5%, the only graph value with a usable floor; and the
+outlier-beats-neighbours result is **4 of 4**, though the margin shrank to +6 points here because
+the whole neighbourhood is strong.
+
+**Still unmeasured: 26 checkpoints at 90%** (the four 100% points are now done). A full
+re-measurement would select 47 and take ~3 hours. Given that the best of nine 100% points reached
+83% and the record came from an 80% point, more sampling of this arm has diminishing returns —
+prefer spending the machine on new seeds.
 
 **Do not judge either on a single trailing reading.** `b8d` read trailing 42.6 at 2336k, which
 looked alarming and was not — its surrounding 50k blocks ran 66.7-80.6 and it went on to a 50.0%
