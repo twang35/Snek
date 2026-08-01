@@ -154,6 +154,44 @@ count that varies by arm (32 vs 20 vs 1) and over a population truncated at 60%,
 arm's pooled figure is not computed the same way as a weak one's. Compare **best checkpoint**
 across arms, and treat pooled as a within-arm consistency read.
 
+#### Watching a run in progress: `eval_progress.py`
+
+A close-out is 20-50 checkpoints at ~4 minutes each, usually split across several parallel
+processes, so "how is it going and how long is left" is not answerable from the logs without
+reading all of them. This renders one consolidated view instead:
+
+```
+cd snek2
+PYTHONPATH=. python -u eval_progress.py b8f-disc9975seed2
+EVAL_PROGRESS_WATCH=30 PYTHONPATH=. python -u eval_progress.py b8f-disc9975seed2
+```
+
+It prints a text summary and writes `runs/<policy>_eval_progress.png`. **Prefer the text output
+when checking programmatically** — it carries the same numbers without opening an image. Watch
+mode exits by itself once every run is complete, so it does not become a process to remember.
+
+| part | shows |
+|---|---|
+| in-flight chart | running perfect rate vs round, one line per process — is the current checkpoint any good, and how many rounds left |
+| completed chart | every finished measurement by checkpoint step, with best and pooled marked |
+| text block | progress bar, top 5 checkpoints, pace, ETA |
+
+Three things worth knowing about it:
+
+- **It reports the current *job*, not the arm's lifetime.** Result files written within
+  `EVAL_PROGRESS_WINDOW` seconds (default 3600) of the newest one are grouped as one job, which
+  captures the parallel chunks and excludes earlier sessions. `EVAL_PROGRESS_ALL=1` pools
+  everything, which double-counts any checkpoint measured twice.
+- **The ETA comes from this run's own pace**, not a constant. Strong policies play longer
+  episodes and measure slower, so a fixed estimate is wrong in both directions.
+- **It flags a run as STALE** if its file has not been written for 180s while incomplete. A
+  killed process leaves its last in-flight state behind and would otherwise be drawn forever as
+  though still working.
+
+It is a separate script rather than a chart inside `eval_checkpoints.py` because six processes
+each drawing their own window would be six partial pictures of one job, and writing one shared
+PNG would have them overwrite each other.
+
 #### Results are saved incrementally
 
 The output JSON is rewritten after **every** checkpoint, via `.partial` + `os.replace` so a

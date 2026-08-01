@@ -165,13 +165,20 @@ def run_round(parallel_env, policy, worker_envs):
     return scores.tolist(), perfect.tolist(), rewards.tolist(), steps
 
 
-def evaluate(parallel_env, policy, num_episodes):
-    """Collects at least num_episodes, in whole rounds of one episode per worker."""
+def evaluate(parallel_env, policy, num_episodes, on_round=None):
+    """Collects at least num_episodes, in whole rounds of one episode per worker.
+
+    `on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round_perfect)`
+    is called after each round if given. It exists so the running perfect rate can be
+    persisted while a checkpoint is still in flight — a checkpoint takes ~5 minutes and
+    without this the only observable state is "started" until it finishes.
+    """
     worker_envs = parallel_env.pyenv.envs
     num_workers = len(worker_envs)
     rounds = -(-num_episodes // num_workers)  # ceil
 
     scores, perfect_flags, rewards = [], [], []
+    per_round_perfect = []
     steps = 0
     start = time.time()
     for index in range(rounds):
@@ -181,13 +188,16 @@ def evaluate(parallel_env, policy, num_episodes):
         perfect_flags.extend(round_perfect)
         rewards.extend(round_rewards)
         steps += round_steps
+        per_round_perfect.append(int(sum(round_perfect)))
         print('    round {0}/{1}: {2} episodes, {3} perfect'.format(
             index + 1, rounds, len(round_scores), sum(round_perfect)))
+        if on_round is not None:
+            on_round(index + 1, rounds, int(sum(perfect_flags)), len(scores), list(per_round_perfect))
 
     elapsed = time.time() - start
     print('    {0} episodes in {1}s ({2} env steps/s)'.format(
         len(scores), round(elapsed, 1), round(steps / elapsed)))
-    return scores, perfect_flags, rewards
+    return scores, perfect_flags, rewards, elapsed
 
 
 # Selection thresholds, in single-eval (10-episode) percentage points.
@@ -474,8 +484,8 @@ def main(argv):
     suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
     out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
 
-    def write_results(results, complete):
-        """Rewrites the whole file after every checkpoint.
+    def write_results(results, complete, in_flight=None):
+        """Rewrites the whole file after every checkpoint, and after every round.
 
         A long run is expensive — 20 checkpoints x 100 episodes is well over an hour, and a
         63-checkpoint run took four — so writing only at the end means any interruption
@@ -491,6 +501,12 @@ def main(argv):
                    'episodes_per_checkpoint': num_episodes,
                    'checkpoints_requested': len(requested_steps),
                    'complete': complete,
+                   'requested_steps': requested_steps,
+                   # The checkpoint being measured right now, updated every round, or None
+                   # between checkpoints. eval_progress.py renders this; without it a
+                   # ~5-minute checkpoint is invisible until it lands.
+                   'in_flight': in_flight,
+                   'updated_at': time.time(),
                    'results': results}
         partial_path = out_path + '.partial'
         with open(partial_path, 'w') as handle:
@@ -507,7 +523,22 @@ def main(argv):
         if restored != step:
             print('    warning: global_step reads {0}, expected {1}'.format(restored, step))
 
-        scores, perfect_flags, rewards = evaluate(parallel_env, agent.policy, num_episodes)
+        started_at = time.time()
+
+        def on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round):
+            write_results(results, complete=False, in_flight={
+                'step': step,
+                'round': round_index,
+                'rounds_total': rounds_total,
+                'perfect_so_far': perfect_so_far,
+                'episodes_so_far': episodes_so_far,
+                'running_percent': round(100.0 * perfect_so_far / episodes_so_far, 1),
+                'per_round_perfect': per_round,
+                'started_at': started_at,
+            })
+
+        scores, perfect_flags, rewards, elapsed = evaluate(
+            parallel_env, agent.policy, num_episodes, on_round=on_round)
         perfect = sum(perfect_flags)
         low, high = wilson_interval(perfect, len(scores))
         meta = selected_by.get(step, {'selected_by': 'explicit'})
@@ -525,6 +556,10 @@ def main(argv):
             'min_score': round(float(np.min(scores)), 1),
             'max_score': round(float(np.max(scores)), 1),
             'avg_reward': round(float(np.mean(rewards)), 2),
+            # Wall-clock per checkpoint, so eval_progress.py can give an ETA from this run's
+            # own throughput rather than a hardcoded guess. Strong policies play longer
+            # episodes and measure slower, so a fixed estimate is wrong in both directions.
+            'seconds': round(elapsed, 1),
         }
         results.append(row)
         write_results(results, complete=len(results) == len(requested_steps))

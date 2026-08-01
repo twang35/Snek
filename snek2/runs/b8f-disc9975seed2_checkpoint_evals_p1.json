@@ -1,0 +1,28 @@
+{
+  "policy_name": "b8f-disc9975seed2",
+  "episodes_per_checkpoint": 100,
+  "checkpoints_requested": 2,
+  "complete": false,
+  "requested_steps": [
+    2581000,
+    3145000
+  ],
+  "in_flight": {
+    "step": 2581000,
+    "round": 5,
+    "rounds_total": 10,
+    "perfect_so_far": 36,
+    "episodes_so_far": 50,
+    "running_percent": 72.0,
+    "per_round_perfect": [
+      7,
+      7,
+      8,
+      5,
+      9
+    ],
+    "started_at": 1785612931.655394
+  },
+  "updated_at": 1785613066.3050408,
+  "results": []
+}

@@ -1,0 +1,52 @@
+{
+  "policy_name": "b8f-disc9975seed2",
+  "episodes_per_checkpoint": 60,
+  "checkpoints_requested": 2,
+  "complete": true,
+  "requested_steps": [
+    2816000,
+    2581000
+  ],
+  "in_flight": null,
+  "updated_at": 1785612190.829943,
+  "results": [
+    {
+      "step": 2816000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 60,
+      "perfect_games": 53,
+      "perfect_percent": 88.3,
+      "perfect_ci95": [
+        77.8,
+        94.2
+      ],
+      "avg_score": 94.13,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 179.68,
+      "seconds": 173.3
+    },
+    {
+      "step": 2581000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 60,
+      "perfect_games": 52,
+      "perfect_percent": 86.7,
+      "perfect_ci95": [
+        75.8,
+        93.1
+      ],
+      "avg_score": 92.25,
+      "median_score": 95.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 176.41,
+      "seconds": 126.8
+    }
+  ]
+}
