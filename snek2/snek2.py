@@ -78,7 +78,6 @@ def main(argv):
 
     display_training = False
     # display_training = True
-    initialize_with_schmid = False
 
     display_eval = True
     # eval_limit_fps = True
@@ -148,10 +147,10 @@ def main(argv):
         snake_constants.PERFECT_GAME_REWARD = 10000
 
     if snake_constants.DEBUG_LOGGING:
-        print('policy_name: {0}, learning_rate: {1}, discount: {2}, initialize_with_schmid: {3}, steps_left: False, '
-              'FOOD_DISTANCE_REWARD: {4}, initial_populate_replay_buffer_steps: {5}, total_groups_obs: True, '
-              'DEATH_REWARD: {6}, agent_target_update_period: {7}'
-              .format(policy_name, learning_rate, discount, initialize_with_schmid, FOOD_DISTANCE_REWARD,
+        print('policy_name: {0}, learning_rate: {1}, discount: {2}, steps_left: False, '
+              'FOOD_DISTANCE_REWARD: {3}, initial_populate_replay_buffer_steps: {4}, total_groups_obs: True, '
+              'DEATH_REWARD: {5}, agent_target_update_period: {6}'
+              .format(policy_name, learning_rate, discount, FOOD_DISTANCE_REWARD,
                       initial_populate_replay_buffer_steps, DEATH_REWARD, agent_target_update_period))
         print(tf.config.list_physical_devices('GPU'))
     else:
@@ -165,12 +164,6 @@ def main(argv):
             gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=500)])
 
     train_py_env = SnakeEnvironment(discount=discount, display=display_training, policy_name=policy_name)
-    schmid_py_env = None
-    schmid_env = None
-    if initialize_with_schmid:
-        schmid_py_env = SnakeEnvironment(discount=discount, display=True, policy_name=policy_name)
-        schmid_py_env.reset()
-        schmid_env = tf_py_environment.TFPyEnvironment(schmid_py_env)
     eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps,
                                    policy_name=policy_name)
 
@@ -255,13 +248,11 @@ def main(argv):
     def rb_observer(traj):
         replay_buffer.add(traj)
 
-    initial_populate_replay_buffer(initialize_with_schmid,
-                                   train_env.time_step_spec(),
-                                   train_env.action_spec(),
-                                   train_py_env,
-                                   schmid_py_env,
-                                   rb_observer,
-                                   initial_populate_replay_buffer_steps)
+    random_play(train_env.time_step_spec(),
+                train_env.action_spec(),
+                train_py_env,
+                rb_observer,
+                initial_populate_replay_buffer_steps)
 
     # Create a driver to collect experience.
     collect_driver = py_driver.PyDriver(
@@ -317,7 +308,6 @@ def main(argv):
         'importance_sampling_beta': '{0} -> 1.0 over {1} steps'.format(
             initial_importance_sampling_beta, beta_anneal_steps) if use_is_weights else 'disabled',
         'initial_populate_steps': initial_populate_replay_buffer_steps,
-        'initialize_with_schmid': initialize_with_schmid,
         'eval': '{0} episodes every {1} steps'.format(num_eval_episodes, eval_interval),
         'grid': '{0}x{0}, max possible score {1}'.format(GRID_LENGTH, int(MAX_POSSIBLE_SCORE)),
         'DEATH_REWARD': DEATH_REWARD,

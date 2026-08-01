@@ -2,7 +2,6 @@ import os
 import time
 from under_the_hood import *
 from run_report import history_path, load_history, merge_eval_row, save_history, write_run_report
-from schmid_policy import TheSchmidPolicy
 
 from tf_agents.drivers import py_driver
 from tf_agents.policies import py_tf_eager_policy
@@ -24,19 +23,6 @@ buffer_save_interval = 10 * eval_interval
 quiet_eval_log_interval = 10
 
 
-def initial_populate_replay_buffer(use_theschmid_bot,
-                                   time_step_spec,
-                                   action_spec,
-                                   train_py_env,
-                                   schmid_py_env,
-                                   rb_observer,
-                                   initial_collect_steps):
-    if not use_theschmid_bot:
-        random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps)
-    else:
-        schmid_play(time_step_spec, action_spec, schmid_py_env, rb_observer, initial_collect_steps)
-
-
 def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
     if snake_constants.DEBUG_LOGGING:
         print('Random play to populate replay buffer')
@@ -47,20 +33,6 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         train_py_env,
         py_tf_eager_policy.PyTFEagerPolicy(
             random_policy, use_tf_function=True),
-        [rb_observer],
-        max_steps=initial_collect_steps).run(train_py_env.reset())
-
-
-def schmid_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
-    if snake_constants.DEBUG_LOGGING:
-        print('theSchmid play to populate replay buffer')
-
-    schmid_policy = TheSchmidPolicy(time_step_spec, action_spec)
-
-    py_driver.PyDriver(
-        train_py_env,
-        py_tf_eager_policy.PyTFEagerPolicy(
-            schmid_policy, use_tf_function=True),
         [rb_observer],
         max_steps=initial_collect_steps).run(train_py_env.reset())
 

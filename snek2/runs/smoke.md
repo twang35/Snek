@@ -28,7 +28,6 @@ Training was resumed at step 0, 6000, 11000, 13000, 31000 (the dashed lines on t
 | priority_signal | td_error |
 | importance_sampling_beta | 0.4 -> 1.0 over 1000000 steps |
 | initial_populate_steps | 1000 |
-| initialize_with_schmid | False |
 | eval | 10 episodes every 1000 steps |
 | grid | 9x9, max possible score 95 |
 | DEATH_REWARD | -5.0 |
@@ -36,7 +35,7 @@ Training was resumed at step 0, 6000, 11000, 13000, 31000 (the dashed lines on t
 | FOOD_DISTANCE_REWARD | 0.001 |
 | eval_only | False |
 | perfect_game_wait_ms | 500 |
-| min_checkpoint_score | 0.5 |
+| min_checkpoint_score | 40.0 |
 
 ## Evals
 
@@ -44,8 +43,8 @@ Training was resumed at step 0, 6000, 11000, 13000, 31000 (the dashed lines on t
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
-| 0 | 0.1 | 0.1 | 0 | 1/95 | -4.904 | 0 | 0.4 |
-| 1000 | 0.1 | 0.1 | 0 | 1/95 | -4.907 | 0 | 0.4 |
+| 0 | 0.0 | 0.0 | 0 | 0/95 | -5.001 | 0 | 0.4 |
+| 1000 | 2.5 | 2.5 | 0 | 6/95 | -2.518 | 0 | 0.4 |
 | 2000 | 4.0 | 2.05 | 1 | 8/95 | -1.031 | 0 | 0.4 |
 | ... | | | | | | | |
 | 32000 | 55.7 | 55.7 | 0 | 77/95 | 52.753 | 0 | 0.01 |
