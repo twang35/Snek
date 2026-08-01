@@ -36,9 +36,10 @@ at >=60%.
 **The two configs remain statistically tied on pooled** (56.5-60.3 vs 57.9-60.4, overlapping)
 while `b8f` is clearly ahead on best checkpoint. Gradient clipping still buys nothing; see below.
 
-**Both arms are still running**, so these are mid-run snapshots at 2.93M (`b8d`) and 2.65M
-(`b8f`). Files are suffixed `_midrun2`; the earlier `_midrun` set is kept for the repeat-measurement
-analysis in [`findings.md`](findings.md).
+**Both arms have since been stopped** (2026-08-01), so these mid-run measurements at 2.93M (`b8d`)
+and 2.65M (`b8f`) are their final figures. Files are suffixed `_midrun2`; the earlier `_midrun` set
+is kept for the repeat-measurement analysis in [`findings.md`](findings.md), and `_100pct` holds the
+targeted spot check.
 
 ### Older `DISCOUNT=0.995` context
 
@@ -104,45 +105,71 @@ one, so the honest read is that **these two arms cannot be placed on the ranking
 the alpha question stays where batch 7 left it. Do not re-add this task; if the alpha
 comparison matters, it needs new seeds, not new measurements of old ones.
 
-## Currently running: batch 8
+## Nothing is running — all four slots are free
 
-**Launched 2026-07-29.** All arms share
-`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`; overrides
-verified in every log. Design rationale is in the Batch 8 section below.
+**Batch 8 finished 2026-08-01.** Its last two arms, `b8f-disc9975seed2` and `b8d-disc995clip`,
+were stopped at 5.47M and 11.64M steps. Full per-arm results and the batch's design rationale
+have moved to
+[`completedRuns.md`](completedRuns.md#batch-8--the-discount-optimum-gradient-clipping-and-the-arm-lifetime).
 
-Status as of **2026-07-31 08:47**, two arms running:
+| policy | extra override | final step | best 30-eval pf | **best measured ckpt** | pooled | why stopped |
+|---|---|---|---|---|---|---|
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 5.47M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | 2.5M past peak, ~3% of best rate |
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | **11.64M** | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | **dead** — no perfect game in 6.1M steps |
+| `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | died, recovered after 1.2M, died again |
+| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | flat — never above 6.9% in any 300k block |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | monotone decline, no perfect game in 1.26M |
+| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | 0.7% @82k | 0% (dead) | — | dead at 452k |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | 0.0% | 0% (dead) | — | dead — zero perfect games in 1.41M |
 
-| policy | extra override | step | best 30-eval pf | **best measured ckpt** | pooled | max pt | status |
-|---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 3.51M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **100%** | running, oscillating |
-| `b8d-disc995clip` | `0.995 + CLIPPING=10` | 4.24M | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | 100% | running, declining |
-| `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | 50% | **stopped — died, recovered, died** |
-| `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | 60% | **stopped — flat, then faded** |
-| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | 40% | **stopped — monotone decline** |
-| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | 0.7% @82k | 0% (dead) | — | 10% | **stopped — dead** |
-| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | 0.0% | 0% (dead) | — | 0% | **stopped — dead** |
+**Both were stopped for running past their useful life.** Per-1M-step means tell the whole arc:
 
-**Both arms peaked around 2.7-2.8M, and they are failing differently.** Their last 400k in 100k
-blocks (mean perfect, and the best single eval in each block):
+| block | `b8f` trailing / perfect | `b8d` trailing / perfect |
+|---|---|---|
+| 1-2M | 80.6 / 30.1% | 73.4 / 15.4% |
+| **2-3M** | **82.1 / 40.9%** | **72.2 / 27.4%** |
+| 3-4M | 65.8 / 18.6% | 56.8 / 14.6% |
+| 4-5M | 44.7 / 7.4% | 47.8 / 11.9% |
+| 5-6M | 38.9 / 10.1% | 25.5 / 0.3% |
+| 6-7M | — | 12.0 / 0.0% |
+| 7-11.6M | — | **0.0-2.0 / 0.0%** |
 
-| arm | best window | 4 blocks back | 3 back | 2 back | last block |
-|---|---|---|---|---|---|
-| `b8f` | 69.3% @2828k | 38.9% (**100%**) | 12.2% (60%) | 37.4% (**100%**) | 9.2% (70%) |
-| `b8d` | 50.0% @2671k | 23.7% (90%) | 15.2% (80%) | 19.5% (80%) | 15.3% (70%) |
+**`b8d` died.** Its last perfect game was at step 5496k — **6.1M steps** before it was stopped — and
+it sat at trailing ~0-2 from 7M onward. Its final step of **11.64M** is the longest run in the
+project by more than 2x.
 
-**`b8f` is oscillating, not declining** — high and low blocks alternate, and the high ones still
-produce 100% single evals. That is the pattern `b6b` and `b7b` showed before recovering, and this
-file has twice been wrong by reading one low block as terminal. Its current trailing of 44.3 is a
-dip inside that oscillation, not a trend.
+**`b8f` was declining but not dead** when stopped: last perfect game 12k steps before the end,
+final trailing 59.6, and it still threw the occasional 100% single eval. It was stopped because its
+last two 100k blocks averaged 2.7% perfect against 40.9% at its 2-3M peak — 2.5M steps past peak at
+~3% of its best rate, with its record checkpoint already banked.
 
-**`b8d` is in slow monotone decline**: no block in 400k above 24%, trailing sliding 65.8 → 52.2,
-and it is 1.5M steps past its peak. This is the pattern `b8c` showed before being stopped.
+**This supersedes the "oscillating, not declining" read from 2026-07-31**, which was correct on the
+evidence then — high and low blocks were genuinely alternating with 100% evals in the high ones.
+Three further declining blocks have settled it. The lesson stands in both directions: that read
+was not wrong to withhold judgement, and withholding judgement forever is not free either.
 
-Neither is dead (`zero_since` null for both).
+**Both record checkpoints are in [`../hallOfFame/`](../hallOfFame/README.md)**, so nothing was lost
+by stopping either arm.
 
-**The record checkpoints are already saved to [`../hallOfFame/`](../hallOfFame/README.md)**, so a
-further decline cannot cost the result. That removes the usual urgency about stopping a
-past-peak arm before `max_to_keep` evicts its best checkpoint.
+### New finding: these arms have a lifetime, and the horizon has an upper bound
+
+`b8d` ran to 11.6M steps and died. Together with `b8f`'s decline this bounds the "do not stop a
+healthy arm at 1M" finding from the other side:
+
+| phase | steps | what happens |
+|---|---|---|
+| climb | 0 to ~2.5M | rate rises; the best checkpoints appear late in this phase |
+| **peak** | **~2.5-3M** | both arms' best measured checkpoints (2581k, 2538k) and best windows (2828k, 2671k) |
+| decline | ~3-6M | perfect rate falls steadily; occasional elite checkpoints persist |
+| death | ~7M+ (`b8d`) | trailing ~0, no perfect games at all |
+
+So the practical horizon is **stop around 3-3.5M**, not 1M and not indefinitely. Everything after
+the peak cost ~8.5M steps of machine time on `b8d` and produced nothing measurable.
+
+**A step-count trap this exposes:** `b8d` advanced 7.3M steps in ~24 hours while `b8f` managed
+1.9M, and the difference is almost entirely that **a dead policy plays very short episodes**, so it
+burns training steps far faster. Never compare two arms' progress by wall-clock step rate — a
+sudden acceleration is a symptom of death, not of speed.
 
 ### Targeted re-measurement of `b8f`, 2026-07-31: the 88% record stands
 
@@ -452,38 +479,45 @@ the config mid-run and invalidates the arm.
 Per-run logs written to `$CLAUDE_JOB_DIR/tmp` are job-scoped and do not survive.
 The durable record is `runs/<policy>_evals.json`; analyse from there.
 
-## Batch 8 — push the discount further
+## Next up: batch 9 — settle the discount optimum
 
-The obvious next question: if 0.995 helped this much, does more help more? A perfect game
-runs several hundred steps, so even 0.995 (~200-step horizon) may still under-weight the
-terminal bonus. All arms keep the winning base
-`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`:
+**All four slots are free.** The one unresolved question from batch 8 is whether the optimum sits at
+`0.995` or `0.9975`: 0.9975 holds the record (88%) but is **1 of 2** on survival, while 0.995 is 3
+of 3 with a lower ceiling. Two more 0.9975 seeds decide it.
 
-| policy | extra override | effective horizon | role |
-|---|---|---|---|
-| `b8a-disc999` | `SNEK_DISCOUNT=0.999` | ~1000 steps | is more better, or unstable? |
-| `b8b-disc999seed2` | `SNEK_DISCOUNT=0.999` | ~1000 steps | second seed, since n=1 proves nothing here |
-| `b8c-disc9975` | `SNEK_DISCOUNT=0.9975` | ~400 steps | the midpoint, if 0.999 breaks |
-| `b8d-disc995clip` | `SNEK_DISCOUNT=0.995 SNEK_GRADIENT_CLIPPING=10` | ~200 steps | clipping on the known-good setting |
+| policy | override on top of the shared base | role |
+|---|---|---|
+| `b9a-disc9975seed3` | `SNEK_DISCOUNT=0.9975` | third 0.9975 seed — takes it to n=3 |
+| `b9b-disc9975seed4` | `SNEK_DISCOUNT=0.9975` | fourth seed; 0.9975 is 1 of 2, so n=4 is not excessive |
+| `b9c-disc996` | `SNEK_DISCOUNT=0.996` | between the two known-good values, in case the optimum is interior |
+| `b9d-lr1e4` | `SNEK_DISCOUNT=0.9975 SNEK_LEARNING_RATE=1e-4` | the highest-value untested knob, on the record config |
 
-Higher discounts are a **known source of instability** — bootstrapped targets grow as the
-horizon lengthens — so 0.999 may well be worse rather than better. That is why 0.9975 sits
-in the batch as a fallback midpoint and why `b8d` tests a stability aid on the setting that
-already works rather than on a riskier one.
+Shared base for every arm:
+
+```
+SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0
+```
+
+**Run each to ~3-3.5M steps and stop.** That is the new horizon finding: both batch-8 arms peaked at
+~2.5-3M and `b8d` then died at ~7M, spending 8.5M steps producing nothing. Do not repeat that.
+
+**Close out with `top20`**, which now measures every checkpoint at >=90% and fills to 20 from >=60%.
+Measure the **100% graph points first** — 9 of 9 have come in above 64%.
 
 ### Later candidates
 
 | change | why | gate |
 |---|---|---|
-| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.995 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after batch 8 |
-| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after a stable base exists |
+| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.9975 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after batch 9 |
+| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after batch 9 |
 | partial IS correction (beta < 1) | full correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |
-| `LEARNING_RATE=1e-4` | 1e-5 is very conservative; worth trying now that a stable base exists | after batch 8 |
+| anything aimed at the post-peak decline | both batch-8 arms peaked at ~2.5-3M and fell away; nothing tried so far addresses *why* | needs a mechanism first |
 
-**Seed count is the binding constraint, not the number of knobs tried.** Five single-seed
-conclusions in this document have been overturned or weakened. Nothing goes in
-[`findings.md`](findings.md) as established without n=3 — which is why batch 8 spends two of
-four slots on the same value.
+**Seed count is the binding constraint, not the number of knobs tried.** Six single-seed conclusions
+in this document have been overturned or weakened — most recently gradient clipping, which looked
+like batch 8's headline twice before failing at 1 of 3. Nothing goes in
+[`findings.md`](findings.md) as established without n=3, which is why batch 9 spends two of four
+slots on the same value.
 
 Launch commands are in
 [`hyperparamTuning.md`](hyperparamTuning.md#launching-a-run).

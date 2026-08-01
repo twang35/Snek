@@ -826,9 +826,36 @@ The counter-evidence from before still stands: `b7d` ran to 1.60M at 0.995 and p
 `b7a` reached 2.00M with a 19% ceiling. Long runs do not rescue a mediocre arm.
 
 **Practical rule: do not stop a healthy arm at ~1M steps.** Both records came from territory the
-old horizon forbade. Both arms have since peaked and begun declining (`b8d` clearly, `b8f`
-tentatively), so the horizon is not unlimited either — around 2.5-2.9M is where these two topped
-out.
+old horizon forbade.
+
+### The horizon has an upper bound too: peak ~2.5-3M, dead by ~7M
+
+Followed to the end, both arms traced the same four-phase arc. `b8d` ran to **11.6M steps** — the
+longest run in the project by more than 2x — and died:
+
+| phase | steps | `b8f` perfect (per 1M) | `b8d` perfect (per 1M) |
+|---|---|---|---|
+| climb | 0-2M | 17.2% → 30.1% | 6.8% → 15.4% |
+| **peak** | **~2.5-3M** | **40.9%** | **27.4%** |
+| decline | 3-6M | 18.6% → 7.4% → 10.1% | 14.6% → 11.9% → 0.3% |
+| death | 7M+ | — | **0.0%** for 4.5M steps |
+
+Both arms' best measured checkpoints (2581k, 2538k) and best 30-eval windows (2828k, 2671k) fall in
+the peak band. `b8d`'s last perfect game was at 5496k, 6.1M steps before it was still running.
+
+**So the practical horizon is ~3-3.5M steps**, not 1M and not unlimited. The ~8.5M steps `b8d` spent
+after its peak produced nothing measurable. That the decline ends in death rather than a plateau
+also means a past-peak arm is not merely unproductive — it is on its way to zero.
+
+#### Corollary: a sudden jump in step rate is a symptom of death
+
+`b8d` advanced **7.3M steps in ~24 hours** while `b8f` managed 1.9M on the same machine. Almost all
+of that gap is that **a dead policy plays very short episodes** — the snake dies immediately — so it
+burns training steps several times faster than a competent one.
+
+Never read step rate as progress. This is the same confound that once made eval cost look like a
+config difference, and it now has a second use: an arm that suddenly starts advancing much faster
+than its sibling is probably dying, not accelerating.
 
 ## Filter, not ranker — but the *surrounding* rate does rank, at n=88
 

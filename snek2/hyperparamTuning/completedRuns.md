@@ -22,19 +22,21 @@ Arms measured with the **outlier-top10** rule carry a best-checkpoint and top-3 
 are mutually comparable; older `measured` figures used other selection rules and are not.
 
 **From 2026-07-30 the `measured` column stops being comparable at all**, so the episode count
-is now spelled out per row (`/1000`, `/100`). The selector measures every checkpoint above 80%
-and none at or below 50%, so the checkpoint count varies per arm — `b8e` has 1, `b8f` has 16.
-Use **best ckpt**. `b8e` is the illustration: 32% best checkpoint reads mid-table, but having
-one checkpoint above the floor where the batch's best arm has sixteen is the actual result.
+is now spelled out per row (`/6300`, `/1000`, `/100`). The selector measures every checkpoint at
+>=90% and nothing below 60%, capped at 20, so the checkpoint count varies per arm — `b8e` has 1,
+`b8f` has 63. Use **best ckpt**. `b8e` is the illustration: 32% best checkpoint reads mid-table, but
+having one checkpoint above the floor where the batch's best arm has dozens is the actual result.
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **51%** | **48.0%** | 38.8% /1000 | 44.0% | **best on record**, and survived |
+| `b8f-disc9975seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.47M | **88%** | **82.7%** | **59.2%** /6300 | **69.3%** | **project record**; declining when stopped |
+| `b8d-disc995clip` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | **11.64M** | **80%** | 74.7% | 58.4% /2500 | 50.0% | 2nd by measurement, then **died at ~7M** |
+| `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | 51% | 48.0% | 38.8% /1000 | 44.0% | best of batch 7, and survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 50% | 46.7% | 37.1% /1000 | 34.0% | ties `b7f` on ceiling, **1 of 3 seeds survive** |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 39% | 34.7% | 29.5% /1000 | 32.3% | strong, survived |
 | `b6b-alpha06` | alpha 0.6, `td_loss`, no IS | 1.80M | — | — | 24.5% /1000 | 21.7% | old selector, **underestimate**; re-measure |
 | `b7d-discount995` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.60M | 26% | 22.7% | 16.4% /1000 | 17.7% | survived, weakest of the three discount seeds |
-| `b8e-clipseed2` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | 1.16M | **32%** | — | 32% /100 | 21.3% | one good ckpt, **no good region** — 1 above the 50% floor |
+| `b8e-clipseed2` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | 1.16M | **32%** | — | 32% /100 | 21.3% | one good ckpt, **no good region** — 1 above the floor |
 | `b7a-a06seed2` | alpha 0.6, `td_loss`, no IS | 2.00M | 19% | 18.3% | 12.0% /1000 | 15.0% | survived to 2M, low ceiling |
 | `b6a-alpha04` | alpha 0.4, `td_loss`, no IS | 1.41M | — | — | 8.1% /1000 | 14.3% | stable, never near death, low ceiling |
 | `b5d-schlongTDE` | alpha 0.8, `td_error`, no IS | 2.07M | — | — | 6.6% /1000 | 10.7% | stable, low ceiling |
@@ -79,22 +81,73 @@ Four things this ranking makes visible that per-batch reading did not:
   63.7 trailing before collapsing again. A ranking by endpoint hides that entirely — see
   [`findings.md`](findings.md).
 
-Two batch-8 arms are **absent from this table because they are still running**, and both would
-top it by a wide margin. Measured mid-run late on 2026-07-30, at ~2.6-2.9M steps:
+**The top two rows were measured mid-run at ~2.6-2.9M steps**, not at the final steps shown, because
+both arms kept training after measurement and then declined. Those are their best figures, and their
+record checkpoints are preserved in [`../hallOfFame/`](../hallOfFame/README.md).
 
-| arm | ckpts | best ckpt | top-3 | pooled |
-|---|---|---|---|---|
-| `b8f-disc9975seed2` | 63 | **88.0%** @2581k | **82.7%** | **59.2%** /6300 |
-| `b8d-disc995clip` | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 |
+**Read the `final steps` column with care — it is not a quality signal.** `b8d`'s 11.64M is the
+largest number in this table and it died; the same arm's best checkpoint came at 2538k. Both top
+arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
+~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
+they had not finished improving** — see [`findings.md`](findings.md).
 
-Both beat `b7f`'s 51% / 38.8% by ~20 points on pooled rate with non-overlapping intervals, and tie
-each other on pooled. Their record checkpoints are preserved in
-[`../hallOfFame/`](../hallOfFame/README.md).
+## Batch 8 — the discount optimum, gradient clipping, and the arm lifetime
 
-**Every arm in the table above was stopped before ~2.1M steps, and the top four at ~1.06M** — the
-two arms here measured 63% and 62% at that range and only reached 88% and 80% past 2.5M. So this
-ranking compares configs at a horizon where none of them had finished improving; see
-[`findings.md`](findings.md).
+**Started 2026-07-29, all arms stopped 2026-08-01.** Seven arms in four slots. It produced the
+**project record (88% perfect games)**, falsified `DISCOUNT=0.999` and gradient clipping, and — by
+running two arms far longer than any before — established that an arm has a *lifetime*.
+
+| policy | extra override | final step | best 30-eval pf | **best measured ckpt** | pooled | verdict |
+|---|---|---|---|---|---|---|
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 5.47M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **project record**; declining when stopped |
+| `b8d-disc995clip` | `0.995` + `CLIPPING=10` | **11.64M** | 50.0% @2671k | **80.0%** @2538k | 58.4% /2500 | 2nd by measurement, then **died at ~7M** |
+| `b8g-clipseed3` | `0.995` + `CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | died, recovered after 1.2M, died again |
+| `b8e-clipseed2` | `0.995` + `CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | flat; one good ckpt, no good region |
+| `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | monotone decline to a stop |
+| `b8a-disc999` | `DISCOUNT=0.999` | 1.11M | 0.7% @82k | 0% (dead) | — | dead at 452k |
+| `b8b-disc999seed2` | `DISCOUNT=0.999` | 1.41M | 0.0% | 0% (dead) | — | dead; zero perfect games in 1.41M |
+
+**Four results, in descending order of how much they change what to do next:**
+
+1. **The horizon, not a hyperparameter, was the binding constraint.** `b8f` and `b8d` measured 63%
+   and 62% at ~1.8M steps and **88% and 80%** at ~2.6M. Every previous record-holder had been
+   stopped at ~1.06M. But followed further both peaked at **~2.5-3M** and then declined, and `b8d`
+   died. The horizon has both a floor and a ceiling: **stop around 3-3.5M**.
+2. **`DISCOUNT=0.9975` holds the record but is 1 of 2 on survival.** `b8f` produced the 88%
+   champion; its sibling `b8c` ran the identical config and declined monotonically to a stop. The
+   discount optimum sits somewhere in 0.995-0.9975 and is not yet resolved.
+3. **`DISCOUNT=0.999` is falsified, 2 of 2 dead** — and it failed differently from other deaths,
+   never learning at all (peak trailing 63.1 and 31.8; `b8b` produced zero perfect games in 1.41M
+   steps). That gives the discount an optimum rather than a monotone benefit.
+4. **`GRADIENT_CLIPPING=10` is falsified at 1 of 3**, against 3 of 3 for plain 0.995. It briefly
+   looked like the batch's headline off `b8d` at 163k steps, then off `b8d`'s 62% measurement; both
+   readings were premature, and `b8f` matched or beat that ceiling without clipping.
+
+### Original design rationale
+
+The obvious next question: if 0.995 helped this much, does more help more? A perfect game
+runs several hundred steps, so even 0.995 (~200-step horizon) may still under-weight the
+terminal bonus. All arms keep the winning base
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`:
+
+| policy | extra override | effective horizon | role |
+|---|---|---|---|
+| `b8a-disc999` | `SNEK_DISCOUNT=0.999` | ~1000 steps | is more better, or unstable? |
+| `b8b-disc999seed2` | `SNEK_DISCOUNT=0.999` | ~1000 steps | second seed, since n=1 proves nothing here |
+| `b8c-disc9975` | `SNEK_DISCOUNT=0.9975` | ~400 steps | the midpoint, if 0.999 breaks |
+| `b8d-disc995clip` | `SNEK_DISCOUNT=0.995 SNEK_GRADIENT_CLIPPING=10` | ~200 steps | clipping on the known-good setting |
+
+Higher discounts are a **known source of instability** — bootstrapped targets grow as the
+horizon lengthens — so 0.999 may well be worse rather than better. That is why 0.9975 sits
+in the batch as a fallback midpoint and why `b8d` tests a stability aid on the setting that
+already works rather than on a riskier one.
+
+### What the batch cost, and the step-rate trap
+
+`b8d` spent ~8.5M steps after its peak and produced nothing measurable in them. It also advanced
+**7.3M steps in ~24 hours** while `b8f` managed 1.9M on the same machine — almost entirely because a
+dead policy plays very short episodes and therefore burns training steps far faster. A sudden jump
+in step rate is a symptom of death, not speed.
 
 ## Batch 7 — seeding `b6b`, and finding `DISCOUNT=0.995`
 

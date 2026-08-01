@@ -38,7 +38,7 @@ grep -o 'charts/[a-zA-Z0-9-]*\.png' charts.md | sed 's|charts/||;s|\.png||' | so
 comm -23 /tmp/have /tmp/doc
 ```
 
-Snapshot refreshed 2026-07-31, at the steps noted below.
+Snapshot refreshed 2026-08-01, at the steps noted below.
 
 **Batches run newest first** — the highest-numbered batch at the top, batch 1 at the bottom — so the current
 state of the investigation is what you see on opening the file, and the early dead ends stay
@@ -59,8 +59,8 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.51M | 89.4 (1716k) | **69.3%** | **88%** @2581k | **59.2%** /6300 | **project record**; 63 ckpts at >=80% |
-| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | 4.24M | 86.9 (2058k) | 50.0% | **80%** @2538k | 58.4% /2500 | second; ties `b8f` on pooled, clipping adds nothing |
+| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.46M | 89.4 (1716k) | **69.3%** | **88%** @2581k | **59.2%** /6300 | **project record**; 63 ckpts at >=80% |
+| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | **11.60M** | 86.9 (2058k) | 50.0% | **80%** @2538k | 58.4% /2500 | second by measurement, but **died at ~7M**; clipping adds nothing |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | 44.0% | 51% @860k | 38.8% /1000 | best of batch 7, and it survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | **50%** @869k | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 39% @334k | 29.5% | strong, survived |
@@ -137,8 +137,9 @@ table was stopped at or before 2.1M, and the four previous best were stopped at 
 table has been systematically comparing configs at a step count where none of them had finished
 improving. Do not stop a healthy arm at 1M steps.
 
-**Eight of the 30 arms died outright**, and six of those ran the same PER config as the best
-arm. That is the central tension in these charts: `b4c` and `b7f` reach ~50% at their best
+**Nine of the 30 arms died outright** — `b8d-disc995clip` joined them at ~7M steps, having first
+produced the project's second-best measured checkpoint — and six of those ran the same PER config as
+the best arm. That is the central tension in these charts: `b4c` and `b7f` reach ~50% at their best
 checkpoints, while `b5a`, `b5b`, `b7b`, `b7c` and `b8g` — near-identical configs — went to 0.0
 and stayed there. `DISCOUNT=0.995` remains the only change that has held the ceiling while
 avoiding the deaths at n=3.
@@ -163,7 +164,7 @@ headline and ended as its negative result.
 
 ### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
 
-Step 3.51M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 88.0%**, pooled 59.2% /6300
+Step 5.46M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 88.0%**, pooled 59.2% /6300
 
 **The project record.** Measured mid-run over 63 checkpoints: best **88.0%** at 2581k
 (CI 80.2-93.0), top-3 82.7%, pooled **59.2%** — 20 points above `b7f`'s 38.8% with no overlap.
@@ -181,10 +182,13 @@ checkpoints above 80% to 63.
 **Its 90% graph points measured 22-82%** — a ~60-point spread — while its 80% points produced the
 88% champion. The graph eval filters but does not rank; see [`findings.md`](findings.md).
 
-**Past peak and oscillating rather than declining.** Its last four 100k blocks read 38.9% → 12.2%
-→ 37.4% → 9.2% mean perfect against a 69.3% best window at 2828k — high and low blocks alternating,
-with the high ones still producing **100% single evals**. That is the `b6b`/`b7b` pattern, and this
-file has twice mistaken one low block for a terminal decline.
+**Now declining, not oscillating.** Per-1M means: 30.1% (1-2M) → **40.9% (2-3M peak)** → 18.6% →
+7.4% → 10.1% (5-6M). An earlier version of this caption called it oscillation rather than decline,
+which was right on the evidence at the time — high and low blocks were alternating with 100% evals
+in the high ones — and three further declining blocks have settled it.
+
+It is **not dead**: its last perfect game was 2k steps before this snapshot and it still throws the
+occasional 100% single eval. But its last two 100k blocks averaged 2.7% against 40.9% at peak.
 
 **Its four 100% graph points were spot-checked on 2026-07-31** and measured 80% (2806k), 83%
 (3145k), 81% (3149k) and 73% (3386k) — all top-decile, none beating the 88% champion at 2581k. 26
@@ -194,7 +198,7 @@ checkpoints at 90% remain unmeasured. See [`runs.md`](runs.md).
 
 ### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
 
-Step 4.24M (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
+Step **11.60M** (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
 
 **Second best arm in the project, tied with `b8f` on pooled rate.** Measured mid-run over 25
 checkpoints: best **80.0%** at 2538k (CI 71.1-86.7), top-3 74.7%, pooled **58.4%** (CI 56.5-60.3),
@@ -205,9 +209,13 @@ overlapping `b8f`'s interval. 13 of 25 checkpoints measured >=60%. The 2538k che
 tied on pooled. An interim note in these docs, written while `b8d` was measured and `b8f` was not,
 claimed clipping raised the ceiling; both re-measurements closed that off.
 
-**In slow monotone decline**, and further along than `b8f`: no 100k block in its last 400k averaged
-above 24% perfect (23.7 → 15.2 → 19.5 → 15.3) and trailing has slid 65.8 → 52.2, now 1.5M steps past
-its peak. This is the shape `b8c` had when it was stopped, rather than `b8f`'s oscillation. Unlike `b8f`, its measured quality did **not** improve with
+**Dead, and the longest run in the project.** It reached **11.60M steps** — more than 2x any other
+arm — and its last perfect game was at 5496k, **6.1M steps** earlier. Per-1M perfect means:
+**27.4% (2-3M peak)** → 14.6% → 11.9% → 0.3% → 0.0% from 6M on, with trailing at 0.0-2.0 for its
+final 4.5M steps.
+
+This arm is why the horizon finding now has an **upper** bound as well as a lower one: ~8.5M steps
+after its peak produced nothing measurable. See [`findings.md`](findings.md). Unlike `b8f`, its measured quality did **not** improve with
 step count within the selected set (corr −0.11), and its 2.6-3.0M band measured worse than its
 2.2-2.6M band.
 
