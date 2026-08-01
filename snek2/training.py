@@ -157,6 +157,9 @@ class TrainingMetrics:
         self.perfect_percentage = 0.0
         self.num_of_percents = 0
         self.recent_steps_per_second = 0.0
+        # Evals whose checkpoint was skipped for scoring below MIN_CHECKPOINT_SCORE. Counted
+        # so a progress check can tell "this arm is not saving" from "this arm is not running".
+        self.skipped_checkpoints = 0
 
     def reset(self):
         self.steps_start_time = time.time()
@@ -217,19 +220,50 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
 
         maybe_update_epsilon(avg_reward, epsilon, min_epsilon)
 
-        if not eval_only:
-            if debug:
-                print('saving checkpoint')
-            train_checkpointer.save(global_step)
-            # The buffer is ~20 MB and only warm-starts the next run, so it saves
-            # far less often than the agent to keep disk churn down.
-            if step % buffer_save_interval == 0:
-                replay_buffer.save(replay_buffer_dir)
-
         metrics.trailing_avg_scores.append(avg_score)
         if len(metrics.trailing_avg_scores) > trailing_avg_window:
             metrics.trailing_avg_scores.pop(0)
         trailing_avg_score = sum(metrics.trailing_avg_scores) / len(metrics.trailing_avg_scores)
+
+        # Skip checkpointing a policy that is not worth keeping. Two reasons, and the
+        # second is the one that actually cost this project evidence:
+        #
+        # 1. Disk. A checkpoint is 188 KB and one is written every 1000 steps.
+        # 2. `max_to_keep` is a *rolling* window, so a dead arm that keeps training keeps
+        #    writing worthless checkpoints and **evicts the good ones behind them**.
+        #    `b8d-disc995clip` ran to 11.64M steps with its last 4.5M at trailing ~1, hit
+        #    the 10000 cap, and deleted everything before step 1.64M. Its 80% checkpoint at
+        #    2538k survived by luck; a few million more steps would have taken it.
+        #
+        # Gate on `max(this eval, trailing)` rather than trailing alone. The best
+        # checkpoints in this project are *outliers* that spike well above their
+        # neighbourhood, so a trailing-only test could skip exactly the checkpoint worth
+        # keeping while an arm is recovering. Either signal clearing the bar is enough.
+        #
+        # The bar is deliberately below any useful policy: anything capable of a perfect game
+        # scores ~85-95 out of 95. Checked against every checkpoint this project has measured
+        # at 100 episodes — of the 232 that reached 30% perfect games, the lowest
+        # max(avg_score, trailing) was 49.8 — so the default of 40 discards only arms that are
+        # dead or have not started learning.
+        keep_checkpoint = max(avg_score, trailing_avg_score) >= snake_constants.MIN_CHECKPOINT_SCORE
+
+        if not eval_only:
+            if keep_checkpoint:
+                if debug:
+                    print('saving checkpoint')
+                train_checkpointer.save(global_step)
+                # The buffer is ~20 MB and only warm-starts the next run, so it saves
+                # far less often than the agent to keep disk churn down. It is gated on the
+                # same condition so the two never desync — a resume that paired an old
+                # policy with a much newer buffer would train the restored weights on
+                # experience they never generated.
+                if step % buffer_save_interval == 0:
+                    replay_buffer.save(replay_buffer_dir)
+            else:
+                metrics.skipped_checkpoints += 1
+                if debug:
+                    print('skipping checkpoint: score {0:.1f} / trailing {1:.1f} below {2}'.format(
+                        avg_score, trailing_avg_score, snake_constants.MIN_CHECKPOINT_SCORE))
 
         eval_str = 'step = {0}: avg_score = {1}, trailing_avg_score = {2}, min_score = {3}, ' \
                    'max_score = {4}/{5}, avg_reward = {6}, min_reward = {7}, max_reward = {8}, ' \
@@ -275,7 +309,8 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
                           metrics.last_eval_perfect_percent * 100,
                           summary['best_perfect30']['value'],
                           round(float(epsilon.numpy()), 4),
-                          '  <- best so far' if is_new_best else ''),
+                          '  <- best so far' if is_new_best else
+                          ('  no ckpt' if not keep_checkpoint else '')),
                       flush=True)
         # restart time because compute_avg_return() takes a while and messes up the timing
         metrics.reset()

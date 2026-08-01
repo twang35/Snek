@@ -1,0 +1,26 @@
+{
+  "policy_name": "b8f-disc9975seed2",
+  "episodes_per_checkpoint": 100,
+  "checkpoints_requested": 13,
+  "complete": false,
+  "results": [
+    {
+      "step": 1633000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 100,
+      "perfect_games": 24,
+      "perfect_percent": 24.0,
+      "perfect_ci95": [
+        16.7,
+        33.2
+      ],
+      "avg_score": 77.64,
+      "median_score": 79.5,
+      "min_score": 32.0,
+      "max_score": 95.0,
+      "avg_reward": 96.75
+    }
+  ]
+}

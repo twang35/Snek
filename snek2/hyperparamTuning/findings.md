@@ -10,7 +10,13 @@ section before proposing an epsilon or buffer experiment.
 
 | finding | status |
 |---|---|
-| **`DISCOUNT=0.995` matches the best ceiling (51%) and survives 3 of 3 seeds** | **measured**, ~2.3x expected value |
+| **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes |
+| **An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M** | **established**, 2 arms followed to the end |
+| **The horizon was the binding constraint** — records live past 2.5M, old arms stopped at ~1.06M | **established** |
+| A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
+| 100-episode measurement reproduces within binomial noise | **established**, 51 repeats, mean spread 4.8 |
+| Checkpoints below score 40 are no longer written, so a dead arm cannot evict good ones | **fixed** 2026-08-01 |
+| `DISCOUNT=0.995` matches the then-best ceiling (51%) and survives 3 of 3 seeds | **measured**, ~2.3x expected value |
 | Prefer top-3 pooled over best-of-10; the max of 10 noisy measurements is upward-biased | **established** |
 | `b6b-alpha06` (alpha 0.6, `td_loss`, no IS) is the best *bet* at 0.99: 24.5% over 1000 eps | **measured**, n=1 seed, and an **underestimate** |
 | `b4c` has the best *ceiling*: ~31%, but survives only 1 of 3 | **measured**, 1400 eps |
@@ -23,9 +29,9 @@ section before proposing an epsilon or buffer experiment.
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — it is arithmetic |
 | Sharpness is a variance dial: higher ceiling *and* higher death risk | **weakened** — eff 1.2 dies 2 of 4, eff 1.6 dies 2 of 3 |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds across two sharpness levels |
-| `DISCOUNT=0.995` is the current best lead | **measured**, 3 of 3 survived, 38.8% pooled |
+| `DISCOUNT=0.9975` holds the record but is 1 of 2 on survival | **open** — needs seeds 3 and 4 |
 | Higher discount is monotonically better | **falsified** — 0.999 died 2 of 2 |
-| `GRADIENT_CLIPPING=10` on 0.995 reaches a good level much faster | **promising**, n=1, seeding now |
+| `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
 | The 5s perfect-game pause slowed good arms ~40% and biased wall-clock comparisons | **fixed**, now 500ms |
 | Evals looked truncated but never were: 11 of 11 complete at 10 ckpts x 100 eps | **verified** |
 | There is a stability "cliff" between eff 0.8 and 1.2 | **retracted** — `b6b` crossed it and thrived |
@@ -308,14 +314,15 @@ variance or something differs between runs that has not been identified. Either 
 The `b4c` @869000 case above now looks like the outlier rather than the rule. Twenty checkpoints
 were measured twice on the same day, at 100 episodes each:
 
-| arm | repeats | mean delta | mean abs delta | max abs delta |
-|---|---|---|---|---|
-| `b8f-disc9975seed2` | 16 | -1.2 | 5.1 | 11 |
-| `b8d-disc995clip` | 4 | +3.5 | 4.0 | 9 |
+| arm | steps measured 2+ times | mean spread | max spread |
+|---|---|---|---|
+| `b8f-disc9975seed2` | 34 | 4.8 | 11 |
+| `b8d-disc995clip` | 17 | 5.0 | 12 |
+| **combined** | **51** | **4.8** | **12** |
 
-**Mean absolute deviation 4.9 points, max 11** — comfortably inside the ±10 binomial interval,
-with no systematic bias in either direction. A third reading of the champion checkpoint during the
-hall-of-fame verification gave 85% over 20 episodes against 88% over 100, also consistent.
+**Mean spread 4.8 points and 47 of 51 within ±10** — comfortably inside binomial expectation, with
+no systematic direction. Independent spot checks agree too: the 92% champion read 25/30 and the 88%
+one 85/20 during hall-of-fame restore verification.
 
 So a single 100-episode figure is usable at ±10, and the earlier warning should be read as "one
 checkpoint once behaved strangely" rather than a property of the measurement. The practical advice
@@ -780,19 +787,26 @@ an unproven survival record, on one seed each way.
 seeds would only re-confirm it, while 0.9975 could be either the new optimum or a coin flip and
 two seeds decide which. Run them past 2.5M steps — that is where both records were found.
 
-## The record is **88% perfect games**, and the horizon was the binding constraint
+## The record is **92% perfect games**, and the horizon was the binding constraint
 
-Measured 2026-07-30 late, both arms mid-run. The two rows in the middle are the *same two arms*
-measured thirteen hours and ~860k steps earlier, which is the whole story of this section:
+Final close-out measurement 2026-08-01, with the same arms' earlier measurements below for the
+trajectory — which is the whole story of this section:
 
-| arm | config | ckpts | best ckpt | top-3 | pooled | 95% CI |
+| arm | when | ckpts | best ckpt | top-3 | pooled | 95% CI |
 |---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | disc **0.9975** | 63 | **88.0%** @2581k | **82.7%** | **59.2%** /6300 | 57.9-60.4 |
-| `b8d-disc995clip` | disc 0.995 + clip | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 | 56.5-60.3 |
-| `b8f`, 13h earlier | disc 0.9975 | 16 | 63.0% @1618k | 60.3% | 46.5% /1600 | 44.1-48.9 |
-| `b8d`, 13h earlier | disc 0.995 + clip | 10 | 62.0% @1688k | 58.7% | 48.3% /1000 | 45.2-51.4 |
-| `b7f-disc995seed3` | disc 0.995 | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
-| `b4c-schlongper` | disc 0.99 | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
+| `b8f-disc9975seed2` | **close-out, 5.47M** | 52 | **92.0%** @2816k | **86.7%** | **66.3%** /5200 | 65.1-67.6 |
+| `b8d-disc995clip` | close-out, 11.64M | 20 | 76.0% @5027k | 72.7% | 60.4% /2000 | 58.2-62.5 |
+| `b8f` | mid-run, 2.65M | 63 | 88.0% @2581k | 82.7% | 59.2% /6300 | 57.9-60.4 |
+| `b8d` | mid-run, 2.93M | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 | 56.5-60.3 |
+| `b8f` | mid-run, 1.78M | 16 | 63.0% @1618k | 60.3% | 46.5% /1600 | 44.1-48.9 |
+| `b8d` | mid-run, 2.08M | 10 | 62.0% @1688k | 58.7% | 48.3% /1000 | 45.2-51.4 |
+| `b7f-disc995seed3` | final, 1.06M | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
+| `b4c-schlongper` | final, 1.06M | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
+
+**Pooled figures are only comparable within one selector.** The close-out rows used the current rule
+(all >=90%, fill to 20 from >=60%); the mid-run rows used the earlier >=80% rule. A more selective
+set has a higher pooled rate by construction, so `b8f`'s 59.2% → 66.3% is partly the selector. The
+**best-checkpoint column is comparable throughout**, and there the record went 51% → 88% → **92%**.
 
 **The pooled column carries the claim.** 59.2% over 6300 episodes has a ±1.3 interval, so this is
 not a best-of-N artefact: it is 20 points above the pooled figure that stood the same morning and

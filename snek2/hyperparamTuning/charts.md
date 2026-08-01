@@ -59,8 +59,8 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.46M | 89.4 (1716k) | **69.3%** | **88%** @2581k | **59.2%** /6300 | **project record**; 63 ckpts at >=80% |
-| `b8d-disc995clip` ‡ | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | **11.60M** | 86.9 (2058k) | 50.0% | **80%** @2538k | 58.4% /2500 | second by measurement, but **died at ~7M**; clipping adds nothing |
+| `b8f-disc9975seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.47M | 89.4 (1716k) | **69.3%** | **92%** @2816k | **66.3%** /5200 | **project record**; 38 of 52 ckpts measured >=60% |
+| `b8d-disc995clip` | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | **11.64M** | 86.9 (2058k) | 50.0% | **80%** @2538k | 60.4% /2000 | second by measurement, but **died at ~7M**; clipping adds nothing |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | 44.0% | 51% @860k | 38.8% /1000 | best of batch 7, and it survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 92.0 (869k) | 34.0% | **50%** @869k | 37.1% | ties `b7f` on ceiling, dies 2 of 3 seeds |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 92.3 (997k) | 32.3% | 39% @334k | 29.5% | strong, survived |
@@ -90,13 +90,17 @@ ranking.
 | `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | 76.9 | 1.0% | not measured | — | stopped early, verdict weak |
 | `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | 74.6 (140k) | 0.7% | not measured | — | dead end |
 
-**‡ still running; measured mid-run** at 2.93M (`b8d`) and 2.65M (`b8f`), so both `best eval'd
-ckpt` figures are **stale by ~600-1300k steps**. Results are in
-`runs/<arm>_checkpoint_evals_midrun2.json`. Both record checkpoints are preserved in
-[`../hallOfFame/`](../hallOfFame/README.md).
+**The top two rows are final**, measured after both arms were stopped on 2026-08-01 — `b8f` over 52
+checkpoints and `b8d` over 20, in `runs/<arm>_checkpoint_evals_closeout.json`. Three record
+checkpoints are preserved in [`../hallOfFame/`](../hallOfFame/README.md).
 
-**A 2026-07-31 spot check of `b8f`'s four unmeasured 100% points found nothing above 83%**, so its
-88% at 2581k stands as the project record. 26 of its checkpoints at 90% are still unmeasured.
+**`b8f`'s record moved 88% → 92%** (step 2816000) in that close-out. Its pooled figure rose from
+59.2% to 66.3%, but **that jump is partly the selector** — the close-out measured only >=90% graph
+points where the earlier run went down to >=80%, and a more selective set pools higher by
+construction. Best checkpoint is the column that compares across both.
+
+**`b8d`'s close-out best (76% @5027k) is below its all-time best (80% @2538k)**, which the current
+selector did not pick. The table shows its ceiling of 80%.
 
 **These two rows moved 25 points in thirteen hours.** Measured earlier the same day at 63% and
 62% best / ~47% pooled, they re-measured at **88% and 80% best / ~59% pooled** after another ~860k
@@ -164,11 +168,11 @@ headline and ended as its negative result.
 
 ### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
 
-Step 5.46M (running) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 88.0%**, pooled 59.2% /6300
+Step 5.47M (stopped 2026-08-01) · peak score **89.4** (at 1716k) · **best 30-eval perfect 69.3%** (at 2828k) · max single eval **100%** · **best measured checkpoint 92.0%** (at 2816k), pooled 66.3% /5200
 
-**The project record.** Measured mid-run over 63 checkpoints: best **88.0%** at 2581k
-(CI 80.2-93.0), top-3 82.7%, pooled **59.2%** — 20 points above `b7f`'s 38.8% with no overlap.
-**35 of its 63 checkpoints measured >=60%.** The 2581k checkpoint is saved in
+**The project record.** Its close-out measured 52 checkpoints: best **92.0%** at 2816k
+(CI 84.9-95.9), top-3 86.7%, pooled **66.3%** over 5200 episodes, with **38 of 52 above 60%** and
+only one below 40%. Both the 92% and the earlier 88% checkpoint are saved in
 [`../hallOfFame/`](../hallOfFame/README.md).
 
 It leads every statistic in the file, graph and measured alike, and recorded the **first 100%
@@ -198,12 +202,14 @@ checkpoints at 90% remain unmeasured. See [`runs.md`](runs.md).
 
 ### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
 
-Step **11.60M** (running) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
+Step **11.64M** (stopped 2026-08-01) · peak score 86.9 (at 2058k) · **best 30-eval perfect 50.0%** (at 2671k) · max single eval 100% · **best measured checkpoint 80.0%**, pooled 58.4% /2500
 
-**Second best arm in the project, tied with `b8f` on pooled rate.** Measured mid-run over 25
-checkpoints: best **80.0%** at 2538k (CI 71.1-86.7), top-3 74.7%, pooled **58.4%** (CI 56.5-60.3),
-overlapping `b8f`'s interval. 13 of 25 checkpoints measured >=60%. The 2538k checkpoint is saved in
-[`../hallOfFame/`](../hallOfFame/README.md).
+**Second best arm in the project.** Its ceiling is **80.0%** at 2538k (CI 71.1-86.7), from the
+mid-run measurement; its close-out over 20 different checkpoints peaked at 76.0% @5027k with pooled
+60.4%. The 2538k checkpoint is saved in [`../hallOfFame/`](../hallOfFame/README.md).
+
+Notable that its 76% came at step **5027k** — well past the 2.5-3M peak band — so elite checkpoints
+do persist into the decline phase even as the average collapses.
 
 **This does not vindicate gradient clipping.** `b8f` beat it without clipping — 88% vs 80% on best,
 tied on pooled. An interim note in these docs, written while `b8d` was measured and `b8f` was not,

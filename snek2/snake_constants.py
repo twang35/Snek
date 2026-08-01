@@ -19,6 +19,15 @@ global PERFECT_GAME_REWARD
 PERFECT_GAME_REWARD = 100
 global PERFECT_GAME_WAIT_MS
 PERFECT_GAME_WAIT_MS = 5000
+
+# Below this average score, an eval's checkpoint is not written at all. Set from
+# SNEK_MIN_CHECKPOINT_SCORE in snek2.py. `max_to_keep` is a rolling window, so a dead arm
+# that keeps training evicts the good checkpoints behind it — see the gate in training.py.
+#
+# 40 is well clear of anything useful: across 232 checkpoints measured at 100 episodes, every
+# one that reached 30% perfect games had max(avg_score, trailing) of at least 49.8.
+global MIN_CHECKPOINT_SCORE
+MIN_CHECKPOINT_SCORE = 40.0
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
 
 CLOSER_TO_FOOD_REWARD_SCORE_LIMIT = 10

@@ -29,8 +29,8 @@ having one checkpoint above the floor where the batch's best arm has dozens is t
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.47M | **88%** | **82.7%** | **59.2%** /6300 | **69.3%** | **project record**; declining when stopped |
-| `b8d-disc995clip` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | **11.64M** | **80%** | 74.7% | 58.4% /2500 | 50.0% | 2nd by measurement, then **died at ~7M** |
+| `b8f-disc9975seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.47M | **92%** | **86.7%** | **66.3%** /5200 | **69.3%** | **project record**; declining when stopped |
+| `b8d-disc995clip` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | **11.64M** | **80%** | 74.7% | 60.4% /2000 | 50.0% | 2nd by measurement, then **died at ~7M** |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | 51% | 48.0% | 38.8% /1000 | 44.0% | best of batch 7, and survived |
 | `b4c-schlongper` | alpha 0.8, `td_loss`, no IS | 1.06M | 50% | 46.7% | 37.1% /1000 | 34.0% | ties `b7f` on ceiling, **1 of 3 seeds survive** |
 | `b7e-disc995seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.28M | 39% | 34.7% | 29.5% /1000 | 32.3% | strong, survived |
@@ -94,13 +94,13 @@ they had not finished improving** — see [`findings.md`](findings.md).
 ## Batch 8 — the discount optimum, gradient clipping, and the arm lifetime
 
 **Started 2026-07-29, all arms stopped 2026-08-01.** Seven arms in four slots. It produced the
-**project record (88% perfect games)**, falsified `DISCOUNT=0.999` and gradient clipping, and — by
+**project record (92% perfect games)**, falsified `DISCOUNT=0.999` and gradient clipping, and — by
 running two arms far longer than any before — established that an arm has a *lifetime*.
 
 | policy | extra override | final step | best 30-eval pf | **best measured ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 5.47M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | **project record**; declining when stopped |
-| `b8d-disc995clip` | `0.995` + `CLIPPING=10` | **11.64M** | 50.0% @2671k | **80.0%** @2538k | 58.4% /2500 | 2nd by measurement, then **died at ~7M** |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 5.47M | **69.3%** @2828k | **92.0%** @2816k | **66.3%** /5200 | **project record**; declining when stopped |
+| `b8d-disc995clip` | `0.995` + `CLIPPING=10` | **11.64M** | 50.0% @2671k | **80.0%** @2538k | 60.4% /2000 | 2nd by measurement, then **died at ~7M** |
 | `b8g-clipseed3` | `0.995` + `CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | died, recovered after 1.2M, died again |
 | `b8e-clipseed2` | `0.995` + `CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | flat; one good ckpt, no good region |
 | `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | monotone decline to a stop |
@@ -110,10 +110,10 @@ running two arms far longer than any before — established that an arm has a *l
 **Four results, in descending order of how much they change what to do next:**
 
 1. **The horizon, not a hyperparameter, was the binding constraint.** `b8f` and `b8d` measured 63%
-   and 62% at ~1.8M steps and **88% and 80%** at ~2.6M. Every previous record-holder had been
+   and 62% at ~1.8M steps and **92% and 80%** at their best. Every previous record-holder had been
    stopped at ~1.06M. But followed further both peaked at **~2.5-3M** and then declined, and `b8d`
    died. The horizon has both a floor and a ceiling: **stop around 3-3.5M**.
-2. **`DISCOUNT=0.9975` holds the record but is 1 of 2 on survival.** `b8f` produced the 88%
+2. **`DISCOUNT=0.9975` holds the record but is 1 of 2 on survival.** `b8f` produced the 92%
    champion; its sibling `b8c` ran the identical config and declined monotonically to a stop. The
    discount optimum sits somewhere in 0.995-0.9975 and is not yet resolved.
 3. **`DISCOUNT=0.999` is falsified, 2 of 2 dead** — and it failed differently from other deaths,

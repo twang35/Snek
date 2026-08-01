@@ -87,6 +87,7 @@ can run at once on different checkpoints. Give each copy its own
 EVAL_OUT_SUFFIX in that case, or they overwrite each other's results; merge
 afterwards with merge_checkpoint_evals().
 """
+import glob
 import json
 import os
 import sys
@@ -304,6 +305,84 @@ def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=1
         {c['step']: {'selected_by': c['selected_by'],
                      'single_eval': c['single'],
                      'surrounding': round(c['smoothed'], 1)} for c in chosen}
+
+
+def merge_checkpoint_evals(policy_name, suffixes=None, out_suffix='_merged'):
+    """Combines several result files for one policy into one, and writes it.
+
+    Splitting an arm's checkpoints across parallel processes is the only way to use more than
+    one core per arm, and each process needs its own EVAL_OUT_SUFFIX or they overwrite each
+    other. This puts the pieces back together.
+
+    **A step measured more than once is combined, not deduplicated.** Repeat measurements of
+    one frozen checkpoint are independent samples of the same quantity, so summing episodes and
+    perfect games is the statistically correct treatment and tightens the interval — dropping
+    one would throw away half the data. `perfect_percent` and the Wilson interval are
+    recomputed from the combined counts.
+
+    Pass `suffixes` explicitly, or leave it None to pick up every
+    `<policy>_checkpoint_evals*.json` except previous merges. Returns the merged payload.
+    """
+    pattern = os.path.join(RUNS_DIR, '{0}_checkpoint_evals*.json'.format(policy_name))
+    if suffixes is None:
+        paths = [p for p in sorted(glob.glob(pattern)) if not p.endswith(out_suffix + '.json')]
+    else:
+        paths = [os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, s))
+                 for s in suffixes]
+
+    by_step, episodes_per, sources, incomplete = {}, set(), [], []
+    for path in paths:
+        if not os.path.exists(path):
+            raise SystemExit('no such result file: {0}'.format(path))
+        with open(path) as handle:
+            payload = json.load(handle)
+        sources.append(os.path.basename(path))
+        episodes_per.add(payload.get('episodes_per_checkpoint'))
+        if payload.get('complete') is False:
+            incomplete.append(os.path.basename(path))
+        for row in payload.get('results', []):
+            existing = by_step.get(row['step'])
+            if existing is None:
+                by_step[row['step']] = dict(row)
+                continue
+            # Same checkpoint measured twice: pool the episodes.
+            total_episodes = existing['episodes'] + row['episodes']
+            total_perfect = existing['perfect_games'] + row['perfect_games']
+            weight, other = existing['episodes'], row['episodes']
+            existing['avg_score'] = round(
+                (existing['avg_score'] * weight + row['avg_score'] * other) / total_episodes, 2)
+            existing['episodes'] = total_episodes
+            existing['perfect_games'] = total_perfect
+            existing['perfect_percent'] = round(100.0 * total_perfect / total_episodes, 1)
+            low, high = wilson_interval(total_perfect, total_episodes)
+            existing['perfect_ci95'] = [round(100.0 * low, 1), round(100.0 * high, 1)]
+            existing['measurements'] = existing.get('measurements', 1) + 1
+            # min/max are order statistics, so take the extremes across both runs.
+            existing['min_score'] = min(existing['min_score'], row['min_score'])
+            existing['max_score'] = max(existing['max_score'], row['max_score'])
+
+    results = [by_step[step] for step in sorted(by_step)]
+    payload = {'policy_name': policy_name,
+               'episodes_per_checkpoint': (episodes_per.pop() if len(episodes_per) == 1 else
+                                           sorted(e for e in episodes_per if e is not None)),
+               'checkpoints_requested': len(results),
+               'complete': not incomplete,
+               'merged_from': sources,
+               'incomplete_sources': incomplete,
+               'results': results}
+
+    out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, out_suffix))
+    partial_path = out_path + '.partial'
+    with open(partial_path, 'w') as handle:
+        json.dump(payload, handle, indent=2)
+    os.replace(partial_path, out_path)
+
+    repeats = sum(1 for r in results if r.get('measurements', 1) > 1)
+    print('merged {0} files -> {1} checkpoints ({2} measured more than once), wrote {3}'.format(
+        len(sources), len(results), repeats, out_path))
+    if incomplete:
+        print('    note: {0} source(s) were incomplete: {1}'.format(len(incomplete), ', '.join(incomplete)))
+    return payload
 
 
 def main(argv):

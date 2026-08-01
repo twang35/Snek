@@ -132,6 +132,16 @@ def main(argv):
     # apparent step-count gap between good and dead arms. 500ms still shows the win.
     snake_constants.PERFECT_GAME_WAIT_MS = tuned('PERFECT_WAIT_MS', 500, int)
 
+    # Checkpoints below this average score are not written. max_to_keep is a rolling window,
+    # so a dead arm that keeps training evicts the good checkpoints behind it: b8d-disc995clip
+    # reached 11.64M steps with its last 4.5M at trailing ~1, hit the 10000 cap, and deleted
+    # everything before step 1.64M. Set to 0 to restore the old save-everything behaviour.
+    #
+    # 40 rather than a token value: measured against 232 checkpoints evaluated at 100 episodes,
+    # every one that reached 30% perfect games scored at least 49.8 on max(avg_score, trailing),
+    # so 40 has margin and still discards the whole dead-arm range.
+    snake_constants.MIN_CHECKPOINT_SCORE = tuned('MIN_CHECKPOINT_SCORE', 40.0)
+
     if policy_name == 'eval':
         eval_only = True
         initial_populate_replay_buffer_steps = 10
@@ -315,6 +325,7 @@ def main(argv):
         'FOOD_DISTANCE_REWARD': FOOD_DISTANCE_REWARD,
         'eval_only': eval_only,
         'perfect_game_wait_ms': snake_constants.PERFECT_GAME_WAIT_MS,
+        'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }
 
     train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,

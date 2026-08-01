@@ -12,34 +12,31 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Current best: **88% perfect games**, measured 2026-07-30 late
+## Current best: **92% perfect games**
 
-Re-measured after both arms trained another ~860k steps. The record moved by **25 points** in
-thirteen hours:
+Close-out measurement of both batch-8 arms after stopping them, 2026-08-01:
 
 | arm | config | ckpts | best ckpt | top-3 | pooled | 95% CI |
 |---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | **disc 0.9975** | 63 | **88.0%** @2581k | **82.7%** | **59.2%** /6300 | 57.9-60.4 |
-| `b8d-disc995clip` | disc 0.995 + clip 10 | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 | 56.5-60.3 |
-| same two arms, 13h earlier | — | 16 / 10 | 63.0% / 62.0% | 60.3% | 46.5% / 48.3% | — |
+| `b8f-disc9975seed2` | **disc 0.9975** | 52 | **92.0%** @2816k | **86.7%** | **66.3%** /5200 | 65.1-67.6 |
+| `b8d-disc995clip` | disc 0.995 + clip 10 | 20 | 76.0% @5027k | 72.7% | 60.4% /2000 | 58.2-62.5 |
+| `b8d`, best ever (earlier run) | disc 0.995 + clip 10 | 25 | **80.0%** @2538k | 74.7% | 58.4% /2500 | 56.5-60.3 |
 | `b7f-disc995seed3` | disc 0.995 | 10 | 51% @860k | 48.0% | 38.8% /1000 | — |
 | `b4c-schlongper` | disc 0.99 | 10 | 50% @869k | 46.7% | 37.1% /1000 | — |
 
-**One checkpoint won 88 of 100 games.** It is preserved in
-[`../hallOfFame/`](../hallOfFame/README.md) along with `b8d`'s 80% checkpoint, outside the
-`max_to_keep` rotation that would eventually delete them.
+**One checkpoint won 92 of 100 games** (CI 84.9-95.9), and is preserved in
+[`../hallOfFame/`](../hallOfFame/README.md) with the previous 88% champion and `b8d`'s 80%.
 
-**Pooled rate is up 20 points on the record that stood the same morning** — 59.2% over 6300
-episodes with a ±1.3 interval, so this is not a lucky best-of-N. `b8f` has 35 of 63 checkpoints
-at >=60%.
+**`b8f`'s pooled 66.3% over 5200 episodes** is the strongest aggregate the project has produced —
+38 of its 52 checkpoints measured >=60%, and only one below 40%.
 
-**The two configs remain statistically tied on pooled** (56.5-60.3 vs 57.9-60.4, overlapping)
-while `b8f` is clearly ahead on best checkpoint. Gradient clipping still buys nothing; see below.
+**Do not compare these pooled figures to the earlier ones.** The close-out ran the current
+selector (everything at >=90%, fill to 20 from >=60%), which is more selective than the >=80% rule
+used for the 59.2% figure measured a day earlier — a more selective set has a higher pooled rate by
+construction. **Best checkpoint is the comparable column**, and there `b8f` moved 88% → 92%.
 
-**Both arms have since been stopped** (2026-08-01), so these mid-run measurements at 2.93M (`b8d`)
-and 2.65M (`b8f`) are their final figures. Files are suffixed `_midrun2`; the earlier `_midrun` set
-is kept for the repeat-measurement analysis in [`findings.md`](findings.md), and `_100pct` holds the
-targeted spot check.
+`b8d`'s close-out best of 76% @5027k is *lower* than its all-time best of 80% @2538k, which the
+current selector did not pick. Both rows are shown; its ceiling is 80%.
 
 ### Older `DISCOUNT=0.995` context
 
@@ -114,8 +111,8 @@ have moved to
 
 | policy | extra override | final step | best 30-eval pf | **best measured ckpt** | pooled | why stopped |
 |---|---|---|---|---|---|---|
-| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 5.47M | **69.3%** @2828k | **88.0%** @2581k | **59.2%** /6300 | 2.5M past peak, ~3% of best rate |
-| `b8d-disc995clip` | `0.995 + CLIPPING=10` | **11.64M** | **50.0%** @2671k | **80.0%** @2538k | 58.4% /2500 | **dead** — no perfect game in 6.1M steps |
+| `b8f-disc9975seed2` | `DISCOUNT=0.9975` | 5.47M | **69.3%** @2828k | **92.0%** @2816k | **66.3%** /5200 | 2.5M past peak, ~3% of best rate |
+| `b8d-disc995clip` | `0.995 + CLIPPING=10` | **11.64M** | **50.0%** @2671k | **80.0%** @2538k | 60.4% /2000 | **dead** — no perfect game in 6.1M steps |
 | `b8g-clipseed3` | `0.995 + CLIPPING=10` | 3.43M | 30.0% @253k | none >50% | — | died, recovered after 1.2M, died again |
 | `b8e-clipseed2` | `0.995 + CLIPPING=10` | 1.16M | 21.3% @515k | 32.0% @500k | 32% /100 | flat — never above 6.9% in any 300k block |
 | `b8c-disc9975` | `DISCOUNT=0.9975` | 1.75M | 14.7% @343k | not measured | — | monotone decline, no perfect game in 1.26M |
@@ -423,7 +420,13 @@ says so itself rather than spending 100 episodes proving it.
 
 #### Long runs used to delete their own best checkpoints
 
-**Fixed: `max_to_keep` is now 10000**, a rolling 10M-step window at ~188 KB per checkpoint
+**Also fixed 2026-08-01: checkpoints are not written at all below `SNEK_MIN_CHECKPOINT_SCORE`**
+(default 40, on `max(this eval, trailing)`). A dead arm no longer writes worthless checkpoints that
+evict good ones behind them — the failure `b8d-disc995clip` came within a few million steps of
+causing. Validated against every checkpoint this project has measured: of the 232 that reached 30%
+perfect games, the lowest `max(avg_score, trailing)` was 49.8, so 40 has margin.
+
+**`max_to_keep` is 10000**, a rolling 10M-step window at ~188 KB per checkpoint
 (~1.8 GB per policy at full depth). At the old value of 1000 it was a 1M-step window, and it
 cost real evidence — three of batch 5/6's four arms outran it:
 
@@ -482,7 +485,7 @@ The durable record is `runs/<policy>_evals.json`; analyse from there.
 ## Next up: batch 9 — settle the discount optimum
 
 **All four slots are free.** The one unresolved question from batch 8 is whether the optimum sits at
-`0.995` or `0.9975`: 0.9975 holds the record (88%) but is **1 of 2** on survival, while 0.995 is 3
+`0.995` or `0.9975`: 0.9975 holds the record (92%) but is **1 of 2** on survival, while 0.995 is 3
 of 3 with a lower ceiling. Two more 0.9975 seeds decide it.
 
 | policy | override on top of the shared base | role |

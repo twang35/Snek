@@ -13,18 +13,22 @@ rotation and are not deleted by anything.
 
 | checkpoint | measured perfect rate | 95% CI | avg score | config |
 |---|---|---|---|---|
-| **`b8f-disc9975seed2-ckpt2581000`** | **88.0%** (88/100) | 80.2-93.0 | 93.6 | `DISCOUNT=0.9975` |
-| `b8d-disc995clip-ckpt2538000` | **80.0%** (80/100) | 71.1-86.7 | 90.6 | `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10` |
+| **`b8f-disc9975seed2-ckpt2816000`** | **92.0%** (92/100) | 84.9-95.9 | 94.7 | `DISCOUNT=0.9975` |
+| `b8f-disc9975seed2-ckpt2581000` | 88.0% (88/100) | 80.2-93.0 | 94.2 | `DISCOUNT=0.9975` |
+| `b8d-disc995clip-ckpt2538000` | 80.0% (80/100) | 71.1-86.7 | 90.6 | `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10` |
 
-"Perfect rate" is the share of episodes where the snake fills the board. Measured over 100
-greedy episodes each on 2026-07-30; see [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md).
+"Perfect rate" is the share of episodes where the snake fills the board, over 100 greedy episodes
+each; see [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md).
 
-The champion has been measured **three times** — 88/100, then 85/20 during the restore
-verification for this folder. Both readings agree within sampling noise.
+**`ckpt2816000` won 92 of 100 games** and is the project record, found in the close-out measurement
+of `b8f` on 2026-08-01. It re-measured at 25/30 during the restore verification for this folder,
+consistent with 92/100.
 
-Two entries rather than one because they come from **different configs**. `b8f` has the higher
-ceiling; `b8d` reached a comparable pooled rate with gradient clipping, and keeping both means
-the comparison stays reproducible if either config is revisited.
+Three entries, kept deliberately. `2816000` and `2581000` are the top two policies ever measured
+and come from the same arm — the second is kept because it was measured twice independently
+(88/100 and 90/10) and is the more corroborated of the pair. `b8d`'s entry is the best from a
+**different config**, so the clipping-vs-no-clipping comparison stays reproducible if either is
+revisited.
 
 ## Running a checkpoint manually
 
@@ -39,9 +43,9 @@ cd /Users/tony_wang/Projects/Snek/snek2
 conda activate snek
 
 mkdir -p savedPolicies/champion
-cp hallOfFame/b8f-disc9975seed2-ckpt2581000/* savedPolicies/champion/
+cp hallOfFame/b8f-disc9975seed2-ckpt2816000/* savedPolicies/champion/
 
-PYTHONPATH=. python -u eval_checkpoints.py champion 2581000
+PYTHONPATH=. python -u eval_checkpoints.py champion 2816000
 ```
 
 **Worker 0 renders a visible window**, so this opens a game and plays it while the other nine
@@ -60,7 +64,7 @@ To just watch one game end to end, with a visible pause on the win:
 
 ```
 EVAL_EPISODES=1 EVAL_WORKERS=1 EVAL_PERFECT_WAIT_MS=2000 \
-  PYTHONPATH=. python -u eval_checkpoints.py champion 2581000
+  PYTHONPATH=. python -u eval_checkpoints.py champion 2816000
 ```
 
 Results are written to `runs/champion_checkpoint_evals.json`.
@@ -103,3 +107,8 @@ cp savedPolicies/<arm>/ckpt-<step>.index \
 Then add a row to the table above with its **measured** rate over at least 100 episodes — not
 a graph point. A graph point is 10 episodes and reads in 10-point jumps; 90% graph points have
 measured anywhere from 22% to 82%.
+
+Note that training now **skips writing checkpoints below `SNEK_MIN_CHECKPOINT_SCORE`** (default
+40), because `max_to_keep` is a rolling window and a dead arm used to evict good checkpoints
+behind it. That reduces the risk of losing a record before it can be copied here, but does not
+remove it — copy anything worth keeping as soon as it is measured.
