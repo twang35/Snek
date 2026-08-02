@@ -272,22 +272,47 @@ that the code is fine.
 For refactors, also diff observations against a fixed-seed run — byte-identical output over a
 few thousand steps catches what 24 assertions do not.
 
-## Rendering is off by default — it was the slowest thing in the project
+## Rendering is off by default — use `watch.py` to see a game
 
-Both the eval script and training used to draw a real game window, and that window cost
-~37x a headless step (6050us against 163us). Because `ParallelPyEnvironment` steps every
-worker together and waits for the slowest, one rendering worker paced all ten. Turning it
-off made a 30-episode eval **5x** faster and cut training-to-10k-steps from 83s to 56s,
-with the gap widening as a policy improves and its episodes get longer.
+A game window costs **~5.2ms per frame**, and the game flips once per game step. That is a
+round trip to the macOS window server; it is not our drawing code, and dirty rects do not
+help, because the cost is per flip rather than per pixel. Everything else `render()` does is
+2-4us per call.
 
-- `EVAL_RENDER=1` — window back in `eval_checkpoints.py` (worker 0 only)
-- `SNEK_DISPLAY_EVAL=1` — window back for training's eval episode
+**To watch a policy play, run `watch.py` — never turn a window on inside a run:**
+
+```
+cd snek2
+PYTHONPATH=. python -u watch.py <policy_name>        # follows the newest checkpoint
+PYTHONPATH=. python -u watch.py <policy_name> <step>  # pins one checkpoint
+```
+
+It renders in its own process, reloads the newest checkpoint between episodes so a live arm's
+progress shows up without a restart, and costs training nothing — it only reads checkpoint
+files. `WATCH_FPS` caps the frame rate (default 90; drop to 20-30 to follow the moves).
+
+The two in-run switches still exist for debugging, and both are off by default:
+
+- `EVAL_RENDER=1` — window in `eval_checkpoints.py` (worker 0 only), ~5x the wall clock
+- `SNEK_DISPLAY_EVAL=1` — window for training's one displayed eval episode
 
 Neither affects results: `render()` only draws and returns immediately when `display=False`.
-Use them when you actually want to watch a game, not for a close-out or an unattended arm.
+
+**The two paths were slow for different reasons, and it matters.** In `eval_checkpoints.py`
+the visible worker sits *inside* the `ParallelPyEnvironment`, which steps every worker
+together and waits for the slowest — so one window paced all ten, and a 30-episode eval went
+**70.1s → 14.0s** when it was turned off. Training is not like that: `compute_avg_return()`
+runs the displayed episode alone and *then* calls the parallel batch, so the window never
+gated a worker and the cost was purely additive — **15.6s against 1.3s** for one champion eval
+episode, every eval.
+
+**Measure a render change per-episode with a fixed policy, not by timing a training run.**
+An earlier "10k steps 83s → 56s" claim here was learning-speed variance, not the flag it was
+attributed to: first-eval scores across smoke runs ranged 0.1 to 39.1, episode length tracks
+skill, and the flag in question was a no-op at the time anyway.
 
 **When something here seems slow, profile the critical path rather than the hot-looking
-code.** A 11x speedup of the observation code and a 6.8x speedup of policy inference both
+code.** An 11x speedup of the observation code and a 6.8x speedup of policy inference both
 moved eval wall clock by approximately nothing, because neither was the slowest worker.
 
 ## Active development

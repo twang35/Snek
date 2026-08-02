@@ -134,6 +134,7 @@ class Game:
         # several 10-worker processes at once. pygame.time/sprite/draw need no init.
         pygame.display.init()
         pygame.font.init()
+        self._fonts = {}
 
     def set_display(self, enabled):
         self.display = enabled
@@ -345,6 +346,21 @@ class Game:
     def check_perfect_game(self):
         return (self.current_score + START_SEGMENTS + 1) == PERFECT_SCORE
 
+    def _font(self, size):
+        """Cached pygame.font.Font by size.
+
+        Constructing a Font parses the font file: ~122us each, and render() built three of
+        them per frame. That was 366us of a 5300us frame — second only to the display flip.
+        """
+        font = self._fonts.get(size)
+        if font is None:
+            font = pygame.font.Font(None, size)
+            self._fonts[size] = font
+        return font
+
+    def _hud_font(self):
+        return self._font(12)
+
     def render(self):
         if self.perfect_game and snake_constants.DEBUG_LOGGING:
             print('PERFECT GAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1!!!1!!1!!!!11111!!!!111!!!!!!!!')
@@ -356,7 +372,7 @@ class Game:
         pygame.event.pump()
 
         if self.perfect_game:
-            f = pygame.font.Font(None, 25)
+            f = self._font(25)
             fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
@@ -367,11 +383,11 @@ class Game:
 
         if self.finished:
             if self.starved:
-                f = pygame.font.Font(None, 60)
+                f = self._font(60)
                 death_reason = 'NO FUD'
             else:
                 death_reason = 'DED'
-                f = pygame.font.Font(None, 100)
+                f = self._font(100)
             fail_message = f.render(death_reason, True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
@@ -381,18 +397,16 @@ class Game:
             return
 
         # score
+        f = self._hud_font()
         d = self.screen.blit(self.bg, SCORE_POS, pygame.Rect(SCORE_POS, (50, 100)))
-        f = pygame.font.Font(None, 12)
         score_image = f.render(SCORE_PREFIX + str(self.current_score), True, SCORE_COLOR)
         d2 = self.screen.blit(score_image, SCORE_POS)
         # steps
         d3 = self.screen.blit(self.bg, STEP_POS, pygame.Rect(STEP_POS, (50, 100)))
-        f = pygame.font.Font(None, 12)
         step_image = f.render(STEP_PREFIX + str(self.current_step), True, STEP_COLOR)
         d4 = self.screen.blit(step_image, STEP_POS)
         # policy name
         d5 = self.screen.blit(self.bg, POLICY_POS, pygame.Rect(POLICY_POS, (50, 100)))
-        f = pygame.font.Font(None, 12)
         policy_image = f.render(POLICY_PREFIX + self.policy_name, True, POLICY_COLOR)
         d6 = self.screen.blit(policy_image, POLICY_POS)
 
@@ -409,7 +423,11 @@ class Game:
         pygame.display.update(dirty)
 
         if self.limit_fps:
-            self.clock.tick(FPS_LIMIT)
+            # Read through the module, not the star-imported name: `from snake_constants import
+            # *` binds a copy at import time, so watch.py setting snake_constants.FPS_LIMIT
+            # would have had no effect here. PERFECT_GAME_WAIT_MS above is qualified for the
+            # same reason.
+            self.clock.tick(snake_constants.FPS_LIMIT)
 
         # slow down when close to finished
         if self.current_score >= SCORE_SLOW_THRESHOLD:

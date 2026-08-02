@@ -113,7 +113,6 @@ import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import parallel_py_environment
 from tf_agents.environments import tf_py_environment
-from tf_agents.networks import sequential
 from tf_agents.specs import tensor_spec
 from tf_agents.system import system_multiprocessing
 from tf_agents.utils import common
@@ -121,7 +120,7 @@ from tf_agents.utils import common
 import snake_constants
 from snake_constants import POLICY_DIR, RUNS_DIR
 from snake_environment import SnakeEnvironment
-from snek2 import dense_layer
+from snek2 import build_q_net
 
 
 def wilson_interval(successes, trials, z=1.96):
@@ -450,14 +449,11 @@ def main(argv):
 
     action_tensor_spec = tensor_spec.from_spec(spec_env.action_spec())
     num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
-    fc_layer_params = (50, 100, 50)
-    dense_layers = [dense_layer(units) for units in fc_layer_params]
-    q_values_layer = tf.keras.layers.Dense(
-        num_actions,
-        activation=None,
-        kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.03, maxval=0.03),
-        bias_initializer=tf.keras.initializers.Constant(0.0))
-    q_net = sequential.Sequential(dense_layers + [q_values_layer])
+    # Shared with training and watch.py, and it reads SNEK_FC_LAYERS like training does. This
+    # used to hardcode (50, 100, 50) while training took the override, so a run with
+    # SNEK_FC_LAYERS set would have been measured against the wrong network — silently, since
+    # restore() below uses expect_partial().
+    q_net = build_q_net(num_actions)
 
     global_step = tf.compat.v1.train.get_or_create_global_step()
     agent = dqn_agent.DdqnAgent(

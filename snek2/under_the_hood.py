@@ -10,6 +10,7 @@ import os
 import time
 
 import tensorflow as tf
+from tf_agents.networks import sequential
 
 
 # Define a helper function to create Dense layers configured with the right
@@ -22,15 +23,49 @@ def dense_layer(num_units):
             scale=2.0, mode='fan_in', distribution='truncated_normal'))
 
 
+def eval_fc_layer_params():
+    """Layer widths for rebuilding a trained network, honouring SNEK_FC_LAYERS.
+
+    Training reads its widths from the same variable, so anything that restores a checkpoint
+    has to read it too. eval_checkpoints.py used to hardcode (50, 100, 50), which was right
+    for every run so far only because nobody has set the override — and a mismatch would not
+    have been loud, because restore() is called with expect_partial() and would simply not
+    populate the layers it could not match.
+    """
+    raw = os.environ.get('SNEK_FC_LAYERS')
+    if raw is None:
+        return 50, 100, 50
+    return tuple(int(width) for width in raw.split(','))
+
+
+def build_q_net(num_actions, fc_layer_params=None):
+    """The Q-network training builds, so restored weights line up.
+
+    Shared by eval_checkpoints.py and watch.py. Keeping a second copy of the architecture is
+    how the two quietly drift apart.
+    """
+    if fc_layer_params is None:
+        fc_layer_params = eval_fc_layer_params()
+    dense_layers = [dense_layer(num_units) for num_units in fc_layer_params]
+    q_values_layer = tf.keras.layers.Dense(
+        num_actions,
+        activation=None,
+        kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.03, maxval=0.03),
+        bias_initializer=tf.keras.initializers.Constant(0.0))
+    return sequential.Sequential(dense_layers + [q_values_layer])
+
+
 def compute_avg_return(environment, parallel_environment, policy, metrics, eval_only, num_episodes=10):
     start_time = time.time()
     total_steps = 0
 
-    # first episode: shown displayed on the single environment
+    # First episode runs alone on the single environment, and is the only one that can be
+    # displayed. This used to force set_display(True) unconditionally, which overrode
+    # SNEK_DISPLAY_EVAL and made it a no-op — the window was always drawn.
     py_env = environment.pyenv
     if hasattr(py_env, 'envs'):
         py_env = py_env.envs[0]
-    py_env.set_display(True)
+    py_env.set_display(snake_constants.DISPLAY_EVAL)
 
     time_step = environment.reset()
     episode_reward = 0.0

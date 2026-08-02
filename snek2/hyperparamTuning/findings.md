@@ -1104,7 +1104,7 @@ observations and rewards are byte-identical across 7,976 records of fixed-seed p
 | what | before | after | on the real workload |
 |---|---|---|---|
 | **Eval window** (worker 0 rendered) | 6050 us/step | 163 us/step | 30-ep eval **70.1s → 14.0s (5.0x)** |
-| **Training eval window** (every eval) | 11.56s/episode | 1.71s/episode | 10k steps **83s → 56s**, widening with skill |
+| **Training eval window** (every eval) | 15.6s/episode | 1.3s/episode | ~14s saved per eval at champion skill |
 | `get_pos` used `np.add` on int pairs | 8.3M calls, 11.7s | removed entirely | game+obs **1791 → 161 us/step (11.1x)** |
 | Flood fill recursed and re-checked `is_open` | 2.0M redundant numpy lookups | iterative, no re-check | included above |
 | **Flood fill rewritten as bitwise dilation** | 0.899s in `count_groups` | 0.155s | game+obs **161 → 54 us/step**, 33x overall |
@@ -1119,7 +1119,46 @@ critical path, not the code that looks hot.
 
 Both windows are now off by default and restored with `EVAL_RENDER=1` and
 `SNEK_DISPLAY_EVAL=1`. Neither can affect results: `render()` only draws, and returns
-immediately when `display=False`.
+immediately when `display=False`. Use `watch.py` to see a game instead — it renders in its
+own process, follows the newest checkpoint of a live arm, and costs training nothing.
+
+#### Two corrections to the first version of this section
+
+**The mechanism is not the same in both places.** In `eval_checkpoints.py` the visible worker
+sits *inside* the `ParallelPyEnvironment`, so it genuinely paced the other nine. Training is
+different: `compute_avg_return()` runs the displayed episode alone on a single env and *then*
+calls the parallel batch, so the window never gated a worker — the cost was simply additive.
+The original text described training as if it had the lockstep problem. It did not.
+
+**`SNEK_DISPLAY_EVAL` did nothing when first added, and the "10k steps 83s → 56s" figure
+was noise.** `compute_avg_return()` called `set_display(True)` unconditionally at the start of
+every eval, overriding the flag, so both of those runs rendered. What that timing actually
+measured was learning-speed variance: first-eval scores across smoke runs ranged 0.1 to 39.1,
+and episode length tracks skill, so two runs of the same code differ by far more than the flag
+would. The flag now reads `snake_constants.DISPLAY_EVAL`, which both ends consult.
+
+The honest measurement is per-episode with a fixed policy, which has no variance to hide in:
+one champion eval episode costs **15.6s rendered against 1.3s headless** (2835 steps at 5493us
+against 2654 steps at 484us). Scale that by evals-per-run rather than trusting an end-to-end
+smoke timing.
+
+#### Why a window costs 5.2ms a frame and cannot be optimised away
+
+Profiling `render()` against a real window, with the snake short enough that sprite count is
+not a factor:
+
+| component | us per frame |
+|---|---|
+| `pygame.display.update()` | **5164** |
+| `pygame.font.Font(None, n)` built 3x per frame | 366 |
+| `all.draw()`, `all.clear()`, `event.pump()`, cached font renders | 2-4 each |
+| whole `render()` | 5300 |
+
+It is the flip — a round trip to the macOS window server — and the game flips once per game
+step. Dirty-rect updates do not help, because the cost is per flip and not per pixel. The
+fonts are now cached, which is worth 7% of a windowed frame and rather more of a headless one,
+but the only real levers are flipping less often or flipping in another process. `watch.py`
+does the latter and caps its own frame rate.
 
 #### How the connectivity fill got to 33x
 

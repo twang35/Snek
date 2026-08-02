@@ -84,17 +84,9 @@ def main(argv):
     display_training = False
     # display_training = True
 
-    # Off by default: this renders the first episode of *every* eval in a real window, and
-    # that window is by far the most expensive thing in a training run. Measured with the
-    # champion policy, one eval episode costs 11.56s rendered (2091 steps at 5530us) against
-    # 1.71s headless (3133 steps at 545us) — roughly 10x per step, and worse as the run
-    # improves because a better policy plays longer episodes. Evals fire every 1000 training
-    # steps, so on a 3M-step arm that is hours of wall clock spent drawing circles nobody is
-    # watching, concentrated in the 2.5-3M region where the good checkpoints live.
-    #
-    # Status is meant to be read from runs/<policy>_evals.json rather than the window, and
-    # arms run unattended for days, four at a time. SNEK_DISPLAY_EVAL=1 brings it back.
-    display_eval = _os.environ.get('SNEK_DISPLAY_EVAL', '0') not in ('0', '', 'false', 'False')
+    # See snake_constants.DISPLAY_EVAL for why this is off by default and what it costs.
+    # compute_avg_return() reads the same constant, so both ends agree.
+    display_eval = snake_constants.DISPLAY_EVAL
     # eval_limit_fps = True
     eval_limit_fps = False
 
