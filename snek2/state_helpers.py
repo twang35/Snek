@@ -19,17 +19,53 @@ def get_observations(old_grid,
                      last_food_step,
                      snake_len,
                      game_finished):
+    """Builds the 20-value observation vector. Layout, in order:
+
+    idx      values  what
+    0-5      6       food: [is closer, 1/(distance+1)] per action
+    6-8      3       is the move safe (not body or wall)
+    9-14     6       [can still reach tail, lg(open regions)] per action
+    15-17    3       does the move win the game
+    18       1       lg(steps left before starving)
+    19       1       is the episode over
+
+    Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
+    from the current heading, not compass directions. Keep this in step with
+    SnakeEnvironment.observation_spec(), which sums the same counts.
+    """
     observations = []
+
+    # 6 values, [is closer, 1/(distance+1)] for each action. The flag is 1 when the move cuts
+    # the Manhattan distance to the food; the reciprocal is 1 on the food and falls towards 0
+    # far away. All six are 0 only when there is no food, which happens on a winning step.
     observations.extend(food_observations(old_grid, head_pos, current_food, head_move_dir))
+
+    # 3 values, one per action: 1 if the move is survivable, 0 if it hits body or wall. Note
+    # the polarity - 1 means safe. The tail's own cell counts as safe, because it vacates as
+    # the snake advances.
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos, head_move_dir))
+
+    # 6 values, [can still reach tail, lg(open regions)] for each action. Together these are
+    # the "am I about to trap myself" signal: reaching the tail means an escape route exists,
+    # and a rising region count means the move is cutting the free space into pieces.
     observations.extend(group_obs(old_grid,
                                   head_pos,
                                   tail_pos,
                                   head_move_dir))
+
+    # 3 values, one per action: 1 if the move eats the last food and fills the board. All zero
+    # unless the snake is exactly one food short, so this fires on the final move of a game.
     observations.extend(perfect_game_obs(old_grid, head_pos, head_move_dir, snake_len))
+
+    # 1 value: lg of the steps left before starving, the budget being max(100, 10 * length)
+    # capped at 500 and counted from the last food. Tells the snake how long it can stall.
     observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
+
+    # Disabled: count of open cells left on the grid. observation_spec() reserves 0 for it.
     # remaining spaces
     # observations.extend([((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1)) - (snake_len + START_SEGMENTS + 1)])
+
+    # 1 value: 1 once the episode has ended, by death, starvation or a win.
     # end of game
     observations.extend([1] if game_finished else [0])
     return observations
