@@ -305,6 +305,20 @@ It renders in its own process, reloads the newest checkpoint between episodes so
 progress shows up without a restart, and costs training nothing — it only reads checkpoint
 files. `WATCH_FPS` caps the frame rate (default 90; drop to 20-30 to follow the moves).
 
+**Window size is `SNEK_TILE_PIXELS`, and it is cosmetic only.** Every pixel constant in
+`snake_constants.py` — `TILE_SIZE`, `SCREENSIZE`, the sprite radii, the HUD — derives from it,
+so one number scales the whole window; `watch.py` sets 15 (a 150x150 window) and training keeps
+the default 10. Observations are built from tile positions and never pixels, verified by a
+fixed-seed hash of every observation and reward over 40 episodes coming out byte-identical at
+10, 20, 25 and 40 pixels per tile. **It must be set in the environment before
+`snake_constants` is imported**, not assigned afterwards: `from snake_constants import *` binds
+a copy, so a later assignment never reaches `Snake.py`.
+
+The window title is `<policy_name> — ckpt <step>`, arm name first because macOS truncates from
+the right and the arm is what tells two watchers apart. `Game.reset()` re-applies
+`game.caption` every episode, so `watch.py` setting it once per checkpoint load survives — and
+follows a live arm forward.
+
 **Training cannot draw at all — there is no switch.** `SNEK_DISPLAY_EVAL` and
 `SNEK_DISPLAY_TRAINING` are gone, along with the second environment that existed only to play
 one eval episode where it could be drawn. `snek2.main()` selects `SDL_VIDEODRIVER=dummy`

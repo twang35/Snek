@@ -24,10 +24,15 @@ the score clears SNEK_MIN_CHECKPOINT_SCORE), so what you see is at most one eval
 A dead or very young arm may have no checkpoint at all, since training skips writing them
 below the score gate. That is reported rather than treated as an error.
 
+The window is titled `<policy_name> — ckpt <step>`, and sized 1.5x the game's native 100x100 so
+macOS has room to show some of that title. Both matter when several of these are open at once,
+which is the normal case with a batch of four arms running.
+
 Environment:
     WATCH_FPS         frame rate cap (default 90; 0 for uncapped)
     WATCH_EPISODES    episodes to play, 0 for forever (default 0)
     WATCH_PERFECT_WAIT_MS  pause on a win (default 2000, long enough to see it)
+    SNEK_TILE_PIXELS  pixels per tile, so 10x this is the window edge (default here 15)
 
 One frame is one game step, so 90 fps moves the snake 90 tiles a second and a full board
 (~3000 steps) takes about 35 seconds. That is close to the ceiling: a display flip costs ~5.2ms,
@@ -42,6 +47,12 @@ import time
 # silenced, for the same reason everything else does it — a bare pygame.init() anywhere would
 # open a CoreAudio stream and spin coreaudiod.
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
+# A 150x150 window instead of the 100x100 the game defaults to. That is about the floor for
+# this: macOS needs roughly this much width to show any of the title, and 12pt 'Policy: <arm>'
+# only just fits across it. setdefault, and before snake_constants is imported, because every
+# pixel constant is derived from this at import time. Training keeps the small default — it
+# never draws, but it still allocates a surface per sprite.
+os.environ.setdefault('SNEK_TILE_PIXELS', '15')
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
 
@@ -135,6 +146,9 @@ def main(argv):
             checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(wanted))).expect_partial()
             loaded_step = wanted
             print('  loaded checkpoint {0}'.format(loaded_step))
+            # Game.reset() applies this on every episode, so it follows a live arm forward
+            # rather than being clobbered by the next reset.
+            env._game.caption = '{0} — ckpt {1}'.format(policy_name, loaded_step)
 
         time_step = tf_env.reset()
         started = time.time()

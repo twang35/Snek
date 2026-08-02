@@ -126,6 +126,11 @@ class Game:
         self.finished = False
         self.starved = False
         self.perfect_game = False
+        # Window title. The arm name leads, because macOS truncates from the right and the
+        # arm is what tells two watch.py windows apart. Settable from outside — watch.py
+        # appends the checkpoint step it loaded — and reset() re-applies it every episode, so
+        # an override sticks rather than being overwritten on the next reset.
+        self.caption = '{0} — {1}'.format(policy_name, CAPTION) if policy_name else CAPTION
         self.clock = pygame.time.Clock()
         # Init only the subsystems this game uses. Bare pygame.init() also starts
         # pygame.mixer, which opens a real CoreAudio output stream per process even
@@ -140,7 +145,7 @@ class Game:
         self.display = enabled
 
     def reset(self):
-        pygame.display.set_caption(CAPTION)
+        pygame.display.set_caption(self.caption)
         self.bg = pygame.Surface(SCREENSIZE).convert()
         self.bg.fill(BACKGROUND_COLOR)
         self.screen.blit(self.bg, (0, 0))
@@ -359,7 +364,22 @@ class Game:
         return font
 
     def _hud_font(self):
-        return self._font(12)
+        return self._font(HUD_FONT_SIZE)
+
+    def _message_font(self, text, max_size):
+        """Largest font at or below max_size whose rendering of `text` fits across the window.
+
+        The end-of-game messages are sized to fill the window, but 'DED' at 100pt is already
+        ~150px wide against a 100px board, so both D's were clipped off the edges — and scaling
+        with the window reproduced that at every size. Shrinking to fit keeps the message
+        full-width without cutting it in half. Runs once per episode, on the death frame, and
+        every size it tries lands in the same font cache.
+        """
+        limit = int(SCREENSIZE[0] * 0.95)
+        size = max_size
+        while size > 8 and self._font(size).size(text)[0] > limit:
+            size = int(size * 0.9)
+        return self._font(size)
 
     def render(self):
         if self.perfect_game and snake_constants.DEBUG_LOGGING:
@@ -372,7 +392,7 @@ class Game:
         pygame.event.pump()
 
         if self.perfect_game:
-            f = self._font(25)
+            f = self._message_font('PERFECT GAME!!!', PERFECT_FONT_SIZE)
             fail_message = f.render('PERFECT GAME!!!', True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
@@ -383,11 +403,11 @@ class Game:
 
         if self.finished:
             if self.starved:
-                f = self._font(60)
                 death_reason = 'NO FUD'
+                f = self._message_font(death_reason, STARVE_FONT_SIZE)
             else:
                 death_reason = 'DED'
-                f = self._font(100)
+                f = self._message_font(death_reason, DEATH_FONT_SIZE)
             fail_message = f.render(death_reason, True, (0, 0, 0))
             fail_rect = fail_message.get_rect()
             fail_rect.center = SCREENRECT.center
@@ -398,15 +418,15 @@ class Game:
 
         # score
         f = self._hud_font()
-        d = self.screen.blit(self.bg, SCORE_POS, pygame.Rect(SCORE_POS, (50, 100)))
+        d = self.screen.blit(self.bg, SCORE_POS, pygame.Rect(SCORE_POS, HUD_ERASE_SIZE))
         score_image = f.render(SCORE_PREFIX + str(self.current_score), True, SCORE_COLOR)
         d2 = self.screen.blit(score_image, SCORE_POS)
         # steps
-        d3 = self.screen.blit(self.bg, STEP_POS, pygame.Rect(STEP_POS, (50, 100)))
+        d3 = self.screen.blit(self.bg, STEP_POS, pygame.Rect(STEP_POS, HUD_ERASE_SIZE))
         step_image = f.render(STEP_PREFIX + str(self.current_step), True, STEP_COLOR)
         d4 = self.screen.blit(step_image, STEP_POS)
         # policy name
-        d5 = self.screen.blit(self.bg, POLICY_POS, pygame.Rect(POLICY_POS, (50, 100)))
+        d5 = self.screen.blit(self.bg, POLICY_POS, pygame.Rect(POLICY_POS, HUD_ERASE_SIZE))
         policy_image = f.render(POLICY_PREFIX + self.policy_name, True, POLICY_COLOR)
         d6 = self.screen.blit(policy_image, POLICY_POS)
 

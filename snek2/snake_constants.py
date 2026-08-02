@@ -30,8 +30,20 @@ global MIN_CHECKPOINT_SCORE
 MIN_CHECKPOINT_SCORE = 40.0
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
 
+# Pixels per tile, and so the window size: the board is 10x10 tiles, so the historical 10
+# gives a 100x100 window. That is small enough that macOS shows none of the title bar text,
+# which is the whole problem when several watch.py windows are open at once — so watch.py
+# raises it to 15 (a 150x150 window). Purely cosmetic: observations are built from tile
+# positions, never pixels, so this cannot change what a policy sees or scores.
+#
+# Read from the environment rather than assigned by the caller, because `from snake_constants
+# import *` binds a copy at import time — setting snake_constants.TILE_SIZE afterwards would
+# never reach Snake.py — and because everything below is derived from it.
+TILE_PIXELS = int(os.environ.get('SNEK_TILE_PIXELS', 10))
+DISPLAY_SCALE = TILE_PIXELS / 10.0
+
 # size of each grid
-TILE_SIZE = (10, 10)
+TILE_SIZE = (TILE_PIXELS, TILE_PIXELS)
 
 # number of grid of the screen
 # GRID_LENGTH = 15
@@ -49,8 +61,12 @@ START_TILE = (5, 3)
 START_SEGMENTS = 4
 # START_SEGMENTS = 20
 
-SNAKE_HEAD_RADIUS = 13
-SNAKE_SEGMENT_RADIUS = 17
+# Both radii deliberately exceed half a tile, so the circles clip against their tile-sized
+# surface and paint as solid squares. They scale with the tile size to keep that: left at 13
+# and 17 in a 15px tile they would render as circles with visible gaps between segments,
+# and a head noticeably smaller than its body.
+SNAKE_HEAD_RADIUS = int(13 * DISPLAY_SCALE)
+SNAKE_SEGMENT_RADIUS = int(17 * DISPLAY_SCALE)
 FOOD_RADIUS = SNAKE_SEGMENT_RADIUS
 
 POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'savedPolicies') + '/'
@@ -81,15 +97,33 @@ FOOD_COLOR = (0, 255, 0)
 BLOCK_COLOR = (0, 0, 150)
 COLORKEY_COLOR = (255, 255, 0)
 
+# The HUD is drawn on top of the board, so it grows sub-linearly on purpose. Scaling 12pt with
+# the window covered the board in labels and *still* ran the policy name off the right edge —
+# the 100x100 window's own problem, reproduced larger. Floored at the historical 12, which is
+# also what a 150px window gets: at 12pt 'Policy: <arm name>' fits across it with ~5px spare.
+HUD_FONT_SIZE = max(12, int(TILE_PIXELS * 0.45))
+HUD_LINE_HEIGHT = HUD_FONT_SIZE + int(4 * DISPLAY_SCALE)
+HUD_ORIGIN = (int(20 * DISPLAY_SCALE), int(20 * DISPLAY_SCALE))
+
+# Death and win messages are meant to fill the window, so those do scale 1:1.
+PERFECT_FONT_SIZE = int(25 * DISPLAY_SCALE)
+STARVE_FONT_SIZE = int(60 * DISPLAY_SCALE)
+DEATH_FONT_SIZE = int(100 * DISPLAY_SCALE)
+
 SCORE_COLOR = (0, 0, 0)
-SCORE_POS = (20, 20)
+SCORE_POS = HUD_ORIGIN
 SCORE_PREFIX = 'Score: '
 STEP_COLOR = (0, 0, 0)
-STEP_POS = (20, 40)
+STEP_POS = (HUD_ORIGIN[0], HUD_ORIGIN[1] + HUD_LINE_HEIGHT)
 STEP_PREFIX = 'Steps: '
 POLICY_COLOR = (0, 0, 0)
-POLICY_POS = (20, 60)
+POLICY_POS = (HUD_ORIGIN[0], HUD_ORIGIN[1] + 2 * HUD_LINE_HEIGHT)
 POLICY_PREFIX = 'Policy: '
+
+# Background patch repainted before each label is redrawn, so the previous value doesn't show
+# through. One line tall and the rest of the window wide: the old fixed (50, 100) was narrower
+# than a policy name at any scale, which left the tail of a long one smeared across the board.
+HUD_ERASE_SIZE = (SCREENSIZE[0] - HUD_ORIGIN[0], HUD_LINE_HEIGHT)
 
 DIRECTIONS = ['left', 'right', 'up', 'down']
 MOVE_VECTORS = {'left': (-1, 0),
