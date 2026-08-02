@@ -1,0 +1,32 @@
+{
+  "policy_name": "b8f-disc9975seed2",
+  "episodes_per_checkpoint": 100,
+  "checkpoints_requested": 1,
+  "complete": true,
+  "requested_steps": [
+    2581000
+  ],
+  "in_flight": null,
+  "updated_at": 1785686762.1460428,
+  "results": [
+    {
+      "step": 2581000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 100,
+      "perfect_games": 63,
+      "perfect_percent": 63.0,
+      "perfect_ci95": [
+        53.2,
+        71.8
+      ],
+      "avg_score": 89.11,
+      "median_score": 95.0,
+      "min_score": 22.0,
+      "max_score": 95.0,
+      "avg_reward": 148.74,
+      "seconds": 68.5
+    }
+  ]
+}

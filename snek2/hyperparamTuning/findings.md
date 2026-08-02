@@ -11,6 +11,7 @@ section before proposing an epsilon or buffer experiment.
 | finding | status |
 |---|---|
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
+| The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
 | **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes, **old env** |
 | **An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M** | **established**, 2 arms followed to the end |
 | **The horizon was the binding constraint** — records live past 2.5M, old arms stopped at ~1.06M | **established** |
@@ -105,14 +106,44 @@ outcomes are now exactly their constants, verified by playing until each occurre
 The shaping penalty now applies only to an ordinary surviving move, so it can no longer
 contaminate a terminal reward.
 
-#### What this cost
+#### What this cost: about 10 points, measured properly
 
-The 92% champion re-measured **21/30 (70.0%)** on the new environment, against 27/30 (90.0%)
-on the old one. Those two intervals overlap at n=30, so treat the size of the drop as
-unresolved — but the direction is what you would expect from a policy reading two features
-whose meaning changed underneath it. **This is not evidence the fixes are harmful.** It says
-the champion is off-distribution, which was the accepted price of the audit. Whether the
-corrected observations train *better* is untested and needs a fresh arm.
+Both batch-8 arms were re-run through the full `top20` close-out on the new environment,
+2026-08-02. The selector is deterministic on an arm's graph history, so it picked the **same
+checkpoints** as the original close-outs — 52 for `b8f`, 20 for `b8d` — which makes this a
+matched comparison at 100 episodes a side, free of the selection confound that makes pooled
+rates otherwise incomparable.
+
+| arm | ckpts | old pooled | new pooled | change | per-ckpt median | improved |
+|---|---|---|---|---|---|---|
+| `b8f-disc9975seed2` | 52 | 66.3% | **54.4%** | **-11.9 pts** | -10.0 | 3 of 52 |
+| `b8d-disc995clip` | 20 | 60.4% | **51.2%** | **-9.1 pts** | -7.0 | 1 of 20 |
+
+**Systematic, not noise**: 49 of 52 and 19 of 20 checkpoints got worse, and the two arms lost a
+similar amount despite different configs — consistent with a uniform off-distribution tax rather
+than anything config-specific. Worst single checkpoint fell 28 points; the best gained 3.
+
+**Best checkpoint, and the ranking moved:**
+
+| arm | old best | new best |
+|---|---|---|
+| `b8f` | 88.9% @2816000 | **82.0% @3149000** |
+| `b8d` | 76.0% @5027000 | **73.0% @2539000** |
+
+The old champion `2816000` reads 73% now, while `3149000` — 84.3% before, third-ranked — is the
+best on this environment. So *which* checkpoint is best is environment-dependent, and a
+hall-of-fame entry is only the record for the environment that measured it.
+
+**Cross-arm ordering survived**, which is the reassuring part for the investigation: `b8f` still
+beats `b8d` on pooled (54.4 vs 51.2) and on best checkpoint (82 vs 73), same as before (66.3 vs
+60.4, 88.9 vs 76.0). The gap narrowed but never changed sign. The audit shifted both arms down
+by a similar amount rather than scrambling their order.
+
+**This is not evidence the fixes are harmful.** These policies were trained to read two features
+whose meaning changed underneath them, so a drop is the expected cost of being off-distribution.
+Whether the corrected observations *train* better is a different question, untested, and what
+batch 9 will start to answer. An earlier 30-episode spot check put the champion at 21/30 and this
+supersedes it — 100 episodes on 72 checkpoints rather than 30 on one.
 
 ## `DISCOUNT=0.995` matches the best ceiling and removes the death risk
 

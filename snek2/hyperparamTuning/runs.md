@@ -12,7 +12,15 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Current best: **92% perfect games**
+## Current best: **82% on the environment that runs today**
+
+`b8f-disc9975seed2` @3149000, 82/100, re-measured 2026-08-02 and preserved in
+[`../hallOfFame/`](../hallOfFame/README.md). The 92% below was measured on the **pre-audit**
+environment and does not reproduce — the same checkpoint that scored it now reads 73%. Both
+figures are real; they describe different MDPs. See
+[the audit cost](findings.md#what-this-cost-about-10-points-measured-properly).
+
+### Batch 8's numbers, as measured on the old environment
 
 Close-out measurement of both batch-8 arms after stopping them, 2026-08-01:
 
@@ -102,9 +110,37 @@ one, so the honest read is that **these two arms cannot be placed on the ranking
 the alpha question stays where batch 7 left it. Do not re-add this task; if the alpha
 comparison matters, it needs new seeds, not new measurements of old ones.
 
-## Nothing is running — all four slots are free
+## Running now: batch 9, three arms — launched 2026-08-02 00:41
 
-**Batch 8 finished 2026-08-01.** Its last two arms, `b8f-disc9975seed2` and `b8d-disc995clip`,
+Four arms went up together; `b9b` was stopped after 8h22m. See
+[the batch 9 plan](#batch-9--0995-against-09975-on-the-new-environment) for what each isolates.
+
+| policy | discount | step | trailing | peak trailing | best30 | state |
+|---|---|---|---|---|---|---|
+| `b9a-disc9975a` | 0.9975 | 3.42M | 81.2 | **89.8** @3.28M | 56.0% @1.74M | healthy, **at the stop horizon** |
+| `b9b-disc9975b` | 0.9975 | **10.46M** | **0.5** | 72.1 @**328k** | 5.0% @221k | **stopped 2026-08-02 — dead** |
+| `b9c-disc995a` | 0.995 | 3.43M | 78.0 | 86.4 @2.60M | 37.3% @2.61M | healthy, **at the stop horizon** |
+| `b9d-disc995b` | 0.995 | 3.27M | 49.4 | 86.7 @1.23M | 30.3% @1.32M | alive, well past peak |
+
+**`b9b` is the overrun failure this batch's stop rule exists to prevent.** It peaked at step
+**328k** and then ran a further 10.1M steps producing nothing — `zero_since` 9.92M, best-30 of
+5.0%. Nobody was watching it overnight, which is the whole argument for stopping at 3-3.5M
+rather than by inspection.
+
+**All three survivors are at or past the 3-3.5M stop point and are still training.** b9a and b9c
+are past their peak trailing, b9d peaked at 1.23M. Stopping them is the user's call; the
+recommendation is to stop all three.
+
+**Early and not a result:** 0.9975 is **1 of 2** on survival, 0.995 is **2 of 2** — the same
+shape as the old environment's finding. Suggestive that the audit did not disturb the underlying
+dynamics, but n=2 a side and six single-seed conclusions in this file have been overturned.
+
+`top20` close-outs are running on all three survivors (20, 20 and 17 checkpoints selected),
+written to `_r0`.
+
+## Batch 8 — finished 2026-08-01
+
+Its last two arms, `b8f-disc9975seed2` and `b8d-disc995clip`,
 were stopped at 5.47M and 11.64M steps. Full per-arm results and the batch's design rationale
 have moved to
 [`completedRuns.md`](completedRuns.md#batch-8--the-discount-optimum-gradient-clipping-and-the-arm-lifetime).
@@ -482,28 +518,21 @@ the config mid-run and invalidates the arm.
 Per-run logs written to `$CLAUDE_JOB_DIR/tmp` are job-scoped and do not survive.
 The durable record is `runs/<policy>_evals.json`; analyse from there.
 
-## Next up: batch 9 — settle the discount optimum
+## Batch 9 — 0.995 against 0.9975, on the new environment
 
-**All four slots are free.** The one unresolved question from batch 8 is whether the optimum sits at
-`0.995` or `0.9975`: 0.9975 holds the record (92%) but is **1 of 2** on survival, while 0.995 is 3
-of 3 with a lower ceiling. Two more 0.9975 seeds decide it.
-
-> **The environment changed on 2026-08-01 and batch 9 has not been re-baselined.** Six env bugs
-> were fixed; two of them alter the observation and one alters the reward, so the 92% / 1-of-2
-> figures above were produced by a different MDP than the one batch 9 would run in. See
-> [the audit section in `findings.md`](findings.md#environment-audit-2026-08-01-observations-and-rewards-both-changed).
-> The discount comparison is still the right question and the arms below are still the right
-> arms — but their results are a **new baseline**, not a continuation of batch 8's, and the
-> survival counts restart at n=0. The audit is also unfinished by intent, so expect further env
-> changes before launch; each one resets this line again. Do not launch mid-audit and then
-> compare across it.
+**Head-to-head at n=2 each, and nothing else.** The open question from batch 8 is whether the
+discount optimum sits at `0.995` or `0.9975`. Both candidates have to be re-run, because the
+evidence that made this look like a one-sided question — 0.9975 holding the record at 92% but
+surviving 1 of 2, against 0.995 surviving 3 of 3 with a lower ceiling — was **all measured on the
+pre-audit observation space and is void**. Survival counts restart at n=0 for both values. See
+[the audit section in `findings.md`](findings.md#environment-audit-2026-08-01-observations-and-rewards-both-changed).
 
 | policy | override on top of the shared base | role |
 |---|---|---|
-| `b9a-disc9975seed3` | `SNEK_DISCOUNT=0.9975` | third 0.9975 seed — takes it to n=3 |
-| `b9b-disc9975seed4` | `SNEK_DISCOUNT=0.9975` | fourth seed; 0.9975 is 1 of 2, so n=4 is not excessive |
-| `b9c-disc996` | `SNEK_DISCOUNT=0.996` | between the two known-good values, in case the optimum is interior |
-| `b9d-lr1e4` | `SNEK_DISCOUNT=0.9975 SNEK_LEARNING_RATE=1e-4` | the highest-value untested knob, on the record config |
+| `b9a-disc9975a` | `SNEK_DISCOUNT=0.9975` | re-anchors the old record config on the new env |
+| `b9b-disc9975b` | `SNEK_DISCOUNT=0.9975` | second seed; n=1 has been overturned here repeatedly |
+| `b9c-disc995a` | `SNEK_DISCOUNT=0.995` | the other candidate, whose 3-of-3 no longer counts |
+| `b9d-disc995b` | `SNEK_DISCOUNT=0.995` | second seed |
 
 Shared base for every arm:
 
@@ -511,16 +540,31 @@ Shared base for every arm:
 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0
 ```
 
-**Run each to ~3-3.5M steps and stop.** That is the new horizon finding: both batch-8 arms peaked at
-~2.5-3M and `b8d` then died at ~7M, spending 8.5M steps producing nothing. Do not repeat that.
+**Why this shape rather than the one queued before.** The original batch 9 spent two slots on
+0.9975 seeds and the others on `0.996` and `LEARNING_RATE=1e-4`, on the assumption that 0.995 was
+already established at 3 of 3. On the new environment it is not, so that batch would have had no
+0.995 arm and could not have made the comparison it existed to make. Four arms on two values
+answers one question properly instead of three questions partially.
 
-**Close out with `top20`**, which now measures every checkpoint at >=90% and fills to 20 from >=60%.
-Measure the **100% graph points first** — 9 of 9 have come in above 64%.
+**Names carry no seed numbers on purpose.** Calling these `seed3`/`seed4` would imply continuity
+with `b8c`/`b8f`, and pooling across the audit boundary is exactly the error `findings.md` warns
+about. On this environment they are the first and second seed of each value.
+
+**Run each to ~3-3.5M steps and stop.** Both batch-8 arms peaked at ~2.5-3M and `b8d` then died at
+~7M, spending 8.5M steps producing nothing. Do not repeat that.
+
+**Close out with `top20`**, which measures every checkpoint at >=90% and fills to 20 from >=60%.
+A close-out is much cheaper than it was — 4.75x on the eval phase — so the 52-checkpoint case is
+now under an hour rather than four.
+
+`0.996` and `LEARNING_RATE=1e-4` move to the head of [later candidates](#later-candidates).
 
 ### Later candidates
 
 | change | why | gate |
 |---|---|---|
+| `SNEK_DISCOUNT=0.996` on the batch-9 winner | in case the optimum is interior to 0.995-0.9975 | after batch 9 settles which end wins |
+| `SNEK_LEARNING_RATE=1e-4` on the batch-9 winner | the highest-value untested knob | after batch 9 |
 | eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.9975 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after batch 9 |
 | best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after batch 9 |
 | partial IS correction (beta < 1) | full correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |

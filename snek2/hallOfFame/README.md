@@ -11,34 +11,46 @@ rotation and are not deleted by anything.
 
 ## Entries
 
-| checkpoint | measured perfect rate | 95% CI | avg score | config |
-|---|---|---|---|---|
-| **`b8f-disc9975seed2-ckpt2816000`** | **92.0%** (92/100) | 84.9-95.9 | 94.7 | `DISCOUNT=0.9975` |
-| `b8f-disc9975seed2-ckpt2581000` | 88.0% (88/100) | 80.2-93.0 | 94.2 | `DISCOUNT=0.9975` |
-| `b8d-disc995clip-ckpt2538000` | 80.0% (80/100) | 71.1-86.7 | 90.6 | `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10` |
+Every entry is measured on **both** environments, because the 2026-08-01 audit changed two
+observation components and the reward. `old env` is what the policy achieved when it was
+trained; `new env` is the same weights re-measured on the environment that runs today. Read
+`new env` if you want to know what a checkpoint will do if you load it now.
 
-"Perfect rate" is the share of episodes where the snake fills the board, over 100 greedy episodes
-each; see [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md).
+| checkpoint | old env | new env | config |
+|---|---|---|---|
+| **`b8f-disc9975seed2-ckpt3149000`** | 84.3% pooled /300 | **82.0%** (82/100, CI 73.3-88.3), avg 92.0 | `DISCOUNT=0.9975` |
+| `b8f-disc9975seed2-ckpt2816000` | **88.9% pooled /360**, peak 92.0% | 73.0% (73/100, CI 63.6-80.7), avg 86.8 | `DISCOUNT=0.9975` |
+| `b8f-disc9975seed2-ckpt2581000` | 87.6% pooled /170 | 63.0% (63/100, CI 53.2-71.8) | `DISCOUNT=0.9975` |
+| `b8d-disc995clip-ckpt2538000` | 73.3% pooled /300, peak 80.0% | 61.0% (61/100, CI 51.0-70.2), avg 86.5 | `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10` |
 
-> **These rates were measured on the pre-2026-08-01 environment and will not reproduce.** An env
-> audit that day fixed six bugs, two of which changed the observation (the tail is now freed when
-> the connectivity features are computed, and `reset()` builds the same bordered grid as `step()`)
-> and one of which changed the reward. These policies were trained to read the old features, so
-> they are now off-distribution. `ckpt2816000` re-measured **21/30** afterwards against 27/30
-> before. The entries are kept because they are the record *as achieved*, not because they still
-> score that — see the audit section in `findings.md`. Anything measured from here on belongs to
-> the new baseline, so do not put a new row in the table above next to an old one without
-> labelling which environment produced it.
+"Perfect rate" is the share of episodes where the snake fills the board, over greedy episodes;
+see [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md). Old-env figures are
+**pooled over every measurement of that step**, which is why `2816000` reads 88.9% rather than
+the 92.0% single run it is famous for, and `2538000` reads 73.3% rather than 80.0% — both of
+those were the high draw of three (92/88.3/83/92 and 70/80/70). The peak is given alongside.
 
-**`ckpt2816000` won 92 of 100 games** and is the project record, found in the close-out measurement
-of `b8f` on 2026-08-01. It re-measured at 25/30 during the restore verification for this folder,
-consistent with 92/100.
+> **The two columns rank the entries differently, and that is the point.** `3149000` is now the
+> best checkpoint this project has, at 82%, despite ranking third on the old environment.
+> `2816000`, the famous 92%, reads 73% today. Which checkpoint is "best" depends on the
+> environment measuring it, so a record is only ever a record for one of them.
+>
+> The drop is not evidence the audit was harmful: these policies were trained to read features
+> whose meaning then changed, so being off-distribution costs them. Across 72 checkpoints
+> measured on both, the loss was ~10 points and 49 of 52 got worse — systematic, and roughly
+> equal for both arms. Whether the corrected observations *train* better is what batch 9 tests.
 
-Three entries, kept deliberately. `2816000` and `2581000` are the top two policies ever measured
-and come from the same arm — the second is kept because it was measured twice independently
-(88/100 and 90/10) and is the more corroborated of the pair. `b8d`'s entry is the best from a
-**different config**, so the clipping-vs-no-clipping comparison stays reproducible if either is
-revisited.
+Four entries, kept deliberately.
+
+- **`3149000`** is the best policy that exists on the current environment, 82 of 100. Added
+  2026-08-02 after the re-measurement, which is also when it stopped being just b8f's
+  third-ranked checkpoint.
+- **`2816000`** won 92 of 100 on the old environment and was the project record for a day. Kept
+  as the historical high-water mark, and as the clearest single illustration of what the audit
+  cost a policy trained before it.
+- **`2581000`** is kept because it was independently corroborated on the old environment (88/100
+  and 90/100) when reproducibility of the 100-episode measurement was still an open question.
+- **`b8d`'s `2538000`** is the best from a **different config**, so the clipping-vs-no-clipping
+  comparison stays reproducible if either is revisited.
 
 ## Running a checkpoint manually
 

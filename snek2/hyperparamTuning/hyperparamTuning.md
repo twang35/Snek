@@ -378,12 +378,14 @@ Notes that matter:
   `runs/<policy>_evals.json` rather than from the log — it precomputes step, trailing,
   peak, best 30-eval perfect window and `dead_since`, which is everything a progress
   check needs. `dead_since` is an onset, not a verdict; compare it to `step` for duration.
-- **Every arm gets a visible window.** `display_eval` defaults to `True`, so launch with
-  no `SDL_VIDEODRIVER` override at all. The user wants to see each arm as it runs; do
-  not add `SDL_VIDEODRIVER=dummy` to a tuning arm unless asked. (Earlier guidance here
-  suggested one visible arm per batch with the rest headless — superseded.)
-- The policy name is the graph window title, so name it so it's identifiable at a
-  glance while running.
+- **Every arm gets a progress-chart window**, titled `<policy_name> results` — the score and
+  perfect-rate graph, redrawn each eval. Name arms so they are identifiable at a glance.
+- **No arm draws a game.** `display_eval` and `SNEK_DISPLAY_EVAL` are gone, and `snek2.main()`
+  sets `SDL_VIDEODRIVER=dummy` itself, so there is nothing to pass and nothing to switch on.
+  A game window cost ~5.2ms per frame and the game flips once per game step, which is why it
+  left the training loop entirely. **To watch a policy play, run `watch.py <arm>`** — it
+  follows the arm's newest checkpoint in its own process and costs training nothing
+  (measured: 4 watchers alongside 4 arms had no detectable effect on throughput).
 - Every override prints a `hyperparameter override:` line at startup. Grep for it
   to confirm a run really got the config you intended — this has already caught
   one silently-misconfigured control arm.
