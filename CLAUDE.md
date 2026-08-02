@@ -230,6 +230,22 @@ Two markdown traps that look fine in the source and render wrong:
 Worth a grep for `^[A-Za-z]\.\s` and a duplicate-number check after editing any md
 file here, since the user reads these rendered rather than as source.
 
+## No audio — never call bare `pygame.init()`
+
+`pygame.init()` starts *every* subsystem, including `pygame.mixer`, which opens a real
+CoreAudio output stream **per process**. `SDL_VIDEODRIVER=dummy` does not affect audio, so
+headless workers were still holding audio streams: 10 idle env processes drove
+`coreaudiod` to **15% CPU**, and evals routinely run several 10-worker processes at once,
+which is what made it look like the evals were sending `coreaudiod` off the rails.
+
+Nothing in this project plays sound. `Snake.Game.__init__` therefore inits only what it
+uses — `pygame.display.init()` and `pygame.font.init()` (`pygame.time`/`sprite`/`draw` need
+no init) — and `snek2.py` and `eval_checkpoints.py` both set `SDL_AUDIODRIVER=dummy` before
+any pygame import as a second line of defence.
+
+If a future change needs another subsystem, init that subsystem by name. Measure with
+`ps -o %cpu= -p $(pgrep -x coreaudiod)` while workers run; it should read 0.0.
+
 ## Active development
 
 `snek2/` is the only directory that should be edited going forward. It's a

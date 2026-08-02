@@ -127,7 +127,13 @@ class Game:
         self.starved = False
         self.perfect_game = False
         self.clock = pygame.time.Clock()
-        pygame.init()
+        # Init only the subsystems this game uses. Bare pygame.init() also starts
+        # pygame.mixer, which opens a real CoreAudio output stream per process even
+        # under SDL_VIDEODRIVER=dummy. Nothing here plays sound, but 10 idle workers
+        # holding those streams pushed coreaudiod to 15% CPU, and evals commonly run
+        # several 10-worker processes at once. pygame.time/sprite/draw need no init.
+        pygame.display.init()
+        pygame.font.init()
 
     def set_display(self, enabled):
         self.display = enabled

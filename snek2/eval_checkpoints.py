@@ -94,6 +94,11 @@ import sys
 import time
 
 os.environ['SDL_VIDEODRIVER'] = 'dummy'  # must precede any pygame import
+# Belt-and-braces against audio. Snake.Game inits only display+font, but a bare
+# pygame.init() anywhere would open a CoreAudio stream per worker and spin coreaudiod
+# (measured 15% CPU for 10 idle workers). Unlike the video driver, this is never
+# unset for the visible worker — nothing in this project plays sound.
+os.environ['SDL_AUDIODRIVER'] = 'dummy'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import numpy as np

@@ -6,6 +6,11 @@ _QUIET = _os.environ.get('SNEK_DEBUG', '0') in ('0', '', 'false', 'False')
 if _QUIET:
     _os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
 
+# Must precede any pygame import. Snake.Game inits only display+font, but a bare
+# pygame.init() anywhere would open a real CoreAudio stream in every env process and
+# spin coreaudiod (measured 15% CPU for 10 idle workers). Nothing here plays sound.
+_os.environ['SDL_AUDIODRIVER'] = 'dummy'
+
 # The gym "unmaintained, upgrade to Gymnasium" block is deliberately left alone. It is a raw
 # print to stderr from gym's import, not a warnings.warn - it survives
 # warnings.filterwarnings('ignore') - so removing it would mean redirecting stderr around the
