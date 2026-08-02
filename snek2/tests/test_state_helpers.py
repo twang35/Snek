@@ -11,9 +11,18 @@ from state_helpers import *
 # dropped from the observation (snake_environment.observation_spec sets head_with_food_obs = 0)
 # and with it the argument. Signature now:
 #
-#     group_obs(grid, head_pos, tail_pos, head_move_dir) -> [head_with_tail, num_groups] * 3
+#     group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir)
+#         -> [head_with_tail, num_groups] * 3
 #
 # ordered by ACTIONS = ['left', 'right', 'forward'].
+#
+# `next_tail_pos` is the cell the tail lands on when the move does not eat, which in the game is
+# the position of the segment ahead of it. In these fixtures it has to be supplied by hand, and
+# it changes the head_with_tail answers, so each call below names the body cell that the tail's
+# chain actually runs through. Several of the older fixtures are not strict snake chains — a
+# body cell or two is orphaned — so where more than one neighbour would do, the choice is the
+# one that makes the longest coherent chain, and the new fixtures at the end of this section
+# spell their chains out.
 #
 # The expectations also moved, because update_grid() now frees the tail cell: the snake
 # advances as a whole, so the tail vacates as the head takes a new cell. Two consequences show
@@ -33,7 +42,7 @@ def test_hwt_no_touching():
                      [4, 4, 4, 4, 4, 4, 4]])
     # Open board: every action leaves one region, and the freed tail keeps head and tail
     # sharing it.
-    assert group_obs(grid, (3, 1), (1, 1), 'right') == [1, log2plus1(1),
+    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(1)]
 
@@ -46,7 +55,7 @@ def test_hwt_no_touching_eats_food():
                      [4, 4, 4, 4, 4, 4, 4]])
     # 'forward' eats the food at (4, 1), so the tail stays put. The board is open enough that
     # it makes no difference to the counts here.
-    assert group_obs(grid, (3, 1), (1, 1), 'right') == [1, log2plus1(1),
+    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(1)]
 
@@ -59,7 +68,7 @@ def test_hwt_following_forward_tail():
                      [4, 4, 4, 4, 4, 4, 4]])
     # The tail at (4, 0) is walled in by its own body, so vacating it leaves a one-cell region
     # and the count goes to 2 — except on 'forward', which moves into that very cell.
-    assert group_obs(grid, (3, 0), (4, 0), 'right') == [0, log2plus1(2),
+    assert group_obs(grid, (3, 0), (4, 0), (4, 1), 'right') == [0, log2plus1(2),
                                                        0, log2plus1(2),
                                                        1, log2plus1(1)]
 
@@ -71,7 +80,7 @@ def test_hwt_following_right_tail():
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
     # Same board, facing up, so 'right' is the move onto the tail.
-    assert group_obs(grid, (3, 0), (4, 0), 'up') == [0, log2plus1(2),
+    assert group_obs(grid, (3, 0), (4, 0), (4, 1), 'up') == [0, log2plus1(2),
                                                     1, log2plus1(1),
                                                     0, log2plus1(2)]
 
@@ -82,7 +91,7 @@ def test_hwt_following_left_tail():
                      [4, 0, 0, 3, 5, 3, 4],
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 0), (3, 1), 'left') == [1, log2plus1(1),
+    assert group_obs(grid, (3, 0), (3, 1), (4, 1), 'left') == [1, log2plus1(1),
                                                       0, log2plus1(2),
                                                       0, log2plus1(2)]
 
@@ -97,7 +106,7 @@ def test_hwt_no_forward():
     # The tail at (0, 1) is the only gap in the body wall, so freeing it merges the strip above
     # with everything below: 3 regions become 2, and on 'forward' 2 become 1. This is the case
     # the old behaviour got wrong most often in real play.
-    assert group_obs(grid, (3, 1), (0, 1), 'right') == [1, log2plus1(2),
+    assert group_obs(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(2),
                                                        1, log2plus1(2),
                                                        0, log2plus1(1)]
 
@@ -108,7 +117,7 @@ def test_hwt_no_left():
                      [4, 0, 5, 3, 2, 0, 4],
                      [4, 0, 1, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (1, 1), 'right') == [0, log2plus1(1),
+    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [0, log2plus1(1),
                                                        1, log2plus1(3),
                                                        1, log2plus1(2)]
 
@@ -119,7 +128,7 @@ def test_hwt_no_right():
                      [4, 0, 5, 3, 2, 0, 4],
                      [4, 0, 0, 3, 0, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (1, 1), 'right') == [1, log2plus1(3),
+    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(3),
                                                        0, log2plus1(1),
                                                        1, log2plus1(2)]
 
@@ -130,7 +139,7 @@ def test_hwt_follow_tail_and_empty_forward_no_food():
                      [4, 1, 2, 2, 3, 5, 4],
                      [4, 0, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), 'up') == [0, log2plus1(2),
+    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'up') == [0, log2plus1(2),
                                                     1, log2plus1(2),
                                                     1, log2plus1(2)]
 
@@ -141,7 +150,7 @@ def test_hwt_multiple_open_groups_separate_food_and_tail():
                      [4, 0, 0, 0, 3, 5, 4],
                      [4, 1, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), 'left') == [0, log2plus1(2),
+    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'left') == [0, log2plus1(2),
                                                       1, log2plus1(2),
                                                       0, log2plus1(2)]
 
@@ -152,7 +161,7 @@ def test_groups_new_group_left():
                      [4, 0, 2, 2, 3, 5, 4],
                      [4, 1, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), 'right') == [1, log2plus1(2),
+    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'right') == [1, log2plus1(2),
                                                        0, log2plus1(1),
                                                        1, log2plus1(1)]
 
@@ -177,8 +186,8 @@ def test_food_cell_counts_as_open_space():
     expected = [1, log2plus1(2),
                 0, log2plus1(1),
                 1, log2plus1(1)]
-    assert group_obs(with_food, (3, 1), (4, 1), 'right') == expected
-    assert group_obs(without_food, (3, 1), (4, 1), 'right') == expected
+    assert group_obs(with_food, (3, 1), (4, 1), (4, 2), 'right') == expected
+    assert group_obs(without_food, (3, 1), (4, 1), (4, 2), 'right') == expected
 
 
 def test_groups_new_group_forward():
@@ -187,7 +196,7 @@ def test_groups_new_group_forward():
                      [4, 0, 0, 0, 3, 5, 4],
                      [4, 0, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), 'up') == [1, log2plus1(1),
+    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'up') == [1, log2plus1(1),
                                                     1, log2plus1(1),
                                                     1, log2plus1(2)]
 
@@ -206,7 +215,7 @@ def test_eating_move_does_not_free_the_tail():
                      [4, 5, 3, 3, 2, 1, 4],
                      [4, 0, 0, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (0, 1), 'right') == [1, log2plus1(1),
+    assert group_obs(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(2)]
 
@@ -222,9 +231,71 @@ def test_tail_vacating_merges_two_regions():
                      [4, 3, 3, 5, 3, 3, 4],
                      [4, 0, 0, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (0, 0), (2, 1), 'right') == [0, log2plus1(1),
+    assert group_obs(grid, (0, 0), (2, 1), (1, 1), 'right') == [0, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(1)]
+
+
+def test_hwt_enclosed_vacated_tail_still_reaches_the_tail():
+    """The endgame case the old code got wrong on 78% of the decisions that lost games.
+
+    The snake is coiled so that the tail at (1, 2) is walled in by its own body on all four
+    sides. update_grid() frees that cell, which makes it a region with *no open neighbours*, so
+    asking which regions are adjacent to it returns nothing and the flag reads 0 whatever the
+    head does. The question it should ask is about the cell the tail is moving *to* — (2, 2),
+    the segment ahead of it — which touches the open right-hand side at (3, 2).
+
+    Body chain, head first: (2,4) (2,3) (1,3) (0,3) (0,2) (0,1) (1,1) (2,1) (2,2) (1,2)=tail.
+
+        y=0   . . . . .
+        y=1   # # # . .
+        y=2   # t # . .        t = tail, a = the segment ahead of it
+        y=3   # # # . .
+        y=4   . . H . .
+
+    Under the old behaviour every action here reported 0.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 3, 3, 3, 0, 0, 4],
+                     [4, 3, 5, 3, 0, 0, 4],
+                     [4, 3, 3, 3, 0, 0, 4],
+                     [4, 0, 0, 2, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    # 'right' turns into the wall row below the board and reaches nothing, so it stays 0.
+    assert group_obs(grid, (2, 4), (1, 2), (2, 2), 'right') == [1, log2plus1(3),
+                                                               0, log2plus1(3),
+                                                               1, log2plus1(3)]
+
+
+def test_hwt_eating_move_does_not_advance_the_tail():
+    """The other half of the fix: on a step that eats, the tail does not move.
+
+    add_segment() refills the tile the tail came from, so the snake grows from the back and the
+    tail stays put. Here that is the difference between 1 and 0. The tail at (0, 1) touches the
+    open cell (0, 2), which is the region the head lands in when it eats the food at (0, 3).
+    The segment ahead of it at (0, 0) is boxed in by the wall, its own body at (1, 0), and the
+    tail itself — so advancing the tail on this step would report 0.
+
+    Body chain, head first: (0,4) (1,4) (1,3) (1,2) (1,1) (1,0) (0,0) (0,1)=tail.
+
+        y=0   a # . . .        a = the segment ahead of the tail
+        y=1   t # . . .        t = tail
+        y=2   . # . . .
+        y=3   F # . . .
+        y=4   H # . . .
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 3, 3, 0, 0, 0, 4],
+                     [4, 5, 3, 0, 0, 0, 4],
+                     [4, 0, 3, 0, 0, 0, 4],
+                     [4, 1, 3, 0, 0, 0, 4],
+                     [4, 2, 3, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    # Facing up, so 'forward' is the move onto the food. 'left' leaves the board.
+    assert group_obs(grid, (0, 4), (0, 1), (0, 0), 'up') == [0, log2plus1(2),
+                                                            0, log2plus1(2),
+                                                            1, log2plus1(2)]
 
 
 # =============================== body_and_wall_collisions tests ===============================

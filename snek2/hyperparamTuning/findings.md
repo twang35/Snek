@@ -18,7 +18,9 @@ it as evidence from that date, not as current state.
 |---|---|
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
-| **Audit fix #6 was incomplete**: `group_obs` uses one tail position for a tail that has usually moved — 22.1% of losing decisions flagged, against 94.1% once advanced | **measured**, 360 eps |
+| **Observations changed again 2026-08-02** — a second boundary, one week of results after the first | **breaking**, `head_with_tail` fixed |
+| **Fixing `head_with_tail` moved the champion 80.0% → 90.3% with no retraining** | **measured**, 360 eps a side, intervals disjoint |
+| Audit fix #6 was incomplete: `group_obs` used one tail position for a tail that has usually moved | **fixed** 2026-08-02 |
 | **Terminal steps never carry `discount = 0`**, so death trains toward `−5 + 0.9975·V(terminal)` | mechanism confirmed, effect unmeasured |
 | Nothing in the observation vector distinguishes snake lengths 50 to 99 | **measured**, it is a single value |
 | On the new env, `0.995` has the better expected value and `0.9975` the steadier single arm | **open**, n=2 each |
@@ -127,6 +129,43 @@ Full write-up in [`../claudeFeatureRecommendations.md`](../claudeFeatureRecommen
 including a ranked scoring of every other candidate observation, the terminal-discount defect, and
 the absent length signal. Instruments in [`diagnostics/`](diagnostics/). Both are frozen at
 2026-08-02.
+
+#### Fixed 2026-08-02, and it was worth 10 points with no retraining
+
+`group_obs` now takes both tail positions and picks between them per action: the tail advances to
+the cell ahead of it, except on a move that eats, where `add_segment()` refills the tile it came
+from and the tail does not move. The observation width is unchanged at 20, so old checkpoints
+still load.
+
+| `b8f-disc9975seed2` @3149000, greedy, 360 episodes | perfect | 95% CI |
+|---|---|---|
+| broken `head_with_tail` | 288/360 — 80.0% | 75.9-84.1 |
+| **fixed** | **325/360 — 90.3%** | **87.2-93.3** |
+
+**+10.3 points on a policy that was never trained with the corrected feature**, and the intervals
+do not overlap. That direction is the opposite of the audit, which cost old policies ~10 points,
+and the asymmetry has a mechanism: the audit changed what the features *said*, while this changed
+whether one of them said anything at all. The policy had already learned to trust
+`head_with_tail = 1`; the flag was simply mute in coiled endgames, and unmuting it lets behaviour
+the network already had fire where it previously could not.
+
+Where the remaining 35 losses sit is the more interesting part:
+
+| score at the loss | broken | fixed |
+|---|---|---|
+| below 50 | 5 | 1 |
+| 50-79 | 31 | 12 |
+| 80-89 | 21 | 8 |
+| **90-94** | **15** | **14** |
+
+Mid-game deaths collapsed; deaths within five food of a win did not move at all. The endgame
+residual is a different problem from the one this fixed, which is what
+`claudeFeatureRecommendations.md` predicted when it put the ceiling from this feature near 95%
+rather than 100%.
+
+**This is a second comparability boundary.** Everything measured between 2026-08-01 and this fix
+was produced by a different MDP than the one that runs now, so batch 9's figures and the 80.0%
+baseline above are both historical. Re-baseline before comparing.
 
 #### Rewards are now exact
 

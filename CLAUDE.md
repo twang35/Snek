@@ -260,7 +260,24 @@ any pygame import as a second line of defence.
 If a future change needs another subsystem, init that subsystem by name. Measure with
 `ps -o %cpu= -p $(pgrep -x coreaudiod)` while workers run; it should read 0.0.
 
-## Tests: `snek2/tests/`, and run them — they rot silently
+## Tests: `snek2/tests/` — write them, and run them
+
+**When a change has logic worth pinning down, add a test for it in the same pass.** Coverage here
+is sparse — one file, 26 assertions, all of them on `group_obs` and `body_and_wall_collisions` —
+so most of the environment has nothing guarding it, and the sparseness is a reason to add rather
+than a precedent to follow. Worth a fixture whenever a change involves:
+
+- a conditional whose branches are easy to collapse later (the eat/no-eat distinction has now
+  been got wrong twice, in `update_grid` and again in `group_obs`)
+- an index or coordinate convention (the padded grid's `(y + 1) * cols + (x + 1)` bit layout, the
+  `SCREENTILES + 1` bounds guards)
+- a rule someone could "simplify" without seeing why it exists, like the clause for stepping onto
+  the cell the tail is vacating
+- an edge case that took thinking to get right — if it needed reasoning, it needs a fixture,
+  because the reasoning does not survive in the diff
+
+The bar is not complexity, it is whether a future edit could break the behaviour without anything
+noticing. These fixtures are cheap: a hand-written grid, a call, one `assert`.
 
 `tests/test_state_helpers.py` covers `group_obs` and `body_and_wall_collisions` on
 hand-written grids. **pytest is not installed in the `snek` env**, so run them directly:
@@ -284,7 +301,22 @@ was dead at the point `group_obs` was changed.** Run the suite before and after 
 that the code is fine.
 
 For refactors, also diff observations against a fixed-seed run — byte-identical output over a
-few thousand steps catches what 24 assertions do not.
+few thousand steps catches what 26 assertions do not.
+
+**A passing suite is not coverage of the change you just made.** `group_obs` took a third
+signature in 2026-08-02 — `next_tail_pos` was added, because the tail moves on the step the head
+does — and all 24 existing tests passed *before and after* the behaviour changed, since every
+fixture was an open board where the old and new answers agree. Two tests were added to cover it,
+and both were checked by mutating the implementation and confirming a test fails:
+
+| mutation | tests that catch it |
+|---|---|
+| don't advance the tail at all (the old behaviour) | `test_hwt_enclosed_vacated_tail_still_reaches_the_tail` |
+| advance it even on a move that eats | `test_hwt_eating_move_does_not_advance_the_tail` |
+| drop the "stepping onto the vacated cell" clause | 7 of the existing tests |
+
+That mutation check is worth repeating for any future change here: write the fixture, then break
+the code deliberately and confirm the fixture notices.
 
 ## Rendering is off by default — use `watch.py` to see a game
 

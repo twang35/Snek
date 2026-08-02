@@ -10,6 +10,12 @@ Everything below was measured on the **post-audit environment** (the 2026-08-01 
 six env bugs were fixed) using the current champion `b8f-disc9975seed2` at checkpoint
 `3149000`, greedy, over **360 episodes / 1,076,492 steps**.
 
+**Status, added the same day:** the first recommendation — advancing `tail_pos` — was implemented
+immediately after this was written, and moved that same checkpoint from 80.0% to **90.3%** with no
+retraining. See the "Fixed 2026-08-02" subsection of
+[`hyperparamTuning/findings.md`](hyperparamTuning/findings.md). Nothing else here has been
+implemented, and the rest of the document is left exactly as measured.
+
 ---
 
 ## Summary of recommendations

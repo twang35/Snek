@@ -13,6 +13,7 @@ NEIGHBOUR_OFFSETS = tuple(MOVE_VECTORS[direction] for direction in DIRECTIONS)
 def get_observations(old_grid,
                      head_pos,
                      tail_pos,
+                     next_tail_pos,
                      head_move_dir,
                      current_food,
                      current_step,
@@ -47,10 +48,12 @@ def get_observations(old_grid,
 
     # 6 values, [can still reach tail, lg(open regions)] for each action. Together these are
     # the "am I about to trap myself" signal: reaching the tail means an escape route exists,
-    # and a rising region count means the move is cutting the free space into pieces.
+    # and a rising region count means the move is cutting the free space into pieces. Needs
+    # both tail positions, because the tail moves too - see group_obs.
     observations.extend(group_obs(old_grid,
                                   head_pos,
                                   tail_pos,
+                                  next_tail_pos,
                                   head_move_dir))
 
     # 3 values, one per action: 1 if the move eats the last food and fills the board. All zero
@@ -135,7 +138,23 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
 
 # head_with_tail: returns 1 for with tail or 0 for no tail groups in each action
 # total_group_obs: returns number of groups
-def group_obs(old_grid, head_pos, tail_pos, head_move_dir):
+def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir):
+    """[can the head still reach the tail, lg(open regions)] per action.
+
+    Takes two tail positions, because the tail moves on the same step the head does.
+    `tail_pos` is where it is now; `next_tail_pos` is the cell ahead of it, which is where it
+    lands on any move that does not eat. Both are needed: the vacated cell decides what
+    `update_grid` frees, and the *post-move* tail is what "can the head reach the tail" is
+    actually about.
+
+    Using `tail_pos` for both was a defect, and a quiet one. Measured over 360 episodes of the
+    92%-era champion, the flag separated the move that lost the game from a surviving move at
+    only 22.1% of the 68 decisions that lost one, against 94.1% once the tail advances - it
+    never claimed the wrong thing, it just went silent. The reason is that `update_grid` frees
+    the vacated cell, and in a coiled endgame that cell is walled in by the snake's own body,
+    so it becomes a region with no open neighbours and `get_adjacent_groups` returns nothing
+    for it whatever the head does. See ../claudeFeatureRecommendations.md.
+    """
     observations = []
     cols = old_grid.shape[1]
     for action in ACTIONS:
@@ -150,10 +169,24 @@ def group_obs(old_grid, head_pos, tail_pos, head_move_dir):
         head_with_tail = 0
         num_groups = log2plus1(group_count)
 
-        head_groups = get_adjacent_groups(regions, cols, new_head_pos)
-        tail_groups = get_adjacent_groups(regions, cols, tail_pos)
+        # Read from old_grid, which update_grid has not touched. This repeats the test
+        # update_grid makes internally rather than having it return the answer, so that its
+        # signature stays a grid in and a grid out - the diagnostics in
+        # hyperparamTuning/diagnostics/ call it directly. One array lookup.
+        eats_food = get_grid_value(new_head_pos, old_grid) == 1
+        # A move that eats does not move the tail at all: add_segment() refills the tile it
+        # came from, so the snake grows from the back and the tail stays where it is.
+        post_move_tail = tail_pos if eats_food else next_tail_pos
 
-        if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tail_pos:
+        head_groups = get_adjacent_groups(regions, cols, new_head_pos)
+        tail_groups = get_adjacent_groups(regions, cols, post_move_tail)
+
+        # The second clause stays, and it compares against the *current* tail: stepping onto
+        # the cell the tail is vacating is always safe, and no region test can see that move,
+        # because the cell ends up holding the head rather than being open. Dropping it while
+        # advancing the tail looked catastrophic in measurement - 1481 spurious disagreements
+        # in 15700 actions - and that single move was the whole difference.
+        if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tuple(tail_pos):
             head_with_tail = 1
 
         observations.extend([head_with_tail, num_groups])

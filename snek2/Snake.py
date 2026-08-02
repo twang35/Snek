@@ -191,9 +191,17 @@ class Game:
         self.perfect_game = False
 
     def get_observation(self):
+        # Each segment lands on the cell its predecessor just left, so the tail's next cell is
+        # wherever the segment ahead of it stands now. group_obs needs that as well as the
+        # current tail: the tail moves on the same step the head does, and asking about the cell
+        # it is leaving rather than the one it is taking is what made head_with_tail go silent in
+        # coiled endgames. front_segment is None only for a length-1 snake, which cannot happen
+        # while START_SEGMENTS is at least 1, but the fallback keeps this honest.
+        ahead_of_tail = self.tail if self.tail.front_segment is None else self.tail.front_segment
         return np.array(get_observations(self.grid,
                                          self.head.tile_pos,
                                          self.tail.tile_pos,
+                                         ahead_of_tail.tile_pos,
                                          self.head.move_dir,
                                          self.current_food,
                                          self.current_step,
