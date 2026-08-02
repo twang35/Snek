@@ -9,12 +9,35 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
+## These checkpoints no longer load on `master` (2026-08-02)
+
+The observation vector went from 20 values to 21 — the starve observation was split into a
+scaled budget and an explicit snake length — and the network's first layer is sized by that.
+Restoring any checkpoint here now fails immediately and loudly:
+
+```
+ValueError: Received incompatible tensor with shape (20, 50) when attempting to restore
+variable with shape (21, 50) and name sequential/dense/kernel:0
+```
+
+That is a clean failure rather than a silent partial load, but it does mean **the commands
+below only work against a 20-value observation**. To run one of these by hand, check out the
+last commit that had one:
+
+```
+git checkout e4514a8    # "Fix head_with_tail to advance the tail"
+```
+
+The `new env` column below was measured before that boundary and cannot currently be
+reproduced on `master`. The entries stay here regardless: they are the record of what this
+project achieved, and the weights are still the weights.
+
 ## Entries
 
 Every entry is measured on **both** environments, because the 2026-08-01 audit changed two
 observation components and the reward. `old env` is what the policy achieved when it was
-trained; `new env` is the same weights re-measured on the environment that runs today. Read
-`new env` if you want to know what a checkpoint will do if you load it now.
+trained; `new env` is the same weights re-measured on the environment that ran on 2026-08-02,
+before the 21-value change. Read `new env` for what a checkpoint does at commit `e4514a8`.
 
 | checkpoint | old env | new env | config |
 |---|---|---|---|

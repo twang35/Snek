@@ -335,7 +335,7 @@ class Game:
             reward = snake_constants.PERFECT_GAME_REWARD
         elif not self.finished and steps_until_starve(self.current_step,
                                                       self.last_food_step,
-                                                      len(self.snake_group))[0] <= 0:
+                                                      len(self.snake_group)) <= 0:
             self.finished = True
             self.starved = True
             reward = STARVE_REWARD

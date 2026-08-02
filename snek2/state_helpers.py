@@ -9,6 +9,11 @@ from snake_constants import *
 # instead, so it needs no coordinate offsets at all.
 NEIGHBOUR_OFFSETS = tuple(MOVE_VECTORS[direction] for direction in DIRECTIONS)
 
+# Divisor that puts the starve observation in [0, 1]: the largest value log2plus1 can return for
+# a budget that tops out at MAX_STARVE_BUDGET. Spelled with math.log2 rather than log2plus1 so it
+# does not depend on where in this file that function is defined.
+STARVE_OBS_SCALE = math.log2(MAX_STARVE_BUDGET + 1)
+
 
 def get_observations(old_grid,
                      head_pos,
@@ -20,15 +25,16 @@ def get_observations(old_grid,
                      last_food_step,
                      snake_len,
                      game_finished):
-    """Builds the 20-value observation vector. Layout, in order:
+    """Builds the 21-value observation vector. Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
     6-8      3       is the move safe (not body or wall)
     9-14     6       [can still reach tail, lg(open regions)] per action
     15-17    3       does the move win the game
-    18       1       lg(steps left before starving)
-    19       1       is the episode over
+    18       1       starve budget left, lg-compressed to [0, 1]
+    19       1       fraction of the board the snake fills
+    20       1       is the episode over
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
     from the current heading, not compass directions. Keep this in step with
@@ -60,13 +66,14 @@ def get_observations(old_grid,
     # unless the snake is exactly one food short, so this fires on the final move of a game.
     observations.extend(perfect_game_obs(old_grid, head_pos, head_move_dir, snake_len))
 
-    # 1 value: lg of the steps left before starving, the budget being max(100, 10 * length)
-    # capped at 500 and counted from the last food. Tells the snake how long it can stall.
-    observations.extend(steps_until_starve(current_step, last_food_step, snake_len))
-
-    # Disabled: count of open cells left on the grid. observation_spec() reserves 0 for it.
-    # remaining spaces
-    # observations.extend([((SCREENTILES[0] + 1) * (SCREENTILES[1] + 1)) - (snake_len + START_SEGMENTS + 1)])
+    # 2 values: how much of the starve budget is left, lg-compressed and scaled to [0, 1], and
+    # how much of the board the snake fills, linear. The second is the only signal for how far
+    # through the game this is. These used to be one entangled value that went flat from length
+    # 50 up and reached 8.97 on a vector of otherwise sub-3 inputs - see starve_and_length_obs.
+    # The board-fill value also supersedes the "remaining spaces" observation that
+    # observation_spec() used to reserve a disabled slot for: open cells are the complement of
+    # snake length, so it is the same signal already normalised.
+    observations.extend(starve_and_length_obs(current_step, last_food_step, snake_len))
 
     # 1 value: 1 once the episode has ended, by death, starvation or a win.
     # end of game
@@ -194,11 +201,48 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir):
     return observations
 
 
-# Returns log2 number of remaining steps until starving to death
+def starve_budget(snake_len):
+    """Steps this snake may go without food. A game rule, not an observation."""
+    return max(MIN_STARVE_BUDGET,
+               min(snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER, MAX_STARVE_BUDGET))
+
+
 def steps_until_starve(current_step, last_food_step, snake_len):
-    # cap max at 500
-    max_steps_until_starve = min(snake_len * MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER, 500)
-    return [log2plus1(max(100, max_steps_until_starve) - (current_step - last_food_step))]
+    """Steps left before starving, as a plain count. Snake.step() ends the episode at 0 or less.
+
+    Returns an int, where this used to return `[log2plus1(budget - elapsed)]`. The rule fires at
+    exactly the same moment either way, since `log2plus1(x) <= 0` precisely when `x <= 0`, but
+    the game rule and the observation were reading the same function - so rescaling the
+    observation would silently have moved the starvation threshold. They are separate now.
+    """
+    return starve_budget(snake_len) - (current_step - last_food_step)
+
+
+def starve_and_length_obs(current_step, last_food_step, snake_len):
+    """[starve budget left, how much of the board the snake fills], both in [0, 1].
+
+    Replaces a single value, `log2plus1(budget - elapsed)`, which had two problems.
+
+    It was the only input carrying anything about the snake's length, and it carried nothing
+    past length 50. The budget is `min(10 * len, 500)`, so from 50 segments up every length
+    produces the identical value at equal elapsed steps - one number, 8.9687, for the whole
+    second half of every game, while the fatal decisions sit at a median length of 83. Length
+    now has its own input. Linear, not log: the difference between 80 and 90 segments matters at
+    least as much as 20 to 30, so there is nothing to compress.
+
+    It also reached 8.97 while every other input sat at or below 3.17. With one shared weight
+    initialisation that lets a single input dominate the first layer's gradients for no reason
+    beyond its units. Dividing by STARVE_OBS_SCALE puts it in [0, 1] and keeps the log
+    compression, which is worth keeping on its own merits: the difference between 10 and 20
+    steps of budget is worth reacting to, the difference between 400 and 410 is not.
+
+    The budget is scaled by its own maximum rather than by this snake's budget, so a given value
+    always means the same number of steps left whatever the length. The network can work out the
+    fraction from the two together, now that it can see length at all.
+    """
+    remaining = steps_until_starve(current_step, last_food_step, snake_len)
+    return [log2plus1(max(0, remaining)) / STARVE_OBS_SCALE,
+            snake_len / PERFECT_SCORE]
 
 
 def log2plus1(num):

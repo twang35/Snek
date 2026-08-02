@@ -32,8 +32,10 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         total_groups_obs = 3        # lg(num_groups) for each action
         # end group obs
         perfect_game_move_obs = 3   # move results in a perfect game
-        steps_until_starve_obs = 1  # steps until starve, capped at log2(500)
-        remaining_spaces = 0        # open spaces left on grid
+        steps_until_starve_obs = 1  # starve budget left, lg-compressed and scaled to [0, 1]
+        # Supersedes the disabled `remaining_spaces` slot that sat here: open cells are the
+        # complement of snake length, so this is that signal, normalised, and switched on.
+        snake_length_obs = 1        # fraction of the board the snake fills
         game_over_obs = 1           # if game is over
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
@@ -42,7 +44,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                                  + total_groups_obs
                                  + perfect_game_move_obs
                                  + steps_until_starve_obs
-                                 + remaining_spaces
+                                 + snake_length_obs
                                  + game_over_obs,), np.float32)
 
     def set_display(self, enabled):

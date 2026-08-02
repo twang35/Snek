@@ -18,7 +18,8 @@ it as evidence from that date, not as current state.
 |---|---|
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
-| **Observations changed again 2026-08-02** — a second boundary, one week of results after the first | **breaking**, `head_with_tail` fixed |
+| **Observations changed twice on 2026-08-02** — two more boundaries after the audit's | **breaking**, and the second changes the vector width |
+| **The vector is 21 values, so every earlier checkpoint fails to load** — use commit `e4514a8` for those | **breaking**, loud `ValueError` |
 | **Fixing `head_with_tail` moved the champion 80.0% → 90.3% with no retraining** | **measured**, 360 eps a side, intervals disjoint |
 | Audit fix #6 was incomplete: `group_obs` used one tail position for a tail that has usually moved | **fixed** 2026-08-02 |
 | **Terminal steps never carry `discount = 0`**, so death trains toward `−5 + 0.9975·V(terminal)` | mechanism confirmed, effect unmeasured |
@@ -166,6 +167,47 @@ rather than 100%.
 **This is a second comparability boundary.** Everything measured between 2026-08-01 and this fix
 was produced by a different MDP than the one that runs now, so batch 9's figures and the 80.0%
 baseline above are both historical. Re-baseline before comparing.
+
+## The starve observation, 2026-08-02: split in two, and the vector is now 21 wide
+
+The third boundary of the day, and the first one that **changes the width of the observation**,
+so unlike the previous two it breaks checkpoint loading outright.
+
+`steps_until_starve` was a single value, `log2plus1(budget - elapsed)`, and it was doing three
+jobs badly at once.
+
+| problem | detail |
+|---|---|
+| length was invisible | the budget is `min(10 * len, 500)`, so **every length from 50 to 99 gave the identical 8.9687** at equal elapsed steps |
+| it was the only length signal | so the second half of every game had no phase information at all, while fatal decisions sit at median length 83 |
+| the scale was an outlier | it reached **8.97** where every other input was at or below 3.17, with no input normalisation in `build_q_net` |
+| it drove the game rule too | `Snake.step()` starved on `steps_until_starve(...)[0] <= 0`, so rescaling the observation would have moved the starvation threshold |
+
+Now there are two observations and a separated rule:
+
+- `starve_budget(len)` and `steps_until_starve(...)` return plain step counts, and the rule reads
+  those. The observation no longer shares a function with the rule.
+- Index 18 is `log2plus1(remaining) / log2plus1(500)`, in `[0, 1]`, keeping the log compression —
+  10 versus 20 steps of budget is worth reacting to, 400 versus 410 is not. Scaled by the maximum
+  budget rather than each snake's own, so one value always means the same number of steps.
+- Index 19 is `snake_len / PERFECT_SCORE`, linear, because 80 versus 90 segments matters at least
+  as much as 20 versus 30. It also supersedes the `remaining_spaces` slot `observation_spec` had
+  reserved and disabled, open cells being the complement of length.
+
+**The starvation rule is provably unmoved**: `log2plus1(x) <= 0` exactly when `x <= 0`, checked as
+a unit test across the boundary for five lengths, and confirmed over 14,984 steps of real play
+with 9 starvations and **0 disagreements** with the old formula. Starvation still fires at 500
+elapsed for long snakes and at `10 * len` for short ones.
+
+The largest value anywhere in the vector is now **3.585** rather than 8.97. The remaining outlier
+is `lg(num_groups)` at indices 10, 12 and 14 — which
+[`../claudeFeatureRecommendations.md`](../claudeFeatureRecommendations.md) recommends removing
+rather than rescaling, having measured it as right 7.4% and wrong 57.4% at the decisions that lose
+games.
+
+**Effect on the perfect rate is unmeasured, and cannot be measured by transfer.** The width change
+means no existing checkpoint loads, so unlike the `head_with_tail` fix there is no
+policy-that-never-saw-it to re-run. This one needs a training arm to evaluate.
 
 #### Rewards are now exact
 

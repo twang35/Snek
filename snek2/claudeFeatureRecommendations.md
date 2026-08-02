@@ -10,11 +10,18 @@ Everything below was measured on the **post-audit environment** (the 2026-08-01 
 six env bugs were fixed) using the current champion `b8f-disc9975seed2` at checkpoint
 `3149000`, greedy, over **360 episodes / 1,076,492 steps**.
 
-**Status, added the same day:** the first recommendation — advancing `tail_pos` — was implemented
-immediately after this was written, and moved that same checkpoint from 80.0% to **90.3%** with no
-retraining. See the "Fixed 2026-08-02" subsection of
-[`hyperparamTuning/findings.md`](hyperparamTuning/findings.md). Nothing else here has been
-implemented, and the rest of the document is left exactly as measured.
+**Status, added the same day.** Two of the recommendations were implemented immediately after this
+was written; the document itself is left exactly as measured.
+
+| recommendation | outcome |
+|---|---|
+| advance `tail_pos` | done — moved that same checkpoint 80.0% → **90.3%** with no retraining |
+| fix the starve observation and add length | done — split into a `[0, 1]` budget and an explicit `snake_len / PERFECT_SCORE`, taking the vector to **21 values**, so the checkpoints this document was measured on no longer load (use commit `e4514a8`) |
+| everything else | not implemented |
+
+See the two 2026-08-02 subsections of
+[`hyperparamTuning/findings.md`](hyperparamTuning/findings.md). Note that the "20 values" and
+"input 18 reaches 8.97" observations below are now historical.
 
 ---
 

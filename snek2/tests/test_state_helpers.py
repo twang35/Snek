@@ -298,6 +298,86 @@ def test_hwt_eating_move_does_not_advance_the_tail():
                                                             1, log2plus1(2)]
 
 
+# =============================== starve and length tests ===============================
+def test_starve_budget_is_ten_per_segment_between_its_limits():
+    assert starve_budget(20) == 200
+    assert starve_budget(37) == 370
+    # Floored, so a short snake gets time to cross the board.
+    assert starve_budget(1) == MIN_STARVE_BUDGET
+    assert starve_budget(5) == MIN_STARVE_BUDGET
+    assert starve_budget(10) == MIN_STARVE_BUDGET
+    # Capped, so a long one cannot stall forever.
+    assert starve_budget(50) == MAX_STARVE_BUDGET
+    assert starve_budget(99) == MAX_STARVE_BUDGET
+
+
+def test_steps_until_starve_counts_down_to_zero_at_the_budget():
+    """The game rule reads this directly, so the boundary is the behaviour that matters."""
+    assert steps_until_starve(0, 0, 20) == 200
+    assert steps_until_starve(50, 0, 20) == 150
+    assert steps_until_starve(199, 0, 20) == 1     # alive
+    assert steps_until_starve(200, 0, 20) == 0     # Snake.step() starves at <= 0
+    assert steps_until_starve(201, 0, 20) == -1
+    # Counted from the last food, not the start of the episode.
+    assert steps_until_starve(1000, 950, 20) == 150
+
+
+def test_starve_rule_boundary_is_unchanged_by_the_rescale():
+    """Guards the split: the observation was rescaled, the rule must not move.
+
+    The old code returned `[log2plus1(budget - elapsed)]` and Snake.step() starved on `[0] <= 0`.
+    log2plus1(x) <= 0 exactly when x <= 0, so an int return has to starve on the same step.
+    """
+    for snake_len in (5, 10, 23, 50, 99):
+        budget = starve_budget(snake_len)
+        for elapsed in range(budget - 2, budget + 2):
+            new_rule = steps_until_starve(elapsed, 0, snake_len) <= 0
+            old_rule = log2plus1(max(0, budget - elapsed)) <= 0
+            assert new_rule == old_rule, (snake_len, elapsed)
+
+
+def test_length_is_visible_past_fifty_segments():
+    """The bug this replaced: every length from 50 up produced one identical value.
+
+    The starve budget caps at MAX_STARVE_BUDGET, so `log2plus1(budget - elapsed)` was the same
+    number for lengths 50 through 99 at equal elapsed steps - no length information at all for
+    the whole second half of a game, which is where games are decided.
+    """
+    late = [tuple(starve_and_length_obs(0, 0, n)) for n in range(50, 100)]
+    assert len(set(late)) == len(late)
+    # The starve half is still identical up there, by design: the budget really is capped. It is
+    # the length half that separates them.
+    assert len({obs[0] for obs in late}) == 1
+    assert len({obs[1] for obs in late}) == len(late)
+    # And it is monotone, so "longer" is a direction the network can follow.
+    assert [obs[1] for obs in late] == sorted(obs[1] for obs in late)
+
+
+def test_starve_and_length_obs_stay_within_zero_and_one():
+    """Scale was the other half of the problem: this input used to reach 8.97."""
+    values = []
+    for snake_len in range(1, PERFECT_SCORE + 1):
+        budget = starve_budget(snake_len)
+        for elapsed in (0, 1, budget // 2, budget - 1, budget, budget + 5):
+            values.extend(starve_and_length_obs(elapsed, 0, snake_len))
+    assert min(values) >= 0.0
+    assert max(values) <= 1.0
+    # Both ends are actually reached, so the range is used rather than merely respected.
+    assert max(values) == 1.0
+    assert min(values) == 0.0
+
+
+def test_starve_obs_is_the_same_value_for_the_same_steps_remaining():
+    """Scaled by the maximum budget, not by each snake's own, so the units stay comparable.
+
+    100 steps left means the same number whether the snake is short or long; that is what lets
+    the network read urgency off one input instead of combining two.
+    """
+    short = starve_and_length_obs(starve_budget(15) - 100, 0, 15)[0]
+    long_ = starve_and_length_obs(starve_budget(80) - 100, 0, 80)[0]
+    assert short == long_
+
+
 # =============================== body_and_wall_collisions tests ===============================
 def test_bw_left_wall():
     grid = np.array([[4, 4, 4, 4, 4, 4, 4],

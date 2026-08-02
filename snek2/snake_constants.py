@@ -28,7 +28,13 @@ PERFECT_GAME_WAIT_MS = 500
 # one that reached 30% perfect games had max(avg_score, trailing) of at least 49.8.
 global MIN_CHECKPOINT_SCORE
 MIN_CHECKPOINT_SCORE = 40.0
+# Steps the snake may go without food: 10 per segment, floored at 100 so a short snake can cross
+# the board, capped at 500 so a long one cannot stall forever. The floor and the cap were inline
+# magic numbers inside steps_until_starve(); naming them matters because the cap is what made the
+# old starve observation go flat for every length from 50 up.
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
+MIN_STARVE_BUDGET = 100
+MAX_STARVE_BUDGET = 500
 
 # Pixels per tile, and so the window size: the board is 10x10 tiles, so the historical 10
 # gives a 100x100 window. That is small enough that macOS shows none of the title bar text,
