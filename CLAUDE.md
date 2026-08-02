@@ -246,6 +246,24 @@ any pygame import as a second line of defence.
 If a future change needs another subsystem, init that subsystem by name. Measure with
 `ps -o %cpu= -p $(pgrep -x coreaudiod)` while workers run; it should read 0.0.
 
+## Rendering is off by default — it was the slowest thing in the project
+
+Both the eval script and training used to draw a real game window, and that window cost
+~37x a headless step (6050us against 163us). Because `ParallelPyEnvironment` steps every
+worker together and waits for the slowest, one rendering worker paced all ten. Turning it
+off made a 30-episode eval **5x** faster and cut training-to-10k-steps from 83s to 56s,
+with the gap widening as a policy improves and its episodes get longer.
+
+- `EVAL_RENDER=1` — window back in `eval_checkpoints.py` (worker 0 only)
+- `SNEK_DISPLAY_EVAL=1` — window back for training's eval episode
+
+Neither affects results: `render()` only draws and returns immediately when `display=False`.
+Use them when you actually want to watch a game, not for a close-out or an unattended arm.
+
+**When something here seems slow, profile the critical path rather than the hot-looking
+code.** A 11x speedup of the observation code and a 6.8x speedup of policy inference both
+moved eval wall clock by approximately nothing, because neither was the slowest worker.
+
 ## Active development
 
 `snek2/` is the only directory that should be edited going forward. It's a

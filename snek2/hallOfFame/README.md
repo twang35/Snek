@@ -55,25 +55,32 @@ conda activate snek
 mkdir -p savedPolicies/champion
 cp hallOfFame/b8f-disc9975seed2-ckpt2816000/* savedPolicies/champion/
 
-PYTHONPATH=. python -u eval_checkpoints.py champion 2816000
+EVAL_RENDER=1 PYTHONPATH=. python -u eval_checkpoints.py champion 2816000
 ```
 
-**Worker 0 renders a visible window**, so this opens a game and plays it while the other nine
-workers run headless. Watching one game is the point of running this by hand.
+**`EVAL_RENDER=1` is what opens the window** — worker 0 renders a game while the other nine
+run headless. Watching one game is the point of running this by hand, so leave it on here.
+Without it every worker is headless and you get numbers and no window.
+
+Rendering is off by default because it is the slowest thing in an eval: 163us per game step
+headless against 6050us in a real window, and since all workers step together the rendering
+one paces the whole round. A 30-episode eval takes 14s headless and 70s with the window.
+That is the right trade for an unattended close-out and the wrong one for watching a game.
 
 Useful environment variables:
 
 | variable | default | effect |
 |---|---|---|
 | `EVAL_EPISODES` | 100 | episodes to measure, rounded up to whole rounds |
-| `EVAL_WORKERS` | 10 | parallel envs; `1` gives a single visible game and nothing else |
+| `EVAL_WORKERS` | 10 | parallel envs; `1` with `EVAL_RENDER=1` gives a single visible game |
+| `EVAL_RENDER` | 0 | `1` shows a game in a window, at ~5x the wall clock |
 | `EVAL_PERFECT_WAIT_MS` | 400 | pause on a win — raise to ~2000 to actually see it |
 | `EVAL_OUT_SUFFIX` | none | appended to the output filename |
 
 To just watch one game end to end, with a visible pause on the win:
 
 ```
-EVAL_EPISODES=1 EVAL_WORKERS=1 EVAL_PERFECT_WAIT_MS=2000 \
+EVAL_RENDER=1 EVAL_EPISODES=1 EVAL_WORKERS=1 EVAL_PERFECT_WAIT_MS=2000 \
   PYTHONPATH=. python -u eval_checkpoints.py champion 2816000
 ```
 

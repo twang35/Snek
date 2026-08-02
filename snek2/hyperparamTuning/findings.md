@@ -1095,6 +1095,37 @@ are written.
 - **It used to freeze for seconds at a time.** The 5000ms blocking wait above, during which
   no `pygame.event.pump()` runs, so macOS marks the window unresponsive.
 
+## Speed pass 2026-08-01: rendering was the bottleneck, not the code
+
+Profiled and fixed in order of measured cost. Everything below is behaviour-preserving —
+observations and rewards are byte-identical across 7,976 records of fixed-seed play, and the
+9 live tests still pass.
+
+| what | before | after | on the real workload |
+|---|---|---|---|
+| **Eval window** (worker 0 rendered) | 6050 us/step | 163 us/step | 30-ep eval **70.1s → 14.0s (5.0x)** |
+| **Training eval window** (every eval) | 11.56s/episode | 1.71s/episode | 10k steps **83s → 56s**, widening with skill |
+| `get_pos` used `np.add` on int pairs | 8.3M calls, 11.7s | 190k calls, 0.03s | game+obs **1791 → 161 us/step (11.1x)** |
+| Flood fill recursed and re-checked `is_open` | 2.0M redundant numpy lookups | iterative, no re-check | included above |
+| Eval inference ran eager | 1421 us/call | 208 us/call (6.8x) | ~0 end to end (not the bottleneck) |
+| `copy.deepcopy` on the grid | 0.056s | `.copy()` | negligible, 0.3% of profile |
+
+**The lesson is the ordering.** Two optimizations that looked large in isolation — 11.1x on
+the observation path and 6.8x on inference — moved the eval wall clock by roughly nothing,
+because `ParallelPyEnvironment` steps every worker together and waits for the slowest, and
+the slowest was the one drawing a window at 37x the cost of a headless step. Profile the
+critical path, not the code that looks hot.
+
+Both windows are now off by default and restored with `EVAL_RENDER=1` and
+`SNEK_DISPLAY_EVAL=1`. Neither can affect results: `render()` only draws, and returns
+immediately when `display=False`.
+
+**Still open, and deliberately not done:** `group_obs` runs a full-board flood fill three
+times per observation, once per candidate action, and that is now ~84% of what remains of
+observation cost. It is not worth attacking — after the render fix the whole game+observation
+path is ~10% of a single-process step, so even an infinitely fast environment buys ~10%. The
+bottleneck is TF inference now.
+
 ## Engineering facts worth not rediscovering
 
 - **Importance-sampling weights must stay mean-normalized.** cpprb normalizes by the

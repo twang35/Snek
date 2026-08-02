@@ -5,6 +5,11 @@ import numpy as np
 
 from snake_constants import *
 
+# The four neighbour offsets, in DIRECTIONS order so the flood fill visits cells in the same
+# order it always did. Precomputed because the inner loop used to re-read MOVE_VECTORS by
+# direction name on every cell.
+NEIGHBOUR_OFFSETS = tuple(MOVE_VECTORS[direction] for direction in DIRECTIONS)
+
 
 def get_observations(old_grid,
                      head_pos,
@@ -98,7 +103,10 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
 def group_obs(old_grid, head_pos, tail_pos, head_move_dir):
     observations = []
     for action in ACTIONS:
-        grid = update_grid(action, head_pos, tail_pos, copy.deepcopy(old_grid), head_move_dir)
+        # .copy() rather than copy.deepcopy(): an ndarray copy is already independent, and
+        # deepcopy walks the object graph to reach the same result. Worth almost nothing on
+        # its own (0.3% of the profile) but there is no reason to pay it.
+        grid = update_grid(action, head_pos, tail_pos, old_grid.copy(), head_move_dir)
         new_head_pos = get_relative_pos(action, head_pos, head_move_dir)
 
         groups = count_groups(grid)
@@ -134,10 +142,14 @@ def count_groups(grid):
     groups = []
 
     # don't need to check the boundaries which are always value 4
+    # Read the whole array out once. Indexing a numpy array cell by cell costs far more per
+    # lookup than indexing nested lists, and this scan covers the full board on every call.
+    cells = grid.tolist()
     for i in range(grid.shape[1] - 2):
         for j in range(grid.shape[0] - 2):
             # if is 0 or 1, add to remaining_spaces.
-            if is_open((i, j), grid):
+            value = cells[j + 1][i + 1]
+            if value == 0 or value == 1:
                 remaining_spaces.add((i, j))
 
     # for each grid element, recurse and try to connect
@@ -149,15 +161,28 @@ def count_groups(grid):
 
 
 def populate_group(group_set, tile_pos, grid, remaining_spaces):
+    """Flood-fills the connected group containing tile_pos, consuming remaining_spaces.
+
+    Iterative rather than recursive: an open board is one ~100-cell region, so the recursive
+    form spent a Python call frame per cell and came within sight of the recursion limit.
+
+    The `is_open()` re-check it used to do was redundant — remaining_spaces is built from
+    exactly the open cells, so membership already implies openness. That check alone was
+    ~2M calls per 8k steps, each one a numpy lookup.
+    """
+    stack = [tile_pos]
     group_set.add((tile_pos[0], tile_pos[1]))
 
-    for direction in DIRECTIONS:
-        new_tile_pos = get_pos(direction, tile_pos)
-        pos_tuple = (new_tile_pos[0], new_tile_pos[1])
-
-        if pos_tuple in remaining_spaces and is_open(new_tile_pos, grid):
-            remaining_spaces.remove(pos_tuple)
-            populate_group(group_set, new_tile_pos, grid, remaining_spaces)
+    while stack:
+        pos = stack.pop()
+        x = pos[0]
+        y = pos[1]
+        for offset in NEIGHBOUR_OFFSETS:
+            neighbour = (x + offset[0], y + offset[1])
+            if neighbour in remaining_spaces:
+                remaining_spaces.remove(neighbour)
+                group_set.add(neighbour)
+                stack.append(neighbour)
 
 
 def is_open(tile_pos, grid):
@@ -233,8 +258,15 @@ def get_grid_value(tile_pos, grid):
 
 
 def get_pos(direction, tile_pos):
-    return tuple(np.add(tile_pos, MOVE_VECTORS[direction]))
+    # Plain tuple arithmetic. This was `tuple(np.add(tile_pos, MOVE_VECTORS[direction]))`,
+    # which dispatched into numpy to add two pairs of small ints and then rebuilt a tuple
+    # from the result. The flood fill calls this four times per cell visited, so it ran
+    # 8.3M times per 8k game steps and was 68% of the entire observation cost — a bigger
+    # share than everything else in state_helpers put together.
+    vector = MOVE_VECTORS[direction]
+    return tile_pos[0] + vector[0], tile_pos[1] + vector[1]
 
 
 def get_relative_pos(action, tile_pos, move_dir):
-    return tuple(np.add(tile_pos, MOVE_VECTORS[CURRENT_DIRECTION_MAPS[move_dir][action]]))
+    vector = MOVE_VECTORS[CURRENT_DIRECTION_MAPS[move_dir][action]]
+    return tile_pos[0] + vector[0], tile_pos[1] + vector[1]

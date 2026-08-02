@@ -1,0 +1,32 @@
+{
+  "policy_name": "champion",
+  "episodes_per_checkpoint": 2,
+  "checkpoints_requested": 1,
+  "complete": true,
+  "requested_steps": [
+    2816000
+  ],
+  "in_flight": null,
+  "updated_at": 1785643952.252773,
+  "results": [
+    {
+      "step": 2816000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 2,
+      "perfect_games": 2,
+      "perfect_percent": 100.0,
+      "perfect_ci95": [
+        34.2,
+        100.0
+      ],
+      "avg_score": 95.0,
+      "median_score": 95.0,
+      "min_score": 95.0,
+      "max_score": 95.0,
+      "avg_reward": 192.88,
+      "seconds": 17.8
+    }
+  ]
+}

@@ -54,11 +54,18 @@ Environment:
     EVAL_WORKERS      parallel envs inside this process (default 10)
     EVAL_OUT_SUFFIX   appended to the output filename
     EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
-                      (default 400; the game default of 5000 stalls the whole round)
+                      (default 400; the game default stalls the whole round)
+    EVAL_RENDER       1 to show a game in a window (default 0, all workers headless)
 
-**Worker 0 renders a visible window**, so each eval process shows one game as it
-plays; the remaining workers are headless. Running four checkpoints in parallel
-therefore gives four windows to watch.
+**All workers are headless by default.** Rendering is the most expensive thing in an
+eval by a wide margin — 163us per game step headless against 6050us in a real window —
+and because ParallelPyEnvironment steps every worker together and waits for the slowest,
+a single rendering worker paced all ten while the other nine idled. Turning it off made a
+30-episode eval 5x faster (70.1s -> 14.0s). It cannot affect the numbers: render() only
+draws, and with display=False it returns before doing even that.
+
+**`EVAL_RENDER=1` puts the window back**, on worker 0 only, which is what you want when
+watching a policy by hand. Running four checkpoints in parallel then gives four windows.
 
 Two things about that window look like bugs and are not. Both are cosmetic: the
 recorded results are unaffected, because only each worker's *first* episode of a
@@ -71,11 +78,11 @@ round is counted.
    throwaway episode when the round ends, and the process exits after the last
    checkpoint, closing the window at whatever point it had reached.
 
-2. **It used to freeze for ~5s at a time.** snake_constants.PERFECT_GAME_WAIT_MS
-   defaults to 5000 so a human can see a win, and Snake.render() implements it with a
+2. **It used to freeze for seconds at a time.** snake_constants.PERFECT_GAME_WAIT_MS
+   pauses on a win so a human can see it, and Snake.render() implements it with a
    blocking pygame.time.wait(). In an eval that blocks the whole round — every other
    worker waits on the parallel step — and with no event pumping during the wait macOS
-   marks the window unresponsive. This script now sets it to EVAL_PERFECT_WAIT_MS
+   marks the window unresponsive. This script overrides it with EVAL_PERFECT_WAIT_MS
    (default 400ms) so wins are still visible without stalling.
 
 Results go to runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and
@@ -129,7 +136,7 @@ def wilson_interval(successes, trials, z=1.96):
     return max(0.0, centre - spread), min(1.0, centre + spread)
 
 
-def run_round(parallel_env, policy, worker_envs):
+def run_round(parallel_env, policy_action, worker_envs):
     """One episode per worker, every worker run to completion.
 
     Deliberately *not* "collect N finished episodes and stop": stopping mid-flight
@@ -147,7 +154,7 @@ def run_round(parallel_env, policy, worker_envs):
 
     time_step = parallel_env.reset()
     while not np.all(done):
-        action_step = policy.action(time_step)
+        action_step = policy_action(time_step)
         time_step = parallel_env.step(action_step.action)
         step_rewards = time_step.reward.numpy()
         is_last = time_step.is_last().numpy()
@@ -170,7 +177,7 @@ def run_round(parallel_env, policy, worker_envs):
     return scores.tolist(), perfect.tolist(), rewards.tolist(), steps
 
 
-def evaluate(parallel_env, policy, num_episodes, on_round=None):
+def evaluate(parallel_env, policy_action, num_episodes, on_round=None):
     """Collects at least num_episodes, in whole rounds of one episode per worker.
 
     `on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round_perfect)`
@@ -188,7 +195,7 @@ def evaluate(parallel_env, policy, num_episodes, on_round=None):
     start = time.time()
     for index in range(rounds):
         round_scores, round_perfect, round_rewards, round_steps = run_round(
-            parallel_env, policy, worker_envs)
+            parallel_env, policy_action, worker_envs)
         scores.extend(round_scores)
         perfect_flags.extend(round_perfect)
         rewards.extend(round_rewards)
@@ -408,6 +415,13 @@ def main(argv):
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     num_workers = int(os.environ.get('EVAL_WORKERS', 10))
     perfect_wait_ms = int(os.environ.get('EVAL_PERFECT_WAIT_MS', 400))
+    # Rendering is off by default because it was the single slowest thing in an eval, by a
+    # wide margin. Measured per game step: 163us headless, 2449us with display=True on the
+    # dummy driver, 6050us in a real window. ParallelPyEnvironment steps every worker
+    # together and does not return until the slowest finishes, so one rendering worker set
+    # the pace for all ten while the other nine idled — a ~37x penalty on the critical path.
+    # EVAL_RENDER=1 brings the window back for watching a game by hand.
+    render_worker = os.environ.get('EVAL_RENDER', '0') not in ('0', '', 'false', 'False')
 
     ckpt_dir = POLICY_DIR + policy_name
     available = {int(f[len('ckpt-'):].split('.')[0])
@@ -475,16 +489,30 @@ def main(argv):
         snake_constants.PERFECT_GAME_WAIT_MS = perfect_wait_ms
         return SnakeEnvironment(discount=0.99, display=True, policy_name=policy_name)
 
-    # Worker 0 renders; the rest are headless. A rendering worker is slower, which
-    # only means it and its round-mates take a little longer — episodes are i.i.d.
-    # across workers, so which worker produced one carries no information.
-    constructors = [make_visible_worker] + [make_headless_worker] * (num_workers - 1)
+    # All headless unless EVAL_RENDER=1, in which case worker 0 renders. Episodes are i.i.d.
+    # across workers, so which worker produced one carries no information either way — the
+    # window is purely for watching, and it costs ~37x on the critical path (see EVAL_RENDER
+    # above), so a close-out nobody is watching should not pay for it.
+    if render_worker:
+        constructors = [make_visible_worker] + [make_headless_worker] * (num_workers - 1)
+    else:
+        constructors = [make_headless_worker] * num_workers
     parallel_env = tf_py_environment.TFPyEnvironment(
         parallel_py_environment.ParallelPyEnvironment(constructors))
 
     # Mirrors the keys common.Checkpointer uses in snek2.py, so a specific
     # ckpt-<step> can be restored instead of only the latest.
     checkpoint = tf.train.Checkpoint(agent=agent, policy=agent.policy, global_step=global_step)
+
+    # Run inference inside a tf.function instead of eager. Training already does this for its
+    # collect policy (PyTFEagerPolicy(..., use_tf_function=True) in snek2.py) but this script
+    # called agent.policy.action() directly, paying full eager dispatch on every step of every
+    # episode. For this network, batched across 10 workers, that is 1421us per call eager
+    # against 208us wrapped — 6.8x — for byte-identical actions.
+    #
+    # Traced once and reused across every checkpoint: restoring new weights writes into the
+    # same variables, so it does not force a retrace.
+    policy_action = common.function(agent.policy.action)
 
     suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
     out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
@@ -543,7 +571,7 @@ def main(argv):
             })
 
         scores, perfect_flags, rewards, elapsed = evaluate(
-            parallel_env, agent.policy, num_episodes, on_round=on_round)
+            parallel_env, policy_action, num_episodes, on_round=on_round)
         perfect = sum(perfect_flags)
         low, high = wilson_interval(perfect, len(scores))
         meta = selected_by.get(step, {'selected_by': 'explicit'})
