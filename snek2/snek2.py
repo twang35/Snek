@@ -81,26 +81,16 @@ def main(argv):
     # exploration forever. See hyperparamTuning/runs.md.
     min_epsilon = tuned('MIN_EPSILON', 0.0)
 
-    display_training = snake_constants.DISPLAY_TRAINING
-
-    # See snake_constants.DISPLAY_EVAL for why this is off by default and what it costs.
-    # compute_avg_return() reads the same constant, so both ends agree.
-    display_eval = snake_constants.DISPLAY_EVAL
-    # eval_limit_fps = True
-    eval_limit_fps = False
-
-    # Nothing here will draw unless one of those is on, but Game.__init__ calls
-    # pygame.display.set_mode() regardless, and reset() blits the background and flips. So
-    # without the dummy driver this process opened a real window, painted it white once, and
-    # then never touched it again, because render() returns early when display is off. An empty
-    # white square looks like a broken window rather than a disabled one.
+    # Training never draws — use watch.py to see a policy play. Game.__init__ still calls
+    # pygame.display.set_mode() regardless of its display flag, and reset() blits the
+    # background and flips, so without the dummy driver this process would open a real window,
+    # paint it white once and never touch it again. An empty white square looks like a broken
+    # window rather than an absent one, which is exactly the bug this replaced.
     #
-    # The parallel eval workers already select the dummy driver in their factory; the main
-    # process was the one left out. setdefault so an explicit SDL_VIDEODRIVER still wins, and
-    # inside main() rather than at import so that importing snek2 — which eval_checkpoints.py
-    # and watch.py both do, for build_q_net — cannot suppress *their* windows.
-    if not (display_eval or display_training):
-        _os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    # setdefault so an explicit SDL_VIDEODRIVER still wins, and inside main() rather than at
+    # import so that importing snek2 — which eval_checkpoints.py and watch.py both do, for
+    # build_q_net — cannot suppress *their* windows.
+    _os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 
     eval_only = False
     # eval_only = True
@@ -143,13 +133,6 @@ def main(argv):
     if len(argv) > 1:
         policy_name = argv[1]
 
-    # Snake.render() celebrates a perfect game with a *blocking* pygame.time.wait(), and the
-    # game default is 5000ms. Every eval runs its first episode on the displayed env, so at
-    # 5000ms an arm that wins ~40% of the time lost ~2s per eval — every 1000 steps, against
-    # ~5s of actual training. That penalised exactly the arms worth running and inflated the
-    # apparent step-count gap between good and dead arms. 500ms still shows the win.
-    snake_constants.PERFECT_GAME_WAIT_MS = tuned('PERFECT_WAIT_MS', 500, int)
-
     # Checkpoints below this average score are not written. max_to_keep is a rolling window,
     # so a dead arm that keeps training evicts the good checkpoints behind it: b8d-disc995clip
     # reached 11.64M steps with its last 4.5M at trailing ~1, hit the 10000 cap, and deleted
@@ -182,28 +165,21 @@ def main(argv):
         tf.config.experimental.set_virtual_device_configuration(
             gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=500)])
 
-    train_py_env = SnakeEnvironment(discount=discount, display=display_training, policy_name=policy_name)
-    eval_py_env = SnakeEnvironment(discount=discount, display=display_eval, limit_fps=eval_limit_fps,
-                                   policy_name=policy_name)
-
+    train_py_env = SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
     train_py_env.reset()
-    eval_py_env.reset()
-
     train_env = tf_py_environment.TFPyEnvironment(train_py_env)
-    eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 
-    # Beyond the first (displayed) eval episode, the rest run headless in
-    # parallel worker processes to speed up eval.
-    num_parallel_eval_envs = num_eval_episodes - 1
-    eval_parallel_env = None
-    if num_parallel_eval_envs > 0:
-        def make_headless_eval_env():
-            os.environ['SDL_VIDEODRIVER'] = 'dummy'
-            return SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
+    # Every eval episode runs in parallel, one per worker. There used to be a second
+    # environment here whose only job was to play the first episode by itself so it could be
+    # drawn in a window; watch.py renders instead, so the environment, the serial episode and
+    # the display switches are all gone. Worth ~24% of an eval — see compute_avg_return().
+    def make_headless_eval_env():
+        os.environ['SDL_VIDEODRIVER'] = 'dummy'
+        return SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
 
-        eval_parallel_env = tf_py_environment.TFPyEnvironment(
-            parallel_py_environment.ParallelPyEnvironment(
-                [make_headless_eval_env] * num_parallel_eval_envs))
+    eval_parallel_env = tf_py_environment.TFPyEnvironment(
+        parallel_py_environment.ParallelPyEnvironment(
+            [make_headless_eval_env] * num_eval_episodes))
 
     # fc_layer_params = (100, 50)
     fc_layer_params = tuned('FC_LAYERS', (50, 100, 50),
@@ -333,11 +309,10 @@ def main(argv):
         'FOOD_REWARD': FOOD_REWARD,
         'FOOD_DISTANCE_REWARD': FOOD_DISTANCE_REWARD,
         'eval_only': eval_only,
-        'perfect_game_wait_ms': snake_constants.PERFECT_GAME_WAIT_MS,
         'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }
 
-    train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+    train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
           run_config, priority_signal, use_is_weights)
 

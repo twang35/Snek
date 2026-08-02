@@ -1117,10 +1117,37 @@ because `ParallelPyEnvironment` steps every worker together and waits for the sl
 the slowest was the one drawing a window at 37x the cost of a headless step. Profile the
 critical path, not the code that looks hot.
 
-Both windows are now off by default and restored with `EVAL_RENDER=1` and
-`SNEK_DISPLAY_EVAL=1`. Neither can affect results: `render()` only draws, and returns
-immediately when `display=False`. Use `watch.py` to see a game instead — it renders in its
-own process, follows the newest checkpoint of a live arm, and costs training nothing.
+**Training can no longer draw at all**, and `SNEK_DISPLAY_EVAL` is gone with the environment
+it controlled — see the section below. `eval_checkpoints.py` keeps `EVAL_RENDER=1`; that and
+`watch.py`, which renders in its own process and follows a live arm's newest checkpoint, are
+the only ways to see a game.
+
+#### Deleting the display path made every eval episode parallel
+
+Training used to play the first of its ten eval episodes alone, on a second environment in the
+main process, because pygame allows one display per process and the workers are separate
+processes — so that was the only episode that *could* be drawn. Nothing else used it. Once
+watching moved to `watch.py` the constraint was gone, and with it the serial episode, the extra
+environment, and both display switches.
+
+| eval shape | per eval, champion skill |
+|---|---|
+| 1 serial + 9 parallel | 5.95s (1.67s serial + 4.28s round) |
+| **10 parallel** | **4.55s** |
+
+**~24% of an eval**, 3 reps each with a tight spread. The tenth worker costs only ~0.27s: a
+round ends with its slowest episode, and slowest-of-ten is barely worse than slowest-of-nine.
+Statistically unchanged — still ten independent greedy episodes, and the round already counted
+only each worker's first.
+
+End to end on four arms it measured 588 → 675 steps/s (+15%) at 32-46k steps, but treat that
+loosely: arm ranges overlap and these 4-arm benchmarks vary ~8% run to run, which is why the
+isolated per-eval figure is the one to quote. Early training also understates it, because short
+episodes make the serial episode cheap.
+
+**This is the third thing that only existed because of the window** — after the eval script's
+lockstep visible worker and training's per-eval render cost. Turning rendering off did not just
+save its own cost, it invalidated a chunk of surrounding design.
 
 #### Two corrections to the first version of this section
 

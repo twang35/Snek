@@ -55,39 +55,30 @@ def build_q_net(num_actions, fc_layer_params=None):
     return sequential.Sequential(dense_layers + [q_values_layer])
 
 
-def compute_avg_return(environment, parallel_environment, policy, metrics, eval_only, num_episodes=10):
+def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_episodes=10):
+    """Runs num_episodes greedy episodes, one per worker, and folds them into metrics.
+
+    Every episode runs in parallel. This used to play the first episode by itself on a
+    separate single environment in the main process, because that was the only episode that
+    could be drawn in a window — pygame allows one display per process and the workers are
+    separate processes. Watching moved to watch.py, so the reason went away and with it the
+    whole serial path, the extra environment and the display switch.
+
+    Flattening it is worth about 24% of an eval: at champion skill the split shape measured
+    5.95s (1.67s serial + 4.28s round) against 4.55s for a single round of 10. Adding the
+    tenth worker costs only ~0.27s, because a round ends with its slowest episode and the
+    slowest of ten is barely worse than the slowest of nine.
+
+    Statistically unchanged: still num_episodes independent greedy episodes, and
+    run_parallel_eval_episodes already counts only each worker's first episode.
+    """
     start_time = time.time()
-    total_steps = 0
 
-    # First episode runs alone on the single environment, and is the only one that can be
-    # displayed. This used to force set_display(True) unconditionally, which overrode
-    # SNEK_DISPLAY_EVAL and made it a no-op — the window was always drawn.
-    py_env = environment.pyenv
-    if hasattr(py_env, 'envs'):
-        py_env = py_env.envs[0]
-    py_env.set_display(snake_constants.DISPLAY_EVAL)
-
-    time_step = environment.reset()
-    episode_reward = 0.0
-    while not time_step.is_last():
-        action_step = policy.action(time_step)
-        time_step = environment.step(action_step.action)
-        episode_reward += time_step.reward.numpy()[0]
-        total_steps += 1
-
-    episode_rewards = [episode_reward]
-    episode_scores = [py_env.get_score()]
-    last_rewards = [time_step.reward.numpy()[0]]
-
-    # remaining episodes: run in parallel, headless
-    num_parallel = num_episodes - 1
-    if num_parallel > 0 and parallel_environment is not None:
-        parallel_rewards, parallel_scores, parallel_last_rewards, parallel_steps = run_parallel_eval_episodes(
-            parallel_environment, policy, num_parallel)
-        episode_rewards.extend(parallel_rewards.tolist())
-        episode_scores.extend(parallel_scores.tolist())
-        last_rewards.extend(parallel_last_rewards.tolist())
-        total_steps += parallel_steps
+    rewards, scores, last_rewards_array, total_steps = run_parallel_eval_episodes(
+        parallel_environment, policy, num_episodes)
+    episode_rewards = rewards.tolist()
+    episode_scores = scores.tolist()
+    last_rewards = last_rewards_array.tolist()
 
     for episode_reward in episode_rewards:
         if metrics.min_reward > episode_reward:

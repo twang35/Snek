@@ -8,22 +8,6 @@ import pygame
 # live in the game and environment classes, which run in separate worker processes.
 DEBUG_LOGGING = os.environ.get('SNEK_DEBUG', '0') not in ('0', '', 'false', 'False')
 
-# Whether training draws one eval episode in a window. Off by default: the game flips the
-# display once per game step, and a flip costs ~5.2ms against ~2us for everything else
-# render() does, so a 2000-step episode spends ~11.6s in the window server against 1.7s
-# headless — every eval, i.e. every 1000 training steps, and worse as the policy improves and
-# plays longer. Use watch.py to see a game instead; it renders in its own process and costs
-# training nothing.
-#
-# Read here rather than in snek2.py because compute_avg_return() forces the display on at the
-# start of every eval and has to consult the same switch. It used to hardcode set_display(True),
-# which silently overrode the setting.
-DISPLAY_EVAL = os.environ.get('SNEK_DISPLAY_EVAL', '0') not in ('0', '', 'false', 'False')
-
-# The same switch for the training environment itself. Off by default and rarely wanted: it
-# draws every collect step rather than one episode per eval, so it is far more expensive again.
-DISPLAY_TRAINING = os.environ.get('SNEK_DISPLAY_TRAINING', '0') not in ('0', '', 'false', 'False')
-
 # screen that game appears on 0 or 1
 SCREEN_TO_DISPLAY = 0
 

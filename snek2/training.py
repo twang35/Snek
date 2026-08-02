@@ -37,7 +37,7 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
 
-def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
           run_config, priority_signal='td_error', use_is_weights=True):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
@@ -68,7 +68,7 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
             training_metrics.resume_steps.append(int(initial_step))
             training_metrics.resume_steps.sort()
 
-    avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, training_metrics,
+    avg_reward, avg_score = compute_avg_return(eval_parallel_env, agent.policy, training_metrics,
                                                eval_only, num_eval_episodes)
     merge_eval_row(training_metrics.eval_rows,
                    build_eval_row(int(initial_step), avg_score, avg_score, avg_reward, training_metrics, epsilon))
@@ -103,7 +103,7 @@ def train(num_iterations, eval_env, eval_parallel_env, train_py_env, agent, coll
             replay_buffer.update_priorities(indexes, signal.numpy())
 
         step += 1
-        log_messages_and_eval(training_metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen,
+        log_messages_and_eval(training_metrics, loss_info, eval_parallel_env, agent, train_py_env, screen,
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
                               replay_buffer_dir, global_step, epsilon, min_epsilon, step, eval_only, initial_step,
                               policy_name, run_config)
@@ -162,7 +162,7 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
     }
 
 
-def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent, train_py_env, screen, graph_path,
+def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
                           global_step, epsilon, min_epsilon, step, eval_only, initial_step, policy_name, run_config):
     debug = snake_constants.DEBUG_LOGGING
@@ -185,7 +185,7 @@ def log_messages_and_eval(metrics, loss_info, eval_env, eval_parallel_env, agent
             print('training time: ', get_time(metrics.training_start_time))
             print('train_py_env high score: ', train_py_env.high_score)
         metrics.eval_start_time = time.time()
-        avg_reward, avg_score = compute_avg_return(eval_env, eval_parallel_env, agent.policy, metrics, eval_only,
+        avg_reward, avg_score = compute_avg_return(eval_parallel_env, agent.policy, metrics, eval_only,
                                                    num_eval_episodes)
         if debug:
             print('eval time: ', get_time(metrics.eval_start_time))

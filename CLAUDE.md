@@ -305,26 +305,26 @@ It renders in its own process, reloads the newest checkpoint between episodes so
 progress shows up without a restart, and costs training nothing — it only reads checkpoint
 files. `WATCH_FPS` caps the frame rate (default 90; drop to 20-30 to follow the moves).
 
-The in-run switches still exist for debugging, and all are off by default:
+**Training cannot draw at all — there is no switch.** `SNEK_DISPLAY_EVAL` and
+`SNEK_DISPLAY_TRAINING` are gone, along with the second environment that existed only to play
+one eval episode where it could be drawn. `snek2.main()` selects `SDL_VIDEODRIVER=dummy`
+unconditionally. `eval_checkpoints.py` keeps `EVAL_RENDER=1` for debugging a policy by hand
+(worker 0 only, ~5x the wall clock), and that plus `watch.py` are the only ways to see a game.
 
-- `EVAL_RENDER=1` — window in `eval_checkpoints.py` (worker 0 only), ~5x the wall clock
-- `SNEK_DISPLAY_EVAL=1` — window for training's one displayed eval episode
-- `SNEK_DISPLAY_TRAINING=1` — window for the *collect* loop, which draws every training step
-  rather than one episode per eval, so it is far more expensive again
-
-None of them affect results: `render()` only draws and returns immediately when
-`display=False`.
+Removing the display path made every eval episode parallel, which is worth ~24% of an eval:
+at champion skill the old split shape measured 5.95s (1.67s serial + 4.28s round) against
+4.55s for one round of ten. The tenth worker costs ~0.27s, because a round ends with its
+slowest episode and slowest-of-ten is barely worse than slowest-of-nine.
 
 **A process that will not draw must select the dummy video driver, not merely skip
 drawing.** `Game.__init__` calls `pygame.display.set_mode()` unconditionally and `reset()`
 blits the background and flips, so a process with a real driver and `display=False` opens a
 window, paints it white once, and never touches it again. That looks like a broken window
-rather than a disabled one, and it is exactly what happened when training's default flipped to
-headless. `snek2.main()` now sets `SDL_VIDEODRIVER=dummy` unless a display switch is on.
+rather than an absent one, and it is exactly what happened when training's default first
+flipped to headless.
 
-Note it does that inside `main()`, not at import: `eval_checkpoints.py` and `watch.py` both
-import `snek2` for `build_q_net`, and an import-time `setdefault` would suppress *their*
-windows too.
+`main()` does that, not module scope: `eval_checkpoints.py` and `watch.py` both import
+`snek2` for `build_q_net`, and an import-time `setdefault` would suppress *their* windows too.
 
 **The two paths were slow for different reasons, and it matters.** In `eval_checkpoints.py`
 the visible worker sits *inside* the `ParallelPyEnvironment`, which steps every worker
