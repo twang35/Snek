@@ -19,7 +19,10 @@ it as evidence from that date, not as current state.
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
 | **Observations changed twice on 2026-08-02** — two more boundaries after the audit's | **breaking**, and the second changes the vector width |
-| **Earlier checkpoints load on `master` and play like beginners** — the width matches, the meanings changed; use `e4514a8` | **breaking**, and **silent** |
+| **Earlier checkpoints do not run on `master`** — the vector is 23 values against their 20; use `e4514a8` | **breaking** |
+| A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **measured**, and a standing hazard |
+| **Safe-to-chase-food added**: 1 when head, food and tail share one region after the move | **new** 2026-08-02, untested in training |
+| **Fatal moves now read zero on all three group values**, not a hypothetical survivor's answer | **fixed** 2026-08-02, was 1 on 5,289/14,642 body collisions |
 | **Terminal steps carried a non-zero discount**, so every episode's last transition bootstrapped off the terminal state | **fixed** 2026-08-02 |
 | The n-step falsification was measured with returns that leak across episode ends | **re-opened**, not overturned |
 | **Fixing `head_with_tail` moved the champion 80.0% → 90.3% with no retraining** | **measured**, 360 eps a side, intervals disjoint |
@@ -249,6 +252,69 @@ section is downgraded to open rather than reversed.
 **Also unmeasurable by transfer**, for a sharper reason than the starve change: this one alters
 what the agent is trained toward, not what it sees, so a policy already trained cannot show
 anything about it either way. It needs an arm.
+
+## Safe to chase the food, 2026-08-02: three values, and the vector is 23
+
+The fifth change of the day, and the first that *adds* a signal rather than fixing one. Per action,
+1 when the head, the food and the tail all land in **one** region after the move — a route to the
+food and a route back out. It fills the `head_with_food_obs` slot that `observation_spec` has had
+reserved and disabled since before the audit, with a stricter test than that slot was named for.
+
+The gap it closes: the food values say which way the food is, `head_with_tail` says an escape route
+exists, and nothing tied the two together, so a policy had no way to distinguish a reachable meal
+from one that seals it in. Relevant given that the food is sealed off from every legal move on
+**33.9% of late steps**.
+
+One region, not three reachable things. The head can neighbour two regions at once, and taking the
+food through one while the only escape is through the other is exactly the trap — so the test is
+`head_groups & tail_groups`, intersected with the region holding the food. Two special cases earn
+their keep, both caught by dedicated tests after a mutation check:
+
+| case | why it needs handling |
+|---|---|
+| the move eats | the food's cell becomes the head, belongs to no region, and would always read 0 — the move the flag exists to encourage |
+| the move follows the tail | no region test sees the tail from the cell it is vacating, so intersecting would veto a move that is safe by construction |
+
+Measured over 15,316 steps of heuristic play: the flag is 1 on **32.5%** of action slots, at least
+one action is chaseable on 43.2% of steps but only **20.6% of late steps**, and there were zero
+cases of it claiming safety where `head_with_tail` was 0. So it is informative rather than
+degenerate, and conservative exactly where the board is crowded.
+
+**It is free.** `get_observation()` costs 39.1 µs against 39.3 µs before the observation existed,
+because it is computed inside `group_obs` and shares the flood fill — which is ~46% of the cost of
+an observation and would otherwise have run three more times per step.
+
+Effect on the perfect rate is unmeasured and needs an arm, like the two changes above it.
+
+#### Fatal moves are zeroed, not hypothesised
+
+A follow-up the same day, after the user asked directly: for a move that runs into a wall or the
+snake's own body, what happens to `head_with_tail`, `lg(num_groups)` and safe-to-chase? Measured
+answer, before this fix — a wall move could never read 1 (an off-board cell's only on-board
+neighbour is the vacated head cell, which `update_grid` never clears, so no region test finds
+anything past it), but a **body** collision had no such accident protecting it: the new head cell
+is still on-board and can see whatever real regions sit beside it, so `head_with_tail` read 1 on
+**5,289 of 14,642** body-collision moves in a sweep of real games — a hypothetical answer about a
+snake that does not survive the move that produced it.
+
+`group_obs` now checks legality first, using the same test `body_and_wall_collisions` already
+makes — food, open, or the tail-follow special case — and short-circuits a fatal move to zero
+before running the flood fill at all, rather than computing what a survivor would have found.
+This is strictly safer than the accident it replaces: the wall case kept its existing zero, and the
+body case lost a number that was never meaningful.
+
+**It is also faster, not merely safer.** Skipping `count_groups` for every fatal action means the
+measured cost of `get_observation()` **dropped to 28.7 µs**, against the 39.1 µs the safe-to-chase
+addition itself had already been shown to add for free — a fatal move now costs nothing at all
+rather than a full flood fill whose answer got discarded.
+
+15 of 44 tests catch the exact regression of removing this gate, confirmed by mutation test: a
+version restored to "compute regardless of legality" fails a third of the suite. One persisted
+test covers walls specifically, built on a full-size board rather than a hand fixture, since the
+point is the real board's edges. The body-collision sweep — 14,642 moves, re-measured after the
+fix at zero non-zero flags, against 5,289 before it — was ad-hoc verification rather than a stored
+test, since the fixtures already updated for the eat/no-eat conditional cover that case by
+construction (every action they name as fatal now asserts `0`, not a hypothetical count).
 
 #### Rewards are now exact
 

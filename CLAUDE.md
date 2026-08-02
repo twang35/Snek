@@ -97,19 +97,26 @@ already destroyed evidence once (`b5c-schlongIS`'s 17.0% peak).
 worth keeping. Each is two files, ~190 KB. The README documents the copy-in-and-evaluate
 procedure; both commands in it were verified working when written.
 
-**Matching widths do not mean a checkpoint still works, and this bites hardest here.** A checkpoint
+**Matching widths do not mean a checkpoint still works, and this has already bitten.** A checkpoint
 restores whenever the vector is the same *length*; nothing checks that the values still mean what
-they meant. The observation changed three times on 2026-08-02 and ended back at 20 values, so every
-checkpoint in this folder loads on `master` without a warning and plays like a beginner — the
-2026-08-02 champion went from **90.3%** to scoring **0, 0, 1** over three episodes.
+they meant. The observation changed four times on 2026-08-02, and for part of that day it was
+coincidentally back at its original 20 values while two indices meant something different — so
+every hall-of-fame checkpoint restored with no warning and played like a beginner, the champion
+going from **90.3%** to scoring **0, 0, 1** over three episodes.
 
 An input that was constant is the specific trap: `game_over` sat at 0 in every state a policy acts
-in, so its weights were never constrained by anything, and index 19 now carries board-fill instead.
-Arbitrary weights times a live signal.
+in, so its weights were never constrained by anything, and the index it occupied now carries
+board-fill. Arbitrary weights times a live signal.
 
 So when the observation changes, **record which indices changed meaning in the hall of fame
 README, and name the last commit whose observation matches those checkpoints** (currently
-`e4514a8`). A width change at least fails loudly; a same-width change does not fail at all.
+`e4514a8`). A width change at least fails loudly — the vector is 23 now, so those checkpoints error
+out — but that is luck, not a safeguard.
+
+**Append new per-action values after the existing blocks rather than interleaving them.** The
+frozen diagnostics in `hyperparamTuning/diagnostics/` read `head_with_tail` at `obs[9 + 2 * i]`,
+and putting the safe-to-chase triple after the group block instead of inside it kept them correct
+through every change on 2026-08-02.
 
 Note that deleting `<policy_name>_history.json` also throws away the graph's
 history for that policy, so its next run restarts the curve from the current
@@ -328,6 +335,15 @@ and both were checked by mutating the implementation and confirming a test fails
 | don't advance the tail at all (the old behaviour) | `test_hwt_enclosed_vacated_tail_still_reaches_the_tail` |
 | advance it even on a move that eats | `test_hwt_eating_move_does_not_advance_the_tail` |
 | drop the "stepping onto the vacated cell" clause | 7 of the existing tests |
+
+The flip side happened the same day: fixtures for `group_obs` routinely include a fatal action
+(a wall or a self-collision) alongside the legal ones, because a real snake facing three choices
+usually has one that kills it. When fatal moves were changed to read zero outright instead of a
+hypothetical "what if this move survived" value, **15 of the 44 tests broke immediately** —
+not because anyone wrote a test for that change in advance, but because the existing fixtures
+already exercised the case by accident. Comprehensive fixtures pay for themselves in ways
+written for a different purpose; it is the reason a test failure here is worth reading rather
+than reflexively rewriting the assertion to match.
 
 That mutation check is worth repeating for any future change here: write the fixture, then break
 the code deliberately and confirm the fixture notices.

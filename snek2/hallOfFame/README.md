@@ -9,31 +9,31 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## These checkpoints load on `master` and produce garbage (2026-08-02)
+## These checkpoints do not run on `master` (2026-08-02)
 
-**This is the dangerous kind of stale, so read it before trusting a number.** The observation
-vector is still 20 values wide, so nothing errors, but two of those values changed meaning on
-2026-08-02:
+The observation vector is **23 values** and these were trained on 20, so the first layer's shape
+no longer matches and restoring one fails immediately:
 
-| index | when these were trained | on `master` now |
-|---|---|---|
-| 0-17 | unchanged | unchanged |
-| 18 | `lg(starve steps left)`, ranging 1 to 8.97 | starve budget left, scaled to `[0, 1]` |
-| 19 | `is the episode over`, constant 0 in every acting state | fraction of the board the snake fills, 0.05 to 1.0 |
+```
+ValueError: Received incompatible tensor with shape (20, 50) when attempting to restore
+variable with shape (23, 50) and name sequential/dense/kernel:0
+```
 
-Index 19 is the trap. Its weights were trained against an input that was always zero, so they
-were never constrained by anything, and they now multiply a live signal. Measured: the champion
-below, which scored **90.3%** at commit `e4514a8`, loads on `master` without a single warning
-and scores **0, 0, 1** over three episodes.
-
-To run one of these by hand, check out the last commit whose observation matches them:
+To run one by hand, check out the last commit whose observation matches them:
 
 ```
 git checkout e4514a8    # "Fix head_with_tail to advance the tail"
 ```
 
-The `new env` column below was measured there. The entries stay regardless: they are the record
-of what this project achieved, and the weights are still the weights.
+**Do not assume a matching width means a working checkpoint.** For part of 2026-08-02 the vector
+was coincidentally back at 20 while indices 18 and 19 meant entirely different things, and in that
+window these checkpoints restored with no warning at all and played like beginners — the champion
+below scored **0, 0, 1** over three episodes against **90.3%** at `e4514a8`. Nothing checks that
+values still mean what they meant; only the length is checked. If the count ever returns to 20,
+that silent failure comes back.
+
+The `new env` column below was measured at `e4514a8`. The entries stay regardless: they are the
+record of what this project achieved, and the weights are still the weights.
 
 ## Entries
 

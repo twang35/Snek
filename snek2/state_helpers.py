@@ -24,15 +24,16 @@ def get_observations(old_grid,
                      current_step,
                      last_food_step,
                      snake_len):
-    """Builds the 20-value observation vector. Layout, in order:
+    """Builds the 23-value observation vector. Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
     6-8      3       is the move safe (not body or wall)
     9-14     6       [can still reach tail, lg(open regions)] per action
-    15-17    3       does the move win the game
-    18       1       starve budget left, lg-compressed to [0, 1]
-    19       1       fraction of the board the snake fills
+    15-17    3       is it safe to chase the food (head, food and tail in one region)
+    18-20    3       does the move win the game
+    21       1       starve budget left, lg-compressed to [0, 1]
+    22       1       fraction of the board the snake fills
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
     from the current heading, not compass directions. Keep this in step with
@@ -50,15 +51,25 @@ def get_observations(old_grid,
     # the snake advances.
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos, head_move_dir))
 
-    # 6 values, [can still reach tail, lg(open regions)] for each action. Together these are
-    # the "am I about to trap myself" signal: reaching the tail means an escape route exists,
-    # and a rising region count means the move is cutting the free space into pieces. Needs
-    # both tail positions, because the tail moves too - see group_obs.
-    observations.extend(group_obs(old_grid,
-                                  head_pos,
-                                  tail_pos,
-                                  next_tail_pos,
-                                  head_move_dir))
+    # 6 values, [can still reach tail, lg(open regions)] for each action, then 3 more below.
+    # Together these are the "am I about to trap myself" signal: reaching the tail means an
+    # escape route exists, and a rising region count means the move is cutting the free space
+    # into pieces. Needs both tail positions, because the tail moves too - see group_obs.
+    group_values, food_chase_values = group_obs(old_grid,
+                                                head_pos,
+                                                tail_pos,
+                                                next_tail_pos,
+                                                head_move_dir,
+                                                current_food)
+    observations.extend(group_values)
+
+    # 3 values, one per action: 1 when the head, the food and the tail all end up in the same
+    # region, so the snake can reach the food and still get out afterwards. This is the "is it
+    # safe to chase" signal - the food values above say which way the food is and
+    # head_with_tail says an escape exists, but nothing tied the two together, so a policy had
+    # no way to tell a reachable meal from one that seals it in. Computed inside group_obs to
+    # share the flood fill.
+    observations.extend(food_chase_values)
 
     # 3 values, one per action: 1 if the move eats the last food and fills the board. All zero
     # unless the snake is exactly one food short, so this fires on the final move of a game.
@@ -147,8 +158,42 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
 
 # head_with_tail: returns 1 for with tail or 0 for no tail groups in each action
 # total_group_obs: returns number of groups
-def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir):
-    """[can the head still reach the tail, lg(open regions)] per action.
+# safe_to_chase_food: returns 1 when head, food and tail all end up in one group
+def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, current_food):
+    """Returns two lists: [can reach tail, lg(open regions)] per action, and [safe to chase
+    the food] per action.
+
+    Two lists rather than one because they sit in different places in the observation vector
+    while sharing all of their expensive work. `count_groups` is roughly 46% of the cost of
+    building an observation and runs three times here, once per action; computing the food flag
+    in its own function would run it three more times for nothing.
+
+    **Safe to chase the food** is 1 when the head, the food and the tail all land in *one* region
+    after the move - so there is a route to the food and a route back out afterwards. One region,
+    not merely all three reachable: the head can neighbour two regions at once, and a meal in one
+    of them with the only escape through the other is the trap the flag exists to name.
+    Reaching the food is useless if it seals the snake in with it, and the two halves of that
+    question were previously only answerable separately: `head_with_tail` says an escape exists
+    and the food values say which way the food is, with nothing tying them together.
+    `observation_spec` had a `head_with_food_obs` slot reserved and disabled for the weaker
+    version of this, food reachability alone.
+
+    A move that eats is the special case: the food is gone, so the flag is just whether the
+    tail is still reachable from the cell the food was on. Without that branch the food's cell
+    is occupied by the head and belongs to no region, so an eating move would always read 0 -
+    precisely the move the flag exists to encourage.
+
+    A fatal move - wall or body, from `body_and_wall_collisions`' own test - reports zero for
+    every value here rather than "what if this move were legal". A move into a wall happens to
+    read zero already: the only on-board neighbour of an off-board cell is the vacated head
+    cell, which `update_grid` never clears, so no region test can find anything past it. A move
+    into the snake's own body has no such accident protecting it - the new head cell is still
+    on-board and can see whatever real regions sit beside it - so it was reporting `1` on 5,289
+    of 14,642 body-collision actions measured in play, `head_with_tail` describing a hypothetical
+    survivor of a move that kills the snake. Harmless as long as indices 6-8 mark the same move
+    fatal and nothing downstream trusts one flag without the other, but there is no upside to
+    leaving a fatal move free to say anything at all, so it is short-circuited before the flood
+    fill runs - which also skips `count_groups` for it entirely.
 
     Takes two tail positions, because the tail moves on the same step the head does.
     `tail_pos` is where it is now; `next_tail_pos` is the cell ahead of it, which is where it
@@ -165,24 +210,39 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir):
     for it whatever the head does. See ../claudeFeatureRecommendations.md.
     """
     observations = []
+    food_observations = []
     cols = old_grid.shape[1]
+    # Bit for the food's cell, matching count_groups' layout, or None when there is no food -
+    # which happens on the step that wins the game.
+    food_bit = None
+    if current_food != 'no food':
+        food_bit = 1 << ((current_food.position[1] + 1) * cols + (current_food.position[0] + 1))
+
     for action in ACTIONS:
+        new_head_pos = get_relative_pos(action, head_pos, head_move_dir)
+        # Read from old_grid: it is untouched by update_grid, so this is one lookup against the
+        # board as it stands before the move, same as body_and_wall_collisions' own test - grid
+        # value 1 (food) or 0 (open), or the tail-follow special case, is what "legal" means. A
+        # wall (4) or the snake's own body (3) is anything else.
+        grid_value = get_grid_value(new_head_pos, old_grid)
+        eats_food = grid_value == 1
+        if not (eats_food or grid_value == 0 or tuple(new_head_pos) == tuple(tail_pos)):
+            # Fatal move: no group means anything for a head that does not survive to occupy
+            # one. Skips update_grid and count_groups for this action entirely.
+            observations.extend([0, 0])
+            food_observations.append(0)
+            continue
+
         # .copy() rather than copy.deepcopy(): an ndarray copy is already independent, and
         # deepcopy walks the object graph to reach the same result. Worth almost nothing on
         # its own (0.3% of the profile) but there is no reason to pay it.
         grid = update_grid(action, head_pos, tail_pos, old_grid.copy(), head_move_dir)
-        new_head_pos = get_relative_pos(action, head_pos, head_move_dir)
 
         regions, group_count = count_groups(grid)
 
         head_with_tail = 0
         num_groups = log2plus1(group_count)
 
-        # Read from old_grid, which update_grid has not touched. This repeats the test
-        # update_grid makes internally rather than having it return the answer, so that its
-        # signature stays a grid in and a grid out - the diagnostics in
-        # hyperparamTuning/diagnostics/ call it directly. One array lookup.
-        eats_food = get_grid_value(new_head_pos, old_grid) == 1
         # A move that eats does not move the tail at all: add_segment() refills the tile it
         # came from, so the snake grows from the back and the tail stays where it is.
         post_move_tail = tail_pos if eats_food else next_tail_pos
@@ -198,9 +258,35 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir):
         if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tuple(tail_pos):
             head_with_tail = 1
 
-        observations.extend([head_with_tail, num_groups])
+        # Safe to chase: one region has to hold the food while touching both the head and the
+        # tail. `head_groups & tail_groups` is that set, and testing the food against the
+        # intersection rather than against head_groups alone is the whole point - the head can
+        # sit next to two regions at once, and reaching the food through one while the tail is
+        # only reachable through the other is exactly the trap this flag is meant to name.
+        #
+        # The food test is containment, not adjacency: a food cell is open and belongs to a
+        # region of its own, unlike the head and tail cells, which are occupied and can only be
+        # asked what they neighbour.
+        if tuple(new_head_pos) == tuple(tail_pos):
+            # Following the tail. Nothing reaches the vacated cell by a region test, so take the
+            # regions the head can see from there; the tail is one step ahead by construction.
+            escape_regions = head_groups
+        else:
+            escape_regions = head_groups & tail_groups
 
-    return observations
+        safe_to_chase_food = 0
+        if food_bit is not None:
+            if eats_food:
+                # The food is being taken this step, so there is no food cell left to reach and
+                # the only question left is whether the tail survives the move.
+                safe_to_chase_food = head_with_tail
+            elif any(regions[index] & food_bit for index in escape_regions):
+                safe_to_chase_food = 1
+
+        observations.extend([head_with_tail, num_groups])
+        food_observations.append(safe_to_chase_food)
+
+    return observations, food_observations
 
 
 def starve_budget(snake_len):

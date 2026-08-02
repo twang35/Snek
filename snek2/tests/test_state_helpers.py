@@ -11,10 +11,15 @@ from state_helpers import *
 # dropped from the observation (snake_environment.observation_spec sets head_with_food_obs = 0)
 # and with it the argument. Signature now:
 #
-#     group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir)
-#         -> [head_with_tail, num_groups] * 3
+#     group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, current_food)
+#         -> ([head_with_tail, num_groups] * 3, [safe_to_chase_food] * 3)
 #
 # ordered by ACTIONS = ['left', 'right', 'forward'].
+#
+# The two return values sit in different places in the observation vector, so they come back as
+# separate lists. The helpers below pick one half each, which also keeps the assertions that
+# predate the food flag readable — none of them depend on `current_food`, because the first list
+# genuinely does not: the food only enters the second one.
 #
 # `next_tail_pos` is the cell the tail lands on when the move does not eat, which in the game is
 # the position of the segment ahead of it. In these fixtures it has to be supplied by hand, and
@@ -33,6 +38,23 @@ from state_helpers import *
 # test_eating_move_does_not_free_the_tail.
 
 
+class FakeFood:
+    """Stands in for Snake.Food, of which group_obs only ever reads `.position`."""
+
+    def __init__(self, position):
+        self.position = position
+
+
+def group_values(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food='no food'):
+    """The [head_with_tail, lg(regions)] half, which does not depend on where the food is."""
+    return group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food)[0]
+
+
+def food_chase_values(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food):
+    """The [safe to chase the food] half, one value per action."""
+    return group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food)[1]
+
+
 # =============================== group_obs tests ===============================
 def test_hwt_no_touching():
     grid = np.array([[4, 4, 4, 4, 4, 4, 4],
@@ -42,7 +64,7 @@ def test_hwt_no_touching():
                      [4, 4, 4, 4, 4, 4, 4]])
     # Open board: every action leaves one region, and the freed tail keeps head and tail
     # sharing it.
-    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(1)]
 
@@ -55,7 +77,7 @@ def test_hwt_no_touching_eats_food():
                      [4, 4, 4, 4, 4, 4, 4]])
     # 'forward' eats the food at (4, 1), so the tail stays put. The board is open enough that
     # it makes no difference to the counts here.
-    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(1)]
 
@@ -66,10 +88,10 @@ def test_hwt_following_forward_tail():
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    # The tail at (4, 0) is walled in by its own body, so vacating it leaves a one-cell region
-    # and the count goes to 2 — except on 'forward', which moves into that very cell.
-    assert group_obs(grid, (3, 0), (4, 0), (4, 1), 'right') == [0, log2plus1(2),
-                                                       0, log2plus1(2),
+    # 'left' runs off the top of the board and 'right' into the body at (3, 1); both fatal, so
+    # both are zeroed outright. Only 'forward', onto the tail, is legal here.
+    assert group_values(grid, (3, 0), (4, 0), (4, 1), 'right') == [0, 0,
+                                                       0, 0,
                                                        1, log2plus1(1)]
 
 
@@ -79,10 +101,11 @@ def test_hwt_following_right_tail():
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    # Same board, facing up, so 'right' is the move onto the tail.
-    assert group_obs(grid, (3, 0), (4, 0), (4, 1), 'up') == [0, log2plus1(2),
+    # Same board, facing up, so 'right' is the move onto the tail. 'left' walks into the body at
+    # (2, 0) and 'forward' off the top of the board; both fatal, both zeroed.
+    assert group_values(grid, (3, 0), (4, 0), (4, 1), 'up') == [0, 0,
                                                     1, log2plus1(1),
-                                                    0, log2plus1(2)]
+                                                    0, 0]
 
 
 def test_hwt_following_left_tail():
@@ -91,9 +114,11 @@ def test_hwt_following_left_tail():
                      [4, 0, 0, 3, 5, 3, 4],
                      [4, 0, 0, 3, 3, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 0), (3, 1), (4, 1), 'left') == [1, log2plus1(1),
-                                                      0, log2plus1(2),
-                                                      0, log2plus1(2)]
+    # 'left' is the move onto the tail; 'right' runs off the top of the board and 'forward' into
+    # the body at (2, 0), both fatal.
+    assert group_values(grid, (3, 0), (3, 1), (4, 1), 'left') == [1, log2plus1(1),
+                                                      0, 0,
+                                                      0, 0]
 
 
 def test_hwt_no_forward():
@@ -106,7 +131,7 @@ def test_hwt_no_forward():
     # The tail at (0, 1) is the only gap in the body wall, so freeing it merges the strip above
     # with everything below: 3 regions become 2, and on 'forward' 2 become 1. This is the case
     # the old behaviour got wrong most often in real play.
-    assert group_obs(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(2),
+    assert group_values(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(2),
                                                        1, log2plus1(2),
                                                        0, log2plus1(1)]
 
@@ -117,7 +142,7 @@ def test_hwt_no_left():
                      [4, 0, 5, 3, 2, 0, 4],
                      [4, 0, 1, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [0, log2plus1(1),
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [0, log2plus1(1),
                                                        1, log2plus1(3),
                                                        1, log2plus1(2)]
 
@@ -128,7 +153,7 @@ def test_hwt_no_right():
                      [4, 0, 5, 3, 2, 0, 4],
                      [4, 0, 0, 3, 0, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(3),
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(3),
                                                        0, log2plus1(1),
                                                        1, log2plus1(2)]
 
@@ -139,7 +164,9 @@ def test_hwt_follow_tail_and_empty_forward_no_food():
                      [4, 1, 2, 2, 3, 5, 4],
                      [4, 0, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'up') == [0, log2plus1(2),
+    # 'left' walks into the blocked cell at (2, 1); fatal, zeroed. 'right' (onto the tail) and
+    # 'forward' are both legal.
+    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'up') == [0, 0,
                                                     1, log2plus1(2),
                                                     1, log2plus1(2)]
 
@@ -150,7 +177,9 @@ def test_hwt_multiple_open_groups_separate_food_and_tail():
                      [4, 0, 0, 0, 3, 5, 4],
                      [4, 1, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'left') == [0, log2plus1(2),
+    # 'left' walks into the blocked cell at (3, 2); fatal, zeroed. 'right' and 'forward' are
+    # both legal.
+    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'left') == [0, 0,
                                                       1, log2plus1(2),
                                                       0, log2plus1(2)]
 
@@ -161,8 +190,10 @@ def test_groups_new_group_left():
                      [4, 0, 2, 2, 3, 5, 4],
                      [4, 1, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'right') == [1, log2plus1(2),
-                                                       0, log2plus1(1),
+    # 'right' walks into the blocked cell at (3, 2); fatal, zeroed. 'left' and 'forward' (onto
+    # the tail) are both legal.
+    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'right') == [1, log2plus1(2),
+                                                       0, 0,
                                                        1, log2plus1(1)]
 
 
@@ -183,11 +214,12 @@ def test_food_cell_counts_as_open_space():
                              [4, 0, 2, 2, 3, 5, 4],
                              [4, 0, 2, 2, 2, 2, 4],
                              [4, 4, 4, 4, 4, 4, 4]])
+    # 'right' walks into the blocked cell at (3, 2) in both variants; fatal, zeroed.
     expected = [1, log2plus1(2),
-                0, log2plus1(1),
+                0, 0,
                 1, log2plus1(1)]
-    assert group_obs(with_food, (3, 1), (4, 1), (4, 2), 'right') == expected
-    assert group_obs(without_food, (3, 1), (4, 1), (4, 2), 'right') == expected
+    assert group_values(with_food, (3, 1), (4, 1), (4, 2), 'right') == expected
+    assert group_values(without_food, (3, 1), (4, 1), (4, 2), 'right') == expected
 
 
 def test_groups_new_group_forward():
@@ -196,7 +228,7 @@ def test_groups_new_group_forward():
                      [4, 0, 0, 0, 3, 5, 4],
                      [4, 0, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (4, 1), (4, 2), 'up') == [1, log2plus1(1),
+    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'up') == [1, log2plus1(1),
                                                     1, log2plus1(1),
                                                     1, log2plus1(2)]
 
@@ -215,7 +247,7 @@ def test_eating_move_does_not_free_the_tail():
                      [4, 5, 3, 3, 2, 1, 4],
                      [4, 0, 0, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(1),
+    assert group_values(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(1),
                                                        1, log2plus1(1),
                                                        1, log2plus1(2)]
 
@@ -224,15 +256,16 @@ def test_tail_vacating_merges_two_regions():
     """The tail is the only gap in a body wall, so vacating it joins both halves.
 
     Under the old behaviour the tail counted as a wall and every action here reported two
-    regions.
+    regions. Only 'forward' is legal now - 'left' runs off the top of the board and 'right'
+    into the body at (0, 1) - so it is the only one left to make that point.
     """
     grid = np.array([[4, 4, 4, 4, 4, 4, 4],
                      [4, 2, 0, 0, 0, 0, 4],
                      [4, 3, 3, 5, 3, 3, 4],
                      [4, 0, 0, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_obs(grid, (0, 0), (2, 1), (1, 1), 'right') == [0, log2plus1(1),
-                                                       1, log2plus1(1),
+    assert group_values(grid, (0, 0), (2, 1), (1, 1), 'right') == [0, 0,
+                                                       0, 0,
                                                        1, log2plus1(1)]
 
 
@@ -253,7 +286,10 @@ def test_hwt_enclosed_vacated_tail_still_reaches_the_tail():
         y=3   # # # . .
         y=4   . . H . .
 
-    Under the old behaviour every action here reported 0.
+    Under the old behaviour every action here reported 0. Under the current one, 'left' and
+    'right' are also both fatal - 'left' walks into the body at (2, 3), 'right' into the wall
+    row below the board - so 'forward' is the only action either version had a chance to get
+    right, and both of its zeroed siblings read 0 by construction rather than by this bug.
     """
     grid = np.array([[4, 4, 4, 4, 4, 4, 4],
                      [4, 0, 0, 0, 0, 0, 4],
@@ -262,9 +298,8 @@ def test_hwt_enclosed_vacated_tail_still_reaches_the_tail():
                      [4, 3, 3, 3, 0, 0, 4],
                      [4, 0, 0, 2, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    # 'right' turns into the wall row below the board and reaches nothing, so it stays 0.
-    assert group_obs(grid, (2, 4), (1, 2), (2, 2), 'right') == [1, log2plus1(3),
-                                                               0, log2plus1(3),
+    assert group_values(grid, (2, 4), (1, 2), (2, 2), 'right') == [0, 0,
+                                                               0, 0,
                                                                1, log2plus1(3)]
 
 
@@ -292,10 +327,244 @@ def test_hwt_eating_move_does_not_advance_the_tail():
                      [4, 1, 3, 0, 0, 0, 4],
                      [4, 2, 3, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    # Facing up, so 'forward' is the move onto the food. 'left' leaves the board.
-    assert group_obs(grid, (0, 4), (0, 1), (0, 0), 'up') == [0, log2plus1(2),
-                                                            0, log2plus1(2),
+    # Facing up, so 'forward' is the move onto the food. 'left' leaves the board and 'right'
+    # walks into the body at (1, 4); both fatal, both zeroed.
+    assert group_values(grid, (0, 4), (0, 1), (0, 0), 'up') == [0, 0,
+                                                            0, 0,
                                                             1, log2plus1(2)]
+
+
+# =============================== safe-to-chase-food tests ===============================
+def test_chase_food_open_board_is_safe_from_every_action():
+    """Nothing is split, so head, food and tail share the one region whatever the snake does."""
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 5, 3, 2, 0, 4],
+                     [4, 0, 1, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert food_chase_values(grid, (3, 1), (1, 1), (2, 1), 'right',
+                             FakeFood((1, 2))) == [1, 1, 1]
+
+
+def test_chase_food_is_zero_when_the_food_is_sealed_off():
+    """The tail is reachable and the food is not, which is the case the flag exists for.
+
+    The food at (0, 0) is boxed in by two body cells that are nowhere near the tail, so freeing
+    the tail cannot open it. head_with_tail stays 1 for the survivable moves — that is the point:
+    the existing flag says "you have an escape route" and says nothing about whether the meal on
+    offer is reachable.
+
+    Body chain, head first: (0,3) (0,2) (0,1) (1,1) (1,0) (2,0) (3,0)=tail.
+
+        y=0   F # # t .        F = food, t = tail
+        y=1   # # . . .
+        y=2   # . . . .
+        y=3   H . . . .
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 1, 3, 3, 5, 0, 4],
+                     [4, 3, 3, 0, 0, 0, 4],
+                     [4, 3, 0, 0, 0, 0, 4],
+                     [4, 2, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    food = FakeFood((0, 0))
+    # 'right' walks off the left edge, so it reaches nothing at all - both values zeroed, not
+    # merely head_with_tail, since a fatal move gets nothing rather than a hypothetical count.
+    assert group_values(grid, (0, 3), (3, 0), (2, 0), 'down', food) == [1, log2plus1(2),
+                                                                       0, 0,
+                                                                       1, log2plus1(2)]
+    assert food_chase_values(grid, (0, 3), (3, 0), (2, 0), 'down', food) == [0, 0, 0]
+
+
+def test_chase_food_counts_an_eating_move_by_whether_the_tail_survives_it():
+    """Eating is the special case, and this is the outcome where it costs the snake its escape.
+
+    The food at (1, 0) sits in a pocket boxed in by walls on two sides and the head on the third,
+    so its only opening is the head's own cell. `forward` eats it and lands in that pocket with
+    nowhere else to go: the tail is unreachable, 0, even though the move reached the food.
+
+    `left` and `right` are both legal and both keep the tail reachable (`head_with_tail` is 1 for
+    both), but neither can see the food either - its only opening is the cell the head started
+    in, and that cell is never open in the single-move lookahead this function computes,
+    occupied or not. So the food reads unreachable from every direction except eating it, and
+    eating it is what seals the snake in. Paired with
+    `test_chase_food_is_one_for_an_eating_move_that_keeps_the_tail`, which is the same eating
+    branch coming out the other way.
+
+    Body chain, head first: (1,1) (1,2) (1,3) (1,4)=tail.
+
+        y=0   . F . . .        F = food, boxed except from below
+        y=1   . H . . .
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 4, 1, 4, 0, 0, 4],
+                     [4, 0, 2, 0, 0, 0, 4],
+                     [4, 0, 3, 0, 0, 0, 4],
+                     [4, 0, 3, 0, 0, 0, 4],
+                     [4, 0, 5, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert food_chase_values(grid, (1, 1), (1, 4), (1, 3), 'up',
+                             FakeFood((1, 0))) == [0, 0, 0]
+    # head_with_tail confirms left and right are alive and well; the zeros above are the food
+    # being unreachable, not the tail.
+    assert group_values(grid, (1, 1), (1, 4), (1, 3), 'up', FakeFood((1, 0))) == [
+        1, log2plus1(2), 1, log2plus1(2), 0, log2plus1(2)]
+
+
+def test_chase_food_is_one_for_an_eating_move_that_keeps_the_tail():
+    """The move the flag exists to encourage, and the reason eating needs its own branch.
+
+    'forward' takes the food at (4, 1) and the tail at (1, 1) stays reachable, so this is 1.
+    Without the eating branch it would read 0: the food's cell is occupied by the head after the
+    move, so it belongs to no region and a containment test finds nothing.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 5, 3, 2, 1, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert food_chase_values(grid, (3, 1), (1, 1), (2, 1), 'right',
+                             FakeFood((4, 1))) == [1, 1, 1]
+
+
+def test_chase_food_needs_one_region_holding_food_and_tail_together():
+    """All three in the *same* region, not merely all three reachable.
+
+    The head can neighbour two regions at once, and `forward` is that case. It puts the head on
+    (1, 0), which plugs the food's only opening and leaves the food at (0, 0) as a region of one —
+    a region the head is standing next to but which does not touch the tail. So the head can reach
+    the food and can reach its tail, through *different* regions: eating would seal it in with the
+    meal. The flag is 0, and it would be 1 if the food were tested against everything the head can
+    see instead of against the intersection with the tail.
+
+    `right` leaves (1, 0) open, so food, head and tail all share the board's one big region and
+    chasing is genuinely safe: 1. `left` walks into the body at (0, 1) - fatal, so 0 regardless
+    of any of this.
+
+    Body chain, head first: (1,1) (0,1) (0,2) (0,3)=tail.
+
+        y=0   F . . . .        F = food
+        y=1   # H . . .
+        y=2   # . . . .
+        y=3   t . . . .        t = tail
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 1, 0, 0, 0, 0, 4],
+                     [4, 3, 2, 0, 0, 0, 4],
+                     [4, 3, 0, 0, 0, 0, 4],
+                     [4, 5, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    food = FakeFood((0, 0))
+    assert food_chase_values(grid, (1, 1), (0, 3), (0, 2), 'up', food) == [0, 1, 0]
+    # head_with_tail is 1 for the two legal moves, so those 0/1 values are the food half
+    # talking, not the tail - and 0 for 'left', which is fatal.
+    assert group_values(grid, (1, 1), (0, 3), (0, 2), 'up', food) == [0, 0,
+                                                                     1, log2plus1(1),
+                                                                     1, log2plus1(2)]
+
+
+def test_chase_food_finds_a_food_cell_that_is_its_own_region():
+    """Asks which region *holds* the food, not which regions neighbour it.
+
+    `forward` moves the head from (0, 1) to (0, 0), which does not land on the food but does sit
+    next to it. update_grid() marks (0, 0) occupied once the head arrives there, so the food at
+    (1, 0) ends up with every neighbour blocked — the head's new cell on one side, the body at
+    (1, 1) and the not-yet-vacated segment at (2, 0) on the others, the board edge on the last.
+    It is a genuine region of one.
+
+    Asking what neighbours the food cell directly finds nothing, since all four are blocked, and
+    would read 0 for a move that is actually safe. The right question is which region *contains*
+    the food — region 0, size 1 cell — and that region is what `new_head_pos` is adjacent to
+    (through the food cell itself) and what `next_tail_pos` is *also* adjacent to, through the
+    old tail cell (3, 0) freeing up on the same move. Both paths land on the same single-cell
+    region, so the intersection holds it and the answer is 1.
+
+    'left' leaves the board; 'right' walks into the body at (1, 1). Both are fatal, so both read
+    0 regardless of the food.
+
+    Body chain, head first: (0,1) (1,1) (2,1) (2,0) (3,0)=tail.
+
+        y=0   . F # t .        F = food, t = tail
+        y=1   H # # . .
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 1, 3, 5, 0, 4],
+                     [4, 2, 3, 3, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    food = FakeFood((1, 0))
+    assert food_chase_values(grid, (0, 1), (3, 0), (2, 0), 'up', food) == [0, 0, 1]
+
+
+def test_chase_food_when_following_the_tail_into_open_space():
+    """Following the tail needs its own case, the same way head_with_tail does.
+
+    `forward` steps onto (2, 0), the cell the tail is leaving. No region test can see the tail from
+    there — the segment ahead of it at (3, 0) is boxed in by the body at (4, 0) and (3, 1) and by
+    the head's new cell, so the set of regions touching the post-move tail is empty. Intersecting
+    with that empty set would say "not safe" about a move that is safe by construction: the snake
+    is walking in its own wake, with the whole open board and the food at (0, 0) in front of it.
+
+    `left` stays legal and reaches everything the ordinary way; `right` walks into the body at
+    (3, 1) and is fatal, so 0 regardless of the food.
+
+    Body chain, head first: (2,1) (3,1) (4,1) (4,0) (3,0) (2,0)=tail.
+
+        y=0   F . t # #        F = food, t = tail
+        y=1   . . H # #
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 1, 0, 5, 3, 3, 4],
+                     [4, 0, 0, 2, 3, 3, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert food_chase_values(grid, (2, 1), (2, 0), (3, 0), 'up',
+                             FakeFood((0, 0))) == [1, 0, 1]
+
+
+def test_chase_food_is_zero_when_there_is_no_food():
+    """The winning step: the last food is eaten and no replacement is placed."""
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 5, 3, 2, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert food_chase_values(grid, (3, 1), (1, 1), (2, 1), 'right', 'no food') == [0, 0, 0]
+
+
+def test_chase_food_never_claims_safe_where_the_tail_is_lost():
+    """The flag is a conjunction, so it can never be 1 where head_with_tail is 0.
+
+    Sweeps the fixtures in this file rather than asserting on one board, since the invariant is
+    what matters: a route to the food is worthless without a route back out.
+    """
+    boards = [
+        (np.array([[4, 4, 4, 4, 4, 4, 4],
+                   [4, 0, 0, 3, 2, 5, 4],
+                   [4, 0, 0, 3, 3, 3, 4],
+                   [4, 0, 0, 3, 3, 3, 4],
+                   [4, 4, 4, 4, 4, 4, 4]]), (3, 0), (4, 0), (4, 1), 'right', (1, 0)),
+        (np.array([[4, 4, 4, 4, 4, 4, 4],
+                   [4, 0, 0, 0, 0, 0, 4],
+                   [4, 3, 3, 3, 0, 0, 4],
+                   [4, 3, 5, 3, 0, 0, 4],
+                   [4, 3, 3, 3, 0, 0, 4],
+                   [4, 0, 0, 2, 1, 0, 4],
+                   [4, 4, 4, 4, 4, 4, 4]]), (2, 4), (1, 2), (2, 2), 'right', (3, 4)),
+    ]
+    for grid, head, tail, next_tail, move_dir, food_pos in boards:
+        food = FakeFood(food_pos)
+        pairs = group_values(grid, head, tail, next_tail, move_dir, food)
+        chase = food_chase_values(grid, head, tail, next_tail, move_dir, food)
+        for index in range(3):
+            if not pairs[2 * index]:
+                assert chase[index] == 0, (index, pairs, chase)
 
 
 # =============================== starve and length tests ===============================
@@ -378,6 +647,57 @@ def test_starve_obs_is_the_same_value_for_the_same_steps_remaining():
     assert short == long_
 
 
+def test_a_move_into_a_wall_reaches_nothing():
+    """None of the three group_obs values may fire for a move off the board.
+
+    `group_obs` checks legality itself now - the same test `body_and_wall_collisions` uses,
+    food, open, or the tail-follow special case - and short-circuits a fatal move to zero before
+    computing anything, rather than running the flood fill and reporting what a move that kills
+    the snake would have found. Verified over 4,035 wall moves and 14,642 body-collision moves
+    in a sweep of real games: zero non-zero flags either way, where the pre-fix code reported
+    `head_with_tail = 1` on 5,289 of the body-collision moves - a hypothetical answer for a
+    snake that no longer exists after that move.
+
+    Before the legality gate, walls happened to read zero by accident rather than by design: an
+    off-board cell's only on-board neighbour is the vacated head cell, which `update_grid` never
+    clears, so no region test could find anything past it - and a version that "tidied up" by
+    clearing that cell would have broken silently. The gate below makes that accident load-bearing
+    no longer.
+
+    Built on a full-size board rather than a hand-typed fixture, since the point is the real
+    board's edges.
+    """
+    for head, move_dir, spine in (((0, 4), 'left', [(1, 4), (2, 4), (3, 4)]),
+                                  ((SCREENTILES[0], 4), 'right',
+                                   [(SCREENTILES[0] - 1, 4), (SCREENTILES[0] - 2, 4),
+                                    (SCREENTILES[0] - 3, 4)]),
+                                  ((4, 0), 'up', [(4, 1), (4, 2), (4, 3)]),
+                                  ((4, SCREENTILES[1]), 'down',
+                                   [(4, SCREENTILES[1] - 1), (4, SCREENTILES[1] - 2),
+                                    (4, SCREENTILES[1] - 3)])):
+        grid = np.zeros((SCREENTILES[1] + 3, SCREENTILES[0] + 3))
+        grid[[0, -1], :] = 4
+        grid[:, [0, -1]] = 4
+        for cell in spine:
+            grid[cell[1] + 1][cell[0] + 1] = 3
+        grid[head[1] + 1][head[0] + 1] = 2
+        tail, next_tail = spine[-1], spine[-2]
+        # Food sitting in the wide-open middle, so it is reachable from everywhere on the board
+        # and cannot be the reason a flag reads 0.
+        food = FakeFood((6, 6))
+
+        pairs = group_values(grid, head, tail, next_tail, move_dir, food)
+        chase = food_chase_values(grid, head, tail, next_tail, move_dir, food)
+        forward = ACTIONS.index('forward')
+        assert pairs[2 * forward] == 0, (move_dir, pairs)
+        assert pairs[2 * forward + 1] == 0, (move_dir, pairs)
+        assert chase[forward] == 0, (move_dir, chase)
+        # Turning away from the wall stays on the board and does reach both, so the zeros above
+        # are the wall talking and not a broken fixture.
+        assert any(pairs[2 * index] for index in range(3) if index != forward), (move_dir, pairs)
+        assert any(chase[index] for index in range(3) if index != forward), (move_dir, chase)
+
+
 # =============================== observation vector tests ===============================
 def test_observation_spec_matches_what_the_game_emits():
     """A spec that disagrees with reality has bitten this project before.
@@ -393,8 +713,8 @@ def test_observation_spec_matches_what_the_game_emits():
 
     env = SnakeEnvironment(display=False)
     env.reset()
-    assert env.observation_spec().shape == (20,)
-    assert env._game.get_observation().shape == (20,)
+    assert env.observation_spec().shape == (23,)
+    assert env._game.get_observation().shape == (23,)
 
 
 def test_terminal_steps_carry_zero_discount():

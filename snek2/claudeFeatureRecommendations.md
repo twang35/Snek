@@ -10,8 +10,8 @@ Everything below was measured on the **post-audit environment** (the 2026-08-01 
 six env bugs were fixed) using the current champion `b8f-disc9975seed2` at checkpoint
 `3149000`, greedy, over **360 episodes / 1,076,492 steps**.
 
-**Status, added the same day.** Two of the recommendations were implemented immediately after this
-was written; the document itself is left exactly as measured.
+**Status, added the same day.** Several of the recommendations were implemented immediately after
+this was written; the document itself is left exactly as measured.
 
 | recommendation | outcome |
 |---|---|
@@ -19,11 +19,14 @@ was written; the document itself is left exactly as measured.
 | fix the starve observation and add length | done — split into a `[0, 1]` budget and an explicit `snake_len / PERFECT_SCORE` |
 | set `discount = 0.0` on terminal steps | done — the final transition of every episode now trains toward the reward instead of `reward + 0.9975 * V(terminal)` |
 | drop the `game_over` input | done, and only safe *after* the discount fix, exactly as this document argued |
+| add "is the food reachable" | done, and stricter than proposed here: head, food **and** tail in one region, so it names a reachable meal rather than merely a visible one |
+| zero the region values on a fatal move | done, raised by the user after reading the food-reachable fix: a wall move happened to read 0 already, but a self-collision did not — `head_with_tail` was 1 on **5,289 of 14,642** body-collision moves in real play, describing a snake that does not survive the move that produced it |
 | everything else | not implemented |
 
-The vector is still 20 values wide, having gone to 21 and back, which makes the checkpoints this
-document was measured on **load silently and play like beginners** — indices 18 and 19 changed
-meaning. Use commit `e4514a8` for those. Details in the 2026-08-02 subsections of
+The vector is **23 values** now, so the checkpoints this document was measured on fail to load. Use
+commit `e4514a8` for those — and note that for part of the same day the count was coincidentally
+back at 20 while two indices meant different things, in which window those checkpoints loaded
+silently and played like beginners. Details in the 2026-08-02 subsections of
 [`hyperparamTuning/findings.md`](hyperparamTuning/findings.md); the "input 18 reaches 8.97" and
 "input 19 is always 0" observations below are now historical.
 

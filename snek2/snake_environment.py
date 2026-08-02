@@ -28,7 +28,9 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         body_and_wall_obs = 3       # body and wall is_collision
         # group obs are mixed by action
         head_with_tail_obs = 3      # head is in same group as tail
-        head_with_food_obs = 0      # head is in same group as food
+        # Switched on 2026-08-02, and stricter than the version this slot was reserved for:
+        # head, food *and* tail in one group, so there is a way to the food and a way back out.
+        head_with_food_obs = 3      # safe to chase the food
         total_groups_obs = 3        # lg(num_groups) for each action
         # end group obs
         perfect_game_move_obs = 3   # move results in a perfect game

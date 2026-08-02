@@ -85,8 +85,12 @@ From `b8f-disc9975seed2` at checkpoint `3149000`, 360 episodes, 1,076,492 steps:
 If a re-run diverges from these, suspect the environment changed rather than the scripts — every
 number above is tied to the observation space and reward function as of 2026-08-02.
 
-**These numbers cannot be reproduced on `master`, and the failure is silent.** Two later changes
-the same day rewrote observation indices 18 and 19, while leaving the vector 20 values wide — so
-`b8f-disc9975seed2` still restores without an error and then plays like a beginner (0, 0, 1 over
-three episodes, against 90.3% at the time). Check out commit `e4514a8` to reproduce anything above.
-`simcheck.py`, `simcheck2.py` and `probe.py` load no checkpoint and still run anywhere.
+**These numbers cannot be reproduced on `master`.** The observation is 23 values there against the
+20 these checkpoints were trained on, so `b8f-disc9975seed2` fails to restore with a shape error,
+which takes `diag.py` through `diag4.py` with it. Check out commit `e4514a8` to reproduce anything
+above. `simcheck.py`, `simcheck2.py` and `probe.py` load no checkpoint and still run anywhere.
+
+Note also that these scripts read `head_with_tail` at `obs[9 + 2 * i]` and the region count at
+`obs[10 + 2 * i]`. Those indices survived every 2026-08-02 change on purpose — the safe-to-chase
+values were appended after the group block rather than interleaved into it — but a future change
+that reorders the vector would make them read the wrong fields silently.
