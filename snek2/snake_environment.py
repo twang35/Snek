@@ -36,7 +36,12 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         # Supersedes the disabled `remaining_spaces` slot that sat here: open cells are the
         # complement of snake length, so this is that signal, normalised, and switched on.
         snake_length_obs = 1        # fraction of the board the snake fills
-        game_over_obs = 1           # if game is over
+        # `game_over` used to live here, and it was load-bearing for the wrong reason: terminal
+        # steps carried a non-zero discount, so the loss bootstrapped off the terminal state's
+        # Q-values and the only way the network could learn those are worth nothing was to key
+        # on this flag. With the discount zeroed in to_tensor_time_step() the bootstrap is gone,
+        # nothing reads a terminal state's value, and the flag was 0 in 100% of the states a
+        # policy ever acts in — a constant input.
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
                                  + head_with_tail_obs
@@ -44,8 +49,7 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                                  + total_groups_obs
                                  + perfect_game_move_obs
                                  + steps_until_starve_obs
-                                 + snake_length_obs
-                                 + game_over_obs,), np.float32)
+                                 + snake_length_obs,), np.float32)
 
     def set_display(self, enabled):
         self._game.set_display(enabled)
@@ -81,7 +85,23 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         return self.to_tensor_time_step(step_type, reward, self._observations)
 
     def to_tensor_time_step(self, step_type, reward, observations):
+        # A terminal step must carry discount 0, because that zero is the *only* thing that stops
+        # the bootstrap. tf_agents' own ts.termination() sets it; this environment did not, and
+        # nothing else compensates: DdqnAgent is built without `gamma`, so gamma defaults to 1.0,
+        # and dqn_agent._loss computes `discounts = gamma * next_time_steps.discount` and then
+        # `td_targets = rewards + discounts * next_q_values`. The valid_mask there only drops
+        # transitions whose *current* step is LAST, not the bootstrap off a terminal next state.
+        #
+        # So every episode's final transition was trained toward `reward + 0.9975 * V(terminal)`
+        # rather than toward `reward`, which quietly discounted the -5 death penalty by whatever
+        # value the network assigned the terminal observation.
+        #
+        # It also matters for n-step returns, where the composed reward is
+        # `r_t + g*d_t*r_{t+1} + g^2*d_t*d_{t+1}*r_{t+2} + ...` — those per-step d values are the
+        # only truncation at an episode boundary, so a non-zero one sums rewards straight through
+        # the end of the episode.
+        discount = 0.0 if step_type == StepType.LAST else self._discount
         return TimeStep(step_type=convert_to_tensor(step_type, dtype=np.int32),
                         reward=convert_to_tensor(reward, dtype=np.float32),
-                        discount=convert_to_tensor(self._discount, dtype=np.float32),
+                        discount=convert_to_tensor(discount, dtype=np.float32),
                         observation=convert_to_tensor(observations, dtype=np.float32))

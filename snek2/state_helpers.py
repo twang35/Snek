@@ -23,9 +23,8 @@ def get_observations(old_grid,
                      current_food,
                      current_step,
                      last_food_step,
-                     snake_len,
-                     game_finished):
-    """Builds the 21-value observation vector. Layout, in order:
+                     snake_len):
+    """Builds the 20-value observation vector. Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
@@ -34,7 +33,6 @@ def get_observations(old_grid,
     15-17    3       does the move win the game
     18       1       starve budget left, lg-compressed to [0, 1]
     19       1       fraction of the board the snake fills
-    20       1       is the episode over
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
     from the current heading, not compass directions. Keep this in step with
@@ -75,9 +73,13 @@ def get_observations(old_grid,
     # snake length, so it is the same signal already normalised.
     observations.extend(starve_and_length_obs(current_step, last_food_step, snake_len))
 
-    # 1 value: 1 once the episode has ended, by death, starvation or a win.
-    # end of game
-    observations.extend([1] if game_finished else [0])
+    # There used to be a final "is the episode over" value here, and it is gone. It was 1 only in
+    # a terminal observation, which no policy ever acts on, so it was a constant 0 for every state
+    # the network is asked about — but it could not simply be deleted, because the environment was
+    # handing terminal steps a non-zero discount and the loss therefore bootstrapped off terminal
+    # Q-values. This flag was the only signal the network could use to learn that those states are
+    # worth nothing. With to_tensor_time_step() now zeroing that discount, nothing reads a
+    # terminal state's value and the input has no job left.
     return observations
 
 

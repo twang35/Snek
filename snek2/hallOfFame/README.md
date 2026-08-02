@@ -9,28 +9,31 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## These checkpoints no longer load on `master` (2026-08-02)
+## These checkpoints load on `master` and produce garbage (2026-08-02)
 
-The observation vector went from 20 values to 21 — the starve observation was split into a
-scaled budget and an explicit snake length — and the network's first layer is sized by that.
-Restoring any checkpoint here now fails immediately and loudly:
+**This is the dangerous kind of stale, so read it before trusting a number.** The observation
+vector is still 20 values wide, so nothing errors, but two of those values changed meaning on
+2026-08-02:
 
-```
-ValueError: Received incompatible tensor with shape (20, 50) when attempting to restore
-variable with shape (21, 50) and name sequential/dense/kernel:0
-```
+| index | when these were trained | on `master` now |
+|---|---|---|
+| 0-17 | unchanged | unchanged |
+| 18 | `lg(starve steps left)`, ranging 1 to 8.97 | starve budget left, scaled to `[0, 1]` |
+| 19 | `is the episode over`, constant 0 in every acting state | fraction of the board the snake fills, 0.05 to 1.0 |
 
-That is a clean failure rather than a silent partial load, but it does mean **the commands
-below only work against a 20-value observation**. To run one of these by hand, check out the
-last commit that had one:
+Index 19 is the trap. Its weights were trained against an input that was always zero, so they
+were never constrained by anything, and they now multiply a live signal. Measured: the champion
+below, which scored **90.3%** at commit `e4514a8`, loads on `master` without a single warning
+and scores **0, 0, 1** over three episodes.
+
+To run one of these by hand, check out the last commit whose observation matches them:
 
 ```
 git checkout e4514a8    # "Fix head_with_tail to advance the tail"
 ```
 
-The `new env` column below was measured before that boundary and cannot currently be
-reproduced on `master`. The entries stay here regardless: they are the record of what this
-project achieved, and the weights are still the weights.
+The `new env` column below was measured there. The entries stay regardless: they are the record
+of what this project achieved, and the weights are still the weights.
 
 ## Entries
 

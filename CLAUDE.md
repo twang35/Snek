@@ -97,12 +97,19 @@ already destroyed evidence once (`b5c-schlongIS`'s 17.0% peak).
 worth keeping. Each is two files, ~190 KB. The README documents the copy-in-and-evaluate
 procedure; both commands in it were verified working when written.
 
-**A checkpoint only loads against the observation width it was trained on.** The vector went from
-20 values to 21 on 2026-08-02, and `build_q_net`'s first layer is sized by it, so every checkpoint
-predating that fails with `Shapes (21, 50) and (20, 50) are incompatible`. It is a loud failure,
-not a silent one. Run older checkpoints by checking out the last 20-value commit, `e4514a8`, and
-**record the width boundary in the hall of fame README whenever the observation count changes** —
-otherwise the evaluate-by-hand instructions there quietly stop working.
+**Matching widths do not mean a checkpoint still works, and this bites hardest here.** A checkpoint
+restores whenever the vector is the same *length*; nothing checks that the values still mean what
+they meant. The observation changed three times on 2026-08-02 and ended back at 20 values, so every
+checkpoint in this folder loads on `master` without a warning and plays like a beginner — the
+2026-08-02 champion went from **90.3%** to scoring **0, 0, 1** over three episodes.
+
+An input that was constant is the specific trap: `game_over` sat at 0 in every state a policy acts
+in, so its weights were never constrained by anything, and index 19 now carries board-fill instead.
+Arbitrary weights times a live signal.
+
+So when the observation changes, **record which indices changed meaning in the hall of fame
+README, and name the last commit whose observation matches those checkpoints** (currently
+`e4514a8`). A width change at least fails loudly; a same-width change does not fail at all.
 
 Note that deleting `<policy_name>_history.json` also throws away the graph's
 history for that policy, so its next run restarts the curve from the current

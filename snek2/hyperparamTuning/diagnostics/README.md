@@ -85,8 +85,8 @@ From `b8f-disc9975seed2` at checkpoint `3149000`, 360 episodes, 1,076,492 steps:
 If a re-run diverges from these, suspect the environment changed rather than the scripts — every
 number above is tied to the observation space and reward function as of 2026-08-02.
 
-**These numbers can no longer be reproduced on `master`.** The observation went to 21 values later
-the same day, so `b8f-disc9975seed2` and every other pre-existing checkpoint fail to load with a
-shape error, which takes `diag.py` through `diag4.py` with them. Check out commit `e4514a8` to
-reproduce anything above. `simcheck.py`, `simcheck2.py` and `probe.py` load no checkpoint and still
-run anywhere.
+**These numbers cannot be reproduced on `master`, and the failure is silent.** Two later changes
+the same day rewrote observation indices 18 and 19, while leaving the vector 20 values wide — so
+`b8f-disc9975seed2` still restores without an error and then plays like a beginner (0, 0, 1 over
+three episodes, against 90.3% at the time). Check out commit `e4514a8` to reproduce anything above.
+`simcheck.py`, `simcheck2.py` and `probe.py` load no checkpoint and still run anywhere.

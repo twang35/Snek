@@ -378,6 +378,55 @@ def test_starve_obs_is_the_same_value_for_the_same_steps_remaining():
     assert short == long_
 
 
+# =============================== observation vector tests ===============================
+def test_observation_spec_matches_what_the_game_emits():
+    """A spec that disagrees with reality has bitten this project before.
+
+    `head_with_food_obs` sat at 0 in the spec for a whole signature generation while the argument
+    it needed was still being passed, and the count is maintained by hand as a sum of named
+    parts, so it drifts silently. This asserts the two agree rather than trusting either.
+    """
+    import os
+    os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+    from snake_environment import SnakeEnvironment
+
+    env = SnakeEnvironment(display=False)
+    env.reset()
+    assert env.observation_spec().shape == (20,)
+    assert env._game.get_observation().shape == (20,)
+
+
+def test_terminal_steps_carry_zero_discount():
+    """The zero is the only thing that stops the loss bootstrapping off a terminal state.
+
+    dqn_agent._loss computes `discounts = gamma * next_time_steps.discount` and then
+    `rewards + discounts * next_q_values`, and DdqnAgent here is built without `gamma`, so gamma
+    is 1.0 and this field carries all of it. A terminal step with a non-zero discount trains the
+    final transition of every episode toward `reward + 0.9975 * V(terminal)`.
+    """
+    import os
+    os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+    import numpy
+    from tf_agents.trajectories.time_step import StepType
+    from snake_environment import SnakeEnvironment
+
+    env = SnakeEnvironment(discount=0.9975, display=False)
+    observations = env.reset().observation
+
+    mid = env.to_tensor_time_step(StepType.MID, numpy.asarray(1.0), observations)
+    last = env.to_tensor_time_step(StepType.LAST, numpy.asarray(-5.0), observations)
+    first = env.to_tensor_time_step(StepType.FIRST, numpy.asarray(0.0), observations)
+
+    assert float(last.discount) == 0.0
+    # Every other step type keeps the tuned discount, which is where the horizon comes from.
+    # Tolerance is float32-sized on purpose: the field is float32, so 0.9975 comes back as
+    # 0.9975000023841858 and a 1e-9 comparison fails on the storage format rather than the logic.
+    assert abs(float(mid.discount) - 0.9975) < 1e-6
+    assert abs(float(first.discount) - 0.9975) < 1e-6
+
+
 # =============================== body_and_wall_collisions tests ===============================
 def test_bw_left_wall():
     grid = np.array([[4, 4, 4, 4, 4, 4, 4],

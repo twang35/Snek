@@ -16,12 +16,16 @@ was written; the document itself is left exactly as measured.
 | recommendation | outcome |
 |---|---|
 | advance `tail_pos` | done — moved that same checkpoint 80.0% → **90.3%** with no retraining |
-| fix the starve observation and add length | done — split into a `[0, 1]` budget and an explicit `snake_len / PERFECT_SCORE`, taking the vector to **21 values**, so the checkpoints this document was measured on no longer load (use commit `e4514a8`) |
+| fix the starve observation and add length | done — split into a `[0, 1]` budget and an explicit `snake_len / PERFECT_SCORE` |
+| set `discount = 0.0` on terminal steps | done — the final transition of every episode now trains toward the reward instead of `reward + 0.9975 * V(terminal)` |
+| drop the `game_over` input | done, and only safe *after* the discount fix, exactly as this document argued |
 | everything else | not implemented |
 
-See the two 2026-08-02 subsections of
-[`hyperparamTuning/findings.md`](hyperparamTuning/findings.md). Note that the "20 values" and
-"input 18 reaches 8.97" observations below are now historical.
+The vector is still 20 values wide, having gone to 21 and back, which makes the checkpoints this
+document was measured on **load silently and play like beginners** — indices 18 and 19 changed
+meaning. Use commit `e4514a8` for those. Details in the 2026-08-02 subsections of
+[`hyperparamTuning/findings.md`](hyperparamTuning/findings.md); the "input 18 reaches 8.97" and
+"input 19 is always 0" observations below are now historical.
 
 ---
 

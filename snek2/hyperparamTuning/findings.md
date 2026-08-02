@@ -19,7 +19,9 @@ it as evidence from that date, not as current state.
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
 | **Observations changed twice on 2026-08-02** — two more boundaries after the audit's | **breaking**, and the second changes the vector width |
-| **The vector is 21 values, so every earlier checkpoint fails to load** — use commit `e4514a8` for those | **breaking**, loud `ValueError` |
+| **Earlier checkpoints load on `master` and play like beginners** — the width matches, the meanings changed; use `e4514a8` | **breaking**, and **silent** |
+| **Terminal steps carried a non-zero discount**, so every episode's last transition bootstrapped off the terminal state | **fixed** 2026-08-02 |
+| The n-step falsification was measured with returns that leak across episode ends | **re-opened**, not overturned |
 | **Fixing `head_with_tail` moved the champion 80.0% → 90.3% with no retraining** | **measured**, 360 eps a side, intervals disjoint |
 | Audit fix #6 was incomplete: `group_obs` used one tail position for a tail that has usually moved | **fixed** 2026-08-02 |
 | **Terminal steps never carry `discount = 0`**, so death trains toward `−5 + 0.9975·V(terminal)` | mechanism confirmed, effect unmeasured |
@@ -56,7 +58,7 @@ it as evidence from that date, not as current state.
 | Degradation after 236-312k is systemic across configs | **established**, 5 arms |
 | Epsilon reaching 0.0 causes the collapse | **falsified** |
 | A larger replay buffer prevents the collapse | **not settled** |
-| n-step returns help | **falsified**, n=2 and n=3 |
+| n-step returns help | **open** — the n=2 and n=3 arms ran with returns that leaked across episode ends |
 
 ---
 
@@ -205,9 +207,48 @@ is `lg(num_groups)` at indices 10, 12 and 14 — which
 rather than rescaling, having measured it as right 7.4% and wrong 57.4% at the decisions that lose
 games.
 
-**Effect on the perfect rate is unmeasured, and cannot be measured by transfer.** The width change
-means no existing checkpoint loads, so unlike the `head_with_tail` fix there is no
-policy-that-never-saw-it to re-run. This one needs a training arm to evaluate.
+**Effect on the perfect rate is unmeasured, and cannot be measured by transfer.** Unlike the
+`head_with_tail` fix there is no policy-that-never-saw-it to re-run, because a policy trained on
+the old value cannot read the new one. This needs a training arm to evaluate.
+
+## The terminal bootstrap, 2026-08-02: never cut off, now cut off
+
+The fourth change of the day, and the only one that alters the **training target** rather than the
+observation. `SnakeEnvironment.to_tensor_time_step` set `discount = self._discount` for every step
+type, including `StepType.LAST`. tf-agents' own `ts.termination()` sets `0.0`, and that zero is the
+only mechanism that stops the bootstrap:
+
+- `dqn_agent._loss`: `discounts = gamma * next_time_steps.discount`
+- `common.compute_td_targets`: `rewards + discounts * next_q_values`
+- `DdqnAgent` is built without `gamma` in `snek2.py`, so `gamma` is **1.0** and the time step
+  carried all of the discounting
+- the `valid_mask` in that loss drops transitions whose *current* step is LAST — not the bootstrap
+  off a terminal *next* state
+
+So every episode's final transition was trained toward `reward + 0.9975 * V(terminal)` instead of
+`reward`. Verified directly on a real terminal step: the target was `-4.932` where the reward is
+`-5.0`, and is now exactly `-5.000`. That demo used a freshly initialised network, so `V(terminal)`
+was only `+0.068`; on a trained network, with a `+100` win bonus a few hundred steps out, it is
+plausibly in the tens, and the `-5` death penalty was being diluted by that much.
+
+**Two consequences beyond the arithmetic.**
+
+The `game_over` observation is gone, taking the vector from 21 values back to 20. It was 1 only in
+a terminal observation, which no policy ever acts on, so it was a constant 0 input — but it could
+not simply be deleted while the bootstrap existed, because it was the only signal the network could
+use to learn that terminal states are worth nothing. That is now nothing's job.
+
+**The n-step falsification needs re-testing.** `to_n_step_transition` composes
+`r_t + g*d_t*r_{t+1} + g^2*d_t*d_{t+1}*r_{t+2} + ...`, and those per-step `d` values are the only
+truncation at an episode boundary. With a terminal `d` of 0.9975 the sum runs straight through the
+end of the episode and into whatever follows it in the buffer. The `n=2` and `n=3` arms that
+falsified n-step returns were therefore measuring something other than n-step returns. This does
+not mean n-step helps — it means the experiment was not clean, so the entry in the falsified
+section is downgraded to open rather than reversed.
+
+**Also unmeasurable by transfer**, for a sharper reason than the starve change: this one alters
+what the agent is trained toward, not what it sees, so a policy already trained cannot show
+anything about it either way. It needs an arm.
 
 #### Rewards are now exact
 
@@ -988,19 +1029,34 @@ mechanism described in [`completedRuns.md`](completedRuns.md) is still an untest
 hypothesis**, not a finding. `REPLAY_BUFFER_MAX_LENGTH=1000000` is in the backlog at low
 priority.
 
-## Falsified: n-step returns
+## Re-opened 2026-08-02: n-step returns were never cleanly tested
 
 | policy | steps | peak score (at) | best perfect-30 | 1st perfect |
 |---|---|---|---|---|
 | `b1c-nstep3` | 1.14M | 76.0 (255k) | 1.7% | 206k |
 | `b2b-nstep2` | 580k | 74.6 (140k) | 0.7% | 121k |
 
-Both peak *below* every baseline, both then decline for hundreds of thousands of steps,
-and both sit at zero perfect games in their trailing windows. Two arms ordered by n giving
-the same shape is a trend, not noise.
+Both peaked *below* every baseline, both then declined for hundreds of thousands of steps,
+and both sat at zero perfect games in their trailing windows. Two arms ordered by n giving
+the same shape looked like a trend rather than noise, and this overturned a still earlier read
+that n=3 had "the best trajectory of the batch" — true through 200k, false afterwards.
 
-This overturned an earlier read that n=3 had "the best trajectory of the batch" — true
-through 200k, false afterwards. Do not plan an n=5 arm.
+**That conclusion is withdrawn, because the mechanism it tested was broken.** Terminal steps
+carried a non-zero discount until 2026-08-02, and `to_n_step_transition` composes
+
+```
+r_t + g*d_t*r_{t+1} + g^2*d_t*d_{t+1}*r_{t+2} + ...
+```
+
+where those per-step `d` values are the **only** thing that truncates the sum at an episode
+boundary. At `d = 0.9975` on a terminal step, an n-step return keeps accumulating past the end of
+the episode into whatever sits next to it in the replay buffer. Both arms above were therefore
+trained on returns that mix episodes together, which is a fair explanation for peaking below every
+1-step baseline.
+
+This is **not** evidence that n-step helps. It is a retraction of the evidence that it does not.
+If a slot is ever spare, `n=2` on the fixed environment is a cheap re-test — and unlike the
+original pair it would be measuring n-step returns.
 
 ## The discount has an optimum near 0.995, not a monotone benefit
 
