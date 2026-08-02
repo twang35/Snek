@@ -12,6 +12,8 @@ section before proposing an epsilon or buffer experiment.
 |---|---|
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
+| On the new env, `0.995` has the better expected value and `0.9975` the steadier single arm | **open**, n=2 each |
+| Nothing trained *after* the audit yet beats a pre-audit checkpoint re-measured on the new env | **open**, 1 batch |
 | **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes, **old env** |
 | **An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M** | **established**, 2 arms followed to the end |
 | **The horizon was the binding constraint** — records live past 2.5M, old arms stopped at ~1.06M | **established** |
@@ -144,6 +146,54 @@ whose meaning changed underneath them, so a drop is the expected cost of being o
 Whether the corrected observations *train* better is a different question, untested, and what
 batch 9 will start to answer. An earlier 30-episode spot check put the champion at 21/30 and this
 supersedes it — 100 episodes on 72 checkpoints rather than 30 on one.
+
+## Batch 9: the discount candidates win different things, and neither is settled
+
+First batch trained on the post-audit environment. 2x `0.9975` against 2x `0.995`, shared base
+alpha 0.6 / `td_loss` / no IS, close-outs measured at 3.4-3.6M steps while the arms were still
+training.
+
+| arm | discount | best ckpt | top-3 | pooled | outcome |
+|---|---|---|---|---|---|
+| `b9a-disc9975a` | 0.9975 | 65.0% @1735k | 64.3% | **54.9%** /2000 | survived |
+| `b9b-disc9975b` | 0.9975 | — | — | — | **dead**, peaked at 328k |
+| `b9c-disc995a` | 0.995 | 52.0% @2603k | 51.3% | 38.0% /2000 | survived |
+| `b9d-disc995b` | 0.995 | **70.0%** @2544k | **66.3%** | 42.4% /1700 | survived |
+
+**Expected value favours `0.995`, because it survives.** Mean top-3 across both seeds is **58.8%
+for 0.995** against **32.2% for 0.9975** — the dead arm contributes zero, and that gap is larger
+than anything the surviving arms differ by. This is the same shape the pre-audit data showed, where
+0.995 went 3 of 3 and 0.9975 1 of 2, which is mild evidence the audit did not change the underlying
+dynamics.
+
+**Consistency favours `0.9975`.** `b9a` pools 54.9% with 18 of 20 checkpoints above 40%, against
+42.4% and 38.0% for the 0.995 seeds. If a run survives, 0.9975 gives a wider good region.
+
+**Seed spread exceeds the effect.** The two 0.995 seeds are 18 points apart on best checkpoint
+(70% vs 52%) — more than any difference between the values. At n=2 that is expected, and it is why
+this stays open rather than becoming a finding. Seeds 3 and 4 of each value would separate them.
+
+### Nothing trained after the audit beats a pre-audit checkpoint yet
+
+Batch 9's best is **70%**. `b8f`'s `3149000`, trained on the *old* observation space, re-measures
+at **82%** on this one, at a comparable horizon (its best sat at 3.15M; batch 9 was measured at
+3.4-3.6M).
+
+So the corrected observations have not yet produced a better policy than the buggy ones did. That
+is one batch, two configs, and arms that had not finished, so it is not a verdict — but it is the
+opposite of what the fixes were meant to buy, and worth stating plainly rather than waiting for a
+batch that agrees. The audit's justification was always correctness rather than performance: a
+feature that claims the snake is trapped when it is not was wrong regardless of what it scored.
+
+### Two process notes from this batch
+
+**A partial close-out is not a small version of a complete one.** `b9d` at 12 of 17 checkpoints had
+a best of 49% and looked like the weakest arm in the batch; its final five checkpoints contained its
+top three, including the batch's best at 70%. I reported the interim ranking and it was wrong.
+
+**The best checkpoint and the trailing peak are in different places.** `b9a`'s best is at 1735k
+against a trailing peak at 3277k; `b9d`'s best is at 2544k against a trailing peak at 1232k. In
+both directions, so trailing average is not a proxy for where the good checkpoints are.
 
 ## `DISCOUNT=0.995` matches the best ceiling and removes the death risk
 

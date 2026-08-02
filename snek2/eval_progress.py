@@ -262,15 +262,43 @@ def render(policy_name, state, out_path):
             top.plot(rounds, running, marker='o', markersize=3.5, linewidth=1.4,
                      label='{0} @{1}'.format(label, flight['step']))
             top.set_xlim(0.5, flight['rounds_total'] + 0.5)
+        # How many processes are contributing at each round, as a step line on its own axis.
+        # Not a section of its own — it is a one-line answer to "how much of the machine is on
+        # this right now", which the perfect-rate lines cannot show: several lines at round 3
+        # could be one process on its third round or three processes on their first.
+        #
+        # A process counts toward round r once it has reported r rounds, so the line starts at
+        # however many are working and steps down as the quicker ones finish their checkpoint.
+        depths = [len(flight.get('per_round_perfect') or []) for _, flight in state['active']]
+        if depths:
+            deepest = max(depths)
+            per_round_processes = [sum(1 for d in depths if d >= r) for r in range(1, deepest + 1)]
+            process_axis = top.twinx()
+            process_axis.step(range(1, deepest + 1), per_round_processes, where='mid',
+                              color='tab:gray', linewidth=1.2, linestyle=(0, (5, 2)),
+                              alpha=0.8, label='processes')
+            process_axis.set_ylabel('processes evaluating', color='tab:gray', fontsize=8)
+            process_axis.tick_params(axis='y', labelcolor='tab:gray', labelsize=7)
+            # Integer ticks only: a count of 2.5 processes is meaningless.
+            process_axis.set_ylim(0, max(per_round_processes) + 1)
+            process_axis.set_yticks(range(0, max(per_round_processes) + 2))
+            process_axis.grid(False)
+
         if top.lines:
             top.legend(fontsize=7, loc='lower right', ncol=2, framealpha=0.85)
-        top.set_title('In flight: running perfect rate by round ({0} checkpoint{1})'.format(
-            len(state['active']), '' if len(state['active']) == 1 else 's'), fontsize=10)
-        top.set_xlabel('round', fontsize=8)
+        top.set_title('In flight: running perfect rate by round ({0} checkpoint{1}, {2} process{3})'.format(
+            len(state['active']), '' if len(state['active']) == 1 else 's',
+            len(state['active']), '' if len(state['active']) == 1 else 'es'), fontsize=10)
+        top.set_xlabel('round  (one episode per worker, so 10 rounds x 10 workers = 100 episodes)',
+                       fontsize=8)
         top.set_ylabel('running perfect %', fontsize=8)
         top.set_ylim(0, 100)
         top.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
         top.tick_params(labelsize=7)
+        # Keep the perfect-rate lines drawn over the process step line, and let the twin axis
+        # show through: twinx() puts the new axes on top with an opaque patch by default.
+        top.set_zorder(2)
+        top.patch.set_visible(False)
 
     # --- 2. completed checkpoints by step ------------------------------------------------
     middle = figure.add_subplot(grid[next_row])

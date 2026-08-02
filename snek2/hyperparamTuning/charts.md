@@ -59,6 +59,10 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
+| `b9d-disc995b` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 3.40M | 86.7 (1232k) | 30.3% | **70%** @2544k | 42.4% /1700 | ‡ **new env** — best ceiling of batch 9 |
+| `b9a-disc9975a` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.61M | 89.8 (3277k) | 56.0% | 65% @1735k | **54.9%** /2000 | ‡ **new env** — most consistent of batch 9 |
+| `b9c-disc995a` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 3.64M | 86.4 (2599k) | 37.3% | 52% @2603k | 38.0% /2000 | ‡ **new env** — weakest survivor |
+| `b9b-disc9975b` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | **10.47M** | 72.1 (328k) | 5.0% | not measured | — | ‡ **new env** — **dead**, peaked at 328k |
 | `b8f-disc9975seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.47M | 89.4 (1716k) | **69.3%** | **92%** @2816k | **66.3%** /5200 | **project record**; 38 of 52 ckpts measured >=60% |
 | `b8d-disc995clip` | + **`GRADIENT_CLIPPING=10`**, disc 0.995 | **11.64M** | 86.9 (2058k) | 50.0% | **80%** @2538k | 60.4% /2000 | second by measurement, but **died at ~7M**; clipping adds nothing |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | **92.6** (267k) | 44.0% | 51% @860k | 38.8% /1000 | best of batch 7, and it survived |
@@ -165,6 +169,67 @@ Seven arms in four slots. Set out to push the discount past 0.995 and found that
 has an optimum: 0.999 is dead 2 of 2, while **0.9975 produced the best arm the investigation
 has run**. Gradient clipping, added as an incidental stability aid, was briefly the batch's
 headline and ended as its negative result.
+
+### ‡ Batch 9 arms are measured on a different environment
+
+The 2026-08-02 audit changed two observation components and the reward, and every arm below the
+batch-9 rows was measured before it. A batch-9 number is **not comparable** to a pre-audit one:
+the same checkpoint that scored 92% on the old environment reads 73% on this one. Compare batch-9
+arms to each other, and to `b8f`'s re-measured 82% if you want a pre-audit reference. See
+[`findings.md`](findings.md#what-this-cost-about-10-points-measured-properly).
+
+All three survivors were still training when measured, at 3.4-3.6M steps, so these are mid-run
+close-outs rather than final ones.
+
+### b9a-disc9975a — `DISCOUNT=0.9975`, new env
+
+Step 3.61M (running) · peak score **89.8** (at 3277k) · **best 30-eval perfect 56.0%** (at 1738k) · max single eval **90%** · **best measured checkpoint 65.0%** (at 1735k), pooled **54.9%** /2000
+
+**The most consistent arm of batch 9**, and the only 0.9975 seed that survived. Its pooled 54.9%
+over 20 checkpoints is well clear of both 0.995 seeds, and 18 of 20 checkpoints measured above 40%.
+
+Its best checkpoint sits at **1735k, less than half way to its trailing peak at 3277k** — the
+graph keeps climbing after the measurable quality stops improving, which is the same pattern
+`b8f` showed and a reason not to read peak trailing as a proxy for peak policy.
+
+![b9a-disc9975a progress](charts/b9a-disc9975a.png)
+
+### b9b-disc9975b — `DISCOUNT=0.9975`, new env, dead
+
+Step **10.47M** (stopped 2026-08-02) · peak score 72.1 (at **328k**) · best 30-eval perfect 5.0% (at 221k) · max single eval 20% · not measured
+
+**The overrun failure the 3-3.5M stop rule exists to prevent.** It peaked at step **328k** — before
+any sibling had warmed up — then declined and ran a further 10.1M steps producing nothing, with
+`zero_since` at 9.92M. Nothing was watching it for eight hours overnight.
+
+Not measured: no checkpoint came near the 60% selector floor, so a close-out would have had
+nothing to evaluate.
+
+![b9b-disc9975b progress](charts/b9b-disc9975b.png)
+
+### b9c-disc995a — `DISCOUNT=0.995`, new env
+
+Step 3.64M (running) · peak score 86.4 (at 2599k) · best 30-eval perfect 37.3% (at 2608k) · max single eval **80%** · **best measured checkpoint 52.0%** (at 2603k), pooled 38.0% /2000
+
+The weakest of the three survivors on every measure, and the reason 0.995 cannot be called the
+better value on this environment despite going 2 for 2 on survival. Its good region is narrow:
+best and second-best are 2603k and 2626k, 23k apart.
+
+![b9c-disc995a progress](charts/b9c-disc995a.png)
+
+### b9d-disc995b — `DISCOUNT=0.995`, new env
+
+Step 3.40M (running) · peak score 86.7 (at 1232k) · best 30-eval perfect 30.3% (at 1324k) · max single eval **90%** · **best measured checkpoint 70.0%** (at 2544k), pooled 42.4% /1700
+
+**The best single checkpoint of batch 9** at 70%, and the arm that inverts the interim reading —
+at 12 of 17 checkpoints its best was 49% and it looked like the weakest arm in the batch. The
+remaining five checkpoints contained its top three. A partial close-out is not a small version of
+a complete one.
+
+Its trailing average peaked at **1232k** and had fallen to 49.4 by 3.4M, while its best measured
+checkpoint is at 2544k — the graph and the measurement disagree about when this arm was good.
+
+![b9d-disc995b progress](charts/b9d-disc995b.png)
 
 ### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
 

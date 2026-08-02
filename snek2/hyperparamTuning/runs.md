@@ -131,12 +131,39 @@ rather than by inspection.
 are past their peak trailing, b9d peaked at 1.23M. Stopping them is the user's call; the
 recommendation is to stop all three.
 
-**Early and not a result:** 0.9975 is **1 of 2** on survival, 0.995 is **2 of 2** — the same
-shape as the old environment's finding. Suggestive that the audit did not disturb the underlying
-dynamics, but n=2 a side and six single-seed conclusions in this file have been overturned.
+### Close-out measurements, 2026-08-02 — mid-run, arms still training
 
-`top20` close-outs are running on all three survivors (20, 20 and 17 checkpoints selected),
-written to `_r0`.
+| arm | discount | ckpts | best ckpt | top-3 | pooled | 95% CI |
+|---|---|---|---|---|---|---|
+| `b9a-disc9975a` | 0.9975 | 20 | 65.0% @1735k | 64.3% | **54.9%** /2000 | 52.7-57.1 |
+| `b9c-disc995a` | 0.995 | 20 | 52.0% @2603k | 51.3% | 38.0% /2000 | 35.9-40.1 |
+| `b9d-disc995b` | 0.995 | 17 | **70.0%** @2544k | **66.3%** | 42.4% /1700 | 40.0-44.7 |
+
+**The discount question is not settled, and the two candidates win different things.**
+
+- **Ceiling goes to 0.995**: `b9d`'s 70% is the best checkpoint in the batch, and its top-3 of
+  66.3% edges `b9a`'s 64.3%.
+- **Consistency goes to 0.9975**: `b9a` pools 54.9% against 42.4% and 38.0%, with 18 of 20
+  checkpoints above 40%.
+- **Survival goes to 0.995**, 2 of 2 against 1 of 2 — and that dominates expected value. Mean
+  top-3 across seeds is **58.8% for 0.995** against **32.2% for 0.9975**, because a dead arm
+  contributes zero.
+- **Spread within 0.995 is larger than the gap between values**: `b9d` 70% against `b9c` 52%.
+  Seed variance is still bigger than the effect being measured, exactly as at n=2 it should be.
+
+**Nothing here is established.** n=2 a side, both survivors were still training when measured, and
+this file already records six single-seed conclusions that were later overturned. The honest
+summary is that 0.995 has the better expected value on this environment and 0.9975 the steadier
+single arm, and that separating those needs seeds 3 and 4 of each.
+
+**Batch 9's best checkpoint (70%) is below `b8f`'s re-measured 82%.** A policy trained *before* the
+audit still beats everything trained after it, at a comparable horizon. That is one batch and not
+a verdict on the corrected observations, but it is the opposite of what the fixes were meant to
+buy and it belongs on the record.
+
+**`b9d` inverted its own interim reading.** At 12 of 17 checkpoints its best was 49% and it looked
+like the weakest arm; its last five checkpoints held its top three. Do not act on a partial
+close-out.
 
 ## Batch 8 — finished 2026-08-01
 

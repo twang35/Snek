@@ -2,7 +2,7 @@
   "policy_name": "b9c-disc995a",
   "episodes_per_checkpoint": 100,
   "checkpoints_requested": 20,
-  "complete": false,
+  "complete": true,
   "requested_steps": [
     554000,
     645000,
@@ -25,19 +25,8 @@
     3234000,
     3252000
   ],
-  "in_flight": {
-    "step": 3234000,
-    "round": 1,
-    "rounds_total": 10,
-    "perfect_so_far": 4,
-    "episodes_so_far": 10,
-    "running_percent": 40.0,
-    "per_round_perfect": [
-      4
-    ],
-    "started_at": 1785688232.079264
-  },
-  "updated_at": 1785688237.970073,
+  "in_flight": null,
+  "updated_at": 1785688385.7972422,
   "results": [
     {
       "step": 554000,
@@ -380,6 +369,44 @@
       "max_score": 95.0,
       "avg_reward": 101.45,
       "seconds": 82.1
+    },
+    {
+      "step": 3234000,
+      "selected_by": "outlier",
+      "graph_single_eval": 70,
+      "graph_surrounding": 29.0,
+      "episodes": 100,
+      "perfect_games": 33,
+      "perfect_percent": 33.0,
+      "perfect_ci95": [
+        24.6,
+        42.7
+      ],
+      "avg_score": 83.71,
+      "median_score": 89.5,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 112.5,
+      "seconds": 76.3
+    },
+    {
+      "step": 3252000,
+      "selected_by": "outlier",
+      "graph_single_eval": 80,
+      "graph_surrounding": 24.0,
+      "episodes": 100,
+      "perfect_games": 22,
+      "perfect_percent": 22.0,
+      "perfect_ci95": [
+        15.0,
+        31.1
+      ],
+      "avg_score": 79.97,
+      "median_score": 85.5,
+      "min_score": 6.0,
+      "max_score": 95.0,
+      "avg_reward": 97.31,
+      "seconds": 77.4
     }
   ]
 }
