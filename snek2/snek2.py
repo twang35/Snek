@@ -81,14 +81,26 @@ def main(argv):
     # exploration forever. See hyperparamTuning/runs.md.
     min_epsilon = tuned('MIN_EPSILON', 0.0)
 
-    display_training = False
-    # display_training = True
+    display_training = snake_constants.DISPLAY_TRAINING
 
     # See snake_constants.DISPLAY_EVAL for why this is off by default and what it costs.
     # compute_avg_return() reads the same constant, so both ends agree.
     display_eval = snake_constants.DISPLAY_EVAL
     # eval_limit_fps = True
     eval_limit_fps = False
+
+    # Nothing here will draw unless one of those is on, but Game.__init__ calls
+    # pygame.display.set_mode() regardless, and reset() blits the background and flips. So
+    # without the dummy driver this process opened a real window, painted it white once, and
+    # then never touched it again, because render() returns early when display is off. An empty
+    # white square looks like a broken window rather than a disabled one.
+    #
+    # The parallel eval workers already select the dummy driver in their factory; the main
+    # process was the one left out. setdefault so an explicit SDL_VIDEODRIVER still wins, and
+    # inside main() rather than at import so that importing snek2 — which eval_checkpoints.py
+    # and watch.py both do, for build_q_net — cannot suppress *their* windows.
+    if not (display_eval or display_training):
+        _os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 
     eval_only = False
     # eval_only = True

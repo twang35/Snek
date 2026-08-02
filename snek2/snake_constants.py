@@ -20,6 +20,10 @@ DEBUG_LOGGING = os.environ.get('SNEK_DEBUG', '0') not in ('0', '', 'false', 'Fal
 # which silently overrode the setting.
 DISPLAY_EVAL = os.environ.get('SNEK_DISPLAY_EVAL', '0') not in ('0', '', 'false', 'False')
 
+# The same switch for the training environment itself. Off by default and rarely wanted: it
+# draws every collect step rather than one episode per eval, so it is far more expensive again.
+DISPLAY_TRAINING = os.environ.get('SNEK_DISPLAY_TRAINING', '0') not in ('0', '', 'false', 'False')
+
 # screen that game appears on 0 or 1
 SCREEN_TO_DISPLAY = 0
 

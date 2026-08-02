@@ -62,15 +62,29 @@ snek2/savedPolicies/` wholesale — target the `smoke/` subdirectory only.
 ## Run artifacts
 
 Every eval writes `snek2/runs/<policy_name>.{png,md}` plus
-`<policy_name>_history.json`. **Never delete anything in `snek2/runs/`** — not
-even throwaway smoke output like `snek2/runs/smoke.*`. The user reviews these by
-hand, so they have to survive after a run finishes, and a deleted graph can't be
-recovered without re-running the training that produced it.
+`<policy_name>_history.json`. **Keep everything from a real training arm.** The user
+reviews these by hand, a deleted graph cannot be recovered without re-running the
+training that produced it, and disk is not a constraint. That covers the whole
+`b<n><letter>-<name>` family and their `_checkpoint_evals*.json` measurements, which
+the tuning docs cite directly.
 
-This is the opposite of the checkpoint rule above: `savedPolicies/smoke/` is
-scratch space and is fine to clear, `runs/` is output to keep. Letting a later run
-of the same policy overwrite these files is expected and fine; removing them is
-not.
+**Throwaway output is fine to delete.** Smoke tests, speed benchmarks and
+verification runs are not results — they are scaffolding from proving a change
+works, and they age into noise that makes the directory harder to read. Judge by
+what produced it, not by where it lives:
+
+| keep | delete |
+|---|---|
+| `b8f-disc9975seed2.*`, `b8d-disc995clip_checkpoint_evals.json` | `smoke.*`, `smoke_evals.json` |
+| any arm named in `completedRuns.md` or `runs.md` | `bench-*` and similar timing scaffolding |
+| `_checkpoint_evals*.json` for a real arm | `champion_*` / `smoke_checkpoint_evals_*` verification evals |
+
+When in doubt, keep it — the asymmetry still holds, since a wrongly kept file costs
+a few KB and a wrongly deleted one costs a training run. Check for references first
+(`grep -rn <name> --include='*.md' .`): the tuning docs link specific files by name,
+and a deletion that breaks one of those links is worse than the clutter.
+
+Letting a later run of the same policy overwrite these files is expected and fine.
 
 ## `snek2/hallOfFame/` — record checkpoints, never delete
 
@@ -291,12 +305,26 @@ It renders in its own process, reloads the newest checkpoint between episodes so
 progress shows up without a restart, and costs training nothing — it only reads checkpoint
 files. `WATCH_FPS` caps the frame rate (default 90; drop to 20-30 to follow the moves).
 
-The two in-run switches still exist for debugging, and both are off by default:
+The in-run switches still exist for debugging, and all are off by default:
 
 - `EVAL_RENDER=1` — window in `eval_checkpoints.py` (worker 0 only), ~5x the wall clock
 - `SNEK_DISPLAY_EVAL=1` — window for training's one displayed eval episode
+- `SNEK_DISPLAY_TRAINING=1` — window for the *collect* loop, which draws every training step
+  rather than one episode per eval, so it is far more expensive again
 
-Neither affects results: `render()` only draws and returns immediately when `display=False`.
+None of them affect results: `render()` only draws and returns immediately when
+`display=False`.
+
+**A process that will not draw must select the dummy video driver, not merely skip
+drawing.** `Game.__init__` calls `pygame.display.set_mode()` unconditionally and `reset()`
+blits the background and flips, so a process with a real driver and `display=False` opens a
+window, paints it white once, and never touches it again. That looks like a broken window
+rather than a disabled one, and it is exactly what happened when training's default flipped to
+headless. `snek2.main()` now sets `SDL_VIDEODRIVER=dummy` unless a display switch is on.
+
+Note it does that inside `main()`, not at import: `eval_checkpoints.py` and `watch.py` both
+import `snek2` for `build_q_net`, and an import-time `setdefault` would suppress *their*
+windows too.
 
 **The two paths were slow for different reasons, and it matters.** In `eval_checkpoints.py`
 the visible worker sits *inside* the `ParallelPyEnvironment`, which steps every worker
