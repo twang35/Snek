@@ -1105,8 +1105,9 @@ observations and rewards are byte-identical across 7,976 records of fixed-seed p
 |---|---|---|---|
 | **Eval window** (worker 0 rendered) | 6050 us/step | 163 us/step | 30-ep eval **70.1s → 14.0s (5.0x)** |
 | **Training eval window** (every eval) | 11.56s/episode | 1.71s/episode | 10k steps **83s → 56s**, widening with skill |
-| `get_pos` used `np.add` on int pairs | 8.3M calls, 11.7s | 190k calls, 0.03s | game+obs **1791 → 161 us/step (11.1x)** |
+| `get_pos` used `np.add` on int pairs | 8.3M calls, 11.7s | removed entirely | game+obs **1791 → 161 us/step (11.1x)** |
 | Flood fill recursed and re-checked `is_open` | 2.0M redundant numpy lookups | iterative, no re-check | included above |
+| **Flood fill rewritten as bitwise dilation** | 0.899s in `count_groups` | 0.155s | game+obs **161 → 54 us/step**, 33x overall |
 | Eval inference ran eager | 1421 us/call | 208 us/call (6.8x) | ~0 end to end (not the bottleneck) |
 | `copy.deepcopy` on the grid | 0.056s | `.copy()` | negligible, 0.3% of profile |
 
@@ -1120,11 +1121,27 @@ Both windows are now off by default and restored with `EVAL_RENDER=1` and
 `SNEK_DISPLAY_EVAL=1`. Neither can affect results: `render()` only draws, and returns
 immediately when `display=False`.
 
-**Still open, and deliberately not done:** `group_obs` runs a full-board flood fill three
-times per observation, once per candidate action, and that is now ~84% of what remains of
-observation cost. It is not worth attacking — after the render fix the whole game+observation
-path is ~10% of a single-process step, so even an infinitely fast environment buys ~10%. The
-bottleneck is TF inference now.
+#### How the connectivity fill got to 33x
+
+`count_groups` now represents the open cells as a single Python int and grows a region by
+smearing it one cell in each direction — `region | region<<1 | region>>1 | region<<cols |
+region>>cols`, masked back to open cells, until it stops growing. Each round is a handful of
+operations on a ~144-bit int no matter how many cells the region holds, against a
+cell-at-a-time walk paying interpreter overhead per cell per neighbour.
+
+The wall ring `_rebuild_grid()` pads the grid with is what makes it safe. Shifting by one
+crosses a row boundary, but the first and last columns are always wall, so no open bit ever
+sits where it could wrap, and the mask discards it anyway. The same ring keeps the vertical
+shifts in range. Regions come back as bitmasks instead of sets of coordinates, so
+`get_adjacent_groups` tests membership with one `&` rather than searching a set per region.
+
+Output is byte-identical across 7,976 records of fixed-seed play, and region *ordering*
+changed, which nothing reads — callers want the count and whether two cells share a region.
+
+**Where it stands:** no single hotspot is left. `group_obs` is ~46% of observation cost,
+down from ~84%, and the rest is spread across `Snake.move`, `_rebuild_grid` and
+`get_adjacent_groups`. Further work has little to aim at, and little to win: the whole
+game+observation path is now well under 10% of a step, so the bottleneck is TF inference.
 
 ## Engineering facts worth not rediscovering
 

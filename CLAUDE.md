@@ -246,6 +246,32 @@ any pygame import as a second line of defence.
 If a future change needs another subsystem, init that subsystem by name. Measure with
 `ps -o %cpu= -p $(pgrep -x coreaudiod)` while workers run; it should read 0.0.
 
+## Tests: `snek2/tests/`, and run them — they rot silently
+
+`tests/test_state_helpers.py` covers `group_obs` and `body_and_wall_collisions` on
+hand-written grids. **pytest is not installed in the `snek` env**, so run them directly:
+
+```
+cd snek2
+PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -c "
+import sys; sys.path.insert(0, 'tests')
+import test_state_helpers as t
+for n in [x for x in dir(t) if x.startswith('test')]:
+    try: getattr(t, n)(); print('PASS', n)
+    except Exception as e: print('FAIL', n, type(e).__name__, e)
+"
+```
+
+13 of these were dead for two signature generations — they called `group_obs` with a food
+position it had stopped taking, so they raised `TypeError` rather than failing an assertion,
+and a `TypeError` looks like noise if nobody is watching. **Every test covering `group_obs`
+was dead at the point `group_obs` was changed.** Run the suite before and after touching
+`state_helpers.py`, and check the failure *type*: a `TypeError` means the test is stale, not
+that the code is fine.
+
+For refactors, also diff observations against a fixed-seed run — byte-identical output over a
+few thousand steps catches what 24 assertions do not.
+
 ## Rendering is off by default — it was the slowest thing in the project
 
 Both the eval script and training used to draw a real game window, and that window cost

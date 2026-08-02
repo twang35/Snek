@@ -1,13 +1,12 @@
-import copy
 import math
 
 import numpy as np
 
 from snake_constants import *
 
-# The four neighbour offsets, in DIRECTIONS order so the flood fill visits cells in the same
-# order it always did. Precomputed because the inner loop used to re-read MOVE_VECTORS by
-# direction name on every cell.
+# The four neighbour offsets, derived from MOVE_VECTORS so they cannot drift from it. Used by
+# get_adjacent_groups; the flood fill in count_groups works on flat bit positions and shifts
+# instead, so it needs no coordinate offsets at all.
 NEIGHBOUR_OFFSETS = tuple(MOVE_VECTORS[direction] for direction in DIRECTIONS)
 
 
@@ -102,6 +101,7 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
 # total_group_obs: returns number of groups
 def group_obs(old_grid, head_pos, tail_pos, head_move_dir):
     observations = []
+    cols = old_grid.shape[1]
     for action in ACTIONS:
         # .copy() rather than copy.deepcopy(): an ndarray copy is already independent, and
         # deepcopy walks the object graph to reach the same result. Worth almost nothing on
@@ -109,13 +109,13 @@ def group_obs(old_grid, head_pos, tail_pos, head_move_dir):
         grid = update_grid(action, head_pos, tail_pos, old_grid.copy(), head_move_dir)
         new_head_pos = get_relative_pos(action, head_pos, head_move_dir)
 
-        groups = count_groups(grid)
+        regions, group_count = count_groups(grid)
 
         head_with_tail = 0
-        num_groups = log2plus1(len(groups))
+        num_groups = log2plus1(group_count)
 
-        head_groups = get_adjacent_groups(grid, groups, new_head_pos)
-        tail_groups = get_adjacent_groups(grid, groups, tail_pos)
+        head_groups = get_adjacent_groups(regions, cols, new_head_pos)
+        tail_groups = get_adjacent_groups(regions, cols, tail_pos)
 
         if len(head_groups & tail_groups) > 0 or tuple(new_head_pos) == tail_pos:
             head_with_tail = 1
@@ -137,78 +137,71 @@ def log2plus1(num):
 
 
 def count_groups(grid):
-    remaining_spaces = set()
-    # maybe groups is not needed? or big groups are ok?
-    groups = []
+    """Groups the open cells into connected regions, as bitmasks over the padded grid.
 
-    # don't need to check the boundaries which are always value 4
-    # Read the whole array out once. Indexing a numpy array cell by cell costs far more per
-    # lookup than indexing nested lists, and this scan covers the full board on every call.
-    cells = grid.tolist()
-    for i in range(grid.shape[1] - 2):
-        for j in range(grid.shape[0] - 2):
-            # if is 0 or 1, add to remaining_spaces.
-            value = cells[j + 1][i + 1]
-            if value == 0 or value == 1:
-                remaining_spaces.add((i, j))
+    Returns `(regions, count)`. Each region is a Python int whose set bits are the cells it
+    contains, tile (x, y) being bit `(y + 1) * cols + (x + 1)`. `count` is `len(regions)`.
 
-    # for each grid element, recurse and try to connect
-    while len(remaining_spaces) > 0:
-        groups.append(set())
-        populate_group(groups[-1], remaining_spaces.pop(), grid, remaining_spaces)
+    The fill is a bitwise dilation rather than a per-cell walk: repeatedly smear the region
+    one cell in each direction and mask back down to open cells, until it stops growing. Each
+    round is a handful of operations on a ~144-bit int regardless of how many cells the region
+    holds, where a cell-at-a-time flood fill pays interpreter overhead per cell per neighbour.
 
-    return groups
+    Two things make this safe, both courtesy of the wall ring Snake._rebuild_grid() pads with.
+    Shifting by one crosses a row boundary — bit (r, cols-1) shifts into (r+1, 0) — but the
+    first and last column are always wall, so no open bit ever sits where it could wrap, and
+    `& open_mask` discards it regardless. The same ring keeps the vertical shifts in range.
 
-
-def populate_group(group_set, tile_pos, grid, remaining_spaces):
-    """Flood-fills the connected group containing tile_pos, consuming remaining_spaces.
-
-    Iterative rather than recursive: an open board is one ~100-cell region, so the recursive
-    form spent a Python call frame per cell and came within sight of the recursion limit.
-
-    The `is_open()` re-check it used to do was redundant — remaining_spaces is built from
-    exactly the open cells, so membership already implies openness. That check alone was
-    ~2M calls per 8k steps, each one a numpy lookup.
+    Region order differs from earlier versions. Nothing reads it: callers want the region
+    count and whether two cells share a region.
     """
-    stack = [tile_pos]
-    group_set.add((tile_pos[0], tile_pos[1]))
+    cols = grid.shape[1]
+    # Bit i set iff cell i is open (empty or food). packbits with little bit order matches
+    # int.from_bytes little endian, so bit i lands on element i - verified against a
+    # shift-and-or loop over 500 random cases.
+    open_flags = ((grid == 0) | (grid == 1)).ravel()
+    open_mask = int.from_bytes(np.packbits(open_flags, bitorder='little').tobytes(), 'little')
 
-    while stack:
-        pos = stack.pop()
-        x = pos[0]
-        y = pos[1]
-        for offset in NEIGHBOUR_OFFSETS:
-            neighbour = (x + offset[0], y + offset[1])
-            if neighbour in remaining_spaces:
-                remaining_spaces.remove(neighbour)
-                group_set.add(neighbour)
-                stack.append(neighbour)
+    regions = []
+    remaining = open_mask
+    while remaining:
+        region = remaining & -remaining          # lowest set bit: an arbitrary unvisited cell
+        while True:
+            grown = (region | (region << 1) | (region >> 1)
+                     | (region << cols) | (region >> cols)) & open_mask
+            if grown == region:
+                break
+            region = grown
+        regions.append(region)
+        remaining &= ~region
 
-
-def is_open(tile_pos, grid):
-    grid_num = get_grid_number(tile_pos, grid)
-    return grid_num == 0 or grid_num == 1
-
-
-def get_adjacent_groups(grid, groups, tile_pos):
-    group_set = set()
-    for direction in DIRECTIONS:
-        direction_pos = get_pos(direction, tile_pos)
-        grid_number = get_grid_number(direction_pos, grid)
-        if grid_number == 0 or grid_number == 1:
-            for i in range(len(groups)):
-                if tuple(direction_pos) in groups[i]:
-                    group_set.add(i)
-
-    return group_set
+    return regions, len(regions)
 
 
-def get_grid_number(coord, grid):
-    if coord[0] > SCREENTILES[0] + 1 or coord[1] > SCREENTILES[1] + 1:
-        return 4
-    if coord[0] < 0 or coord[1] < 0:
-        return 4
-    return grid[coord[1] + 1][coord[0] + 1]
+def get_adjacent_groups(regions, cols, tile_pos):
+    """Indices of the regions holding an open cell orthogonally adjacent to tile_pos.
+
+    `tile_pos` is allowed to be off the board — callers pass the prospective head position,
+    which may be past a wall — so each neighbour gets the same guard get_grid_value() applies,
+    reading anything off-board as wall rather than indexing for it.
+    """
+    found = set()
+    x = tile_pos[0]
+    y = tile_pos[1]
+    for offset in NEIGHBOUR_OFFSETS:
+        neighbour_x = x + offset[0]
+        neighbour_y = y + offset[1]
+        if neighbour_x < 0 or neighbour_y < 0:
+            continue
+        if neighbour_x > SCREENTILES[0] + 1 or neighbour_y > SCREENTILES[1] + 1:
+            continue
+        bit = 1 << ((neighbour_y + 1) * cols + (neighbour_x + 1))
+        for index in range(len(regions)):
+            if regions[index] & bit:
+                found.add(index)
+                break
+
+    return found
 
 
 def distance_to_food(start_pos, food_pos):
@@ -257,16 +250,11 @@ def get_grid_value(tile_pos, grid):
     return grid[tile_pos[1] + 1][tile_pos[0] + 1]
 
 
-def get_pos(direction, tile_pos):
-    # Plain tuple arithmetic. This was `tuple(np.add(tile_pos, MOVE_VECTORS[direction]))`,
-    # which dispatched into numpy to add two pairs of small ints and then rebuilt a tuple
-    # from the result. The flood fill calls this four times per cell visited, so it ran
-    # 8.3M times per 8k game steps and was 68% of the entire observation cost — a bigger
-    # share than everything else in state_helpers put together.
-    vector = MOVE_VECTORS[direction]
-    return tile_pos[0] + vector[0], tile_pos[1] + vector[1]
-
-
 def get_relative_pos(action, tile_pos, move_dir):
+    # Plain tuple arithmetic. Its sibling get_pos() was `tuple(np.add(tile_pos, vector))`,
+    # dispatching into numpy to add two pairs of small ints and rebuilding a tuple from the
+    # result; the flood fill called it four times per cell visited, 8.3M times per 8k game
+    # steps, and it was 68% of the entire observation cost. The rewritten flood fill works on
+    # flat integer indices and needs no coordinate helper at all, so get_pos() is gone.
     vector = MOVE_VECTORS[CURRENT_DIRECTION_MAPS[move_dir][action]]
     return tile_pos[0] + vector[0], tile_pos[1] + vector[1]

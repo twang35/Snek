@@ -172,7 +172,7 @@ class Game:
         # Every episode's opening observation was therefore computed against an empty,
         # wrongly-shaped grid. It happened to produce the same 20 numbers because the snake
         # always starts mid-board with all three moves open, but it is not robust: with the
-        # tail near an edge the smaller array raises IndexError out of get_grid_number(),
+        # tail near an edge the smaller array raises IndexError out of get_grid_value(),
         # which bounds-checks against SCREENTILES + 1 and so assumes the (12, 12) form.
         self._rebuild_grid()
 
@@ -219,7 +219,7 @@ class Game:
 
         Cell values: 0 empty, 1 food, 2 head, 3 body, 4 wall. The array is two cells wider
         and taller than the board so the outer ring can hold the walls, which is why every
-        lookup offsets by +1 — see get_grid_number()/get_grid_value() in state_helpers.
+        lookup offsets by +1 — see get_grid_value() in state_helpers.
 
         Shared by reset() and step() on purpose. These were two separate copies that
         disagreed on the shape, and the observation code assumes the bordered form.
