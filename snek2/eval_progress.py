@@ -8,6 +8,8 @@ Answers the two questions you actually have while an eval is running — *how is
     PYTHONPATH=. python -u eval_progress.py            # every policy with eval results
     EVAL_PROGRESS_WATCH=30 PYTHONPATH=. python -u eval_progress.py b8f-disc9975seed2
     EVAL_PROGRESS_ALL=1 PYTHONPATH=. python -u eval_progress.py b8f-disc9975seed2
+    EVAL_PROGRESS_WINDOW_MODE=1 EVAL_PROGRESS_WATCH=20 PYTHONPATH=. python -u \
+        eval_progress.py b9a-disc9975a b9c-disc995a b9d-disc995b
 
 By default it reports the **current job** — every result file written within
 `EVAL_PROGRESS_WINDOW` seconds (default 3600) of the most recent one, which groups the parallel
@@ -22,12 +24,18 @@ case needs no second command. This script stays useful for the cases that one ca
 attaching to an eval already in flight, the text summary, the lifetime view
 (`EVAL_PROGRESS_ALL=1`), and watching several arms at once.
 
-The original objection to building it in was that splitting one arm across several
-`EVAL_OUT_SUFFIX` processes — six were used for the batch-8 close-out — would give six partial
-pictures and six writers racing on one PNG. load_runs() answers that: it pools every result
-file for the policy, so each window shows the whole job, and render() writes via a temporary
-file and os.replace so a racing writer cannot produce a torn PNG. What is left is duplicate
-windows, which `EVAL_CHART=0` on all but one process handles.
+`EVAL_PROGRESS_WINDOW_MODE=1` opens one window per policy from here, which is how you attach to
+an eval that is **already running** — started before the built-in chart existed, or by something
+that could not open a window itself. Combine it with `EVAL_PROGRESS_WATCH` to keep them live, and
+pass several policy names to follow a whole batch from one process.
+
+The original objection to building the chart into eval_checkpoints.py was that splitting one arm
+across several `EVAL_OUT_SUFFIX` processes — six were used for the batch-8 close-out — would give
+six partial pictures and six writers racing on one PNG. load_runs() answers that: it pools every
+result file for the policy, so each window shows the whole job, and render() writes via a
+temporary file and os.replace so a racing writer cannot produce a torn PNG. What is left is
+duplicate windows in that one case, which is the accepted price of an eval never silently having
+no chart at all.
 
 The PNG has three parts:
 
@@ -49,6 +57,7 @@ import sys
 import time
 
 import imageio
+import numpy as np
 
 import matplotlib
 matplotlib.use('Agg')  # no display needed; several of these may run over ssh or headless
@@ -348,14 +357,42 @@ def main(argv):
 
     include_all = os.environ.get('EVAL_PROGRESS_ALL', '0') not in ('0', '', 'false', 'False')
     watch = float(os.environ.get('EVAL_PROGRESS_WATCH', 0))
+    # One window per policy, for attaching to evals that are already running — an eval started
+    # before this existed, or one launched by something that could not open a window itself.
+    # eval_checkpoints.py draws its own window now, so this is the catch-up path, not the norm.
+    window_mode = os.environ.get('EVAL_PROGRESS_WINDOW_MODE', '0') not in ('0', '', 'false', 'False')
+    screens = {}
+
+    def draw_windows():
+        if not window_mode:
+            return
+        import pyformulas
+        for name in policy_names:
+            try:
+                frame = live_frame(name, include_all=include_all)
+                if frame is None:
+                    continue
+                if name not in screens:
+                    screens[name] = pyformulas.screen(
+                        np.zeros(frame.shape[:2], dtype=np.uint8),
+                        '{0} eval progress'.format(name))
+                # cv2 reads three channels as BGR; matplotlib produced RGB.
+                screens[name].update(frame[:, :, ::-1])
+            except Exception as error:
+                print('  {0}: window unavailable ({1}: {2})'.format(
+                    name, type(error).__name__, error))
+                screens[name] = None
+
     if not watch:
         report(policy_names, include_all)
+        draw_windows()
         return 0
 
     # Watch mode exits on its own once every policy is complete, so it can be left running
     # without becoming a process someone has to remember to kill.
     while True:
         report(policy_names, include_all)
+        draw_windows()
         outstanding = False
         for name in policy_names:
             state = summarize(load_runs(name, include_all=include_all))

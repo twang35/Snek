@@ -56,7 +56,6 @@ Environment:
     EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
                       (default 400; the game default stalls the whole round)
     EVAL_RENDER       1 to show a game in a window (default 0, all workers headless)
-    EVAL_CHART        0 to suppress the live progress window (default 1)
 
 **All workers are headless by default.** Rendering is the most expensive thing in an
 eval by a wide margin — 163us per game step headless against 6050us in a real window —
@@ -86,18 +85,22 @@ round is counted.
    marks the window unresponsive. This script overrides it with EVAL_PERFECT_WAIT_MS
    (default 400ms) so wins are still visible without stalling.
 
-**A live progress window opens by default**, the same cv2-via-pyformulas mechanism training
-uses for its graph: completed checkpoints, the one in flight converging round by round, and a
-text block with the top 5 and an ETA. It refreshes every round, costs ~0.1s a frame against a
-~4s round, and writes the same picture to runs/<policy_name>_eval_progress.png. `EVAL_CHART=0`
-turns it off for a headless or unattended run, and any failure to open a window disables it
-rather than failing the eval.
+**A live progress window always opens** — there is no flag to suppress it. It uses the same
+cv2-via-pyformulas mechanism as training's graph: completed checkpoints, the one in flight
+converging round by round, and a text block with the top 5 and an ETA. It refreshes every round,
+costs ~0.1s a frame against a ~4s round, and writes the same picture to
+runs/<policy_name>_eval_progress.png. If a window cannot be opened at all — headless, no cv2 —
+it disables itself on the first failure and the eval carries on, so an unattended run needs no
+configuration.
 
-It shows the *whole* job, pooling every result file for this policy, so running several
-processes on one arm with different EVAL_OUT_SUFFIX gives each window the same consolidated
-view rather than its own slice — set EVAL_CHART=0 on all but one to avoid duplicate windows.
-eval_progress.py renders the identical chart from outside, which is still the better option
-when the eval is already running or you want the text summary.
+It shows the *whole* job, pooling every result file for this policy, so running several processes
+on one arm with different EVAL_OUT_SUFFIX gives each window the same consolidated view rather
+than its own slice. Duplicate windows in that one case are the accepted price of never silently
+having none.
+
+To attach a window to an eval **already running**, use
+`EVAL_PROGRESS_WINDOW_MODE=1 EVAL_PROGRESS_WATCH=20 python -u eval_progress.py <policy> [...]`,
+which draws the identical chart from outside and can follow several arms at once.
 
 Results go to runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and
 can be compared across sessions.
@@ -566,13 +569,17 @@ def main(argv):
     # write_results(), so it advances every round rather than once a checkpoint — a frame costs
     # ~0.1s against a ~4s round, and CHART_MIN_INTERVAL keeps that bounded if rounds are quick.
     #
+    # Always on. There is no switch, deliberately: an eval you cannot follow is the thing this
+    # was built to fix, and a flag to suppress it only ever got used by mistake. If the window
+    # cannot be opened at all — headless, no cv2 — update_chart() disables itself on the first
+    # failure and the eval carries on, so nothing needs configuring for an unattended run.
+    #
     # eval_progress.live_frame() reads *every* result file for this policy, not just this
     # process's, so with several EVAL_OUT_SUFFIX processes on one arm each window shows the whole
-    # job rather than its own slice. They will be near-identical windows, so set EVAL_CHART=0 on
-    # all but one. Turn it off entirely for a headless or unattended run.
-    chart_enabled = os.environ.get('EVAL_CHART', '1') not in ('0', '', 'false', 'False')
+    # job rather than its own slice, and they will be near-identical. Duplicate windows are the
+    # price of never silently having none.
     chart_path = os.path.join(RUNS_DIR, '{0}_eval_progress.png'.format(policy_name))
-    chart = {'screen': None, 'last': 0.0, 'off': not chart_enabled}
+    chart = {'screen': None, 'last': 0.0, 'off': False}
 
     def update_chart(force=False):
         if chart['off']:
