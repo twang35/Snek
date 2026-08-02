@@ -193,7 +193,11 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
 
     image = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
 
-    screen.update(image)
+    # pyformulas is a thin cv2.imshow wrapper, and cv2 reads a three-channel array as BGR while
+    # matplotlib produces RGB — so passing `image` straight through swapped red and blue in the
+    # window, making the blue score trace look red and vice versa. The saved PNG was always
+    # correct, which is why this went unnoticed. Reverse the channels for the window only.
+    screen.update(image[:, :, ::-1])
     if graph_path is not None:
         # Same array that goes to the window, so the file always matches what's
         # on screen. Written beside the target and renamed so anything reading it

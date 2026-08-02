@@ -56,6 +56,7 @@ Environment:
     EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
                       (default 400; the game default stalls the whole round)
     EVAL_RENDER       1 to show a game in a window (default 0, all workers headless)
+    EVAL_CHART        0 to suppress the live progress window (default 1)
 
 **All workers are headless by default.** Rendering is the most expensive thing in an
 eval by a wide margin — 163us per game step headless against 6050us in a real window —
@@ -84,6 +85,19 @@ round is counted.
    worker waits on the parallel step — and with no event pumping during the wait macOS
    marks the window unresponsive. This script overrides it with EVAL_PERFECT_WAIT_MS
    (default 400ms) so wins are still visible without stalling.
+
+**A live progress window opens by default**, the same cv2-via-pyformulas mechanism training
+uses for its graph: completed checkpoints, the one in flight converging round by round, and a
+text block with the top 5 and an ETA. It refreshes every round, costs ~0.1s a frame against a
+~4s round, and writes the same picture to runs/<policy_name>_eval_progress.png. `EVAL_CHART=0`
+turns it off for a headless or unattended run, and any failure to open a window disables it
+rather than failing the eval.
+
+It shows the *whole* job, pooling every result file for this policy, so running several
+processes on one arm with different EVAL_OUT_SUFFIX gives each window the same consolidated
+view rather than its own slice — set EVAL_CHART=0 on all but one to avoid duplicate windows.
+eval_progress.py renders the identical chart from outside, which is still the better option
+when the eval is already running or you want the text summary.
 
 Results go to runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and
 can be compared across sessions.
@@ -220,6 +234,10 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None):
 ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, even past `count`
 MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
 DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
+
+# Seconds between live-chart refreshes. A frame is ~0.1s and a round ~4s, so this only bites
+# early in a run when episodes are short and rounds finish fast.
+CHART_MIN_INTERVAL = 2.0
 
 
 def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=10):
@@ -541,6 +559,45 @@ def main(argv):
         with open(partial_path, 'w') as handle:
             json.dump(payload, handle, indent=2)
         os.replace(partial_path, out_path)
+        update_chart()
+
+    # Live progress window, the same mechanism training uses for its own graph: render a
+    # matplotlib figure and push the pixels into a cv2 window via pyformulas. Refreshed from
+    # write_results(), so it advances every round rather than once a checkpoint — a frame costs
+    # ~0.1s against a ~4s round, and CHART_MIN_INTERVAL keeps that bounded if rounds are quick.
+    #
+    # eval_progress.live_frame() reads *every* result file for this policy, not just this
+    # process's, so with several EVAL_OUT_SUFFIX processes on one arm each window shows the whole
+    # job rather than its own slice. They will be near-identical windows, so set EVAL_CHART=0 on
+    # all but one. Turn it off entirely for a headless or unattended run.
+    chart_enabled = os.environ.get('EVAL_CHART', '1') not in ('0', '', 'false', 'False')
+    chart_path = os.path.join(RUNS_DIR, '{0}_eval_progress.png'.format(policy_name))
+    chart = {'screen': None, 'last': 0.0, 'off': not chart_enabled}
+
+    def update_chart(force=False):
+        if chart['off']:
+            return
+        now = time.time()
+        if not force and now - chart['last'] < CHART_MIN_INTERVAL:
+            return
+        chart['last'] = now
+        try:
+            import eval_progress
+            frame = eval_progress.live_frame(policy_name, chart_path)
+            if frame is None:
+                return
+            if chart['screen'] is None:
+                import pyformulas
+                chart['screen'] = pyformulas.screen(
+                    np.zeros(frame.shape[:2], dtype=np.uint8),
+                    '{0} eval progress'.format(policy_name))
+            # cv2 reads a three-channel array as BGR and matplotlib produces RGB, so the window
+            # needs the channels reversed. The PNG keeps RGB and is written by live_frame().
+            chart['screen'].update(frame[:, :, ::-1])
+        except Exception as error:
+            # A chart is never worth losing an eval over — no display, no cv2, a closed window.
+            chart['off'] = True
+            print('    progress chart off ({0}: {1})'.format(type(error).__name__, error))
 
     results = []
     for step in requested_steps:
@@ -597,6 +654,7 @@ def main(argv):
         print('    score mean {0}  median {1}  min {2}  max {3}'.format(
             row['avg_score'], row['median_score'], row['min_score'], row['max_score']))
 
+    update_chart(force=True)
     print('\nwrote {0}'.format(out_path))
 
     print('\n{0:>9}  {1:>11}  {2:>11}  {3:>8}  {4:>16}  {5:>9}'.format(

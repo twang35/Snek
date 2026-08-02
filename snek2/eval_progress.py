@@ -17,12 +17,17 @@ policy instead, which is a lifetime view and will double-count any checkpoint me
 It reads `runs/<policy>_checkpoint_evals*.json`, which `eval_checkpoints.py` rewrites after
 every round, and renders `runs/<policy>_eval_progress.png` plus a text summary on stdout.
 
-**Why this is a separate script rather than a chart inside eval_checkpoints.py.** Using more
-than one core per arm means splitting its checkpoints across several processes, each with its
-own `EVAL_OUT_SUFFIX` — six were used for the batch-8 close-out. Six processes each drawing
-their own window would be six partial pictures of one job, and if they wrote one shared PNG
-they would overwrite each other. Reading the result files from outside gives one consolidated
-view and costs the eval nothing.
+**eval_checkpoints.py now opens this chart itself**, via live_frame() below, so the common
+case needs no second command. This script stays useful for the cases that one cannot cover:
+attaching to an eval already in flight, the text summary, the lifetime view
+(`EVAL_PROGRESS_ALL=1`), and watching several arms at once.
+
+The original objection to building it in was that splitting one arm across several
+`EVAL_OUT_SUFFIX` processes — six were used for the batch-8 close-out — would give six partial
+pictures and six writers racing on one PNG. load_runs() answers that: it pools every result
+file for the policy, so each window shows the whole job, and render() writes via a temporary
+file and os.replace so a racing writer cannot produce a torn PNG. What is left is duplicate
+windows, which `EVAL_CHART=0` on all but one process handles.
 
 The PNG has three parts:
 
@@ -42,6 +47,8 @@ import json
 import os
 import sys
 import time
+
+import imageio
 
 import matplotlib
 matplotlib.use('Agg')  # no display needed; several of these may run over ssh or headless
@@ -296,6 +303,25 @@ def render(policy_name, state, out_path):
     figure.savefig(partial, dpi=110, bbox_inches='tight')
     plt.close(figure)
     os.replace(partial, out_path)
+
+
+def live_frame(policy_name, out_path=None, include_all=False):
+    """Renders the progress chart and returns it as an RGB array, or None if there is nothing yet.
+
+    For the live window eval_checkpoints.py opens. Costs ~0.1s a frame, which is why it can be
+    refreshed every round rather than once per checkpoint.
+
+    Reads the PNG back instead of pulling the figure canvas: render() saves with
+    bbox_inches='tight', which trims whitespace the raw canvas keeps, so going through the file
+    guarantees the window and the saved chart are the same image.
+    """
+    runs = load_runs(policy_name, include_all=include_all)
+    if not runs:
+        return None
+    if out_path is None:
+        out_path = os.path.join(RUNS_DIR, '{0}_eval_progress.png'.format(policy_name))
+    render(policy_name, summarize(runs), out_path)
+    return imageio.imread(out_path)[:, :, :3]
 
 
 def report(policy_names, include_all=False):
