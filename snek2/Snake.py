@@ -150,9 +150,6 @@ class Game:
         self.taken_up_group = pygame.sprite.Group()
 
         self.all = pygame.sprite.RenderUpdates()
-        column = SCREENSIZE[0] / TILE_SIZE[0]
-        row = SCREENSIZE[1] / TILE_SIZE[1]
-        self.grid = np.zeros((int(row), int(column)))
         self.snake = SnakeHead(START_TILE, 'right', [self.snake_group, self.all, self.taken_up_group])
         self.snake_head_group.add(self.snake)
         self.head = self.snake
@@ -168,6 +165,16 @@ class Game:
         self.current_score = 0
         self.current_step = 0
         self.last_food_step = 0
+
+        # The first observation of an episode is read straight after reset(), so the grid has
+        # to be built here too. reset() used to build its own — a bare (10, 10) of zeros with
+        # no border, no snake and no food — while step() builds a (12, 12) with wall cells.
+        # Every episode's opening observation was therefore computed against an empty,
+        # wrongly-shaped grid. It happened to produce the same 20 numbers because the snake
+        # always starts mid-board with all three moves open, but it is not robust: with the
+        # tail near an edge the smaller array raises IndexError out of get_grid_number(),
+        # which bounds-checks against SCREENTILES + 1 and so assumes the (12, 12) form.
+        self._rebuild_grid()
 
         # turn screen to white
         pygame.display.flip()
@@ -207,7 +214,46 @@ class Game:
         self.tail.behind_segment.front_segment = self.tail
         self.tail = self.tail.behind_segment
 
+    def _rebuild_grid(self):
+        """Rewrites self.grid from the current snake and food positions.
+
+        Cell values: 0 empty, 1 food, 2 head, 3 body, 4 wall. The array is two cells wider
+        and taller than the board so the outer ring can hold the walls, which is why every
+        lookup offsets by +1 — see get_grid_number()/get_grid_value() in state_helpers.
+
+        Shared by reset() and step() on purpose. These were two separate copies that
+        disagreed on the shape, and the observation code assumes the bordered form.
+        """
+        column = SCREENSIZE[0] // TILE_SIZE[0]
+        row = SCREENSIZE[1] // TILE_SIZE[1]
+        self.grid = np.zeros((row + 2, column + 2))
+        self.grid[[0, -1], :] = 4
+        self.grid[:, [0, -1]] = 4
+
+        # 1 is food
+        if self.current_food != 'no food':
+            self.grid[self.current_food.position[1] + 1, self.current_food.position[0] + 1] = 1
+
+        body_positions = self.snake.get_positions()
+        for i in range(0, len(body_positions)):
+            position = body_positions[i]
+            if i == 0:
+                # 2 is head
+                self.grid[position[1] + 1, position[0] + 1] = 2
+            else:
+                if not (position[1] < 0 or position[0] < 0):
+                    # 3 is body part
+                    self.grid[position[1] + 1, position[0] + 1] = 3
+
     def step(self, relative_direction):
+        # Counted up front so `current_step` already includes this step when it is compared
+        # against `last_food_step` below. These used to be incremented near the end, after
+        # the food block had set `last_food_step = current_step`, which left
+        # `current_step - last_food_step == 1` on the step immediately after eating and so
+        # docked one step from every starve budget.
+        self.current_step += 1
+        self.total_steps += 1
+
         if self.current_food != 'no food':
             old_moves_to_food = distance_to_food(self.head.tile_pos, self.current_food.position)
         else:
@@ -226,7 +272,8 @@ class Game:
 
         # head -> food
         col = pygame.sprite.groupcollide(self.snake_head_group, self.food_group, False, True)
-        if len(col) > 0:
+        ate_food = len(col) > 0
+        if ate_food:
             self.current_food = 'no food'
             self.add_segment()
             self.current_score += 1
@@ -242,27 +289,7 @@ class Game:
             self.taken_up_group.add(self.current_food)
             self.all.add(self.current_food)
 
-        column = SCREENSIZE[0] / TILE_SIZE[0]
-        row = SCREENSIZE[1] / TILE_SIZE[1]
-        self.grid = np.zeros((int(row + 2), int(column + 2)))
-        self.grid[[0, -1], :] = 4
-        self.grid[:, [0, -1]] = 4
-
-        body_positions = self.snake.get_positions()
-
-        # 1 is food
-        if self.current_food != 'no food':
-            self.grid[self.current_food.position[1] + 1, self.current_food.position[0] + 1] = 1
-
-        for i in range(0, len(body_positions)):
-            position = body_positions[i]
-            if i == 0:
-                # 2 is head
-                self.grid[position[1] + 1, position[0] + 1] = 2
-            else:
-                if not (position[1] < 0 or position[0] < 0):
-                    # 3 is body part
-                    self.grid[position[1] + 1, position[0] + 1] = 3
+        self._rebuild_grid()
 
         # checks out of bounds
         pos = self.snake.rect.topleft
@@ -287,9 +314,6 @@ class Game:
             self.finished = True
             reward = DEATH_REWARD
 
-        self.current_step += 1
-        self.total_steps += 1
-
         # game over
         if self.check_perfect_game():
             self.finished = True
@@ -302,7 +326,16 @@ class Game:
             self.starved = True
             reward = STARVE_REWARD
 
-        if self.current_food != 'no food':
+        # Distance shaping, and only for an ordinary move. Skipped when this step ate,
+        # because `old_moves_to_food` measures the food that was just consumed while
+        # `current_food` is already its randomly placed replacement — comparing the two
+        # is meaningless, and since the head had to be adjacent to eat, old_moves_to_food
+        # is always 1 and the replacement is almost never that close. The penalty
+        # therefore fired on 96.8% of food-eating steps (measured over 4825), quietly
+        # making every FOOD_REWARD 0.999. Skipped when the episode ended for the same
+        # reason: on a death the head is off the board, so the comparison is noise on top
+        # of DEATH_REWARD.
+        if not ate_food and not self.finished and self.current_food != 'no food':
             moves_to_food = distance_to_food(self.head.tile_pos, self.current_food.position)
             if moves_to_food > old_moves_to_food:
                 reward -= FOOD_DISTANCE_REWARD

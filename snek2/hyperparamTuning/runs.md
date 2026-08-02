@@ -488,6 +488,16 @@ The durable record is `runs/<policy>_evals.json`; analyse from there.
 `0.995` or `0.9975`: 0.9975 holds the record (92%) but is **1 of 2** on survival, while 0.995 is 3
 of 3 with a lower ceiling. Two more 0.9975 seeds decide it.
 
+> **The environment changed on 2026-08-01 and batch 9 has not been re-baselined.** Six env bugs
+> were fixed; two of them alter the observation and one alters the reward, so the 92% / 1-of-2
+> figures above were produced by a different MDP than the one batch 9 would run in. See
+> [the audit section in `findings.md`](findings.md#environment-audit-2026-08-01-observations-and-rewards-both-changed).
+> The discount comparison is still the right question and the arms below are still the right
+> arms — but their results are a **new baseline**, not a continuation of batch 8's, and the
+> survival counts restart at n=0. The audit is also unfinished by intent, so expect further env
+> changes before launch; each one resets this line again. Do not launch mid-audit and then
+> compare across it.
+
 | policy | override on top of the shared base | role |
 |---|---|---|
 | `b9a-disc9975seed3` | `SNEK_DISCOUNT=0.9975` | third 0.9975 seed — takes it to n=3 |

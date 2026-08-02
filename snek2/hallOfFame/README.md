@@ -20,6 +20,16 @@ rotation and are not deleted by anything.
 "Perfect rate" is the share of episodes where the snake fills the board, over 100 greedy episodes
 each; see [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md).
 
+> **These rates were measured on the pre-2026-08-01 environment and will not reproduce.** An env
+> audit that day fixed six bugs, two of which changed the observation (the tail is now freed when
+> the connectivity features are computed, and `reset()` builds the same bordered grid as `step()`)
+> and one of which changed the reward. These policies were trained to read the old features, so
+> they are now off-distribution. `ckpt2816000` re-measured **21/30** afterwards against 27/30
+> before. The entries are kept because they are the record *as achieved*, not because they still
+> score that — see the audit section in `findings.md`. Anything measured from here on belongs to
+> the new baseline, so do not put a new row in the table above next to an old one without
+> labelling which environment produced it.
+
 **`ckpt2816000` won 92 of 100 games** and is the project record, found in the close-out measurement
 of `b8f` on 2026-08-01. It re-measured at 25/30 during the restore verification for this folder,
 consistent with 92/100.

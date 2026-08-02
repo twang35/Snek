@@ -18,7 +18,7 @@ STARVE_REWARD = -0.5
 global PERFECT_GAME_REWARD
 PERFECT_GAME_REWARD = 100
 global PERFECT_GAME_WAIT_MS
-PERFECT_GAME_WAIT_MS = 5000
+PERFECT_GAME_WAIT_MS = 500
 
 # Below this average score, an eval's checkpoint is not written at all. Set from
 # SNEK_MIN_CHECKPOINT_SCORE in snek2.py. `max_to_keep` is a rolling window, so a dead arm
@@ -29,9 +29,6 @@ PERFECT_GAME_WAIT_MS = 5000
 global MIN_CHECKPOINT_SCORE
 MIN_CHECKPOINT_SCORE = 40.0
 MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
-
-CLOSER_TO_FOOD_REWARD_SCORE_LIMIT = 10
-CLOSER_TO_FOOD_REWARD_STEP_LIMIT = 20000
 
 # size of each grid
 TILE_SIZE = (10, 10)
@@ -66,10 +63,12 @@ FPS_LIMIT = 15
 SCORE_SLOW_THRESHOLD = 248
 SCORE_THRESHOLD_FPS = 10
 
-SCREENTILES = (
-    (SCREENSIZE[0] / TILE_SIZE[0]) - 1,
-    (SCREENSIZE[1] / TILE_SIZE[1]) - 1
-)
+# SCREENTILES used to be recomputed here as
+# `(SCREENSIZE[0] / TILE_SIZE[0]) - 1`, a round trip through SCREENSIZE that returned the
+# same tile count but as a *float*. That made `random.randint(0, 9.0)` in Food.__init__
+# raise a DeprecationWarning on Python 3.10 and a TypeError on 3.12+, so it blocked any
+# interpreter upgrade. The tuple defined above from GRID_LENGTH is already correct and
+# integral, so the recomputation is gone.
 
 PERFECT_SCORE = (SCREENTILES[0] + 1) * (SCREENTILES[1] + 1)
 # highest food-eaten count reachable before a perfect game triggers

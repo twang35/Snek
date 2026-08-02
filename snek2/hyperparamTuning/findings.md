@@ -10,7 +10,8 @@ section before proposing an epsilon or buffer experiment.
 
 | finding | status |
 |---|---|
-| **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes |
+| **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
+| **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes, **old env** |
 | **An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M** | **established**, 2 arms followed to the end |
 | **The horizon was the binding constraint** — records live past 2.5M, old arms stopped at ~1.06M | **established** |
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
@@ -43,6 +44,75 @@ section before proposing an epsilon or buffer experiment.
 | n-step returns help | **falsified**, n=2 and n=3 |
 
 ---
+
+## Environment audit 2026-08-01: observations and rewards both changed
+
+**Nothing measured before 2026-08-01 is comparable to anything measured after it.** Six
+environment bugs were fixed in one pass. Two of them change what the agent sees, one changes
+what it is paid, and one changes how long it may go without food — so every arm in
+`completedRuns.md`, every number in this file, and the `hallOfFame` entries were produced by a
+*different* MDP than the one that runs now. Re-baseline before comparing anything across that
+line.
+
+| # | fix | changes | measured effect of the bug |
+|---|---|---|---|
+| 1 | `reset()` built a `(10, 10)` unbordered grid; `step()` builds `(12, 12)` with walls | observation | 0 of 500 first-observations differed numerically; latent `IndexError` |
+| 2 | Distance shaping compared the eaten food to its replacement | reward | fired on 96.8% of eat steps (n=4825), making `FOOD_REWARD` 0.999 |
+| 3 | `SCREENTILES` were floats, so `random.randint(0, 9.0)` | neither | `DeprecationWarning` on 3.10, `TypeError` on 3.12+ |
+| 4 | `last_food_step` set before the step counter incremented | starve budget | every budget was short by one step |
+| 5 | `CLOSER_TO_FOOD_REWARD_*` unused | neither | dead code |
+| 6 | `update_grid` never freed the tail tile | **observation** | `num_groups` wrong on 12.1% of steps, 40.0% past score 80 |
+
+#### #6 is the one that matters
+
+`group_obs` simulates each candidate move to report how fragmented the free space is and
+whether the head can still reach its tail. It marked the prospective head cell as occupied but
+never freed the tail cell, so connectivity was computed as though the tail were a wall and any
+region reachable only *through* the tail read as sealed off. Measured against the 92% policy
+over 20,814 steps:
+
+| score | steps | `head_with_tail` differs | `num_groups` differs |
+|---|---|---|---|
+| 0-19 | 3,543 | 1.1% | 2.8% |
+| 20-39 | 6,826 | 0.6% | 4.5% |
+| 40-59 | 5,110 | 0.7% | 15.9% |
+| 60-79 | 3,299 | 1.6% | 14.8% |
+| **80-99** | 2,036 | **3.5%** | **40.0%** |
+
+All 258 `head_with_tail` flips were `0 → 1` — the feature only ever claimed the snake was
+trapped when it was not, never the reverse. The error was therefore a **pessimism bias**, and
+it concentrated in the endgame, where free space is a thin channel and one cell is much more
+likely to be the bridge between two regions.
+
+The fix has to be conditional: on a move that eats, `add_segment()` refills the tile the tail
+came from, so it stays occupied. Verified over 39,684 steps — 5,068 eat steps always kept the
+old tail tile as body, 34,616 non-eat steps always freed it. That conditional is why the
+original line was commented out rather than missing, so this was a parked trade-off, not an
+oversight.
+
+#### Rewards are now exact
+
+Before, an eaten food usually paid 0.999 and a death usually cost 5.001. All four terminal
+outcomes are now exactly their constants, verified by playing until each occurred:
+
+| outcome | reward | episodes checked |
+|---|---|---|
+| ate food | `1.0` | 400 games, only value seen |
+| died | `-5.0` | 400 games, only value seen |
+| starved | `-0.5` | 398 starve episodes |
+| perfect game | `100` | 199, with the threshold patched to score 5 to reach the branch |
+
+The shaping penalty now applies only to an ordinary surviving move, so it can no longer
+contaminate a terminal reward.
+
+#### What this cost
+
+The 92% champion re-measured **21/30 (70.0%)** on the new environment, against 27/30 (90.0%)
+on the old one. Those two intervals overlap at n=30, so treat the size of the drop as
+unresolved — but the direction is what you would expect from a policy reading two features
+whose meaning changed underneath it. **This is not evidence the fixes are harmful.** It says
+the champion is off-distribution, which was the accepted price of the audit. Whether the
+corrected observations train *better* is untested and needs a fresh arm.
 
 ## `DISCOUNT=0.995` matches the best ceiling and removes the death risk
 
