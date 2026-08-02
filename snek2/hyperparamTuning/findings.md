@@ -8,10 +8,19 @@ the order it was discovered. Companion to [`runs.md`](runs.md) (what is next),
 Don't re-litigate anything here without new evidence. Do re-read the falsified
 section before proposing an epsilon or buffer experiment.
 
+The observation space has its own write-up:
+[`../claudeFeatureRecommendations.md`](../claudeFeatureRecommendations.md) covers what the
+champion's 72 losses turn on and which candidate observations measured well or badly, with the
+instruments in [`diagnostics/`](diagnostics/). It is a **frozen artifact from 2026-08-02** — read
+it as evidence from that date, not as current state.
+
 | finding | status |
 |---|---|
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
+| **Audit fix #6 was incomplete**: `group_obs` uses one tail position for a tail that has usually moved — 22.1% of losing decisions flagged, against 94.1% once advanced | **measured**, 360 eps |
+| **Terminal steps never carry `discount = 0`**, so death trains toward `−5 + 0.9975·V(terminal)` | mechanism confirmed, effect unmeasured |
+| Nothing in the observation vector distinguishes snake lengths 50 to 99 | **measured**, it is a single value |
 | On the new env, `0.995` has the better expected value and `0.9975` the steadier single arm | **open**, n=2 each |
 | Nothing trained *after* the audit yet beats a pre-audit checkpoint re-measured on the new env | **open**, 1 batch |
 | **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes, **old env** |
@@ -92,6 +101,32 @@ came from, so it stays occupied. Verified over 39,684 steps — 5,068 eat steps 
 old tail tile as body, 34,616 non-eat steps always freed it. That conditional is why the
 original line was commented out rather than missing, so this was a parked trade-off, not an
 oversight.
+
+#### But fix #6 was incomplete, and the same conditional was missed elsewhere
+
+Freeing the tile was necessary and not sufficient. `group_obs` is handed a single `tail_pos` and
+uses it for all three actions, yet the post-move tail is the **segment ahead of it** on an
+ordinary step and that same cell only on a step that eats — the identical eat/no-eat distinction
+that fix #6 turned on. Worse, the cell it does use is queried by *adjacency*, and now that the
+cell is free it is usually a singleton region with no open neighbours in a coiled endgame, so the
+flag reads 0 whatever the head does.
+
+Measured 2026-08-02 over 360 episodes of the champion, at the 68 decisions that actually lost
+games:
+
+| version of the tail test | flags the losing move | wrong way |
+|---|---|---|
+| as shipped | 15 — **22.1%** | 0 |
+| `tail_pos` advanced to the post-move tail | 64 — **94.1%** | 0 |
+| a full time-aware walk, for reference | 63 — 92.6% | 0 |
+
+The flag never lies; it goes silent, and it goes silent exactly where games are decided. Note the
+direction is the same **pessimism bias** as bug #6 itself, from the same cause one layer up.
+
+Full write-up in [`../claudeFeatureRecommendations.md`](../claudeFeatureRecommendations.md),
+including a ranked scoring of every other candidate observation, the terminal-discount defect, and
+the absent length signal. Instruments in [`diagnostics/`](diagnostics/). Both are frozen at
+2026-08-02.
 
 #### Rewards are now exact
 
