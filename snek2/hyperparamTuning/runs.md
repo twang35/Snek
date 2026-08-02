@@ -110,60 +110,18 @@ one, so the honest read is that **these two arms cannot be placed on the ranking
 the alpha question stays where batch 7 left it. Do not re-add this task; if the alpha
 comparison matters, it needs new seeds, not new measurements of old ones.
 
-## Running now: batch 9, three arms — launched 2026-08-02 00:41
+## Nothing is running — all four slots are free
 
-Four arms went up together; `b9b` was stopped after 8h22m. See
-[the batch 9 plan](#batch-9--0995-against-09975-on-the-new-environment) for what each isolates.
+**Batch 9 finished 2026-08-02**, the day it launched. Three arms were stopped at 3.4-3.7M and
+`b9b` was stopped dead at 10.47M. Full results and rationale are in
+[`completedRuns.md`](completedRuns.md#batch-9--0995-against-09975-on-the-post-audit-environment).
 
-| policy | discount | step | trailing | peak trailing | best30 | state |
+| policy | discount | final step | **best eval'd ckpt** | top-3 | pooled | outcome |
 |---|---|---|---|---|---|---|
-| `b9a-disc9975a` | 0.9975 | 3.42M | 81.2 | **89.8** @3.28M | 56.0% @1.74M | healthy, **at the stop horizon** |
-| `b9b-disc9975b` | 0.9975 | **10.46M** | **0.5** | 72.1 @**328k** | 5.0% @221k | **stopped 2026-08-02 — dead** |
-| `b9c-disc995a` | 0.995 | 3.43M | 78.0 | 86.4 @2.60M | 37.3% @2.61M | healthy, **at the stop horizon** |
-| `b9d-disc995b` | 0.995 | 3.27M | 49.4 | 86.7 @1.23M | 30.3% @1.32M | alive, well past peak |
-
-**`b9b` is the overrun failure this batch's stop rule exists to prevent.** It peaked at step
-**328k** and then ran a further 10.1M steps producing nothing — `zero_since` 9.92M, best-30 of
-5.0%. Nobody was watching it overnight, which is the whole argument for stopping at 3-3.5M
-rather than by inspection.
-
-**All three survivors are at or past the 3-3.5M stop point and are still training.** b9a and b9c
-are past their peak trailing, b9d peaked at 1.23M. Stopping them is the user's call; the
-recommendation is to stop all three.
-
-### Close-out measurements, 2026-08-02 — mid-run, arms still training
-
-| arm | discount | ckpts | best ckpt | top-3 | pooled | 95% CI |
-|---|---|---|---|---|---|---|
-| `b9a-disc9975a` | 0.9975 | 20 | 65.0% @1735k | 64.3% | **54.9%** /2000 | 52.7-57.1 |
-| `b9c-disc995a` | 0.995 | 20 | 52.0% @2603k | 51.3% | 38.0% /2000 | 35.9-40.1 |
-| `b9d-disc995b` | 0.995 | 17 | **70.0%** @2544k | **66.3%** | 42.4% /1700 | 40.0-44.7 |
-
-**The discount question is not settled, and the two candidates win different things.**
-
-- **Ceiling goes to 0.995**: `b9d`'s 70% is the best checkpoint in the batch, and its top-3 of
-  66.3% edges `b9a`'s 64.3%.
-- **Consistency goes to 0.9975**: `b9a` pools 54.9% against 42.4% and 38.0%, with 18 of 20
-  checkpoints above 40%.
-- **Survival goes to 0.995**, 2 of 2 against 1 of 2 — and that dominates expected value. Mean
-  top-3 across seeds is **58.8% for 0.995** against **32.2% for 0.9975**, because a dead arm
-  contributes zero.
-- **Spread within 0.995 is larger than the gap between values**: `b9d` 70% against `b9c` 52%.
-  Seed variance is still bigger than the effect being measured, exactly as at n=2 it should be.
-
-**Nothing here is established.** n=2 a side, both survivors were still training when measured, and
-this file already records six single-seed conclusions that were later overturned. The honest
-summary is that 0.995 has the better expected value on this environment and 0.9975 the steadier
-single arm, and that separating those needs seeds 3 and 4 of each.
-
-**Batch 9's best checkpoint (70%) is below `b8f`'s re-measured 82%.** A policy trained *before* the
-audit still beats everything trained after it, at a comparable horizon. That is one batch and not
-a verdict on the corrected observations, but it is the opposite of what the fixes were meant to
-buy and it belongs on the record.
-
-**`b9d` inverted its own interim reading.** At 12 of 17 checkpoints its best was 49% and it looked
-like the weakest arm; its last five checkpoints held its top three. Do not act on a partial
-close-out.
+| `b9a-disc9975a` | 0.9975 | 3.68M | 65.0% @1735k | 64.3% | **54.9%** /2000 | survived, most consistent |
+| `b9b-disc9975b` | 0.9975 | **10.47M** | not measured | — | — | **dead**, peaked at 328k |
+| `b9c-disc995a` | 0.995 | 3.71M | 52.0% @2603k | 51.3% | 38.0% /2000 | survived, weakest |
+| `b9d-disc995b` | 0.995 | 3.45M | **70.0%** @2544k | **66.3%** | 42.4% /1700 | survived, best ceiling |
 
 ## Batch 8 — finished 2026-08-01
 
@@ -545,21 +503,19 @@ the config mid-run and invalidates the arm.
 Per-run logs written to `$CLAUDE_JOB_DIR/tmp` are job-scoped and do not survive.
 The durable record is `runs/<policy>_evals.json`; analyse from there.
 
-## Batch 9 — 0.995 against 0.9975, on the new environment
+## Next up: batch 10 — take both discounts to n=4
 
-**Head-to-head at n=2 each, and nothing else.** The open question from batch 8 is whether the
-discount optimum sits at `0.995` or `0.9975`. Both candidates have to be re-run, because the
-evidence that made this look like a one-sided question — 0.9975 holding the record at 92% but
-surviving 1 of 2, against 0.995 surviving 3 of 3 with a lower ceiling — was **all measured on the
-pre-audit observation space and is void**. Survival counts restart at n=0 for both values. See
-[the audit section in `findings.md`](findings.md#environment-audit-2026-08-01-observations-and-rewards-both-changed).
+**Seed count is the binding constraint, and batch 9 made that concrete**: the two `0.995` seeds
+came out 18 points apart on best checkpoint (70% and 52%), which is wider than any difference
+between the two values being compared. Nothing separates 0.995 from 0.9975 until each has more
+seeds, so batch 10 is two more of each and no new knobs.
 
 | policy | override on top of the shared base | role |
 |---|---|---|
-| `b9a-disc9975a` | `SNEK_DISCOUNT=0.9975` | re-anchors the old record config on the new env |
-| `b9b-disc9975b` | `SNEK_DISCOUNT=0.9975` | second seed; n=1 has been overturned here repeatedly |
-| `b9c-disc995a` | `SNEK_DISCOUNT=0.995` | the other candidate, whose 3-of-3 no longer counts |
-| `b9d-disc995b` | `SNEK_DISCOUNT=0.995` | second seed |
+| `b10a-disc9975c` | `SNEK_DISCOUNT=0.9975` | third 0.9975 seed on this environment |
+| `b10b-disc9975d` | `SNEK_DISCOUNT=0.9975` | fourth; survival is 1 of 2 so far, so this matters most |
+| `b10c-disc995c` | `SNEK_DISCOUNT=0.995` | third 0.995 seed |
+| `b10d-disc995d` | `SNEK_DISCOUNT=0.995` | fourth |
 
 Shared base for every arm:
 
@@ -567,24 +523,16 @@ Shared base for every arm:
 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0
 ```
 
-**Why this shape rather than the one queued before.** The original batch 9 spent two slots on
-0.9975 seeds and the others on `0.996` and `LEARNING_RATE=1e-4`, on the assumption that 0.995 was
-already established at 3 of 3. On the new environment it is not, so that batch would have had no
-0.995 arm and could not have made the comparison it existed to make. Four arms on two values
-answers one question properly instead of three questions partially.
+**What each outcome would mean.** At n=4 a side, survival stops being anecdote: 0.9975 dying 2 of 4
+against 0.995 surviving 4 of 4 would settle it on expected value regardless of ceiling. If both
+survive 4 of 4, the comparison moves to top-3 pooled, where batch 9 has them within 2 points and a
+real difference would need to show up consistently rather than in one seed.
 
-**Names carry no seed numbers on purpose.** Calling these `seed3`/`seed4` would imply continuity
-with `b8c`/`b8f`, and pooling across the audit boundary is exactly the error `findings.md` warns
-about. On this environment they are the first and second seed of each value.
+**Run each to ~3-3.5M steps and stop**, and stop them rather than leaving them overnight — `b9b`
+reached 10.47M unattended and spent 10.1M steps past its peak producing nothing.
 
-**Run each to ~3-3.5M steps and stop.** Both batch-8 arms peaked at ~2.5-3M and `b8d` then died at
-~7M, spending 8.5M steps producing nothing. Do not repeat that.
-
-**Close out with `top20`**, which measures every checkpoint at >=90% and fills to 20 from >=60%.
-A close-out is much cheaper than it was — 4.75x on the eval phase — so the 52-checkpoint case is
-now under an hour rather than four.
-
-`0.996` and `LEARNING_RATE=1e-4` move to the head of [later candidates](#later-candidates).
+**Close out with `top20`** on each, then compare **top-3 pooled** across the four seeds of each
+value rather than best-of-N, which is upward biased.
 
 ### Later candidates
 

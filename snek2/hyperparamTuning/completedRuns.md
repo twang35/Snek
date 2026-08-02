@@ -27,8 +27,17 @@ is now spelled out per row (`/6300`, `/1000`, `/100`). The selector measures eve
 `b8f` has 63. Use **best ckpt**. `b8e` is the illustration: 32% best checkpoint reads mid-table, but
 having one checkpoint above the floor where the batch's best arm has dozens is the actual result.
 
+**‡ marks arms measured on the post-audit environment (2026-08-02 onward)**, whose numbers are
+not comparable to any row without the mark. The audit changed two observation components and the
+reward; the same checkpoint that scored 92% before reads 73% after. Compare ‡ rows only to each
+other, or to `b8f`'s `3149000` re-measured at 82%.
+
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b9d-disc995b` ‡ | disc **0.995**, new env | 3.45M | **70%** @2544k | **66.3%** | 42.4% /1700 | 30.3% | ‡ best ceiling of batch 9 |
+| `b9a-disc9975a` ‡ | disc **0.9975**, new env | 3.68M | 65% @1735k | 64.3% | **54.9%** /2000 | 56.0% | ‡ most consistent of batch 9 |
+| `b9c-disc995a` ‡ | disc **0.995**, new env | 3.71M | 52% @2603k | 51.3% | 38.0% /2000 | 37.3% | ‡ weakest survivor |
+| `b9b-disc9975b` ‡ | disc **0.9975**, new env | **10.47M** | not measured | — | — | 5.0% | ‡ **dead**, peaked at 328k |
 | `b8f-disc9975seed2` | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 5.47M | **92%** | **86.7%** | **66.3%** /5200 | **69.3%** | **project record**; declining when stopped |
 | `b8d-disc995clip` | disc 0.995 + **`GRADIENT_CLIPPING=10`** | **11.64M** | **80%** | 74.7% | 60.4% /2000 | 50.0% | 2nd by measurement, then **died at ~7M** |
 | `b7f-disc995seed3` | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 1.06M | 51% | 48.0% | 38.8% /1000 | 44.0% | best of batch 7, and survived |
@@ -90,6 +99,45 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 9 — 0.995 against 0.9975 on the post-audit environment
+
+**Launched 2026-08-02 00:41, all four stopped the same day.** The first batch trained on the
+environment left by the observation/reward audit, so **none of its numbers are comparable to any
+batch above it** — the same checkpoint that scored 92% pre-audit reads 73% here. Shared base
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
+
+| policy | discount | final step | peak trailing | best30 | **best eval'd ckpt** | top-3 | pooled | outcome |
+|---|---|---|---|---|---|---|---|---|
+| `b9a-disc9975a` | 0.9975 | 3.68M | **89.8** @3277k | **56.0%** @1738k | 65.0% @1735k | 64.3% | **54.9%** /2000 | survived |
+| `b9b-disc9975b` | 0.9975 | **10.47M** | 72.1 @**328k** | 5.0% @221k | not measured | — | — | **dead** |
+| `b9c-disc995a` | 0.995 | 3.71M | 86.5 @3573k | 37.3% @2608k | 52.0% @2603k | 51.3% | 38.0% /2000 | survived |
+| `b9d-disc995b` | 0.995 | 3.45M | 86.7 @1232k | 30.3% @1324k | **70.0%** @2544k | **66.3%** | 42.4% /1700 | survived |
+
+**Why the batch was shaped this way.** The queued plan had two 0.9975 seeds plus `0.996` and
+`LEARNING_RATE=1e-4`, resting on 0.995 having survived 3 of 3 — but that was measured pre-audit and
+was void, so as written the batch had no 0.995 arm and could not settle the question it existed for.
+Four arms on two values answers one question properly instead of three partially. `0.996` and the
+learning rate stayed deferred.
+
+**Outcome: the candidates win different things and the question is still open.** Ceiling and top-3
+go to 0.995 (`b9d` at 70% / 66.3%), consistency to 0.9975 (`b9a` pools 54.9% with 18 of 20
+checkpoints above 40%), and survival to 0.995 at 2 of 2 against 1 of 2. Survival dominates expected
+value — mean top-3 across seeds is **58.8% for 0.995** against **32.2% for 0.9975** — but the two
+0.995 seeds are **18 points apart** on best checkpoint, so seed spread still exceeds the effect.
+
+**`b9b` is the clearest overrun failure in the file.** It peaked at step **328k**, before any sibling
+had warmed up, then ran a further 10.1M steps producing nothing, `zero_since` 9.92M. It did that
+overnight with nobody watching, which is the entire argument for the 3-3.5M stop rule rather than
+stopping by inspection.
+
+**The three survivors were measured while still training**, at 3.4-3.7M, so their close-outs are
+mid-run. `b9c` was still climbing when stopped — peak trailing at 3573k, its last few hundred
+thousand steps — so it is the one arm here that might have had more to give.
+
+**Batch 9's best checkpoint (70%) is below `b8f`'s re-measured 82%.** Nothing trained after the audit
+yet beats something trained before it, at a comparable horizon. One batch, and not a verdict, but
+recorded because it is the opposite of what the fixes were meant to buy.
 
 ## Batch 8 — the discount optimum, gradient clipping, and the arm lifetime
 
