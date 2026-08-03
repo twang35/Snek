@@ -99,6 +99,20 @@ folder always shows just what the current eval or batch produced rather than acc
 every chart from every arm ever measured. History is not lost, only moved — check
 `evals/archive/` for anything earlier.
 
+**Several processes starting together, as a batch does, do not archive each other.** The
+archive step runs before any setup — before the checkpoint restore, before the first eval
+round — so every process in a simultaneous batch clears out the *previous* batch before any
+of them has written a chart of its own; there is nothing from the current batch yet for a
+sibling to sweep up. Verified directly: four processes launched at once each end with their
+own chart at the top level and no cross-archiving.
+
+**Starting one *more* eval while an earlier one is still running is different.** The new
+process's archive call moves the still-running one's current chart into `evals/archive/`
+too — it has no way to tell "mid-run" from "finished". That is harmless rather than lossy:
+the running process keeps writing to the same top-level path every round regardless of
+whether anything is there, so its chart reappears within one round (a few seconds). Expect a
+brief window where a genuinely active arm's chart looks archived rather than current.
+
 It shows the *whole* job, pooling every result file for this policy, so running several processes
 on one arm with different EVAL_OUT_SUFFIX gives each window the same consolidated view rather
 than its own slice. Duplicate windows in that one case are the accepted price of never silently

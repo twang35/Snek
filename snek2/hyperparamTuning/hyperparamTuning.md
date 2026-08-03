@@ -176,6 +176,15 @@ so glancing at the top-level folder always shows exactly what last finished — 
 step numbers or timestamps to tell current from stale. Nothing is lost; look in `evals/archive/`
 for a previous batch's charts.
 
+**Launching a batch of evals together does not make them archive each other.** The archive
+step happens before any process has written a chart of its own, so a simultaneous batch only
+ever clears the *previous* batch, verified by actually running four at once. Starting one more
+eval while an earlier one is still running is the one case that visibly does something: the
+new process archives the still-running one's current chart along with everything else, since
+it cannot tell "mid-run" from "finished". That arm's chart reappears at the top level within
+one round regardless, so nothing is lost — but a chart can look briefly archived while its arm
+is still very much alive.
+
 | part | shows |
 |---|---|
 | in-flight chart | running perfect rate vs round, one line per process — is the current checkpoint any good, and how many rounds left |
