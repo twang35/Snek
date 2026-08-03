@@ -17,7 +17,7 @@ chunks of one run and excludes earlier sessions. `EVAL_PROGRESS_ALL=1` pools eve
 policy instead, which is a lifetime view and will double-count any checkpoint measured twice.
 
 It reads `runs/<policy>_checkpoint_evals*.json`, which `eval_checkpoints.py` rewrites after
-every round, and renders `runs/<policy>_eval_progress.png` plus a text summary on stdout.
+every round, and renders `evals/<policy>_eval_progress.png` plus a text summary on stdout.
 
 **eval_checkpoints.py now opens this chart itself**, via live_frame() below, so the common
 case needs no second command. This script stays useful for the cases that one cannot cover:
@@ -64,7 +64,7 @@ matplotlib.use('Agg')  # no display needed; several of these may run over ssh or
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from snake_constants import RUNS_DIR
+from snake_constants import EVALS_DIR, RUNS_DIR
 
 # Results files that are aggregates rather than a running process, so including them would
 # double-count finished work and invent in-flight state that no longer exists.
@@ -356,7 +356,8 @@ def live_frame(policy_name, out_path=None, include_all=False):
     if not runs:
         return None
     if out_path is None:
-        out_path = os.path.join(RUNS_DIR, '{0}_eval_progress.png'.format(policy_name))
+        out_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     render(policy_name, summarize(runs), out_path)
     return imageio.imread(out_path)[:, :, :3]
 
@@ -371,7 +372,8 @@ def report(policy_names, include_all=False):
         print(text_summary(policy_name, state))
         print('  from {0} file(s): {1}'.format(
             len(runs), ', '.join(sorted(r['suffix'] for r in runs))))
-        out_path = os.path.join(RUNS_DIR, '{0}_eval_progress.png'.format(policy_name))
+        out_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
+        os.makedirs(EVALS_DIR, exist_ok=True)
         render(policy_name, state, out_path)
         print('  chart: {0}'.format(out_path))
         print()

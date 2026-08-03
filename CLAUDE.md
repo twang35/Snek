@@ -68,6 +68,15 @@ training that produced it, and disk is not a constraint. That covers the whole
 `b<n><letter>-<name>` family and their `_checkpoint_evals*.json` measurements, which
 the tuning docs cite directly.
 
+**`snek2/evals/` is different: only the top level is meant to be current.**
+`eval_checkpoints.py` writes each arm's live `_eval_progress.png` there so the user can
+glance at one folder and see what last completed, and it moves whatever was already
+there into a timestamped `snek2/evals/archive/<timestamp>/` folder before writing a new
+one — so starting an eval is exactly when files move out of the top level, not when
+they get deleted. **Never delete anything under `snek2/evals/archive/`**, same
+asymmetry as everywhere else here: it is the only record of a chart that is no longer
+in the top-level folder.
+
 **Throwaway output is fine to delete.** Smoke tests, speed benchmarks and
 verification runs are not results — they are scaffolding from proving a change
 works, and they age into noise that makes the directory harder to read. Judge by

@@ -95,6 +95,13 @@ POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'savedPoli
 # Progress graphs are written here, one per policy name, rewritten each eval.
 RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
 
+# The live "what just finished" eval chart lives here instead of RUNS_DIR, so a glance at
+# this one folder shows only the current eval or batch. eval_checkpoints.py archives
+# whatever is already here into EVALS_ARCHIVE_DIR before it writes a new one — see its
+# archive_existing_eval_pngs().
+EVALS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'evals')
+EVALS_ARCHIVE_DIR = os.path.join(EVALS_DIR, 'archive')
+
 CAPTION = 'MiniSnake'
 FPS_LIMIT = 15
 SCORE_SLOW_THRESHOLD = 248

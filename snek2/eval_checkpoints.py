@@ -89,9 +89,15 @@ round is counted.
 cv2-via-pyformulas mechanism as training's graph: completed checkpoints, the one in flight
 converging round by round, and a text block with the top 5 and an ETA. It refreshes every round,
 costs ~0.1s a frame against a ~4s round, and writes the same picture to
-runs/<policy_name>_eval_progress.png. If a window cannot be opened at all — headless, no cv2 —
+evals/<policy_name>_eval_progress.png. If a window cannot be opened at all — headless, no cv2 —
 it disables itself on the first failure and the eval carries on, so an unattended run needs no
 configuration.
+
+**`evals/` holds only the latest work.** Before writing anything, this script moves whatever
+is already in `evals/` into a timestamped folder under `evals/archive/`, so the top-level
+folder always shows just what the current eval or batch produced rather than accumulating
+every chart from every arm ever measured. History is not lost, only moved — check
+`evals/archive/` for anything earlier.
 
 It shows the *whole* job, pooling every result file for this policy, so running several processes
 on one arm with different EVAL_OUT_SUFFIX gives each window the same consolidated view rather
@@ -114,6 +120,7 @@ afterwards with merge_checkpoint_evals().
 import glob
 import json
 import os
+import shutil
 import sys
 import time
 
@@ -135,9 +142,33 @@ from tf_agents.system import system_multiprocessing
 from tf_agents.utils import common
 
 import snake_constants
-from snake_constants import POLICY_DIR, RUNS_DIR
+from snake_constants import EVALS_ARCHIVE_DIR, EVALS_DIR, POLICY_DIR, RUNS_DIR
 from snake_environment import SnakeEnvironment
 from snek2 import build_q_net
+
+
+def archive_existing_eval_pngs():
+    """Moves whatever is currently in EVALS_DIR into a timestamped EVALS_ARCHIVE_DIR
+    subfolder, so a new eval or batch starts from an empty folder and evals/ always shows
+    only the most recently completed work.
+
+    Safe when several processes start at once, which is the normal case for a batch: the
+    move happens before this process writes anything of its own, so whichever process gets
+    here first archives the previous batch's leftovers and the rest find nothing left to
+    move. A FileNotFoundError from a sibling winning that race is swallowed rather than
+    raised.
+    """
+    os.makedirs(EVALS_DIR, exist_ok=True)
+    pngs = [name for name in os.listdir(EVALS_DIR) if name.endswith('.png')]
+    if not pngs:
+        return
+    dest = os.path.join(EVALS_ARCHIVE_DIR, time.strftime('%Y%m%d-%H%M%S'))
+    os.makedirs(dest, exist_ok=True)
+    for name in pngs:
+        try:
+            shutil.move(os.path.join(EVALS_DIR, name), os.path.join(dest, name))
+        except FileNotFoundError:
+            pass
 
 
 def wilson_interval(successes, trials, z=1.96):
@@ -431,6 +462,7 @@ def main(argv):
     if len(argv) < 3:
         print(__doc__)
         return 1
+    archive_existing_eval_pngs()
     policy_name = argv[1]
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     num_workers = int(os.environ.get('EVAL_WORKERS', 10))
@@ -578,7 +610,7 @@ def main(argv):
     # process's, so with several EVAL_OUT_SUFFIX processes on one arm each window shows the whole
     # job rather than its own slice, and they will be near-identical. Duplicate windows are the
     # price of never silently having none.
-    chart_path = os.path.join(RUNS_DIR, '{0}_eval_progress.png'.format(policy_name))
+    chart_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
     chart = {'screen': None, 'last': 0.0, 'off': False}
 
     def update_chart(force=False):

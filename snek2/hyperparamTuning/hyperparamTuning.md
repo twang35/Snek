@@ -166,9 +166,15 @@ PYTHONPATH=. python -u eval_progress.py b8f-disc9975seed2
 EVAL_PROGRESS_WATCH=30 PYTHONPATH=. python -u eval_progress.py b8f-disc9975seed2
 ```
 
-It prints a text summary and writes `runs/<policy>_eval_progress.png`. **Prefer the text output
+It prints a text summary and writes `evals/<policy>_eval_progress.png`. **Prefer the text output
 when checking programmatically** — it carries the same numbers without opening an image. Watch
 mode exits by itself once every run is complete, so it does not become a process to remember.
+
+**`evals/` holds only the current eval or batch.** `eval_checkpoints.py` moves whatever is
+already there into a timestamped folder under `evals/archive/` before it writes anything new,
+so glancing at the top-level folder always shows exactly what last finished — no need to check
+step numbers or timestamps to tell current from stale. Nothing is lost; look in `evals/archive/`
+for a previous batch's charts.
 
 | part | shows |
 |---|---|

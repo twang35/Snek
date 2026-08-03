@@ -14,10 +14,11 @@ mkdir -p $HERE/charts
 for graph in $RUNS/*.png; do
   policy=${${graph:t}%.png}
   [[ $policy == smoke || $policy == tunetest ]] && continue
-  # runs/ also holds <policy>_eval_progress.png, written by eval_progress.py. Those are
-  # close-out progress views, not an arm's training graph, and copying them in made charts/
-  # look like it held twice as many arms as it does — each one showed up as an undocumented
-  # arm in the charts.md completeness check.
+  # runs/ used to also hold <policy>_eval_progress.png, written by eval_progress.py /
+  # eval_checkpoints.py. Those are close-out progress views, not an arm's training graph, and
+  # copying them in made charts/ look like it held twice as many arms as it does — each one
+  # showed up as an undocumented arm in the charts.md completeness check. They now write to
+  # snek2/evals/ instead, so this exclusion only matters for files from before that change.
   [[ $policy == *_eval_progress ]] && continue
   cp $graph $HERE/charts/$policy.png
   step=$($PY - "$RUNS/${policy}_evals.json" <<'EOF' 2>/dev/null || echo "?"
