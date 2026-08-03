@@ -44,6 +44,11 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         # on this flag. With the discount zeroed in to_tensor_time_step() the bootstrap is gone,
         # nothing reads a terminal state's value, and the flag was 0 in 100% of the states a
         # policy ever acts in — a constant input.
+        #
+        # Appended after every existing block rather than interleaved, per the rule in
+        # CLAUDE.md - it keeps every index above unchanged, including the ones the frozen
+        # hyperparamTuning/diagnostics/ scripts hardcode.
+        hugging_wall_obs = 3         # post-move head has a wall or body on its left or right
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
                                  + head_with_tail_obs
@@ -51,7 +56,8 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                                  + total_groups_obs
                                  + perfect_game_move_obs
                                  + steps_until_starve_obs
-                                 + snake_length_obs,), np.float32)
+                                 + snake_length_obs
+                                 + hugging_wall_obs,), np.float32)
 
     def set_display(self, enabled):
         self._game.set_display(enabled)

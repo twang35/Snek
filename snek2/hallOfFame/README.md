@@ -11,12 +11,11 @@ rotation and are not deleted by anything.
 
 ## These checkpoints do not run on `master` (2026-08-02)
 
-The observation vector is **23 values** and these were trained on 20, so the first layer's shape
+The observation vector is **26 values** and these were trained on 20, so the first layer's shape
 no longer matches and restoring one fails immediately:
 
 ```
-ValueError: Received incompatible tensor with shape (20, 50) when attempting to restore
-variable with shape (23, 50) and name sequential/dense/kernel:0
+ValueError: Shapes (26, 50) and (20, 50) are incompatible
 ```
 
 To run one by hand, check out the last commit whose observation matches them:

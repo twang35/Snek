@@ -19,11 +19,12 @@ it as evidence from that date, not as current state.
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
 | **Observations changed twice on 2026-08-02** — two more boundaries after the audit's | **breaking**, and the second changes the vector width |
-| **Earlier checkpoints do not run on `master`** — the vector is 23 values against their 20; use `e4514a8` | **breaking** |
+| **Earlier checkpoints do not run on `master`** — the vector is 26 values against their 20; use `e4514a8` | **breaking** |
 | A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **measured**, and a standing hazard |
 | **Safe-to-chase-food added**: 1 when head, food and tail share one region after the move | **new** 2026-08-02, untested in training |
 | **Fatal moves now read zero on all three group values**, not a hypothetical survivor's answer | **fixed** 2026-08-02, was 1 on 5,289/14,642 body collisions |
 | **`lg(num_groups)` normalized to `[0, 1]`**, was reaching ~4.4 on a vector otherwise capped at 1.0 | **fixed** 2026-08-02, rest of the vector audited clean |
+| **Hugging a wall or body added**: 1 per action when the post-move head has one on its left or right | **new** 2026-08-02, a hypothesis about pocket-splitting, untested in training |
 | **Terminal steps carried a non-zero discount**, so every episode's last transition bootstrapped off the terminal state | **fixed** 2026-08-02 |
 | The n-step falsification was measured with returns that leak across episode ends | **re-opened**, not overturned |
 | **Fixing `head_with_tail` moved the champion 80.0% → 90.3% with no retraining** | **measured**, 360 eps a side, intervals disjoint |
@@ -364,6 +365,54 @@ scaled value hits exactly 1.0 at the design cap and exceeds it just past it, and
 region count from the 422,608-move sweep stays in `[0, 1]` with real margin under the cap. Two
 mutations confirmed these catch what they are meant to: lowering the cap below the measured
 ceiling, and reverting the scale formula to drop its `+1`.
+
+#### Hugging a wall or body, 2026-08-02: three more values, and the vector is 26
+
+The user's own idea, not one this document proposed: for each action, 1 when the post-move head
+has a wall or body segment immediately to its left *or* right, 0 when both sides are open or the
+move is fatal. **This is a hypothesis, not a finding** - the intent is to let a policy learn to
+travel along a wall or the edge of an existing pocket rather than through the middle of open space
+next to one, since cutting through the middle can turn one large pocket into two smaller ones that
+are each harder to use later. Nothing here measures whether that actually happens; it is recorded
+as a design rationale, to be judged the same way `head_with_food_obs` was - by what a trained arm
+does with it, not by intuition.
+
+"Left" and "right" are relative to the heading the move leaves the head facing, found by looking
+`CURRENT_DIRECTION_MAPS` up a second time - the same table that answers "what is my new heading"
+for the action itself answers "what is 90 degrees off that heading" when asked of the new heading
+rather than the old one. Checked against the grid *after* the move (the same one `group_obs`
+already builds for the region values), not before it, so a cell the tail is vacating this step
+reads as open rather than blocked - the one case that distinguishes the two is narrow (the left or
+right cell has to be exactly the tail's current position), but it is exactly the same kind of
+staleness the tail-advancing fix corrected in `head_with_tail` two fixes earlier the same day, so
+it is treated the same way here on principle rather than only after it was shown to matter.
+
+A fatal move reads 0 regardless of the geometry beside it, matching the group-value convention
+established earlier the same day. Computed inside `group_obs` to reuse its legality gate and its
+post-move grid rather than duplicating either - it needs neither the flood fill nor the regions
+those exist for, so this is a reuse of infrastructure rather than a third thing sharing genuinely
+shared work.
+
+Measured over 18,450 steps of heuristic play: the flag is 1 on **37.9%** of action slots (**40.0%**
+of slots at length ≥ 50), and the full vector's range is unaffected - every value still spans
+exactly `[0, 1]`. Cost is unaffected too: two extra grid lookups per legal action, no flood fill,
+measured at 27.2 µs at length 75 against 28.7 µs before this addition existed - within run-to-run
+noise, not a measurable increase.
+
+55 tests now, 8 new. Four are hand-built boards proving the geometry (open board hugs nothing;
+running along the left edge hugs on the forward move and is fatal on the move that would leave the
+board; a placed body segment is hugged whether reached head-on or from an adjacent angle; both
+sides blocked still reads a single 1, not 2); one proves the fatal-move override directly, using
+the same obstacle that would have read 1 if the move survived; two are a matched pair proving the
+post-move-grid decision - the same board reads 0 when the move does not eat (tail vacates, cell
+reads open) and 1 when it does (tail stays, cell reads blocked); one sweeps every fixture in the
+section checking the fatal-move invariant holds throughout. Four mutations confirmed each design
+decision is load-bearing: checking the old grid instead of the new one, using the pre-move heading
+instead of the post-move one, requiring both sides blocked instead of either, and checking only one
+side - each is caught by a different subset of the fixtures.
+
+Effect on the perfect rate is unmeasured and needs an arm, like every other observation change
+today.
 
 #### Rewards are now exact
 

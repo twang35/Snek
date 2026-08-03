@@ -29,7 +29,7 @@ def get_observations(old_grid,
                      current_step,
                      last_food_step,
                      snake_len):
-    """Builds the 23-value observation vector. Layout, in order:
+    """Builds the 26-value observation vector. Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
@@ -39,6 +39,7 @@ def get_observations(old_grid,
     18-20    3       does the move win the game
     21       1       starve budget left, lg-compressed to [0, 1]
     22       1       fraction of the board the snake fills
+    23-25    3       is the post-move head hugging a wall or body on its left or right
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
     from the current heading, not compass directions. Keep this in step with
@@ -61,7 +62,7 @@ def get_observations(old_grid,
     # Together these are the "am I about to trap myself" signal: reaching the tail means an
     # escape route exists, and a rising region count means the move is cutting the free space
     # into pieces. Needs both tail positions, because the tail moves too - see group_obs.
-    group_values, food_chase_values = group_obs(old_grid,
+    group_values, food_chase_values, wall_hug_values = group_obs(old_grid,
                                                 head_pos,
                                                 tail_pos,
                                                 next_tail_pos,
@@ -89,6 +90,15 @@ def get_observations(old_grid,
     # observation_spec() used to reserve a disabled slot for: open cells are the complement of
     # snake length, so it is the same signal already normalised.
     observations.extend(starve_and_length_obs(current_step, last_food_step, snake_len))
+
+    # 3 values, one per action: 1 when the post-move head has a wall or body immediately to its
+    # left or right, 0 when both sides are open (or the move is fatal). The intent is to let a
+    # policy learn to travel along a wall or an existing pocket boundary rather than through the
+    # middle of open space next to one, which can split one large pocket into two smaller ones -
+    # harder to use later than the single pocket was. Unvalidated: this is a hypothesis about
+    # what the feature enables, not yet a measured effect. Computed inside group_obs to reuse
+    # its legality gate and its post-move grid - see group_obs.
+    observations.extend(wall_hug_values)
 
     # There used to be a final "is the episode over" value here, and it is gone. It was 1 only in
     # a terminal observation, which no policy ever acts on, so it was a constant 0 for every state
@@ -165,14 +175,19 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
 # head_with_tail: returns 1 for with tail or 0 for no tail groups in each action
 # total_group_obs: returns lg(number of groups), scaled to [0, 1]
 # safe_to_chase_food: returns 1 when head, food and tail all end up in one group
+# hugging_wall: returns 1 when the post-move head has a wall or body immediately to its left
+#   or right, 0 if both sides are open or the move is fatal
 def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, current_food):
-    """Returns two lists: [can reach tail, lg(open regions) scaled to [0, 1]] per action, and
-    [safe to chase the food] per action.
+    """Returns three lists, each one value per action: [can reach tail, lg(open regions) scaled
+    to [0, 1]], [safe to chase the food], and [is the post-move head hugging a wall or body].
 
-    Two lists rather than one because they sit in different places in the observation vector
-    while sharing all of their expensive work. `count_groups` is roughly 46% of the cost of
-    building an observation and runs three times here, once per action; computing the food flag
-    in its own function would run it three more times for nothing.
+    Three lists rather than three functions because they share all of their expensive work.
+    `count_groups` is roughly 46% of the cost of building an observation and runs three times
+    here, once per action; computing the other two elsewhere would either run it three more
+    times for nothing (safe-to-chase, which reads the regions it produces) or duplicate the
+    legality gate and the post-move grid (hugging-wall, which needs neither the flood fill nor
+    the regions, but does need to know a move is legal before asking what its neighbours are,
+    and needs the grid *after* the move for the tail's vacated cell to read as open).
 
     **Safe to chase the food** is 1 when the head, the food and the tail all land in *one* region
     after the move - so there is a route to the food and a route back out afterwards. One region,
@@ -201,6 +216,28 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
     leaving a fatal move free to say anything at all, so it is short-circuited before the flood
     fill runs - which also skips `count_groups` for it entirely.
 
+    **Hugging a wall** is 1 when the cell immediately to the head's left *or* right, after the
+    move and relative to the heading the move leaves it facing, is a wall or body segment; 0 if
+    both sides are open, and 0 for a fatal move regardless of the geometry (there is no
+    "afterwards" to hug anything in). "Left" and "right" are found by looking up
+    `CURRENT_DIRECTION_MAPS` a second time, treating the head's *new* facing as the base
+    direction rather than its old one, which is exactly the question "what is 90 degrees off my
+    new heading" - the same table already answers "what is my new heading" for the action
+    itself, one level up.
+
+    The intent is to let a policy learn to travel *along* a wall or an existing pocket boundary
+    rather than through open air next to one: cutting through the middle of free space can leave
+    two smaller pockets where there was one big one, and a big single pocket is easier to use
+    later than two small ones. This does not exist yet as a validated finding - it is a
+    hypothesis about what the feature should let the network learn, not a measured effect.
+
+    Checked against the grid *after* the move (the same `grid = update_grid(...)` used for the
+    regions below), not the grid before it, so that a cell the tail is vacating this step reads
+    as open rather than as body. The one place this matters is narrow: the left or right cell
+    would have to be exactly the tail's current position for the two grids to disagree, which
+    only arises in a tight coil. Whether a cell is a wall is unaffected either way, since
+    `update_grid` never touches the padded wall ring.
+
     Takes two tail positions, because the tail moves on the same step the head does.
     `tail_pos` is where it is now; `next_tail_pos` is the cell ahead of it, which is where it
     lands on any move that does not eat. Both are needed: the vacated cell decides what
@@ -217,6 +254,7 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
     """
     observations = []
     food_observations = []
+    wall_hug_observations = []
     cols = old_grid.shape[1]
     # Bit for the food's cell, matching count_groups' layout, or None when there is no food -
     # which happens on the step that wins the game.
@@ -237,12 +275,26 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
             # one. Skips update_grid and count_groups for this action entirely.
             observations.extend([0, 0])
             food_observations.append(0)
+            wall_hug_observations.append(0)
             continue
 
         # .copy() rather than copy.deepcopy(): an ndarray copy is already independent, and
         # deepcopy walks the object graph to reach the same result. Worth almost nothing on
         # its own (0.3% of the profile) but there is no reason to pay it.
         grid = update_grid(action, head_pos, tail_pos, old_grid.copy(), head_move_dir)
+
+        # The heading this move leaves the head facing, and the cardinal directions 90 degrees
+        # either side of it - CURRENT_DIRECTION_MAPS answers "what heading does turning left (or
+        # right) from here produce", which is exactly "what is to my left (or right)" when asked
+        # of the *new* heading rather than the old one used to get new_head_pos itself.
+        new_facing = CURRENT_DIRECTION_MAPS[head_move_dir][action]
+        left_vector = MOVE_VECTORS[CURRENT_DIRECTION_MAPS[new_facing]['left']]
+        right_vector = MOVE_VECTORS[CURRENT_DIRECTION_MAPS[new_facing]['right']]
+        left_pos = (new_head_pos[0] + left_vector[0], new_head_pos[1] + left_vector[1])
+        right_pos = (new_head_pos[0] + right_vector[0], new_head_pos[1] + right_vector[1])
+        left_blocked = get_grid_value(left_pos, grid) not in (0, 1)
+        right_blocked = get_grid_value(right_pos, grid) not in (0, 1)
+        wall_hug_observations.append(1 if (left_blocked or right_blocked) else 0)
 
         regions, group_count = count_groups(grid)
 
@@ -295,7 +347,7 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
         observations.extend([head_with_tail, num_groups])
         food_observations.append(safe_to_chase_food)
 
-    return observations, food_observations
+    return observations, food_observations, wall_hug_observations
 
 
 def starve_budget(snake_len):

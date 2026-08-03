@@ -55,6 +55,11 @@ def food_chase_values(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, fo
     return group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food)[1]
 
 
+def wall_hug_values(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food='no food'):
+    """The [hugging a wall or body] third, one value per action."""
+    return group_obs(grid, head_pos, tail_pos, next_tail_pos, head_move_dir, food)[2]
+
+
 # =============================== group_obs tests ===============================
 def test_hwt_no_touching():
     grid = np.array([[4, 4, 4, 4, 4, 4, 4],
@@ -606,6 +611,143 @@ def test_chase_food_never_claims_safe_where_the_tail_is_lost():
                 assert chase[index] == 0, (index, pairs, chase)
 
 
+# =============================== wall/body hugging tests ===============================
+def test_hug_open_board_hugs_nothing():
+    """Nothing nearby in any direction, so every action reads 0."""
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 3, 3, 2, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [0, 0, 0]
+
+
+def test_hug_wall_on_forward_fatal_on_left_open_on_right():
+    """The head runs along the left edge of the board (x = 0), facing up.
+
+    'forward' stays at x = 0: its left side, west, is off the board - a wall - so it hugs.
+    'left' would step off the board entirely (x = -1): fatal, not a hugging question at all.
+    'right' turns away from the edge into open space: nothing on either side.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 2, 0, 0, 0, 0, 4],
+                     [4, 3, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (0, 1), (0, 2), (0, 1), 'up') == [0, 0, 1]
+
+
+def test_hug_body_on_one_side_of_forward_and_coincidentally_left_too():
+    """A body segment at (4, 0) sits beside two different candidate landing cells.
+
+    Facing right, 'forward' lands at (4, 1); (4, 0) is its left side (north), so it hugs.
+    'left' turns to face up and lands at (3, 0); (4, 0) happens to be *its* right side (east)
+    too, from a different angle - also hugs, which is correct, not a coincidence to explain
+    away. 'right' turns to face down, landing at (3, 2), nowhere near (4, 0): open both sides.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 3, 0, 4],
+                     [4, 0, 3, 3, 2, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, 0, 1]
+
+
+def test_hug_reads_one_when_both_sides_are_blocked_not_two():
+    """Body segments on both sides of the forward landing cell still read a single 1.
+
+    This is a flag, not a count - group_obs' own num_groups already carries "how fragmented",
+    so hugging only has to say whether the move runs along an edge at all.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 3, 0, 4],
+                     [4, 0, 3, 3, 2, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 3, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, 1, 1]
+
+
+def test_hug_is_zero_for_a_fatal_move_regardless_of_what_is_beside_it():
+    """A move that kills the snake reads 0 here even where the geometry would say 1.
+
+    'forward' now runs straight into a body segment at (4, 1) - fatal - despite the *same*
+    obstacle at (4, 0) from the previous fixture sitting right where its left side would be if
+    it survived the move. There is no "afterwards" to hug anything in.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 0, 3, 0, 4],
+                     [4, 0, 3, 3, 2, 3, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, 0, 0]
+
+
+def test_hug_reads_the_board_after_the_move_not_before_it():
+    """The cell beside the new head is the tail's *current* position, which vacates this step.
+
+    Facing right from (1, 1), 'forward' lands at (2, 1); its left side (north) is (2, 0), where
+    the tail sits right now. Checked against old_grid that cell is still body - `test_hug`
+    would read 1, wrongly, for a move that is actually running along open space the tail is
+    about to leave. Checked against the grid *after* the move, as group_obs does, it is open: 0.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 3, 0, 0, 4],
+                     [4, 0, 2, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (1, 1), (2, 0), (3, 1), 'right') == [0, 0, 0]
+    # The wrong answer old_grid would have given, spelled out rather than left implicit.
+    assert get_grid_value((2, 0), grid) not in (0, 1), 'fixture no longer exercises the case'
+
+
+def test_hug_an_eating_move_does_not_free_the_tail_either():
+    """Same board as the previous test, except 'forward' now lands on food instead of open space.
+
+    Eating means add_segment() refills the tile the tail came from, so (2, 0) stays occupied
+    after the move rather than vacating - and 'forward' hugs it: 1, the opposite of the
+    otherwise-identical non-eating fixture above.
+    """
+    grid = np.array([[4, 4, 4, 4, 4, 4, 4],
+                     [4, 0, 0, 3, 0, 0, 4],
+                     [4, 0, 2, 1, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4, 4]])
+    assert wall_hug_values(grid, (1, 1), (2, 0), (3, 1), 'right') == [0, 0, 1]
+
+
+def test_hug_never_fires_for_a_move_that_is_not_legal():
+    """Sweeps every fixture above: wherever the chosen move is fatal, hug is 0 too.
+
+    A cheap invariant check on top of the fixture-by-fixture assertions - the fatal case is
+    covered directly above, but this confirms nothing else in this section accidentally relies
+    on it going the other way.
+    """
+    boards = [
+        (np.array([[4, 4, 4, 4, 4, 4, 4],
+                   [4, 0, 0, 0, 0, 0, 4],
+                   [4, 2, 0, 0, 0, 0, 4],
+                   [4, 3, 0, 0, 0, 0, 4],
+                   [4, 4, 4, 4, 4, 4, 4]]), (0, 1), (0, 2), (0, 1), 'up'),
+        (np.array([[4, 4, 4, 4, 4, 4, 4, 4],
+                   [4, 0, 0, 0, 0, 3, 0, 4],
+                   [4, 0, 3, 3, 2, 3, 0, 4],
+                   [4, 0, 0, 0, 0, 0, 0, 4],
+                   [4, 4, 4, 4, 4, 4, 4, 4]]), (3, 1), (1, 1), (2, 1), 'right'),
+    ]
+    for grid, head, tail, next_tail, move_dir in boards:
+        hug = wall_hug_values(grid, head, tail, next_tail, move_dir)
+        for index, action in enumerate(ACTIONS):
+            new_head = get_relative_pos(action, head, move_dir)
+            grid_value = get_grid_value(new_head, grid)
+            legal = grid_value in (0, 1) or tuple(new_head) == tuple(tail)
+            if not legal:
+                assert hug[index] == 0, (action, hug)
+
+
 # =============================== starve and length tests ===============================
 def test_starve_budget_is_ten_per_segment_between_its_limits():
     assert starve_budget(20) == 200
@@ -752,8 +894,8 @@ def test_observation_spec_matches_what_the_game_emits():
 
     env = SnakeEnvironment(display=False)
     env.reset()
-    assert env.observation_spec().shape == (23,)
-    assert env._game.get_observation().shape == (23,)
+    assert env.observation_spec().shape == (26,)
+    assert env._game.get_observation().shape == (26,)
 
 
 def test_terminal_steps_carry_zero_discount():

@@ -22,9 +22,10 @@ this was written; the document itself is left exactly as measured.
 | add "is the food reachable" | done, and stricter than proposed here: head, food **and** tail in one region, so it names a reachable meal rather than merely a visible one |
 | zero the region values on a fatal move | done, raised by the user after reading the food-reachable fix: a wall move happened to read 0 already, but a self-collision did not — `head_with_tail` was 1 on **5,289 of 14,642** body-collision moves in real play, describing a snake that does not survive the move that produced it |
 | normalize `lg(num_groups)` to `[0, 1]` | done, raised by the user re-reading this section's own input-scale table: the value reached ~4.4 on the current board (13 regions measured, 16-region design cap) against a vector otherwise in `[0, 1]`, the same mismatch this document flagged for the pre-split starve value. Removing the input, which the "points the wrong way" finding below still recommends, has not been done |
+| add "hugging a wall or body" per action | **new**, not a recommendation of this document — the user's own idea, added afterward. A hypothesis about pocket-splitting, not yet a measured finding; see `hyperparamTuning/findings.md` |
 | everything else | not implemented |
 
-The vector is **23 values** now, so the checkpoints this document was measured on fail to load. Use
+The vector is **26 values** now, so the checkpoints this document was measured on fail to load. Use
 commit `e4514a8` for those — and note that for part of the same day the count was coincidentally
 back at 20 while two indices meant different things, in which window those checkpoints loaded
 silently and played like beginners. Details in the 2026-08-02 subsections of

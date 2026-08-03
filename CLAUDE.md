@@ -110,7 +110,7 @@ board-fill. Arbitrary weights times a live signal.
 
 So when the observation changes, **record which indices changed meaning in the hall of fame
 README, and name the last commit whose observation matches those checkpoints** (currently
-`e4514a8`). A width change at least fails loudly — the vector is 23 now, so those checkpoints error
+`e4514a8`). A width change at least fails loudly — the vector is 26 now, so those checkpoints error
 out — but that is luck, not a safeguard.
 
 **Append new per-action values after the existing blocks rather than interleaving them.** The
