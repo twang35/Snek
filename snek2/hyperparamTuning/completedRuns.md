@@ -32,8 +32,19 @@ not comparable to any row without the mark. The audit changed two observation co
 reward; the same checkpoint that scored 92% before reads 73% after. Compare ‡ rows only to each
 other, or to `b8f`'s `3149000` re-measured at 82%.
 
+**‡‡ marks arms trained on the environment after 2026-08-02's seven further fixes**
+(fatal-move zeroing, wall/body hugging, normalized group count, the corrected starve/length
+split, the terminal-discount fix, safe-to-chase-food, and the audit that started the day) — a
+third, later environment than ‡. Batch 9 (‡) predates all seven; batch 10 (‡‡) is the first to
+train on the result. Compare ‡‡ rows only to each other; they are not comparable to ‡ or
+unmarked rows.
+
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | **95%** @1815k (mid-run) | **93.3%** | **74.5%** /24600 | 84.3% | ‡‡ **project record**; stopped healthy |
+| `b10b-disc995seed2` ‡‡ | disc **0.995**, third env | 4.65M | 87% @1157k (mid-run) | 86.3% | 70.4% /12000 | 85.0% | ‡‡ 2nd of batch 10; stopped healthy |
+| `b10a-disc995seed1` ‡‡ | disc **0.995**, third env | 4.29M | close-out eval pending | pending | pending | 78.3% | ‡‡ stopped healthy |
+| `b10c-disc995seed3` ‡‡ | disc **0.995**, third env | 4.12M | close-out eval pending | pending | pending | 72.7% | ‡‡ stopped healthy |
 | `b9d-disc995b` ‡ | disc **0.995**, new env | 3.45M | **70%** @2544k | **66.3%** | 42.4% /1700 | 30.3% | ‡ best ceiling of batch 9 |
 | `b9a-disc9975a` ‡ | disc **0.9975**, new env | 3.68M | 65% @1735k | 64.3% | **54.9%** /2000 | 56.0% | ‡ most consistent of batch 9 |
 | `b9c-disc995a` ‡ | disc **0.995**, new env | 3.71M | 52% @2603k | 51.3% | 38.0% /2000 | 37.3% | ‡ weakest survivor |
@@ -99,6 +110,53 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 10 — a fresh baseline, and a new project record
+
+**Launched 2026-08-02, all four stopped 2026-08-03** by request, healthy, to make room for
+further changes — not because any of them died or declined. Seven observation/reward changes
+had landed the same day batch 10 launched (fatal-move zeroing, wall/body hugging, normalized
+group count, the corrected starve/length split, the terminal-discount fix, safe-to-chase-food,
+and the audit that started the day), on top of the audit that already made batch 9 incomparable
+to batch 8. Nothing had trained on the resulting environment at all, so batch 10 was deliberately
+four seeds of **one** config — `DISCOUNT=0.995`, the most reliably-surviving value on record (3 of
+3 in batch 7, 2 of 2 in batch 9) — rather than another comparison, on the reasoning that comparing
+two things before either has a baseline on the actual environment being measured just repeats
+batch 9's own lesson at one remove. Shared base for all four:
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
+
+| policy | final step | peak trailing | best-30 perfect | best ckpt (mid-run eval) | top-3 | pooled | outcome |
+|---|---|---|---|---|---|---|---|
+| `b10a-disc995seed1` | 4.29M | 94.4 @3402k | 78.3% @3402k | close-out eval pending | — | — | stopped healthy |
+| `b10b-disc995seed2` | 4.65M | 94.96 @4545k | 85.0% @4547k | 87% @1157k | 86.3% | 70.4%/12000 | stopped healthy, 2nd-best |
+| `b10c-disc995seed3` | 4.12M | 93.8 @4021k | 72.7% @4064k | close-out eval pending | — | — | stopped healthy |
+| `b10d-disc995seed4` | 4.45M | 94.7 @3978k | 84.3% @1666k | **95%** @1815k | **93.3%** | **74.5%/24600** | stopped healthy, **project record** |
+
+**All four were still healthy when stopped** — no `dead_since`/`zero_since` on any of them, and
+two (`b10b`, `b10c`) were at or near their own peak trailing score *at the moment they were
+stopped*, not declining from an earlier peak the way every record-setting arm before this batch
+was. That is a first for this project: every previous best-checkpoint arm (`b8f`, `b8d`, `b9d`)
+had already peaked and was declining by the time it was measured or stopped.
+
+**`b10d`'s 95% (CI 88.8-97.8, 246 checkpoints cleared the ≥90% tier) is the best figure this
+project has produced on any environment**, ahead of the pre-audit record of 92% (`b8f`
+`ckpt2816000`, no longer reproducible — see the hall of fame) and far ahead of the previous
+post-audit best of 82% (`b8f` `ckpt3149000`, also no longer reproducible after this session's
+seven fixes). Both `b10b`'s and `b10d`'s measurements were taken **mid-run** — each arm kept
+training for another ~2.5-2.9M steps afterward, up to a final step neither eval's checkpoint
+range covered — so a full close-out re-measurement across each arm's complete checkpoint history
+may move these numbers further; see [`runs.md`](runs.md) for whether that has happened yet.
+
+**Not yet established: whether this is the config or the environment.** Batch 10 deliberately
+ran one config, so it cannot separate "the seven 2026-08-02 fixes made training better" from
+"this seed cluster happened to be strong" — n=4 on one value is enough to trust as a baseline,
+not enough to attribute the gain. Both `b10d` (95%) and `b10b` (87%) comfortably clear the old
+82% ceiling, and `b10a`/`b10c` graph-eval no worse than batch 9's arms did at a comparable
+horizon, which is suggestive but not the isolating comparison a future batch would need to make
+the claim safely.
+
+Both champion checkpoints are preserved in
+[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-95-trained-end-to-end-on-todays-environment-2026-08-03).
 
 ## Batch 9 — 0.995 against 0.9975 on the post-audit environment
 

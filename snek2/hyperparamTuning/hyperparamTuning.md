@@ -257,6 +257,17 @@ Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
 confidence interval. Several copies can run at once on different arms — give each its own
 `EVAL_OUT_SUFFIX` or they overwrite each other, then merge.
 
+**Always give an exploratory run its own throwaway `EVAL_OUT_SUFFIX`, even a 30-second one.**
+The first write happens at the first round of the first checkpoint, not at the end, and it
+overwrites whatever was already at that path unconditionally — a CPU-load probe killed after
+seeing an unexpectedly large checkpoint count is enough to do it. This is exactly how a
+246-checkpoint close-out (`b10d`'s full breakdown, the day of the batch-10 close-out) got
+destroyed: a calibration run reused the real `_top20` suffix and was killed before completing,
+but not before its first in-flight write landed. `eval_checkpoints.py` now keeps one rolling
+`<path>.previous` backup of the last *complete* result at each path before overwriting it —
+recover with a plain file copy if this happens again — but that is the safety net, not a
+reason to skip the distinct suffix.
+
 **Checkpoint retention bounds all of this.** A checkpoint is written every 1000 steps, so
 `max_to_keep` is a rolling window measured in millions of steps, and an arm run past that
 window **deletes the checkpoint behind its best number**.

@@ -130,6 +130,15 @@ one checkpoint's episodes across worker envs, and several copies of this script
 can run at once on different checkpoints. Give each copy its own
 EVAL_OUT_SUFFIX in that case, or they overwrite each other's results; merge
 afterwards with merge_checkpoint_evals().
+
+**Use a throwaway EVAL_OUT_SUFFIX for anything exploratory** — a timing check, a CPU-load
+calibration probe, or just watching what the `top20` selection picks before committing to a
+full run. The first write to disk happens seconds in, at the very first round of the very
+first checkpoint, and it unconditionally overwrites whatever was already at that path. A run
+sharing its suffix with a prior complete measurement destroys that measurement the moment it
+starts, whether or not it is later killed early. backup_previous_results() below keeps one
+rolling `.previous` copy as a safety net, but a distinct suffix is the thing that actually
+prevents this.
 """
 import glob
 import json
@@ -159,6 +168,34 @@ import snake_constants
 from snake_constants import EVALS_ARCHIVE_DIR, EVALS_DIR, POLICY_DIR, RUNS_DIR
 from snake_environment import SnakeEnvironment
 from snek2 import build_q_net
+
+
+def backup_previous_results(out_path):
+    """Copies an existing *complete* result file to `<out_path>.previous` before this run's
+    first write can overwrite it.
+
+    `write_results()` below rewrites the whole file starting from the very first round of the
+    very first checkpoint — seconds into the run, not at the end — so a run killed early (a
+    timing check, a CPU-load calibration probe, second-guessing a `top20` selection once the
+    checkpoint count turns out huge) destroys a prior complete measurement with no warning if
+    it happens to share this run's `EVAL_OUT_SUFFIX`. That cost this project a 246-checkpoint
+    close-out once already. Prefer a throwaway `EVAL_OUT_SUFFIX` for anything exploratory —
+    this backup is the safety net for when that doesn't happen, not a reason to skip it.
+
+    A single rolling backup, not history: a second overwrite in a row replaces the same
+    `.previous` file, so it protects the last complete run at this path, not every run ever
+    made with this suffix.
+    """
+    if not os.path.exists(out_path):
+        return
+    try:
+        with open(out_path) as handle:
+            payload = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return
+    if not payload.get('complete'):
+        return
+    shutil.copy2(out_path, out_path + '.previous')
 
 
 def archive_existing_eval_pngs():
@@ -579,6 +616,7 @@ def main(argv):
 
     suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
     out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
+    backup_previous_results(out_path)
 
     def write_results(results, complete, in_flight=None):
         """Rewrites the whole file after every checkpoint, and after every round.

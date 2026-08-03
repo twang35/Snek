@@ -157,7 +157,11 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     tick_size = 5
 
     score_color = 'tab:blue'
-    score_axis.plot(steps, scores, color=score_color)
+    # Thin on purpose: a long run has thousands of points packed into ~300px of plot width,
+    # so the default 1.5pt stroke overlaps itself into a near-solid band with almost no
+    # visible texture. 0.3 keeps individual excursions readable instead of just filling the
+    # whole band one color; chosen by comparing 0.3/0.5/0.8/1.2 side by side on a real arm.
+    score_axis.plot(steps, scores, color=score_color, linewidth=0.3)
     score_axis.set_ylabel('Average Score', color=score_color, fontsize=label_size)
     score_axis.set_xlabel('Iterations', fontsize=label_size)
     score_axis.tick_params(axis='y', labelcolor=score_color, labelsize=tick_size)
@@ -166,7 +170,7 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
 
     percent_color = 'tab:red'
     percent_axis = score_axis.twinx()
-    percent_axis.plot(steps, perfect_percents, color=percent_color)
+    percent_axis.plot(steps, perfect_percents, color=percent_color, linewidth=0.3)
     percent_axis.set_ylabel('Perfect Game %', color=percent_color, fontsize=label_size)
     percent_axis.tick_params(axis='y', labelcolor=percent_color, labelsize=tick_size)
     percent_axis.set_ylim(bottom=0, top=100)

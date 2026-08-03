@@ -77,6 +77,13 @@ they get deleted. **Never delete anything under `snek2/evals/archive/`**, same
 asymmetry as everywhere else here: it is the only record of a chart that is no longer
 in the top-level folder.
 
+**`<policy>_checkpoint_evals<suffix>.json.previous` is a safety net, not scaffolding.**
+`eval_checkpoints.py` writes one before overwriting an existing *complete* result at that
+path, because the first write of a new run lands seconds in and destroys whatever was
+there unconditionally — including a real close-out, if a probe or timing check reuses its
+suffix. Keep it until you've checked it isn't the only copy of something real; do not
+lump it in with smoke-test output.
+
 **Throwaway output is fine to delete.** Smoke tests, speed benchmarks and
 verification runs are not results — they are scaffolding from proving a change
 works, and they age into noise that makes the directory harder to read. Judge by

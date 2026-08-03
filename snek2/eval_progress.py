@@ -262,40 +262,59 @@ def render(policy_name, state, out_path):
             top.plot(rounds, running, marker='o', markersize=3.5, linewidth=1.4,
                      label='{0} @{1}'.format(label, flight['step']))
             top.set_xlim(0.5, flight['rounds_total'] + 0.5)
-        # How many processes are contributing at each round, as a step line on its own axis.
-        # Not a section of its own — it is a one-line answer to "how much of the machine is on
-        # this right now", which the perfect-rate lines cannot show: several lines at round 3
-        # could be one process on its third round or three processes on their first.
+        # How many workers are contributing at each round, as a step line on its own axis. Not
+        # a section of its own — it is a one-line answer to "how much of the machine is on this
+        # right now", which the perfect-rate lines cannot show on their own: several lines at
+        # round 3 could be one process at 2 workers each still on its third round, or a second
+        # process at 10 workers just getting started.
         #
-        # A process counts toward round r once it has reported r rounds, so the line starts at
-        # however many are working and steps down as the quicker ones finish their checkpoint.
-        depths = [len(flight.get('per_round_perfect') or []) for _, flight in state['active']]
-        if depths:
-            deepest = max(depths)
-            per_round_processes = [sum(1 for d in depths if d >= r) for r in range(1, deepest + 1)]
-            process_axis = top.twinx()
-            process_axis.step(range(1, deepest + 1), per_round_processes, where='mid',
-                              color='tab:gray', linewidth=1.2, linestyle=(0, (5, 2)),
-                              alpha=0.8, label='processes')
-            process_axis.set_ylabel('processes evaluating', color='tab:gray', fontsize=8)
-            process_axis.tick_params(axis='y', labelcolor='tab:gray', labelsize=7)
-            # Integer ticks only: a count of 2.5 processes is meaningless.
-            process_axis.set_ylim(0, max(per_round_processes) + 1)
-            process_axis.set_yticks(range(0, max(per_round_processes) + 2))
-            process_axis.grid(False)
+        # Deliberately workers, not process count — a process is essentially always 1 here (see
+        # EVAL_OUT_SUFFIX below for the sharded exception), while EVAL_WORKERS varies run to run,
+        # so a process count is almost always a flat, uninformative line at 1. A process's
+        # workers count toward round r once it has reported r rounds, so the line starts at
+        # however many are working and steps down as quicker processes finish their checkpoint.
+        depths_and_workers = []
+        for _, flight in state['active']:
+            per_round = flight.get('per_round_perfect') or []
+            if not per_round:
+                continue
+            workers = max(1, flight['episodes_so_far'] // max(1, flight['round']))
+            depths_and_workers.append((len(per_round), workers))
+        if depths_and_workers:
+            deepest = max(depth for depth, _ in depths_and_workers)
+            per_round_workers = [sum(workers for depth, workers in depths_and_workers if depth >= r)
+                                  for r in range(1, deepest + 1)]
+            worker_axis = top.twinx()
+            worker_axis.step(range(1, deepest + 1), per_round_workers, where='mid',
+                             color='tab:gray', linewidth=1.2, linestyle=(0, (5, 2)),
+                             alpha=0.8, label='workers')
+            worker_axis.set_ylabel('workers evaluating', color='tab:gray', fontsize=8)
+            worker_axis.tick_params(axis='y', labelcolor='tab:gray', labelsize=7)
+            # Integer ticks only: a count of 2.5 workers is meaningless.
+            worker_axis.set_ylim(0, max(per_round_workers) + 1)
+            worker_axis.set_yticks(range(0, max(per_round_workers) + 2))
+            worker_axis.grid(False)
 
         if top.lines:
             top.legend(fontsize=7, loc='lower right', ncol=2, framealpha=0.85)
         top.set_title('In flight: running perfect rate by round ({0} checkpoint{1}, {2} process{3})'.format(
             len(state['active']), '' if len(state['active']) == 1 else 's',
             len(state['active']), '' if len(state['active']) == 1 else 'es'), fontsize=10)
-        top.set_xlabel('round  (one episode per worker, so 10 rounds x 10 workers = 100 episodes)',
+        # EVAL_WORKERS varies run to run (2 and 10 have both been used this project), so the old
+        # hardcoded "10 rounds x 10 workers = 100 episodes" was only ever right by coincidence.
+        worker_counts = sorted({workers for _, workers in depths_and_workers})
+        if len(worker_counts) == 1:
+            episode_formula = 'rounds x {0} worker{1} = episodes'.format(
+                worker_counts[0], '' if worker_counts[0] == 1 else 's')
+        else:
+            episode_formula = 'rounds x workers = episodes (worker count varies by process)'
+        top.set_xlabel('round  (one episode per worker, so {0})'.format(episode_formula),
                        fontsize=8)
         top.set_ylabel('running perfect %', fontsize=8)
         top.set_ylim(0, 100)
         top.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
         top.tick_params(labelsize=7)
-        # Keep the perfect-rate lines drawn over the process step line, and let the twin axis
+        # Keep the perfect-rate lines drawn over the worker step line, and let the twin axis
         # show through: twinx() puts the new axes on top with an opaque patch by default.
         top.set_zorder(2)
         top.patch.set_visible(False)

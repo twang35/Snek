@@ -9,7 +9,27 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## These checkpoints do not run on `master` (2026-08-02)
+## The current record: 95%, trained end-to-end on today's environment (2026-08-03)
+
+Batch 10 was a fresh baseline on the environment left by 2026-08-02's seven observation/reward
+changes (fatal-move zeroing, the wall/body-hugging observation, normalized group count, the
+corrected starve/length split, the terminal-discount fix, safe-to-chase-food, and the audit that
+started the day) — the first arms ever to train end-to-end on it, since batch 9 predates all
+seven. All four seeds beat every post-audit result on record before being stopped 2026-08-03 to
+make room for further changes; two were measured with `eval_checkpoints.py` first:
+
+| checkpoint | measured | config |
+|---|---|---|
+| `b10d-disc995seed4-ckpt1815000` | **95.0%** (95/100, CI 88.8-97.8), top-3 93.3%, pooled 74.5%/24600 | `DISCOUNT=0.995` |
+| `b10b-disc995seed2-ckpt1157000` | 87.0% (87/100, CI 79.0-92.2), top-3 86.3%, pooled 70.4%/12000 | `DISCOUNT=0.995` |
+
+**These load directly on `master`, no checkout needed** — unlike every entry below, which
+predates the 2026-08-02 changes. Both measurements were taken mid-run (the arms kept training
+for another ~2.5-2.9M steps afterward), so a full close-out re-measurement may still move these
+numbers; see [`../hyperparamTuning/completedRuns.md`](../hyperparamTuning/completedRuns.md) for
+the batch's full results and whichever numbers are most current.
+
+## The entries below predate 2026-08-02 and do not run on `master`
 
 The observation vector is **26 values** and these were trained on 20, so the first layer's shape
 no longer matches and restoring one fails immediately:
@@ -35,6 +55,11 @@ The `new env` column below was measured at `e4514a8`. The entries stay regardles
 record of what this project achieved, and the weights are still the weights.
 
 ## Entries
+
+**Superseded as the project's best by the batch-10 entries above** — this section's own
+analysis of *why* is left as written, since it is still the correct read of these four
+relative to each other and to the pre-08-02 environment. Read "best checkpoint this project
+has" below as "best of these four", not literally.
 
 Every entry is measured on **both** environments, because the 2026-08-01 audit changed two
 observation components and the reward. `old env` is what the policy achieved when it was

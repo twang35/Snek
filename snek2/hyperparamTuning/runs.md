@@ -12,85 +12,53 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## The best figure on record cannot be reproduced today
+## The current record: 95%, and it runs on `master` today
 
-`b8f-disc9975seed2` @3149000 scored 82/100 and is preserved in
-[`../hallOfFame/`](../hallOfFame/README.md). The observation vector changed from 20 to 26
-values on 2026-08-02 — fatal-move zeroing, `lg(num_groups)` normalization, and a new
-wall/body-hugging observation, on top of four earlier same-day changes (starve/length split,
-terminal-discount fix, safe-to-chase-food, the audit itself). **No checkpoint on record loads
-on the current environment, and no arm has ever trained on it.** 82% is the best figure that
-exists, not a floor or a ceiling for what batch 10 should produce. Full history and the
-82%-vs-73%-vs-92% picture: [`findings.md`](findings.md#what-this-cost-about-10-points-measured-properly).
+`b10d-disc995seed4` @1815000 scored 95/100 (CI 88.8-97.8), measured mid-run, and is preserved in
+[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-95-trained-end-to-end-on-todays-environment-2026-08-03).
+Unlike every earlier record in this project, **this one needs no checkout** — it trained on the
+observation vector that is on `master` right now. Full batch results and the "config vs
+environment" open question: [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
 ## Nothing is running — all four slots are free
 
-**Batch 9 finished 2026-08-02**, the day it launched, and settled nothing between the two
-discounts (0.995 and 0.9975 each won on a different axis). Full results:
-[`completedRuns.md`](completedRuns.md#batch-9--0995-against-09975-on-the-post-audit-environment).
-Batch 9 also predates the seven observation/reward changes above, so its numbers are not
-comparable to anything trained from here on either.
+**Batch 10 was stopped 2026-08-03 by request**, all four arms healthy (no `dead_since` on any
+of them), to make room for further changes. It was launched as a fresh baseline after seven
+observation/reward changes landed 2026-08-02 (fatal-move zeroing, wall/body hugging, normalized
+group count, the corrected starve/length split, the terminal-discount fix, safe-to-chase-food,
+and the audit that started the day) — nothing had trained on the resulting environment before
+it. All four seeds beat every prior post-audit result; full design and results:
+[`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
-## Batch 10 — a fresh baseline on the changed environment
+**Close-out `top20` evals for all four arms are the next step**, so `b10a` and `b10c` get the
+same full-run measurement `b10b` and `b10d` already have (theirs was mid-run and may not have
+seen each arm's best checkpoint — both kept training for another ~2.5-2.9M steps afterward).
 
-**Why a baseline batch, not another comparison.** Seven observation/reward changes landed on
-2026-08-02, on top of the audit that already made batch 9 incomparable to batch 8. Nothing has
-trained on the resulting environment at all. Launching straight into another discount
-comparison — the plan queued before this session's changes — would repeat batch 9's own
-lesson at one remove: comparing two things before either has a baseline on the environment
-actually being measured. So batch 10 is four seeds of **one** config, chosen for reliability
-rather than for testing anything new:
+### Next batch: pending the user's planned changes
 
-```
-SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0
-```
-
-| policy | role |
-|---|---|
-| `b10a-disc995seed1` | baseline seed 1 |
-| `b10b-disc995seed2` | baseline seed 2 |
-| `b10c-disc995seed3` | baseline seed 3 |
-| `b10d-disc995seed4` | baseline seed 4 |
-
-**Why `DISCOUNT=0.995` and not `0.9975`.** It is the single most reliably-surviving config on
-record — 3 of 3 in batch 7, 2 of 2 in batch 9, 5 of 5 overall — against `0.9975`'s 1 of 2. The
-discount question is deliberately not what this batch is for; a baseline should be boring, and
-if the new environment reopens the discount question, that is a batch 11 problem with its own
-seeds.
-
-**What this answers.** Where "normal" sits on the current environment, at n=4 instead of n=1 or
-n=0. Concretely: do this session's observation-space changes net out to better, worse, or
-unchanged training relative to batch 9's two `0.995` seeds (52-70% best ckpt, 38.0-42.4%
-pooled)? Every write-up from this session ended with "effect on the perfect rate is unmeasured
-and needs an arm" — this is that arm, four times over.
-
-**Run each to ~3-3.5M steps and stop**, per the horizon batch 8 established — do not leave
-these unattended overnight (`b9b` reached 10.47M and spent 10.1M steps past its peak producing
-nothing).
-
-**Close out with `top20`** on each, then compare **best checkpoint** and **top-3 pooled**
-across the four seeds — the same protocol as every batch since 7. Launch commands:
-[`hyperparamTuning.md`](hyperparamTuning.md#launching-a-run). Watch with
-`./watch_when_ready.sh <arm>`, launched right alongside the trainer — it waits out the
-no-checkpoint-yet period itself rather than needing a timed retry by hand.
+The user wants to make additional changes before the next batch — unspecified as of this
+close-out. Whatever they are, they will presumably retrain the environment (again) and reopen
+the "config vs environment" question `completedRuns.md` flags for batch 10: nothing yet
+isolates whether the 2026-08-02 fixes or just this seed cluster produced the 95%. Update this
+section once the next batch is actually designed.
 
 ### Later candidates
 
-Deferred until batch 10 gives the new environment a baseline to compare against:
+Deferred pending the above. Still relevant to whatever comes after it:
 
 | change | why | gate |
 |---|---|---|
-| second discount value (`0.9975`, or an interior point like `0.996`) | batch 9 left 0.995 vs 0.9975 unsettled; whether that survives the new environment is unknown | after batch 10 |
-| `SNEK_LEARNING_RATE=1e-4` | the highest-value untested knob | after batch 10 |
-| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.995 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after batch 10 |
-| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after batch 10 |
+| second discount value (`0.9975`, or an interior point like `0.996`) | batch 9 left 0.995 vs 0.9975 unsettled; whether that survives the third environment is unknown | after the user's pending changes |
+| `SNEK_LEARNING_RATE=1e-4` | the highest-value untested knob | after the user's pending changes |
+| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.995 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after the user's pending changes |
+| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after the user's pending changes |
 | partial IS correction (beta < 1) | full correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |
 | anything aimed at the post-peak decline | both batch-8 arms peaked at ~2.5-3M and fell away; nothing tried so far addresses *why* | needs a mechanism first |
 
 **Seed count is the binding constraint, not the number of knobs tried.** Six single-seed
 conclusions in this document have been overturned or weakened — most recently gradient
 clipping, which looked like batch 8's headline twice before failing at 1 of 3. Nothing goes in
-[`findings.md`](findings.md) as established without n=3, which is why batch 10 spends all four
+[`findings.md`](findings.md) as established without n=3, which is why batch 10 spent all four
 slots on one value rather than splitting them.
 
 ## Standing backlog
@@ -135,10 +103,12 @@ trying.
   suspect, see [`findings.md`](findings.md).
 - **`N_STEP_UPDATE=5`** — n=2 and n=3 both peak below baseline and then decline, so
   the trend already points the wrong way.
-- **Resuming any arm from batch 9 or earlier** — every checkpoint on record was trained
-  on an observation vector this session changed (20 or 23 values against today's 26), so
-  none of them load; see [`../hallOfFame/README.md`](../hallOfFame/README.md#these-checkpoints-do-not-run-on-master-2026-08-02).
-  A fresh seed is the only option now regardless of how promising an old arm looked.
+- **Resuming any arm from batch 9 or earlier** — every checkpoint on record from before
+  batch 10 was trained on an observation vector this project has since changed (20 or 23
+  values against the 26 batch 10 trained on), so none of them load; see
+  [`../hallOfFame/README.md`](../hallOfFame/README.md#the-entries-below-predate-2026-08-02-and-do-not-run-on-master).
+  Batch 10's own checkpoints *do* still load on `master` as of this close-out — see the
+  note above about the user's pending changes for whether that keeps being true.
 
 ### Batch bookkeeping
 
