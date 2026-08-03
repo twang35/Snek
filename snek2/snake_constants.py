@@ -36,6 +36,21 @@ MAX_STEPS_BEFORE_STARVE_SIZE_MULTIPLIER = 10
 MIN_STARVE_BUDGET = 100
 MAX_STARVE_BUDGET = 500
 
+# Design cap for normalizing lg(open regions) into [0, 1], the same way MAX_STARVE_BUDGET does
+# for the starve observation. Unlike the starve budget this is not a game rule - nothing clamps
+# the true region count, and a rare board could exceed it, in which case the normalized value
+# runs slightly past 1.0 rather than losing information the way clamping the raw count would.
+#
+# There is no closed-form maximum: the region count a single connected snake body can carve
+# out of a 10x10 board depends on its exact shape, and no simple formula bounds it tightly.
+# Measured instead. A heuristic player was swept across 180 episodes and 422,608 candidate
+# moves (the same per-action lookahead group_obs itself computes) and never exceeded 13. A
+# hand-built adversarial body - a comb of five full-height teeth, each notched twice to split
+# its neighbouring corridor into three pieces - reached 13 with a 70-cell body, well under the
+# ~100-cell board. Both independent methods topped out at the same number, so 16 is chosen for
+# real headroom over either without compressing the range that matters for everyday values.
+MAX_GROUPS_FOR_SCALE = 16
+
 # Pixels per tile, and so the window size: the board is 10x10 tiles, so the historical 10
 # gives a 100x100 window. That is small enough that macOS shows none of the title bar text,
 # which is the whole problem when several watch.py windows are open at once — so watch.py

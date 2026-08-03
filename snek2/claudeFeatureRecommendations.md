@@ -21,6 +21,7 @@ this was written; the document itself is left exactly as measured.
 | drop the `game_over` input | done, and only safe *after* the discount fix, exactly as this document argued |
 | add "is the food reachable" | done, and stricter than proposed here: head, food **and** tail in one region, so it names a reachable meal rather than merely a visible one |
 | zero the region values on a fatal move | done, raised by the user after reading the food-reachable fix: a wall move happened to read 0 already, but a self-collision did not — `head_with_tail` was 1 on **5,289 of 14,642** body-collision moves in real play, describing a snake that does not survive the move that produced it |
+| normalize `lg(num_groups)` to `[0, 1]` | done, raised by the user re-reading this section's own input-scale table: the value reached ~4.4 on the current board (13 regions measured, 16-region design cap) against a vector otherwise in `[0, 1]`, the same mismatch this document flagged for the pre-split starve value. Removing the input, which the "points the wrong way" finding below still recommends, has not been done |
 | everything else | not implemented |
 
 The vector is **23 values** now, so the checkpoints this document was measured on fail to load. Use

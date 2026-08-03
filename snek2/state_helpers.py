@@ -14,6 +14,11 @@ NEIGHBOUR_OFFSETS = tuple(MOVE_VECTORS[direction] for direction in DIRECTIONS)
 # does not depend on where in this file that function is defined.
 STARVE_OBS_SCALE = math.log2(MAX_STARVE_BUDGET + 1)
 
+# Same idea for lg(open regions): puts it in [0, 1] against the measured/designed ceiling in
+# MAX_GROUPS_FOR_SCALE, rather than the unbounded raw value - which reached ~4.4 on a vector of
+# otherwise 0-1 inputs, the same scale mismatch the starve observation had before it was split.
+GROUPS_OBS_SCALE = math.log2(MAX_GROUPS_FOR_SCALE + 1)
+
 
 def get_observations(old_grid,
                      head_pos,
@@ -29,7 +34,7 @@ def get_observations(old_grid,
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
     6-8      3       is the move safe (not body or wall)
-    9-14     6       [can still reach tail, lg(open regions)] per action
+    9-14     6       [can still reach tail, lg(open regions) scaled to [0, 1]] per action
     15-17    3       is it safe to chase the food (head, food and tail in one region)
     18-20    3       does the move win the game
     21       1       starve budget left, lg-compressed to [0, 1]
@@ -51,7 +56,8 @@ def get_observations(old_grid,
     # the snake advances.
     observations.extend(body_and_wall_collisions(old_grid, head_pos, tail_pos, head_move_dir))
 
-    # 6 values, [can still reach tail, lg(open regions)] for each action, then 3 more below.
+    # 6 values, [can still reach tail, lg(open regions) scaled to [0, 1]] for each action, then
+    # 3 more below.
     # Together these are the "am I about to trap myself" signal: reaching the tail means an
     # escape route exists, and a rising region count means the move is cutting the free space
     # into pieces. Needs both tail positions, because the tail moves too - see group_obs.
@@ -157,11 +163,11 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
 
 
 # head_with_tail: returns 1 for with tail or 0 for no tail groups in each action
-# total_group_obs: returns number of groups
+# total_group_obs: returns lg(number of groups), scaled to [0, 1]
 # safe_to_chase_food: returns 1 when head, food and tail all end up in one group
 def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, current_food):
-    """Returns two lists: [can reach tail, lg(open regions)] per action, and [safe to chase
-    the food] per action.
+    """Returns two lists: [can reach tail, lg(open regions) scaled to [0, 1]] per action, and
+    [safe to chase the food] per action.
 
     Two lists rather than one because they sit in different places in the observation vector
     while sharing all of their expensive work. `count_groups` is roughly 46% of the cost of
@@ -241,7 +247,10 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
         regions, group_count = count_groups(grid)
 
         head_with_tail = 0
-        num_groups = log2plus1(group_count)
+        # Scaled to [0, 1] against the design cap in GROUPS_OBS_SCALE - see its comment and
+        # MAX_GROUPS_FOR_SCALE. The raw log2plus1(group_count) reached ~4.4 in measured play,
+        # the same kind of scale mismatch the starve observation had before it was split.
+        num_groups = log2plus1(group_count) / GROUPS_OBS_SCALE
 
         # A move that eats does not move the tail at all: add_segment() refills the tile it
         # came from, so the snake grows from the back and the tail stays where it is.

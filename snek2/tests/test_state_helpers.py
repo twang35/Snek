@@ -64,9 +64,9 @@ def test_hwt_no_touching():
                      [4, 4, 4, 4, 4, 4, 4]])
     # Open board: every action leaves one region, and the freed tail keeps head and tail
     # sharing it.
-    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
-                                                       1, log2plus1(1),
-                                                       1, log2plus1(1)]
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_no_touching_eats_food():
@@ -77,9 +77,9 @@ def test_hwt_no_touching_eats_food():
                      [4, 4, 4, 4, 4, 4, 4]])
     # 'forward' eats the food at (4, 1), so the tail stays put. The board is open enough that
     # it makes no difference to the counts here.
-    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(1),
-                                                       1, log2plus1(1),
-                                                       1, log2plus1(1)]
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_following_forward_tail():
@@ -92,7 +92,7 @@ def test_hwt_following_forward_tail():
     # both are zeroed outright. Only 'forward', onto the tail, is legal here.
     assert group_values(grid, (3, 0), (4, 0), (4, 1), 'right') == [0, 0,
                                                        0, 0,
-                                                       1, log2plus1(1)]
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_following_right_tail():
@@ -104,7 +104,7 @@ def test_hwt_following_right_tail():
     # Same board, facing up, so 'right' is the move onto the tail. 'left' walks into the body at
     # (2, 0) and 'forward' off the top of the board; both fatal, both zeroed.
     assert group_values(grid, (3, 0), (4, 0), (4, 1), 'up') == [0, 0,
-                                                    1, log2plus1(1),
+                                                    1, (log2plus1(1) / GROUPS_OBS_SCALE),
                                                     0, 0]
 
 
@@ -116,7 +116,7 @@ def test_hwt_following_left_tail():
                      [4, 4, 4, 4, 4, 4, 4]])
     # 'left' is the move onto the tail; 'right' runs off the top of the board and 'forward' into
     # the body at (2, 0), both fatal.
-    assert group_values(grid, (3, 0), (3, 1), (4, 1), 'left') == [1, log2plus1(1),
+    assert group_values(grid, (3, 0), (3, 1), (4, 1), 'left') == [1, (log2plus1(1) / GROUPS_OBS_SCALE),
                                                       0, 0,
                                                       0, 0]
 
@@ -131,9 +131,9 @@ def test_hwt_no_forward():
     # The tail at (0, 1) is the only gap in the body wall, so freeing it merges the strip above
     # with everything below: 3 regions become 2, and on 'forward' 2 become 1. This is the case
     # the old behaviour got wrong most often in real play.
-    assert group_values(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(2),
-                                                       1, log2plus1(2),
-                                                       0, log2plus1(1)]
+    assert group_values(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, (log2plus1(2) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(2) / GROUPS_OBS_SCALE),
+                                                       0, (log2plus1(1) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_no_left():
@@ -142,9 +142,9 @@ def test_hwt_no_left():
                      [4, 0, 5, 3, 2, 0, 4],
                      [4, 0, 1, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [0, log2plus1(1),
-                                                       1, log2plus1(3),
-                                                       1, log2plus1(2)]
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [0, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(3) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_no_right():
@@ -153,9 +153,9 @@ def test_hwt_no_right():
                      [4, 0, 5, 3, 2, 0, 4],
                      [4, 0, 0, 3, 0, 3, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, log2plus1(3),
-                                                       0, log2plus1(1),
-                                                       1, log2plus1(2)]
+    assert group_values(grid, (3, 1), (1, 1), (2, 1), 'right') == [1, (log2plus1(3) / GROUPS_OBS_SCALE),
+                                                       0, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_follow_tail_and_empty_forward_no_food():
@@ -167,8 +167,8 @@ def test_hwt_follow_tail_and_empty_forward_no_food():
     # 'left' walks into the blocked cell at (2, 1); fatal, zeroed. 'right' (onto the tail) and
     # 'forward' are both legal.
     assert group_values(grid, (3, 1), (4, 1), (4, 2), 'up') == [0, 0,
-                                                    1, log2plus1(2),
-                                                    1, log2plus1(2)]
+                                                    1, (log2plus1(2) / GROUPS_OBS_SCALE),
+                                                    1, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_multiple_open_groups_separate_food_and_tail():
@@ -180,8 +180,8 @@ def test_hwt_multiple_open_groups_separate_food_and_tail():
     # 'left' walks into the blocked cell at (3, 2); fatal, zeroed. 'right' and 'forward' are
     # both legal.
     assert group_values(grid, (3, 1), (4, 1), (4, 2), 'left') == [0, 0,
-                                                      1, log2plus1(2),
-                                                      0, log2plus1(2)]
+                                                      1, (log2plus1(2) / GROUPS_OBS_SCALE),
+                                                      0, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_groups_new_group_left():
@@ -192,9 +192,9 @@ def test_groups_new_group_left():
                      [4, 4, 4, 4, 4, 4, 4]])
     # 'right' walks into the blocked cell at (3, 2); fatal, zeroed. 'left' and 'forward' (onto
     # the tail) are both legal.
-    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'right') == [1, log2plus1(2),
+    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'right') == [1, (log2plus1(2) / GROUPS_OBS_SCALE),
                                                        0, 0,
-                                                       1, log2plus1(1)]
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE)]
 
 
 def test_food_cell_counts_as_open_space():
@@ -215,9 +215,9 @@ def test_food_cell_counts_as_open_space():
                              [4, 0, 2, 2, 2, 2, 4],
                              [4, 4, 4, 4, 4, 4, 4]])
     # 'right' walks into the blocked cell at (3, 2) in both variants; fatal, zeroed.
-    expected = [1, log2plus1(2),
+    expected = [1, (log2plus1(2) / GROUPS_OBS_SCALE),
                 0, 0,
-                1, log2plus1(1)]
+                1, (log2plus1(1) / GROUPS_OBS_SCALE)]
     assert group_values(with_food, (3, 1), (4, 1), (4, 2), 'right') == expected
     assert group_values(without_food, (3, 1), (4, 1), (4, 2), 'right') == expected
 
@@ -228,9 +228,9 @@ def test_groups_new_group_forward():
                      [4, 0, 0, 0, 3, 5, 4],
                      [4, 0, 2, 2, 2, 2, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'up') == [1, log2plus1(1),
-                                                    1, log2plus1(1),
-                                                    1, log2plus1(2)]
+    assert group_values(grid, (3, 1), (4, 1), (4, 2), 'up') == [1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                    1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                    1, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_eating_move_does_not_free_the_tail():
@@ -247,9 +247,9 @@ def test_eating_move_does_not_free_the_tail():
                      [4, 5, 3, 3, 2, 1, 4],
                      [4, 0, 0, 0, 0, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
-    assert group_values(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, log2plus1(1),
-                                                       1, log2plus1(1),
-                                                       1, log2plus1(2)]
+    assert group_values(grid, (3, 1), (0, 1), (1, 1), 'right') == [1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                       1, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_tail_vacating_merges_two_regions():
@@ -266,7 +266,7 @@ def test_tail_vacating_merges_two_regions():
                      [4, 4, 4, 4, 4, 4, 4]])
     assert group_values(grid, (0, 0), (2, 1), (1, 1), 'right') == [0, 0,
                                                        0, 0,
-                                                       1, log2plus1(1)]
+                                                       1, (log2plus1(1) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_enclosed_vacated_tail_still_reaches_the_tail():
@@ -300,7 +300,7 @@ def test_hwt_enclosed_vacated_tail_still_reaches_the_tail():
                      [4, 4, 4, 4, 4, 4, 4]])
     assert group_values(grid, (2, 4), (1, 2), (2, 2), 'right') == [0, 0,
                                                                0, 0,
-                                                               1, log2plus1(3)]
+                                                               1, (log2plus1(3) / GROUPS_OBS_SCALE)]
 
 
 def test_hwt_eating_move_does_not_advance_the_tail():
@@ -331,7 +331,46 @@ def test_hwt_eating_move_does_not_advance_the_tail():
     # walks into the body at (1, 4); both fatal, both zeroed.
     assert group_values(grid, (0, 4), (0, 1), (0, 0), 'up') == [0, 0,
                                                             0, 0,
-                                                            1, log2plus1(2)]
+                                                            1, (log2plus1(2) / GROUPS_OBS_SCALE)]
+
+
+def test_groups_obs_scale_matches_the_starve_pattern():
+    """GROUPS_OBS_SCALE has to be log2(MAX_GROUPS_FOR_SCALE + 1), the same relationship
+    STARVE_OBS_SCALE has to MAX_STARVE_BUDGET - not merely close to it.
+
+    Pins the constant down directly rather than only through group_values() assertions, so a
+    refactor that recomputes the scale a different way (off by one, wrong log base, forgetting
+    the +1) fails here even if it happens to still satisfy every hand-picked fixture.
+    """
+    assert GROUPS_OBS_SCALE == math.log2(MAX_GROUPS_FOR_SCALE + 1)
+
+
+def test_num_groups_reaches_exactly_one_at_the_design_cap():
+    """The design cap is meant to be reached, not merely approached.
+
+    At group_count == MAX_GROUPS_FOR_SCALE the scaled value is exactly 1.0 - the same relationship
+    the starve budget has to its own scale (`test_starve_and_length_obs_stay_within_zero_and_one`
+    reaches exactly 0.0 and 1.0, not just close to them). One cell past it - a board more
+    fragmented than anything measured in the sweep that picked MAX_GROUPS_FOR_SCALE - runs past
+    1.0 on purpose rather than losing information the way clamping the raw count would: there is
+    no game rule capping the true count the way there is for the starve budget, so this is a
+    design choice, not a guarantee.
+    """
+    assert log2plus1(MAX_GROUPS_FOR_SCALE) / GROUPS_OBS_SCALE == 1.0
+    assert log2plus1(MAX_GROUPS_FOR_SCALE - 1) / GROUPS_OBS_SCALE < 1.0
+    assert log2plus1(MAX_GROUPS_FOR_SCALE + 1) / GROUPS_OBS_SCALE > 1.0
+
+
+def test_num_groups_stays_in_zero_to_one_for_measured_region_counts():
+    """Every group_count actually measured in a 422,608-action sweep of real play, replayed
+    through the scale directly. 13 was the highest seen; this checks well past it for margin.
+    """
+    values = [log2plus1(count) / GROUPS_OBS_SCALE for count in range(0, MAX_GROUPS_FOR_SCALE + 1)]
+    assert min(values) == 0.0
+    assert max(values) == 1.0
+    assert all(0.0 <= value <= 1.0 for value in values)
+    # The measured ceiling (13) still leaves real headroom under the design cap (16).
+    assert log2plus1(13) / GROUPS_OBS_SCALE < 0.95
 
 
 # =============================== safe-to-chase-food tests ===============================
@@ -371,9 +410,9 @@ def test_chase_food_is_zero_when_the_food_is_sealed_off():
     food = FakeFood((0, 0))
     # 'right' walks off the left edge, so it reaches nothing at all - both values zeroed, not
     # merely head_with_tail, since a fatal move gets nothing rather than a hypothetical count.
-    assert group_values(grid, (0, 3), (3, 0), (2, 0), 'down', food) == [1, log2plus1(2),
+    assert group_values(grid, (0, 3), (3, 0), (2, 0), 'down', food) == [1, (log2plus1(2) / GROUPS_OBS_SCALE),
                                                                        0, 0,
-                                                                       1, log2plus1(2)]
+                                                                       1, (log2plus1(2) / GROUPS_OBS_SCALE)]
     assert food_chase_values(grid, (0, 3), (3, 0), (2, 0), 'down', food) == [0, 0, 0]
 
 
@@ -409,7 +448,7 @@ def test_chase_food_counts_an_eating_move_by_whether_the_tail_survives_it():
     # head_with_tail confirms left and right are alive and well; the zeros above are the food
     # being unreachable, not the tail.
     assert group_values(grid, (1, 1), (1, 4), (1, 3), 'up', FakeFood((1, 0))) == [
-        1, log2plus1(2), 1, log2plus1(2), 0, log2plus1(2)]
+        1, (log2plus1(2) / GROUPS_OBS_SCALE), 1, (log2plus1(2) / GROUPS_OBS_SCALE), 0, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_chase_food_is_one_for_an_eating_move_that_keeps_the_tail():
@@ -461,8 +500,8 @@ def test_chase_food_needs_one_region_holding_food_and_tail_together():
     # head_with_tail is 1 for the two legal moves, so those 0/1 values are the food half
     # talking, not the tail - and 0 for 'left', which is fatal.
     assert group_values(grid, (1, 1), (0, 3), (0, 2), 'up', food) == [0, 0,
-                                                                     1, log2plus1(1),
-                                                                     1, log2plus1(2)]
+                                                                     1, (log2plus1(1) / GROUPS_OBS_SCALE),
+                                                                     1, (log2plus1(2) / GROUPS_OBS_SCALE)]
 
 
 def test_chase_food_finds_a_food_cell_that_is_its_own_region():

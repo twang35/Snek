@@ -23,6 +23,7 @@ it as evidence from that date, not as current state.
 | A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **measured**, and a standing hazard |
 | **Safe-to-chase-food added**: 1 when head, food and tail share one region after the move | **new** 2026-08-02, untested in training |
 | **Fatal moves now read zero on all three group values**, not a hypothetical survivor's answer | **fixed** 2026-08-02, was 1 on 5,289/14,642 body collisions |
+| **`lg(num_groups)` normalized to `[0, 1]`**, was reaching ~4.4 on a vector otherwise capped at 1.0 | **fixed** 2026-08-02, rest of the vector audited clean |
 | **Terminal steps carried a non-zero discount**, so every episode's last transition bootstrapped off the terminal state | **fixed** 2026-08-02 |
 | The n-step falsification was measured with returns that leak across episode ends | **re-opened**, not overturned |
 | **Fixing `head_with_tail` moved the champion 80.0% → 90.3% with no retraining** | **measured**, 360 eps a side, intervals disjoint |
@@ -315,6 +316,54 @@ point is the real board's edges. The body-collision sweep — 14,642 moves, re-m
 fix at zero non-zero flags, against 5,289 before it — was ad-hoc verification rather than a stored
 test, since the fixtures already updated for the eat/no-eat conditional cover that case by
 construction (every action they name as fatal now asserts `0`, not a hypothetical count).
+
+#### `lg(num_groups)` was on the wrong scale, and the rest of the vector was audited too
+
+The user asked for two things after this: fix the region-count scale, and check whether anything
+else in the 23-value vector shares the problem.
+
+`lg(num_groups)` (indices 10, 12, 14) had no normalization at all — it was `log2plus1(group_count)`
+with nothing dividing it down, sitting on a vector where every other input is `[0, 1]`. Measured
+directly: **1.0** where every other observation's ceiling is **1.0**, against `lg(num_groups)`
+reaching **~4.4** — the same scale mismatch the starve observation had before it was split earlier
+the same day.
+
+The fix mirrors the starve pattern: `MAX_GROUPS_FOR_SCALE = 16` in `snake_constants.py`,
+`GROUPS_OBS_SCALE = log2(MAX_GROUPS_FOR_SCALE + 1)` in `state_helpers.py`, and
+`num_groups = log2plus1(group_count) / GROUPS_OBS_SCALE`. Unlike the starve budget, this cap is
+not a game rule — nothing clamps the true region count, so a sufficiently fragmented board could
+push the normalized value slightly past 1.0. The cap itself needed measuring rather than deriving,
+since no closed-form formula bounds how many regions a single connected snake body can carve out
+of a 10x10 board:
+
+| method | result |
+|---|---|
+| heuristic play, 180 episodes, 422,608 candidate moves (the same per-action lookahead `group_obs` computes) | never exceeded **13** |
+| hand-built adversarial body — a comb of 5 full-height teeth, each notched to split its corridor into 3 pieces, 70 of 100 cells | reached **13** |
+
+Both independent methods topped out at the same number, so 16 was chosen for real headroom without
+compressing the range that matters for everyday values.
+
+**The rest of the vector was audited on request, and nothing else needed changing:**
+
+| indices | what | range |
+|---|---|---|
+| 0-5 | food: is-closer flag, `1/(distance+1)` | `[0, 1]` by construction — reciprocal of a distance ≥ 0 |
+| 6-8, 15-17, 18-20 | binary flags (safe, safe-to-chase, wins) | `{0, 1}` exactly |
+| 9, 11, 13 | `head_with_tail` | `{0, 1}` exactly |
+| 21 | starve budget, already split and scaled this same day | `[0, 1]`, both ends reached exactly |
+| 22 | `snake_len / PERFECT_SCORE` | `[0, 1]` by construction — length is bounded by the board |
+
+Confirmed directly rather than only reasoned about: a sweep of 18,450 steps recorded the min and
+max of every one of the 23 indices, and the largest value anywhere in the vector is now **exactly
+1.0**, the smallest **exactly 0.0** — the region-count values were the only outlier.
+
+47 tests now, 3 new ones dedicated to this: the scale constant's formula matches the starve
+pattern's (`GROUPS_OBS_SCALE == log2(MAX_GROUPS_FOR_SCALE + 1)`, not merely close to it), the
+scaled value hits exactly 1.0 at the design cap and exceeds it just past it, and every measured
+region count from the 422,608-move sweep stays in `[0, 1]` with real margin under the cap. Two
+mutations confirmed these catch what they are meant to: lowering the cap below the measured
+ceiling, and reverting the scale formula to drop its `+1`.
 
 #### Rewards are now exact
 
