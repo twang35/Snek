@@ -229,6 +229,23 @@ Both `b6b`-config deaths came **late** (573k, 1162k) compared to the eff ~1.6 de
 272k), which suggests lower sharpness delays death rather than preventing it. Any survival
 rate from here needs a step horizon attached.
 
+**The gain from `DISCOUNT=0.995` is reliability, not ceiling.** `b7f` (51%) and `b4c` (50%,
+eff exponent ~1.6) are a dead heat on level, and their intervals nearly coincide. What changed
+is survival: `b4c`'s config threw away two runs in three to reach that level, and the three
+`0.995` seeds reached a comparable level three times out of three. Weighting level by survival
+makes the difference concrete:
+
+| config | mean level across seeds | survival | expected value |
+|---|---|---|---|
+| `DISCOUNT=0.995` | 28.2% | **3 of 3** | **28.2%** |
+| `b4c` config, eff ~1.6 | 37.1% | 1 of 3 | 12.4% |
+| same config at 0.99 (`b7a`) | 12.0% | 2 of 4 | 6.0% |
+
+**~2.3x the expected value of the best previous config.** This was the first change in the
+investigation to *remove* the ceiling/reliability tradeoff rather than move along it, and the
+mechanism was predicted in advance: at 0.99 the effective horizon is ~100 steps while a perfect
+game runs several hundred, so the terminal bonus was discounted into irrelevance.
+
 ## Batch 6 — the effective-exponent sweep
 
 **Started 2026-07-27, both arms stopped 2026-07-28.** Both arms keep the `b4c` signature (`td_loss`, no IS) and dial

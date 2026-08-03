@@ -386,6 +386,14 @@ Notes that matter:
   left the training loop entirely. **To watch a policy play, run `watch.py <arm>`** — it
   follows the arm's newest checkpoint in its own process and costs training nothing
   (measured: 4 watchers alongside 4 arms had no detectable effect on throughput).
+- **A freshly-launched arm has no checkpoint yet**, since training skips writing one until
+  the score clears `SNEK_MIN_CHECKPOINT_SCORE` (default 40) — `watch.py` run immediately
+  after the trainer just exits with "no checkpoints in …". Use
+  `./watch_when_ready.sh <arm>` instead when starting a watcher alongside a fresh arm: it
+  polls every 30s (`WATCH_WHEN_READY_POLL` to change that) and execs into `watch.py` the
+  moment the first checkpoint appears, so it can be launched in the same breath as the
+  trainer rather than timed by hand. In practice the wait is short — batch 10's four arms
+  all had a checkpoint within ~12k steps.
 - Every override prints a `hyperparameter override:` line at startup. Grep for it
   to confirm a run really got the config you intended — this has already caught
   one silently-misconfigured control arm.
