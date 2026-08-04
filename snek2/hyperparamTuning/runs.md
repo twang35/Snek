@@ -20,7 +20,7 @@ Unlike every earlier record in this project, **this one needs no checkout** — 
 observation vector that is on `master` right now. Full batch results and the "config vs
 environment" open question: [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
-## Nothing is running — all four slots are free
+## No training is running — all four slots are free (two close-out evals are)
 
 **Batch 10 was stopped 2026-08-03 by request**, all four arms healthy (no `dead_since` on any
 of them), to make room for further changes. It was launched as a fresh baseline after seven
@@ -30,9 +30,46 @@ and the audit that started the day) — nothing had trained on the resulting env
 it. All four seeds beat every prior post-audit result; full design and results:
 [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
-**Close-out `top20` evals for all four arms are the next step**, so `b10a` and `b10c` get the
-same full-run measurement `b10b` and `b10d` already have (theirs was mid-run and may not have
-seen each arm's best checkpoint — both kept training for another ~2.5-2.9M steps afterward).
+**Close-out evals: two done, two running.** `b10a` (272 checkpoints) and `b10c` (47) are
+complete. `b10b` and `b10d` are still going, resumed 2026-08-03 at `EVAL_WORKERS=10` after the
+worker-count measurement below — no training slots are involved either way.
+
+| arm | checkpoints | best (100 episodes) | pooled | state |
+|---|---|---|---|---|
+| `b10a-disc995seed1` | 272 | 85.0% @2344000 | 67.2% | complete |
+| `b10b-disc995seed2` | 624 | 90.0% @1501000 so far | 71.8% | ~58%, ~2h left |
+| `b10c-disc995seed3` | 47 | 79.0% @3965000 | 63.0% | complete |
+| `b10d-disc995seed4` | 660 | 93.0% @1695000 so far | 74.1% | ~53%, ~3h left |
+
+`b10d`'s 93% @1695000 now beats the 95% @1815000 in the hall of fame on point estimate order
+— except it doesn't, quite: the two intervals overlap almost entirely, and the 95% was itself
+the max of ~300 noisy measurements. Both are the same policy family measured twice. See the
+winner's-curse note in [`hyperparamTuning.md`](hyperparamTuning.md#why-not-abandon-weak-checkpoints-early)
+before quoting either as a record.
+
+### Evals got ~10x cheaper on 2026-08-03
+
+Two changes, both measured rather than assumed:
+
+| change | effect |
+|---|---|
+| `EVAL_WORKERS` 2 → 10 | **2.8x** faster per checkpoint (103s → 37s) at *lower* CPU per episode |
+| `EVAL_SCREEN_EPISODES=20` | **3.6x** fewer episodes for a statistically indistinguishable answer |
+
+The worker-count finding is a correction: this project had concluded eval throughput was
+core-bound past ~10 workers and dropped batch 10's close-out to 2 workers to hit a ~50% CPU
+target. That made it 2.8x slower *and* cost more CPU per episode, because TensorFlow's thread
+pool costs about a core whether its batch has 2 rows or 20. **To be gentler on the machine, run
+fewer arms, not fewer workers.**
+
+The early-abandonment idea — cut a checkpoint once its running rate looks weak — was simulated
+against all 937 batch-10 measurements and **rejected**: safe thresholds save only 14%, because
+the selected population is a tight blob between 60% and 80% rather than a few good runs among
+junk. Screening wins by economising on the many mediocre checkpoints instead of the few bad
+ones. Full numbers in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes).
+
+A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
+count mid-run cost only the checkpoint in flight rather than the 333 already measured.
 
 ### Next batch: pending the user's planned changes
 

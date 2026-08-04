@@ -125,6 +125,23 @@ def discover_policies():
     return sorted(names)
 
 
+def best_of(rows):
+    """The best row among those measured to at least half the deepest length on offer.
+
+    Rates from different episode counts are not comparable as a maximum: a 20-episode screen
+    has a ~5x wider interval than a 100-episode confirmation, so across hundreds of screened
+    checkpoints some will read 19/20 or 20/20 on luck alone and beat every honestly-measured
+    row. Restricting the comparison to the deep rows keeps "best checkpoint" meaning what it
+    has always meant. With one uniform episode count — every protocol before screening existed
+    — this returns exactly what max() over everything would.
+    """
+    if not rows:
+        return None
+    deepest = max(r['episodes'] for r in rows)
+    deep = [r for r in rows if r['episodes'] >= deepest / 2.0]
+    return max(deep, key=lambda r: r['perfect_percent'])
+
+
 def summarize(runs, stale_after=180):
     """Aggregate state across every process working on one policy.
 
@@ -157,19 +174,62 @@ def summarize(runs, stale_after=180):
     # ETA from this run's own pace. Checkpoints are measured sequentially within a process and
     # the processes run in parallel, so the wall-clock estimate divides remaining work by the
     # number of live processes rather than assuming one worker.
-    remaining = max(0, requested - len(completed))
-    mean_seconds = (sum(times) / len(times)) if times else None
+    #
+    # Priced in episodes rather than checkpoints wherever the writer reports them, because a
+    # screening protocol measures some checkpoints twice at different lengths: a 20-episode
+    # screen and a 100-episode confirmation are not interchangeable units of work, so counting
+    # checkpoints would put the ETA out by up to 5x. Files written before those fields existed
+    # fall back to the old per-checkpoint arithmetic.
+    # Pace from what the *live* processes have done this session, not from every row on file. A
+    # resumed close-out carries rows measured under the earlier run's settings, and EVAL_WORKERS
+    # alone moves seconds-per-episode by 3x — averaging the two put b10b's ETA at 7h10m against
+    # a real ~2h. Falls back through session totals, then all rows, then per-checkpoint counting,
+    # so files from any earlier version still produce an estimate.
     workers = max(1, len(active))
-    eta_seconds = (remaining * mean_seconds / workers) if mean_seconds else None
+    session_seconds = sum(r.get('session_seconds') or 0 for r in runs)
+    session_episodes = sum(r.get('session_episodes') or 0 for r in runs)
+    session_measurements = sum(r.get('session_measurements') or 0 for r in runs)
+    if session_episodes and session_seconds:
+        seconds_per_episode = session_seconds / session_episodes
+        mean_seconds = (session_seconds / session_measurements) if session_measurements else None
+    elif total_episodes and times:
+        seconds_per_episode = sum(times) / total_episodes
+        mean_seconds = sum(times) / len(times)
+    else:
+        seconds_per_episode = None
+        mean_seconds = (sum(times) / len(times)) if times else None
+
+    planned_episodes = sum(r.get('episodes_planned') or 0 for r in runs)
+    if planned_episodes and seconds_per_episode:
+        remaining_episodes = max(0, planned_episodes - total_episodes)
+        eta_seconds = remaining_episodes * seconds_per_episode / workers
+    else:
+        remaining = max(0, requested - len(completed))
+        eta_seconds = (remaining * mean_seconds / workers) if mean_seconds else None
+
+    # Progress in measurements, which counts a confirmation pass separately from the screen that
+    # earned it. Without it a screening run reads 100% done the moment stage 1 ends.
+    planned = sum(r.get('measurements_planned') or 0 for r in runs)
+    done = sum(r.get('measurements_done') or 0 for r in runs)
+    if not planned:
+        planned, done = requested, len(completed)
 
     return {
         'completed': completed,
         'active': active,
         'stale': stale,
-        'requested': requested,
-        'done': len(completed),
-        'percent_done': (100.0 * len(completed) / requested) if requested else 0.0,
-        'best': max(completed, key=lambda r: r['perfect_percent']) if completed else None,
+        'requested': planned,
+        'done': done,
+        'percent_done': (100.0 * done / planned) if planned else 0.0,
+        # Best over the deeply-measured rows only. Under a screening protocol a checkpoint that
+        # got 20 episodes and went 19/20 would otherwise outrank a confirmed 88/100 and be shown
+        # as the arm's best — a lucky screen the protocol deliberately declined to pursue. The
+        # half-of-deepest floor rather than an exact match tolerates a worker count that rounds
+        # 100 episodes up to 108; a 20-episode screen is nowhere near it either way.
+        'best': best_of(completed),
+        # Stage-aware label: 'measurements' when some checkpoints are measured twice, since then
+        # the count is no longer one per checkpoint.
+        'unit': ('measurements' if any(r.get('screen_episodes') for r in runs) else 'checkpoints'),
         'pooled': (100.0 * total_perfect / total_episodes) if total_episodes else 0.0,
         'episodes': total_episodes,
         'mean_seconds': mean_seconds,
@@ -195,8 +255,9 @@ def text_summary(policy_name, state):
     bar_width = 28
     filled = int(bar_width * state['percent_done'] / 100.0)
     lines.append('{0}'.format(policy_name))
-    lines.append('  [{0}{1}] {2}/{3} checkpoints  ({4:.0f}%)'.format(
-        '#' * filled, '.' * (bar_width - filled), done, requested, state['percent_done']))
+    lines.append('  [{0}{1}] {2}/{3} {4}  ({5:.0f}%)'.format(
+        '#' * filled, '.' * (bar_width - filled), done, requested, state['unit'],
+        state['percent_done']))
 
     if state['completed']:
         lines.append('  best {0:.1f}% @{1}   pooled {2:.1f}% over {3} episodes'.format(
@@ -339,7 +400,8 @@ def render(policy_name, state, out_path):
         middle.text(0.5, 0.5, 'no checkpoint finished yet', fontsize=9, color='#888888',
                     ha='center', va='center', transform=middle.transAxes)
         middle.set_xticks([])
-    middle.set_title('Completed checkpoints ({0} of {1})'.format(state['done'], state['requested']),
+    middle.set_title('Completed {0} ({1} of {2})'.format(
+        state['unit'], state['done'], state['requested']),
                      fontsize=10)
     middle.set_xlabel('checkpoint step (thousands)', fontsize=8)
     middle.set_ylabel('measured perfect %', fontsize=8)

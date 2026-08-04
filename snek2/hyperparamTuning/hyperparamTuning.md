@@ -102,9 +102,13 @@ does, reload its checkpoint and evaluate it over hundreds of episodes:
 
 ```
 cd snek2
-EVAL_OUT_SUFFIX=_top20 \
+EVAL_SCREEN_EPISODES=20 EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
   PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top20
 ```
+
+`EVAL_SCREEN_EPISODES=20` is the current close-out shape and is **3.6x cheaper than measuring
+every selected checkpoint at 100 episodes, for the same answer** — see "Screening" below. Drop it
+to get the flat one-pass protocol every arm before batch 10 was measured under.
 
 `top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
 10-episode eval** from the graph, using the surrounding perfect rate to order within an
@@ -123,6 +127,67 @@ values 0, 10, … 100 — which makes those thresholds coarser than they look. `
 
 Explicit steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is
 the question, and they bypass both thresholds.
+
+#### Screening: `EVAL_SCREEN_EPISODES`
+
+Two stages instead of one:
+
+1. every selected checkpoint gets **20 episodes**
+2. the best **30** (`EVAL_CONFIRM_COUNT`) get **80 more**, reaching the full 100
+
+A finalist ends with exactly 100 episodes — the screen counts toward the total — so its number is
+directly comparable with every arm measured under the flat protocol. Checkpoints that miss the cut
+keep their 20-episode row, whose much wider Wilson interval says plainly how little it is worth.
+
+**Simulated against the 937 checkpoints batch 10 measured at 100 episodes**, per arm:
+
+| protocol | episodes | cost | how far below the arm's true best it crowns |
+|---|---|---|---|
+| 100 on all (flat) | 30,400 | 1.00x | 2.82 pp |
+| 20 on all, +80 on top 30 | 8,480 | **3.6x cheaper** | 3.04 pp |
+| 20 on all, +80 on top 60, +500 on top 5 | 13,380 | 2.3x cheaper | **1.13 pp** |
+
+The middle row is what is implemented. The bottom row is *both* cheaper than flat and much more
+accurate, and is the option to reach for if best-checkpoint precision ever matters more than
+comparability — it needs a third stage this script does not have.
+
+**Take the arm-level pooled rate from stage 1**, which the run prints. Do not pool the rows in the
+output file: they have different episode counts, and the deep ones are by construction the arm's
+best, so pooling them weights the winners 5x and reads high. Best-checkpoint is taken over
+full-length rows only, since across hundreds of 20-episode screens some will read 19/20 on luck.
+
+**Ranking uses the screen rate, ties broken on the surrounding graph rate.** 20 episodes admit
+only 21 distinct values, so ties are the common case and the tie-break does real work — the
+surrounding rate correlates +0.48 with the true rate inside the high band where the graph point
+itself manages +0.10.
+
+#### Why not abandon weak checkpoints early
+
+The intuitive alternative is to start every checkpoint at 100 episodes and cut it once it looks
+weak. It was simulated and **it barely helps**. Cutting anything below 12/20 at the 20-episode
+mark is statistically safe — of the 157 checkpoints that finished at >=80%, the expected number
+wrongly cut is 0.24, or **0.15%** — but it saves only **14%** of the episodes.
+
+The reason is the shape of the selected population, which is a tight blob rather than a few good
+runs among junk:
+
+| final rate | share of selected checkpoints |
+|---|---|
+| below 60% | 9.7% |
+| 60-69% | 32.9% |
+| 70-79% | 40.7% |
+| 80% or better | 16.8% |
+
+Only a tenth of the population finishes below 60%, and a gate lenient enough to keep an 80%
+checkpoint keeps nearly everything above 60% as well — at 20 episodes the noise band is ±17pp, so
+a safe gate has to sit right where the population already is. Pushing the gate to 14/20 buys
+1.44x but starts losing 3.2% of the >=80% set. Screening wins because it economises on the many
+*mediocre* checkpoints, which is where the time actually is, rather than on the few bad ones.
+
+Worth knowing when reading any of these numbers: of the 8.8pp spread between checkpoints in a
+100-episode measurement, **26% is pure coin-flip noise**, and the winner's curse is real — batch
+10's headline 93/100 shrinks to a posterior mean of **87.2%** once you account for it being the
+max of ~300 noisy measurements.
 
 #### Why the thresholds moved from >=80%/cap 10 to >=90%/cap 20
 
@@ -246,16 +311,36 @@ rate systematically picked worse checkpoints.
 perfect rate by tens of points — one measured triple reads 8% / 35% / 7% — so neighbouring
 checkpoints are separate policies rather than repeat samples of one.
 
-**Budget ~4 minutes per checkpoint**, so a 20-checkpoint run is ~80 minutes. That rate held for
-both a single arm at 10 workers and two arms in parallel at 20 workers each — **throughput is
-core-bound**, so raising `EVAL_WORKERS` past ~10 does not make a run faster, it only lets a
-second arm run alongside. Two arms in parallel is the real speedup; more workers is not.
+**Budget ~37 seconds per 100-episode checkpoint** with `EVAL_WORKERS=10` and two arms in
+parallel, which is ~50% of a 14-core machine. A 20-checkpoint run is ~12 minutes; a 660-checkpoint
+arm is ~7 hours flat, or ~2 hours with `EVAL_SCREEN_EPISODES=20`.
 
-An arm whose mandatory tier exceeds the cap costs proportionally more: `b8f` at 32 is ~2 hours.
+**Do not lower `EVAL_WORKERS` to save CPU — it does the opposite.** Measured seconds per episode
+on one checkpoint: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20**. TensorFlow's thread pool costs
+about a core whether the batch it is handed has 2 rows or 20, so a small worker count pays full
+inference overhead for a fraction of the work; 2 workers is 3x slower *and* worse per unit of CPU.
+This document previously said throughput was core-bound past ~10 workers, and the batch-10
+close-out was launched at 2 workers on that basis — it ran 2.8x slower than it needed to. If a run
+has to be made gentler on the machine, run fewer arms at once, not fewer workers.
+
+**Prefer a worker count that divides `EVAL_EPISODES`.** Episodes round up to a whole round, so 12
+workers turn a 100-episode request into 108 and those rows no longer match the rest of the arm.
+
+XLA (`jit_compile=True`) is *worse* here — 0.38 s/episode against 0.32 — and pinning TensorFlow to
+one thread makes no reliable difference. Neither is used.
+
+An arm whose mandatory tier exceeds the cap costs proportionally more: `b8f` at 32 is ~20 minutes.
 
 Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
 confidence interval. Several copies can run at once on different arms — give each its own
 `EVAL_OUT_SUFFIX` or they overwrite each other, then merge.
+
+**An interrupted close-out is resumable.** `EVAL_RESUME=1` with the identical command skips every
+checkpoint the output file already holds at full length and measures the rest, keeping the
+`top20` selection metadata that an explicit step list would lose. A checkpoint that was only
+part-measured is redone rather than topped up, so no run has to pool two summaries of one
+checkpoint. This is also the safe way to change `EVAL_WORKERS` mid-close-out: kill it, relaunch
+with `EVAL_RESUME=1`, lose only the checkpoint that was in flight.
 
 **Always give an exploratory run its own throwaway `EVAL_OUT_SUFFIX`, even a 30-second one.**
 The first write happens at the first round of the first checkpoint, not at the end, and it

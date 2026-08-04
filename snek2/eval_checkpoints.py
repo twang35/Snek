@@ -15,6 +15,15 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top[N]
 
+    # the normal close-out: screen wide, confirm the best 30, 3.6x cheaper than measuring
+    # every selected checkpoint at 100 episodes
+    EVAL_SCREEN_EPISODES=20 EVAL_WORKERS=10 PYTHONPATH=. python -u \
+        eval_checkpoints.py <policy_name> top20
+
+    # continue a close-out that was interrupted
+    EVAL_RESUME=1 EVAL_WORKERS=10 PYTHONPATH=. python -u \
+        eval_checkpoints.py <policy_name> top20
+
 `top20` (or `top`, `top:20`) is the normal way to close out an arm. It selects on the
 **single 10-episode eval** from the graph, using the surrounding perfect rate to rank within
 a tier, under three rules:
@@ -46,13 +55,75 @@ move the pooled number on their own. Compare best-checkpoint instead, or re-meas
 under the current rule.
 
 **Results are written after every checkpoint**, so an interrupted run keeps everything measured
-so far. The payload carries `complete: false` until the last checkpoint lands.
+so far. The payload carries `complete: false` until the last checkpoint lands. `EVAL_RESUME=1`
+picks such a run back up: relaunch the identical command and it skips whatever the output file
+already holds at full length. A checkpoint that was only part-measured is redone from scratch
+rather than topped up, so no run ever has to pool two summaries of the same checkpoint.
+
+## Screening: EVAL_SCREEN_EPISODES
+
+`EVAL_SCREEN_EPISODES=20` runs the close-out in two stages instead of one:
+
+1. every selected checkpoint gets 20 episodes
+2. the best `EVAL_CONFIRM_COUNT` (default 30) get 80 more, reaching the full 100
+
+A finalist therefore ends with exactly `EVAL_EPISODES` episodes — the screen counts toward the
+total rather than being thrown away — so its number is directly comparable with every arm
+measured under the flat protocol. Checkpoints that do not make the cut keep their 20-episode row,
+whose much wider Wilson interval says plainly how little it is worth.
+
+**This costs 3.6x fewer episodes than measuring everything at 100, for the same answer.**
+Simulated against the 937 checkpoints batch 10 measured at 100 episodes: crowning the arm's best
+checkpoint under screening lands 3.04pp below its true best, against 2.82pp for the flat
+protocol — a difference far smaller than either number. What makes that possible is that the
+regret is dominated by 100 episodes being too few to rank a tight population, not by which
+checkpoints got measured.
+
+**Rank the pool on the screen rate, break ties on the surrounding graph rate.** 20 episodes
+admit only 21 distinct values, so dozens of checkpoints arrive on the same one and the tie-break
+does real work — see pick_finalists.
+
+**Take the arm-level pooled rate from stage 1, not from the output file.** The rows in the file
+have different episode counts, and the deep ones are by construction the best of the arm, so
+pooling them weights the winners 5x and reads high. The stage-1 figure the run prints gives every
+checkpoint identical effort and is the honest one. Same for best-checkpoint: it is taken over the
+full-length rows only, because across hundreds of screens some will read 19/20 on luck alone.
+
+**An early-abandonment gate was measured and rejected.** The obvious alternative — start every
+checkpoint at 100 episodes and abandon it once it is clearly weak — barely helps here. Cutting
+anything below 12/20 at the 20-episode mark is statistically safe (of the 157 checkpoints that
+finished at >=80%, the expected number wrongly cut is 0.24, or 0.15%) but saves only 14% of the
+episodes. The reason is the shape of the selected population: it is a tight blob between 60% and
+80%, only 9.7% of it finishes below 60%, and a gate lenient enough to keep an 80% checkpoint
+necessarily keeps almost everything above 60% too. Screening beats gating because it spends its
+savings on the many mediocre checkpoints rather than the few bad ones.
+
+## Worker count: the throughput knob that matters
+
+**`EVAL_WORKERS` is close to free, and low values are actively expensive.** Measured on one
+checkpoint of `b10d`, seconds per episode: 1.03 at 2 workers, 0.33 at 10, 0.30 at 20. TensorFlow's
+thread pool burns about a core whether the batch it is given has 2 rows or 20, so a small worker
+count pays the full inference overhead for a fraction of the work — 2 workers is 3x slower *and*
+worse per unit of CPU. Two processes at 10 workers each measure a 100-episode checkpoint in ~37s
+at ~50% of a 14-core machine; the same pair at 2 workers took ~103s.
+
+Prefer a worker count that divides `EVAL_EPISODES`. Episodes are rounded up to a whole number of
+rounds, so 12 workers turn a 100-episode request into 108 and the rows stop matching the rest of
+the arm.
+
+XLA (`jit_compile=True`) was measured and is *worse* here — 0.38 s/episode against 0.32 — and
+pinning TensorFlow to one thread made no reliable difference. Neither is used.
 
 Environment:
     EVAL_EPISODES     episodes per checkpoint, rounded up to a whole number of
                       rounds (default 100)
     EVAL_WORKERS      parallel envs inside this process (default 10)
     EVAL_OUT_SUFFIX   appended to the output filename
+    EVAL_SCREEN_EPISODES  screen every checkpoint at this many episodes first, then measure
+                      only the best of them at full length (default 0, off)
+    EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 30)
+    EVAL_RESUME       1 to skip checkpoints this run's own output file already measured at
+                      full length, or a comma-separated list of suffixes to take them from
     EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
                       (default 400; the game default stalls the whole round)
     EVAL_RENDER       1 to show a game in a window (default 0, all workers headless)
@@ -198,6 +269,48 @@ def backup_previous_results(out_path):
     shutil.copy2(out_path, out_path + '.previous')
 
 
+def resume_suffixes(spec, own_suffix):
+    """Which result-file suffixes EVAL_RESUME asks us to treat as already-measured work.
+
+    `1`/`true` means "this run's own output file", which is the case that matters: a killed run
+    is continued by relaunching the identical command with EVAL_RESUME=1. Anything else is read
+    as a comma-separated list of explicit suffixes, for pulling in work done under a different
+    EVAL_OUT_SUFFIX.
+    """
+    if spec is None or spec in ('', '0', 'false', 'False'):
+        return []
+    if spec in ('1', 'true', 'True'):
+        return [own_suffix]
+    return [s.strip() for s in spec.split(',') if s.strip()]
+
+
+def load_finished_results(policy_name, suffixes, num_episodes):
+    """Rows from earlier runs that are already measured to this run's full episode count.
+
+    Returns (rows, steps) where `steps` is the set to skip. Only rows with at least
+    `num_episodes` episodes count: a checkpoint that a killed run had only partly measured is
+    re-measured from scratch rather than topped up, which keeps this a plain skip-list and
+    avoids having to pool a prior row's summary statistics with fresh episodes. Re-measuring one
+    checkpoint is cheap next to getting the arithmetic subtly wrong.
+
+    A step appearing in two source files is loaded once — first file listed wins — because these
+    are alternative records of the same frozen checkpoint, not extra samples to combine. Use
+    merge_checkpoint_evals() when pooling repeat measurements is what you actually want.
+    """
+    rows, steps = [], set()
+    for suffix in suffixes:
+        path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
+        if not os.path.exists(path):
+            continue
+        with open(path) as handle:
+            payload = json.load(handle)
+        for row in payload.get('results', []):
+            if row.get('episodes', 0) >= num_episodes and row['step'] not in steps:
+                rows.append(row)
+                steps.add(row['step'])
+    return sorted(rows, key=lambda r: r['step']), steps
+
+
 def archive_existing_eval_pngs():
     """Moves whatever is currently in EVALS_DIR into a timestamped EVALS_ARCHIVE_DIR
     subfolder, so a new eval or batch starts from an empty folder and evals/ always shows
@@ -234,14 +347,80 @@ def wilson_interval(successes, trials, z=1.96):
     return max(0.0, centre - spread), min(1.0, centre + spread)
 
 
+def build_row(step, held, meta=None):
+    """One result row from a checkpoint's accumulated episodes.
+
+    `held` carries the raw per-episode lists rather than running totals, so a screening pass
+    that is later topped up to full length recomputes the median and the extremes exactly
+    instead of approximating them from two summaries.
+    """
+    scores = held['scores']
+    perfect = int(sum(held['perfect']))
+    meta = meta or {'selected_by': 'explicit'}
+    low, high = wilson_interval(perfect, len(scores))
+    return {
+        'step': step,
+        'selected_by': meta.get('selected_by', 'explicit'),
+        'graph_single_eval': meta.get('single_eval'),
+        'graph_surrounding': meta.get('surrounding'),
+        'episodes': len(scores),
+        'perfect_games': perfect,
+        'perfect_percent': round(100.0 * perfect / len(scores), 1),
+        'perfect_ci95': [round(100.0 * low, 1), round(100.0 * high, 1)],
+        'avg_score': round(float(np.mean(scores)), 2),
+        'median_score': round(float(np.median(scores)), 1),
+        'min_score': round(float(np.min(scores)), 1),
+        'max_score': round(float(np.max(scores)), 1),
+        'avg_reward': round(float(np.mean(held['rewards'])), 2),
+        # Wall-clock per checkpoint, so eval_progress.py can give an ETA from this run's own
+        # throughput rather than a hardcoded guess. Strong policies play longer episodes and
+        # measure slower, so a fixed estimate is wrong in both directions.
+        'seconds': round(held['seconds'], 1),
+    }
+
+
+def pick_finalists(rows, count, already_full=None):
+    """The screened checkpoints that earn a full-length measurement.
+
+    Ranked on the screen rate, then on the surrounding graph rate, then on step. The
+    tie-break is doing real work rather than making the order deterministic: a 20-episode
+    screen can only return 21 distinct rates, so dozens of checkpoints arrive on the same
+    value and something has to separate them. The surrounding rate is the right something —
+    across 88 checkpoints that had all already cleared 80%, it correlated +0.48 with the true
+    rate while the graph point itself managed +0.10 (see select_top_checkpoints).
+
+    `already_full` names steps that came in from a resumed run at full length. They are
+    excluded because they already have the measurement this stage would buy them, so letting
+    them occupy a slot would spend it on work that is finished.
+    """
+    already_full = already_full or {}
+    pool = [r for r in rows if r['step'] not in already_full]
+    ranked = sorted(pool, key=lambda r: (-r['perfect_games'] / r['episodes'],
+                                         -(r.get('graph_surrounding') or 0.0), r['step']))
+    return ranked[:count]
+
+
 def run_round(parallel_env, policy_action, worker_envs):
     """One episode per worker, every worker run to completion.
 
-    Deliberately *not* "collect N finished episodes and stop": stopping mid-flight
-    discards the episodes still running, and perfect games are the longest episodes
-    there are, so truncation drops them preferentially and biases the perfect rate
-    down. Running whole rounds costs a little idle time on the fast workers and
-    keeps the sample unbiased.
+    Deliberately *not* "collect N finished episodes and stop". Truncating mid-flight throws away
+    the episodes still running, and which ones those are is correlated with the outcome, so the
+    surviving sample is not a random one. Running whole rounds costs some idle time on the fast
+    workers and keeps the estimate unbiased.
+
+    **The bias runs the opposite way to what this comment used to claim.** It said perfect games
+    are the longest episodes there are, so truncation would drop them preferentially and read
+    low. Measured over 11 samples of a strong policy, perfect games average ~1780 steps and
+    non-perfect ones ~2200: a win ends the moment the board fills, while a policy that is about
+    to fail circles until the starve budget runs out. So truncation would drop *failures*
+    preferentially and read **high**. The conclusion is unchanged — do not truncate — but the
+    direction matters to anyone reasoning about a variant of this loop.
+
+    The idle time is real and measurable: across 20-40 workers, 20-35% of the env steps executed
+    in a round belong to workers that had already finished and were being stepped into
+    uncounted episodes. Giving each worker a fixed quota of episodes to run back to back,
+    instead of a barrier every episode, recovers ~1.2x of that and stays unbiased, since every
+    worker still contributes exactly the same number of counted episodes. Not implemented.
     """
     num_workers = len(worker_envs)
     scores = np.zeros(num_workers, dtype=np.float64)
@@ -319,6 +498,15 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None):
 ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, even past `count`
 MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
 DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
+
+# How many screened checkpoints EVAL_SCREEN_EPISODES promotes to a full-length measurement.
+# 30 came out of simulating protocols against the 937 checkpoints batch 10 measured at 100
+# episodes: screening everything at 20 and confirming the top 30 costs 3.6x fewer episodes than
+# measuring all of them at 100, for indistinguishable accuracy in the checkpoint it crowns
+# (regret 3.04pp against 2.82pp for the arm's true best). Raising it buys very little, because
+# the selected population is a tight blob between 60% and 80% where extra slots go to
+# checkpoints that were never going to win.
+DEFAULT_CONFIRM_COUNT = 30
 
 # Seconds between live-chart refreshes. A frame is ~0.1s and a round ~4s, so this only bites
 # early in a run when episodes are short and rounds finish fast.
@@ -517,6 +705,12 @@ def main(argv):
     policy_name = argv[1]
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     num_workers = int(os.environ.get('EVAL_WORKERS', 10))
+    screen_episodes = int(os.environ.get('EVAL_SCREEN_EPISODES', 0))
+    confirm_count = int(os.environ.get('EVAL_CONFIRM_COUNT', DEFAULT_CONFIRM_COUNT))
+    if screen_episodes >= num_episodes:
+        raise SystemExit(
+            'EVAL_SCREEN_EPISODES={0} must be below EVAL_EPISODES={1} — a screen that already '
+            'runs the full length has nothing left to confirm'.format(screen_episodes, num_episodes))
     perfect_wait_ms = int(os.environ.get('EVAL_PERFECT_WAIT_MS', 400))
     # Rendering is off by default because it was the single slowest thing in an eval, by a
     # wide margin. Measured per game step: 163us headless, 2449us with display=True on the
@@ -542,6 +736,20 @@ def main(argv):
         missing = [s for s in requested_steps if s not in available]
         if missing:
             raise SystemExit('no checkpoint for step(s) {0} in {1}'.format(missing, ckpt_dir))
+
+    # Resume before the expensive setup, so a run that has nothing left to do says so in
+    # seconds rather than after building an agent and 20 worker processes.
+    suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
+    resumed_rows, resumed_steps = load_finished_results(
+        policy_name, resume_suffixes(os.environ.get('EVAL_RESUME'), suffix), num_episodes)
+    if resumed_steps:
+        skipped = [s for s in requested_steps if s in resumed_steps]
+        requested_steps = [s for s in requested_steps if s not in resumed_steps]
+        print('resuming: {0} of the selected checkpoints are already measured at >={1} '
+              'episodes, {2} left to do'.format(len(skipped), num_episodes, len(requested_steps)))
+        if not requested_steps:
+            print('nothing left to measure')
+            return 0
 
     print('policy {0}: evaluating {1} checkpoints x {2} episodes on {3} workers'.format(
         policy_name, len(requested_steps), num_episodes, num_workers))
@@ -614,9 +822,38 @@ def main(argv):
     # same variables, so it does not force a retrace.
     policy_action = common.function(agent.policy.action)
 
-    suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
     out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
     backup_previous_results(out_path)
+
+    # Everything this arm is accountable for, resumed work included, so the output file and the
+    # progress chart describe the whole job rather than only what this process happened to run.
+    all_steps = sorted(resumed_steps.union(requested_steps))
+
+    def whole_rounds(episodes):
+        """Episodes actually run for a request of `episodes`, rounded up to a whole round."""
+        return -(-episodes // num_workers) * num_workers
+
+    # Planned work, in the two units a reader cares about: how many checkpoint measurements will
+    # happen, and how many episodes they add up to. A screening protocol measures some
+    # checkpoints twice, so "checkpoints" alone no longer tracks progress and the episode count
+    # is what gives eval_progress.py an honest ETA across stages of different lengths.
+    if screen_episodes:
+        confirmed = min(confirm_count, len(requested_steps))
+        measurements_planned = len(resumed_steps) + len(requested_steps) + confirmed
+        episodes_planned = (len(resumed_steps) * whole_rounds(num_episodes)
+                            + len(requested_steps) * whole_rounds(screen_episodes)
+                            + confirmed * whole_rounds(num_episodes - screen_episodes))
+    else:
+        measurements_planned = len(all_steps)
+        episodes_planned = len(all_steps) * whole_rounds(num_episodes)
+
+    # Resumed rows arrive already measured, so they start the count rather than being re-earned.
+    # `session_*` covers only what this process has done, which is what an ETA has to be built
+    # from: resumed rows carry the pace of whatever settings the earlier run used, and a
+    # close-out relaunched at a different EVAL_WORKERS can differ by 3x. Averaging over every
+    # row put b10b's ETA out by nearly 3x — 7h10m against a real ~2h.
+    progress = {'measurements': len(resumed_steps),
+                'session_measurements': 0, 'session_episodes': 0, 'session_seconds': 0.0}
 
     def write_results(results, complete, in_flight=None):
         """Rewrites the whole file after every checkpoint, and after every round.
@@ -633,15 +870,34 @@ def main(argv):
         """
         payload = {'policy_name': policy_name,
                    'episodes_per_checkpoint': num_episodes,
-                   'checkpoints_requested': len(requested_steps),
+                   'checkpoints_requested': len(all_steps),
                    'complete': complete,
-                   'requested_steps': requested_steps,
+                   'requested_steps': all_steps,
+                   # Screening protocol, or None for the flat one-pass measurement. Recorded
+                   # because a pooled rate only compares across arms when the selection rule
+                   # matches, and this is part of the rule.
+                   'screen_episodes': screen_episodes or None,
+                   'confirm_count': confirm_count if screen_episodes else None,
+                   # Progress in measurements and in episodes. Both are needed once checkpoints
+                   # can be measured twice at different lengths: the first tracks the stage plan,
+                   # the second is what an ETA can actually be built from.
+                   'measurements_planned': measurements_planned,
+                   'measurements_done': progress['measurements'],
+                   # This process's own throughput, for the ETA. See `progress` above for why
+                   # the pace cannot be averaged over resumed rows.
+                   'session_measurements': progress['session_measurements'],
+                   'session_episodes': progress['session_episodes'],
+                   'session_seconds': round(progress['session_seconds'], 1),
+                   'episodes_planned': episodes_planned,
+                   'episodes_done': sum(r['episodes'] for r in results),
                    # The checkpoint being measured right now, updated every round, or None
                    # between checkpoints. eval_progress.py renders this; without it a
                    # ~5-minute checkpoint is invisible until it lands.
                    'in_flight': in_flight,
                    'updated_at': time.time(),
-                   'results': results}
+                   # Step order, not measurement order: a resumed run appends new checkpoints
+                   # after the rows it loaded, which would otherwise interleave arbitrarily.
+                   'results': sorted(results, key=lambda r: r['step'])}
         partial_path = out_path + '.partial'
         with open(partial_path, 'w') as handle:
             json.dump(payload, handle, indent=2)
@@ -690,61 +946,107 @@ def main(argv):
             chart['off'] = True
             print('    progress chart off ({0}: {1})'.format(type(error).__name__, error))
 
-    results = []
-    for step in requested_steps:
-        path = os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))
-        print('\ncheckpoint {0} ({1} of {2})'.format(
-            step, len(results) + 1, len(requested_steps)))
-        checkpoint.restore(path).expect_partial()
+    # Episodes measured in this process, kept raw per step so a screening pass can be topped up
+    # to full length later without pooling summary statistics. 660 checkpoints x 100 floats is
+    # nothing next to the agent itself.
+    samples = {}
+    resumed_by_step = {row['step']: row for row in resumed_rows}
+
+    def current_results():
+        """Result rows for every checkpoint with episodes banked.
+
+        The checkpoint in flight is skipped until its episodes land: `on_round` writes progress
+        while `evaluate` is still running, so its sample is still empty at that point and there
+        is no rate to report. Its running state travels in the payload's `in_flight` block
+        instead, which is what eval_progress.py draws it from.
+        """
+        rows = dict(resumed_by_step)
+        for step, held in samples.items():
+            if held['scores']:
+                rows[step] = build_row(step, held, selected_by.get(step))
+        return [rows[step] for step in sorted(rows)]
+
+    def measure(step, episodes, label):
+        """Restores one checkpoint and adds `episodes` more episodes to its sample."""
+        print('\ncheckpoint {0} ({1})'.format(step, label))
+        checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))).expect_partial()
         restored = int(global_step.numpy())
         if restored != step:
             print('    warning: global_step reads {0}, expected {1}'.format(restored, step))
 
+        held = samples.setdefault(step, {'scores': [], 'perfect': [], 'rewards': [], 'seconds': 0.0})
+        already = len(held['scores'])
         started_at = time.time()
 
         def on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round):
-            write_results(results, complete=False, in_flight={
+            # Report the checkpoint's whole sample, screening episodes included, so a topped-up
+            # finalist shows its true running rate rather than restarting from zero.
+            total_perfect = sum(held['perfect']) + perfect_so_far
+            total_episodes = already + episodes_so_far
+            write_results(current_results(), complete=False, in_flight={
                 'step': step,
                 'round': round_index,
                 'rounds_total': rounds_total,
-                'perfect_so_far': perfect_so_far,
-                'episodes_so_far': episodes_so_far,
-                'running_percent': round(100.0 * perfect_so_far / episodes_so_far, 1),
+                'perfect_so_far': total_perfect,
+                'episodes_so_far': total_episodes,
+                'running_percent': round(100.0 * total_perfect / total_episodes, 1),
                 'per_round_perfect': per_round,
                 'started_at': started_at,
             })
 
         scores, perfect_flags, rewards, elapsed = evaluate(
-            parallel_env, policy_action, num_episodes, on_round=on_round)
-        perfect = sum(perfect_flags)
-        low, high = wilson_interval(perfect, len(scores))
-        meta = selected_by.get(step, {'selected_by': 'explicit'})
-        row = {
-            'step': step,
-            'selected_by': meta['selected_by'],
-            'graph_single_eval': meta.get('single_eval'),
-            'graph_surrounding': meta.get('surrounding'),
-            'episodes': len(scores),
-            'perfect_games': perfect,
-            'perfect_percent': round(100.0 * perfect / len(scores), 1),
-            'perfect_ci95': [round(100.0 * low, 1), round(100.0 * high, 1)],
-            'avg_score': round(float(np.mean(scores)), 2),
-            'median_score': round(float(np.median(scores)), 1),
-            'min_score': round(float(np.min(scores)), 1),
-            'max_score': round(float(np.max(scores)), 1),
-            'avg_reward': round(float(np.mean(rewards)), 2),
-            # Wall-clock per checkpoint, so eval_progress.py can give an ETA from this run's
-            # own throughput rather than a hardcoded guess. Strong policies play longer
-            # episodes and measure slower, so a fixed estimate is wrong in both directions.
-            'seconds': round(elapsed, 1),
-        }
-        results.append(row)
-        write_results(results, complete=len(results) == len(requested_steps))
+            parallel_env, policy_action, episodes, on_round=on_round)
+        held['scores'].extend(scores)
+        held['perfect'].extend(perfect_flags)
+        held['rewards'].extend(rewards)
+        held['seconds'] += elapsed
+        progress['measurements'] += 1
+        progress['session_measurements'] += 1
+        progress['session_episodes'] += len(scores)
+        progress['session_seconds'] += elapsed
+
+        row = build_row(step, held, selected_by.get(step))
+        write_results(current_results(), complete=False)
         print('    perfect {0}/{1} = {2}%  (95% CI {3}-{4}%)'.format(
-            perfect, len(scores), row['perfect_percent'], row['perfect_ci95'][0], row['perfect_ci95'][1]))
+            row['perfect_games'], row['episodes'], row['perfect_percent'],
+            row['perfect_ci95'][0], row['perfect_ci95'][1]))
         print('    score mean {0}  median {1}  min {2}  max {3}'.format(
             row['avg_score'], row['median_score'], row['min_score'], row['max_score']))
 
+    if screen_episodes:
+        print('\nstage 1: screening {0} checkpoints at {1} episodes each'.format(
+            len(requested_steps), screen_episodes))
+        for index, step in enumerate(requested_steps, 1):
+            measure(step, screen_episodes, 'screen {0} of {1}'.format(index, len(requested_steps)))
+
+        # Snapshot the pooled rate now, while every screened checkpoint has had exactly the same
+        # number of episodes. After stage 2 the finalists carry five times the weight of
+        # everything else and, being the best of the arm, drag a pooled figure upward — so the
+        # end-of-run pooled number over mixed lengths is not an arm-level rate at all. This one
+        # is: equal effort per checkpoint, selected the same way, no promotion applied yet.
+        screened = [r for r in current_results() if r['step'] not in resumed_by_step]
+        screen_pooled = (sum(r['perfect_games'] for r in screened),
+                         sum(r['episodes'] for r in screened), len(screened))
+
+        finalists = pick_finalists(current_results(), confirm_count, resumed_by_step)
+        print('\nstage 2: confirming the top {0} of {1} screened checkpoints at {2} episodes '
+              '({3} more each)'.format(len(finalists), len(requested_steps), num_episodes,
+                                       num_episodes - screen_episodes))
+        for entry in finalists:
+            print('    {0:>8}  screen {1:>5.1f}%   surrounding {2}'.format(
+                entry['step'], entry['perfect_percent'],
+                '-' if entry.get('graph_surrounding') is None
+                else '{0:.1f}%'.format(entry['graph_surrounding'])))
+        for index, entry in enumerate(finalists, 1):
+            measure(entry['step'], num_episodes - screen_episodes,
+                    'confirm {0} of {1}'.format(index, len(finalists)))
+    else:
+        for index, step in enumerate(requested_steps, 1):
+            measure(step, num_episodes,
+                    '{0} of {1}'.format(len(resumed_by_step) + index, len(all_steps)))
+
+    results = current_results()
+    write_results(results, complete=True)
     update_chart(force=True)
     print('\nwrote {0}'.format(out_path))
 
@@ -760,15 +1062,33 @@ def main(argv):
             row['perfect_percent'],
             row['perfect_ci95'][0], row['perfect_ci95'][1], row['avg_score']))
 
-    perfect = sum(r['perfect_games'] for r in results)
-    episodes = sum(r['episodes'] for r in results)
-    low, high = wilson_interval(perfect, episodes)
-    print('\npooled: {0}/{1} = {2:.1f}%  (95% CI {3:.1f}-{4:.1f}%)  over {5} checkpoints'.format(
-        perfect, episodes, 100.0 * perfect / episodes,
-        100.0 * low, 100.0 * high, len(results)))
-    best = max(results, key=lambda r: r['perfect_percent'])
-    print('best checkpoint: {0} at {1}% (95% CI {2}-{3}%)'.format(
-        best['step'], best['perfect_percent'], best['perfect_ci95'][0], best['perfect_ci95'][1]))
+    if screen_episodes:
+        perfect, episodes, count = screen_pooled
+        low, high = wilson_interval(perfect, episodes)
+        print('\npooled (stage 1, equal effort per checkpoint): {0}/{1} = {2:.1f}%  '
+              '(95% CI {3:.1f}-{4:.1f}%)  over {5} checkpoints'.format(
+                  perfect, episodes, 100.0 * perfect / episodes,
+                  100.0 * low, 100.0 * high, count))
+        print('    this is the arm-level rate. Do not pool the rows in the output file instead:'
+              '\n    the confirmed finalists hold {0}x the episodes of everything else and are '
+              'the\n    best of the arm, so that figure reads high by construction.'.format(
+                  num_episodes // max(1, screen_episodes)))
+    else:
+        perfect = sum(r['perfect_games'] for r in results)
+        episodes = sum(r['episodes'] for r in results)
+        low, high = wilson_interval(perfect, episodes)
+        print('\npooled: {0}/{1} = {2:.1f}%  (95% CI {3:.1f}-{4:.1f}%)  over {5} checkpoints'.format(
+            perfect, episodes, 100.0 * perfect / episodes,
+            100.0 * low, 100.0 * high, len(results)))
+
+    # Best-checkpoint over the full-length rows only. A screened-out checkpoint has a 20-episode
+    # rate whose interval is ~5x wider, so letting one win on a lucky 18/20 would crown a
+    # checkpoint the protocol deliberately declined to measure.
+    full_length = [r for r in results if r['episodes'] >= num_episodes] or results
+    best = max(full_length, key=lambda r: r['perfect_percent'])
+    print('best checkpoint: {0} at {1}% (95% CI {2}-{3}%) over {4} episodes'.format(
+        best['step'], best['perfect_percent'], best['perfect_ci95'][0],
+        best['perfect_ci95'][1], best['episodes']))
     print('\nPooled rates only compare across arms when the selection rule matches.')
     return 0
 

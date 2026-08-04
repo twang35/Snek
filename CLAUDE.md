@@ -435,6 +435,27 @@ skill, and the flag in question was a no-op at the time anyway.
 code.** An 11x speedup of the observation code and a 6.8x speedup of policy inference both
 moved eval wall clock by approximately nothing, because neither was the slowest worker.
 
+**`EVAL_WORKERS` is close to free, and lowering it to save CPU does the opposite.** Measured
+seconds per episode on one checkpoint: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20**.
+TensorFlow's thread pool costs about a core whether the batch it is handed has 2 rows or 20, so
+a small worker count pays full inference overhead for a fraction of the work — 2 workers is 3x
+slower *and* worse per unit of CPU. The batch-10 close-out was launched at 2 workers to hit a
+~50% CPU target and ran 2.8x slower than it needed to for *more* CPU per episode. To be gentler
+on the machine, run fewer arms at once, not fewer workers. Prefer a worker count that divides
+`EVAL_EPISODES`, since episodes round up to a whole round.
+
+**Do not trust `resource.getrusage(RUSAGE_CHILDREN)` for a `ParallelPyEnvironment`'s cost.** It
+only counts children that have been reaped, and the worker processes are alive for the whole
+run, so it reports roughly the parent alone — it undercounted a 20-worker eval by ~3x here. Read
+total CPU from `top -l 2 -n 0` instead.
+
+**The eval close-out screens before it confirms** (`EVAL_SCREEN_EPISODES`): 20 episodes on every
+selected checkpoint, then 80 more on the best 30. 3.6x fewer episodes than measuring everything
+at 100, for a statistically indistinguishable answer. Two consequences for anyone reading the
+output file: rows have *different* episode counts, so pooling them over-weights the winners and
+reads high — the arm-level rate is the stage-1 figure the run prints — and best-checkpoint must
+come from full-length rows only. `eval_progress.best_of()` enforces the latter.
+
 ## Active development
 
 `snek2/` is the only directory that should be edited going forward. It's a
