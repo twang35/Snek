@@ -39,10 +39,12 @@ third, later environment than ‡. Batch 9 (‡) predates all seven; batch 10 (�
 train on the result. Compare ‡‡ rows only to each other; they are not comparable to ‡ or
 unmarked rows.
 
-**‡‡‡ will mark arms trained after the following-tail observation (2026-08-03)**, which took the
-vector from 26 values to 29 — a fourth environment. No arm has trained on it yet, so no row
-carries the mark; the first batch to do so cannot be compared against ‡‡ any more than ‡‡ can be
-compared against ‡. Batch 10's checkpoints stopped loading on `master` when this landed.
+**‡‡‡ marks arms trained on the 30-value vector (2026-08-03 onward)** — a fourth environment,
+adding the following-tail block (26-28) and food-space (29). Batch 11 is the first and only batch
+to train on it. ‡‡‡ rows compare to each other and, with care, to ‡‡ rows: batch 11 is byte-identical
+to batch 10 in config, so that one cross-era comparison is *designed* and is written up under
+batch 11 below. Everything else stays within its own era. Batch 10's checkpoints stopped loading on
+`master` when this landed.
 
 **Four environments in two days is the real cost being paid here**, and it is worth stating
 plainly: every environment change resets the comparison set, so a batch's numbers are only ever
@@ -51,10 +53,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | **95%** @1815k (mid-run) | **93.3%** | **74.5%** /24600 | 84.3% | ‡‡ **project record**; stopped healthy |
-| `b10b-disc995seed2` ‡‡ | disc **0.995**, third env | 4.65M | 87% @1157k (mid-run) | 86.3% | 70.4% /12000 | 85.0% | ‡‡ 2nd of batch 10; stopped healthy |
-| `b10a-disc995seed1` ‡‡ | disc **0.995**, third env | 4.29M | close-out eval pending | pending | pending | 78.3% | ‡‡ stopped healthy |
-| `b10c-disc995seed3` ‡‡ | disc **0.995**, third env | 4.12M | close-out eval pending | pending | pending | 72.7% | ‡‡ stopped healthy |
+| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | close-out running | pending | pending | **91.7%** | ‡‡‡ highest best-30 of any arm on record |
+| `b11a-obs30seed1` ‡‡‡ | disc 0.995, **fourth env** | 3.19M | close-out running | pending | pending | 85.7% | ‡‡‡ peaked at 678k, then lost 42 pp |
+| `b11d-obs30seed4` ‡‡‡ | disc 0.995, **fourth env** | 3.59M | close-out running | pending | pending | 78.3% | ‡‡‡ only arm still near peak when stopped |
+| `b11c-obs30seed3` ‡‡‡ | disc 0.995, **fourth env** | 3.23M | close-out running | pending | pending | 73.0% | ‡‡‡ weakest of batch 11 |
+| `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | **93%** @1695k | **93.3%** | **74.9%** /66000 | 84.3% | ‡‡ best measured checkpoint on record |
+| `b10b-disc995seed2` ‡‡ | disc **0.995**, third env | 4.65M | 90% @1501k | 86.3% | 71.8% /62400 | 85.0% | ‡‡ 2nd of batch 10 |
+| `b10a-disc995seed1` ‡‡ | disc **0.995**, third env | 4.29M | 85% @2344k | — | 67.2% /27200 | 78.3% | ‡‡ stopped healthy |
+| `b10c-disc995seed3` ‡‡ | disc **0.995**, third env | 4.12M | 79% @3965k | — | 63.0% /4700 | 72.7% | ‡‡ weakest of batch 10 |
 | `b9d-disc995b` ‡ | disc **0.995**, new env | 3.45M | **70%** @2544k | **66.3%** | 42.4% /1700 | 30.3% | ‡ best ceiling of batch 9 |
 | `b9a-disc9975a` ‡ | disc **0.9975**, new env | 3.68M | 65% @1735k | 64.3% | **54.9%** /2000 | 56.0% | ‡ most consistent of batch 9 |
 | `b9c-disc995a` ‡ | disc **0.995**, new env | 3.71M | 52% @2603k | 51.3% | 38.0% /2000 | 37.3% | ‡ weakest survivor |
@@ -120,6 +126,65 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 11 — the same config on the 30-value vector: no significant difference
+
+**Launched 2026-08-03 22:55, all four stopped 2026-08-04 09:09** by request — 10h14m, 3.19-3.59M
+steps per arm (~330k/arm/hour). Four seeds of batch 10's config, byte for byte
+(`SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`),
+on the 30-value observation vector. The **first seeded batch** in this project — `SNEK_SEED=1..4`,
+recorded in each `runs/<policy>.md`. The only difference from batch 10 is the two observations added
+2026-08-03 (following-tail at 26-28, food-space at 29), verified by checking that no other
+training-relevant commit landed in between.
+
+| policy | final step | peak trailing | best-30 perfect | best-30 @3.185M | drawdown to final |
+|---|---|---|---|---|---|
+| `b11b-obs30seed2` ‡‡‡ | 3.56M | 94.92 @855k | **91.7%** @873k | **91.7%** | 18.0 pp |
+| `b11a-obs30seed1` ‡‡‡ | 3.19M | 94.82 @653k | 85.7% @678k | 85.7% | **42.4 pp** |
+| `b11d-obs30seed4` ‡‡‡ | 3.59M | 94.18 @3468k | 78.3% @3468k | 76.3% | 5.6 pp |
+| `b11c-obs30seed3` ‡‡‡ | 3.23M | 94.26 @2452k | 73.0% @1718k | 73.0% | 18.0 pp |
+
+### The pre-registered result: not significant
+
+Fixed before launch: best-30 perfect at a **common horizon**, not at each arm's final step. Batch 11
+turned out to be the shorter batch, so the horizon is **3.185M**.
+
+| batch | best-30 @3.185M | mean | sd |
+|---|---|---|---|
+| 10 (26-value) | 74.7 / 84.0 / 62.0 / 84.3 | 76.2% | 10.5 |
+| 11 (30-value) | 85.7 / 91.7 / 73.0 / 76.3 | **81.7%** | 8.6 |
+
+**+5.4 pp, SE 6.8, t=0.80 — not significant**, against a pre-registered threshold of ~10 pp. This is
+the outcome the design predicted, and it is recorded as a non-result rather than a lean. The two
+observations are kept under the pre-registered decision rule: keep unless clearly worse.
+
+`b11b`'s **91.7%** best-30 is the highest any arm in either batch reached, but that is n=1 out of
+eight arms and the batch means overlap heavily. Do not promote it to a finding.
+
+### Two things that did differ, and neither was predicted
+
+**Peaks came far earlier.** Best-30 peak step: 678k / 873k / 1718k / 3468k against batch 10's
+3402k / 4547k / 4064k / 1666k — mean **1.68M vs 3.42M**. Three of four batch-11 arms had already
+peaked before 1.8M, and then spent 1.5-2.5M further steps declining.
+
+This is not a speed advantage, and an earlier read of mine that said so was wrong. Measured properly
+— steps for the rolling best-30 to first reach 70% — batch 10 is if anything *faster*: median 653k
+against 913k. The "peaks came earlier" number was conflating *when the best window occurred* with
+*how fast the arm learned*, and `b10c` reaching 70% only at 4052k drags batch 10's mean while
+leaving its median untouched.
+
+**The decline was worse.** Mean drawdown from best-30 to the final window: **21.0 pp against
+16.9 pp**, and `b11a` gave up **42.4 pp** — from 85.7% at 678k to 43.3% at the end. Every arm in
+both batches declined, so this is the known post-peak failure mode rather than a new one, but batch
+11 hit it sooner and harder. With n=4 and this spread that is a hypothesis, not a finding.
+
+### What this suggests for the next batch
+
+**Three of four arms peaked before 1.8M, so most of a 10-hour run was spent watching arms get
+worse.** If that holds, a batch capped near 2M costs a third as much per arm and buys 3x the seeds
+in the same wall time — which is the only thing that fixes the ~10 pp resolution problem that made
+this batch's result unreadable. n=12 at 2M would detect ~5 pp. That is worth testing before
+spending another four slots on a knob whose effect is probably smaller than 10 pp.
 
 ## Batch 10 — a fresh baseline, and a new project record
 

@@ -166,115 +166,44 @@ that seed cluster produced the 95%, and the environment has moved on again.
 their processes loaded the 26-value code at startup; `EVAL_RESUME=1` would now build a 30-value
 network and fail to restore. Whatever they have written is what there will be.
 
-## Batch 11 — RUNNING, launched 2026-08-03 ~22:55
+## Nothing is training — batch 11 stopped 2026-08-04 09:09, close-out evals running
 
-**Four seeds of one config on the 30-value environment.** Batch 10's config, unchanged, so the
-only difference between the two batches is the two observations added 2026-08-03. **The first
-seeded batch in this project's history** — `SNEK_SEED=1..4`, recorded in each `runs/<policy>.md`.
+**Batch 11 gave a null result, as its own pre-registration predicted.** Four seeds of batch 10's
+config on the 30-value vector; best-30 at the common 3.185M horizon was **81.7% vs 76.2%**, a
+**+5.4 pp difference at t=0.80** against a pre-registered threshold of ~10 pp. The two new
+observations are kept under the stated decision rule (keep unless clearly worse). Full write-up,
+including two unpredicted differences that are *not* findings:
+[`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
 
-Verify with `pgrep -fl "python -u snek2.py"`. Four watchers are attached via
-`watch_when_ready.sh`. `b10d`'s close-out eval was still finishing at launch, by request.
+| arm | final step | best-30 perfect | best-30 @3.185M | drawdown to final |
+|---|---|---|---|---|
+| `b11b-obs30seed2` | 3.56M | **91.7%** @873k | **91.7%** | 18.0 pp |
+| `b11a-obs30seed1` | 3.19M | 85.7% @678k | 85.7% | **42.4 pp** |
+| `b11d-obs30seed4` | 3.59M | 78.3% @3468k | 76.3% | 5.6 pp |
+| `b11c-obs30seed3` | 3.23M | 73.0% @1718k | 73.0% | 18.0 pp |
 
-**Early numbers mean nothing yet and are recorded here only so they are not mistaken for a
-result later.** At 10k steps batch 11 averages score 41.1 against batch 10's 25.7, and
-`b11c` showed 30% perfect where no batch-10 arm had any. That difference is **t=0.90, p≈0.4** —
-the within-batch spread is 7.0 to 71.9. This document's own rule is that nothing is judgeable
-below ~250k steps, and two runs of one identical config have reached final avg_score 62.5 and
-18.0 at 30k. Do not quote this paragraph as evidence of anything.
+`b11b`'s 91.7% is the highest best-30 any arm in this project has reached. It is also n=1 of eight
+and the batch means overlap heavily — not a finding.
 
-| arm | policy name | config |
-|---|---|---|
-| a | `b11a-obs30seed1` | `SNEK_SEED=1` |
-| b | `b11b-obs30seed2` | `SNEK_SEED=2` |
-| c | `b11c-obs30seed3` | `SNEK_SEED=3` |
-| d | `b11d-obs30seed4` | `SNEK_SEED=4` |
+Close-out evals are running on all four arms under the three-stage protocol. Batch 10's four arms
+are fully measured and are the control.
 
-Shared base, byte-identical to batch 10:
-`SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`
+### The next batch should be shorter and wider, not another knob
 
-**Names encode the vector length rather than the config**, which departs from the usual convention
-of naming what varies (`disc995`, `nstep3`, `unifbuf500k`) — nothing about batch 11's config varies
-from batch 10's, so there is nothing to name there. `obs30` identifies the *environment*, and that
-is the label worth having: it decides checkpoint compatibility, and it makes this batch reusable as
-**the benchmark for every later batch trained on the 30-value vector**. A batch 12 arm at
-`LEARNING_RATE=1e-4` compares against `obs30` arms directly; one on a 31-value vector does not, and
-its name will say so.
+**Three of batch 11's four arms peaked before 1.8M**, then spent 1.5-2.5M further steps getting
+worse. A 10-hour run therefore spent most of its compute past the point of interest. Capping a
+batch near 2M costs about a third per arm and buys **3x the seeds in the same wall time** — and
+seed count is the only thing that fixes the resolution problem that made batch 11 unreadable.
+n=4 detects ~10 pp; **n=12 at 2M would detect ~5 pp**, in the same overnight window.
 
-**Batch 10 is a clean control, verified rather than assumed.** The only training-relevant commit
-between batch 10's launch and now is `b09c616`, the two observation blocks; the one other commit
-touched a chart line width. So batch 11 minus batch 10 isolates exactly those two observations —
-the comparison batch 10 could never provide for the 2026-08-02 changes.
+That is worth doing *before* spending four slots on `LEARNING_RATE=1e-4` or any other knob, because
+every knob on the backlog plausibly has an effect smaller than 10 pp — which means the current
+design cannot see any of them, and four more slots would produce another unreadable batch.
 
-**Why four seeds of one config and not a knob test.** The tempting alternative is 2 baseline plus 2
-at `LEARNING_RATE=1e-4`, the highest-value untested knob. That is batch 9's documented mistake at
-one remove: it buys two n=2 answers instead of one n=4 baseline that every later batch spends.
-
-### What this batch can and cannot show
-
-| metric | batch 10 (n=4) | sd | detectable vs a new n=4 |
-|---|---|---|---|
-| equal-effort pooled | 69.2% | 5.2 | **9.0 pp** at p<0.05 |
-| best-30 perfect (graph) | 80.1% | 5.8 | 10.0 pp |
-| best checkpoint | 86.8% | 6.1 | 10.6 pp |
-| peak trailing score | 94.47 | 0.50 | 0.9 pp |
-
-**A null result is the most likely outcome, and it will not mean the observations are useless.** If
-they help by 3-5pp this design cannot see it — between-seed variance dominates and no amount of
-eval precision touches it. Recorded here in advance so a null is not later written up as a finding.
-
-That last row is a trap: peak trailing score sits at 93.8-94.96 against a saturated ceiling, so its
-tight sd is compression rather than sensitivity. Useful only as a **regression tripwire**.
-
-### Pre-registered comparison
-
-Fixed before launch, because this document notes that earlier batch rankings compared arms at
-horizons where they had not finished improving:
-
-- **Primary:** equal-effort pooled from the close-out, plus best-30 perfect **at a common 4.12M
-  horizon** (batch 10's shortest arm) — not at final step, whatever each arm reaches.
-- **Secondary:** best checkpoint, with winner's-curse shrinkage applied. Batch 10's headline 93%
-  shrinks to 87.2% once it is treated as the max of ~300 noisy measurements.
-- **Tripwire:** peak trailing score. A drop below ~93 is a regression signal.
-- **Decision rule:** keep the new observations unless clearly worse.
-
-### Horizon: run until they stop improving
-
-No fixed cap, by request. Judged on the trailing-window criteria in
-[`hyperparamTuning.md`](hyperparamTuning.md#when-to-keep-a-run-going-and-when-to-stop-it) — last 20
-evals vs the previous 20 for score, last 30 vs previous 30 for perfect rate — and **nothing gets
-stopped without reporting first**.
-
-Batch 10 managed 4.1-4.65M steps in 15.6 hours with four arms in parallel, so ~281k steps per arm
-per hour; expect that to slow as skill rises and eval episodes lengthen. Batch 10 was stopped
-*healthy* — `b10b` peaked at 4545k and was stopped at 4652k, `b10c` peaked at 4021k and stopped at
-4122k — so its ceiling is unknown, and because the vector changed those arms can never be resumed
-to find out. Not repeating that is the reason for an open horizon.
-
-### Infrastructure added for this batch
-
-Both landed before launch and are off by default, so nothing about batch 10 or earlier is affected.
-
-**`SNEK_SEED`** — the first seeding this project has ever had. Nothing seeded anything before, so
-`seed1`..`seed4` in batch 10's names were labels and no run was reproducible. The base seed and any
-ablation now appear in `runs/<policy>.md`. It buys reduced variance and a roughly repeatable run,
-**not** bit-identical replay: exact determinism would also need single-threaded TF and a fixed
-arrival order for the parallel workers. It does not help the batch-10 comparison either, since
-adding four inputs changes the initialisation RNG stream; it pays off from batch 12 on, where most
-tests change only a hyperparameter.
-
-The hazard it had to avoid: food placement uses the *global* `random` module and
-`ParallelPyEnvironment` runs one constructor per worker process, so a single shared seed would have
-all ten workers deal identical food — turning every 10-episode eval into one episode counted ten
-times, with confidence intervals to match, and raising nothing. Each worker gets its own derived
-stream, and `tests/test_seed_and_ablation.py` covers it.
-
-**`SNEK_ZERO_OBS`** — zeroes named observation indices *without changing the vector length*, e.g.
-`SNEK_ZERO_OBS=26-29`. This is the only way to ever answer "did those two observations help"
-cleanly: both groups train on the same 30-value spec, their checkpoints stay mutually loadable, and
-the only difference is the information in those indices. Batch 11 can then serve as the treatment
-group for a later 4-arm ablated control — a real 4v4 with no environment confound. Deleting a block
-instead would change the length and make it a two-environment comparison again, which is the
-confound that already cost this project the ability to attribute batch 10's result.
+Open question the cap does not answer: whether the arms that peak at ~700k would have gone higher
+with more steps, or whether the peak is the ceiling. Batch 11's `b11d` peaked at 3468k and was the
+only arm still near its peak when stopped, so the cap risks truncating that kind of arm. A
+reasonable compromise is n=8 at 2.5M with two arms allowed to run on.
 
 ### Later candidates
 
