@@ -4,7 +4,7 @@
 
 Blue is average score (food eaten) on the left axis, red is perfect-game percentage on the right.
 
-Latest eval: step 16000, avg score 68.3, perfect games 0%.
+Latest eval: step 19000, avg score 64.6, perfect games 0%.
 
 ## Config
 
@@ -38,7 +38,7 @@ Latest eval: step 16000, avg score 68.3, perfect games 0%.
 
 ## Evals
 
-17 evals so far. Full series in [`b11b-obs30seed2_evals.json`](b11b-obs30seed2_evals.json).
+20 evals so far. Full series in [`b11b-obs30seed2_evals.json`](b11b-obs30seed2_evals.json).
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
@@ -46,9 +46,6 @@ Latest eval: step 16000, avg score 68.3, perfect games 0%.
 | 1000 | 0.7 | 0.7 | 0 | 3/95 | -0.745 | 0 | 0.4 |
 | 2000 | 0.7 | 0.7 | 0 | 2/95 | 0.146 | 0 | 0.4 |
 | ... | | | | | | | |
-| 5000 | 1.5 | 1.24 | 0 | 5/95 | 0.943 | 0 | 0.4 |
-| 6000 | 16.9 | 4.48 | 9 | 36/95 | 11.85 | 0 | 0.2 |
-| 7000 | 28.3 | 10.0 | 16 | 64/95 | 23.2 | 0 | 0.1 |
 | 8000 | 35.1 | 16.82 | 21 | 50/95 | 29.961 | 0 | 0.05 |
 | 9000 | 30.9 | 22.54 | 10 | 60/95 | 25.782 | 0 | 0.05 |
 | 10000 | 38.3 | 29.9 | 27 | 68/95 | 33.14 | 0 | 0.05 |
@@ -58,3 +55,6 @@ Latest eval: step 16000, avg score 68.3, perfect games 0%.
 | 14000 | 70.2 | 55.8 | 41 | 91/95 | 66.666 | 0 | 0.001 |
 | 15000 | 73.8 | 62.9 | 60 | 85/95 | 72.198 | 0 | 0.001 |
 | 16000 | 68.3 | 68.76 | 29 | 93/95 | 66.859 | 0 | 0.001 |
+| 17000 | 77.1 | 71.1 | 49 | 87/95 | 75.587 | 0 | 0.001 |
+| 18000 | 69.5 | 71.78 | 52 | 81/95 | 68.057 | 0 | 0.001 |
+| 19000 | 64.6 | 70.66 | 39 | 79/95 | 63.192 | 0 | 0.001 |

@@ -665,8 +665,24 @@
     4433000,
     4439000
   ],
-  "in_flight": null,
-  "updated_at": 1785822868.707757,
+  "in_flight": {
+    "step": 4350000,
+    "round": 6,
+    "rounds_total": 10,
+    "perfect_so_far": 50,
+    "episodes_so_far": 60,
+    "running_percent": 83.3,
+    "per_round_perfect": [
+      7,
+      9,
+      9,
+      7,
+      9,
+      9
+    ],
+    "started_at": 1785822868.727077
+  },
+  "updated_at": 1785822920.004352,
   "results": [
     {
       "step": 301000,

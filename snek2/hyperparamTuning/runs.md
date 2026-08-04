@@ -12,13 +12,19 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## The current record: 95%, and it runs on `master` today
+## The current record: 95%, and it no longer runs on `master`
 
 `b10d-disc995seed4` @1815000 scored 95/100 (CI 88.8-97.8), measured mid-run, and is preserved in
-[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-95-trained-end-to-end-on-todays-environment-2026-08-03).
-Unlike every earlier record in this project, **this one needs no checkout** — it trained on the
-observation vector that is on `master` right now. Full batch results and the "config vs
-environment" open question: [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
+[`../hallOfFame/`](../hallOfFame/README.md). It held "runs on `master` today" for exactly one day:
+the two observations added 2026-08-03 took the vector to 30 values, so it and every other batch-10
+checkpoint now fail to restore. **`450e66e` is the last commit with the 26-value vector.**
+
+Its close-out found a better checkpoint in the same arm — 93% @1695000 over a full 100 episodes —
+and the two intervals overlap almost entirely, so treat them as one policy family measured twice
+rather than a record and a near-miss. The 95% was itself the max of ~300 noisy measurements and
+shrinks to ~87% once that is accounted for; see the winner's-curse note in
+[`hyperparamTuning.md`](hyperparamTuning.md#why-not-abandon-weak-checkpoints-early).
+Full batch results: [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
 ## Batch 10 is closed out — its arms are the control for batch 11
 
@@ -30,22 +36,20 @@ and the audit that started the day) — nothing had trained on the resulting env
 it. All four seeds beat every prior post-audit result; full design and results:
 [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
-**Close-out evals: two done, two running.** `b10a` (272 checkpoints) and `b10c` (47) are
-complete. `b10b` and `b10d` are still going, resumed 2026-08-03 at `EVAL_WORKERS=10` after the
-worker-count measurement below — no training slots are involved either way.
+**Close-out evals: three complete, `b10d` finishing.** These four rows are the control batch 11
+is measured against.
 
 | arm | checkpoints | best (100 episodes) | pooled | state |
 |---|---|---|---|---|
 | `b10a-disc995seed1` | 272 | 85.0% @2344000 | 67.2% | complete |
-| `b10b-disc995seed2` | 624 | 90.0% @1501000 so far | 71.8% | ~58%, ~2h left |
+| `b10b-disc995seed2` | 624 | 90.0% @1501000 | 71.8% | complete |
 | `b10c-disc995seed3` | 47 | 79.0% @3965000 | 63.0% | complete |
-| `b10d-disc995seed4` | 660 | 93.0% @1695000 so far | 74.1% | ~53%, ~3h left |
+| `b10d-disc995seed4` | 660 | 93.0% @1695000 | 74.9% | 645/660, still running |
 
-`b10d`'s 93% @1695000 now beats the 95% @1815000 in the hall of fame on point estimate order
-— except it doesn't, quite: the two intervals overlap almost entirely, and the 95% was itself
-the max of ~300 noisy measurements. Both are the same policy family measured twice. See the
-winner's-curse note in [`hyperparamTuning.md`](hyperparamTuning.md#why-not-abandon-weak-checkpoints-early)
-before quoting either as a record.
+`b10d`'s two figures have not moved in its last ~50 checkpoints, so treat them as settled. Note
+the *pooled* column here is over full-length rows only and is not the equal-effort arm rate the
+current protocol prints — these four arms predate that change and were measured flat at 100
+episodes each, which is why they are directly comparable to each other.
 
 ### Evals got ~10x cheaper on 2026-08-03
 
