@@ -22,6 +22,31 @@ buffer_save_interval = 10 * eval_interval
 # lost — the file is the durable record and the console was only ever a live feed.
 quiet_eval_log_interval = 10
 
+# --- epsilon schedule -------------------------------------------------------------------
+#
+# `avg_reward` thresholds that drive the bootstrap phase, and the window used for the
+# refinement phase's skill signal. See `epsilon_for` for the whole design.
+BOOTSTRAP_REWARD_THRESHOLDS = (5, 10, 20)
+# Rungs halve, so the phase hands over at initial_epsilon / 2**len(thresholds) — 0.05 for
+# the default 0.4. Named because the refinement phase starts from exactly that value.
+BOOTSTRAP_RUNGS = len(BOOTSTRAP_REWARD_THRESHOLDS)
+# Trailing perfect rate at which refinement reaches the floor. 0.80 rather than 1.0 because
+# no arm has ever sustained a trailing rate above ~0.92, so anchoring at 1.0 would mean the
+# floor is unreachable in practice.
+REFINE_PERFECT_TARGET = 0.80
+# Evals averaged for the skill signal. 30 x 10 episodes = 300, giving ~2.6pp standard error
+# at p=0.8 — enough that a single lucky 10-episode eval cannot move epsilon far. The same
+# window `run_report.build_summary` uses for `best_perfect30`, deliberately.
+REFINE_TRAILING_WINDOW = 30
+# Evals averaged for the bootstrap phase's reward signal. Much shorter than the refinement
+# window because the phase only lasts ~10k steps, but > 1 so it does not flap on noise.
+BOOTSTRAP_TRAILING_WINDOW = 5
+# epsilon is never allowed to reach exactly 0. A fully greedy collect policy makes the replay
+# buffer a closed loop on the policy's own behaviour, and it is a degenerate case with no
+# measured upside: batch 3 found 0.001 and 0.0 indistinguishable, so nothing is given up by
+# forbidding the endpoint.
+EPSILON_HARD_FLOOR = 1e-4
+
 
 def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_collect_steps):
     if snake_constants.DEBUG_LOGGING:
@@ -38,8 +63,8 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 
 def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
-          run_config, priority_signal='td_error', use_is_weights=True):
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
+          eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -105,8 +130,8 @@ def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_parallel_env, agent, train_py_env, screen,
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
-                              replay_buffer_dir, global_step, epsilon, min_epsilon, step, eval_only, initial_step,
-                              policy_name, run_config)
+                              replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon, step,
+                              eval_only, initial_step, policy_name, run_config)
 
 
 class TrainingMetrics:
@@ -164,7 +189,8 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
 
 def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
-                          global_step, epsilon, min_epsilon, step, eval_only, initial_step, policy_name, run_config):
+                          global_step, epsilon, initial_epsilon, min_epsilon, step, eval_only, initial_step,
+                          policy_name, run_config):
     debug = snake_constants.DEBUG_LOGGING
 
     if step % log_interval == 0:
@@ -190,7 +216,11 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
         if debug:
             print('eval time: ', get_time(metrics.eval_start_time))
 
-        maybe_update_epsilon(avg_reward, epsilon, min_epsilon)
+        # Skill signal for the refinement phase, computed before this eval's row is merged so
+        # the window is the last 30 evals *including* this one and no row is counted twice.
+        perfect_rate = trailing_perfect_rate(metrics.eval_rows, metrics.last_eval_perfect_percent)
+        reward_signal = trailing_reward(metrics.eval_rows, avg_reward)
+        maybe_update_epsilon(reward_signal, perfect_rate, epsilon, initial_epsilon, min_epsilon)
 
         metrics.trailing_avg_scores.append(avg_score)
         if len(metrics.trailing_avg_scores) > trailing_avg_window:
@@ -300,47 +330,115 @@ def get_time(start_time):
     return str(round(total_time, 1)) + 's'
 
 
-def maybe_update_epsilon(avg_reward, epsilon, min_epsilon=0.0):
-    # For grid length 15
-    # if train_py_env.epsilon > 0.2 and avg_return > 40:
-    #     train_py_env.epsilon = 0.2
-    # elif train_py_env.epsilon > 0.1 and avg_return > 60:
-    #     train_py_env.epsilon = 0.1
-    # elif train_py_env.epsilon > 0.05 and avg_return > 80:
-    #     train_py_env.epsilon = 0.05
-    # elif train_py_env.epsilon > 0.01 and avg_return > 100:
-    #     train_py_env.epsilon = 0.01
-    # elif avg_return > 140:
-    #     train_py_env.epsilon = 0.001
-    # For grid length 9
-    # Round-trip through float32 makes the stored value slightly larger than the
-    # literal (0.2 comes back as 0.20000000298), so comparing it directly would
-    # re-match the first branch forever and pin epsilon at 0.2. Rounding restores
-    # the exact comparisons the ladder relies on to step down one level per eval.
-    current = round(float(epsilon.numpy()), 6)
-    if current > 0.2 and avg_reward > 5:
-        target = 0.2
-    elif current > 0.1 and avg_reward > 10:
-        target = 0.1
-    elif current > 0.05 and avg_reward > 20:
-        target = 0.05
-    elif current > 0.01 and avg_reward > 40:
-        target = 0.01
-    elif current > 0.001 and avg_reward > 60:
-        target = 0.001
-    elif avg_reward > 100:
-        target = 0.0
-    else:
-        return
+def trailing_mean(eval_rows, key, current, window, scale=1.0):
+    """Mean of `key` over the last `window` evals, including this one as `current`.
 
-    # The last rung is 0.0, which makes the collect policy fully greedy and turns
-    # the replay buffer into a closed loop on the policy's own behaviour — the
-    # leading suspect for the collapses documented in hyperparamTuning/runs.md.
-    # min_epsilon keeps a trickle of exploration instead; it defaults to 0.0, which
-    # leaves the ladder exactly as it was.
-    target = max(target, min_epsilon)
-    # The rungs above descend one per eval because each is guarded on `current`.
-    # Clamping can push a target back up to where it already is, so only ever move
-    # down; otherwise a floor above a rung would make the ladder oscillate.
-    if target < current:
+    Averages over however many evals exist when there are fewer than `window`, rather than
+    dividing by `window` — a fresh run would otherwise read near zero for its first evals,
+    which would pin epsilon at the ceiling exactly when it needs to descend.
+
+    `scale` divides the stored rows only, for the one field whose stored and live units differ.
+    """
+    history = [row.get(key, 0) / scale for row in eval_rows[-(window - 1):]] if window > 1 else []
+    history.append(current)
+    return sum(history) / len(history)
+
+
+def trailing_perfect_rate(eval_rows, current_percent, window=REFINE_TRAILING_WINDOW):
+    """Skill signal for the refinement phase: mean perfect rate as a fraction.
+
+    `eval_rows` store `perfect_percent` on a 0-100 scale and `current_percent` arrives as a
+    0-1 fraction from `metrics.last_eval_perfect_percent`; the two are reconciled here rather
+    than at the call site, because getting that wrong scales epsilon by 100.
+    """
+    return trailing_mean(eval_rows, 'perfect_percent', current_percent, window, scale=100.0)
+
+
+def trailing_reward(eval_rows, current_reward, window=BOOTSTRAP_TRAILING_WINDOW):
+    """Signal for the bootstrap phase: mean `avg_reward` over a short window.
+
+    Short because the phase it drives lasts ~10k steps and has to stay responsive, but not
+    one, because the raw signal is 10 episodes and flaps. A smoke run caught this: avg_reward
+    read 7.63 then 4.96 across two consecutive evals — noise either side of the first
+    threshold — and undamped epsilon went 0.4 -> 0.2 -> 0.4. Harmless where it happened, since
+    exploration is nearly free at score ~5, but the collected distribution should not oscillate
+    for no reason. Five evals is the same window `trailing_avg_score` already uses.
+
+    Note this is a *damper*, not a ratchet: the bootstrap phase is still allowed to raise
+    epsilon when an arm genuinely regresses, which is the behaviour the old ladder lacked.
+    """
+    return trailing_mean(eval_rows, 'avg_reward', current_reward, window)
+
+
+def bootstrap_epsilon(avg_reward, initial_epsilon):
+    """Phase 1: halve epsilon as `avg_reward` clears each threshold, then stand down.
+
+    Returns 0.0 once the arm is past the last threshold, which means "this phase has nothing
+    to say" rather than "epsilon is 0" — `epsilon_for` takes the max of the two phases, so
+    standing down hands control to the refinement term instead of pinning epsilon here.
+
+    Kept on `avg_reward` deliberately. Score rises 0 -> 70 in the first ~13k steps and this
+    phase is calibrated to that stretch, where it demonstrably works: arms reach avg_score
+    55-75 by step 13k. The defect being fixed was never the early descent, it was the three
+    further rungs that dropped epsilon to 0.001 while the arm was still at 0% perfect games.
+    """
+    for index, threshold in enumerate(BOOTSTRAP_REWARD_THRESHOLDS):
+        if avg_reward <= threshold:
+            return initial_epsilon / (2.0 ** index)
+    return 0.0
+
+
+def refine_epsilon(perfect_rate, top, floor, perfect_target=REFINE_PERFECT_TARGET):
+    """Phase 2: geometric interpolation from `top` at 0% perfect to `floor` at `perfect_target`.
+
+    Geometric rather than linear because the useful range spans more than an order of
+    magnitude (0.05 to 0.002), and equal *ratios* are what matter to an exploration rate:
+    0.05 -> 0.025 changes behaviour as much as 0.004 -> 0.002. A linear ramp would sit above
+    0.02 for more than half its length, where a random move every ~40 steps wrecks the
+    endgame, and then cross the entire low range in its last few percent.
+
+    A pure function of the current skill estimate, with no memory. That is the point: the old
+    ladder was a one-way ratchet, so a single lucky eval pinned epsilon permanently and a
+    regression never bought exploration back — `b11b` sat at 0.001 while its score collapsed
+    from 64.6 to 8.8. Here a declining arm automatically explores more.
+    """
+    if top <= floor:
+        return floor
+    # Only the lower clamp is needed. A rate above `perfect_target` gives a fraction over 1,
+    # which undershoots the floor and is caught by the max() below — but a *negative* rate
+    # would give a negative exponent and push epsilon above `top`, which nothing else guards.
+    fraction = max(0.0, perfect_rate / perfect_target)
+    return max(floor, top * (floor / top) ** fraction)
+
+
+def epsilon_for(avg_reward, perfect_rate, initial_epsilon, min_epsilon):
+    """The epsilon this eval implies. Two phases, combined with max().
+
+    | phase | driven by | range |
+    |---|---|---|
+    | bootstrap | `avg_reward`, one halving per threshold | initial_epsilon -> initial/4 |
+    | refinement | trailing perfect rate | initial/8 -> min_epsilon |
+
+    `max()` rather than `min()` because the phases must not fight: the bootstrap term is
+    larger than the refinement term's ceiling while it is active and returns 0.0 once it is
+    not, so the maximum is whichever phase is live. `min()` would jump straight to the
+    refinement ceiling on the first eval, before the arm can play at all.
+
+    Stateless, which also makes a resume safe: the first eval after restarting recomputes the
+    right epsilon from the restored history rather than having to descend a ladder again.
+    """
+    top = initial_epsilon / (2.0 ** BOOTSTRAP_RUNGS)
+    return max(bootstrap_epsilon(avg_reward, initial_epsilon),
+               refine_epsilon(perfect_rate, top, min_epsilon))
+
+
+def maybe_update_epsilon(avg_reward, perfect_rate, epsilon, initial_epsilon, min_epsilon):
+    """Assigns the scheduled epsilon, if it differs from what the Variable already holds.
+
+    Round-trip through float32 makes the stored value slightly larger than the literal (0.2
+    comes back as 0.20000000298), so the comparison is on the rounded value — the original
+    ladder pinned itself at 0.2 forever without this.
+    """
+    target = epsilon_for(avg_reward, perfect_rate, initial_epsilon, min_epsilon)
+    if round(float(epsilon.numpy()), 6) != round(target, 6):
         epsilon.assign(target)

@@ -9,7 +9,46 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: 95%, on the environment of 2026-08-02 (superseded 2026-08-03)
+## The current record: 96%, and it runs on `master`
+
+Batch 11 is four seeds of batch 10's config on the **30-value observation vector** — the current one,
+after the following-tail block (26-28) and food-space (29) landed 2026-08-03. It is the only batch
+trained on it, so **these two entries are the only ones in this folder that load on `master` as it
+stands.** Both were found by the batch's close-out on 2026-08-04, not measured mid-run.
+
+| checkpoint | measured | config |
+|---|---|---|
+| `b11b-obs30seed2-ckpt855000` | **96.0%** (96/100, CI 90.2-98.4), top-3 95.3%, ~94% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=2` |
+| `b11a-obs30seed1-ckpt671000` | 94.0% (94/100, CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
+
+**Verified by loading the copies in this folder**, not just the originals: `b11b`'s copy re-measured
+19/20 perfect (95.0%, avg score 94.8) from `savedPolicies/champion_b11b/` before that scratch
+directory was removed. Worth doing every time, given the silent-failure history below.
+
+The **shrunk** figure is the winner's-curse correction — each is the maximum over 148-204 full-length
+measurements in its own arm, so some of the headline is luck. Shrinking against a Beta prior fitted
+on each arm's *unselected* graph-100% rows gives 94.0% and 90.2%. Use those when comparing to
+anything that was not selected the same way; see
+[`../hyperparamTuning/completedRuns.md`](../hyperparamTuning/completedRuns.md#a-new-best-measured-checkpoint-b11b-855000-96100).
+
+Both arms were **still healthy when stopped** at 3.19M and 3.56M steps, but both had long since
+peaked — `b11a` gave up 42 pp between 678k and its final window. The checkpoints preserved here are
+from the peak, which is the entire reason this folder exists.
+
+**The 30-value era starts at `b09c616`** ("Two new observations, a three-stage close-out, and
+`EVAL_CONFIRM_COUNT=100`"), which is the commit to check out if a future change moves the vector
+again — the same role `450e66e` plays for the 26-value era and `e4514a8` for the 20-value one. Both
+new blocks already carry their final polarity in that commit (1 = good at 26-28 and 29), so there is
+no sub-era to worry about, and no checkpoint exists from the few hours the reversed version was live
+because batch 11 launched after the flip.
+
+**These two are also the first entries whose arm can still be resumed at all**, since every earlier
+batch trained on a narrower vector. `SNEK_SEED` is recorded per arm in `runs/<policy>.md` (a
+batch-11 first), which makes a *fresh* run of the same config reproducible — it does **not** make a
+resume reproducible, because the replay buffer and RNG state are not checkpointed. A resumed arm
+diverges from the original immediately.
+
+## The previous record: 95%, on the environment of 2026-08-02 (superseded 2026-08-03)
 
 Batch 10 was a fresh baseline on the environment left by 2026-08-02's seven observation/reward
 changes (fatal-move zeroing, the wall/body-hugging observation, normalized group count, the

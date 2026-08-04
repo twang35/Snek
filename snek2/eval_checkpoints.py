@@ -1046,6 +1046,14 @@ def main(argv):
         payload = {'policy_name': policy_name,
                    'episodes_per_checkpoint': num_episodes,
                    'checkpoints_requested': len(all_steps),
+                   # EVAL_WORKERS, recorded once at startup because it is fixed for the life of
+                   # the process — the ParallelPyEnvironment is built once. The chart used to
+                   # infer it as episodes_so_far // round, which is wrong for any checkpoint
+                   # being topped up: the numerator counts the screen episodes already on file
+                   # and the denominator only counts this pass's rounds, so a 20-episode screen
+                   # growing to 100 reported 30, 20, 16, 15, 14, 13, 12, 12 workers over its
+                   # eight rounds. Read this instead.
+                   'num_workers': num_workers,
                    'complete': complete,
                    'requested_steps': all_steps,
                    # Screening protocol, or None for the flat one-pass measurement. Recorded
@@ -1185,6 +1193,10 @@ def main(argv):
                 'rounds_total': rounds_total,
                 'perfect_so_far': total_perfect,
                 'episodes_so_far': total_episodes,
+                # Just this pass, where `episodes_so_far` is the checkpoint's whole sample. The
+                # two differ by `already` whenever a screened checkpoint is being topped up, and
+                # only this one shares a denominator with `round`.
+                'episodes_this_pass': episodes_so_far,
                 'running_percent': round(100.0 * total_perfect / total_episodes, 1),
                 'per_round_perfect': per_round,
                 'started_at': started_at,

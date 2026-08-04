@@ -63,16 +63,22 @@ Graph-derived columns misrank arms badly (`b5c` is 2nd of its batch on best perf
 last on measurement), so read peak score and best perfect-30 as chart description, not as
 ranking.
 
+**† batch 11's pooled column is the graph-100% tier only.** Those arms were measured under the
+three-stage protocol, where rows have different depths and the deep ones were selected for screening
+well — pooling them reads high. The tier is measured at 100 episodes unscreened in both batches, so
+it is the figure that crosses the ‡‡/‡‡‡ line; see the longer note in
+[`completedRuns.md`](completedRuns.md).
+
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
-| `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | 94.74 (3978k) | 84.3% | **93%** @1695k | **74.9%** /66000 | ‡‡ **best measured ckpt on record**; stopped healthy |
+| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **30-value vector** | 3.56M | 94.92 (855k) | **91.7%** | **96%** @855k | 81.0% /10400 † | ‡‡‡ **best measured ckpt on record**, and highest best-30 |
+| `b11a-obs30seed1` ‡‡‡ | disc 0.995, **30-value vector** | 3.19M | 94.82 (653k) | 85.7% | 94% @671k | 79.5% /4800 † | ‡‡‡ 2nd of batch 11; **largest drawdown on record**, 42.4 pp |
+| `b11d-obs30seed4` ‡‡‡ | disc 0.995, **30-value vector** | 3.59M | 94.18 (3468k) | 78.3% | 88% @3507k | 69.3% /4000 † | ‡‡‡ only arm still near peak when stopped |
+| `b11c-obs30seed3` ‡‡‡ | disc 0.995, **30-value vector** | 3.23M | 94.26 (2452k) | 73.0% | 87% @1706k | 69.0% /2300 † | ‡‡‡ weakest of batch 11 |
+| `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | 94.74 (3978k) | 84.3% | **93%** @1695k | **74.9%** /66000 | ‡‡ best of batch 10; stopped healthy |
 | `b10b-disc995seed2` ‡‡ | disc **0.995**, third env | 4.65M | **94.96** (4545k) | 85.0% | 90% @1501k | 71.8% /62400 | ‡‡ still climbing when stopped; cannot be resumed |
 | `b10a-disc995seed1` ‡‡ | disc **0.995**, third env | 4.29M | 94.38 (3402k) | 78.3% | 85% @2344k | 67.2% /27200 | ‡‡ stopped healthy |
 | `b10c-disc995seed3` ‡‡ | disc **0.995**, third env | 4.12M | 93.84 (4021k) | 72.7% | 79% @3965k | 63.0% /4700 | ‡‡ weakest of batch 10 |
-| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **30-value vector** | 3.56M | 94.92 (855k) | **91.7%** | close-out running | — | ‡‡‡ **highest best-30 on record**, at 873k |
-| `b11a-obs30seed1` ‡‡‡ | disc 0.995, **30-value vector** | 3.19M | 94.82 (653k) | 85.7% | close-out running | — | ‡‡‡ **largest drawdown on record**, 42.4 pp |
-| `b11d-obs30seed4` ‡‡‡ | disc 0.995, **30-value vector** | 3.59M | 94.18 (3468k) | 78.3% | close-out running | — | ‡‡‡ only arm still near peak when stopped |
-| `b11c-obs30seed3` ‡‡‡ | disc 0.995, **30-value vector** | 3.23M | 94.26 (2452k) | 73.0% | close-out running | — | ‡‡‡ weakest of batch 11 |
 | `b9d-disc995b` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 3.40M | 86.7 (1232k) | 30.3% | **70%** @2544k | 42.4% /1700 | ‡ **new env** — best ceiling of batch 9 |
 | `b9a-disc9975a` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.61M | 89.8 (3277k) | 56.0% | 65% @1735k | **54.9%** /2000 | ‡ **new env** — most consistent of batch 9 |
 | `b9c-disc995a` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 3.64M | 86.4 (2599k) | 37.3% | 52% @2603k | 38.0% /2000 | ‡ **new env** — weakest survivor |
@@ -182,50 +188,80 @@ Uniform sampling (`b4a`, `b4b`) was the prior favourite and landed at about a th
 Four seeds of batch 10's config, byte for byte, on the observation vector after the following-tail
 and food-space blocks landed. **A deliberate null-result test**: the only difference from batch 10
 is those two observations, and the comparison was pre-registered before launch. It came back
-**+5.4 pp at t=0.80 — not significant** against a ~10 pp threshold. The first seeded batch
-(`SNEK_SEED=1..4`). Full write-up: [`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
+**+5.4 pp at t=0.80 — not significant** against a ~10 pp threshold, and the close-out added two
+measured comparisons that came out the same way (+4.1 pp on the graph-100% tier, +4.5 pp on best
+checkpoint; exact p = 0.14 and 0.16). The first seeded batch (`SNEK_SEED=1..4`). Full write-up:
+[`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
 
 Read these four charts for their *shape*, not their level: three of the four peaked before 1.8M and
-then declined for another 1.5-2.5M steps, which is the most useful thing batch 11 produced.
+then declined for another 1.5-2.5M steps, which is the most useful thing batch 11 produced. The
+close-out puts numbers on what that cost — in all four arms the best measured checkpoint lands
+**within 39k steps of the graph's best-30 peak**, so nothing in the declining tail contributed to any
+of the four records.
+
+**That agreement is a batch-11 property, not a general rule**, and it would be easy to over-read.
+Batch 10's gaps are -1058k, -3046k, -99k and +29k — `b10b`'s best checkpoint came at 1501k while its
+graph peaked at 4547k. The difference is chart shape: batch 11's arms have one sharp peak, so the
+graph's best window and the best individual checkpoint have nowhere else to be, whereas batch 10's
+broad plateaus let the two land 3M apart. **Do not use a graph peak to decide where to look for a
+checkpoint** — that is what the close-out is for.
 
 ### b11b-obs30seed2 — `DISCOUNT=0.995`, 30-value vector, seed 2
 
 ![b11b](charts/b11b-obs30seed2.png)
 
-Step 3.56M · peak score 94.92 (at 855k) · **best 30-eval perfect 91.7%** (at 873k) · close-out running
+Step 3.56M · peak score 94.92 (at 855k) · **best 30-eval perfect 91.7%** (at 873k) · **best ckpt 96%** @855k
 
-**The highest best-30 any arm in this project has reached**, and it got there by 873k. Also n=1 of
-eight arms across the two batches, with the batch means overlapping heavily — a high-water mark,
-not a finding. Gave up 18 pp from that peak by the time it was stopped.
+**The best arm in the project on both metrics**: the highest best-30 any arm has reached, and the
+highest single-checkpoint measurement (96/100, CI 90.2-98.4, ~94% after the winner's-curse
+correction). Both peaks are in the same place — the graph tops out at 855k and the record checkpoint
+*is* 855k, which is the tidiest agreement between graph and measurement in this file.
+
+Also n=1 of eight arms across the two batches, with the batch means overlapping heavily — a
+high-water mark, not a finding. Gave up 18 pp from that peak by the time it was stopped.
 
 ### b11a-obs30seed1 — `DISCOUNT=0.995`, 30-value vector, seed 1
 
 ![b11a](charts/b11a-obs30seed1.png)
 
-Step 3.19M · peak score 94.82 (at 653k) · **best 30-eval perfect 85.7%** (at 678k) · close-out running
+Step 3.19M · peak score 94.82 (at 653k) · **best 30-eval perfect 85.7%** (at 678k) · best ckpt 94% @671k
 
 **The clearest picture of the post-peak decline in the project so far.** 85.7% at 678k down to
 43.3% by 3.19M — a **42.4 pp** drawdown, the largest on record, with no death event: the arm never
 went to zero, it just got steadily worse for 2.5M steps.
 
+Its record checkpoint sits at 671k, inside that early peak, and measures 94% — so the decline cost
+this arm a policy it had already found rather than one it never reached. That is the case for the
+shorter, wider batch design in [`runs.md`](runs.md) stated as concretely as it gets.
+
 ### b11d-obs30seed4 — `DISCOUNT=0.995`, 30-value vector, seed 4
 
 ![b11d](charts/b11d-obs30seed4.png)
 
-Step 3.59M · peak score 94.18 (at 3468k) · **best 30-eval perfect 78.3%** (at 3468k) · close-out running
+Step 3.59M · peak score 94.18 (at 3468k) · **best 30-eval perfect 78.3%** (at 3468k) · best ckpt 88% @3507k
 
 The one arm still near its peak when stopped, and the reason not to cap the next batch at 2M
 without hedging: it peaked at 3468k, where the other three peaked before 1.8M. A short cap would
 have truncated this arm before its best work.
 
+Its record checkpoint is at 3507k — the last 100k steps of the run, and the only arm in either batch
+whose best measured checkpoint came from its final stretch. Whether it was still improving or had
+just arrived at its ceiling is unanswerable now; it is the batch's one genuinely open question.
+
 ### b11c-obs30seed3 — `DISCOUNT=0.995`, 30-value vector, seed 3
 
 ![b11c](charts/b11c-obs30seed3.png)
 
-Step 3.23M · peak score 94.26 (at 2452k) · **best 30-eval perfect 73.0%** (at 1718k) · close-out running
+Step 3.23M · peak score 94.26 (at 2452k) · **best 30-eval perfect 73.0%** (at 1718k) · best ckpt 87% @1706k
 
 Weakest of the batch, and the illustration of why n=4 cannot settle a 5 pp question: 73.0% against
-`b11b`'s 91.7% on an identical config differing only in seed.
+`b11b`'s 91.7% on an identical config differing only in seed. The measured gap is narrower — 87%
+against 96% — because a best-checkpoint figure asks what the arm managed once, and a best-30 asks
+whether it could hold it.
+
+The one arm whose close-out degenerated: only 87 checkpoints screened, against an
+`EVAL_CONFIRM_COUNT` of 100, so every screened checkpoint was confirmed anyway and the screen was
+pure overhead. See the note in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
 
 ---
 
@@ -233,9 +269,10 @@ Weakest of the batch, and the illustration of why n=4 cannot settle a 5 pp quest
 
 Four seeds of `DISCOUNT=0.995`, the first arms to train end-to-end on the environment left by
 2026-08-02's seven fixes. **Every arm was stopped healthy rather than dying or declining to a
-stop** — a first for this project — and it produced the best measured checkpoint on record.
-These four are the control batch 11 is compared against. Their checkpoints **no longer load on
-`master`**: `450e66e` is the last commit with the 26-value vector.
+stop** — a first for this project — and it held the best measured checkpoint on record (93%) until
+batch 11's close-out beat it with 96%. These four are the control batch 11 is compared against.
+Their checkpoints **no longer load on `master`**: `450e66e` is the last commit with the 26-value
+vector.
 
 ### b10d-disc995seed4 — `DISCOUNT=0.995`, third env, seed 4
 

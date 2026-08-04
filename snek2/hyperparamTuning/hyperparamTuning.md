@@ -168,6 +168,12 @@ Those figures are at the old `EVAL_CONFIRM_COUNT=30`; at 100 the b10d plan is 29
 90% tier** — only 1-2 of each arm's top 10 were graph-100%. The 90% tier is ~4x larger, so the max
 of the bigger group wins. Stage 3 is what looks for the champion.
 
+Batch 11 weakens the "all four" but not the conclusion: **2 of its 4 best checkpoints came from the
+90% tier**, including the project record (`b11b` @855000 at 96%, whose graph point read 90). Across
+the eight arms now measured that is 6 of 8, so the rule to act on stays "the 100% tier is coverage
+and the confirm stage finds the champion" — which is also the argument for keeping
+`EVAL_CONFIRM_COUNT` high.
+
 **`EVAL_CONFIRM_COUNT` is 100, raised from 30 on 2026-08-03**, because 30 was losing the champion
 outright. Simulated on b10d, the best non-100% checkpoint reaches the confirm set only 57% of the
 time at 30:
@@ -184,12 +190,50 @@ There is a floor on how far this can go — below about 2x a flat pass is simple
 checkpoint a real measurement, and `test_default_confirm_count_is_100_and_still_pays_for_itself`
 fails if a future increase crosses it.
 
+**A fixed count of 100 degenerates on a small arm, and batch 11 hit it.** The saving comes entirely
+from checkpoints that screen and are then *dropped*, so once the screened pool is smaller than
+`EVAL_CONFIRM_COUNT` every checkpoint is confirmed anyway and the 20-episode screen becomes pure
+overhead — the run pays 120 episodes per checkpoint to measure 100. Measured across batch 11's
+close-outs:
+
+| arm | at 100% | screened | confirmed | episodes | vs flat |
+|---|---|---|---|---|---|
+| `b11b` | 104 | 272 | 100 | 23,840 | 1.58x |
+| `b11a` | 48 | 181 | 100 | 16,420 | 1.39x |
+| `b11d` | 40 | 194 | 100 | 15,880 | 1.47x |
+| `b11c` | 23 | **87** | **87** | 11,000 | **1.00x** |
+
+`b11c` screened 87 checkpoints against a confirm count of 100, so all 87 were promoted and it ran
+**exactly** a flat pass — 11,000 episodes either way. That is 1.00x, not worse than flat: the screen's
+20 episodes count toward the promoted checkpoint's 100, so a fully-promoted arm wastes no episodes.
+What it does waste is *measurements* — 197 instead of 110, so 87 extra checkpoint restores and round
+set-ups for nothing. Small next to the episodes, but not free.
+
+None of the four reached the 2.2x the b10d projection implied, because batch 11's arms had smaller
+selected pools. The projection was taken from the largest arm of the previous batch and should have
+been quoted as a range.
+
+**The knob would be better expressed as a fraction of the screened pool** (`min(100, 0.4 * screened)`
+or similar), which would have put `b11c` at ~1.6x while leaving the large arms untouched. Not
+implemented. The fixed count is still right for *choosing* the champion — that is what the 97% recall
+figure above buys — it is only the saving that collapses.
+
 **Take the arm-level pooled rate from the equal-effort figure the run prints.** Do not pool the
 rows in the output file: they have different episode counts, and the deep ones are by construction
 the arm's best, so pooling them weights the winners 5x and reads high however good the policy is.
 The printed figure truncates every checkpoint to its first 20 episodes, which is a valid sample of
 each and lets the 100% tier count too. Best-checkpoint is taken over full-length rows only, since
 across hundreds of 20-episode screens some will read 19/20 on luck.
+
+**If the run did not print it, the equal-effort rate is gone — use the graph-100% tier instead.**
+The output file stores per-checkpoint totals, not per-episode results, so the first-20 prefix of a
+100-episode row cannot be reconstructed afterwards; `pooled_equal_effort` has to be computed in the
+process that ran the episodes. Batch 11's four close-outs predate that field and have no arm-level
+rate for exactly this reason. The usable fallback is to pool the **graph-100% tier only**: every
+checkpoint in it gets 100 episodes with no screening and no selection applied, in both protocols, so
+it is unbiased within itself and comparable across arms and across batches. It answers a narrower
+question — how good is a checkpoint the graph called perfect — and its episode counts are much
+smaller, but it is a real number rather than a biased one.
 
 **Ranking uses the screen rate, ties broken on the surrounding graph rate.** 20 episodes admit
 only 21 distinct values, so ties are the common case and the tie-break does real work — the
@@ -555,8 +599,8 @@ Notes that matter:
 | `SNEK_TARGET_UPDATE_TAU` | 1.0 | 1.0 = hard copy; <1 = soft/Polyak updates |
 | `SNEK_GRADIENT_CLIPPING` | 0.0 (off) | norm clip; 0 disables |
 | `SNEK_N_STEP_UPDATE` | 1 | n-step returns; buffer window is n+1 automatically |
-| `SNEK_INITIAL_EPSILON` | 0.4 | where the decay ladder starts |
-| `SNEK_MIN_EPSILON` | 0.0 | floor for the ladder. 0.0 = the historical behaviour, a fully greedy collect policy at the end |
+| `SNEK_INITIAL_EPSILON` | 0.4 | where the bootstrap phase starts; the refinement phase's ceiling is this / 8 |
+| `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 8` |
 | `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
 | `SNEK_PRIORITY_EXPONENT` | 0.6 | alpha; 0.0 disables prioritization |
@@ -570,19 +614,76 @@ Rewards (`snake_constants.py`) are deliberately **held fixed** so `avg_score` st
 comparable across every run. Changing them invalidates comparison with everything
 already recorded here.
 
-One behaviour worth understanding before reading any run: `maybe_update_epsilon()`
-in `training.py` ratchets epsilon down a fixed ladder (0.2, 0.1, 0.05, 0.01, 0.001,
-then `SNEK_MIN_EPSILON`) as `avg_reward` rises, one rung per eval, and never back
-up. The rungs are driven by reward thresholds, so **only strong runs reach the
-bottom** — the last rung needs `avg_reward > 100`. That makes "which rung did it
-reach" a proxy for how good a run got, and a confound when comparing arms.
+### The epsilon schedule — rewritten 2026-08-04, and it breaks curve comparability
 
-Historically the last rung was hard-coded to 0.0, i.e. a fully greedy collect
-policy; `SNEK_MIN_EPSILON` now floors it and defaults to 0.0, preserving that.
-Each eval row records the current epsilon in `runs/<policy>_evals.json`, which is
-how to tell after the fact which rung a run was on — worth checking, because
-reaching the last rung is the leading suspect for the collapse (see
-[`runs.md`](runs.md)).
+`training.epsilon_for()` has two phases. Neither is a ratchet: epsilon is a pure function of
+the current eval, so it can rise again.
+
+| phase | driven by | range | window |
+|---|---|---|---|
+| bootstrap | `avg_reward` past 5 / 10 / 20 | `INITIAL_EPSILON` → /4, then stands down | trailing 5 evals |
+| refinement | trailing perfect rate, 0 → 80% | `INITIAL_EPSILON`/8 → `MIN_EPSILON`, geometric | trailing 30 evals |
+
+The two are combined with `max()`, so whichever phase is live controls epsilon. Each eval row
+records the value in `runs/<policy>_evals.json`.
+
+**This changes training dynamics, so learning curves from 2026-08-04 onward are not comparable
+to batches 1-11.** Checkpoints still load — the observation vector is untouched — but
+`avg_score`, best-30 and the shape of any graph now come from a run that explored for a
+meaningfully long time, which no earlier arm did. Treat it like an environment change for the
+purpose of reading curves against each other.
+
+#### What was wrong with the ladder it replaced
+
+The old version ratcheted down fixed rungs (0.2, 0.1, 0.05, 0.01, 0.001, then 0.0) on
+`avg_reward`, one rung per eval, and never back up. Measured across batches 10 and 11 — 8 arms,
+31.1M steps:
+
+| epsilon | share of all training steps | first reached (median) |
+|---|---|---|
+| 0.4 → 0.01 | 0.37% | steps 0 → 13k |
+| 0.001 | 2.79% | 15k |
+| **exactly 0.0** | **96.83%** | 86k |
+
+**The rungs were calibrated to sub-beginner skill.** `avg_reward > 60` → 0.001 translates to
+"eats 65 of 95 food, then dies, never wins". At the moment epsilon hit 0.001 the arms were at
+`avg_score` 57-76 with **0% perfect games in 7 of 8**. The whole perfect-game learning phase,
+which is 99% of a run, happened at epsilon ≈ 0. **33 of the 42 arms on record reached exactly
+0.0**, and the median arm spent 2.38% of its life above 0.001.
+
+Three specific defects, each fixed:
+
+- **Score saturates where the ladder spends its rungs.** `avg_score` goes 0 → 70 in 13k steps
+  and 70 → 95 over the next 3M, so every rung fired inside the first 2% of the journey.
+  Perfect rate spans 0 → 96% across the whole run, which is why the refinement phase uses it.
+- **One-way ratchet on a 10-episode signal.** A single eval crossing a threshold pinned epsilon
+  permanently: `b11b` sat at 0.001 while its score collapsed 64.6 → 8.8. Both phases are now
+  pure functions of the current estimate.
+- **Exactly 0 was reachable, and was where almost all training happened.** Now rejected at
+  startup rather than clamped, so a `SNEK_MIN_EPSILON=0` override fails loudly.
+
+#### Why geometric, and why the floor is small
+
+The useful range spans more than an order of magnitude, so equal *ratios* matter rather than
+equal differences: 0.05 → 0.025 changes behaviour as much as 0.004 → 0.002. A linear ramp sits
+above 0.02 for more than half its length — a forced random move every ~40 steps — then crosses
+the entire low range in its last few percent.
+
+The floor is small because a random action is nearly free early in an episode and usually fatal
+late, and the cost scales with length: at epsilon 0.01 a 1780-step perfect game absorbs ~12
+forced non-greedy moves. 0.002 is ~2.4.
+
+**One measured fact kept the handover at 0.05 rather than lower:** `b11d` reached a 10% perfect
+rate at step 13000 while collecting at epsilon 0.05, and `b11b`/`b11c` at 0.01. `perfect_percent`
+is a *greedy eval* metric, so this does not show the collect policy finishing games — but it does
+show that learning to win is compatible with collecting at 25x the old effective floor.
+
+#### What is still unknown
+
+No arm on record has trained past ~20k steps with meaningful exploration, so the effect of this
+is untested rather than established. It is a candidate explanation for the post-peak decline —
+retroactively, `b11a` would have gone 0.0020 → 0.0087 across its 42pp drawdown — but that is a
+hypothesis about a mechanism, not a measurement.
 
 ### Naming
 

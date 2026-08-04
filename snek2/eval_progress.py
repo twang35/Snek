@@ -181,6 +181,30 @@ STAGE_LABELS = {
 }
 
 
+def flight_workers(run, flight):
+    """How many workers the in-flight checkpoint is being measured on.
+
+    Prefer the writer's own `num_workers`, which is EVAL_WORKERS read once at startup and fixed
+    for the life of the process. It is a static property of the run and was never something to
+    derive per round.
+
+    The derivation is kept only for files written before the field existed, and it has to use
+    `episodes_this_pass`: `episodes_so_far` is the checkpoint's *cumulative* sample, so on a
+    screened checkpoint being topped up from 20 to 100 it starts 20 ahead of the rounds counting
+    it, and `episodes_so_far // round` walks 30, 20, 16, 15, 14, 13, 12, 12 across the pass
+    instead of sitting at 10. Files older still than `episodes_this_pass` fall through to the
+    original arithmetic, which is exact for a fresh checkpoint and wrong the same way for a
+    topped-up one — there is nothing in those files to do better with.
+    """
+    reported = run.get('num_workers')
+    if reported:
+        return max(1, int(reported))
+    episodes = flight.get('episodes_this_pass')
+    if episodes is None:
+        episodes = flight.get('episodes_so_far', 0)
+    return max(1, episodes // max(1, flight.get('round') or 1))
+
+
 def stage_summary(runs):
     """Per-stage planned/done totals across every process on this policy, or None for a flat run.
 
@@ -285,7 +309,11 @@ def summarize(runs, stale_after=180):
     # alone moves seconds-per-episode by 3x — averaging the two put b10b's ETA at 7h10m against
     # a real ~2h. Falls back through session totals, then all rows, then per-checkpoint counting,
     # so files from any earlier version still produce an estimate.
-    workers = max(1, len(active))
+    # Live *processes*, not workers: seconds-per-episode is already measured across a process's
+    # whole worker pool, so the parallelism still to divide out is the number of processes. Named
+    # explicitly because calling this `workers` is what let a genuine worker-count bug hide in
+    # this file (see flight_workers).
+    processes = max(1, len(active))
     session_seconds = sum(r.get('session_seconds') or 0 for r in runs)
     session_episodes = sum(r.get('session_episodes') or 0 for r in runs)
     session_measurements = sum(r.get('session_measurements') or 0 for r in runs)
@@ -302,10 +330,10 @@ def summarize(runs, stale_after=180):
     planned_episodes = sum(r.get('episodes_planned') or 0 for r in runs)
     if planned_episodes and seconds_per_episode:
         remaining_episodes = max(0, planned_episodes - total_episodes)
-        eta_seconds = remaining_episodes * seconds_per_episode / workers
+        eta_seconds = remaining_episodes * seconds_per_episode / processes
     else:
         remaining = max(0, requested - len(completed))
-        eta_seconds = (remaining * mean_seconds / workers) if mean_seconds else None
+        eta_seconds = (remaining * mean_seconds / processes) if mean_seconds else None
 
     # Progress in measurements, which counts a confirmation pass separately from the screen that
     # earned it. Without it a screening run reads 100% done the moment stage 1 ends.
@@ -428,7 +456,7 @@ def render(policy_name, state, out_path):
             per_round = flight.get('per_round_perfect') or []
             if not per_round:
                 continue
-            workers = max(1, flight['episodes_so_far'] // max(1, flight['round']))
+            workers = flight_workers(run, flight)
             running, seen, won = [], 0, 0
             for count in per_round:
                 won += count
@@ -455,12 +483,11 @@ def render(policy_name, state, out_path):
         # workers count toward round r once it has reported r rounds, so the line starts at
         # however many are working and steps down as quicker processes finish their checkpoint.
         depths_and_workers = []
-        for _, flight in state['active']:
+        for run, flight in state['active']:
             per_round = flight.get('per_round_perfect') or []
             if not per_round:
                 continue
-            workers = max(1, flight['episodes_so_far'] // max(1, flight['round']))
-            depths_and_workers.append((len(per_round), workers))
+            depths_and_workers.append((len(per_round), flight_workers(run, flight)))
         if depths_and_workers:
             deepest = max(depth for depth, _ in depths_and_workers)
             per_round_workers = [sum(workers for depth, workers in depths_and_workers if depth >= r)

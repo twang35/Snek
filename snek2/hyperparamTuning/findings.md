@@ -19,7 +19,8 @@ it as evidence from that date, not as current state.
 | **Observations and rewards changed 2026-08-01 — nothing before that line is comparable** | **breaking**, 6 env bugs fixed |
 | The audit cost old policies ~10 points, and cross-arm ordering survived it | **measured**, 72 ckpts matched |
 | **Observations changed twice on 2026-08-02** — two more boundaries after the audit's | **breaking**, and the second changes the vector width |
-| **Earlier checkpoints do not run on `master`** — the vector is 26 values against their 20; use `e4514a8` | **breaking** |
+| **Only batch 11's checkpoints run on `master`** — the vector is **30** values; use `450e66e` for 26, `e4514a8` for 20 | **breaking** |
+| **Observations changed a fourth time 2026-08-03**: following-tail (26-28) and food-space (29) | **breaking**, vector 26 → 30 |
 | A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **measured**, and a standing hazard |
 | **Safe-to-chase-food added**: 1 when head, food and tail share one region after the move | **new** 2026-08-02, untested in training |
 | **Fatal moves now read zero on all three group values**, not a hypothetical survivor's answer | **fixed** 2026-08-02, was 1 on 5,289/14,642 body collisions |
@@ -32,8 +33,11 @@ it as evidence from that date, not as current state.
 | **Terminal steps never carry `discount = 0`**, so death trains toward `−5 + 0.9975·V(terminal)` | mechanism confirmed, effect unmeasured |
 | Nothing in the observation vector distinguishes snake lengths 50 to 99 | **measured**, it is a single value |
 | On the new env, `0.995` has the better expected value and `0.9975` the steadier single arm | **open**, n=2 each |
-| Nothing trained *after* the audit yet beats a pre-audit checkpoint re-measured on the new env | **open**, 1 batch |
-| **The record is 92% perfect games** (`b8f-disc9975seed2` @2816k, `DISCOUNT=0.9975`) | **measured**, 92/100 episodes, **old env** |
+| Post-audit training now clearly beats any pre-audit checkpoint re-measured on the new env | **resolved**, batches 10-11 |
+| **The record is 96% perfect games** (`b11b-obs30seed2` @855k, `DISCOUNT=0.995`, 30-value vector) | **measured**, 96/100, ~94% shrunk |
+| The previous records — 92% (`b8f` @2816k, old env) and 93% (`b10d` @1695k, 26-value) — are superseded | **measured**, all three eras |
+| **The two 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant** | **open**, n=4 per batch, p 0.14-0.24 |
+| **n=4 cannot resolve an effect below ~10 pp**, which is larger than most knobs plausibly are | **established**, batch 11 demonstrated it three ways |
 | **An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M** | **established**, 2 arms followed to the end |
 | **The horizon was the binding constraint** — records live past 2.5M, old arms stopped at ~1.06M | **established** |
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
@@ -61,7 +65,9 @@ it as evidence from that date, not as current state.
 | Reverting *either* factor alone survives the crisis | **established**, n=1 each |
 | The committed config reaches ~1% at 1M steps | **established** |
 | Degradation after 236-312k is systemic across configs | **established**, 5 arms |
-| Epsilon reaching 0.0 causes the collapse | **falsified** |
+| Epsilon reaching 0.0 causes the collapse | **falsified**, but only at a floor of 0.001 vs 0.0 |
+| **96.8% of batches 10-11's training steps ran at epsilon exactly 0.0**, the ladder bottoming out at step ~15k | **measured**, 8 arms, 31.1M steps |
+| The epsilon schedule was rewritten 2026-08-04: two phases, no ratchet, 0 rejected | **new**, untested in training |
 | A larger replay buffer prevents the collapse | **not settled** |
 | n-step returns help | **open** — the n=2 and n=3 arms ran with returns that leaked across episode ends |
 
@@ -1151,9 +1157,37 @@ Two things worth carrying forward:
   run anyway, closed the question, and incidentally produced batch 3's best arm and the
   natural experiment that settled it.
 
-`MIN_EPSILON` stays in the code — it defaults to 0.0 and changes nothing unless set, and
-knowing epsilon 0.0 is *safe* is a useful result. Do not add a knob for the last-rung
-threshold.
+`MIN_EPSILON` stays in the code, and knowing epsilon 0.0 is *safe* relative to 0.001 is a
+useful result.
+
+### Scope of that falsification, added 2026-08-04: it was never about the descent rate
+
+**This result stands, and it is narrower than its own heading.** What batch 3 compared was a
+floor of **0.001 against 0.0** — and 0.001 is ~1.2 forced non-greedy moves in a 1780-step game,
+so both arms were playing essentially greedily. The test established that those two are
+indistinguishable. It did not test exploration, because neither condition had any.
+
+What went unexamined for four months is how fast the ladder got there. Measured across batches
+10 and 11: **96.8% of all 31.1M training steps ran at epsilon exactly 0.0**, 99.6% at ≤0.001,
+and the ladder bottomed out at median step 15000 of runs 3.2-4.7M long — while 7 of 8 arms were
+still at 0% perfect games. So the correct reading of batch 3 is:
+
+| tested | not tested |
+|---|---|
+| floor 0.001 vs 0.0, both effectively greedy | any floor large enough to change behaviour |
+| whether the *last rung's value* matters | whether reaching the last rung at step 15k matters |
+
+The schedule was rewritten 2026-08-04 for that reason — two phases, no ratchet, floor 0.002,
+and exactly 0 rejected. See
+[`hyperparamTuning.md`](hyperparamTuning.md#the-epsilon-schedule--rewritten-2026-08-04-and-it-breaks-curve-comparability).
+**That rewrite is not evidence against anything on this page.** It is a change to an
+untested part of the design, and it is itself unmeasured: no arm has trained past ~20k steps
+with meaningful exploration, in either direction.
+
+The lesson worth keeping is about how the original hypothesis was framed. "Epsilon 0.0 causes
+the collapse" named a *value*, so the experiment tested a value and closed the question at that
+value — while the schedule that produced the value went unexamined. A hypothesis about a knob
+should say which property of the knob is doing the work.
 
 ### Related: when each arm's epsilon treatment actually started
 
@@ -1274,7 +1308,30 @@ an unproven survival record, on one seed each way.
 seeds would only re-confirm it, while 0.9975 could be either the new optimum or a coin flip and
 two seeds decide which. Run them past 2.5M steps — that is where both records were found.
 
-## The record is **92% perfect games**, and the horizon was the binding constraint
+## The record across four environments: 51% → 92% → 93% → **96%**
+
+Each environment change resets the comparison set, so the record is really four records. The
+progression is still worth reading as one line, because every step came from a different cause:
+
+| record | arm / checkpoint | environment | what moved it |
+|---|---|---|---|
+| 51% | `b7f-disc995seed3` @860k | pre-audit | `DISCOUNT=0.995` |
+| 92% | `b8f-disc9975seed2` @2816k | pre-audit | **the horizon** — 2.8M steps instead of 1.06M |
+| 93% | `b10d-disc995seed4` @1695k | 26-value (2026-08-02's seven fixes) | the environment fixes, not a config change |
+| **96%** | `b11b-obs30seed2` @855k | **30-value (current)** | unattributable — see the caveat below |
+
+**The 96% cannot be credited to the two new observations.** Batch 11 differs from batch 10 only by
+those observations, and its close-out came out +4 to +5 pp on three metrics with p between 0.14 and
+0.24 — consistent with a real effect and equally consistent with seed luck. A single record
+checkpoint is the weakest possible evidence for a config change, being the max of 204 noisy
+measurements in one arm; corrected for the winner's curse it is ~94%, against `b10d`'s ~87%.
+Write-up: [`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
+
+**Two of the four steps came from something other than hyperparameters** — the horizon, and the
+environment audit. That is the most useful pattern in this table, and it is why the standing backlog
+in [`runs.md`](runs.md) is ordered below the design fix rather than above it.
+
+### The 92% of the batch-8 era, and why the horizon was the binding constraint
 
 Final close-out measurement 2026-08-01, with the same arms' earlier measurements below for the
 trajectory — which is the whole story of this section:

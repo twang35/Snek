@@ -12,19 +12,26 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## The current record: 95%, and it no longer runs on `master`
+## The current record: 96%, and it runs on `master`
 
-`b10d-disc995seed4` @1815000 scored 95/100 (CI 88.8-97.8), measured mid-run, and is preserved in
-[`../hallOfFame/`](../hallOfFame/README.md). It held "runs on `master` today" for exactly one day:
-the two observations added 2026-08-03 took the vector to 30 values, so it and every other batch-10
-checkpoint now fail to restore. **`450e66e` is the last commit with the 26-value vector.**
+`b11b-obs30seed2` @855000 scored **96/100** (CI 90.2-98.4), found by batch 11's close-out on
+2026-08-04, and preserved in [`../hallOfFame/`](../hallOfFame/README.md). It is the first record in
+a while that loads on `master` as it stands, because batch 11 is the only batch trained on the
+current 30-value vector.
 
-Its close-out found a better checkpoint in the same arm — 93% @1695000 over a full 100 episodes —
-and the two intervals overlap almost entirely, so treat them as one policy family measured twice
-rather than a record and a near-miss. The 95% was itself the max of ~300 noisy measurements and
-shrinks to ~87% once that is accounted for; see the winner's-curse note in
-[`hyperparamTuning.md`](hyperparamTuning.md#why-not-abandon-weak-checkpoints-early).
-Full batch results: [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
+**Corrected for the winner's curse it is ~94%.** It is the maximum of 204 full-length measurements
+in its own arm. Shrinking it against a Beta prior fitted on `b11b`'s 104 *unselected* graph-100%
+rows gives 94.0% — a much smaller haircut than the previous record's, because this measurement is
+100 episodes rather than 30. Details and the reason the unselected tier is the only clean prior:
+[`completedRuns.md`](completedRuns.md#a-new-best-measured-checkpoint-b11b-855000-96100).
+
+**The previous record, `b10d-disc995seed4` @1815000 at 95/100, no longer runs.** The two
+observations added 2026-08-03 took the vector to 30 values, so it and every other batch-10
+checkpoint fail to restore; **`450e66e` is the last commit with the 26-value vector.** That 95% was
+measured mid-run over 30 episodes and shrinks to ~87%, and its own arm's close-out found 93%
+@1695000 over a full 100 — treat those two as one policy family measured twice rather than a record
+and a near-miss. Full batch results:
+[`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
 ## Batch 10 is closed out — its arms are the control for batch 11
 
@@ -36,20 +43,22 @@ and the audit that started the day) — nothing had trained on the resulting env
 it. All four seeds beat every prior post-audit result; full design and results:
 [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
-**Close-out evals: three complete, `b10d` finishing.** These four rows are the control batch 11
-is measured against.
+**Close-out evals: all four complete.** These four rows are the control batch 11 is measured
+against.
 
-| arm | checkpoints | best (100 episodes) | pooled | state |
+| arm | checkpoints | best (100 episodes) | pooled | graph-100% tier |
 |---|---|---|---|---|
-| `b10a-disc995seed1` | 272 | 85.0% @2344000 | 67.2% | complete |
-| `b10b-disc995seed2` | 624 | 90.0% @1501000 | 71.8% | complete |
-| `b10c-disc995seed3` | 47 | 79.0% @3965000 | 63.0% | complete |
-| `b10d-disc995seed4` | 660 | 93.0% @1695000 | 74.9% | 645/660, still running |
+| `b10d-disc995seed4` | 660 | 93.0% @1695000 | 74.9% | 75.7% (n=146) |
+| `b10b-disc995seed2` | 624 | 90.0% @1501000 | 71.8% | 72.9% (n=142) |
+| `b10a-disc995seed1` | 272 | 85.0% @2344000 | 67.2% | 68.7% (n=47) |
+| `b10c-disc995seed3` | 47 | 79.0% @3965000 | 63.0% | 65.1% (n=7) |
 
-`b10d`'s two figures have not moved in its last ~50 checkpoints, so treat them as settled. Note
-the *pooled* column here is over full-length rows only and is not the equal-effort arm rate the
-current protocol prints — these four arms predate that change and were measured flat at 100
-episodes each, which is why they are directly comparable to each other.
+The *pooled* column is over full-length rows only. It is a valid equal-effort arm rate here — these
+four predate the screening protocol and were measured flat at 100 episodes each — which is why they
+compare directly to each other. It is **not** comparable to a batch-11 pooled figure, where rows
+have different depths; the **graph-100% tier** column is the one that crosses the two batches, since
+that tier is measured at 100 episodes unscreened in both. See the † note in
+[`completedRuns.md`](completedRuns.md).
 
 ### Evals got ~10x cheaper on 2026-08-03
 
@@ -83,7 +92,7 @@ The early-abandonment idea — cut a checkpoint once its running rate looks weak
 against all 937 batch-10 measurements and **rejected**: safe thresholds save only 14%, because
 the selected population is a tight blob between 60% and 80% rather than a few good runs among
 junk. Screening wins by economising on the many mediocre checkpoints instead of the few bad
-ones. Full numbers in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes).
+ones. Full numbers in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
 
 A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
 count mid-run cost only the checkpoint in flight rather than the 333 already measured.
@@ -162,31 +171,39 @@ vector. The "config vs environment" question `completedRuns.md` raises for batch
 permanently unanswerable in its original form — nothing isolates whether the 2026-08-02 fixes or
 that seed cluster produced the 95%, and the environment has moved on again.
 
-**The two close-out evals still running cannot be resumed if they die.** They work only because
-their processes loaded the 26-value code at startup; `EVAL_RESUME=1` would now build a 30-value
-network and fail to restore. Whatever they have written is what there will be.
+Batch 10's close-outs finished before this mattered, but the hazard is worth keeping in mind: an
+eval process works only because it loaded the matching observation code at startup, so `EVAL_RESUME=1`
+against a batch-10 arm would now build a 30-value network and fail to restore. **Batch 10's measured
+numbers are final and cannot be extended.**
 
-## Nothing is training — batch 11 stopped 2026-08-04 09:09, close-out evals running
+## Nothing is training, and nothing is evaluating
 
-**Batch 11 gave a null result, as its own pre-registration predicted.** Four seeds of batch 10's
-config on the 30-value vector; best-30 at the common 3.185M horizon was **81.7% vs 76.2%**, a
-**+5.4 pp difference at t=0.80** against a pre-registered threshold of ~10 pp. The two new
-observations are kept under the stated decision rule (keep unless clearly worse). Full write-up,
-including two unpredicted differences that are *not* findings:
+**Batch 11 stopped 2026-08-04 09:09; its close-outs finished the same day.** Four seeds of batch
+10's config on the 30-value vector, and a null result exactly as its own pre-registration predicted.
+Full write-up, including two unpredicted differences that are *not* findings:
 [`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
 
-| arm | final step | best-30 perfect | best-30 @3.185M | drawdown to final |
+| arm | final step | best-30 perfect | best-30 @3.185M | best ckpt (100 ep) | graph-100% tier | drawdown |
+|---|---|---|---|---|---|---|
+| `b11b-obs30seed2` | 3.56M | **91.7%** @873k | **91.7%** | **96%** @855k | **81.0%** (n=104) | 18.0 pp |
+| `b11a-obs30seed1` | 3.19M | 85.7% @678k | 85.7% | 94% @671k | 79.5% (n=48) | **42.4 pp** |
+| `b11d-obs30seed4` | 3.59M | 78.3% @3468k | 76.3% | 88% @3507k | 69.3% (n=40) | 5.6 pp |
+| `b11c-obs30seed3` | 3.23M | 73.0% @1718k | 73.0% | 87% @1706k | 69.0% (n=23) | 18.0 pp |
+
+**All three comparisons against batch 10 came out the same way — +4 to +5 pp, none significant:**
+
+| metric | batch 10 | batch 11 | difference | exact p |
 |---|---|---|---|---|
-| `b11b-obs30seed2` | 3.56M | **91.7%** @873k | **91.7%** | 18.0 pp |
-| `b11a-obs30seed1` | 3.19M | 85.7% @678k | 85.7% | **42.4 pp** |
-| `b11d-obs30seed4` | 3.59M | 78.3% @3468k | 76.3% | 5.6 pp |
-| `b11c-obs30seed3` | 3.23M | 73.0% @1718k | 73.0% | 18.0 pp |
+| best-30 @3.185M (pre-registered) | 76.2% | 81.7% | +5.4 pp | 0.243 |
+| graph-100% tier rate | 70.6% | 74.7% | +4.1 pp | 0.143 |
+| best checkpoint | 86.8% | 91.2% | +4.5 pp | 0.157 |
 
-`b11b`'s 91.7% is the highest best-30 any arm in this project has reached. It is also n=1 of eight
-and the batch means overlap heavily — not a finding.
+The two new observations are kept under the stated decision rule (keep unless clearly worse). The
+agreement across metrics makes a real positive effect more likely than zero, but n=4 cannot separate
++5 pp from +1 pp — which is the whole argument for the next batch being wider.
 
-Close-out evals are running on all four arms under the three-stage protocol. Batch 10's four arms
-are fully measured and are the control.
+`b11b` holds both records now: the highest best-30 (91.7%) and the best measured checkpoint (96%).
+Both are n=1 of eight arms with heavily overlapping batch means — high-water marks, not findings.
 
 ### The next batch should be shorter and wider, not another knob
 
@@ -207,14 +224,16 @@ reasonable compromise is n=8 at 2.5M with two arms allowed to run on.
 
 ### Later candidates
 
-Deferred pending the above. Still relevant to whatever comes after it:
+Deferred pending the above. The gate on all four is the same and it is not a code change any more —
+it is that **n=4 cannot see an effect this size**, which batch 11 has now demonstrated three
+different ways. Running any of these at n=4 would produce another unreadable batch.
 
 | change | why | gate |
 |---|---|---|
-| second discount value (`0.9975`, or an interior point like `0.996`) | batch 9 left 0.995 vs 0.9975 unsettled; whether that survives the third environment is unknown | after the user's pending changes |
-| `SNEK_LEARNING_RATE=1e-4` | the highest-value untested knob | after the user's pending changes |
-| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.995 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | after the user's pending changes |
-| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | after the user's pending changes |
+| second discount value (`0.9975`, or an interior point like `0.996`) | batch 9 left 0.995 vs 0.9975 unsettled; whether that survives the fourth environment is unknown | needs the wider design |
+| `SNEK_LEARNING_RATE=1e-4` | the highest-value untested knob | needs the wider design |
+| eff exponent ~1.4 (`td_loss` alpha 0.7) at 0.995 | `b4c` and `b7f` tie on ceiling; sharpness may still add on top of the discount | needs the wider design |
+| best config + `REPLAY_BUFFER_MAX_LENGTH=500000` | `b4b` beat `b4a` slightly, so diversity may stack | needs the wider design |
 | partial IS correction (beta < 1) | full correction cost `b5c` almost everything (2.1%); partial may keep stability without the cost | needs a new knob |
 | anything aimed at the post-peak decline | both batch-8 arms peaked at ~2.5-3M and fell away; nothing tried so far addresses *why* | needs a mechanism first |
 
@@ -235,7 +254,7 @@ table.
 | `TARGET_UPDATE_PERIOD=50` / `500` | early learning speed | medium — 2 points to test a hinted trend |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
 | `FC_LAYERS=128,128` | capacity | low |
-| epsilon ladder *shape* (not floor) | exploration schedule | low |
+| ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |
 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | experience diversity | low — the 500k result was ambiguous |
 
 **`LEARNING_RATE=1e-4` — only after a stability fix.** 1e-5 is very conservative and
@@ -248,11 +267,21 @@ faster early even though they didn't reduce drawdown. Two more points establish
 whether that is a trend or noise. Note `b1b-tgt200` was stopped at 104k, well short of
 the ~250k horizon, so that hint is weak evidence.
 
-**Epsilon ladder shape.** The floor was tested and the hypothesis falsified. What
-remains untested is the *shape*: the ladder is driven by reward thresholds and steps
-down once per eval, so it is coupled to `eval_interval` — a latent confound if that
-interval is ever changed, and a reason a slower or step-count-based decay is worth
-trying.
+**Epsilon ladder shape — rewritten 2026-08-04, and it is now the highest-value untested
+change on this page.** The old ladder ran **96.8% of batches 10-11's training steps at epsilon
+exactly 0.0**, bottoming out at median step 15000 while 7 of 8 arms were still at 0% perfect
+games, because its rungs were calibrated to `avg_reward` values a non-winning policy clears.
+Replaced with two phases — `avg_reward` bootstrap to `INITIAL_EPSILON`/8, then a geometric
+descent driven by the trailing-30 perfect rate — neither a ratchet, floor 0.002, and exactly 0
+rejected at startup. Design and the measured diagnosis:
+[`hyperparamTuning.md`](hyperparamTuning.md#the-epsilon-schedule--rewritten-2026-08-04-and-it-breaks-curve-comparability).
+
+Two consequences for planning. **Learning curves are no longer comparable to batches 1-11** —
+checkpoints still load, but every earlier arm trained greedily from step ~15k, so graph shapes
+are not like-for-like. And because the refinement phase is a pure function of current skill, a
+declining arm now automatically explores more (`b11a` would have gone 0.0020 → 0.0087 across its
+42pp drawdown), which makes this the first change in the backlog aimed at the post-peak decline
+rather than at the ceiling.
 
 ## Explicitly not planned
 
@@ -262,16 +291,22 @@ trying.
   learning cost, so cheaper experiments come from keeping it.
 - **An LR schedule** — no evidence of optimization instability; degradation is gradual
   in every arm, not spiky.
-- **Making the epsilon last-rung threshold tunable** — the ladder is no longer a
-  suspect, see [`findings.md`](findings.md).
+- **Adding more epsilon knobs** — the schedule was rewritten 2026-08-04 and already exposes
+  `INITIAL_EPSILON` and `MIN_EPSILON`; the thresholds, windows and the 80% target are constants
+  in `training.py` on purpose. Measure the new schedule before making any of them tunable, or
+  the next batch will vary four things at once.
+- **Setting `SNEK_MIN_EPSILON=0`** — rejected at startup. See
+  [`findings.md`](findings.md#scope-of-that-falsification-added-2026-08-04-it-was-never-about-the-descent-rate)
+  for why the batch-3 result does not license it.
 - **`N_STEP_UPDATE=5`** — n=2 and n=3 both peak below baseline and then decline, so
   the trend already points the wrong way.
-- **Resuming any arm from batch 9 or earlier** — every checkpoint on record from before
-  batch 10 was trained on an observation vector this project has since changed (20 or 23
-  values against the 26 batch 10 trained on), so none of them load; see
+- **Resuming any arm from batch 10 or earlier** — every checkpoint on record from before
+  batch 11 was trained on an observation vector this project has since changed (20, 23 or 26
+  values against the 30 batch 11 trained on), so none of them load; see
   [`../hallOfFame/README.md`](../hallOfFame/README.md#the-entries-below-predate-2026-08-02-and-do-not-run-on-master).
-  Batch 10's own checkpoints *do* still load on `master` as of this close-out — see the
-  note above about the user's pending changes for whether that keeps being true.
+  **Batch 11 is now the only resumable batch.** Its four arms were stopped healthy at 3.19-3.59M,
+  and `b11d` was still near its peak, so resuming *that* arm is the one case worth considering —
+  it is also the open question the 2M cap below would truncate.
 
 ### Batch bookkeeping
 

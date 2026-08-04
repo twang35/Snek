@@ -129,6 +129,50 @@ def test_summarize_divides_remaining_work_across_live_processes():
     assert two['eta_seconds'] < one['eta_seconds']
 
 
+# ------------------------------------------------------------ flight_workers
+
+def flight(round_index=3, episodes_so_far=50, **extra):
+    payload = {'step': 7, 'round': round_index, 'rounds_total': 8, 'perfect_so_far': 30,
+               'episodes_so_far': episodes_so_far, 'running_percent': 60.0,
+               'per_round_perfect': [7] * round_index, 'started_at': 1e12}
+    payload.update(extra)
+    return payload
+
+
+def test_flight_workers_reads_the_static_count_from_the_run():
+    # The live b11a case: round 3 of a top-up, 20 screen episodes already on file plus 30 from
+    # this pass. Inferring gives 50 // 3 = 16 and changes every round; the run says 10.
+    assert eval_progress.flight_workers(run([], num_workers=10), flight()) == 10
+
+
+def test_flight_workers_is_constant_across_a_topped_up_checkpoints_rounds():
+    # The actual symptom. Without the recorded count this walks 30, 20, 16, 15, 14, 13, 12, 12.
+    counts = {eval_progress.flight_workers(
+        run([], num_workers=10), flight(round_index=r, episodes_so_far=20 + 10 * r))
+        for r in range(1, 9)}
+    assert counts == {10}
+
+
+def test_flight_workers_prefers_the_pass_local_count_when_deriving():
+    # No num_workers, but episodes_this_pass shares a denominator with `round`, so 30 // 3 = 10
+    # even though the checkpoint's cumulative sample is 50.
+    assert eval_progress.flight_workers(
+        run([]), flight(episodes_this_pass=30)) == 10
+
+
+def test_flight_workers_still_derives_something_for_the_oldest_files():
+    # Neither field present. Exact for a fresh checkpoint, which is all those files ever had.
+    assert eval_progress.flight_workers(run([]), flight(round_index=3,
+                                                        episodes_so_far=30)) == 10
+
+
+def test_flight_workers_never_returns_zero():
+    # Round 1 of a fresh checkpoint writes progress before any episode lands in some orderings;
+    # a zero here would divide by zero in the running-rate line.
+    assert eval_progress.flight_workers(run([]), flight(round_index=1,
+                                                        episodes_so_far=0)) == 1
+
+
 # ------------------------------------------------------------- stage reporting
 
 def staged(full=(48, 48), screen=(181, 0), confirm=(100, 0), **extra):

@@ -80,11 +80,27 @@ def main(argv):
     target_update_tau = tuned('TARGET_UPDATE_TAU', 1.0)
     gradient_clipping = tuned('GRADIENT_CLIPPING', 0.0)
     initial_epsilon = tuned('INITIAL_EPSILON', 0.4)
-    # Floor for the decay ladder in maybe_update_epsilon(). The ladder's last rung
-    # is 0.0, i.e. a fully greedy collect policy, which makes the replay buffer a
-    # closed loop on the policy's own behaviour. Raise this to keep a trickle of
-    # exploration forever. See hyperparamTuning/runs.md.
-    min_epsilon = tuned('MIN_EPSILON', 0.0)
+    # Floor for the two-phase schedule in training.epsilon_for(). 0.002 is ~2.4 forced
+    # non-greedy moves in a 1780-step perfect game, which is meaningful exploration without
+    # wrecking the endgame the collect policy has to play through.
+    #
+    # **Exactly 0 is no longer accepted.** It made the collect policy fully greedy and the
+    # replay buffer a closed loop on the policy's own behaviour, and it was where 96.8% of
+    # batches 10-11's training steps actually ran. Rejected rather than silently clamped,
+    # because a hyperparameter override that quietly does something else is worse than one
+    # that refuses: this project reads `hyperparameter override:` at startup to confirm an
+    # arm got its config. See hyperparamTuning/hyperparamTuning.md.
+    min_epsilon = tuned('MIN_EPSILON', 0.002)
+    if min_epsilon < EPSILON_HARD_FLOOR:
+        raise SystemExit(
+            'SNEK_MIN_EPSILON={0} is below the hard floor of {1}. Epsilon reaching 0 is no '
+            'longer supported — it makes the collect policy fully greedy. Use {1} or higher.'
+            .format(min_epsilon, EPSILON_HARD_FLOOR))
+    if min_epsilon >= initial_epsilon / (2.0 ** BOOTSTRAP_RUNGS):
+        raise SystemExit(
+            'SNEK_MIN_EPSILON={0} is at or above where the refinement phase starts ({1}), so '
+            'epsilon would never decay. Lower the floor or raise SNEK_INITIAL_EPSILON.'
+            .format(min_epsilon, initial_epsilon / (2.0 ** BOOTSTRAP_RUNGS)))
 
     # Training never draws — use watch.py to see a policy play. Game.__init__ still calls
     # pygame.display.set_mode() regardless of its display flag, and reset() blits the
@@ -320,6 +336,10 @@ def main(argv):
         'n_step_update': n_step_update,
         'initial_epsilon': initial_epsilon,
         'min_epsilon': min_epsilon,
+        'epsilon_schedule': 'bootstrap on avg_reward {0} then geometric to floor by {1:.0%} '
+                            'trailing-{2} perfect'.format(
+                                list(BOOTSTRAP_REWARD_THRESHOLDS), REFINE_PERFECT_TARGET,
+                                REFINE_TRAILING_WINDOW),
         'fc_layer_params': fc_layer_params,
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
         'priority_exponent (alpha)': priority_exponent,
@@ -337,8 +357,8 @@ def main(argv):
     }
 
     train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
-          train_checkpointer, replay_buffer_dir, global_step, epsilon, min_epsilon, eval_only, policy_name,
-          run_config, priority_signal, use_is_weights)
+          train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
+          eval_only, policy_name, run_config, priority_signal, use_is_weights)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))
