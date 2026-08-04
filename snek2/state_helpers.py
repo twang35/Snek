@@ -129,6 +129,14 @@ def get_observations(old_grid,
     # a learning problem. Unvalidated.
     observations.extend(food_space_obs(old_grid, current_food))
 
+    # Ablation, applied last so the indices it names are the ones in the layout above rather than
+    # whatever position a block happened to occupy while being built. Empty unless SNEK_ZERO_OBS is
+    # set, and then it costs one pass over a 30-element list - see ZERO_OBS_INDICES for why an
+    # ablation zeroes rather than deletes.
+    for index in ZERO_OBS_INDICES:
+        if 0 <= index < len(observations):
+            observations[index] = 0.0
+
     # There used to be a final "is the episode over" value here, and it is gone. It was 1 only in
     # a terminal observation, which no policy ever acts on, so it was a constant 0 for every state
     # the network is asked about — but it could not simply be deleted, because the environment was

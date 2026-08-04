@@ -7,6 +7,7 @@ import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import random
 import time
 
 import tensorflow as tf
@@ -15,6 +16,47 @@ from tf_agents.networks import sequential
 
 # Define a helper function to create Dense layers configured with the right
 # activation and kernel initializer.
+def derive_seed(seed, stream):
+    """A distinct seed per (base seed, stream), or None when seeding is off.
+
+    **Every RNG consumer needs its own stream, and getting this wrong is silent and severe.**
+    Food placement in Snake.Food uses the *global* `random` module, and
+    `ParallelPyEnvironment` builds its workers from one constructor called once per worker
+    process. Seed them all identically and all ten workers deal the same food in the same order:
+    a 10-episode eval becomes one episode measured ten times, every confidence interval it
+    produces is a fiction, and nothing anywhere raises. So the worker index goes in here.
+
+    The multiplier is a large prime so adjacent base seeds do not produce overlapping streams —
+    seed 1 stream 2 must not collide with seed 2 stream 1. Masked into positive int32 because
+    `numpy.random.seed` rejects anything wider.
+    """
+    if seed is None:
+        return None
+    return (seed * 1000003 + stream) % (2 ** 31 - 1)
+
+
+def seed_process(seed, stream):
+    """Seeds this process's `random`, numpy and TensorFlow RNGs. No-op when seed is None.
+
+    Call once per process, and in a `ParallelPyEnvironment` worker that means inside the env
+    constructor — the constructor is what runs in the child, so it is the only place a
+    per-worker stream can be applied.
+
+    **This buys reduced variance, not reproducibility.** Exact determinism would additionally
+    need single-threaded TF (`set_inter_op_parallelism_threads(1)`), deterministic op selection,
+    and a fixed arrival order for the parallel workers' results, none of which hold here. Treat a
+    seed as making a run *describable* and roughly repeatable, not bit-identical, and do not
+    report a re-run as confirmation of an exact number.
+    """
+    derived = derive_seed(seed, stream)
+    if derived is None:
+        return None
+    random.seed(derived)
+    np.random.seed(derived)
+    tf.random.set_seed(derived)
+    return derived
+
+
 def dense_layer(num_units):
     return tf.keras.layers.Dense(
         num_units,

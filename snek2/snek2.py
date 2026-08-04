@@ -64,6 +64,11 @@ def main(argv):
         tf.get_logger().setLevel('ERROR')
 
     # --------------------------------------------- Constants ---------------------------------------------
+    # Off by default, which is how every arm up to batch 10 ran: nothing in this project seeded
+    # anything, so "seed1".."seed4" in those names were labels rather than controlled conditions.
+    # Set it and the base seed is recorded in runs/<policy>.md like any other override. It buys
+    # reduced variance and a roughly repeatable run, not bit-identical replay — see seed_process.
+    seed = tuned('SEED', None, int)
     learning_rate = tuned('LEARNING_RATE', 1e-5)
 
     # batch_size = 64
@@ -165,6 +170,12 @@ def main(argv):
         tf.config.experimental.set_virtual_device_configuration(
             gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=500)])
 
+    # Stream 0 is this process: network initialisation, replay sampling, epsilon draws, and the
+    # training environment, which lives here rather than in a worker. Every other stream belongs
+    # to a parallel eval worker below. Seeding is off unless SNEK_SEED is set, which is how every
+    # arm before batch 11 ran — those runs are not reproducible and never were.
+    seed_process(seed, stream=0)
+
     train_py_env = SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
     train_py_env.reset()
     train_env = tf_py_environment.TFPyEnvironment(train_py_env)
@@ -173,13 +184,20 @@ def main(argv):
     # environment here whose only job was to play the first episode by itself so it could be
     # drawn in a window; watch.py renders instead, so the environment, the serial episode and
     # the display switches are all gone. Worth ~24% of an eval — see compute_avg_return().
-    def make_headless_eval_env():
-        os.environ['SDL_VIDEODRIVER'] = 'dummy'
-        return SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
+    # One constructor per worker, each closing over its own stream. Deliberately *not*
+    # `[make_headless_eval_env] * num_eval_episodes` with a shared seed: the constructor runs
+    # inside the worker process, so a single stream would have every worker deal identical food
+    # and turn a 10-episode eval into one episode counted ten times. See derive_seed().
+    def make_headless_eval_env(stream):
+        def build():
+            os.environ['SDL_VIDEODRIVER'] = 'dummy'
+            seed_process(seed, stream=stream)
+            return SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
+        return build
 
     eval_parallel_env = tf_py_environment.TFPyEnvironment(
         parallel_py_environment.ParallelPyEnvironment(
-            [make_headless_eval_env] * num_eval_episodes))
+            [make_headless_eval_env(stream) for stream in range(1, num_eval_episodes + 1)]))
 
     # fc_layer_params = (100, 50)
     fc_layer_params = tuned('FC_LAYERS', (50, 100, 50),
@@ -287,6 +305,12 @@ def main(argv):
     # away from the values that actually produced the run.
     run_config = {
         'policy_name': policy_name,
+        # `tuned()` only prints an override to the console; this dict is what reaches
+        # runs/<policy>.md, and it is written out by hand. A seed nobody recorded is no better
+        # than no seed, so this line is the whole point of the knob.
+        'seed': seed if seed is not None else 'unseeded',
+        'zeroed_observations': (','.join(str(i) for i in sorted(ZERO_OBS_INDICES))
+                                if ZERO_OBS_INDICES else 'none'),
         'learning_rate': learning_rate,
         'batch_size': batch_size,
         'discount': discount,

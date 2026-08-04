@@ -99,6 +99,38 @@ RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
 # this one folder shows only the current eval or batch. eval_checkpoints.py archives
 # whatever is already here into EVALS_ARCHIVE_DIR before it writes a new one — see its
 # archive_existing_eval_pngs().
+# Observation indices to force to 0.0, from SNEK_ZERO_OBS as a comma-separated list of indices
+# and inclusive ranges — `SNEK_ZERO_OBS=26-29` zeroes the following-tail block and food-space.
+#
+# **This is how an observation gets ablated without changing the MDP's shape.** Deleting a block
+# changes the vector length, which stops every existing checkpoint loading and makes the
+# with/without comparison a comparison between two environments — the confound that has already
+# cost this project the ability to attribute batch 10's result. Zeroing keeps the length, so an
+# ablated arm and a full arm train on the same 30-value spec, their checkpoints are mutually
+# loadable, and the only difference is the information content of those indices.
+#
+# A zeroed input is not quite a deleted one: the network still has weights for it, they just have
+# nothing to learn from. That is the right null for "does this signal help", which is the question,
+# and it is exactly the `game_over` situation documented in CLAUDE.md — so do not later repurpose
+# an index that spent a run zeroed.
+def _parse_zero_obs(raw):
+    if not raw:
+        return frozenset()
+    indices = set()
+    for part in raw.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if '-' in part.lstrip('-'):
+            low, high = part.split('-', 1)
+            indices.update(range(int(low), int(high) + 1))
+        else:
+            indices.add(int(part))
+    return frozenset(indices)
+
+
+ZERO_OBS_INDICES = _parse_zero_obs(os.environ.get('SNEK_ZERO_OBS'))
+
 EVALS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'evals')
 EVALS_ARCHIVE_DIR = os.path.join(EVALS_DIR, 'archive')
 

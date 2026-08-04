@@ -162,12 +162,99 @@ that seed cluster produced the 95%, and the environment has moved on again.
 their processes loaded the 26-value code at startup; `EVAL_RESUME=1` would now build a 30-value
 network and fail to restore. Whatever they have written is what there will be.
 
-### Next batch: not yet designed
+## Batch 11 — designed, awaiting the go-ahead (not launched)
 
-The obvious shape is another 4-seed baseline at `DISCOUNT=0.995`, directly comparable to batch 10
-in config and differing only in the environment — which would make it the closest thing available
-to a read on whether the following-tail observation helps. Nothing is launched. Decide the shape
-before starting, and record it here.
+**Four seeds of one config on the 30-value environment.** Batch 10's config, unchanged, so the
+only difference between the two batches is the two observations added 2026-08-03.
+
+| arm | policy name | config |
+|---|---|---|
+| a | `b11a-obs30seed1` | `SNEK_SEED=1` |
+| b | `b11b-obs30seed2` | `SNEK_SEED=2` |
+| c | `b11c-obs30seed3` | `SNEK_SEED=3` |
+| d | `b11d-obs30seed4` | `SNEK_SEED=4` |
+
+Shared base, byte-identical to batch 10:
+`SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`
+
+Names encode the vector length rather than the discount, because the discount is unchanged from
+batch 10 and the vector length is what decides checkpoint compatibility.
+
+**Batch 10 is a clean control, verified rather than assumed.** The only training-relevant commit
+between batch 10's launch and now is `b09c616`, the two observation blocks; the one other commit
+touched a chart line width. So batch 11 minus batch 10 isolates exactly those two observations —
+the comparison batch 10 could never provide for the 2026-08-02 changes.
+
+**Why four seeds of one config and not a knob test.** The tempting alternative is 2 baseline plus 2
+at `LEARNING_RATE=1e-4`, the highest-value untested knob. That is batch 9's documented mistake at
+one remove: it buys two n=2 answers instead of one n=4 baseline that every later batch spends.
+
+### What this batch can and cannot show
+
+| metric | batch 10 (n=4) | sd | detectable vs a new n=4 |
+|---|---|---|---|
+| equal-effort pooled | 69.2% | 5.2 | **9.0 pp** at p<0.05 |
+| best-30 perfect (graph) | 80.1% | 5.8 | 10.0 pp |
+| best checkpoint | 86.8% | 6.1 | 10.6 pp |
+| peak trailing score | 94.47 | 0.50 | 0.9 pp |
+
+**A null result is the most likely outcome, and it will not mean the observations are useless.** If
+they help by 3-5pp this design cannot see it — between-seed variance dominates and no amount of
+eval precision touches it. Recorded here in advance so a null is not later written up as a finding.
+
+That last row is a trap: peak trailing score sits at 93.8-94.96 against a saturated ceiling, so its
+tight sd is compression rather than sensitivity. Useful only as a **regression tripwire**.
+
+### Pre-registered comparison
+
+Fixed before launch, because this document notes that earlier batch rankings compared arms at
+horizons where they had not finished improving:
+
+- **Primary:** equal-effort pooled from the close-out, plus best-30 perfect **at a common 4.12M
+  horizon** (batch 10's shortest arm) — not at final step, whatever each arm reaches.
+- **Secondary:** best checkpoint, with winner's-curse shrinkage applied. Batch 10's headline 93%
+  shrinks to 87.2% once it is treated as the max of ~300 noisy measurements.
+- **Tripwire:** peak trailing score. A drop below ~93 is a regression signal.
+- **Decision rule:** keep the new observations unless clearly worse.
+
+### Horizon: run until they stop improving
+
+No fixed cap, by request. Judged on the trailing-window criteria in
+[`hyperparamTuning.md`](hyperparamTuning.md#when-to-keep-a-run-going-and-when-to-stop-it) — last 20
+evals vs the previous 20 for score, last 30 vs previous 30 for perfect rate — and **nothing gets
+stopped without reporting first**.
+
+Batch 10 managed 4.1-4.65M steps in 15.6 hours with four arms in parallel, so ~281k steps per arm
+per hour; expect that to slow as skill rises and eval episodes lengthen. Batch 10 was stopped
+*healthy* — `b10b` peaked at 4545k and was stopped at 4652k, `b10c` peaked at 4021k and stopped at
+4122k — so its ceiling is unknown, and because the vector changed those arms can never be resumed
+to find out. Not repeating that is the reason for an open horizon.
+
+### Infrastructure added for this batch
+
+Both landed before launch and are off by default, so nothing about batch 10 or earlier is affected.
+
+**`SNEK_SEED`** — the first seeding this project has ever had. Nothing seeded anything before, so
+`seed1`..`seed4` in batch 10's names were labels and no run was reproducible. The base seed and any
+ablation now appear in `runs/<policy>.md`. It buys reduced variance and a roughly repeatable run,
+**not** bit-identical replay: exact determinism would also need single-threaded TF and a fixed
+arrival order for the parallel workers. It does not help the batch-10 comparison either, since
+adding four inputs changes the initialisation RNG stream; it pays off from batch 12 on, where most
+tests change only a hyperparameter.
+
+The hazard it had to avoid: food placement uses the *global* `random` module and
+`ParallelPyEnvironment` runs one constructor per worker process, so a single shared seed would have
+all ten workers deal identical food — turning every 10-episode eval into one episode counted ten
+times, with confidence intervals to match, and raising nothing. Each worker gets its own derived
+stream, and `tests/test_seed_and_ablation.py` covers it.
+
+**`SNEK_ZERO_OBS`** — zeroes named observation indices *without changing the vector length*, e.g.
+`SNEK_ZERO_OBS=26-29`. This is the only way to ever answer "did those two observations help"
+cleanly: both groups train on the same 30-value spec, their checkpoints stay mutually loadable, and
+the only difference is the information in those indices. Batch 11 can then serve as the treatment
+group for a later 4-arm ablated control — a real 4v4 with no environment confound. Deleting a block
+instead would change the length and make it a two-environment comparison again, which is the
+confound that already cost this project the ability to attribute batch 10's result.
 
 ### Later candidates
 
