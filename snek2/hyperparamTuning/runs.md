@@ -54,7 +54,20 @@ Two changes, both measured rather than assumed:
 | change | effect |
 |---|---|
 | `EVAL_WORKERS` 2 → 10 | **2.8x** faster per checkpoint (103s → 37s) at *lower* CPU per episode |
-| `EVAL_SCREEN_EPISODES=20` | **3.6x** fewer episodes for a statistically indistinguishable answer |
+| three-stage close-out (default) | **~2.4x** fewer episodes, with every graph-100% checkpoint fully measured |
+
+The close-out protocol is now: every checkpoint whose training graph point was **100%** gets the
+full 100 episodes immediately (uncapped — 47/142/7/146 across batch 10's arms), everything else
+selected gets 20, and the best `EVAL_CONFIRM_COUNT` **of those screened** get 80 more.
+
+**The 100% tier is coverage, not a champion shortlist.** Graph-100% checkpoints average 73.0%
+against 71.2% for graph-90% ones, but the 90% tier holds the higher maximum (93% vs 89%) and
+produced *all four* arms' best checkpoint, being ~4x larger. Finding the best checkpoint is the
+confirm stage's job.
+
+**`EVAL_CONFIRM_COUNT` is 100, raised from 30 on 2026-08-03.** At 30 the arm's true best non-100%
+checkpoint reached the confirm set only **57%** of the time on b10d's 369 candidates — a coin flip
+on the headline number. 100 takes that to **97%** and only moves the cost from 2.71x to 2.20x.
 
 The worker-count finding is a correction: this project had concluded eval throughput was
 core-bound past ~10 workers and dropped batch 10's close-out to 2 workers to hit a ~50% CPU
@@ -71,13 +84,90 @@ ones. Full numbers in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval
 A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
 count mid-run cost only the checkpoint in flight rather than the 333 already measured.
 
-### Next batch: pending the user's planned changes
+### The environment changed again on 2026-08-03: two new observations
 
-The user wants to make additional changes before the next batch — unspecified as of this
-close-out. Whatever they are, they will presumably retrain the environment (again) and reopen
-the "config vs environment" question `completedRuns.md` flags for batch 10: nothing yet
-isolates whether the 2026-08-02 fixes or just this seed cluster produced the 95%. Update this
-section once the next batch is actually designed.
+A fourth environment (‡‡‡ in [`completedRuns.md`](completedRuns.md)). The vector went from **26
+values to 30**, in two steps.
+
+#### Indices 26-28: following the tail
+
+Three values, one per action, set to **0** when the move lands the head on the cell the tail is
+vacating — the tail-chasing move — and 1 otherwise. 1 is good, per the project convention.
+
+One wart of that direction: a **fatal** move also reads 1, since the flag only answers "is this the
+tail's cell". Nothing is lost — indices 6-8 mark fatal moves, so the three cases are still
+recoverable — but a 1 here on its own does not mean "this move is fine".
+
+**The hypothesis.** Tucking in directly behind its own tail is safe forever and makes no
+progress, and it is the same move that closes a pocket down one cell at a time from behind.
+Keeping a cell of slack — pushing a bubble of open space along ahead of the tail rather than
+closing on it — leaves room to manoeuvre later. Nothing in the vector named that move before:
+indices 6-8 call it safe (it is), 9-14 call the tail reachable (it is), and 23-25 fire on it
+exactly as they fire on travelling along a wall. Unvalidated — a hypothesis about what the
+feature lets a policy express, not a measured effect.
+
+Measured live so it is at least not a dead input, over 24k states of random-but-legal play: the
+flag is available on **4.0%** of states, spread across all three actions (380/310/262). The rate
+rises with snake length over the range random play reaches (3.9% at length 4-7, 5.7% at 8-11),
+which is the direction the hypothesis wants, but random play cannot grow a snake far enough to
+say more — that needs a trained policy on this vector, which does not exist yet.
+
+#### Index 29: how cramped the food's space is
+
+One value, not per action — the first observation to describe the food rather than the snake. **0**
+when the food is sealed into a single cell, 0.5 when its open region is exactly two cells, 1 for
+anything roomier or when there is no food. 1 is safe, per the project convention.
+
+**The hypothesis.** Food sealed into a one- or two-cell pocket cannot be taken by approaching it.
+The snake has to wait, or work elsewhere, until its own tail vacates a cell and opens the pocket —
+push a bubble of space round to it. Nothing in the vector could express that: `food_observations`
+gives direction and distance, which point straight at an unreachable meal, and `safe_to_chase_food`
+collapses to 0 without distinguishing "sealed in one cell" from "reachable but the exit is bad".
+
+**Polarity was flipped to the convention deliberately**, after briefly shipping the reverse. The
+sign costs nothing in itself — the first layer absorbs it exactly (`w(1-x) + b` = `(-w)x + (b + w)`,
+both unconstrained, no weight decay anywhere here) — so the whole vector reading one way is worth
+more than the alternative.
+
+The alternative had one advantage, now given up: the common case would sit at **0**. As shipped,
+this input reads 1 in **99.95%** of states, which makes it very nearly a constant — it acts much
+like a second bias, collecting gradient on almost every sample while carrying information on very
+few. That is the shape of the `game_over` trap this project has already been bitten by. The effect
+on learning is modest, since a bias absorbs a constant either way, but **do not assume this index's
+weights were meaningfully trained** if it is ever repurposed.
+
+**This is a rare-event feature, and how rare depends entirely on length.** Over 48,635 states of
+random-but-legal play it left 1 only 14 times — 0.03% — because random play cannot grow a snake past
+length ~11. Against a self-avoiding random-walk body as a proxy for a real one:
+
+| snake length | rate below 1 (cramped) |
+|---|---|
+| 10 | 0.4% |
+| 30 | 2.2% |
+| 50 | 9.6% |
+| 60 | ~26% |
+
+So it is nearly silent early and common in the endgame — which is where an 80%-plus policy spends
+its decisive moves, filling an 81-cell board. Treat those figures as a floor: real snakes coil more
+tightly than a random walk. Unvalidated either way.
+
+#### Consequences of both
+
+Batch 10's checkpoints no longer load on `master`; `450e66e` is the last commit with a 26-value
+vector. The "config vs environment" question `completedRuns.md` raises for batch 10 is now
+permanently unanswerable in its original form — nothing isolates whether the 2026-08-02 fixes or
+that seed cluster produced the 95%, and the environment has moved on again.
+
+**The two close-out evals still running cannot be resumed if they die.** They work only because
+their processes loaded the 26-value code at startup; `EVAL_RESUME=1` would now build a 30-value
+network and fail to restore. Whatever they have written is what there will be.
+
+### Next batch: not yet designed
+
+The obvious shape is another 4-seed baseline at `DISCOUNT=0.995`, directly comparable to batch 10
+in config and differing only in the environment — which would make it the closest thing available
+to a read on whether the following-tail observation helps. Nothing is launched. Decide the shape
+before starting, and record it here.
 
 ### Later candidates
 

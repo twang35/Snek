@@ -39,6 +39,16 @@ third, later environment than ‡. Batch 9 (‡) predates all seven; batch 10 (�
 train on the result. Compare ‡‡ rows only to each other; they are not comparable to ‡ or
 unmarked rows.
 
+**‡‡‡ will mark arms trained after the following-tail observation (2026-08-03)**, which took the
+vector from 26 values to 29 — a fourth environment. No arm has trained on it yet, so no row
+carries the mark; the first batch to do so cannot be compared against ‡‡ any more than ‡‡ can be
+compared against ‡. Batch 10's checkpoints stopped loading on `master` when this landed.
+
+**Four environments in two days is the real cost being paid here**, and it is worth stating
+plainly: every environment change resets the comparison set, so a batch's numbers are only ever
+readable against its own siblings. That is why seed count inside a batch matters more than the
+number of knobs tried across batches — see the note at the end of [`runs.md`](runs.md).
+
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
 | `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | **95%** @1815k (mid-run) | **93.3%** | **74.5%** /24600 | 84.3% | ‡‡ **project record**; stopped healthy |

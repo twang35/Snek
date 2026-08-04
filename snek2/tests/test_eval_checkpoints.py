@@ -54,6 +54,42 @@ def test_resume_list_tolerates_whitespace_and_empty_entries():
     assert eval_checkpoints.resume_suffixes(' _a , , _b ', '_x') == ['_a', '_b']
 
 
+# --------------------------------------------------- resolve_screen_episodes
+
+def test_screening_is_on_by_default():
+    # The default is the decision this pins: a close-out with nothing set should screen.
+    assert eval_checkpoints.resolve_screen_episodes(None, 100) == (20, None)
+
+
+def test_screening_default_survives_an_empty_env_var():
+    # `EVAL_SCREEN_EPISODES=` in a launch script must not be read as int('').
+    assert eval_checkpoints.resolve_screen_episodes('', 100) == (20, None)
+
+
+def test_screening_can_be_turned_off_explicitly():
+    assert eval_checkpoints.resolve_screen_episodes('0', 100) == (0, None)
+
+
+def test_screening_honours_an_explicit_length():
+    assert eval_checkpoints.resolve_screen_episodes('40', 100) == (40, None)
+
+
+def test_screening_default_stands_down_on_a_short_run():
+    # EVAL_EPISODES=20 to sanity-check one checkpoint must not fail because the default screen is
+    # also 20. It reports and carries on flat.
+    screen, note = eval_checkpoints.resolve_screen_episodes(None, 20)
+    assert screen == 0 and note and 'screening off' in note
+
+
+def test_screening_rejects_an_explicit_length_that_cannot_confirm():
+    try:
+        eval_checkpoints.resolve_screen_episodes('100', 100)
+    except SystemExit as error:
+        assert 'must be below' in str(error)
+    else:
+        raise AssertionError('a screen as long as the full measurement should be rejected')
+
+
 # ------------------------------------------------------- load_finished_results
 
 def test_load_returns_nothing_when_there_is_no_file():
@@ -174,6 +210,163 @@ def test_build_row_ci_widens_as_the_sample_shrinks():
            (narrow['perfect_ci95'][1] - narrow['perfect_ci95'][0])
 
 
+# --------------------------------------------------------------- skips_screening
+
+def test_graph_100_percent_goes_straight_to_full_length():
+    assert eval_checkpoints.skips_screening({'selected_by': 'threshold90', 'single_eval': 100.0})
+
+
+def test_graph_90_percent_is_screened_first():
+    # 90% is still in select_top_checkpoints' mandatory tier, so it is measured — just not at full
+    # length unless it earns a confirmation slot. This is the line the whole split turns on.
+    assert not eval_checkpoints.skips_screening({'selected_by': 'threshold90', 'single_eval': 90.0})
+
+
+def test_lower_graph_points_are_screened_first():
+    for single in (60.0, 70.0, 80.0):
+        assert not eval_checkpoints.skips_screening({'single_eval': single}), single
+
+
+def test_an_explicitly_named_step_goes_straight_to_full_length():
+    # Naming a step is a request to measure it. The docs promise explicit steps bypass the
+    # selection thresholds; leaving one at 20 episodes would quietly break that.
+    assert eval_checkpoints.skips_screening({'selected_by': 'explicit'})
+    assert eval_checkpoints.skips_screening({'selected_by': 'explicit', 'single_eval': None})
+    assert eval_checkpoints.skips_screening(None)
+
+
+# ---------------------------------------------------------------- plan_stages
+
+def graph(single):
+    return {'selected_by': 'threshold90', 'single_eval': single}
+
+
+def batch10ish(n_full=140, n_rest=480):
+    """Roughly b10d's shape: a large uncapped 100% tier and a much larger 90% tier."""
+    steps = list(range(1, n_full + n_rest + 1))
+    selected_by = {s: graph(100.0 if i < n_full else 90.0) for i, s in enumerate(steps)}
+    return steps, selected_by
+
+
+def test_plan_splits_the_full_tier_from_the_screened_one():
+    steps, selected_by = batch10ish(3, 7)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 30, 100, 10)
+    assert plan['full'] == [1, 2, 3]
+    assert plan['screened'] == [4, 5, 6, 7, 8, 9, 10]
+    assert plan['confirmed'] == 7, 'confirm count is capped by the screened pool, not padded'
+
+
+def test_plan_prices_each_stage_correctly():
+    steps, selected_by = batch10ish(2, 10)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 3, 100, 10)
+    # 2 full x 100 + 10 screened x 20 + 3 confirmed x 80 = 200 + 200 + 240
+    assert plan['episodes_planned'] == 640
+    assert plan['flat_episodes'] == 1200
+    # one measurement per full, per screen, and per confirmation
+    assert plan['measurements_planned'] == 2 + 10 + 3
+
+
+def test_plan_rounds_episodes_up_to_whole_rounds():
+    # 12 workers cannot run exactly 100 or exactly 20 episodes: it runs 108 and 24.
+    steps, selected_by = batch10ish(1, 1)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 1, 100, 12)
+    # 1 x 108 (full) + 1 x 24 (screen) + 1 x 84 (80 rounded up) = 216
+    assert plan['episodes_planned'] == 216
+
+
+def test_plan_counts_resumed_rows_as_already_done_work():
+    steps, selected_by = batch10ish(1, 1)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 1, 100, 10, resumed=5)
+    assert plan['measurements_planned'] == 5 + 1 + 1 + 1
+    assert plan['episodes_planned'] == 5 * 100 + 100 + 20 + 80
+    assert plan['flat_episodes'] == 7 * 100
+
+
+def test_plan_with_screening_off_is_one_flat_pass():
+    steps, selected_by = batch10ish(3, 7)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 0, 30, 100, 10)
+    assert plan['full'] == steps and plan['screened'] == [] and plan['confirmed'] == 0
+    assert plan['episodes_planned'] == plan['flat_episodes'] == 1000
+
+
+def test_plan_handles_an_arm_that_is_all_100_percent():
+    # A very strong arm can leave nothing to screen. There is then no stage 3, and the plan is the
+    # flat one — correctly, since every checkpoint is being measured at full length anyway.
+    steps, selected_by = batch10ish(6, 0)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 30, 100, 10)
+    assert plan['screened'] == [] and plan['confirmed'] == 0
+    assert plan['episodes_planned'] == plan['flat_episodes'] == 600
+
+
+def test_plan_handles_an_arm_with_no_100_percent_checkpoints():
+    steps, selected_by = batch10ish(0, 8)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 2, 100, 10)
+    assert plan['full'] == [] and len(plan['screened']) == 8
+    assert plan['episodes_planned'] == 8 * 20 + 2 * 80
+
+
+def test_default_confirm_count_is_100_and_still_pays_for_itself():
+    """Pins the confirm count, and the reason it can be this high.
+
+    100 rather than 30 because 30 recovered b10d's best non-100% checkpoint only 57% of the time
+    against 97% at 100 — a coin flip on the headline number. The guard on the ratio is the other
+    half of that decision: the count can be raised until screening stops being worth doing, and
+    below about 2x a flat pass is simpler and gives every checkpoint a real measurement, so a
+    future increase should have to justify itself here.
+    """
+    assert eval_checkpoints.DEFAULT_CONFIRM_COUNT == 100
+    steps, selected_by = batch10ish(146, 514)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20,
+                                        eval_checkpoints.DEFAULT_CONFIRM_COUNT, 100, 10)
+    assert plan['confirmed'] == 100
+    ratio = plan['flat_episodes'] / plan['episodes_planned']
+    assert ratio > 2.0, 'screening must still beat a flat pass by a clear margin: %.2fx' % ratio
+
+
+def test_plan_on_a_real_arm_shape_beats_a_flat_pass():
+    # b10d's actual shape. The saving is smaller than the 3.6x of a pure screen-everything
+    # protocol, because the uncapped 100% tier is 146 checkpoints at full length.
+    steps, selected_by = batch10ish(146, 514)
+    plan = eval_checkpoints.plan_stages(steps, selected_by, 20, 30, 100, 10)
+    ratio = plan['flat_episodes'] / plan['episodes_planned']
+    assert 2.3 < ratio < 2.5, ratio
+
+
+# ------------------------------------------------------------ equal_effort_pooled
+
+def sample(perfect_flags):
+    return {'perfect': list(perfect_flags), 'scores': [1] * len(perfect_flags),
+            'rewards': [1.0] * len(perfect_flags), 'seconds': 1.0}
+
+
+def test_equal_effort_pooled_truncates_every_checkpoint_to_the_same_prefix():
+    # The deep checkpoint is a perfect 100/100 and the shallow one 5/20. Pooling the rows would
+    # give 105/120 = 87.5%; equal effort gives 25/40 = 62.5%, which is the arm-level rate.
+    samples = {1: sample([True] * 100), 2: sample([True] * 5 + [False] * 15)}
+    perfect, episodes, count = eval_checkpoints.equal_effort_pooled(samples, 20)
+    assert (perfect, episodes, count) == (25, 40, 2)
+
+
+def test_equal_effort_pooled_uses_the_prefix_not_the_best_part():
+    # Order matters: the first 20 must be taken as they came, not sorted or sampled favourably.
+    samples = {1: sample([False] * 20 + [True] * 80)}
+    assert eval_checkpoints.equal_effort_pooled(samples, 20) == (0, 20, 1)
+
+
+def test_equal_effort_pooled_skips_a_checkpoint_with_too_few_episodes():
+    # A checkpoint interrupted mid-screen would otherwise be pooled at a different weight.
+    samples = {1: sample([True] * 20), 2: sample([True] * 7)}
+    assert eval_checkpoints.equal_effort_pooled(samples, 20) == (20, 20, 1)
+
+
+def test_equal_effort_pooled_counts_the_full_tier_too():
+    # The 100%-tier checkpoints never have a screening stage, so a snapshot taken at the end of
+    # one could not include them. Truncating can.
+    samples = {1: sample([True] * 100), 2: sample([True] * 100), 3: sample([True] * 10 + [False] * 10)}
+    perfect, episodes, count = eval_checkpoints.equal_effort_pooled(samples, 20)
+    assert count == 3 and episodes == 60 and perfect == 50
+
+
 # --------------------------------------------------------------- pick_finalists
 
 def screened(step, perfect, episodes=20, surrounding=None):
@@ -210,6 +403,14 @@ def test_pick_finalists_breaks_screen_ties_on_the_surrounding_rate():
 def test_pick_finalists_tolerates_a_missing_surrounding_rate():
     rows = [screened(1, 15, surrounding=None), screened(2, 15, surrounding=10.0)]
     assert [r['step'] for r in eval_checkpoints.pick_finalists(rows, 1)] == [2]
+
+
+def test_pick_finalists_accepts_a_set_of_excluded_steps():
+    # main() passes `set(resumed) | set(full_steps)`, not a dict, so the membership test has to
+    # work for both.
+    rows = [screened(1, 20), screened(2, 15), screened(3, 14)]
+    picked = eval_checkpoints.pick_finalists(rows, 2, already_full={1})
+    assert [r['step'] for r in picked] == [2, 3]
 
 
 def test_pick_finalists_excludes_steps_already_measured_at_full_length():

@@ -125,14 +125,36 @@ in, so its weights were never constrained by anything, and the index it occupied
 board-fill. Arbitrary weights times a live signal.
 
 So when the observation changes, **record which indices changed meaning in the hall of fame
-README, and name the last commit whose observation matches those checkpoints** (currently
-`e4514a8`). A width change at least fails loudly — the vector is 26 now, so those checkpoints error
-out — but that is luck, not a safeguard.
+README, and name the last commit whose observation matches those checkpoints** (`e4514a8` for the
+20-value era, `450e66e` for the 26-value one). A width change at least fails loudly — the vector
+is 30 now, so both eras' checkpoints error out — but that is luck, not a safeguard.
 
 **Append new per-action values after the existing blocks rather than interleaving them.** The
 frozen diagnostics in `hyperparamTuning/diagnostics/` read `head_with_tail` at `obs[9 + 2 * i]`,
 and putting the safe-to-chase triple after the group block instead of inside it kept them correct
-through every change on 2026-08-02.
+through every change on 2026-08-02. The following-tail triple and the food-space value added on
+2026-08-03 went on the end for the same reason, which is why the vector's order is chronological
+rather than logical. **Not every block is a per-action triple** — food-space is one value
+describing the board, as are the starve and board-fill pair, so do not assume index arithmetic in
+threes.
+
+**1 means good or safe throughout the vector**, including the two blocks added on 2026-08-03: index
+26-28 is 0 for the tail-chasing move and 1 otherwise, index 29 is 0 for food sealed in a single cell
+and 1 for roomy. Both shipped inverted for a few hours and were flipped to the convention on
+purpose. Two caveats that came with that. A *fatal* move reads 1 at 26-28, because the flag only
+asks "is this the tail's cell" — combine it with 6-8 before reading a 1 as "this move is fine". And
+index 29 now sits at 1 in **99.95%** of states, so it is very nearly a constant: the same shape as
+the `game_over` trap above. Its weights are barely constrained by anything, so **do not repurpose
+that index assuming they were trained.**
+
+**`tests/test_observation_spec.py` is the guard.** It asserts `observation_spec()`'s length equals
+what `get_observations` actually builds, across three hand-built board states, and pins each of
+the last two blocks to its documented index range by comparing against the producing function
+rather than a literal — an ordering bug passed a literal-based version because hugging-wall and
+following-tail happen to hold the same three values in an open-board position.
+`test_state_helpers.py` additionally hardcodes the count as a deliberate tripwire, so adding a
+block fails until the count, the layout docstring and the hall-of-fame era markers are all
+updated in one pass.
 
 Note that deleting `<policy_name>_history.json` also throws away the graph's
 history for that policy, so its next run restarts the curve from the current
@@ -449,12 +471,22 @@ only counts children that have been reaped, and the worker processes are alive f
 run, so it reports roughly the parent alone — it undercounted a 20-worker eval by ~3x here. Read
 total CPU from `top -l 2 -n 0` instead.
 
-**The eval close-out screens before it confirms** (`EVAL_SCREEN_EPISODES`): 20 episodes on every
-selected checkpoint, then 80 more on the best 30. 3.6x fewer episodes than measuring everything
-at 100, for a statistically indistinguishable answer. Two consequences for anyone reading the
-output file: rows have *different* episode counts, so pooling them over-weights the winners and
-reads high — the arm-level rate is the stage-1 figure the run prints — and best-checkpoint must
+**The eval close-out runs in three stages** (`EVAL_SCREEN_EPISODES`, on by default): every
+checkpoint whose training graph point was 100% gets the full 100 episodes immediately (uncapped —
+47 to 146 checkpoints on a batch-10 arm), everything else selected gets 20, and the best 30 *of
+those screened* get 80 more. ~2.4x fewer episodes than measuring everything at 100.
+
+Two consequences for anyone reading the output file: rows have *different* episode counts, so
+pooling them over-weights the winners and reads high — the arm-level rate is the equal-effort
+figure the run prints, which truncates every checkpoint to its first 20 — and best-checkpoint must
 come from full-length rows only. `eval_progress.best_of()` enforces the latter.
+
+**The 100% tier is a coverage guarantee, not a shortlist of champions**, and it is easy to
+misread as one. Across batch 10, graph-100% checkpoints average 73.0% against 71.2% for graph-90%,
+but the 90% tier holds the higher maximum (93% vs 89%) and produced **all four arms' best
+checkpoint**, being ~4x larger. Finding the best checkpoint is `EVAL_CONFIRM_COUNT`'s job, and the
+default 30 only recovers the true best 57% of the time on a 369-candidate arm; 100 gets 97% for
+almost no extra cost.
 
 ## Active development
 

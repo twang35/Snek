@@ -886,6 +886,11 @@ def test_observation_spec_matches_what_the_game_emits():
     `head_with_food_obs` sat at 0 in the spec for a whole signature generation while the argument
     it needed was still being passed, and the count is maintained by hand as a sum of named
     parts, so it drifts silently. This asserts the two agree rather than trusting either.
+
+    The literal below is a deliberate tripwire, not redundancy with the equality: adding a block
+    is supposed to fail here so the count, the layout docstring in get_observations and
+    hallOfFame/README.md's era markers all get updated in the same pass. 26 -> 29 on 2026-08-03
+    when the following-tail block landed, then 29 -> 30 the same day for food-space.
     """
     import os
     os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -894,8 +899,8 @@ def test_observation_spec_matches_what_the_game_emits():
 
     env = SnakeEnvironment(display=False)
     env.reset()
-    assert env.observation_spec().shape == (26,)
-    assert env._game.get_observation().shape == (26,)
+    assert env.observation_spec().shape == (30,)
+    assert env._game.get_observation().shape == (30,)
 
 
 def test_terminal_steps_carry_zero_discount():
@@ -1006,3 +1011,219 @@ def test_bw_forward_tail():
                      [4, 0, 0, 0, 3, 0, 4],
                      [4, 4, 4, 4, 4, 4, 4]])
     assert body_and_wall_collisions(grid, (3, 1), (4, 1), 'right') == [0, 0, 1]
+
+
+# ========================== following_tail_obs tests ==========================
+#
+# Pure position arithmetic: no grid, because the answer is "is this destination the tail's
+# current cell" and nothing about the board can change that. Ordered by ACTIONS — left, right,
+# forward — as relative turns from the heading.
+#
+# Coordinates are (x, y) with y increasing downward, so for a head at (5, 5) heading 'up' the
+# three action destinations are (4, 5) left, (6, 5) right, (5, 4) forward. (5, 6) is the cell
+# behind the head, which no action can reach.
+#
+# 1 is good, so the tail-chasing action is the 0 and everything else is 1.
+
+def test_ft_tail_to_the_left():
+    assert following_tail_obs((5, 5), (4, 5), 'up') == [0, 1, 1]
+
+
+def test_ft_tail_to_the_right():
+    assert following_tail_obs((5, 5), (6, 5), 'up') == [1, 0, 1]
+
+
+def test_ft_tail_straight_ahead():
+    assert following_tail_obs((5, 5), (5, 4), 'up') == [1, 1, 0]
+
+
+def test_ft_tail_directly_behind_is_unreachable():
+    # The straight-snake case, and the reason a fresh episode reads all ones: the tail sits
+    # behind the head, and reversing is not one of the three actions.
+    assert following_tail_obs((5, 5), (5, 6), 'up') == [1, 1, 1]
+
+
+def test_ft_tail_far_away():
+    assert following_tail_obs((5, 5), (1, 1), 'up') == [1, 1, 1]
+
+
+def test_ft_tail_diagonally_adjacent_does_not_count():
+    # One move never reaches a diagonal, so a tail one step off the diagonal is not "behind" it.
+    assert following_tail_obs((5, 5), (4, 4), 'up') == [1, 1, 1]
+
+
+def test_ft_relative_turns_follow_the_heading():
+    # Same geometry, four headings: the cell at (4, 5) is to the left of a head facing up, to the
+    # right of one facing down, behind one facing right, and ahead of one facing left. This is the
+    # test that catches CURRENT_DIRECTION_MAPS being consulted with the wrong base direction.
+    assert following_tail_obs((5, 5), (4, 5), 'up') == [0, 1, 1]
+    assert following_tail_obs((5, 5), (4, 5), 'down') == [1, 0, 1]
+    assert following_tail_obs((5, 5), (4, 5), 'right') == [1, 1, 1]
+    assert following_tail_obs((5, 5), (4, 5), 'left') == [1, 1, 0]
+
+
+def test_ft_ignores_the_board_entirely():
+    # "Otherwise, even if wall or body, it is 0" — and conversely, a 1 does not depend on the
+    # grid. following_tail_obs takes no grid at all, which is what makes that unconditional.
+    import inspect
+    assert 'grid' not in inspect.signature(following_tail_obs).parameters
+
+
+def test_ft_accepts_a_list_tail_position():
+    # Snake.tail.tile_pos is not guaranteed to be a tuple, and == between a list and a tuple is
+    # False however equal the contents are. body_and_wall_collisions' own tail check needed the
+    # same coercion. Without it the tail would never match and this would read [1, 1, 1].
+    assert following_tail_obs((5, 5), [4, 5], 'up') == [0, 1, 1]
+
+
+def test_ft_marks_at_most_one_action_as_a_tail_chase():
+    # Three distinct destinations, so no two can be the same cell. Two zeros would mean
+    # get_relative_pos had collapsed two actions onto one cell.
+    for heading in DIRECTIONS:
+        for tail in [(4, 5), (6, 5), (5, 4), (5, 6), (7, 7)]:
+            values = following_tail_obs((5, 5), tail, heading)
+            assert values.count(0) <= 1, (heading, tail, values)
+            assert set(values) <= {0, 1}, (heading, tail, values)
+
+
+# ============================ food_space_obs tests ============================
+#
+# One value, not per action, and 1 is safe: 0 when the food is sealed alone, 0.5 when its open
+# region is two cells, 1 for anything roomier or no food. Grid cells are grid[y + 1][x + 1]:
+# 0 open, 1 food, 2 head, 3 body, 4 wall.
+
+def food_space(grid, position):
+    return food_space_obs(grid, FakeFood(position))
+
+
+def test_fs_no_food_is_safe():
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 4],
+                     [4, 0, 0, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    # Nothing is stuck when there is no food. Unreachable in practice — no food means the board
+    # is full, a terminal state — but the polarity should still be honest.
+    assert food_space_obs(grid, 'no food') == [1]
+
+
+def test_fs_open_board_is_safe():
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 4],
+                     [4, 1, 0, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert food_space(grid, (0, 1)) == [1]
+
+
+def test_fs_food_sealed_by_body_is_zero():
+    # Food at (1, 1) boxed in by body on all four sides.
+    grid = np.array([[4, 4, 4, 4, 4, 4],
+                     [4, 0, 3, 0, 0, 4],
+                     [4, 3, 1, 3, 0, 4],
+                     [4, 0, 3, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4]])
+    assert food_space(grid, (1, 1)) == [0]
+
+
+def test_fs_food_sealed_in_a_corner_by_walls_and_body_is_zero():
+    # Two of the four neighbours are wall, the other two body. Still a one-cell region.
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 1, 3, 0, 4],
+                     [4, 3, 0, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert food_space(grid, (0, 0)) == [0]
+
+
+def test_fs_food_against_the_head_counts_as_sealed():
+    # The head (2) is not open space, and unlike the tail it does not vacate. Food with body on
+    # three sides and the head on the fourth is stuck.
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 3, 3, 0, 4],
+                     [4, 1, 2, 0, 4],
+                     [4, 3, 0, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert food_space(grid, (0, 1)) == [0]
+
+
+def test_fs_food_with_exactly_one_open_neighbour_is_a_half():
+    # Food at (1, 1), open cell at (1, 2) below it, and that cell's other neighbours are all
+    # closed — so the region is exactly {food, (1, 2)}.
+    grid = np.array([[4, 4, 4, 4, 4, 4],
+                     [4, 0, 3, 0, 0, 4],
+                     [4, 3, 1, 3, 0, 4],
+                     [4, 3, 0, 3, 0, 4],
+                     [4, 0, 3, 0, 0, 4],
+                     [4, 4, 4, 4, 4, 4]])
+    assert food_space(grid, (1, 1)) == [0.5]
+
+
+def test_fs_two_cell_pocket_against_a_wall_is_a_half():
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 1, 3, 0, 4],
+                     [4, 0, 3, 0, 4],
+                     [4, 3, 3, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert food_space(grid, (0, 0)) == [0.5]
+
+
+def test_fs_three_cell_pocket_is_safe():
+    # The one-open-neighbour test passes, but that neighbour opens onto a third cell, so this is
+    # a region of three and must read 1. This is the case a naive "count the food's neighbours"
+    # implementation gets wrong.
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 1, 3, 0, 4],
+                     [4, 0, 3, 0, 4],
+                     [4, 0, 3, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert food_space(grid, (0, 0)) == [1]
+
+
+def test_fs_food_with_two_open_neighbours_is_safe():
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 0, 3, 0, 4],
+                     [4, 1, 3, 0, 4],
+                     [4, 0, 3, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert food_space(grid, (0, 1)) == [1]
+
+
+def test_fs_only_ever_returns_one_value():
+    grid = np.array([[4, 4, 4, 4, 4],
+                     [4, 0, 0, 0, 4],
+                     [4, 1, 0, 0, 4],
+                     [4, 4, 4, 4, 4]])
+    assert len(food_space(grid, (0, 1))) == 1
+
+
+def test_food_space_matches_a_real_flood_fill():
+    """Cross-checks the local test against count_groups over random boards.
+
+    food_space_obs decides the 1 / 0.5 / 0 trichotomy from at most eight grid lookups instead of
+    running a fourth flood fill per step. That is only worth doing if it is exactly equivalent, so
+    this derives the answer the expensive way — find the region holding the food, count its bits —
+    and asserts the two agree on every board.
+    """
+    rng = np.random.default_rng(11)
+    size = 7                       # 5x5 interior plus the wall ring
+    checked = {1: 0, 0.5: 0, 0: 0}
+    for _ in range(3000):
+        grid = np.zeros((size, size), dtype=int)
+        grid[0, :] = grid[-1, :] = grid[:, 0] = grid[:, -1] = 4
+        interior = grid[1:-1, 1:-1]
+        # Dense body so sealed and two-cell pockets actually occur.
+        interior[:] = np.where(rng.random(interior.shape) < 0.55, 3, 0)
+        fx, fy = int(rng.integers(0, size - 2)), int(rng.integers(0, size - 2))
+        grid[fy + 1][fx + 1] = 1
+
+        regions, _ = count_groups(grid)
+        food_bit = 1 << ((fy + 1) * grid.shape[1] + (fx + 1))
+        holding = [r for r in regions if r & food_bit]
+        assert len(holding) == 1, 'the food cell is open, so exactly one region holds it'
+        actual_size = bin(holding[0]).count('1')
+        expected = 0 if actual_size == 1 else (0.5 if actual_size == 2 else 1)
+
+        got = food_space(grid, (fx, fy))[0]
+        assert got == expected, (
+            'region of %d should read %s, got %s\n%s' % (actual_size, expected, got, grid))
+        checked[expected] += 1
+    # A vacuous pass would be the real failure here, so require every branch to have been hit.
+    assert min(checked.values()) > 20, checked

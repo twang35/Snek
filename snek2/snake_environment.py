@@ -49,6 +49,19 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
         # CLAUDE.md - it keeps every index above unchanged, including the ones the frozen
         # hyperparamTuning/diagnostics/ scripts hardcode.
         hugging_wall_obs = 3         # post-move head has a wall or body on its left or right
+        # Added 2026-08-03, on the end for the same reason. 0 when the move lands the head on the
+        # cell the tail is vacating, 1 otherwise — the tail-chasing move, named so a policy can
+        # price it rather than only being told it is safe (indices 6-8) and keeps the tail reachable
+        # (9-14). 1 is good, per the convention, with the caveat that a fatal move also reads 1.
+        # The hypothesis is that closing on its own tail is a local optimum that consumes the free
+        # space the snake still needs; see state_helpers.following_tail_obs.
+        following_tail_obs = 3       # move does NOT land on the cell the tail is leaving
+        # Added 2026-08-03, on the end, and the first single-value observation about the *food*
+        # rather than the snake. 0 when the food is sealed into a one-cell pocket, 0.5 when its
+        # region is two cells, 1 for anything roomier or no food. Not per-action: it is a property
+        # of the board. 1 is safe, per the convention — which does mean the input sits at 1 in
+        # ~99.97% of states and is very nearly a constant. See state_helpers.food_space_obs.
+        food_space_obs = 1           # how much room the region holding the food has
         return BoundedArraySpec((food_obs
                                  + body_and_wall_obs
                                  + head_with_tail_obs
@@ -57,7 +70,9 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
                                  + perfect_game_move_obs
                                  + steps_until_starve_obs
                                  + snake_length_obs
-                                 + hugging_wall_obs,), np.float32)
+                                 + hugging_wall_obs
+                                 + following_tail_obs
+                                 + food_space_obs,), np.float32)
 
     def set_display(self, enabled):
         self._game.set_display(enabled)

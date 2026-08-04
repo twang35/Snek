@@ -29,7 +29,7 @@ def get_observations(old_grid,
                      current_step,
                      last_food_step,
                      snake_len):
-    """Builds the 26-value observation vector. Layout, in order:
+    """Builds the 30-value observation vector. Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
@@ -40,10 +40,22 @@ def get_observations(old_grid,
     21       1       starve budget left, lg-compressed to [0, 1]
     22       1       fraction of the board the snake fills
     23-25    3       is the post-move head hugging a wall or body on its left or right
+    26-28    3       is the move NOT a tail-chase (0 = it lands on the cell the tail is vacating)
+    29       1       room around the food: 1 roomy or no food, 0.5 a two-cell pocket, 0 sealed in
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
-    from the current heading, not compass directions. Keep this in step with
+    from the current heading, not compass directions. Index 29 is not per action: it describes
+    the board, and is the same whichever move is taken. Keep this in step with
     SnakeEnvironment.observation_spec(), which sums the same counts.
+
+    **New blocks go on the end, never in the middle.** Several frozen diagnostic scripts index
+    this vector by hardcoded position to answer questions about past runs, and inserting a block
+    would silently repoint every one of them. The order above is therefore chronological rather
+    than logical, and that is deliberate.
+
+    **Changing the length changes the MDP.** A checkpoint only restores against the vector it
+    trained on, so every checkpoint from before a change here stops loading — see
+    ../hallOfFame/README.md, which tracks which era each entry belongs to.
     """
     observations = []
 
@@ -99,6 +111,23 @@ def get_observations(old_grid,
     # what the feature enables, not yet a measured effect. Computed inside group_obs to reuse
     # its legality gate and its post-move grid - see group_obs.
     observations.extend(wall_hug_values)
+
+    # 3 values, one per action: 0 if the move puts the head on the cell the tail is vacating this
+    # step, 1 for anything else. 1 is good, per the project convention - but note a fatal move also
+    # reads 1, because the flag only answers "is this the tail's cell"; indices 6-8 remain the only
+    # place legality is stated. The intent is to let a policy price the tail-chasing move
+    # specifically, on the hypothesis that closing on its own tail is a local optimum that eats the
+    # free space the snake still needs - see following_tail_obs. Unvalidated.
+    observations.extend(following_tail_obs(head_pos, tail_pos, head_move_dir))
+
+    # 1 value, not per action: how much room the food has - 0 when it is sealed into its own cell,
+    # 0.5 when it has exactly one open neighbour, 1 for anything roomier or when there is no food.
+    # 1 is safe, per the project convention. The intent is to let a policy recognise food it cannot
+    # simply approach, because taking it needs the snake's own tail to vacate a cell first - push a
+    # bubble of space round to it. Note this makes the input 1 in ~99.97% of states, so it is very
+    # nearly a constant; see food_space_obs for why that is a hazard worth remembering rather than
+    # a learning problem. Unvalidated.
+    observations.extend(food_space_obs(old_grid, current_food))
 
     # There used to be a final "is the episode over" value here, and it is gone. It was 1 only in
     # a terminal observation, which no policy ever acts on, so it was a constant 0 for every state
@@ -170,6 +199,128 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
             observations.extend([0])
 
     return observations
+
+
+def food_space_obs(grid, current_food):
+    """One value: how much room the food has. 1 is safe, 0 is sealed in.
+
+    | region holding the food | value |
+    |---|---|
+    | anything roomier than two cells, or no food at all | 1 |
+    | the food plus exactly one open cell | 0.5 |
+    | the food's cell alone, sealed in | 0 |
+
+    Not per-action — this is a property of the board, and the same for all three moves. It is the
+    first single-value observation to describe the food rather than the snake.
+
+    The hypothesis is that stuck food needs a different plan. Food sealed into a one- or two-cell
+    pocket cannot be taken by approaching it: the snake has to wait, or travel elsewhere, until
+    its own tail vacates a cell and opens the pocket up — push a bubble of space round to it. The
+    existing food observations cannot express that. `food_observations` reports direction and
+    distance, which point straight at a meal that is unreachable, and `safe_to_chase_food` goes to
+    0 for an unreachable one without distinguishing "sealed in a single cell" from "reachable but
+    the way out is bad". Unvalidated: a hypothesis about what the feature lets a policy express.
+
+    **1 is safe**, matching `body_and_wall_collisions`, `head_with_tail` and `safe_to_chase_food`.
+    This was the reverse for a few hours on 2026-08-03 and was flipped to the project convention
+    deliberately, so the whole vector now reads one way and a future reader cannot mistake the
+    sense of one input.
+
+    Polarity costs nothing in itself: the first layer computes `ReLU(Wx + b)`, so swapping an input
+    for its complement is absorbed exactly by flipping that column of `W` and shifting `b` —
+    `w(1-x) + b` is `(-w)x + (b + w)`. Both are unconstrained and trainable, the kernel initializer
+    is symmetric about zero, and there is no weight decay anywhere in this project, so the two
+    encodings define the same function class.
+
+    **The cost this direction does carry is that the common case is now 1.** The interesting cases
+    are rare — the value is 1 in 99.97% of random-play states, and still ~90% at snake length 50 —
+    so this input sits at 1 nearly always and acts much like a second bias, collecting gradient on
+    almost every sample while carrying information on very few. That is the shape of the
+    `game_over` trap this project has already been bitten by (see ../CLAUDE.md): a near-constant
+    input whose weights end up constrained by nothing much, which then does real damage if the
+    index later changes meaning. The effect on learning is modest, since a bias can absorb a
+    constant either way, but the hazard is worth knowing about — if this index is ever repurposed,
+    do not assume its weights were meaningfully trained.
+
+    **Decided locally rather than with a flood fill**, which is exact for this question and much
+    cheaper. A region of one cell means the food has no open orthogonal neighbour. A region of two
+    means it has exactly one, and *that* cell has no open neighbour but the food. Any region of
+    three or more fails both tests, so the trichotomy needs at most eight grid lookups —
+    `count_groups` is ~46% of the cost of building an observation and already runs three times per
+    step, so a fourth call for one value would have been the most expensive input in the vector.
+    `test_food_space_matches_a_real_flood_fill` checks the two agree over random boards.
+
+    "Open" is grid value 0 or 1 — empty or food — matching count_groups. The head (2) is not open,
+    so food tucked against the head reads as sealed on that side, which is correct: the head does
+    not vacate the way the tail does.
+    """
+    # No food means nothing is stuck, so 1 rather than 0 — which keeps the polarity honest even
+    # though it cannot matter in practice: there is no food only once the board is full, and that
+    # is a terminal state no policy ever acts on.
+    if current_food == 'no food':
+        return [1]
+    food_pos = current_food.position
+    open_neighbours = [(food_pos[0] + offset[0], food_pos[1] + offset[1])
+                       for offset in NEIGHBOUR_OFFSETS
+                       if get_grid_value((food_pos[0] + offset[0], food_pos[1] + offset[1]),
+                                         grid) in (0, 1)]
+    if not open_neighbours:
+        return [0]
+    if len(open_neighbours) > 1:
+        return [1]
+
+    # Exactly one open neighbour, so the region is {food, neighbour} unless that neighbour opens
+    # onto something else. Comparing against the food's own cell as a tuple because `position`
+    # is not guaranteed to be one.
+    neighbour = open_neighbours[0]
+    food_cell = tuple(food_pos)
+    for offset in NEIGHBOUR_OFFSETS:
+        beyond = (neighbour[0] + offset[0], neighbour[1] + offset[1])
+        if beyond != food_cell and get_grid_value(beyond, grid) in (0, 1):
+            return [1]
+    return [0.5]
+
+
+def following_tail_obs(head_pos, tail_pos, head_move_dir):
+    """0 per action when the move puts the head on the cell the tail is vacating; 1 otherwise.
+
+    Ordered by ACTIONS. **1 is good**, matching the project convention — the move is not a
+    tail-chase. This read 1 for the tail-chase for a few hours on 2026-08-03 and was flipped so
+    the whole vector points one way.
+
+    **A fatal move also reads 1 here, and that is a wart of the inversion.** The flag answers
+    exactly one question — is this destination the tail's current cell — so a move into a wall or
+    into the body is "not a tail-chase" and comes out 1 alongside the genuinely good moves. Under
+    the old polarity that case was harmlessly 0. Nothing is lost, because indices 6-8 mark fatal
+    moves and any reader combining the two recovers the three cases, but do not read a 1 here on
+    its own as "this move is fine". `group_obs` takes the other approach for its own flags,
+    zeroing everything for an illegal move; matching that would mean conflating "fatal" with
+    "chases the tail" in this index, which is a different observation from the one asked for.
+
+    The hypothesis is that tail-chasing is a local optimum. A snake that tucks in immediately
+    behind its own tail is safe forever and makes no progress, and the same move is the one that
+    seals a pocket down to nothing: the free space the snake could have travelled *through* gets
+    consumed one cell at a time from behind. Keeping a cell of slack — pushing a bubble of open
+    space along ahead of the tail rather than closing on it — leaves room to manoeuvre later.
+    Nothing in the vector named that move before this: `body_and_wall_collisions` calls it safe,
+    `head_with_tail` calls it reachable (it is), and `hugging_wall` fires on it the same way it
+    fires on travelling along a wall. Unvalidated: this is a hypothesis about what the feature
+    lets a policy express, not a measured effect.
+
+    **A 0 always marks a legal move**, which is why there is no fatality gate here. The move can
+    only read 0 if the destination holds the tail, and a cell holding the tail holds body rather
+    than food, so the move does not eat, so the tail does advance out of it. The same reasoning is
+    why `body_and_wall_collisions` treats the tail's cell as safe. An eating move and a
+    tail-following move are mutually exclusive for the same reason: food never occupies the tail's
+    cell.
+
+    Uses `tail_pos`, the cell the tail is leaving — not `next_tail_pos`, the one it is taking.
+    That is the opposite of what `group_obs`' reachability test needs, and the distinction is the
+    same one that made `head_with_tail` go quiet in coiled endgames when it read the wrong one.
+    Here the vacated cell is the whole question.
+    """
+    return [0 if tuple(get_relative_pos(action, head_pos, head_move_dir)) == tuple(tail_pos) else 1
+            for action in ACTIONS]
 
 
 # head_with_tail: returns 1 for with tail or 0 for no tail groups in each action

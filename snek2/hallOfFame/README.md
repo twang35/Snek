@@ -9,7 +9,7 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: 95%, trained end-to-end on today's environment (2026-08-03)
+## The current record: 95%, on the environment of 2026-08-02 (superseded 2026-08-03)
 
 Batch 10 was a fresh baseline on the environment left by 2026-08-02's seven observation/reward
 changes (fatal-move zeroing, the wall/body-hugging observation, normalized group count, the
@@ -23,19 +23,30 @@ make room for further changes; two were measured with `eval_checkpoints.py` firs
 | `b10d-disc995seed4-ckpt1815000` | **95.0%** (95/100, CI 88.8-97.8), top-3 93.3%, pooled 74.5%/24600 | `DISCOUNT=0.995` |
 | `b10b-disc995seed2-ckpt1157000` | 87.0% (87/100, CI 79.0-92.2), top-3 86.3%, pooled 70.4%/12000 | `DISCOUNT=0.995` |
 
-**These load directly on `master`, no checkout needed** — unlike every entry below, which
-predates the 2026-08-02 changes. Both measurements were taken mid-run (the arms kept training
-for another ~2.5-2.9M steps afterward), so a full close-out re-measurement may still move these
-numbers; see [`../hyperparamTuning/completedRuns.md`](../hyperparamTuning/completedRuns.md) for
-the batch's full results and whichever numbers are most current.
+**These no longer load on `master` either, as of 2026-08-03.** Two observations were added that
+day — following-tail (26 -> 29) and food-space (29 -> 30) — so batch 10's checkpoints now fail the
+same way every entry below does:
+
+```
+ValueError: Shapes (30, 50) and (26, 50) are incompatible
+```
+
+They held the "runs on master today" status for one day. To run one, check out a commit before
+those landed — `450e66e` is the last one with a 26-value vector.
+
+Both measurements were taken mid-run (the arms kept training for another ~2.5-2.9M steps
+afterward) and the close-out re-measurement has since found better checkpoints in both arms —
+90% @1501000 in `b10b` and 93% @1695000 in `b10d`, the latter within noise of the 95% above.
+See [`../hyperparamTuning/completedRuns.md`](../hyperparamTuning/completedRuns.md) for the
+batch's full results and whichever numbers are most current.
 
 ## The entries below predate 2026-08-02 and do not run on `master`
 
-The observation vector is **26 values** and these were trained on 20, so the first layer's shape
+The observation vector is **30 values** and these were trained on 20, so the first layer's shape
 no longer matches and restoring one fails immediately:
 
 ```
-ValueError: Shapes (26, 50) and (20, 50) are incompatible
+ValueError: Shapes (30, 50) and (20, 50) are incompatible
 ```
 
 To run one by hand, check out the last commit whose observation matches them:

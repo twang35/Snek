@@ -102,13 +102,13 @@ does, reload its checkpoint and evaluate it over hundreds of episodes:
 
 ```
 cd snek2
-EVAL_SCREEN_EPISODES=20 EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
+EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
   PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top20
 ```
 
-`EVAL_SCREEN_EPISODES=20` is the current close-out shape and is **3.6x cheaper than measuring
-every selected checkpoint at 100 episodes, for the same answer** — see "Screening" below. Drop it
-to get the flat one-pass protocol every arm before batch 10 was measured under.
+**Screening is on by default** and is **3.6x cheaper than measuring every selected checkpoint at
+100 episodes, for the same answer** — see "Screening" below. `EVAL_SCREEN_EPISODES=0` gets the flat
+one-pass protocol every arm before batch 10 was measured under.
 
 `top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
 10-episode eval** from the graph, using the surrounding perfect rate to order within an
@@ -128,33 +128,68 @@ values 0, 10, … 100 — which makes those thresholds coarser than they look. `
 Explicit steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is
 the question, and they bypass both thresholds.
 
-#### Screening: `EVAL_SCREEN_EPISODES`
+#### Screening: `EVAL_SCREEN_EPISODES` (on by default)
 
-Two stages instead of one:
+Three stages instead of one:
 
-1. every selected checkpoint gets **20 episodes**
-2. the best **30** (`EVAL_CONFIRM_COUNT`) get **80 more**, reaching the full 100
+1. every checkpoint whose **graph point is 100%** (ten perfect games out of ten) gets the full
+   **100 episodes** immediately. Uncapped, and large on a strong arm — 47/142/7/146 across batch
+   10's four arms. Explicitly named steps join this tier, since naming one is a request to measure it.
+2. everything else selected gets **20 episodes**
+3. the best **100** (`EVAL_CONFIRM_COUNT`) **of those screened** get **80 more**, reaching 100
 
-A finalist ends with exactly 100 episodes — the screen counts toward the total — so its number is
-directly comparable with every arm measured under the flat protocol. Checkpoints that miss the cut
-keep their 20-episode row, whose much wider Wilson interval says plainly how little it is worth.
+A promoted checkpoint ends with exactly 100 episodes — the screen counts toward the total — so its
+number is directly comparable with every arm measured under the flat protocol. Checkpoints that
+miss the cut keep their 20-episode row, whose much wider Wilson interval says how little it is worth.
+Confirmation slots exclude the 100% tier, which already has the measurement a slot would buy.
 
-**Simulated against the 937 checkpoints batch 10 measured at 100 episodes**, per arm:
+**Cost on a batch-10-shaped arm**, against measuring all 660 selected checkpoints at 100:
 
-| protocol | episodes | cost | how far below the arm's true best it crowns |
+| arm | selected | at 100% | screened | episodes | vs flat |
+|---|---|---|---|---|---|
+| `b10a` | 272 | 47 | 225 | 11,600 | 2.34x |
+| `b10b` | 624 | 142 | 482 | 26,240 | 2.38x |
+| `b10c` | 47 | 7 | 40 | 3,900 | 1.21x |
+| `b10d` | 660 | 146 | 514 | 27,280 | 2.42x |
+
+Those figures are at the old `EVAL_CONFIRM_COUNT=30`; at 100 the b10d plan is 29,980 episodes and
+2.20x.
+
+`EVAL_SCREEN_EPISODES=0` returns to the flat protocol.
+
+**The 100% tier is coverage, not a shortlist of likely champions.** Measured across batch 10:
+
+| training graph point | n | mean measured | max measured |
 |---|---|---|---|
-| 100 on all (flat) | 30,400 | 1.00x | 2.82 pp |
-| 20 on all, +80 on top 30 | 8,480 | **3.6x cheaper** | 3.04 pp |
-| 20 on all, +80 on top 60, +500 on top 5 | 13,380 | 2.3x cheaper | **1.13 pp** |
+| 90% | 1007 | 71.2% | **93%** |
+| 100% | 270 | **73.0%** | 89% |
 
-The middle row is what is implemented. The bottom row is *both* cheaper than flat and much more
-accurate, and is the option to reach for if best-checkpoint precision ever matters more than
-comparability — it needs a third stage this script does not have.
+1.8pp better on average, but a *lower* maximum, and **all four arms' best checkpoint came from the
+90% tier** — only 1-2 of each arm's top 10 were graph-100%. The 90% tier is ~4x larger, so the max
+of the bigger group wins. Stage 3 is what looks for the champion.
 
-**Take the arm-level pooled rate from stage 1**, which the run prints. Do not pool the rows in the
-output file: they have different episode counts, and the deep ones are by construction the arm's
-best, so pooling them weights the winners 5x and reads high. Best-checkpoint is taken over
-full-length rows only, since across hundreds of 20-episode screens some will read 19/20 on luck.
+**`EVAL_CONFIRM_COUNT` is 100, raised from 30 on 2026-08-03**, because 30 was losing the champion
+outright. Simulated on b10d, the best non-100% checkpoint reaches the confirm set only 57% of the
+time at 30:
+
+| confirm count | champion recall | episodes | vs flat |
+|---|---|---|---|
+| 30 (the old default) | 57% | 24,380 | 2.71x |
+| 50 | 85% | 25,980 | 2.54x |
+| **100 (current)** | **97%** | 29,980 | **2.20x** |
+| 150 | 99% | 33,980 | 1.94x |
+
+100 is the knee: a coin flip on the headline number becomes near-certainty for ~23% more episodes.
+There is a floor on how far this can go — below about 2x a flat pass is simpler and gives *every*
+checkpoint a real measurement, and `test_default_confirm_count_is_100_and_still_pays_for_itself`
+fails if a future increase crosses it.
+
+**Take the arm-level pooled rate from the equal-effort figure the run prints.** Do not pool the
+rows in the output file: they have different episode counts, and the deep ones are by construction
+the arm's best, so pooling them weights the winners 5x and reads high however good the policy is.
+The printed figure truncates every checkpoint to its first 20 episodes, which is a valid sample of
+each and lets the 100% tier count too. Best-checkpoint is taken over full-length rows only, since
+across hundreds of 20-episode screens some will read 19/20 on luck.
 
 **Ranking uses the screen rate, ties broken on the surrounding graph rate.** 20 episodes admit
 only 21 distinct values, so ties are the common case and the tie-break does real work — the
