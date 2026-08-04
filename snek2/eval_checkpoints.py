@@ -1020,8 +1020,15 @@ def main(argv):
     # from: resumed rows carry the pace of whatever settings the earlier run used, and a
     # close-out relaunched at a different EVAL_WORKERS can differ by 3x. Averaging over every
     # row put b10b's ETA out by nearly 3x — 7h10m against a real ~2h.
+    #
+    # `stage` and the per-stage counts exist so the progress chart can say which of the three
+    # passes is running and how far through it is. Without them a screening close-out shows one
+    # undifferentiated bar that stalls for an hour on the full tier and then races, which reads
+    # as a hung run.
     progress = {'measurements': len(resumed_steps),
-                'session_measurements': 0, 'session_episodes': 0, 'session_seconds': 0.0}
+                'session_measurements': 0, 'session_episodes': 0, 'session_seconds': 0.0,
+                'stage': 'full' if screen_episodes else 'flat',
+                'full_done': 0, 'screen_done': 0, 'confirm_done': 0}
 
     def write_results(results, complete, in_flight=None):
         """Rewrites the whole file after every checkpoint, and after every round.
@@ -1056,6 +1063,25 @@ def main(argv):
                    'session_measurements': progress['session_measurements'],
                    'session_episodes': progress['session_episodes'],
                    'session_seconds': round(progress['session_seconds'], 1),
+                   # Which pass is running and how far through each one is, so the chart can show
+                   # the shape of a three-stage close-out rather than one bar that stalls.
+                   'stage': progress['stage'],
+                   # The arm-level rate, computed the only way that means anything once rows have
+                   # different depths: every checkpoint truncated to its first `screen_episodes`.
+                   # Pooling the rows instead weights the full-length ones — the arm's best by
+                   # construction — five times as heavily, so the chart was displaying a figure its
+                   # own documentation says not to use. None for a flat run, where pooling the rows
+                   # already gives equal effort.
+                   'pooled_equal_effort': (
+                       (lambda t: round(100.0 * t[0] / t[1], 2) if t[1] else None)(
+                           equal_effort_pooled(samples, screen_episodes))
+                       if screen_episodes else None),
+                   'stages': {
+                       'full': {'planned': len(full_steps), 'done': progress['full_done']},
+                       'screen': {'planned': len(screen_steps), 'done': progress['screen_done']},
+                       'confirm': {'planned': plan['confirmed'],
+                                   'done': progress['confirm_done']},
+                   } if screen_episodes else None,
                    'episodes_planned': episodes_planned,
                    'episodes_done': sum(r['episodes'] for r in results),
                    # The checkpoint being measured right now, updated every round, or None
@@ -1134,8 +1160,10 @@ def main(argv):
                 rows[step] = build_row(step, held, selected_by.get(step))
         return [rows[step] for step in sorted(rows)]
 
-    def measure(step, episodes, label):
+    def measure(step, episodes, label, stage=None):
         """Restores one checkpoint and adds `episodes` more episodes to its sample."""
+        if stage:
+            progress['stage'] = stage
         print('\ncheckpoint {0} ({1})'.format(step, label))
         checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))).expect_partial()
         restored = int(global_step.numpy())
@@ -1169,6 +1197,7 @@ def main(argv):
         held['rewards'].extend(rewards)
         held['seconds'] += elapsed
         progress['measurements'] += 1
+        progress[progress['stage'] + '_done'] = progress.get(progress['stage'] + '_done', 0) + 1
         progress['session_measurements'] += 1
         progress['session_episodes'] += len(scores)
         progress['session_seconds'] += elapsed
@@ -1186,12 +1215,14 @@ def main(argv):
               '{2:.0f}%, or explicitly named)'.format(len(full_steps), num_episodes,
                                                       ALWAYS_FULL_SINGLE))
         for index, step in enumerate(full_steps, 1):
-            measure(step, num_episodes, 'full {0} of {1}'.format(index, len(full_steps)))
+            measure(step, num_episodes, 'full {0} of {1}'.format(index, len(full_steps)),
+                    stage='full')
 
         print('\nstage 2: screening the other {0} checkpoints at {1} episodes each'.format(
             len(screen_steps), screen_episodes))
         for index, step in enumerate(screen_steps, 1):
-            measure(step, screen_episodes, 'screen {0} of {1}'.format(index, len(screen_steps)))
+            measure(step, screen_episodes, 'screen {0} of {1}'.format(index, len(screen_steps)),
+                    stage='screen')
 
         # Ranked among the screened only. The full tier is excluded because it already has the
         # measurement a confirmation slot would buy — spending one there would spend it on
@@ -1210,11 +1241,12 @@ def main(argv):
                 else '{0:.1f}%'.format(entry['graph_surrounding'])))
         for index, entry in enumerate(finalists, 1):
             measure(entry['step'], num_episodes - screen_episodes,
-                    'confirm {0} of {1}'.format(index, len(finalists)))
+                    'confirm {0} of {1}'.format(index, len(finalists)), stage='confirm')
     else:
         for index, step in enumerate(requested_steps, 1):
             measure(step, num_episodes,
-                    '{0} of {1}'.format(len(resumed_by_step) + index, len(all_steps)))
+                    '{0} of {1}'.format(len(resumed_by_step) + index, len(all_steps)),
+                    stage='flat')
 
     results = current_results()
     write_results(results, complete=True)

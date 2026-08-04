@@ -48,10 +48,16 @@ the ordering worth seeing at a glance.
 
 ## Every arm at a glance
 
-Sorted by **best evaluated checkpoint** — the highest 100-episode measurement any single
-checkpoint of that arm produced, which is the closest thing here to "how good did this
-config ever get". **Pooled** is the average across its ten measured checkpoints, so it
-answers the different question of how good a *typical* good checkpoint is.
+Sorted **newest batch first, then by best evaluated checkpoint within a batch** — the highest
+100-episode measurement any single checkpoint of that arm produced, which is the closest thing here
+to "how good did this config ever get". **Pooled** answers the different question of how good a
+*typical* good checkpoint is, and the episode count after it (`/66000`) is how much measurement
+stands behind it — the selector picks anywhere from 1 to 660 checkpoints per arm, so this is not a
+fixed ten and has not been for a long time.
+
+**Only compare within an era marker.** ‡ is the post-audit environment, ‡‡ the one after
+2026-08-02's seven fixes, ‡‡‡ the 30-value vector. Unmarked rows predate all of it. The one
+designed cross-era comparison is batch 11 against batch 10, which share a config exactly.
 
 Graph-derived columns misrank arms badly (`b5c` is 2nd of its batch on best perfect-30 and
 last on measurement), so read peak score and best perfect-30 as chart description, not as
@@ -59,6 +65,14 @@ ranking.
 
 | policy | change | steps | peak score (at) | best perfect-30 | **best eval'd ckpt** | pooled | verdict |
 |---|---|---|---|---|---|---|---|
+| `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | 94.74 (3978k) | 84.3% | **93%** @1695k | **74.9%** /66000 | ‡‡ **best measured ckpt on record**; stopped healthy |
+| `b10b-disc995seed2` ‡‡ | disc **0.995**, third env | 4.65M | **94.96** (4545k) | 85.0% | 90% @1501k | 71.8% /62400 | ‡‡ still climbing when stopped; cannot be resumed |
+| `b10a-disc995seed1` ‡‡ | disc **0.995**, third env | 4.29M | 94.38 (3402k) | 78.3% | 85% @2344k | 67.2% /27200 | ‡‡ stopped healthy |
+| `b10c-disc995seed3` ‡‡ | disc **0.995**, third env | 4.12M | 93.84 (4021k) | 72.7% | 79% @3965k | 63.0% /4700 | ‡‡ weakest of batch 10 |
+| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **30-value vector** | 3.56M | 94.92 (855k) | **91.7%** | close-out running | — | ‡‡‡ **highest best-30 on record**, at 873k |
+| `b11a-obs30seed1` ‡‡‡ | disc 0.995, **30-value vector** | 3.19M | 94.82 (653k) | 85.7% | close-out running | — | ‡‡‡ **largest drawdown on record**, 42.4 pp |
+| `b11d-obs30seed4` ‡‡‡ | disc 0.995, **30-value vector** | 3.59M | 94.18 (3468k) | 78.3% | close-out running | — | ‡‡‡ only arm still near peak when stopped |
+| `b11c-obs30seed3` ‡‡‡ | disc 0.995, **30-value vector** | 3.23M | 94.26 (2452k) | 73.0% | close-out running | — | ‡‡‡ weakest of batch 11 |
 | `b9d-disc995b` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 3.40M | 86.7 (1232k) | 30.3% | **70%** @2544k | 42.4% /1700 | ‡ **new env** — best ceiling of batch 9 |
 | `b9a-disc9975a` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.9975** | 3.61M | 89.8 (3277k) | 56.0% | 65% @1735k | **54.9%** /2000 | ‡ **new env** — most consistent of batch 9 |
 | `b9c-disc995a` ‡ | alpha 0.6, `td_loss`, no IS, **disc 0.995** | 3.64M | 86.4 (2599k) | 37.3% | 52% @2603k | 38.0% /2000 | ‡ **new env** — weakest survivor |
@@ -163,14 +177,111 @@ Uniform sampling (`b4a`, `b4b`) was the prior favourite and landed at about a th
 
 ---
 
-## Batch 8 — the discount optimum, and gradient clipping
+## Batch 11 — the same config on the 30-value vector
 
-Seven arms in four slots. Set out to push the discount past 0.995 and found that the discount
-has an optimum: 0.999 is dead 2 of 2, while **0.9975 produced the best arm the investigation
-has run**. Gradient clipping, added as an incidental stability aid, was briefly the batch's
-headline and ended as its negative result.
+Four seeds of batch 10's config, byte for byte, on the observation vector after the following-tail
+and food-space blocks landed. **A deliberate null-result test**: the only difference from batch 10
+is those two observations, and the comparison was pre-registered before launch. It came back
+**+5.4 pp at t=0.80 — not significant** against a ~10 pp threshold. The first seeded batch
+(`SNEK_SEED=1..4`). Full write-up: [`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
 
-### ‡ Batch 9 arms are measured on a different environment
+Read these four charts for their *shape*, not their level: three of the four peaked before 1.8M and
+then declined for another 1.5-2.5M steps, which is the most useful thing batch 11 produced.
+
+### b11b-obs30seed2 — `DISCOUNT=0.995`, 30-value vector, seed 2
+
+![b11b](charts/b11b-obs30seed2.png)
+
+Step 3.56M · peak score 94.92 (at 855k) · **best 30-eval perfect 91.7%** (at 873k) · close-out running
+
+**The highest best-30 any arm in this project has reached**, and it got there by 873k. Also n=1 of
+eight arms across the two batches, with the batch means overlapping heavily — a high-water mark,
+not a finding. Gave up 18 pp from that peak by the time it was stopped.
+
+### b11a-obs30seed1 — `DISCOUNT=0.995`, 30-value vector, seed 1
+
+![b11a](charts/b11a-obs30seed1.png)
+
+Step 3.19M · peak score 94.82 (at 653k) · **best 30-eval perfect 85.7%** (at 678k) · close-out running
+
+**The clearest picture of the post-peak decline in the project so far.** 85.7% at 678k down to
+43.3% by 3.19M — a **42.4 pp** drawdown, the largest on record, with no death event: the arm never
+went to zero, it just got steadily worse for 2.5M steps.
+
+### b11d-obs30seed4 — `DISCOUNT=0.995`, 30-value vector, seed 4
+
+![b11d](charts/b11d-obs30seed4.png)
+
+Step 3.59M · peak score 94.18 (at 3468k) · **best 30-eval perfect 78.3%** (at 3468k) · close-out running
+
+The one arm still near its peak when stopped, and the reason not to cap the next batch at 2M
+without hedging: it peaked at 3468k, where the other three peaked before 1.8M. A short cap would
+have truncated this arm before its best work.
+
+### b11c-obs30seed3 — `DISCOUNT=0.995`, 30-value vector, seed 3
+
+![b11c](charts/b11c-obs30seed3.png)
+
+Step 3.23M · peak score 94.26 (at 2452k) · **best 30-eval perfect 73.0%** (at 1718k) · close-out running
+
+Weakest of the batch, and the illustration of why n=4 cannot settle a 5 pp question: 73.0% against
+`b11b`'s 91.7% on an identical config differing only in seed.
+
+---
+
+## Batch 10 — the fresh baseline on the third environment
+
+Four seeds of `DISCOUNT=0.995`, the first arms to train end-to-end on the environment left by
+2026-08-02's seven fixes. **Every arm was stopped healthy rather than dying or declining to a
+stop** — a first for this project — and it produced the best measured checkpoint on record.
+These four are the control batch 11 is compared against. Their checkpoints **no longer load on
+`master`**: `450e66e` is the last commit with the 26-value vector.
+
+### b10d-disc995seed4 — `DISCOUNT=0.995`, third env, seed 4
+
+![b10d](charts/b10d-disc995seed4.png)
+
+Step 4.45M · peak score 94.74 (at 3978k) · best 30-eval perfect 84.3% (at 1666k) · **best measured checkpoint 93%** (at 1695k), pooled **74.9%** /66000
+
+**The best measured checkpoint in the project.** A mid-run eval had read 95% at 1815k; the full
+close-out found 93% at 1695k instead, and the two intervals overlap almost entirely — the same
+policy family measured twice, not a record and a near-miss. Treat ~87% as the honest estimate of
+the underlying rate once the winner's curse is accounted for.
+
+### b10b-disc995seed2 — `DISCOUNT=0.995`, third env, seed 2
+
+![b10b](charts/b10b-disc995seed2.png)
+
+Step 4.65M · peak score 94.96 (at 4545k) · **best 30-eval perfect 85.0%** (at 4547k) · best measured checkpoint 90% (at 1501k), pooled 71.8% /62400
+
+Still climbing when it was stopped — peak trailing score at 4545k out of 4652k run. Its ceiling is
+unknown and, because the vector has since changed, unknowable: this arm cannot be resumed.
+
+### b10a-disc995seed1 — `DISCOUNT=0.995`, third env, seed 1
+
+![b10a](charts/b10a-disc995seed1.png)
+
+Step 4.29M · peak score 94.38 (at 3402k) · best 30-eval perfect 78.3% (at 3402k) · best measured checkpoint 85% (at 2344k), pooled 67.2% /27200
+
+### b10c-disc995seed3 — `DISCOUNT=0.995`, third env, seed 3
+
+![b10c](charts/b10c-disc995seed3.png)
+
+Step 4.12M · peak score 93.84 (at 4021k) · best 30-eval perfect 72.7% (at 4064k) · best measured checkpoint 79% (at 3965k), pooled 63.0% /4700
+
+Weakest of batch 10, and the arm whose close-out selected only 47 checkpoints where `b10d` selected
+660 — the selector's own read on how much of a run is worth measuring.
+
+---
+
+## Batch 9 — two discounts on the post-audit environment
+
+Four arms, two seeds each of `DISCOUNT=0.995` and `0.9975`, and the first batch to run after the
+2026-08-02 audit. Its own lesson was methodological: it compared two values before either had a
+baseline on the environment being measured, which is why batch 10 spent all four slots on one
+config instead.
+
+### ‡ These arms are measured on a different environment
 
 The 2026-08-02 audit changed two observation components and the reward, and every arm below the
 batch-9 rows was measured before it. A batch-9 number is **not comparable** to a pre-audit one:
@@ -230,6 +341,15 @@ Its trailing average peaked at **1232k** and had fallen to 49.4 by 3.4M, while i
 checkpoint is at 2544k — the graph and the measurement disagree about when this arm was good.
 
 ![b9d-disc995b progress](charts/b9d-disc995b.png)
+
+---
+
+## Batch 8 — the discount optimum, and gradient clipping
+
+Seven arms in four slots. Set out to push the discount past 0.995 and found that the discount
+has an optimum: 0.999 is dead 2 of 2, while **0.9975 produced the best arm the investigation
+has run**. Gradient clipping, added as an incidental stability aid, was briefly the batch's
+headline and ended as its negative result.
 
 ### b8f-disc9975seed2 — `DISCOUNT=0.9975`, seed 2
 

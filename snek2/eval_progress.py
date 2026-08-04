@@ -43,9 +43,26 @@ The PNG has three parts:
    process. A checkpoint takes ~5 minutes and 10 rounds, so this is where you see whether the
    one being measured now is heading somewhere good, and how many rounds are left.
 2. **Completed checkpoints by step** — every finished measurement as a point, so the shape of
-   the arm's good region is visible, with the best and the pooled mean marked.
-3. **A text block** — top 5 checkpoints, percent complete, and an ETA computed from this run's
-   own measured pace.
+   the arm's good region is visible, with the best and the pooled mean marked. Under the screening
+   protocol the points are **split by depth**: solid for full-length measurements, small hollow grey
+   for 20-episode screens, because the two are not the same kind of number and drawing them alike
+   invites reading a lucky 19/20 as a result.
+3. **A text block** — a per-stage progress breakdown, top 5 checkpoints, percent complete, and an
+   ETA computed from this run's own measured pace.
+
+**The stage block is the thing to read while a three-stage close-out runs.** One undifferentiated
+bar reads as a hung job, because the stages run at wildly different speeds: the 100%-graph-point
+tier is 100 episodes a checkpoint and crawls, screening is 20 and races, confirming crawls again. A
+finished stage collapses to `done` rather than keeping a 100% bar, and the screening line reports how
+much of its pool was **cut** — left at screen length rather than promoted — which is the number that
+says what the protocol bought on that arm.
+
+**Two numbers here are deliberately filtered, and both used to be wrong.** `best` and `top 5` rank
+over full-length rows only (`deep_rows`): across a few hundred 20-episode screens several land on
+20/20, and an unfiltered top 5 showed five lucky screens at 100.0% sitting directly under a `best`
+of 95%. And `pooled` prefers the writer's `pooled_equal_effort` — every checkpoint truncated to the
+same prefix — because pooling rows of different depths weights the full-length ones, which are the
+arm's best by construction, and reads high however good the policy is.
 
 Text output goes to stdout as well, and that is the better one to read when checking progress
 programmatically — it carries the same numbers without needing to open an image.
@@ -125,6 +142,21 @@ def discover_policies():
     return sorted(names)
 
 
+def deep_rows(rows):
+    """Rows measured to at least half the deepest length on offer.
+
+    The shared definition of "a measurement worth ranking". A 20-episode screen has a ~5x wider
+    interval than a 100-episode confirmation, so across hundreds of screens some land on 20/20 by
+    luck; anything that reports a maximum or a ranking has to exclude them or it reports noise.
+    With one uniform episode count this is every row, which is why every protocol before screening
+    is unaffected.
+    """
+    if not rows:
+        return []
+    deepest = max(r['episodes'] for r in rows)
+    return [r for r in rows if r['episodes'] >= deepest / 2.0]
+
+
 def best_of(rows):
     """The best row among those measured to at least half the deepest length on offer.
 
@@ -135,11 +167,79 @@ def best_of(rows):
     has always meant. With one uniform episode count — every protocol before screening existed
     — this returns exactly what max() over everything would.
     """
-    if not rows:
+    deep = deep_rows(rows)
+    if not deep:
         return None
-    deepest = max(r['episodes'] for r in rows)
-    deep = [r for r in rows if r['episodes'] >= deepest / 2.0]
     return max(deep, key=lambda r: r['perfect_percent'])
+
+
+STAGE_LABELS = {
+    'full': 'measuring every 100% graph point at full length',
+    'screen': 'screening the rest',
+    'confirm': 'confirming the best of the screened',
+    'done': 'complete',
+}
+
+
+def stage_summary(runs):
+    """Per-stage planned/done totals across every process on this policy, or None for a flat run.
+
+    Exists because a three-stage close-out shown as one bar reads as a hung job: the full tier is
+    100 episodes a checkpoint and crawls, then screening is 20 and races, then confirming crawls
+    again. Three separate counts make that shape legible.
+
+    `current` is the first stage that is not finished rather than whatever the writer last set,
+    so it stays right when several processes are at different points and when a stage has nothing
+    planned at all — an arm with no 100% graph points has an empty full tier and should read as
+    screening from the start, not as "stage 1, 0/0".
+    """
+    reported = [r.get('stages') for r in runs if r.get('stages')]
+    if not reported:
+        return None
+    out = {}
+    for name in ('full', 'screen', 'confirm'):
+        out[name] = {'planned': sum(s[name]['planned'] for s in reported),
+                     'done': sum(s[name]['done'] for s in reported)}
+    out['current'] = next((name for name in ('full', 'screen', 'confirm')
+                           if out[name]['done'] < out[name]['planned']), 'done')
+    out['order'] = ['full', 'screen', 'confirm']
+    return out
+
+
+def stage_lines(stages):
+    """The stage block for the text summary: one line per stage, detail only where it is useful.
+
+    A finished stage collapses to `done` — its percentage is noise once the next stage is running,
+    which is what was asked for. The screening line additionally reports how much of its pool was
+    *cut*, i.e. left at the screen length rather than promoted, because that is the number that
+    says what the protocol actually bought on this arm.
+    """
+    if not stages:
+        return []
+    current = stages['current']
+    position = stages['order'].index(current) + 1 if current != 'done' else len(stages['order'])
+    lines = ['  stage {0} of 3 — {1}'.format(position, STAGE_LABELS[current])]
+    for name in stages['order']:
+        planned, done = stages[name]['planned'], stages[name]['done']
+        if planned == 0:
+            lines.append('    {0:<8} {1:>4}       none for this arm'.format(name, '-'))
+            continue
+        counts = '{0}/{1}'.format(done, planned)
+        if done >= planned:
+            detail = 'done'
+            if name == 'screen':
+                promoted = stages['confirm']['planned']
+                cut = planned - promoted
+                detail = 'done — {0} promoted, {1} ({2:.0f}%) left at screen length'.format(
+                    promoted, cut, 100.0 * cut / planned)
+        elif done == 0 and name != current:
+            detail = 'pending'
+        else:
+            filled = int(20 * done / planned)
+            detail = '{0:>3.0f}%  {1}{2}'.format(100.0 * done / planned,
+                                                 '#' * filled, '.' * (20 - filled))
+        lines.append('    {0:<8} {1:>9}  {2}'.format(name, counts, detail))
+    return lines
 
 
 def summarize(runs, stale_after=180):
@@ -230,7 +330,16 @@ def summarize(runs, stale_after=180):
         # Stage-aware label: 'measurements' when some checkpoints are measured twice, since then
         # the count is no longer one per checkpoint.
         'unit': ('measurements' if any(r.get('screen_episodes') for r in runs) else 'checkpoints'),
-        'pooled': (100.0 * total_perfect / total_episodes) if total_episodes else 0.0,
+        'stages': stage_summary(runs),
+        'screen_episodes': next((r.get('screen_episodes') for r in runs
+                                 if r.get('screen_episodes')), None),
+        # Prefer the writer's equal-effort figure when it exists. Pooling the rows themselves is
+        # only an arm rate when every row has the same depth; under screening the deep rows are the
+        # arm's best and pooling them reads high by construction.
+        'pooled': next((r['pooled_equal_effort'] for r in runs
+                        if r.get('pooled_equal_effort') is not None),
+                       (100.0 * total_perfect / total_episodes) if total_episodes else 0.0),
+        'pooled_is_equal_effort': any(r.get('pooled_equal_effort') is not None for r in runs),
         'episodes': total_episodes,
         'mean_seconds': mean_seconds,
         'eta_seconds': eta_seconds,
@@ -259,14 +368,24 @@ def text_summary(policy_name, state):
         '#' * filled, '.' * (bar_width - filled), done, requested, state['unit'],
         state['percent_done']))
 
+    lines.extend(stage_lines(state.get('stages')))
+
     if state['completed']:
-        lines.append('  best {0:.1f}% @{1}   pooled {2:.1f}% over {3} episodes'.format(
+        pooled_note = (' (equal effort)' if state.get('pooled_is_equal_effort')
+                       else ' over {0} episodes'.format(state['episodes']))
+        lines.append('  best {0:.1f}% @{1}   pooled {2:.1f}%{3}'.format(
             state['best']['perfect_percent'], state['best']['step'],
-            state['pooled'], state['episodes']))
+            state['pooled'], pooled_note))
         lines.append('  pace {0}/checkpoint   ETA {1}'.format(
             format_duration(state['mean_seconds']), format_duration(state['eta_seconds'])))
-        lines.append('  top 5:')
-        top = sorted(state['completed'], key=lambda r: -r['perfect_percent'])[:5]
+        # Ranked over the deeply-measured rows only, the same rule best_of() applies. Without it
+        # the list contradicted the `best` line directly above it: across a few hundred 20-episode
+        # screens several land on 20/20, so an unfiltered top 5 was five lucky screens at 100.0%
+        # sitting under a `best` of 95% — the filtered answer.
+        deep = deep_rows(state['completed'])
+        note = '' if len(deep) == len(state['completed']) else '  (full-length rows only)'
+        lines.append('  top 5:{0}'.format(note))
+        top = sorted(deep, key=lambda r: -r['perfect_percent'])[:5]
         for rank, row in enumerate(top, 1):
             lines.append('    {0}. {1:>8}  {2:>5.1f}%  (CI {3:.0f}-{4:.0f})  avg score {5}'.format(
                 rank, row['step'], row['perfect_percent'],
@@ -279,7 +398,8 @@ def text_summary(policy_name, state):
         for run, flight in sorted(state['active'], key=lambda p: p[1]['step']):
             lines.append('    {0:<9} {1:>8}  round {2}/{3}  running {4:.0f}%  ({5} elapsed)'.format(
                 run['suffix'], flight['step'], flight['round'], flight['rounds_total'],
-                flight['running_percent'], format_duration(time.time() - flight['started_at'])))
+                flight['running_percent'],
+                format_duration(max(0, time.time() - flight['started_at']))))
     elif done < requested:
         lines.append('  nothing in flight')
 
@@ -384,11 +504,28 @@ def render(policy_name, state, out_path):
     middle = figure.add_subplot(grid[next_row])
     next_row += 1
     if state['completed']:
-        steps = [r['step'] / 1000.0 for r in state['completed']]
-        rates = [r['perfect_percent'] for r in state['completed']]
-        middle.scatter(steps, rates, s=22, alpha=0.75, color='#1f77b4', zorder=3)
+        # Split by measurement depth, because the two are not the same kind of number: a screened
+        # point is 20 episodes with a ~5x wider interval, and drawing it identically to a
+        # 100-episode point invites reading a lucky 19/20 as a real result. Hollow small markers
+        # for screens, solid for full-length. With one uniform depth — every protocol before
+        # screening — everything lands in the "full" series and the chart looks as it always did.
+        deepest = max(r['episodes'] for r in state['completed'])
+        full = [r for r in state['completed'] if r['episodes'] >= deepest / 2.0]
+        screened = [r for r in state['completed'] if r['episodes'] < deepest / 2.0]
+        if screened:
+            middle.scatter([r['step'] / 1000.0 for r in screened],
+                           [r['perfect_percent'] for r in screened],
+                           s=9, alpha=0.35, facecolors='none', edgecolors='#8c8c8c',
+                           linewidths=0.7, zorder=2,
+                           label='screened, {0} ep'.format(min(r['episodes'] for r in screened)))
+        middle.scatter([r['step'] / 1000.0 for r in full],
+                       [r['perfect_percent'] for r in full],
+                       s=22, alpha=0.75, color='#1f77b4', zorder=3,
+                       label='full, {0} ep'.format(deepest) if screened else None)
         middle.axhline(state['pooled'], color='#666666', linestyle=(0, (5, 3)), linewidth=1.0,
-                       label='pooled {0:.1f}%'.format(state['pooled']), zorder=2)
+                       label='pooled {0:.1f}%{1}'.format(
+                           state['pooled'],
+                           ' eq' if state.get('pooled_is_equal_effort') else ''), zorder=2)
         best = state['best']
         middle.scatter([best['step'] / 1000.0], [best['perfect_percent']], s=90, zorder=4,
                        facecolors='none', edgecolors='#d62728', linewidths=1.6,
@@ -400,9 +537,15 @@ def render(policy_name, state, out_path):
         middle.text(0.5, 0.5, 'no checkpoint finished yet', fontsize=9, color='#888888',
                     ha='center', va='center', transform=middle.transAxes)
         middle.set_xticks([])
-    middle.set_title('Completed {0} ({1} of {2})'.format(
-        state['unit'], state['done'], state['requested']),
-                     fontsize=10)
+    stages = state.get('stages')
+    if stages and stages['current'] != 'done':
+        title = 'Completed {0} ({1} of {2}) — stage {3}/3, {4}'.format(
+            state['unit'], state['done'], state['requested'],
+            stages['order'].index(stages['current']) + 1, stages['current'])
+    else:
+        title = 'Completed {0} ({1} of {2})'.format(
+            state['unit'], state['done'], state['requested'])
+    middle.set_title(title, fontsize=10)
     middle.set_xlabel('checkpoint step (thousands)', fontsize=8)
     middle.set_ylabel('measured perfect %', fontsize=8)
     middle.set_ylim(0, 100)

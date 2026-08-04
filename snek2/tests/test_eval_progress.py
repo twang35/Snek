@@ -127,3 +127,141 @@ def test_summarize_divides_remaining_work_across_live_processes():
                                    run([result(2, seconds=100.0)], complete=False,
                                        checkpoints_requested=0, in_flight=flight)])
     assert two['eta_seconds'] < one['eta_seconds']
+
+
+# ------------------------------------------------------------- stage reporting
+
+def staged(full=(48, 48), screen=(181, 0), confirm=(100, 0), **extra):
+    """A run payload carrying the three-stage counts, as (planned, done) pairs."""
+    return run([], complete=False,
+               screen_episodes=20, confirm_count=confirm[0],
+               stages={'full': {'planned': full[0], 'done': full[1]},
+                       'screen': {'planned': screen[0], 'done': screen[1]},
+                       'confirm': {'planned': confirm[0], 'done': confirm[1]}},
+               **extra)
+
+
+def test_stage_summary_is_none_for_a_flat_run():
+    # Every protocol before screening. The chart must fall back to its old single-bar form.
+    assert eval_progress.stage_summary([run([])]) is None
+
+
+def test_stage_summary_reports_the_first_unfinished_stage():
+    s = eval_progress.stage_summary([staged(full=(48, 20))])
+    assert s['current'] == 'full'
+    s = eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 90))])
+    assert s['current'] == 'screen'
+    s = eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 181), confirm=(100, 3))])
+    assert s['current'] == 'confirm'
+
+
+def test_stage_summary_says_done_when_every_stage_is_finished():
+    s = eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 181), confirm=(100, 100))])
+    assert s['current'] == 'done'
+
+
+def test_stage_summary_skips_a_stage_with_nothing_planned():
+    # An arm with no 100% graph points has an empty full tier and should read as screening from the
+    # start, not as "stage 1, 0 of 0" forever.
+    s = eval_progress.stage_summary([staged(full=(0, 0), screen=(87, 4))])
+    assert s['current'] == 'screen'
+
+
+def test_stage_summary_sums_across_parallel_processes():
+    two = [staged(full=(20, 20), screen=(50, 10)), staged(full=(30, 30), screen=(60, 5))]
+    s = eval_progress.stage_summary(two)
+    assert s['full'] == {'planned': 50, 'done': 50}
+    assert s['screen'] == {'planned': 110, 'done': 15}
+
+
+def test_stage_lines_hide_the_percentage_once_a_stage_is_finished():
+    # The specific request: a finished stage's progress percent is noise once the next is running.
+    lines = eval_progress.stage_lines(
+        eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 90))]))
+    full_line = [l for l in lines if l.strip().startswith('full')][0]
+    screen_line = [l for l in lines if l.strip().startswith('screen')][0]
+    assert 'done' in full_line and '%' not in full_line
+    assert '%' in screen_line and '#' in screen_line, screen_line
+
+
+def test_stage_lines_report_how_much_the_screen_cut():
+    # Answers "what percentage was screened out": 181 screened, 100 promoted, 81 left at 20.
+    lines = eval_progress.stage_lines(
+        eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 181), confirm=(100, 5))]))
+    screen_line = [l for l in lines if l.strip().startswith('screen')][0]
+    assert '100 promoted' in screen_line and '81 (45%)' in screen_line, screen_line
+
+
+def test_stage_lines_mark_a_future_stage_pending_not_zero_percent():
+    lines = eval_progress.stage_lines(
+        eval_progress.stage_summary([staged(full=(48, 20))]))
+    confirm_line = [l for l in lines if l.strip().startswith('confirm')][0]
+    assert 'pending' in confirm_line, confirm_line
+
+
+def test_stage_lines_name_the_current_stage_and_its_position():
+    lines = eval_progress.stage_lines(
+        eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 181), confirm=(100, 5))]))
+    assert lines[0].strip().startswith('stage 3 of 3'), lines[0]
+
+
+def test_stage_lines_are_empty_for_a_flat_run():
+    assert eval_progress.stage_lines(None) == []
+
+
+def test_text_summary_includes_the_stage_block():
+    state = eval_progress.summarize([staged(full=(48, 48), screen=(181, 90))])
+    text = eval_progress.text_summary('arm', state)
+    assert 'stage 2 of 3' in text and 'screening the rest' in text, text
+
+
+def test_top_five_excludes_lucky_screens_like_the_best_line_does():
+    """The list and the `best` line above it must agree.
+
+    Caught by eyeballing a rendered chart: an unfiltered top 5 showed five 20-episode screens at
+    100.0% sitting directly under a `best` of 95%, because across a few hundred screens several
+    land on 20/20 by luck. Both now rank over full-length rows only.
+    """
+    rows = ([result(1000 + i, episodes=20, perfect=20) for i in range(8)]
+            + [result(9000, episodes=100, perfect=95)])
+    state = eval_progress.summarize([run(rows, checkpoints_requested=9)])
+    text = eval_progress.text_summary('arm', state)
+    assert state['best']['step'] == 9000
+    assert '100.0%' not in text, text
+    assert 'full-length rows only' in text
+
+
+def test_top_five_has_no_caveat_when_every_row_is_full_length():
+    rows = [result(1000 + i, episodes=100, perfect=70 + i) for i in range(6)]
+    state = eval_progress.summarize([run(rows, checkpoints_requested=6)])
+    assert 'full-length rows only' not in eval_progress.text_summary('arm', state)
+
+
+def test_deep_rows_is_every_row_under_one_uniform_episode_count():
+    rows = [result(1, episodes=100), result(2, episodes=100)]
+    assert eval_progress.deep_rows(rows) == rows
+    assert eval_progress.deep_rows([]) == []
+
+
+def test_pooled_prefers_the_writers_equal_effort_figure():
+    """Pooling the rows is not an arm rate once depths differ, and the chart used to show it.
+
+    Here the deep row is a perfect 100/100 and the shallow one 5/20. Pooling gives 105/120 = 87.5%,
+    which reads high purely because the deep rows are the arm's best by construction. The writer's
+    equal-effort figure (every checkpoint truncated to its first 20) is 62.5%.
+    """
+    rows = [result(1, episodes=100, perfect=100), result(2, episodes=20, perfect=5)]
+    state = eval_progress.summarize([run(rows, screen_episodes=20, pooled_equal_effort=62.5)])
+    assert state['pooled'] == 62.5
+    assert state['pooled_is_equal_effort'] is True
+    assert 'equal effort' in eval_progress.text_summary('arm', state)
+
+
+def test_pooled_falls_back_to_row_pooling_for_a_flat_run():
+    # With one uniform depth, pooling the rows already gives equal effort, and every arm measured
+    # before screening existed reports it that way.
+    rows = [result(1, episodes=100, perfect=70), result(2, episodes=100, perfect=80)]
+    state = eval_progress.summarize([run(rows, checkpoints_requested=2)])
+    assert abs(state['pooled'] - 75.0) < 0.001
+    assert state['pooled_is_equal_effort'] is False
+    assert 'equal effort' not in eval_progress.text_summary('arm', state)
