@@ -20,7 +20,7 @@ Unlike every earlier record in this project, **this one needs no checkout** — 
 observation vector that is on `master` right now. Full batch results and the "config vs
 environment" open question: [`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
 
-## No training is running — all four slots are free (two close-out evals are)
+## Batch 10 is closed out — its arms are the control for batch 11
 
 **Batch 10 was stopped 2026-08-03 by request**, all four arms healthy (no `dead_since` on any
 of them), to make room for further changes. It was launched as a fresh baseline after seven
@@ -162,10 +162,21 @@ that seed cluster produced the 95%, and the environment has moved on again.
 their processes loaded the 26-value code at startup; `EVAL_RESUME=1` would now build a 30-value
 network and fail to restore. Whatever they have written is what there will be.
 
-## Batch 11 — designed, awaiting the go-ahead (not launched)
+## Batch 11 — RUNNING, launched 2026-08-03 ~22:55
 
 **Four seeds of one config on the 30-value environment.** Batch 10's config, unchanged, so the
-only difference between the two batches is the two observations added 2026-08-03.
+only difference between the two batches is the two observations added 2026-08-03. **The first
+seeded batch in this project's history** — `SNEK_SEED=1..4`, recorded in each `runs/<policy>.md`.
+
+Verify with `pgrep -fl "python -u snek2.py"`. Four watchers are attached via
+`watch_when_ready.sh`. `b10d`'s close-out eval was still finishing at launch, by request.
+
+**Early numbers mean nothing yet and are recorded here only so they are not mistaken for a
+result later.** At 10k steps batch 11 averages score 41.1 against batch 10's 25.7, and
+`b11c` showed 30% perfect where no batch-10 arm had any. That difference is **t=0.90, p≈0.4** —
+the within-batch spread is 7.0 to 71.9. This document's own rule is that nothing is judgeable
+below ~250k steps, and two runs of one identical config have reached final avg_score 62.5 and
+18.0 at 30k. Do not quote this paragraph as evidence of anything.
 
 | arm | policy name | config |
 |---|---|---|
@@ -177,8 +188,13 @@ only difference between the two batches is the two observations added 2026-08-03
 Shared base, byte-identical to batch 10:
 `SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`
 
-Names encode the vector length rather than the discount, because the discount is unchanged from
-batch 10 and the vector length is what decides checkpoint compatibility.
+**Names encode the vector length rather than the config**, which departs from the usual convention
+of naming what varies (`disc995`, `nstep3`, `unifbuf500k`) — nothing about batch 11's config varies
+from batch 10's, so there is nothing to name there. `obs30` identifies the *environment*, and that
+is the label worth having: it decides checkpoint compatibility, and it makes this batch reusable as
+**the benchmark for every later batch trained on the 30-value vector**. A batch 12 arm at
+`LEARNING_RATE=1e-4` compares against `obs30` arms directly; one on a 31-value vector does not, and
+its name will say so.
 
 **Batch 10 is a clean control, verified rather than assumed.** The only training-relevant commit
 between batch 10's launch and now is `b09c616`, the two observation blocks; the one other commit
