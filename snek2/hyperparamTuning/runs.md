@@ -205,22 +205,51 @@ agreement across metrics makes a real positive effect more likely than zero, but
 `b11b` holds both records now: the highest best-30 (91.7%) and the best measured checkpoint (96%).
 Both are n=1 of eight arms with heavily overlapping batch means — high-water marks, not findings.
 
-### The next batch should be shorter and wider, not another knob
+## Proposed next: batch 12 — the epsilon rewrite at n=8, in two waves
+
+| | |
+|---|---|
+| arms | 8, `SNEK_SEED=1..8`, all identical |
+| config | byte-identical to batch 11 plus the new epsilon default |
+| cap | 2.5M steps per arm (~7.5 h per wave of 4, from batch 11's ~332k steps/arm/hour) |
+| schedule | **two waves of 4** — the 4-trainer cap makes n=8 sequential, one overnight each |
+| control | batch 11's four arms, already measured, at a 2.5M horizon |
+| pairing | seeds 1-4 pair directly with `b11a`-`b11d` |
+| primary metric | `strong_eval_fraction` at 2.5M; `best_perfect30` secondary for continuity |
+| decision rule | **keep the schedule unless clearly worse** — revert only on a >10 pp drop |
+
+```
+SNEK_SEED=n SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 \
+SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 \
+  /opt/miniconda3/envs/snek/bin/python -u snek2.py b12<x>-eps002seed<n>
+```
+
+`eps002` names the floor the way `obs30` named the vector, so it reads as a benchmark label later.
+**The control is clean**: the only training-relevant diff since batch 11 launched is the epsilon
+schedule and its plumbing, verified by diffing every training file against `83abbd4`.
+
+**This batch cannot prove the epsilon fix helps, and is not meant to.** Even paired, n=4 resolves
+~10-15 pp. The fix is justified on mechanism — 96.8% of steps at epsilon exactly 0 is a defect
+whatever the effect size — so the pre-registered role of wave 1 is a **regression check** with an
+asymmetric rule, and its second purpose is banking the first seeds on the new default. Wave 2
+takes n to 8, which is what future knob tests need.
+
+### Why shorter and wider, and what it actually buys
 
 **Three of batch 11's four arms peaked before 1.8M**, then spent 1.5-2.5M further steps getting
-worse. A 10-hour run therefore spent most of its compute past the point of interest. Capping a
-batch near 2M costs about a third per arm and buys **3x the seeds in the same wall time** — and
-seed count is the only thing that fixes the resolution problem that made batch 11 unreadable.
-n=4 detects ~10 pp; **n=12 at 2M would detect ~5 pp**, in the same overnight window.
+worse, so a 10-hour run spent most of its compute past the point of interest. Capping near 2.5M
+costs about a third per arm and buys seeds instead — and seed count is the binding constraint.
 
-That is worth doing *before* spending four slots on `LEARNING_RATE=1e-4` or any other knob, because
-every knob on the backlog plausibly has an effect smaller than 10 pp — which means the current
-design cannot see any of them, and four more slots would produce another unreadable batch.
+Be precise about the gain, because an earlier version of this section was not: **n=12 detects ~5 pp
+only on a low-variance metric.** On `best_perfect30` it is 8.7 pp, and 5 pp there would need ~37
+arms per group, which is not reachable. On `strong_eval_fraction` n=12 gives 5.9 pp and n=8 gives
+7.2 pp. See the table in
+[`hyperparamTuning.md`](hyperparamTuning.md#the-primary-metric-strong_eval_fraction-the-share-of-an-arms-evals-at-80).
 
-Open question the cap does not answer: whether the arms that peak at ~700k would have gone higher
-with more steps, or whether the peak is the ceiling. Batch 11's `b11d` peaked at 3468k and was the
-only arm still near its peak when stopped, so the cap risks truncating that kind of arm. A
-reasonable compromise is n=8 at 2.5M with two arms allowed to run on.
+Open question the cap does not answer: whether arms that peak at ~700k would have gone higher with
+more steps, or whether the peak is the ceiling. `b11d` peaked at 3468k and was the only arm still
+near its peak when stopped, so a 2.5M cap risks truncating that kind of arm — worth letting one or
+two run on past the cap once the wave's comparison data is in hand.
 
 ### Later candidates
 

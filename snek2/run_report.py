@@ -48,6 +48,40 @@ def load_history(path):
     return saved.get('evals', []), saved.get('resumes', [])
 
 
+STRONG_EVAL_THRESHOLD = 80.0
+
+
+def strong_eval_fraction(perfect, threshold=STRONG_EVAL_THRESHOLD):
+    """Percentage of this arm's evals that reached `threshold` perfect games or better.
+
+    **The primary metric for cross-arm comparison from 2026-08-04.** It displaced
+    `best_perfect30` because it has the lowest between-seed variance of every candidate measured
+    on batch 11's four identical configs — sd 5.8 pp against 8.6 for best-30 — and variance is
+    what decides how small an effect a batch can resolve. Same arms, same data, ~40% tighter
+    detectable effect for no extra compute:
+
+    | metric | sd across 4 identical seeds | detects at n=8 |
+    |---|---|---|
+    | fraction of evals >= 80% | **5.8** | **7.2 pp** |
+    | mean perfect over the last half | 6.3 | 7.9 pp |
+    | best checkpoint, 100 episodes | 7.3 | 9.1 pp |
+    | best_perfect30 | 8.6 | 10.7 pp |
+
+    Two reasons it behaves better. **best_perfect30 is a max statistic**, and maxima inflate
+    variance — it reports the single luckiest 30-eval window an arm ever had. And this measures
+    *sustained* competence, which is closer to the stated goal ("the highest perfect rate while
+    learning consistently") than one good window is.
+
+    Note it is a fraction of an arm's *own* evals, so it is only comparable between arms compared
+    at the same step horizon — the denominator grows with run length, and a long tail of decline
+    drags it down. That is intended, but it means the horizon has to be fixed first, exactly as
+    the pre-registered best-30 comparison already required.
+    """
+    if not perfect:
+        return 0.0
+    return round(100.0 * sum(1 for value in perfect if value >= threshold) / len(perfect), 1)
+
+
 def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1.0):
     """Precomputed answers to the questions every progress check asks.
 
@@ -109,6 +143,9 @@ def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1
         'trailing_now': round(trailing[-1], 2),
         'peak_trailing': {'value': round(max(trailing), 2), 'step': eval_rows[peak_index]['step']},
         'best_perfect30': {'value': round(best_perfect, 1), 'step': best_perfect_step},
+        # The primary metric from 2026-08-04. See `strong_eval_fraction` for why it displaced
+        # best_perfect30, which stays here because every arm through batch 11 is recorded on it.
+        'strong_eval_fraction': strong_eval_fraction(perfect),
         'recent_perfect30': round(sum(recent) / len(recent), 1),
         'max_single_eval': max(perfect),
         'dead_since': dead_since,

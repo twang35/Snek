@@ -240,64 +240,6 @@ only 21 distinct values, so ties are the common case and the tie-break does real
 surrounding rate correlates +0.48 with the true rate inside the high band where the graph point
 itself manages +0.10.
 
-#### Why not abandon weak checkpoints early
-
-The intuitive alternative is to start every checkpoint at 100 episodes and cut it once it looks
-weak. It was simulated and **it barely helps**. Cutting anything below 12/20 at the 20-episode
-mark is statistically safe — of the 157 checkpoints that finished at >=80%, the expected number
-wrongly cut is 0.24, or **0.15%** — but it saves only **14%** of the episodes.
-
-The reason is the shape of the selected population, which is a tight blob rather than a few good
-runs among junk:
-
-| final rate | share of selected checkpoints |
-|---|---|
-| below 60% | 9.7% |
-| 60-69% | 32.9% |
-| 70-79% | 40.7% |
-| 80% or better | 16.8% |
-
-Only a tenth of the population finishes below 60%, and a gate lenient enough to keep an 80%
-checkpoint keeps nearly everything above 60% as well — at 20 episodes the noise band is ±17pp, so
-a safe gate has to sit right where the population already is. Pushing the gate to 14/20 buys
-1.44x but starts losing 3.2% of the >=80% set. Screening wins because it economises on the many
-*mediocre* checkpoints, which is where the time actually is, rather than on the few bad ones.
-
-Worth knowing when reading any of these numbers: of the 8.8pp spread between checkpoints in a
-100-episode measurement, **26% is pure coin-flip noise**, and the winner's curse is real — batch
-10's headline 93/100 shrinks to a posterior mean of **87.2%** once you account for it being the
-max of ~300 noisy measurements.
-
-#### Why the thresholds moved from >=80%/cap 10 to >=90%/cap 20
-
-The first version measured **everything** at >=80% with no upper bound, which does not scale
-on a good arm. Once `b8f-disc9975seed2` reached 3M steps it presented **109** such checkpoints —
-about seven hours of evaluation — and it was still training:
-
-| arm | checkpoints picked now | under the old rule |
-|---|---|---|
-| `b8f-disc9975seed2` | **32** | 109 |
-| `b8d-disc995clip` | **20** | 33 |
-| `b7f-disc995seed3` | 20 | 10 |
-
-Measurement justified the narrowing: across 88 checkpoints, 90% and 80% graph points had
-**indistinguishable** mean true rates (57.9% vs 58.6%), so an unbounded 80% tier was buying
-volume rather than information. The 100% points were the only genuinely distinct group.
-
-Note the change is not uniformly cheaper. A **weak** arm now gets *more* attention — `b7f` goes
-from 10 to 20 — because the cap doubled and the fill band widened to include 80%. The saving is
-concentrated where the cost was: strong arms with hundreds of high checkpoints.
-
-**Most arms have nothing above the floor,** so the selector refuses them outright with a message
-naming their best graph point. That is the intended outcome: 22 of the 30 arms run so far never
-produced a single eval above 50%. It also means `b6a-alpha04` cannot be re-measured at all and
-`b6b-alpha06` yields only 2 checkpoints.
-
-**These rule changes break pooled-rate comparability.** Pooled now averages over a checkpoint
-count that varies by arm (32 vs 20 vs 1) and over a population truncated at 60%, so a strong
-arm's pooled figure is not computed the same way as a weak one's. Compare **best checkpoint**
-across arms, and treat pooled as a within-arm consistency read.
-
 #### Watching a run in progress: `eval_progress.py`
 
 A close-out is 20-50 checkpoints at ~4 minutes each, usually split across several parallel
@@ -351,155 +293,39 @@ It is a separate script rather than a chart inside `eval_checkpoints.py` because
 each drawing their own window would be six partial pictures of one job, and writing one shared
 PNG would have them overwrite each other.
 
-#### Results are saved incrementally
+### The primary metric: `strong_eval_fraction`, the share of an arm's evals at >=80%
 
-The output JSON is rewritten after **every** checkpoint, via `.partial` + `os.replace` so a
-reader never sees a half-written file. An interrupted run therefore keeps everything measured up
-to that point, and the payload carries `complete: false` until the final checkpoint lands —
-check that field before treating a file as an arm's full measurement.
+**Changed 2026-08-04, from `best_perfect30`.** Both are in `runs/<policy>_evals.json`'s summary
+block; the old one is kept because every arm through batch 11 is recorded on it.
 
-This matters because these runs are long: 20 checkpoints is over an hour, and a 63-checkpoint
-run took four. The earlier version wrote once at the end, so any interruption discarded all of
-it — the numbers would survive in the log, but nothing machine-readable.
+The reason is variance, not taste. Measured across batch 11's four *identical* configs, the
+between-seed spread of each candidate metric — and what that spread implies a batch can resolve:
 
-**Measure the whole >=80% tier; do not trust its order.** 26 high-eval checkpoints measured on
-2026-07-30 show the graph value carries no ranking signal once it is high — correlation with the
-true rate is **-0.09** across both arms, and it flips sign between them (+0.66 / -0.57). The
-three 90% points in that sample measured 39%, 21% and 44%, the worst three of `b8f`'s sixteen.
-Range restriction explains part of it (everything here is 70-90%), so this coexists with the
-+0.64 below rather than replacing it. The practical consequence is the important part: **there is
-no way to tell in advance which >=80% checkpoint is the 63% and which is the 21%**, so measure
-all of them rather than truncating the list.
+| candidate primary metric | sd across 4 identical seeds | detects at n=4 | n=8 | n=12 |
+|---|---|---|---|---|
+| **fraction of evals >=80%** | **5.8** | 10.2 pp | **7.2 pp** | **5.9 pp** |
+| mean perfect over the last half of the run | 6.3 | 11.2 pp | 7.9 pp | 6.4 pp |
+| best checkpoint, 100 episodes | 7.3 | 12.9 pp | 9.1 pp | 7.4 pp |
+| `best_perfect30` (the old primary) | 8.6 | 15.1 pp | 10.7 pp | 8.7 pp |
+| graph-100% tier rate | 9.3 | 16.4 pp | 11.6 pp | 9.5 pp |
 
-**Outlier evals are not luck — those checkpoints really are better.** This was measured,
-not assumed, and it reversed an earlier version of this protocol that ranked by smoothed
-rate on the theory that a 70-80% single eval had to be a fluke:
+**Switching buys a ~40% tighter detectable effect for zero extra compute.** Two reasons it behaves
+better: `best_perfect30` is a **max statistic**, and maxima inflate variance — it reports the
+single luckiest 30-eval window an arm ever had. And a share-of-strong-evals measures *sustained*
+competence, which is closer to the stated goal ("the highest perfect rate while learning
+consistently") than one good window is.
 
-| evidence | result |
-|---|---|
-| correlation with true 100-episode rate | raw single eval **+0.64**, smoothed **-0.40** |
-| pooled measurement by selection rule | raw **41.3%**, smoothed 27.1% (non-overlapping) |
-| outlier vs the checkpoints 1000 steps either side | outlier won **3 of 3**, by 9.0 / 11.5 / 27.5 points |
-| P(10-episode eval shows 7+ perfect \| true rate 27%) | **0.006** |
+**It is a fraction of each arm's own evals, so a common step horizon is mandatory**, not just good
+practice — the denominator grows with run length and a long declining tail drags it down. That is
+intended behaviour (the decline is real and should cost the arm something), but it means the
+horizon has to be fixed before comparing, exactly as the pre-registered best-30 comparison already
+required.
 
-So a spike is evidence about *that checkpoint*, and smoothing averages it into a statement
-about the *region* — which is a different and less useful thing. Ranking on the surrounding
-rate systematically picked worse checkpoints.
-
-**Adjacent steps are allowed through on purpose.** 1000 training steps is enough to move the
-perfect rate by tens of points — one measured triple reads 8% / 35% / 7% — so neighbouring
-checkpoints are separate policies rather than repeat samples of one.
-
-**Budget ~37 seconds per 100-episode checkpoint** with `EVAL_WORKERS=10` and two arms in
-parallel, which is ~50% of a 14-core machine. A 20-checkpoint run is ~12 minutes; a 660-checkpoint
-arm is ~7 hours flat, or ~2 hours with `EVAL_SCREEN_EPISODES=20`.
-
-**Do not lower `EVAL_WORKERS` to save CPU — it does the opposite.** Measured seconds per episode
-on one checkpoint: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20**. TensorFlow's thread pool costs
-about a core whether the batch it is handed has 2 rows or 20, so a small worker count pays full
-inference overhead for a fraction of the work; 2 workers is 3x slower *and* worse per unit of CPU.
-This document previously said throughput was core-bound past ~10 workers, and the batch-10
-close-out was launched at 2 workers on that basis — it ran 2.8x slower than it needed to. If a run
-has to be made gentler on the machine, run fewer arms at once, not fewer workers.
-
-**Prefer a worker count that divides `EVAL_EPISODES`.** Episodes round up to a whole round, so 12
-workers turn a 100-episode request into 108 and those rows no longer match the rest of the arm.
-
-XLA (`jit_compile=True`) is *worse* here — 0.38 s/episode against 0.32 — and pinning TensorFlow to
-one thread makes no reliable difference. Neither is used.
-
-An arm whose mandatory tier exceeds the cap costs proportionally more: `b8f` at 32 is ~20 minutes.
-
-Results land in `runs/<policy>_checkpoint_evals<suffix>.json` with a Wilson 95%
-confidence interval. Several copies can run at once on different arms — give each its own
-`EVAL_OUT_SUFFIX` or they overwrite each other, then merge.
-
-**An interrupted close-out is resumable.** `EVAL_RESUME=1` with the identical command skips every
-checkpoint the output file already holds at full length and measures the rest, keeping the
-`top20` selection metadata that an explicit step list would lose. A checkpoint that was only
-part-measured is redone rather than topped up, so no run has to pool two summaries of one
-checkpoint. This is also the safe way to change `EVAL_WORKERS` mid-close-out: kill it, relaunch
-with `EVAL_RESUME=1`, lose only the checkpoint that was in flight.
-
-**Always give an exploratory run its own throwaway `EVAL_OUT_SUFFIX`, even a 30-second one.**
-The first write happens at the first round of the first checkpoint, not at the end, and it
-overwrites whatever was already at that path unconditionally — a CPU-load probe killed after
-seeing an unexpectedly large checkpoint count is enough to do it. This is exactly how a
-246-checkpoint close-out (`b10d`'s full breakdown, the day of the batch-10 close-out) got
-destroyed: a calibration run reused the real `_top20` suffix and was killed before completing,
-but not before its first in-flight write landed. `eval_checkpoints.py` now keeps one rolling
-`<path>.previous` backup of the last *complete* result at each path before overwriting it —
-recover with a plain file copy if this happens again — but that is the safety net, not a
-reason to skip the distinct suffix.
-
-**Checkpoint retention bounds all of this.** A checkpoint is written every 1000 steps, so
-`max_to_keep` is a rolling window measured in millions of steps, and an arm run past that
-window **deletes the checkpoint behind its best number**.
-
-`max_to_keep` was 1000 — a 1M-step window — which cost real evidence: three of batch 5/6's
-four arms outran it, and `b5c-schlongIS`'s 17.0% peak at 211k became unmeasurable once the
-arm passed 1.28M steps, leaving a best surviving region worth only 7.0%. **It is now
-10000**, a 10M-step window, at ~188 KB per checkpoint (~1.8 GB per policy at full depth).
-The legacy `train*/` dirs run 9.7 MB per checkpoint because they predate moving the replay
-buffer out of the checkpointer, so they would be ~97 GB at this depth — do not resume those
-under the new setting without checking disk.
-
-Two habits still apply. Close an arm out at its horizon: past peak, the marginal training
-step is worth less than the checkpoint it evicts. And `top20` filters to surviving
-checkpoints, so it degrades gracefully instead of failing on a deleted step.
-
-**Each eval process opens one visible window** (worker 0 renders, the rest are
-headless), so four parallel evals give four games to watch. The rendering worker is
-slower, which only means its round takes longer — episodes are i.i.d. across workers, so
-which worker produced one carries no information.
-
-**Episodes are collected in whole rounds**, one per worker, rather than by stopping at
-the Nth finished episode. Stopping mid-flight discards the episodes still running, and
-**perfect games are the longest episodes there are**, so truncation drops them
-preferentially and biases the measured rate *downward*. `EVAL_EPISODES` is rounded up to
-a whole number of rounds for this reason. The first published measurement (51% at
-`b4c-schlongper` 869000) used the truncating version, so it is if anything an
-underestimate.
-
-**Never quote a graph peak as a policy's perfect-game rate**, but do use it to *choose*
-what to measure. A graph point is only 10 episodes, so the number itself is unusable — a
-70% point measured 40%, and a 40-50% point measured 12-17%. What the spike reliably tells
-you is *which checkpoint is worth 100 episodes*, and there it beats every smoothed
-alternative (+0.64 vs -0.40 correlation). Use the graph to select, `eval_checkpoints.py`
-to quote.
-
-**Every arm ends with checkpoint evals.** Run `eval_checkpoints.py <arm> top20` and compare
-*those* numbers across arms. Comparing graph peaks across arms compounds the error once per
-arm, and it demonstrably misranks: `b5c-schlongIS` is 2nd of its batch by graph window and
-**last by measurement** (17.0% vs 2.1%).
-
-**Compare pooled rates only when the selection rule matches.** `b4c-schlongper` pools 31.4%
-under outlier+smoothed selection and 26.2% under cluster selection — not a contradiction,
-because 6 of the 10 cluster picks are deliberately the weaker neighbours. Its level is
-~31%. A pooled number is only meaningful alongside the rule that produced it.
-
-**Repeat a measurement before trusting it.** Checkpoint 869000, frozen weights and a greedy
-policy, measured 51%, 42% and 32% on three separate 100-episode runs — a 19-point spread,
-about 2.8 sigma, wider than binomial noise comfortably explains. Its pooled figure over 300
-episodes is 41.7%. Treat a lone 100-episode result as provisional even though its Wilson
-interval looks tight.
-Choose the candidates by trailing-window rate rather than by single-eval peak, and expect
-the measured value to come in below the window that selected it.
-
-Three of the run-comparison metrics above need care:
-
-- **Always use a trailing window for perfect %, never a single eval.** One eval is
-  10 episodes, so the metric moves in 10-point jumps. Use the last 30 for a coarse
-  read, and compare it against the previous 30 rather than an absolute threshold.
-- **Score stops proxying the objective late in a run.** `b1a-base` recovered from a
-  collapse to its old score while its perfect rate kept falling to a fifth of its
-  peak. Score is right early, when perfect % sits at 0 for tens of thousands of
-  steps and cannot separate two configs at all. Past ~250k steps, or after any
-  collapse, read perfect % directly and treat score as context only.
-- **A large drawdown is not disqualifying.** A config that swings wildly but reaches
-  a high perfect-game rate beats a placid one that plateaus low — `b1a-base` versus
-  `b2a-base2` is exactly that contrast. `b4c-schlongper` is the extreme case: it
-  collapsed to score ~19 and went on to be the best arm in the investigation.
+**The honest ceiling.** At these variances, detecting a **5 pp** effect needs n≈17 arms per group
+on the new metric and n≈37 on the old one. Nothing feasible here resolves 5 pp on `best_perfect30`,
+and an earlier claim in [`runs.md`](runs.md) that "n=12 at 2M would detect ~5 pp" was true only for
+a low-variance metric — on best-30 it is 8.7 pp. Choosing the metric is the only lever that moves
+this materially; adding arms runs into a square root.
 
 ### Comparing arms fairly
 

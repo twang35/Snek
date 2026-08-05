@@ -2,511 +2,344 @@
 
 ## Work as a collaborator
 
-**Ask questions when a request is ambiguous** in a way that changes the work — which
-arms to stop, what "best" means for a selection, how long to let something run. Don't
-ask about things already answered by the code, the tuning docs, or an obvious default.
+**Ask questions when a request is ambiguous** in a way that changes the work — which arms to stop,
+what "best" means, how long to let something run. Don't ask what the code or docs already answer.
 
-**Volunteer better approaches**, before starting and as they occur mid-task. Give a
-recommendation rather than a menu, then proceed with it unless redirected — don't block
-on approval for ordinary work. This is explicitly wanted: the largest result in this
-project so far came from an unrequested suggestion to diff `snek2` against the old
+**Volunteer better approaches**, before starting and as they occur mid-task. Give a recommendation
+rather than a menu, then proceed with it unless redirected. This is explicitly wanted: the largest
+result in this project came from an unrequested suggestion to diff `snek2` against the old
 `theSchlong` implementation instead of continuing to sweep hyperparameters.
 
-**Say so when evidence undercuts the plan**, including a previous conclusion written in
-these docs. This investigation has overturned several of its own findings, and each
-retraction was more valuable than the section it replaced.
+**Say so when evidence undercuts the plan**, including a conclusion written in these docs. This
+investigation has overturned several of its own findings and each retraction was worth more than
+the section it replaced.
 
-This project uses a dedicated conda environment named `snek` (Python 3.10).
+**Be succinct in the docs.** Detail belongs in the summary at the end of a reply; the docs should
+be scannable. Lead a section covering a *set* of things with a compact table, then explain
+underneath.
 
-Before running any Python scripts or installing packages in this project, activate it:
+## Environment
 
-```
-conda activate snek
-```
+Dedicated conda env named `snek` (Python 3.10). Activate before running anything:
+`conda activate snek`, or `conda run -n snek <command>` non-interactively.
 
-If running commands non-interactively, use `conda run -n snek <command>` instead.
-
-**Caveat:** `conda run` buffers/relays the wrapped process's stdout internally,
-even with `python -u`. If you redirect a background process's output to a log
-file and poll that file (e.g. while a training run is going), the log can
-stay completely empty for 90+ seconds while the process is actually running
-fine — and killing it with `kill -9` at that point discards whatever was
-sitting in `conda run`'s buffer, permanently. For any background run where you
-need to see live/incremental output, invoke the env's python binary directly
-instead, e.g.:
+**`conda run` buffers stdout**, even with `python -u`. A backgrounded run's log can stay empty for
+90+ seconds while the process is fine, and `kill -9` then discards the buffer permanently. For any
+background run where you need live output, call the env's python directly:
 
 ```
 /opt/miniconda3/envs/snek/bin/python -u snek2.py smoke > log 2>&1 &
 ```
 
-Reserve `conda run` for short one-shot commands where only the final
-exit/output matters.
+Reserve `conda run` for short one-shot commands where only the final output matters.
+
+**`snek2/` is the only directory to edit.** `theSchlong/`, `theSchlongCardinalDirs/`,
+`humanPlayer/` etc. are kept as-is for posterity.
+
+## Git workflow
+
+**Leave finished work uncommitted.** Do not `git commit`, `git push` or even `git add` until the
+user explicitly approves *that* change — "push" or "commit this" is the go-ahead and applies only
+to the change in front of you. The reason is review: the user reads diffs in their editor, and
+committing or staging moves the change out of the working tree where it is visible.
+
+So the loop is: make the edit, describe what changed, stop and wait. Read-only git commands are
+fine at any time.
 
 ## Smoke tests
 
-`policy_name` (the arg to `snek2.py`, e.g. `python snek2.py train`) doubles as
-the checkpoint directory name under `snek2/savedPolicies/`. The user runs real
-training under `train` — never delete or overwrite `snek2/savedPolicies/train/`.
+`policy_name` (the arg to `snek2.py`) doubles as the checkpoint directory under
+`snek2/savedPolicies/`. **Always pass `smoke`** for verification runs, so output is isolated in
+`savedPolicies/smoke/`, which is safe to delete afterward. The user's real run is `train` — never
+delete or overwrite `savedPolicies/train/`. **Never `rm -rf snek2/savedPolicies/` wholesale.**
 
-When running a smoke test (verifying a code change doesn't crash, timing
-startup, etc.), always pass `smoke` as the policy name:
+## What must never be deleted
 
-```
-/opt/miniconda3/envs/snek/bin/python -u snek2.py smoke > log 2>&1 &
-```
-
-This keeps smoke-test checkpoints isolated in `snek2/savedPolicies/smoke/`,
-which is safe to `rm -rf` before/after a test. Never run `rm -rf
-snek2/savedPolicies/` wholesale — target the `smoke/` subdirectory only.
-
-## Run artifacts
-
-Every eval writes `snek2/runs/<policy_name>.{png,md}` plus
-`<policy_name>_history.json`. **Keep everything from a real training arm.** The user
-reviews these by hand, a deleted graph cannot be recovered without re-running the
-training that produced it, and disk is not a constraint. That covers the whole
-`b<n><letter>-<name>` family and their `_checkpoint_evals*.json` measurements, which
-the tuning docs cite directly.
-
-**`snek2/evals/` is different: only the top level is meant to be current.**
-`eval_checkpoints.py` writes each arm's live `_eval_progress.png` there so the user can
-glance at one folder and see what last completed, and it moves whatever was already
-there into a timestamped `snek2/evals/archive/<timestamp>/` folder before writing a new
-one — so starting an eval is exactly when files move out of the top level, not when
-they get deleted. **Never delete anything under `snek2/evals/archive/`**, same
-asymmetry as everywhere else here: it is the only record of a chart that is no longer
-in the top-level folder.
-
-**`<policy>_checkpoint_evals<suffix>.json.previous` is a safety net, not scaffolding.**
-`eval_checkpoints.py` writes one before overwriting an existing *complete* result at that
-path, because the first write of a new run lands seconds in and destroys whatever was
-there unconditionally — including a real close-out, if a probe or timing check reuses its
-suffix. Keep it until you've checked it isn't the only copy of something real; do not
-lump it in with smoke-test output.
-
-**Throwaway output is fine to delete.** Smoke tests, speed benchmarks and
-verification runs are not results — they are scaffolding from proving a change
-works, and they age into noise that makes the directory harder to read. Judge by
-what produced it, not by where it lives:
-
-| keep | delete |
+| path | rule |
 |---|---|
-| `b8f-disc9975seed2.*`, `b8d-disc995clip_checkpoint_evals.json` | `smoke.*`, `smoke_evals.json` |
-| any arm named in `completedRuns.md` or `runs.md` | `bench-*` and similar timing scaffolding |
-| `_checkpoint_evals*.json` for a real arm | `champion_*` / `smoke_checkpoint_evals_*` verification evals |
+| `snek2/savedPolicies/train/` | the user's own run |
+| `snek2/hallOfFame/` | record checkpoints, outside the `max_to_keep` rotation |
+| `snek2/runs/` | every real arm's graph, report and measurements |
+| `snek2/evals/archive/` | the only record of a chart no longer at the top level |
 
-When in doubt, keep it — the asymmetry still holds, since a wrongly kept file costs
-a few KB and a wrongly deleted one costs a training run. Check for references first
-(`grep -rn <name> --include='*.md' .`): the tuning docs link specific files by name,
-and a deletion that breaks one of those links is worse than the clutter.
+A wrongly kept file costs a few KB; a wrongly deleted one costs a training run. When in doubt,
+keep it, and `grep -rn <name> --include='*.md' .` first — the tuning docs link files by name.
 
-Letting a later run of the same policy overwrite these files is expected and fine.
+**Throwaway output is fine to delete**: smoke tests, speed benchmarks, `champion_*` and
+`bench-*` verification evals. Judge by what produced it, not where it lives.
 
-## `snek2/hallOfFame/` — record checkpoints, never delete
+**`snek2/evals/` top level is meant to be current.** `eval_checkpoints.py` writes each arm's live
+`_eval_progress.png` there and moves whatever was there into `evals/archive/<timestamp>/` first —
+so starting an eval is when files move out, not when they are lost.
 
-Copies of the best policies produced so far, with a README covering how to run one by
-hand. They live outside `savedPolicies/` precisely so the `max_to_keep` rotation cannot
-delete them — a long run otherwise eventually evicts its own best checkpoint, which has
-already destroyed evidence once (`b5c-schlongIS`'s 17.0% peak).
+**`<policy>_checkpoint_evals<suffix>.json.previous` is a safety net.** Written before overwriting
+an existing *complete* result, because the first write of a new run destroys whatever was at that
+path. Check it isn't the only copy of something real before removing it.
 
-**Never delete anything here**, and add an entry whenever a run produces a checkpoint
-worth keeping. Each is two files, ~190 KB. The README documents the copy-in-and-evaluate
-procedure; both commands in it were verified working when written.
+Deleting `<policy>_history.json` also throws away the graph's history, so the next run restarts
+the curve instead of continuing it.
 
-**Matching widths do not mean a checkpoint still works, and this has already bitten.** A checkpoint
-restores whenever the vector is the same *length*; nothing checks that the values still mean what
-they meant. The observation changed four times on 2026-08-02, and for part of that day it was
-coincidentally back at its original 20 values while two indices meant something different — so
-every hall-of-fame checkpoint restored with no warning and played like a beginner, the champion
-going from **90.3%** to scoring **0, 0, 1** over three episodes.
+## `snek2/hallOfFame/` — record checkpoints
 
-An input that was constant is the specific trap: `game_over` sat at 0 in every state a policy acts
-in, so its weights were never constrained by anything, and the index it occupied now carries
-board-fill. Arbitrary weights times a live signal.
+Copies of the best policies, outside `savedPolicies/` so the `max_to_keep` rotation cannot evict
+them. That has already destroyed evidence once (`b5c-schlongIS`'s 17.0% peak). **Never delete
+anything here**, and add an entry whenever a run produces a checkpoint worth keeping — two files,
+~190 KB. The README has the copy-in-and-evaluate procedure; verify the *copy* loads and plays, not
+just the original.
 
-So when the observation changes, **record which indices changed meaning in the hall of fame
-README, and name the last commit whose observation matches those checkpoints** (`e4514a8` for the
-20-value era, `450e66e` for the 26-value one). A width change at least fails loudly — the vector
-is 30 now, so both eras' checkpoints error out — but that is luck, not a safeguard.
+**Matching widths do not mean a working checkpoint, and this has bitten.** A checkpoint restores
+whenever the vector is the same *length*; nothing checks the values still mean what they meant. On
+2026-08-02 the vector was briefly back at its original 20 values with two indices repurposed, and
+every hall-of-fame checkpoint restored with no warning and played like a beginner — the champion
+went from **90.3%** to scoring **0, 0, 1**. An input that was previously constant is the specific
+trap: `game_over` sat at 0 in every state a policy acts in, so its weights were unconstrained, and
+the index it occupied now carried board-fill.
 
-**Append new per-action values after the existing blocks rather than interleaving them.** The
-frozen diagnostics in `hyperparamTuning/diagnostics/` read `head_with_tail` at `obs[9 + 2 * i]`,
-and putting the safe-to-chase triple after the group block instead of inside it kept them correct
-through every change on 2026-08-02. The following-tail triple and the food-space value added on
-2026-08-03 went on the end for the same reason, which is why the vector's order is chronological
-rather than logical. **Not every block is a per-action triple** — food-space is one value
-describing the board, as are the starve and board-fill pair, so do not assume index arithmetic in
-threes.
+So **when the observation changes, record which indices changed meaning in the hall-of-fame README
+and name the last commit whose observation matches those checkpoints.** Era markers: `e4514a8` =
+20 values, `450e66e` = 26, `b09c616` = the current 30.
 
-**1 means good or safe throughout the vector**, including the two blocks added on 2026-08-03: index
-26-28 is 0 for the tail-chasing move and 1 otherwise, index 29 is 0 for food sealed in a single cell
-and 1 for roomy. Both shipped inverted for a few hours and were flipped to the convention on
-purpose. Two caveats that came with that. A *fatal* move reads 1 at 26-28, because the flag only
-asks "is this the tail's cell" — combine it with 6-8 before reading a 1 as "this move is fine". And
-index 29 now sits at 1 in **99.95%** of states, so it is very nearly a constant: the same shape as
-the `game_over` trap above. Its weights are barely constrained by anything, so **do not repurpose
-that index assuming they were trained.**
+**Append new per-action blocks after the existing ones**, never interleaved. The frozen diagnostics
+in `hyperparamTuning/diagnostics/` read `head_with_tail` at `obs[9 + 2 * i]`. That is why the
+vector's order is chronological rather than logical. **Not every block is a per-action triple** —
+food-space, starve and board-fill are single values, so don't assume index arithmetic in threes.
+
+**1 means good or safe throughout the vector.** Two caveats on the newest blocks: a *fatal* move
+reads 1 at indices 26-28 (the flag only asks "is this the tail's cell" — combine with 6-8), and
+index 29 sits at 1 in **99.95%** of states, so it is nearly a constant and **its weights are not
+meaningfully trained** — same shape as the `game_over` trap above.
 
 **`tests/test_observation_spec.py` is the guard.** It asserts `observation_spec()`'s length equals
-what `get_observations` actually builds, across three hand-built board states, and pins each of
-the last two blocks to its documented index range by comparing against the producing function
-rather than a literal — an ordering bug passed a literal-based version because hugging-wall and
-following-tail happen to hold the same three values in an open-board position.
-`test_state_helpers.py` additionally hardcodes the count as a deliberate tripwire, so adding a
-block fails until the count, the layout docstring and the hall-of-fame era markers are all
-updated in one pass.
-
-Note that deleting `<policy_name>_history.json` also throws away the graph's
-history for that policy, so its next run restarts the curve from the current
-iteration instead of continuing.
+what `get_observations` builds across three hand-built boards, and pins each recent block to its
+index range by comparing against the producing function rather than a literal — an ordering bug
+passed a literal-based version because two blocks coincidentally held the same values.
+`test_state_helpers.py` hardcodes the count as a tripwire, so adding a block fails until the count,
+the layout docstring and the era markers are all updated together.
 
 ## Hyperparameter tuning
 
-There is an ongoing, resumable investigation into configs that reach the highest
-possible perfect-game percentage while learning consistently. Reducing
-catastrophic forgetting is a means to that end, not the goal itself. Everything
-lives in **`snek2/hyperparamTuning/`**:
+An ongoing, resumable investigation into configs that reach the highest perfect-game percentage
+while learning consistently. Reducing catastrophic forgetting is a means to that, not the goal.
+Everything is in **`snek2/hyperparamTuning/`**:
 
-- `runs.md` — what is running and what to run next. **Start here** when picking
-  the task up mid-flight. Kept short on purpose.
-- `hyperparamTuning.md` — the protocol: metrics, stop criteria, how to judge, how
-  to launch, available knobs. Read this for how the machinery works.
-- `findings.md` — what is established and what has been falsified. Read before
-  proposing an experiment, so a closed question doesn't get reopened.
-- `completedRuns.md` — every finished arm: config, final numbers, verdict.
-- `failureModes.md` — the four ways a policy degrades here and how to tell them
-  apart. They look alike in a single trailing window.
-- `charts.md` + `charts/` — progress graph per arm; snapshot copies, refreshed
-  with `refresh_charts.sh`.
+| file | contents |
+|---|---|
+| `runs.md` | what is running, what to run next. **Start here** |
+| `hyperparamTuning.md` | the protocol: metrics, stop criteria, how to judge, how to launch, knobs |
+| `findings.md` | what is established, what is falsified. Read before proposing an experiment |
+| `completedRuns.md` | every arm: config, final numbers, verdict. The canonical arm table |
+| `failureModes.md` | the four ways a policy degrades and how to tell them apart |
+| `charts.md` + `charts/` | progress graph per arm, batch 9 onward |
+| `archive/` | batches 1-8 and superseded findings. **History only — do not read into context** |
 
-Keep the split clean: `runs.md` is current state and forward plan only. Results go
-to `completedRuns.md`, conclusions to `findings.md`, and anything about *how to
-measure or judge* to `hyperparamTuning.md`. The reason is that `runs.md` grew to 950
-lines of interleaved status, results and conclusions and stopped being usable.
+Keep the split clean: `runs.md` is current state and forward plan only, results go to
+`completedRuns.md`, conclusions to `findings.md`, anything about *how to measure or judge* to
+`hyperparamTuning.md`. `runs.md` once grew to 950 lines of interleaved status and stopped being
+usable.
 
-**Every running batch keeps its description in `runs.md`** — why the batch is shaped
-that way, what each arm isolates, and what each possible outcome would mean. Keep it
-there while *any* arm of the batch is still running, then move it to
-`completedRuns.md` when the last arm stops. Without the rationale, a future session
-can't tell whether a surprising result is informative or came from an arm that was
-never going to answer anything.
-
-Read those before starting or judging any tuning run, and update them as runs
-start, finish, or get killed — they are the handoff between sessions.
+**Every running batch keeps its description in `runs.md`** — why it is shaped that way, what each
+arm isolates, what each outcome would mean — while *any* arm is still running, then moves to
+`completedRuns.md` when the last one stops. Without the rationale a future session cannot tell a
+surprising result from an arm that was never going to answer anything.
 
 ### "Progress update" means look, don't touch
 
-When the user asks for a progress update or to check on progress, that is
-**read-only with respect to running processes**: analyse the evals, refresh the
-charts, update the docs, report. **Do not kill, stop, or restart any arm** — not
-even one that looks finished, is past the 4-hour cap, or is clearly failing.
+A progress update is **read-only with respect to running processes**: analyse, refresh charts,
+update docs, report. **Do not kill, stop or restart any arm** — not even one that looks finished,
+is past its cap, or is clearly failing. Deciding a run is done is the user's call. If a run looks
+finished and no slot is needed, say so as a recommendation.
 
-A progress update means updating **`charts.md` as well as `runs.md`**. Running
-`refresh_charts.sh` only copies the PNGs — it does not add anything to `charts.md`,
-so a new arm silently ends up with an image and no entry. Every arm needs a row in
-the "Every arm at a glance" table and a `### <policy> — <change>` section with a
-stats line, a short reading of what the chart shows, and the `![...]` image. Check
-with:
+Stop an arm only when asked, or when the user asks for something that plainly needs a free slot —
+and then say which ones are stopping and why.
 
-```
-ls snek2/hyperparamTuning/charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -o 'charts/[a-zA-Z0-9-]*\.png' snek2/hyperparamTuning/charts.md | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
-comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
-```
-
-This drifted once already: batches 5, 6 and 7 accumulated 12 arms with images and no
-sections, because `refresh_charts.sh` succeeding looked like the charts were handled.
-
-Deciding a run is done is the user's call, not a side effect of asking how it's
-going. A long run may still be producing the late-horizon data that makes it
-worth something, and judging an arm dead has already been wrong here more than
-once. If a run looks finished and no slot is needed, say so in the report as a
-recommendation and let the user decide.
-
-Stop an arm only when the user asks, or when they ask for something that
-plainly needs a free slot ("start the next batch" with the budget full) — and
-then say which ones are stopping and why.
-
-Two other rules are easy to get wrong:
-
-- **Never run more than 4 snek trainers at once**, counting human-started ones.
-  Check with `pgrep -fl "python -u snek2.py"`. Do **not** count with
-  `grep "[s]nek2.py"` — Airbnb's git telemetry fires `curl` processes whose JSON
-  payload contains `snek2/snek2.py` as a git argument, so that pattern
-  intermittently over-counts by several processes for the few seconds each curl
-  lives. It read 6 trainers once when only 4 were running.
-- **This domain is very noisy** — the same config has produced final scores of
-  62.5 and 18.0. Never conclude anything from a single run; repeat promising
-  configs 2-3 times.
-
-Hyperparameters are overridden with `SNEK_*` env vars (see `tuned()` in
-`snek2.py`), so variants run side by side without editing files.
-
-### Logging: quiet by default, `SNEK_DEBUG=1` for everything
-
-Training runs **quiet**: one compact line per 10 evals, and nothing else after startup.
-`SNEK_DEBUG=1` restores the original output verbatim — per-200-step loss lines, the
-five-line eval block, `Saved checkpoint` per eval, perfect-game and high-score banners.
-Use it when a run is actually being debugged, not for status.
-
-**Read status from `runs/<policy>_evals.json`, not from the log.** Every history file
-carries a precomputed `summary` block:
+It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
+so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
+<change>` section with a stats line, a short reading, and the image. Captions for batches 1-8 are
+in `archive/batches1-8.md`, so check both:
 
 ```
-step, evals, trailing_now, peak_trailing{value,step}, best_perfect30{value,step},
-recent_perfect30, max_single_eval, dead_since, zero_since, epsilon
+cd snek2/hyperparamTuning
+ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-8.md \
+  | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
+comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 ```
 
-That is exactly what a progress check needs, so reading `summary` from each arm replaces
-scanning the eval series.
+This drifted once: batches 5-7 reached 12 undocumented arms because `refresh_charts.sh` succeeding
+looked like the charts were handled.
 
-**Use `zero_since`, not `dead_since`, to ask whether an arm is dead now.** `dead_since` is
-the earliest sustained-zero stretch and is history; `zero_since` is the start of the
-*current* unbroken stretch and is `null` if the latest eval is above threshold.
-`b8d-disc995clip` carried `dead_since=275000` while going on to a 36% best-30 window, so
-`dead_since` alone would have condemned the best arm in its batch.
+### Two rules that are easy to get wrong
 
-Neither is a verdict. Arms have recovered from trailing 0.3, and `b8g-clipseed3` recovered from
-**1.2M steps** near zero — to 63.7 trailing — before collapsing for good. Read `zero_since`
-against `step` for the duration, and only call an arm dead after hundreds of thousands of steps
-pinned there *and* no recovery arc still in progress.
+- **Never run more than 4 snek trainers at once**, counting human-started ones. Check with
+  `pgrep -fl "python -u snek2.py"`. **Not** `grep "[s]nek2.py"` — Airbnb git telemetry fires `curl`
+  processes whose JSON payload contains `snek2/snek2.py`, which read 6 trainers when 4 were
+  running. The same class of trap caught `pgrep -fl watch` matching `watchdogd` and `watchman`.
+- **This domain is very noisy** — the same config has produced 62.5 and 18.0. Never conclude from a
+  single run; repeat promising configs 2-3 times. **n=4 cannot resolve an effect below ~10 pp.**
+
+Hyperparameters come from `SNEK_*` env vars (see `tuned()` in `snek2.py`), so variants run side by
+side without editing files.
+
+### Reading status: the summary block, not the log
+
+Training runs **quiet** — one compact line per 10 evals. `SNEK_DEBUG=1` restores the original
+verbose output; use it for debugging, not status. The one log line worth grepping is
+`hyperparameter override:` at startup, which confirms an arm got its intended config.
+
+Read status from `runs/<policy>_evals.json`'s precomputed `summary` block: `step, evals,
+trailing_now, peak_trailing, best_perfect30, strong_eval_fraction, recent_perfect30,
+max_single_eval, dead_since, zero_since, epsilon`.
+
+**`strong_eval_fraction` is the primary metric** (share of the arm's evals at >=80% perfect) — it
+has the lowest between-seed variance of the candidates, so it resolves ~40% smaller effects than
+`best_perfect30`, which is kept for continuity with batches 1-11. It is a fraction of each arm's
+own evals, so **compare only at a common step horizon**.
+
+**Use `zero_since`, not `dead_since`, to ask whether an arm is dead now.** `dead_since` is the
+earliest sustained-zero stretch and is history; `zero_since` is the current unbroken stretch and is
+`null` if the latest eval is above threshold. `b8d-disc995clip` carried `dead_since=275000` while
+going on to a 36% best-30 window.
+
+Neither is a verdict. `b8g-clipseed3` recovered from **1.2M steps** near zero to 63.7 trailing
+before collapsing for good. Read `zero_since` against `step` for duration, and only call an arm
+dead after hundreds of thousands of steps pinned there *and* no recovery arc in progress.
 
 **Check `zero_since` is actually present before trusting it.** Arms launched before the field
-was added keep overwriting the backfill from their old in-memory `run_report`, so the key is
-absent — and `summary.get('zero_since')` returns `None` for a missing key, which reads
-identically to "alive right now". That made a status check on `b8d-disc995clip` report "not
-dead" for a reason unrelated to the data. Use `'zero_since' in summary`, or recompute with
-`run_report.build_summary(rows['evals'])`.
+existed overwrite the backfill from their old in-memory `run_report`, so the key is absent — and
+`summary.get('zero_since')` returns `None`, which reads identically to "alive". Use
+`'zero_since' in summary`, or recompute with `run_report.build_summary(rows['evals'])`.
 
-The one log line worth grepping is `hyperparameter override:` at startup, which confirms
-an arm got the config intended. That prints in both modes.
+## Markdown traps
 
-## Writing the docs
+Two that look fine in source and render wrong. The user reads these rendered.
 
-**Lead with a table, then explain underneath.** Any time a section covers a *set* of
-comparable things — run statuses, queued experiments, config options, ranked
-metrics — open with a compact table, one row per item and only columns that carry
-signal, then put the rationale in `####` subsections or paragraphs below it. Keep
-cells to a few words and push anything longer down into the prose. The point is
-that the state of things should be readable at a glance without reading paragraphs
-to reconstruct facts that belong in a grid.
+- **`A.`/`a.` are not list markers** — only digits and `-`/`*`. Lettered items collapse into one
+  run-together paragraph. Use `#### A. Thing` headings when the letters are cross-referenced.
+- **Duplicate numbers in one list renumber silently** — two items both written `6.` render as 6 and
+  7, shifting everything after and breaking prose that refers to "item 12". Cross-reference items
+  by name, not number.
 
-Two markdown traps that look fine in the source and render wrong:
-
-- **`A.`/`a.` are not list markers** — only digits and `-`/`*` are. Lettered items
-  collapse into one run-together paragraph. Use `#### A. Thing` headings when the
-  letters are cross-referenced elsewhere.
-- **Duplicate numbers in one list renumber silently** — two items both written `6.`
-  render as 6 and 7, shifting everything after them and breaking any prose that
-  refers to "item 12". Cross-reference items by name, not number.
-
-Worth a grep for `^[A-Za-z]\.\s` and a duplicate-number check after editing any md
-file here, since the user reads these rendered rather than as source.
+Worth a `grep -n '^[A-Za-z]\.\s'` and a duplicate-number check after editing any md file here.
 
 ## No audio — never call bare `pygame.init()`
 
-`pygame.init()` starts *every* subsystem, including `pygame.mixer`, which opens a real
-CoreAudio output stream **per process**. `SDL_VIDEODRIVER=dummy` does not affect audio, so
-headless workers were still holding audio streams: 10 idle env processes drove
-`coreaudiod` to **15% CPU**, and evals routinely run several 10-worker processes at once,
-which is what made it look like the evals were sending `coreaudiod` off the rails.
+`pygame.init()` starts *every* subsystem including `pygame.mixer`, which opens a real CoreAudio
+stream **per process**. `SDL_VIDEODRIVER=dummy` does not affect audio, so headless workers were
+still holding audio streams: 10 idle env processes drove `coreaudiod` to **15% CPU**, and evals run
+several 10-worker processes at once.
 
-Nothing in this project plays sound. `Snake.Game.__init__` therefore inits only what it
-uses — `pygame.display.init()` and `pygame.font.init()` (`pygame.time`/`sprite`/`draw` need
-no init) — and `snek2.py` and `eval_checkpoints.py` both set `SDL_AUDIODRIVER=dummy` before
-any pygame import as a second line of defence.
-
-If a future change needs another subsystem, init that subsystem by name. Measure with
+Nothing here plays sound. `Snake.Game.__init__` inits only `pygame.display` and `pygame.font`, and
+`snek2.py` and `eval_checkpoints.py` both set `SDL_AUDIODRIVER=dummy` before any pygame import. If
+a future change needs another subsystem, init that subsystem by name. Verify with
 `ps -o %cpu= -p $(pgrep -x coreaudiod)` while workers run; it should read 0.0.
 
 ## Tests: `snek2/tests/` — write them, and run them
 
-**When a change has logic worth pinning down, add a test for it in the same pass.** Coverage here
-is sparse — one file, 26 assertions, all of them on `group_obs` and `body_and_wall_collisions` —
-so most of the environment has nothing guarding it, and the sparseness is a reason to add rather
-than a precedent to follow. Worth a fixture whenever a change involves:
+**When a change has logic worth pinning down, add a test in the same pass.** Worth a fixture
+whenever a change involves a conditional whose branches could later collapse, an index or
+coordinate convention, a rule someone could "simplify" without seeing why it exists, or an edge
+case that took thinking to get right — if it needed reasoning, it needs a fixture, because the
+reasoning does not survive in the diff.
 
-- a conditional whose branches are easy to collapse later (the eat/no-eat distinction has now
-  been got wrong twice, in `update_grid` and again in `group_obs`)
-- an index or coordinate convention (the padded grid's `(y + 1) * cols + (x + 1)` bit layout, the
-  `SCREENTILES + 1` bounds guards)
-- a rule someone could "simplify" without seeing why it exists, like the clause for stepping onto
-  the cell the tail is vacating
-- an edge case that took thinking to get right — if it needed reasoning, it needs a fixture,
-  because the reasoning does not survive in the diff
-
-The bar is not complexity, it is whether a future edit could break the behaviour without anything
-noticing. These fixtures are cheap: a hand-written grid, a call, one `assert`.
-
-`tests/test_state_helpers.py` covers `group_obs` and `body_and_wall_collisions` on
-hand-written grids. **pytest is not installed in the `snek` env**, so run them directly:
+**pytest is not installed**, so run them directly:
 
 ```
 cd snek2
 PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -c "
-import sys; sys.path.insert(0, 'tests')
-import test_state_helpers as t
-for n in [x for x in dir(t) if x.startswith('test')]:
-    try: getattr(t, n)(); print('PASS', n)
-    except Exception as e: print('FAIL', n, type(e).__name__, e)
-"
+import sys; sys.path.insert(0, 'tests'); import importlib
+total = fails = 0
+for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablation',
+             'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
+             'test_run_report']:
+    mod = importlib.import_module(name)
+    for t in [x for x in dir(mod) if x.startswith('test')]:
+        total += 1
+        try: getattr(mod, t)()
+        except Exception as e: print('FAIL', name, t, type(e).__name__, e); fails += 1
+print(total, 'tests,', fails, 'failed')"
 ```
 
-13 of these were dead for two signature generations — they called `group_obs` with a food
-position it had stopped taking, so they raised `TypeError` rather than failing an assertion,
-and a `TypeError` looks like noise if nobody is watching. **Every test covering `group_obs`
-was dead at the point `group_obs` was changed.** Run the suite before and after touching
-`state_helpers.py`, and check the failure *type*: a `TypeError` means the test is stale, not
+**A passing suite is not coverage of the change you just made.** `group_obs` took a third signature
+and all 24 existing tests passed before and after, because every fixture was an open board where
+old and new answers agree. **So mutate the implementation and confirm a test fails.** Every
+behaviour change in this project since has been checked that way, and it has repeatedly found
+tests that assert nothing.
+
+**Check the failure *type*.** 13 tests were dead for two signature generations — they called
+`group_obs` with an argument it had stopped taking, so they raised `TypeError` rather than failing
+an assertion, and a `TypeError` looks like noise if nobody is watching. **Every test covering
+`group_obs` was dead at the point `group_obs` changed.** A `TypeError` means the test is stale, not
 that the code is fine.
 
-For refactors, also diff observations against a fixed-seed run — byte-identical output over a
-few thousand steps catches what 26 assertions do not.
-
-**A passing suite is not coverage of the change you just made.** `group_obs` took a third
-signature in 2026-08-02 — `next_tail_pos` was added, because the tail moves on the step the head
-does — and all 24 existing tests passed *before and after* the behaviour changed, since every
-fixture was an open board where the old and new answers agree. Two tests were added to cover it,
-and both were checked by mutating the implementation and confirming a test fails:
-
-| mutation | tests that catch it |
-|---|---|
-| don't advance the tail at all (the old behaviour) | `test_hwt_enclosed_vacated_tail_still_reaches_the_tail` |
-| advance it even on a move that eats | `test_hwt_eating_move_does_not_advance_the_tail` |
-| drop the "stepping onto the vacated cell" clause | 7 of the existing tests |
-
-The flip side happened the same day: fixtures for `group_obs` routinely include a fatal action
-(a wall or a self-collision) alongside the legal ones, because a real snake facing three choices
-usually has one that kills it. When fatal moves were changed to read zero outright instead of a
-hypothetical "what if this move survived" value, **15 of the 44 tests broke immediately** —
-not because anyone wrote a test for that change in advance, but because the existing fixtures
-already exercised the case by accident. Comprehensive fixtures pay for themselves in ways
-written for a different purpose; it is the reason a test failure here is worth reading rather
-than reflexively rewriting the assertion to match.
-
-That mutation check is worth repeating for any future change here: write the fixture, then break
-the code deliberately and confirm the fixture notices.
+For refactors, also diff observations against a fixed-seed run — byte-identical output over a few
+thousand steps catches what assertions do not.
 
 ## Rendering is off by default — use `watch.py` to see a game
 
-A game window costs **~5.2ms per frame**, and the game flips once per game step. That is a
-round trip to the macOS window server; it is not our drawing code, and dirty rects do not
-help, because the cost is per flip rather than per pixel. Everything else `render()` does is
-2-4us per call.
+A game window costs **~5.2ms per frame** and the game flips once per step. That is a round trip to
+the macOS window server, not our drawing code, so dirty rects do not help. Everything else
+`render()` does is 2-4us.
 
 **To watch a policy play, run `watch.py` — never turn a window on inside a run:**
 
 ```
 cd snek2
-PYTHONPATH=. python -u watch.py <policy_name>        # follows the newest checkpoint
-PYTHONPATH=. python -u watch.py <policy_name> <step>  # pins one checkpoint
+PYTHONPATH=. python -u watch.py <policy_name>          # follows the newest checkpoint
+PYTHONPATH=. python -u watch.py <policy_name> <step>    # pins one checkpoint
 ```
 
 It renders in its own process, reloads the newest checkpoint between episodes so a live arm's
-progress shows up without a restart, and costs training nothing — it only reads checkpoint
-files. `WATCH_FPS` caps the frame rate (default 90; drop to 20-30 to follow the moves).
+progress shows up, and costs training nothing. `WATCH_FPS` caps the frame rate (default 90; drop to
+20-30 to follow the moves).
 
-**Window size is `SNEK_TILE_PIXELS`, and it is cosmetic only.** Every pixel constant in
-`snake_constants.py` — `TILE_SIZE`, `SCREENSIZE`, the sprite radii, the HUD — derives from it,
-so one number scales the whole window; `watch.py` sets 15 (a 150x150 window) and training keeps
-the default 10. Observations are built from tile positions and never pixels, verified by a
-fixed-seed hash of every observation and reward over 40 episodes coming out byte-identical at
-10, 20, 25 and 40 pixels per tile. **It must be set in the environment before
-`snake_constants` is imported**, not assigned afterwards: `from snake_constants import *` binds
-a copy, so a later assignment never reaches `Snake.py`.
+**Window size is `SNEK_TILE_PIXELS` and is cosmetic only.** Every pixel constant derives from it.
+Observations are built from tile positions, verified by a fixed-seed hash coming out identical at
+10, 20, 25 and 40 pixels per tile. **It must be set in the environment before `snake_constants` is
+imported** — `from snake_constants import *` binds a copy, so a later assignment never reaches
+`Snake.py`.
 
-The window title is `<policy_name> — ckpt <step>`, arm name first because macOS truncates from
-the right and the arm is what tells two watchers apart. `Game.reset()` re-applies
-`game.caption` every episode, so `watch.py` setting it once per checkpoint load survives — and
-follows a live arm forward.
+**Training cannot draw at all — there is no switch.** `snek2.main()` selects
+`SDL_VIDEODRIVER=dummy` unconditionally. `eval_checkpoints.py` keeps `EVAL_RENDER=1` for debugging
+by hand (worker 0 only, ~5x the wall clock); that plus `watch.py` are the only ways to see a game.
 
-**Training cannot draw at all — there is no switch.** `SNEK_DISPLAY_EVAL` and
-`SNEK_DISPLAY_TRAINING` are gone, along with the second environment that existed only to play
-one eval episode where it could be drawn. `snek2.main()` selects `SDL_VIDEODRIVER=dummy`
-unconditionally. `eval_checkpoints.py` keeps `EVAL_RENDER=1` for debugging a policy by hand
-(worker 0 only, ~5x the wall clock), and that plus `watch.py` are the only ways to see a game.
+**A process that will not draw must select the dummy driver, not merely skip drawing.**
+`Game.__init__` calls `set_mode()` unconditionally and `reset()` blits and flips, so a process with
+a real driver and `display=False` opens a window, paints it white once and never touches it again —
+which looks like a broken window rather than an absent one. `main()` does this, not module scope:
+`eval_checkpoints.py` and `watch.py` both import `snek2` for `build_q_net`, and an import-time
+`setdefault` would suppress *their* windows too.
 
-Removing the display path made every eval episode parallel, which is worth ~24% of an eval:
-at champion skill the old split shape measured 5.95s (1.67s serial + 4.28s round) against
-4.55s for one round of ten. The tenth worker costs ~0.27s, because a round ends with its
-slowest episode and slowest-of-ten is barely worse than slowest-of-nine.
+**When something here seems slow, profile the critical path rather than the hot-looking code.** An
+11x speedup of the observation code and a 6.8x speedup of policy inference both moved eval wall
+clock by approximately nothing, because neither was the slowest worker. And **measure a render
+change per-episode with a fixed policy, not by timing a training run** — an earlier "83s → 56s"
+claim was learning-speed variance attributed to a flag that was a no-op at the time.
 
-**A process that will not draw must select the dummy video driver, not merely skip
-drawing.** `Game.__init__` calls `pygame.display.set_mode()` unconditionally and `reset()`
-blits the background and flips, so a process with a real driver and `display=False` opens a
-window, paints it white once, and never touches it again. That looks like a broken window
-rather than an absent one, and it is exactly what happened when training's default first
-flipped to headless.
-
-`main()` does that, not module scope: `eval_checkpoints.py` and `watch.py` both import
-`snek2` for `build_q_net`, and an import-time `setdefault` would suppress *their* windows too.
-
-**The two paths were slow for different reasons, and it matters.** In `eval_checkpoints.py`
-the visible worker sits *inside* the `ParallelPyEnvironment`, which steps every worker
-together and waits for the slowest — so one window paced all ten, and a 30-episode eval went
-**70.1s → 14.0s** when it was turned off. Training is not like that: `compute_avg_return()`
-runs the displayed episode alone and *then* calls the parallel batch, so the window never
-gated a worker and the cost was purely additive — **15.6s against 1.3s** for one champion eval
-episode, every eval.
-
-**Measure a render change per-episode with a fixed policy, not by timing a training run.**
-An earlier "10k steps 83s → 56s" claim here was learning-speed variance, not the flag it was
-attributed to: first-eval scores across smoke runs ranged 0.1 to 39.1, episode length tracks
-skill, and the flag in question was a no-op at the time anyway.
-
-**When something here seems slow, profile the critical path rather than the hot-looking
-code.** An 11x speedup of the observation code and a 6.8x speedup of policy inference both
-moved eval wall clock by approximately nothing, because neither was the slowest worker.
+## Eval cost
 
 **`EVAL_WORKERS` is close to free, and lowering it to save CPU does the opposite.** Measured
-seconds per episode on one checkpoint: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20**.
-TensorFlow's thread pool costs about a core whether the batch it is handed has 2 rows or 20, so
-a small worker count pays full inference overhead for a fraction of the work — 2 workers is 3x
-slower *and* worse per unit of CPU. The batch-10 close-out was launched at 2 workers to hit a
-~50% CPU target and ran 2.8x slower than it needed to for *more* CPU per episode. To be gentler
-on the machine, run fewer arms at once, not fewer workers. Prefer a worker count that divides
-`EVAL_EPISODES`, since episodes round up to a whole round.
+seconds per episode: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20.** TensorFlow's thread pool costs
+about a core whether its batch has 2 rows or 20, so a small count pays full inference overhead for
+a fraction of the work. Batch 10's close-out was launched at 2 workers to hit a ~50% CPU target and
+ran 2.8x slower for *more* CPU per episode. **To be gentler on the machine, run fewer arms, not
+fewer workers.** Prefer a count that divides `EVAL_EPISODES`, since episodes round up to whole
+rounds.
 
-**Do not trust `resource.getrusage(RUSAGE_CHILDREN)` for a `ParallelPyEnvironment`'s cost.** It
-only counts children that have been reaped, and the worker processes are alive for the whole
-run, so it reports roughly the parent alone — it undercounted a 20-worker eval by ~3x here. Read
-total CPU from `top -l 2 -n 0` instead.
+**Do not trust `resource.getrusage(RUSAGE_CHILDREN)` for a `ParallelPyEnvironment`.** It only counts
+reaped children and the workers live for the whole run, so it reported roughly the parent alone —
+undercounting a 20-worker eval by ~3x. Read total CPU from `top -l 2 -n 0`.
 
-**The eval close-out runs in three stages** (`EVAL_SCREEN_EPISODES`, on by default): every
-checkpoint whose training graph point was 100% gets the full 100 episodes immediately (uncapped —
-47 to 146 checkpoints on a batch-10 arm), everything else selected gets 20, and the best 30 *of
-those screened* get 80 more. ~2.4x fewer episodes than measuring everything at 100.
+**The close-out runs in three stages** (`EVAL_SCREEN_EPISODES`, on by default): every checkpoint
+whose graph point was 100% gets the full 100 episodes immediately (uncapped), everything else
+selected gets 20, and the best `EVAL_CONFIRM_COUNT` *of those screened* get 80 more. ~2.4x fewer
+episodes on a large arm — but the saving collapses to 1.0x when the screened pool is smaller than
+the confirm count, which happened on `b11c`.
 
-Two consequences for anyone reading the output file: rows have *different* episode counts, so
-pooling them over-weights the winners and reads high — the arm-level rate is the equal-effort
-figure the run prints, which truncates every checkpoint to its first 20 — and best-checkpoint must
-come from full-length rows only. `eval_progress.best_of()` enforces the latter.
+Two consequences for reading the output file: rows have **different episode counts**, so pooling
+them over-weights the winners and reads high — use the equal-effort figure the run prints, or the
+graph-100% tier if the run predates that field — and best-checkpoint must come from full-length rows
+only, which `eval_progress.best_of()` enforces.
 
-**The 100% tier is a coverage guarantee, not a shortlist of champions**, and it is easy to
-misread as one. Across batch 10, graph-100% checkpoints average 73.0% against 71.2% for graph-90%,
-but the 90% tier holds the higher maximum (93% vs 89%) and produced **all four arms' best
-checkpoint**, being ~4x larger. Finding the best checkpoint is `EVAL_CONFIRM_COUNT`'s job, and the
-default 30 only recovers the true best 57% of the time on a 369-candidate arm; 100 gets 97% for
-almost no extra cost.
-
-## Active development
-
-`snek2/` is the only directory that should be edited going forward. It's a
-working copy of `theSchlong/`.
-
-All other directories (`theSchlong/`, `theSchlongCardinalDirs/`, `humanPlayer/`,
-etc.) are kept as-is for posterity — do not edit files in them.
-
-## Git workflow
-
-Leave finished work uncommitted. Do not run `git commit` or `git push` until the
-user has explicitly approved that specific change — "push" or "commit this" from
-the user is the go-ahead, and it applies only to the change in front of you, not
-to later ones.
-
-The reason is review: the user reads diffs in their editor, and committing moves
-the change out of the working tree where it's no longer visible there. Staging
-has the same problem, so don't `git add` either.
-
-So the loop is: make the edit, describe what changed, then stop and wait. It's
-fine to run read-only git commands (`status`, `diff`, `log`, `show`) at any
-point — the restriction is only on commands that write history or the index.
+**The 100% tier is a coverage guarantee, not a shortlist of champions.** 6 of the 8 arms measured
+across batches 10-11 found their best checkpoint in the graph-90% tier, which is ~4x larger.
+Finding the best checkpoint is `EVAL_CONFIRM_COUNT`'s job.
