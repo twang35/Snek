@@ -627,11 +627,12 @@ the current eval, so it can rise again.
 The two are combined with `max()`, so whichever phase is live controls epsilon. Each eval row
 records the value in `runs/<policy>_evals.json`.
 
-**This changes training dynamics, so learning curves from 2026-08-04 onward are not comparable
-to batches 1-11.** Checkpoints still load — the observation vector is untouched — but
-`avg_score`, best-30 and the shape of any graph now come from a run that explored for a
-meaningfully long time, which no earlier arm did. Treat it like an environment change for the
-purpose of reading curves against each other.
+**Arms from 2026-08-04 onward are a different config, not a different environment.** Checkpoints
+still load; the observation vector is untouched. Epsilon only shapes the collected data, so it
+changes *which policy you get at step N* and therefore moves every column — but every metric here
+is a greedy eval either way, so a post-rewrite batch compares to batch 11 as a controlled test of
+the schedule, in exactly the way batch 11 compared to batch 10. **What is not legitimate is
+pooling the two as seeds of one baseline.**
 
 #### What was wrong with the ladder it replaced
 

@@ -47,11 +47,18 @@ batch 11 below. Everything else stays within its own era. Batch 10's checkpoints
 `master` when this landed.
 
 **§ marks arms trained after the epsilon rewrite of 2026-08-04.** Not an environment change —
-the observation vector is untouched and every ‡‡‡ checkpoint still loads — but a *training
-dynamics* change, and a large one: every arm above ran at epsilon exactly 0.0 for 96.8% of its
-steps, and § arms explore for a meaningful fraction of the run. `avg_score`, best-30 and graph
-shape are therefore not like-for-like against ‡‡‡ or anything earlier. Best-checkpoint
-measurements are still comparable, since those are greedy evals either way.
+the observation vector is untouched and every ‡‡‡ checkpoint still loads — but a config change,
+and a large one: every arm above ran at epsilon exactly 0.0 for 96.8% of its steps, and § arms
+explore for a meaningful fraction of the run.
+
+**Every metric here is a greedy eval, so § rows are comparable to ‡‡‡ rows in exactly the way
+batch 11 was comparable to batch 10 — as a controlled test of the one thing that changed.** An
+earlier draft of this note claimed best-checkpoint survived the change while best-30 did not;
+that was wrong, and the distinction does not exist. Epsilon only shapes the data, so it changes
+*which policy you get at step N*, and every column then differs — but all of them still measure
+the greedy policy's quality, which is what makes the comparison meaningful rather than broken.
+What is not legitimate is treating a § arm as another seed of the ‡‡‡ baseline: it is a different
+config, and pooling the two would hide the change instead of measuring it.
 
 **Four environments in two days is the real cost being paid here**, and it is worth stating
 plainly: every environment change resets the comparison set, so a batch's numbers are only ever
