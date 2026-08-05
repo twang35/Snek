@@ -5,7 +5,7 @@ it covers every arm ever run, including the batches whose narratives moved to
 [`archive/batches1-9.md`](archive/batches1-9.md).
 
 Companion to [`runs.md`](runs.md) (what is running), [`findings.md`](findings.md) (conclusions) and
-[`charts.md`](charts.md) (graphs, batch 9 onward). Nothing here should be re-run without a reason.
+[`charts.md`](charts.md) (graphs, batch 10 onward). Nothing here should be re-run without a reason.
 
 ## All arms, ranked by best sustained perfect rate
 
@@ -147,6 +147,62 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 13 — the epsilon rewrite plus the exploration shield: an exact null
+
+**Ran 2026-08-05, four arms to 3.4-3.7M, stopped healthy.** Same environment and config as batch 11
+(‡‡‡, 30-value vector) except the epsilon schedule: handover 0.0125, `GUIDED_FRACTION=0.5`.
+Checkpoint measurement is **still running** — the rows for these four go into the table above once
+it finishes. Graphs in [`charts.md`](charts.md#batch-13--the-lower-handover-plus-the-shield-and-an-exact-null).
+
+| seed | best30 | `strong_eval_fraction` | peak trailing | trailing-30 at stop | final eps |
+|---|---|---|---|---|---|
+| 1 | 78.0% @2679k | 11.5% | 94.5 @2661k | 70.7% | 0.0024 |
+| 2 | 82.3% @1508k | 25.4% | 94.8 @1919k | 67.0% | 0.0027 |
+| 3 | **85.3%** @2864k | **26.5%** | 94.8 @3185k | 72.3% | 0.0023 |
+| 4 | 83.3% @1005k | 14.5% | 94.5 @980k | 39.0% | 0.0050 |
+| **mean** | **82.2%** | **19.5%** | | | |
+
+### The pre-registered comparison: no difference at all
+
+Paired by seed against `b11a`-`b11d`, exact paired permutation test over all 16 sign flips:
+
+| metric | batch 13 | batch 11 | diff | p |
+|---|---|---|---|---|
+| `best_perfect30` | 82.2% | 82.2% | **+0.0 pp** | **1.000** |
+| `strong_eval_fraction` | 19.5% | 17.5% | +2.0 pp | — |
+| post-peak drawdown | 20.0 pp | 21.0 pp | -1.0 pp | 0.875 |
+
+`best_perfect30` landing on the same mean to one decimal is a coincidence of rounding, not a
+suspicious result — the per-seed diffs are -7.7, -9.4, +12.3, +5.0. **That spread around a zero mean
+is the finding**: n=4 cannot see anything smaller than ~10-15 pp here, and there is nothing larger
+than that to see.
+
+This confirms the null hypothesis stated in advance in
+[`hyperparamTuning.md`](hyperparamTuning.md#what-is-still-unknown): batch 11's near-zero epsilon
+regime was not costing anything, and no version of this schedule has beaten it.
+
+### What the rewrite did buy, which is not nothing
+
+**The schedule now works as designed.** Epsilon descended on skill to 0.0023-0.0050 in all four
+arms, so the refinement phase reached its intended range instead of pinning at a ceiling. The two
+real defects are fixed and stay fixed: exactly-0 is unreachable, and the one-way ratchet is gone, so
+a collapsing arm buys exploration back — `b13d` reads 0.0050 at stop against its siblings' 0.0024,
+which is the anti-ratchet responding to its 44 pp drawdown exactly as intended.
+
+**The 350k abandon condition passed 4/4** — `b13b` was at trailing 92.4 with a 72.3% perfect rate by
+step 350k, where every batch-12 arm was at 0%. Whatever the rewrite is worth, the deadlock is gone.
+
+### What it did not buy, stated plainly
+
+- **No outcome gain.** Three batches of work on epsilon have produced one deadlock and one exact
+  null. The `min_epsilon` floor and the anti-ratchet are worth keeping on mechanism; the elevated
+  exploration is not worth pursuing further at n=4.
+- **The shield is unproven.** It fixed batch 12's decay at handover 0.05 (see
+  `b12s-shield05seed1`), but at 0.0125 there is no decay to fix and nothing separates it from batch
+  11. It is confounded with the handover change here and cannot be isolated at this sample size.
+- **The drawdown is not improved.** -1.0 pp at p = 0.875, with per-seed diffs of -35.1 and +38.7.
+  `b13d` gave up 44.3 pp where batch 11's seed 4 gave up 5.6, so the seeds simply swapped places.
 
 ## Batch 11 — the same config on the 30-value vector: no significant difference
 

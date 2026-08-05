@@ -351,34 +351,44 @@ row by its maximum and so samples an all-masked row uniformly by accident; `-inf
 load-bearing and testable. And the shield's one-step depth was flagged as an acceptable limitation
 when it is in fact the binding one.
 
-## The design: batch 13, the lower handover plus the shield
+## Batch 13 is stopped and being measured — the epsilon question is closed
 
-| | |
+`b13a-shieldseed1`, `b13b-shieldseed2`, `b13c-shieldseed3`, `b13d-shieldseed4`, run 2026-08-05 to
+3.39M / 3.70M / 3.67M / 3.51M and stopped healthy after 10.4 h. **Checkpoint evals are running** —
+`evals/<policy>_eval_progress.png` for live state, `runs/<policy>_checkpoint_evals.json` for
+results. Full write-up in
+[`completedRuns.md`](completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null).
+
+| | result |
 |---|---|
-| arms | 4, `SNEK_SEED=1..4`, all identical |
-| change vs batch 12 | handover 0.05 → **0.0125** (5 rungs), plus `GUIDED_FRACTION=0.5` |
-| change vs batch 11 | the epsilon schedule and the shield — epsilon regime now *similar* to b11's |
-| control | batch 11's four arms, already measured; `b12a-d` as the 0.05 reference |
-| pairing | seeds 1-4 pair directly with `b11a`-`b11d` and `b12a`-`b12d` |
-| primary metric | `strong_eval_fraction`; `best_perfect30` secondary for continuity |
-| horizon | 2.5M, but **judged much earlier** — see the abandon condition |
+| 350k abandon condition | **passed 4/4** — `b13b` hit trailing 92.4 / pf30 72.3% by 350k |
+| epsilon at stop | 0.0023-0.0050 — the refinement phase reached its intended range |
+| `best_perfect30` vs batch 11 | 82.2% vs 82.2%, **+0.0 pp, p = 1.000** paired, n=4 |
+| `strong_eval_fraction` vs batch 11 | 19.5% vs 17.5%, +2.0 pp |
+| post-peak drawdown | 20.0 vs 21.0 pp, p = 0.875 |
 
-```
-SNEK_SEED=n SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 \
-SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 SNEK_GUIDED_FRACTION=0.5 \
-  /opt/miniconda3/envs/snek/bin/python -u snek2.py b13<x>-shieldseed<n>
-```
+**The deadlock is gone and the outcome is unchanged.** Three batches on epsilon have produced one
+deadlock (12) and one exact null (13). Keep the floor and the anti-ratchet, which were always
+justified on mechanism; **do not spend more arms on exploration level.** Recorded in
+[`findings.md`](findings.md#now-measured-2026-08-05-exploration-was-tested-in-both-directions-and-neither-helped).
 
-**Pre-registered abandon condition, at 350k steps:** batch 12 needed 1M and four arms to say what
-350k of one arm already says, so read it early this time. By 350k, `b11a` was at trailing 90.8 with
-pf30 19.0%, `b12a` at 77.2 / 0.0%, the shielded 0.05 smoke at 82.9 / 0.3%. **An arm below trailing
-~87 or pf30 ~10% at 350k is in the failed regime**, and if 3 of 4 are, stop the batch and add the
-guaranteed-descent envelope rather than paying for another 2M steps of confirmation.
+**The shield stays on by default** at `GUIDED_FRACTION=0.5`. It is confounded with the handover
+change here and unproven at 0.0125 — but it demonstrably fixed batch 12's decay at 0.05, costs
+nothing measurable, and `SNEK_GUIDED_FRACTION=0` reproduces the unshielded behaviour exactly if it
+ever needs isolating.
 
-**What this batch can and cannot show.** n=4 resolves ~10-15 pp, so it cannot measure the shield's
-effect size against batch 11. It *can* answer the question that actually blocks progress: does an
-arm at handover 0.0125 learn at b11's rate, or is any elevated exploration harmful? Those two
-outcomes are ~20 pp apart on the primary metric, which n=4 can see.
+### What batch 13 leaves for the next batch
+
+The epsilon axis is closed, so the next batch should spend its four slots on something else. The
+binding constraint has not moved: **n=4 resolves ~10-15 pp on `best_perfect30` and ~7 pp on
+`strong_eval_fraction`**, and the per-seed spread in this batch was -9.4 to +12.3 pp on an effect
+that is genuinely zero. Candidates are in the backlog below, unchanged — `SNEK_LEARNING_RATE=1e-4`
+is still the highest-value untested knob.
+
+One thing worth doing first and cheaply: **batch 13's arms are four fresh seeds on the current
+config and environment**, so pooled with batch 11 they give **n=8 for the baseline** rather than a
+treatment group. That is the widest baseline this project has had, and it is what any future knob
+test should be compared against.
 
 **Honest statement of the bet.** The rewrite's original premise — that batches 10-11 running 96.8%
 of steps at epsilon exactly 0 was itself a defect — has one falsified prediction against it and no

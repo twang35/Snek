@@ -55,7 +55,10 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A larger replay buffer prevents the collapse | **not settled** — opposite results twice |
 | Epsilon reaching 0.0 causes the collapse | **falsified**, *but only at 0.001 vs 0.0* |
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
-| The epsilon schedule was rewritten 2026-08-04: two phases, no ratchet, 0 rejected | **new**, untested in training |
+| Elevated exploration (handover 0.05) helps | **falsified** — batch 12 deadlocked, 0% perfect 4 of 4 |
+| Elevated exploration (handover 0.0125) helps | **falsified** — batch 13 is an exact null, p=1.000, n=4 |
+| A one-step exploration shield helps | **open**, confounded — fixed batch 12's decay, nothing to fix at 0.0125 |
+| The epsilon *ratchet* was a real defect | **standing**, on mechanism: no recovery from a collapse |
 
 **Measurement**
 
@@ -288,8 +291,32 @@ The schedule was rewritten 2026-08-04 for that reason — two phases, no ratchet
 and exactly 0 rejected. See
 [`hyperparamTuning.md`](hyperparamTuning.md#the-epsilon-schedule--rewritten-2026-08-04-and-it-breaks-curve-comparability).
 **That rewrite is not evidence against anything on this page.** It is a change to an
-untested part of the design, and it is itself unmeasured: no arm has trained past ~20k steps
-with meaningful exploration, in either direction.
+untested part of the design.
+
+#### Now measured, 2026-08-05: exploration was tested in both directions, and neither helped
+
+Two batches closed the gap this section described, and the answer is that the untested part of the
+design was untested because there was nothing there.
+
+| batch | handover epsilon | result |
+|---|---|---|
+| 12 | 0.05 | **deadlock.** 4 arms, 0% perfect games to ~1M, greedy trailing 53-63 vs 84-88 |
+| 12s | 0.05 + exploration shield | decay fixed, still plateaus at trailing ~83 with 0.3% perfect |
+| 13 | 0.0125 + shield | works, and is an **exact null** vs batch 11: +0.0 pp, p = 1.000, n=4 paired |
+
+So the honest closing position on epsilon: **too much exploration is actively harmful and the right
+amount is indistinguishable from none.** 0.05 is fatal to sit at, because a collect policy at 3.3%
+random actions never finishes a board and the buffer never holds the last ten food. 0.0125 is
+harmless and buys nothing measurable.
+
+What survives is only what was defensible on mechanism in the first place: the **ratchet** was a
+real defect (`b11b` sat at 0.001 through a collapse from 64.6 to 8.8 with no way to recover), and
+exactly 0.0 makes the buffer a closed loop. A 0.002 floor plus a stateless schedule fixes both
+without needing elevated exploration. The original framing — "96.8% of steps at exactly 0 is a
+defect" — was **cosmetic**, and it cost two batches to find that out.
+
+**Do not re-open this at n=4.** Three batches have now failed to separate any epsilon regime from
+batch 11's on a metric whose between-seed spread is ±12 pp.
 
 The lesson worth keeping is about how the original hypothesis was framed. "Epsilon 0.0 causes
 the collapse" named a *value*, so the experiment tested a value and closed the question at that
