@@ -500,17 +500,42 @@ The floor is small because a random action is nearly free early in an episode an
 late, and the cost scales with length: at epsilon 0.01 a 1780-step perfect game absorbs ~12
 forced non-greedy moves. 0.002 is ~2.4.
 
-**One measured fact kept the handover at 0.05 rather than lower:** `b11d` reached a 10% perfect
-rate at step 13000 while collecting at epsilon 0.05, and `b11b`/`b11c` at 0.01. `perfect_percent`
-is a *greedy eval* metric, so this does not show the collect policy finishing games — but it does
-show that learning to win is compatible with collecting at 25x the old effective floor.
+#### The handover moved from 0.05 to 0.0125 on 2026-08-05, and why
+
+The original handover was 0.05, on the reading that `b11d` reached a 10% perfect rate at step 13000
+while collecting at epsilon 0.05. **Batch 12 falsified that**: 0.05 is fine to pass *through* and
+fatal to *sit at*.
+
+| evidence | at epsilon 0.05 |
+|---|---|
+| batch 12, 4 arms to ~1M | 0% perfect games, greedy trailing 53-63 vs batch 11's 84-88 |
+| worst case | `b12b` pinned 942k steps, **0 perfect games in 1032 evals** |
+| with the exploration shield | decay fixed, but plateaus at trailing ~83 with 0.3% perfect |
+| improvement rate, shielded | 4.7 trailing points per 100k vs `b11a`'s 11.1 |
+
+The mechanism is that a collect policy at 3.3% random actions per step essentially never finishes
+a board, so the buffer holds no trajectories that eat the last ~10 food and the greedy policy
+cannot learn them. The shield makes exploration *survivable* without making the endgame
+*completable*, because a one-step mask cannot prevent self-trapping.
+
+Two rungs were added **below** the existing ladder rather than above — thresholds are now
+`(2, 5, 10, 15, 20)` — so the handover falls to `0.4 / 2**5` while every threshold that drops
+epsilon still sits in the pre-winning regime. Pinned at the new ceiling, an arm forces a
+non-greedy move 0.83% of steps against 3.3% before.
 
 #### What is still unknown
 
-No arm on record has trained past ~20k steps with meaningful exploration, so the effect of this
-is untested rather than established. It is a candidate explanation for the post-peak decline —
-retroactively, `b11a` would have gone 0.0020 → 0.0087 across its 42pp drawdown — but that is a
-hypothesis about a mechanism, not a measurement.
+**Whether any elevated exploration helps at all.** Every record this project holds was set at
+near-zero epsilon, and the rewrite's original premise — that batches 10-11 running 96.8% of steps
+at exactly 0 was itself the defect — has no evidence behind it and one falsified prediction against
+it. What survives on evidence is narrower: the *ratchet* was a real defect, because `b11b` sat at
+0.001 through a collapse from 64.6 to 8.8 with no way to buy exploration back. A floor of 0.002
+plus a stateless schedule fixes that without needing a high ceiling.
+
+So the honest position is that 0.0125 is a bet, not a finding, and the null hypothesis — that
+b11's near-zero regime is simply correct — is still live. A **guaranteed-descent envelope**
+(`max(pf30 / target, step / S)`) is the fallback if 0.0125 also deadlocks; it was deliberately
+left out so the ceiling can be judged on its own.
 
 ### Naming
 

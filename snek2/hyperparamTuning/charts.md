@@ -46,6 +46,22 @@ at the same 1M steps. The mechanism, the fix, and the two wrong turns taken diag
 arms are kept as the measured cost of sitting at epsilon 0.05: not a wasted batch, a negative
 result with four seeds behind it.
 
+### b12s-shield05seed1 — the exploration shield at handover 0.05, seed 1
+
+![b12s](charts/b12s-shield05seed1.png)
+
+Step 0.43M (stopped) · trailing 83.1 at stop · best 30-eval perfect 0.3% · max single eval 10% · not measured
+
+**The arm that moved the handover.** A verification run, `SEED=1` so it pairs with `b12a`, with the
+one-step exploration shield on and the handover still at 0.05. It **fixed the decay** — `b12a` fell
+83.8 → 74.2 between 200k and 400k while this one was still rising — and **did not fix perfect
+games**: 2 perfect-game evals in 431, plateauing at trailing ~83 where the perfect rate is ~0,
+improving at 4.7 points per 100k against `b11a`'s 11.1.
+
+Kept because it is the whole argument for dropping the handover to 0.0125: a one-step mask prevents
+blunders but not self-trapping, so the collect policy still never finishes a board and the buffer
+never contains the last ten food. Read against `b12a` below and `b11a` above.
+
 ### b12a-eps002seed1 — two-phase epsilon, seed 1
 
 ![b12a](charts/b12a-eps002seed1.png)

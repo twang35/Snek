@@ -9,8 +9,9 @@ import training
 
 INITIAL = 0.4
 FLOOR = 0.002
-# Where the bootstrap phase hands over: INITIAL / 2**3.
-TOP = 0.05
+# Where the bootstrap phase hands over: INITIAL / 2**5. Was INITIAL/2**3 = 0.05 until batch 12
+# measured what sitting at 0.05 costs — see the comment on BOOTSTRAP_REWARD_THRESHOLDS.
+TOP = 0.0125
 
 
 def eps(avg_reward, perfect_rate, initial=INITIAL, floor=FLOOR):
@@ -20,33 +21,56 @@ def eps(avg_reward, perfect_rate, initial=INITIAL, floor=FLOOR):
 # ------------------------------------------------------- bootstrap phase
 
 def test_bootstrap_halves_once_per_threshold():
-    # -5 is the reward of an agent that dies immediately, which is where every run starts.
+    # -5 is the reward of an agent that dies immediately, which is where every run starts. One
+    # halving per rung, walking up the thresholds (2, 5, 10, 15, 20).
     assert eps(-5.0, 0.0) == INITIAL
-    assert eps(7.0, 0.0) == INITIAL / 2
-    assert eps(15.0, 0.0) == INITIAL / 4
+    assert eps(4.0, 0.0) == INITIAL / 2
+    assert eps(7.0, 0.0) == INITIAL / 4
+    assert eps(12.0, 0.0) == INITIAL / 8
+    assert eps(18.0, 0.0) == INITIAL / 16
 
 
 def test_bootstrap_hands_over_at_the_refinement_ceiling():
     # Past the last threshold the bootstrap term stands down and refinement takes over at
-    # exactly INITIAL/8 — the two phases must meet, not overlap or leave a gap.
+    # exactly INITIAL/32 — the two phases must meet, not overlap or leave a gap.
     assert eps(25.0, 0.0) == TOP
     assert training.bootstrap_epsilon(25.0, INITIAL) == 0.0
+    assert TOP == INITIAL / (2.0 ** training.BOOTSTRAP_RUNGS)
+
+
+def test_the_handover_is_well_below_what_batch_12_measured_as_too_high():
+    # 0.05 is not a hypothetical: four arms sat there for up to 942k steps at 0% perfect games,
+    # and the shielded smoke run plateaued at trailing ~83 there too. Whatever the rung count,
+    # the handover has to land clear of it, or batch 12 repeats.
+    assert TOP <= 0.02
 
 
 def test_bootstrap_thresholds_are_below_the_first_perfect_game():
     # The whole diagnosis: the old ladder's *last* rung fired at avg_reward > 60, which is
     # "eats 65 of 95 food and never wins". Every threshold that still drops epsilon must sit
     # in the pre-winning regime, so nothing cuts exploration while the arm is learning to win.
+    # Deeper descent has to come from adding rungs *below*, never from raising the last one.
     assert max(training.BOOTSTRAP_REWARD_THRESHOLDS) <= 20
+
+
+def test_bootstrap_thresholds_are_strictly_increasing():
+    # bootstrap_epsilon returns on the first threshold it clears, so an out-of-order ladder
+    # silently makes the rungs after the inversion unreachable.
+    thresholds = training.BOOTSTRAP_REWARD_THRESHOLDS
+    assert all(a < b for a, b in zip(thresholds, thresholds[1:]))
 
 
 def test_a_collapsed_arm_gets_exploration_back():
     # b11b at step 20000: score fell 64.6 -> 8.8 with epsilon pinned at 0.001 by the ratchet.
-    # A reward that low is back inside the bootstrap band, so epsilon must rise.
+    # A reward that low is back inside the bootstrap band, so epsilon must rise — and by a lot,
+    # not by one notch: the point is to re-explore, not to twitch.
     healthy = eps(90.0, 0.85)
     collapsed = eps(4.0, 0.85)
     assert collapsed > healthy
-    assert collapsed == INITIAL
+    assert collapsed == INITIAL / 2
+    assert collapsed >= 50 * healthy
+    # A fully dead arm goes all the way back to the top of the ladder.
+    assert eps(-5.0, 0.85) == INITIAL
 
 
 # ------------------------------------------------------ refinement phase
@@ -123,8 +147,9 @@ def test_bootstrap_signal_is_damped_against_flapping():
     # trailing mean of the same two readings stays above 5, so epsilon holds.
     undamped = eps(4.96, 0.0)
     damped = eps(training.trailing_reward(reward_rows(7.63), 4.96), 0.0)
-    assert undamped == INITIAL
-    assert damped == INITIAL / 2
+    assert damped < undamped
+    assert undamped == INITIAL / 2
+    assert damped == INITIAL / 4
 
 
 def test_bootstrap_signal_still_responds_within_its_window():
@@ -191,16 +216,23 @@ def test_a_lucky_eval_does_not_pin_epsilon():
 
 # ------------------------------------------------------- the whole curve
 
-def test_the_schedule_spends_real_time_above_the_old_effective_floor():
-    # The headline defect: batches 10-11 ran 99.6% of their steps at epsilon <= 0.001. Under
-    # this schedule an arm is still above 0.01 at a 40% trailing perfect rate, which no arm
-    # on record reached before ~300k steps.
-    assert eps(90.0, 0.40) >= 0.01
-    assert eps(90.0, 0.30) > 0.01
+def test_a_learning_arm_explores_more_than_a_winning_one():
+    # This replaced `test_the_schedule_spends_real_time_above_the_old_effective_floor`, which
+    # asserted eps >= 0.01 at a 40% perfect rate. That encoded the rewrite's original premise —
+    # that batches 10-11 running 99.6% of their steps at epsilon <= 0.001 was itself the defect.
+    # Batch 12 falsified it: 0.05 produced 0% perfect games in four arms, the shielded smoke run
+    # plateaued there too, and every record this project holds was set at near-zero epsilon. So
+    # a *lower bound* on epsilon in the winning regime is no longer something to want.
+    #
+    # What survives is the shape: an arm that cannot win yet explores substantially more than one
+    # that can, and neither ever reaches exactly 0. Both are relative, so this test no longer
+    # pins the schedule to an absolute level the evidence keeps moving.
+    assert eps(90.0, 0.0) >= 5 * FLOOR
+    assert eps(90.0, 0.0) > eps(90.0, 0.40) > eps(90.0, training.REFINE_PERFECT_TARGET)
 
 
 def test_a_bigger_initial_epsilon_scales_the_whole_curve():
     # INITIAL_EPSILON stays a meaningful knob: the rungs and the handover are derived from it
     # rather than hardcoded, so doubling it doubles the ceiling the refinement starts from.
-    assert eps(25.0, 0.0, initial=0.8) == 0.1
+    assert eps(25.0, 0.0, initial=0.8) == 0.8 / (2.0 ** training.BOOTSTRAP_RUNGS)
     assert eps(-5.0, 0.0, initial=0.8) == 0.8

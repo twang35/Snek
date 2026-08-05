@@ -205,18 +205,17 @@ agreement across metrics makes a real positive effect more likely than zero, but
 `b11b` holds both records now: the highest best-30 (91.7%) and the best measured checkpoint (96%).
 Both are n=1 of eight arms with heavily overlapping batch means — high-water marks, not findings.
 
-## RUNNING: batch 12 wave 1 — launched 2026-08-04, four arms, no watchers
+## Batch 12 is abandoned at ~1M of 2.5M — it is the negative result batch 13 is built on
 
-`b12a-eps002seed1`, `b12b-eps002seed2`, `b12c-eps002seed3`, `b12d-eps002seed4`. Logs at
-`/tmp/b12<x>-eps002seed<n>.log`; status from `runs/<policy>_evals.json`'s `summary` block.
-Config verified at startup on all four — seed 1-4, disc 0.995, `td_loss`, no IS — and the new
-epsilon schedule confirmed live in `runs/<policy>.md` (`min_epsilon` 0.002, two-phase).
+`b12a-eps002seed1`, `b12b-eps002seed2`, `b12c-eps002seed3`, `b12d-eps002seed4`, stopped
+2026-08-04. All four cleared the pre-registered abandon condition together, so the batch was
+called early rather than run to its horizon. Charts and per-arm readings in
+[`charts.md`](charts.md#batch-12--the-epsilon-rewrite-and-the-deadlock-it-found).
 
-**These have no step cap.** `num_iterations` is effectively unbounded and no cap knob exists, so
-they run until stopped. That is deliberate rather than an oversight: the pre-registered comparison
-happens at a **2.5M horizon** whatever they reach, so extra steps cost the comparison nothing and
-buy data on the open question of whether an arm that peaks late keeps improving. **Wave 2 needs
-these four slots**, so they do need stopping — expect ~7.5 h to 2.5M, ~10 h to ~3.3M.
+Note for anyone stopping an arm: `SIGTERM` and `SIGINT` are both swallowed by the trainer — there
+is no signal handler in `training.py` — so it takes `SIGKILL`. Checkpoints and `_evals.json` are
+rewritten every 1000 steps, so at most a partial interval is lost, but copy the four
+`_evals.json` files aside first if they hold the only record of something.
 
 ### ‡ The new schedule deadlocks. All four arms are failing, 4/4, at ~1M steps
 
@@ -288,8 +287,9 @@ step, instead of uniformly from all three. `shielded_policy.py`, wired in as the
 | the greedy argmax | **never shielded** | it must eat the -5 and learn |
 | `SNEK_GUIDED_FRACTION` | 0.5 | half of refinement-phase episodes |
 | when it engages | at the bootstrap handover | nothing to protect while the snake is short |
-| `INITIAL_EPSILON` / handover | **unchanged**, 0.4 / 0.05 | change one thing at a time |
-| guaranteed-descent envelope | **not added** | the shield should un-deadlock this on its own |
+| `INITIAL_EPSILON` | **unchanged**, 0.4 | the early ladder is the part that works |
+| handover | **0.05 → 0.0125** | two rungs added below; see the smoke result |
+| guaranteed-descent envelope | **not added** | judge the lower ceiling on its own first |
 
 **Only exploration is shielded, never the greedy action.** Overriding a fatal *greedy* move would
 mean `Q(s, a_fatal)` never gets updated toward `DEATH_REWARD` in the states where the network is
@@ -310,45 +310,81 @@ flipped and the snake drove into its own body".
 way `epsilon_for` is: one rule, "shielded iff refining". An arm back in the bootstrap band is
 relearning to survive, which is where dying is informative.
 
-**Verified before launch.** 19 new tests in `tests/test_shielded_policy.py`, all 9 mutants of the
-mask and schedule logic caught; 235 tests total, 0 failures. A smoke run at the batch-12 config
-logged `exploration shield ON (guided fraction 0.5)` at the handover with epsilon at 0.05.
+**Verified before launch.** 19 tests in `tests/test_shielded_policy.py`, all 9 mutants of the mask
+and schedule logic caught; 237 tests total, 0 failures.
 
-Two things this write-up got wrong on the way, both worth remembering. The perfect rate was
+### ‡ The shield alone is not enough — this is why the handover moved too
+
+A smoke run at the batch-12 config, `SEED=1` so it pairs with `b12a`, shield on, handover still at
+0.05. Mean trailing score per 50k band:
+
+| band | smoke shielded | `b12a` unshielded | `b11a` near-zero eps |
+|---|---|---|---|
+| 200-250k | 79.6 | 83.8 | 84.9 |
+| 300-350k | 83.3 | 77.5 | 89.5 |
+| 350-400k | **82.8** | **74.2** | **90.9** |
+| pf30 @350k | 0.3% | 0.0% | **19.0%** |
+| trailing gained per 100k | 4.7 | negative | 11.1 |
+
+**What the shield fixed:** the decay. `b12a` peaked at 214k and fell 83.8 → 74.2; the shielded arm
+was still rising at the same step. That is the failure mode that killed batch 12, and it is gone.
+
+**What it did not fix:** perfect games. 2 perfect-game evals in 355 against `b12a`'s 41 by the same
+step, and it plateaus at trailing ~83 where the perfect rate is ~0. The curve is steeply nonlinear —
+trailing 83 → ~0% perfect, trailing 91 → 19% — so plateauing 8 points low costs everything.
+
+**Why.** A one-step mask prevents blunders, not *self-trapping*, and in a near-full board almost any
+deviation seals a region a few moves later. So the collect policy still never finishes a board, the
+buffer still holds no trajectories that eat the last ~10 food, and the greedy policy still cannot
+learn them. Perfect games are measured greedy, so this was never exploration killing the eval — it
+is the buffer missing completed endgames. **The shield makes exploration survivable without making
+the endgame completable.**
+
+Hence the handover drop to 0.0125: 0.83% forced non-greedy per step against 3.3%, close to the
+regime batch 11 proved. Keep the shield anyway — it costs nothing and removes the decay.
+
+Three things this write-up got wrong on the way, all worth remembering. The perfect rate was
 believed to be measured under epsilon, making the controller read its own noise — it is not, evals
-are greedy, so the proposed greedy probe episodes were **rejected as solving nothing**. And a
-`-1e9` masked logit made the boxed-in fallback look redundant, because `tf.random.categorical`
-shifts each row by its maximum and so samples an all-masked row uniformly by accident; `-inf`
-makes the fallback load-bearing and testable.
+are greedy, so the proposed greedy probe episodes were **rejected as solving nothing**. A `-1e9`
+masked logit made the boxed-in fallback look redundant, because `tf.random.categorical` shifts each
+row by its maximum and so samples an all-masked row uniformly by accident; `-inf` makes the fallback
+load-bearing and testable. And the shield's one-step depth was flagged as an acceptable limitation
+when it is in fact the binding one.
 
-## The design: the epsilon rewrite at n=8, in two waves
+## The design: batch 13, the lower handover plus the shield
 
 | | |
 |---|---|
-| arms | 8, `SNEK_SEED=1..8`, all identical |
-| config | byte-identical to batch 11 plus the new epsilon default |
-| cap | 2.5M steps per arm (~7.5 h per wave of 4, from batch 11's ~332k steps/arm/hour) |
-| schedule | **two waves of 4** — the 4-trainer cap makes n=8 sequential, one overnight each |
-| control | batch 11's four arms, already measured, at a 2.5M horizon |
-| pairing | seeds 1-4 pair directly with `b11a`-`b11d` |
-| primary metric | `strong_eval_fraction` at 2.5M; `best_perfect30` secondary for continuity |
-| decision rule | **keep the schedule unless clearly worse** — revert only on a >10 pp drop |
+| arms | 4, `SNEK_SEED=1..4`, all identical |
+| change vs batch 12 | handover 0.05 → **0.0125** (5 rungs), plus `GUIDED_FRACTION=0.5` |
+| change vs batch 11 | the epsilon schedule and the shield — epsilon regime now *similar* to b11's |
+| control | batch 11's four arms, already measured; `b12a-d` as the 0.05 reference |
+| pairing | seeds 1-4 pair directly with `b11a`-`b11d` and `b12a`-`b12d` |
+| primary metric | `strong_eval_fraction`; `best_perfect30` secondary for continuity |
+| horizon | 2.5M, but **judged much earlier** — see the abandon condition |
 
 ```
 SNEK_SEED=n SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 \
-SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 \
-  /opt/miniconda3/envs/snek/bin/python -u snek2.py b12<x>-eps002seed<n>
+SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0 SNEK_GUIDED_FRACTION=0.5 \
+  /opt/miniconda3/envs/snek/bin/python -u snek2.py b13<x>-shieldseed<n>
 ```
 
-`eps002` names the floor the way `obs30` named the vector, so it reads as a benchmark label later.
-**The control is clean**: the only training-relevant diff since batch 11 launched is the epsilon
-schedule and its plumbing, verified by diffing every training file against `83abbd4`.
+**Pre-registered abandon condition, at 350k steps:** batch 12 needed 1M and four arms to say what
+350k of one arm already says, so read it early this time. By 350k, `b11a` was at trailing 90.8 with
+pf30 19.0%, `b12a` at 77.2 / 0.0%, the shielded 0.05 smoke at 82.9 / 0.3%. **An arm below trailing
+~87 or pf30 ~10% at 350k is in the failed regime**, and if 3 of 4 are, stop the batch and add the
+guaranteed-descent envelope rather than paying for another 2M steps of confirmation.
 
-**This batch cannot prove the epsilon fix helps, and is not meant to.** Even paired, n=4 resolves
-~10-15 pp. The fix is justified on mechanism — 96.8% of steps at epsilon exactly 0 is a defect
-whatever the effect size — so the pre-registered role of wave 1 is a **regression check** with an
-asymmetric rule, and its second purpose is banking the first seeds on the new default. Wave 2
-takes n to 8, which is what future knob tests need.
+**What this batch can and cannot show.** n=4 resolves ~10-15 pp, so it cannot measure the shield's
+effect size against batch 11. It *can* answer the question that actually blocks progress: does an
+arm at handover 0.0125 learn at b11's rate, or is any elevated exploration harmful? Those two
+outcomes are ~20 pp apart on the primary metric, which n=4 can see.
+
+**Honest statement of the bet.** The rewrite's original premise — that batches 10-11 running 96.8%
+of steps at epsilon exactly 0 was itself a defect — has one falsified prediction against it and no
+evidence for it. The part that survives is the *ratchet* being a real defect. So the null
+hypothesis here is that b11's near-zero regime is simply correct and every version of this schedule
+is a wash at best. 0.0125 is a bet placed to find that out cheaply.
 
 ### Why shorter and wider, and what it actually buys
 

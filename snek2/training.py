@@ -26,9 +26,21 @@ quiet_eval_log_interval = 10
 #
 # `avg_reward` thresholds that drive the bootstrap phase, and the window used for the
 # refinement phase's skill signal. See `epsilon_for` for the whole design.
-BOOTSTRAP_REWARD_THRESHOLDS = (5, 10, 20)
-# Rungs halve, so the phase hands over at initial_epsilon / 2**len(thresholds) — 0.05 for
+BOOTSTRAP_REWARD_THRESHOLDS = (2, 5, 10, 15, 20)
+# Rungs halve, so the phase hands over at initial_epsilon / 2**len(thresholds) — 0.0125 for
 # the default 0.4. Named because the refinement phase starts from exactly that value.
+#
+# **Five rungs, not the original three.** Three handed over at 0.05, and batch 12 measured what
+# sitting at 0.05 costs: four arms pinned there for up to 942k steps, 0% perfect games, greedy
+# trailing 53-63 against batch 11's 84-88. A smoke run with the exploration shield on removed the
+# *decay* but still plateaued at trailing ~83 with 0.3% perfect, improving at 4.7 points per 100k
+# against `b11a`'s 11.1 — so 0.05 is too high for this task with or without the shield, because
+# a collect policy that never finishes a board leaves no completed trajectories in the buffer.
+#
+# The two new rungs go *below* the existing ones rather than above, so the property that made
+# the rewrite worth doing survives: every threshold that drops epsilon still sits in the
+# pre-winning regime (max is still 20), and nothing cuts exploration while an arm is learning to
+# win. What changed is only how far the ladder descends before refinement takes over.
 BOOTSTRAP_RUNGS = len(BOOTSTRAP_REWARD_THRESHOLDS)
 # Trailing perfect rate at which refinement reaches the floor. 0.80 rather than 1.0 because
 # no arm has ever sustained a trailing rate above ~0.92, so anchoring at 1.0 would mean the
