@@ -335,6 +335,14 @@ selected gets 20, and the best `EVAL_CONFIRM_COUNT` *of those screened* get 80 m
 episodes on a large arm — but the saving collapses to 1.0x when the screened pool is smaller than
 the confirm count, which happened on `b11c`.
 
+**`EVAL_MIN_ACHIEVABLE=85` abandons a checkpoint mid-measurement** once it cannot reach 85% even if
+every remaining episode is perfect — at 100 episodes, once more than 15 have failed. Full-length
+work drops to 70% and **no ranking can change**, because the test is arithmetic rather than
+predictive: a checkpoint that would have reached the gate is never stopped, and an abandoned row's
+rate is always below the gate. Abandoned rows carry `abandoned: true`, are shorter, and are **not
+comparable with full-length rows** — one more reason not to pool raw rows. `pooled_equal_effort` and
+`best ckpt` are both unaffected by construction. `EVAL_MIN_ACHIEVABLE=0` turns it off.
+
 Two consequences for reading the output file: rows have **different episode counts**, so pooling
 them over-weights the winners and reads high — use the equal-effort figure the run prints, or the
 graph-100% tier if the run predates that field — and best-checkpoint must come from full-length rows

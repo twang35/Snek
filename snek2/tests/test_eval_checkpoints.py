@@ -444,3 +444,108 @@ def test_wilson_interval_tightens_with_more_episodes():
     narrow = eval_checkpoints.wilson_interval(350, 500)
     wide = eval_checkpoints.wilson_interval(70, 100)
     assert (narrow[1] - narrow[0]) < (wide[1] - wide[0]) / 2
+
+
+# ------------------------------------------- early abandonment: EVAL_MIN_ACHIEVABLE
+
+def test_achievable_percent_assumes_every_remaining_episode_is_perfect():
+    # 30 perfect of 40 run, 60 left: the ceiling is (30 + 60) / 100.
+    assert eval_checkpoints.achievable_percent(30, 40, 100) == 90.0
+    # Nothing left to run, so the ceiling is the actual rate.
+    assert eval_checkpoints.achievable_percent(72, 100, 100) == 72.0
+    # A perfect start cannot exceed 100%.
+    assert eval_checkpoints.achievable_percent(10, 10, 100) == 100.0
+
+
+def test_achievable_percent_is_monotone_non_increasing():
+    # The whole basis of the stopping rule: once the ceiling drops below the gate it can never
+    # come back, so stopping is safe. Any counter-example would make the rule discard a
+    # checkpoint that could still recover.
+    for perfect_rate in (0.0, 0.4, 0.85, 1.0):
+        ceilings = [eval_checkpoints.achievable_percent(int(round(done * perfect_rate)), done, 100)
+                    for done in range(10, 101, 10)]
+        assert all(b <= a + 1e-9 for a, b in zip(ceilings, ceilings[1:])), ceilings
+
+
+def test_abandons_only_when_the_gate_is_arithmetically_out_of_reach():
+    test = eval_checkpoints.make_abandon_test(85.0, 100, 20)
+    # 4 perfect of 20: ceiling is 84%, below the gate by one episode. Stop.
+    assert test(4, 20) is True
+    # 5 perfect of 20: ceiling is exactly 85%, still reachable. Keep going.
+    assert test(5, 20) is False
+    # Deep in the run: 74 of 90 can still reach 84%, 75 can reach 85%.
+    assert test(74, 90) is True
+    assert test(75, 90) is False
+
+
+def test_a_checkpoint_that_would_reach_the_gate_is_never_abandoned():
+    # The property that makes this free rather than a trade-off. Walk every prefix of a run that
+    # finishes at exactly the gate, and at 100%: the rule must never fire on either.
+    test = eval_checkpoints.make_abandon_test(85.0, 100, 20)
+    for final in (85, 100):
+        for done in range(10, 101, 10):
+            # Worst case ordering for the rule: every failure lands as early as possible.
+            failures = min(100 - final, done)
+            perfect = done - failures
+            assert test(perfect, done) is False, (final, done, perfect)
+
+
+def test_an_abandoned_row_can_never_outrank_a_kept_one():
+    # An abandoned row's own rate is always strictly below the gate, so a truncated row cannot
+    # win a best-checkpoint comparison it did not earn.
+    test = eval_checkpoints.make_abandon_test(85.0, 100, 20)
+    for done in range(20, 100, 10):
+        for perfect in range(0, done + 1):
+            if test(perfect, done):
+                assert 100.0 * perfect / done < 85.0, (done, perfect)
+
+
+def test_the_floor_protects_the_equal_effort_pool():
+    # equal_effort_pooled truncates to screen_episodes and *skips* rows shorter than that, so
+    # abandoning below the floor would silently delete checkpoints from the arm-level figure.
+    #
+    # At the shipped defaults the floor is slack rather than load-bearing: reaching a ceiling below
+    # 85% of 100 needs more than 15 failures, which cannot happen in the first 10 episodes. It
+    # binds as soon as either knob moves, so test it where it bites — a 95% gate can fire on the
+    # very first round, and the floor is what stops it.
+    ungated = eval_checkpoints.make_abandon_test(95.0, 100, 0)
+    assert ungated(4, 10) is True
+    floored = eval_checkpoints.make_abandon_test(95.0, 100, 20)
+    assert floored(4, 10) is False
+    assert floored(4, 20) is True
+
+    # Same story with a deeper screen, which is how the floor is actually raised at startup.
+    deep = eval_checkpoints.make_abandon_test(85.0, 100, 30)
+    assert eval_checkpoints.make_abandon_test(85.0, 100, 20)(0, 20) is True
+    assert deep(0, 20) is False
+    assert deep(0, 30) is True
+
+    # And a row abandoned at the floor is exactly long enough to still count in the pool.
+    samples = {1: {'perfect': [1] * 5 + [0] * 15}, 2: {'perfect': [1] * 18 + [0] * 82}}
+    perfect, episodes, count = eval_checkpoints.equal_effort_pooled(samples, 20)
+    assert (perfect, episodes, count) == (5 + 18, 40, 2)
+    # A row one episode shorter is dropped entirely — the failure mode the floor prevents.
+    samples[1]['perfect'] = samples[1]['perfect'][:19]
+    assert eval_checkpoints.equal_effort_pooled(samples, 20) == (18, 20, 1)
+
+
+def test_a_completed_checkpoint_is_not_abandoned():
+    test = eval_checkpoints.make_abandon_test(85.0, 100, 20)
+    assert test(0, 100) is False
+    assert test(0, 120) is False
+
+
+def test_the_gate_can_be_turned_off():
+    assert eval_checkpoints.make_abandon_test(0, 100, 20) is None
+    assert eval_checkpoints.make_abandon_test(None, 100, 20) is None
+
+
+def test_the_gate_scales_with_a_shorter_target():
+    # EVAL_EPISODES=40 with the same gate: 4 of 20 leaves a ceiling of (4 + 20) / 40 = 60%.
+    test = eval_checkpoints.make_abandon_test(85.0, 40, 20)
+    assert test(4, 20) is True
+    # 14 of 20 leaves a ceiling of exactly 85%, which is reachable, so it survives — the boundary
+    # is inclusive on the keep side at every target length.
+    assert eval_checkpoints.achievable_percent(14, 20, 40) == 85.0
+    assert test(14, 20) is False
+    assert test(13, 20) is True

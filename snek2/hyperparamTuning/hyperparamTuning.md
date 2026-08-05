@@ -110,6 +110,15 @@ EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
 100 episodes, for the same answer** — see "Screening" below. `EVAL_SCREEN_EPISODES=0` gets the flat
 one-pass protocol every arm before batch 10 was measured under.
 
+**Early abandonment is also on by default, from 2026-08-05** (`EVAL_MIN_ACHIEVABLE=85`): a
+checkpoint stops being measured the moment it cannot reach 85% even if every remaining episode is
+perfect. Measured on batch 13's first 505 full-length rows, that cuts full-length work to **70%**,
+and it cannot change any ranking — the test is arithmetic, so a checkpoint that would have reached
+85% is never stopped, and an abandoned row's own rate is always below the gate. `best ckpt` comes
+from full-length rows only and `pooled_equal_effort` truncates to the screen depth, so both are
+untouched. What *is* affected: rows below the gate are shorter, carry `abandoned: true`, and are
+not comparable with full-length rows. `EVAL_MIN_ACHIEVABLE=0` restores the old behaviour.
+
 `top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
 10-episode eval** from the graph, using the surrounding perfect rate to order within an
 equal-eval tier, and applies two thresholds:

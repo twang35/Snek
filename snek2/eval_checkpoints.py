@@ -116,6 +116,38 @@ episodes. The reason is the shape of the selected population: it is a tight blob
 necessarily keeps almost everything above 60% too. Screening beats gating because it spends its
 savings on the many mediocre checkpoints rather than the few bad ones.
 
+## Early abandonment: EVAL_MIN_ACHIEVABLE
+
+**On by default at 85%.** After every round, a checkpoint's *ceiling* — its rate if every remaining
+episode were perfect — is compared against the threshold, and the measurement stops the moment the
+ceiling falls below it. At 100 episodes that means "stop once more than 15 episodes have failed",
+since 15 failures already cap the run at 85%.
+
+This is free rather than a trade-off, and the reason is that the test is arithmetic rather than
+predictive:
+
+| property | why it holds |
+|---|---|
+| a checkpoint that would reach the gate is never stopped | the ceiling is monotone, and it only fires once the gate is unreachable |
+| an abandoned row can never outrank a kept one | firing implies the row's own rate is below the gate |
+| best-checkpoint is unaffected | it is already taken from full-length rows only |
+| `pooled_equal_effort` is unaffected | the floor is never below `screen_episodes`, the depth it truncates to |
+
+**Measured saving: full-length work drops to 70%** on batch 13's first 505 full-length rows, where
+439 were already out of contention before their 100th episode. A 90% gate would drop it to 52% but
+would leave the 85-89% band — which holds real hall-of-fame candidates — as truncated rows.
+
+What it does cost: a row below the gate is shorter, so its own rate is noisier and is *not*
+comparable with a full-length row. Such rows carry `abandoned: true` and print with an
+`abandoned at N` marker, and the payload records `min_achievable` so a file measured under the gate
+can be told apart from one measured without it. **Do not pool raw rows across the two**, which was
+already true for the screened/full split and is now true for one more reason.
+
+The floor exists because `equal_effort_pooled` skips rows shorter than `screen_episodes`, so
+abandoning below it would silently delete checkpoints from the one arm-level figure meant to be
+comparable across arms. At the shipped defaults the floor is slack — 100 episodes cannot reach a
+sub-85% ceiling in the first 10 — but it binds as soon as either knob moves.
+
 ## Worker count: the throughput knob that matters
 
 **`EVAL_WORKERS` is close to free, and low values are actively expensive.** Measured on one
@@ -140,6 +172,10 @@ Environment:
     EVAL_SCREEN_EPISODES  screen every checkpoint at this many episodes first, then measure
                       only the best of them at full length (default 20; 0 turns screening off)
     EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 30)
+    EVAL_MIN_ACHIEVABLE   stop measuring a checkpoint once it can no longer reach this perfect
+                      rate even if every remaining episode is perfect (default 85; 0 disables)
+    EVAL_ABANDON_FLOOR    never abandon before this many episodes (default 20, raised to
+                      EVAL_SCREEN_EPISODES if that is larger)
     EVAL_RESUME       1 to skip checkpoints this run's own output file already measured at
                       full length, or a comma-separated list of suffixes to take them from
     EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
@@ -415,6 +451,12 @@ def build_row(step, held, meta=None):
         'min_score': round(float(np.min(scores)), 1),
         'max_score': round(float(np.max(scores)), 1),
         'avg_reward': round(float(np.mean(held['rewards'])), 2),
+        # True when EVAL_MIN_ACHIEVABLE stopped this checkpoint short because it could no longer
+        # reach the threshold. Such a row is a valid but *shorter* sample whose rate is always
+        # below the threshold, so it can be read as "below the bar" but not compared on equal
+        # footing with a full-length row. `equal_effort_pooled` is unaffected — see
+        # `make_abandon_test` for why the floor guarantees that.
+        'abandoned': bool(held.get('abandoned')),
         # Wall-clock per checkpoint, so eval_progress.py can give an ETA from this run's own
         # throughput rather than a hardcoded guess. Strong policies play longer episodes and
         # measure slower, so a fixed estimate is wrong in both directions.
@@ -587,13 +629,65 @@ def run_round(parallel_env, policy_action, worker_envs):
     return scores.tolist(), perfect.tolist(), rewards.tolist(), steps
 
 
-def evaluate(parallel_env, policy_action, num_episodes, on_round=None):
+def achievable_percent(perfect_so_far, episodes_so_far, target_episodes):
+    """The best perfect rate a checkpoint can still reach, if every remaining episode is perfect.
+
+    Monotonically non-increasing as episodes land, which is what makes it usable as a stopping
+    rule: once it drops below a threshold it can never come back.
+    """
+    remaining = max(0, target_episodes - episodes_so_far)
+    return 100.0 * (perfect_so_far + remaining) / target_episodes
+
+
+def make_abandon_test(min_achievable, target_episodes, floor_episodes):
+    """Stopping rule: give up on a checkpoint that can no longer reach `min_achievable`.
+
+    Returns None when disabled, so the caller can skip the whole mechanism rather than pass a
+    predicate that always says no.
+
+    Two guards, and both matter:
+
+    * **`floor_episodes`** — never stop before this many episodes, however hopeless. The floor is
+      raised to the screen depth by the caller because `equal_effort_pooled` truncates every
+      checkpoint to its first `screen_episodes` and *skips rows shorter than that*. Abandoning at
+      or above the floor therefore leaves the arm-level pooled figure bit-for-bit identical to what
+      the un-gated protocol would have produced. Abandoning below it would silently delete rows
+      from that statistic, which is the one number in the output designed to be comparable
+      across arms.
+    * **`episodes_so_far >= target_episodes`** — a completed checkpoint is never "abandoned".
+
+    The rule is exact, not predictive: it fires only when the remaining episodes *cannot*
+    arithmetically carry the checkpoint to the threshold. So a checkpoint that would have finished
+    at or above `min_achievable` is never stopped, and an abandoned row's own rate is always below
+    the threshold — an abandoned row can never outrank a kept one.
+    """
+    if not min_achievable:
+        return None
+
+    def should_abandon(perfect_total, episodes_total):
+        if episodes_total < floor_episodes or episodes_total >= target_episodes:
+            return False
+        return achievable_percent(perfect_total, episodes_total, target_episodes) < min_achievable
+
+    return should_abandon
+
+
+def evaluate(parallel_env, policy_action, num_episodes, on_round=None, should_abandon=None):
     """Collects at least num_episodes, in whole rounds of one episode per worker.
 
     `on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round_perfect)`
     is called after each round if given. It exists so the running perfect rate can be
     persisted while a checkpoint is still in flight — a checkpoint takes ~5 minutes and
     without this the only observable state is "started" until it finishes.
+
+    `should_abandon(perfect_so_far, episodes_so_far)` is checked after each round, and stops this
+    pass early when it returns True. The counts passed to it are **this pass's**, so a caller
+    topping up a screened checkpoint has to fold in the episodes already held — see `measure`. The
+    predicate is the caller's business rather than this function's because only the caller knows
+    the checkpoint's target length; a round is the smallest unit that can be stopped at, since a
+    round runs until every worker's episode ends.
+
+    Returns `(scores, perfect_flags, rewards, elapsed, abandoned)`.
     """
     worker_envs = parallel_env.pyenv.envs
     num_workers = len(worker_envs)
@@ -602,6 +696,7 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None):
     scores, perfect_flags, rewards = [], [], []
     per_round_perfect = []
     steps = 0
+    abandoned = False
     start = time.time()
     for index in range(rounds):
         round_scores, round_perfect, round_rewards, round_steps = run_round(
@@ -615,11 +710,16 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None):
             index + 1, rounds, len(round_scores), sum(round_perfect)))
         if on_round is not None:
             on_round(index + 1, rounds, int(sum(perfect_flags)), len(scores), list(per_round_perfect))
+        if should_abandon is not None and should_abandon(int(sum(perfect_flags)), len(scores)):
+            abandoned = True
+            print('    abandoned after {0} episodes: cannot reach the threshold from here'.format(
+                len(scores)))
+            break
 
     elapsed = time.time() - start
     print('    {0} episodes in {1}s ({2} env steps/s)'.format(
         len(scores), round(elapsed, 1), round(steps / elapsed)))
-    return scores, perfect_flags, rewards, elapsed
+    return scores, perfect_flags, rewards, elapsed, abandoned
 
 
 # Selection thresholds, in single-eval (10-episode) percentage points.
@@ -636,6 +736,26 @@ DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
 # then only the best DEFAULT_CONFIRM_COUNT are taken to EVAL_EPISODES. Set EVAL_SCREEN_EPISODES=0
 # for the flat one-pass protocol every arm before batch 10 was measured under.
 DEFAULT_SCREEN_EPISODES = 20
+
+# Abandon a checkpoint mid-measurement once it can no longer reach this perfect rate, even if
+# every remaining episode is perfect. `EVAL_MIN_ACHIEVABLE=0` turns it off.
+#
+# 85 rather than something closer to the record because the rule has to be *arithmetically* certain
+# to be free: it fires only when `perfect + remaining < threshold`, so a checkpoint that would have
+# finished at or above 85% is never stopped, and no ranking changes. Measured on batch 13's first
+# 505 full-length rows, an 85% gate leaves the top tier untouched and cuts full-length work to
+# **70%** — 439 of those 505 rows were already arithmetically out of contention before their 100th
+# episode. A 90% gate cuts it to 52% but would leave the 85-89% band, which holds real
+# hall-of-fame candidates, as truncated rows.
+#
+# What it costs: rows below the gate are shorter, so their own rates are noisier and cannot be
+# compared on equal footing with full-length ones. The pooled arm-level figure is untouched, since
+# the floor below is never lower than the screen depth `equal_effort_pooled` truncates to.
+DEFAULT_MIN_ACHIEVABLE = 85.0
+
+# Never abandon before this many episodes. Raised to the screen depth at startup, so an abandoned
+# row is always long enough to still count in equal_effort_pooled — see make_abandon_test.
+DEFAULT_ABANDON_FLOOR = 20
 
 # Graph single-eval at or above which a checkpoint skips the screen and is measured at full length
 # straight away. 100% means ten perfect games out of ten, the strongest signal the training graph
@@ -868,6 +988,19 @@ def main(argv):
     confirm_count = int(os.environ.get('EVAL_CONFIRM_COUNT', DEFAULT_CONFIRM_COUNT))
     if screen_note:
         print(screen_note)
+    min_achievable = float(os.environ.get('EVAL_MIN_ACHIEVABLE', DEFAULT_MIN_ACHIEVABLE))
+    if min_achievable and not 0 < min_achievable <= 100:
+        raise SystemExit('EVAL_MIN_ACHIEVABLE={0} must be a percentage in (0, 100], or 0 to '
+                         'disable early abandonment.'.format(min_achievable))
+    # Never below the screen depth: equal_effort_pooled truncates to it and drops shorter rows, so
+    # a lower floor would quietly delete checkpoints from the one arm-level figure meant to be
+    # comparable across arms. Raised silently rather than rejected, because the two knobs are
+    # independent and a screen deeper than the floor is a reasonable thing to ask for.
+    abandon_floor = max(int(os.environ.get('EVAL_ABANDON_FLOOR', DEFAULT_ABANDON_FLOOR)),
+                        screen_episodes)
+    if min_achievable:
+        print('abandoning any checkpoint that can no longer reach {0}%, once it has run {1}+ '
+              'episodes (EVAL_MIN_ACHIEVABLE=0 to disable)'.format(min_achievable, abandon_floor))
     perfect_wait_ms = int(os.environ.get('EVAL_PERFECT_WAIT_MS', 400))
     # Rendering is off by default because it was the single slowest thing in an eval, by a
     # wide margin. Measured per game step: 163us headless, 2449us with display=True on the
@@ -1061,6 +1194,13 @@ def main(argv):
                    # matches, and this is part of the rule.
                    'screen_episodes': screen_episodes or None,
                    'confirm_count': confirm_count if screen_episodes else None,
+                   # Also part of the selection rule, so also recorded: a file measured with the
+                   # gate on holds shorter rows below the threshold than one measured without it,
+                   # and pooling the two sets of raw rows would compare different protocols.
+                   'min_achievable': min_achievable or None,
+                   'abandon_floor': abandon_floor if min_achievable else None,
+                   'abandoned': progress.get('abandoned', 0),
+                   'episodes_saved': progress.get('episodes_saved', 0),
                    # Progress in measurements and in episodes. Both are needed once checkpoints
                    # can be measured twice at different lengths: the first tracks the stage plan,
                    # the second is what an ETA can actually be built from.
@@ -1202,8 +1342,22 @@ def main(argv):
                 'started_at': started_at,
             })
 
-        scores, perfect_flags, rewards, elapsed = evaluate(
-            parallel_env, policy_action, episodes, on_round=on_round)
+        # The stopping rule reasons about the checkpoint's *whole* sample against its target
+        # length, but `evaluate` only counts this pass — the two differ by `already` whenever a
+        # screened checkpoint is being topped up. Fold the held tally in here, where it is known.
+        held_perfect = int(sum(held['perfect']))
+        abandon_test = make_abandon_test(min_achievable, num_episodes, abandon_floor)
+        should_abandon = (None if abandon_test is None else
+                         lambda perfect, done: abandon_test(held_perfect + perfect, already + done))
+
+        scores, perfect_flags, rewards, elapsed, abandoned = evaluate(
+            parallel_env, policy_action, episodes, on_round=on_round,
+            should_abandon=should_abandon)
+        if abandoned:
+            held['abandoned'] = True
+            progress['abandoned'] = progress.get('abandoned', 0) + 1
+            progress['episodes_saved'] = (progress.get('episodes_saved', 0)
+                                          + (episodes - len(scores)))
         held['scores'].extend(scores)
         held['perfect'].extend(perfect_flags)
         held['rewards'].extend(rewards)
@@ -1270,12 +1424,23 @@ def main(argv):
     for row in results:
         graph = row.get('graph_single_eval')
         near = row.get('graph_surrounding')
-        print('{0:>9}  {1:>11}  {2:>11}  {3:>7}%  {4:>7}-{5:<7}  {6:>9}'.format(
+        print('{0:>9}  {1:>11}  {2:>11}  {3:>7}%  {4:>7}-{5:<7}  {6:>9}{7}'.format(
             row['step'],
             '-' if graph is None else '{0:.0f}%'.format(graph),
             '-' if near is None else '{0:.1f}%'.format(near),
             row['perfect_percent'],
-            row['perfect_ci95'][0], row['perfect_ci95'][1], row['avg_score']))
+            row['perfect_ci95'][0], row['perfect_ci95'][1], row['avg_score'],
+            # Flagged because the rate on this row is over fewer episodes than its neighbours', so
+            # it reads as "provably below the gate" rather than as a comparable measurement.
+            '  abandoned at {0}'.format(row['episodes']) if row.get('abandoned') else ''))
+
+    if min_achievable and progress.get('abandoned'):
+        planned = progress['session_episodes'] + progress['episodes_saved']
+        print('\nabandoned {0} checkpoints that could no longer reach {1}%, saving {2} of {3} '
+              'episodes ({4:.0f}% of this session\'s planned work)'.format(
+                  progress['abandoned'], min_achievable, progress['episodes_saved'], planned,
+                  100.0 * progress['episodes_saved'] / max(1, planned)))
+        print('    None of them could have reached the gate arithmetically, so no ranking changed.')
 
     if screen_episodes:
         perfect, episodes, count = equal_effort_pooled(samples, screen_episodes)
