@@ -1,7 +1,8 @@
-# Archive: batches 1-8
+# Archive: batches 1-9
 
-Per-batch write-ups and chart captions for the eight batches before the environment audits.
-Moved out of `completedRuns.md` and `charts.md` on 2026-08-04. **Historical record — not
+Per-batch write-ups and chart captions for the nine batches before the current baselines.
+Moved out of `completedRuns.md` and `charts.md` on 2026-08-04; batch 9 followed on 2026-08-05,
+once batch 12 made batches 10-12 the only ones still worth loading. **Historical record — not
 meant to be read into context.** See [`README.md`](README.md).
 
 The one-line-per-arm ranking for every batch, including these, stays in
@@ -93,7 +94,7 @@ The useful result came from the fourth slot. `DISCOUNT=0.995` was included as th
 untested high-prior knob, and after the first arm looked strong the two freed slots went to
 seeding it instead of `b6b`. That decision — replacing dead seeds of a mediocre config with
 seeds of a promising one, rather than completing the original design — is what produced the
-result. See [`findings.md`](findings.md).
+result. See [`findings.md`](../findings.md).
 
 Both `b6b`-config deaths came **late** (573k, 1162k) compared to the eff ~1.6 deaths (246k,
 272k), which suggests lower sharpness delays death rather than preventing it. Any survival
@@ -128,7 +129,7 @@ alpha down, testing whether the effective exponent is what governs stability:
 
 Because `td_loss` squares the error before alpha is applied, `alpha=0.8` with `td_loss`
 is really ~1.6 on the `td_error` scale — see
-[`findings.md`](findings.md). So the alpha *label* has never matched what was tested, and
+[`findings.md`](../findings.md). So the alpha *label* has never matched what was tested, and
 these two arms are the first honest points on that axis.
 
 Note `b6b`'s alpha 0.6 **is** the committed default, so that override is a no-op on that
@@ -146,7 +147,7 @@ sharpness kills these arms), or both surviving *and* scoring no better than base
 stayed stable throughout and measured 8.1% — safe but a low ceiling. `b6b` (eff ~1.2) was
 called "marginal", crashed to near-zero twice, recovered both times, and measured 24.5% —
 the best arm at the time. That produced the "sharpness is a variance dial" reading in
-[`findings.md`](findings.md), later weakened when batch 7 seeded `b6b`'s config and lost 2
+[`findings.md`](../findings.md), later weakened when batch 7 seeded `b6b`'s config and lost 2
 of 4 to late deaths.
 
 Both arms were measured with the old smoothed-first selector, so **both figures are
@@ -177,7 +178,7 @@ batches would give, in half the wall clock.
 died permanently in the 200-270k window and stayed flat at 0.0 for 1.7-1.9M steps. Both
 single-factor arms survived. This retracted the "restoring `theSchlong`'s PER triples the
 perfect rate" finding and led to the effective-exponent mechanism — see
-[`findings.md`](findings.md).
+[`findings.md`](../findings.md).
 
 ### Restarted at ~36-47k to add visible windows
 
@@ -203,7 +204,7 @@ favourite and came in at a third of `b4c`'s rate.
 | `b4b-unifbuf500k` | uniform plus diversity should stack | 9.3% — steadiest curve, marginal gain over `b4a` |
 | `b4c-schlongper` | a long shot; "less correct" than the default | **34.0%** — the breakthrough |
 
-Detail on why `b4c` won is in [`findings.md`](findings.md). The one caveat carried
+Detail on why `b4c` won is in [`findings.md`](../findings.md). The one caveat carried
 forward: it is **n=1**, and its own history contains a collapse at 150-300k deep enough
 to have ended the run if it had been judged at 300k.
 
@@ -242,7 +243,7 @@ nobody checked was the *descent*: the ladder reached 0.001 by median step 15000 
 after, so **96.8% of batches 10-11's training steps ran fully greedy**. "A keeps exploratory data
 being generated" was the right idea aimed at the wrong parameter. The schedule was rewritten on
 2026-08-04; scope note in
-[`findings.md`](findings.md#scope-of-that-falsification-added-2026-08-04-it-was-never-about-the-descent-rate).
+[`findings.md`](../findings.md#scope-of-that-falsification-added-2026-08-04-it-was-never-about-the-descent-rate).
 
 ## Batch 2 — baseline repeats and n=2
 
@@ -296,7 +297,7 @@ Three conclusions were drawn from this table and **all three were later overturn
    ten, which is noise, not an arrival.
 
 This is the origin of the rule that **nothing can be judged below ~250k steps** — see
-[`hyperparamTuning.md`](hyperparamTuning.md).
+[`hyperparamTuning.md`](../hyperparamTuning.md).
 
 ### `N_STEP_UPDATE=3`: the momentum that fooled everyone
 
@@ -334,131 +335,74 @@ both readings are weak.
 
 ## From charts.md
 
-## Batch 11 — the same config on the 30-value vector
+## Batch 9 — two discounts on the post-audit environment
 
-Four seeds of batch 10's config, byte for byte, on the observation vector after the following-tail
-and food-space blocks landed. **A deliberate null-result test**: the only difference from batch 10
-is those two observations, and the comparison was pre-registered before launch. It came back
-**+5.4 pp at t=0.80 — not significant** against a ~10 pp threshold, and the close-out added two
-measured comparisons that came out the same way (+4.1 pp on the graph-100% tier, +4.5 pp on best
-checkpoint; exact p = 0.14 and 0.16). The first seeded batch (`SNEK_SEED=1..4`). Full write-up:
-[`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
+Four arms, two seeds each of `DISCOUNT=0.995` and `0.9975`, and the first batch to run after the
+2026-08-02 audit. Its own lesson was methodological: it compared two values before either had a
+baseline on the environment being measured, which is why batch 10 spent all four slots on one
+config instead.
 
-Read these four charts for their *shape*, not their level: three of the four peaked before 1.8M and
-then declined for another 1.5-2.5M steps, which is the most useful thing batch 11 produced. The
-close-out puts numbers on what that cost — in all four arms the best measured checkpoint lands
-**within 39k steps of the graph's best-30 peak**, so nothing in the declining tail contributed to any
-of the four records.
+### ‡ These arms are measured on a different environment
 
-**That agreement is a batch-11 property, not a general rule**, and it would be easy to over-read.
-Batch 10's gaps are -1058k, -3046k, -99k and +29k — `b10b`'s best checkpoint came at 1501k while its
-graph peaked at 4547k. The difference is chart shape: batch 11's arms have one sharp peak, so the
-graph's best window and the best individual checkpoint have nowhere else to be, whereas batch 10's
-broad plateaus let the two land 3M apart. **Do not use a graph peak to decide where to look for a
-checkpoint** — that is what the close-out is for.
+The 2026-08-02 audit changed two observation components and the reward, and every arm below the
+batch-9 rows was measured before it. A batch-9 number is **not comparable** to a pre-audit one:
+the same checkpoint that scored 92% on the old environment reads 73% on this one. Compare batch-9
+arms to each other, and to `b8f`'s re-measured 82% if you want a pre-audit reference. The audit's
+own measurements are in
+[`archive/findings-superseded.md`](findings-superseded.md).
 
-### b11b-obs30seed2 — `DISCOUNT=0.995`, 30-value vector, seed 2
+All three survivors were still training when measured, at 3.4-3.6M steps, so these are mid-run
+close-outs rather than final ones.
 
-![b11b](charts/b11b-obs30seed2.png)
+### b9a-disc9975a — `DISCOUNT=0.9975`, new env
 
-Step 3.56M · peak score 94.92 (at 855k) · **best 30-eval perfect 91.7%** (at 873k) · **best ckpt 96%** @855k
+Step 3.61M (running) · peak score **89.8** (at 3277k) · **best 30-eval perfect 56.0%** (at 1738k) · max single eval **90%** · **best measured checkpoint 65.0%** (at 1735k), pooled **54.9%** /2000
 
-**The best arm in the project on both metrics**: the highest best-30 any arm has reached, and the
-highest single-checkpoint measurement (96/100, CI 90.2-98.4, ~94% after the winner's-curse
-correction). Both peaks are in the same place — the graph tops out at 855k and the record checkpoint
-*is* 855k, which is the tidiest agreement between graph and measurement in this file.
+**The most consistent arm of batch 9**, and the only 0.9975 seed that survived. Its pooled 54.9%
+over 20 checkpoints is well clear of both 0.995 seeds, and 18 of 20 checkpoints measured above 40%.
 
-Also n=1 of eight arms across the two batches, with the batch means overlapping heavily — a
-high-water mark, not a finding. Gave up 18 pp from that peak by the time it was stopped.
+Its best checkpoint sits at **1735k, less than half way to its trailing peak at 3277k** — the
+graph keeps climbing after the measurable quality stops improving, which is the same pattern
+`b8f` showed and a reason not to read peak trailing as a proxy for peak policy.
 
-### b11a-obs30seed1 — `DISCOUNT=0.995`, 30-value vector, seed 1
+![b9a-disc9975a progress](../charts/b9a-disc9975a.png)
 
-![b11a](charts/b11a-obs30seed1.png)
+### b9b-disc9975b — `DISCOUNT=0.9975`, new env, dead
 
-Step 3.19M · peak score 94.82 (at 653k) · **best 30-eval perfect 85.7%** (at 678k) · best ckpt 94% @671k
+Step **10.47M** (stopped 2026-08-02) · peak score 72.1 (at **328k**) · best 30-eval perfect 5.0% (at 221k) · max single eval 20% · not measured
 
-**The clearest picture of the post-peak decline in the project so far.** 85.7% at 678k down to
-43.3% by 3.19M — a **42.4 pp** drawdown, the largest on record, with no death event: the arm never
-went to zero, it just got steadily worse for 2.5M steps.
+**The overrun failure the 3-3.5M stop rule exists to prevent.** It peaked at step **328k** — before
+any sibling had warmed up — then declined and ran a further 10.1M steps producing nothing, with
+`zero_since` at 9.92M. Nothing was watching it for eight hours overnight.
 
-Its record checkpoint sits at 671k, inside that early peak, and measures 94% — so the decline cost
-this arm a policy it had already found rather than one it never reached. That is the case for the
-shorter, wider batch design in [`runs.md`](runs.md) stated as concretely as it gets.
+Not measured: no checkpoint came near the 60% selector floor, so a close-out would have had
+nothing to evaluate.
 
-### b11d-obs30seed4 — `DISCOUNT=0.995`, 30-value vector, seed 4
+![b9b-disc9975b progress](../charts/b9b-disc9975b.png)
 
-![b11d](charts/b11d-obs30seed4.png)
+### b9c-disc995a — `DISCOUNT=0.995`, new env
 
-Step 3.59M · peak score 94.18 (at 3468k) · **best 30-eval perfect 78.3%** (at 3468k) · best ckpt 88% @3507k
+Step 3.64M (running) · peak score 86.4 (at 2599k) · best 30-eval perfect 37.3% (at 2608k) · max single eval **80%** · **best measured checkpoint 52.0%** (at 2603k), pooled 38.0% /2000
 
-The one arm still near its peak when stopped, and the reason not to cap the next batch at 2M
-without hedging: it peaked at 3468k, where the other three peaked before 1.8M. A short cap would
-have truncated this arm before its best work.
+The weakest of the three survivors on every measure, and the reason 0.995 cannot be called the
+better value on this environment despite going 2 for 2 on survival. Its good region is narrow:
+best and second-best are 2603k and 2626k, 23k apart.
 
-Its record checkpoint is at 3507k — the last 100k steps of the run, and the only arm in either batch
-whose best measured checkpoint came from its final stretch. Whether it was still improving or had
-just arrived at its ceiling is unanswerable now; it is the batch's one genuinely open question.
+![b9c-disc995a progress](../charts/b9c-disc995a.png)
 
-### b11c-obs30seed3 — `DISCOUNT=0.995`, 30-value vector, seed 3
+### b9d-disc995b — `DISCOUNT=0.995`, new env
 
-![b11c](charts/b11c-obs30seed3.png)
+Step 3.40M (running) · peak score 86.7 (at 1232k) · best 30-eval perfect 30.3% (at 1324k) · max single eval **90%** · **best measured checkpoint 70.0%** (at 2544k), pooled 42.4% /1700
 
-Step 3.23M · peak score 94.26 (at 2452k) · **best 30-eval perfect 73.0%** (at 1718k) · best ckpt 87% @1706k
+**The best single checkpoint of batch 9** at 70%, and the arm that inverts the interim reading —
+at 12 of 17 checkpoints its best was 49% and it looked like the weakest arm in the batch. The
+remaining five checkpoints contained its top three. A partial close-out is not a small version of
+a complete one.
 
-Weakest of the batch, and the illustration of why n=4 cannot settle a 5 pp question: 73.0% against
-`b11b`'s 91.7% on an identical config differing only in seed. The measured gap is narrower — 87%
-against 96% — because a best-checkpoint figure asks what the arm managed once, and a best-30 asks
-whether it could hold it.
+Its trailing average peaked at **1232k** and had fallen to 49.4 by 3.4M, while its best measured
+checkpoint is at 2544k — the graph and the measurement disagree about when this arm was good.
 
-The one arm whose close-out degenerated: only 87 checkpoints screened, against an
-`EVAL_CONFIRM_COUNT` of 100, so every screened checkpoint was confirmed anyway and the screen was
-pure overhead. See the note in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
-
----
-
-## Batch 10 — the fresh baseline on the third environment
-
-Four seeds of `DISCOUNT=0.995`, the first arms to train end-to-end on the environment left by
-2026-08-02's seven fixes. **Every arm was stopped healthy rather than dying or declining to a
-stop** — a first for this project — and it held the best measured checkpoint on record (93%) until
-batch 11's close-out beat it with 96%. These four are the control batch 11 is compared against.
-Their checkpoints **no longer load on `master`**: `450e66e` is the last commit with the 26-value
-vector.
-
-### b10d-disc995seed4 — `DISCOUNT=0.995`, third env, seed 4
-
-![b10d](charts/b10d-disc995seed4.png)
-
-Step 4.45M · peak score 94.74 (at 3978k) · best 30-eval perfect 84.3% (at 1666k) · **best measured checkpoint 93%** (at 1695k), pooled **74.9%** /66000
-
-**The best measured checkpoint in the project.** A mid-run eval had read 95% at 1815k; the full
-close-out found 93% at 1695k instead, and the two intervals overlap almost entirely — the same
-policy family measured twice, not a record and a near-miss. Treat ~87% as the honest estimate of
-the underlying rate once the winner's curse is accounted for.
-
-### b10b-disc995seed2 — `DISCOUNT=0.995`, third env, seed 2
-
-![b10b](charts/b10b-disc995seed2.png)
-
-Step 4.65M · peak score 94.96 (at 4545k) · **best 30-eval perfect 85.0%** (at 4547k) · best measured checkpoint 90% (at 1501k), pooled 71.8% /62400
-
-Still climbing when it was stopped — peak trailing score at 4545k out of 4652k run. Its ceiling is
-unknown and, because the vector has since changed, unknowable: this arm cannot be resumed.
-
-### b10a-disc995seed1 — `DISCOUNT=0.995`, third env, seed 1
-
-![b10a](charts/b10a-disc995seed1.png)
-
-Step 4.29M · peak score 94.38 (at 3402k) · best 30-eval perfect 78.3% (at 3402k) · best measured checkpoint 85% (at 2344k), pooled 67.2% /27200
-
-### b10c-disc995seed3 — `DISCOUNT=0.995`, third env, seed 3
-
-![b10c](charts/b10c-disc995seed3.png)
-
-Step 4.12M · peak score 93.84 (at 4021k) · best 30-eval perfect 72.7% (at 4064k) · best measured checkpoint 79% (at 3965k), pooled 63.0% /4700
-
-Weakest of batch 10, and the arm whose close-out selected only 47 checkpoints where `b10d` selected
-660 — the selector's own read on how much of a run is worth measuring.
+![b9d-disc995b progress](../charts/b9d-disc995b.png)
 
 ---
 
@@ -476,7 +420,7 @@ Step 5.47M (stopped 2026-08-01) · peak score **89.4** (at 1716k) · **best 30-e
 **The project record.** Its close-out measured 52 checkpoints: best **92.0%** at 2816k
 (CI 84.9-95.9), top-3 86.7%, pooled **66.3%** over 5200 episodes, with **38 of 52 above 60%** and
 only one below 40%. Both the 92% and the earlier 88% checkpoint are saved in
-[`../hallOfFame/`](../hallOfFame/README.md).
+[`../hallOfFame/`](../../hallOfFame/README.md).
 
 It leads every statistic in the file, graph and measured alike, and recorded the **first 100%
 single eval** in the project. Its block means climb from 1.3% over the first 300k to **56.8%
@@ -487,7 +431,7 @@ across 2823-2923k**.
 checkpoints above 80% to 63.
 
 **Its 90% graph points measured 22-82%** — a ~60-point spread — while its 80% points produced the
-88% champion. The graph eval filters but does not rank; see [`findings.md`](findings.md).
+88% champion. The graph eval filters but does not rank; see [`findings.md`](../findings.md).
 
 **Now declining, not oscillating.** Per-1M means: 30.1% (1-2M) → **40.9% (2-3M peak)** → 18.6% →
 7.4% → 10.1% (5-6M). An earlier version of this caption called it oscillation rather than decline,
@@ -499,9 +443,9 @@ occasional 100% single eval. But its last two 100k blocks averaged 2.7% against 
 
 **Its four 100% graph points were spot-checked on 2026-07-31** and measured 80% (2806k), 83%
 (3145k), 81% (3149k) and 73% (3386k) — all top-decile, none beating the 88% champion at 2581k. 26
-checkpoints at 90% remain unmeasured. See [`runs.md`](runs.md).
+checkpoints at 90% remain unmeasured. See [`runs.md`](../runs.md).
 
-![b8f-disc9975seed2](charts/b8f-disc9975seed2.png)
+![b8f-disc9975seed2](../charts/b8f-disc9975seed2.png)
 
 ### b8d-disc995clip — `DISCOUNT=0.995` + **`GRADIENT_CLIPPING=10`**
 
@@ -509,7 +453,7 @@ Step **11.64M** (stopped 2026-08-01) · peak score 86.9 (at 2058k) · **best 30-
 
 **Second best arm in the project.** Its ceiling is **80.0%** at 2538k (CI 71.1-86.7), from the
 mid-run measurement; its close-out over 20 different checkpoints peaked at 76.0% @5027k with pooled
-60.4%. The 2538k checkpoint is saved in [`../hallOfFame/`](../hallOfFame/README.md).
+60.4%. The 2538k checkpoint is saved in [`../hallOfFame/`](../../hallOfFame/README.md).
 
 Notable that its 76% came at step **5027k** — well past the 2.5-3M peak band — so elite checkpoints
 do persist into the decline phase even as the average collapses.
@@ -524,7 +468,7 @@ arm — and its last perfect game was at 5496k, **6.1M steps** earlier. Per-1M p
 final 4.5M steps.
 
 This arm is why the horizon finding now has an **upper** bound as well as a lower one: ~8.5M steps
-after its peak produced nothing measurable. See [`findings.md`](findings.md). Unlike `b8f`, its measured quality did **not** improve with
+after its peak produced nothing measurable. See [`findings.md`](../findings.md). Unlike `b8f`, its measured quality did **not** improve with
 step count within the selected set (corr −0.11), and its 2.6-3.0M band measured worse than its
 2.2-2.6M band.
 
@@ -553,7 +497,7 @@ Its `dead_since` reads 275000 from that collapse while the arm went on to 38.3%,
 the summary block carries `zero_since` for "is it dead *now*" — and note `b8d` predates that
 field, so its summary lacks the key entirely.
 
-![b8d-disc995clip](charts/b8d-disc995clip.png)
+![b8d-disc995clip](../charts/b8d-disc995clip.png)
 
 ### b8e-clipseed2 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 2
 
@@ -567,7 +511,7 @@ Its one checkpoint above the 50% floor (step 500k) measured **32.0% (CI 23.7-41.
 *better* than the 21.3% window implied and comparable to `b7e`'s 39%. So the config found a good
 policy once and could not find a second — 1 checkpoint above the floor against `b8f`'s 16.
 
-![b8e-clipseed2](charts/b8e-clipseed2.png)
+![b8e-clipseed2](../charts/b8e-clipseed2.png)
 
 ### b8g-clipseed3 — `DISCOUNT=0.995` + `GRADIENT_CLIPPING=10`, seed 3
 
@@ -595,7 +539,7 @@ is not proof of durability — the same thing `b7b` taught, now with a far large
 **no checkpoint above the 50% floor** in 3429 evals, so the selector declines to measure it at
 all.
 
-![b8g-clipseed3](charts/b8g-clipseed3.png)
+![b8g-clipseed3](../charts/b8g-clipseed3.png)
 
 ### b8c-disc9975 — `DISCOUNT=0.9975`
 
@@ -610,7 +554,7 @@ stopping criterion from the 0.999 arms. Its sibling `b8f` runs the identical con
 the best arm in the file, so this is seed variance, not the discount value — 0.9975 stands at
 1 of 2.
 
-![b8c-disc9975](charts/b8c-disc9975.png)
+![b8c-disc9975](../charts/b8c-disc9975.png)
 
 ### b8a-disc999 — `DISCOUNT=0.999`
 
@@ -623,10 +567,10 @@ window before flatlining at 452k.
 That is the signature of a badly conditioned target rather than of catastrophic forgetting.
 At a ~1000-step effective horizon the value function bootstraps over a span longer than an
 episode, so the discount has an **optimum near 0.995 rather than a monotone benefit** — see
-[`findings.md`](findings.md). The prediction that 0.999 might destabilise was recorded
+[`findings.md`](../findings.md). The prediction that 0.999 might destabilise was recorded
 before launch.
 
-![b8a-disc999](charts/b8a-disc999.png)
+![b8a-disc999](../charts/b8a-disc999.png)
 
 ### b8b-disc999seed2 — `DISCOUNT=0.999`, seed 2
 
@@ -636,7 +580,7 @@ The second 0.999 seed, and the worst chart in this file. Peak trailing 31.8, and
 perfect game across 1.41M steps** — no other arm here has failed to produce at least one.
 Two seeds failing this badly is what makes 0.999 falsified rather than unlucky.
 
-![b8b-disc999seed2](charts/b8b-disc999seed2.png)
+![b8b-disc999seed2](../charts/b8b-disc999seed2.png)
 
 ---
 
@@ -660,7 +604,7 @@ is a **region** rather than a lucky point.
 The chart also shows the honest limit of the result. Compare it to `b4c`'s and the ceilings
 are the same; what changed is that `b4c`'s config threw away two runs in three to get there.
 
-![b7f-disc995seed3](charts/b7f-disc995seed3.png)
+![b7f-disc995seed3](../charts/b7f-disc995seed3.png)
 
 ### b7e-disc995seed2 — alpha 0.6, `td_loss`, no IS, **`DISCOUNT=0.995`**
 
@@ -670,7 +614,7 @@ Second discount seed, and the one that opened fastest — trailing 75.3 within 1
 strongest start of any arm here. It oscillates more than `b7f` and its best window comes
 early (318k), but it never approaches death across 1.28M steps.
 
-![b7e-disc995seed2](charts/b7e-disc995seed2.png)
+![b7e-disc995seed2](../charts/b7e-disc995seed2.png)
 
 ### b7d-discount995 — alpha 0.6, `td_loss`, no IS, **`DISCOUNT=0.995`**
 
@@ -681,7 +625,7 @@ still beats every non-discount arm in its own batch, so **the worst of three dis
 outperforms the best seed of the config it modifies.** Its best work comes late, around
 1.24-1.34M, unlike `b7e`'s early peak.
 
-![b7d-discount995](charts/b7d-discount995.png)
+![b7d-discount995](../charts/b7d-discount995.png)
 
 ### b7a-a06seed2 — alpha 0.6, `td_loss`, no IS (the seed that lived)
 
@@ -692,7 +636,7 @@ The one surviving `b6b` seed, and the direct control for the discount arms — s
 16.4-38.8% for its three discount siblings. Its peak score arrives at 1978k, right at the
 end, so it was still improving when stopped.
 
-![b7a-a06seed2](charts/b7a-a06seed2.png)
+![b7a-a06seed2](../charts/b7a-a06seed2.png)
 
 ### b7b-a06seed3 — `b6b` seed 3
 
@@ -703,7 +647,7 @@ climbed out of one deep trough, was called an oscillator on that basis, and then
 the next one. **A past recovery is not evidence of a future one** — telling an oscillation
 from a slow death needs the trend *after* the trough, not the resilience before it.
 
-![b7b-a06seed3](charts/b7b-a06seed3.png)
+![b7b-a06seed3](../charts/b7b-a06seed3.png)
 
 ### b7c-a06seed4 — `b6b` seed 4
 
@@ -718,7 +662,7 @@ because `b6b` had recovered from a similar trough, and it went on to sit at exac
 **363 consecutive evals**. Both these deaths arrive far later than the eff ~1.6 deaths at
 246k and 272k, which suggests lower sharpness delays death rather than preventing it.
 
-![b7c-a06seed4](charts/b7c-a06seed4.png)
+![b7c-a06seed4](../charts/b7c-a06seed4.png)
 
 ---
 
@@ -746,7 +690,7 @@ have been right.
 Its 24.5% was measured with the old smoothed-first selector, so it is an **underestimate**
 and is due a re-measure.
 
-![b6b-alpha06](charts/b6b-alpha06.png)
+![b6b-alpha06](../charts/b6b-alpha06.png)
 
 ### b6a-alpha04 — alpha 0.4, `td_loss`, no IS (eff ~0.8)
 
@@ -760,7 +704,7 @@ The pair together is the whole point: **`b6a` is safe and low, `b6b` is violent 
 That produced the "sharpness is a variance dial" reading, later weakened when batch 7 seeded
 `b6b`'s config and lost 2 of 4 arms to late deaths.
 
-![b6a-alpha04](charts/b6a-alpha04.png)
+![b6a-alpha04](../charts/b6a-alpha04.png)
 
 ---
 
@@ -788,7 +732,7 @@ This arm also demonstrates the checkpoint-retention trap. It ran 2M steps past i
 by measurement time the 211k checkpoint behind that 17.0% had been evicted and only weak
 survivors remained. **Its true ceiling is unmeasurable.**
 
-![b5c-schlongIS](charts/b5c-schlongIS.png)
+![b5c-schlongIS](../charts/b5c-schlongIS.png)
 
 ### b5d-schlongTDE — alpha 0.8, **`abs(td_error)`** priorities, no IS
 
@@ -802,7 +746,7 @@ The chart shows a real dip to ~23 around 243k — the same crisis window that ki
 repeats — followed by full recovery. So the crisis is a property of the config family, not
 of the two arms that died; what differs is whether it is absorbing.
 
-![b5d-schlongTDE](charts/b5d-schlongTDE.png)
+![b5d-schlongTDE](../charts/b5d-schlongTDE.png)
 
 ### b5a-schlong — exact `b4c` repeat, seed 1
 
@@ -818,7 +762,7 @@ Checking `b4c` afterwards showed it bottomed at trailing 10.1 in the same 200-27
 and recovered. So the config produces a **~1-in-3 lottery ticket** rather than a better
 policy.
 
-![b5a-schlong](charts/b5a-schlong.png)
+![b5a-schlong](../charts/b5a-schlong.png)
 
 ### b5b-schlong2 — exact `b4c` repeat, seed 2
 
@@ -828,7 +772,7 @@ The second exact repeat, and the confirmation. Same shape as `b5a` above: a heal
 130k, then the 200-270k crisis, then flat at 0.0 for 1.9M steps. Two independent seeds
 failing the same way is what makes this a retraction rather than one unlucky run.
 
-![b5b-schlong2](charts/b5b-schlong2.png)
+![b5b-schlong2](../charts/b5b-schlong2.png)
 
 ---
 
@@ -847,7 +791,7 @@ all reverted together.
 
 Its checkpoint at 869k was reloaded and evaluated over 100 greedy episodes: **51.0%
 perfect (95% CI 41.3-60.6%), median score 95 of 95.** It wins more than half the games it
-plays. See [`findings.md`](findings.md) for all four checkpoint measurements.
+plays. See [`findings.md`](../findings.md) for all four checkpoint measurements.
 
 The red trace is unmistakable against every other chart in this file: sustained 40-60%
 spikes from 700k onward, **41 separate evals at >=50%**, and a peak of 80% at 970k. No
@@ -863,7 +807,7 @@ then climbed for 600k steps to a level nothing else has approached. The dip to 0
 High ceiling, wide spread — exactly what the human described `theSchlong` as. Consistency
 is now the open problem rather than ceiling.
 
-![b4c-schlongper](charts/b4c-schlongper.png)
+![b4c-schlongper](../charts/b4c-schlongper.png)
 
 ### b4b-unifbuf500k — alpha 0 (uniform) + 500k buffer
 
@@ -877,7 +821,7 @@ same buffer *with* PER and died: the difference between them is prioritization.
 Steady, though, at a low level. This is the "stable but stuck" pattern again, and it is
 the trade `b4c` refuses to make.
 
-![b4b-unifbuf500k](charts/b4b-unifbuf500k.png)
+![b4b-unifbuf500k](../charts/b4b-unifbuf500k.png)
 
 ### b4a-uniform — alpha 0 (uniform), default buffer
 
@@ -892,7 +836,7 @@ committed `alpha=0.6 + IS` config but far worse than `theSchlong`'s aggressive
 prioritization.** So the relationship is not monotonic in "how much prioritization", which
 is why isolating which of `b4c`'s three changes carries the gain is batch 5's priority.
 
-![b4a-uniform](charts/b4a-uniform.png)
+![b4a-uniform](../charts/b4a-uniform.png)
 
 ---
 
@@ -915,7 +859,7 @@ Then it turned: 8.6% → 6.8 → 2.6 → 3.6 → 3.4 → **1.3**, with score sli
 The floor was engaged from 267k, i.e. for the entire decline, so it did not prevent
 anything.
 
-![b3a-epsfloor](charts/b3a-epsfloor.png)
+![b3a-epsfloor](../charts/b3a-epsfloor.png)
 
 ### b3b-epsfloor2 — `MIN_EPSILON=0.001`, floored since 147k
 
@@ -930,7 +874,7 @@ were in the 50s. Growing variance alongside a falling mean is the signature to
 recognise. Its worst eval in the 500-550k block is 28.2, against 52.2 in the 250-300k
 block. Zero exploration was never involved.
 
-![b3b-epsfloor2](charts/b3b-epsfloor2.png)
+![b3b-epsfloor2](../charts/b3b-epsfloor2.png)
 
 ### b3c-buf500k — `REPLAY_BUFFER_MAX_LENGTH=500000`
 
@@ -960,7 +904,7 @@ like, and it is nothing like the gentle slides elsewhere in this file. Also note
 dead policy is *fast*: episodes end instantly, so evals become free and this arm raced
 to 4.81M steps while its batch mates did ~1.2M. Step count is not progress.
 
-![b3c-buf500k](charts/b3c-buf500k.png)
+![b3c-buf500k](../charts/b3c-buf500k.png)
 
 ---
 
@@ -978,7 +922,7 @@ anywhere on this curve.
 misses badly.** At 967k steps — the horizon where ~50% perfect games was expected —
 its 950-1000k block is 64.3 score and **1.1% perfect**. Its best window all run was
 7.0%. See "The committed config reaches ~1% at 1M steps" in
-[`findings.md`](findings.md).
+[`findings.md`](../findings.md).
 
 The chart's other useful feature is its **very long wavelength**: score dips to a
 trough near 575k, recovers to ~66 by 760k, then drifts down again. At 680k this looked
@@ -990,7 +934,7 @@ calling trends from the most recent window.
 Also worth noting: it never triggered the last epsilon rung, its `avg_reward` peaking
 at 99.1 against the threshold of 100.
 
-![b2a-base2](charts/b2a-base2.png)
+![b2a-base2](../charts/b2a-base2.png)
 
 ### b2b-nstep2 — `N_STEP_UPDATE=2`
 
@@ -1004,7 +948,7 @@ two isolated perfect evals in its whole history.
 Two arms, same shape, ordered by n. That is a trend rather than noise, and it closes
 the n-step direction.
 
-![b2b-nstep2](charts/b2b-nstep2.png)
+![b2b-nstep2](../charts/b2b-nstep2.png)
 
 ---
 
@@ -1028,9 +972,9 @@ This happened *after* its best perfect rate — the run was on track for a good
 result and destroyed it. `b2a-base2` below is the identical config and has not
 collapsed, so this is stochastic rather than inherent to the config. It is also the
 only arm that ever drove epsilon to exactly 0.0 (at 92k), which was the leading
-suspect for a long time — since falsified, see [`findings.md`](findings.md).
+suspect for a long time — since falsified, see [`findings.md`](../findings.md).
 
-![b1a-base](charts/b1a-base.png)
+![b1a-base](../charts/b1a-base.png)
 
 ### b1b-tgt200 — `TARGET_UPDATE_PERIOD=200`
 
@@ -1041,7 +985,7 @@ Fastest early riser in the batch, reaching ~55 by 15k where the baseline needed
 below the baseline and its perfect rate never took off. Stopped to free a slot;
 resumable with `SNEK_TARGET_UPDATE_PERIOD=200`.
 
-![b1b-tgt200](charts/b1b-tgt200.png)
+![b1b-tgt200](../charts/b1b-tgt200.png)
 
 ### b1c-nstep3 — `N_STEP_UPDATE=3`
 
@@ -1056,5 +1000,5 @@ Its only perfect games were a handful around 206-300k; nothing since. The long
 right-hand tail is the useful part of this chart — it is what "promising trajectory
 that simply runs out" looks like, and it is only visible at this horizon.
 
-![b1c-nstep3](charts/b1c-nstep3.png)
+![b1c-nstep3](../charts/b1c-nstep3.png)
 

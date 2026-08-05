@@ -108,7 +108,7 @@ Two process notes that came out of batch 9 and still apply:
   steps on `b10b`. Do not use a graph peak to decide where to look for a checkpoint.
 
 Per-batch tables: [`archive/findings-superseded.md`](archive/findings-superseded.md) and
-[`archive/batches1-8.md`](archive/batches1-8.md).
+[`archive/batches1-9.md`](archive/batches1-9.md).
 
 ## Graph evals are a filter, not a ranker
 

@@ -2,7 +2,7 @@
 
 Every arm that has finished: config, final numbers, verdict. The table below is **canonical** —
 it covers every arm ever run, including the batches whose narratives moved to
-[`archive/batches1-8.md`](archive/batches1-8.md).
+[`archive/batches1-9.md`](archive/batches1-9.md).
 
 Companion to [`runs.md`](runs.md) (what is running), [`findings.md`](findings.md) (conclusions) and
 [`charts.md`](charts.md) (graphs, batch 9 onward). Nothing here should be re-run without a reason.
@@ -314,7 +314,7 @@ horizon, which is suggestive but not the isolating comparison a future batch wou
 the claim safely.
 
 Both champion checkpoints are preserved in
-[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-95-trained-end-to-end-on-todays-environment-2026-08-03).
+[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-96-and-it-runs-on-master).
 
 ## Batch 9 — 0.995 against 0.9975 on the post-audit environment
 

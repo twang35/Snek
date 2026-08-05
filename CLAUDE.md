@@ -129,8 +129,8 @@ Everything is in **`snek2/hyperparamTuning/`**:
 | `findings.md` | what is established, what is falsified. Read before proposing an experiment |
 | `completedRuns.md` | every arm: config, final numbers, verdict. The canonical arm table |
 | `failureModes.md` | the four ways a policy degrades and how to tell them apart |
-| `charts.md` + `charts/` | progress graph per arm, batch 9 onward |
-| `archive/` | batches 1-8 and superseded findings. **History only — do not read into context** |
+| `charts.md` + `charts/` | progress graph per arm, batch 10 onward |
+| `archive/` | batches 1-9 and superseded findings. **History only — do not read into context** |
 
 Keep the split clean: `runs.md` is current state and forward plan only, results go to
 `completedRuns.md`, conclusions to `findings.md`, anything about *how to measure or judge* to
@@ -154,13 +154,13 @@ and then say which ones are stopping and why.
 
 It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
 so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
-<change>` section with a stats line, a short reading, and the image. Captions for batches 1-8 are
-in `archive/batches1-8.md`, so check both:
+<change>` section with a stats line, a short reading, and the image. Captions for batches 1-9 are
+in `archive/batches1-9.md`, so check both:
 
 ```
 cd snek2/hyperparamTuning
 ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-8.md \
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-9.md \
   | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 ```
@@ -250,7 +250,7 @@ import sys; sys.path.insert(0, 'tests'); import importlib
 total = fails = 0
 for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablation',
              'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
-             'test_run_report']:
+             'test_run_report', 'test_shielded_policy']:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1

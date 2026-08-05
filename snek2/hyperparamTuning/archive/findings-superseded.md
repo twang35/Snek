@@ -74,9 +74,9 @@ games:
 The flag never lies; it goes silent, and it goes silent exactly where games are decided. Note the
 direction is the same **pessimism bias** as bug #6 itself, from the same cause one layer up.
 
-Full write-up in [`../claudeFeatureRecommendations.md`](../claudeFeatureRecommendations.md),
+Full write-up in [`../claudeFeatureRecommendations.md`](../../claudeFeatureRecommendations.md),
 including a ranked scoring of every other candidate observation, the terminal-discount defect, and
-the absent length signal. Instruments in [`diagnostics/`](diagnostics/). Both are frozen at
+the absent length signal. Instruments in [`diagnostics/`](../diagnostics/). Both are frozen at
 2026-08-02.
 
 #### Fixed 2026-08-02, and it was worth 10 points with no retraining
@@ -149,7 +149,7 @@ elapsed for long snakes and at `10 * len` for short ones.
 
 The largest value anywhere in the vector is now **3.585** rather than 8.97. The remaining outlier
 is `lg(num_groups)` at indices 10, 12 and 14 — which
-[`../claudeFeatureRecommendations.md`](../claudeFeatureRecommendations.md) recommends removing
+[`../claudeFeatureRecommendations.md`](../../claudeFeatureRecommendations.md) recommends removing
 rather than rescaling, having measured it as right 7.4% and wrong 57.4% at the decisions that lose
 games.
 
@@ -494,14 +494,14 @@ Caveat on `b5c`'s number specifically: it ran 2M steps past its peak, so its 17.
 checkpoint had already been evicted and only weak survivors remained to measure. Its true
 ceiling is somewhere above 2.1% and unrecoverable. That is a measurement failure caused by
 letting the arm run, not purely a property of the config — see
-[`runs.md`](runs.md) on checkpoint retention.
+[`runs.md`](../runs.md) on checkpoint retention.
 
 ---
 
 ## The headline: 51% perfect games, measured
 
 The four best `b4c-schlongper` checkpoints were reloaded and evaluated over **100
-greedy episodes each** with [`eval_checkpoints.py`](../eval_checkpoints.py). Full
+greedy episodes each** with [`eval_checkpoints.py`](../../eval_checkpoints.py). Full
 results in `runs/b4c-schlongper_checkpoint_evals.json`.
 
 | checkpoint | perfect % over 100 eps | 95% CI | mean score | median score |
@@ -528,7 +528,7 @@ was right, and three PER changes were the regression.
 
 The methodological lesson from this measurement — that selecting checkpoints off the
 graph overestimates, by up to 24 points here — is in
-[`hyperparamTuning.md`](hyperparamTuning.md), since it is about how to measure rather
+[`hyperparamTuning.md`](../hyperparamTuning.md), since it is about how to measure rather
 than about the policy.
 
 ## What `theSchlong` did differently: three PER changes, none validated

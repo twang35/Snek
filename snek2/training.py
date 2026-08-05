@@ -64,6 +64,7 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 
 def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
+          guided_fraction, configured_guided_fraction,
           eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
@@ -130,7 +131,8 @@ def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver
         step += 1
         log_messages_and_eval(training_metrics, loss_info, eval_parallel_env, agent, train_py_env, screen,
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
-                              replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon, step,
+                              replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
+                              guided_fraction, configured_guided_fraction, step,
                               eval_only, initial_step, policy_name, run_config)
 
 
@@ -189,7 +191,8 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
 
 def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
-                          global_step, epsilon, initial_epsilon, min_epsilon, step, eval_only, initial_step,
+                          global_step, epsilon, initial_epsilon, min_epsilon, guided_fraction,
+                          configured_guided_fraction, step, eval_only, initial_step,
                           policy_name, run_config):
     debug = snake_constants.DEBUG_LOGGING
 
@@ -221,6 +224,10 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
         perfect_rate = trailing_perfect_rate(metrics.eval_rows, metrics.last_eval_perfect_percent)
         reward_signal = trailing_reward(metrics.eval_rows, avg_reward)
         maybe_update_epsilon(reward_signal, perfect_rate, epsilon, initial_epsilon, min_epsilon)
+        # Same reward signal, so the shield switches on at exactly the eval the bootstrap phase
+        # hands over on — the two cannot drift apart by a window's worth of evals.
+        maybe_update_guided_fraction(reward_signal, initial_epsilon, configured_guided_fraction,
+                                     guided_fraction)
 
         metrics.trailing_avg_scores.append(avg_score)
         if len(metrics.trailing_avg_scores) > trailing_avg_window:
@@ -430,6 +437,41 @@ def epsilon_for(avg_reward, perfect_rate, initial_epsilon, min_epsilon):
     top = initial_epsilon / (2.0 ** BOOTSTRAP_RUNGS)
     return max(bootstrap_epsilon(avg_reward, initial_epsilon),
                refine_epsilon(perfect_rate, top, min_epsilon))
+
+
+def guided_fraction_for(avg_reward, initial_epsilon, configured_fraction):
+    """Fraction of episodes the exploration shield covers, given where the schedule is.
+
+    Zero while the bootstrap phase is live, the configured value once it stands down. The
+    shield exists to make exploration survivable in the *endgame*, and during bootstrap there
+    is no endgame to protect — epsilon is 0.1-0.4 and the snake is a few segments long, so
+    dying is cheap and the deaths are the signal. Turning it on only at the handover also keeps
+    the early curve identical to batch 11's, which is the part that already works.
+
+    Stateless, like `epsilon_for`: if an arm collapses far enough for bootstrap to re-arm, the
+    shield switches back off with it rather than latching. That keeps one rule — "shielded iff
+    refining" — instead of two that can disagree, and makes a resume recompute the right state
+    from restored history.
+    """
+    if bootstrap_epsilon(avg_reward, initial_epsilon) > 0.0:
+        return 0.0
+    return configured_fraction
+
+
+def maybe_update_guided_fraction(avg_reward, initial_epsilon, configured_fraction, guided_fraction):
+    """Assigns the scheduled guided fraction, if it differs from what the Variable holds.
+
+    Rounded comparison for the same float32 round-trip reason as `maybe_update_epsilon`.
+    """
+    target = guided_fraction_for(avg_reward, initial_epsilon, configured_fraction)
+    if round(float(guided_fraction.numpy()), 6) != round(target, 6):
+        guided_fraction.assign(target)
+        # One line per transition, and transitions are rare — the shield switches on once at the
+        # handover and only switches off again if the arm collapses back into the bootstrap
+        # band. Without it there is no way to tell from a log whether an arm ever got shielded.
+        if configured_fraction > 0.0:
+            print('exploration shield {0} (guided fraction {1})'.format(
+                'ON' if target > 0.0 else 'OFF', target), flush=True)
 
 
 def maybe_update_epsilon(avg_reward, perfect_rate, epsilon, initial_epsilon, min_epsilon):

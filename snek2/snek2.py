@@ -19,6 +19,7 @@ _os.environ['SDL_AUDIODRIVER'] = 'dummy'
 # that trade.
 
 from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
+from shielded_policy import ShieldedEpsilonGreedyPolicy
 from snake_environment import SnakeEnvironment
 from training import *
 
@@ -101,6 +102,16 @@ def main(argv):
             'SNEK_MIN_EPSILON={0} is at or above where the refinement phase starts ({1}), so '
             'epsilon would never decay. Lower the floor or raise SNEK_INITIAL_EPSILON.'
             .format(min_epsilon, initial_epsilon / (2.0 ** BOOTSTRAP_RUNGS)))
+
+    # Fraction of *refinement-phase* episodes in which the epsilon coin's random move is drawn
+    # from the non-fatal moves instead of all three. 0.0 reproduces batch 12 exactly. See
+    # shielded_policy.py for why only the exploration draw is shielded and never the greedy
+    # action, and training.guided_fraction_for() for why it stays 0 until bootstrap stands down.
+    guided_fraction = tuned('GUIDED_FRACTION', 0.5)
+    if not 0.0 <= guided_fraction <= 1.0:
+        raise SystemExit(
+            'SNEK_GUIDED_FRACTION={0} is not a probability. Use a value in [0.0, 1.0].'
+            .format(guided_fraction))
 
     # Training never draws — use watch.py to see a policy play. Game.__init__ still calls
     # pygame.display.set_mode() regardless of its display flag, and reset() blits the
@@ -258,7 +269,14 @@ def main(argv):
     agent.initialize()
 
     eval_policy = agent.policy
-    collect_policy = agent.collect_policy
+    # Scheduled alongside epsilon and for the same reason a Variable is used there: the collect
+    # policy runs inside a tf.function, so a plain float would be frozen at trace time. Starts
+    # at 0.0 because every run starts in the bootstrap phase.
+    guided_fraction_var = tf.Variable(0.0, dtype=tf.float32, trainable=False,
+                                      name='guided_fraction')
+    # Replaces agent.collect_policy. Wraps agent.policy — the greedy one — because the shield
+    # supplies its own epsilon branch and must not stack on top of a second one.
+    collect_policy = ShieldedEpsilonGreedyPolicy(agent.policy, epsilon, guided_fraction_var)
 
     # Replay buffer
     # reverb has no macOS wheel, so prioritized replay comes from cpprb's C++ sum
@@ -287,7 +305,7 @@ def main(argv):
     collect_driver = py_driver.PyDriver(
         train_py_env,
         py_tf_eager_policy.PyTFEagerPolicy(
-            agent.collect_policy, use_tf_function=True),
+            collect_policy, use_tf_function=True),
         [rb_observer],
         max_steps=collect_steps_per_iteration)
 
@@ -340,6 +358,11 @@ def main(argv):
                             'trailing-{2} perfect'.format(
                                 list(BOOTSTRAP_REWARD_THRESHOLDS), REFINE_PERFECT_TARGET,
                                 REFINE_TRAILING_WINDOW),
+        'guided_fraction': guided_fraction,
+        'exploration_shield': ('off' if guided_fraction == 0.0 else
+                               '{0:.0%} of refinement-phase episodes draw the epsilon move from '
+                               'non-fatal actions; greedy moves never shielded'
+                               .format(guided_fraction)),
         'fc_layer_params': fc_layer_params,
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
         'priority_exponent (alpha)': priority_exponent,
@@ -358,6 +381,7 @@ def main(argv):
 
     train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
+          guided_fraction_var, guided_fraction,
           eval_only, policy_name, run_config, priority_signal, use_is_weights)
 
     # todo: fix video creation by using the display surface

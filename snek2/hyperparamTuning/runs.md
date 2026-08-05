@@ -176,7 +176,7 @@ eval process works only because it loaded the matching observation code at start
 against a batch-10 arm would now build a 30-value network and fail to restore. **Batch 10's measured
 numbers are final and cannot be extended.**
 
-## Nothing is training, and nothing is evaluating
+## Batch 11 is closed out — it is the control for batch 12
 
 **Batch 11 stopped 2026-08-04 09:09; its close-outs finished the same day.** Four seeds of batch
 10's config on the 30-value vector, and a null result exactly as its own pre-registration predicted.
@@ -205,7 +205,123 @@ agreement across metrics makes a real positive effect more likely than zero, but
 `b11b` holds both records now: the highest best-30 (91.7%) and the best measured checkpoint (96%).
 Both are n=1 of eight arms with heavily overlapping batch means — high-water marks, not findings.
 
-## Proposed next: batch 12 — the epsilon rewrite at n=8, in two waves
+## RUNNING: batch 12 wave 1 — launched 2026-08-04, four arms, no watchers
+
+`b12a-eps002seed1`, `b12b-eps002seed2`, `b12c-eps002seed3`, `b12d-eps002seed4`. Logs at
+`/tmp/b12<x>-eps002seed<n>.log`; status from `runs/<policy>_evals.json`'s `summary` block.
+Config verified at startup on all four — seed 1-4, disc 0.995, `td_loss`, no IS — and the new
+epsilon schedule confirmed live in `runs/<policy>.md` (`min_epsilon` 0.002, two-phase).
+
+**These have no step cap.** `num_iterations` is effectively unbounded and no cap knob exists, so
+they run until stopped. That is deliberate rather than an oversight: the pre-registered comparison
+happens at a **2.5M horizon** whatever they reach, so extra steps cost the comparison nothing and
+buy data on the open question of whether an arm that peaks late keeps improving. **Wave 2 needs
+these four slots**, so they do need stopping — expect ~7.5 h to 2.5M, ~10 h to ~3.3M.
+
+### ‡ The new schedule deadlocks. All four arms are failing, 4/4, at ~1M steps
+
+Epsilon descends out of bootstrap correctly and then **pins at the refine ceiling 0.05 forever**,
+because the refine phase descends on mastery that the level of exploration it is holding prevents
+the agent from acquiring.
+
+| arm | step | trailing | pf30 now | eps | pinned at 0.05 for | evals with a perfect game |
+|---|---|---|---|---|---|---|
+| `b12a` | 1.02M | 55.5 | 0.0% | 0.05 | 686k steps | 41 / 1022 |
+| `b12b` | 0.95M | 57.8 | 0.0% | 0.05 | **942k steps** | **0 / 954** |
+| `b12c` | 0.92M | 60.4 | 0.0% | 0.05 | 409k steps | 8 / 918 |
+| `b12d` | 1.02M | 61.7 | 0.0% | 0.05 | 455k steps | 32 / 1021 |
+
+Against the control at the same step, on the pre-registered primary metric:
+
+| | `strong_eval_fraction` @1.01M | trailing @1.01M | pf30 @1.01M |
+|---|---|---|---|
+| batch 11 | 25.2 / 30.5 / 0.0 / 8.2% | 84.5-88.5 | 14.0-82.3% |
+| batch 12 | **0.0% ×4** | **54.9-61.7** | **0.0% ×4** |
+
+**The numbers above are greedy, and the comparison is clean.** Evals run `agent.policy`, which
+TF-Agents builds as `GreedyPolicy`; only `agent.collect_policy` is the `EpsilonGreedyPolicy` that
+`epsilon` feeds. Verified two ways — `_setup_policy` in the installed `dqn_agent`, and empirically
+with `epsilon=1.0`, where `agent.policy` returns one action on a fixed observation across 60 calls
+while `collect_policy` returns all three. So there is **no exploration tax on the metric**: pf30 = 0
+is a real property of the greedy policy, and batch 11 and batch 12 are measured the same way.
+
+**The mechanism is a learning deadlock, not a measurement one.** At eps 0.05, 3.3% of *collected*
+actions are random, and a random move with a long snake is usually fatal — so the replay buffer
+fills with trajectories that die before the endgame and the agent never sees the states a perfect
+game is made of. The greedy policy therefore never masters the endgame, greedy pf30 stays 0,
+`refine_epsilon(0, top=0.05, floor=0.002)` returns exactly `top`, and the collection distribution
+never improves. The loop closes through the *policy*:
+
+```
+eps 0.05 → 3.3% random collected actions → buffer lacks endgame states
+        → greedy policy cannot finish → pf30 = 0 → refine returns the ceiling → (repeat)
+```
+
+Batch 11's crude ladder always escaped because it descended on step count, which no policy can
+suppress.
+
+**The descent is also far too shallow to escape even with luck.** 0% → 6.3% pf30 (`b12a`'s
+best-ever window) moves epsilon only 0.0500 → 0.0388. Meaningful relief needs 20-40% pf30, which
+is exactly what 0.05 makes impossible: `pf30=10%` → 0.0334, `20%` → 0.0224, `40%` → 0.0100.
+
+**Sustained high epsilon degrades a policy that was already working.** `b12a` read greedy trailing
+**87.0** and pf30 6.3% at step 214k, then decayed to 55.5 over the next 800k steps at the same
+epsilon. All four peak at 81-87 by step 214-479k and then decline. Both numbers are greedy, so this
+is the learned policy getting worse, not a measurement artefact.
+
+This clears the pre-registered abandon condition (a >10 pp drop on the primary metric) 4/4 with a
+mechanism understood analytically, at 1M of the 2.5M horizon. Running to 2.5M would spend ~5 h
+confirming a deadlock that is provable from the code.
+
+The design flaw is general: *any* purely mastery-gated schedule deadlocks if its ceiling sits above
+the exploration level at which mastery is achievable.
+
+### The fix: shield the exploration move, not the schedule
+
+Rather than making epsilon decay faster, attack what makes exploration expensive. In a *guided*
+episode the epsilon coin's random move is drawn from the moves that do not kill the snake this
+step, instead of uniformly from all three. `shielded_policy.py`, wired in as the collect policy.
+
+| decision | value | why |
+|---|---|---|
+| what is shielded | **the epsilon draw only** | see below — this is the whole design |
+| the greedy argmax | **never shielded** | it must eat the -5 and learn |
+| `SNEK_GUIDED_FRACTION` | 0.5 | half of refinement-phase episodes |
+| when it engages | at the bootstrap handover | nothing to protect while the snake is short |
+| `INITIAL_EPSILON` / handover | **unchanged**, 0.4 / 0.05 | change one thing at a time |
+| guaranteed-descent envelope | **not added** | the shield should un-deadlock this on its own |
+
+**Only exploration is shielded, never the greedy action.** Overriding a fatal *greedy* move would
+mean `Q(s, a_fatal)` never gets updated toward `DEATH_REWARD` in the states where the network is
+wrong, so those values would drift on generalisation alone — and evals run unshielded, so the arm
+would walk into walls it was never allowed to learn about. Shielding exploration only removes the
+tax while keeping every death the policy earns itself.
+
+**The mask was already in the observation.** Indices 6-8 are "is the move safe (not body or wall)",
+per action, and `state_helpers.body_and_wall_collisions` already handles the case a naive check gets
+wrong: the cell the tail is vacating is safe to enter. So the shield needs **no environment change
+and no new game logic**, just `obs[6:9]`.
+
+**It is one step deep, deliberately.** Snake's hard problem is sealing itself into a region it
+cannot escape, and that is untouched — an arm still has to learn it. All this removes is "the coin
+flipped and the snake drove into its own body".
+
+**The shield turns off if an arm collapses**, because `guided_fraction_for` is stateless in the same
+way `epsilon_for` is: one rule, "shielded iff refining". An arm back in the bootstrap band is
+relearning to survive, which is where dying is informative.
+
+**Verified before launch.** 19 new tests in `tests/test_shielded_policy.py`, all 9 mutants of the
+mask and schedule logic caught; 235 tests total, 0 failures. A smoke run at the batch-12 config
+logged `exploration shield ON (guided fraction 0.5)` at the handover with epsilon at 0.05.
+
+Two things this write-up got wrong on the way, both worth remembering. The perfect rate was
+believed to be measured under epsilon, making the controller read its own noise — it is not, evals
+are greedy, so the proposed greedy probe episodes were **rejected as solving nothing**. And a
+`-1e9` masked logit made the boxed-in fallback look redundant, because `tf.random.categorical`
+shifts each row by its maximum and so samples an all-masked row uniformly by accident; `-inf`
+makes the fallback load-bearing and testable.
+
+## The design: the epsilon rewrite at n=8, in two waves
 
 | | |
 |---|---|

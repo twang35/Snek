@@ -1,8 +1,8 @@
 # Charts
 
-Progress graphs, **batch 9 onward**. Per-arm numbers live in
+Progress graphs, **batch 10 onward**. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each.
-Batch 1-8 captions moved to [`archive/batches1-8.md`](archive/batches1-8.md) — the PNGs are all
+Batch 1-9 captions moved to [`archive/batches1-9.md`](archive/batches1-9.md) — the PNGs are all
 still in `charts/`.
 
 In every chart: **blue is average score** (food eaten, out of 95) on the left axis, **red is
@@ -26,78 +26,196 @@ and the archive, since captions now live in two places:
 ```
 cd snek2/hyperparamTuning
 ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-8.md \
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-9.md \
   | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
-## Batch 9 — two discounts on the post-audit environment
+## Batch 12 — the epsilon rewrite, and the deadlock it found
 
-Four arms, two seeds each of `DISCOUNT=0.995` and `0.9975`, and the first batch to run after the
-2026-08-02 audit. Its own lesson was methodological: it compared two values before either had a
-baseline on the environment being measured, which is why batch 10 spent all four slots on one
-config instead.
+Four seeds of batch 11's config plus the two-phase epsilon schedule, **stopped at ~1M of a
+planned 2.5M** because all four failed the same way: epsilon pinned at the refinement ceiling
+0.05 and the perfect rate never left 0. Read these four charts as one shape repeated four times —
+a fast climb to 81-87 trailing between 214k and 479k, then a slow decay to 53-63 that never
+recovers. Both numbers are greedy evals, so that decay is the learned policy getting worse, not
+an exploration tax on the measurement.
 
-### ‡ These arms are measured on a different environment
+**`strong_eval_fraction` is 0.0% in all four arms**, against 25.2 / 30.5 / 0.0 / 8.2% for batch 11
+at the same 1M steps. The mechanism, the fix, and the two wrong turns taken diagnosing it are in
+[`runs.md`](runs.md#-the-new-schedule-deadlocks-all-four-arms-are-failing-44-at-1m-steps). These
+arms are kept as the measured cost of sitting at epsilon 0.05: not a wasted batch, a negative
+result with four seeds behind it.
 
-The 2026-08-02 audit changed two observation components and the reward, and every arm below the
-batch-9 rows was measured before it. A batch-9 number is **not comparable** to a pre-audit one:
-the same checkpoint that scored 92% on the old environment reads 73% on this one. Compare batch-9
-arms to each other, and to `b8f`'s re-measured 82% if you want a pre-audit reference. The audit's
-own measurements are in
-[`archive/findings-superseded.md`](archive/findings-superseded.md).
+### b12a-eps002seed1 — two-phase epsilon, seed 1
 
-All three survivors were still training when measured, at 3.4-3.6M steps, so these are mid-run
-close-outs rather than final ones.
+![b12a](charts/b12a-eps002seed1.png)
 
-### b9a-disc9975a — `DISCOUNT=0.9975`, new env
+Step 1.12M (stopped) · peak score 89.1, peak trailing 87.02 (at 214k) · best 30-eval perfect **6.3%** (at 213k) · max single eval 40% · not measured
 
-Step 3.61M (running) · peak score **89.8** (at 3277k) · **best 30-eval perfect 56.0%** (at 1738k) · max single eval **90%** · **best measured checkpoint 65.0%** (at 1735k), pooled **54.9%** /2000
+The best of a bad batch, and the arm that makes the decay unambiguous. It read trailing **87.0**
+with 6.3% best-30 at 214k — a genuinely promising arm — then fell to 59.6 over the next 900k steps
+**at exactly the same epsilon**. Same exploration rate, worse policy, so nothing about the
+measurement explains it.
 
-**The most consistent arm of batch 9**, and the only 0.9975 seed that survived. Its pooled 54.9%
-over 20 checkpoints is well clear of both 0.995 seeds, and 18 of 20 checkpoints measured above 40%.
+41 of its 1122 evals contained a perfect game, which was enough to nudge epsilon to 0.0388 at its
+best and never enough to escape: the refinement phase needs 20-40% to reach the floor, and 0.05
+makes that unreachable.
 
-Its best checkpoint sits at **1735k, less than half way to its trailing peak at 3277k** — the
-graph keeps climbing after the measurable quality stops improving, which is the same pattern
-`b8f` showed and a reason not to read peak trailing as a proxy for peak policy.
+### b12d-eps002seed4 — two-phase epsilon, seed 4
 
-![b9a-disc9975a progress](charts/b9a-disc9975a.png)
+![b12d](charts/b12d-eps002seed4.png)
 
-### b9b-disc9975b — `DISCOUNT=0.9975`, new env, dead
+Step 1.09M (stopped) · peak score 87.2, peak trailing 86.36 (at 479k) · best 30-eval perfect 6.3% (at 29k) · max single eval 30% · not measured
 
-Step **10.47M** (stopped 2026-08-02) · peak score 72.1 (at **328k**) · best 30-eval perfect 5.0% (at 221k) · max single eval 20% · not measured
+The latest peak in the batch at 479k, and the only arm whose best-30 came in its first 30k steps —
+during the bootstrap phase, before the ceiling took hold. Everything after is decline.
 
-**The overrun failure the 3-3.5M stop rule exists to prevent.** It peaked at step **328k** — before
-any sibling had warmed up — then declined and ran a further 10.1M steps producing nothing, with
-`zero_since` at 9.92M. Nothing was watching it for eight hours overnight.
+### b12c-eps002seed3 — two-phase epsilon, seed 3
 
-Not measured: no checkpoint came near the 60% selector floor, so a close-out would have had
-nothing to evaluate.
+![b12c](charts/b12c-eps002seed3.png)
 
-![b9b-disc9975b progress](charts/b9b-disc9975b.png)
+Step 0.98M (stopped) · peak score 85.3, peak trailing 82.46 (at 360k) · best 30-eval perfect 1.7% (at 369k) · max single eval 10% · not measured
 
-### b9c-disc995a — `DISCOUNT=0.995`, new env
+8 perfect games in 977 evals, and a max single eval of 10% — it reached the endgame often enough
+to prove the policy was not hopeless and never often enough for the schedule to notice.
 
-Step 3.64M (running) · peak score 86.4 (at 2599k) · best 30-eval perfect 37.3% (at 2608k) · max single eval **80%** · **best measured checkpoint 52.0%** (at 2603k), pooled 38.0% /2000
+### b12b-eps002seed2 — two-phase epsilon, seed 2
 
-The weakest of the three survivors on every measure, and the reason 0.995 cannot be called the
-better value on this environment despite going 2 for 2 on survival. Its good region is narrow:
-best and second-best are 2603k and 2626k, 23k apart.
+![b12b](charts/b12b-eps002seed2.png)
 
-![b9c-disc995a progress](charts/b9c-disc995a.png)
+Step 1.03M (stopped) · peak score 82.8, peak trailing 81.4 (at 259k) · **best 30-eval perfect 0.0%** · max single eval **0%** · not measured
 
-### b9d-disc995b — `DISCOUNT=0.995`, new env
+**The cleanest demonstration of the deadlock in the project: zero perfect games in 1032 evals.**
+Epsilon reached 0.05 at step 11000 and sat there for the remaining 942k steps, because the signal
+that would have lowered it requires finishing a game and 3.3% random actions never let it. An arm
+that peaked at 81.4 trailing was never once measured completing the board.
 
-Step 3.40M (running) · peak score 86.7 (at 1232k) · best 30-eval perfect 30.3% (at 1324k) · max single eval **90%** · **best measured checkpoint 70.0%** (at 2544k), pooled 42.4% /1700
+---
 
-**The best single checkpoint of batch 9** at 70%, and the arm that inverts the interim reading —
-at 12 of 17 checkpoints its best was 49% and it looked like the weakest arm in the batch. The
-remaining five checkpoints contained its top three. A partial close-out is not a small version of
-a complete one.
+## Batch 11 — the same config on the 30-value vector
 
-Its trailing average peaked at **1232k** and had fallen to 49.4 by 3.4M, while its best measured
-checkpoint is at 2544k — the graph and the measurement disagree about when this arm was good.
+Four seeds of batch 10's config, byte for byte, on the observation vector after the following-tail
+and food-space blocks landed. **A deliberate null-result test**: the only difference from batch 10
+is those two observations, and the comparison was pre-registered before launch. It came back
+**+5.4 pp at t=0.80 — not significant** against a ~10 pp threshold, and the close-out added two
+measured comparisons that came out the same way (+4.1 pp on the graph-100% tier, +4.5 pp on best
+checkpoint; exact p = 0.14 and 0.16). The first seeded batch (`SNEK_SEED=1..4`). Full write-up:
+[`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
 
-![b9d-disc995b progress](charts/b9d-disc995b.png)
+Read these four charts for their *shape*, not their level: three of the four peaked before 1.8M and
+then declined for another 1.5-2.5M steps, which is the most useful thing batch 11 produced. The
+close-out puts numbers on what that cost — in all four arms the best measured checkpoint lands
+**within 39k steps of the graph's best-30 peak**, so nothing in the declining tail contributed to any
+of the four records.
+
+**That agreement is a batch-11 property, not a general rule**, and it would be easy to over-read.
+Batch 10's gaps are -1058k, -3046k, -99k and +29k — `b10b`'s best checkpoint came at 1501k while its
+graph peaked at 4547k. The difference is chart shape: batch 11's arms have one sharp peak, so the
+graph's best window and the best individual checkpoint have nowhere else to be, whereas batch 10's
+broad plateaus let the two land 3M apart. **Do not use a graph peak to decide where to look for a
+checkpoint** — that is what the close-out is for.
+
+### b11b-obs30seed2 — `DISCOUNT=0.995`, 30-value vector, seed 2
+
+![b11b](charts/b11b-obs30seed2.png)
+
+Step 3.56M · peak score 94.92 (at 855k) · **best 30-eval perfect 91.7%** (at 873k) · **best ckpt 96%** @855k
+
+**The best arm in the project on both metrics**: the highest best-30 any arm has reached, and the
+highest single-checkpoint measurement (96/100, CI 90.2-98.4, ~94% after the winner's-curse
+correction). Both peaks are in the same place — the graph tops out at 855k and the record checkpoint
+*is* 855k, which is the tidiest agreement between graph and measurement in this file.
+
+Also n=1 of eight arms across the two batches, with the batch means overlapping heavily — a
+high-water mark, not a finding. Gave up 18 pp from that peak by the time it was stopped.
+
+### b11a-obs30seed1 — `DISCOUNT=0.995`, 30-value vector, seed 1
+
+![b11a](charts/b11a-obs30seed1.png)
+
+Step 3.19M · peak score 94.82 (at 653k) · **best 30-eval perfect 85.7%** (at 678k) · best ckpt 94% @671k
+
+**The clearest picture of the post-peak decline in the project so far.** 85.7% at 678k down to
+43.3% by 3.19M — a **42.4 pp** drawdown, the largest on record, with no death event: the arm never
+went to zero, it just got steadily worse for 2.5M steps.
+
+Its record checkpoint sits at 671k, inside that early peak, and measures 94% — so the decline cost
+this arm a policy it had already found rather than one it never reached. That is the case for the
+shorter, wider batch design in [`runs.md`](runs.md) stated as concretely as it gets.
+
+### b11d-obs30seed4 — `DISCOUNT=0.995`, 30-value vector, seed 4
+
+![b11d](charts/b11d-obs30seed4.png)
+
+Step 3.59M · peak score 94.18 (at 3468k) · **best 30-eval perfect 78.3%** (at 3468k) · best ckpt 88% @3507k
+
+The one arm still near its peak when stopped, and the reason not to cap the next batch at 2M
+without hedging: it peaked at 3468k, where the other three peaked before 1.8M. A short cap would
+have truncated this arm before its best work.
+
+Its record checkpoint is at 3507k — the last 100k steps of the run, and the only arm in either batch
+whose best measured checkpoint came from its final stretch. Whether it was still improving or had
+just arrived at its ceiling is unanswerable now; it is the batch's one genuinely open question.
+
+### b11c-obs30seed3 — `DISCOUNT=0.995`, 30-value vector, seed 3
+
+![b11c](charts/b11c-obs30seed3.png)
+
+Step 3.23M · peak score 94.26 (at 2452k) · **best 30-eval perfect 73.0%** (at 1718k) · best ckpt 87% @1706k
+
+Weakest of the batch, and the illustration of why n=4 cannot settle a 5 pp question: 73.0% against
+`b11b`'s 91.7% on an identical config differing only in seed. The measured gap is narrower — 87%
+against 96% — because a best-checkpoint figure asks what the arm managed once, and a best-30 asks
+whether it could hold it.
+
+The one arm whose close-out degenerated: only 87 checkpoints screened, against an
+`EVAL_CONFIRM_COUNT` of 100, so every screened checkpoint was confirmed anyway and the screen was
+pure overhead. See the note in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
+
+---
+
+## Batch 10 — the fresh baseline on the third environment
+
+Four seeds of `DISCOUNT=0.995`, the first arms to train end-to-end on the environment left by
+2026-08-02's seven fixes. **Every arm was stopped healthy rather than dying or declining to a
+stop** — a first for this project — and it held the best measured checkpoint on record (93%) until
+batch 11's close-out beat it with 96%. These four are the control batch 11 is compared against.
+Their checkpoints **no longer load on `master`**: `450e66e` is the last commit with the 26-value
+vector.
+
+### b10d-disc995seed4 — `DISCOUNT=0.995`, third env, seed 4
+
+![b10d](charts/b10d-disc995seed4.png)
+
+Step 4.45M · peak score 94.74 (at 3978k) · best 30-eval perfect 84.3% (at 1666k) · **best measured checkpoint 93%** (at 1695k), pooled **74.9%** /66000
+
+**The best measured checkpoint in the project.** A mid-run eval had read 95% at 1815k; the full
+close-out found 93% at 1695k instead, and the two intervals overlap almost entirely — the same
+policy family measured twice, not a record and a near-miss. Treat ~87% as the honest estimate of
+the underlying rate once the winner's curse is accounted for.
+
+### b10b-disc995seed2 — `DISCOUNT=0.995`, third env, seed 2
+
+![b10b](charts/b10b-disc995seed2.png)
+
+Step 4.65M · peak score 94.96 (at 4545k) · **best 30-eval perfect 85.0%** (at 4547k) · best measured checkpoint 90% (at 1501k), pooled 71.8% /62400
+
+Still climbing when it was stopped — peak trailing score at 4545k out of 4652k run. Its ceiling is
+unknown and, because the vector has since changed, unknowable: this arm cannot be resumed.
+
+### b10a-disc995seed1 — `DISCOUNT=0.995`, third env, seed 1
+
+![b10a](charts/b10a-disc995seed1.png)
+
+Step 4.29M · peak score 94.38 (at 3402k) · best 30-eval perfect 78.3% (at 3402k) · best measured checkpoint 85% (at 2344k), pooled 67.2% /27200
+
+### b10c-disc995seed3 — `DISCOUNT=0.995`, third env, seed 3
+
+![b10c](charts/b10c-disc995seed3.png)
+
+Step 4.12M · peak score 93.84 (at 4021k) · best 30-eval perfect 72.7% (at 4064k) · best measured checkpoint 79% (at 3965k), pooled 63.0% /4700
+
+Weakest of batch 10, and the arm whose close-out selected only 47 checkpoints where `b10d` selected
+660 — the selector's own read on how much of a run is worth measuring.
 
 ---
