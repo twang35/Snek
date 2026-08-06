@@ -51,7 +51,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
 | `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
-| n-step returns help | **open** — the n=2/n=3 arms leaked returns across episode ends |
+| n-step returns help | **open**, never cleanly tested — the old arms leaked returns across episode ends; batch 15 tests `n=3` |
 | A larger replay buffer prevents the collapse | **not settled** — opposite results twice |
 | Epsilon reaching 0.0 causes the collapse | **falsified**, *but only at 0.001 vs 0.0* |
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
@@ -394,8 +394,15 @@ trained on returns that mix episodes together, which is a fair explanation for p
 1-step baseline.
 
 This is **not** evidence that n-step helps. It is a retraction of the evidence that it does not.
-If a slot is ever spare, `n=2` on the fixed environment is a cheap re-test — and unlike the
-original pair it would be measuring n-step returns.
+
+**Queued as batch 15 at `n=3`, not `n=2`** — an earlier version of this line suggested n=2 as "a
+cheap re-test", which is the wrong call once the numbers are in. The cost of a larger n is that an
+uncorrected n-step return is only exact if the intermediate actions were greedy, and epsilon in this
+project settles at a *measured* 0.0034-0.0039 over the back half of a run, so contamination is 0.27%
+of targets at n=2 against 0.53% at n=3 — no real difference. The upside scales with n: propagating
+the +100 perfect-game reward back across a ~1780-step game takes ~890 backups at n=2 and ~593 at
+n=3. With n=4 arms resolving only a clear win, the larger effect is the one worth a night. Design in
+[`runs.md`](runs.md#queued-batch-15--n-step-returns-at-n_step_update3-launch-when-batch-14-hits-its-cap).
 
 ## The record across four environments: 51% → 92% → 93% → **96%**
 

@@ -339,7 +339,132 @@ row by its maximum and so samples an all-masked row uniformly by accident; `-inf
 load-bearing and testable. And the shield's one-step depth was flagged as an acceptable limitation
 when it is in fact the binding one.
 
-## Nothing is training and nothing is evaluating. The epsilon question is closed
+## RUNNING: batch 14 — `DISCOUNT=0.9975` on the current vector, launched 2026-08-05, no watchers
+
+`b14a-disc9975seed1` … `b14d-disc9975seed4`. Logs at `/tmp/b14<x>-disc9975seed<n>.log`. Verified at
+startup on all four: seeds 1-4, **disc 0.9975**, `td_loss`, no IS, **`GUIDED_FRACTION=0.8`**,
+`max_steps` 5,000,000, five-rung ladder. Exactly 4 trainers, 0 watchers.
+
+**They stop themselves at 5M** — the first batch to run under `SNEK_MAX_STEPS`. 5M rather than 3.5M
+so a still-improving arm is not truncated; batch 13's arms reached 3.4-3.7M in 10.4 h, so expect
+~14 h to the cap.
+
+### Interim read at 1.3M, 4 h in: 0.9975 raises the floor and lowers the ceiling
+
+All four arms alive and within 0.5-3.9 points of their own peak — **0.9975 is 4/4 on survival so
+far**, against 1 of 2 on the pre-audit vector where a seed died at 328k. Means per 200k band, every
+arm truncated to 1.28M:
+
+| band | b14 trail | b13 trail | b14 pf | b13 pf | b14 evals ≥80% | b13 evals ≥80% |
+|---|---|---|---|---|---|---|
+| 400-600k | **91.3** | 88.7 | 34.8% | 34.5% | 3.0% | **8.4%** |
+| 800-1000k | **91.4** | 88.9 | **53.3%** | 49.9% | 11.0% | **23.5%** |
+| 1200-1400k | **92.0** | 89.8 | 51.3% | 51.5% | 13.6% | **18.9%** |
+
+**Higher and steadier average, fewer excellent evals.** Trailing score is up ~2.7 points from 400k
+onward and the mean perfect rate is level-to-better, but batch 13 produces **~1.4-2.4x as many evals
+at ≥80%**. `strong_eval_fraction` — the pre-registered primary — is therefore *behind*: -7.8 pp
+cumulative, -15 pp on the last 400 evals. Nothing is significant (p = 0.375-0.500 paired, n=4).
+
+It is not a slow start: b14 reaches pf30 ≥ 40% **earlier** in 3 of 4 seeds (639k vs 1525k, 227k vs
+246k, 530k vs 807k). It gets to "good" sooner and then compresses toward ~92 trailing / ~51% perfect
+instead of swinging up into the 80-100% band.
+
+**‡ This exposes a tension in the primary metric.** `strong_eval_fraction` was chosen for low
+between-seed variance, but it counts *peak* evals, so a config that reduces **within-arm** variance
+scores badly on it even when its mean is higher. The project's record is itself a peak phenomenon —
+the best single checkpoint — so this may be the metric behaving correctly rather than misleading.
+Deciding which needs the close-out.
+
+**Falsifiable prediction for the close-out, recorded now:** if variance compression is what is
+happening, batch 14 should come back with a **better** equal-effort pooled rate and a **worse** best
+checkpoint than batch 13. If instead both move together, the interim read is wrong.
+
+### The question, and why the discount is the right knob to ask it with
+
+Every observation added on 2026-08-03 describes **long-horizon endgame structure** — following-tail
+(26-28), food-space (29), safe-to-chase-food (15-17), reachable-tail (9-14). `DISCOUNT=0.995` gives
+an effective horizon of ~200 steps against a perfect game's ~1780, and it was tuned on batches 7-9,
+three vectors before any of those features existed. **An agent cannot act on a trap it will hit in
+300 steps if its value function does not look that far.** So the prediction is that the new features
+raise the optimal discount, and batch 9's inability to separate 0.995 from 0.9975 on the *old*
+vector does not settle it on this one.
+
+| | |
+|---|---|
+| arms | 4, `SNEK_SEED=1..4`, `SNEK_DISCOUNT=0.9975`, `SNEK_GUIDED_FRACTION=0.8` |
+| control | **batch 13** (n=4, same epsilon schedule) and batch 11+13 pooled (n=8) for 0.995 |
+| primary | `strong_eval_fraction`; best ckpt and graph-100% tier secondary |
+| resolves | ~9 pp on the primary at 4-vs-8, ~15 pp on best ckpt — a *clear* win or nothing |
+| follow-up if it wins | `DISCOUNT=0.999`, dead 2 of 2 on an older vector; the optimum may have moved past 0.9975 too |
+
+**‡ This batch changes two things, not one.** `GUIDED_FRACTION` went 0.5 → 0.8 as well, so a
+difference cannot be attributed to the discount alone. The confound is probably mild — at handover
+0.0125 with epsilon settling to ~0.003, the shield acts on roughly 0.1% of steps, so the 0.5 → 0.8
+move touches few events — but "probably mild" is not "measured". **If batch 14 wins, the clean
+attribution is a 4-arm control at `DISCOUNT=0.995 GUIDED_FRACTION=0.8`**, which is the batch to run
+next in that case rather than 0.999.
+
+## QUEUED: batch 15 — n-step returns at `N_STEP_UPDATE=3`, launch when batch 14 hits its cap
+
+The first batch that would actually measure n-step returns. Both existing n-step arms are retracted
+rather than negative: `b1c-nstep3` and `b2b-nstep2` trained on returns that summed **straight
+through episode boundaries**, because the per-step discount is the only truncation in
+`r_t + g·d_t·r_{t+1} + g²·d_t·d_{t+1}·r_{t+2} + …` and terminal steps carried 0.9975 until
+2026-08-02. Fixed at `snake_environment.py:126` (`discount = 0.0 if step_type == StepType.LAST`),
+whose comment names this consequence outright.
+
+### Why n=3 rather than n=2
+
+The standard reason to keep n small is that an uncorrected n-step return is only exact if the
+intermediate actions were greedy. **That cost is negligible at this project's epsilon.** Measured
+mean epsilon over the back half of each arm: **0.0034** (batch 13), **0.0039** (batch 14).
+
+| epsilon | P(non-greedy)/step | contaminated at n=2 | at n=3 |
+|---|---|---|---|
+| 0.0125 (refinement ceiling) | 0.83% | 0.83% | 1.66% |
+| **~0.004 (what arms actually run at)** | **0.27%** | **0.27%** | **0.53%** |
+| 0.002 (floor) | 0.13% | 0.13% | 0.27% |
+
+So n=2 → n=3 moves contamination from ~0.3% to ~0.5% of targets, while the upside scales with n:
+propagating the **+100 perfect-game reward** back across a ~1780-step perfect game takes ~890
+sequential backups at n=2 against ~593 at n=3. Add that **n=4 arms resolve only a clear win**, so the
+variant with the larger expected effect is the one to spend a night on, and that n=3 is Rainbow's
+value and therefore the only choice here with outside evidence behind it.
+
+The honest counter, unresolved: priorities come from the n-step TD error, so larger n feeds
+larger-magnitude errors into `td_loss` + alpha 0.6, a combination already flagged as effectively
+more aggressive than intended. It argues both ways — bigger errors push Huber into its linear
+region, which *reduces* the distortion — so it is a thing to watch, not a reason to pick n=2.
+
+### Config: inherit whichever batch wins, so n is the only change
+
+| if batch 14 | control | batch 15 runs |
+|---|---|---|
+| **wins** | batch 14 | `DISCOUNT=0.9975 GUIDED_FRACTION=0.8 N_STEP_UPDATE=3` |
+| **loses** | batch 13 | `DISCOUNT=0.995 GUIDED_FRACTION=0.5 N_STEP_UPDATE=3` |
+
+Either way exactly one variable moves against a measured 4-arm control. Do **not** combine this with
+a discount change; batch 14 already carries one confound (`GUIDED_FRACTION` 0.5 → 0.8) and a second
+would make the batch unreadable.
+
+### Pre-registered: judge this on *speed*, not ceiling
+
+n-step's predicted effect is faster credit propagation to the same asymptote, so the primary read is
+**steps to pf30 ≥ 40%**, with `strong_eval_fraction` secondary. The controls:
+
+| seed | batch 13 | batch 14 |
+|---|---|---|
+| 1 | 1525k | 639k |
+| 2 | 246k | 227k |
+| 3 | 807k | 530k |
+| 4 | 179k | 320k |
+
+If n=3 helps, that milestone should arrive earlier. **If it raises the ceiling without arriving
+sooner, that is a surprise and worth writing up as one** — it would mean n-step is doing something
+other than accelerating propagation here.
+
+## Batch 13 is closed out — it is the 0.995 control for batch 14
 
 Batch 13 (`b13a`-`b13d`) ran 2026-08-05 to 3.39M / 3.70M / 3.67M / 3.51M, stopped healthy after
 10.4 h, and is fully measured. Full write-up in
@@ -478,15 +603,19 @@ rather than at the ceiling.
 - **Setting `SNEK_MIN_EPSILON=0`** — rejected at startup. See
   [`findings.md`](findings.md#scope-of-that-falsification-added-2026-08-04-it-was-never-about-the-descent-rate)
   for why the batch-3 result does not license it.
-- **`N_STEP_UPDATE=5`** — n=2 and n=3 both peak below baseline and then decline, so
-  the trend already points the wrong way.
+- **`N_STEP_UPDATE=5`, *for now*** — this used to read "n=2 and n=3 both peak below baseline, so
+  the trend already points the wrong way", which rests on the retracted evidence: both arms leaked
+  returns across episode boundaries. There is no trend. It stays off the list only because batch 15
+  tests n=3 first, and the contamination arithmetic that makes n=3 safe (0.53% of targets) reaches
+  1.06% at n=5 — still small, so **n=5 becomes reasonable if n=3 wins**.
 - **Resuming any arm from batch 10 or earlier** — every checkpoint on record from before
   batch 11 was trained on an observation vector this project has since changed (20, 23 or 26
   values against the 30 batch 11 trained on), so none of them load; see
   [`../hallOfFame/README.md`](../hallOfFame/README.md#the-entries-below-predate-2026-08-02-and-do-not-run-on-master).
-  **Batch 11 is now the only resumable batch.** Its four arms were stopped healthy at 3.19-3.59M,
-  and `b11d` was still near its peak, so resuming *that* arm is the one case worth considering —
-  it is also the open question the 2M cap below would truncate.
+  **Batches 11 onward are all resumable** — 11, 12, 13 and 14 share the 30-value vector. `b11d` and
+  `b13c` were both still near their peak when stopped, so those are the two arms where resuming
+  would answer something; note that resuming now needs `SNEK_MAX_STEPS` raised above the arm's
+  current step or it exits immediately.
 
 ### Batch bookkeeping
 
