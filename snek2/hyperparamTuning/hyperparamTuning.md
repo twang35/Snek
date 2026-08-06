@@ -110,14 +110,24 @@ EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
 100 episodes, for the same answer** — see "Screening" below. `EVAL_SCREEN_EPISODES=0` gets the flat
 one-pass protocol every arm before batch 10 was measured under.
 
-**Early abandonment is also on by default, from 2026-08-05** (`EVAL_MIN_ACHIEVABLE=85`): a
-checkpoint stops being measured the moment it cannot reach 85% even if every remaining episode is
-perfect. Measured on batch 13's first 505 full-length rows, that cuts full-length work to **70%**,
-and it cannot change any ranking — the test is arithmetic, so a checkpoint that would have reached
-85% is never stopped, and an abandoned row's own rate is always below the gate. `best ckpt` comes
-from full-length rows only and `pooled_equal_effort` truncates to the screen depth, so both are
-untouched. What *is* affected: rows below the gate are shorter, carry `abandoned: true`, and are
-not comparable with full-length rows. `EVAL_MIN_ACHIEVABLE=0` restores the old behaviour.
+**Early abandonment is also on by default, from 2026-08-05** (`EVAL_MIN_ACHIEVABLE`, **90 since
+2026-08-06**, 85 before that): a checkpoint stops being measured the moment it cannot reach the gate
+even if every remaining episode is perfect. Measured on batch 13's first 505 full-length rows, the
+85% gate cuts full-length work to **70%** and the 90% gate to **52%**. It cannot change any ranking
+among rows that reach the gate — the test is arithmetic, so a checkpoint that would have reached it is
+never stopped, and an abandoned row's own rate is always below it. `pooled_equal_effort` truncates to
+the screen depth, so it is untouched at any gate. `EVAL_MIN_ACHIEVABLE=0` restores the old behaviour.
+
+**Why 90, and the one thing it costs.** The project is chasing 95%+, so a checkpoint in the 85-89%
+band is not a candidate and does not need 100 episodes to be ruled out. The cost is that
+**best ckpt degrades on a weak arm**: an arm that never clears 90% has no full-length row at all, and
+3 of the 8 arms measured across batches 11 and 13 peaked below 90% (`b11c` 87%, `b11d` 88%, `b13a`
+80%). `best_full_length_row` then relaxes to **half-depth** rows — never to all rows, which would
+crown a 20-episode screen on a lucky 20/20 — and prints `[truncated]` when it does.
+
+**Check `min_achievable` in the payload before comparing best-checkpoint across batches.** Batches 11
+and 13 were measured with no gate at all, so their sub-90% rows are full length where batch 14's are
+truncated. Above the gate the comparison is exact; below it, it is not a comparison.
 
 `top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
 10-episode eval** from the graph, using the surrounding perfect rate to order within an

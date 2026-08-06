@@ -549,3 +549,60 @@ def test_the_gate_scales_with_a_shorter_target():
     assert eval_checkpoints.achievable_percent(14, 20, 40) == 85.0
     assert test(14, 20) is False
     assert test(13, 20) is True
+
+
+def test_the_default_gate_is_90_and_stops_a_100_episode_run_after_11_failures():
+    # Raised 85 -> 90 on 2026-08-06: the target is a 95%+ policy, so the 85-89% band is not worth
+    # measuring to full depth. Pinned as arithmetic rather than as a bare constant, because what
+    # matters downstream is where the rule fires, not the number itself.
+    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 90.0
+    test = eval_checkpoints.make_abandon_test(eval_checkpoints.DEFAULT_MIN_ACHIEVABLE, 100,
+                                              eval_checkpoints.DEFAULT_ABANDON_FLOOR)
+    # 10 failures still allow exactly 90%, so the run continues; the 11th makes 90% unreachable.
+    assert test(80, 90) is False
+    assert eval_checkpoints.achievable_percent(80, 90, 100) == 90.0
+    assert test(79, 90) is True
+    # The old 85% gate tolerated 15 failures, so it would have kept both of those going. This is
+    # the whole behaviour change, stated as a comparison so a revert cannot pass silently.
+    old = eval_checkpoints.make_abandon_test(85.0, 100, 20)
+    assert old(79, 90) is False
+    assert test(79, 90) is True
+
+
+# ------------------------------------------- best checkpoint under a gate that can truncate everything
+
+def _row(step, perfect_percent, episodes):
+    return {'step': step, 'perfect_percent': perfect_percent, 'episodes': episodes}
+
+
+def test_best_checkpoint_ignores_shallow_screens_when_a_full_length_row_exists():
+    # A 20-episode screen can read 100% on luck across hundreds of tries, so it must never beat an
+    # honestly-measured row.
+    rows = [_row(1000, 100.0, 20), _row(2000, 96.0, 100), _row(3000, 91.0, 100)]
+    assert eval_checkpoints.best_full_length_row(rows, 100)['step'] == 2000
+
+
+def test_best_checkpoint_falls_back_to_deep_rows_not_to_every_row():
+    # The case the 90% gate makes reachable: no checkpoint cleared the gate, so every 100-episode
+    # target was abandoned short and there is no full-length row at all. Falling back to *all* rows
+    # would crown the 20-episode screen on its lucky 20/20 — which is what the old
+    # `or results` did, and is exactly what the deep-row rule exists to prevent.
+    rows = [_row(1000, 100.0, 20), _row(2000, 88.0, 92), _row(3000, 86.0, 89)]
+    best = eval_checkpoints.best_full_length_row(rows, 100)
+    assert best['step'] == 2000, 'a 20-episode screen must not win by default'
+    assert best['episodes'] == 92
+
+
+def test_best_checkpoint_relaxes_all_the_way_only_when_nothing_is_deep():
+    # If every row really is shallow there is nothing better to report, so it still returns the
+    # best of what exists rather than None — a missing line would read as "the arm failed".
+    rows = [_row(1000, 70.0, 20), _row(2000, 80.0, 20)]
+    assert eval_checkpoints.best_full_length_row(rows, 100)['step'] == 2000
+    assert eval_checkpoints.best_full_length_row([], 100) is None
+
+
+def test_best_checkpoint_treats_half_depth_as_the_relaxed_boundary():
+    # Half of num_episodes, matching eval_progress.deep_rows, so the two agree on what is rankable.
+    # 50 is in, 49 is out; a row abandoned under a 90% gate has ~89 episodes so it lands well inside.
+    rows = [_row(1000, 100.0, 49), _row(2000, 60.0, 50)]
+    assert eval_checkpoints.best_full_length_row(rows, 100)['step'] == 2000

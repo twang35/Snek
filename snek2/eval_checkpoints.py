@@ -118,35 +118,40 @@ savings on the many mediocre checkpoints rather than the few bad ones.
 
 ## Early abandonment: EVAL_MIN_ACHIEVABLE
 
-**On by default at 85%.** After every round, a checkpoint's *ceiling* — its rate if every remaining
-episode were perfect — is compared against the threshold, and the measurement stops the moment the
-ceiling falls below it. At 100 episodes that means "stop once more than 15 episodes have failed",
-since 15 failures already cap the run at 85%.
+**On by default at 90%** (85% until 2026-08-06). After every round, a checkpoint's *ceiling* — its
+rate if every remaining episode were perfect — is compared against the threshold, and the
+measurement stops the moment the ceiling falls below it. At 100 episodes and a 90% gate that means
+"stop once more than 10 episodes have failed", since 11 failures already cap the run at 89%.
 
-This is free rather than a trade-off, and the reason is that the test is arithmetic rather than
-predictive:
+The test is arithmetic rather than predictive, which is what makes it safe:
 
 | property | why it holds |
 |---|---|
 | a checkpoint that would reach the gate is never stopped | the ceiling is monotone, and it only fires once the gate is unreachable |
 | an abandoned row can never outrank a kept one | firing implies the row's own rate is below the gate |
-| best-checkpoint is unaffected | it is already taken from full-length rows only |
 | `pooled_equal_effort` is unaffected | the floor is never below `screen_episodes`, the depth it truncates to |
 
-**Measured saving: full-length work drops to 70%** on batch 13's first 505 full-length rows, where
-439 were already out of contention before their 100th episode. A 90% gate would drop it to 52% but
-would leave the 85-89% band — which holds real hall-of-fame candidates — as truncated rows.
+**Measured saving: full-length work drops to 52% at a 90% gate**, against 70% at 85%, on batch 13's
+first 505 full-length rows.
 
-What it does cost: a row below the gate is shorter, so its own rate is noisier and is *not*
-comparable with a full-length row. Such rows carry `abandoned: true` and print with an
-`abandoned at N` marker, and the payload records `min_achievable` so a file measured under the gate
-can be told apart from one measured without it. **Do not pool raw rows across the two**, which was
+**Best-checkpoint is the one thing the gate can degrade, and 90 makes it reachable.** Rows that
+reach the gate are always full length, so as long as one checkpoint clears 90% the ranking is exact.
+An arm that never clears it has *no* full-length row, and 3 of the 8 arms measured across batches 11
+and 13 peaked below 90% (`b11c` 87%, `b11d` 88%, `b13a` 80%). `best_full_length_row` handles that by
+relaxing to half-depth rows rather than to all rows — relaxing to all rows would crown a 20-episode
+screen on a lucky 20/20 — and the printed line is marked `[truncated]` when it happens.
+
+The other cost: a row below the gate is shorter, so its own rate is noisier and is *not* comparable
+with a full-length row. Such rows carry `abandoned: true` and print with an `abandoned at N` marker,
+and the payload records `min_achievable` so a file measured under the gate can be told apart from one
+measured without it, or under a different gate. **Do not pool raw rows across the two**, which was
 already true for the screened/full split and is now true for one more reason.
 
 The floor exists because `equal_effort_pooled` skips rows shorter than `screen_episodes`, so
 abandoning below it would silently delete checkpoints from the one arm-level figure meant to be
 comparable across arms. At the shipped defaults the floor is slack — 100 episodes cannot reach a
-sub-85% ceiling in the first 10 — but it binds as soon as either knob moves.
+sub-90% ceiling in the first 10 — but it binds as soon as either knob moves, and the 85 -> 90 change
+narrowed that slack from 15 permitted failures to 10.
 
 ## Worker count: the throughput knob that matters
 
@@ -173,7 +178,7 @@ Environment:
                       only the best of them at full length (default 20; 0 turns screening off)
     EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 30)
     EVAL_MIN_ACHIEVABLE   stop measuring a checkpoint once it can no longer reach this perfect
-                      rate even if every remaining episode is perfect (default 85; 0 disables)
+                      rate even if every remaining episode is perfect (default 90; 0 disables)
     EVAL_ABANDON_FLOOR    never abandon before this many episodes (default 20, raised to
                       EVAL_SCREEN_EPISODES if that is larger)
     EVAL_RESUME       1 to skip checkpoints this run's own output file already measured at
@@ -672,6 +677,37 @@ def make_abandon_test(min_achievable, target_episodes, floor_episodes):
     return should_abandon
 
 
+def best_full_length_row(results, num_episodes):
+    """The best checkpoint, ranked over rows deep enough for a maximum to mean anything.
+
+    A screened-out checkpoint has a 20-episode rate whose interval is ~5x wider than a
+    100-episode one, so across hundreds of screens some read 19/20 or 20/20 on luck alone.
+    Letting one of those win would crown a checkpoint the protocol deliberately declined to
+    measure, so ranking is over rows at `num_episodes` whenever any exist.
+
+    **The fallback is the part that matters, and it is why this is a function.** Raising
+    `EVAL_MIN_ACHIEVABLE` to 90 makes "no row reached full length" a *reachable* state rather
+    than a theoretical one: an arm whose best checkpoint lands in the 85-89% band has every row
+    abandoned short. 3 of the 8 arms measured across batches 11 and 13 peaked below 90%. The
+    previous code fell back to *all* results in that case, which hands the title to a 20-episode
+    screen on a lucky 20/20 — the exact outcome the deep-row rule exists to prevent, reintroduced
+    precisely when the arm is too weak to defend itself.
+
+    So the fallback keeps the depth requirement and only relaxes it: rows at half `num_episodes`
+    or better, matching `eval_progress.deep_rows`, and only then everything. An abandoned row is
+    always shorter than full length but never shorter than the abandon floor, and a row abandoned
+    under a 90% gate at 100 target episodes has at least ~89 episodes behind it, so in practice the
+    relaxed tier is populated by genuinely deep rows.
+    """
+    if not results:
+        return None
+    for minimum in (num_episodes, num_episodes / 2.0, 0):
+        deep = [r for r in results if r['episodes'] >= minimum]
+        if deep:
+            return max(deep, key=lambda r: r['perfect_percent'])
+    return None
+
+
 def evaluate(parallel_env, policy_action, num_episodes, on_round=None, should_abandon=None):
     """Collects at least num_episodes, in whole rounds of one episode per worker.
 
@@ -740,18 +776,24 @@ DEFAULT_SCREEN_EPISODES = 20
 # Abandon a checkpoint mid-measurement once it can no longer reach this perfect rate, even if
 # every remaining episode is perfect. `EVAL_MIN_ACHIEVABLE=0` turns it off.
 #
-# 85 rather than something closer to the record because the rule has to be *arithmetically* certain
-# to be free: it fires only when `perfect + remaining < threshold`, so a checkpoint that would have
-# finished at or above 85% is never stopped, and no ranking changes. Measured on batch 13's first
-# 505 full-length rows, an 85% gate leaves the top tier untouched and cuts full-length work to
-# **70%** — 439 of those 505 rows were already arithmetically out of contention before their 100th
-# episode. A 90% gate cuts it to 52% but would leave the 85-89% band, which holds real
-# hall-of-fame candidates, as truncated rows.
+# The rule is *arithmetically* certain rather than predictive: it fires only when
+# `perfect + remaining < threshold`, so a checkpoint that would have finished at or above the gate
+# is never stopped, and no ranking among rows that reach the gate can change.
 #
-# What it costs: rows below the gate are shorter, so their own rates are noisier and cannot be
-# compared on equal footing with full-length ones. The pooled arm-level figure is untouched, since
-# the floor below is never lower than the screen depth `equal_effort_pooled` truncates to.
-DEFAULT_MIN_ACHIEVABLE = 85.0
+# **Raised 85 -> 90 on 2026-08-06**, because the target is a 95%+ policy and a checkpoint in the
+# 85-89% band is not a candidate for it. Measured on batch 13's first 505 full-length rows, an 85%
+# gate cuts full-length work to **70%** and a 90% gate cuts it to **52%** — 439 of those 505 rows
+# were already out of contention before their 100th episode at 85%, and more at 90%.
+#
+# What 90 costs, and it is more than 85 cost: the 85-89% band is now truncated too, so an arm whose
+# *best* checkpoint lands there has no full-length row at all. That is survivable but it is not free
+# — 3 of the 8 arms measured across batches 11 and 13 peaked below 90% (`b11c` 87%, `b11d` 88%,
+# `b13a` 80%) — so best-checkpoint for a weak arm now comes from a truncated row and reads noisier.
+# `best_full_length_row` handles that case explicitly; it is the reason it exists.
+#
+# The pooled arm-level figure is untouched at any gate, since the floor below is never lower than
+# the screen depth `equal_effort_pooled` truncates to.
+DEFAULT_MIN_ACHIEVABLE = 90.0
 
 # Never abandon before this many episodes. Raised to the screen depth at startup, so an abandoned
 # row is always long enough to still count in equal_effort_pooled — see make_abandon_test.
@@ -1461,14 +1503,12 @@ def main(argv):
             perfect, episodes, 100.0 * perfect / episodes,
             100.0 * low, 100.0 * high, len(results)))
 
-    # Best-checkpoint over the full-length rows only. A screened-out checkpoint has a 20-episode
-    # rate whose interval is ~5x wider, so letting one win on a lucky 18/20 would crown a
-    # checkpoint the protocol deliberately declined to measure.
-    full_length = [r for r in results if r['episodes'] >= num_episodes] or results
-    best = max(full_length, key=lambda r: r['perfect_percent'])
-    print('best checkpoint: {0} at {1}% (95% CI {2}-{3}%) over {4} episodes'.format(
+    best = best_full_length_row(results, num_episodes)
+    print('best checkpoint: {0} at {1}% (95% CI {2}-{3}%) over {4} episodes{5}'.format(
         best['step'], best['perfect_percent'], best['perfect_ci95'][0],
-        best['perfect_ci95'][1], best['episodes']))
+        best['perfect_ci95'][1], best['episodes'],
+        '  [truncated — no checkpoint reached the abandonment gate]'
+        if best['episodes'] < num_episodes else ''))
     print('\nPooled rates only compare across arms when the selection rule matches.')
     return 0
 

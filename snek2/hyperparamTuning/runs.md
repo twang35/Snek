@@ -72,14 +72,16 @@ fewer arms, not fewer workers.**
 about *which rule*, not new data. The rejected version cut a checkpoint once its running rate
 **looked weak** — a predictive rule, which needs a safety margin to avoid discarding something that
 would recover, and safe margins saved only 14% against batch 10's 937 measurements.
-`EVAL_MIN_ACHIEVABLE=85` is instead an **arithmetic** rule: stop only when the remaining episodes
-cannot carry the checkpoint to 85% even if all of them are perfect. No margin is needed, because
+`EVAL_MIN_ACHIEVABLE` is instead an **arithmetic** rule: stop only when the remaining episodes
+cannot carry the checkpoint to the gate even if all of them are perfect. No margin is needed, because
 nothing that would reach the bar can be cut.
 
 That the population is a tight blob between 60% and 80% is what *made* it work rather than what
-killed it: a gate at 85% sits above the whole blob, so nearly all of it is out of contention early.
-Measured on batch 13's first 505 full-length rows, full-length work drops to **70%** — 439 of them
-were already arithmetically out before their 100th episode. Details in
+killed it: the gate sits above the whole blob, so nearly all of it is out of contention early.
+Measured on batch 13's first 505 full-length rows, full-length work drops to **70%** at an 85% gate
+and **52%** at 90% — 439 of those 505 were already arithmetically out before their 100th episode even
+at 85%. **The gate is 90 from 2026-08-06**, since the project is chasing 95%+ and the 85-89% band is
+not a candidate; the trade-off it accepts, and what it does to best-checkpoint on a weak arm, is in
 [`hyperparamTuning.md`](hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy).
 
 A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
