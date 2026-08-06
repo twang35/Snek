@@ -339,15 +339,16 @@ row by its maximum and so samples an all-masked row uniformly by accident; `-inf
 load-bearing and testable. And the shield's one-step depth was flagged as an acceptable limitation
 when it is in fact the binding one.
 
-## RUNNING: batch 14 — `DISCOUNT=0.9975` on the current vector, launched 2026-08-05, no watchers
+## Batch 14 is stopped at 4.2-4.5M, awaiting checkpoint evals — the `DISCOUNT=0.9975` arm
 
-`b14a-disc9975seed1` … `b14d-disc9975seed4`. Logs at `/tmp/b14<x>-disc9975seed<n>.log`. Verified at
-startup on all four: seeds 1-4, **disc 0.9975**, `td_loss`, no IS, **`GUIDED_FRACTION=0.8`**,
-`max_steps` 5,000,000, five-rung ladder. Exactly 4 trainers, 0 watchers.
+`b14a-disc9975seed1` … `b14d-disc9975seed4`, launched 2026-08-05 19:34, **stopped by hand
+2026-08-06 08:12 after 12.6 h** at 4.17M / 4.13M / 4.16M / 4.46M — roughly 2 h short of the 5M cap,
+at ~340k steps/h. Logs at `/tmp/b14<x>-disc9975seed<n>.log`. Verified at startup on all four: seeds
+1-4, **disc 0.9975**, `td_loss`, no IS, **`GUIDED_FRACTION=0.8`**, five-rung ladder. Exactly 4
+trainers, 0 watchers, no arm died.
 
-**They stop themselves at 5M** — the first batch to run under `SNEK_MAX_STEPS`. 5M rather than 3.5M
-so a still-improving arm is not truncated; batch 13's arms reached 3.4-3.7M in 10.4 h, so expect
-~14 h to the cap.
+This was the first batch to run under `SNEK_MAX_STEPS`, at 5M. **The cap is now 10M** — see the
+close-out below for why 5M turned out to be too tight to be a pure backstop.
 
 ### Interim read at 1.3M, 4 h in: 0.9975 raises the floor and lowers the ceiling
 
@@ -380,6 +381,51 @@ Deciding which needs the close-out.
 happening, batch 14 should come back with a **better** equal-effort pooled rate and a **worse** best
 checkpoint than batch 13. If instead both move together, the interim read is wrong.
 
+### Close-out at 4.2-4.5M: the interim read was wrong, and the batch is a null so far
+
+Everything below is from the **training curves**; checkpoint evals are running and decide the batch.
+
+| metric, equal effort to 3.391M | batch 13 | batch 14 | delta | p exact, n=4 |
+|---|---|---|---|---|
+| `strong_eval_fraction` (primary) | 19.6% | 20.0% | **+0.4 pp** | 1.000 |
+| mean perfect rate | 49.9% | 52.1% | +2.3 pp | 0.750 |
+| mean perfect, back half | 59.5% | 62.9% | +3.3 pp | 0.875 |
+| mean trailing score | 88.8 | 89.9 | +1.1 | 0.375 |
+| peak trailing score | 94.64 | 94.71 | +0.07 | 0.625 |
+
+**The primary is a dead null and the interim read did not survive.** At 1.3M, `strong_eval_fraction`
+was -7.8 pp and the story was "0.9975 raises the floor and lowers the ceiling" through variance
+compression. By 3.39M the gap is +0.4 pp, and the mechanism is directly falsified: **back-half
+within-arm sd of the perfect rate is 18.4 in both batches** (b13 18.7/18.5/16.9/19.3, b14
+18.9/20.1/19.4/15.4). Batch 14 does not compress within-arm variance at all. The 1.3M reading was
+an artifact of measuring a peak-counting metric before the arms had had time to produce peaks —
+batch 14 got to "good" earlier and the ≥80% evals simply arrived later.
+
+The pre-registered falsification test was "better equal-effort pooled rate *and* worse best
+checkpoint means compression; both moving together means the interim read is wrong." Pooled rate is
+better (+2.3 pp) and peak trailing is level (+0.07), so the checkpoint evals are what close it, but
+the sd measurement settles the mechanism on its own.
+
+**Between-seed spread still swamps the effect**, which is the same wall as batch 13:
+
+| seed | b13 `sef` | b14 `sef` | delta |
+|---|---|---|---|
+| 1 | 11.6% | 17.2% | +5.6 |
+| 2 | 26.4% | **10.7%** | -15.7 |
+| 3 | 25.5% | 15.2% | -10.3 |
+| 4 | 14.9% | **36.8%** | +21.9 |
+
+A ±22 pp per-seed swing around a +0.4 pp mean. **`b14d-disc9975seed4` is the strongest arm the
+project has recorded on the primary** — 39.3% at full length, against a previous best of 30.5%
+(`b11b`) — and `b14b` is among the weakest at 9.3%. More evidence for the standing rule that a seed
+number is not a stable unit of quality.
+
+**Why the cap moved to 10M.** Two of four arms produced their best window past 3.5M (`b14a` peak
+trailing at 3.79M, `b14c` best 30-eval perfect at 4.14M), and `b14c` was still climbing in its final
+band — 75.9% perfect over 4.0-4.5M against a 62.6% previous best. The other two were past peak. A 5M
+stop would have truncated one arm in four mid-climb, which makes 5M part of the experiment rather
+than a backstop against neglect.
+
 ### The question, and why the discount is the right knob to ask it with
 
 Every observation added on 2026-08-03 describes **long-horizon endgame structure** — following-tail
@@ -405,7 +451,7 @@ move touches few events — but "probably mild" is not "measured". **If batch 14
 attribution is a 4-arm control at `DISCOUNT=0.995 GUIDED_FRACTION=0.8`**, which is the batch to run
 next in that case rather than 0.999.
 
-## QUEUED: batch 15 — n-step returns at `N_STEP_UPDATE=3`, launch when batch 14 hits its cap
+## QUEUED: batch 15 — n-step returns at `N_STEP_UPDATE=3`, launch once batch 14's evals land
 
 The first batch that would actually measure n-step returns. Both existing n-step arms are retracted
 rather than negative: `b1c-nstep3` and `b2b-nstep2` trained on returns that summed **straight
@@ -447,6 +493,12 @@ region, which *reduces* the distortion — so it is a thing to watch, not a reas
 Either way exactly one variable moves against a measured 4-arm control. Do **not** combine this with
 a discount change; batch 14 already carries one confound (`GUIDED_FRACTION` 0.5 → 0.8) and a second
 would make the batch unreadable.
+
+**Tie-breaker, since batch 14's training curves came back a null (+0.4 pp on the primary):** if the
+checkpoint evals also fail to separate the two, inherit **batch 13's** config. Not because 0.995 is
+better — nothing here says it is — but because 0.995 has n=8 behind it (batches 11 + 13) against
+n=4, so it is the tighter control to measure n against, and it avoids carrying batch 14's
+`GUIDED_FRACTION` confound forward into a batch about something else.
 
 ### Pre-registered: judge this on *speed*, not ceiling
 

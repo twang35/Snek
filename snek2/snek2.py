@@ -128,14 +128,15 @@ def main(argv):
     # eval_only = True
 
     # Absolute step at which training stops, so a wave self-terminates and frees its slots
-    # instead of needing a human to notice. 5M is deliberately generous — arms peak between ~1M
-    # and ~3.4M, so this is "well past useful" rather than a planned horizon, and running over is
-    # cheaper than an arm dying unattended. `b9b-disc9975b` ran **10.1M steps past its peak**
-    # overnight producing nothing, which is the failure this prevents.
+    # instead of needing a human to notice. 10M is deliberately generous — this is "well past
+    # useful" rather than a planned horizon, and running over is cheaper than an arm dying
+    # unattended. `b9b-disc9975b` ran **10.1M steps past its peak** overnight producing nothing,
+    # which is the failure this prevents. Raised from 5M after batch 14: all four arms were still
+    # gaining at 4.1-4.5M, so 5M was inside the useful range rather than past it.
     #
     # Absolute rather than per-run: `global_step` is restored on resume, so a relative count would
     # let an arm resumed at 4M run to 9M. See training.steps_remaining().
-    max_steps = tuned('MAX_STEPS', 5000000, int)
+    max_steps = tuned('MAX_STEPS', 10000000, int)
     if max_steps < 1:
         raise SystemExit('SNEK_MAX_STEPS={0} must be at least 1.'.format(max_steps))
 

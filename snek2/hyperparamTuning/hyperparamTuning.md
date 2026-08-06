@@ -437,7 +437,7 @@ Notes that matter:
 | `SNEK_INITIAL_EPSILON` | 0.4 | where the bootstrap phase starts; the refinement ceiling is this / 32 |
 | `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 32` |
 | `SNEK_GUIDED_FRACTION` | 0.5 | share of refinement-phase episodes whose epsilon move avoids fatal actions; 0 disables the shield |
-| `SNEK_MAX_STEPS` | 5000000 | **absolute** step at which training stops, so a wave self-terminates |
+| `SNEK_MAX_STEPS` | 10000000 | **absolute** step at which training stops, so a wave self-terminates |
 | `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
 | `SNEK_PRIORITY_EXPONENT` | 0.6 | alpha; 0.0 disables prioritization |
@@ -451,8 +451,16 @@ Notes that matter:
 **`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added
 2026-08-05; before it, `num_iterations` was hardcoded to 1e9 and every batch had to be stopped by
 hand. `b9b-disc9975b` is why it exists: it ran **10.1M steps past its peak** overnight with nobody
-watching. The default of 5M is deliberately generous — arms produce their best checkpoint between
-~1M and ~3.4M — so it is a backstop rather than a planned horizon.
+watching. The default is deliberately generous, so it is a backstop rather than a planned horizon.
+
+**The default was raised 5M → 10M on 2026-08-06**, because 5M is closer to the useful range than it
+looked. In batch 14, two of four arms produced their best window past 3.5M — `b14a`'s best trailing
+score at 3.79M, `b14c`'s best 30-eval perfect rate at 4.14M — and `b14c` was still gaining in its
+final 4.0-4.5M band (75.9% perfect, its best of the run, against a 62.6% previous best). The other
+two were past peak. So one arm in four would have been truncated mid-climb by a 5M stop.
+
+The old "best checkpoint lands between ~1M and ~3.4M" rule of thumb came from batches a human
+killed around 3.5M, so it partly described the stopping habit rather than the learning curve.
 
 Absolute means "stop when `global_step` reaches this", not "run this many more steps", because
 `global_step` is restored on resume; a relative count would let an arm resumed at 4M run to 9M. An

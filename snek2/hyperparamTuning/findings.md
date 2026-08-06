@@ -402,7 +402,7 @@ project settles at a *measured* 0.0034-0.0039 over the back half of a run, so co
 of targets at n=2 against 0.53% at n=3 — no real difference. The upside scales with n: propagating
 the +100 perfect-game reward back across a ~1780-step game takes ~890 backups at n=2 and ~593 at
 n=3. With n=4 arms resolving only a clear win, the larger effect is the one worth a night. Design in
-[`runs.md`](runs.md#queued-batch-15--n-step-returns-at-n_step_update3-launch-when-batch-14-hits-its-cap).
+[`runs.md`](runs.md#queued-batch-15--n-step-returns-at-n_step_update3-launch-once-batch-14s-evals-land).
 
 ## The record across four environments: 51% → 92% → 93% → **96%**
 

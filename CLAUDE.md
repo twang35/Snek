@@ -48,15 +48,16 @@ fine at any time.
 
 ## Training runs
 
-**`SNEK_MAX_STEPS` (default 5,000,000) is an absolute cap**, so a wave self-terminates and frees
+**`SNEK_MAX_STEPS` (default 10,000,000) is an absolute cap**, so a wave self-terminates and frees
 its slots instead of needing someone to notice. Absolute means "stop when `global_step` reaches
 this", not "run this many more" — `global_step` is restored on resume, so a relative count would
 let an arm resumed at 4M run to 9M. An arm already at its cap prints `already at or past the
 N-step cap` and exits after its opening eval; raise the knob to continue it.
 
-The default is generous on purpose: arms produce their best checkpoint between ~1M and ~3.4M, so
-5M is a backstop against an unattended arm, not a planned horizon. `b9b-disc9975b` ran **10.1M
-steps past its peak** overnight before this existed.
+The default is generous on purpose — a backstop against an unattended arm, not a planned horizon.
+`b9b-disc9975b` ran **10.1M steps past its peak** overnight before this existed. Raised 5M → 10M on
+2026-08-06: in batch 14 two of four arms peaked past 3.5M and one was still gaining at 4.0-4.5M, so
+the old "arms peak between ~1M and ~3.4M" rule partly described where humans stopped them.
 
 **An arm that never clears `SNEK_MIN_CHECKPOINT_SCORE` (default 40) never writes a checkpoint**, so
 it cannot resume and its cap counts from 0 on each launch. That matters for short smoke runs, which
