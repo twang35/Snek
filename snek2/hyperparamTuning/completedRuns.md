@@ -2,10 +2,10 @@
 
 Every arm that has finished: config, final numbers, verdict. The table below is **canonical** —
 it covers every arm ever run, including the batches whose narratives moved to
-[`archive/batches1-10.md`](archive/batches1-10.md).
+[`archive/batches1-11.md`](archive/batches1-11.md).
 
 Companion to [`runs.md`](runs.md) (what is running), [`findings.md`](findings.md) (conclusions) and
-[`charts.md`](charts.md) (graphs, batch 11 onward). Nothing here should be re-run without a reason.
+[`charts.md`](charts.md) (graphs, batch 12 onward). Nothing here should be re-run without a reason.
 
 ## All arms, ranked by best sustained perfect rate
 
@@ -36,11 +36,15 @@ train on the result. Compare ‡‡ rows only to each other; they are not compar
 unmarked rows.
 
 **‡‡‡ marks arms trained on the 30-value vector (2026-08-03 onward)** — a fourth environment,
-adding the following-tail block (26-28) and food-space (29). Batches 11, 12 and 13 all train on it,
+adding the following-tail block (26-28) and food-space (29). Batches 11-14 all train on it,
 and it is still current. ‡‡‡ rows compare to each other and, with care, to ‡‡ rows: batch 11 is
 byte-identical to batch 10 in config, so that one cross-era comparison is *designed* and is written
-up in [`archive/batches1-10.md`](archive/batches1-10.md). Everything else stays within its own era.
+up in [`archive/batches1-11.md`](archive/batches1-11.md). Everything else stays within its own era.
 Batch 10's checkpoints stopped loading on `master` when this landed.
+
+**§§ in the `measured` column marks a run measured under an abandonment gate**, whose figure is
+`pooled_equal_effort` rather than the graph-100% tier. See the footnote under the table; the short
+version is that a gate censors the tier and `pooled_equal_effort` is exact regardless.
 
 **§ marks arms trained after the epsilon rewrite of 2026-08-04.** Not an environment change —
 the observation vector is untouched and every ‡‡‡ checkpoint still loads — but a config change,
@@ -63,10 +67,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ **best measured ckpt on record** |
+| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ **best measured ckpt on record**; ~94% shrunk |
+| `b14a-disc9975seed1` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.17M | **96%** @3702k | 93.0% | 72.4% /eq §§ | 79.7% | ‡‡‡ § **ties the record on paper**; 91/100 on re-measure, **93.5% over 200** |
 | `b13d-shieldseed4` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.51M | **95%** @986k | 93.3% | 77.2% /4800 † | 83.3% | ‡‡‡ § **2nd best ckpt on record**; peaked ~1M then lost 44 pp |
+| `b14d-disc9975seed4` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.46M | 93% @2559k | 93.0% | **77.6%** /eq §§ | **89.7%** | ‡‡‡ § **best arm on record for `strong_eval_fraction`, 39.3%**; only 11.7 pp drawdown |
 | `b13c-shieldseed3` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.67M | 92% @3367k | 90.7% | 75.9% /11400 † | **85.3%** | ‡‡‡ § best of batch 13 on the graph; best ckpt in its final 300k |
 | `b13b-shieldseed2` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.70M | 91% @1166k | 90.3% | 74.8% /7800 † | 82.3% | ‡‡‡ § fastest start on record: 72.3% pf30 by 350k |
+| `b14b-disc9975seed2` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.12M | 90% @2261k | — | 67.1% /eq §§ | 76.3% | ‡‡‡ § weakest of batch 14; **one full-length row survived the gate**; lost 47 pp |
+| `b14c-disc9975seed3` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.16M | 90% @2099k | 89.3% | 71.3% /eq §§ | 87.7% | ‡‡‡ § **still improving at 4.5M** — the arm that moved the step cap to 10M |
 | `b13a-shieldseed1` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.39M | 80% @2044k | 80.0% | 70.5% /3100 † | 78.0% | ‡‡‡ § weakest of batch 13, and the batch's slowest starter |
 | `b11a-obs30seed1` ‡‡‡ | disc 0.995, **fourth env** | 3.19M | 94% @671k | 93.3% | 79.5% /4800 † | 85.7% | ‡‡‡ 2nd of batch 11; peaked at 678k, then lost 42 pp |
 | `b11d-obs30seed4` ‡‡‡ | disc 0.995, **fourth env** | 3.59M | 88% @3507k | 86.7% | 69.3% /4000 † | 78.3% | ‡‡‡ only arm still near peak when stopped |
@@ -131,6 +139,14 @@ Batch 13 ran the same three-stage protocol and *does* have `pooled_equal_effort`
 down the table and so the batch 11 comparison is like-for-like; the equal-effort figures are in the
 batch 13 write-up below.
 
+**§§ batch 14's `measured` column is `pooled_equal_effort` (`/eq`), because the graph-100% tier does
+not exist for it.** Batch 14 is the first batch measured under `EVAL_MIN_ACHIEVABLE=90`, and the gate
+truncates every tier member that falls below 90%, leaving the tier's own top slice — it reads 90.3%
+against batch 13's 74.6% and means nothing. `pooled_equal_effort` truncates to the 20-episode screen
+depth, which is at or below the abandon floor, so it is exact at any gate and is the **only** column
+here that compares cleanly to batch 13 (72.07% against 72.08%). When comparing `measured` across the
+† and §§ rows, don't — compare the batch write-ups, which state both figures.
+
 `train` was a human-started run on committed defaults, stopped by the human. Never
 touch `snek2/savedPolicies/train*`.
 
@@ -161,6 +177,79 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 14 — disc 0.9975 at guided 0.8, and the widest seed spread yet
+
+**Ran 2026-08-05 19:34 to 2026-08-06 08:12 (12.6 h), four arms to 4.17M / 4.13M / 4.16M / 4.46M,
+stopped by hand ~2 h short of the 5M cap, measured 2026-08-06.** `DISCOUNT=0.9975`,
+`GUIDED_FRACTION=0.8`, otherwise batch 13's config. Graphs in
+[`charts.md`](charts.md#batch-14--discount09975-at-guided_fraction08-and-a-third-null).
+
+| seed | best ckpt | top-3 | eq-effort | best30 | SEF | drawdown | final eps |
+|---|---|---|---|---|---|---|---|
+| 1 | **96%** @3702k | 93.0% | 72.4% | 79.7% | 20.0% | 25.0 pp | 0.0036 |
+| 2 | 90% @2261k | — † | 67.1% | 76.3% | 9.3% | **47.0 pp** | 0.0064 |
+| 3 | 90% @2099k | 89.3% | 71.3% | 87.7% | 17.8% | **5.7 pp** | 0.0020 |
+| 4 | 93% @2559k | 93.0% | **77.6%** | **89.7%** | **39.3%** | 11.7 pp | 0.0021 |
+| **mean** | **92.3%** | **91.3%** | **72.1%** | **83.3%** | **21.6%** | **22.3 pp** | |
+
+**† `b14b` produced exactly one full-length row**, so it has no top-3. That is the 90% abandonment
+gate, not the arm: every other checkpoint was truncated once 90% became unreachable. Batch 14 is the
+first batch measured under a gate, and the counts are 9 / 1 / 4 / 47 full-length rows against batch
+13's 131 / 178 / 214 / 148.
+
+### Null against batch 13 on every metric that survives the gate
+
+Paired by seed, exact permutation over all 16 sign flips:
+
+| metric | batch 13 | batch 14 | diff | p | per-seed diffs |
+|---|---|---|---|---|---|
+| `pooled_equal_effort` | 72.07% | 72.08% | **+0.01 pp** | **1.000** | +3.7, -4.5, -1.9, +2.8 |
+| best ckpt | 89.5% | 92.3% | +2.75 pp | 1.000 | +16.0, -1.0, -2.0, -2.0 |
+| top-3 mean | 88.6% | 91.3% | +2.75 pp | 1.000 | +13.0, -0.3, -1.3, -0.3 |
+| `best_perfect30` | 82.2% | 83.3% | +1.08 pp | 0.625 | +1.7, -6.0, +2.3, +6.3 |
+| `strong_eval_fraction` | 19.5% | 21.6% | +2.05 pp | 1.000 | +8.3, -16.2, -8.7, +24.8 |
+| drawdown | 19.3 pp | 22.3 pp | +3.00 pp | 1.000 | +18.7, +31.3, -6.3, -31.7 |
+
+**`pooled_equal_effort` landing within 0.01 pp is the cleanest null this project has measured.** It
+is also the metric to trust here: it truncates every checkpoint to its first 20 episodes, and
+abandonment cannot fire before the 20-episode floor, so it is exact under the gate where the others
+are not.
+
+**The best-ckpt gain is one seed and mostly winner's curse.** +2.75 pp is +16.0 on seed 1 and
+-1 to -2 on the other three. `b14a`'s 96/100 @3702k tied the record on paper; re-measured
+independently at 100 episodes it read **91/100**, pooling to **187/200 = 93.5%** (CI 89.2-96.2). It
+was the maximum over 176 attempted full-length measurements in its own arm, and this is what that
+costs.
+
+**‡ The graph-100% tier is unusable for this batch and is deliberately absent from the table above.**
+It reads 90.3% against batch 13's 74.6%, a +15.6 pp "win" that is pure artifact: the gate truncates
+every tier member below 90%, so what remains is the tier's own top slice. Tier sizes went from 31-114
+checkpoints per arm to 1-28. See
+[`hyperparamTuning.md`](hyperparamTuning.md#taking-the-arm-level-pooled-rate).
+
+### What batch 14 actually established
+
+- **`DISCOUNT=0.9975` is not better than 0.995 on this vector.** The pre-registered argument was that
+  the 2026-08-03 endgame observations need a longer horizon than 0.995's ~200 steps. Measured, it
+  makes no difference, and this is now the second batch to say so (batch 9 said it on the old vector,
+  which was the reason to re-ask). **Do not re-ask at n=4.**
+- **The interim read at 1.3M was wrong, and the mechanism it proposed is falsified.** At 1.3M
+  `strong_eval_fraction` was -7.8 pp and the story was variance compression — 0.9975 raising the floor
+  and lowering the ceiling. Back-half within-arm sd of the perfect rate is **18.4 in both batches**
+  (13: 18.7/18.5/16.9/19.3, 14: 18.9/20.1/19.4/15.4). There is no compression. The early number was a
+  peak-counting metric read before the peaks had arrived.
+- **Arms do not reliably peak by 3.4M**, which moved `SNEK_MAX_STEPS` to 10M. `b14a`'s best trailing
+  window is at 3.79M, `b14c`'s best perfect window at 4.14M, and `b14c`'s final 4.0-4.5M band is its
+  best of the run. Every earlier batch was stopped by hand near 3.5M, so the old rule of thumb partly
+  measured the stopping habit.
+- **`GUIDED_FRACTION=0.8` is still unmeasured.** It moved with the discount, so this batch cannot
+  attribute anything to it. Since the discount result is a null, the confound is now moot rather than
+  resolved — there is nothing to attribute.
+- **Seed instability is worse than previously stated.** `strong_eval_fraction` per-seed diffs run
+  -16.2 to +24.8 pp around a +2.05 pp mean. `b14d` is the best arm on the primary the project has
+  recorded (39.3%, previous best 30.5%) and `b14b` among the worst (9.3%) — same config, adjacent
+  seeds.
 
 ## Batch 13 — the epsilon rewrite plus the exploration shield: an exact null
 
@@ -228,124 +317,148 @@ step 350k, where every batch-12 arm was at 0%. Whatever the rewrite is worth, th
 - **The drawdown is not improved.** -1.0 pp at p = 0.875, with per-seed diffs of -35.1 and +38.7.
   `b13d` gave up 44.3 pp where batch 11's seed 4 gave up 5.6, so the seeds simply swapped places.
 
-## Batch 11 — the same config on the 30-value vector: no significant difference
+## Batch 12 — the deadlock, abandoned at ~1M of 2.5M
 
-**Launched 2026-08-03 22:55, all four stopped 2026-08-04 09:09** by request — 10h14m, 3.19-3.59M
-steps per arm (~330k/arm/hour). Four seeds of batch 10's config, byte for byte
-(`SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`),
-on the 30-value observation vector. The **first seeded batch** in this project — `SNEK_SEED=1..4`,
-recorded in each `runs/<policy>.md`. The only difference from batch 10 is the two observations added
-2026-08-03 (following-tail at 26-28, food-space at 29), verified by checking that no other
-training-relevant commit landed in between.
+`b12a-eps002seed1`, `b12b-eps002seed2`, `b12c-eps002seed3`, `b12d-eps002seed4`, stopped
+2026-08-04. All four cleared the pre-registered abandon condition together, so the batch was
+called early rather than run to its horizon. Charts and per-arm readings in
+[`charts.md`](charts.md#batch-12--the-epsilon-rewrite-and-the-deadlock-it-found).
 
-| policy | final step | peak trailing | best-30 perfect | best-30 @3.185M | drawdown to final |
-|---|---|---|---|---|---|
-| `b11b-obs30seed2` ‡‡‡ | 3.56M | 94.92 @855k | **91.7%** @873k | **91.7%** | 18.0 pp |
-| `b11a-obs30seed1` ‡‡‡ | 3.19M | 94.82 @653k | 85.7% @678k | 85.7% | **42.4 pp** |
-| `b11d-obs30seed4` ‡‡‡ | 3.59M | 94.18 @3468k | 78.3% @3468k | 76.3% | 5.6 pp |
-| `b11c-obs30seed3` ‡‡‡ | 3.23M | 94.26 @2452k | 73.0% @1718k | 73.0% | 18.0 pp |
+Note for anyone stopping an arm: `SIGTERM` and `SIGINT` are both swallowed by the trainer — there
+is no signal handler in `training.py` — so it takes `SIGKILL`. Checkpoints and `_evals.json` are
+rewritten every 1000 steps, so at most a partial interval is lost, but copy the four
+`_evals.json` files aside first if they hold the only record of something.
 
-### The pre-registered result: not significant
+### ‡ The new schedule deadlocks. All four arms are failing, 4/4, at ~1M steps
 
-Fixed before launch: best-30 perfect at a **common horizon**, not at each arm's final step. Batch 11
-turned out to be the shorter batch, so the horizon is **3.185M**.
+Epsilon descends out of bootstrap correctly and then **pins at the refine ceiling 0.05 forever**,
+because the refine phase descends on mastery that the level of exploration it is holding prevents
+the agent from acquiring.
 
-| batch | best-30 @3.185M | mean | sd |
+| arm | step | trailing | pf30 now | eps | pinned at 0.05 for | evals with a perfect game |
+|---|---|---|---|---|---|---|
+| `b12a` | 1.02M | 55.5 | 0.0% | 0.05 | 686k steps | 41 / 1022 |
+| `b12b` | 0.95M | 57.8 | 0.0% | 0.05 | **942k steps** | **0 / 954** |
+| `b12c` | 0.92M | 60.4 | 0.0% | 0.05 | 409k steps | 8 / 918 |
+| `b12d` | 1.02M | 61.7 | 0.0% | 0.05 | 455k steps | 32 / 1021 |
+
+Against the control at the same step, on the pre-registered primary metric:
+
+| | `strong_eval_fraction` @1.01M | trailing @1.01M | pf30 @1.01M |
 |---|---|---|---|
-| 10 (26-value) | 74.7 / 84.0 / 62.0 / 84.3 | 76.2% | 10.5 |
-| 11 (30-value) | 85.7 / 91.7 / 73.0 / 76.3 | **81.7%** | 8.6 |
+| batch 11 | 25.2 / 30.5 / 0.0 / 8.2% | 84.5-88.5 | 14.0-82.3% |
+| batch 12 | **0.0% ×4** | **54.9-61.7** | **0.0% ×4** |
 
-**+5.4 pp, SE 6.8, t=0.80 — not significant**, against a pre-registered threshold of ~10 pp. This is
-the outcome the design predicted, and it is recorded as a non-result rather than a lean. The two
-observations are kept under the pre-registered decision rule: keep unless clearly worse.
+**The numbers above are greedy, and the comparison is clean.** Evals run `agent.policy`, which
+TF-Agents builds as `GreedyPolicy`; only `agent.collect_policy` is the `EpsilonGreedyPolicy` that
+`epsilon` feeds. Verified two ways — `_setup_policy` in the installed `dqn_agent`, and empirically
+with `epsilon=1.0`, where `agent.policy` returns one action on a fixed observation across 60 calls
+while `collect_policy` returns all three. So there is **no exploration tax on the metric**: pf30 = 0
+is a real property of the greedy policy, and batch 11 and batch 12 are measured the same way.
 
-`b11b`'s **91.7%** best-30 is the highest any arm in either batch reached, but that is n=1 out of
-eight arms and the batch means overlap heavily. Do not promote it to a finding.
+**The mechanism is a learning deadlock, not a measurement one.** At eps 0.05, 3.3% of *collected*
+actions are random, and a random move with a long snake is usually fatal — so the replay buffer
+fills with trajectories that die before the endgame and the agent never sees the states a perfect
+game is made of. The greedy policy therefore never masters the endgame, greedy pf30 stays 0,
+`refine_epsilon(0, top=0.05, floor=0.002)` returns exactly `top`, and the collection distribution
+never improves. The loop closes through the *policy*:
 
-### The close-out agrees with the pre-registration, on two more metrics
+```
+eps 0.05 → 3.3% random collected actions → buffer lacks endgame states
+        → greedy policy cannot finish → pf30 = 0 → refine returns the ceiling → (repeat)
+```
 
-All four close-outs finished 2026-08-04 — 1.7 to 2.9 hours of eval per arm, 9.1 hours of work in
-total across four parallel processes, 67,140 episodes. They add two *measured* comparisons to the
-graph-based one, and all three land in the same place: batch 11 ahead by 4-5 pp, none of it
-significant at n=4.
+Batch 11's crude ladder always escaped because it descended on step count, which no policy can
+suppress.
 
-| metric | batch 10 | batch 11 | difference | exact p (one-sided) |
-|---|---|---|---|---|
-| best-30 @3.185M horizon (pre-registered) | 76.2% | 81.7% | **+5.4 pp** | 0.243 |
-| graph-100% tier rate, 100 episodes each | 70.6% | 74.7% | **+4.1 pp** | 0.143 |
-| best checkpoint, 100 episodes | 86.8% | 91.2% | **+4.5 pp** | 0.157 |
+**The descent is also far too shallow to escape even with luck.** 0% → 6.3% pf30 (`b12a`'s
+best-ever window) moves epsilon only 0.0500 → 0.0388. Meaningful relief needs 20-40% pf30, which
+is exactly what 0.05 makes impossible: `pf30=10%` → 0.0334, `20%` → 0.0224, `40%` → 0.0100.
 
-Per arm, paired by rank within its batch:
+**Sustained high epsilon degrades a policy that was already working.** `b12a` read greedy trailing
+**87.0** and pf30 6.3% at step 214k, then decayed to 55.5 over the next 800k steps at the same
+epsilon. All four peak at 81-87 by step 214-479k and then decline. Both numbers are greedy, so this
+is the learned policy getting worse, not a measurement artefact.
 
-| rank | batch 11 arm | best ckpt | tier rate | tier n | batch 10 arm | best ckpt | tier rate | tier n |
-|---|---|---|---|---|---|---|---|---|
-| 1 | `b11b` | **96%** @855k | **81.0%** | 104 | `b10d` | 93% @1695k | 75.7% | 146 |
-| 2 | `b11a` | 94% @671k | 79.5% | 48 | `b10b` | 90% @1501k | 72.9% | 142 |
-| 3 | `b11d` | 88% @3507k | 69.3% | 40 | `b10a` | 85% @2344k | 68.7% | 47 |
-| 4 | `b11c` | 87% @1706k | 69.0% | 23 | `b10c` | 79% @3965k | 65.1% | 7 |
+This clears the pre-registered abandon condition (a >10 pp drop on the primary metric) 4/4 with a
+mechanism understood analytically, at 1M of the 2.5M horizon. Running to 2.5M would spend ~5 h
+confirming a deadlock that is provable from the code.
 
-Batch 11 is ahead at every rank on both columns, which shows the +4 to +5 pp more usefully than the
-means do: it is not one lucky arm carrying the batch. The pairing is presentational — nothing links
-`b11b` to `b10d` beyond each being its batch's best — so this is not a paired test, and the
-permutation p-values above are the unpaired ones.
+The design flaw is general: *any* purely mastery-gated schedule deadlocks if its ceiling sits above
+the exploration level at which mastery is achievable.
 
-The p-values are exact permutation tests over all 70 ways to split eight arms 4-and-4, which is the
-right test here: the unit of analysis is the arm, not the checkpoint, because checkpoints within an
-arm share a training trajectory and are nowhere near independent. Pooling 2205 checkpoint
-measurements would give a tiny p-value answering a question nobody asked.
+### The fix: shield the exploration move, not the schedule
 
-**Three metrics agreeing on +4 to +5 pp is worth more than any one of them, and still is not
-significance.** They are *not* independent — all three read the same eight training runs, and the
-measured pair comes from the same eval data — so this is one piece of evidence looked at three ways,
-not three. What the agreement does buy is that the sign is not an artefact of which metric was
-chosen, since the graph metric and the measured ones disagree badly in general (`b5c` is 2nd of its
-batch by graph and last by measurement). It raises the odds the effect is real and positive rather
-than zero; it cannot separate +5 pp from +1 pp, which is the resolution the design lacked from the
-start. The pre-registered decision rule stands: the observations are kept.
+Rather than making epsilon decay faster, attack what makes exploration expensive. In a *guided*
+episode the epsilon coin's random move is drawn from the moves that do not kill the snake this
+step, instead of uniformly from all three. `shielded_policy.py`, wired in as the collect policy.
 
-#### A new best measured checkpoint: `b11b` @855000, 96/100
+| decision | value | why |
+|---|---|---|
+| what is shielded | **the epsilon draw only** | see below — this is the whole design |
+| the greedy argmax | **never shielded** | it must eat the -5 and learn |
+| `SNEK_GUIDED_FRACTION` | 0.5 | half of refinement-phase episodes |
+| when it engages | at the bootstrap handover | nothing to protect while the snake is short |
+| `INITIAL_EPSILON` | **unchanged**, 0.4 | the early ladder is the part that works |
+| handover | **0.05 → 0.0125** | two rungs added below; see the smoke result |
+| guaranteed-descent envelope | **not added** | judge the lower ceiling on its own first |
 
-The highest single-checkpoint measurement in the project, ahead of `b10d`'s 93% @1695000, and
-preserved in [`../hallOfFame/`](../hallOfFame/README.md).
+**Only exploration is shielded, never the greedy action.** Overriding a fatal *greedy* move would
+mean `Q(s, a_fatal)` never gets updated toward `DEATH_REWARD` in the states where the network is
+wrong, so those values would drift on generalisation alone — and evals run unshielded, so the arm
+would walk into walls it was never allowed to learn about. Shielding exploration only removes the
+tax while keeping every death the policy earns itself.
 
-**Corrected for the winner's curse it is ~94%.** It is the maximum of 204 full-length measurements
-in its own arm, so some of the 96 is luck. Fitting a Beta prior by moment-matching on `b11b`'s 104
-*unselected* graph-100% rows — Beta(12.4, 2.9), mean 81.0%, true-rate sd 9.7 pp — shrinks 96% to
-**94.0%**. That is a much smaller correction than `b10d`'s 95% → ~87%, for two reasons: the
-measurement is 100 episodes rather than 30, and this arm's true-rate spread is wide enough that a
-high observation is more plausibly real.
+**The mask was already in the observation.** Indices 6-8 are "is the move safe (not body or wall)",
+per action, and `state_helpers.body_and_wall_collisions` already handles the case a naive check gets
+wrong: the cell the tail is vacating is safe to enter. So the shield needs **no environment change
+and no new game logic**, just `obs[6:9]`.
 
-Fitting the prior on the *selected* full-length rows instead would have given 93.5%, and that
-number would have been too generous — those rows were chosen for screening well, so their mean is
-inflated and the prior pulls less. The unselected tier is the only clean prior available.
+**It is one step deep, deliberately.** Snake's hard problem is sealing itself into a region it
+cannot escape, and that is untouched — an arm still has to learn it. All this removes is "the coin
+flipped and the snake drove into its own body".
 
-**Two of the four arms' best checkpoints came from the graph-90% tier**, `b11b` @855k among them
-(its graph point read 90, not 100). In batch 10 it was all four. The pattern in
-[`hyperparamTuning.md`](hyperparamTuning.md) holds: the 100% tier is a coverage guarantee, not a
-shortlist of champions, and the confirm stage is what actually finds the best checkpoint.
+**The shield turns off if an arm collapses**, because `guided_fraction_for` is stateless in the same
+way `epsilon_for` is: one rule, "shielded iff refining". An arm back in the bootstrap band is
+relearning to survive, which is where dying is informative.
 
-### Two things that did differ, and neither was predicted
+**Verified before launch.** 19 tests in `tests/test_shielded_policy.py`, all 9 mutants of the mask
+and schedule logic caught; 237 tests total, 0 failures.
 
-**Peaks came far earlier.** Best-30 peak step: 678k / 873k / 1718k / 3468k against batch 10's
-3402k / 4547k / 4064k / 1666k — mean **1.68M vs 3.42M**. Three of four batch-11 arms had already
-peaked before 1.8M, and then spent 1.5-2.5M further steps declining.
+### ‡ The shield alone is not enough — this is why the handover moved too
 
-This is not a speed advantage, and an earlier read of mine that said so was wrong. Measured properly
-— steps for the rolling best-30 to first reach 70% — batch 10 is if anything *faster*: median 653k
-against 913k. The "peaks came earlier" number was conflating *when the best window occurred* with
-*how fast the arm learned*, and `b10c` reaching 70% only at 4052k drags batch 10's mean while
-leaving its median untouched.
+A smoke run at the batch-12 config, `SEED=1` so it pairs with `b12a`, shield on, handover still at
+0.05. Mean trailing score per 50k band:
 
-**The decline was worse.** Mean drawdown from best-30 to the final window: **21.0 pp against
-16.9 pp**, and `b11a` gave up **42.4 pp** — from 85.7% at 678k to 43.3% at the end. Every arm in
-both batches declined, so this is the known post-peak failure mode rather than a new one, but batch
-11 hit it sooner and harder. With n=4 and this spread that is a hypothesis, not a finding.
+| band | smoke shielded | `b12a` unshielded | `b11a` near-zero eps |
+|---|---|---|---|
+| 200-250k | 79.6 | 83.8 | 84.9 |
+| 300-350k | 83.3 | 77.5 | 89.5 |
+| 350-400k | **82.8** | **74.2** | **90.9** |
+| pf30 @350k | 0.3% | 0.0% | **19.0%** |
+| trailing gained per 100k | 4.7 | negative | 11.1 |
 
-### What this suggests for the next batch
+**What the shield fixed:** the decay. `b12a` peaked at 214k and fell 83.8 → 74.2; the shielded arm
+was still rising at the same step. That is the failure mode that killed batch 12, and it is gone.
 
-**Three of four arms peaked before 1.8M, so most of a 10-hour run was spent watching arms get
-worse.** If that holds, a batch capped near 2M costs a third as much per arm and buys 3x the seeds
-in the same wall time — which is the only thing that fixes the ~10 pp resolution problem that made
-this batch's result unreadable. n=12 at 2M would detect ~5 pp. That is worth testing before
-spending another four slots on a knob whose effect is probably smaller than 10 pp.
+**What it did not fix:** perfect games. 2 perfect-game evals in 355 against `b12a`'s 41 by the same
+step, and it plateaus at trailing ~83 where the perfect rate is ~0. The curve is steeply nonlinear —
+trailing 83 → ~0% perfect, trailing 91 → 19% — so plateauing 8 points low costs everything.
 
+**Why.** A one-step mask prevents blunders, not *self-trapping*, and in a near-full board almost any
+deviation seals a region a few moves later. So the collect policy still never finishes a board, the
+buffer still holds no trajectories that eat the last ~10 food, and the greedy policy still cannot
+learn them. Perfect games are measured greedy, so this was never exploration killing the eval — it
+is the buffer missing completed endgames. **The shield makes exploration survivable without making
+the endgame completable.**
+
+Hence the handover drop to 0.0125: 0.83% forced non-greedy per step against 3.3%, close to the
+regime batch 11 proved. Keep the shield anyway — it costs nothing and removes the decay.
+
+Three things this write-up got wrong on the way, all worth remembering. The perfect rate was
+believed to be measured under epsilon, making the controller read its own noise — it is not, evals
+are greedy, so the proposed greedy probe episodes were **rejected as solving nothing**. A `-1e9`
+masked logit made the boxed-in fallback look redundant, because `tf.random.categorical` shifts each
+row by its maximum and so samples an all-masked row uniformly by accident; `-inf` makes the fallback
+load-bearing and testable. And the shield's one-step depth was flagged as an acceptable limitation
+when it is in fact the binding one.

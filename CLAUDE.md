@@ -189,12 +189,12 @@ and then say which ones are stopping and why.
 It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
 so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
 <change>` section with a stats line, a short reading, and the image. Captions for batches 1-10 are
-in `archive/batches1-10.md`, so check both:
+in `archive/batches1-11.md`, so check both:
 
 ```
 cd snek2/hyperparamTuning
 ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-10.md \
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md \
   | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 ```

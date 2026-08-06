@@ -237,22 +237,46 @@ or similar), which would have put `b11c` at ~1.6x while leaving the large arms u
 implemented. The fixed count is still right for *choosing* the champion — that is what the 97% recall
 figure above buys — it is only the saving that collapses.
 
-**Take the arm-level pooled rate from the equal-effort figure the run prints.** Do not pool the
+#### Taking the arm-level pooled rate
+
+**Take it from the equal-effort figure the run prints.** Do not pool the
 rows in the output file: they have different episode counts, and the deep ones are by construction
 the arm's best, so pooling them weights the winners 5x and reads high however good the policy is.
 The printed figure truncates every checkpoint to its first 20 episodes, which is a valid sample of
 each and lets the 100% tier count too. Best-checkpoint is taken over full-length rows only, since
 across hundreds of 20-episode screens some will read 19/20 on luck.
 
-**If the run did not print it, the equal-effort rate is gone — use the graph-100% tier instead.**
-The output file stores per-checkpoint totals, not per-episode results, so the first-20 prefix of a
-100-episode row cannot be reconstructed afterwards; `pooled_equal_effort` has to be computed in the
-process that ran the episodes. Batch 11's four close-outs predate that field and have no arm-level
-rate for exactly this reason. The usable fallback is to pool the **graph-100% tier only**: every
-checkpoint in it gets 100 episodes with no screening and no selection applied, in both protocols, so
-it is unbiased within itself and comparable across arms and across batches. It answers a narrower
-question — how good is a checkpoint the graph called perfect — and its episode counts are much
-smaller, but it is a real number rather than a biased one.
+**If the run did not print it, the equal-effort rate is gone — use the graph-100% tier instead,
+but only for a run measured without an abandonment gate.** The output file stores per-checkpoint
+totals, not per-episode results, so the first-20 prefix of a 100-episode row cannot be reconstructed
+afterwards; `pooled_equal_effort` has to be computed in the process that ran the episodes. Batch 11's
+four close-outs predate that field and have no arm-level rate for exactly this reason. The fallback is
+to pool the **graph-100% tier only**: with no gate, every checkpoint in it gets 100 episodes with no
+screening and no selection applied, so it is unbiased within itself and comparable across arms. It
+answers a narrower question — how good is a checkpoint the graph called perfect — and its episode
+counts are much smaller, but it is a real number rather than a biased one.
+
+**‡ `EVAL_MIN_ACHIEVABLE` destroys the graph-100% tier, and this was missed when the gate shipped.**
+The tier's whole claim is "no selection applied", and a gate *is* a selection: only tier members that
+clear the gate stay at 100 episodes, so the pooled figure is censored from below. Batch 14 makes the
+size of the artifact obvious:
+
+| arm | graph-100% tier, gated | batch 13's, ungated |
+|---|---|---|
+| seed 1 | 91.0% over 500 ep / 5 ckpts | 70.5% over 3100 ep / 31 ckpts |
+| seed 4 | 90.5% over 2800 ep / 28 ckpts | 77.2% over 4800 ep / 48 ckpts |
+
+That reads as +15.6 pp across the batch and means nothing — the tier shrank from 31-114 checkpoints
+per arm to 1-28, because the rest were abandoned. **Never compare a gated tier figure to an ungated
+one, and never quote a gated one at all.** `pooled_equal_effort` is the metric to use: it truncates
+to the screen depth, abandonment cannot fire before the floor, so it is exact at any gate. Check
+`min_achievable` in the payload before using the tier for anything.
+
+**The winner's-curse shrinkage is collateral damage from the same cause.** It was fitted on each
+arm's *unselected* graph-100% rows, and under a gate those rows are abandoned and downward-biased by
+optional stopping. A shrunk figure cannot be computed for a gated arm by the existing method. The
+substitute is a second independent 100-episode measurement of the champion, which is worth more
+anyway — see `b14a` in [`../hallOfFame/README.md`](../hallOfFame/README.md).
 
 **Ranking uses the screen rate, ties broken on the surrounding graph rate.** 20 episodes admit
 only 21 distinct values, so ties are the common case and the tie-break does real work — the

@@ -34,9 +34,10 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
-| **The record is 96%** (`b11b-obs30seed2` @855k, 30-value vector), ~94% after shrinkage | **measured**, 96/100 |
+| **The record is 96%**, held jointly by `b11b` @855k and `b14a` @3702k; both correct to ~94% | **measured**, 96/100 each; `b14a` re-measured 187/200 |
 | Two of the four record jumps came from the **horizon** and the **env audit**, not hyperparameters | **established** |
 | An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M | **established**, 2 arms to the end |
+| Arms peak by ~3.4M | **falsified** — 2 of batch 14's 4 peaked past 3.5M and `b14c` was still climbing at 4.5M; the old rule tracked where humans stopped arms |
 | The horizon was the binding constraint — records live past 2.5M, early arms stopped at ~1.06M | **established** |
 | Degradation after 236-312k is systemic across configs | **established**, 5 arms |
 | Arms recover from long zero stretches — `b8g` came back from 1.2M steps at zero | **established** |
@@ -47,7 +48,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 |---|---|
 | `DISCOUNT=0.995` matches the best ceiling and survives 3 of 3 seeds | **measured**, ~2.3x expected value |
 | Higher discount is monotonically better | **falsified** — 0.999 died 2 of 2 |
-| `0.995` vs `0.9975` on the current environment | **open**, n=2 each |
+| `0.995` vs `0.9975` on the current environment | **falsified as a difference** — batch 14 null vs 13, `pooled_equal_effort` +0.01 pp, n=4 paired |
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
 | `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
@@ -57,7 +58,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
 | Elevated exploration (handover 0.05) helps | **falsified** — batch 12 deadlocked, 0% perfect 4 of 4 |
 | Elevated exploration (handover 0.0125) helps | **falsified** — batch 13 null on **five** metrics, n=4 paired |
-| A one-step exploration shield helps | **open**, confounded — fixed batch 12's decay, nothing to fix at 0.0125 |
+| A one-step exploration shield helps | **open**, confounded twice — nothing to fix at 0.0125, and `GUIDED_FRACTION` 0.8 moved with the discount in batch 14 |
 | A seed number is a stable unit of quality across configs | **falsified** — batch 11's best seed became batch 13's worst |
 | The epsilon *ratchet* was a real defect | **standing**, on mechanism: no recovery from a collapse |
 
@@ -69,7 +70,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Abandoning a checkpoint eval early is not worth it | **falsified for an arithmetic rule** — 30% saved at an 85% achievability gate, 48% at the 90% gate shipped 2026-08-06; only the *predictive* version was 14% |
 | **n=4 cannot resolve an effect below ~10 pp**; 5 pp needs n≈17-37 depending on the metric | **established** |
 | 100-episode measurement reproduces within binomial noise | **established**, 51 repeats |
-| The max of N noisy measurements is upward-biased — shrink it before quoting it | **established** |
+| The max of N noisy measurements is upward-biased — shrink it before quoting it | **established** — `b14a`'s 96/100 re-measured 91/100, pooling to 93.5% |
+| The graph-100% tier is comparable across arms and batches | **falsified under a gate** — `EVAL_MIN_ACHIEVABLE` censors it from below; reads +15.6 pp on batch 14 as pure artifact |
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
@@ -79,7 +81,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 ---
 
-## The discount: an optimum near 0.995-0.9975, and it is still not settled
+## The discount: an optimum near 0.995-0.9975, and now a closed question
 
 The one hyperparameter that has reliably helped. Not monotone — the sweep has a peak and falls off
 hard on both sides:
@@ -95,14 +97,27 @@ hard on both sides:
 config: 28.2% mean level at 3 of 3 surviving, against `b4c`'s 37.1% at 1 of 3 (expected value 12.4%).
 The ceiling claim made for it originally would have been wrong — `0.9975` beats it there.
 
-**`0.995` vs `0.9975` remains open at n=2 each**, and batch 9 is why it stayed open: on the
-post-audit environment the two win *different* things. 0.995 had the better expected value (one
-0.9975 seed died at 328k), 0.9975 the steadier single arm (`b9a` pooled 54.9% with 18 of 20
-checkpoints above 40%). **The seed spread exceeded the effect** — batch 9's two 0.995 seeds were 18
-points apart on best checkpoint — which is the same resolution problem batch 11 later quantified.
+**`0.995` vs `0.9975` is settled on the current vector, and the answer is "no difference".**
+Batch 14 ran 0.9975 against batch 13's 0.995 at n=4 paired and came back null on every metric that
+survives its abandonment gate — `pooled_equal_effort` **72.08% against 72.07%**, best checkpoint
++2.75 pp at p=1.000, `best_perfect30` +1.08 pp at p=0.625. Write-up:
+[`completedRuns.md`](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet).
 
-**Stop sweeping upward.** Anything above 0.9975 is measured dead. The open question is between two
-adjacent values, or an interior point like 0.996, and it needs seeds rather than range.
+That closes the question batch 9 left open at n=2, and it closes it against a specific hypothesis
+worth recording as dead: **the 2026-08-03 endgame observations do not need a longer horizon to be
+usable.** The argument for re-asking was that following-tail (26-28), food-space (29) and
+reachable-tail (9-14) all describe structure 300+ steps out, while 0.995's effective horizon is ~200
+against a perfect game's ~1780. Measured, it makes no difference. **Do not re-ask at n=4.**
+
+Batch 9's reason for staying open still describes the shape of the problem: the two values won
+*different* things there (0.995 better expected value, one 0.9975 seed dead at 328k; 0.9975 the
+steadier single arm), and **the seed spread exceeded the effect** — batch 9's two 0.995 seeds were 18
+points apart on best checkpoint. Batch 14 is the same story with more arms: -16.2 to +24.8 pp per
+seed on the primary around a +2.05 pp mean.
+
+**Stop sweeping the discount.** Above 0.9975 is measured dead, 0.995 and 0.9975 are measured
+indistinguishable, and an interior point like 0.996 cannot plausibly differ from either by more than
+the ~10 pp n=4 can resolve. This is now a closed question, not a narrower one.
 
 Two process notes that came out of batch 9 and still apply:
 
@@ -113,7 +128,7 @@ Two process notes that came out of batch 9 and still apply:
   steps on `b10b`. Do not use a graph peak to decide where to look for a checkpoint.
 
 Per-batch tables: [`archive/findings-superseded.md`](archive/findings-superseded.md) and
-[`archive/batches1-10.md`](archive/batches1-10.md).
+[`archive/batches1-11.md`](archive/batches1-11.md).
 
 ## Graph evals are a filter, not a ranker
 
@@ -144,7 +159,25 @@ batches 10-11 found their best checkpoint in the 90% tier, which is ~4x larger. 
 underestimates.** They cannot be fixed by re-measuring — `b6a`'s best graph point in 1415 evals is
 50%, so the current thresholds yield nothing from it. The alpha comparison needs new seeds.
 
-## Two measurement caveats
+## Three measurement caveats
+
+**‡ An abandonment gate silently invalidates every pooled figure except `pooled_equal_effort`.**
+Learned on batch 14, the first batch measured under `EVAL_MIN_ACHIEVABLE=90`. The gate stops a
+checkpoint once its ceiling drops below 90%, which means every surviving full-length row is a
+*winner* — so any statistic pooled over "the rows that reached full length" is censored from below.
+Two casualties:
+
+| statistic | what the gate does to it |
+|---|---|
+| **graph-100% tier** | reads 90.3% on batch 14 against batch 13's 74.6%, a +15.6 pp artifact. Tier sizes fell from 31-114 checkpoints per arm to 1-28. **Unusable.** |
+| **winner's-curse shrinkage** | was fitted on each arm's *unselected* graph-100% rows; under a gate those rows are abandoned and biased low by optional stopping. **Not computable.** |
+| `pooled_equal_effort` | **exact at any gate** — it truncates every checkpoint to the 20-episode screen depth, and abandonment cannot fire before the floor |
+
+The reason this was easy to miss is that the gate's safety argument is about *rankings* — an
+abandoned row can never outrank a kept one, which is true — and says nothing about *pooling*. Check
+`min_achievable` in a payload before pooling anything from it, and never compare a gated figure to an
+ungated one. The substitute for shrinkage is a second independent 100-episode run on the champion,
+which is stronger evidence anyway: `b14a`'s 96/100 re-measured **91/100**, pooling to 93.5%.
 
 **Pooled rates only compare when the selection rule matches.** The rule has changed several times
 and the checkpoint count now varies per arm (1 to 660), so pooling over 16 checkpoints and over 1
@@ -402,7 +435,7 @@ project settles at a *measured* 0.0034-0.0039 over the back half of a run, so co
 of targets at n=2 against 0.53% at n=3 — no real difference. The upside scales with n: propagating
 the +100 perfect-game reward back across a ~1780-step game takes ~890 backups at n=2 and ~593 at
 n=3. With n=4 arms resolving only a clear win, the larger effect is the one worth a night. Design in
-[`runs.md`](runs.md#queued-batch-15--n-step-returns-at-n_step_update3-launch-once-batch-14s-evals-land).
+[`runs.md`](runs.md#ready-to-launch-batch-15--n-step-returns-at-n_step_update3).
 
 ## The record across four environments: 51% → 92% → 93% → **96%**
 
@@ -421,7 +454,7 @@ those observations, and its close-out came out +4 to +5 pp on three metrics with
 0.24 — consistent with a real effect and equally consistent with seed luck. A single record
 checkpoint is the weakest possible evidence for a config change, being the max of 204 noisy
 measurements in one arm; corrected for the winner's curse it is ~94%, against `b10d`'s ~87%.
-Write-up: [`completedRuns.md`](completedRuns.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
+Write-up: [`archive/batches1-11.md`](archive/batches1-11.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
 
 **Two of the four steps came from something other than hyperparameters** — the horizon, and the
 environment audit. That is the most useful pattern in this table, and it is why the standing backlog

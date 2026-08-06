@@ -1,16 +1,146 @@
-# Archive: batches 1-10
+# Archive: batches 1-11
 
-Per-batch write-ups and chart captions for the ten batches before the current baseline.
-Moved out of `completedRuns.md` and `charts.md` in three passes: batches 1-8 on
+Per-batch write-ups and chart captions for the eleven batches before the current baseline.
+Moved out of `completedRuns.md` and `charts.md` in four passes: batches 1-8 on
 2026-08-04, then batches 9 and 10 on 2026-08-05 once batch 13 established batch 11 as the
-baseline every future comparison runs against. Batch 10's checkpoints no longer load on
-`master` either — `450e66e` is the last commit with the 26-value vector. **Historical record — not
-meant to be read into context.** See [`README.md`](README.md).
+baseline every future comparison runs against, then **batch 11 itself on 2026-08-06**, once
+batches 13 and 14 had both come back null against it and the live docs held three narratives for
+one unchanged answer. Batch 10's checkpoints no longer load on `master` either — `450e66e` is the
+last commit with the 26-value vector. **Historical record — not meant to be read into context.**
+See [`README.md`](README.md).
+
+**Batch 11 is still the live 0.995 control**, and archiving its narrative does not retire it: its
+per-arm numbers stay in the canonical table, its pooled n=8 with batch 13 is what batch 15 measures
+against, and `b11b-obs30seed2` still holds the best selected checkpoint on record. What moved here is
+the write-up, because batch 13's and batch 14's close-outs now state the same conclusion more
+usefully.
 
 The one-line-per-arm ranking for every batch, including these, stays in
 [`../completedRuns.md`](../completedRuns.md) — that table is canonical and was not moved.
 
 ## From completedRuns.md
+
+## Batch 11 — the same config on the 30-value vector: no significant difference
+
+**Launched 2026-08-03 22:55, all four stopped 2026-08-04 09:09** by request — 10h14m, 3.19-3.59M
+steps per arm (~330k/arm/hour). Four seeds of batch 10's config, byte for byte
+(`SNEK_DISCOUNT=0.995 SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`),
+on the 30-value observation vector. The **first seeded batch** in this project — `SNEK_SEED=1..4`,
+recorded in each `runs/<policy>.md`. The only difference from batch 10 is the two observations added
+2026-08-03 (following-tail at 26-28, food-space at 29), verified by checking that no other
+training-relevant commit landed in between.
+
+| policy | final step | peak trailing | best-30 perfect | best-30 @3.185M | drawdown to final |
+|---|---|---|---|---|---|
+| `b11b-obs30seed2` ‡‡‡ | 3.56M | 94.92 @855k | **91.7%** @873k | **91.7%** | 18.0 pp |
+| `b11a-obs30seed1` ‡‡‡ | 3.19M | 94.82 @653k | 85.7% @678k | 85.7% | **42.4 pp** |
+| `b11d-obs30seed4` ‡‡‡ | 3.59M | 94.18 @3468k | 78.3% @3468k | 76.3% | 5.6 pp |
+| `b11c-obs30seed3` ‡‡‡ | 3.23M | 94.26 @2452k | 73.0% @1718k | 73.0% | 18.0 pp |
+
+### The pre-registered result: not significant
+
+Fixed before launch: best-30 perfect at a **common horizon**, not at each arm's final step. Batch 11
+turned out to be the shorter batch, so the horizon is **3.185M**.
+
+| batch | best-30 @3.185M | mean | sd |
+|---|---|---|---|
+| 10 (26-value) | 74.7 / 84.0 / 62.0 / 84.3 | 76.2% | 10.5 |
+| 11 (30-value) | 85.7 / 91.7 / 73.0 / 76.3 | **81.7%** | 8.6 |
+
+**+5.4 pp, SE 6.8, t=0.80 — not significant**, against a pre-registered threshold of ~10 pp. This is
+the outcome the design predicted, and it is recorded as a non-result rather than a lean. The two
+observations are kept under the pre-registered decision rule: keep unless clearly worse.
+
+`b11b`'s **91.7%** best-30 is the highest any arm in either batch reached, but that is n=1 out of
+eight arms and the batch means overlap heavily. Do not promote it to a finding.
+
+### The close-out agrees with the pre-registration, on two more metrics
+
+All four close-outs finished 2026-08-04 — 1.7 to 2.9 hours of eval per arm, 9.1 hours of work in
+total across four parallel processes, 67,140 episodes. They add two *measured* comparisons to the
+graph-based one, and all three land in the same place: batch 11 ahead by 4-5 pp, none of it
+significant at n=4.
+
+| metric | batch 10 | batch 11 | difference | exact p (one-sided) |
+|---|---|---|---|---|
+| best-30 @3.185M horizon (pre-registered) | 76.2% | 81.7% | **+5.4 pp** | 0.243 |
+| graph-100% tier rate, 100 episodes each | 70.6% | 74.7% | **+4.1 pp** | 0.143 |
+| best checkpoint, 100 episodes | 86.8% | 91.2% | **+4.5 pp** | 0.157 |
+
+Per arm, paired by rank within its batch:
+
+| rank | batch 11 arm | best ckpt | tier rate | tier n | batch 10 arm | best ckpt | tier rate | tier n |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `b11b` | **96%** @855k | **81.0%** | 104 | `b10d` | 93% @1695k | 75.7% | 146 |
+| 2 | `b11a` | 94% @671k | 79.5% | 48 | `b10b` | 90% @1501k | 72.9% | 142 |
+| 3 | `b11d` | 88% @3507k | 69.3% | 40 | `b10a` | 85% @2344k | 68.7% | 47 |
+| 4 | `b11c` | 87% @1706k | 69.0% | 23 | `b10c` | 79% @3965k | 65.1% | 7 |
+
+Batch 11 is ahead at every rank on both columns, which shows the +4 to +5 pp more usefully than the
+means do: it is not one lucky arm carrying the batch. The pairing is presentational — nothing links
+`b11b` to `b10d` beyond each being its batch's best — so this is not a paired test, and the
+permutation p-values above are the unpaired ones.
+
+The p-values are exact permutation tests over all 70 ways to split eight arms 4-and-4, which is the
+right test here: the unit of analysis is the arm, not the checkpoint, because checkpoints within an
+arm share a training trajectory and are nowhere near independent. Pooling 2205 checkpoint
+measurements would give a tiny p-value answering a question nobody asked.
+
+**Three metrics agreeing on +4 to +5 pp is worth more than any one of them, and still is not
+significance.** They are *not* independent — all three read the same eight training runs, and the
+measured pair comes from the same eval data — so this is one piece of evidence looked at three ways,
+not three. What the agreement does buy is that the sign is not an artefact of which metric was
+chosen, since the graph metric and the measured ones disagree badly in general (`b5c` is 2nd of its
+batch by graph and last by measurement). It raises the odds the effect is real and positive rather
+than zero; it cannot separate +5 pp from +1 pp, which is the resolution the design lacked from the
+start. The pre-registered decision rule stands: the observations are kept.
+
+#### A new best measured checkpoint: `b11b` @855000, 96/100
+
+The highest single-checkpoint measurement in the project, ahead of `b10d`'s 93% @1695000, and
+preserved in [`../hallOfFame/`](../../hallOfFame/README.md).
+
+**Corrected for the winner's curse it is ~94%.** It is the maximum of 204 full-length measurements
+in its own arm, so some of the 96 is luck. Fitting a Beta prior by moment-matching on `b11b`'s 104
+*unselected* graph-100% rows — Beta(12.4, 2.9), mean 81.0%, true-rate sd 9.7 pp — shrinks 96% to
+**94.0%**. That is a much smaller correction than `b10d`'s 95% → ~87%, for two reasons: the
+measurement is 100 episodes rather than 30, and this arm's true-rate spread is wide enough that a
+high observation is more plausibly real.
+
+Fitting the prior on the *selected* full-length rows instead would have given 93.5%, and that
+number would have been too generous — those rows were chosen for screening well, so their mean is
+inflated and the prior pulls less. The unselected tier is the only clean prior available.
+
+**Two of the four arms' best checkpoints came from the graph-90% tier**, `b11b` @855k among them
+(its graph point read 90, not 100). In batch 10 it was all four. The pattern in
+[`hyperparamTuning.md`](../hyperparamTuning.md) holds: the 100% tier is a coverage guarantee, not a
+shortlist of champions, and the confirm stage is what actually finds the best checkpoint.
+
+### Two things that did differ, and neither was predicted
+
+**Peaks came far earlier.** Best-30 peak step: 678k / 873k / 1718k / 3468k against batch 10's
+3402k / 4547k / 4064k / 1666k — mean **1.68M vs 3.42M**. Three of four batch-11 arms had already
+peaked before 1.8M, and then spent 1.5-2.5M further steps declining.
+
+This is not a speed advantage, and an earlier read of mine that said so was wrong. Measured properly
+— steps for the rolling best-30 to first reach 70% — batch 10 is if anything *faster*: median 653k
+against 913k. The "peaks came earlier" number was conflating *when the best window occurred* with
+*how fast the arm learned*, and `b10c` reaching 70% only at 4052k drags batch 10's mean while
+leaving its median untouched.
+
+**The decline was worse.** Mean drawdown from best-30 to the final window: **21.0 pp against
+16.9 pp**, and `b11a` gave up **42.4 pp** — from 85.7% at 678k to 43.3% at the end. Every arm in
+both batches declined, so this is the known post-peak failure mode rather than a new one, but batch
+11 hit it sooner and harder. With n=4 and this spread that is a hypothesis, not a finding.
+
+### What this suggests for the next batch
+
+**Three of four arms peaked before 1.8M, so most of a 10-hour run was spent watching arms get
+worse.** If that holds, a batch capped near 2M costs a third as much per arm and buys 3x the seeds
+in the same wall time — which is the only thing that fixes the ~10 pp resolution problem that made
+this batch's result unreadable. n=12 at 2M would detect ~5 pp. That is worth testing before
+spending another four slots on a knob whose effect is probably smaller than 10 pp.
+
 
 ## Batch 10 — a fresh baseline, and a new project record
 
@@ -57,7 +187,7 @@ horizon, which is suggestive but not the isolating comparison a future batch wou
 the claim safely.
 
 Both champion checkpoints are preserved in
-[`../hallOfFame/`](../../hallOfFame/README.md#the-current-record-96-and-it-runs-on-master).
+[`../hallOfFame/`](../../hallOfFame/README.md#the-current-record-two-checkpoints-at-96-both-94-corrected-both-on-master).
 
 ## Batch 9 — 0.995 against 0.9975 on the post-audit environment
 
@@ -422,6 +552,88 @@ backlog. Note this arm was stopped at 104k, well short of the judgeable horizon,
 both readings are weak.
 
 ## From charts.md
+
+## Batch 11 — the same config on the 30-value vector
+
+Four seeds of batch 10's config, byte for byte, on the observation vector after the following-tail
+and food-space blocks landed. **A deliberate null-result test**: the only difference from batch 10
+is those two observations, and the comparison was pre-registered before launch. It came back
+**+5.4 pp at t=0.80 — not significant** against a ~10 pp threshold, and the close-out added two
+measured comparisons that came out the same way (+4.1 pp on the graph-100% tier, +4.5 pp on best
+checkpoint; exact p = 0.14 and 0.16). The first seeded batch (`SNEK_SEED=1..4`). Full write-up:
+[`completedRuns.md`](#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference).
+
+Read these four charts for their *shape*, not their level: three of the four peaked before 1.8M and
+then declined for another 1.5-2.5M steps, which is the most useful thing batch 11 produced. The
+close-out puts numbers on what that cost — in all four arms the best measured checkpoint lands
+**within 39k steps of the graph's best-30 peak**, so nothing in the declining tail contributed to any
+of the four records.
+
+**That agreement is a batch-11 property, not a general rule**, and it would be easy to over-read.
+Batch 10's gaps are -1058k, -3046k, -99k and +29k — `b10b`'s best checkpoint came at 1501k while its
+graph peaked at 4547k. The difference is chart shape: batch 11's arms have one sharp peak, so the
+graph's best window and the best individual checkpoint have nowhere else to be, whereas batch 10's
+broad plateaus let the two land 3M apart. **Do not use a graph peak to decide where to look for a
+checkpoint** — that is what the close-out is for.
+
+### b11b-obs30seed2 — `DISCOUNT=0.995`, 30-value vector, seed 2
+
+![b11b](../charts/b11b-obs30seed2.png)
+
+Step 3.56M · peak score 94.92 (at 855k) · **best 30-eval perfect 91.7%** (at 873k) · **best ckpt 96%** @855k
+
+**The best arm in the project on both metrics**: the highest best-30 any arm has reached, and the
+highest single-checkpoint measurement (96/100, CI 90.2-98.4, ~94% after the winner's-curse
+correction). Both peaks are in the same place — the graph tops out at 855k and the record checkpoint
+*is* 855k, which is the tidiest agreement between graph and measurement in this file.
+
+Also n=1 of eight arms across the two batches, with the batch means overlapping heavily — a
+high-water mark, not a finding. Gave up 18 pp from that peak by the time it was stopped.
+
+### b11a-obs30seed1 — `DISCOUNT=0.995`, 30-value vector, seed 1
+
+![b11a](../charts/b11a-obs30seed1.png)
+
+Step 3.19M · peak score 94.82 (at 653k) · **best 30-eval perfect 85.7%** (at 678k) · best ckpt 94% @671k
+
+**The clearest picture of the post-peak decline in the project so far.** 85.7% at 678k down to
+43.3% by 3.19M — a **42.4 pp** drawdown, the largest on record, with no death event: the arm never
+went to zero, it just got steadily worse for 2.5M steps.
+
+Its record checkpoint sits at 671k, inside that early peak, and measures 94% — so the decline cost
+this arm a policy it had already found rather than one it never reached. That is the case for the
+shorter, wider batch design in [`runs.md`](../runs.md) stated as concretely as it gets.
+
+### b11d-obs30seed4 — `DISCOUNT=0.995`, 30-value vector, seed 4
+
+![b11d](../charts/b11d-obs30seed4.png)
+
+Step 3.59M · peak score 94.18 (at 3468k) · **best 30-eval perfect 78.3%** (at 3468k) · best ckpt 88% @3507k
+
+The one arm still near its peak when stopped, and the reason not to cap the next batch at 2M
+without hedging: it peaked at 3468k, where the other three peaked before 1.8M. A short cap would
+have truncated this arm before its best work.
+
+Its record checkpoint is at 3507k — the last 100k steps of the run, and the only arm in either batch
+whose best measured checkpoint came from its final stretch. Whether it was still improving or had
+just arrived at its ceiling is unanswerable now; it is the batch's one genuinely open question.
+
+### b11c-obs30seed3 — `DISCOUNT=0.995`, 30-value vector, seed 3
+
+![b11c](../charts/b11c-obs30seed3.png)
+
+Step 3.23M · peak score 94.26 (at 2452k) · **best 30-eval perfect 73.0%** (at 1718k) · best ckpt 87% @1706k
+
+Weakest of the batch, and the illustration of why n=4 cannot settle a 5 pp question: 73.0% against
+`b11b`'s 91.7% on an identical config differing only in seed. The measured gap is narrower — 87%
+against 96% — because a best-checkpoint figure asks what the arm managed once, and a best-30 asks
+whether it could hold it.
+
+The one arm whose close-out degenerated: only 87 checkpoints screened, against an
+`EVAL_CONFIRM_COUNT` of 100, so every screened checkpoint was confirmed anyway and the screen was
+pure overhead. See the note in [`hyperparamTuning.md`](../hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
+
+---
 
 ## Batch 9 — two discounts on the post-audit environment
 
