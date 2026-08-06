@@ -11,7 +11,7 @@ the only place that reflects which.
 
 | file | what is in it |
 |---|---|
-| [`batches1-9.md`](batches1-9.md) | per-batch write-ups and chart captions for batches 1-9 |
+| [`batches1-10.md`](batches1-10.md) | per-batch write-ups and chart captions for batches 1-10 |
 | [`findings-superseded.md`](findings-superseded.md) | findings about replaced observation vectors, and batch 1-8 config results later settled |
 
 ## What was kept live instead

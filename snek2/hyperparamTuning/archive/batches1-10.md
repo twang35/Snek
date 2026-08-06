@@ -1,14 +1,102 @@
-# Archive: batches 1-9
+# Archive: batches 1-10
 
-Per-batch write-ups and chart captions for the nine batches before the current baselines.
-Moved out of `completedRuns.md` and `charts.md` on 2026-08-04; batch 9 followed on 2026-08-05,
-once batch 12 made batches 10-12 the only ones still worth loading. **Historical record — not
+Per-batch write-ups and chart captions for the ten batches before the current baseline.
+Moved out of `completedRuns.md` and `charts.md` in three passes: batches 1-8 on
+2026-08-04, then batches 9 and 10 on 2026-08-05 once batch 13 established batch 11 as the
+baseline every future comparison runs against. Batch 10's checkpoints no longer load on
+`master` either — `450e66e` is the last commit with the 26-value vector. **Historical record — not
 meant to be read into context.** See [`README.md`](README.md).
 
 The one-line-per-arm ranking for every batch, including these, stays in
 [`../completedRuns.md`](../completedRuns.md) — that table is canonical and was not moved.
 
 ## From completedRuns.md
+
+## Batch 10 — a fresh baseline, and a new project record
+
+**Launched 2026-08-02, all four stopped 2026-08-03** by request, healthy, to make room for
+further changes — not because any of them died or declined. Seven observation/reward changes
+had landed the same day batch 10 launched (fatal-move zeroing, wall/body hugging, normalized
+group count, the corrected starve/length split, the terminal-discount fix, safe-to-chase-food,
+and the audit that started the day), on top of the audit that already made batch 9 incomparable
+to batch 8. Nothing had trained on the resulting environment at all, so batch 10 was deliberately
+four seeds of **one** config — `DISCOUNT=0.995`, the most reliably-surviving value on record (3 of
+3 in batch 7, 2 of 2 in batch 9) — rather than another comparison, on the reasoning that comparing
+two things before either has a baseline on the actual environment being measured just repeats
+batch 9's own lesson at one remove. Shared base for all four:
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
+
+| policy | final step | peak trailing | best-30 perfect | best ckpt (mid-run eval) | top-3 | pooled | outcome |
+|---|---|---|---|---|---|---|---|
+| `b10a-disc995seed1` | 4.29M | 94.4 @3402k | 78.3% @3402k | close-out eval pending | — | — | stopped healthy |
+| `b10b-disc995seed2` | 4.65M | 94.96 @4545k | 85.0% @4547k | 87% @1157k | 86.3% | 70.4%/12000 | stopped healthy, 2nd-best |
+| `b10c-disc995seed3` | 4.12M | 93.8 @4021k | 72.7% @4064k | close-out eval pending | — | — | stopped healthy |
+| `b10d-disc995seed4` | 4.45M | 94.7 @3978k | 84.3% @1666k | **95%** @1815k | **93.3%** | **74.5%/24600** | stopped healthy, **project record** |
+
+**All four were still healthy when stopped** — no `dead_since`/`zero_since` on any of them, and
+two (`b10b`, `b10c`) were at or near their own peak trailing score *at the moment they were
+stopped*, not declining from an earlier peak the way every record-setting arm before this batch
+was. That is a first for this project: every previous best-checkpoint arm (`b8f`, `b8d`, `b9d`)
+had already peaked and was declining by the time it was measured or stopped.
+
+**`b10d`'s 95% (CI 88.8-97.8, 246 checkpoints cleared the ≥90% tier) is the best figure this
+project has produced on any environment**, ahead of the pre-audit record of 92% (`b8f`
+`ckpt2816000`, no longer reproducible — see the hall of fame) and far ahead of the previous
+post-audit best of 82% (`b8f` `ckpt3149000`, also no longer reproducible after this session's
+seven fixes). Both `b10b`'s and `b10d`'s measurements were taken **mid-run** — each arm kept
+training for another ~2.5-2.9M steps afterward, up to a final step neither eval's checkpoint
+range covered — so a full close-out re-measurement across each arm's complete checkpoint history
+may move these numbers further; see [`runs.md`](../runs.md) for whether that has happened yet.
+
+**Not yet established: whether this is the config or the environment.** Batch 10 deliberately
+ran one config, so it cannot separate "the seven 2026-08-02 fixes made training better" from
+"this seed cluster happened to be strong" — n=4 on one value is enough to trust as a baseline,
+not enough to attribute the gain. Both `b10d` (95%) and `b10b` (87%) comfortably clear the old
+82% ceiling, and `b10a`/`b10c` graph-eval no worse than batch 9's arms did at a comparable
+horizon, which is suggestive but not the isolating comparison a future batch would need to make
+the claim safely.
+
+Both champion checkpoints are preserved in
+[`../hallOfFame/`](../../hallOfFame/README.md#the-current-record-96-and-it-runs-on-master).
+
+## Batch 9 — 0.995 against 0.9975 on the post-audit environment
+
+**Launched 2026-08-02 00:41, all four stopped the same day.** The first batch trained on the
+environment left by the observation/reward audit, so **none of its numbers are comparable to any
+batch above it** — the same checkpoint that scored 92% pre-audit reads 73% here. Shared base
+`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
+
+| policy | discount | final step | peak trailing | best30 | **best eval'd ckpt** | top-3 | pooled | outcome |
+|---|---|---|---|---|---|---|---|---|
+| `b9a-disc9975a` | 0.9975 | 3.68M | **89.8** @3277k | **56.0%** @1738k | 65.0% @1735k | 64.3% | **54.9%** /2000 | survived |
+| `b9b-disc9975b` | 0.9975 | **10.47M** | 72.1 @**328k** | 5.0% @221k | not measured | — | — | **dead** |
+| `b9c-disc995a` | 0.995 | 3.71M | 86.5 @3573k | 37.3% @2608k | 52.0% @2603k | 51.3% | 38.0% /2000 | survived |
+| `b9d-disc995b` | 0.995 | 3.45M | 86.7 @1232k | 30.3% @1324k | **70.0%** @2544k | **66.3%** | 42.4% /1700 | survived |
+
+**Why the batch was shaped this way.** The queued plan had two 0.9975 seeds plus `0.996` and
+`LEARNING_RATE=1e-4`, resting on 0.995 having survived 3 of 3 — but that was measured pre-audit and
+was void, so as written the batch had no 0.995 arm and could not settle the question it existed for.
+Four arms on two values answers one question properly instead of three partially. `0.996` and the
+learning rate stayed deferred.
+
+**Outcome: the candidates win different things and the question is still open.** Ceiling and top-3
+go to 0.995 (`b9d` at 70% / 66.3%), consistency to 0.9975 (`b9a` pools 54.9% with 18 of 20
+checkpoints above 40%), and survival to 0.995 at 2 of 2 against 1 of 2. Survival dominates expected
+value — mean top-3 across seeds is **58.8% for 0.995** against **32.2% for 0.9975** — but the two
+0.995 seeds are **18 points apart** on best checkpoint, so seed spread still exceeds the effect.
+
+**`b9b` is the clearest overrun failure in the file.** It peaked at step **328k**, before any sibling
+had warmed up, then ran a further 10.1M steps producing nothing, `zero_since` 9.92M. It did that
+overnight with nobody watching, which is the entire argument for the 3-3.5M stop rule rather than
+stopping by inspection.
+
+**The three survivors were measured while still training**, at 3.4-3.7M, so their close-outs are
+mid-run. `b9c` was still climbing when stopped — peak trailing at 3573k, its last few hundred
+thousand steps — so it is the one arm here that might have had more to give.
+
+**Batch 9's best checkpoint (70%) is below `b8f`'s re-measured 82%.** Nothing trained after the audit
+yet beats something trained before it, at a comparable horizon. One batch, and not a verdict, but
+recorded because it is the opposite of what the fixes were meant to buy.
 
 ## Batch 8 — the discount optimum, gradient clipping, and the arm lifetime
 
@@ -403,6 +491,54 @@ Its trailing average peaked at **1232k** and had fallen to 49.4 by 3.4M, while i
 checkpoint is at 2544k — the graph and the measurement disagree about when this arm was good.
 
 ![b9d-disc995b progress](../charts/b9d-disc995b.png)
+
+---
+
+## Batch 10 — the fresh baseline on the third environment
+
+Four seeds of `DISCOUNT=0.995`, the first arms to train end-to-end on the environment left by
+2026-08-02's seven fixes. **Every arm was stopped healthy rather than dying or declining to a
+stop** — a first for this project — and it held the best measured checkpoint on record (93%) until
+batch 11's close-out beat it with 96%. These four are the control batch 11 is compared against.
+Their checkpoints **no longer load on `master`**: `450e66e` is the last commit with the 26-value
+vector.
+
+### b10d-disc995seed4 — `DISCOUNT=0.995`, third env, seed 4
+
+![b10d](../charts/b10d-disc995seed4.png)
+
+Step 4.45M · peak score 94.74 (at 3978k) · best 30-eval perfect 84.3% (at 1666k) · **best measured checkpoint 93%** (at 1695k), pooled **74.9%** /66000
+
+**The best measured checkpoint in the project.** A mid-run eval had read 95% at 1815k; the full
+close-out found 93% at 1695k instead, and the two intervals overlap almost entirely — the same
+policy family measured twice, not a record and a near-miss. Treat ~87% as the honest estimate of
+the underlying rate once the winner's curse is accounted for.
+
+### b10b-disc995seed2 — `DISCOUNT=0.995`, third env, seed 2
+
+![b10b](../charts/b10b-disc995seed2.png)
+
+Step 4.65M · peak score 94.96 (at 4545k) · **best 30-eval perfect 85.0%** (at 4547k) · best measured checkpoint 90% (at 1501k), pooled 71.8% /62400
+
+Still climbing when it was stopped — peak trailing score at 4545k out of 4652k run. Its ceiling is
+unknown and, because the vector has since changed, unknowable: this arm cannot be resumed.
+
+### b10a-disc995seed1 — `DISCOUNT=0.995`, third env, seed 1
+
+![b10a](../charts/b10a-disc995seed1.png)
+
+Step 4.29M · peak score 94.38 (at 3402k) · best 30-eval perfect 78.3% (at 3402k) · best measured checkpoint 85% (at 2344k), pooled 67.2% /27200
+
+### b10c-disc995seed3 — `DISCOUNT=0.995`, third env, seed 3
+
+![b10c](../charts/b10c-disc995seed3.png)
+
+Step 4.12M · peak score 93.84 (at 4021k) · best 30-eval perfect 72.7% (at 4064k) · best measured checkpoint 79% (at 3965k), pooled 63.0% /4700
+
+Weakest of batch 10, and the arm whose close-out selected only 47 checkpoints where `b10d` selected
+660 — the selector's own read on how much of a run is worth measuring.
+
+---
 
 ---
 

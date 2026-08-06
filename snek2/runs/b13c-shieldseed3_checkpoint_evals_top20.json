@@ -1,0 +1,8118 @@
+{
+  "policy_name": "b13c-shieldseed3",
+  "episodes_per_checkpoint": 100,
+  "checkpoints_requested": 404,
+  "num_workers": 10,
+  "complete": true,
+  "requested_steps": [
+    796000,
+    840000,
+    850000,
+    866000,
+    905000,
+    907000,
+    916000,
+    917000,
+    920000,
+    926000,
+    932000,
+    961000,
+    967000,
+    977000,
+    1009000,
+    1020000,
+    1025000,
+    1028000,
+    1041000,
+    1222000,
+    1231000,
+    1235000,
+    1318000,
+    1330000,
+    1339000,
+    1340000,
+    1415000,
+    1420000,
+    1423000,
+    1441000,
+    1496000,
+    1503000,
+    1548000,
+    1553000,
+    1559000,
+    1577000,
+    1592000,
+    1593000,
+    1597000,
+    1644000,
+    1647000,
+    1659000,
+    1668000,
+    1675000,
+    1697000,
+    1700000,
+    1710000,
+    1714000,
+    1723000,
+    1730000,
+    1797000,
+    1806000,
+    1809000,
+    1811000,
+    1813000,
+    1822000,
+    1831000,
+    1835000,
+    1838000,
+    1841000,
+    1844000,
+    1851000,
+    1864000,
+    1872000,
+    1876000,
+    1881000,
+    1889000,
+    1890000,
+    1901000,
+    1929000,
+    1932000,
+    1936000,
+    1937000,
+    1949000,
+    1958000,
+    1960000,
+    1961000,
+    1968000,
+    1972000,
+    1976000,
+    1986000,
+    1987000,
+    1989000,
+    1991000,
+    1995000,
+    1996000,
+    1998000,
+    2000000,
+    2002000,
+    2012000,
+    2015000,
+    2019000,
+    2024000,
+    2025000,
+    2035000,
+    2038000,
+    2041000,
+    2045000,
+    2047000,
+    2048000,
+    2051000,
+    2053000,
+    2055000,
+    2057000,
+    2060000,
+    2061000,
+    2066000,
+    2075000,
+    2078000,
+    2079000,
+    2086000,
+    2088000,
+    2090000,
+    2092000,
+    2097000,
+    2103000,
+    2114000,
+    2121000,
+    2123000,
+    2129000,
+    2134000,
+    2139000,
+    2141000,
+    2172000,
+    2178000,
+    2181000,
+    2182000,
+    2185000,
+    2186000,
+    2191000,
+    2193000,
+    2208000,
+    2216000,
+    2251000,
+    2256000,
+    2264000,
+    2266000,
+    2277000,
+    2295000,
+    2343000,
+    2346000,
+    2353000,
+    2354000,
+    2357000,
+    2359000,
+    2361000,
+    2378000,
+    2379000,
+    2382000,
+    2383000,
+    2385000,
+    2390000,
+    2392000,
+    2393000,
+    2397000,
+    2401000,
+    2402000,
+    2404000,
+    2406000,
+    2410000,
+    2413000,
+    2416000,
+    2418000,
+    2419000,
+    2420000,
+    2430000,
+    2432000,
+    2438000,
+    2444000,
+    2471000,
+    2481000,
+    2490000,
+    2492000,
+    2497000,
+    2507000,
+    2511000,
+    2512000,
+    2513000,
+    2516000,
+    2518000,
+    2519000,
+    2521000,
+    2535000,
+    2536000,
+    2545000,
+    2549000,
+    2551000,
+    2556000,
+    2559000,
+    2563000,
+    2567000,
+    2576000,
+    2579000,
+    2580000,
+    2591000,
+    2597000,
+    2599000,
+    2605000,
+    2618000,
+    2626000,
+    2627000,
+    2650000,
+    2657000,
+    2667000,
+    2668000,
+    2682000,
+    2684000,
+    2690000,
+    2699000,
+    2700000,
+    2702000,
+    2707000,
+    2708000,
+    2717000,
+    2724000,
+    2731000,
+    2735000,
+    2737000,
+    2747000,
+    2748000,
+    2779000,
+    2781000,
+    2789000,
+    2793000,
+    2804000,
+    2807000,
+    2816000,
+    2820000,
+    2821000,
+    2822000,
+    2823000,
+    2825000,
+    2828000,
+    2831000,
+    2835000,
+    2837000,
+    2839000,
+    2841000,
+    2842000,
+    2846000,
+    2847000,
+    2850000,
+    2851000,
+    2853000,
+    2855000,
+    2856000,
+    2859000,
+    2863000,
+    2864000,
+    2865000,
+    2868000,
+    2871000,
+    2878000,
+    2881000,
+    2882000,
+    2883000,
+    2885000,
+    2887000,
+    2889000,
+    2891000,
+    2892000,
+    2896000,
+    2901000,
+    2909000,
+    2923000,
+    2925000,
+    2926000,
+    2927000,
+    2928000,
+    2931000,
+    2937000,
+    2938000,
+    2955000,
+    2972000,
+    2979000,
+    2992000,
+    2993000,
+    2996000,
+    2998000,
+    3004000,
+    3007000,
+    3015000,
+    3024000,
+    3038000,
+    3070000,
+    3076000,
+    3078000,
+    3084000,
+    3087000,
+    3088000,
+    3090000,
+    3092000,
+    3093000,
+    3099000,
+    3100000,
+    3104000,
+    3105000,
+    3109000,
+    3112000,
+    3117000,
+    3132000,
+    3134000,
+    3136000,
+    3140000,
+    3150000,
+    3152000,
+    3153000,
+    3155000,
+    3156000,
+    3160000,
+    3161000,
+    3166000,
+    3171000,
+    3173000,
+    3175000,
+    3178000,
+    3181000,
+    3182000,
+    3183000,
+    3184000,
+    3187000,
+    3188000,
+    3190000,
+    3191000,
+    3205000,
+    3218000,
+    3220000,
+    3223000,
+    3224000,
+    3234000,
+    3236000,
+    3239000,
+    3240000,
+    3241000,
+    3244000,
+    3246000,
+    3248000,
+    3252000,
+    3253000,
+    3257000,
+    3269000,
+    3284000,
+    3296000,
+    3300000,
+    3308000,
+    3309000,
+    3314000,
+    3319000,
+    3331000,
+    3340000,
+    3342000,
+    3347000,
+    3352000,
+    3360000,
+    3367000,
+    3368000,
+    3374000,
+    3377000,
+    3380000,
+    3388000,
+    3390000,
+    3391000,
+    3392000,
+    3394000,
+    3396000,
+    3399000,
+    3400000,
+    3410000,
+    3411000,
+    3414000,
+    3416000,
+    3417000,
+    3421000,
+    3422000,
+    3426000,
+    3427000,
+    3432000,
+    3437000,
+    3441000,
+    3443000,
+    3444000,
+    3452000,
+    3457000,
+    3460000,
+    3471000,
+    3497000,
+    3515000,
+    3520000,
+    3523000,
+    3526000,
+    3532000,
+    3533000,
+    3536000,
+    3538000,
+    3541000,
+    3548000,
+    3555000,
+    3622000,
+    3652000,
+    3656000,
+    3666000,
+    3668000,
+    3669000,
+    3674000
+  ],
+  "screen_episodes": 20,
+  "confirm_count": 100,
+  "measurements_planned": 504,
+  "measurements_done": 504,
+  "session_measurements": 504,
+  "session_episodes": 25200,
+  "session_seconds": 25081.1,
+  "stage": "confirm",
+  "pooled_equal_effort": 73.18,
+  "stages": {
+    "full": {
+      "planned": 114,
+      "done": 114
+    },
+    "screen": {
+      "planned": 290,
+      "done": 290
+    },
+    "confirm": {
+      "planned": 100,
+      "done": 100
+    }
+  },
+  "episodes_planned": 25200,
+  "episodes_done": 25200,
+  "in_flight": null,
+  "updated_at": 1785972433.7349372,
+  "results": [
+    {
+      "step": 796000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 41.0,
+      "episodes": 100,
+      "perfect_games": 43,
+      "perfect_percent": 43.0,
+      "perfect_ci95": [
+        33.7,
+        52.8
+      ],
+      "avg_score": 91.81,
+      "median_score": 94.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 132.89,
+      "seconds": 55.5
+    },
+    {
+      "step": 840000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 60.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 88.4,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 151.31,
+      "seconds": 9.7
+    },
+    {
+      "step": 850000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 53.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 94.05,
+      "median_score": 95.0,
+      "min_score": 90.0,
+      "max_score": 95.0,
+      "avg_reward": 162.1,
+      "seconds": 9.9
+    },
+    {
+      "step": 866000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 57.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 93.75,
+      "median_score": 95.0,
+      "min_score": 89.0,
+      "max_score": 95.0,
+      "avg_reward": 151.66,
+      "seconds": 9.1
+    },
+    {
+      "step": 905000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 58.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 92.17,
+      "median_score": 95.0,
+      "min_score": 35.0,
+      "max_score": 95.0,
+      "avg_reward": 159.55,
+      "seconds": 49.8
+    },
+    {
+      "step": 907000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 59.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 90.45,
+      "median_score": 95.0,
+      "min_score": 39.0,
+      "max_score": 95.0,
+      "avg_reward": 153.56,
+      "seconds": 9.9
+    },
+    {
+      "step": 916000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 91.95,
+      "median_score": 94.0,
+      "min_score": 67.0,
+      "max_score": 95.0,
+      "avg_reward": 140.47,
+      "seconds": 11.7
+    },
+    {
+      "step": 917000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 93.72,
+      "median_score": 95.0,
+      "min_score": 62.0,
+      "max_score": 95.0,
+      "avg_reward": 169.84,
+      "seconds": 30.8
+    },
+    {
+      "step": 920000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 89.6,
+      "median_score": 95.0,
+      "min_score": 42.0,
+      "max_score": 95.0,
+      "avg_reward": 158.13,
+      "seconds": 9.4
+    },
+    {
+      "step": 926000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 88.55,
+      "median_score": 95.0,
+      "min_score": 41.0,
+      "max_score": 95.0,
+      "avg_reward": 141.29,
+      "seconds": 8.8
+    },
+    {
+      "step": 932000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 63.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 91.9,
+      "median_score": 95.0,
+      "min_score": 64.0,
+      "max_score": 95.0,
+      "avg_reward": 150.01,
+      "seconds": 9.7
+    },
+    {
+      "step": 961000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 73.0,
+      "max_score": 95.0,
+      "avg_reward": 171.82,
+      "seconds": 8.6
+    },
+    {
+      "step": 967000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 62.0,
+      "episodes": 100,
+      "perfect_games": 51,
+      "perfect_percent": 51.0,
+      "perfect_ci95": [
+        41.3,
+        60.6
+      ],
+      "avg_score": 82.76,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 131.67,
+      "seconds": 49.1
+    },
+    {
+      "step": 977000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 89.0,
+      "median_score": 95.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 142.55,
+      "seconds": 10.4
+    },
+    {
+      "step": 1009000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 54.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.6,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 166.68,
+      "seconds": 9.3
+    },
+    {
+      "step": 1020000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.35,
+      "median_score": 95.0,
+      "min_score": 45.0,
+      "max_score": 95.0,
+      "avg_reward": 159.81,
+      "seconds": 10.2
+    },
+    {
+      "step": 1025000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 89.1,
+      "median_score": 95.0,
+      "min_score": 23.0,
+      "max_score": 95.0,
+      "avg_reward": 142.17,
+      "seconds": 12.2
+    },
+    {
+      "step": 1028000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 84.35,
+      "median_score": 95.0,
+      "min_score": 29.0,
+      "max_score": 95.0,
+      "avg_reward": 137.32,
+      "seconds": 9.2
+    },
+    {
+      "step": 1041000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 90.45,
+      "median_score": 95.0,
+      "min_score": 64.0,
+      "max_score": 95.0,
+      "avg_reward": 163.77,
+      "seconds": 9.2
+    },
+    {
+      "step": 1222000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 58.0,
+      "episodes": 100,
+      "perfect_games": 60,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        50.2,
+        69.1
+      ],
+      "avg_score": 92.84,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 150.94,
+      "seconds": 48.8
+    },
+    {
+      "step": 1231000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 94.0,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 167.57,
+      "seconds": 9.4
+    },
+    {
+      "step": 1235000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 61.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.85,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 151.22,
+      "seconds": 10.2
+    },
+    {
+      "step": 1318000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 47.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 91.1,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 144.38,
+      "seconds": 9.5
+    },
+    {
+      "step": 1330000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 60.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.95,
+      "median_score": 95.0,
+      "min_score": 89.0,
+      "max_score": 95.0,
+      "avg_reward": 161.85,
+      "seconds": 8.8
+    },
+    {
+      "step": 1339000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 67,
+      "perfect_percent": 67.0,
+      "perfect_ci95": [
+        57.3,
+        75.4
+      ],
+      "avg_score": 92.15,
+      "median_score": 95.0,
+      "min_score": 47.0,
+      "max_score": 95.0,
+      "avg_reward": 157.34,
+      "seconds": 50.7
+    },
+    {
+      "step": 1340000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 64,
+      "perfect_percent": 64.0,
+      "perfect_ci95": [
+        54.2,
+        72.7
+      ],
+      "avg_score": 92.09,
+      "median_score": 95.0,
+      "min_score": 29.0,
+      "max_score": 95.0,
+      "avg_reward": 154.05,
+      "seconds": 50.4
+    },
+    {
+      "step": 1415000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 55.0,
+      "episodes": 100,
+      "perfect_games": 64,
+      "perfect_percent": 64.0,
+      "perfect_ci95": [
+        54.2,
+        72.7
+      ],
+      "avg_score": 90.92,
+      "median_score": 95.0,
+      "min_score": 24.0,
+      "max_score": 95.0,
+      "avg_reward": 153.13,
+      "seconds": 49.7
+    },
+    {
+      "step": 1420000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 91.25,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 148.87,
+      "seconds": 10.1
+    },
+    {
+      "step": 1423000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 58.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 90.05,
+      "median_score": 95.0,
+      "min_score": 17.0,
+      "max_score": 95.0,
+      "avg_reward": 148.14,
+      "seconds": 10.4
+    },
+    {
+      "step": 1441000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 59.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 92.75,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 156.02,
+      "seconds": 9.9
+    },
+    {
+      "step": 1496000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 89.85,
+      "median_score": 94.5,
+      "min_score": 59.0,
+      "max_score": 95.0,
+      "avg_reward": 137.55,
+      "seconds": 9.0
+    },
+    {
+      "step": 1503000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 93.1,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 145.67,
+      "seconds": 9.5
+    },
+    {
+      "step": 1548000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.0,
+      "median_score": 95.0,
+      "min_score": 34.0,
+      "max_score": 95.0,
+      "avg_reward": 159.52,
+      "seconds": 9.4
+    },
+    {
+      "step": 1553000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 92.45,
+      "median_score": 95.0,
+      "min_score": 76.0,
+      "max_score": 95.0,
+      "avg_reward": 145.36,
+      "seconds": 9.6
+    },
+    {
+      "step": 1559000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 94.05,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 172.58,
+      "seconds": 8.8
+    },
+    {
+      "step": 1577000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 71,
+      "perfect_percent": 71.0,
+      "perfect_ci95": [
+        61.5,
+        79.0
+      ],
+      "avg_score": 91.97,
+      "median_score": 95.0,
+      "min_score": 55.0,
+      "max_score": 95.0,
+      "avg_reward": 160.94,
+      "seconds": 47.3
+    },
+    {
+      "step": 1592000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 87.75,
+      "median_score": 95.0,
+      "min_score": 34.0,
+      "max_score": 95.0,
+      "avg_reward": 145.88,
+      "seconds": 9.3
+    },
+    {
+      "step": 1593000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 68,
+      "perfect_percent": 68.0,
+      "perfect_ci95": [
+        58.3,
+        76.3
+      ],
+      "avg_score": 93.13,
+      "median_score": 95.0,
+      "min_score": 67.0,
+      "max_score": 95.0,
+      "avg_reward": 159.17,
+      "seconds": 36.2
+    },
+    {
+      "step": 1597000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 93.25,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 146.34,
+      "seconds": 9.8
+    },
+    {
+      "step": 1644000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 100,
+      "perfect_games": 66,
+      "perfect_percent": 66.0,
+      "perfect_ci95": [
+        56.3,
+        74.5
+      ],
+      "avg_score": 91.8,
+      "median_score": 95.0,
+      "min_score": 17.0,
+      "max_score": 95.0,
+      "avg_reward": 156.21,
+      "seconds": 476.2
+    },
+    {
+      "step": 1647000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 20,
+      "perfect_games": 9,
+      "perfect_percent": 45.0,
+      "perfect_ci95": [
+        25.8,
+        65.8
+      ],
+      "avg_score": 85.35,
+      "median_score": 93.0,
+      "min_score": 30.0,
+      "max_score": 95.0,
+      "avg_reward": 128.76,
+      "seconds": 10.8
+    },
+    {
+      "step": 1659000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 56.0,
+      "episodes": 20,
+      "perfect_games": 9,
+      "perfect_percent": 45.0,
+      "perfect_ci95": [
+        25.8,
+        65.8
+      ],
+      "avg_score": 90.0,
+      "median_score": 92.5,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 132.42,
+      "seconds": 10.8
+    },
+    {
+      "step": 1668000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 63.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 91.8,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 149.97,
+      "seconds": 9.7
+    },
+    {
+      "step": 1675000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 88.5,
+      "median_score": 95.0,
+      "min_score": 37.0,
+      "max_score": 95.0,
+      "avg_reward": 146.84,
+      "seconds": 9.7
+    },
+    {
+      "step": 1697000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 20,
+      "perfect_games": 9,
+      "perfect_percent": 45.0,
+      "perfect_ci95": [
+        25.8,
+        65.8
+      ],
+      "avg_score": 91.4,
+      "median_score": 94.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 134.24,
+      "seconds": 10.1
+    },
+    {
+      "step": 1700000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 61.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 90.6,
+      "median_score": 95.0,
+      "min_score": 45.0,
+      "max_score": 95.0,
+      "avg_reward": 159.16,
+      "seconds": 9.3
+    },
+    {
+      "step": 1710000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 83.45,
+      "median_score": 94.0,
+      "min_score": 47.0,
+      "max_score": 95.0,
+      "avg_reward": 131.81,
+      "seconds": 9.8
+    },
+    {
+      "step": 1714000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 80.1,
+      "median_score": 94.0,
+      "min_score": 47.0,
+      "max_score": 95.0,
+      "avg_reward": 128.73,
+      "seconds": 9.9
+    },
+    {
+      "step": 1723000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 59.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.2,
+      "median_score": 95.0,
+      "min_score": 41.0,
+      "max_score": 95.0,
+      "avg_reward": 159.55,
+      "seconds": 10.2
+    },
+    {
+      "step": 1730000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 61.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 171.83,
+      "seconds": 9.3
+    },
+    {
+      "step": 1797000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 93.88,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 166.04,
+      "seconds": 47.3
+    },
+    {
+      "step": 1806000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.9,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 157.4,
+      "seconds": 11.6
+    },
+    {
+      "step": 1809000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 94.45,
+      "median_score": 95.0,
+      "min_score": 92.0,
+      "max_score": 95.0,
+      "avg_reward": 167.74,
+      "seconds": 10.8
+    },
+    {
+      "step": 1811000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 92.32,
+      "median_score": 95.0,
+      "min_score": 40.0,
+      "max_score": 95.0,
+      "avg_reward": 163.58,
+      "seconds": 38.0
+    },
+    {
+      "step": 1813000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 93.15,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 151.23,
+      "seconds": 10.7
+    },
+    {
+      "step": 1822000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 67.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.19,
+      "median_score": 95.0,
+      "min_score": 56.0,
+      "max_score": 95.0,
+      "avg_reward": 167.42,
+      "seconds": 47.4
+    },
+    {
+      "step": 1831000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 94.25,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 176.64,
+      "seconds": 36.7
+    },
+    {
+      "step": 1835000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 94.1,
+      "median_score": 95.0,
+      "min_score": 89.0,
+      "max_score": 95.0,
+      "avg_reward": 157.02,
+      "seconds": 9.3
+    },
+    {
+      "step": 1838000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 168.54,
+      "seconds": 48.9
+    },
+    {
+      "step": 1841000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 87.35,
+      "median_score": 95.0,
+      "min_score": 34.0,
+      "max_score": 95.0,
+      "avg_reward": 144.86,
+      "seconds": 9.8
+    },
+    {
+      "step": 1844000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 86.85,
+      "median_score": 95.0,
+      "min_score": 12.0,
+      "max_score": 95.0,
+      "avg_reward": 149.84,
+      "seconds": 8.3
+    },
+    {
+      "step": 1851000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 91.65,
+      "median_score": 95.0,
+      "min_score": 63.0,
+      "max_score": 95.0,
+      "avg_reward": 144.34,
+      "seconds": 8.6
+    },
+    {
+      "step": 1864000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.45,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 150.72,
+      "seconds": 9.4
+    },
+    {
+      "step": 1872000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 90.85,
+      "median_score": 95.0,
+      "min_score": 57.0,
+      "max_score": 95.0,
+      "avg_reward": 159.17,
+      "seconds": 9.7
+    },
+    {
+      "step": 1876000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 93.0,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 150.63,
+      "seconds": 10.2
+    },
+    {
+      "step": 1881000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.75,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 166.88,
+      "seconds": 8.2
+    },
+    {
+      "step": 1889000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 66.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 92.85,
+      "median_score": 95.0,
+      "min_score": 60.0,
+      "max_score": 95.0,
+      "avg_reward": 163.8,
+      "seconds": 45.8
+    },
+    {
+      "step": 1890000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.95,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 166.02,
+      "seconds": 8.8
+    },
+    {
+      "step": 1901000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 89.25,
+      "median_score": 95.0,
+      "min_score": 46.0,
+      "max_score": 95.0,
+      "avg_reward": 147.41,
+      "seconds": 10.3
+    },
+    {
+      "step": 1929000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 93.04,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 159.89,
+      "seconds": 48.9
+    },
+    {
+      "step": 1932000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 89.7,
+      "median_score": 95.0,
+      "min_score": 39.0,
+      "max_score": 95.0,
+      "avg_reward": 153.28,
+      "seconds": 9.0
+    },
+    {
+      "step": 1936000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.45,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 161.57,
+      "seconds": 8.2
+    },
+    {
+      "step": 1937000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 93.02,
+      "median_score": 95.0,
+      "min_score": 69.0,
+      "max_score": 95.0,
+      "avg_reward": 163.87,
+      "seconds": 45.9
+    },
+    {
+      "step": 1949000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.95,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 151.05,
+      "seconds": 11.5
+    },
+    {
+      "step": 1958000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.35,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 156.26,
+      "seconds": 9.5
+    },
+    {
+      "step": 1960000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 92.55,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 155.28,
+      "seconds": 9.6
+    },
+    {
+      "step": 1961000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 83.75,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 151.92,
+      "seconds": 10.0
+    },
+    {
+      "step": 1968000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 83.0,
+      "max_score": 95.0,
+      "avg_reward": 166.62,
+      "seconds": 9.7
+    },
+    {
+      "step": 1972000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 92.75,
+      "median_score": 95.0,
+      "min_score": 23.0,
+      "max_score": 95.0,
+      "avg_reward": 165.01,
+      "seconds": 50.7
+    },
+    {
+      "step": 1976000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.25,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 156.15,
+      "seconds": 9.5
+    },
+    {
+      "step": 1986000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 88.95,
+      "median_score": 95.0,
+      "min_score": 40.0,
+      "max_score": 95.0,
+      "avg_reward": 146.66,
+      "seconds": 9.8
+    },
+    {
+      "step": 1987000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 93.89,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 177.08,
+      "seconds": 30.3
+    },
+    {
+      "step": 1989000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 92.22,
+      "median_score": 95.0,
+      "min_score": 35.0,
+      "max_score": 95.0,
+      "avg_reward": 170.39,
+      "seconds": 47.2
+    },
+    {
+      "step": 1991000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 92.53,
+      "median_score": 95.0,
+      "min_score": 36.0,
+      "max_score": 95.0,
+      "avg_reward": 167.43,
+      "seconds": 31.0
+    },
+    {
+      "step": 1995000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 71,
+      "perfect_percent": 71.0,
+      "perfect_ci95": [
+        61.5,
+        79.0
+      ],
+      "avg_score": 91.43,
+      "median_score": 95.0,
+      "min_score": 12.0,
+      "max_score": 95.0,
+      "avg_reward": 160.46,
+      "seconds": 33.5
+    },
+    {
+      "step": 1996000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 94.3,
+      "median_score": 95.0,
+      "min_score": 90.0,
+      "max_score": 95.0,
+      "avg_reward": 162.23,
+      "seconds": 10.4
+    },
+    {
+      "step": 1998000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 93.97,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 173.13,
+      "seconds": 32.4
+    },
+    {
+      "step": 2000000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 91.71,
+      "median_score": 95.0,
+      "min_score": 27.0,
+      "max_score": 95.0,
+      "avg_reward": 159.57,
+      "seconds": 36.0
+    },
+    {
+      "step": 2002000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 67.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.66,
+      "median_score": 95.0,
+      "min_score": 52.0,
+      "max_score": 95.0,
+      "avg_reward": 167.78,
+      "seconds": 45.7
+    },
+    {
+      "step": 2012000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 94.09,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 171.28,
+      "seconds": 36.9
+    },
+    {
+      "step": 2015000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 65,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        55.3,
+        73.6
+      ],
+      "avg_score": 90.97,
+      "median_score": 95.0,
+      "min_score": 11.0,
+      "max_score": 95.0,
+      "avg_reward": 153.98,
+      "seconds": 46.8
+    },
+    {
+      "step": 2019000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 91.49,
+      "median_score": 95.0,
+      "min_score": 12.0,
+      "max_score": 95.0,
+      "avg_reward": 163.84,
+      "seconds": 32.0
+    },
+    {
+      "step": 2024000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 91.62,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 159.78,
+      "seconds": 35.2
+    },
+    {
+      "step": 2025000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 83,
+      "perfect_percent": 83.0,
+      "perfect_ci95": [
+        74.5,
+        89.1
+      ],
+      "avg_score": 93.72,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 175.13,
+      "seconds": 35.2
+    },
+    {
+      "step": 2035000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.84,
+      "median_score": 95.0,
+      "min_score": 75.0,
+      "max_score": 95.0,
+      "avg_reward": 172.09,
+      "seconds": 44.9
+    },
+    {
+      "step": 2038000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 94.1,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 166.91,
+      "seconds": 11.6
+    },
+    {
+      "step": 2041000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.6,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 167.82,
+      "seconds": 31.0
+    },
+    {
+      "step": 2045000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 93.13,
+      "median_score": 95.0,
+      "min_score": 62.0,
+      "max_score": 95.0,
+      "avg_reward": 161.12,
+      "seconds": 48.3
+    },
+    {
+      "step": 2047000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.7,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 160.63,
+      "seconds": 9.0
+    },
+    {
+      "step": 2048000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 90,
+      "perfect_percent": 90.0,
+      "perfect_ci95": [
+        82.6,
+        94.5
+      ],
+      "avg_score": 93.0,
+      "median_score": 95.0,
+      "min_score": 6.0,
+      "max_score": 95.0,
+      "avg_reward": 181.4,
+      "seconds": 42.4
+    },
+    {
+      "step": 2051000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 93.42,
+      "median_score": 95.0,
+      "min_score": 67.0,
+      "max_score": 95.0,
+      "avg_reward": 164.38,
+      "seconds": 30.4
+    },
+    {
+      "step": 2053000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 94.18,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 178.57,
+      "seconds": 43.9
+    },
+    {
+      "step": 2055000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.45,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 156.19,
+      "seconds": 9.8
+    },
+    {
+      "step": 2057000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.35,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 165.26,
+      "seconds": 8.5
+    },
+    {
+      "step": 2060000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 92.51,
+      "median_score": 95.0,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 174.72,
+      "seconds": 35.5
+    },
+    {
+      "step": 2061000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 93.77,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 172.89,
+      "seconds": 32.9
+    },
+    {
+      "step": 2066000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 92.95,
+      "median_score": 95.0,
+      "min_score": 43.0,
+      "max_score": 95.0,
+      "avg_reward": 166.98,
+      "seconds": 45.8
+    },
+    {
+      "step": 2075000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.72,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 170.88,
+      "seconds": 33.8
+    },
+    {
+      "step": 2078000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 75,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        65.7,
+        82.5
+      ],
+      "avg_score": 93.33,
+      "median_score": 95.0,
+      "min_score": 59.0,
+      "max_score": 95.0,
+      "avg_reward": 166.47,
+      "seconds": 32.5
+    },
+    {
+      "step": 2079000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 92.85,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 145.11,
+      "seconds": 9.8
+    },
+    {
+      "step": 2086000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 72,
+      "perfect_percent": 72.0,
+      "perfect_ci95": [
+        62.5,
+        79.9
+      ],
+      "avg_score": 91.1,
+      "median_score": 95.0,
+      "min_score": 30.0,
+      "max_score": 95.0,
+      "avg_reward": 161.01,
+      "seconds": 46.4
+    },
+    {
+      "step": 2088000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 90.61,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 165.75,
+      "seconds": 46.3
+    },
+    {
+      "step": 2090000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 89.3,
+      "median_score": 95.0,
+      "min_score": 32.0,
+      "max_score": 95.0,
+      "avg_reward": 151.98,
+      "seconds": 9.7
+    },
+    {
+      "step": 2092000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 92.33,
+      "median_score": 95.0,
+      "min_score": 44.0,
+      "max_score": 95.0,
+      "avg_reward": 166.53,
+      "seconds": 45.8
+    },
+    {
+      "step": 2097000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 75,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        65.7,
+        82.5
+      ],
+      "avg_score": 93.09,
+      "median_score": 95.0,
+      "min_score": 39.0,
+      "max_score": 95.0,
+      "avg_reward": 166.2,
+      "seconds": 48.0
+    },
+    {
+      "step": 2103000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 93.95,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 172.27,
+      "seconds": 9.0
+    },
+    {
+      "step": 2114000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 90.76,
+      "median_score": 95.0,
+      "min_score": 15.0,
+      "max_score": 95.0,
+      "avg_reward": 162.81,
+      "seconds": 47.3
+    },
+    {
+      "step": 2121000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.65,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 166.74,
+      "seconds": 9.8
+    },
+    {
+      "step": 2123000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 92.97,
+      "median_score": 95.0,
+      "min_score": 53.0,
+      "max_score": 95.0,
+      "avg_reward": 169.12,
+      "seconds": 31.0
+    },
+    {
+      "step": 2129000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 86.45,
+      "median_score": 95.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 144.18,
+      "seconds": 9.6
+    },
+    {
+      "step": 2134000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 75,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        65.7,
+        82.5
+      ],
+      "avg_score": 92.93,
+      "median_score": 95.0,
+      "min_score": 21.0,
+      "max_score": 95.0,
+      "avg_reward": 166.16,
+      "seconds": 48.4
+    },
+    {
+      "step": 2139000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 71.0,
+      "max_score": 95.0,
+      "avg_reward": 169.75,
+      "seconds": 31.7
+    },
+    {
+      "step": 2141000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.95,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 159.65,
+      "seconds": 9.4
+    },
+    {
+      "step": 2172000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 93.75,
+      "median_score": 95.0,
+      "min_score": 79.0,
+      "max_score": 95.0,
+      "avg_reward": 172.0,
+      "seconds": 9.5
+    },
+    {
+      "step": 2178000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 92.75,
+      "median_score": 95.0,
+      "min_score": 75.0,
+      "max_score": 95.0,
+      "avg_reward": 171.03,
+      "seconds": 9.2
+    },
+    {
+      "step": 2181000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 66.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 92.09,
+      "median_score": 95.0,
+      "min_score": 9.0,
+      "max_score": 95.0,
+      "avg_reward": 170.17,
+      "seconds": 41.9
+    },
+    {
+      "step": 2182000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 78.7,
+      "median_score": 94.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 126.64,
+      "seconds": 10.5
+    },
+    {
+      "step": 2185000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 71.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.4,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 156.54,
+      "seconds": 9.6
+    },
+    {
+      "step": 2186000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 92.53,
+      "median_score": 95.0,
+      "min_score": 44.0,
+      "max_score": 95.0,
+      "avg_reward": 164.6,
+      "seconds": 52.6
+    },
+    {
+      "step": 2191000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 87.8,
+      "median_score": 95.0,
+      "min_score": 37.0,
+      "max_score": 95.0,
+      "avg_reward": 150.56,
+      "seconds": 10.0
+    },
+    {
+      "step": 2193000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.25,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 166.45,
+      "seconds": 10.9
+    },
+    {
+      "step": 2208000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 67.0,
+      "episodes": 100,
+      "perfect_games": 67,
+      "perfect_percent": 67.0,
+      "perfect_ci95": [
+        57.3,
+        75.4
+      ],
+      "avg_score": 89.75,
+      "median_score": 95.0,
+      "min_score": 30.0,
+      "max_score": 95.0,
+      "avg_reward": 155.02,
+      "seconds": 48.8
+    },
+    {
+      "step": 2216000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 63.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 82.55,
+      "median_score": 95.0,
+      "min_score": 6.0,
+      "max_score": 95.0,
+      "avg_reward": 151.13,
+      "seconds": 10.4
+    },
+    {
+      "step": 2251000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 71.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 91.05,
+      "median_score": 95.0,
+      "min_score": 47.0,
+      "max_score": 95.0,
+      "avg_reward": 149.15,
+      "seconds": 11.4
+    },
+    {
+      "step": 2256000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 88.15,
+      "median_score": 95.0,
+      "min_score": 42.0,
+      "max_score": 95.0,
+      "avg_reward": 146.43,
+      "seconds": 12.5
+    },
+    {
+      "step": 2264000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 100,
+      "perfect_games": 72,
+      "perfect_percent": 72.0,
+      "perfect_ci95": [
+        62.5,
+        79.9
+      ],
+      "avg_score": 92.41,
+      "median_score": 95.0,
+      "min_score": 54.0,
+      "max_score": 95.0,
+      "avg_reward": 162.37,
+      "seconds": 35.3
+    },
+    {
+      "step": 2266000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 86.25,
+      "median_score": 95.0,
+      "min_score": 6.0,
+      "max_score": 95.0,
+      "avg_reward": 138.77,
+      "seconds": 11.2
+    },
+    {
+      "step": 2277000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 87.0,
+      "median_score": 95.0,
+      "min_score": 29.0,
+      "max_score": 95.0,
+      "avg_reward": 155.31,
+      "seconds": 11.9
+    },
+    {
+      "step": 2295000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.05,
+      "median_score": 95.0,
+      "min_score": 69.0,
+      "max_score": 95.0,
+      "avg_reward": 149.34,
+      "seconds": 11.6
+    },
+    {
+      "step": 2343000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 90.55,
+      "median_score": 95.0,
+      "min_score": 42.0,
+      "max_score": 95.0,
+      "avg_reward": 148.43,
+      "seconds": 11.1
+    },
+    {
+      "step": 2346000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 88.05,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 166.18,
+      "seconds": 8.0
+    },
+    {
+      "step": 2353000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 89.1,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 157.22,
+      "seconds": 12.7
+    },
+    {
+      "step": 2354000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 93.83,
+      "median_score": 95.0,
+      "min_score": 73.0,
+      "max_score": 95.0,
+      "avg_reward": 168.7,
+      "seconds": 33.6
+    },
+    {
+      "step": 2357000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 87.26,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 155.28,
+      "seconds": 50.1
+    },
+    {
+      "step": 2359000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 66,
+      "perfect_percent": 66.0,
+      "perfect_ci95": [
+        56.3,
+        74.5
+      ],
+      "avg_score": 89.15,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 153.02,
+      "seconds": 38.6
+    },
+    {
+      "step": 2361000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 88.4,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 161.56,
+      "seconds": 8.5
+    },
+    {
+      "step": 2378000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 84.3,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 157.7,
+      "seconds": 8.8
+    },
+    {
+      "step": 2379000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 84.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 88.4,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 161.76,
+      "seconds": 9.2
+    },
+    {
+      "step": 2382000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 88.31,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 166.58,
+      "seconds": 45.7
+    },
+    {
+      "step": 2383000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 92.27,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 171.46,
+      "seconds": 7630.5
+    },
+    {
+      "step": 2385000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.52,
+      "median_score": 95.0,
+      "min_score": 73.0,
+      "max_score": 95.0,
+      "avg_reward": 173.6,
+      "seconds": 35.5
+    },
+    {
+      "step": 2390000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 92.3,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 154.96,
+      "seconds": 8.6
+    },
+    {
+      "step": 2392000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.45,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 166.3,
+      "seconds": 8.9
+    },
+    {
+      "step": 2393000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 89.28,
+      "median_score": 95.0,
+      "min_score": 10.0,
+      "max_score": 95.0,
+      "avg_reward": 160.29,
+      "seconds": 31.2
+    },
+    {
+      "step": 2397000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 71,
+      "perfect_percent": 71.0,
+      "perfect_ci95": [
+        61.5,
+        79.0
+      ],
+      "avg_score": 91.65,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 160.61,
+      "seconds": 107.9
+    },
+    {
+      "step": 2401000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.55,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 160.88,
+      "seconds": 10.3
+    },
+    {
+      "step": 2402000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.63,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 170.79,
+      "seconds": 45.8
+    },
+    {
+      "step": 2404000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 83,
+      "perfect_percent": 83.0,
+      "perfect_ci95": [
+        74.5,
+        89.1
+      ],
+      "avg_score": 90.5,
+      "median_score": 95.0,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 171.91,
+      "seconds": 32.8
+    },
+    {
+      "step": 2406000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.51,
+      "median_score": 95.0,
+      "min_score": 53.0,
+      "max_score": 95.0,
+      "avg_reward": 171.65,
+      "seconds": 35.4
+    },
+    {
+      "step": 2410000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 77.7,
+      "median_score": 93.5,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 125.53,
+      "seconds": 10.1
+    },
+    {
+      "step": 2413000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.05,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 167.14,
+      "seconds": 32.7
+    },
+    {
+      "step": 2416000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 166.15,
+      "seconds": 10.2
+    },
+    {
+      "step": 2418000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 71,
+      "perfect_percent": 71.0,
+      "perfect_ci95": [
+        61.5,
+        79.0
+      ],
+      "avg_score": 93.17,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 161.72,
+      "seconds": 37.1
+    },
+    {
+      "step": 2419000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.15,
+      "median_score": 95.0,
+      "min_score": 83.0,
+      "max_score": 95.0,
+      "avg_reward": 155.37,
+      "seconds": 8.9
+    },
+    {
+      "step": 2420000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 80.8,
+      "median_score": 93.5,
+      "min_score": 24.0,
+      "max_score": 95.0,
+      "avg_reward": 129.05,
+      "seconds": 8.8
+    },
+    {
+      "step": 2430000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 100,
+      "perfect_games": 87,
+      "perfect_percent": 87.0,
+      "perfect_ci95": [
+        79.0,
+        92.2
+      ],
+      "avg_score": 93.55,
+      "median_score": 95.0,
+      "min_score": 54.0,
+      "max_score": 95.0,
+      "avg_reward": 178.7,
+      "seconds": 34.6
+    },
+    {
+      "step": 2432000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 83.82,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 150.85,
+      "seconds": 41.9
+    },
+    {
+      "step": 2438000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.4,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 161.18,
+      "seconds": 9.9
+    },
+    {
+      "step": 2444000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.15,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 166.02,
+      "seconds": 10.3
+    },
+    {
+      "step": 2471000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 63.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 88.7,
+      "median_score": 95.0,
+      "min_score": 32.0,
+      "max_score": 95.0,
+      "avg_reward": 146.22,
+      "seconds": 8.4
+    },
+    {
+      "step": 2481000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.85,
+      "median_score": 95.0,
+      "min_score": 90.0,
+      "max_score": 95.0,
+      "avg_reward": 161.67,
+      "seconds": 9.7
+    },
+    {
+      "step": 2490000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.05,
+      "median_score": 95.0,
+      "min_score": 75.0,
+      "max_score": 95.0,
+      "avg_reward": 166.56,
+      "seconds": 9.0
+    },
+    {
+      "step": 2492000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 68,
+      "perfect_percent": 68.0,
+      "perfect_ci95": [
+        58.3,
+        76.3
+      ],
+      "avg_score": 90.39,
+      "median_score": 95.0,
+      "min_score": 21.0,
+      "max_score": 95.0,
+      "avg_reward": 156.55,
+      "seconds": 46.3
+    },
+    {
+      "step": 2497000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 91.15,
+      "median_score": 95.0,
+      "min_score": 56.0,
+      "max_score": 95.0,
+      "avg_reward": 164.27,
+      "seconds": 9.1
+    },
+    {
+      "step": 2507000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 89.73,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 167.83,
+      "seconds": 42.9
+    },
+    {
+      "step": 2511000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 92.79,
+      "median_score": 95.0,
+      "min_score": 16.0,
+      "max_score": 95.0,
+      "avg_reward": 175.06,
+      "seconds": 33.5
+    },
+    {
+      "step": 2512000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.8,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 165.84,
+      "seconds": 9.1
+    },
+    {
+      "step": 2513000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.9,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 167.03,
+      "seconds": 8.5
+    },
+    {
+      "step": 2516000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 92.92,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 171.08,
+      "seconds": 33.2
+    },
+    {
+      "step": 2518000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 71,
+      "perfect_percent": 71.0,
+      "perfect_ci95": [
+        61.5,
+        79.0
+      ],
+      "avg_score": 90.66,
+      "median_score": 95.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 159.96,
+      "seconds": 47.3
+    },
+    {
+      "step": 2519000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 87,
+      "perfect_percent": 87.0,
+      "perfect_ci95": [
+        79.0,
+        92.2
+      ],
+      "avg_score": 93.19,
+      "median_score": 95.0,
+      "min_score": 51.0,
+      "max_score": 95.0,
+      "avg_reward": 178.39,
+      "seconds": 40.4
+    },
+    {
+      "step": 2521000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.16,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 170.21,
+      "seconds": 34.8
+    },
+    {
+      "step": 2535000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 85.4,
+      "median_score": 95.0,
+      "min_score": 10.0,
+      "max_score": 95.0,
+      "avg_reward": 143.11,
+      "seconds": 9.1
+    },
+    {
+      "step": 2536000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 89.69,
+      "median_score": 95.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 158.03,
+      "seconds": 47.7
+    },
+    {
+      "step": 2545000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 71.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.4,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 159.01,
+      "seconds": 12.7
+    },
+    {
+      "step": 2549000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 87.9,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 156.18,
+      "seconds": 10.3
+    },
+    {
+      "step": 2551000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 93.71,
+      "median_score": 95.0,
+      "min_score": 48.0,
+      "max_score": 95.0,
+      "avg_reward": 177.84,
+      "seconds": 43.6
+    },
+    {
+      "step": 2556000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 91.97,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 166.12,
+      "seconds": 35.8
+    },
+    {
+      "step": 2559000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 89.85,
+      "median_score": 95.0,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 157.94,
+      "seconds": 10.1
+    },
+    {
+      "step": 2563000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 91.34,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 162.42,
+      "seconds": 41.9
+    },
+    {
+      "step": 2567000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 90.35,
+      "median_score": 95.0,
+      "min_score": 45.0,
+      "max_score": 95.0,
+      "avg_reward": 148.21,
+      "seconds": 10.3
+    },
+    {
+      "step": 2576000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 82.45,
+      "median_score": 95.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 156.01,
+      "seconds": 10.4
+    },
+    {
+      "step": 2579000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 86.6,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 154.54,
+      "seconds": 8.4
+    },
+    {
+      "step": 2580000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 88.9,
+      "median_score": 95.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 157.43,
+      "seconds": 9.1
+    },
+    {
+      "step": 2591000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 64,
+      "perfect_percent": 64.0,
+      "perfect_ci95": [
+        54.2,
+        72.7
+      ],
+      "avg_score": 80.71,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 143.03,
+      "seconds": 46.4
+    },
+    {
+      "step": 2597000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 82.77,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 154.12,
+      "seconds": 47.1
+    },
+    {
+      "step": 2599000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 80.55,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 154.19,
+      "seconds": 10.2
+    },
+    {
+      "step": 2605000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 63.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 89.65,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 165.8,
+      "seconds": 34.7
+    },
+    {
+      "step": 2618000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 88.08,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 167.32,
+      "seconds": 33.5
+    },
+    {
+      "step": 2626000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.6,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 165.66,
+      "seconds": 9.9
+    },
+    {
+      "step": 2627000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 89.05,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 151.89,
+      "seconds": 11.8
+    },
+    {
+      "step": 2650000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 93.2,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 171.46,
+      "seconds": 9.4
+    },
+    {
+      "step": 2657000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 67.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 90.1,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 162.51,
+      "seconds": 48.1
+    },
+    {
+      "step": 2667000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 72.5,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 136.22,
+      "seconds": 9.5
+    },
+    {
+      "step": 2668000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 69.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 90.11,
+      "median_score": 95.0,
+      "min_score": 6.0,
+      "max_score": 95.0,
+      "avg_reward": 165.35,
+      "seconds": 52.3
+    },
+    {
+      "step": 2682000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 88.35,
+      "median_score": 95.0,
+      "min_score": 33.0,
+      "max_score": 95.0,
+      "avg_reward": 151.41,
+      "seconds": 9.7
+    },
+    {
+      "step": 2684000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.7,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 161.71,
+      "seconds": 11.9
+    },
+    {
+      "step": 2690000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 68,
+      "perfect_percent": 68.0,
+      "perfect_ci95": [
+        58.3,
+        76.3
+      ],
+      "avg_score": 89.63,
+      "median_score": 95.0,
+      "min_score": 12.0,
+      "max_score": 95.0,
+      "avg_reward": 155.73,
+      "seconds": 52.3
+    },
+    {
+      "step": 2699000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.29,
+      "median_score": 95.0,
+      "min_score": 57.0,
+      "max_score": 95.0,
+      "avg_reward": 173.62,
+      "seconds": 45.5
+    },
+    {
+      "step": 2700000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 72,
+      "perfect_percent": 72.0,
+      "perfect_ci95": [
+        62.5,
+        79.9
+      ],
+      "avg_score": 93.73,
+      "median_score": 95.0,
+      "min_score": 85.0,
+      "max_score": 95.0,
+      "avg_reward": 163.64,
+      "seconds": 49.0
+    },
+    {
+      "step": 2702000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 94.16,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 171.31,
+      "seconds": 49.5
+    },
+    {
+      "step": 2707000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.9,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 161.38,
+      "seconds": 10.2
+    },
+    {
+      "step": 2708000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 83.72,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 155.18,
+      "seconds": 57.1
+    },
+    {
+      "step": 2717000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.09,
+      "median_score": 95.0,
+      "min_score": 26.0,
+      "max_score": 95.0,
+      "avg_reward": 175.39,
+      "seconds": 37.5
+    },
+    {
+      "step": 2724000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 92.84,
+      "median_score": 95.0,
+      "min_score": 47.0,
+      "max_score": 95.0,
+      "avg_reward": 173.1,
+      "seconds": 35.0
+    },
+    {
+      "step": 2731000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.4,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 150.2,
+      "seconds": 9.3
+    },
+    {
+      "step": 2735000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 91.4,
+      "median_score": 95.0,
+      "min_score": 60.0,
+      "max_score": 95.0,
+      "avg_reward": 144.03,
+      "seconds": 9.1
+    },
+    {
+      "step": 2737000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 60,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        50.2,
+        69.1
+      ],
+      "avg_score": 89.69,
+      "median_score": 95.0,
+      "min_score": 12.0,
+      "max_score": 95.0,
+      "avg_reward": 147.81,
+      "seconds": 49.2
+    },
+    {
+      "step": 2747000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 92.1,
+      "median_score": 95.0,
+      "min_score": 48.0,
+      "max_score": 95.0,
+      "avg_reward": 170.41,
+      "seconds": 8.5
+    },
+    {
+      "step": 2748000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 66.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 93.09,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 160.09,
+      "seconds": 49.3
+    },
+    {
+      "step": 2779000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 88.35,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 141.33,
+      "seconds": 8.0
+    },
+    {
+      "step": 2781000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.0,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 159.92,
+      "seconds": 8.7
+    },
+    {
+      "step": 2789000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 92.15,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 144.6,
+      "seconds": 8.8
+    },
+    {
+      "step": 2793000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 71.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.05,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 155.27,
+      "seconds": 9.0
+    },
+    {
+      "step": 2804000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 67.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.8,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 160.47,
+      "seconds": 8.4
+    },
+    {
+      "step": 2807000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 92.4,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 155.03,
+      "seconds": 10.2
+    },
+    {
+      "step": 2816000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.57,
+      "median_score": 95.0,
+      "min_score": 79.0,
+      "max_score": 95.0,
+      "avg_reward": 167.81,
+      "seconds": 33.4
+    },
+    {
+      "step": 2820000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.45,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 166.49,
+      "seconds": 9.2
+    },
+    {
+      "step": 2821000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 72,
+      "perfect_percent": 72.0,
+      "perfect_ci95": [
+        62.5,
+        79.9
+      ],
+      "avg_score": 92.03,
+      "median_score": 95.0,
+      "min_score": 28.0,
+      "max_score": 95.0,
+      "avg_reward": 162.27,
+      "seconds": 38.7
+    },
+    {
+      "step": 2822000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 93.37,
+      "median_score": 95.0,
+      "min_score": 58.0,
+      "max_score": 95.0,
+      "avg_reward": 169.59,
+      "seconds": 41.3
+    },
+    {
+      "step": 2823000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.4,
+      "median_score": 95.0,
+      "min_score": 76.0,
+      "max_score": 95.0,
+      "avg_reward": 165.26,
+      "seconds": 13.5
+    },
+    {
+      "step": 2825000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.5,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 160.56,
+      "seconds": 9.8
+    },
+    {
+      "step": 2828000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 92.88,
+      "median_score": 95.0,
+      "min_score": 64.0,
+      "max_score": 95.0,
+      "avg_reward": 168.15,
+      "seconds": 45.6
+    },
+    {
+      "step": 2831000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 87,
+      "perfect_percent": 87.0,
+      "perfect_ci95": [
+        79.0,
+        92.2
+      ],
+      "avg_score": 93.67,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 179.12,
+      "seconds": 44.5
+    },
+    {
+      "step": 2835000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 94.1,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 176.39,
+      "seconds": 48.2
+    },
+    {
+      "step": 2837000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 92.72,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 169.08,
+      "seconds": 48.9
+    },
+    {
+      "step": 2839000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.55,
+      "median_score": 95.0,
+      "min_score": 43.0,
+      "max_score": 95.0,
+      "avg_reward": 175.71,
+      "seconds": 40.7
+    },
+    {
+      "step": 2841000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 94.05,
+      "median_score": 95.0,
+      "min_score": 91.0,
+      "max_score": 95.0,
+      "avg_reward": 162.46,
+      "seconds": 12.4
+    },
+    {
+      "step": 2842000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 93.81,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 178.15,
+      "seconds": 39.0
+    },
+    {
+      "step": 2846000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 92.01,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 169.29,
+      "seconds": 50.5
+    },
+    {
+      "step": 2847000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 85.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.65,
+      "median_score": 95.0,
+      "min_score": 49.0,
+      "max_score": 95.0,
+      "avg_reward": 159.72,
+      "seconds": 9.5
+    },
+    {
+      "step": 2850000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 88,
+      "perfect_percent": 88.0,
+      "perfect_ci95": [
+        80.2,
+        93.0
+      ],
+      "avg_score": 93.57,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 179.94,
+      "seconds": 37.6
+    },
+    {
+      "step": 2851000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 88.0,
+      "episodes": 100,
+      "perfect_games": 71,
+      "perfect_percent": 71.0,
+      "perfect_ci95": [
+        61.5,
+        79.0
+      ],
+      "avg_score": 91.41,
+      "median_score": 95.0,
+      "min_score": 9.0,
+      "max_score": 95.0,
+      "avg_reward": 160.55,
+      "seconds": 57.5
+    },
+    {
+      "step": 2853000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 94.08,
+      "median_score": 95.0,
+      "min_score": 79.0,
+      "max_score": 95.0,
+      "avg_reward": 177.27,
+      "seconds": 46.6
+    },
+    {
+      "step": 2855000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 87.0,
+      "episodes": 100,
+      "perfect_games": 87,
+      "perfect_percent": 87.0,
+      "perfect_ci95": [
+        79.0,
+        92.2
+      ],
+      "avg_score": 93.08,
+      "median_score": 95.0,
+      "min_score": 48.0,
+      "max_score": 95.0,
+      "avg_reward": 178.43,
+      "seconds": 44.2
+    },
+    {
+      "step": 2856000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.77,
+      "median_score": 95.0,
+      "min_score": 81.0,
+      "max_score": 95.0,
+      "avg_reward": 174.05,
+      "seconds": 36.6
+    },
+    {
+      "step": 2859000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 91.28,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 174.68,
+      "seconds": 31.6
+    },
+    {
+      "step": 2863000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.66,
+      "median_score": 95.0,
+      "min_score": 59.0,
+      "max_score": 95.0,
+      "avg_reward": 175.86,
+      "seconds": 38.5
+    },
+    {
+      "step": 2864000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 92.99,
+      "median_score": 95.0,
+      "min_score": 44.0,
+      "max_score": 95.0,
+      "avg_reward": 172.15,
+      "seconds": 36.6
+    },
+    {
+      "step": 2865000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 92.67,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 177.0,
+      "seconds": 37.3
+    },
+    {
+      "step": 2868000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 88.6,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 165.09,
+      "seconds": 52.7
+    },
+    {
+      "step": 2871000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 83,
+      "perfect_percent": 83.0,
+      "perfect_ci95": [
+        74.5,
+        89.1
+      ],
+      "avg_score": 94.22,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 175.48,
+      "seconds": 50.1
+    },
+    {
+      "step": 2878000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.78,
+      "median_score": 95.0,
+      "min_score": 76.0,
+      "max_score": 95.0,
+      "avg_reward": 174.08,
+      "seconds": 34.8
+    },
+    {
+      "step": 2881000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 92.18,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 171.37,
+      "seconds": 47.6
+    },
+    {
+      "step": 2882000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.32,
+      "median_score": 95.0,
+      "min_score": 14.0,
+      "max_score": 95.0,
+      "avg_reward": 173.61,
+      "seconds": 51.1
+    },
+    {
+      "step": 2883000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 93.68,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 172.93,
+      "seconds": 41.7
+    },
+    {
+      "step": 2885000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 88.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 90.05,
+      "median_score": 94.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 137.5,
+      "seconds": 8.3
+    },
+    {
+      "step": 2887000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 88.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 90.66,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 170.98,
+      "seconds": 39.5
+    },
+    {
+      "step": 2889000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 93.84,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 177.24,
+      "seconds": 44.7
+    },
+    {
+      "step": 2891000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 72,
+      "perfect_percent": 72.0,
+      "perfect_ci95": [
+        62.5,
+        79.9
+      ],
+      "avg_score": 93.38,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 163.59,
+      "seconds": 48.1
+    },
+    {
+      "step": 2892000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 75,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        65.7,
+        82.5
+      ],
+      "avg_score": 91.73,
+      "median_score": 95.0,
+      "min_score": 36.0,
+      "max_score": 95.0,
+      "avg_reward": 164.77,
+      "seconds": 34.4
+    },
+    {
+      "step": 2896000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 93.62,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 172.73,
+      "seconds": 32.1
+    },
+    {
+      "step": 2901000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.35,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 156.68,
+      "seconds": 7.3
+    },
+    {
+      "step": 2909000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 62.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 93.78,
+      "median_score": 95.0,
+      "min_score": 28.0,
+      "max_score": 95.0,
+      "avg_reward": 177.94,
+      "seconds": 52.5
+    },
+    {
+      "step": 2923000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 93.61,
+      "median_score": 95.0,
+      "min_score": 69.0,
+      "max_score": 95.0,
+      "avg_reward": 168.78,
+      "seconds": 46.8
+    },
+    {
+      "step": 2925000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.58,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 167.44,
+      "seconds": 46.3
+    },
+    {
+      "step": 2926000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.6,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 166.44,
+      "seconds": 6.9
+    },
+    {
+      "step": 2927000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 85.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.05,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 166.19,
+      "seconds": 8.4
+    },
+    {
+      "step": 2928000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 89,
+      "perfect_percent": 89.0,
+      "perfect_ci95": [
+        81.4,
+        93.7
+      ],
+      "avg_score": 93.94,
+      "median_score": 95.0,
+      "min_score": 56.0,
+      "max_score": 95.0,
+      "avg_reward": 181.24,
+      "seconds": 42.4
+    },
+    {
+      "step": 2931000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 93.92,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 172.96,
+      "seconds": 36.2
+    },
+    {
+      "step": 2937000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 92.75,
+      "median_score": 94.5,
+      "min_score": 76.0,
+      "max_score": 95.0,
+      "avg_reward": 140.6,
+      "seconds": 9.2
+    },
+    {
+      "step": 2938000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 66,
+      "perfect_percent": 66.0,
+      "perfect_ci95": [
+        56.3,
+        74.5
+      ],
+      "avg_score": 92.94,
+      "median_score": 95.0,
+      "min_score": 63.0,
+      "max_score": 95.0,
+      "avg_reward": 156.95,
+      "seconds": 48.1
+    },
+    {
+      "step": 2955000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.2,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 166.03,
+      "seconds": 7.7
+    },
+    {
+      "step": 2972000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.35,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 156.38,
+      "seconds": 7.8
+    },
+    {
+      "step": 2979000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 69.0,
+      "episodes": 100,
+      "perfect_games": 63,
+      "perfect_percent": 63.0,
+      "perfect_ci95": [
+        53.2,
+        71.8
+      ],
+      "avg_score": 92.77,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 153.41,
+      "seconds": 52.6
+    },
+    {
+      "step": 2992000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 92.1,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 144.74,
+      "seconds": 9.3
+    },
+    {
+      "step": 2993000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 92.0,
+      "median_score": 95.0,
+      "min_score": 77.0,
+      "max_score": 95.0,
+      "avg_reward": 144.63,
+      "seconds": 8.8
+    },
+    {
+      "step": 2996000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 93.72,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 161.47,
+      "seconds": 31.8
+    },
+    {
+      "step": 2998000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 93.39,
+      "median_score": 95.0,
+      "min_score": 70.0,
+      "max_score": 95.0,
+      "avg_reward": 167.21,
+      "seconds": 36.2
+    },
+    {
+      "step": 3004000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 65.0,
+      "episodes": 100,
+      "perfect_games": 70,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        60.4,
+        78.1
+      ],
+      "avg_score": 93.18,
+      "median_score": 95.0,
+      "min_score": 34.0,
+      "max_score": 95.0,
+      "avg_reward": 160.99,
+      "seconds": 49.1
+    },
+    {
+      "step": 3007000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.6,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 165.47,
+      "seconds": 7.7
+    },
+    {
+      "step": 3015000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 93.25,
+      "median_score": 95.0,
+      "min_score": 87.0,
+      "max_score": 95.0,
+      "avg_reward": 151.19,
+      "seconds": 7.8
+    },
+    {
+      "step": 3024000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.44,
+      "median_score": 95.0,
+      "min_score": 46.0,
+      "max_score": 95.0,
+      "avg_reward": 170.49,
+      "seconds": 36.4
+    },
+    {
+      "step": 3038000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 92.84,
+      "median_score": 95.0,
+      "min_score": 19.0,
+      "max_score": 95.0,
+      "avg_reward": 170.74,
+      "seconds": 1546.9
+    },
+    {
+      "step": 3070000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 53.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 94.19,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 176.3,
+      "seconds": 43.2
+    },
+    {
+      "step": 3076000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 69.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.34,
+      "median_score": 95.0,
+      "min_score": 40.0,
+      "max_score": 95.0,
+      "avg_reward": 173.49,
+      "seconds": 44.1
+    },
+    {
+      "step": 3078000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 71.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 92.76,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 159.75,
+      "seconds": 33.3
+    },
+    {
+      "step": 3084000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 94.05,
+      "median_score": 95.0,
+      "min_score": 88.0,
+      "max_score": 95.0,
+      "avg_reward": 167.06,
+      "seconds": 8.1
+    },
+    {
+      "step": 3087000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 93.49,
+      "median_score": 95.0,
+      "min_score": 50.0,
+      "max_score": 95.0,
+      "avg_reward": 169.44,
+      "seconds": 33.3
+    },
+    {
+      "step": 3088000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.4,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 161.24,
+      "seconds": 8.5
+    },
+    {
+      "step": 3090000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 84.92,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 159.09,
+      "seconds": 47.0
+    },
+    {
+      "step": 3092000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.9,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 165.55,
+      "seconds": 7.0
+    },
+    {
+      "step": 3093000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.67,
+      "median_score": 95.0,
+      "min_score": 57.0,
+      "max_score": 95.0,
+      "avg_reward": 175.76,
+      "seconds": 36.8
+    },
+    {
+      "step": 3099000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 93.53,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 169.29,
+      "seconds": 36.5
+    },
+    {
+      "step": 3100000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.37,
+      "median_score": 95.0,
+      "min_score": 23.0,
+      "max_score": 95.0,
+      "avg_reward": 171.49,
+      "seconds": 43.2
+    },
+    {
+      "step": 3104000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 90,
+      "perfect_percent": 90.0,
+      "perfect_ci95": [
+        82.6,
+        94.5
+      ],
+      "avg_score": 94.54,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 182.73,
+      "seconds": 48.8
+    },
+    {
+      "step": 3105000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.65,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 165.3,
+      "seconds": 7.5
+    },
+    {
+      "step": 3109000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 88,
+      "perfect_percent": 88.0,
+      "perfect_ci95": [
+        80.2,
+        93.0
+      ],
+      "avg_score": 93.93,
+      "median_score": 95.0,
+      "min_score": 44.0,
+      "max_score": 95.0,
+      "avg_reward": 180.14,
+      "seconds": 30.3
+    },
+    {
+      "step": 3112000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 79.0,
+      "max_score": 95.0,
+      "avg_reward": 166.77,
+      "seconds": 8.7
+    },
+    {
+      "step": 3117000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 72.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 92.95,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 156.06,
+      "seconds": 8.1
+    },
+    {
+      "step": 3132000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 87.36,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 154.64,
+      "seconds": 49.9
+    },
+    {
+      "step": 3134000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 91.74,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 167.98,
+      "seconds": 46.0
+    },
+    {
+      "step": 3136000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 69,
+      "perfect_percent": 69.0,
+      "perfect_ci95": [
+        59.4,
+        77.2
+      ],
+      "avg_score": 92.15,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 159.18,
+      "seconds": 45.6
+    },
+    {
+      "step": 3140000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 86.8,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 154.47,
+      "seconds": 7.4
+    },
+    {
+      "step": 3150000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 92.55,
+      "median_score": 95.0,
+      "min_score": 58.0,
+      "max_score": 95.0,
+      "avg_reward": 163.43,
+      "seconds": 35.7
+    },
+    {
+      "step": 3152000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.54,
+      "median_score": 95.0,
+      "min_score": 7.0,
+      "max_score": 95.0,
+      "avg_reward": 173.61,
+      "seconds": 48.5
+    },
+    {
+      "step": 3153000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 93.76,
+      "median_score": 95.0,
+      "min_score": 76.0,
+      "max_score": 95.0,
+      "avg_reward": 169.82,
+      "seconds": 46.3
+    },
+    {
+      "step": 3155000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 83,
+      "perfect_percent": 83.0,
+      "perfect_ci95": [
+        74.5,
+        89.1
+      ],
+      "avg_score": 93.27,
+      "median_score": 95.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 174.56,
+      "seconds": 33.9
+    },
+    {
+      "step": 3156000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 94.07,
+      "median_score": 95.0,
+      "min_score": 64.0,
+      "max_score": 95.0,
+      "avg_reward": 177.25,
+      "seconds": 32.4
+    },
+    {
+      "step": 3160000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 84.35,
+      "median_score": 95.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 157.5,
+      "seconds": 7.8
+    },
+    {
+      "step": 3161000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 93.8,
+      "median_score": 95.0,
+      "min_score": 61.0,
+      "max_score": 95.0,
+      "avg_reward": 174.09,
+      "seconds": 45.9
+    },
+    {
+      "step": 3166000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.1,
+      "median_score": 95.0,
+      "min_score": 75.0,
+      "max_score": 95.0,
+      "avg_reward": 165.42,
+      "seconds": 7.3
+    },
+    {
+      "step": 3171000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 92.74,
+      "median_score": 95.0,
+      "min_score": 30.0,
+      "max_score": 95.0,
+      "avg_reward": 176.11,
+      "seconds": 32.8
+    },
+    {
+      "step": 3173000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 89.92,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 165.16,
+      "seconds": 42.9
+    },
+    {
+      "step": 3175000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 90,
+      "perfect_percent": 90.0,
+      "perfect_ci95": [
+        82.6,
+        94.5
+      ],
+      "avg_score": 93.33,
+      "median_score": 95.0,
+      "min_score": 5.0,
+      "max_score": 95.0,
+      "avg_reward": 181.66,
+      "seconds": 30.8
+    },
+    {
+      "step": 3178000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 85.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 90.38,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 168.66,
+      "seconds": 44.1
+    },
+    {
+      "step": 3181000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 87.0,
+      "episodes": 100,
+      "perfect_games": 85,
+      "perfect_percent": 85.0,
+      "perfect_ci95": [
+        76.7,
+        90.7
+      ],
+      "avg_score": 93.3,
+      "median_score": 95.0,
+      "min_score": 28.0,
+      "max_score": 95.0,
+      "avg_reward": 176.54,
+      "seconds": 45.4
+    },
+    {
+      "step": 3182000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.7,
+      "median_score": 95.0,
+      "min_score": 61.0,
+      "max_score": 95.0,
+      "avg_reward": 165.76,
+      "seconds": 7.6
+    },
+    {
+      "step": 3183000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 92.67,
+      "median_score": 95.0,
+      "min_score": 27.0,
+      "max_score": 95.0,
+      "avg_reward": 166.78,
+      "seconds": 46.5
+    },
+    {
+      "step": 3184000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 83.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 92.43,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 172.57,
+      "seconds": 47.1
+    },
+    {
+      "step": 3187000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 86.0,
+      "episodes": 100,
+      "perfect_games": 89,
+      "perfect_percent": 89.0,
+      "perfect_ci95": [
+        81.4,
+        93.7
+      ],
+      "avg_score": 93.41,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 180.82,
+      "seconds": 35.2
+    },
+    {
+      "step": 3188000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 90.7,
+      "median_score": 95.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 167.93,
+      "seconds": 47.7
+    },
+    {
+      "step": 3190000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 89,
+      "perfect_percent": 89.0,
+      "perfect_ci95": [
+        81.4,
+        93.7
+      ],
+      "avg_score": 94.34,
+      "median_score": 95.0,
+      "min_score": 66.0,
+      "max_score": 95.0,
+      "avg_reward": 181.62,
+      "seconds": 44.0
+    },
+    {
+      "step": 3191000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 89.63,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 171.93,
+      "seconds": 27.1
+    },
+    {
+      "step": 3205000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.27,
+      "median_score": 95.0,
+      "min_score": 68.0,
+      "max_score": 95.0,
+      "avg_reward": 170.23,
+      "seconds": 37.1
+    },
+    {
+      "step": 3218000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 73,
+      "perfect_percent": 73.0,
+      "perfect_ci95": [
+        63.6,
+        80.7
+      ],
+      "avg_score": 92.68,
+      "median_score": 95.0,
+      "min_score": 56.0,
+      "max_score": 95.0,
+      "avg_reward": 163.37,
+      "seconds": 39.5
+    },
+    {
+      "step": 3220000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 85.5,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 158.26,
+      "seconds": 9.0
+    },
+    {
+      "step": 3223000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 87.95,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 162.08,
+      "seconds": 49.0
+    },
+    {
+      "step": 3224000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 92.95,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 169.81,
+      "seconds": 30.0
+    },
+    {
+      "step": 3234000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 88,
+      "perfect_percent": 88.0,
+      "perfect_ci95": [
+        80.2,
+        93.0
+      ],
+      "avg_score": 91.26,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 177.49,
+      "seconds": 44.2
+    },
+    {
+      "step": 3236000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 92.02,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 172.09,
+      "seconds": 35.4
+    },
+    {
+      "step": 3239000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 94.04,
+      "median_score": 95.0,
+      "min_score": 55.0,
+      "max_score": 95.0,
+      "avg_reward": 174.03,
+      "seconds": 35.2
+    },
+    {
+      "step": 3240000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 90.55,
+      "median_score": 95.0,
+      "min_score": 64.0,
+      "max_score": 95.0,
+      "avg_reward": 142.71,
+      "seconds": 8.7
+    },
+    {
+      "step": 3241000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 90.82,
+      "median_score": 95.0,
+      "min_score": 0.0,
+      "max_score": 95.0,
+      "avg_reward": 168.89,
+      "seconds": 47.0
+    },
+    {
+      "step": 3244000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 83.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 91.95,
+      "median_score": 95.0,
+      "min_score": 58.0,
+      "max_score": 95.0,
+      "avg_reward": 164.75,
+      "seconds": 7.9
+    },
+    {
+      "step": 3246000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 89.7,
+      "median_score": 95.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 162.76,
+      "seconds": 8.2
+    },
+    {
+      "step": 3248000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.3,
+      "median_score": 95.0,
+      "min_score": 58.0,
+      "max_score": 95.0,
+      "avg_reward": 170.27,
+      "seconds": 47.0
+    },
+    {
+      "step": 3252000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.72,
+      "median_score": 95.0,
+      "min_score": 47.0,
+      "max_score": 95.0,
+      "avg_reward": 175.78,
+      "seconds": 45.2
+    },
+    {
+      "step": 3253000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 88.15,
+      "median_score": 95.0,
+      "min_score": 52.0,
+      "max_score": 95.0,
+      "avg_reward": 140.77,
+      "seconds": 8.4
+    },
+    {
+      "step": 3257000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 156.38,
+      "seconds": 7.7
+    },
+    {
+      "step": 3269000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 68.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.4,
+      "median_score": 95.0,
+      "min_score": 81.0,
+      "max_score": 95.0,
+      "avg_reward": 161.21,
+      "seconds": 7.6
+    },
+    {
+      "step": 3284000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 60.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.3,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 160.91,
+      "seconds": 7.5
+    },
+    {
+      "step": 3296000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 69.0,
+      "episodes": 100,
+      "perfect_games": 72,
+      "perfect_percent": 72.0,
+      "perfect_ci95": [
+        62.5,
+        79.9
+      ],
+      "avg_score": 93.41,
+      "median_score": 95.0,
+      "min_score": 76.0,
+      "max_score": 95.0,
+      "avg_reward": 162.97,
+      "seconds": 47.8
+    },
+    {
+      "step": 3300000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 65.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.55,
+      "median_score": 95.0,
+      "min_score": 74.0,
+      "max_score": 95.0,
+      "avg_reward": 171.56,
+      "seconds": 36.2
+    },
+    {
+      "step": 3308000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 58.0,
+      "episodes": 20,
+      "perfect_games": 10,
+      "perfect_percent": 50.0,
+      "perfect_ci95": [
+        29.9,
+        70.1
+      ],
+      "avg_score": 90.7,
+      "median_score": 94.0,
+      "min_score": 65.0,
+      "max_score": 95.0,
+      "avg_reward": 137.88,
+      "seconds": 9.0
+    },
+    {
+      "step": 3309000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 58.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.4,
+      "median_score": 95.0,
+      "min_score": 78.0,
+      "max_score": 95.0,
+      "avg_reward": 150.03,
+      "seconds": 8.5
+    },
+    {
+      "step": 3314000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.7,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 150.34,
+      "seconds": 7.1
+    },
+    {
+      "step": 3319000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 93.5,
+      "median_score": 95.0,
+      "min_score": 86.0,
+      "max_score": 95.0,
+      "avg_reward": 156.56,
+      "seconds": 7.8
+    },
+    {
+      "step": 3331000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 60.0,
+      "episodes": 100,
+      "perfect_games": 75,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        65.7,
+        82.5
+      ],
+      "avg_score": 91.65,
+      "median_score": 95.0,
+      "min_score": 32.0,
+      "max_score": 95.0,
+      "avg_reward": 164.68,
+      "seconds": 48.7
+    },
+    {
+      "step": 3340000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 65.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 92.32,
+      "median_score": 95.0,
+      "min_score": 15.0,
+      "max_score": 95.0,
+      "avg_reward": 167.53,
+      "seconds": 48.0
+    },
+    {
+      "step": 3342000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 60.0,
+      "episodes": 20,
+      "perfect_games": 9,
+      "perfect_percent": 45.0,
+      "perfect_ci95": [
+        25.8,
+        65.8
+      ],
+      "avg_score": 89.05,
+      "median_score": 93.5,
+      "min_score": 60.0,
+      "max_score": 95.0,
+      "avg_reward": 131.73,
+      "seconds": 8.0
+    },
+    {
+      "step": 3347000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 57.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 91.45,
+      "median_score": 95.0,
+      "min_score": 62.0,
+      "max_score": 95.0,
+      "avg_reward": 164.69,
+      "seconds": 7.4
+    },
+    {
+      "step": 3352000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 87.7,
+      "median_score": 95.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 156.05,
+      "seconds": 6.7
+    },
+    {
+      "step": 3360000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 68.0,
+      "episodes": 100,
+      "perfect_games": 68,
+      "perfect_percent": 68.0,
+      "perfect_ci95": [
+        58.3,
+        76.3
+      ],
+      "avg_score": 92.48,
+      "median_score": 95.0,
+      "min_score": 32.0,
+      "max_score": 95.0,
+      "avg_reward": 158.39,
+      "seconds": 48.9
+    },
+    {
+      "step": 3367000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 100,
+      "perfect_games": 92,
+      "perfect_percent": 92.0,
+      "perfect_ci95": [
+        85.0,
+        95.9
+      ],
+      "avg_score": 94.74,
+      "median_score": 95.0,
+      "min_score": 90.0,
+      "max_score": 95.0,
+      "avg_reward": 185.09,
+      "seconds": 36.6
+    },
+    {
+      "step": 3368000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 91.25,
+      "median_score": 95.0,
+      "min_score": 56.0,
+      "max_score": 95.0,
+      "avg_reward": 149.27,
+      "seconds": 8.4
+    },
+    {
+      "step": 3374000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 91.91,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 168.1,
+      "seconds": 32.9
+    },
+    {
+      "step": 3377000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 91.6,
+      "median_score": 95.0,
+      "min_score": 51.0,
+      "max_score": 95.0,
+      "avg_reward": 160.03,
+      "seconds": 7.5
+    },
+    {
+      "step": 3380000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 75.65,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 144.33,
+      "seconds": 6.6
+    },
+    {
+      "step": 3388000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 82.0,
+      "episodes": 100,
+      "perfect_games": 88,
+      "perfect_percent": 88.0,
+      "perfect_ci95": [
+        80.2,
+        93.0
+      ],
+      "avg_score": 94.46,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 180.75,
+      "seconds": 46.2
+    },
+    {
+      "step": 3390000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 63,
+      "perfect_percent": 63.0,
+      "perfect_ci95": [
+        53.2,
+        71.8
+      ],
+      "avg_score": 91.62,
+      "median_score": 95.0,
+      "min_score": 35.0,
+      "max_score": 95.0,
+      "avg_reward": 152.7,
+      "seconds": 31.7
+    },
+    {
+      "step": 3391000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 92.01,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 172.34,
+      "seconds": 48.2
+    },
+    {
+      "step": 3392000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 85.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.11,
+      "median_score": 95.0,
+      "min_score": 33.0,
+      "max_score": 95.0,
+      "avg_reward": 171.28,
+      "seconds": 33.0
+    },
+    {
+      "step": 3394000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 63,
+      "perfect_percent": 63.0,
+      "perfect_ci95": [
+        53.2,
+        71.8
+      ],
+      "avg_score": 90.98,
+      "median_score": 95.0,
+      "min_score": 19.0,
+      "max_score": 95.0,
+      "avg_reward": 151.9,
+      "seconds": 55.0
+    },
+    {
+      "step": 3396000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 88.99,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 163.19,
+      "seconds": 35.9
+    },
+    {
+      "step": 3399000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.0,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 149.77,
+      "seconds": 7.8
+    },
+    {
+      "step": 3400000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 75.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 87.2,
+      "median_score": 95.0,
+      "min_score": 50.0,
+      "max_score": 95.0,
+      "avg_reward": 160.49,
+      "seconds": 8.7
+    },
+    {
+      "step": 3410000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 76,
+      "perfect_percent": 76.0,
+      "perfect_ci95": [
+        66.8,
+        83.3
+      ],
+      "avg_score": 88.77,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 163.02,
+      "seconds": 36.0
+    },
+    {
+      "step": 3411000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.55,
+      "median_score": 95.0,
+      "min_score": 54.0,
+      "max_score": 95.0,
+      "avg_reward": 175.83,
+      "seconds": 47.8
+    },
+    {
+      "step": 3414000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 93.69,
+      "median_score": 95.0,
+      "min_score": 51.0,
+      "max_score": 95.0,
+      "avg_reward": 177.76,
+      "seconds": 34.5
+    },
+    {
+      "step": 3416000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.18,
+      "median_score": 95.0,
+      "min_score": 34.0,
+      "max_score": 95.0,
+      "avg_reward": 175.45,
+      "seconds": 34.8
+    },
+    {
+      "step": 3417000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 20,
+      "perfect_games": 15,
+      "perfect_percent": 75.0,
+      "perfect_ci95": [
+        53.1,
+        88.8
+      ],
+      "avg_score": 92.5,
+      "median_score": 95.0,
+      "min_score": 67.0,
+      "max_score": 95.0,
+      "avg_reward": 165.3,
+      "seconds": 7.8
+    },
+    {
+      "step": 3421000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 82,
+      "perfect_percent": 82.0,
+      "perfect_ci95": [
+        73.3,
+        88.3
+      ],
+      "avg_score": 94.21,
+      "median_score": 95.0,
+      "min_score": 83.0,
+      "max_score": 95.0,
+      "avg_reward": 174.34,
+      "seconds": 36.2
+    },
+    {
+      "step": 3422000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.56,
+      "median_score": 95.0,
+      "min_score": 63.0,
+      "max_score": 95.0,
+      "avg_reward": 171.69,
+      "seconds": 49.4
+    },
+    {
+      "step": 3426000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 83,
+      "perfect_percent": 83.0,
+      "perfect_ci95": [
+        74.5,
+        89.1
+      ],
+      "avg_score": 92.28,
+      "median_score": 95.0,
+      "min_score": 46.0,
+      "max_score": 95.0,
+      "avg_reward": 173.59,
+      "seconds": 34.4
+    },
+    {
+      "step": 3427000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 77.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.92,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 176.14,
+      "seconds": 48.8
+    },
+    {
+      "step": 3432000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 86.7,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 150.06,
+      "seconds": 7.3
+    },
+    {
+      "step": 3437000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 93.03,
+      "median_score": 95.0,
+      "min_score": 31.0,
+      "max_score": 95.0,
+      "avg_reward": 177.2,
+      "seconds": 40.5
+    },
+    {
+      "step": 3441000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 91.65,
+      "median_score": 95.0,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 168.75,
+      "seconds": 32.0
+    },
+    {
+      "step": 3443000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 86,
+      "perfect_percent": 86.0,
+      "perfect_ci95": [
+        77.9,
+        91.5
+      ],
+      "avg_score": 93.22,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 177.47,
+      "seconds": 43.4
+    },
+    {
+      "step": 3444000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 90,
+      "perfect_percent": 90.0,
+      "perfect_ci95": [
+        82.6,
+        94.5
+      ],
+      "avg_score": 93.56,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 181.96,
+      "seconds": 42.7
+    },
+    {
+      "step": 3452000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 78,
+      "perfect_percent": 78.0,
+      "perfect_ci95": [
+        68.9,
+        85.0
+      ],
+      "avg_score": 85.47,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 161.86,
+      "seconds": 48.8
+    },
+    {
+      "step": 3457000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 80.0,
+      "episodes": 100,
+      "perfect_games": 81,
+      "perfect_percent": 81.0,
+      "perfect_ci95": [
+        72.2,
+        87.5
+      ],
+      "avg_score": 92.97,
+      "median_score": 95.0,
+      "min_score": 54.0,
+      "max_score": 95.0,
+      "avg_reward": 172.02,
+      "seconds": 37.2
+    },
+    {
+      "step": 3460000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 79.0,
+      "episodes": 100,
+      "perfect_games": 68,
+      "perfect_percent": 68.0,
+      "perfect_ci95": [
+        58.3,
+        76.3
+      ],
+      "avg_score": 89.77,
+      "median_score": 95.0,
+      "min_score": 13.0,
+      "max_score": 95.0,
+      "avg_reward": 155.8,
+      "seconds": 51.7
+    },
+    {
+      "step": 3471000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 66.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 90.95,
+      "median_score": 95.0,
+      "min_score": 61.0,
+      "max_score": 95.0,
+      "avg_reward": 158.74,
+      "seconds": 10.0
+    },
+    {
+      "step": 3497000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 75.0,
+      "episodes": 100,
+      "perfect_games": 84,
+      "perfect_percent": 84.0,
+      "perfect_ci95": [
+        75.6,
+        89.9
+      ],
+      "avg_score": 93.59,
+      "median_score": 95.0,
+      "min_score": 54.0,
+      "max_score": 95.0,
+      "avg_reward": 175.48,
+      "seconds": 45.8
+    },
+    {
+      "step": 3515000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 77,
+      "perfect_percent": 77.0,
+      "perfect_ci95": [
+        67.8,
+        84.2
+      ],
+      "avg_score": 92.27,
+      "median_score": 95.0,
+      "min_score": 4.0,
+      "max_score": 95.0,
+      "avg_reward": 167.14,
+      "seconds": 28.8
+    },
+    {
+      "step": 3520000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 70.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.17,
+      "median_score": 95.0,
+      "min_score": 35.0,
+      "max_score": 95.0,
+      "avg_reward": 171.26,
+      "seconds": 47.8
+    },
+    {
+      "step": 3523000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 69.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 92.95,
+      "median_score": 95.0,
+      "min_score": 81.0,
+      "max_score": 95.0,
+      "avg_reward": 160.63,
+      "seconds": 6.0
+    },
+    {
+      "step": 3526000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 64.0,
+      "episodes": 20,
+      "perfect_games": 16,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        58.4,
+        91.9
+      ],
+      "avg_score": 93.4,
+      "median_score": 95.0,
+      "min_score": 81.0,
+      "max_score": 95.0,
+      "avg_reward": 171.22,
+      "seconds": 6.8
+    },
+    {
+      "step": 3532000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 93.39,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 165.27,
+      "seconds": 31.0
+    },
+    {
+      "step": 3533000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.35,
+      "median_score": 95.0,
+      "min_score": 80.0,
+      "max_score": 95.0,
+      "avg_reward": 149.6,
+      "seconds": 6.6
+    },
+    {
+      "step": 3536000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 79,
+      "perfect_percent": 79.0,
+      "perfect_ci95": [
+        70.0,
+        85.8
+      ],
+      "avg_score": 93.08,
+      "median_score": 95.0,
+      "min_score": 54.0,
+      "max_score": 95.0,
+      "avg_reward": 169.8,
+      "seconds": 47.6
+    },
+    {
+      "step": 3538000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 100,
+      "graph_surrounding": 84.0,
+      "episodes": 100,
+      "perfect_games": 65,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        55.3,
+        73.6
+      ],
+      "avg_score": 91.0,
+      "median_score": 95.0,
+      "min_score": 6.0,
+      "max_score": 95.0,
+      "avg_reward": 153.6,
+      "seconds": 52.9
+    },
+    {
+      "step": 3541000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 81.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 92.4,
+      "median_score": 95.0,
+      "min_score": 83.0,
+      "max_score": 95.0,
+      "avg_reward": 155.05,
+      "seconds": 7.3
+    },
+    {
+      "step": 3548000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.0,
+      "episodes": 100,
+      "perfect_games": 80,
+      "perfect_percent": 80.0,
+      "perfect_ci95": [
+        71.1,
+        86.7
+      ],
+      "avg_score": 93.28,
+      "median_score": 95.0,
+      "min_score": 45.0,
+      "max_score": 95.0,
+      "avg_reward": 171.42,
+      "seconds": 34.0
+    },
+    {
+      "step": 3555000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 62.0,
+      "episodes": 100,
+      "perfect_games": 74,
+      "perfect_percent": 74.0,
+      "perfect_ci95": [
+        64.6,
+        81.6
+      ],
+      "avg_score": 92.58,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 164.11,
+      "seconds": 4825.8
+    },
+    {
+      "step": 3622000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 61.0,
+      "episodes": 20,
+      "perfect_games": 8,
+      "perfect_percent": 40.0,
+      "perfect_ci95": [
+        21.9,
+        61.3
+      ],
+      "avg_score": 86.25,
+      "median_score": 92.0,
+      "min_score": 3.0,
+      "max_score": 95.0,
+      "avg_reward": 124.11,
+      "seconds": 8.0
+    },
+    {
+      "step": 3652000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 74.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 88.9,
+      "median_score": 95.0,
+      "min_score": 2.0,
+      "max_score": 95.0,
+      "avg_reward": 141.33,
+      "seconds": 8.9
+    },
+    {
+      "step": 3656000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 70.0,
+      "episodes": 20,
+      "perfect_games": 13,
+      "perfect_percent": 65.0,
+      "perfect_ci95": [
+        43.3,
+        81.9
+      ],
+      "avg_score": 91.75,
+      "median_score": 95.0,
+      "min_score": 72.0,
+      "max_score": 95.0,
+      "avg_reward": 154.78,
+      "seconds": 7.8
+    },
+    {
+      "step": 3666000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 78.0,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 77.95,
+      "median_score": 95.0,
+      "min_score": 1.0,
+      "max_score": 95.0,
+      "avg_reward": 146.31,
+      "seconds": 7.0
+    },
+    {
+      "step": 3668000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 11,
+      "perfect_percent": 55.0,
+      "perfect_ci95": [
+        34.2,
+        74.2
+      ],
+      "avg_score": 91.3,
+      "median_score": 95.0,
+      "min_score": 63.0,
+      "max_score": 95.0,
+      "avg_reward": 144.29,
+      "seconds": 9.2
+    },
+    {
+      "step": 3669000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 76.0,
+      "episodes": 20,
+      "perfect_games": 12,
+      "perfect_percent": 60.0,
+      "perfect_ci95": [
+        38.7,
+        78.1
+      ],
+      "avg_score": 92.9,
+      "median_score": 95.0,
+      "min_score": 84.0,
+      "max_score": 95.0,
+      "avg_reward": 151.21,
+      "seconds": 8.7
+    },
+    {
+      "step": 3674000,
+      "selected_by": "threshold90",
+      "graph_single_eval": 90,
+      "graph_surrounding": 73.3,
+      "episodes": 20,
+      "perfect_games": 14,
+      "perfect_percent": 70.0,
+      "perfect_ci95": [
+        48.1,
+        85.5
+      ],
+      "avg_score": 93.0,
+      "median_score": 95.0,
+      "min_score": 82.0,
+      "max_score": 95.0,
+      "avg_reward": 161.06,
+      "seconds": 7.3
+    }
+  ]
+}

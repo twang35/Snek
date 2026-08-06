@@ -72,6 +72,23 @@ keep it, and `grep -rn <name> --include='*.md' .` first — the tuning docs link
 `_eval_progress.png` there and moves whatever was there into `evals/archive/<timestamp>/` first —
 so starting an eval is when files move out, not when they are lost.
 
+**A throwaway `EVAL_OUT_SUFFIX` protects the results file but *not* `evals/`.** The suffix only
+renames `<policy>_checkpoint_evals<suffix>.json`; the chart path has no suffix in it, and
+`archive_existing_eval_pngs()` runs before any setup — before the checkpoint restore, before the
+worker spawn — so **any** eval launched for any reason displaces every chart at the top level. A
+one-checkpoint verification run is enough to do it. This has now happened twice: once to batch 11's
+four charts, once to batch 13's.
+
+Two consequences worth internalising:
+
+- **Don't run a verification eval while a real close-out's charts matter.** There is no flag that
+  makes one harmless; the only safe options are to wait, or to accept the displacement and restore
+  afterwards.
+- **Restoring is easy and lossless** — `cp evals/archive/<timestamp>/<policy>_eval_progress.png
+  evals/`, and leave the archive directory in place. A *running* arm repairs itself within a round
+  because it rewrites its own chart every round regardless of what is there; only finished arms
+  need the copy back.
+
 **`<policy>_checkpoint_evals<suffix>.json.previous` is a safety net.** Written before overwriting
 an existing *complete* result, because the first write of a new run destroys whatever was at that
 path. Check it isn't the only copy of something real before removing it.
@@ -129,8 +146,8 @@ Everything is in **`snek2/hyperparamTuning/`**:
 | `findings.md` | what is established, what is falsified. Read before proposing an experiment |
 | `completedRuns.md` | every arm: config, final numbers, verdict. The canonical arm table |
 | `failureModes.md` | the four ways a policy degrades and how to tell them apart |
-| `charts.md` + `charts/` | progress graph per arm, batch 10 onward |
-| `archive/` | batches 1-9 and superseded findings. **History only — do not read into context** |
+| `charts.md` + `charts/` | progress graph per arm, batch 11 onward |
+| `archive/` | batches 1-10 and superseded findings. **History only — do not read into context** |
 
 Keep the split clean: `runs.md` is current state and forward plan only, results go to
 `completedRuns.md`, conclusions to `findings.md`, anything about *how to measure or judge* to
@@ -154,13 +171,13 @@ and then say which ones are stopping and why.
 
 It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
 so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
-<change>` section with a stats line, a short reading, and the image. Captions for batches 1-9 are
-in `archive/batches1-9.md`, so check both:
+<change>` section with a stats line, a short reading, and the image. Captions for batches 1-10 are
+in `archive/batches1-10.md`, so check both:
 
 ```
 cd snek2/hyperparamTuning
 ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-9.md \
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-10.md \
   | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 ```

@@ -1,8 +1,8 @@
 # Charts
 
-Progress graphs, **batch 10 onward**. Per-arm numbers live in
+Progress graphs, **batch 11 onward**. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each.
-Batch 1-9 captions moved to [`archive/batches1-9.md`](archive/batches1-9.md) — the PNGs are all
+Batch 1-9 captions moved to [`archive/batches1-10.md`](archive/batches1-10.md) — the PNGs are all
 still in `charts/`.
 
 In every chart: **blue is average score** (food eaten, out of 95) on the left axis, **red is
@@ -26,7 +26,7 @@ and the archive, since captions now live in two places:
 ```
 cd snek2/hyperparamTuning
 ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-9.md \
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-10.md \
   | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
@@ -254,51 +254,5 @@ whether it could hold it.
 The one arm whose close-out degenerated: only 87 checkpoints screened, against an
 `EVAL_CONFIRM_COUNT` of 100, so every screened checkpoint was confirmed anyway and the screen was
 pure overhead. See the note in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
-
----
-
-## Batch 10 — the fresh baseline on the third environment
-
-Four seeds of `DISCOUNT=0.995`, the first arms to train end-to-end on the environment left by
-2026-08-02's seven fixes. **Every arm was stopped healthy rather than dying or declining to a
-stop** — a first for this project — and it held the best measured checkpoint on record (93%) until
-batch 11's close-out beat it with 96%. These four are the control batch 11 is compared against.
-Their checkpoints **no longer load on `master`**: `450e66e` is the last commit with the 26-value
-vector.
-
-### b10d-disc995seed4 — `DISCOUNT=0.995`, third env, seed 4
-
-![b10d](charts/b10d-disc995seed4.png)
-
-Step 4.45M · peak score 94.74 (at 3978k) · best 30-eval perfect 84.3% (at 1666k) · **best measured checkpoint 93%** (at 1695k), pooled **74.9%** /66000
-
-**The best measured checkpoint in the project.** A mid-run eval had read 95% at 1815k; the full
-close-out found 93% at 1695k instead, and the two intervals overlap almost entirely — the same
-policy family measured twice, not a record and a near-miss. Treat ~87% as the honest estimate of
-the underlying rate once the winner's curse is accounted for.
-
-### b10b-disc995seed2 — `DISCOUNT=0.995`, third env, seed 2
-
-![b10b](charts/b10b-disc995seed2.png)
-
-Step 4.65M · peak score 94.96 (at 4545k) · **best 30-eval perfect 85.0%** (at 4547k) · best measured checkpoint 90% (at 1501k), pooled 71.8% /62400
-
-Still climbing when it was stopped — peak trailing score at 4545k out of 4652k run. Its ceiling is
-unknown and, because the vector has since changed, unknowable: this arm cannot be resumed.
-
-### b10a-disc995seed1 — `DISCOUNT=0.995`, third env, seed 1
-
-![b10a](charts/b10a-disc995seed1.png)
-
-Step 4.29M · peak score 94.38 (at 3402k) · best 30-eval perfect 78.3% (at 3402k) · best measured checkpoint 85% (at 2344k), pooled 67.2% /27200
-
-### b10c-disc995seed3 — `DISCOUNT=0.995`, third env, seed 3
-
-![b10c](charts/b10c-disc995seed3.png)
-
-Step 4.12M · peak score 93.84 (at 4021k) · best 30-eval perfect 72.7% (at 4064k) · best measured checkpoint 79% (at 3965k), pooled 63.0% /4700
-
-Weakest of batch 10, and the arm whose close-out selected only 47 checkpoints where `b10d` selected
-660 — the selector's own read on how much of a run is worth measuring.
 
 ---

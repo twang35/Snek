@@ -12,7 +12,7 @@ closed *narrowly* in ways worth checking before reopening them.
 | per-arm numbers and verdicts | [`completedRuns.md`](completedRuns.md) |
 | how to measure and judge | [`hyperparamTuning.md`](hyperparamTuning.md) |
 | the four degradation patterns | [`failureModes.md`](failureModes.md) |
-| superseded findings, batches 1-8 | [`archive/`](archive/) — history only, don't load it |
+| superseded findings, batches 1-10 | [`archive/`](archive/) — history only, don't load it |
 
 ## Status at a glance
 
@@ -56,8 +56,9 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Epsilon reaching 0.0 causes the collapse | **falsified**, *but only at 0.001 vs 0.0* |
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
 | Elevated exploration (handover 0.05) helps | **falsified** — batch 12 deadlocked, 0% perfect 4 of 4 |
-| Elevated exploration (handover 0.0125) helps | **falsified** — batch 13 is an exact null, p=1.000, n=4 |
+| Elevated exploration (handover 0.0125) helps | **falsified** — batch 13 null on **five** metrics, n=4 paired |
 | A one-step exploration shield helps | **open**, confounded — fixed batch 12's decay, nothing to fix at 0.0125 |
+| A seed number is a stable unit of quality across configs | **falsified** — batch 11's best seed became batch 13's worst |
 | The epsilon *ratchet* was a real defect | **standing**, on mechanism: no recovery from a collapse |
 
 **Measurement**
@@ -65,6 +66,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | finding | status |
 |---|---|
 | **`fraction of evals >= 80%` has the lowest between-seed variance** of the candidate metrics | **measured**, sd 5.8 vs 8.6 for best-30 |
+| Abandoning a checkpoint eval early is not worth it | **falsified for an arithmetic rule** — 30% saved at an 85% achievability gate; only the *predictive* version was 14% |
 | **n=4 cannot resolve an effect below ~10 pp**; 5 pp needs n≈17-37 depending on the metric | **established** |
 | 100-episode measurement reproduces within binomial noise | **established**, 51 repeats |
 | The max of N noisy measurements is upward-biased — shrink it before quoting it | **established** |
@@ -111,7 +113,7 @@ Two process notes that came out of batch 9 and still apply:
   steps on `b10b`. Do not use a graph peak to decide where to look for a checkpoint.
 
 Per-batch tables: [`archive/findings-superseded.md`](archive/findings-superseded.md) and
-[`archive/batches1-9.md`](archive/batches1-9.md).
+[`archive/batches1-10.md`](archive/batches1-10.md).
 
 ## Graph evals are a filter, not a ranker
 
@@ -302,7 +304,12 @@ design was untested because there was nothing there.
 |---|---|---|
 | 12 | 0.05 | **deadlock.** 4 arms, 0% perfect games to ~1M, greedy trailing 53-63 vs 84-88 |
 | 12s | 0.05 + exploration shield | decay fixed, still plateaus at trailing ~83 with 0.3% perfect |
-| 13 | 0.0125 + shield | works, and is an **exact null** vs batch 11: +0.0 pp, p = 1.000, n=4 paired |
+| 13 | 0.0125 + shield | works, and is **null on five metrics** vs batch 11, n=4 paired |
+
+Batch 13's five, now that its checkpoints are measured: best ckpt -1.8 pp (p=0.875), top-3 -1.4 pp
+(p=0.875), graph-100% tier **-0.1 pp** (p=1.000), `best_perfect30` **+0.0 pp** (p=1.000),
+`strong_eval_fraction` +2.0 pp. Two independently-computed metrics landing within 0.1 pp is what a
+genuinely zero effect looks like measured five ways.
 
 So the honest closing position on epsilon: **too much exploration is actively harmful and the right
 amount is indistinguishable from none.** 0.05 is fatal to sit at, because a collect policy at 3.3%

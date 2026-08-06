@@ -2,10 +2,10 @@
 
 Every arm that has finished: config, final numbers, verdict. The table below is **canonical** —
 it covers every arm ever run, including the batches whose narratives moved to
-[`archive/batches1-9.md`](archive/batches1-9.md).
+[`archive/batches1-10.md`](archive/batches1-10.md).
 
 Companion to [`runs.md`](runs.md) (what is running), [`findings.md`](findings.md) (conclusions) and
-[`charts.md`](charts.md) (graphs, batch 10 onward). Nothing here should be re-run without a reason.
+[`charts.md`](charts.md) (graphs, batch 11 onward). Nothing here should be re-run without a reason.
 
 ## All arms, ranked by best sustained perfect rate
 
@@ -36,11 +36,11 @@ train on the result. Compare ‡‡ rows only to each other; they are not compar
 unmarked rows.
 
 **‡‡‡ marks arms trained on the 30-value vector (2026-08-03 onward)** — a fourth environment,
-adding the following-tail block (26-28) and food-space (29). Batch 11 is the first and only batch
-to train on it. ‡‡‡ rows compare to each other and, with care, to ‡‡ rows: batch 11 is byte-identical
-to batch 10 in config, so that one cross-era comparison is *designed* and is written up under
-batch 11 below. Everything else stays within its own era. Batch 10's checkpoints stopped loading on
-`master` when this landed.
+adding the following-tail block (26-28) and food-space (29). Batches 11, 12 and 13 all train on it,
+and it is still current. ‡‡‡ rows compare to each other and, with care, to ‡‡ rows: batch 11 is
+byte-identical to batch 10 in config, so that one cross-era comparison is *designed* and is written
+up in [`archive/batches1-10.md`](archive/batches1-10.md). Everything else stays within its own era.
+Batch 10's checkpoints stopped loading on `master` when this landed.
 
 **§ marks arms trained after the epsilon rewrite of 2026-08-04.** Not an environment change —
 the observation vector is untouched and every ‡‡‡ checkpoint still loads — but a config change,
@@ -64,9 +64,18 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
 | `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ **best measured ckpt on record** |
+| `b13d-shieldseed4` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.51M | **95%** @986k | 93.3% | 77.2% /4800 † | 83.3% | ‡‡‡ § **2nd best ckpt on record**; peaked ~1M then lost 44 pp |
+| `b13c-shieldseed3` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.67M | 92% @3367k | 90.7% | 75.9% /11400 † | **85.3%** | ‡‡‡ § best of batch 13 on the graph; best ckpt in its final 300k |
+| `b13b-shieldseed2` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.70M | 91% @1166k | 90.3% | 74.8% /7800 † | 82.3% | ‡‡‡ § fastest start on record: 72.3% pf30 by 350k |
+| `b13a-shieldseed1` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.39M | 80% @2044k | 80.0% | 70.5% /3100 † | 78.0% | ‡‡‡ § weakest of batch 13, and the batch's slowest starter |
 | `b11a-obs30seed1` ‡‡‡ | disc 0.995, **fourth env** | 3.19M | 94% @671k | 93.3% | 79.5% /4800 † | 85.7% | ‡‡‡ 2nd of batch 11; peaked at 678k, then lost 42 pp |
 | `b11d-obs30seed4` ‡‡‡ | disc 0.995, **fourth env** | 3.59M | 88% @3507k | 86.7% | 69.3% /4000 † | 78.3% | ‡‡‡ only arm still near peak when stopped |
 | `b11c-obs30seed3` ‡‡‡ | disc 0.995, **fourth env** | 3.23M | 87% @1706k | 84.7% | 69.0% /2300 † | 73.0% | ‡‡‡ weakest of batch 11 |
+| `b12d-eps002seed4` ‡‡‡ § | eps handover **0.05**, no shield | 1.09M | not measured | — | — | 6.3% | ‡‡‡ § **deadlocked**; abandoned at 1M of 2.5M |
+| `b12a-eps002seed1` ‡‡‡ § | eps handover **0.05**, no shield | 1.12M | not measured | — | — | 6.3% | ‡‡‡ § deadlocked; peaked 87.0 trailing @214k then decayed to 55 |
+| `b12c-eps002seed3` ‡‡‡ § | eps handover **0.05**, no shield | 0.98M | not measured | — | — | 1.7% | ‡‡‡ § deadlocked; 8 perfect games in 977 evals |
+| `b12b-eps002seed2` ‡‡‡ § | eps handover **0.05**, no shield | 1.03M | not measured | — | — | **0.0%** | ‡‡‡ § deadlocked; **zero perfect games in 1032 evals** |
+| `b12s-shield05seed1` ‡‡‡ § | eps handover **0.05** + shield 0.5 | 0.43M | not measured | — | — | 0.3% | ‡‡‡ § the probe that moved the handover; decay fixed, plateau not |
 | `b10d-disc995seed4` ‡‡ | disc **0.995**, third env | 4.45M | **93%** @1695k | **93.3%** | **74.9%** /66000 | 84.3% | ‡‡ best of batch 10; held the record until `b11b` |
 | `b10b-disc995seed2` ‡‡ | disc **0.995**, third env | 4.65M | 90% @1501k | 86.3% | 71.8% /62400 | 85.0% | ‡‡ 2nd of batch 10 |
 | `b10a-disc995seed1` ‡‡ | disc **0.995**, third env | 4.29M | 85% @2344k | — | 67.2% /27200 | 78.3% | ‡‡ stopped healthy |
@@ -106,7 +115,7 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b1b-tgt200` | `TARGET_UPDATE_PERIOD=200` | 106k | — | — | — | 1.0% | stopped early, verdict weak |
 | `b2b-nstep2` | `N_STEP_UPDATE=2` | 580k | — | — | — | 0.7% | dead end |
 
-**† batch 11's `measured` column is the graph-100% tier only, not the whole arm.** Batch 10 was
+**† batches 11 and 13's `measured` column is the graph-100% tier only, not the whole arm.** Batch 10 was
 measured flat — every selected checkpoint at 100 episodes — so pooling all its rows is already an
 equal-effort figure. Batch 11 ran the three-stage protocol, where the rows have different depths and
 the deep ones were chosen *because* they screened well, so pooling them reads high by construction.
@@ -116,6 +125,11 @@ four runs predate the `pooled_equal_effort` field that computes it in-process. W
 both batches is the graph-100% tier — 100 episodes each, no screening applied in either — so that is
 what these four rows report, and it is the column the batch 11 vs batch 10 comparison below uses.
 The episode counts are correspondingly smaller (`/4800` against batch 10's `/27200`).
+
+Batch 13 ran the same three-stage protocol and *does* have `pooled_equal_effort` (68.7 / 71.6 / 73.2
+/ 74.8 across seeds 1-4). Its rows still report the graph-100% tier so the column means one thing
+down the table and so the batch 11 comparison is like-for-like; the equal-effort figures are in the
+batch 13 write-up below.
 
 `train` was a human-started run on committed defaults, stopped by the human. Never
 touch `snek2/savedPolicies/train*`.
@@ -150,37 +164,44 @@ they had not finished improving** — see [`findings.md`](findings.md).
 
 ## Batch 13 — the epsilon rewrite plus the exploration shield: an exact null
 
-**Ran 2026-08-05, four arms to 3.4-3.7M, stopped healthy.** Same environment and config as batch 11
-(‡‡‡, 30-value vector) except the epsilon schedule: handover 0.0125, `GUIDED_FRACTION=0.5`.
-Checkpoint measurement is **still running** — the rows for these four go into the table above once
-it finishes. Graphs in [`charts.md`](charts.md#batch-13--the-lower-handover-plus-the-shield-and-an-exact-null).
+**Ran 2026-08-05, four arms to 3.4-3.7M, stopped healthy, measured 2026-08-05.** Same environment
+and config as batch 11 (‡‡‡, 30-value vector) except the epsilon schedule: handover 0.0125,
+`GUIDED_FRACTION=0.5`. Graphs in
+[`charts.md`](charts.md#batch-13--the-lower-handover-plus-the-shield-and-an-exact-null).
 
-| seed | best30 | `strong_eval_fraction` | peak trailing | trailing-30 at stop | final eps |
+| seed | best ckpt | top-3 | eq-effort | graph-100% tier | best30 | SEF | final eps |
+|---|---|---|---|---|---|---|---|
+| 1 | 80% @2044k | 80.0% | 68.7% | 70.5% /3100 | 78.0% | 11.5% | 0.0024 |
+| 2 | 91% @1166k | 90.3% | 71.6% | 74.8% /7800 | 82.3% | 25.4% | 0.0027 |
+| 3 | 92% @3367k | 90.7% | 73.2% | 75.9% /11400 | **85.3%** | **26.5%** | 0.0023 |
+| 4 | **95%** @986k | 93.3% | **74.8%** | 77.2% /4800 | 83.3% | 14.5% | 0.0050 |
+| **mean** | **89.5%** | **88.6%** | **72.1%** | **74.6%** | **82.2%** | **19.5%** | |
+
+### The pre-registered comparison: null on all five metrics
+
+Paired by seed against `b11a`-`b11d`, exact permutation test over all 16 sign flips:
+
+| metric | batch 13 | batch 11 | diff | p | per-seed diffs |
 |---|---|---|---|---|---|
-| 1 | 78.0% @2679k | 11.5% | 94.5 @2661k | 70.7% | 0.0024 |
-| 2 | 82.3% @1508k | 25.4% | 94.8 @1919k | 67.0% | 0.0027 |
-| 3 | **85.3%** @2864k | **26.5%** | 94.8 @3185k | 72.3% | 0.0023 |
-| 4 | 83.3% @1005k | 14.5% | 94.5 @980k | 39.0% | 0.0050 |
-| **mean** | **82.2%** | **19.5%** | | | |
+| best ckpt | 89.5% | 91.2% | -1.8 pp | 0.875 | -14.0, -5.0, +5.0, +7.0 |
+| top-3 mean | 88.6% | 90.0% | -1.4 pp | 0.875 | -13.3, -5.0, +6.0, +6.7 |
+| graph-100% tier | 74.6% | 74.7% | **-0.1 pp** | **1.000** | -9.0, -6.1, +6.9, +7.9 |
+| `best_perfect30` | 82.2% | 82.2% | **+0.0 pp** | **1.000** | -7.7, -9.4, +12.3, +5.0 |
+| `strong_eval_fraction` | 19.5% | 17.5% | +2.0 pp | — | -6.7, +2.5, +16.9, -4.7 |
 
-### The pre-registered comparison: no difference at all
+**Two independently-computed metrics landing on a mean difference of 0.1 pp or less is not
+coincidence, it is what a genuinely zero effect looks like measured five ways.** The per-seed spread
+is what to read instead: every metric has one seed at roughly -10 pp and another at roughly +7 pp.
+Post-peak drawdown is the same story, 20.0 vs 21.0 pp at p = 0.875.
 
-Paired by seed against `b11a`-`b11d`, exact paired permutation test over all 16 sign flips:
+This confirms the null hypothesis stated in advance: batch 11's near-zero epsilon regime was not
+costing anything, and no version of this schedule has beaten it.
 
-| metric | batch 13 | batch 11 | diff | p |
-|---|---|---|---|---|
-| `best_perfect30` | 82.2% | 82.2% | **+0.0 pp** | **1.000** |
-| `strong_eval_fraction` | 19.5% | 17.5% | +2.0 pp | — |
-| post-peak drawdown | 20.0 pp | 21.0 pp | -1.0 pp | 0.875 |
-
-`best_perfect30` landing on the same mean to one decimal is a coincidence of rounding, not a
-suspicious result — the per-seed diffs are -7.7, -9.4, +12.3, +5.0. **That spread around a zero mean
-is the finding**: n=4 cannot see anything smaller than ~10-15 pp here, and there is nothing larger
-than that to see.
-
-This confirms the null hypothesis stated in advance in
-[`hyperparamTuning.md`](hyperparamTuning.md#what-is-still-unknown): batch 11's near-zero epsilon
-regime was not costing anything, and no version of this schedule has beaten it.
+**The seeds swapped ranks wholesale**, which is worth internalising before designing another n=4
+batch. Seed 3 went from batch 11's weakest arm (87% best ckpt) to 92%; seed 1 went from 94% to 80%.
+Same config, same environment, same seed number — the only difference is which random stream the
+epsilon draws consumed. **A seed is not a stable unit of quality**, so pairing by seed removes less
+variance than it looks like it should.
 
 ### What the rewrite did buy, which is not nothing
 
@@ -195,9 +216,12 @@ step 350k, where every batch-12 arm was at 0%. Whatever the rewrite is worth, th
 
 ### What it did not buy, stated plainly
 
-- **No outcome gain.** Three batches of work on epsilon have produced one deadlock and one exact
-  null. The `min_epsilon` floor and the anti-ratchet are worth keeping on mechanism; the elevated
-  exploration is not worth pursuing further at n=4.
+- **No outcome gain, on five metrics.** Three batches of work on epsilon have produced one deadlock
+  and one null measured five independent ways. The `min_epsilon` floor and the anti-ratchet are worth
+  keeping on mechanism; the elevated exploration is not worth pursuing further at n=4.
+- **No new record.** `b13d`'s 95% @986k is the second-best checkpoint on record and does not beat
+  `b11b`'s 96%. It is in [`../hallOfFame/`](../hallOfFame/README.md) because a 95% on the current
+  environment is worth keeping, not because it changed the ceiling.
 - **The shield is unproven.** It fixed batch 12's decay at handover 0.05 (see
   `b12s-shield05seed1`), but at 0.0125 there is no decay to fix and nothing separates it from batch
   11. It is confounded with the handover change here and cannot be isolated at this sample size.
@@ -325,88 +349,3 @@ in the same wall time — which is the only thing that fixes the ~10 pp resoluti
 this batch's result unreadable. n=12 at 2M would detect ~5 pp. That is worth testing before
 spending another four slots on a knob whose effect is probably smaller than 10 pp.
 
-## Batch 10 — a fresh baseline, and a new project record
-
-**Launched 2026-08-02, all four stopped 2026-08-03** by request, healthy, to make room for
-further changes — not because any of them died or declined. Seven observation/reward changes
-had landed the same day batch 10 launched (fatal-move zeroing, wall/body hugging, normalized
-group count, the corrected starve/length split, the terminal-discount fix, safe-to-chase-food,
-and the audit that started the day), on top of the audit that already made batch 9 incomparable
-to batch 8. Nothing had trained on the resulting environment at all, so batch 10 was deliberately
-four seeds of **one** config — `DISCOUNT=0.995`, the most reliably-surviving value on record (3 of
-3 in batch 7, 2 of 2 in batch 9) — rather than another comparison, on the reasoning that comparing
-two things before either has a baseline on the actual environment being measured just repeats
-batch 9's own lesson at one remove. Shared base for all four:
-`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
-
-| policy | final step | peak trailing | best-30 perfect | best ckpt (mid-run eval) | top-3 | pooled | outcome |
-|---|---|---|---|---|---|---|---|
-| `b10a-disc995seed1` | 4.29M | 94.4 @3402k | 78.3% @3402k | close-out eval pending | — | — | stopped healthy |
-| `b10b-disc995seed2` | 4.65M | 94.96 @4545k | 85.0% @4547k | 87% @1157k | 86.3% | 70.4%/12000 | stopped healthy, 2nd-best |
-| `b10c-disc995seed3` | 4.12M | 93.8 @4021k | 72.7% @4064k | close-out eval pending | — | — | stopped healthy |
-| `b10d-disc995seed4` | 4.45M | 94.7 @3978k | 84.3% @1666k | **95%** @1815k | **93.3%** | **74.5%/24600** | stopped healthy, **project record** |
-
-**All four were still healthy when stopped** — no `dead_since`/`zero_since` on any of them, and
-two (`b10b`, `b10c`) were at or near their own peak trailing score *at the moment they were
-stopped*, not declining from an earlier peak the way every record-setting arm before this batch
-was. That is a first for this project: every previous best-checkpoint arm (`b8f`, `b8d`, `b9d`)
-had already peaked and was declining by the time it was measured or stopped.
-
-**`b10d`'s 95% (CI 88.8-97.8, 246 checkpoints cleared the ≥90% tier) is the best figure this
-project has produced on any environment**, ahead of the pre-audit record of 92% (`b8f`
-`ckpt2816000`, no longer reproducible — see the hall of fame) and far ahead of the previous
-post-audit best of 82% (`b8f` `ckpt3149000`, also no longer reproducible after this session's
-seven fixes). Both `b10b`'s and `b10d`'s measurements were taken **mid-run** — each arm kept
-training for another ~2.5-2.9M steps afterward, up to a final step neither eval's checkpoint
-range covered — so a full close-out re-measurement across each arm's complete checkpoint history
-may move these numbers further; see [`runs.md`](runs.md) for whether that has happened yet.
-
-**Not yet established: whether this is the config or the environment.** Batch 10 deliberately
-ran one config, so it cannot separate "the seven 2026-08-02 fixes made training better" from
-"this seed cluster happened to be strong" — n=4 on one value is enough to trust as a baseline,
-not enough to attribute the gain. Both `b10d` (95%) and `b10b` (87%) comfortably clear the old
-82% ceiling, and `b10a`/`b10c` graph-eval no worse than batch 9's arms did at a comparable
-horizon, which is suggestive but not the isolating comparison a future batch would need to make
-the claim safely.
-
-Both champion checkpoints are preserved in
-[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-96-and-it-runs-on-master).
-
-## Batch 9 — 0.995 against 0.9975 on the post-audit environment
-
-**Launched 2026-08-02 00:41, all four stopped the same day.** The first batch trained on the
-environment left by the observation/reward audit, so **none of its numbers are comparable to any
-batch above it** — the same checkpoint that scored 92% pre-audit reads 73% here. Shared base
-`SNEK_PRIORITY_EXPONENT=0.6 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0`.
-
-| policy | discount | final step | peak trailing | best30 | **best eval'd ckpt** | top-3 | pooled | outcome |
-|---|---|---|---|---|---|---|---|---|
-| `b9a-disc9975a` | 0.9975 | 3.68M | **89.8** @3277k | **56.0%** @1738k | 65.0% @1735k | 64.3% | **54.9%** /2000 | survived |
-| `b9b-disc9975b` | 0.9975 | **10.47M** | 72.1 @**328k** | 5.0% @221k | not measured | — | — | **dead** |
-| `b9c-disc995a` | 0.995 | 3.71M | 86.5 @3573k | 37.3% @2608k | 52.0% @2603k | 51.3% | 38.0% /2000 | survived |
-| `b9d-disc995b` | 0.995 | 3.45M | 86.7 @1232k | 30.3% @1324k | **70.0%** @2544k | **66.3%** | 42.4% /1700 | survived |
-
-**Why the batch was shaped this way.** The queued plan had two 0.9975 seeds plus `0.996` and
-`LEARNING_RATE=1e-4`, resting on 0.995 having survived 3 of 3 — but that was measured pre-audit and
-was void, so as written the batch had no 0.995 arm and could not settle the question it existed for.
-Four arms on two values answers one question properly instead of three partially. `0.996` and the
-learning rate stayed deferred.
-
-**Outcome: the candidates win different things and the question is still open.** Ceiling and top-3
-go to 0.995 (`b9d` at 70% / 66.3%), consistency to 0.9975 (`b9a` pools 54.9% with 18 of 20
-checkpoints above 40%), and survival to 0.995 at 2 of 2 against 1 of 2. Survival dominates expected
-value — mean top-3 across seeds is **58.8% for 0.995** against **32.2% for 0.9975** — but the two
-0.995 seeds are **18 points apart** on best checkpoint, so seed spread still exceeds the effect.
-
-**`b9b` is the clearest overrun failure in the file.** It peaked at step **328k**, before any sibling
-had warmed up, then ran a further 10.1M steps producing nothing, `zero_since` 9.92M. It did that
-overnight with nobody watching, which is the entire argument for the 3-3.5M stop rule rather than
-stopping by inspection.
-
-**The three survivors were measured while still training**, at 3.4-3.7M, so their close-outs are
-mid-run. `b9c` was still climbing when stopped — peak trailing at 3573k, its last few hundred
-thousand steps — so it is the one arm here that might have had more to give.
-
-**Batch 9's best checkpoint (70%) is below `b8f`'s re-measured 82%.** Nothing trained after the audit
-yet beats something trained before it, at a comparable horizon. One batch, and not a verdict, but
-recorded because it is the opposite of what the fixes were meant to buy.

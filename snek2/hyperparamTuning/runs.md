@@ -31,36 +31,16 @@ checkpoint fail to restore; **`450e66e` is the last commit with the 26-value vec
 measured mid-run over 30 episodes and shrinks to ~87%, and its own arm's close-out found 93%
 @1695000 over a full 100 — treat those two as one policy family measured twice rather than a record
 and a near-miss. Full batch results:
-[`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
+[`archive/batches1-10.md`](archive/batches1-10.md).
 
-## Batch 10 is closed out — its arms are the control for batch 11
+## Reference: the 2026-08-03 changes, and what they froze
 
-**Batch 10 was stopped 2026-08-03 by request**, all four arms healthy (no `dead_since` on any
-of them), to make room for further changes. It was launched as a fresh baseline after seven
-observation/reward changes landed 2026-08-02 (fatal-move zeroing, wall/body hugging, normalized
-group count, the corrected starve/length split, the terminal-discount fix, safe-to-chase-food,
-and the audit that started the day) — nothing had trained on the resulting environment before
-it. All four seeds beat every prior post-audit result; full design and results:
-[`completedRuns.md`](completedRuns.md#batch-10--a-fresh-baseline-and-a-new-project-record).
+Batch 10's own write-up moved to
+[`archive/batches1-10.md`](archive/batches1-10.md) once batch 13 made batch 11 the baseline.
+The two subsections below stayed here because they are not about batch 10 — they describe the eval
+protocol and the observation vector every current arm runs on.
 
-**Close-out evals: all four complete.** These four rows are the control batch 11 is measured
-against.
-
-| arm | checkpoints | best (100 episodes) | pooled | graph-100% tier |
-|---|---|---|---|---|
-| `b10d-disc995seed4` | 660 | 93.0% @1695000 | 74.9% | 75.7% (n=146) |
-| `b10b-disc995seed2` | 624 | 90.0% @1501000 | 71.8% | 72.9% (n=142) |
-| `b10a-disc995seed1` | 272 | 85.0% @2344000 | 67.2% | 68.7% (n=47) |
-| `b10c-disc995seed3` | 47 | 79.0% @3965000 | 63.0% | 65.1% (n=7) |
-
-The *pooled* column is over full-length rows only. It is a valid equal-effort arm rate here — these
-four predate the screening protocol and were measured flat at 100 episodes each — which is why they
-compare directly to each other. It is **not** comparable to a batch-11 pooled figure, where rows
-have different depths; the **graph-100% tier** column is the one that crosses the two batches, since
-that tier is measured at 100 episodes unscreened in both. See the † note in
-[`completedRuns.md`](completedRuns.md).
-
-### Evals got ~10x cheaper on 2026-08-03
+## Evals got ~10x cheaper on 2026-08-03
 
 Two changes, both measured rather than assumed:
 
@@ -88,16 +68,24 @@ target. That made it 2.8x slower *and* cost more CPU per episode, because Tensor
 pool costs about a core whether its batch has 2 rows or 20. **To be gentler on the machine, run
 fewer arms, not fewer workers.**
 
-The early-abandonment idea — cut a checkpoint once its running rate looks weak — was simulated
-against all 937 batch-10 measurements and **rejected**: safe thresholds save only 14%, because
-the selected population is a tight blob between 60% and 80% rather than a few good runs among
-junk. Screening wins by economising on the many mediocre checkpoints instead of the few bad
-ones. Full numbers in [`hyperparamTuning.md`](hyperparamTuning.md#screening-eval_screen_episodes-on-by-default).
+**Early abandonment was rejected in 2026-08-03 and shipped on 2026-08-05**, and the reversal is
+about *which rule*, not new data. The rejected version cut a checkpoint once its running rate
+**looked weak** — a predictive rule, which needs a safety margin to avoid discarding something that
+would recover, and safe margins saved only 14% against batch 10's 937 measurements.
+`EVAL_MIN_ACHIEVABLE=85` is instead an **arithmetic** rule: stop only when the remaining episodes
+cannot carry the checkpoint to 85% even if all of them are perfect. No margin is needed, because
+nothing that would reach the bar can be cut.
+
+That the population is a tight blob between 60% and 80% is what *made* it work rather than what
+killed it: a gate at 85% sits above the whole blob, so nearly all of it is out of contention early.
+Measured on batch 13's first 505 full-length rows, full-length work drops to **70%** — 439 of them
+were already arithmetically out before their 100th episode. Details in
+[`hyperparamTuning.md`](hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy).
 
 A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
 count mid-run cost only the checkpoint in flight rather than the 333 already measured.
 
-### The environment changed again on 2026-08-03: two new observations
+## The environment changed again on 2026-08-03: two new observations
 
 A fourth environment (‡‡‡ in [`completedRuns.md`](completedRuns.md)). The vector went from **26
 values to 30**, in two steps.
@@ -351,21 +339,22 @@ row by its maximum and so samples an all-masked row uniformly by accident; `-inf
 load-bearing and testable. And the shield's one-step depth was flagged as an acceptable limitation
 when it is in fact the binding one.
 
-## Batch 13 is stopped and being measured — the epsilon question is closed
+## Nothing is training and nothing is evaluating. The epsilon question is closed
 
-`b13a-shieldseed1`, `b13b-shieldseed2`, `b13c-shieldseed3`, `b13d-shieldseed4`, run 2026-08-05 to
-3.39M / 3.70M / 3.67M / 3.51M and stopped healthy after 10.4 h. **Checkpoint evals are running** —
-`evals/<policy>_eval_progress.png` for live state, `runs/<policy>_checkpoint_evals.json` for
-results. Full write-up in
+Batch 13 (`b13a`-`b13d`) ran 2026-08-05 to 3.39M / 3.70M / 3.67M / 3.51M, stopped healthy after
+10.4 h, and is fully measured. Full write-up in
 [`completedRuns.md`](completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null).
 
 | | result |
 |---|---|
 | 350k abandon condition | **passed 4/4** — `b13b` hit trailing 92.4 / pf30 72.3% by 350k |
 | epsilon at stop | 0.0023-0.0050 — the refinement phase reached its intended range |
-| `best_perfect30` vs batch 11 | 82.2% vs 82.2%, **+0.0 pp, p = 1.000** paired, n=4 |
+| best ckpt vs batch 11 | 89.5% vs 91.2%, -1.8 pp, p = 0.875 |
+| graph-100% tier vs batch 11 | 74.6% vs 74.7%, **-0.1 pp, p = 1.000** |
+| `best_perfect30` vs batch 11 | 82.2% vs 82.2%, **+0.0 pp, p = 1.000** |
 | `strong_eval_fraction` vs batch 11 | 19.5% vs 17.5%, +2.0 pp |
 | post-peak drawdown | 20.0 vs 21.0 pp, p = 0.875 |
+| new hall-of-fame entry | `b13d-shieldseed4-ckpt986000` at **95%**, 2nd best on record |
 
 **The deadlock is gone and the outcome is unchanged.** Three batches on epsilon have produced one
 deadlock (12) and one exact null (13). Keep the floor and the anti-ratchet, which were always
