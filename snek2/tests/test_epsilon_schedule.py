@@ -236,3 +236,27 @@ def test_a_bigger_initial_epsilon_scales_the_whole_curve():
     # rather than hardcoded, so doubling it doubles the ceiling the refinement starts from.
     assert eps(25.0, 0.0, initial=0.8) == 0.8 / (2.0 ** training.BOOTSTRAP_RUNGS)
     assert eps(-5.0, 0.0, initial=0.8) == 0.8
+
+
+# --------------------------------------------------- the step cap
+
+def test_steps_remaining_counts_from_the_restored_step():
+    # The whole point of an absolute cap: an arm resumed at 4M and capped at 5M has 1M left, not
+    # another 5M. Counting relatively is how `b9b` ran 10.1M steps past its peak.
+    assert training.steps_remaining(0, 5000000) == 5000000
+    assert training.steps_remaining(4000000, 5000000) == 1000000
+    assert training.steps_remaining(4999999, 5000000) == 1
+
+
+def test_steps_remaining_never_goes_negative():
+    # range(negative) is empty rather than an error, but a negative would silently misreport in
+    # the startup line. An arm already past its cap has nothing to do, not a debt.
+    assert training.steps_remaining(5000000, 5000000) == 0
+    assert training.steps_remaining(9000000, 5000000) == 0
+
+
+def test_steps_remaining_accepts_numpy_style_steps():
+    # global_step.numpy() returns a numpy integer, not a Python int.
+    import numpy
+    assert training.steps_remaining(numpy.int64(4000000), 5000000) == 1000000
+    assert isinstance(training.steps_remaining(numpy.int64(10), 20), int)

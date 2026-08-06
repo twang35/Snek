@@ -434,8 +434,10 @@ Notes that matter:
 | `SNEK_TARGET_UPDATE_TAU` | 1.0 | 1.0 = hard copy; <1 = soft/Polyak updates |
 | `SNEK_GRADIENT_CLIPPING` | 0.0 (off) | norm clip; 0 disables |
 | `SNEK_N_STEP_UPDATE` | 1 | n-step returns; buffer window is n+1 automatically |
-| `SNEK_INITIAL_EPSILON` | 0.4 | where the bootstrap phase starts; the refinement phase's ceiling is this / 8 |
-| `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 8` |
+| `SNEK_INITIAL_EPSILON` | 0.4 | where the bootstrap phase starts; the refinement ceiling is this / 32 |
+| `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 32` |
+| `SNEK_GUIDED_FRACTION` | 0.5 | share of refinement-phase episodes whose epsilon move avoids fatal actions; 0 disables the shield |
+| `SNEK_MAX_STEPS` | 5000000 | **absolute** step at which training stops, so a wave self-terminates |
 | `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
 | `SNEK_PRIORITY_EXPONENT` | 0.6 | alpha; 0.0 disables prioritization |
@@ -444,6 +446,21 @@ Notes that matter:
 | `SNEK_IS_BETA` | 0.4 | ignored when `IS_WEIGHTS=0` |
 | `SNEK_BETA_ANNEAL_STEPS` | 1000000 | |
 | `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
+| `SNEK_MIN_CHECKPOINT_SCORE` | 40.0 | below this a checkpoint is not written at all |
+
+**`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added
+2026-08-05; before it, `num_iterations` was hardcoded to 1e9 and every batch had to be stopped by
+hand. `b9b-disc9975b` is why it exists: it ran **10.1M steps past its peak** overnight with nobody
+watching. The default of 5M is deliberately generous — arms produce their best checkpoint between
+~1M and ~3.4M — so it is a backstop rather than a planned horizon.
+
+Absolute means "stop when `global_step` reaches this", not "run this many more steps", because
+`global_step` is restored on resume; a relative count would let an arm resumed at 4M run to 9M. An
+arm already at its cap prints `already at or past the N-step cap` and exits after its opening eval.
+
+One interaction worth knowing: an arm whose score never clears `SNEK_MIN_CHECKPOINT_SCORE` never
+writes a checkpoint, so it cannot resume at all and its cap counts from 0 again. That is
+pre-existing behaviour, but it means a *cap* on such an arm is per-launch in practice.
 
 Rewards (`snake_constants.py`) are deliberately **held fixed** so `avg_score` stays
 comparable across every run. Changing them invalidates comparison with everything

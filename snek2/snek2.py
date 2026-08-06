@@ -127,7 +127,17 @@ def main(argv):
     eval_only = False
     # eval_only = True
 
-    num_iterations = 1000000000  # 1,000,000,000
+    # Absolute step at which training stops, so a wave self-terminates and frees its slots
+    # instead of needing a human to notice. 5M is deliberately generous — arms peak between ~1M
+    # and ~3.4M, so this is "well past useful" rather than a planned horizon, and running over is
+    # cheaper than an arm dying unattended. `b9b-disc9975b` ran **10.1M steps past its peak**
+    # overnight producing nothing, which is the failure this prevents.
+    #
+    # Absolute rather than per-run: `global_step` is restored on resume, so a relative count would
+    # let an arm resumed at 4M run to 9M. See training.steps_remaining().
+    max_steps = tuned('MAX_STEPS', 5000000, int)
+    if max_steps < 1:
+        raise SystemExit('SNEK_MAX_STEPS={0} must be at least 1.'.format(max_steps))
 
     initial_populate_replay_buffer_steps = tuned('INITIAL_POPULATE_STEPS', 1000, int)
     collect_steps_per_iteration = 1
@@ -369,6 +379,7 @@ def main(argv):
         'priority_signal': priority_signal,
         'importance_sampling_beta': '{0} -> 1.0 over {1} steps'.format(
             initial_importance_sampling_beta, beta_anneal_steps) if use_is_weights else 'disabled',
+        'max_steps': max_steps,
         'initial_populate_steps': initial_populate_replay_buffer_steps,
         'eval': '{0} episodes every {1} steps'.format(num_eval_episodes, eval_interval),
         'grid': '{0}x{0}, max possible score {1}'.format(GRID_LENGTH, int(MAX_POSSIBLE_SCORE)),
@@ -379,7 +390,7 @@ def main(argv):
         'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }
 
-    train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+    train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction_var, guided_fraction,
           eval_only, policy_name, run_config, priority_signal, use_is_weights)

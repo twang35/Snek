@@ -74,7 +74,7 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
 
-def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction, configured_guided_fraction,
           eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True):
@@ -113,12 +113,17 @@ def train(num_iterations, eval_parallel_env, train_py_env, agent, collect_driver
     if snake_constants.DEBUG_LOGGING:
         print('before training score: ', round(avg_score, 2))
 
-    print('Begin training: ', time.strftime("%d/%m %H:%M:%S", time.localtime()))
+    remaining = steps_remaining(step, max_steps)
+    print('Begin training: {0}  (stopping at step {1}, {2} to go)'.format(
+        time.strftime("%d/%m %H:%M:%S", time.localtime()), max_steps, remaining))
+    if remaining == 0:
+        print('already at or past the {0}-step cap — nothing to train. Raise SNEK_MAX_STEPS to '
+              'continue this arm.'.format(max_steps))
 
     # Reset the environment.
     time_step = train_py_env.reset()
 
-    for _ in range(num_iterations):
+    for _ in range(remaining):
         # Collect a few steps and save to replay buffer.
         # To view q_values, breakpoint at line 160 in tf_agents/policies/q_policy.py
         time_step, _ = collect_driver.run(time_step)
@@ -347,6 +352,17 @@ def get_time(start_time):
     if total_time > 60:
         return str(round(total_time / 60.0, 2)) + ' min'
     return str(round(total_time, 1)) + 's'
+
+
+def steps_remaining(current_step, max_steps):
+    """How many more training steps this run should take, given where a resume left off.
+
+    `max_steps` is **absolute**, not "this run's steps": the loop increments `global_step`, which
+    a resume restores, so counting relatively would let an arm resumed at 4M run to 9M. Returns 0
+    rather than a negative when an arm is already past its cap, so `range()` is a no-op and the
+    run exits after its opening eval instead of raising.
+    """
+    return max(0, int(max_steps) - int(current_step))
 
 
 def trailing_mean(eval_rows, key, current, window, scale=1.0):

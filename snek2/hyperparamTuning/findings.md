@@ -27,7 +27,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | The vector is **30 values**; only batch 11+ checkpoints load on `master` (`450e66e` = 26, `e4514a8` = 20) | **breaking** |
 | A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **standing hazard** |
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
-| Nothing in the vector distinguishes snake lengths 50 to 99 | **measured**, it is one value |
+| ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
 
 **Records and the horizon**

@@ -46,6 +46,22 @@ committing or staging moves the change out of the working tree where it is visib
 So the loop is: make the edit, describe what changed, stop and wait. Read-only git commands are
 fine at any time.
 
+## Training runs
+
+**`SNEK_MAX_STEPS` (default 5,000,000) is an absolute cap**, so a wave self-terminates and frees
+its slots instead of needing someone to notice. Absolute means "stop when `global_step` reaches
+this", not "run this many more" — `global_step` is restored on resume, so a relative count would
+let an arm resumed at 4M run to 9M. An arm already at its cap prints `already at or past the
+N-step cap` and exits after its opening eval; raise the knob to continue it.
+
+The default is generous on purpose: arms produce their best checkpoint between ~1M and ~3.4M, so
+5M is a backstop against an unattended arm, not a planned horizon. `b9b-disc9975b` ran **10.1M
+steps past its peak** overnight before this existed.
+
+**An arm that never clears `SNEK_MIN_CHECKPOINT_SCORE` (default 40) never writes a checkpoint**, so
+it cannot resume and its cap counts from 0 on each launch. That matters for short smoke runs, which
+score ~0 — set `SNEK_MIN_CHECKPOINT_SCORE=0` to test resume behaviour.
+
 ## Smoke tests
 
 `policy_name` (the arg to `snek2.py`) doubles as the checkpoint directory under
