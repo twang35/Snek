@@ -226,42 +226,89 @@ larger-magnitude errors into `td_loss` + alpha 0.6, a combination already flagge
 more aggressive than intended. It argues both ways — bigger errors push Huber into its linear
 region, which *reduces* the distortion — so it is a thing to watch, not a reason to pick n=2.
 
-### Config: decided — inherit batch 13, so n is the only change
-
-**Batch 14 came back null**, so the pre-registered tie-breaker applies and batch 15 runs batch 13's
-config with one knob moved:
+### Config: `DISCOUNT=0.995` with `GUIDED_FRACTION=0.8`, control is batch 14
 
 ```
-SNEK_SEED=1..4  SNEK_DISCOUNT=0.995  SNEK_GUIDED_FRACTION=0.5  SNEK_N_STEP_UPDATE=3
+SNEK_SEED=1..4  SNEK_DISCOUNT=0.995  SNEK_GUIDED_FRACTION=0.8  SNEK_N_STEP_UPDATE=3
 SNEK_PRIORITY_EXPONENT=0.6  SNEK_PRIORITY_SIGNAL=td_loss  SNEK_IS_WEIGHTS=0
 SNEK_MAX_STEPS=10000000
 ```
 
-Not because 0.995 beat 0.9975 — nothing says it did — but because **0.995 has n=8 behind it**
-(batches 11 + 13) against 0.9975's n=4, so it is the tighter control, and it avoids carrying batch
-14's `GUIDED_FRACTION` 0.5 → 0.8 confound into a batch about something else. Control is batch 13,
-seed-matched.
+`GUIDED_FRACTION=0.8` is now the standing value, so batch 15 onward all share it and stay mutually
+comparable. That choice decides which control to read this batch against:
 
-Exactly one variable moves. Do **not** also change the discount.
+| control | differs from batch 15 by | usable? |
+|---|---|---|
+| **batch 14** | discount (0.9975 → 0.995) **and** n | **yes** — the discount is measured null, so n is the only live variable |
+| batch 13 | `GUIDED_FRACTION` (0.5 → 0.8) **and** n | weaker — `GUIDED_FRACTION` has never been isolated at any discount |
+| batches 13+14 pooled, n=8 | both of the above | for the primary metric, since 13 and 14 are indistinguishable |
 
-**The 10M cap will not stop these arms**, so this batch needs a stopping decision of its own — batch
-14 took 12.6 h to reach 4.2-4.5M, and 10M is roughly 30 h. Either stop them by hand once the curves
-flatten, or set `SNEK_MAX_STEPS` to something near 5M deliberately, knowing from `b14c` that ~1 arm
-in 4 is still climbing there.
+**So judge batch 15 against batch 14, seed-matched**, and use the 13+14 pool for the primary where
+the extra arms help. This works only because the discount question came back null: `0.995` and
+`0.9975` are measured indistinguishable at n=4 paired, so swapping them is not expected to move
+anything, whereas `GUIDED_FRACTION` 0.5 → 0.8 is genuinely unmeasured.
+
+**‡ The residual risk, stated so it is not discovered later:** the discount null was measured *at*
+`GUIDED_FRACTION` 0.8 vs 0.5, so it is a null on the pair, not on each knob independently. If the
+discount and the shield interact, "0.995 ≡ 0.9975" need not hold at fixed `GUIDED_FRACTION=0.8`.
+Nothing suggests they do — at epsilon ~0.003 the shield touches roughly 0.1% of steps, which is too
+few events to plausibly interact with a horizon change — but it is an assumption this batch rests on.
+If batch 15 comes back with a large effect, **check it against batch 14 before crediting n-step.**
+
+**Do not also change the discount, and leave `GUIDED_FRACTION` at 0.8 from here on.**
+
+**The 10M cap will not stop these arms in reasonable time** — batch 14 took 12.6 h to reach
+4.2-4.5M, so 10M is roughly 30 h. Left at the default deliberately: it self-terminates, so an
+unattended batch is safe, and `b14c` shows ~1 arm in 4 is still climbing at 4.5M. Stop them by hand
+once the curves flatten.
+
+### RUNNING: interim read at 280k — steadier average, fewer perfect games, do not believe it yet
+
+All four alive at ~280k after ~1 h, epsilon 0.0074-0.0119, shield active. Truncated to 277k against
+batch 14 seed-matched:
+
+| metric | b13 | b14 | b15 | vs b14 | p |
+|---|---|---|---|---|---|
+| pf30 | 26.3% | 22.0% | **10.1%** | -11.9 | 0.375 |
+| mean perfect | 13.2% | 9.6% | **3.0%** | -6.6 | 0.250 |
+| trailing score | 87.60 | 86.60 | **88.08** | **+1.48** | 0.125 |
+| mean trailing | 77.6 | 68.0 | **73.0** | **+4.98** | 0.125 |
+| peak trailing | 90.14 | 90.09 | 89.22 | -0.88 | 0.750 |
+
+Trailing score up in **4 of 4** seeds, perfect rate down in 3 of 4. **No arm has crossed pf30 ≥ 40%**
+yet, where batch 13 had 2 of 4 across by this step and batch 14 had 1 of 4. Independent corroboration
+that the completion deficit is not a metric artifact: epsilon is *less* descended on seeds 2-4, and
+the ladder descends on `avg_reward`, which carries the +100 perfect-game bonus.
+
+**‡ This is the exact shape that produced a wrong call on batch 14, so it is recorded as a caution
+rather than a finding.** Batch 14's 1.3M interim read was "raises the floor, lowers the ceiling",
+explained by variance compression, and the close-out falsified it outright — the gap vanished and
+within-arm sd was identical in both batches. The failure was reading a peak-counting metric before the
+peaks arrived. **Batch 15 at 280k is 5x earlier than that mistake.**
+
+**The falsification test, pre-registered now:** if n=3 genuinely completes games more slowly, the
+pf30 ≥ 40% crossings land **materially later than batch 14's 429k mean**. If this is the batch-14
+artifact again, they land at or before it. Do not restate the table above as a result until those
+crossings are in.
 
 ### Pre-registered: judge this on *speed*, not ceiling
 
 n-step's predicted effect is faster credit propagation to the same asymptote, so the primary read is
-**steps to pf30 ≥ 40%**, with `strong_eval_fraction` secondary. The controls:
+**steps to pf30 ≥ 40%**, with `strong_eval_fraction` secondary. Batch 14 is the control to beat;
+batch 13 is shown too because the pooled n=8 is what the primary metric uses:
 
-| seed | batch 13 | batch 14 |
+| seed | **batch 14 (control)** | batch 13 |
 |---|---|---|
-| 1 | 1525k | 639k |
-| 2 | 246k | 227k |
-| 3 | 807k | 530k |
-| 4 | 179k | 320k |
+| 1 | **639k** | 1525k |
+| 2 | **227k** | 246k |
+| 3 | **530k** | 807k |
+| 4 | **320k** | 179k |
+| **mean** | **429k** | 689k |
 
-If n=3 helps, that milestone should arrive earlier. **If it raises the ceiling without arriving
+If n=3 helps, that milestone should arrive earlier than batch 14's 429k mean. Note how little room
+there is on seeds 2 and 4 — 227k and 320k are close to the floor set by the bootstrap ladder itself,
+so a speed gain will show up mostly on the slow seeds, and the mean is the number to read rather than
+a count of seeds improved. **If it raises the ceiling without arriving
 sooner, that is a surprise and worth writing up as one** — it would mean n-step is doing something
 other than accelerating propagation here.
 
