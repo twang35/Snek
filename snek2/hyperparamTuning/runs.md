@@ -172,29 +172,39 @@ eval process works only because it loaded the matching observation code at start
 against a batch-10 arm would now build a 30-value network and fail to restore. **Batch 10's measured
 numbers are final and cannot be extended.**
 
-## Closed batches: 11, 12, 13, 14 — all null, and what that means for the next one
+## Closed batches: 11-15 — all null, and what that means for the next one
 
-Nothing is running. Four consecutive batches on the current 30-value vector have failed to separate
-from each other, and the per-batch write-ups are in
+Nothing is running. **Five consecutive batches on the current 30-value vector have failed to separate
+from each other** — 20 arms across four different hypotheses. Per-batch write-ups are in
 [`completedRuns.md`](completedRuns.md):
 
 | batch | what it changed | verdict |
 |---|---|---|
+| [15](#batch-15-is-stopped-at-55-58m-awaiting-evals--n-step-returns-at-n_step_update3) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; level null |
 | [14](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
 | [13](completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
 | [12](completedRuns.md#batch-12--the-deadlock-abandoned-at-1m-of-25m) | eps handover 0.05 | **deadlocked**, abandoned 4/4 |
 | [11](archive/batches1-11.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference) | the 30-value vector itself | +4 to +5 pp vs batch 10, not significant |
 
-**The 0.995 baseline now has n=8** (batches 11 + 13) and is what batch 15 measures against.
+**The 0.995 baseline now has n=8** (batches 11 + 13), and batch 14 adds n=4 at 0.9975 that is indistinguishable from it.
 
 **The binding constraint is seed variance, not ideas.** Batch 14's primary metric spread -16.2 to
-+24.8 pp per seed around a +2.05 pp mean; `b14d` is the best arm on record for
-`strong_eval_fraction` (39.3%) and `b14b` among the worst (9.3%) on the same config. At n=4 nothing
-below ~10 pp is resolvable, so a fourth null is the expected outcome of any knob whose true effect
-is a few points. That is the argument for the shorter-and-wider batch described under
++24.8 pp per seed around a +2.05 pp mean; batch 15's spread -9.7 to +22.9 pp. `b15a` is the best arm
+on record for `strong_eval_fraction` (39.9%) and `b15c` among the worst (9.4%) — **same config, same
+batch, adjacent seeds**. At n=4 nothing below ~10 pp is resolvable, so a fifth null is the expected
+outcome of any knob whose true effect is a few points. That is the argument for the shorter-and-wider
+batch described under
 [what batch 13 leaves for the next batch](#what-batch-13-leaves-for-the-next-batch), not for another
 n=4 sweep.
-## READY TO LAUNCH: batch 15 — n-step returns at `N_STEP_UPDATE=3`
+
+**‡ The ceiling has not moved at all, and that is the most important number here.** Peak trailing
+score across the five batches reads 94.92 / 94.80 / 94.90 / 95.00 (b11, b13, b14, b15) — flat inside
+0.2 points, even though run length went 3.2-3.6M → 3.4-3.7M → 4.1-4.5M → 5.5-5.8M. What *has* risen
+is how long an arm stays good, which is why full-length `strong_eval_fraction` keeps climbing (19.5 →
+21.6 → 30.5%) while the equal-effort figures stay flat. **That is a run-length artifact, not
+progress**, and it is the honest reading of every "record" in the last three batches.
+
+## Batch 15 is stopped at 5.5-5.8M, awaiting evals — n-step returns at `N_STEP_UPDATE=3`
 
 The first batch that would actually measure n-step returns. Both existing n-step arms are retracted
 rather than negative: `b1c-nstep3` and `b2b-nstep2` trained on returns that summed **straight
@@ -262,34 +272,63 @@ If batch 15 comes back with a large effect, **check it against batch 14 before c
 unattended batch is safe, and `b14c` shows ~1 arm in 4 is still climbing at 4.5M. Stop them by hand
 once the curves flatten.
 
-### RUNNING: interim read at 280k — steadier average, fewer perfect games, do not believe it yet
+### Stopped at 5.5-5.8M, awaiting evals — the primary says n=3 does **not** accelerate
 
-All four alive at ~280k after ~1 h, epsilon 0.0074-0.0119, shield active. Truncated to 277k against
-batch 14 seed-matched:
+Ran 2026-08-06 16:26 to 2026-08-07 08:22, **15.9 h**, four arms to 5.79M / 5.75M / 5.46M / 5.81M —
+the longest arms on this vector by 1.3M. Stopped by hand well short of the 10M cap. No arm died.
 
-| metric | b13 | b14 | b15 | vs b14 | p |
-|---|---|---|---|---|---|
-| pf30 | 26.3% | 22.0% | **10.1%** | -11.9 | 0.375 |
-| mean perfect | 13.2% | 9.6% | **3.0%** | -6.6 | 0.250 |
-| trailing score | 87.60 | 86.60 | **88.08** | **+1.48** | 0.125 |
-| mean trailing | 77.6 | 68.0 | **73.0** | **+4.98** | 0.125 |
-| peak trailing | 90.14 | 90.09 | 89.22 | -0.88 | 0.750 |
+**The pre-registered primary went the wrong way.** n-step's predicted mechanism was faster credit
+propagation, read as steps to pf30 ≥ 40%:
 
-Trailing score up in **4 of 4** seeds, perfect rate down in 3 of 4. **No arm has crossed pf30 ≥ 40%**
-yet, where batch 13 had 2 of 4 across by this step and batch 14 had 1 of 4. Independent corroboration
-that the completion deficit is not a metric artifact: epsilon is *less* descended on seeds 2-4, and
-the ladder descends on `avg_reward`, which carries the +100 perfect-game bonus.
+| seed | b14 (control) | b15 | delta |
+|---|---|---|---|
+| 1 | 639k | 620k | -19k |
+| 2 | 227k | **524k** | **+297k** |
+| 3 | 530k | **707k** | **+177k** |
+| 4 | 320k | 378k | +58k |
+| **mean** | **429k** | **557k** | **+128k slower**, p=0.250 |
 
-**‡ This is the exact shape that produced a wrong call on batch 14, so it is recorded as a caution
-rather than a finding.** Batch 14's 1.3M interim read was "raises the floor, lowers the ceiling",
-explained by variance compression, and the close-out falsified it outright — the gap vanished and
-within-arm sd was identical in both batches. The failure was reading a peak-counting metric before the
-peaks arrived. **Batch 15 at 280k is 5x earlier than that mistake.**
+3 of 4 seeds slower. Not significant, but **the direction is against the hypothesis**, and there is
+no reading of this batch in which n=3 propagated credit faster.
 
-**The falsification test, pre-registered now:** if n=3 genuinely completes games more slowly, the
-pf30 ≥ 40% crossings land **materially later than batch 14's 429k mean**. If this is the batch-14
-artifact again, they land at or before it. Do not restate the table above as a result until those
-crossings are in.
+**Everything else is a fifth null**, equal effort to 4.125M against batch 14:
+
+| metric | b14 | b15 | delta | p |
+|---|---|---|---|---|
+| `strong_eval_fraction` | 21.53% | 25.59% | +4.05 pp | 0.625 |
+| mean perfect | 53.64% | 55.76% | +2.13 pp | 0.625 |
+| mean perfect, back half | 62.39% | 63.01% | +0.62 pp | 1.000 |
+| `best_perfect30` | 82.50% | 83.17% | +0.67 pp | 0.875 |
+| mean trailing | 90.15 | 89.55 | -0.60 | 0.875 |
+| peak trailing | 94.74 | 94.64 | -0.10 | 0.875 |
+| drawdown | 23.75 pp | 20.42 pp | -3.33 pp | 1.000 |
+
+**‡ The 280k interim read was half wrong, in the same direction as batch 14's.** It reported the
+perfect rate down 11.9 pp; at equal effort it finished **up** 2.13 pp. What *did* survive is the early
+deficit it was actually measuring — that is the +128k on the primary. So the lesson holds and gets
+sharper: **an early snapshot of level reverses, an early snapshot of *timing* does not.** Read
+crossings early, read levels late.
+
+**Full-length numbers look much better than the equal-effort ones, and the gap is the point.**
+`b15a` set a new peak trailing score of **95.00** (previous best on this vector 94.92, `b11b`) and the
+best `strong_eval_fraction` on record at **39.9%**, with `b15b` at 39.0% — so batch 15 has two arms
+above the 39.3% that was the previous single best. But `strong_eval_fraction` is a *fraction of an
+arm's own evals*, and these arms ran 1.3-1.7M steps longer than batch 14's while still playing at
+70-80% perfect. At matched steps the advantage is +4.05 pp at p=0.625. **The honest reading is that
+the arms sustained a high level for 5.8M steps, not that n=3 raised the level.**
+
+**‡ 2 of 4 arms were still gaining when stopped**, and this is now the third batch to say the horizon
+is longer than assumed. Final 500k band against each arm's best prior band:
+
+| arm | final band (5.5-6.0M) | best prior | |
+|---|---|---|---|
+| `b15a` | **80.6%** | 80.4% | still gaining |
+| `b15d` | **75.8%** | 72.8% | still gaining |
+| `b15b` | 62.3% | 78.5% | past peak |
+| `b15c` | 53.7% | 59.7% | past peak |
+
+`b15d`'s peak trailing score is at **5799k — its second-to-last eval**. Stopping here truncated two
+arms mid-climb. The 10M cap was not the wrong setting; the habit of stopping at a round number is.
 
 ### Pre-registered: judge this on *speed*, not ceiling
 
@@ -312,7 +351,7 @@ a count of seeds improved. **If it raises the ceiling without arriving
 sooner, that is a surprise and worth writing up as one** — it would mean n-step is doing something
 other than accelerating propagation here.
 
-## What the four nulls leave for the batch after 15
+## What five nulls leave for batch 16
 
 ### What batch 13 leaves for the next batch
 
@@ -426,18 +465,19 @@ rather than at the ceiling.
 - **Setting `SNEK_MIN_EPSILON=0`** — rejected at startup. See
   [`findings.md`](findings.md#scope-of-that-falsification-added-2026-08-04-it-was-never-about-the-descent-rate)
   for why the batch-3 result does not license it.
-- **`N_STEP_UPDATE=5`, *for now*** — this used to read "n=2 and n=3 both peak below baseline, so
-  the trend already points the wrong way", which rests on the retracted evidence: both arms leaked
-  returns across episode boundaries. There is no trend. It stays off the list only because batch 15
-  tests n=3 first, and the contamination arithmetic that makes n=3 safe (0.53% of targets) reaches
-  1.06% at n=5 — still small, so **n=5 becomes reasonable if n=3 wins**.
+- **`N_STEP_UPDATE=5`** — batch 15 measured n=3 and the predicted mechanism is absent: it reached
+  pf30 ≥ 40% **128k later** than its control, 3 of 4 seeds slower, with level a null. The whole case
+  for a larger n was that the effect scales with n, so its absence at n=3 is the worst possible sign
+  for n=5. Contamination was never the obstacle either — 0.53% of targets at n=3, 1.06% at n=5 — so
+  there is no cost to blame the null on. **Closed unless the propagation story is revived by
+  something other than n.**
 - **Resuming any arm from batch 10 or earlier** — every checkpoint on record from before
   batch 11 was trained on an observation vector this project has since changed (20, 23 or 26
   values against the 30 batch 11 trained on), so none of them load; see
   [`../hallOfFame/README.md`](../hallOfFame/README.md#the-entries-below-predate-2026-08-02-and-do-not-run-on-master).
-  **Batches 11 onward are all resumable** — 11, 12, 13 and 14 share the 30-value vector. `b11d` and
-  `b13c` were both still near their peak when stopped, so those are the two arms where resuming
-  would answer something; note that resuming now needs `SNEK_MAX_STEPS` raised above the arm's
+  **Batches 11 onward are all resumable** — 11-15 share the 30-value vector. The arms worth resuming
+  are the ones stopped mid-climb: **`b15a` and `b15d`, both still gaining in their final 500k band at
+  5.5-6.0M**, then `b14c`, `b11d` and `b13c`. Resuming needs `SNEK_MAX_STEPS` raised above the arm's
   current step or it exits immediately.
 
 ### Batch bookkeeping

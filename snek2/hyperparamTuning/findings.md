@@ -37,7 +37,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **The record is 96%**, held jointly by `b11b` @855k and `b14a` @3702k; both correct to ~94% | **measured**, 96/100 each; `b14a` re-measured 187/200 |
 | Two of the four record jumps came from the **horizon** and the **env audit**, not hyperparameters | **established** |
 | An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M | **established**, 2 arms to the end |
-| Arms peak by ~3.4M | **falsified** — 2 of batch 14's 4 peaked past 3.5M and `b14c` was still climbing at 4.5M; the old rule tracked where humans stopped arms |
+| Arms peak by ~3.4M | **falsified** — 2 of batch 14's 4 peaked past 3.5M, and 2 of batch 15's were still gaining at **5.5-6.0M**; the old rule tracked where humans stopped arms |
 | The horizon was the binding constraint — records live past 2.5M, early arms stopped at ~1.06M | **established** |
 | Degradation after 236-312k is systemic across configs | **established**, 5 arms |
 | Arms recover from long zero stretches — `b8g` came back from 1.2M steps at zero | **established** |
@@ -52,7 +52,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
 | `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
-| n-step returns help | **open**, never cleanly tested — the old arms leaked returns across episode ends; batch 15 tests `n=3` |
+| n-step returns help | **falsified on speed** — batch 15 at n=3 reached pf30 >= 40% **128k later** than its control, 3 of 4 seeds slower; level is a null (+4.05 pp `sef`, p=0.625). Evals pending |
 | A larger replay buffer prevents the collapse | **not settled** — opposite results twice |
 | Epsilon reaching 0.0 causes the collapse | **falsified**, *but only at 0.001 vs 0.0* |
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
@@ -428,14 +428,23 @@ trained on returns that mix episodes together, which is a fair explanation for p
 
 This is **not** evidence that n-step helps. It is a retraction of the evidence that it does not.
 
-**Queued as batch 15 at `n=3`, not `n=2`** — an earlier version of this line suggested n=2 as "a
-cheap re-test", which is the wrong call once the numbers are in. The cost of a larger n is that an
-uncorrected n-step return is only exact if the intermediate actions were greedy, and epsilon in this
-project settles at a *measured* 0.0034-0.0039 over the back half of a run, so contamination is 0.27%
-of targets at n=2 against 0.53% at n=3 — no real difference. The upside scales with n: propagating
-the +100 perfect-game reward back across a ~1780-step game takes ~890 backups at n=2 and ~593 at
-n=3. With n=4 arms resolving only a clear win, the larger effect is the one worth a night. Design in
-[`runs.md`](runs.md#ready-to-launch-batch-15--n-step-returns-at-n_step_update3).
+**Batch 15 tested `n=3` on 2026-08-06 and the predicted mechanism did not appear.** n-step's claim
+here was faster credit propagation — the +100 perfect-game reward needs ~890 sequential backups to
+cross a ~1780-step game at n=2 and ~593 at n=3 — so the pre-registered read was **steps to
+pf30 ≥ 40%**. It came out **128k slower** than the batch-14 control, 3 of 4 seeds slower (p=0.250).
+Level is a null: `strong_eval_fraction` +4.05 pp at p=0.625 equal-effort, peak trailing -0.10.
+
+So the honest status is **falsified on speed, null on level**, at n=4. Contamination was never the
+issue — at the measured epsilon of 0.0034-0.0039 an uncorrected n=3 return is exact for 99.5% of
+targets — so the absence of an effect is not explained by the one cost the theory predicts. What
+remains unexplained is *why* propagation did not speed up, and the most likely answer is that credit
+propagation was never the binding constraint. Do not try `n=5`: the reason for preferring larger n
+was that the effect scales with n, and the effect is absent at n=3 in the direction it should be
+largest.
+
+Design and full numbers in
+[`runs.md`](runs.md#batch-15-is-stopped-at-55-58m-awaiting-evals--n-step-returns-at-n_step_update3);
+checkpoint evals pending.
 
 ## The record across four environments: 51% → 92% → 93% → **96%**
 
