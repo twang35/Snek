@@ -551,22 +551,27 @@ def test_the_gate_scales_with_a_shorter_target():
     assert test(13, 20) is True
 
 
-def test_the_default_gate_is_90_and_stops_a_100_episode_run_after_11_failures():
-    # Raised 85 -> 90 on 2026-08-06: the target is a 95%+ policy, so the 85-89% band is not worth
-    # measuring to full depth. Pinned as arithmetic rather than as a bare constant, because what
-    # matters downstream is where the rule fires, not the number itself.
-    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 90.0
+def test_the_default_gate_is_95_and_stops_a_100_episode_run_after_6_failures():
+    # The gate is the bar a checkpoint has to clear to be worth keeping at all. Pinned as
+    # arithmetic rather than as a bare constant, because what matters downstream is where the rule
+    # fires, not the number itself.
+    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 95.0
     test = eval_checkpoints.make_abandon_test(eval_checkpoints.DEFAULT_MIN_ACHIEVABLE, 100,
                                               eval_checkpoints.DEFAULT_ABANDON_FLOOR)
-    # 10 failures still allow exactly 90%, so the run continues; the 11th makes 90% unreachable.
-    assert test(80, 90) is False
-    assert eval_checkpoints.achievable_percent(80, 90, 100) == 90.0
-    assert test(79, 90) is True
-    # The old 85% gate tolerated 15 failures, so it would have kept both of those going. This is
-    # the whole behaviour change, stated as a comparison so a revert cannot pass silently.
-    old = eval_checkpoints.make_abandon_test(85.0, 100, 20)
-    assert old(79, 90) is False
-    assert test(79, 90) is True
+    # 5 failures still allow exactly 95%, so the run continues; the 6th makes 95% unreachable.
+    assert eval_checkpoints.achievable_percent(45, 50, 100) == 95.0
+    assert test(45, 50) is False
+    assert test(44, 50) is True
+    # A 90% gate tolerates 10 failures and would keep both of those going, so a revert to any
+    # looser gate cannot pass silently.
+    for looser in (90.0, 85.0):
+        assert eval_checkpoints.make_abandon_test(looser, 100, 20)(44, 50) is False
+
+    # The floor still binds first: 95% of 100 is unreachable after 6 failures, which can happen
+    # inside the first 20 episodes, so the floor is what keeps a row long enough for
+    # equal_effort_pooled. This is the gate at which the floor stops being slack.
+    assert test(4, 10) is False, 'the floor must suppress a check below 20 episodes'
+    assert test(4, 20) is True
 
 
 # ------------------------------------------- best checkpoint under a gate that can truncate everything

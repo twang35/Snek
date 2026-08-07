@@ -1,274 +1,135 @@
 """Measures a saved checkpoint's true perfect-game rate over many episodes.
 
-The graph in runs/<policy>.png plots a 10-episode eval per point, so a single point
-moves in 10-percentage-point jumps and its *value* is far too coarse to quote. This
-script reloads specific checkpoints and evaluates each over a few hundred episodes,
-which is the only way to state a policy's real rate.
+The graph in runs/<policy>.png plots one 10-episode eval per point, so its value moves in
+10-point jumps and is far too coarse to quote. This script reloads specific checkpoints and
+evaluates each over hundreds of episodes. The graph point is still a good *selector* even
+though it is a bad measurement — see select_top_checkpoints.
 
-Note the graph point is still a good *selector* even though it is a bad measurement:
-a high 10-episode eval reliably marks a genuinely better checkpoint. See
-select_top_checkpoints below.
+Protocol rationale, measured costs and cross-batch comparability rules live in
+hyperparamTuning/hyperparamTuning.md. This docstring covers how to run it and the traps.
 
 Usage:
 
     cd snek2
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
-    PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top[N]
 
-    # the normal close-out. Screening is on by default: 20 episodes on every selected
-    # checkpoint, then 80 more on the best 30 -- 3.6x cheaper than 100 on all of them
+    # the normal close-out
     EVAL_WORKERS=10 PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top20
 
-    # the flat one-pass protocol, which every arm before batch 10 was measured under
-    EVAL_SCREEN_EPISODES=0 PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top20
+    # flat one-pass protocol (every arm before batch 10 was measured this way)
+    EVAL_SCREEN_EPISODES=0 ... top20
 
-    # continue a close-out that was interrupted
-    EVAL_RESUME=1 EVAL_WORKERS=10 PYTHONPATH=. python -u \
-        eval_checkpoints.py <policy_name> top20
+    # continue an interrupted close-out
+    EVAL_RESUME=1 ... top20
 
-`top20` (or `top`, `top:20`) is the normal way to close out an arm. It selects on the
-**single 10-episode eval** from the graph, using the surrounding perfect rate to rank within
-a tier, under three rules:
+Selection (`top20`, `top`, `top:20`) ranks on the single 10-episode graph eval, breaking ties
+on the surrounding rate:
 
-- every checkpoint at **>=90%** is measured, even if that alone exceeds the N asked for
-- remaining slots go to the best of the rest down to **>=60%**, up to N total
-- nothing below 60% is measured at all
+- every checkpoint at **>=90%** is measured, even past N
+- remaining slots go to the best of the rest down to **>=60%**
+- nothing below 60% is measured
 
-So the count is a target, not a quota: a strong arm runs N and a weak one may run 1 or 0.
-Fewer than N is a normal outcome, and padding with sub-60% checkpoints would only depress
-the pooled rate without adding a candidate for best-checkpoint.
+N is a target, not a quota — a weak arm may run 1 or 0. Because a graph point is 10 episodes,
+the mandatory tier is exactly {90, 100} and the fill band is {60, 70, 80}. Adjacent steps are
+allowed through on purpose: 1000 train steps can change the perfect rate by tens of points, so
+neighbours are separate policies rather than repeat samples.
 
-Because a graph point is 10 episodes, `perfect_percent` only takes the values 0, 10, ... 100,
-so these thresholds are coarser than they look: the mandatory tier is {90, 100} and the fill
-band is exactly {60, 70, 80}.
+Three stages when screening is on (the default):
 
-**Why these numbers.** An earlier version measured everything at >=80%, which on a strong arm
-meant 63 checkpoints and four hours. Restricting the mandatory tier to >=90% and capping the
-total at 20 covers the most promising checkpoints at a fraction of the cost — measurement
-showed 90% and 80% points have indistinguishable means (57.9% vs 58.6%), so an unbounded 80%
-tier bought volume rather than information.
+1. every checkpoint whose graph point is **100%**, plus any explicitly named step, gets the
+   full EVAL_EPISODES immediately. Uncapped.
+2. everything else selected gets EVAL_SCREEN_EPISODES (20)
+3. the best EVAL_CONFIRM_COUNT **of those screened** get the remaining 80
 
-Adjacent steps are allowed through on purpose: 1000 train steps is enough to change the
-perfect rate by tens of points, so neighbours are separate policies, not repeat samples.
+A promoted checkpoint ends with exactly EVAL_EPISODES, so its number is comparable with arms
+measured flat. The 100% tier is excluded from confirmation slots — it already has the
+measurement a slot would buy. **That tier is coverage, not a shortlist of champions**; the
+larger 90% tier holds more of the actual best checkpoints, and finding them is stage 3's job.
 
-**Pooled rates only compare across arms when the selection rule matches**, and this rule has
-now changed twice. A variable checkpoint count, the 60% floor and the 20-checkpoint cap all
-move the pooled number on their own. Compare best-checkpoint instead, or re-measure both arms
-under the current rule.
+Early abandonment (EVAL_MIN_ACHIEVABLE, default 95) stops a checkpoint once its ceiling — its
+rate if every remaining episode were perfect — falls below the gate. At 100 episodes and a 95%
+gate that is "stop once more than 5 have failed". The rule is arithmetic, not predictive, which
+is what makes it safe: a checkpoint that would reach the gate is never stopped, and an abandoned
+row's own rate is always below the gate, so it can never outrank a kept one.
 
-**Results are written after every checkpoint**, so an interrupted run keeps everything measured
-so far. The payload carries `complete: false` until the last checkpoint lands. `EVAL_RESUME=1`
-picks such a run back up: relaunch the identical command and it skips whatever the output file
-already holds at full length. A checkpoint that was only part-measured is redone from scratch
-rather than topped up, so no run ever has to pool two summaries of the same checkpoint.
+What the gate costs, and it is not nothing:
 
-## Screening: EVAL_SCREEN_EPISODES
+- **best-checkpoint degrades on an arm that never clears the gate**, which at 95 is most arms.
+  Such an arm has no full-length row at all; best_full_length_row falls back to half-depth rows
+  and the printed line is marked `[truncated]`.
+- **abandoned rows are shorter, noisier and not comparable with full-length rows.** They carry
+  `abandoned: true`; the payload records `min_achievable` so files measured under different
+  gates can be told apart. Do not pool raw rows across them.
+- **pooled_equal_effort is exact at any gate** — it truncates to screen depth, and the abandon
+  floor is never below that. It is the arm-level figure to use.
 
-Screening is **on by default** (`EVAL_SCREEN_EPISODES=20`), which runs the close-out in three
-stages instead of one:
+Take the arm-level rate from the equal-effort figure the run prints, never by pooling the rows
+in the output file: those have different depths and the deep ones are by construction the arm's
+best, so pooling weights the winners 5x.
 
-1. every checkpoint whose **graph point is 100%** — ten perfect games out of ten — gets the full
-   `EVAL_EPISODES` straight away. Uncapped, like the >=90% tier in select_top_checkpoints, and on
-   a strong arm it is large: 47, 142, 7 and 146 checkpoints across batch 10's four arms.
-   Explicitly named steps join this tier too, since naming one is a request to measure it.
-2. everything else selected gets 20 episodes
-3. the best `EVAL_CONFIRM_COUNT` (default 30) **of those screened** get 80 more, reaching the
-   full 100
-
-A promoted checkpoint therefore ends with exactly `EVAL_EPISODES` episodes — the screen counts
-toward the total rather than being thrown away — so its number is directly comparable with every
-arm measured under the flat protocol. Checkpoints that do not make the cut keep their 20-episode
-row, whose much wider Wilson interval says plainly how little it is worth.
-
-**Confirmation slots deliberately exclude the 100% tier**, which already has the measurement a
-slot would buy. The point of the split is that those 30 slots go to checkpoints the training graph
-did *not* already flag.
-
-**This costs ~2.4x fewer episodes than measuring everything at 100** on a batch-10-shaped arm
-(2.34x, 2.38x, 1.21x, 2.42x). Screening *everything* and confirming 30 was 3.6x, so the uncapped
-full tier is what the extra episodes buy — a completeness guarantee on the strongest graph tier.
-
-**Know what the 100% tier is and is not.** It is coverage, not a shortlist of likely champions.
-Measured across batch 10, graph-100% checkpoints average 73.0% against 71.2% for graph-90% ones,
-and the 90% tier holds the higher maximum (93% against 89%) *and* all four arms' best checkpoint,
-because it is roughly four times larger. Finding the best checkpoint is what stage 3 is for, and
-`EVAL_CONFIRM_COUNT=30` is thin for it: simulated on b10d, the arm's true best non-100% checkpoint
-reaches the top 30 of 369 screened candidates only **57%** of the time. Raising the count to 100
-takes that to **97%** and costs only 2.71x -> 2.20x. Consider it on any arm you care about.
-
-**Rank the pool on the screen rate, break ties on the surrounding graph rate.** 20 episodes
-admit only 21 distinct values, so dozens of checkpoints arrive on the same one and the tie-break
-does real work — see pick_finalists.
-
-**Take the arm-level pooled rate from the equal-effort figure the run prints, not from the output
-file.** The rows in the file have different episode counts, and the deep ones are by construction
-the best of the arm, so pooling them weights the winners 5x and reads high however good the policy
-is. equal_effort_pooled() truncates every checkpoint to its first 20 episodes instead, which is a
-valid sample of each and lets the 100% tier count too. Same care for best-checkpoint: it is taken
-over the full-length rows only, because across hundreds of screens some will read 19/20 on luck.
-
-**An early-abandonment gate was measured and rejected.** The obvious alternative — start every
-checkpoint at 100 episodes and abandon it once it is clearly weak — barely helps here. Cutting
-anything below 12/20 at the 20-episode mark is statistically safe (of the 157 checkpoints that
-finished at >=80%, the expected number wrongly cut is 0.24, or 0.15%) but saves only 14% of the
-episodes. The reason is the shape of the selected population: it is a tight blob between 60% and
-80%, only 9.7% of it finishes below 60%, and a gate lenient enough to keep an 80% checkpoint
-necessarily keeps almost everything above 60% too. Screening beats gating because it spends its
-savings on the many mediocre checkpoints rather than the few bad ones.
-
-## Early abandonment: EVAL_MIN_ACHIEVABLE
-
-**On by default at 90%** (85% until 2026-08-06). After every round, a checkpoint's *ceiling* — its
-rate if every remaining episode were perfect — is compared against the threshold, and the
-measurement stops the moment the ceiling falls below it. At 100 episodes and a 90% gate that means
-"stop once more than 10 episodes have failed", since 11 failures already cap the run at 89%.
-
-The test is arithmetic rather than predictive, which is what makes it safe:
-
-| property | why it holds |
-|---|---|
-| a checkpoint that would reach the gate is never stopped | the ceiling is monotone, and it only fires once the gate is unreachable |
-| an abandoned row can never outrank a kept one | firing implies the row's own rate is below the gate |
-| `pooled_equal_effort` is unaffected | the floor is never below `screen_episodes`, the depth it truncates to |
-
-**Measured saving: full-length work drops to 52% at a 90% gate**, against 70% at 85%, on batch 13's
-first 505 full-length rows.
-
-**Best-checkpoint is the one thing the gate can degrade, and 90 makes it reachable.** Rows that
-reach the gate are always full length, so as long as one checkpoint clears 90% the ranking is exact.
-An arm that never clears it has *no* full-length row, and 3 of the 8 arms measured across batches 11
-and 13 peaked below 90% (`b11c` 87%, `b11d` 88%, `b13a` 80%). `best_full_length_row` handles that by
-relaxing to half-depth rows rather than to all rows — relaxing to all rows would crown a 20-episode
-screen on a lucky 20/20 — and the printed line is marked `[truncated]` when it happens.
-
-The other cost: a row below the gate is shorter, so its own rate is noisier and is *not* comparable
-with a full-length row. Such rows carry `abandoned: true` and print with an `abandoned at N` marker,
-and the payload records `min_achievable` so a file measured under the gate can be told apart from one
-measured without it, or under a different gate. **Do not pool raw rows across the two**, which was
-already true for the screened/full split and is now true for one more reason.
-
-The floor exists because `equal_effort_pooled` skips rows shorter than `screen_episodes`, so
-abandoning below it would silently delete checkpoints from the one arm-level figure meant to be
-comparable across arms. At the shipped defaults the floor is slack — 100 episodes cannot reach a
-sub-90% ceiling in the first 10 — but it binds as soon as either knob moves, and the 85 -> 90 change
-narrowed that slack from 15 permitted failures to 10.
-
-## Worker count: the throughput knob that matters
-
-**`EVAL_WORKERS` is close to free, and low values are actively expensive.** Measured on one
-checkpoint of `b10d`, seconds per episode: 1.03 at 2 workers, 0.33 at 10, 0.30 at 20. TensorFlow's
-thread pool burns about a core whether the batch it is given has 2 rows or 20, so a small worker
-count pays the full inference overhead for a fraction of the work — 2 workers is 3x slower *and*
-worse per unit of CPU. Two processes at 10 workers each measure a 100-episode checkpoint in ~37s
-at ~50% of a 14-core machine; the same pair at 2 workers took ~103s.
-
-Prefer a worker count that divides `EVAL_EPISODES`. Episodes are rounded up to a whole number of
-rounds, so 12 workers turn a 100-episode request into 108 and the rows stop matching the rest of
-the arm.
-
-XLA (`jit_compile=True`) was measured and is *worse* here — 0.38 s/episode against 0.32 — and
-pinning TensorFlow to one thread made no reliable difference. Neither is used.
+Results are written after every checkpoint, so an interrupted run keeps what it measured;
+`complete` stays false until the last one lands. EVAL_RESUME=1 relaunches the identical command
+and skips whatever the file already holds at full length. Part-measured checkpoints are redone
+from scratch, so no run pools two summaries of one checkpoint.
 
 Environment:
-    EVAL_EPISODES     episodes per checkpoint, rounded up to a whole number of
-                      rounds (default 100)
+    EVAL_EPISODES     episodes per checkpoint, rounded up to whole rounds (default 100)
     EVAL_WORKERS      parallel envs inside this process (default 10)
     EVAL_OUT_SUFFIX   appended to the output filename
-    EVAL_SCREEN_EPISODES  screen every checkpoint at this many episodes first, then measure
-                      only the best of them at full length (default 20; 0 turns screening off)
-    EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 30)
-    EVAL_MIN_ACHIEVABLE   stop measuring a checkpoint once it can no longer reach this perfect
-                      rate even if every remaining episode is perfect (default 90; 0 disables)
+    EVAL_SCREEN_EPISODES  screen depth before promotion (default 20; 0 turns screening off)
+    EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 100)
+    EVAL_MIN_ACHIEVABLE   abandon once this rate is unreachable (default 95; 0 disables)
     EVAL_ABANDON_FLOOR    never abandon before this many episodes (default 20, raised to
-                      EVAL_SCREEN_EPISODES if that is larger)
-    EVAL_RESUME       1 to skip checkpoints this run's own output file already measured at
-                      full length, or a comma-separated list of suffixes to take them from
-    EVAL_PERFECT_WAIT_MS  how long the visible window pauses on a perfect game
-                      (default 400; the game default stalls the whole round)
+                      EVAL_SCREEN_EPISODES if larger)
+    EVAL_RESUME       1 to skip checkpoints already measured at full length, or a
+                      comma-separated list of suffixes to take them from
+    EVAL_PERFECT_WAIT_MS  window pause on a perfect game (default 400)
     EVAL_RENDER       1 to show a game in a window (default 0, all workers headless)
 
-**All workers are headless by default.** Rendering is the most expensive thing in an
-eval by a wide margin — 163us per game step headless against 6050us in a real window —
-and because ParallelPyEnvironment steps every worker together and waits for the slowest,
-a single rendering worker paced all ten while the other nine idled. Turning it off made a
-30-episode eval 5x faster (70.1s -> 14.0s). It cannot affect the numbers: render() only
-draws, and with display=False it returns before doing even that.
+Traps, all of them learned the hard way:
 
-**`EVAL_RENDER=1` puts the window back**, on worker 0 only, which is what you want when
-watching a policy by hand. Running four checkpoints in parallel then gives four windows.
+**Use a throwaway EVAL_OUT_SUFFIX for anything exploratory.** The first write happens seconds
+in and unconditionally overwrites whatever is at that path, so reusing the suffix of a complete
+measurement destroys it immediately, killed early or not. backup_previous_results() keeps one
+rolling `.previous` copy, but a distinct suffix is what actually prevents this.
 
-Two things about that window look like bugs and are not. Both are cosmetic: the
-recorded results are unaffected, because only each worker's *first* episode of a
-round is counted.
+**Prefer a worker count that divides EVAL_EPISODES.** Episodes round up to whole rounds, so 12
+workers turn a 100-episode request into 108 and the rows stop matching the rest of the arm.
+More workers is close to free; fewer is actively slower *and* costs more CPU per episode. XLA
+(jit_compile=True) measured *worse* here, 0.38 s/episode against 0.32, and is not used.
 
-1. **It stops mid-game and the window closes.** A round runs until every worker has
-   finished one episode. Workers that finish early keep being stepped by
-   ParallelPyEnvironment (it steps all envs together) and auto-reset into fresh
-   episodes that are *not* counted. So the visible worker is often part-way through a
-   throwaway episode when the round ends, and the process exits after the last
-   checkpoint, closing the window at whatever point it had reached.
+**Rendering is the most expensive thing in an eval** — 163us per game step headless against
+6050us in a window — and because ParallelPyEnvironment waits for the slowest worker, one
+rendering worker paces all of them. Hence headless by default. EVAL_RENDER=1 puts a window on
+worker 0 for watching by hand; it cannot affect the numbers.
 
-2. **It used to freeze for seconds at a time.** snake_constants.PERFECT_GAME_WAIT_MS
-   pauses on a win so a human can see it, and Snake.render() implements it with a
-   blocking pygame.time.wait(). In an eval that blocks the whole round — every other
-   worker waits on the parallel step — and with no event pumping during the wait macOS
-   marks the window unresponsive. This script overrides it with EVAL_PERFECT_WAIT_MS
-   (default 400ms) so wins are still visible without stalling.
+Two things about that window look like bugs and are not, both cosmetic because only each
+worker's *first* episode of a round is counted:
 
-**A live progress window always opens** — there is no flag to suppress it. It uses the same
-cv2-via-pyformulas mechanism as training's graph: completed checkpoints, the one in flight
-converging round by round, and a text block with the top 5 and an ETA. It refreshes every round,
-costs ~0.1s a frame against a ~4s round, and writes the same picture to
-evals/<policy_name>_eval_progress.png. If a window cannot be opened at all — headless, no cv2 —
-it disables itself on the first failure and the eval carries on, so an unattended run needs no
-configuration.
+1. **It stops mid-game and closes.** Workers that finish early keep being stepped and
+   auto-reset into uncounted episodes, so the visible worker is usually part-way through a
+   throwaway game when the round ends.
+2. **It used to freeze for seconds.** snake_constants.PERFECT_GAME_WAIT_MS blocks the whole
+   round via pygame.time.wait(); EVAL_PERFECT_WAIT_MS overrides it.
 
-**`evals/` holds only the latest work.** Before writing anything, this script moves whatever
-is already in `evals/` into a timestamped folder under `evals/archive/`, so the top-level
-folder always shows just what the current eval or batch produced rather than accumulating
-every chart from every arm ever measured. History is not lost, only moved — check
-`evals/archive/` for anything earlier.
+**evals/ holds only the latest work.** Before writing anything this script moves whatever is
+in evals/ into a timestamped evals/archive/ folder. Nothing is lost, but **any** eval launched
+for any reason displaces every chart there, including a one-checkpoint verification run — and
+EVAL_OUT_SUFFIX does not protect it, since the chart path has no suffix in it. Simultaneous
+processes do not archive each other (the archive step runs before any of them writes a chart);
+starting one *more* while another runs archives the live one's chart, which reappears within a
+round.
 
-**Several processes starting together, as a batch does, do not archive each other.** The
-archive step runs before any setup — before the checkpoint restore, before the first eval
-round — so every process in a simultaneous batch clears out the *previous* batch before any
-of them has written a chart of its own; there is nothing from the current batch yet for a
-sibling to sweep up. Verified directly: four processes launched at once each end with their
-own chart at the top level and no cross-archiving.
+A live progress window always opens and cannot be suppressed; it disables itself if no window
+can be created, so unattended runs need no configuration. It pools every result file for the
+policy, so several processes on one arm each show the same consolidated view. To attach a
+window to an eval already running, use
+`EVAL_PROGRESS_WINDOW_MODE=1 EVAL_PROGRESS_WATCH=20 python -u eval_progress.py <policy>`.
 
-**Starting one *more* eval while an earlier one is still running is different.** The new
-process's archive call moves the still-running one's current chart into `evals/archive/`
-too — it has no way to tell "mid-run" from "finished". That is harmless rather than lossy:
-the running process keeps writing to the same top-level path every round regardless of
-whether anything is there, so its chart reappears within one round (a few seconds). Expect a
-brief window where a genuinely active arm's chart looks archived rather than current.
-
-It shows the *whole* job, pooling every result file for this policy, so running several processes
-on one arm with different EVAL_OUT_SUFFIX gives each window the same consolidated view rather
-than its own slice. Duplicate windows in that one case are the accepted price of never silently
-having none.
-
-To attach a window to an eval **already running**, use
-`EVAL_PROGRESS_WINDOW_MODE=1 EVAL_PROGRESS_WATCH=20 python -u eval_progress.py <policy> [...]`,
-which draws the identical chart from outside and can follow several arms at once.
-
-Results go to runs/<policy_name>_checkpoint_evals<suffix>.json so they survive and
-can be compared across sessions.
-
-Two levels of parallelism are available and they compose: EVAL_WORKERS spreads
-one checkpoint's episodes across worker envs, and several copies of this script
-can run at once on different checkpoints. Give each copy its own
-EVAL_OUT_SUFFIX in that case, or they overwrite each other's results; merge
-afterwards with merge_checkpoint_evals().
-
-**Use a throwaway EVAL_OUT_SUFFIX for anything exploratory** — a timing check, a CPU-load
-calibration probe, or just watching what the `top20` selection picks before committing to a
-full run. The first write to disk happens seconds in, at the very first round of the very
-first checkpoint, and it unconditionally overwrites whatever was already at that path. A run
-sharing its suffix with a prior complete measurement destroys that measurement the moment it
-starts, whether or not it is later killed early. backup_previous_results() below keeps one
-rolling `.previous` copy as a safety net, but a distinct suffix is the thing that actually
-prevents this.
+Results go to runs/<policy_name>_checkpoint_evals<suffix>.json. Two levels of parallelism
+compose: EVAL_WORKERS spreads one checkpoint's episodes, and several copies of this script can
+run on different checkpoints. Give each copy its own EVAL_OUT_SUFFIX or they overwrite each
+other; merge afterwards with merge_checkpoint_evals().
 """
 import glob
 import json
@@ -301,20 +162,14 @@ from snek2 import build_q_net
 
 
 def backup_previous_results(out_path):
-    """Copies an existing *complete* result file to `<out_path>.previous` before this run's
-    first write can overwrite it.
+    """Copies an existing *complete* result file to `<out_path>.previous` before the first write.
 
-    `write_results()` below rewrites the whole file starting from the very first round of the
-    very first checkpoint — seconds into the run, not at the end — so a run killed early (a
-    timing check, a CPU-load calibration probe, second-guessing a `top20` selection once the
-    checkpoint count turns out huge) destroys a prior complete measurement with no warning if
-    it happens to share this run's `EVAL_OUT_SUFFIX`. That cost this project a 246-checkpoint
-    close-out once already. Prefer a throwaway `EVAL_OUT_SUFFIX` for anything exploratory —
-    this backup is the safety net for when that doesn't happen, not a reason to skip it.
+    `write_results()` rewrites the whole file from the very first round — seconds in, not at the
+    end — so a run killed early destroys a prior complete measurement at the same
+    `EVAL_OUT_SUFFIX` with no warning. That cost a 246-checkpoint close-out once. A throwaway
+    suffix is the real protection; this is the safety net for when that is forgotten.
 
-    A single rolling backup, not history: a second overwrite in a row replaces the same
-    `.previous` file, so it protects the last complete run at this path, not every run ever
-    made with this suffix.
+    One rolling backup, not history: a second overwrite replaces the same `.previous`.
     """
     if not os.path.exists(out_path):
         return
@@ -479,12 +334,11 @@ def skips_screening(meta, threshold=None):
     docs already say explicit steps bypass the selection thresholds, and screening one to 20
     episodes and possibly leaving it there would quietly break that.
 
-    Note this tier is uncapped, like the >=90% tier in select_top_checkpoints, and on a strong arm
-    it is large: 47, 142, 7 and 146 checkpoints across batch 10's four arms.
+    This tier is uncapped and on a strong arm it is large — hundreds of checkpoints.
 
-    `threshold` defaults to ALWAYS_FULL_SINGLE, resolved in the body rather than in the signature
-    because the constants block sits below the helpers in this file and a default argument would
-    be evaluated at import time.
+    `threshold` defaults to ALWAYS_FULL_SINGLE, resolved in the body rather than the signature
+    because the constants block sits below the helpers here and a default would be evaluated at
+    import time.
     """
     if threshold is None:
         threshold = ALWAYS_FULL_SINGLE
@@ -588,19 +442,14 @@ def run_round(parallel_env, policy_action, worker_envs):
     surviving sample is not a random one. Running whole rounds costs some idle time on the fast
     workers and keeps the estimate unbiased.
 
-    **The bias runs the opposite way to what this comment used to claim.** It said perfect games
-    are the longest episodes there are, so truncation would drop them preferentially and read
-    low. Measured over 11 samples of a strong policy, perfect games average ~1780 steps and
-    non-perfect ones ~2200: a win ends the moment the board fills, while a policy that is about
-    to fail circles until the starve budget runs out. So truncation would drop *failures*
-    preferentially and read **high**. The conclusion is unchanged — do not truncate — but the
-    direction matters to anyone reasoning about a variant of this loop.
+    Which way the bias runs is worth knowing if you reason about a variant of this loop:
+    **truncation would read high, not low.** Perfect games average ~1780 steps against ~2200 for
+    non-perfect ones — a win ends the moment the board fills, while a policy about to fail circles
+    until the starve budget runs out — so truncating drops *failures* preferentially.
 
-    The idle time is real and measurable: across 20-40 workers, 20-35% of the env steps executed
-    in a round belong to workers that had already finished and were being stepped into
-    uncounted episodes. Giving each worker a fixed quota of episodes to run back to back,
-    instead of a barrier every episode, recovers ~1.2x of that and stays unbiased, since every
-    worker still contributes exactly the same number of counted episodes. Not implemented.
+    The idle time is real: across 20-40 workers, 20-35% of the env steps in a round belong to
+    workers that already finished. Giving each worker a fixed back-to-back quota instead of a
+    barrier every episode would recover ~1.2x and stay unbiased. Not implemented.
     """
     num_workers = len(worker_envs)
     scores = np.zeros(num_workers, dtype=np.float64)
@@ -647,24 +496,19 @@ def achievable_percent(perfect_so_far, episodes_so_far, target_episodes):
 def make_abandon_test(min_achievable, target_episodes, floor_episodes):
     """Stopping rule: give up on a checkpoint that can no longer reach `min_achievable`.
 
-    Returns None when disabled, so the caller can skip the whole mechanism rather than pass a
-    predicate that always says no.
+    Returns None when disabled, so the caller can skip the mechanism entirely.
 
-    Two guards, and both matter:
+    Two guards. **`floor_episodes`** never stops before this many episodes, however hopeless,
+    because `equal_effort_pooled` truncates to `screen_episodes` and *skips shorter rows* —
+    abandoning above the floor leaves that arm-level figure identical to the un-gated protocol,
+    abandoning below it would silently delete rows from the one number meant to compare across
+    arms. **`episodes_so_far >= target_episodes`** means a completed checkpoint is never
+    "abandoned".
 
-    * **`floor_episodes`** — never stop before this many episodes, however hopeless. The floor is
-      raised to the screen depth by the caller because `equal_effort_pooled` truncates every
-      checkpoint to its first `screen_episodes` and *skips rows shorter than that*. Abandoning at
-      or above the floor therefore leaves the arm-level pooled figure bit-for-bit identical to what
-      the un-gated protocol would have produced. Abandoning below it would silently delete rows
-      from that statistic, which is the one number in the output designed to be comparable
-      across arms.
-    * **`episodes_so_far >= target_episodes`** — a completed checkpoint is never "abandoned".
-
-    The rule is exact, not predictive: it fires only when the remaining episodes *cannot*
-    arithmetically carry the checkpoint to the threshold. So a checkpoint that would have finished
-    at or above `min_achievable` is never stopped, and an abandoned row's own rate is always below
-    the threshold — an abandoned row can never outrank a kept one.
+    The rule is exact rather than predictive: it fires only when the remaining episodes cannot
+    arithmetically reach the threshold. So a checkpoint that would have finished at or above
+    `min_achievable` is never stopped, and an abandoned row's rate is always below the threshold —
+    it can never outrank a kept one.
     """
     if not min_achievable:
         return None
@@ -685,19 +529,12 @@ def best_full_length_row(results, num_episodes):
     Letting one of those win would crown a checkpoint the protocol deliberately declined to
     measure, so ranking is over rows at `num_episodes` whenever any exist.
 
-    **The fallback is the part that matters, and it is why this is a function.** Raising
-    `EVAL_MIN_ACHIEVABLE` to 90 makes "no row reached full length" a *reachable* state rather
-    than a theoretical one: an arm whose best checkpoint lands in the 85-89% band has every row
-    abandoned short. 3 of the 8 arms measured across batches 11 and 13 peaked below 90%. The
-    previous code fell back to *all* results in that case, which hands the title to a 20-episode
-    screen on a lucky 20/20 — the exact outcome the deep-row rule exists to prevent, reintroduced
-    precisely when the arm is too weak to defend itself.
-
-    So the fallback keeps the depth requirement and only relaxes it: rows at half `num_episodes`
-    or better, matching `eval_progress.deep_rows`, and only then everything. An abandoned row is
-    always shorter than full length but never shorter than the abandon floor, and a row abandoned
-    under a 90% gate at 100 target episodes has at least ~89 episodes behind it, so in practice the
-    relaxed tier is populated by genuinely deep rows.
+    **The fallback is why this is a function.** At `EVAL_MIN_ACHIEVABLE=95` most arms have *no*
+    full-length row, since few checkpoints clear 95%. Falling back to all rows would hand the
+    title to a 20-episode screen on a lucky 20/20 — the outcome the deep-row rule exists to
+    prevent, reintroduced exactly when the arm is too weak to defend itself. So the fallback
+    relaxes the depth requirement rather than dropping it: rows at half `num_episodes` or better,
+    matching `eval_progress.deep_rows`, and only then everything.
     """
     if not results:
         return None
@@ -758,74 +595,44 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None, should_ab
     return scores, perfect_flags, rewards, elapsed, abandoned
 
 
-# Selection thresholds, in single-eval (10-episode) percentage points.
-#
-# A graph point is 10 episodes, so perfect_percent only ever takes the values 0, 10,
-# ... 100. That makes these two numbers coarser than they look: the mandatory tier is the
-# set {90, 100}, the fill band is exactly {60, 70, 80}, and everything at 50 or below is
-# excluded.
+# Selection thresholds, in single-eval (10-episode) percentage points. A graph point is 10
+# episodes, so these are coarser than they look: the mandatory tier is {90, 100} and the fill
+# band is exactly {60, 70, 80}.
 ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, even past `count`
 MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
 DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
 
-# Screening is the default close-out shape: every selected checkpoint gets this many episodes,
-# then only the best DEFAULT_CONFIRM_COUNT are taken to EVAL_EPISODES. Set EVAL_SCREEN_EPISODES=0
-# for the flat one-pass protocol every arm before batch 10 was measured under.
+# Screen depth: every selected checkpoint gets this many episodes, then only the best
+# DEFAULT_CONFIRM_COUNT go on to EVAL_EPISODES. 0 gives the flat one-pass protocol.
 DEFAULT_SCREEN_EPISODES = 20
 
-# Abandon a checkpoint mid-measurement once it can no longer reach this perfect rate, even if
-# every remaining episode is perfect. `EVAL_MIN_ACHIEVABLE=0` turns it off.
+# Abandon a checkpoint once it can no longer reach this perfect rate even if every remaining
+# episode is perfect. `EVAL_MIN_ACHIEVABLE=0` turns it off.
 #
-# The rule is *arithmetically* certain rather than predictive: it fires only when
-# `perfect + remaining < threshold`, so a checkpoint that would have finished at or above the gate
-# is never stopped, and no ranking among rows that reach the gate can change.
+# 95 because that is the bar a checkpoint has to clear to be interesting at all; anything lower is
+# not a hall-of-fame candidate and does not need 100 episodes to be ruled out. At 100 episodes this
+# stops a run once more than 5 have failed, which is most of them.
 #
-# **Raised 85 -> 90 on 2026-08-06**, because the target is a 95%+ policy and a checkpoint in the
-# 85-89% band is not a candidate for it. Measured on batch 13's first 505 full-length rows, an 85%
-# gate cuts full-length work to **70%** and a 90% gate cuts it to **52%** — 439 of those 505 rows
-# were already out of contention before their 100th episode at 85%, and more at 90%.
-#
-# What 90 costs, and it is more than 85 cost: the 85-89% band is now truncated too, so an arm whose
-# *best* checkpoint lands there has no full-length row at all. That is survivable but it is not free
-# — 3 of the 8 arms measured across batches 11 and 13 peaked below 90% (`b11c` 87%, `b11d` 88%,
-# `b13a` 80%) — so best-checkpoint for a weak arm now comes from a truncated row and reads noisier.
-# `best_full_length_row` handles that case explicitly; it is the reason it exists.
-#
-# The pooled arm-level figure is untouched at any gate, since the floor below is never lower than
-# the screen depth `equal_effort_pooled` truncates to.
-DEFAULT_MIN_ACHIEVABLE = 90.0
+# The cost is that **most arms will have no full-length row**, since few checkpoints clear 95%.
+# best_full_length_row handles that by relaxing to half-depth rows; pooled_equal_effort is
+# unaffected at any gate. Cross-batch best-checkpoint stays valid for the question that matters
+# here — "did this arm produce a >=95% checkpoint" — because any checkpoint at or above the gate is
+# measured full length under it.
+DEFAULT_MIN_ACHIEVABLE = 95.0
 
-# Never abandon before this many episodes. Raised to the screen depth at startup, so an abandoned
-# row is always long enough to still count in equal_effort_pooled — see make_abandon_test.
+# Never abandon before this many episodes, so an abandoned row is always long enough to count in
+# equal_effort_pooled. Raised to the screen depth at startup — see make_abandon_test.
 DEFAULT_ABANDON_FLOOR = 20
 
-# Graph single-eval at or above which a checkpoint skips the screen and is measured at full length
-# straight away. 100% means ten perfect games out of ten, the strongest signal the training graph
-# produces, and the tier is uncapped — see skips_screening.
-#
-# Worth knowing what this tier is and is not. It is a **coverage** guarantee: every checkpoint the
-# graph called perfect gets a real number. It is *not* where the champion usually lives — measured
-# across batch 10, graph-100% checkpoints average 73.0% against 71.2% for graph-90% ones, and the
-# 90% tier holds both the higher maximum (93% against 89%) and all four arms' best checkpoint,
-# because it is roughly four times larger. Finding the best checkpoint is what EVAL_CONFIRM_COUNT
-# is for.
+# Graph single-eval at or above which a checkpoint skips the screen and goes straight to full
+# length. 100% is ten perfect games out of ten, and the tier is uncapped — see skips_screening.
+# It is a coverage guarantee, not a champion shortlist: the larger 90% tier holds more of the
+# actual best checkpoints. Finding those is EVAL_CONFIRM_COUNT's job.
 ALWAYS_FULL_SINGLE = 100.0
 
-# How many screened checkpoints EVAL_SCREEN_EPISODES promotes to a full-length measurement.
-#
-# 100, raised from 30 on 2026-08-03, because 30 was losing the champion outright. Simulated on
-# b10d's 369 screened candidates, the arm's genuinely best checkpoint reached the top 30 only
-# **57%** of the time — a 20-episode screen simply cannot rank a population clustered between 60%
-# and 80%. Recall against cost, with the uncapped 100%-graph tier included in both:
-#
-#     confirm  recall  episodes  vs a flat pass
-#          30     57%    24,380           2.71x
-#          50     85%    25,980           2.54x
-#         100     97%    29,980           2.20x
-#         150     99%    33,980           1.94x
-#
-# 100 is the knee: it converts a coin-flip on the headline number into near-certainty for ~23%
-# more episodes. Going further trades real cost for a percentage point.
+# How many screened checkpoints get promoted to full length. 100 is the knee of the recall curve:
+# at 30 the arm's true best checkpoint made the cut only 57% of the time, at 100 it is 97%, for
+# ~23% more episodes. A 20-episode screen cannot rank a population clustered between 60% and 80%.
 DEFAULT_CONFIRM_COUNT = 100
 
 # Seconds between live-chart refreshes. A frame is ~0.1s and a round ~4s, so this only bites
@@ -836,44 +643,22 @@ CHART_MIN_INTERVAL = 2.0
 def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=10):
     """Every checkpoint at >=90% single eval, then the best of >=60% up to `count` total.
 
-    Three rules, in order:
+    1. Everything at `ALWAYS_EVAL_SINGLE` or better is measured, even past `count`.
+    2. Remaining slots go to the highest single evals down to `MIN_EVAL_SINGLE`, ordered by
+       the surrounding perfect rate within an equal-eval tier.
+    3. Nothing below `MIN_EVAL_SINGLE` is measured at all.
 
-    1. **Every** checkpoint whose single eval was `ALWAYS_EVAL_SINGLE` or better is
-       measured, even if that alone exceeds `count`. A 10-episode eval reading 9+ perfect
-       is the strongest signal available and there is no reason to drop one because the
-       last slot ran out.
-    2. Remaining slots go to the highest single evals at or above `MIN_EVAL_SINGLE`,
-       ranked by the surrounding perfect rate within an equal-eval tier.
-    3. **Nothing** below `MIN_EVAL_SINGLE` is measured at all. Below 60%, 100 episodes buys
-       a precise number for a checkpoint that was never going to be the arm's best, and it
-       displaces a slot that could go to a real candidate.
+    Fewer than `count` is a normal outcome, not an error.
 
-    Fewer than `count` checkpoints is a normal outcome, not an error: a weak arm may have
-    only two or three points above the floor, and padding the list with 30% checkpoints
-    would only drag its pooled rate down while telling us nothing.
+    Two measured results this rests on. **Rank on the raw single eval, not a smoothed
+    region** — raw correlates +0.64 with the 100-episode measurement across the full range
+    where a smoothed rate correlates -0.40. **Inside the high band that reverses**, which is
+    why the surrounding rate orders the fill tier: over 88 checkpoints already past 80%, the
+    surrounding rate correlated +0.48 against the graph value's +0.10.
 
-    **The tiers used to be >=80% mandatory with a cap of 10.** That made a strong arm
-    ruinously expensive to measure — `b8f-disc9975seed2` presented 63 checkpoints at >=80%,
-    four hours of evaluation — while measurement showed 90% and 80% points have
-    indistinguishable mean true rates (57.9% vs 58.6% over 88 checkpoints). So the wide
-    mandatory tier was buying volume, not information. Restricting it to >=90% and raising
-    the cap to 20 keeps every strongest signal and a deep fill band at a bounded cost.
-
-    Ranking on the raw single eval rather than a smoothed region is a measured result, not
-    an assumption: raw correlates +0.64 with the 100-episode measurement where the smoothed
-    region rate correlates -0.40 *as a selector across the full range*.
-
-    Within the high band the picture reverses, which is why the surrounding rate is used to
-    order the fill tier rather than merely break exact ties. Across 88 checkpoints that had
-    all already cleared 80%, the surrounding rate correlated **+0.48** with the true rate
-    while the graph value itself managed only **+0.10**. Once a checkpoint has spiked, the
-    region it sits in is the better guide to whether the spike will hold up.
-
-    An outlier eval is **not luck** — those checkpoints really are better than their
-    neighbours. Measured against the checkpoints 1000 steps either side, outliers won 3 of
-    3 comparisons by 9.0, 11.5 and 27.5 points, one of them reading 8% / 35% / 7% across
-    three consecutive checkpoints. The binomial agrees: if a policy's true rate were 27%,
-    a 10-episode eval showing 7+ perfect games has probability 0.006.
+    An outlier eval is not luck. Against the checkpoints 1000 steps either side, outliers won
+    3 of 3 by 9.0, 11.5 and 27.5 points; if a policy's true rate were 27%, a 10-episode eval
+    reading 7+ perfect has probability 0.006.
     """
     path = os.path.join(RUNS_DIR, '{0}_evals.json'.format(policy_name))
     with open(path) as handle:
@@ -942,15 +727,13 @@ def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=1
 def merge_checkpoint_evals(policy_name, suffixes=None, out_suffix='_merged'):
     """Combines several result files for one policy into one, and writes it.
 
-    Splitting an arm's checkpoints across parallel processes is the only way to use more than
-    one core per arm, and each process needs its own EVAL_OUT_SUFFIX or they overwrite each
-    other. This puts the pieces back together.
+    Parallel processes on one arm each need their own EVAL_OUT_SUFFIX or they overwrite each
+    other; this puts the pieces back together.
 
-    **A step measured more than once is combined, not deduplicated.** Repeat measurements of
-    one frozen checkpoint are independent samples of the same quantity, so summing episodes and
-    perfect games is the statistically correct treatment and tightens the interval — dropping
-    one would throw away half the data. `perfect_percent` and the Wilson interval are
-    recomputed from the combined counts.
+    **A step measured more than once is combined, not deduplicated.** Repeat measurements of a
+    frozen checkpoint are independent samples of the same quantity, so summing episodes and
+    perfect games is correct and tightens the interval. `perfect_percent` and the Wilson interval
+    are recomputed from the combined counts.
 
     Pass `suffixes` explicitly, or leave it None to pick up every
     `<policy>_checkpoint_evals*.json` except previous merges. Returns the merged payload.
@@ -1044,12 +827,8 @@ def main(argv):
         print('abandoning any checkpoint that can no longer reach {0}%, once it has run {1}+ '
               'episodes (EVAL_MIN_ACHIEVABLE=0 to disable)'.format(min_achievable, abandon_floor))
     perfect_wait_ms = int(os.environ.get('EVAL_PERFECT_WAIT_MS', 400))
-    # Rendering is off by default because it was the single slowest thing in an eval, by a
-    # wide margin. Measured per game step: 163us headless, 2449us with display=True on the
-    # dummy driver, 6050us in a real window. ParallelPyEnvironment steps every worker
-    # together and does not return until the slowest finishes, so one rendering worker set
-    # the pace for all ten while the other nine idled — a ~37x penalty on the critical path.
-    # EVAL_RENDER=1 brings the window back for watching a game by hand.
+    # Off by default: 163us per game step headless against 6050us in a window, and because
+    # ParallelPyEnvironment waits for the slowest worker, one rendering worker paces all of them.
     render_worker = os.environ.get('EVAL_RENDER', '0') not in ('0', '', 'false', 'False')
 
     ckpt_dir = POLICY_DIR + policy_name
@@ -1129,12 +908,8 @@ def main(argv):
         # exactly one real window per eval process — several checkpoints evaluated
         # in parallel each get their own window to watch.
         os.environ.pop('SDL_VIDEODRIVER', None)
-        # Snake.render() implements the perfect-game celebration with a *blocking*
-        # pygame.time.wait(), and the game default is 5000ms. Inside an eval that stalls
-        # the entire round, because parallel_env.step() does not return until every worker
-        # has stepped — so one visible win froze all 10 workers for 5 seconds, and with no
-        # event pumping during the wait the window also went unresponsive. On a 40%-perfect
-        # policy that is ~20s wasted per checkpoint and a window that looks hung.
+        # The game's 5000ms perfect-game celebration is a *blocking* pygame.time.wait(), which
+        # stalls every worker in the round and leaves the window unresponsive. Override it.
         snake_constants.PERFECT_GAME_WAIT_MS = perfect_wait_ms
         return SnakeEnvironment(discount=0.99, display=True, policy_name=policy_name)
 
@@ -1153,14 +928,9 @@ def main(argv):
     # ckpt-<step> can be restored instead of only the latest.
     checkpoint = tf.train.Checkpoint(agent=agent, policy=agent.policy, global_step=global_step)
 
-    # Run inference inside a tf.function instead of eager. Training already does this for its
-    # collect policy (PyTFEagerPolicy(..., use_tf_function=True) in snek2.py) but this script
-    # called agent.policy.action() directly, paying full eager dispatch on every step of every
-    # episode. For this network, batched across 10 workers, that is 1421us per call eager
-    # against 208us wrapped — 6.8x — for byte-identical actions.
-    #
-    # Traced once and reused across every checkpoint: restoring new weights writes into the
-    # same variables, so it does not force a retrace.
+    # Inference in a tf.function rather than eager: 208us per call against 1421us — 6.8x — for
+    # byte-identical actions. Traced once and reused, since restoring weights writes into the
+    # same variables and does not force a retrace.
     policy_action = common.function(agent.policy.action)
 
     out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
@@ -1221,13 +991,9 @@ def main(argv):
         payload = {'policy_name': policy_name,
                    'episodes_per_checkpoint': num_episodes,
                    'checkpoints_requested': len(all_steps),
-                   # EVAL_WORKERS, recorded once at startup because it is fixed for the life of
-                   # the process — the ParallelPyEnvironment is built once. The chart used to
-                   # infer it as episodes_so_far // round, which is wrong for any checkpoint
-                   # being topped up: the numerator counts the screen episodes already on file
-                   # and the denominator only counts this pass's rounds, so a 20-episode screen
-                   # growing to 100 reported 30, 20, 16, 15, 14, 13, 12, 12 workers over its
-                   # eight rounds. Read this instead.
+                   # Recorded rather than inferred from episodes/rounds, which is wrong for any
+                   # checkpoint being topped up — the episode count includes the screen already on
+                   # file while the round count does not.
                    'num_workers': num_workers,
                    'complete': complete,
                    'requested_steps': all_steps,
@@ -1256,12 +1022,9 @@ def main(argv):
                    # Which pass is running and how far through each one is, so the chart can show
                    # the shape of a three-stage close-out rather than one bar that stalls.
                    'stage': progress['stage'],
-                   # The arm-level rate, computed the only way that means anything once rows have
-                   # different depths: every checkpoint truncated to its first `screen_episodes`.
-                   # Pooling the rows instead weights the full-length ones — the arm's best by
-                   # construction — five times as heavily, so the chart was displaying a figure its
-                   # own documentation says not to use. None for a flat run, where pooling the rows
-                   # already gives equal effort.
+                   # The arm-level rate: every checkpoint truncated to its first `screen_episodes`,
+                   # because pooling rows of different depths weights the full-length ones — the
+                   # arm's best by construction — 5x. None for a flat run, already equal effort.
                    'pooled_equal_effort': (
                        (lambda t: round(100.0 * t[0] / t[1], 2) if t[1] else None)(
                            equal_effort_pooled(samples, screen_episodes))
@@ -1288,20 +1051,12 @@ def main(argv):
         os.replace(partial_path, out_path)
         update_chart()
 
-    # Live progress window, the same mechanism training uses for its own graph: render a
-    # matplotlib figure and push the pixels into a cv2 window via pyformulas. Refreshed from
-    # write_results(), so it advances every round rather than once a checkpoint — a frame costs
-    # ~0.1s against a ~4s round, and CHART_MIN_INTERVAL keeps that bounded if rounds are quick.
+    # Live progress window, same mechanism as training's graph. Refreshed from write_results()
+    # so it advances every round; a frame is ~0.1s against a ~4s round.
     #
-    # Always on. There is no switch, deliberately: an eval you cannot follow is the thing this
-    # was built to fix, and a flag to suppress it only ever got used by mistake. If the window
-    # cannot be opened at all — headless, no cv2 — update_chart() disables itself on the first
-    # failure and the eval carries on, so nothing needs configuring for an unattended run.
-    #
-    # eval_progress.live_frame() reads *every* result file for this policy, not just this
-    # process's, so with several EVAL_OUT_SUFFIX processes on one arm each window shows the whole
-    # job rather than its own slice, and they will be near-identical. Duplicate windows are the
-    # price of never silently having none.
+    # Always on, deliberately — update_chart() disables itself if no window can be opened, so an
+    # unattended run needs no configuration. live_frame() reads every result file for the policy,
+    # so parallel EVAL_OUT_SUFFIX processes each show the whole job rather than their own slice.
     chart_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
     chart = {'screen': None, 'last': 0.0, 'off': False}
 

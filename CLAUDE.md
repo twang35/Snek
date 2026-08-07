@@ -369,24 +369,21 @@ selected gets 20, and the best `EVAL_CONFIRM_COUNT` *of those screened* get 80 m
 episodes on a large arm — but the saving collapses to 1.0x when the screened pool is smaller than
 the confirm count, which happened on `b11c`.
 
-**`EVAL_MIN_ACHIEVABLE=90` abandons a checkpoint mid-measurement** once it cannot reach 90% even if
-every remaining episode is perfect — at 100 episodes, once more than 10 have failed. Full-length
-work drops to **52%**, and **no ranking among rows that reach the gate can change**, because the test
-is arithmetic rather than predictive: a checkpoint that would have reached the gate is never stopped,
-and an abandoned row's rate is always below the gate. Abandoned rows carry `abandoned: true`, are
-shorter, and are **not comparable with full-length rows** — one more reason not to pool raw rows.
-`pooled_equal_effort` is unaffected by construction. `EVAL_MIN_ACHIEVABLE=0` turns it off.
+**`EVAL_MIN_ACHIEVABLE=95` abandons a checkpoint mid-measurement** once it cannot reach 95% even if
+every remaining episode is perfect — at 100 episodes, once more than 5 have failed. Full-length work
+drops to **31%** of a flat pass (52% at a 90% gate, 71% at 85%), and **no ranking among rows that
+reach the gate can change**, because the test is arithmetic rather than predictive. Abandoned rows
+carry `abandoned: true`, are shorter, and are **not comparable with full-length rows**.
+`pooled_equal_effort` is exact at any gate. `EVAL_MIN_ACHIEVABLE=0` turns it off.
 
-**Raised 85 → 90 on 2026-08-06** (the target is a 95%+ policy, so the 85-89% band is not worth full
-depth). The one thing this degrades is **best ckpt on a weak arm**: an arm that never clears 90% now
-has no full-length row at all, and 3 of the 8 arms across batches 11 and 13 peaked below 90% (`b11c`
-87%, `b11d` 88%, `b13a` 80%). `best_full_length_row` then relaxes to **half-depth** rows and the
-printed line is marked `[truncated]`. Do not let it relax to *all* rows — that hands the title to a
-20-episode screen on a lucky 20/20, which is what the code did before this change.
+**At 95 most arms will have no full-length row**, since few checkpoints clear 95%.
+`best_full_length_row` then relaxes to **half-depth** rows and prints `[truncated]`. It must never
+relax to *all* rows — that hands the title to a 20-episode screen on a lucky 20/20.
 
-**A file's gate is recorded in its payload as `min_achievable`.** Batches 11 and 13 were measured
-with **no gate** (`min_achievable: null`), so their sub-90% rows are full length and batch 14's are
-not. Best-checkpoint comparisons across that boundary are only sound above the gate.
+**A file's gate is in its payload as `min_achievable`; check it before pooling anything.** Batches 11
+and 13 have no gate, batch 14 has 90, batch 15 onward 95. Cross-batch best-checkpoint stays valid for
+"did this arm produce a ≥95% checkpoint", since anything at or above a gate is measured full length
+under it — but the graph-100% tier is censored by any gate and must not be compared across them.
 
 Two consequences for reading the output file: rows have **different episode counts**, so pooling
 them over-weights the winners and reads high — use the equal-effort figure the run prints, or the

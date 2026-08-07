@@ -67,7 +67,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | finding | status |
 |---|---|
 | **`fraction of evals >= 80%` has the lowest between-seed variance** of the candidate metrics | **measured**, sd 5.8 vs 8.6 for best-30 |
-| Abandoning a checkpoint eval early is not worth it | **falsified for an arithmetic rule** — 30% saved at an 85% achievability gate, 48% at the 90% gate shipped 2026-08-06; only the *predictive* version was 14% |
+| Abandoning a checkpoint eval early is not worth it | **falsified for an arithmetic rule** — full-length work falls to 71 / 52 / 31% at gates of 85 / 90 / 95; only the *predictive* version was a mere 14% |
 | **n=4 cannot resolve an effect below ~10 pp**; 5 pp needs n≈17-37 depending on the metric | **established** |
 | 100-episode measurement reproduces within binomial noise | **established**, 51 repeats |
 | The max of N noisy measurements is upward-biased — shrink it before quoting it | **established** — `b14a`'s 96/100 re-measured 91/100, pooling to 93.5% |

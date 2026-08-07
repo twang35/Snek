@@ -229,33 +229,20 @@ def food_space_obs(grid, current_food):
     0 for an unreachable one without distinguishing "sealed in a single cell" from "reachable but
     the way out is bad". Unvalidated: a hypothesis about what the feature lets a policy express.
 
-    **1 is safe**, matching `body_and_wall_collisions`, `head_with_tail` and `safe_to_chase_food`.
-    This was the reverse for a few hours on 2026-08-03 and was flipped to the project convention
-    deliberately, so the whole vector now reads one way and a future reader cannot mistake the
-    sense of one input.
+    **1 is safe**, matching the rest of the vector. The direction itself is free — the first layer
+    can absorb a complemented input by flipping a weight — but it means the common case is 1.
 
-    Polarity costs nothing in itself: the first layer computes `ReLU(Wx + b)`, so swapping an input
-    for its complement is absorbed exactly by flipping that column of `W` and shifting `b` —
-    `w(1-x) + b` is `(-w)x + (b + w)`. Both are unconstrained and trainable, the kernel initializer
-    is symmetric about zero, and there is no weight decay anywhere in this project, so the two
-    encodings define the same function class.
+    **That is a hazard worth knowing.** The value is 1 in 99.97% of random-play states and still
+    ~90% at snake length 50, so this input acts much like a second bias: gradient on nearly every
+    sample, information on very few. It is the shape of the `game_over` trap this project was
+    already bitten by (see ../CLAUDE.md). **If this index is ever repurposed, do not assume its
+    weights were meaningfully trained.**
 
-    **The cost this direction does carry is that the common case is now 1.** The interesting cases
-    are rare — the value is 1 in 99.97% of random-play states, and still ~90% at snake length 50 —
-    so this input sits at 1 nearly always and acts much like a second bias, collecting gradient on
-    almost every sample while carrying information on very few. That is the shape of the
-    `game_over` trap this project has already been bitten by (see ../CLAUDE.md): a near-constant
-    input whose weights end up constrained by nothing much, which then does real damage if the
-    index later changes meaning. The effect on learning is modest, since a bias can absorb a
-    constant either way, but the hazard is worth knowing about — if this index is ever repurposed,
-    do not assume its weights were meaningfully trained.
-
-    **Decided locally rather than with a flood fill**, which is exact for this question and much
-    cheaper. A region of one cell means the food has no open orthogonal neighbour. A region of two
-    means it has exactly one, and *that* cell has no open neighbour but the food. Any region of
-    three or more fails both tests, so the trichotomy needs at most eight grid lookups —
-    `count_groups` is ~46% of the cost of building an observation and already runs three times per
-    step, so a fourth call for one value would have been the most expensive input in the vector.
+    **Decided locally rather than with a flood fill**, which is exact here and much cheaper: a
+    one-cell region means no open orthogonal neighbour, a two-cell region means exactly one whose
+    only open neighbour is the food, and anything larger fails both tests — at most eight lookups.
+    `count_groups` is ~46% of an observation's cost and already runs three times per step, so a
+    fourth call would have made this the most expensive input in the vector.
     `test_food_space_matches_a_real_flood_fill` checks the two agree over random boards.
 
     "Open" is grid value 0 or 1 — empty or food — matching count_groups. The head (2) is not open,
@@ -363,39 +350,23 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
     is occupied by the head and belongs to no region, so an eating move would always read 0 -
     precisely the move the flag exists to encourage.
 
-    A fatal move - wall or body, from `body_and_wall_collisions`' own test - reports zero for
-    every value here rather than "what if this move were legal". A move into a wall happens to
-    read zero already: the only on-board neighbour of an off-board cell is the vacated head
-    cell, which `update_grid` never clears, so no region test can find anything past it. A move
-    into the snake's own body has no such accident protecting it - the new head cell is still
-    on-board and can see whatever real regions sit beside it - so it was reporting `1` on 5,289
-    of 14,642 body-collision actions measured in play, `head_with_tail` describing a hypothetical
-    survivor of a move that kills the snake. Harmless as long as indices 6-8 mark the same move
-    fatal and nothing downstream trusts one flag without the other, but there is no upside to
-    leaving a fatal move free to say anything at all, so it is short-circuited before the flood
-    fill runs - which also skips `count_groups` for it entirely.
+    A fatal move reports zero for every value here rather than "what if this move were legal".
+    Walls read zero by accident anyway, but a move into the snake's own body does not: measured in
+    play it reported `1` on 5,289 of 14,642 body-collision actions — `head_with_tail` describing a
+    hypothetical survivor of a fatal move. Short-circuited before the flood fill, which also skips
+    `count_groups` for it.
 
-    **Hugging a wall** is 1 when the cell immediately to the head's left *or* right, after the
-    move and relative to the heading the move leaves it facing, is a wall or body segment; 0 if
-    both sides are open, and 0 for a fatal move regardless of the geometry (there is no
-    "afterwards" to hug anything in). "Left" and "right" are found by looking up
-    `CURRENT_DIRECTION_MAPS` a second time, treating the head's *new* facing as the base
-    direction rather than its old one, which is exactly the question "what is 90 degrees off my
-    new heading" - the same table already answers "what is my new heading" for the action
-    itself, one level up.
+    **Hugging a wall** is 1 when the cell to the head's left *or* right — after the move, relative
+    to the heading it leaves the head facing — is a wall or body; 0 if both are open, and 0 for a
+    fatal move. Left and right come from a second `CURRENT_DIRECTION_MAPS` lookup on the *new*
+    facing.
 
-    The intent is to let a policy learn to travel *along* a wall or an existing pocket boundary
-    rather than through open air next to one: cutting through the middle of free space can leave
-    two smaller pockets where there was one big one, and a big single pocket is easier to use
-    later than two small ones. This does not exist yet as a validated finding - it is a
-    hypothesis about what the feature should let the network learn, not a measured effect.
+    The intent is to let a policy travel *along* a boundary rather than through open air beside
+    one, since cutting through free space splits one big pocket into two small ones. Hypothesis,
+    not a measured effect.
 
-    Checked against the grid *after* the move (the same `grid = update_grid(...)` used for the
-    regions below), not the grid before it, so that a cell the tail is vacating this step reads
-    as open rather than as body. The one place this matters is narrow: the left or right cell
-    would have to be exactly the tail's current position for the two grids to disagree, which
-    only arises in a tight coil. Whether a cell is a wall is unaffected either way, since
-    `update_grid` never touches the padded wall ring.
+    Checked against the grid *after* the move so a cell the tail is vacating reads as open. Only
+    matters when that cell is exactly the tail's position, i.e. in a tight coil.
 
     Takes two tail positions, because the tail moves on the same step the head does.
     `tail_pos` is where it is now; `next_tail_pos` is the cell ahead of it, which is where it
