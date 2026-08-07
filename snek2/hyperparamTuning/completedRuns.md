@@ -36,15 +36,17 @@ train on the result. Compare ‡‡ rows only to each other; they are not compar
 unmarked rows.
 
 **‡‡‡ marks arms trained on the 30-value vector (2026-08-03 onward)** — a fourth environment,
-adding the following-tail block (26-28) and food-space (29). Batches 11-14 all train on it,
+adding the following-tail block (26-28) and food-space (29). Batches 11-15 all train on it,
 and it is still current. ‡‡‡ rows compare to each other and, with care, to ‡‡ rows: batch 11 is
 byte-identical to batch 10 in config, so that one cross-era comparison is *designed* and is written
 up in [`archive/batches1-11.md`](archive/batches1-11.md). Everything else stays within its own era.
 Batch 10's checkpoints stopped loading on `master` when this landed.
 
 **§§ in the `measured` column marks a run measured under an abandonment gate**, whose figure is
-`pooled_equal_effort` rather than the graph-100% tier. See the footnote under the table; the short
-version is that a gate censors the tier and `pooled_equal_effort` is exact regardless.
+`pooled_equal_effort` rather than the graph-100% tier — a gate censors the tier, and
+`pooled_equal_effort` is exact regardless. Gates by batch: none through 13, **90** for 14 and 15,
+**95** from 16. ***trunc*** in `best ckpt` means no full-length row survived the gate, so the figure
+comes from a shorter row and reads noisier.
 
 **§ marks arms trained after the epsilon rewrite of 2026-08-04.** Not an environment change —
 the observation vector is untouched and every ‡‡‡ checkpoint still loads — but a config change,
@@ -67,15 +69,19 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ **best measured ckpt on record**; ~94% shrunk |
-| `b14a-disc9975seed1` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.17M | **96%** @3702k | 93.0% | 72.4% /eq §§ | 79.7% | ‡‡‡ § **ties the record on paper**; 91/100 on re-measure, **93.5% over 200** |
+| `b15b-nstep3seed2` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.75M | **97%** @3245k | 96.3% | **79.7%** /eq §§ | 89.3% | ‡‡‡ § **best selected ckpt on record**, but **93.0% over 300**; strongest arm on eq-effort |
+| `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ 96/100 selected, ~94% shrunk |
+| `b14a-disc9975seed1` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.17M | 96% @3702k | 93.0% | 72.4% /eq §§ | 79.7% | ‡‡‡ § 96/100 selected; 91/100 on re-measure, **93.5% over 200** |
+| `b15a-nstep3seed1` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.79M | 95% @4697k | 94.3% | 77.7% /eq §§ | **89.7%** | ‡‡‡ § **peak trailing 95.00, highest on record**; still gaining at 5.8M |
 | `b13d-shieldseed4` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.51M | **95%** @986k | 93.3% | 77.2% /4800 † | 83.3% | ‡‡‡ § **2nd best ckpt on record**; peaked ~1M then lost 44 pp |
 | `b14d-disc9975seed4` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.46M | 93% @2559k | 93.0% | **77.6%** /eq §§ | **89.7%** | ‡‡‡ § **best arm on record for `strong_eval_fraction`, 39.3%**; only 11.7 pp drawdown |
 | `b13c-shieldseed3` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.67M | 92% @3367k | 90.7% | 75.9% /11400 † | **85.3%** | ‡‡‡ § best of batch 13 on the graph; best ckpt in its final 300k |
 | `b13b-shieldseed2` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.70M | 91% @1166k | 90.3% | 74.8% /7800 † | 82.3% | ‡‡‡ § fastest start on record: 72.3% pf30 by 350k |
 | `b14b-disc9975seed2` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.12M | 90% @2261k | — | 67.1% /eq §§ | 76.3% | ‡‡‡ § weakest of batch 14; **one full-length row survived the gate**; lost 47 pp |
 | `b14c-disc9975seed3` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.16M | 90% @2099k | 89.3% | 71.3% /eq §§ | 87.7% | ‡‡‡ § **still improving at 4.5M** — the arm that moved the step cap to 10M |
+| `b15d-nstep3seed4` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.81M | 91% @3671k | 90.3% | 73.5% /eq §§ | 86.3% | ‡‡‡ § **peak trailing at 5799k, its 2nd-to-last eval** — stopped mid-climb |
 | `b13a-shieldseed1` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.39M | 80% @2044k | 80.0% | 70.5% /3100 † | 78.0% | ‡‡‡ § weakest of batch 13, and the batch's slowest starter |
+| `b15c-nstep3seed3` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.46M | 86% @3823k *trunc* | — | 66.4% /eq §§ | 75.7% | ‡‡‡ § weakest of batch 15; **no full-length row survived the gate** — best is a truncated 69/80 |
 | `b11a-obs30seed1` ‡‡‡ | disc 0.995, **fourth env** | 3.19M | 94% @671k | 93.3% | 79.5% /4800 † | 85.7% | ‡‡‡ 2nd of batch 11; peaked at 678k, then lost 42 pp |
 | `b11d-obs30seed4` ‡‡‡ | disc 0.995, **fourth env** | 3.59M | 88% @3507k | 86.7% | 69.3% /4000 † | 78.3% | ‡‡‡ only arm still near peak when stopped |
 | `b11c-obs30seed3` ‡‡‡ | disc 0.995, **fourth env** | 3.23M | 87% @1706k | 84.7% | 69.0% /2300 † | 73.0% | ‡‡‡ weakest of batch 11 |
@@ -177,6 +183,81 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 15 — `N_STEP_UPDATE=3`: falsified on speed, null on level, and a 97/100 that is really 93%
+
+**Ran 2026-08-06 16:26 to 2026-08-07 08:22 (15.9 h), four arms to 5.79M / 5.75M / 5.46M / 5.81M,
+measured 2026-08-07.** `N_STEP_UPDATE=3` on batch 13's config with `GUIDED_FRACTION=0.8`; control is
+batch 14, which shares the 0.8 and differs only by a discount that is a measured null. Graphs in
+[`charts.md`](charts.md#batch-15--n_step_update3-falsified-on-speed-and-the-longest-arms-on-record).
+
+| seed | best ckpt | eq-effort | pf30≥40% at | best30 | SEF | full rows | ≥95% rows |
+|---|---|---|---|---|---|---|---|
+| 1 | 95% @4697k | 77.67% | 620k | 89.7% | 39.9% | 63 | 1 |
+| 2 | **97%** @3245k | **79.68%** | 524k | 89.3% | 39.0% | 94 | **8** |
+| 3 | 86% @3823k † | 66.40% | 707k | 75.7% | 9.4% | **0** | 0 |
+| 4 | 91% @3671k | 73.53% | 378k | 86.3% | 33.8% | 6 | 0 |
+| **mean** | **92.3%** | **74.32%** | **557k** | **85.3%** | **30.5%** | | **9** |
+
+**† `b15c` produced no full-length row at all** and is the first arm to exercise
+`best_full_length_row`'s half-depth fallback in production — its best is a 69/80 row abandoned by the
+90% gate, printed `[truncated]`. Working as designed, and a preview of what the 95% gate makes normal.
+
+### The pre-registered primary failed; the evals are a null
+
+| metric | b14 | b15 | delta | p |
+|---|---|---|---|---|
+| **steps to pf30 ≥ 40%** (primary) | **429k** | **557k** | **+128k slower** | 0.250 |
+| best ckpt | 92.25% | 92.30% | +0.05 pp | 1.000 |
+| `pooled_equal_effort` | 72.08% | 74.32% | +2.24 pp | 0.625 |
+| `strong_eval_fraction` (eq. effort) | 21.53% | 25.59% | +4.05 pp | 0.625 |
+| peak trailing | 94.74 | 94.64 | -0.10 | 0.875 |
+
+n-step's whole predicted mechanism was faster credit propagation, and it came out **slower**, 3 of 4
+seeds. Best checkpoint lands within 0.05 pp. **`N_STEP_UPDATE=5` is closed**, not queued: the case for
+a larger n was that the effect scales with n, so its absence at n=3 is the worst possible sign.
+Contamination cannot be blamed either — at the measured epsilon an n=3 return is exact for 99.5% of
+targets — so there is no predicted cost to attribute the null to.
+
+### ‡ The 97/100 does not survive re-measurement, and the ≥95% count is mostly noise
+
+`b15b` @3245000 read **97/100**, which would have been a project record. Re-measured over **200 fresh
+episodes it read 182/200 = 91.0%**, pooling to **279/300 = 93.0%** (CI 89.5-95.4). Every champion this
+project has selected behaves the same way:
+
+| checkpoint | selected | corrected | how |
+|---|---|---|---|
+| `b11b` @855k | 96/100 | ~94.0% | shrunk against a Beta prior |
+| `b14a` @3702k | 96/100 | 93.5% (CI 89.2-96.2) | re-measured, 187/200 |
+| `b15b` @3245k | **97/100** | **93.0%** (CI 89.5-95.4) | re-measured, 279/300 |
+
+**So the record has not moved. Three batches have produced the same ~93-94% policy.**
+
+Batch 15 has **9 rows at ≥95%** against batch 11's 3, batch 13's 1 and batch 14's 1, and it is
+tempting to read that as more near-perfect checkpoints. It is mostly the right tail of a population
+that is not near-perfect. `b15b`'s 94 full-length rows have **mean 90.7% and median 90.0%**, and for a
+population centred at 90% the expected number of 100-episode measurements reading ≥95 by noise alone
+is ~5.4 per 94 rows. Observed: 8.
+
+The practical consequence, which matters for the gate: **`EVAL_MIN_ACHIEVABLE=95` does not find 95%
+policies, it finds ~90% policies caught on a lucky 100 episodes.** Only re-measurement separates the
+two, and it should be run on any checkpoint before it is called a record.
+
+### What batch 15 did establish
+
+- **`b15b` is the strongest arm ever measured on the arm-level figure** — `pooled_equal_effort`
+  79.68%, against a previous best of 77.55% (`b14d`). That is a real result and it is not a
+  selection artifact, since the figure truncates every checkpoint to 20 episodes.
+- **The horizon is longer than three batches of docs assumed.** 2 of 4 arms were still gaining in
+  their final 500k band at 5.5-6.0M, and `b15d`'s peak trailing score is at 5799k, its
+  second-to-last eval. `b15a` and `b15d` are the top resume candidates on record.
+- **The ceiling has not moved.** Peak trailing reads 94.92 / 94.80 / 94.90 / 95.00 across batches
+  11 / 13 / 14 / 15 — flat inside 0.2 points while run length went 3.2M to 5.8M. Full-length
+  `strong_eval_fraction` rising 19.5 → 21.6 → 30.5% is arms spending longer at a good level, not
+  reaching a better one.
+- **The seed spread is again larger than any effect.** `b15a` at 39.9% `sef` against `b15c` at 9.4%,
+  same config, adjacent seeds; and `b15c` is the only arm in five batches to produce no full-length
+  row at all.
 
 ## Batch 14 — disc 0.9975 at guided 0.8, and the widest seed spread yet
 

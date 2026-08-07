@@ -34,7 +34,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
-| **The record is 96%**, held jointly by `b11b` @855k and `b14a` @3702k; both correct to ~94% | **measured**, 96/100 each; `b14a` re-measured 187/200 |
+| **The record is ~93-94%**, reached three times — `b15b` @3245k (97/100 selected), `b14a` @3702k, `b11b` @855k | **measured**; both re-measured champions pool to 93.0% and 93.5% |
 | Two of the four record jumps came from the **horizon** and the **env audit**, not hyperparameters | **established** |
 | An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M | **established**, 2 arms to the end |
 | Arms peak by ~3.4M | **falsified** — 2 of batch 14's 4 peaked past 3.5M, and 2 of batch 15's were still gaining at **5.5-6.0M**; the old rule tracked where humans stopped arms |
@@ -52,7 +52,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
 | `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
-| n-step returns help | **falsified on speed** — batch 15 at n=3 reached pf30 >= 40% **128k later** than its control, 3 of 4 seeds slower; level is a null (+4.05 pp `sef`, p=0.625). Evals pending |
+| n-step returns help | **falsified on speed** — batch 15 at n=3 reached pf30 >= 40% **128k later** than its control, 3 of 4 seeds slower; evals null too (best ckpt +0.05 pp, p=1.000) |
 | A larger replay buffer prevents the collapse | **not settled** — opposite results twice |
 | Epsilon reaching 0.0 causes the collapse | **falsified**, *but only at 0.001 vs 0.0* |
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
@@ -60,6 +60,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Elevated exploration (handover 0.0125) helps | **falsified** — batch 13 null on **five** metrics, n=4 paired |
 | A one-step exploration shield helps | **open**, confounded twice — nothing to fix at 0.0125, and `GUIDED_FRACTION` 0.8 moved with the discount in batch 14 |
 | A seed number is a stable unit of quality across configs | **falsified** — batch 11's best seed became batch 13's worst |
+| The same `SNEK_SEED` reproduces a run | **falsified** — same seed and config diverge in weights inside 1000 steps; `cpprb`'s sampling RNG is unseeded and unseedable |
 | The epsilon *ratchet* was a real defect | **standing**, on mechanism: no recovery from a collapse |
 
 **Measurement**
@@ -70,7 +71,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Abandoning a checkpoint eval early is not worth it | **falsified for an arithmetic rule** — full-length work falls to 71 / 52 / 31% at gates of 85 / 90 / 95; only the *predictive* version was a mere 14% |
 | **n=4 cannot resolve an effect below ~10 pp**; 5 pp needs n≈17-37 depending on the metric | **established** |
 | 100-episode measurement reproduces within binomial noise | **established**, 51 repeats |
-| The max of N noisy measurements is upward-biased — shrink it before quoting it | **established** — `b14a`'s 96/100 re-measured 91/100, pooling to 93.5% |
+| The max of N noisy measurements is upward-biased — **re-measure** before quoting it | **established, twice** — 96/100 → 93.5%, 97/100 → 93.0% |
+| A high selected reading means a near-perfect policy | **falsified** — `b15b`'s 8 rows at ≥95% come from a population with mean 90.7%, where noise alone predicts ~5.4 |
 | The graph-100% tier is comparable across arms and batches | **falsified under a gate** — `EVAL_MIN_ACHIEVABLE` censors it from below; reads +15.6 pp on batch 14 as pure artifact |
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
@@ -401,6 +403,48 @@ mechanism described in [`completedRuns.md`](completedRuns.md) is still an untest
 hypothesis**, not a finding. `REPLAY_BUFFER_MAX_LENGTH=1000000` is in the backlog at low
 priority.
 
+## A seed does not reproduce a run, and the reason is the replay buffer
+
+Measured 2026-08-07, because two docs disagreed: `seed_process`'s docstring said a seed buys "reduced
+variance, not reproducibility" while the hall-of-fame README claimed a fresh run of the same config
+*was* reproducible. The docstring was right, and the cause is now identified.
+
+**Two arms, same `SNEK_SEED=7`, byte-identical config.** What is the same and what is not:
+
+| layer | same seed → same? | how it was tested |
+|---|---|---|
+| `random` / `numpy` / `tf` draws | **yes**, bit-identical | direct draws in fresh processes |
+| network initialisation | **yes**, identical weight hash | hashed all 8 variables after `create_variables` |
+| environment: food, episode lengths, observations | **yes**, identical stream | fixed action sequence, hashed 6 episodes of observations |
+| 200 gradient steps on a **fixed** batch | **yes**, identical weight hash | same batch fed to both |
+| **trained weights at step 1000** | **no** | hashed every checkpoint from two real arms |
+| eval trajectory | **no** — diverges then amplifies | 0.001 apart at first, 1.8 vs 7.5 avg score by 5000 |
+
+**The nondeterminism is in the data, not the math.** Gradient steps on identical batches reproduce
+exactly, so what differs is *which transitions get sampled*. Prioritized sampling runs inside
+`cpprb`'s C++ sum tree, and nothing in this project seeds it — `seed_process` covers `random`,
+`numpy` and `tf` only. Sampling the same buffer in fresh processes with all three seeded returns
+different indexes every time. **cpprb's constructor accepts a `seed=` kwarg and silently ignores it**,
+verified directly, so this is not a one-line fix.
+
+Three plausible fixes were tested and none works: `TF_DETERMINISTIC_OPS=1`, single-threaded TF
+(`TF_NUM_INTEROP_THREADS=1 TF_NUM_INTRAOP_THREADS=1`) and `PYTHONHASHSEED=0`. Each only moves the
+divergence point by a step or two of eval. Running the arms sequentially instead of in parallel also
+does not help, which rules out CPU contention.
+
+**What this means in practice, and it is mostly reassuring:**
+
+- **Seeds still do their job.** Every arm in a batch starts from the same weights and meets the same
+  environment, which is exactly the between-arm variance a seed is meant to remove. What it cannot
+  remove is trajectory divergence once training starts.
+- **Paired-by-seed statistics remain valid.** Pairing `b14a` with `b15a` is still pairing two arms
+  that began identically; it was never an assumption that they would stay identical. This is the
+  mechanism behind the already-established finding that a seed is not a stable unit of quality.
+- **Never report a re-run as confirming an exact number**, and never expect a resume to continue the
+  original trajectory — the buffer and RNG state are not checkpointed either.
+- **Bit-reproducibility would require replacing cpprb** with a seedable buffer. Not worth it for
+  tuning; it would matter only for debugging a specific divergence.
+
 ## Re-opened 2026-08-02: n-step returns were never cleanly tested
 
 | policy | steps | peak score (at) | best perfect-30 | 1st perfect |
@@ -443,8 +487,9 @@ was that the effect scales with n, and the effect is absent at n=3 in the direct
 largest.
 
 Design and full numbers in
-[`runs.md`](runs.md#batch-15-is-stopped-at-55-58m-awaiting-evals--n-step-returns-at-n_step_update3);
-checkpoint evals pending.
+[`completedRuns.md`](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).
+The checkpoint evals agree: best checkpoint +0.05 pp at p=1.000, `pooled_equal_effort` +2.24 pp at
+p=0.625.
 
 ## The record across four environments: 51% → 92% → 93% → **96%**
 

@@ -187,7 +187,7 @@ horizon, which is suggestive but not the isolating comparison a future batch wou
 the claim safely.
 
 Both champion checkpoints are preserved in
-[`../hallOfFame/`](../../hallOfFame/README.md#the-current-record-two-checkpoints-at-96-both-94-corrected-both-on-master).
+[`../hallOfFame/`](../../hallOfFame/README.md#the-current-record-93-94-reached-three-times-all-on-master).
 
 ## Batch 9 — 0.995 against 0.9975 on the post-audit environment
 

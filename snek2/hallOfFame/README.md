@@ -9,33 +9,39 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: two checkpoints at 96%, both ~94% corrected, both on `master`
+## The current record: ~93-94%, reached three times, all on `master`
 
-Batches 11, 13 and 14 train on the **30-value observation vector** — the current one, after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these four entries are the
-only ones in this folder that load on `master` as it stands.** All four came from a batch close-out
+Batches 11-15 train on the **30-value observation vector** — the current one, after the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these five entries are the
+only ones in this folder that load on `master` as it stands.** All five came from a batch close-out
 rather than a mid-run measurement.
 
 | checkpoint | measured | config |
 |---|---|---|
-| `b11b-obs30seed2-ckpt855000` | **96.0%** (96/100, CI 90.2-98.4), top-3 95.3%, ~94% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=2` |
-| `b14a-disc9975seed1-ckpt3702000` | **96.0%** (96/100) selected, **91/100** on an independent re-run → **93.5% over 200** (CI 89.2-96.2) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=1` |
-| `b13d-shieldseed4-ckpt986000` | 95.0% (95/100, CI 88.8-97.8), top-3 93.3% | + eps handover 0.0125, `GUIDED_FRACTION=0.5`, `SNEK_SEED=4` |
-| `b11a-obs30seed1-ckpt671000` | 94.0% (94/100, CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
+| `b15b-nstep3seed2-ckpt3245000` | **97/100** selected, **182/200** on an independent re-run → **93.0% over 300** (CI 89.5-95.4) | `N_STEP_UPDATE=3`, `DISCOUNT=0.995`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=2` |
+| `b14a-disc9975seed1-ckpt3702000` | 96/100 selected, **91/100** on an independent re-run → **93.5% over 200** (CI 89.2-96.2) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=1` |
+| `b11b-obs30seed2-ckpt855000` | 96/100 (CI 90.2-98.4), top-3 95.3%, **~94% shrunk** | `DISCOUNT=0.995`, `SNEK_SEED=2` |
+| `b13d-shieldseed4-ckpt986000` | 95/100 (CI 88.8-97.8), top-3 93.3% | + eps handover 0.0125, `GUIDED_FRACTION=0.5`, `SNEK_SEED=4` |
+| `b11a-obs30seed1-ckpt671000` | 94/100 (CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
 
-**`b14a` is the only entry with two independent full-length measurements, and it is the best evidence
-in this folder about what a headline number is worth.** Selected at 96/100 it tied `b11b` on paper;
-re-run at 100 fresh episodes it read **91/100**. Neither figure is wrong — the pooled 187/200 = 93.5%
-is simply the better estimate, and the 5-point drop is the winner's curse, since that checkpoint was
-the maximum over 176 attempted full-length measurements in its own arm. **Treat `b11b`'s 96% the same
-way**; its shrunk estimate is 94.0% for the same reason, arrived at by modelling rather than by
-re-measuring.
+**Two entries now have independent second measurements, and both told the same story.** `b14a` was
+selected at 96/100 and re-read 91/100; `b15b` was selected at 97/100 and re-read 182/200 = 91.0%.
+Neither original is wrong — the pooled figures, 93.5% and 93.0%, are simply the better estimates, and
+the drop is the winner's curse, since each was the maximum over dozens to hundreds of full-length
+measurements in its own arm. `b11b`'s ~94.0% comes from modelling rather than a re-run and should be
+read the same way.
 
-Because of that, **`b11b` and `b14a` should be read as a tie around ~94%**, not as a record and a
-challenger. Neither has been shown better than the other.
+**So the top three should be read as a tie around 93-94%, not as a record and two challengers.**
+Their intervals overlap almost entirely, and no batch since 11 has been shown to raise the ceiling.
 
-**Verified by loading the copies in this folder**, not just the originals. `b14a`'s copy was
-re-measured at the full 100 episodes above — the strongest verification done here, and worth
+**‡ A high selected reading does not indicate a near-perfect policy**, and `b15b` is the clearest
+demonstration in this folder. It produced **8 checkpoints reading ≥95%**, more than any other arm —
+but its 94 full-length rows have **mean 90.7%**, and for a population centred at 90% noise alone
+predicts ~5.4 readings of ≥95 per 94 rows. The cluster is a sampling tail. Always re-measure before
+calling something a record.
+
+**Verified by loading the copies in this folder**, not just the originals. `b15b`'s copy was
+re-measured over **200** episodes and `b14a`'s over 100 — the strongest verification done here, and worth
 preferring: it confirms the copy loads *and* sharpens the estimate. `b11b`'s copy re-measured
 19/20 perfect (95.0%, avg score 94.8); `b13d`'s re-measured **17/20 perfect (85.0%, avg score 94.0,
 min 87)** from `savedPolicies/champion_b13d/` before that scratch directory was removed. Worth doing
@@ -52,11 +58,11 @@ measurements in its own arm, so some of the headline is luck. Shrinking against 
 on each arm's *unselected* graph-100% rows gives 94.0% and 90.2%. Use those when comparing to
 anything that was not selected the same way.
 
-**That method no longer works for arms measured under an abandonment gate**, which is why `b14a` has
-a re-measurement instead of a shrunk figure: `EVAL_MIN_ACHIEVABLE=90` truncates the unselected
-graph-100% rows the prior was fitted on, and their rates are biased low by optional stopping. For any
-future champion from a gated close-out, **re-measure at 100 episodes** rather than trying to shrink.
-See
+**That method no longer works for arms measured under an abandonment gate**, which is why `b14a` and
+`b15b` have re-measurements instead of shrunk figures: the gate truncates the unselected graph-100%
+rows the prior was fitted on, and their rates are biased low by optional stopping. For any future
+champion, **re-measure at 100+ episodes** rather than trying to shrink. Prefer 200 — `b15b`'s pooled
+interval is 89.5-95.4 against `b14a`'s 89.2-96.2 for the same effort per episode. See
 [`../hyperparamTuning/archive/batches1-11.md`](../hyperparamTuning/archive/batches1-11.md#a-new-best-measured-checkpoint-b11b-855000-96100).
 
 **Every arm here had long since peaked when it was stopped**, which is the entire reason this folder
@@ -64,9 +70,10 @@ exists. The two batch-11 arms were still healthy at 3.19M and 3.56M but `b11a` h
 since 678k; `b13d` lost 44 pp after ~1M; `b14a` lost 25 pp after 3.70M. The checkpoints preserved
 here are from the peak, not from where the run ended.
 
-**`b14a` is also the latest peak on record** — 3702000, against 855k, 671k and 986k for the others.
+**`b14a` is also the latest peak on record** — 3702000, against 855k, 671k, 986k and `b15b`'s 3245k.
 That is the observation that moved `SNEK_MAX_STEPS` to 10M, and it means the habit of stopping arms
-near 3.5M was costing checkpoints, not just steps.
+near 3.5M was costing checkpoints, not just steps. `b15b`'s own arm ran to 5.75M and had eight
+checkpoints reading ≥95% spread from 3245k to 4594k, so the good region is wide, not a single spike.
 
 **The 30-value era starts at `b09c616`** ("Two new observations, a three-stage close-out, and
 `EVAL_CONFIRM_COUNT=100`"), which is the commit to check out if a future change moves the vector
@@ -75,11 +82,12 @@ new blocks already carry their final polarity in that commit (1 = good at 26-28 
 no sub-era to worry about, and no checkpoint exists from the few hours the reversed version was live
 because batch 11 launched after the flip.
 
-**These four are also the only entries whose arm can still be resumed at all**, since every earlier
+**These five are also the only entries whose arm can still be resumed at all**, since every earlier
 batch trained on a narrower vector. `SNEK_SEED` is recorded per arm in `runs/<policy>.md` (a
-batch-11 first), which makes a *fresh* run of the same config reproducible — it does **not** make a
-resume reproducible, because the replay buffer and RNG state are not checkpointed. A resumed arm
-diverges from the original immediately.
+batch-11 first), which makes a run **describable, not reproducible** — measured 2026-08-07, two arms
+on the same seed and config diverge in their weights within the first 1000 steps. See
+[`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md#a-seed-does-not-reproduce-a-run-and-the-reason-is-the-replay-buffer).
+A resume diverges for the additional reason that the buffer and RNG state are not checkpointed.
 
 ## The previous record: 95%, on the environment of 2026-08-02 (superseded 2026-08-03)
 

@@ -42,11 +42,17 @@ def seed_process(seed, stream):
     constructor — the constructor is what runs in the child, so it is the only place a
     per-worker stream can be applied.
 
-    **This buys reduced variance, not reproducibility.** Exact determinism would additionally
-    need single-threaded TF (`set_inter_op_parallelism_threads(1)`), deterministic op selection,
-    and a fixed arrival order for the parallel workers' results, none of which hold here. Treat a
-    seed as making a run *describable* and roughly repeatable, not bit-identical, and do not
-    report a re-run as confirmation of an exact number.
+    **This buys reduced variance, not reproducibility, and the reason is `cpprb`.** Measured
+    2026-08-07: two arms on the same seed and config have identical network initialisation and an
+    identical environment, but their weights diverge inside the first 1000 steps. The cause is that
+    prioritized sampling happens in cpprb's C++ RNG, which nothing here seeds — its `seed=` kwarg is
+    accepted and silently ignored. So each training step draws a different batch, and 200 gradient
+    steps on a *fixed* batch are bit-identical, which locates the nondeterminism in the data rather
+    than the math.
+
+    `TF_DETERMINISTIC_OPS=1`, single-threaded TF and `PYTHONHASHSEED=0` were all tried and only
+    delay the divergence. Treat a seed as making a run *describable*, and do not report a re-run as
+    confirmation of an exact number.
     """
     derived = derive_seed(seed, stream)
     if derived is None:

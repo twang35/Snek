@@ -117,13 +117,28 @@ reached it is never stopped, and an abandoned row's own rate is always below it.
 `pooled_equal_effort` truncates to the screen depth, so it is exact at any gate.
 `EVAL_MIN_ACHIEVABLE=0` turns it off.
 
-Measured on batch 13's first 505 full-length rows, full-length work as a share of a flat pass:
+Simulated on batch 13's 505 full-length rows, full-length work as a share of a flat pass:
 
 | gate | full-length work | at 100 episodes, stops after |
 |---|---|---|
 | 85 | 71% | 16 failures |
 | 90 | 52% | 11 failures |
 | **95** | **31%** | **6 failures** |
+
+**‡ Those are batch 13's distribution and they over-predict the saving on a strong arm.** The realised
+total saving under the 90% gate was **34.8% of planned episodes on batch 14 and 28.1% on batch 15**,
+and within batch 15 it tracked arm quality inversely — exactly as it must, since a gate only cuts
+checkpoints that fail it:
+
+| arm | eq-effort | episodes saved |
+|---|---|---|
+| `b15c` (weakest) | 66.4% | **55.3%** |
+| `b15d` | 73.5% | 31.3% |
+| `b15a` | 77.7% | 25.6% |
+| `b15b` (strongest) | 79.7% | **22.2%** |
+
+So treat the table above as an upper bound. The better the batch, the less the gate saves — which is
+the right direction, since a strong arm is the one whose checkpoints are worth measuring properly.
 
 **95 is a deliberate narrowing of what the protocol measures well.** The project is chasing 95%+, so
 anything below that is not a candidate and does not need 100 episodes to be ruled out. The cost is

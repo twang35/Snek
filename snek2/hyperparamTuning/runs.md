@@ -12,24 +12,31 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## The current record: two checkpoints at 96%, both really ~94%
+## The current record: three checkpoints read 96-97%, and all three are really ~93-94%
 
-**`b11b-obs30seed2` @855000 and `b14a-disc9975seed1` @3702000 both scored 96/100**, found by batch
-11's close-out on 2026-08-04 and batch 14's on 2026-08-06. Both are preserved in
-[`../hallOfFame/`](../hallOfFame/README.md) and both load on `master`.
-
-**Neither is really a 96% policy, and they should be read as a tie near 94%.** Each is the maximum
-over 176-204 full-length measurements in its own arm, so the headline carries selection luck:
+`b15b-nstep3seed2` @3245000 read **97/100**, the highest selected measurement this project has
+produced. It does not move the record. **Every champion, corrected, lands in the same place:**
 
 | checkpoint | selected | corrected | how |
 |---|---|---|---|
-| `b11b` @855k | 96/100 | **~94.0%** | shrunk against a Beta prior on its 104 unselected graph-100% rows |
-| `b14a` @3702k | 96/100 | **93.5%** (CI 89.2-96.2) | **re-measured** at 100 fresh episodes: 91/100, pooled 187/200 |
+| `b15b` @3245k | **97/100** | **93.0%** (CI 89.5-95.4) | re-measured over 200 fresh episodes: 182/200, pooled 279/300 |
+| `b14a` @3702k | 96/100 | 93.5% (CI 89.2-96.2) | re-measured: 91/100, pooled 187/200 |
+| `b11b` @855k | 96/100 | ~94.0% | shrunk against a Beta prior on its 104 unselected graph-100% rows |
 
-`b14a` is the first champion verified by re-measurement rather than modelling, and it is the better
-method — it confirms the copy loads *and* sharpens the estimate. It became the only option because
-the 90% abandonment gate destroys the unselected graph-100% rows the shrinkage prior needs; see
-[`findings.md`](findings.md#three-measurement-caveats). Prefer a re-run for every future champion.
+All three are in [`../hallOfFame/`](../hallOfFame/README.md) and all three load on `master`. Their
+intervals overlap almost entirely, so **the honest statement is that five batches have produced the
+same ~93-94% policy three times**, not a rising record.
+
+**Re-measure, do not shrink.** Re-measurement confirms the copy loads *and* sharpens the estimate,
+and it is the only option left for a gated close-out, since a gate destroys the unselected
+graph-100% rows the shrinkage prior needs — see
+[`findings.md`](findings.md#three-measurement-caveats).
+
+**‡ A high selected reading is mostly sampling luck, and the numbers say how much.** `b15b`'s 94
+full-length rows have **mean 90.7% and median 90.0%**. For a population centred at 90%, a 100-episode
+measurement reads ≥95 about 5.7% of the time, so ~5.4 of 94 rows should hit ≥95 by noise alone;
+8 did. **`EVAL_MIN_ACHIEVABLE=95` therefore does not find 95% policies — it finds ~90% policies
+caught on a good 100 episodes.** Nothing but a second measurement separates the two.
 
 **The previous record, `b10d-disc995seed4` @1815000 at 95/100, no longer runs.** The two
 observations added 2026-08-03 took the vector to 30 values, so it and every other batch-10
@@ -179,7 +186,7 @@ from each other** — 20 arms across four different hypotheses. Per-batch write-
 
 | batch | what it changed | verdict |
 |---|---|---|
-| [15](#batch-15-is-stopped-at-55-58m-awaiting-evals--n-step-returns-at-n_step_update3) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; level null |
+| [15](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
 | [14](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
 | [13](completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
 | [12](completedRuns.md#batch-12--the-deadlock-abandoned-at-1m-of-25m) | eps handover 0.05 | **deadlocked**, abandoned 4/4 |
@@ -203,7 +210,7 @@ is how long an arm stays good, which is why full-length `strong_eval_fraction` k
 21.6 → 30.5%) while the equal-effort figures stay flat. **That is a run-length artifact, not
 progress**, and it is the honest reading of every "record" in the last three batches.
 
-## Batch 15 is stopped at 5.5-5.8M, awaiting evals — n-step returns at `N_STEP_UPDATE=3`
+## Batch 15 is closed out — n-step at `N_STEP_UPDATE=3` is falsified on speed, null on level
 
 The first batch that would actually measure n-step returns. Both existing n-step arms are retracted
 rather than negative: `b1c-nstep3` and `b2b-nstep2` trained on returns that summed **straight
@@ -271,7 +278,7 @@ If batch 15 comes back with a large effect, **check it against batch 14 before c
 unattended batch is safe, and `b14c` shows ~1 arm in 4 is still climbing at 4.5M. Stop them by hand
 once the curves flatten.
 
-### Stopped at 5.5-5.8M, awaiting evals — the primary says n=3 does **not** accelerate
+### Closed out: the primary says n=3 does **not** accelerate, and the evals agree it is a null
 
 Ran 2026-08-06 16:26 to 2026-08-07 08:22, **15.9 h**, four arms to 5.79M / 5.75M / 5.46M / 5.81M —
 the longest arms on this vector by 1.3M. Stopped by hand well short of the 10M cap. No arm died.
