@@ -191,16 +191,40 @@ def test_no_abandon_rule_means_no_flag_and_no_abandonment():
 
 # ------------------------------------------------------------------ progress reporting
 
-def test_progress_is_reported_per_episode_with_the_running_tally():
+def test_progress_is_reported_once_per_completed_wave():
     calls = []
     flag = FakeFlag()
-    queue = FakeQueue([episode(0, perfect=True), episode(1, perfect=False), done(0), done(1)])
-    collect_results(queue, 2, flag,
+    queue = FakeQueue([episode(0, perfect=True), episode(1, perfect=False),
+                       episode(0, perfect=True), episode(1, perfect=True), done(0), done(1)])
+    collect_results(queue, 2, flag, episodes_total=4,
                     on_progress=lambda *args: calls.append(args))
-    assert len(calls) == 2
+    # 4 episodes on 2 workers = 2 waves, so 2 reports rather than 4. Per-episode reporting made
+    # write_results re-serialise the whole arm up to 100 times a checkpoint.
+    assert len(calls) == 2, calls
     # (wave, waves_total, perfect_so_far, episodes_so_far, per_wave_perfect)
-    assert calls[0][2] == 1 and calls[0][3] == 1
-    assert calls[1][2] == 1 and calls[1][3] == 2
+    assert calls[0][0] == 1 and calls[0][3] == 2
+    assert calls[1][0] == 2 and calls[1][3] == 4
+
+
+def test_the_wave_total_is_constant_from_the_first_report():
+    """The x-axis bug: waves_total used to be "episodes seen so far" and grew every episode."""
+    calls = []
+    flag = FakeFlag()
+    messages = [episode(i % 4) for i in range(12)] + [done(r) for r in range(4)]
+    collect_results(FakeQueue(messages), 4, flag, episodes_total=100,
+                   on_progress=lambda *args: calls.append(args))
+    totals = {call[1] for call in calls}
+    assert totals == {25}, 'waves_total moved during one checkpoint: {0}'.format(sorted(totals))
+
+
+def test_the_wave_total_matches_a_screen_as_well_as_a_full_pass():
+    for episodes, workers, expected in ((100, 4, 25), (20, 4, 5), (80, 4, 20), (100, 10, 10),
+                                        (20, 3, 7)):
+        calls = []
+        messages = [episode(0)] * workers + [done(r) for r in range(workers)]
+        collect_results(FakeQueue(messages), workers, FakeFlag(), episodes_total=episodes,
+                       on_progress=lambda *args: calls.append(args))
+        assert calls and calls[0][1] == expected, (episodes, workers, calls[0][1] if calls else None)
 
 
 def test_per_wave_perfect_counts_group_by_worker_count():
@@ -214,15 +238,16 @@ def test_per_wave_perfect_counts_group_by_worker_count():
     queue = FakeQueue([episode(0, perfect=True), episode(1, perfect=True),
                        episode(0, perfect=False), episode(1, perfect=True),
                        done(0), done(1)])
-    collect_results(queue, 2, flag, on_progress=lambda *args: calls.append(args))
-    assert calls[1][4] == [2], 'first wave of 2 episodes had 2 perfect'
-    assert calls[3][4] == [2, 1], 'second wave had 1 perfect'
+    collect_results(queue, 2, flag, episodes_total=4,
+                    on_progress=lambda *args: calls.append(args))
+    assert calls[0][4] == [2], 'first wave of 2 episodes had 2 perfect'
+    assert calls[1][4] == [2, 1], 'second wave had 1 perfect'
 
 
 def test_progress_is_optional():
     flag = FakeFlag()
     queue = FakeQueue([episode(0), done(0)])
-    scores, _, _, _, _ = collect_results(queue, 1, flag)   # no on_progress
+    scores, _, _, _, _ = collect_results(queue, 1, flag)   # no on_progress, no episodes_total
     assert len(scores) == 1
 
 

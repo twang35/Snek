@@ -110,7 +110,8 @@ def split_quota(episodes, num_workers):
     return [base + (1 if index < remainder else 0) for index in range(num_workers)]
 
 
-def collect_results(results, num_workers, stop_flag, on_progress=None, should_abandon=None):
+def collect_results(results, num_workers, stop_flag, episodes_total=None,
+                    on_progress=None, should_abandon=None):
     """Drains `results` until every worker has reported `TAG_DONE`.
 
     Split out from the process machinery so the scheduling logic is testable with a fake queue and a
@@ -128,13 +129,26 @@ def collect_results(results, num_workers, stop_flag, on_progress=None, should_ab
     "wave" is `num_workers` completed episodes — not a real synchronisation point, just the unit the
     progress display already speaks in.
 
+    **`episodes_total` is what makes `waves_total` a constant, and it is not optional in practice.**
+    It is `ceil(episodes_total / num_workers)` — 25 for the usual 100 episodes on 4 workers, 5 for a
+    20-episode screen — and it is known before the first episode runs. An earlier version left it
+    unset and fell back to the episodes seen so far, so `rounds_total` grew by one every episode and
+    the live chart's x axis stretched continuously through a single checkpoint. The x axis must be
+    fixed from the first frame: its whole job is showing how much is left.
+
+    Progress is reported **once per completed wave**, not per episode, which matches the batched
+    path's cadence. Per-episode reporting also meant `write_results` re-serialising every row of the
+    arm up to 100 times a checkpoint instead of 25.
+
     Returns `(scores, perfect_flags, rewards, steps, abandoned)`.
     """
     scores, perfect_flags, rewards = [], [], []
     steps = 0
     abandoned = False
     finished = 0
-    expected_total = None
+    # Fixed before the first episode: ceil(episodes / workers). None only when a caller does not
+    # say, in which case there is nothing honest to report as a total.
+    waves_total = (-(-episodes_total // num_workers)) if episodes_total else None
     per_wave_perfect = []
     wave_perfect = 0
 
@@ -164,11 +178,9 @@ def collect_results(results, num_workers, stop_flag, on_progress=None, should_ab
         if len(scores) % num_workers == 0:
             per_wave_perfect.append(wave_perfect)
             wave_perfect = 0
-
-        if on_progress is not None:
-            waves_total = (expected_total or len(scores))
-            on_progress(len(scores), waves_total, int(sum(perfect_flags)), len(scores),
-                        list(per_wave_perfect))
+            if on_progress is not None:
+                on_progress(len(per_wave_perfect), waves_total or len(per_wave_perfect),
+                            int(sum(perfect_flags)), len(scores), list(per_wave_perfect))
 
         # Checked every episode, but only ever *sets* the flag — never stops draining.
         if (not abandoned and should_abandon is not None
@@ -330,7 +342,7 @@ class IndependentWorkerPool:
         for queue, quota in zip(self._commands, quotas):
             queue.put(('run', quota))
         scores, perfect_flags, rewards, steps, abandoned = collect_results(
-            self._results, self._num_workers, self._stop_flag,
+            self._results, self._num_workers, self._stop_flag, episodes_total=episodes,
             on_progress=on_progress, should_abandon=should_abandon)
         elapsed = time.time() - started
         print('    {0} episodes in {1}s ({2} env steps/s, {3} independent workers)'.format(

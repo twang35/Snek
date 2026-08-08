@@ -225,28 +225,92 @@ def resolve_screen_episodes(requested, num_episodes):
 def load_finished_results(policy_name, suffixes, num_episodes):
     """Rows from earlier runs that are already measured to this run's full episode count.
 
-    Returns (rows, steps) where `steps` is the set to skip. Only rows with at least
-    `num_episodes` episodes count: a checkpoint that a killed run had only partly measured is
-    re-measured from scratch rather than topped up, which keeps this a plain skip-list and
-    avoids having to pool a prior row's summary statistics with fresh episodes. Re-measuring one
-    checkpoint is cheap next to getting the arithmetic subtly wrong.
+    Returns `(rows, steps, source_screens, partial)`.
+
+    `steps` is the set to skip outright — rows already measured to `num_episodes`.
+
+    `partial` maps step -> a `held` sample for rows measured to *less* than `num_episodes` that carry
+    their per-episode results. Those are **reused, not discarded**: a resumed screen counts as
+    screened, and stage 3 tops it up to full length. Before per-episode storage existed this was not
+    possible — topping up meant pooling summary statistics, and the median cannot be pooled — so a run
+    killed mid-screening lost every screen it had done (192 rows and 7,534 episodes on `b18a` in one
+    incident). Rows from files predating the fields yield None from `held_from_row` and fall back to
+    being re-measured.
+
+    `source_screens` is the set of `screen_episodes` values the source files **recorded** — the
+    protocol each was actually run under. It exists because inferring the protocol from row depths
+    is wrong, and was wrong in production: see `protocol_from_sources`.
 
     A step appearing in two source files is loaded once — first file listed wins — because these
     are alternative records of the same frozen checkpoint, not extra samples to combine. Use
     merge_checkpoint_evals() when pooling repeat measurements is what you actually want.
     """
-    rows, steps = [], set()
+    rows, steps, source_screens = [], set(), set()
+    partial = {}
     for suffix in suffixes:
         path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
         if not os.path.exists(path):
             continue
         with open(path) as handle:
             payload = json.load(handle)
+        contributed = False
         for row in payload.get('results', []):
-            if row.get('episodes', 0) >= num_episodes and row['step'] not in steps:
+            step = row['step']
+            if step in steps:
+                continue
+            if row.get('episodes', 0) >= num_episodes:
                 rows.append(row)
-                steps.add(row['step'])
-    return sorted(rows, key=lambda r: r['step']), steps
+                steps.add(step)
+                # A full-length row supersedes any partial one carried from an earlier file.
+                partial.pop(step, None)
+                contributed = True
+                continue
+            # Shorter than full length: reusable as a partial sample when the row carries its
+            # per-episode results. Deeper wins if two files hold the same step, since more episodes
+            # is strictly more information about the same frozen checkpoint.
+            held = held_from_row(row)
+            if held is None:
+                continue
+            if len(held['scores']) > len(partial.get(step, {}).get('scores', [])):
+                partial[step] = held
+                contributed = True
+        if contributed:
+            # Files written before this field existed record nothing; `None` is the honest answer
+            # and `protocol_from_sources` treats it as "unknown", not as "flat".
+            source_screens.add(payload.get('screen_episodes'))
+    return sorted(rows, key=lambda r: r['step']), steps, source_screens, partial
+
+
+def protocol_from_sources(source_screens):
+    """Whether a resume should keep screening, from what the source files recorded.
+
+    **The guard.** Resume used to decide this by looking at the resumed rows: they were at full
+    length, so the arm "must have been" measured flat, so screening was switched off for the rest of
+    it. That inference is unsound, and it misfired on batch 18 — `b18a` and `b18d` were resumed from
+    3 and 2 full-length rows that were the **stage-1 tier** of the three-stage protocol, where any
+    checkpoint whose graph point read 100% is measured at full length immediately. The heuristic read
+    them as a flat run and turned screening off, which cost ~3x the episodes and left those two arms
+    with no `pooled_equal_effort` while their siblings had one — half the batch's seeds unusable on
+    the metric that compares arms.
+
+    The fix is to stop inferring: the payload has recorded `screen_episodes` all along.
+
+    | recorded in sources | meaning | return |
+    |---|---|---|
+    | any value > 0 | the arm was screened | `True` — keep screening, at that depth |
+    | only 0 | genuinely a flat run | `False` |
+    | only None | predates the field | `None` — unknown, caller decides |
+    | a mix of 0 and >0 | the arm is already inconsistent | `True`, and the caller warns |
+
+    Returns `(keep_screening, depth)`, where `depth` is the screen depth to continue at when a
+    source recorded one, so a resumed arm cannot silently change its own screen length either.
+    """
+    screened = {value for value in source_screens if value}
+    if screened:
+        return True, max(screened)
+    if source_screens and source_screens != {None}:
+        return False, 0
+    return None, 0
 
 
 def archive_existing_eval_pngs():
@@ -320,7 +384,47 @@ def build_row(step, held, meta=None):
         # throughput rather than a hardcoded guess. Strong policies play longer episodes and
         # measure slower, so a fixed estimate is wrong in both directions.
         'seconds': round(held['seconds'], 1),
+        # The raw per-episode results, from 2026-08-08. Everything above is derivable from
+        # these, and storing them is what makes a screen *resumable*: load_finished_results can
+        # seed a checkpoint's sample from a killed run and let stage 3 top it up, instead of
+        # discarding the screen and measuring it again from zero.
+        #
+        # Leaving them out was not free. A run killed mid-screening lost every screen it had
+        # done - 192 rows and 7,534 episodes on b18a, 193 and 6,865 on b18d, in one incident.
+        # Summaries cannot substitute: perfect_games, episodes, min and max pool exactly and the
+        # averages pool from sums, but the *median does not*, so a topped-up row rebuilt from
+        # summaries would carry a median that is quietly wrong.
+        #
+        # Cost is ~1.6 KB a row, so ~1 MB on a 600-row arm against a 145 KB payload. Scores are
+        # whole food counts and stored as ints; perfect flags as 0/1 rather than true/false,
+        # which is smaller and is what sum() already treats them as.
+        'episode_scores': [int(score) for score in scores],
+        'episode_perfect': [int(bool(flag)) for flag in held['perfect']],
+        'episode_rewards': [round(float(reward), 2) for reward in held['rewards']],
     }
+
+
+def held_from_row(row):
+    '''A `held` sample rebuilt from a stored row, or None if the row predates per-episode
+    storage.
+
+    The inverse of the three `episode_*` fields `build_row` writes. Returning None rather than
+    raising is deliberate: every result file written before 2026-08-08 lacks them, and a resume
+    against one of those has to fall back to re-measuring rather than fail.
+    '''
+    scores = row.get('episode_scores')
+    perfect = row.get('episode_perfect')
+    rewards = row.get('episode_rewards')
+    if not scores or perfect is None or rewards is None:
+        return None
+    if not (len(scores) == len(perfect) == len(rewards) == row.get('episodes', -1)):
+        # A truncated or hand-edited row. Re-measuring is cheap; pooling a mismatched sample is
+        # a silent wrong answer, which is the trade this whole module is written around.
+        return None
+    return {'scores': list(scores), 'perfect': list(perfect), 'rewards': list(rewards),
+            'seconds': float(row.get('seconds') or 0.0),
+            'abandoned': bool(row.get('abandoned'))}
+
 
 
 def skips_screening(meta, threshold=None):
@@ -398,6 +502,9 @@ def plan_stages(requested_steps, selected_by, screen_episodes, confirm_count, nu
 
     full = [s for s in requested_steps if skips_screening(selected_by.get(s))]
     screened = [s for s in requested_steps if not skips_screening(selected_by.get(s))]
+    # A floor, not a cap: `pick_finalists` confirms every 20/20 screen even past the quota, and how
+    # many of those there will be is unknowable until the screens have run. main() raises the totals
+    # once the finalists are known, so a plan printed here can read slightly low.
     confirmed = min(confirm_count, len(screened))
     return {
         'full': full,
@@ -422,6 +529,20 @@ def pick_finalists(rows, count, already_full=None):
     across 88 checkpoints that had all already cleared 80%, it correlated +0.48 with the true
     rate while the graph point itself managed +0.10 (see select_top_checkpoints).
 
+    **A perfect screen is mandatory and ignores `count`.** Any checkpoint that went 20/20 is
+    confirmed even if that takes the confirm stage past `EVAL_CONFIRM_COUNT`, mirroring the rule
+    `select_top_checkpoints` already applies one stage earlier, where a graph point of >=90% is
+    measured however many slots are left. The reason is the same in both places: **the quota exists
+    to ration a large middling pool, and the whole point of the close-out is not to miss the best
+    checkpoint.** A 20/20 screen is the strongest signal screening can produce, and dropping one
+    because the quota filled would be selection working directly against the goal — a checkpoint that
+    would have read 95+ never gets the episodes that would show it.
+
+    It is also cheap in the case that matters. Rates are quantised at screen depth, so 20/20 is rare:
+    across batch 15's four arms it was **2 of 596 screens**, and on `b17b` — the arm that produced the
+    project record — **11 of 186**. A dead arm produces none at all. So the cost is a handful of extra
+    measurements on the arms where an extra measurement is most likely to find something.
+
     `already_full` names steps that came in from a resumed run at full length. They are
     excluded because they already have the measurement this stage would buy them, so letting
     them occupy a slot would spend it on work that is finished.
@@ -430,7 +551,20 @@ def pick_finalists(rows, count, already_full=None):
     pool = [r for r in rows if r['step'] not in already_full]
     ranked = sorted(pool, key=lambda r: (-r['perfect_games'] / r['episodes'],
                                          -(r.get('graph_surrounding') or 0.0), r['step']))
-    return ranked[:count]
+    chosen = ranked[:count]
+    # Perfect screens past the quota, appended in the same ranked order. Kept as a separate pass
+    # rather than a bigger slice so the intent survives a future edit to `count`. The `chosen_steps`
+    # guard is what makes this idempotent: scanning `ranked` instead of `ranked[count:]` is an
+    # equivalent mutant precisely because of it, which is the guard doing its job rather than a gap.
+    chosen_steps = {r['step'] for r in chosen}
+    mandatory = [r for r in ranked[count:]
+                 if r['perfect_games'] == r['episodes'] and r['step'] not in chosen_steps]
+    if mandatory:
+        print('    {0} checkpoint{1} screened 100% past the confirm quota of {2} and will be '
+              'confirmed anyway: {3}'.format(
+                  len(mandatory), '' if len(mandatory) == 1 else 's', count,
+                  ', '.join(str(r['step']) for r in mandatory)))
+    return chosen + mandatory
 
 
 def run_round(parallel_env, policy_action, worker_envs):
@@ -859,7 +993,7 @@ def main(argv):
     # Resume before the expensive setup, so a run that has nothing left to do says so in
     # seconds rather than after building an agent and 20 worker processes.
     suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
-    resumed_rows, resumed_steps = load_finished_results(
+    resumed_rows, resumed_steps, source_screens, resumed_partial = load_finished_results(
         policy_name, resume_suffixes(os.environ.get('EVAL_RESUME'), suffix), num_episodes)
     if resumed_steps:
         skipped = [s for s in requested_steps if s in resumed_steps]
@@ -870,14 +1004,50 @@ def main(argv):
             print('nothing left to measure')
             return 0
         if screen_episodes and not screen_requested:
-            # Resume means continue, so an arm that started under the flat protocol finishes under
-            # it. Otherwise switching the *default* would silently leave one arm holding some rows
-            # at 100 episodes and some at 20 — not comparable with each other, let alone with the
-            # arm it is meant to be compared against. Ask for it explicitly to override.
-            print('    screening off: these {0} resumed rows were measured at full length, so the '
-                  'rest of the arm will be too (EVAL_SCREEN_EPISODES=20 to override)'.format(
-                      len(skipped)))
-            screen_episodes = 0
+            # Resume means continue: an arm that started under the flat protocol finishes under it,
+            # because a mix of 20- and 100-episode rows is not comparable with itself, let alone with
+            # the arm it is meant to be compared against.
+            #
+            # Which protocol it started under is READ from the source files, never inferred from the
+            # depth of the resumed rows — see protocol_from_sources for the batch-18 failure that
+            # rule replaced.
+            keep_screening, recorded_depth = protocol_from_sources(source_screens)
+            if keep_screening:
+                if recorded_depth != screen_episodes:
+                    print('    continuing at the recorded screen depth of {0} rather than {1}, so '
+                          'this arm keeps one protocol throughout'.format(
+                              recorded_depth, screen_episodes))
+                    screen_episodes = recorded_depth
+                    abandon_floor = max(abandon_floor, screen_episodes)
+                if len(source_screens) > 1:
+                    print('    warning: the source files disagree about the protocol ({0}); '
+                          'continuing screened at {1}'.format(
+                              sorted(str(v) for v in source_screens), screen_episodes))
+                print('    resuming a screened arm: keeping screening on at {0} episodes '
+                      '({1} full-length rows carried over)'.format(screen_episodes, len(skipped)))
+            elif keep_screening is False:
+                print('    screening off: the source files record a flat run, so the rest of the '
+                      'arm will be too (EVAL_SCREEN_EPISODES={0} to override)'.format(
+                          screen_episodes))
+                screen_episodes = 0
+            else:
+                # Pre-dates `screen_episodes` in the payload. Keep the old behaviour rather than
+                # guess, but say which branch was taken and why.
+                print('    screening off: these {0} resumed rows come from a file that does not '
+                      'record its protocol, so it is assumed flat '
+                      '(EVAL_SCREEN_EPISODES={1} to override)'.format(
+                          len(skipped), screen_episodes))
+                screen_episodes = 0
+
+    # Screens carried over from a killed run. Restricted to this run's candidate set, because a
+    # partial sample for a checkpoint nobody selected is not work this run owes.
+    resumed_partial = {step: held for step, held in resumed_partial.items()
+                       if step in set(requested_steps)}
+    if resumed_partial:
+        carried = sum(len(held['scores']) for held in resumed_partial.values())
+        print('    reusing {0} completed screen{1} ({2} episodes) from the earlier run rather than '
+              're-measuring them'.format(len(resumed_partial),
+                                         '' if len(resumed_partial) == 1 else 's', carried))
 
     print('policy {0}: evaluating {1} checkpoints x {2} episodes on {3} workers'.format(
         policy_name, len(requested_steps), num_episodes, num_workers))
@@ -960,6 +1130,10 @@ def main(argv):
     full_steps, screen_steps = plan['full'], plan['screened']
     measurements_planned = plan['measurements_planned']
     episodes_planned = plan['episodes_planned']
+    # One confirmation's episode cost, rounded to whole rounds the way plan_stages does it, for the
+    # correction applied after the screens run.
+    whole_confirm_rounds = (-(-(num_episodes - screen_episodes) // num_workers) * num_workers
+                            if screen_episodes else 0)
     if screen_episodes:
         print('plan: {0} at full length ({1:.0f}% graph point or explicit), {2} screened at {3}, '
               'of which the best {4} confirmed — {5} episodes against {6} for a flat pass '
@@ -1096,7 +1270,10 @@ def main(argv):
     # Episodes measured in this process, kept raw per step so a screening pass can be topped up
     # to full length later without pooling summary statistics. 660 checkpoints x 100 floats is
     # nothing next to the agent itself.
-    samples = {}
+    # Seeded with any screens carried over from a killed run, so `measure` tops them up to full
+    # length exactly the way it tops up a screen measured in this session — same code path, and the
+    # median and extremes are recomputed from the pooled raw episodes rather than approximated.
+    samples = {step: dict(held) for step, held in resumed_partial.items()}
     resumed_by_step = {row['step']: row for row in resumed_rows}
 
     def current_results():
@@ -1196,14 +1373,38 @@ def main(argv):
               '{2:.0f}%, or explicitly named)'.format(len(full_steps), num_episodes,
                                                       ALWAYS_FULL_SINGLE))
         for index, step in enumerate(full_steps, 1):
-            measure(step, num_episodes, 'full {0} of {1}'.format(index, len(full_steps)),
-                    stage='full')
+            # Same top-up logic as stage 2: a checkpoint the gate stopped at 60 of 100, or one a kill
+            # interrupted, needs only the remainder. Restarting it would throw away real episodes for
+            # nothing, which is what the old resume did to every partial row it found.
+            have = len(samples.get(step, {}).get('scores', []))
+            if have >= num_episodes:
+                continue
+            label = ('full {0} of {1}'.format(index, len(full_steps)) if not have
+                     else 'full {0} of {1}, topping up {2} to {3}'.format(
+                         index, len(full_steps), have, num_episodes))
+            measure(step, num_episodes - have, label, stage='full')
 
-        print('\nstage 2: screening the other {0} checkpoints at {1} episodes each'.format(
-            len(screen_steps), screen_episodes))
-        for index, step in enumerate(screen_steps, 1):
-            measure(step, screen_episodes, 'screen {0} of {1}'.format(index, len(screen_steps)),
-                    stage='screen')
+        # A carried screen already has its episodes, so it is not screened again. One that was cut
+        # short of the screen depth — the abandonment gate, or a kill mid-checkpoint — is topped up by
+        # the difference rather than restarted, which is the whole point of storing raw episodes.
+        to_screen = []
+        for step in screen_steps:
+            have = len(samples.get(step, {}).get('scores', []))
+            if have >= screen_episodes:
+                continue
+            to_screen.append((step, screen_episodes - have, have))
+        reused = len(screen_steps) - len(to_screen)
+        topped = sum(1 for _, _, have in to_screen if have)
+        note = ''
+        if reused or topped:
+            note = ' ({0} already screened, {1} topped up)'.format(reused, topped)
+        print('\nstage 2: screening {0} of {1} checkpoints at {2} episodes each{3}'.format(
+            len(to_screen), len(screen_steps), screen_episodes, note))
+        for index, (step, needed, have) in enumerate(to_screen, 1):
+            label = ('screen {0} of {1}'.format(index, len(to_screen)) if not have
+                     else 'screen {0} of {1}, topping up {2} to {3}'.format(
+                         index, len(to_screen), have, screen_episodes))
+            measure(step, needed, label, stage='screen')
 
         # Ranked among the screened only. The full tier is excluded because it already has the
         # measurement a confirmation slot would buy — spending one there would spend it on
@@ -1211,6 +1412,16 @@ def main(argv):
         # the graph did *not* already flag.
         finalists = pick_finalists(current_results(), confirm_count,
                                    already_full=set(resumed_steps) | set(full_steps))
+        # Mandatory 20/20 screens can take this past the planned confirm count, so the totals are
+        # corrected here rather than left to report >100% done. plan_stages could not know the
+        # number: it depends on how the screens actually came out.
+        overshoot = max(0, len(finalists) - plan['confirmed'])
+        if overshoot:
+            plan['confirmed'] = len(finalists)
+            measurements_planned += overshoot
+            episodes_planned += overshoot * whole_confirm_rounds
+            print('    plan raised by {0} confirmation{1} for the perfect screens'.format(
+                overshoot, '' if overshoot == 1 else 's'))
         print('\nstage 3: confirming the best {0} of {1} screened checkpoints at {2} episodes '
               '({3} more each)'.format(len(finalists), len(screen_steps), num_episodes,
                                        num_episodes - screen_episodes))

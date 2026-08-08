@@ -794,7 +794,7 @@ step 350k, where every batch-12 arm was at 0%. Whatever the rewrite is worth, th
 `b12a-eps002seed1`, `b12b-eps002seed2`, `b12c-eps002seed3`, `b12d-eps002seed4`, stopped
 2026-08-04. All four cleared the pre-registered abandon condition together, so the batch was
 called early rather than run to its horizon. Charts and per-arm readings in
-[`charts.md`](charts.md#batch-12--the-epsilon-rewrite-and-the-deadlock-it-found).
+[`charts.md`](archive/charts-archive.md#batch-12--the-epsilon-rewrite-and-the-deadlock-it-found).
 
 Note for anyone stopping an arm: `SIGTERM` and `SIGINT` are both swallowed by the trainer — there
 is no signal handler in `training.py` — so it takes `SIGKILL`. Checkpoints and `_evals.json` are

@@ -215,6 +215,19 @@ Practical rules that follow:
 - **Consider dropping back to 90** for a batch whose arms are not expected to clear 95. At 90 the
   saving is still ~50% and `b16a`/`b16b` would have had 24 full-length rows between them instead of one.
 
+**‡ A 20/20 screen is always confirmed, from 2026-08-08, even past `EVAL_CONFIRM_COUNT`.** The
+confirm quota exists to ration a large middling pool, and a perfect screen is the strongest signal
+screening can produce — cutting one because the quota filled is selection working against the point of
+the close-out, since the checkpoint most likely to be the arm's best never gets the episodes that would
+show it. It mirrors the rule one stage earlier, where a graph point of >=90% is measured however many
+slots are left.
+
+**The cost is small exactly where it matters.** Rates are quantised at screen depth, so 20/20 is rare:
+**2 of 596 screens** across batch 15's arms, and **11 of 186** on `b17b` — the arm that produced the
+project record. A weak arm produces none. So the extra measurements land on the arms most likely to be
+hiding something, and the stage plan is raised when they appear (an over-quota confirm cannot be
+predicted before the screens run, so a plan printed at launch reads slightly low).
+
 `top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
 10-episode eval** from the graph, using the surrounding perfect rate to order within an
 equal-eval tier, and applies two thresholds:
@@ -500,6 +513,45 @@ only 4 were running, which would have looked like the cap was already blown.
 
 A human-started `python snek2.py train` counts against the budget. Leave it
 alone; never touch `snek2/savedPolicies/train*`.
+
+### When you stop a batch of arms
+
+**A batch is not stopped until its charts are filed.** This list exists because the charts drifted
+once to twelve undocumented arms, and because a successful `refresh_charts.sh` *looks* like the charts
+are handled when it has only copied images — it never edits `charts.md`.
+
+Do these in order, the moment the arms are killed:
+
+1. **`zsh hyperparamTuning/refresh_charts.sh`** — copies every `runs/*.png` into
+   `hyperparamTuning/charts/` and prints the step each one reached, which is what the captions quote.
+2. **Add the batch's section to the top of [`charts.md`](charts.md)**, newest first: a batch-level
+   table, then one subsection per arm ordered best result first, each with its step, peak trailing,
+   best-30, `sef` and recent-30. Say plainly which figures are comparable to the batches below and
+   which are not — `sef` is a fraction of an arm's *own* evals, so a longer batch reads higher for
+   free and the number is only meaningful against a matched truncation.
+3. **Retire the oldest section so `charts.md` holds at most six batches.** Move it verbatim to
+   [`archive/charts-archive.md`](archive/charts-archive.md) and add a row to that file's table saying
+   when and why. **Do not move the PNGs** — every image stays in `charts/`, so archived captions still
+   render, and `completedRuns.md` keeps the one-row-per-arm history regardless.
+
+   **Two link repairs are needed every time, and both are silent if skipped.** The archive is one
+   directory deeper, so every relative link in the moved text needs `../` (`charts/x.png` becomes
+   `../charts/x.png`, `completedRuns.md#...` becomes `../completedRuns.md#...`). And anything that
+   linked *into* the retired section — usually `completedRuns.md` — now points at a heading that is no
+   longer in `charts.md`. Run the link check below afterwards; it catches both.
+4. **Check nothing was missed.** The completeness check at the top of `charts.md`
+   (`comm -23 /tmp/have /tmp/doc`) lists any arm with an image and no caption — run it against the
+   archive files too, since captions now live in three places. Then check every link and anchor across
+   the tuning docs, which is what catches step 3's two repairs.
+5. **Update [`runs.md`](runs.md)**: the batch moves from "Running" to "Closed", with a one-paragraph
+   verdict and a link to its `completedRuns.md` write-up.
+6. **Then start the close-out evals.** Numbers before verdicts — `completedRuns.md` and
+   [`findings.md`](findings.md) get written when the close-out finishes, not before.
+
+**Why six.** `charts.md` is images plus prose and grows ~80 lines a batch; at six batches it is ~490
+lines, which is still readable end to end. The archive is history only and is never loaded during
+normal work, so nothing is lost by moving a section there — the live file is the one that has to stay
+short enough to actually be read.
 
 ### Launching a run
 

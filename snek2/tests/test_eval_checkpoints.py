@@ -15,11 +15,18 @@ import eval_checkpoints
 from snake_constants import RUNS_DIR
 
 
-def write_result_file(policy_name, suffix, rows, complete=True):
-    """Puts a result file where load_finished_results() will look for it."""
+def write_result_file(policy_name, suffix, rows, complete=True, screen_episodes='omit'):
+    """Puts a result file where load_finished_results() will look for it.
+
+    `screen_episodes` records which protocol produced the file, which is what the resume guard
+    reads. `'omit'` leaves the key out entirely, standing in for files written before it existed.
+    """
     path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
+    payload = {'policy_name': policy_name, 'complete': complete, 'results': rows}
+    if screen_episodes != 'omit':
+        payload['screen_episodes'] = screen_episodes
     with open(path, 'w') as handle:
-        json.dump({'policy_name': policy_name, 'complete': complete, 'results': rows}, handle)
+        json.dump(payload, handle)
     return path
 
 
@@ -92,8 +99,79 @@ def test_screening_rejects_an_explicit_length_that_cannot_confirm():
 
 # ------------------------------------------------------- load_finished_results
 
+def test_the_protocol_is_read_from_the_source_not_inferred():
+    """The batch-18 guard.
+
+    `b18a` and `b18d` were resumed from full-length rows that were the *stage-1 tier* of the
+    three-stage protocol — not evidence of a flat run. The old code inferred "flat" from the depth of
+    those rows and turned screening off, costing ~3x the episodes and leaving both arms without a
+    `pooled_equal_effort` while their siblings had one.
+    """
+    keep, depth = eval_checkpoints.protocol_from_sources({20})
+    assert keep is True and depth == 20
+
+
+def test_a_recorded_flat_run_still_turns_screening_off():
+    keep, depth = eval_checkpoints.protocol_from_sources({0})
+    assert keep is False and depth == 0
+
+
+def test_an_unrecorded_protocol_is_unknown_rather_than_flat():
+    """Files predating the field must not be silently classified either way."""
+    keep, _ = eval_checkpoints.protocol_from_sources({None})
+    assert keep is None
+
+
+def test_no_sources_at_all_is_unknown():
+    keep, _ = eval_checkpoints.protocol_from_sources(set())
+    assert keep is None
+
+
+def test_any_screened_source_wins_over_a_flat_one():
+    # An arm holding both is already inconsistent; continuing screened is the recoverable choice,
+    # because a screen can be topped up to full length and a full row cannot be un-measured.
+    keep, depth = eval_checkpoints.protocol_from_sources({0, 20})
+    assert keep is True and depth == 20
+
+
+def test_the_deepest_recorded_screen_depth_is_used():
+    keep, depth = eval_checkpoints.protocol_from_sources({20, 30})
+    assert keep is True and depth == 30
+
+
+def test_none_alongside_a_real_depth_does_not_defeat_the_guard():
+    keep, depth = eval_checkpoints.protocol_from_sources({None, 20})
+    assert keep is True and depth == 20
+
+
+def test_load_reports_the_protocol_of_files_it_actually_used():
+    policy = 'unittest-protocol-src'
+    path = write_result_file(policy, '_t', [row(100, episodes=100)], screen_episodes=20)
+    try:
+        _, _, screens, _ = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
+        assert screens == {20}, screens
+    finally:
+        os.remove(path)
+
+
+def test_a_file_contributing_no_rows_does_not_report_its_protocol():
+    """Otherwise a stale flat file with nothing usable in it could flip a screened arm."""
+    policy = 'unittest-protocol-empty'
+    flat = write_result_file(policy, '_flat', [row(100, episodes=20)], screen_episodes=0)
+    screened = write_result_file(policy, '_screened', [row(200, episodes=100)],
+                                 screen_episodes=20)
+    try:
+        _, steps, screens, _ = eval_checkpoints.load_finished_results(
+            policy, ['_flat', '_screened'], 100)
+        assert steps == {200}, steps
+        assert screens == {20}, 'the flat file contributed no rows, so it should not vote'
+    finally:
+        os.remove(flat)
+        os.remove(screened)
+
+
 def test_load_returns_nothing_when_there_is_no_file():
-    rows, steps = eval_checkpoints.load_finished_results('no-such-policy-xyz', [''], 100)
+    rows, steps, _, _ = eval_checkpoints.load_finished_results('no-such-policy-xyz', [''], 100)
     assert rows == [] and steps == set()
 
 
@@ -104,7 +182,7 @@ def test_load_skips_only_checkpoints_measured_to_the_full_episode_count():
     path = write_result_file(policy, '_t', [row(100, episodes=100), row(200, episodes=20),
                                             row(300, episodes=140)])
     try:
-        rows, steps = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
+        rows, steps, _, _ = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
         assert steps == {100, 300}, 'the 20-episode row must be re-measured, not skipped'
         assert [r['step'] for r in rows] == [100, 300]
     finally:
@@ -115,7 +193,7 @@ def test_load_returns_rows_in_step_order_whatever_the_file_order():
     policy = 'unittest-resume-b'
     path = write_result_file(policy, '_t', [row(500), row(100), row(300)])
     try:
-        rows, _ = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
+        rows, _, _, _ = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
         assert [r['step'] for r in rows] == [100, 300, 500]
     finally:
         os.remove(path)
@@ -128,7 +206,7 @@ def test_load_takes_a_repeated_step_once_from_the_first_file_listed():
     first = write_result_file(policy, '_first', [row(100, perfect=80)])
     second = write_result_file(policy, '_second', [row(100, perfect=20), row(200)])
     try:
-        rows, steps = eval_checkpoints.load_finished_results(policy, ['_first', '_second'], 100)
+        rows, steps, _, _ = eval_checkpoints.load_finished_results(policy, ['_first', '_second'], 100)
         assert steps == {100, 200}
         assert len(rows) == 2, 'step 100 must appear once'
         assert [r for r in rows if r['step'] == 100][0]['perfect_games'] == 80, 'first file wins'
@@ -143,7 +221,7 @@ def test_load_reads_an_incomplete_file():
     policy = 'unittest-resume-d'
     path = write_result_file(policy, '_t', [row(100), row(200)], complete=False)
     try:
-        _, steps = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
+        _, steps, _, _ = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
         assert steps == {100, 200}
     finally:
         os.remove(path)
@@ -153,7 +231,7 @@ def test_load_ignores_a_missing_file_among_present_ones():
     policy = 'unittest-resume-e'
     path = write_result_file(policy, '_t', [row(100)])
     try:
-        _, steps = eval_checkpoints.load_finished_results(policy, ['_absent', '_t'], 100)
+        _, steps, _, _ = eval_checkpoints.load_finished_results(policy, ['_absent', '_t'], 100)
         assert steps == {100}
     finally:
         os.remove(path)
@@ -413,6 +491,60 @@ def test_pick_finalists_accepts_a_set_of_excluded_steps():
     assert [r['step'] for r in picked] == [2, 3]
 
 
+def test_a_perfect_screen_is_confirmed_even_past_the_quota():
+    """20/20 is the strongest signal screening can give; the quota must not discard it.
+
+    The confirm count rations a large middling pool. Cutting a perfect screen because the pool was
+    full is selection working directly against the point of the close-out — the checkpoint most
+    likely to be the arm's best never gets the episodes that would show it.
+    """
+    rows = [screened(1, 20), screened(2, 19), screened(3, 18), screened(4, 20), screened(5, 17)]
+    picked = eval_checkpoints.pick_finalists(rows, 1)
+    steps = [r['step'] for r in picked]
+    # Quota of 1 takes step 1; step 4 also went 20/20 and comes along anyway.
+    assert steps == [1, 4], steps
+
+
+def test_the_quota_still_binds_on_everything_short_of_perfect():
+    rows = [screened(1, 19), screened(2, 19), screened(3, 18), screened(4, 17)]
+    assert len(eval_checkpoints.pick_finalists(rows, 2)) == 2
+
+
+def test_perfect_screens_do_not_get_added_twice_when_inside_the_quota():
+    rows = [screened(1, 20), screened(2, 20), screened(3, 15)]
+    picked = eval_checkpoints.pick_finalists(rows, 3)
+    assert [r['step'] for r in picked] == [1, 2, 3]
+    assert len(picked) == len(set(r['step'] for r in picked))
+
+
+def test_perfect_means_every_screened_episode_not_a_fixed_count():
+    """A screen depth other than 20 still counts as perfect at full marks.
+
+    The 10/10 row has to rank *below* the quota for this to test anything: an earlier version put it
+    first, so it was chosen normally and a `perfect_games == 20` implementation passed.
+    """
+    rows = [screened(1, 20, surrounding=99.0),          # takes the only slot
+            screened(2, 10, episodes=10, surrounding=1.0),  # perfect, but ranked last of the two
+            screened(3, 18)]
+    picked = eval_checkpoints.pick_finalists(rows, 1)
+    steps = [r['step'] for r in picked]
+    assert steps == [1, 2], 'a 10/10 screen is perfect too, and must be promoted past the quota'
+
+
+def test_a_perfect_screen_already_measured_at_full_length_is_not_reconfirmed():
+    rows = [screened(1, 19), screened(2, 20)]
+    picked = eval_checkpoints.pick_finalists(rows, 1, already_full={2: rows[1]})
+    assert [r['step'] for r in picked] == [1], 'step 2 already has the measurement'
+
+
+def test_mandatory_confirms_keep_the_ranked_order():
+    rows = [screened(1, 20, surrounding=10.0), screened(2, 20, surrounding=90.0),
+            screened(3, 20, surrounding=50.0), screened(4, 12)]
+    picked = eval_checkpoints.pick_finalists(rows, 1)
+    # Ranked by surrounding rate within the 20/20 tie: 2, then 3, then 1.
+    assert [r['step'] for r in picked] == [2, 3, 1], [r['step'] for r in picked]
+
+
 def test_pick_finalists_excludes_steps_already_measured_at_full_length():
     # A resumed row already has the measurement this stage would buy, so spending a slot on it
     # would spend it on finished work.
@@ -611,3 +743,114 @@ def test_best_checkpoint_treats_half_depth_as_the_relaxed_boundary():
     # 50 is in, 49 is out; a row abandoned under a 90% gate has ~89 episodes so it lands well inside.
     rows = [_row(1000, 100.0, 49), _row(2000, 60.0, 50)]
     assert eval_checkpoints.best_full_length_row(rows, 100)['step'] == 2000
+
+
+# ------------------------------------- per-episode storage, and screens that survive a resume
+
+def raw_held(scores, perfect, rewards=None, seconds=1.0):
+    """A `held` sample in (scores, perfect) order.
+
+    Named apart from this file's older `raw_held(perfect_flags, scores=...)` helper, which takes
+    its arguments the other way round — the collision was a TypeError, not a stale test.
+    """
+    return {'scores': list(scores), 'perfect': list(perfect),
+            'rewards': list(rewards if rewards is not None else [1.0] * len(scores)),
+            'seconds': seconds}
+
+
+def test_build_row_stores_the_raw_episodes():
+    r = eval_checkpoints.build_row(1000, raw_held([95, 61, 95], [1, 0, 1], [180.0, 40.0, 181.0]))
+    assert r['episode_scores'] == [95, 61, 95]
+    assert r['episode_perfect'] == [1, 0, 1]
+    assert r['episode_rewards'] == [180.0, 40.0, 181.0]
+    assert r['episodes'] == 3 and r['perfect_games'] == 2
+
+
+def test_a_row_round_trips_through_held_from_row():
+    original = raw_held([95, 61, 88], [1, 0, 0], [180.0, 40.0, 90.0], seconds=12.5)
+    row = eval_checkpoints.build_row(1000, original)
+    back = eval_checkpoints.held_from_row(row)
+    assert back['scores'] == [95, 61, 88]
+    assert back['perfect'] == [1, 0, 0]
+    assert back['rewards'] == [180.0, 40.0, 90.0]
+    assert back['seconds'] == 12.5
+
+
+def test_topping_up_a_restored_sample_matches_measuring_it_in_one_go():
+    """The property that makes resuming a screen safe: pooling raw episodes is exact.
+
+    The median is the reason this needs raw episodes rather than summary statistics — it cannot be
+    pooled from two summaries, so a topped-up row rebuilt from summaries would be quietly wrong.
+    """
+    first = [95, 61, 88, 90, 12]
+    second = [95, 95, 40, 77, 95]
+    flags_first, flags_second = [1, 0, 0, 0, 0], [1, 1, 0, 0, 1]
+
+    # measured in one pass
+    one_go = eval_checkpoints.build_row(
+        1000, raw_held(first + second, flags_first + flags_second))
+    # screened, stored, restored, then topped up
+    screen_row = eval_checkpoints.build_row(1000, raw_held(first, flags_first))
+    restored = eval_checkpoints.held_from_row(screen_row)
+    restored['scores'].extend(second)
+    restored['perfect'].extend(flags_second)
+    restored['rewards'].extend([1.0] * len(second))
+    topped = eval_checkpoints.build_row(1000, restored)
+
+    for key in ('episodes', 'perfect_games', 'perfect_percent', 'avg_score', 'median_score',
+                'min_score', 'max_score', 'perfect_ci95'):
+        assert topped[key] == one_go[key], '{0}: {1} != {2}'.format(key, topped[key], one_go[key])
+
+
+def test_held_from_row_returns_none_for_a_row_without_episode_data():
+    assert eval_checkpoints.held_from_row(row(100, episodes=100)) is None
+
+
+def test_held_from_row_rejects_a_row_whose_lists_disagree_with_its_count():
+    r = eval_checkpoints.build_row(1000, raw_held([95, 61], [1, 0]))
+    r['episodes'] = 5          # hand-edited or truncated
+    assert eval_checkpoints.held_from_row(r) is None, 'a mismatched row must not be pooled'
+
+
+def test_resume_carries_a_completed_screen_instead_of_discarding_it():
+    """The b18a incident: 192 screens and 7,534 episodes were thrown away by a resume."""
+    policy = 'unittest-carry-screen'
+    screen = eval_checkpoints.build_row(200, raw_held([95] * 20, [1] * 20))
+    full = eval_checkpoints.build_row(100, raw_held([95] * 100, [1] * 100))
+    path = write_result_file(policy, '_t', [full, screen], screen_episodes=20)
+    try:
+        rows, steps, _, partial = eval_checkpoints.load_finished_results(policy, ['_t'], 100)
+        assert steps == {100}, 'the full-length row is still a plain skip'
+        assert set(partial) == {200}, 'the 20-episode screen should be carried, not dropped'
+        assert len(partial[200]['scores']) == 20
+    finally:
+        os.remove(path)
+
+
+def test_a_full_length_row_supersedes_a_partial_one_for_the_same_step():
+    policy = 'unittest-carry-supersede'
+    partial_row = eval_checkpoints.build_row(300, raw_held([95] * 20, [1] * 20))
+    full_row = eval_checkpoints.build_row(300, raw_held([95] * 100, [1] * 100))
+    first = write_result_file(policy, '_a', [partial_row], screen_episodes=20)
+    second = write_result_file(policy, '_b', [full_row], screen_episodes=20)
+    try:
+        _, steps, _, partial = eval_checkpoints.load_finished_results(policy, ['_a', '_b'], 100)
+        assert steps == {300}
+        assert partial == {}, 'a step measured to full length must not also be carried as partial'
+    finally:
+        os.remove(first)
+        os.remove(second)
+
+
+def test_the_deeper_partial_wins_when_two_files_hold_the_same_step():
+    policy = 'unittest-carry-deeper'
+    shallow = eval_checkpoints.build_row(400, raw_held([95] * 20, [1] * 20))
+    deeper = eval_checkpoints.build_row(400, raw_held([95] * 60, [1] * 60))
+    first = write_result_file(policy, '_a', [shallow], screen_episodes=20)
+    second = write_result_file(policy, '_b', [deeper], screen_episodes=20)
+    try:
+        _, _, _, partial = eval_checkpoints.load_finished_results(policy, ['_a', '_b'], 100)
+        assert len(partial[400]['scores']) == 60, 'more episodes is strictly more information'
+    finally:
+        os.remove(first)
+        os.remove(second)

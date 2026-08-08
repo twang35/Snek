@@ -259,7 +259,7 @@ eval process works only because it loaded the matching observation code at start
 against a batch-10 arm would now build a 30-value network and fail to restore. **Batch 10's measured
 numbers are final and cannot be extended.**
 
-## Closed batches: 11-17 — five nulls, one signal, then another null
+## Closed batches: 11-18 — five nulls, one signal, a null, and a speed result
 
 **Batches 11-15 failed to separate from each other at all** — 20 arms across four hypotheses, every
 one of them an optimiser knob. **Batch 16 went after the reward function instead and is the first
@@ -269,6 +269,7 @@ are in [`completedRuns.md`](completedRuns.md):
 
 | batch | what it changed | verdict |
 |---|---|---|
+| **18** | `TARGET_UPDATE_PERIOD` 8 -> **1000** | **the primary metric moved** — 102k faster to pf30 >= 40%, **4/4 seeds** (p=0.125), and drawdown *improved* 20.8 points against a pre-registered risk that it would worsen. Levels +6.7 pp but not separating. Close-out pending |
 | [**17**](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record) | `SNEK_FORK_BRANCHES=4` — forked endgame collection | **null on the config, record on one arm** — `sef` -1.67 pp (p=0.875) and eq-effort -5.02 pp, both dragged entirely by `b17a`; the other three seeds are **+3.3 to +3.7 pp on eq-effort, 3/3**. And `b17b` produced **99/100 @1205k with a 96.2% region**, the best policy ever measured here |
 | [**16**](completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches) | `FOOD_DISTANCE_REWARD=0` | **the first signal** — `sef` +11.35 pp at a matched 1.25M (p=0.250), `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). Consolidation, not speed or ceiling. Needs replication |
 | [15](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
@@ -384,10 +385,33 @@ produced **451 forks at 73% branch share with 0 violations** of the buffer integ
 (length rises by 0 or 1 per frame and the starve budget decrements exactly, within every stored
 window), against 0 violations in 400k pairs from three unforked arms.
 
-## Running: batch 18 — `TARGET_UPDATE_PERIOD` 1000, forking retained
+## Closed: batch 18 — `TARGET_UPDATE_PERIOD` 1000, forking retained
 
-**Launched 2026-08-08 00:50, four arms `b18a`-`b18d` at seeds 1-4.** Designed 2026-08-07 and swapped
-behind the forking batch so the branching idea got measured first.
+**Ran 2026-08-08 00:50 to 09:04, four arms `b18a`-`b18d` at seeds 1-4, stopped by hand at
+2.40-2.61M.** Charts in
+[`charts.md`](charts.md#batch-18--target_update_period1000-forking-retained-stopped-at-240-261m);
+close-out evals started 2026-08-08 11:5x. Designed 2026-08-07 and swapped behind the forking batch so
+the branching idea got measured first.
+
+**Verdict on the primary metric: it moved, and this is the strongest speed result the project has.**
+Paired against batch 17 truncated to a matched 1.406M — one knob, forking on in both:
+
+| metric | b17 (period 8) | b18 (period 1000) | delta | p |
+|---|---|---|---|---|
+| **steps to pf30 >= 40%** (primary) | 402k | **300k** | **-102.2k** | **0.125** (4/4 seeds) |
+| **max drawdown** | 73.97 | **53.20** | **-20.76** | 0.375 |
+| `strong_eval_fraction` | 17.56% | 24.29% | +6.73 pp | 0.625 |
+| `best_perfect30` | 76.08% | 82.75% | +6.67 pp | 0.625 |
+| peak trailing | 94.56 | 94.69 | +0.14 | 0.875 |
+
+0.125 is the floor at n=4, so **every seed got faster** — by 44k to 152k. The levels all point the
+same way but none of them separate, which is the expected shape for a speed effect at this sample
+size. **And the drawdown risk the batch was pre-registered to watch went the other way**: `b1b-tgt200`
+predicted worse drawdown and got it in batch 1; at period 1000 it improved by 20.8 points, 3/4 seeds.
+
+**The ceiling is unmoved for the eighth batch running** — peak trailing 94.94 mean, inside 0.4 of
+every batch since 11. Close-out numbers pending; `completedRuns.md` and `findings.md` get written when
+the evals finish.
 
 **Forking stays on at batch 17's exact settings**, at the user's direction, and that is the *better*
 design rather than a compromise: **batch 17 becomes a clean seed-matched control differing in one knob
@@ -535,7 +559,7 @@ table.
 | change | targets | prior |
 |---|---|---|
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
-| ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **running as batch 18** — see [the design](#running-batch-18--target_update_period-1000-forking-retained) |
+| ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **running as batch 18** — see [the design](#closed-batch-18--target_update_period-1000-forking-retained) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
 | `FC_LAYERS=128,128` | capacity | low |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |

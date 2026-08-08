@@ -1,9 +1,13 @@
 # Charts
 
-Progress graphs, **batch 12 onward**, newest first. Per-arm numbers live in
+Progress graphs for the **six most recent batches**, newest first. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each.
-Batch 1-11 captions moved to [`archive/batches1-11.md`](archive/batches1-11.md) — the PNGs are all
-still in `charts/`.
+
+**Older sections are retired, not deleted.** Batches 1-11 are in
+[`archive/batches1-11.md`](archive/batches1-11.md) and anything retired since is in
+[`archive/charts-archive.md`](archive/charts-archive.md). **The PNGs are all still in `charts/`**, so
+an archived caption still renders. See
+[when an arm is stopped](hyperparamTuning.md#when-you-stop-a-batch-of-arms) for the procedure.
 
 In every chart: **blue is average score** (food eaten, out of 95) on the left axis, **red is
 perfect-game percentage** on the right. Grey dashed vertical lines mark resumes; faint red dashed
@@ -30,6 +34,84 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md \
   | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
+
+## Batch 18 — `TARGET_UPDATE_PERIOD=1000`, forking retained, stopped at 2.40-2.61M
+
+Four seeds, batch 17's config exactly with the target period taken from 8 to **1000** — a clean
+one-knob test, because forking stayed on in both. **The pre-registered primary metric moved, and it is
+the strongest speed result this project has:** steps to pf30 >= 40% is **102k earlier, 4 of 4 seeds,
+p=0.125** — the floor at n=4. Paired against batch 17 truncated to a matched 1.406M:
+
+| metric | b17 (period 8) | b18 (period 1000) | delta | p |
+|---|---|---|---|---|
+| **steps to pf30 >= 40%** (primary) | 402k | **300k** | **-102.2k** | **0.125** (4/4) |
+| **max drawdown** | 73.97 | **53.20** | **-20.76** | 0.375 |
+| `strong_eval_fraction` | 17.56% | 24.29% | +6.73 pp | 0.625 |
+| `best_perfect30` | 76.08% | 82.75% | +6.67 pp | 0.625 |
+| mean perfect, back half | 57.83% | 64.02% | +6.19 pp | 0.750 |
+| peak trailing | 94.56 | 94.69 | +0.14 | 0.875 |
+
+**‡ The one prior data point predicted the opposite on drawdown and was wrong.** `b1b-tgt200` (batch 1,
+period 200) got a *worse* drawdown than its baseline, 27.4 against 19.2, and that was recorded as the
+risk to watch. At period 1000 the drawdown **improved by 20.8 points**, 3 of 4 seeds. The batch-1 hint
+was right about "longer learns faster early" and wrong about the cost.
+
+**Full-length numbers, which are not comparable to the batches below.** These arms ran to 2.4-2.6M
+against batch 17's 1.4-1.6M, and `sef` is a fraction of an arm's *own* evals, so the figures below are
+inflated by run length relative to any shorter batch. `b18d` at **47.9%** and `b18a` at **41.4%** are
+nonetheless the two highest `sef` readings ever recorded here, against `b15a`'s 39.9% at 5.79M.
+
+| seed | step | pf30 >= 40% at | b17 control | peak trailing | best-30 | `sef` (full) | max drawdown |
+|---|---|---|---|---|---|---|---|
+| 1 | 2612k | 460k | 560k | 94.92 | 88.0% | **41.4%** | 56.58 |
+| 2 | 2401k | **180k** | 332k | 94.96 | 86.0% | 25.0% | 85.08 |
+| 3 | 2510k | 342k | 386k | 94.94 | 84.3% | 24.3% | 56.14 |
+| 4 | 2597k | 216k | 329k | 94.92 | **91.0%** | **47.9%** | **32.62** |
+| **mean** | | **300k** | **402k** | **94.94** | **87.3%** | **34.7%** | **57.6** |
+
+**The ceiling still has not moved — an eighth flat result.** Peak trailing reads 94.92 / 94.96 / 94.94 /
+94.92, mean **94.94**, inside 0.4 of every batch from 11 on. Whatever the target period does, it is not
+raising the maximum an arm reaches.
+
+### b18d-tgt1000seed4 — period 1000, forking on, seed 4
+
+![b18d](charts/b18d-tgt1000seed4.png)
+
+Step 2.60M · peak trailing 94.92 (at 2346k) · **best 30-eval perfect 91.0%** (at 2369k) · `strong_eval_fraction` **47.9%** · recent-30 79.0%
+
+**The steadiest arm on record.** 47.9% of its evals at >=80% perfect is the highest ever, and its max
+drawdown of **32.62** is less than half the batch-17 mean — the red trace stays high instead of
+collapsing and recovering. Reached pf30 >= 40% at 216k against its control's 329k.
+
+### b18a-tgt1000seed1 — period 1000, forking on, seed 1
+
+![b18a](charts/b18a-tgt1000seed1.png)
+
+Step 2.61M · peak trailing 94.92 (at 1605k) · best 30-eval perfect 88.0% (at **2480k**) · `strong_eval_fraction` 41.4% · recent-30 64.0%
+
+Second-highest `sef` ever, and still finding its best window at 2480k — near the end of the run. Its
+seed-1 counterpart in batch 17 was the arm that made that batch a null, so **the pairing that looked
+worst going in came out +40 pp on `sef`**. One seed, but worth noting against the temptation to read
+seed identity as arm quality.
+
+### b18c-tgt1000seed3 — period 1000, forking on, seed 3
+
+![b18c](charts/b18c-tgt1000seed3.png)
+
+Step 2.51M · peak trailing 94.94 (at 2161k) · best 30-eval perfect 84.3% (at 2168k) · `strong_eval_fraction` 24.3% · recent-30 **79.3%**
+
+**Highest recent-30 of the batch at the moment it was stopped**, with peak and best window both inside
+its last 350k — the arm most plausibly cut short.
+
+### b18b-tgt1000seed2 — period 1000, forking on, seed 2
+
+![b18b](charts/b18b-tgt1000seed2.png)
+
+Step 2.40M · peak trailing 94.96 (at 1575k) · best 30-eval perfect 86.0% (at 1600k) · `strong_eval_fraction` 25.0% · recent-30 56.3%
+
+**Fastest start on record: pf30 >= 40% at 180k.** Also the batch's worst drawdown at 85.08, and the
+weakest recent-30 — it peaked around 1.6M and gave a lot back. The two facts together are the case for
+reading this batch on speed rather than on stability.
 
 ## Batch 17 — forked endgame collection (`SNEK_FORK_*`), a null, stopped at 1.41-1.57M
 
@@ -405,82 +487,5 @@ Step 3.39M · peak trailing 94.5 (at 2661k) · best 30-eval perfect 78.0% (at 26
 Weakest of the batch and the slowest to get going — 2.0% perfect at 350k, the only arm that would
 have looked marginal against the abandon condition. Its best work came latest of the four, at 2.68M,
 and it held most of it: a 7.3 pp drawdown against its own seed's 42.4 pp in batch 11.
-
----
-
-## Batch 12 — the epsilon rewrite, and the deadlock it found
-
-Four seeds of batch 11's config plus the two-phase epsilon schedule, **stopped at ~1M of a
-planned 2.5M** because all four failed the same way: epsilon pinned at the refinement ceiling
-0.05 and the perfect rate never left 0. Read these four charts as one shape repeated four times —
-a fast climb to 81-87 trailing between 214k and 479k, then a slow decay to 53-63 that never
-recovers. Both numbers are greedy evals, so that decay is the learned policy getting worse, not
-an exploration tax on the measurement.
-
-**`strong_eval_fraction` is 0.0% in all four arms**, against 25.2 / 30.5 / 0.0 / 8.2% for batch 11
-at the same 1M steps. The mechanism, the fix, and the two wrong turns taken diagnosing it are in
-[`completedRuns.md`](completedRuns.md#-the-new-schedule-deadlocks-all-four-arms-are-failing-44-at-1m-steps). These
-arms are kept as the measured cost of sitting at epsilon 0.05: not a wasted batch, a negative
-result with four seeds behind it.
-
-### b12s-shield05seed1 — the exploration shield at handover 0.05, seed 1
-
-![b12s](charts/b12s-shield05seed1.png)
-
-Step 0.43M (stopped) · trailing 83.1 at stop · best 30-eval perfect 0.3% · max single eval 10% · not measured
-
-**The arm that moved the handover.** A verification run, `SEED=1` so it pairs with `b12a`, with the
-one-step exploration shield on and the handover still at 0.05. It **fixed the decay** — `b12a` fell
-83.8 → 74.2 between 200k and 400k while this one was still rising — and **did not fix perfect
-games**: 2 perfect-game evals in 431, plateauing at trailing ~83 where the perfect rate is ~0,
-improving at 4.7 points per 100k against `b11a`'s 11.1.
-
-Kept because it is the whole argument for dropping the handover to 0.0125: a one-step mask prevents
-blunders but not self-trapping, so the collect policy still never finishes a board and the buffer
-never contains the last ten food. Read against `b12a` below and `b11a` above.
-
-### b12a-eps002seed1 — two-phase epsilon, seed 1
-
-![b12a](charts/b12a-eps002seed1.png)
-
-Step 1.12M (stopped) · peak score 89.1, peak trailing 87.02 (at 214k) · best 30-eval perfect **6.3%** (at 213k) · max single eval 40% · not measured
-
-The best of a bad batch, and the arm that makes the decay unambiguous. It read trailing **87.0**
-with 6.3% best-30 at 214k — a genuinely promising arm — then fell to 59.6 over the next 900k steps
-**at exactly the same epsilon**. Same exploration rate, worse policy, so nothing about the
-measurement explains it.
-
-41 of its 1122 evals contained a perfect game, which was enough to nudge epsilon to 0.0388 at its
-best and never enough to escape: the refinement phase needs 20-40% to reach the floor, and 0.05
-makes that unreachable.
-
-### b12d-eps002seed4 — two-phase epsilon, seed 4
-
-![b12d](charts/b12d-eps002seed4.png)
-
-Step 1.09M (stopped) · peak score 87.2, peak trailing 86.36 (at 479k) · best 30-eval perfect 6.3% (at 29k) · max single eval 30% · not measured
-
-The latest peak in the batch at 479k, and the only arm whose best-30 came in its first 30k steps —
-during the bootstrap phase, before the ceiling took hold. Everything after is decline.
-
-### b12c-eps002seed3 — two-phase epsilon, seed 3
-
-![b12c](charts/b12c-eps002seed3.png)
-
-Step 0.98M (stopped) · peak score 85.3, peak trailing 82.46 (at 360k) · best 30-eval perfect 1.7% (at 369k) · max single eval 10% · not measured
-
-8 perfect games in 977 evals, and a max single eval of 10% — it reached the endgame often enough
-to prove the policy was not hopeless and never often enough for the schedule to notice.
-
-### b12b-eps002seed2 — two-phase epsilon, seed 2
-
-![b12b](charts/b12b-eps002seed2.png)
-
-Step 1.03M (stopped) · peak score 82.8, peak trailing 81.4 (at 259k) · **best 30-eval perfect 0.0%** · max single eval **0%** · not measured
-
-**The cleanest demonstration of the deadlock in the project: zero perfect games in 1032 evals.**
-Epsilon reached 0.05 at step 11000 and sat there for the remaining 942k steps, because the signal
-that would have lowered it requires finishing a game and 3.3% random actions never let it. An arm
-that peaked at 81.4 trailing was never once measured completing the board.
 
 ---

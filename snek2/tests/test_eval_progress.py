@@ -17,7 +17,9 @@ def run(results, complete=True, **extra):
     payload = {'suffix': '_t', 'results': results, 'complete': complete,
                'updated_at': 1e12, 'mtime': 1e12}
     payload.update(extra)
-    return payload
+    # None means "not recorded", which is a real case (files predating the field), so it has to be
+    # representable rather than silently dropped by dict.update.
+    return {k: v for k, v in payload.items() if not (k == 'episodes_per_checkpoint' and v is None)}
 
 
 # ------------------------------------------------------------------- best_of
@@ -435,3 +437,205 @@ def test_the_rate_tracks_the_worker_count():
     # Same per-round counts, different workers: 9 perfect of 3x10=30 is 30%, not 75%.
     texts = render_flight([4, 3, 2], workers=10)
     assert '30%' in texts, texts
+
+
+# ------------------------------------------------- a layout that does not move
+
+def render_figure(active_flight):
+    """Renders with or without in-flight work and returns (figsize, n_axes, top-axis texts)."""
+    import os
+    import tempfile
+
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    if active_flight:
+        live = run([result(1000, perfect=90)], complete=False, num_workers=4, suffix='_p1',
+                   in_flight=flight(round_index=3, per_round_perfect=[4, 3, 2], rounds_total=10),
+                   measurements_planned=20, measurements_done=1)
+    else:
+        live = run([result(1000, perfect=90)], complete=True, num_workers=4, suffix='_p1',
+                   measurements_planned=20, measurements_done=20)
+    state = eval_progress.summarize([live])
+
+    captured = {}
+    real_figure = plt.figure
+
+    def capture(*args, **kwargs):
+        fig = real_figure(*args, **kwargs)
+        captured['figure'] = fig
+        return fig
+
+    handle, path = tempfile.mkstemp(suffix='.png')
+    os.close(handle)
+    plt.figure = capture
+    try:
+        eval_progress.render('arm', state, path)
+        size = os.path.getsize(path)
+    finally:
+        plt.figure = real_figure
+        for leftover in (path, path + '.partial.png'):
+            if os.path.exists(leftover):
+                os.remove(leftover)
+    figure = captured['figure']
+    out = (tuple(figure.get_size_inches()), len(figure.axes),
+           [t.get_text() for t in figure.axes[0].texts])
+    plt.close(figure)
+    return out
+
+
+def test_the_figure_is_the_same_size_whether_or_not_anything_is_in_flight():
+    """The window jumped several times a minute because the panel count changed."""
+    with_flight = render_figure(True)
+    without = render_figure(False)
+    assert with_flight[0] == without[0], (with_flight[0], without[0])
+    assert with_flight[1] == without[1], 'panel count changed: {0} vs {1}'.format(
+        with_flight[1], without[1])
+
+
+def test_the_in_flight_panel_is_kept_and_labelled_when_idle():
+    _, axes, texts = render_figure(False)
+    assert axes == 3, 'the in-flight panel should still be there, empty'
+    assert any('no checkpoint in flight' in t for t in texts), texts
+
+
+def test_the_idle_panel_keeps_the_same_y_scale_so_the_eye_does_not_have_to_readjust():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import os
+    import tempfile
+
+    limits = {}
+    for label, has in (('flight', True), ('idle', False)):
+        if has:
+            live = run([result(1000, perfect=90)], complete=False, num_workers=4, suffix='_p1',
+                       in_flight=flight(round_index=3, per_round_perfect=[4, 3, 2],
+                                        rounds_total=10),
+                       measurements_planned=20, measurements_done=1)
+        else:
+            live = run([result(1000, perfect=90)], complete=True, num_workers=4, suffix='_p1',
+                       measurements_planned=20, measurements_done=20)
+        state = eval_progress.summarize([live])
+        captured = {}
+        real_figure = plt.figure
+
+        def capture(*args, **kwargs):
+            fig = real_figure(*args, **kwargs)
+            captured['figure'] = fig
+            return fig
+
+        handle, path = tempfile.mkstemp(suffix='.png')
+        os.close(handle)
+        plt.figure = capture
+        try:
+            eval_progress.render('arm', state, path)
+        finally:
+            plt.figure = real_figure
+            for leftover in (path, path + '.partial.png'):
+                if os.path.exists(leftover):
+                    os.remove(leftover)
+        limits[label] = captured['figure'].axes[0].get_ylim()
+        plt.close(captured['figure'])
+    assert limits['flight'] == limits['idle'] == (0, 100), limits
+
+
+# ------------------------------------------------- solid means full length, nothing less
+
+def marker_split(rows, target_episodes=100):
+    """Renders panel 2 and returns (solid_count, hollow_count) from its two scatter series."""
+    import os
+    import tempfile
+
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    live = run(rows, complete=True, num_workers=4, suffix='_p1',
+               episodes_per_checkpoint=target_episodes,
+               measurements_planned=len(rows), measurements_done=len(rows))
+    state = eval_progress.summarize([live])
+    captured = {}
+    real_figure = plt.figure
+
+    def capture(*args, **kwargs):
+        fig = real_figure(*args, **kwargs)
+        captured['figure'] = fig
+        return fig
+
+    handle, path = tempfile.mkstemp(suffix='.png')
+    os.close(handle)
+    plt.figure = capture
+    try:
+        eval_progress.render('arm', state, path)
+    finally:
+        plt.figure = real_figure
+        for leftover in (path, path + '.partial.png'):
+            if os.path.exists(leftover):
+                os.remove(leftover)
+    figure = captured['figure']
+    middle = figure.axes[1]
+    solid = hollow = 0
+    for coll in middle.collections:
+        n = len(coll.get_offsets())
+        size = coll.get_sizes()[0] if len(coll.get_sizes()) else 0
+        # Matched on marker size, which is what distinguishes the three scatters: 9 for the
+        # partial series, 22 for the full one, and 90 for the single hollow red ring marking the
+        # best checkpoint. An earlier version of this helper counted that ring as a partial point.
+        if size == 9:
+            hollow += n
+        elif size == 22:
+            solid += n
+    plt.close(figure)
+    return solid, hollow
+
+
+def test_only_full_length_rows_are_solid():
+    """The bug: the split was at half the deepest row, so a row abandoned at 60/100 drew solid."""
+    rows = [result(1000, episodes=100, perfect=90),
+            result(2000, episodes=60, perfect=50),    # abandoned past half of 100 - must be hollow
+            result(3000, episodes=20, perfect=19)]
+    solid, hollow = marker_split(rows)
+    assert solid == 1, 'only the 100-episode row should be solid, got {0}'.format(solid)
+    assert hollow == 2, 'the 60- and 20-episode rows should both be hollow, got {0}'.format(hollow)
+
+
+def test_a_row_just_short_of_the_target_is_hollow():
+    rows = [result(1000, episodes=100, perfect=95), result(2000, episodes=96, perfect=90)]
+    solid, hollow = marker_split(rows)
+    assert (solid, hollow) == (1, 1), (solid, hollow)
+
+
+def test_every_row_at_the_target_is_solid_and_there_is_no_hollow_series():
+    rows = [result(1000, episodes=100, perfect=95), result(2000, episodes=100, perfect=90)]
+    solid, hollow = marker_split(rows)
+    assert (solid, hollow) == (2, 0), (solid, hollow)
+
+
+def test_rows_deeper_than_the_target_still_count_as_full():
+    # A worker count that does not divide the request rounds episodes up; 108 of 100 is full.
+    rows = [result(1000, episodes=108, perfect=95), result(2000, episodes=20, perfect=19)]
+    solid, hollow = marker_split(rows)
+    assert (solid, hollow) == (1, 1), (solid, hollow)
+
+
+def test_without_a_recorded_target_the_deepest_row_defines_full():
+    """Files predating episodes_per_checkpoint must still render sensibly."""
+    rows = [result(1000, episodes=100, perfect=95), result(2000, episodes=40, perfect=30)]
+    solid, hollow = marker_split(rows, target_episodes=None)
+    assert (solid, hollow) == (1, 1), (solid, hollow)
+
+
+def test_an_arm_where_nothing_reached_full_length_has_no_solid_points():
+    """The real b16c/b16d case: under a 95 gate their deepest rows were 40 and 30 episodes.
+
+    `deepest` is then 40, not 100, so any rule keyed on the deepest row would draw a 40-episode
+    abandoned measurement as a confirmed one — on an arm whose headline number this file already
+    marks `[truncated]`. The target has to come from the payload.
+    """
+    rows = [result(1000, episodes=40, perfect=34), result(2000, episodes=30, perfect=24),
+            result(3000, episodes=20, perfect=15)]
+    solid, hollow = marker_split(rows, target_episodes=100)
+    assert solid == 0, 'nothing reached 100 episodes, so nothing should be solid'
+    assert hollow == 3, hollow

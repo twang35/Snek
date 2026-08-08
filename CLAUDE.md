@@ -351,6 +351,19 @@ clock by approximately nothing, because neither was the slowest worker. And **me
 change per-episode with a fixed policy, not by timing a training run** — an earlier "83s → 56s"
 claim was learning-speed variance attributed to a flag that was a no-op at the time.
 
+## Stopping a batch: file the charts before anything else
+
+**When arms are killed, `charts.md` is updated in the same pass** — refresh the images, add the new
+batch's section at the top, and retire the oldest so it holds at most six batches (moved verbatim to
+`hyperparamTuning/archive/charts-archive.md`, PNGs left in `charts/`). Full checklist, including what
+each caption has to say and why the cap is six:
+[`snek2/hyperparamTuning/hyperparamTuning.md`](snek2/hyperparamTuning/hyperparamTuning.md#when-you-stop-a-batch-of-arms).
+
+**`refresh_charts.sh` does not edit `charts.md`.** It copies images only, so a clean run of it looks
+like the charts are handled when no caption has been written. That drifted once to **12 undocumented
+arms across batches 5-7**. The completeness check at the top of `charts.md` is what catches it, and it
+has to be run against the archive files too.
+
 ## Eval cost
 
 **`EVAL_WORKERS` is close to free, and lowering it to save CPU does the opposite.** Measured

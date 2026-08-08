@@ -37,11 +37,14 @@ temporary file and os.replace so a racing writer cannot produce a torn PNG. What
 duplicate windows in that one case, which is the accepted price of an eval never silently having
 no chart at all.
 
-The PNG has three parts:
+The PNG has three parts, **always all three, at a fixed size**:
 
 1. **In-flight convergence** — running perfect rate against round number, one line per
-   process. A checkpoint takes ~5 minutes and 10 rounds, so this is where you see whether the
-   one being measured now is heading somewhere good, and how many rounds are left.
+   process, with the current rate written next to the latest point. A checkpoint takes ~5 minutes
+   and 10 rounds, so this is where you see whether the one being measured now is heading somewhere
+   good, and how many rounds are left. When nothing is in flight the panel stays, empty and
+   labelled — it used to be dropped, which shrank the figure from 9.0in to 6.6in between every pair
+   of checkpoints and made the live window jump several times a minute.
 2. **Completed checkpoints by step** — every finished measurement as a point, so the shape of
    the arm's good region is visible, with the best and the pooled mean marked. Under the screening
    protocol the points are **split by depth**: solid for full-length measurements, small hollow grey
@@ -361,6 +364,11 @@ def summarize(runs, stale_after=180):
         'stages': stage_summary(runs),
         'screen_episodes': next((r.get('screen_episodes') for r in runs
                                  if r.get('screen_episodes')), None),
+        # The run's own full-length target, so the completed-checkpoints chart can mark a row solid
+        # only when it actually reached full depth. Read from the payload rather than the
+        # environment, for the same reason as `min_achievable` below.
+        'target_episodes': next((r.get('episodes_per_checkpoint') for r in runs
+                                 if r.get('episodes_per_checkpoint')), None),
         # The abandonment gate, for the threshold line on the perfect-% charts. Taken from the
         # payload rather than the environment so a chart rendered later, or by `report`, shows the
         # gate the *file* was measured under instead of whatever EVAL_MIN_ACHIEVABLE happens to be
@@ -467,20 +475,23 @@ def draw_threshold(axis, state):
 
 
 def render(policy_name, state, out_path):
-    # The in-flight panel is the point of this chart while a job is running and dead space once
-    # it finishes, so it is only drawn when there is something to draw. A finished job gets a
-    # two-panel figure with the room going to the results instead.
+    # ‡ The layout is deliberately CONSTANT: three panels at a fixed figure size, whether or not
+    # anything is in flight. It used to drop to two panels and shrink from 9.0in to 6.6in as soon as
+    # a checkpoint finished, which happens between every pair of checkpoints — so the live window
+    # resized and both remaining charts jumped several times a minute, and reading a trend off a
+    # target that keeps moving is most of what makes a live chart useless.
+    #
+    # The empty in-flight panel is the cost, and it is the right trade: dead space in a known place
+    # beats live content in a moving one.
     has_flight = any((flight.get('per_round_perfect') or []) for _, flight in state['active'])
-    rows = 3 if has_flight else 2
-    heights = [2.1, 2.1, 2.0] if has_flight else [2.6, 2.0]
-    figure = plt.figure(figsize=(9.5, 9.0 if has_flight else 6.6))
-    grid = gridspec.GridSpec(rows, 1, height_ratios=heights, hspace=0.42)
+    grid = gridspec.GridSpec(3, 1, height_ratios=[2.1, 2.1, 2.0], hspace=0.42)
+    figure = plt.figure(figsize=(9.5, 9.0))
     next_row = 0
 
     # --- 1. in-flight convergence: running perfect rate vs round -------------------------
+    top = figure.add_subplot(grid[next_row])
+    next_row += 1
     if has_flight:
-        top = figure.add_subplot(grid[next_row])
-        next_row += 1
         for run, flight in sorted(state['active'], key=lambda p: p[1]['step']):
             per_round = flight.get('per_round_perfect') or []
             if not per_round:
@@ -541,32 +552,55 @@ def render(policy_name, state, out_path):
         top.set_xlabel('round  (one episode per worker, so {0})'.format(episode_formula),
                        fontsize=8)
         top.set_ylabel('running perfect %', fontsize=8)
-        top.set_ylim(0, 100)
-        top.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
-        top.tick_params(labelsize=7)
+    else:
+        # Nothing in flight: keep the panel, its axes and its scale so the figure does not move.
+        # Titled and labelled the same way, so the eye lands in the same place when work resumes.
+        top.set_title('In flight: running perfect rate by round', fontsize=10)
+        top.set_xlabel('round  (one episode per worker)', fontsize=8)
+        top.set_ylabel('running perfect %', fontsize=8)
+        top.set_xlim(0.5, 11.5)
+        top.text(0.5, 0.5, 'no checkpoint in flight', transform=top.transAxes,
+                 ha='center', va='center', fontsize=10, color='#999999')
+    top.set_ylim(0, 100)
+    top.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
+    top.tick_params(labelsize=7)
 
     # --- 2. completed checkpoints by step ------------------------------------------------
     middle = figure.add_subplot(grid[next_row])
     next_row += 1
     if state['completed']:
-        # Split by measurement depth, because the two are not the same kind of number: a screened
-        # point is 20 episodes with a ~5x wider interval, and drawing it identically to a
-        # 100-episode point invites reading a lucky 19/20 as a real result. Hollow small markers
-        # for screens, solid for full-length. With one uniform depth — every protocol before
-        # screening — everything lands in the "full" series and the chart looks as it always did.
+        # ‡ Split at **full length**, not at half the deepest row. Solid blue means "measured to the
+        # target"; hollow grey means anything less, whether that is a 20-episode screen or a row the
+        # abandonment gate stopped at 60.
+        #
+        # The old rule was `episodes >= deepest / 2`, which was written when the only two depths were
+        # a 20-episode screen and a 100-episode confirmation, and half-of-deepest separated them while
+        # tolerating a worker count that rounded 100 up to 108. Under `EVAL_MIN_ACHIEVABLE` that stopped
+        # being true: the gate leaves rows at every depth from the abandon floor upward, so a row
+        # abandoned at 60 of 100 drew as a solid confirmed point. On b18a, 43 of 100 rows sat between
+        # 50 and 96 episodes — every one of them mismarked as fully measured.
+        #
+        # `target_episodes` comes from the payload; `deepest` is the fallback for files that predate
+        # the field, where it reproduces the old behaviour for a flat run and is still right.
+        target = state.get('target_episodes')
         deepest = max(r['episodes'] for r in state['completed'])
-        full = [r for r in state['completed'] if r['episodes'] >= deepest / 2.0]
-        screened = [r for r in state['completed'] if r['episodes'] < deepest / 2.0]
-        if screened:
-            middle.scatter([r['step'] / 1000.0 for r in screened],
-                           [r['perfect_percent'] for r in screened],
+        full_length = target or deepest
+        full = [r for r in state['completed'] if r['episodes'] >= full_length]
+        partial = [r for r in state['completed'] if r['episodes'] < full_length]
+        if partial:
+            shallowest = min(r['episodes'] for r in partial)
+            deepest_partial = max(r['episodes'] for r in partial)
+            middle.scatter([r['step'] / 1000.0 for r in partial],
+                           [r['perfect_percent'] for r in partial],
                            s=9, alpha=0.35, facecolors='none', edgecolors='#8c8c8c',
                            linewidths=0.7, zorder=2,
-                           label='screened, {0} ep'.format(min(r['episodes'] for r in screened)))
+                           label=('screened/abandoned, {0}-{1} ep'.format(
+                               shallowest, deepest_partial) if deepest_partial != shallowest
+                               else 'screened, {0} ep'.format(shallowest)))
         middle.scatter([r['step'] / 1000.0 for r in full],
                        [r['perfect_percent'] for r in full],
                        s=22, alpha=0.75, color='#1f77b4', zorder=3,
-                       label='full, {0} ep'.format(deepest) if screened else None)
+                       label='full, {0} ep'.format(full_length) if partial else None)
         middle.axhline(state['pooled'], color='#666666', linestyle=(0, (5, 3)), linewidth=1.0,
                        label='pooled {0:.1f}%{1}'.format(
                            state['pooled'],
@@ -607,7 +641,13 @@ def render(policy_name, state, out_path):
     figure.suptitle('{0} — eval progress   {1}'.format(
         policy_name, time.strftime('%m-%d %H:%M:%S')), fontsize=11)
     partial = out_path + '.partial.png'
-    figure.savefig(partial, dpi=110, bbox_inches='tight')
+    # ‡ No bbox_inches='tight' here, deliberately. Tight crops to the drawn content, so the PNG's
+    # pixel dimensions changed whenever a label, legend or the text block changed width — and the
+    # live window sizes itself from the image, so it kept resizing even at a fixed figsize. Fixed
+    # margins instead: every frame is exactly 9.5x9.0in at 110dpi, so the window holds still and
+    # each panel stays where it was in the previous frame.
+    figure.subplots_adjust(left=0.07, right=0.985, top=0.945, bottom=0.045)
+    figure.savefig(partial, dpi=110)
     plt.close(figure)
     os.replace(partial, out_path)
 
@@ -618,9 +658,14 @@ def live_frame(policy_name, out_path=None, include_all=False):
     For the live window eval_checkpoints.py opens. Costs ~0.1s a frame, which is why it can be
     refreshed every round rather than once per checkpoint.
 
-    Reads the PNG back instead of pulling the figure canvas: render() saves with
-    bbox_inches='tight', which trims whitespace the raw canvas keeps, so going through the file
-    guarantees the window and the saved chart are the same image.
+    Reads the PNG back instead of pulling the figure canvas, so the window and the saved chart are
+    guaranteed to be the same image.
+
+    render() writes a **fixed-size** frame — three panels at 9.5x9.0in and 110dpi with explicit
+    margins, no bbox_inches='tight' — so every frame has identical pixel dimensions and the window
+    does not resize between refreshes. That matters more than the trimmed whitespace tight used to
+    save: the panel count used to drop from three to two between checkpoints, and the window jumped
+    several times a minute.
     """
     runs = load_runs(policy_name, include_all=include_all)
     if not runs:
