@@ -184,6 +184,109 @@ arms peaked at ~2.5-3M and were stopped well past it. Everything below them was 
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
 
+## Batch 16 — the food-distance shaping ablated: **the first non-null in six batches**
+
+**Ran 2026-08-07 09:5x to ~19:00, four arms stopped by hand at ~1.25M, measured 2026-08-07.**
+`SNEK_FOOD_DISTANCE_REWARD=0` on batch 14's config exactly — same four seeds, same discount 0.9975,
+same `GUIDED_FRACTION=0.8`, same `td_loss` + `IS_WEIGHTS=0`, `N_STEP_UPDATE=1` in both. **One live
+variable and no reliance on a previous null**, which no batch since 13 has managed. Graphs in
+[`charts.md`](charts.md#batch-16--food_distance_reward0-the-shaping-term-ablated-stopped-at-125m).
+
+| seed | step | peak trailing | best-30 | `sef` | best ckpt | eq-effort |
+|---|---|---|---|---|---|---|
+| 1 | 1245k | 94.82 @837k | 87.0% @850k | 20.6% | 93.3% @838k †90ep | 76.89% |
+| 2 | 1261k | **94.98** @816k | 85.0% @919k | **30.5%** | 93.3% @913k †90ep | **79.08%** |
+| 3 | 1257k | 94.36 @1198k | 72.7% @1221k | 10.5% | 85.0% @979k †40ep | 69.67% |
+| 4 | 1256k | 94.68 @946k | 73.0% @1032k | 7.0% | 80.0% @1010k †30ep | 63.27% |
+| **mean** | | **94.71** | **79.4%** | **17.2%** | | **72.23%** |
+
+**† Every "best ckpt" here is a truncated measurement, not a full 100 episodes** — see the gate
+section below, which is a protocol result in its own right.
+
+### The paired comparison, at a matched 1.25M horizon
+
+Batch 16 stopped at ~1.25M while batch 14 ran to 4.2M, and `strong_eval_fraction` is a fraction of an
+arm's *own* evals — so **every figure below truncates both batches to steps ≤ 1.25M**, giving 1251
+evals per arm on both sides. Exact paired permutation over all 16 sign flips.
+
+| metric | b14 (shaping on) | b16 (shaping off) | delta | p |
+|---|---|---|---|---|
+| **`strong_eval_fraction`** (primary) | **5.80%** | **17.15%** | **+11.35 pp** | 0.250 |
+| `best_perfect30` | 66.83% | 79.42% | **+12.58 pp** | **0.125** (4/4 seeds) |
+| mean perfect, back half | 51.15% | 62.27% | +11.13 pp | 0.250 |
+| mean perfect | 36.52% | 42.87% | +6.35 pp | 0.250 |
+| peak trailing | 94.31 | 94.71 | +0.41 | 0.250 |
+| mean trailing | 85.96 | 85.15 | -0.82 | 0.625 |
+| max drawdown | 65.75 pp | 66.92 pp | +1.18 pp | 0.750 |
+| steps to pf30 ≥ 40% | 429k | 424k | **-6k** | 0.875 |
+
+Per-seed `sef`: b14 `5.6 / 6.9 / 2.8 / 7.9` against b16 `20.6 / 30.5 / 10.5 / 7.0`. 0.125 is the
+**floor** at n=4 — it means all four seeds moved the same way, which is what `best_perfect30` did.
+
+### ‡ It is not a horizon artifact: the gap widens monotonically
+
+The obvious objection is that 1.25M was chosen because that is where batch 16 stopped. Swept:
+
+| horizon | `sef` b14 | `sef` b16 | delta | `best30` delta |
+|---|---|---|---|---|
+| 400k | 0.62% | 0.37% | -0.25 pp | +6.33 pp |
+| 600k | 1.41% | 2.79% | +1.37 pp | +11.00 pp |
+| 800k | 2.81% | 6.49% | +3.68 pp | +6.58 pp |
+| 1.0M | 4.45% | 12.61% | +8.17 pp | +13.50 pp |
+| **1.25M** | **5.80%** | **17.15%** | **+11.35 pp** | **+12.58 pp** |
+
+A noise effect would wander; this one is absent at 400k and grows at every step after. That is the
+signature of arms consolidating earlier, not of a lucky slice.
+
+### What it establishes, and what it does not
+
+**The mechanism is consolidation, not speed and not the ceiling** — and that is exactly the
+pre-registered "handover unchanged, level up" outcome:
+
+- **Not speed.** Steps to pf30 ≥ 40% is flat (-6k, p=0.875), and the epsilon handover was flat too
+  (11.5k against 12.5k, three of four seeds in the same eval).
+- **Not the ceiling.** Peak trailing +0.41 with batches 11-15 holding 94.8-95.0 anyway.
+- **It is time spent near the top.** `sef` is literally the share of evals at ≥80% perfect, and it
+  roughly **tripled**. Arms without the shaping reach a high perfect rate at the same moment and then
+  *hold* it, where the shaping-on arms oscillate back down.
+
+That reading fits the mechanism proposed before launch: 0.001 per retreating move is a small
+permanent tax on exactly the detours a 93% endgame requires, so it does not stop an arm learning to
+win — it stops it staying there.
+
+**What this is not:** established. One batch at n=4, p=0.125-0.250, and **the arms were stopped at
+1.25M**, so whether the advantage holds, closes or reverses past that point is untested — batch 14's
+own curve was still climbing there and its full-run `sef` is 21.53% against batch 16's 17.15% at 1.25M.
+It needs a replication at a longer horizon before it goes into [`findings.md`](findings.md) as more
+than a lead. **Do not restore the shaping** in the meantime: nothing here argues for it, and batch 17
+onward runs with it off.
+
+### ‡ The 95% gate saved 65% of the work and cost the ability to rank checkpoints
+
+A protocol result, and the first close-out run at `EVAL_MIN_ACHIEVABLE=95`:
+
+| arm | rows | episodes | vs flat 100 | deepest row | rows ≥90% | rows ≥95% |
+|---|---|---|---|---|---|---|
+| b16a | 127 | 4,680 | 36.9% | 100 ep (one row) | 9 | **0** |
+| b16b | 196 | 7,080 | 36.1% | 90 ep | 15 | **0** |
+| b16c | 45 | 1,390 | 30.9% | **40 ep** | 0 | **0** |
+| b16d | 26 | 760 | 29.2% | **30 ep** | 0 | **0** |
+| **total** | 394 | **13,910** | **35.3%** | | 24 | **0** |
+
+The saving beat the predicted 31%. The cost is that **no arm produced a full-length measurement worth
+ranking**: b16c's best is 34/40 and b16d's 24/30, so their headline numbers carry ±15 pp intervals, and
+`best_full_length_row`'s half-depth fallback is now the normal path rather than the exception it was
+written as. Two consequences:
+
+- **Cross-batch best-checkpoint comparison is dead at this gate.** Batch 14's bests are 100-episode
+  measurements; batch 16's are 30-90 episode ones. Use `pooled_equal_effort` (exact at any gate) or the
+  training-graph metrics, which do not touch the eval protocol at all.
+- **The gate is calibrated above the population.** Zero of 394 rows reached 95% and only 24 reached
+  90%, so at this skill level a 95 gate is not selecting good checkpoints — it is declining to measure
+  almost all of them. See
+  [`hyperparamTuning.md`](hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy) for the
+  standing recommendation that follows.
+
 ## Batch 15 — `N_STEP_UPDATE=3`: falsified on speed, null on level, and a 97/100 that is really 93%
 
 **Ran 2026-08-06 16:26 to 2026-08-07 08:22 (15.9 h), four arms to 5.79M / 5.75M / 5.46M / 5.81M,

@@ -46,6 +46,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
+| **Removing the food-distance shaping raises how long an arm stays good** | **the first non-null in six batches** — batch 16 `sef` +11.35 pp at a matched 1.25M (p=0.250) and `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). **Needs replication**; see below |
 | `DISCOUNT=0.995` matches the best ceiling and survives 3 of 3 seeds | **measured**, ~2.3x expected value |
 | Higher discount is monotonically better | **falsified** — 0.999 died 2 of 2 |
 | `0.995` vs `0.9975` on the current environment | **falsified as a difference** — batch 14 null vs 13, `pooled_equal_effort` +0.01 pp, n=4 paired |
@@ -82,6 +83,46 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
 
 ---
+
+## The food-distance shaping was a drag on consistency — the first signal in six batches
+
+**Batch 16 removed `FOOD_DISTANCE_REWARD` (0.001 subtracted on every ordinary move that increases the
+distance to food) and beat its control on every level metric.** Against batch 14 — the same four seeds
+and the same config in every other respect — at a matched 1.25M horizon:
+
+| metric | shaping on | shaping off | delta | p |
+|---|---|---|---|---|
+| `strong_eval_fraction` | 5.80% | **17.15%** | **+11.35 pp** | 0.250 |
+| `best_perfect30` | 66.83% | **79.42%** | **+12.58 pp** | **0.125** (4/4 seeds) |
+| mean perfect, back half | 51.15% | 62.27% | +11.13 pp | 0.250 |
+| steps to pf30 ≥ 40% | 429k | 424k | -6k | 0.875 |
+| peak trailing | 94.31 | 94.71 | +0.41 | 0.250 |
+
+**The mechanism is consolidation, and the two nulls are what pin it down.** Speed is unchanged (the
+pf30 crossing, and the epsilon handover at 11.5k against 12.5k) and the ceiling is unchanged (peak
+trailing, which batches 11-16 hold inside 0.3 points). What roughly **tripled** is the share of evals
+at ≥80% perfect. So an arm without the shaping learns to win at the same moment and then *stays*
+winning, where a shaping-on arm oscillates back down.
+
+That is the predicted failure of a hand-designed reward: 0.001 per retreating move is a small
+permanent tax on exactly the detours a 93% endgame requires. It never stopped an arm learning to win —
+it stopped it holding the win.
+
+**‡ Not a horizon artifact.** 1.25M is where batch 16 stopped, so the obvious objection is a
+cherry-picked slice. The `sef` delta is **-0.25 pp at 400k, +1.37 at 600k, +3.68 at 800k, +8.17 at
+1.0M, +11.35 at 1.25M** — absent early and growing monotonically, which is arms consolidating rather
+than a lucky window.
+
+**Why this is a lead and not established.** One batch at n=4, so p bottoms out at 0.125 even with every
+seed agreeing. **The arms were stopped at 1.25M**, so nothing is known past that horizon — batch 14's
+own curve was still climbing there, and its full-run `sef` (21.53%) exceeds batch 16's 17.15% at 1.25M.
+A replication at a longer horizon is what would settle it. In the meantime the shaping stays **off**,
+since nothing here argues for restoring it, and batch 17 onward runs with `FOOD_DISTANCE_REWARD=0`.
+
+**Also corrected by this batch:** an interim read at 500k called it a sixth null, on the grounds that
+the pf30 crossing was flat (424k vs 429k) and the ceiling had not moved. Both facts were right and the
+conclusion was wrong — they are the two metrics this effect does *not* touch. **"Read crossings early,
+read levels late" cuts both ways: an early crossing read is trustworthy and says nothing about level.**
 
 ## The discount: an optimum near 0.995-0.9975, and now a closed question
 

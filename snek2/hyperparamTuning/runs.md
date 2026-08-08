@@ -178,15 +178,16 @@ eval process works only because it loaded the matching observation code at start
 against a batch-10 arm would now build a 30-value network and fail to restore. **Batch 10's measured
 numbers are final and cannot be extended.**
 
-## Closed batches: 11-15 — all null, and what that means for the next one
+## Closed batches: 11-16 — five nulls, then the first signal
 
-**Five consecutive batches on the current 30-value vector have failed to separate from each other** —
-20 arms across four different hypotheses, every one of them an optimiser knob. That is the reason
-batch 16 goes after the reward function instead. Per-batch write-ups are in
+**Batches 11-15 failed to separate from each other at all** — 20 arms across four hypotheses, every
+one of them an optimiser knob. **Batch 16 went after the reward function instead and is the first
+non-null**, which is the single most useful thing this table says. Per-batch write-ups are in
 [`completedRuns.md`](completedRuns.md):
 
 | batch | what it changed | verdict |
 |---|---|---|
+| [**16**](completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches) | `FOOD_DISTANCE_REWARD=0` | **the first signal** — `sef` +11.35 pp at a matched 1.25M (p=0.250), `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). Consolidation, not speed or ceiling. Needs replication |
 | [15](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
 | [14](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
 | [13](completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
@@ -204,183 +205,43 @@ batch described under
 [what batch 13 leaves for the next batch](#what-batch-13-leaves-for-the-next-batch), not for another
 n=4 sweep.
 
-**‡ The ceiling has not moved at all, and that is the most important number here.** Peak trailing
-score across the five batches reads 94.92 / 94.80 / 94.90 / 95.00 (b11, b13, b14, b15) — flat inside
-0.2 points, even though run length went 3.2-3.6M → 3.4-3.7M → 4.1-4.5M → 5.5-5.8M. What *has* risen
-is how long an arm stays good, which is why full-length `strong_eval_fraction` keeps climbing (19.5 →
-21.6 → 30.5%) while the equal-effort figures stay flat. **That is a run-length artifact, not
-progress**, and it is the honest reading of every "record" in the last three batches.
+**‡ The ceiling still has not moved, and batch 16 does not move it either.** Peak trailing score reads
+94.92 / 94.80 / 94.90 / 95.00 / 94.71 (b11, b13, b14, b15, b16) — flat inside 0.3 points across run
+lengths from 1.25M to 5.8M. Through batch 15, rising full-length `strong_eval_fraction` (19.5 → 21.6 →
+30.5%) was a **run-length artifact** rather than progress, because longer arms accumulate more good
+evals. Batch 16 is the first case where that is *not* the explanation: it is the **shortest** batch on
+the vector and still beats its control on `sef` by 11 pp at matched steps. So the honest summary of the
+six batches is that nothing has raised the ceiling and one thing has raised how much of the time an arm
+sits near it.
 
-## Stopped 2026-08-07, close-out pending: batch 16 — the food-distance shaping term, ablated
+## Running: batch 17 — forked endgame collection (`SNEK_FORK_*`)
 
-**Launched 2026-08-07, four arms, `SNEK_FOOD_DISTANCE_REWARD=0`; stopped by hand ~1.25M the same
-day.** The first reward change this project has made, and the first batch to test a piece of
-hand-designed guidance rather than an optimiser knob. The description stays here until the close-out
-runs and its numbers move to [`completedRuns.md`](completedRuns.md).
+**Launched 2026-08-07 19:55, four arms `b17a`-`b17d` at seeds 1-4, no watchers.** All four confirmed
+identical apart from the seed by hashing their `hyperparameter override:` lines. It is the first
+change in this document aimed at the *collect distribution* rather than at the optimiser or the
+reward, and it was moved ahead of the target-period batch deliberately — the mechanism is novel here,
+so it is the more interesting thing to learn from first.
 
-`FOOD_DISTANCE_REWARD` subtracts 0.001 on every ordinary move that increases the head's Manhattan
-distance to the food. It has been on since batch 1 and has never been measured. The case for taking
-it away:
+**The counters start at zero and that is expected.** Forking needs the *collect* line to reach length
+85, which takes longer than the greedy eval does: `b17a` was at `forks: 0` through 8k steps.
 
-- **It rewards the wrong skill.** Approaching food greedily is what a beginner needs and what a 93%
-  policy must sometimes refuse — the endgame is about keeping space and following the tail, and a
-  detour is often the only safe move. A term that prices every detour at 0.001 is a small permanent
-  push against exactly the behaviour the ceiling depends on.
-- **It is a bias with no measured benefit.** Its only defence on record is that it was there. Every
-  other shaping decision in this project has been measured; this one predates the measurements.
-- **The ceiling has not moved in five batches** while every knob tried was in the optimiser. The
-  reward function is the part nobody has looked at.
+### The 100k check passed — the mechanism engages
 
-The counter, stated up front: shaping may be load-bearing *early*, where the food signal is sparse
-and a random policy needs a gradient to find the first few pieces. If so, the arms will be visibly
-slower to leave the bootstrap phase, and that is a real result rather than a failure.
+| arm | step | trailing | eligible points | forks | branch share |
+|---|---|---|---|---|---|
+| `b17a` | 107k | 75.7 | 914 | 191 | 5% |
+| `b17b` | 130k | 83.8 | 1,092 | 216 | 5% |
+| `b17c` | 123k | 86.3 | 1,610 | 402 | 10% |
+| `b17d` | 106k | 50.5 | 2,441 | 510 | **15%** |
 
-### Config: batch 14's config exactly, minus the shaping
+Above the ~5% floor on all four and climbing, so the gate is being reached and the branches are real.
 
-```
-SNEK_SEED=1..4  SNEK_DISCOUNT=0.9975  SNEK_GUIDED_FRACTION=0.8  SNEK_FOOD_DISTANCE_REWARD=0
-SNEK_PRIORITY_SIGNAL=td_loss  SNEK_IS_WEIGHTS=0
-```
-
-**The control is batch 14, and for once it is an exact one** — same four seeds, same discount, same
-shield, same priority settings, `N_STEP_UPDATE=1` in both. One variable, and no reliance on a
-previous null to make the comparison legitimate. That is what makes this batch worth running at n=4
-despite the resolution limit: the difference between two configs is a single reward term.
-
-Batch 15 is *not* the control — its `N_STEP_UPDATE=3` is falsified, so it differs by two things.
-
-### Pre-registered: two reads, and one of them is nearly free
-
-**1. Steps to leave the bootstrap epsilon phase** — the first eval whose epsilon reaches the
-refinement ceiling of 0.0125, which happens when trailing `avg_reward` clears the last bootstrap
-threshold of 20. This lands in the first ~25k steps, so it is measurable within minutes of launch,
-and it is the direct test of "was the shaping scaffolding for early learning".
-
-| batch | handover step per seed (1/2/3/4) | mean |
-|---|---|---|
-| **14 (control)** | **11k / 10k / 9k / 20k** | **12.5k** |
-| 13 | 10k / 10k / 10k / 16k | 11.5k |
-| 15 (n=3, not a control) | 20k / 22k / 15k / 19k | 19.0k |
-
-**‡ Part of any speed-up here is arithmetic, not learning.** The bootstrap thresholds are on
-`avg_reward`, and removing a penalty raises `avg_reward` for identical play, so a shaping-off arm
-clears them slightly sooner by construction. The size of that shift is measurable: with shaping off
-`avg_reward - avg_score` is purely the death and starve penalties, so comparing that gap against
-batch 14's at matched score isolates it. **Subtract it before crediting the change.**
-
-**2. Impact on training** — `pooled_equal_effort` and `strong_eval_fraction` at equal effort against
-batch 14, seed-matched, plus steps to pf30 ≥ 40% as batch 15's primary is still the best available
-speed metric. These need the arms to run out, and at n=4 only a ~10 pp swing is resolvable.
-
-What each outcome means:
-
-| result | reading |
-|---|---|
-| handover unchanged, level unchanged | the shaping is **inert** — 0.001 is too small to matter either way, and it should come out for simplicity |
-| handover unchanged, level up | the shaping was a **drag on the ceiling** without being early scaffolding. The most interesting outcome, and the one the hypothesis predicts |
-| handover later, level unchanged or up | it was **early scaffolding only** — worth replacing with something that anneals off rather than deleting |
-| handover later, level down | it is **load-bearing**. Put it back and note that hand-designed guidance still earns its place here |
-
-**The close-out is the first one at `EVAL_MIN_ACHIEVABLE=95`.** Batch 14 was measured at 90, so
-best-checkpoint stays comparable — anything at or above a gate is measured full length under it — but
-**the graph-100% tier is not**, and batch 16 will have far fewer full-length rows. Read
-`pooled_equal_effort`, which is exact at any gate.
-
-### Answered at 70k steps: the shaping is not early scaffolding
-
-**Read 1 is in, and it is a flat null.** Handover to the refinement phase, seed-matched against
-batch 14:
-
-| seed | b14 (shaping on) | b16 (shaping off) | delta |
-|---|---|---|---|
-| 1 | 11k | 11k | 0 |
-| 2 | 10k | 10k | 0 |
-| 3 | 9k | 9k | 0 |
-| 4 | 20k | **16k** | **-4k** |
-| **mean** | **12.5k** | **11.5k** | **-1k** |
-
-Three seeds land in the *same eval*, and the whole difference is seed 4 — the same seed that was the
-outlier under shaping. Evals are 1000 steps apart, so "same" means within one eval; the honest
-statement is that this measurement cannot see a difference. The sustained form (5 consecutive evals
-at the ceiling) is a wash in the other direction: 22k / 14k / 13k / 20k against batch 14's
-15k / 14k / 13k / 24k.
-
-**And the arithmetic confound is measured, not just acknowledged — it is worth ~63 steps.** Two
-numbers settle it:
-
-| quantity | measured |
-|---|---|
-| what the shaping cost per episode near the threshold | **0.47 reward** (`avg_reward - avg_score` is -1.168 with shaping, -0.696 without, over evals at score 15-25 with no perfect games) |
-| how fast trailing reward rises through the threshold | **7.4 reward per 1000 steps** (mean local slope across all 8 arms) |
-
-0.47 / 7.4 → **≈63 steps of head start, 6% of one eval interval.** So the null is not the artifact
-cancelling a real effect; there was almost no artifact to cancel.
-
-**What this rules out:** the shaping was not providing a dense gradient the early policy needed. Arms
-find their first food and climb to `avg_reward` 20 at the same rate without it. That leaves the
-level question — whether the term was quietly costing the ceiling — which is what the arms are still
-running for.
-
-### At 500k: the speed metric is a null too, but the seed spread collapsed
-
-All four arms have crossed pf30 ≥ 40%, so the **primary speed metric is readable already** — and this
-is the one kind of early read this project trusts, since a crossing cannot un-happen the way a level
-can (see batch 15's interim lesson).
-
-| seed | b14 (shaping on) | b16 (shaping off) | delta |
-|---|---|---|---|
-| 1 | 639k | 450k | **-189k** |
-| 2 | 227k | 400k | +173k |
-| 3 | 530k | 379k | **-151k** |
-| 4 | 320k | 465k | +145k |
-| **mean** | **429k** | **424k** | **-5k**, p=0.875 |
-
-**-5k on a 429k baseline is as flat as this metric gets.** 2 seeds faster, 2 slower.
-
-**‡ The interesting number is the spread, not the mean.** Batch 14's crossings span 227-639k
-(sd 189k); batch 16's span 379-465k (sd 41k) — a **4.6x tighter** spread on the metric whose seed
-variance has been called this project's binding constraint five batches running. If that survives the
-close-out it is worth more than any of the level comparisons, because it would mean the shaping term
-was a *variance* source: a small permanent bias whose cost depends on how often a given seed's food
-placements punish a detour.
-
-**Treat it as a hypothesis, not a result.** Four samples per group cannot establish a variance
-difference — an F-test on sd 189k vs 41k at n=4 is nowhere near significant, and batch 14's spread is
-driven mostly by one slow seed. The way to settle it is more seeds at this config, which is exactly
-the shorter-and-wider design already argued for below. **Do not put it in
-[`findings.md`](findings.md) on this evidence.**
-
-### Stopped at ~1.25M: the ceiling is flat again, the level read waits on the close-out
-
-All four stopped by hand at ~1.25M — much earlier than batch 14/15's 4.2-5.8M, a deliberately shorter
-run. Trailing had plateaued in the low-94s and every arm had peaked (816k-1198k), but that is a
-shorter horizon than the controls, so the level metrics below are **not comparable to batch 14/15 at
-face value** — only the close-out's equal-effort figures against a batch-14 slice at matched steps
-will be.
-
-| seed | step | peak trailing | best-30 | `sef` | recent-30 | note |
-|---|---|---|---|---|---|---|
-| 1 | 1245k | 94.82 @837k | **87.0%** @850k | 20.6% | 77.0% | peaked early, flat since |
-| 2 | 1261k | **94.98** @816k | 85.0% @919k | **30.7%** | 79.0% | strongest and flattest |
-| 3 | 1257k | 94.36 @**1198k** | 72.7% @1221k | 10.6% | 67.0% | latest peak; recovered from a mid-run dip |
-| 4 | 1256k | 94.68 @946k | 73.0% @1032k | 7.2% | **55.7%** | weakest on consistency, mid-pack ceiling |
-| **mean** | | **94.71** | **79.4%** | **17.3%** | | |
-
-**‡ The ceiling did not move — a sixth flat batch.** Mean peak trailing 94.71 sits inside 0.3 pp of
-the 94.8-95.0 band batches 11-15 hold. Removing the shaping neither raised nor lowered the peak, which
-is the level read the training graph *can* give; the eval-level read is what the close-out adds.
-
-**Still to do for this batch:** the close-out at `EVAL_MIN_ACHIEVABLE=95`, seed-matched against a
-batch-14 slice truncated to ~1.25M for the equal-effort comparison. `charts.md` entries are done.
-Running the close-out will displace every top-level chart in `evals/` — no finished arm's charts are
-at risk there right now, but restore from `evals/archive/` afterward if any appear.
-
-## Next up: batch 17 — forked endgame collection (`SNEK_FORK_*`)
-
-**Built 2026-08-07, off by default, not launched.** It is the first change in this document aimed at
-the *collect distribution* rather than at the optimiser or the reward, and it was moved ahead of the
-target-period batch deliberately — the mechanism is novel here, so it is the more interesting thing
-to learn from first.
+**‡ Note the share runs *inverse* to arm quality here** — `b17d` is the weakest arm on trailing score
+and forks the most. That is the right direction on reflection: eligibility needs ≥ 2 safe actions, which
+happens on 42-45% of steps at length 80-84 but only 9-11% at 95-100, so a stronger arm spends its
+endgame in the *narrow* part of the board where there is nothing to branch. Watch it at the 500k check
+rather than reading it as a problem — but it does mean the branch share is partly a skill measure, and a
+strong arm may get less of the treatment than a weak one.
 
 **The premise it was proposed on is falsified; the one it survives on is narrower.** The idea was that
 the endgame is never explored at epsilon ~0.003, so the buffer holds no endgame experience. Measured
@@ -525,7 +386,7 @@ Risk to check on day one: an arm that learns too slowly never clears
 unmeasurable. Batch 1's hint points the other way, so this is a glance at the first few evals rather
 than a real concern.
 
-## What five nulls leave for the batch after this one
+## What six batches leave for the ones after this
 
 ### What batch 13 leaves for the next batch
 
@@ -624,10 +485,12 @@ rather than at the ceiling.
 - ~~**Reward changes**~~ — **retracted 2026-08-07, and the stated reason was wrong.** The claim was
   that changing a reward breaks comparability of `avg_score`. It does not: `avg_score` is a count of
   food eaten, so it and every eval metric derived from it are on the same scale whatever the rewards
-  are. Only `avg_reward` changes scale. `FOOD_DISTANCE_REWARD` is now tunable and batch 16 is testing
-  it; `FOOD_REWARD`, `DEATH_REWARD`, `STARVE_REWARD` and `PERFECT_GAME_REWARD` remain fixed, since
-  those *do* rescale `avg_reward` enough to move the bootstrap epsilon thresholds a long way. See
-  [`hyperparamTuning.md`](hyperparamTuning.md#available-knobs).
+  are. Only `avg_reward` changes scale. **Retracting it paid off immediately**: `FOOD_DISTANCE_REWARD`
+  became tunable and batch 16's ablation of it is the first non-null in six batches. `FOOD_REWARD`,
+  `DEATH_REWARD`, `STARVE_REWARD` and `PERFECT_GAME_REWARD` remain fixed, since those *do* rescale
+  `avg_reward` enough to move the bootstrap epsilon thresholds a long way — but the batch-16 result is
+  a standing argument for looking at the rest of the reward function rather than at another optimiser
+  knob. See [`hyperparamTuning.md`](hyperparamTuning.md#available-knobs).
 - **Reverting to `PyUniformReplayBuffer`** — cpprb is ~2.4x faster with no measured
   learning cost, so cheaper experiments come from keeping it.
 - **An LR schedule** — no evidence of optimization instability; degradation is gradual

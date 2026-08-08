@@ -36,9 +36,10 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 Four seeds, batch 14's config exactly minus the food-distance shaping — one variable, an exact
 control. **Stopped by hand at ~1.25M**, far short of batch 14/15's 4.2-5.8M, so read these charts for
 their *left* halves: the level metrics below (`strong_eval_fraction`, best-30) sit at a much shorter
-horizon than the batches beneath and are **not comparable to them at face value**. The close-out at
-`EVAL_MIN_ACHIEVABLE=95` is still to run. Design and the two interim reads:
-[`runs.md`](runs.md#stopped-2026-08-07-close-out-pending-batch-16--the-food-distance-shaping-term-ablated).
+horizon than the batches beneath and are **not comparable to them at face value** — the comparison that
+is valid truncates batch 14 to the same 1.25M, and doing that makes this **the first non-null in six
+batches**. Closed out at `EVAL_MIN_ACHIEVABLE=95`; full write-up in
+[`completedRuns.md`](completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches).
 
 **The ceiling did not move — a sixth flat result.** Peak trailing across the four arms reads
 94.98 / 94.82 / 94.68 / 94.36, mean **94.71**, inside 0.3 pp of the 94.8-95.0 band the previous five

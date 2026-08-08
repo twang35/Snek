@@ -151,6 +151,36 @@ no gate, batch 14 has 90, batch 15 onward 95. Best-checkpoint stays comparable f
 matters — "did this arm produce a ≥95% checkpoint" — because anything at or above a gate is measured
 full length under it. The graph-100% tier is not comparable across different gates at all.
 
+### ‡ Measured on batch 16: at 95 the gate saves 65% and stops ranking checkpoints
+
+The first close-out actually run at 95, and it is worse than the simulation implied:
+
+| arm | rows | episodes | share of a flat pass | deepest row | rows ≥90% | rows ≥95% |
+|---|---|---|---|---|---|---|
+| `b16a` | 127 | 4,680 | 36.9% | 100 ep (one row) | 9 | **0** |
+| `b16b` | 196 | 7,080 | 36.1% | 90 ep | 15 | **0** |
+| `b16c` | 45 | 1,390 | 30.9% | **40 ep** | 0 | **0** |
+| `b16d` | 26 | 760 | 29.2% | **30 ep** | 0 | **0** |
+| **total** | 394 | **13,910** | **35.3%** | | 24 | **0** |
+
+**Zero of 394 rows reached 95% and only 24 reached 90%**, so the gate sits above the whole population
+rather than selecting from within it. The saving is real — 65% of a flat pass — but two arms produced
+**no measurement deeper than 30-40 episodes**, which makes their headline number a ±15 pp estimate, and
+`b16c`'s "best 85.0%" is 34 of 40 episodes.
+
+Practical rules that follow:
+
+- **Do not compare best-checkpoint across a gate change.** Batch 14's bests are 100-episode
+  measurements; batch 16's are 30-90 episode ones. Use `pooled_equal_effort`, which is exact at any
+  gate, or the training-graph metrics, which never touch the eval protocol.
+- **Judge a batch on `strong_eval_fraction` from the graph, not on the close-out.** That was already
+  the primary metric; batch 16 is the case that shows why it has to be — the close-out could not rank
+  two of its four arms.
+- **If a champion matters, re-measure it explicitly** with `EVAL_MIN_ACHIEVABLE=0` on the handful of
+  checkpoints worth the episodes. The gate is for triage, not for the final number.
+- **Consider dropping back to 90** for a batch whose arms are not expected to clear 95. At 90 the
+  saving is still ~50% and `b16a`/`b16b` would have had 24 full-length rows between them instead of one.
+
 `top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
 10-episode eval** from the graph, using the surrounding perfect rate to order within an
 equal-eval tier, and applies two thresholds:
