@@ -148,17 +148,16 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import numpy as np
 import tensorflow as tf
-from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import parallel_py_environment
 from tf_agents.environments import tf_py_environment
-from tf_agents.specs import tensor_spec
 from tf_agents.system import system_multiprocessing
 from tf_agents.utils import common
 
 import snake_constants
+from eval_agent import build_eval_agent
+from eval_workers import IndependentWorkerPool
 from snake_constants import EVALS_ARCHIVE_DIR, EVALS_DIR, POLICY_DIR, RUNS_DIR
 from snake_environment import SnakeEnvironment
-from snek2 import build_q_net
 
 
 def backup_previous_results(out_path):
@@ -807,7 +806,11 @@ def main(argv):
     archive_existing_eval_pngs()
     policy_name = argv[1]
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
-    num_workers = int(os.environ.get('EVAL_WORKERS', 10))
+    # 4, lowered from 10 on 2026-08-08. Measured on the real close-out shape (4 parallel eval
+    # processes, 800 episodes each): with independent workers 4 gives 117s against 118s at 5 and
+    # 134s at 10, because 4 processes x 4 workers already saturates 14 cores at ~12.7 busy. More
+    # workers past that add cost, not throughput. See eval_workers.py for the full table.
+    num_workers = int(os.environ.get('EVAL_WORKERS', 4))
     screen_requested = os.environ.get('EVAL_SCREEN_EPISODES')
     screen_episodes, screen_note = resolve_screen_episodes(screen_requested, num_episodes)
     confirm_count = int(os.environ.get('EVAL_CONFIRM_COUNT', DEFAULT_CONFIRM_COUNT))
@@ -830,6 +833,11 @@ def main(argv):
     # Off by default: 163us per game step headless against 6050us in a window, and because
     # ParallelPyEnvironment waits for the slowest worker, one rendering worker paces all of them.
     render_worker = os.environ.get('EVAL_RENDER', '0') not in ('0', '', 'false', 'False')
+    # On by default from 2026-08-08. Each worker owns its env and its own network copy, so there is
+    # no batched inference to idle through and no per-episode barrier: 1.41x at 4 workers, 1.91x at
+    # 5, 2.33x at 10. EVAL_INDEPENDENT=0 restores the ParallelPyEnvironment path, which is what
+    # every measurement before this date used and which EVAL_RENDER still needs.
+    independent_workers = os.environ.get('EVAL_INDEPENDENT', '1') not in ('0', '', 'false', 'False')
 
     ckpt_dir = POLICY_DIR + policy_name
     available = {int(f[len('ckpt-'):].split('.')[0])
@@ -879,25 +887,10 @@ def main(argv):
     spec_env.reset()
     spec_tf_env = tf_py_environment.TFPyEnvironment(spec_env)
 
-    action_tensor_spec = tensor_spec.from_spec(spec_env.action_spec())
-    num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
-    # Shared with training and watch.py, and it reads SNEK_FC_LAYERS like training does. This
-    # used to hardcode (50, 100, 50) while training took the override, so a run with
-    # SNEK_FC_LAYERS set would have been measured against the wrong network — silently, since
-    # restore() below uses expect_partial().
-    q_net = build_q_net(num_actions)
-
-    global_step = tf.compat.v1.train.get_or_create_global_step()
-    agent = dqn_agent.DdqnAgent(
-        spec_tf_env.time_step_spec(),
-        spec_tf_env.action_spec(),
-        q_network=q_net,
-        epsilon_greedy=0.0,  # eval is greedy; epsilon only affects the collect policy
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
-        td_errors_loss_fn=common.element_wise_huber_loss,
-        target_update_period=8,
-        train_step_counter=global_step)
-    agent.initialize()
+    # One definition, shared with every independent worker in eval_workers.py. A second copy of
+    # this construction is the failure mode this project has hit twice: expect_partial() hides a
+    # mismatch, so two builders that drift produce a policy that loads silently and plays badly.
+    agent, checkpoint, global_step = build_eval_agent(spec_tf_env, spec_env)
 
     def make_headless_worker():
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
@@ -913,25 +906,40 @@ def main(argv):
         snake_constants.PERFECT_GAME_WAIT_MS = perfect_wait_ms
         return SnakeEnvironment(discount=0.99, display=True, policy_name=policy_name)
 
-    # All headless unless EVAL_RENDER=1, in which case worker 0 renders. Episodes are i.i.d.
-    # across workers, so which worker produced one carries no information either way — the
-    # window is purely for watching, and it costs ~37x on the critical path (see EVAL_RENDER
-    # above), so a close-out nobody is watching should not pay for it.
-    if render_worker:
-        constructors = [make_visible_worker] + [make_headless_worker] * (num_workers - 1)
+    # Independent workers (the default) never build a ParallelPyEnvironment at all: each worker
+    # owns its env *and* its own network copy, so there is no batched inference to share and no
+    # per-episode barrier. Measured 1.41x at 4 workers, 1.91x at 5 and 2.33x at 10 — see
+    # eval_workers.py for the full table and for why ~10 workers is the optimum.
+    #
+    # EVAL_RENDER forces the batched path: rendering needs one visible worker among headless ones,
+    # which is a property of the shared ParallelPyEnvironment. Watching a game is interactive and
+    # already ~37x off the critical path, so it does not need the faster collector.
+    pool = None
+    parallel_env = None
+    policy_action = None
+    if independent_workers and not render_worker:
+        print('    collecting with {0} independent workers '
+              '(EVAL_INDEPENDENT=0 for the batched path)'.format(num_workers))
+        pool = IndependentWorkerPool(policy_name, ckpt_dir, num_workers)
     else:
-        constructors = [make_headless_worker] * num_workers
-    parallel_env = tf_py_environment.TFPyEnvironment(
-        parallel_py_environment.ParallelPyEnvironment(constructors))
+        if independent_workers and render_worker:
+            print('    EVAL_RENDER=1 forces the batched path, which is the one that can show a '
+                  'window')
+        # All headless unless EVAL_RENDER=1, in which case worker 0 renders. Episodes are i.i.d.
+        # across workers, so which worker produced one carries no information either way — the
+        # window is purely for watching, and it costs ~37x on the critical path (see EVAL_RENDER
+        # above), so a close-out nobody is watching should not pay for it.
+        if render_worker:
+            constructors = [make_visible_worker] + [make_headless_worker] * (num_workers - 1)
+        else:
+            constructors = [make_headless_worker] * num_workers
+        parallel_env = tf_py_environment.TFPyEnvironment(
+            parallel_py_environment.ParallelPyEnvironment(constructors))
 
-    # Mirrors the keys common.Checkpointer uses in snek2.py, so a specific
-    # ckpt-<step> can be restored instead of only the latest.
-    checkpoint = tf.train.Checkpoint(agent=agent, policy=agent.policy, global_step=global_step)
-
-    # Inference in a tf.function rather than eager: 208us per call against 1421us — 6.8x — for
-    # byte-identical actions. Traced once and reused, since restoring weights writes into the
-    # same variables and does not force a retrace.
-    policy_action = common.function(agent.policy.action)
+        # Inference in a tf.function rather than eager: 208us per call against 1421us — 6.8x — for
+        # byte-identical actions. Traced once and reused, since restoring weights writes into the
+        # same variables and does not force a retrace.
+        policy_action = common.function(agent.policy.action)
 
     out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
     backup_previous_results(out_path)
@@ -1110,8 +1118,14 @@ def main(argv):
         if stage:
             progress['stage'] = stage
         print('\ncheckpoint {0} ({1})'.format(step, label))
-        checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))).expect_partial()
-        restored = int(global_step.numpy())
+        # With independent workers the parent holds no weights that matter — each worker restores
+        # into its own network and reports the global_step it read, which is a stronger check than
+        # the parent's own restore was: it confirms all N agree.
+        if pool is not None:
+            restored = pool.load(step)
+        else:
+            checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))).expect_partial()
+            restored = int(global_step.numpy())
         if restored != step:
             print('    warning: global_step reads {0}, expected {1}'.format(restored, step))
 
@@ -1147,9 +1161,13 @@ def main(argv):
         should_abandon = (None if abandon_test is None else
                          lambda perfect, done: abandon_test(held_perfect + perfect, already + done))
 
-        scores, perfect_flags, rewards, elapsed, abandoned = evaluate(
-            parallel_env, policy_action, episodes, on_round=on_round,
-            should_abandon=should_abandon)
+        if pool is not None:
+            scores, perfect_flags, rewards, elapsed, abandoned = pool.run(
+                episodes, on_progress=on_round, should_abandon=should_abandon)
+        else:
+            scores, perfect_flags, rewards, elapsed, abandoned = evaluate(
+                parallel_env, policy_action, episodes, on_round=on_round,
+                should_abandon=should_abandon)
         if abandoned:
             held['abandoned'] = True
             progress['abandoned'] = progress.get('abandoned', 0) + 1
@@ -1265,6 +1283,8 @@ def main(argv):
         '  [truncated — no checkpoint reached the abandonment gate]'
         if best['episodes'] < num_episodes else ''))
     print('\nPooled rates only compare across arms when the selection rule matches.')
+    if pool is not None:
+        pool.close()
     return 0
 
 

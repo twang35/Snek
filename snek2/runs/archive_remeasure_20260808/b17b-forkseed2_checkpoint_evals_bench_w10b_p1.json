@@ -1,0 +1,71 @@
+{
+  "policy_name": "b17b-forkseed2",
+  "episodes_per_checkpoint": 100,
+  "checkpoints_requested": 2,
+  "num_workers": 10,
+  "complete": true,
+  "requested_steps": [
+    1190000,
+    1248000
+  ],
+  "screen_episodes": null,
+  "confirm_count": null,
+  "min_achievable": null,
+  "abandon_floor": null,
+  "abandoned": 0,
+  "episodes_saved": 0,
+  "measurements_planned": 2,
+  "measurements_done": 2,
+  "session_measurements": 2,
+  "session_episodes": 200,
+  "session_seconds": 92.4,
+  "stage": "flat",
+  "pooled_equal_effort": null,
+  "stages": null,
+  "episodes_planned": 200,
+  "episodes_done": 200,
+  "in_flight": null,
+  "updated_at": 1786208483.5870762,
+  "results": [
+    {
+      "step": 1190000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 100,
+      "perfect_games": 96,
+      "perfect_percent": 96.0,
+      "perfect_ci95": [
+        90.2,
+        98.4
+      ],
+      "avg_score": 94.68,
+      "median_score": 95.0,
+      "min_score": 69.0,
+      "max_score": 95.0,
+      "avg_reward": 189.17,
+      "abandoned": false,
+      "seconds": 43.2
+    },
+    {
+      "step": 1248000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 100,
+      "perfect_games": 95,
+      "perfect_percent": 95.0,
+      "perfect_ci95": [
+        88.8,
+        97.8
+      ],
+      "avg_score": 94.61,
+      "median_score": 95.0,
+      "min_score": 71.0,
+      "max_score": 95.0,
+      "avg_reward": 187.94,
+      "abandoned": false,
+      "seconds": 49.2
+    }
+  ]
+}

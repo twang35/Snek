@@ -497,9 +497,19 @@ def render(policy_name, state, out_path):
             # the form '_r0' / '_midrun', so labelling them raw produced an empty legend and a
             # "No artists with labels" warning on every render.
             label = run['suffix'].lstrip('_') or 'run'
-            top.plot(rounds, running, marker='o', markersize=3.5, linewidth=1.4,
-                     label='{0} @{1}'.format(label, flight['step']))
-            top.set_xlim(0.5, flight['rounds_total'] + 0.5)
+            line, = top.plot(rounds, running, marker='o', markersize=3.5, linewidth=1.4,
+                             label='{0} @{1}'.format(label, flight['step']))
+            # The current rate, written next to the last point. Reading it off the y axis is
+            # awkward on a 2.1in-tall panel — the gridlines are 20 pp apart and the whole question
+            # while a checkpoint is in flight is "what is it running at right now".
+            top.annotate('{0:.0f}%'.format(running[-1]),
+                         xy=(len(running), running[-1]),
+                         xytext=(5, 0), textcoords='offset points',
+                         va='center', ha='left', fontsize=8, fontweight='bold',
+                         color=line.get_color(), zorder=5)
+            # +1.5 rather than +0.5: the running-rate annotation is drawn to the right of the
+            # last point and would be clipped at the axes edge on a nearly finished checkpoint.
+            top.set_xlim(0.5, flight['rounds_total'] + 1.5)
         # Worker counts are still needed for the x-axis formula below, but they are no longer drawn.
         # There used to be a second y axis here carrying a step line of how many workers were still
         # contributing at each round. It came out on 2026-08-07: for a single process — which is

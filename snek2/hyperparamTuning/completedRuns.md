@@ -69,22 +69,26 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b15b-nstep3seed2` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.75M | **97%** @3245k | 96.3% | **79.7%** /eq §§ | 89.3% | ‡‡‡ § **best selected ckpt on record**, but **93.0% over 300**; strongest arm on eq-effort |
+| `b17b-forkseed2` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.57M | **95.2%** @1190k /600 | 93.5% /500 | **82.42%** /eq §§ | **92.7%** | ‡‡‡ § **the record**, re-measured: selected reads of 99/100 fell to 92.4-95.0 over 500. Reached ~95% at **1.19M** |
+| `b15b-nstep3seed2` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.75M | 97% @3245k | 96.3% | 79.7% /eq §§ | 89.3% | ‡‡‡ § previous best selected ckpt, but **93.0% over 300** |
 | `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ 96/100 selected, ~94% shrunk |
 | `b14a-disc9975seed1` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.17M | 96% @3702k | 93.0% | 72.4% /eq §§ | 79.7% | ‡‡‡ § 96/100 selected; 91/100 on re-measure, **93.5% over 200** |
 | `b15a-nstep3seed1` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.79M | 95% @4697k | 94.3% | 77.7% /eq §§ | **89.7%** | ‡‡‡ § **peak trailing 95.00, highest on record**; still gaining at 5.8M |
 | `b13d-shieldseed4` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.51M | **95%** @986k | 93.3% | 77.2% /4800 † | 83.3% | ‡‡‡ § **2nd best ckpt on record**; peaked ~1M then lost 44 pp |
 | `b14d-disc9975seed4` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.46M | 93% @2559k | 93.0% | **77.6%** /eq §§ | **89.7%** | ‡‡‡ § **best arm on record for `strong_eval_fraction`, 39.3%**; only 11.7 pp drawdown |
+| `b17c-forkseed3` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.52M | 93% @1424k *trunc* | 92.6% | 73.33% /eq §§ | 82.0% | ‡‡‡ § **still climbing when stopped** — peak and best window in its last 140k |
 | `b13c-shieldseed3` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.67M | 92% @3367k | 90.7% | 75.9% /11400 † | **85.3%** | ‡‡‡ § best of batch 13 on the graph; best ckpt in its final 300k |
 | `b13b-shieldseed2` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.70M | 91% @1166k | 90.3% | 74.8% /7800 † | 82.3% | ‡‡‡ § fastest start on record: 72.3% pf30 by 350k |
 | `b14b-disc9975seed2` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.12M | 90% @2261k | — | 67.1% /eq §§ | 76.3% | ‡‡‡ § weakest of batch 14; **one full-length row survived the gate**; lost 47 pp |
 | `b14c-disc9975seed3` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.16M | 90% @2099k | 89.3% | 71.3% /eq §§ | 87.7% | ‡‡‡ § **still improving at 4.5M** — the arm that moved the step cap to 10M |
 | `b15d-nstep3seed4` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.81M | 91% @3671k | 90.3% | 73.5% /eq §§ | 86.3% | ‡‡‡ § **peak trailing at 5799k, its 2nd-to-last eval** — stopped mid-climb |
 | `b13a-shieldseed1` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.39M | 80% @2044k | 80.0% | 70.5% /3100 † | 78.0% | ‡‡‡ § weakest of batch 13, and the batch's slowest starter |
+| `b17d-forkseed4` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.51M | 86% @1260k *trunc* | 84.5% | 66.83% /eq §§ | 75.7% | ‡‡‡ § fastest starter of batch 17; best window at 679k then flat |
 | `b15c-nstep3seed3` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.46M | 86% @3823k *trunc* | — | 66.4% /eq §§ | 75.7% | ‡‡‡ § weakest of batch 15; **no full-length row survived the gate** — best is a truncated 69/80 |
 | `b11a-obs30seed1` ‡‡‡ | disc 0.995, **fourth env** | 3.19M | 94% @671k | 93.3% | 79.5% /4800 † | 85.7% | ‡‡‡ 2nd of batch 11; peaked at 678k, then lost 42 pp |
 | `b11d-obs30seed4` ‡‡‡ | disc 0.995, **fourth env** | 3.59M | 88% @3507k | 86.7% | 69.3% /4000 † | 78.3% | ‡‡‡ only arm still near peak when stopped |
 | `b11c-obs30seed3` ‡‡‡ | disc 0.995, **fourth env** | 3.23M | 87% @1706k | 84.7% | 69.0% /2300 † | 73.0% | ‡‡‡ weakest of batch 11 |
+| `b17a-forkseed1` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.41M | 68% @916k *trunc* | 66.7% | 46.25% /eq §§ | 54.0% | ‡‡‡ § **the arm that made batch 17 a null**; never reached ε ≤ 0.003; 22 episodes is its deepest row |
 | `b12d-eps002seed4` ‡‡‡ § | eps handover **0.05**, no shield | 1.09M | not measured | — | — | 6.3% | ‡‡‡ § **deadlocked**; abandoned at 1M of 2.5M |
 | `b12a-eps002seed1` ‡‡‡ § | eps handover **0.05**, no shield | 1.12M | not measured | — | — | 6.3% | ‡‡‡ § deadlocked; peaked 87.0 trailing @214k then decayed to 55 |
 | `b12c-eps002seed3` ‡‡‡ § | eps handover **0.05**, no shield | 0.98M | not measured | — | — | 1.7% | ‡‡‡ § deadlocked; 8 perfect games in 977 evals |
@@ -153,6 +157,15 @@ depth, which is at or below the abandon floor, so it is exact at any gate and is
 here that compares cleanly to batch 13 (72.07% against 72.08%). When comparing `measured` across the
 † and §§ rows, don't — compare the batch write-ups, which state both figures.
 
+**§§ Batch 17's gate is 95, the same as batch 16's**, so those two batches' `best ckpt` columns are
+comparable to each other and to nothing above them. `b17b` is the exception in both directions: it is
+the only arm in either batch with full 100-episode rows, and it has 26 of them.
+
+**‡ `b17b-forkseed2` displaces `b15b` at the top of this table on every column at once** — best ckpt
+99% vs 97%, top-3 98.7% vs 96.3%, eq-effort 82.42% vs 79.7%, best-30 92.7% vs 89.3% — and it did it at
+**1.57M steps against 5.75M**. Its re-measurement is outstanding, so read the 99% as provisional; the
+eq-effort figure is not provisional, and it is a record on its own.
+
 `train` was a human-started run on committed defaults, stopped by the human. Never
 touch `snek2/savedPolicies/train*`.
 
@@ -183,6 +196,196 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 17 — forked endgame collection: **a null that produced the project record**
+
+**Ran 2026-08-07 19:55 to 2026-08-08 00:45, four arms stopped by hand at 1.41-1.57M, measured
+2026-08-08.** `SNEK_FORK_BRANCHES=4 SNEK_FORK_PROB=0.5 SNEK_FORK_MIN_LENGTH=85
+SNEK_FORK_MAX_STEPS=60` on batch 16's config exactly — same four seeds, same discount 0.9975, same
+`GUIDED_FRACTION=0.8`, shaping off in both, `N_STEP_UPDATE=1`. **Batch 16 is the seed-matched control
+and differs only by `FORK_BRANCHES=1`.** The first change in this project aimed at the *collect
+distribution* rather than the optimiser or the reward. Graphs in
+[`charts.md`](charts.md#batch-17--forked-endgame-collection-snek_fork_-a-null-stopped-at-141-157m).
+
+| seed | step | peak trailing | best-30 | `sef` | best ckpt | eq-effort |
+|---|---|---|---|---|---|---|
+| 1 | 1245k | 93.86 @1144k | 54.0% @1166k | **1.3%** | 68.2% @916k †22ep | **46.25%** |
+| 2 | 1245k | 94.92 @1068k | **92.7%** @1223k | **32.0%** | **99.0%** @1205k **100ep** | **82.42%** |
+| 3 | 1245k | 94.38 @1230k | 71.3% @954k | 9.9% | 93.5% @1424k †92ep | 73.33% |
+| 4 | 1245k | 94.60 @1007k | 75.7% @679k | 18.6% | 86.0% @1260k †50ep | 66.83% |
+| **mean** | | **94.44** | **73.4%** | **15.4%** | | **67.21%** |
+
+**Closed out 2026-08-08 at `EVAL_MIN_ACHIEVABLE=95`, matching batch 16's protocol exactly.** An
+earlier launch at 90 was stopped after ~4 minutes with no completed rows and restarted at 95: when the
+whole point is a paired comparison against batch 16, running the *same* protocol as the control beats
+running a better one. † marks a truncated row; `b17b`'s is the only full 100 in the batch, and there
+are 26 of them.
+
+### The pre-registered comparison, at a matched 1.245M horizon
+
+`b16a` stopped at 1245k, so that is the common horizon — 1246 evals per arm on both sides. Exact
+paired permutation over all 16 sign flips.
+
+| metric | b16 (fork off) | b17 (fork on) | delta | p |
+|---|---|---|---|---|
+| **`strong_eval_fraction`** (primary) | **17.11%** | **15.45%** | **-1.67 pp** | 0.875 |
+| `best_perfect30` | 79.42% | 73.42% | -6.00 pp | 0.875 |
+| mean perfect, back half | 62.22% | 56.37% | -5.85 pp | 0.750 |
+| mean perfect | 42.80% | 42.07% | -0.73 pp | 1.000 |
+| peak trailing | 94.71 | 94.44 | -0.27 | 0.250 |
+| mean trailing | 85.13 | 80.16 | -4.97 | 0.250 |
+| max drawdown | 66.92 pp | 73.97 pp | +7.04 pp | 0.500 |
+| steps to pf30 ≥ 40% | 424k | 402k | **-21.8k** | 0.750 |
+
+**The primary metric points the wrong way and nothing is significant.** The only direction worth
+anything is speed — 22k earlier to pf30 ≥ 40%, 2 of 4 seeds — which is the metric with the largest
+per-seed spread here (+110k, -68k, +7k, -136k).
+
+### ‡ Unlike batch 16, the sweep is flat, so this is not a horizon artifact either way
+
+| horizon | `sef` delta | `best30` delta |
+|---|---|---|
+| 300k | +0.00 pp | +4.67 pp |
+| 500k | +2.30 pp | +4.17 pp |
+| 700k | +3.67 pp | +6.83 pp |
+| 900k | +0.97 pp | -6.00 pp |
+| 1.0M | -1.15 pp | -9.75 pp |
+| **1.245M** | **-1.67 pp** | **-6.00 pp** |
+
+Positive and rising to ~700k, then negative and stable. Batch 16's signal grew monotonically to its
+horizon; this one reverses, which is what a noise effect looks like. **The 900k interim read called it
+a null for the same reason it later stayed a null, by luck** — the 500-700k slice would have called it
+a win.
+
+### ‡ One seed is the whole result, and that has to be said in both directions
+
+| metric | all four seeds | dropping `b17a` |
+|---|---|---|
+| `sef` | **-1.67 pp** | **+4.23 pp** |
+| `best_perfect30` | -6.00 pp | +3.03 pp |
+| mean perfect, back half | -5.85 pp | +4.07 pp |
+
+`b17a-forkseed1` is -19.3 pp on `sef` and -33.0 on best-30; the other three are +1.7 / -0.6 / +11.6.
+**This is not a licence to drop it** — it is the honest statement that n=4 cannot separate "forking
+destabilises some seeds" from "seed 1 drew badly." Two facts argue for the second: `b13a` failed the
+same way with no forking at all, and `b17a`'s fork counters are entirely normal (9683 forks, 27%
+share, retired == created). It is also the only arm of the eight that **never reached ε ≤ 0.003**,
+where all seven others did between 373k and 974k — its schedule is gated on a trailing-30 perfect
+rate it never sustained, so the instability and the high epsilon feed each other. That is a
+[failure mode](failureModes.md), not a forking mechanism.
+
+### The mechanism engaged and held for 1.5M steps — this is a real null, not a null test
+
+| arm | forks | branch share | truncated / ended | eligible skipped, slots full |
+|---|---|---|---|---|
+| `b17a` | 9,683 | 27% | 5,725 / 3,958 | 11,670 |
+| `b17b` | 8,614 | 24% | 5,730 / 2,881 | 12,228 |
+| `b17c` | 10,268 | 29% | 6,537 / 3,731 | 13,772 |
+| `b17d` | 10,544 | 29% | 6,691 / 3,853 | 12,921 |
+
+Inside the pre-registered 25-60% band, `forks == retired` on all four (no leaked branch envs, RSS flat
+at 496-659 MB), `main_steps + branch_steps == global_step` exactly, and 0 violations of the buffer
+integrity invariant.
+
+**But the delivered dose was below design, and that is the one loose end.** Branch share landed at
+**24-29% against the predicted ~46%**, and 12-14k eligible fork points per arm were skipped for want
+of a slot — roughly **30% of all eligible points**. The **cap of 4 is what binds, not `FORK_PROB=0.5`**.
+So the finding is "counterfactual coverage at endgame decision points does not help *at this dose*",
+and `SNEK_FORK_BRANCHES=6-8` is the version of the experiment that would actually test the hypothesis.
+The batch nonetheless landed inside its own pre-registered band, so by its own terms it is a fair null.
+
+### ‡ The close-out: `b17b` is the best policy this project has measured, by a clear margin
+
+| arm | rows | episodes | saved | eq-effort | deepest | rows ≥90% | rows ≥95% | best row |
+|---|---|---|---|---|---|---|---|---|
+| `b17a` | 20 | 440 | 1,560 | **46.25%** | **22 ep** | 0 | 0 | 68.2% @916k |
+| `b17b` | **306** | **13,078** | 10,642 | **82.42%** | 100 ep (**26 of them**) | **69** | **25** | **99.0% @1205k** |
+| `b17c` | 117 | 3,662 | 8,038 | 73.33% | 92 ep | 6 | 0 | 93.5% @1424k |
+| `b17d` | 131 | 3,096 | 9,524 | 66.83% | 50 ep | 0 | 0 | 86.0% @1260k |
+
+**`pooled_equal_effort` 82.42% is the highest ever recorded here**, against `b15b`'s 79.7%, and it is
+the one column that cannot be inflated by selection — it truncates every checkpoint to the 20-episode
+screen depth, so it is exact at any gate.
+
+### ‡ Re-measured the same day over 6,600 fresh episodes: the 99/100 was mostly selection
+
+The close-out produced 26 rows at the full 100 episodes, **25 of them ≥95%**, mean 96.2% — which looked
+like a ~96% region rather than a lucky max. **It was not.** Four processes, `EVAL_MIN_ACHIEVABLE=0`,
+no screening:
+
+| step | close-out | re-measured /500 | change |
+|---|---|---|---|
+| 1190k | 98/100 | **95.0%** (92.7-96.6) | -3.0 |
+| 1205k | **99/100** | **92.4%** (89.7-94.4) | **-6.6** |
+| 1231k | 98/100 | 92.6% (90.0-94.6) | -5.4 |
+| 1248k | **99/100** | 93.8% (91.3-95.6) | -5.2 |
+| **mean of the ≥98% group** | **98.5%** | **93.45%** | **-5.05** |
+| mean of the six 97% rows, /200 | 97.0% | **95.25%** | -1.75 |
+
+**The ranking inside the top rows was noise**: the ≥98% group re-measures *below* the 97% group. And a
+**blind grid** — 17 checkpoints every 10k across 1110-1270k, chosen by position, 100 fresh episodes
+each — prices the selection effect directly:
+
+| sample of the same region | mean | pooled | CI |
+|---|---|---|---|
+| position-chosen grid | **84.06%** | 1429/1700 | 82.2-85.7 |
+| the close-out's selected full-length rows | **96.2%** | — | — |
+| `b16b` control grid, 840-1000k | **80.41%** | 1367/1700 | 78.5-82.2 |
+
+**Three results, in order of how much they matter:**
+
+1. **The reasoning that defended the 99 was circular** — the 26 deep rows reached full depth *because*
+   they screened well, so their mean is inflated by the same mechanism as the max. Full account in
+   [`runs.md`](runs.md#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection).
+2. **The record is real but small.** `b17b` @1190k pools to **95.17% over 600 fresh episodes** (CI
+   93.1-96.6) against `b14a`'s 93.5%/200 and `b15b`'s 93.0%/300 — better, overlapping intervals, and
+   reached at **1.19M steps** against 3.7M and 3.2M. **The speed is the unambiguous part.**
+3. **The region beats its control by +3.65 pp** (84.06% vs 80.41%) on position-chosen samples — which
+   independently reproduces this arm's `pooled_equal_effort` delta of **+3.34 pp**. Two different
+   protocols, same answer, and it is the same ~+3.5 pp that seeds 3 and 4 showed.
+
+**And the region is not a plateau.** `1140k` reads **12.0%** on the blind grid — a complete collapse
+30k steps from a 95% checkpoint, invisible to the close-out because it never screened well enough to be
+selected. Excluding it the grid mean is 88.56%, and quoting that instead would be the same selection
+error one level up, so the 84.06% stands as the region figure.
+
+**And `b17a`'s close-out is nearly worthless, which is worth recording as a protocol result**: 20 rows,
+deepest 22 episodes, 440 episodes total. The gate is arithmetic and correct — that arm has no
+checkpoint that could reach 95% — but it means the batch's mean eq-effort (67.21%) is one real
+measurement and three shallow ones plus one near-empty one.
+
+### The paired close-out comparison, and why it says the opposite of the mean
+
+| seed | b16 eq-effort | b17 eq-effort | delta |
+|---|---|---|---|
+| 1 | 76.89% | 46.25% | **-30.64** |
+| 2 | 79.08% | **82.42%** | **+3.34** |
+| 3 | 69.67% | 73.33% | **+3.66** |
+| 4 | 63.27% | 66.83% | **+3.56** |
+| **mean** | **72.23%** | **67.21%** | **-5.02** (p=1.000) |
+
+**Seeds 2, 3 and 4 move the same way by nearly the same amount** — +3.34, +3.66, +3.56, a spread of
+0.32 pp on a metric whose between-seed sd is several points. That is a more consistent signal than any
+graph metric in this batch produced. And seed 1 reads -30.64, which swamps it.
+
+**Do not resolve this by dropping seed 1.** Two readings survive the data: forking gives ~+3.5 pp and
+seed 1 failed for unrelated reasons, or forking destabilises some fraction of seeds and seed 1 is that
+fraction. **n=4 cannot separate them**, and that — not the sign of the mean — is the batch's real
+finding. The re-run that could separate them is `SNEK_FORK_BRANCHES=6-8` at n=8.
+
+### What it establishes, and what it does not
+
+- **Do not adopt forking on this evidence.** The primary metric is negative at p=0.875.
+- **Do not call the hypothesis falsified either.** At 30% of eligible points skipped, the dose is
+  ~60% of design, and three of four seeds moved the right way.
+- **`b17b-forkseed2` is the most interesting single arm this project has produced on the graph**:
+  `best_perfect30` **92.7%**, the highest of any arm ever run here, at **1.22M steps** against
+  `b11b`'s 91.7% at 3.56M and `b15a`'s 89.7% at 5.79M — and its full-length peak trailing reads
+  **95.00**, tying `b15a` for the highest on record. `best_perfect30` is a max statistic with sd 8.6
+  across identical seeds, which is exactly why this file demoted it, so **one arm is a curiosity and
+  not evidence**. Whether it holds a champion checkpoint is the close-out's job.
+- **The ceiling still has not moved.** Peak trailing 94.44 against 94.71 / 95.00 / 94.90 / 94.80 for
+  batches 16 / 15 / 14 / 13 — seven batches, everything inside 0.6 points.
 
 ## Batch 16 — the food-distance shaping ablated: **the first non-null in six batches**
 

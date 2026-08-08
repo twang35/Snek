@@ -12,7 +12,83 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## The current record: three checkpoints read 96-97%, and all three are really ~93-94%
+## ‡ The record is now ~95%, and the 99/100 that suggested it was mostly selection
+
+**Re-measured 2026-08-08 over 6,600 fresh episodes.** `b17b-forkseed2`'s close-out produced a 99/100
+and 25 of 26 full-length rows at ≥95%, which looked like a jump to ~96%. It is not. Every one of the
+top rows shrank:
+
+| step | close-out | re-measured, 500 fresh episodes | change |
+|---|---|---|---|
+| 1190k | 98/100 | **95.0%** (CI 92.7-96.6) | **-3.0** |
+| 1205k | **99/100** | **92.4%** (CI 89.7-94.4) | **-6.6** |
+| 1231k | 98/100 | 92.6% (CI 90.0-94.6) | -5.4 |
+| 1248k | **99/100** | 93.8% (CI 91.3-95.6) | -5.2 |
+| **mean** | **98.5%** | **93.45%** | **-5.05** |
+
+**The standing rule was right and I argued against it wrongly** — see
+[the reasoning error](#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection)
+below, which is the more valuable thing on this page than the number.
+
+**What the record actually is.** `b17b` @1190000, **94.24% over 5,120 fresh episodes** (4825/5120, CI
+93.6-94.8). It ended up the most heavily measured checkpoint in the project as a by-product of
+validating the independent-worker change, which meant measuring one checkpoint thousands of times.
+
+| | value |
+|---|---|
+| record checkpoint | `b17b-forkseed2` @1190000 |
+| measured | **94.24%**, 4825/5120 fresh episodes, CI **93.6-94.8** |
+| previous | `b14a` 93.5% /200, `b15b` 93.0% /300, `b11b` ~94% shrunk |
+| honest summary | **~94%, level with the old record once measured properly** |
+| steps to get there | **1.19M**, against 3.7M and 3.2M — **the only unambiguous improvement** |
+
+**‡ At 5,120 episodes the level gain mostly disappears.** The earlier 600-episode read of 95.17% sat
+above `b14a`'s 93.5%/200 and `b15b`'s 93.0%/300; at ±0.6 pp the honest figure is **94.24%**, which
+overlaps both. **So the ceiling still has not moved** — seven batches, and what changed is that this
+arm reached the same frontier in a third of the steps. Read the speed, not the level.
+
+**‡ The ordering inside the top rows was pure noise.** The four rows at ≥98% re-measure to **93.45%**
+mean, while the six at exactly 97% re-measure to **95.25%** — the group that originally looked *worse*
+measured *better*. At n=4 and n=6 that inversion is not significant, and that is the point: the
+close-out's ranking among its own best rows carries no information.
+
+**Speed is the durable claim.** ~95% at **1.19M steps** where `b15b` needed 3.2M and `b14a` 3.7M for
+~93.5%. Whatever else batch 17 did or did not do, this arm got to the frontier ~3x faster, and that is
+measured on step counts rather than on a selected eval.
+
+The checkpoint is in `savedPolicies/b17b-forkseed2/` and is worth promoting to
+[`../hallOfFame/`](../hallOfFame/README.md) as a 95.17%/600 champion — a stronger provenance than any
+current entry, all of which rest on 100-300 episodes.
+
+## ‡ The reasoning error: a selected sample cannot defend itself against selection
+
+**Worth recording because it was persuasive and wrong.** The argument for trusting the 99/100 was:
+`b15b`'s 97 was a lucky draw because its 94 full-length rows averaged 90.7%, whereas `b17b`'s 26
+full-length rows averaged **96.2%**, so there was "no ~90% population for the 99 to be drawn from."
+
+**The flaw is that those 26 rows reached full depth *because* they screened well.** The three-stage
+protocol promotes checkpoints on a 20-episode screen, so the deep-row population is itself selected on
+the very quantity being checked. Its mean is inflated by the same mechanism as the max. Using it to
+rule out selection bias is circular.
+
+**A blind grid is the test that is not circular**: 17 checkpoints every 10k across 1110k-1270k, chosen
+by *position* alone, 100 fresh episodes each.
+
+| region sample | mean | pooled | CI |
+|---|---|---|---|
+| `b17b` 1110-1270k, blind grid | **84.06%** | 1429/1700 | 82.2-85.7 |
+| the same region's *selected* full-length rows | **96.2%** | — | — |
+
+**84% against 96% is the size of the selection effect**, measured directly. The rule that follows:
+**an arm's selected full-length rows describe the checkpoints the screen liked, never the region.** Any
+claim about a region needs a position-chosen sample.
+
+**And the region is not flat.** `1140k` reads **12.0%** on the blind grid — a total collapse 30k steps
+from a 95% checkpoint, which the close-out never saw because it never screened well enough to be
+selected. See
+[policy quality changes materially within 1000 training steps](findings.md#policy-quality-changes-materially-within-1000-training-steps).
+
+## The previous record: three checkpoints read 96-97%, and all three are really ~93-94%
 
 `b15b-nstep3seed2` @3245000 read **97/100**, the highest selected measurement this project has
 produced. It does not move the record. **Every champion, corrected, lands in the same place:**
@@ -78,8 +154,13 @@ on the headline number. 100 takes that to **97%** and only moves the cost from 2
 The worker-count finding is a correction: this project had concluded eval throughput was
 core-bound past ~10 workers and dropped batch 10's close-out to 2 workers to hit a ~50% CPU
 target. That made it 2.8x slower *and* cost more CPU per episode, because TensorFlow's thread
-pool costs about a core whether its batch has 2 rows or 20. **To be gentler on the machine, run
-fewer arms, not fewer workers.**
+pool costs about a core whether its batch has 2 rows or 20. **Lowering the worker count to save CPU
+does the opposite of what it looks like.**
+
+**Superseded in spirit on 2026-08-08:** the old advice ended "to be gentler on the machine, run fewer
+arms, not fewer workers." Being gentle is no longer the goal — see
+[evals run hot on purpose](hyperparamTuning.md#-evals-run-hot-on-purpose). The mechanical finding
+stands; the priority it served does not.
 
 **Early abandonment was rejected in 2026-08-03 and shipped on 2026-08-05**, and the reversal is
 about *which rule*, not new data. The rejected version cut a checkpoint once its running rate
@@ -178,15 +259,17 @@ eval process works only because it loaded the matching observation code at start
 against a batch-10 arm would now build a 30-value network and fail to restore. **Batch 10's measured
 numbers are final and cannot be extended.**
 
-## Closed batches: 11-16 — five nulls, then the first signal
+## Closed batches: 11-17 — five nulls, one signal, then another null
 
 **Batches 11-15 failed to separate from each other at all** — 20 arms across four hypotheses, every
 one of them an optimiser knob. **Batch 16 went after the reward function instead and is the first
-non-null**, which is the single most useful thing this table says. Per-batch write-ups are in
-[`completedRuns.md`](completedRuns.md):
+non-null**, which is the single most useful thing this table says. Batch 17 went after the *collect
+distribution*, the third category, and came back null at the dose it delivered. Per-batch write-ups
+are in [`completedRuns.md`](completedRuns.md):
 
 | batch | what it changed | verdict |
 |---|---|---|
+| [**17**](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record) | `SNEK_FORK_BRANCHES=4` — forked endgame collection | **null on the config, record on one arm** — `sef` -1.67 pp (p=0.875) and eq-effort -5.02 pp, both dragged entirely by `b17a`; the other three seeds are **+3.3 to +3.7 pp on eq-effort, 3/3**. And `b17b` produced **99/100 @1205k with a 96.2% region**, the best policy ever measured here |
 | [**16**](completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches) | `FOOD_DISTANCE_REWARD=0` | **the first signal** — `sef` +11.35 pp at a matched 1.25M (p=0.250), `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). Consolidation, not speed or ceiling. Needs replication |
 | [15](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
 | [14](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
@@ -214,60 +297,48 @@ the vector and still beats its control on `sef` by 11 pp at matched steps. So th
 six batches is that nothing has raised the ceiling and one thing has raised how much of the time an arm
 sits near it.
 
-## Running: batch 17 — forked endgame collection (`SNEK_FORK_*`)
+## Closed: batch 17 — forked endgame collection (`SNEK_FORK_*`)
 
-**Launched 2026-08-07 19:55, four arms `b17a`-`b17d` at seeds 1-4, no watchers.** All four confirmed
-identical apart from the seed by hashing their `hyperparameter override:` lines. It is the first
-change in this document aimed at the *collect distribution* rather than at the optimiser or the
-reward, and it was moved ahead of the target-period batch deliberately — the mechanism is novel here,
-so it is the more interesting thing to learn from first.
+**Ran 2026-08-07 19:55 to 2026-08-08 00:45, four arms `b17a`-`b17d` at seeds 1-4, stopped by hand at
+1.41-1.57M.** Full write-up, per-seed numbers and the mechanism audit:
+[`completedRuns.md`](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record).
+**Closed out 2026-08-08 at `EVAL_MIN_ACHIEVABLE=95`, matching batch 16's protocol exactly** — an
+earlier launch at 90 was restarted at 95 after ~4 minutes and no completed rows, because
+same-protocol-as-the-control beats better-protocol when the whole point is a paired comparison.
 
-**The counters start at zero and that is expected.** Forking needs the *collect* line to reach length
-85, which takes longer than the greedy eval does: `b17a` was at `forks: 0` through 8k steps.
+**Verdict: null on the config, and the project record on one arm.** `strong_eval_fraction` **-1.67 pp**
+at a matched 1.245M (p=0.875) against its seed-matched batch-16 control, `pooled_equal_effort`
+**-5.02 pp** (p=1.000) — and `b17b-forkseed2` holds the
+[record at 95.17% over 600 fresh episodes](#-the-record-is-now-95-and-the-99100-that-suggested-it-was-mostly-selection),
+reached at 1.19M steps. Both readings are correct and they are about different things. Four things to
+carry forward rather than re-derive:
 
-### The 100k check passed — the mechanism engages
+- **One seed carries the result.** Drop `b17a` and `sef` is +4.23 pp. `b17a`'s fork counters are
+  normal and `b13a` failed the same way with forking off, so this is most likely seed variance — but
+  n=4 cannot prove that, which is the whole finding.
+- **The delivered dose was ~60% of design.** Branch share 24-29% against a predicted ~46%, with ~30%
+  of eligible fork points skipped because the branch cap was full. **The cap binds, not `FORK_PROB`.**
+  So the hypothesis is untested at full strength, not falsified. `SNEK_FORK_BRANCHES=6-8` is the
+  re-run if it is ever worth four more slots.
+- **The code is sound and stays in.** `forks == retired` on all four arms, `main_steps +
+  branch_steps == global_step` exactly, RSS flat, 0 integrity violations over 1.5M steps × 4.
+  `FORK_BRANCHES` defaults to 1, so the feature is off unless asked for.
+- **‡ The close-out and the graph disagree about the batch, and the close-out is the one with a
+  record in it.** On `pooled_equal_effort` the three non-outlier seeds are **+3.34 / +3.66 / +3.56 pp,
+  3 of 3 the same direction** — a tighter and more consistent signal than anything in the graph
+  metrics — while `b17a` reads **-30.64** and takes the mean to -5.02. **Do not resolve that by
+  dropping `b17a`.** Resolve it by noting that n=4 cannot survive one arm this bad, and that the
+  question "does forking help" is therefore still open after a batch that spent 20 CPU-hours on it.
 
-| arm | step | trailing | eligible points | forks | branch share |
-|---|---|---|---|---|---|
-| `b17a` | 107k | 75.7 | 914 | 191 | 5% |
-| `b17b` | 130k | 83.8 | 1,092 | 216 | 5% |
-| `b17c` | 123k | 86.3 | 1,610 | 402 | 10% |
-| `b17d` | 106k | 50.5 | 2,441 | 510 | **15%** |
+**Outstanding, and the highest-value item on this page:** re-measure `b17b` @1205k and @1248k with
+`EVAL_MIN_ACHIEVABLE=0` over fresh episodes, then promote to
+[`../hallOfFame/`](../hallOfFame/README.md). Until that lands the record is "a ≥95% policy exists",
+not "99%".
 
-Above the ~5% floor on all four and climbing, so the gate is being reached and the branches are real.
+**Forking stays *on* for batch 18** at the user's direction, which makes batch 18 a clean one-knob
+test against batch 17 — see below.
 
-**‡ Note the share runs *inverse* to arm quality here** — `b17d` is the weakest arm on trailing score
-and forks the most. That is the right direction on reflection: eligibility needs ≥ 2 safe actions, which
-happens on 42-45% of steps at length 80-84 but only 9-11% at 95-100, so a stronger arm spends its
-endgame in the *narrow* part of the board where there is nothing to branch. Watch it at the 500k check
-rather than reading it as a problem — but it does mean the branch share is partly a skill measure, and a
-strong arm may get less of the treatment than a weak one.
-
-**The premise it was proposed on is falsified; the one it survives on is narrower.** The idea was that
-the endgame is never explored at epsilon ~0.003, so the buffer holds no endgame experience. Measured
-across all 20 current-era arms' saved buffers, that is not true:
-
-| arm group | buffer at len ≥ 80 | at len ≥ 90 | collected episodes ending perfect |
-|---|---|---|---|
-| batches 11, 13, 14, 15, 16 (eps ~0.003) | **20-34%** | 9-21% | **12-81%** |
-| batch 12 (eps 0.05, the deadlock) | **0.0%** | 0.0% | **0 of 3142** |
-
-Batch 12 is the calibration: the metric reads exactly zero when the endgame really is missing, so the
-20-34% is not a floor artifact. `findings.md`' quote that "the buffer holds no trajectories that eat
-the last ~10 food" is a true description of **batch 12**, and false of every arm since.
-
-**What survives.** At an endgame decision point the buffer holds the consequence of the action taken
-and **never** that of the alternative — measured mean **2.06 safe actions** per eligible state at
-length ≥ 85, so ~1.06 per state are never tried. An arm that dies from state `s` learns that
-`Q(s, a_bad)` is low, but nothing raises `Q(s, a_good)` for the action it did not take, so the argmax
-has no reason to flip. **The hypothesis to pre-register is counterfactual coverage at endgame decision
-points, not endgame volume** — naming it that way is what makes a null closable.
-
-Branch points are also **not rare**, which the original design assumed: ≥ 2 safe actions on **42-45%**
-of steps at length 80-84, falling to **9-11%** at 95-100 — about **74-104 eligible states per episode**
-at length ≥ 85. "Only a few points" holds above ~95, not from 85.
-
-### Pre-registration
+### Pre-registration, as it stood at launch
 
 **`SNEK_FOOD_DISTANCE_REWARD=0` — decided, not conditional on batch 16's close-out.** The distance
 shaping stays off from here: the ablation's early read is a measured null (handover 11.5k against the
@@ -313,11 +384,21 @@ produced **451 forks at 73% branch share with 0 violations** of the buffer integ
 (length rises by 0 or 1 per frame and the starve budget decrements exactly, within every stored
 window), against 0 violations in 400k pairs from three unforked arms.
 
-## After that: batch 18 — `TARGET_UPDATE_PERIOD` 1000
+## Running: batch 18 — `TARGET_UPDATE_PERIOD` 1000, forking retained
 
-**Not launched.** Designed 2026-08-07, and swapped behind the forking batch on 2026-08-07 so the
-branching idea gets measured first. Nothing about the design changes with the reorder: its control is
-whatever the batch before it settles, which is now batch 17 rather than batch 16.
+**Launched 2026-08-08 00:50, four arms `b18a`-`b18d` at seeds 1-4.** Designed 2026-08-07 and swapped
+behind the forking batch so the branching idea got measured first.
+
+**Forking stays on at batch 17's exact settings**, at the user's direction, and that is the *better*
+design rather than a compromise: **batch 17 becomes a clean seed-matched control differing in one knob
+only.** The alternative — turning forking off and controlling against batch 16 — would have changed
+two things at once. It does mean batch 18 inherits batch 17's ~60%-of-design dose and its
+`FORK_BRANCHES` cap pressure, but inherits them *equally on both sides of the comparison*, which is
+all a control has to do.
+
+The reading rule that follows: **this batch measures the target period, not forking.** If it wins, the
+win is the target period on top of a forking baseline, and whether forking is carrying any of it is
+still unmeasured — that question needs the `FORK_BRANCHES=6-8` re-run, not this batch.
 
 `TARGET_UPDATE_PERIOD=8` with `TARGET_UPDATE_TAU=1.0` means the target network is hard-copied from
 the online network every 8 gradient steps. **Standard DQN uses hundreds to thousands**, and at 8 the
@@ -359,27 +440,28 @@ the current replay or shield settings. Treat "longer learns faster early" as the
 
 ### Config, control and pre-registration
 
+**As launched**, byte-identical to batch 17 apart from the target period:
+
 ```
-SNEK_SEED=1..4  SNEK_TARGET_UPDATE_PERIOD=1000  SNEK_DISCOUNT=0.9975  SNEK_GUIDED_FRACTION=0.8
+SNEK_SEED=1..4  SNEK_TARGET_UPDATE_PERIOD=1000
+SNEK_FOOD_DISTANCE_REWARD=0  SNEK_DISCOUNT=0.9975  SNEK_GUIDED_FRACTION=0.8
+SNEK_FORK_BRANCHES=4  SNEK_FORK_PROB=0.5  SNEK_FORK_MIN_LENGTH=85  SNEK_FORK_MAX_STEPS=60
 SNEK_PRIORITY_SIGNAL=td_loss  SNEK_IS_WEIGHTS=0
 ```
 
-**The control is batch 17**, seed-matched, with forking off and `FOOD_DISTANCE_REWARD=0`. That is the
-whole reason for the ordering rule: each batch's control is the one before it, so the two knobs stay
-separable. **Do not launch this until batch 17 is closed out** — running it against batch 16 instead
-would leave the target period confounded with forking.
+| item | value |
+|---|---|
+| control | **batch 17**, seed-matched — identical but for `TARGET_UPDATE_PERIOD` 8 → 1000 |
+| primary | **steps to pf30 ≥ 40%**, the speed metric batch 15 pre-registered, because the live hypothesis is about *early* learning |
+| secondary | `strong_eval_fraction` and `pooled_equal_effort` at equal effort |
+| **also report** | **max drawdown, explicitly** — the one number the prior data point predicts gets *worse*, so it gets read whatever the primary does rather than looked up afterwards if the batch disappoints |
+| horizon | batch 17's arms reached 1.41-1.57M, so the paired read caps at **~1.41M** |
+| check early | a target period 125x longer changes the bootstrap; if an arm has not started scoring by ~50k when every batch-16/17 arm was well up by then, read it as the period being too long rather than a slow seed |
+| abandon | the usual: ≥ 2 of 4 arms not crossing pf30 ≥ 40% by 800k, or a > 10 pp deficit with a mechanism |
 
-Note batch 17 may itself be a `FORK_BRANCHES=1` control-free batch (it reuses batch 16 as its control),
-so if forking comes back null and is dropped, this batch's control reverts to batch 16.
-
-`SNEK_GUIDED_FRACTION=0.8` is shown above for the record; it is the default from 2026-08-07, so
-passing it changes nothing.
-
-**Primary metric: steps to pf30 ≥ 40%**, the same speed metric batch 15 pre-registered, because the
-live hypothesis is about *early* learning. Secondary: `pooled_equal_effort` and
-`strong_eval_fraction` at equal effort. **Also report max drawdown explicitly** — it is the one
-number the prior data point predicts will get worse, so it needs to be read whatever the primary
-does, rather than looked up afterwards if the batch disappoints.
+`SNEK_GUIDED_FRACTION=0.8` is shown for the record; it is the default from 2026-08-07, so passing it
+changes nothing. The four `SNEK_FORK_*` values are batch 17's, carried over deliberately so the
+comparison is one knob.
 
 Risk to check on day one: an arm that learns too slowly never clears
 `SNEK_MIN_CHECKPOINT_SCORE=40` and so writes no checkpoint, which makes it unresumable and
@@ -453,7 +535,7 @@ table.
 | change | targets | prior |
 |---|---|---|
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
-| ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **promoted to batch 18** — see [the design](#after-that-batch-18--target_update_period-1000) |
+| ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **running as batch 18** — see [the design](#running-batch-18--target_update_period-1000-forking-retained) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
 | `FC_LAYERS=128,128` | capacity | low |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |

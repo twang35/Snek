@@ -34,7 +34,10 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
-| **The record is ~93-94%**, reached three times — `b15b` @3245k (97/100 selected), `b14a` @3702k, `b11b` @855k | **measured**; both re-measured champions pool to 93.0% and 93.5% |
+| **The record is ~95%** — `b17b-forkseed2` @1190k, **95.17% over 600 fresh episodes** (CI 93.1-96.6) | **measured 2026-08-08**; up from ~93-94% but with **overlapping intervals** — better, not a different class |
+| ~~The record is ~96%, `b17b` @1205k reads 99/100~~ | **falsified by re-measurement the same day** — 99/100 → **92.4% over 500**; all four ≥98% rows shrank a mean of **5.05 pp** |
+| The previous record was ~93-94% — `b15b` @3245k (93.0% /300), `b14a` @3702k (93.5% /200), `b11b` @855k | **narrowly superseded 2026-08-08** |
+| **~95% is reachable at ~1.2M steps**, not millions | **measured** — `b17b` @1190k against `b15b`'s 3.2M and `b14a`'s 3.7M for ~93.5%; the clearest gain of the batch |
 | Two of the four record jumps came from the **horizon** and the **env audit**, not hyperparameters | **established** |
 | An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M | **established**, 2 arms to the end |
 | Arms peak by ~3.4M | **falsified** — 2 of batch 14's 4 peaked past 3.5M, and 2 of batch 15's were still gaining at **5.5-6.0M**; the old rule tracked where humans stopped arms |
@@ -54,6 +57,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
 | `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
 | n-step returns help | **falsified on speed** — batch 15 at n=3 reached pf30 >= 40% **128k later** than its control, 3 of 4 seeds slower; evals null too (best ckpt +0.05 pp, p=1.000) |
+| Forking the collect line at endgame decision points helps | **the batch failed to measure it** — `sef` -1.67 pp and eq-effort -5.02 pp, both entirely from one arm at -30.64; the other **3 of 3 seeds read +3.34 / +3.66 / +3.56 pp on eq-effort**, and the batch holds the project record. Dose was ~60% of design. **Neither established nor falsified**; see below |
+| **The replay buffer holds no endgame experience at eps ~0.003** | **falsified** — 20-34% of every current-era buffer is at length >= 80, and 12-81% of collected episodes end perfect. True only of batch 12; see below |
 | A larger replay buffer prevents the collapse | **not settled** — opposite results twice |
 | Epsilon reaching 0.0 causes the collapse | **falsified**, *but only at 0.001 vs 0.0* |
 | **96.8% of batches 10-11's steps ran at epsilon exactly 0.0**, the ladder bottoming out at ~15k | **measured**, 8 arms, 31.1M steps |
@@ -73,7 +78,9 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **n=4 cannot resolve an effect below ~10 pp**; 5 pp needs n≈17-37 depending on the metric | **established** |
 | 100-episode measurement reproduces within binomial noise | **established**, 51 repeats |
 | The max of N noisy measurements is upward-biased — **re-measure** before quoting it | **established, twice** — 96/100 → 93.5%, 97/100 → 93.0% |
-| A high selected reading means a near-perfect policy | **falsified** — `b15b`'s 8 rows at ≥95% come from a population with mean 90.7%, where noise alone predicts ~5.4 |
+| A high selected reading means a near-perfect policy | **falsified twice** — `b15b`'s 97/100 → 93.0%, `b17b`'s 99/100 → **92.4% over 500**. No exceptions found yet |
+| ~~The distribution of an arm's full-length rows tests whether its max is real~~ | **falsified, and it was my argument** — those rows reached full depth *because* they screened well, so their mean is inflated by the same mechanism as the max. `b17b`'s selected rows read **96.2%**; a position-chosen grid over the same region reads **84.06%** |
+| **Only a sample chosen by position can describe a region** | **established** — the 12 pp gap above is the selection effect, measured directly on 1,700 fresh episodes |
 | The graph-100% tier is comparable across arms and batches | **falsified under a gate** — `EVAL_MIN_ACHIEVABLE` censors it from below; reads +15.6 pp on batch 14 as pure artifact |
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
@@ -123,6 +130,60 @@ since nothing here argues for restoring it, and batch 17 onward runs with `FOOD_
 the pf30 crossing was flat (424k vs 429k) and the ceiling had not moved. Both facts were right and the
 conclusion was wrong — they are the two metrics this effect does *not* touch. **"Read crossings early,
 read levels late" cuts both ways: an early crossing read is trustworthy and says nothing about level.**
+
+## Forked endgame collection: null at 60% of the intended dose, and the premise it was built on is false
+
+**Batch 17 forked the collect trajectory at endgame decision points** — at snake length ≥ 85, with
+more than one non-fatal action available, it snapshotted the game and played the untaken action out on
+a branch for up to 60 steps, up to 3 branches alongside the main line, all feeding the replay buffer.
+Against its seed-matched batch-16 control at a matched 1.245M: **`sef` -1.67 pp, p=0.875**, every level
+metric slightly negative, speed 21.8k better at p=0.750. Full numbers in
+[`completedRuns.md`](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record).
+
+**‡ The premise it was proposed on is false, and this is the more reusable finding.** The idea was
+that the endgame is never explored at epsilon ~0.003, so the buffer holds no endgame experience.
+Measured across all 20 current-era arms' saved replay buffers:
+
+| arm group | buffer at len ≥ 80 | at len ≥ 90 | collected episodes ending perfect |
+|---|---|---|---|
+| batches 11, 13, 14, 15, 16 (eps ~0.003) | **20-34%** | 9-21% | **12-81%** |
+| batch 12 (eps 0.05, the deadlock) | **0.0%** | 0.0% | **0 of 3142** |
+
+Batch 12 is the calibration: the metric reads exactly zero when the endgame really is missing, so
+20-34% is not a floor artifact. **The old claim that "the buffer holds no trajectories that eat the
+last ~10 food" is a true description of batch 12 and false of every arm since.** Any future proposal
+that starts "the agent never sees the endgame" has to clear this table first.
+
+**What survived the correction, and what the batch actually tested.** At an endgame decision point the
+buffer holds the consequence of the action taken and **never** that of the alternative — mean **2.06
+safe actions** per eligible state at length ≥ 85, so ~1.06 per state are never tried. An arm that dies
+from state `s` learns `Q(s, a_bad)` is low, but nothing raises `Q(s, a_good)` for the action it did not
+take, so the argmax has no reason to flip. That is **counterfactual coverage**, and naming it that way
+is what made the null closable. Branch points are also **not rare**, contrary to the original design:
+≥ 2 safe actions on **42-45%** of steps at length 80-84, falling to **9-11%** at 95-100 — about
+**74-104 eligible states per episode** at length ≥ 85. "Only a few points" holds above ~95, not from 85.
+
+**Why this is not a falsification.** The delivered dose was **24-29% branch share against a predicted
+~46%**, with ~30% of eligible fork points skipped because the 4-branch cap was full — so the cap bound,
+not the fork probability. And one seed carries the whole result: dropping `b17a` turns `sef` from
+-1.67 to **+4.23 pp**. The honest reading is "no effect at ~60% of the intended dose, measured at a
+sample size that cannot resolve one bad seed." `SNEK_FORK_BRANCHES=6-8` is the experiment that would
+settle it.
+
+**‡ The close-out points the other way, and consistently.** On `pooled_equal_effort` the three
+non-outlier seeds read **+3.34 / +3.66 / +3.56 pp** — a 0.32 pp spread on a metric with several points
+of between-seed sd, which is the most consistent signal any batch has produced — while `b17a` reads
+**-30.64** and drags the mean to -5.02 (p=1.000). **And the batch produced the project record**:
+`b17b-forkseed2` @1205k at 99/100 with a 96.2% region, at 1.2M steps. None of that makes forking
+established; all of it makes "forking is null" the wrong summary. **The accurate summary is that the
+batch failed to measure its own effect**, because at n=4 one arm at -30 pp is larger than the effect
+being looked for.
+
+**‡ Also a correction to how the interim read was made.** A 900k read called it a null and was right,
+but a 500-700k read would have called it a **win** (`sef` +2.30 to +3.67 pp) — the sweep rises to
+~700k and then reverses. Batch 16's signal grew monotonically to its horizon; this one did not.
+**A non-monotone sweep is the tell for a noise effect**, and it is worth reading the shape rather than
+any single truncation.
 
 ## The discount: an optimum near 0.995-0.9975, and now a closed question
 

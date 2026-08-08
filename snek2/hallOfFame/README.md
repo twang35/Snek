@@ -9,20 +9,66 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: ~93-94%, reached three times, all on `master`
+## The current record: **94.2% over 5,120 episodes**, `b17b-forkseed2-ckpt1190000`
 
-Batches 11-15 train on the **30-value observation vector** — the current one, after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these five entries are the
-only ones in this folder that load on `master` as it stands.** All five came from a batch close-out
+Batches 11-17 train on the **30-value observation vector** — the current one, after the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these six entries are the
+only ones in this folder that load on `master` as it stands.** All six came from a batch close-out
 rather than a mid-run measurement.
 
 | checkpoint | measured | config |
 |---|---|---|
+| **`b17b-forkseed2-ckpt1190000`** | **4825/5120 = 94.2%** (CI **93.6-94.8**) — the most heavily measured checkpoint in the project, see below | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
 | `b15b-nstep3seed2-ckpt3245000` | **97/100** selected, **182/200** on an independent re-run → **93.0% over 300** (CI 89.5-95.4) | `N_STEP_UPDATE=3`, `DISCOUNT=0.995`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=2` |
 | `b14a-disc9975seed1-ckpt3702000` | 96/100 selected, **91/100** on an independent re-run → **93.5% over 200** (CI 89.2-96.2) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=1` |
 | `b11b-obs30seed2-ckpt855000` | 96/100 (CI 90.2-98.4), top-3 95.3%, **~94% shrunk** | `DISCOUNT=0.995`, `SNEK_SEED=2` |
 | `b13d-shieldseed4-ckpt986000` | 95/100 (CI 88.8-97.8), top-3 93.3% | + eps handover 0.0125, `GUIDED_FRACTION=0.5`, `SNEK_SEED=4` |
 | `b11a-obs30seed1-ckpt671000` | 94/100 (CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
+
+### ‡ `b17b` @1190000 — the first entry measured deeply *before* being called a record
+
+Added 2026-08-08. Three independent measurements, 700 episodes, no selection between them:
+
+| measurement | result | why it exists |
+|---|---|---|
+| 500 fresh episodes, gate off | 475/500 = 95.0% (92.7-96.6) | the re-measurement that tested the close-out's claim |
+| 100 fresh, position-chosen grid | 96/100 = 96.0% (90.2-98.4) | this step also fell on a blind every-10k grid, so it is *not* selection-conditioned |
+| 100 fresh, **on the copy in this folder** | 91/100 = 91.0% (83.8-95.2) | confirms the copy loads and plays, per this folder's standard |
+| 1000 fresh, independent collect path | 955/1000 = 95.5% (94.0-96.6) | half of the paired test that validated `EVAL_INDEPENDENT` |
+| 1000 fresh, batched collect path | 939/1000 = 93.9% (92.2-95.2) | the other half — the two paths agree, p=0.110 |
+| + 2,520 more from benchmark runs | — | every one a real 100-episode measurement, kept rather than discarded |
+| **pooled** | **4825/5120 = 94.24%** (CI **93.6-94.8**) | the figure to quote |
+
+**±0.6 pp is a tighter interval than any other entry in this folder has ever had**, and it exists as a
+by-product rather than by design: validating the independent-worker change meant measuring one
+checkpoint thousands of times, and those episodes are real measurements, so they were pooled instead
+of thrown away. The earlier 700-episode figure of 94.57% is superseded by this, not contradicted —
+94.57% sits inside 93.6-94.8.
+
+**Split by collect path, as a check on the change**: batched **94.03%** (3479/3700) against independent
+**94.79%** (1346/1420), difference +0.76 pp, **p=0.295**. No detectable difference, which is what
+`eval_workers.py`'s quota design is meant to guarantee.
+
+**Its arm's close-out originally read 99/100 at a different step (1205000), and that did not
+survive.** Re-measured at 500 episodes, 1205k fell to **92.4%**, and all four of the arm's ≥98%
+rows fell a mean of 5.05 pp. The reason is in
+[`../hyperparamTuning/runs.md`](../hyperparamTuning/runs.md#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection):
+an argument that the arm's 26 full-length rows averaging 96.2% proved the 99 was real was
+**circular**, because those rows reached full depth by screening well. A position-chosen grid over
+the same region reads **84.06%**, not 96.2% — a 12 pp selection effect, measured.
+
+**1190000 is the entry rather than 1205000 for exactly that reason.** It is the step that reads
+highest on *fresh* episodes and the only one corroborated by a sample that was not selected on the
+quantity being measured. It also lands on the blind grid, which no other champion in this folder can
+claim.
+
+**It reached ~95% at 1.19M steps**, against `b15b`'s 3.2M and `b14a`'s 3.7M for ~93.5% — a third of
+the training for a slightly better policy, and the clearest thing batch 17 produced. Note the batch
+itself was a **null** on its pre-registered metric (`sef` -1.67 pp, p=0.875), so this is one arm's
+achievement and not evidence that forking works.
+
+**Read the record as ~94-95%, narrowly ahead of the 93-94% tie below**, with overlapping intervals.
+Better, not a different class of policy.
 
 **Two entries now have independent second measurements, and both told the same story.** `b14a` was
 selected at 96/100 and re-read 91/100; `b15b` was selected at 97/100 and re-read 182/200 = 91.0%.
@@ -31,8 +77,10 @@ the drop is the winner's curse, since each was the maximum over dozens to hundre
 measurements in its own arm. `b11b`'s ~94.0% comes from modelling rather than a re-run and should be
 read the same way.
 
-**So the top three should be read as a tie around 93-94%, not as a record and two challengers.**
-Their intervals overlap almost entirely, and no batch since 11 has been shown to raise the ceiling.
+**So `b15b`, `b14a` and `b11b` should be read as a tie around 93-94%, not as a record and two
+challengers.** Their intervals overlap almost entirely. `b17b` above sits narrowly ahead of all three
+and overlaps them too, so **no batch since 11 has been shown to raise the ceiling by a clear
+margin** — what has changed is how fast the frontier is reached (1.19M against 3.2-3.7M).
 
 **‡ A high selected reading does not indicate a near-perfect policy**, and `b15b` is the clearest
 demonstration in this folder. It produced **8 checkpoints reading ≥95%**, more than any other arm —
@@ -48,6 +96,12 @@ min 87)** from `savedPolicies/champion_b13d/` before that scratch directory was 
 every time, given the silent-failure history below — and note what a 20-episode check is worth: 17/20
 has a 95% interval of 64.0-94.8%, so it confirms the checkpoint *loads and plays like a champion*
 without re-establishing its rate.
+
+**`b17b` is the first entry whose *arm-level* result was a null.** Batch 17's forking change did not
+beat its control; this checkpoint is here because a ~95% policy on the current environment is worth
+preserving. The same was true of `b13d` below, and it is worth noticing the pattern: **two of the six
+current-era entries come from batches that established nothing.** Champion quality and batch verdicts
+are close to independent.
 
 **`b13d` is the first entry from a post-epsilon-rewrite arm.** It did not raise the ceiling — batch 13
 came back null against batch 11 on five metrics — so it is here because a 95% policy on the current

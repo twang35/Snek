@@ -1,0 +1,50 @@
+{
+  "policy_name": "champion_b17b",
+  "episodes_per_checkpoint": 1000,
+  "checkpoints_requested": 1,
+  "num_workers": 4,
+  "complete": true,
+  "requested_steps": [
+    1190000
+  ],
+  "screen_episodes": null,
+  "confirm_count": null,
+  "min_achievable": null,
+  "abandon_floor": null,
+  "abandoned": 0,
+  "episodes_saved": 0,
+  "measurements_planned": 1,
+  "measurements_done": 1,
+  "session_measurements": 1,
+  "session_episodes": 1000,
+  "session_seconds": 217.2,
+  "stage": "flat",
+  "pooled_equal_effort": null,
+  "stages": null,
+  "episodes_planned": 1000,
+  "episodes_done": 1000,
+  "in_flight": null,
+  "updated_at": 1786211338.099831,
+  "results": [
+    {
+      "step": 1190000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 1000,
+      "perfect_games": 955,
+      "perfect_percent": 95.5,
+      "perfect_ci95": [
+        94.0,
+        96.6
+      ],
+      "avg_score": 94.0,
+      "median_score": 95.0,
+      "min_score": 11.0,
+      "max_score": 95.0,
+      "avg_reward": 187.95,
+      "abandoned": false,
+      "seconds": 217.2
+    }
+  ]
+}

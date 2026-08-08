@@ -285,7 +285,8 @@ total = fails = 0
 for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablation',
              'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
              'test_run_report', 'test_shielded_policy', 'test_reward_shaping',
-             'test_game_snapshot', 'test_replay_streams', 'test_forking_collector']:
+             'test_game_snapshot', 'test_replay_streams', 'test_forking_collector',
+             'test_progress_chart', 'test_eval_workers']:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1
@@ -356,9 +357,19 @@ claim was learning-speed variance attributed to a flag that was a no-op at the t
 seconds per episode: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20.** TensorFlow's thread pool costs
 about a core whether its batch has 2 rows or 20, so a small count pays full inference overhead for
 a fraction of the work. Batch 10's close-out was launched at 2 workers to hit a ~50% CPU target and
-ran 2.8x slower for *more* CPU per episode. **To be gentler on the machine, run fewer arms, not
-fewer workers.** Prefer a count that divides `EVAL_EPISODES`, since episodes round up to whole
-rounds.
+ran 2.8x slower for *more* CPU per episode.
+
+**Evals are allowed to run the machine hot, from 2026-08-08.** Close-out latency is the bottleneck
+after many batches, so a close-out may saturate the box and slow any trainer sharing it — training is
+resumable and loses only wall clock, while an un-analysed batch blocks the next launch. Defaults are
+now `EVAL_INDEPENDENT=1` and `EVAL_WORKERS=4`; see
+[`snek2/hyperparamTuning/hyperparamTuning.md`](snek2/hyperparamTuning/hyperparamTuning.md#-evals-run-hot-on-purpose).
+This replaces the older "to be gentler on the machine, run fewer arms, not fewer workers" — the
+measurement it rested on still holds, the priority does not.
+
+**`EVAL_EPISODES` no longer has to divide `EVAL_WORKERS`.** The independent path splits the remainder
+one episode at a time (`eval_workers.split_quota`), so a request is exact. The batched path still
+rounds up to whole rounds, so the old preference applies only with `EVAL_INDEPENDENT=0`.
 
 **Do not trust `resource.getrusage(RUSAGE_CHILDREN)` for a `ParallelPyEnvironment`.** It only counts
 reaped children and the workers live for the whole run, so it reported roughly the parent alone —

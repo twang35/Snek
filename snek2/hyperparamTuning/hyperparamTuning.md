@@ -151,6 +151,40 @@ no gate, batch 14 has 90, batch 15 onward 95. Best-checkpoint stays comparable f
 matters — "did this arm produce a ≥95% checkpoint" — because anything at or above a gate is measured
 full length under it. The graph-100% tier is not comparable across different gates at all.
 
+### ‡ Evals run hot on purpose
+
+**Standing policy from 2026-08-08: a close-out is allowed to saturate the machine, and training is
+allowed to slow down while it does.** This reverses the older "be gentler on the machine" instinct.
+The reason is throughput of *decisions*, not of episodes: after many batches the bottleneck is how
+fast a finished batch can be turned into a verdict, and a close-out that finishes in 30 minutes
+instead of 90 gets the next batch launched sooner. Training is resumable and loses nothing but wall
+clock; an un-analysed batch blocks everything behind it.
+
+What that means in practice:
+
+| setting | value | why |
+|---|---|---|
+| `EVAL_INDEPENDENT` | **1** (default) | each worker owns its env *and* its own network copy — no batched inference to idle through, no per-episode barrier |
+| `EVAL_WORKERS` | **4** (default, was 10) | with 4 parallel eval processes this pins ~12.7 of 14 cores; more workers add cost, not throughput |
+| trainers alongside | **expect them to slow** | the evals will take the cores they need |
+
+**The trade, measured** on 4 parallel processes x 800 episodes against the record checkpoint:
+
+| path | workers each | wall | cpu-s/ep |
+|---|---|---|---|
+| batched (old default 10) | 10 | 132.0s | 1.59 |
+| best batched | 5 | 128.9s | 1.34 |
+| **independent (new default)** | **4** | **117.0s** | **1.85** |
+
+**1.10x faster for 38% more CPU per episode** — and on a single eval with the machine to itself the
+independent path is **1.4-2.3x**, which is where it really pays. Accepting the CPU is the whole point
+of the policy. Full analysis and the unbiasedness verification are in
+[`../eval_workers.py`](../eval_workers.py).
+
+**What has not changed:** lowering `EVAL_WORKERS` to save CPU still does the opposite of what it
+looks like, for the reason below. "Run hot" is not "run wide" — 4 workers per process is the measured
+optimum for the 4-process shape, and 20 each was **22% slower** than 10 each.
+
 ### ‡ Measured on batch 16: at 95 the gate saves 65% and stops ranking checkpoints
 
 The first close-out actually run at 95, and it is worse than the simulation implied:

@@ -1,0 +1,113 @@
+{
+  "policy_name": "b17b-forkseed2",
+  "episodes_per_checkpoint": 500,
+  "checkpoints_requested": 4,
+  "num_workers": 4,
+  "complete": true,
+  "requested_steps": [
+    1190000,
+    1205000,
+    1231000,
+    1248000
+  ],
+  "screen_episodes": null,
+  "confirm_count": null,
+  "min_achievable": null,
+  "abandon_floor": null,
+  "abandoned": 0,
+  "episodes_saved": 0,
+  "measurements_planned": 4,
+  "measurements_done": 4,
+  "session_measurements": 4,
+  "session_episodes": 2000,
+  "session_seconds": 1187.8,
+  "stage": "flat",
+  "pooled_equal_effort": null,
+  "stages": null,
+  "episodes_planned": 2000,
+  "episodes_done": 2000,
+  "in_flight": null,
+  "updated_at": 1786207419.8491468,
+  "results": [
+    {
+      "step": 1190000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 500,
+      "perfect_games": 475,
+      "perfect_percent": 95.0,
+      "perfect_ci95": [
+        92.7,
+        96.6
+      ],
+      "avg_score": 94.21,
+      "median_score": 95.0,
+      "min_score": 11.0,
+      "max_score": 95.0,
+      "avg_reward": 187.69,
+      "abandoned": false,
+      "seconds": 285.3
+    },
+    {
+      "step": 1205000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 500,
+      "perfect_games": 462,
+      "perfect_percent": 92.4,
+      "perfect_ci95": [
+        89.7,
+        94.4
+      ],
+      "avg_score": 94.34,
+      "median_score": 95.0,
+      "min_score": 10.0,
+      "max_score": 95.0,
+      "avg_reward": 185.13,
+      "abandoned": false,
+      "seconds": 307.3
+    },
+    {
+      "step": 1231000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 500,
+      "perfect_games": 463,
+      "perfect_percent": 92.6,
+      "perfect_ci95": [
+        90.0,
+        94.6
+      ],
+      "avg_score": 94.49,
+      "median_score": 95.0,
+      "min_score": 55.0,
+      "max_score": 95.0,
+      "avg_reward": 185.52,
+      "abandoned": false,
+      "seconds": 291.9
+    },
+    {
+      "step": 1248000,
+      "selected_by": "explicit",
+      "graph_single_eval": null,
+      "graph_surrounding": null,
+      "episodes": 500,
+      "perfect_games": 469,
+      "perfect_percent": 93.8,
+      "perfect_ci95": [
+        91.3,
+        95.6
+      ],
+      "avg_score": 94.02,
+      "median_score": 95.0,
+      "min_score": 9.0,
+      "max_score": 95.0,
+      "avg_reward": 186.18,
+      "abandoned": false,
+      "seconds": 303.2
+    }
+  ]
+}

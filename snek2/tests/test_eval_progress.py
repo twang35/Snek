@@ -369,3 +369,69 @@ def test_the_in_flight_line_reports_the_worker_count():
     state = eval_progress.summarize([payload])
     state['active'] = [(payload, flight)]
     assert 'round 3/10 x 10w' in eval_progress.text_summary('arm', state)
+
+
+# ------------------------------------------------- the in-flight running-rate annotation
+
+def render_flight(per_round, workers, rounds_total=10):
+    """Renders a chart with one in-flight checkpoint and returns the top axes' annotations.
+
+    render() closes its own figure, so the axes are captured by patching plt.subplot-creation the
+    way test_progress_chart does — less invasive than making production hand a figure back.
+    """
+    import os
+    import tempfile
+
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    live = run([result(1000, perfect=90)], complete=False, num_workers=workers, suffix='_p1',
+               in_flight=flight(round_index=len(per_round), per_round_perfect=list(per_round),
+                                rounds_total=rounds_total),
+               measurements_planned=20, measurements_done=1)
+    state = eval_progress.summarize([live])
+    captured = {}
+    real_figure = plt.figure
+
+    def capture(*args, **kwargs):
+        fig = real_figure(*args, **kwargs)
+        captured['figure'] = fig
+        return fig
+
+    handle, path = tempfile.mkstemp(suffix='.png')
+    os.close(handle)
+    plt.figure = capture
+    try:
+        eval_progress.render('arm', state, path)
+    finally:
+        plt.figure = real_figure
+        for leftover in (path, path + '.partial.png'):
+            if os.path.exists(leftover):
+                os.remove(leftover)
+    figure = captured['figure']
+    top = figure.axes[0]
+    texts = [t.get_text() for t in top.texts]
+    plt.close(figure)
+    return texts
+
+
+def test_the_in_flight_panel_writes_out_the_current_running_rate():
+    """Reading the rate off a 2.1in panel with 20pp gridlines is the thing this fixes."""
+    # 3 rounds x 4 workers = 12 episodes, 9 perfect -> 75%
+    texts = render_flight([4, 3, 2], workers=4)
+    assert '75%' in texts, texts
+
+
+def test_the_written_rate_is_the_running_total_not_the_last_round():
+    # Last round alone is 1/4 = 25%; the running total is 9/12 = 75%. The running one is the useful
+    # number and the one the y axis plots.
+    texts = render_flight([4, 4, 1], workers=4)
+    assert '75%' in texts, texts
+    assert '25%' not in texts, texts
+
+
+def test_the_rate_tracks_the_worker_count():
+    # Same per-round counts, different workers: 9 perfect of 3x10=30 is 30%, not 75%.
+    texts = render_flight([4, 3, 2], workers=10)
+    assert '30%' in texts, texts

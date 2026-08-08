@@ -14,6 +14,13 @@ import tensorflow as tf
 from tf_agents.networks import sequential
 
 
+# Share of the perfect-game score an arm has to reach before display_progress draws the
+# perfect-score guide. Named rather than inline because it is a display judgement, not a rule about
+# the game: at 0.8 the guide appears while there is still visible headroom to read, and it stays off
+# for the whole early run where it would only compress the score trace.
+PERFECT_SCORE_GUIDE_FRACTION = 0.8
+
+
 # Define a helper function to create Dense layers configured with the right
 # activation and kernel initializer.
 def derive_seed(seed, stream):
@@ -234,6 +241,24 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     for level in (20, 40, 60, 80):
         percent_axis.axhline(level, color=percent_color, linestyle=(0, (4, 3)),
                              linewidth=0.5, alpha=0.55, zorder=1)
+
+    # The perfect-game score (MAX_POSSIBLE_SCORE, 95 on a 10x10 board — a perfect game triggers at
+    # 95 food eaten, since the snake starts with START_SEGMENTS + 1 cells already on the board).
+    # Answers the question the score trace raises once an arm is good: how much is actually left.
+    #
+    # Only drawn once the arm has been within 80% of it. Before that the line sits far above every
+    # point and its only effect is to stretch the y axis and squash the score trace into the bottom
+    # of the plot, which costs more than the reference is worth. Gated on `max(scores)` rather than
+    # the latest point so it does not flicker on and off between renders as the score oscillates.
+    #
+    # On the *score* axis, so it reads against the left-hand ticks rather than the percent ones, and
+    # at zorder 1 — above the axes patch (0), below both traces (2) — so it cannot hide data. Thin
+    # and dashed for the same reason as the percent guides above: at 3.65x2.25in anything heavier
+    # competes with the traces it is meant to annotate.
+    perfect_score = snake_constants.MAX_POSSIBLE_SCORE
+    if scores and max(scores) > PERFECT_SCORE_GUIDE_FRACTION * perfect_score:
+        score_axis.axhline(perfect_score, color='tab:green', linestyle=(0, (4, 3)),
+                           linewidth=0.5, alpha=0.65, zorder=1)
 
     # One dashed line per point where training was picked back up, so a dip or
     # jump can be tied to a restart rather than to the policy itself.
