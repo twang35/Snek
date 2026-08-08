@@ -211,11 +211,12 @@ is how long an arm stays good, which is why full-length `strong_eval_fraction` k
 21.6 → 30.5%) while the equal-effort figures stay flat. **That is a run-length artifact, not
 progress**, and it is the honest reading of every "record" in the last three batches.
 
-## Running: batch 16 — the food-distance shaping term, ablated
+## Stopped 2026-08-07, close-out pending: batch 16 — the food-distance shaping term, ablated
 
-**Launched 2026-08-07, four arms, `SNEK_FOOD_DISTANCE_REWARD=0`.** The first reward change this
-project has made, and the first batch to test a piece of hand-designed guidance rather than an
-optimiser knob.
+**Launched 2026-08-07, four arms, `SNEK_FOOD_DISTANCE_REWARD=0`; stopped by hand ~1.25M the same
+day.** The first reward change this project has made, and the first batch to test a piece of
+hand-designed guidance rather than an optimiser knob. The description stays here until the close-out
+runs and its numbers move to [`completedRuns.md`](completedRuns.md).
 
 `FOOD_DISTANCE_REWARD` subtracts 0.001 on every ordinary move that increases the head's Manhattan
 distance to the food. It has been on since batch 1 and has never been measured. The case for taking
@@ -270,6 +271,20 @@ batch 14's at matched score isolates it. **Subtract it before crediting the chan
 **2. Impact on training** — `pooled_equal_effort` and `strong_eval_fraction` at equal effort against
 batch 14, seed-matched, plus steps to pf30 ≥ 40% as batch 15's primary is still the best available
 speed metric. These need the arms to run out, and at n=4 only a ~10 pp swing is resolvable.
+
+What each outcome means:
+
+| result | reading |
+|---|---|
+| handover unchanged, level unchanged | the shaping is **inert** — 0.001 is too small to matter either way, and it should come out for simplicity |
+| handover unchanged, level up | the shaping was a **drag on the ceiling** without being early scaffolding. The most interesting outcome, and the one the hypothesis predicts |
+| handover later, level unchanged or up | it was **early scaffolding only** — worth replacing with something that anneals off rather than deleting |
+| handover later, level down | it is **load-bearing**. Put it back and note that hand-designed guidance still earns its place here |
+
+**The close-out is the first one at `EVAL_MIN_ACHIEVABLE=95`.** Batch 14 was measured at 90, so
+best-checkpoint stays comparable — anything at or above a gate is measured full length under it — but
+**the graph-100% tier is not**, and batch 16 will have far fewer full-length rows. Read
+`pooled_equal_effort`, which is exact at any gate.
 
 ### Answered at 70k steps: the shaping is not early scaffolding
 
@@ -335,12 +350,96 @@ driven mostly by one slow seed. The way to settle it is more seeds at this confi
 the shorter-and-wider design already argued for below. **Do not put it in
 [`findings.md`](findings.md) on this evidence.**
 
-**Still to do for this batch:** `charts.md` entries (the arms are too young for a useful graph), then
-the close-out at `EVAL_MIN_ACHIEVABLE=95`.
+### Stopped at ~1.25M: the ceiling is flat again, the level read waits on the close-out
 
-## Next up: batch 17 — `TARGET_UPDATE_PERIOD` 1000
+All four stopped by hand at ~1.25M — much earlier than batch 14/15's 4.2-5.8M, a deliberately shorter
+run. Trailing had plateaued in the low-94s and every arm had peaked (816k-1198k), but that is a
+shorter horizon than the controls, so the level metrics below are **not comparable to batch 14/15 at
+face value** — only the close-out's equal-effort figures against a batch-14 slice at matched steps
+will be.
 
-**Not launched.** Batch 16 holds all four slots; this is the design, agreed 2026-08-07.
+| seed | step | peak trailing | best-30 | `sef` | recent-30 | note |
+|---|---|---|---|---|---|---|
+| 1 | 1245k | 94.82 @837k | **87.0%** @850k | 20.6% | 77.0% | peaked early, flat since |
+| 2 | 1261k | **94.98** @816k | 85.0% @919k | **30.7%** | 79.0% | strongest and flattest |
+| 3 | 1257k | 94.36 @**1198k** | 72.7% @1221k | 10.6% | 67.0% | latest peak; recovered from a mid-run dip |
+| 4 | 1256k | 94.68 @946k | 73.0% @1032k | 7.2% | **55.7%** | weakest on consistency, mid-pack ceiling |
+| **mean** | | **94.71** | **79.4%** | **17.3%** | | |
+
+**‡ The ceiling did not move — a sixth flat batch.** Mean peak trailing 94.71 sits inside 0.3 pp of
+the 94.8-95.0 band batches 11-15 hold. Removing the shaping neither raised nor lowered the peak, which
+is the level read the training graph *can* give; the eval-level read is what the close-out adds.
+
+**Still to do for this batch:** the close-out at `EVAL_MIN_ACHIEVABLE=95`, seed-matched against a
+batch-14 slice truncated to ~1.25M for the equal-effort comparison. `charts.md` entries are done.
+Running the close-out will displace every top-level chart in `evals/` — no finished arm's charts are
+at risk there right now, but restore from `evals/archive/` afterward if any appear.
+
+## Next up: batch 17 — forked endgame collection (`SNEK_FORK_*`)
+
+**Built 2026-08-07, off by default, not launched.** It is the first change in this document aimed at
+the *collect distribution* rather than at the optimiser or the reward, and it was moved ahead of the
+target-period batch deliberately — the mechanism is novel here, so it is the more interesting thing
+to learn from first.
+
+**The premise it was proposed on is falsified; the one it survives on is narrower.** The idea was that
+the endgame is never explored at epsilon ~0.003, so the buffer holds no endgame experience. Measured
+across all 20 current-era arms' saved buffers, that is not true:
+
+| arm group | buffer at len ≥ 80 | at len ≥ 90 | collected episodes ending perfect |
+|---|---|---|---|
+| batches 11, 13, 14, 15, 16 (eps ~0.003) | **20-34%** | 9-21% | **12-81%** |
+| batch 12 (eps 0.05, the deadlock) | **0.0%** | 0.0% | **0 of 3142** |
+
+Batch 12 is the calibration: the metric reads exactly zero when the endgame really is missing, so the
+20-34% is not a floor artifact. `findings.md`' quote that "the buffer holds no trajectories that eat
+the last ~10 food" is a true description of **batch 12**, and false of every arm since.
+
+**What survives.** At an endgame decision point the buffer holds the consequence of the action taken
+and **never** that of the alternative — measured mean **2.06 safe actions** per eligible state at
+length ≥ 85, so ~1.06 per state are never tried. An arm that dies from state `s` learns that
+`Q(s, a_bad)` is low, but nothing raises `Q(s, a_good)` for the action it did not take, so the argmax
+has no reason to flip. **The hypothesis to pre-register is counterfactual coverage at endgame decision
+points, not endgame volume** — naming it that way is what makes a null closable.
+
+Branch points are also **not rare**, which the original design assumed: ≥ 2 safe actions on **42-45%**
+of steps at length 80-84, falling to **9-11%** at 95-100 — about **74-104 eligible states per episode**
+at length ≥ 85. "Only a few points" holds above ~95, not from 85.
+
+### Pre-registration
+
+**Launch once batch 16's close-out lands**, because that verdict fixes one setting this batch has to
+inherit: whether `SNEK_FOOD_DISTANCE_REWARD` stays at 0 (if the shaping ablation is null or better) or
+goes back to 0.001 (if the shaping turns out load-bearing). The control has to match whichever it is.
+
+| item | value |
+|---|---|
+| config | `SNEK_FORK_BRANCHES=4 SNEK_FORK_PROB=0.5 SNEK_FORK_MIN_LENGTH=85 SNEK_FORK_MAX_STEPS=60`, plus batch 16's settled shaping value |
+| control | seed-matched arms at `SNEK_FORK_BRANCHES=1`, same everything else — **batch 16 itself is that control** if the shaping stays off, which saves four slots |
+| primary | `strong_eval_fraction` at a common `global_step` horizon, paired, exact permutation over 16 sign flips |
+| early read | steps to pf30 ≥ 40% — a crossing, which is the read this project trusts early |
+| mechanism metrics | buffer share at len ≥ 80 (baseline **20-34%**), terminal and endgame-death adds per 100k, and the branch share of *sampled* batches |
+| abandon at 100k | if the branch share sits outside ~30-60% of collect, or the len ≥ 80 buffer share is not clearly above the control's |
+
+**‡ It is not a one-knob test, and the write-up must say so.** It changes what is collected, how much
+per game, and how priority mass is distributed. The three consequences, with sizes, are tabulated in
+[`hyperparamTuning.md`](hyperparamTuning.md#forked-endgame-collection--snek_fork_). The one most likely
+to produce a *negative* result: branch transitions enter at max priority and are high-TD-error by
+construction, and the standing config runs `td_loss` with `IS_WEIGHTS=0`, so nothing corrects the
+resulting over-sampling.
+
+**Verified so far, without a batch:** 69 unit tests across `test_game_snapshot.py`,
+`test_replay_streams.py` and `test_forking_collector.py`, all mutation-checked; the off path is
+byte-identical to pre-change code over 3000 steps on three seeds; and a 10k-step forking smoke run
+produced **451 forks at 73% branch share with 0 violations** of the buffer integrity invariant
+(length rises by 0 or 1 per frame and the starve budget decrements exactly, within every stored
+window), against 0 violations in 400k pairs from three unforked arms.
+
+## After that: batch 18 — `TARGET_UPDATE_PERIOD` 1000
+
+**Not launched.** Designed 2026-08-07, and swapped behind the forking batch on 2026-08-07 so the
+branching idea gets measured first. Nothing about the design changes with the reorder: its control is
+whatever the batch before it settles, which is now batch 17 rather than batch 16.
 
 `TARGET_UPDATE_PERIOD=8` with `TARGET_UPDATE_TAU=1.0` means the target network is hard-copied from
 the online network every 8 gradient steps. **Standard DQN uses hundreds to thousands**, and at 8 the
@@ -363,9 +462,9 @@ it would be reckless at 1e-4. The knob with the bigger expected effect is the on
 same argument that picked n=3 over n=2 in batch 15.
 
 **And it unblocks the highest-value item in the backlog.** `LEARNING_RATE=1e-4` is gated on "after a
-stability fix", and a long target period *is* that fix. If 1000 is neutral-or-better, batch 18 is
-`TARGET_UPDATE_PERIOD=1000` + `LEARNING_RATE=1e-4`; if 1000 is harmful, that ordering is dead and the
-soft-update route (`TARGET_UPDATE_TAU=0.005` at period 1) is next instead.
+stability fix", and a long target period *is* that fix. If 1000 is neutral-or-better, the batch after
+it is `TARGET_UPDATE_PERIOD=1000` + `LEARNING_RATE=1e-4`; if 1000 is harmful, that ordering is dead and
+the soft-update route (`TARGET_UPDATE_TAU=0.005` at period 1) is next instead.
 
 ### The one prior data point, and what it actually says
 
@@ -387,15 +486,13 @@ SNEK_SEED=1..4  SNEK_TARGET_UPDATE_PERIOD=1000  SNEK_DISCOUNT=0.9975  SNEK_GUIDE
 SNEK_PRIORITY_SIGNAL=td_loss  SNEK_IS_WEIGHTS=0
 ```
 
-**The control depends on how batch 16 comes out**, and the shaping setting must match it:
+**The control is batch 17**, seed-matched, with forking off and the shaping value batch 16 settles on.
+That is the whole reason for the ordering rule: each batch's control is the one before it, so the two
+knobs stay separable. **Do not launch this until batch 17 is closed out** — running it against batch
+16 instead would leave the target period confounded with forking.
 
-| batch 16 result | batch 17 runs with | control |
-|---|---|---|
-| null, or shaping-off better | `SNEK_FOOD_DISTANCE_REWARD=0` | **batch 16**, seed-matched |
-| shaping is load-bearing | shaping left on (the default) | **batch 14**, seed-matched |
-
-Either way batch 17 differs from its control by one knob. **Do not launch it until batch 16 is
-closed out**, because that verdict is what fixes the reward setting.
+`SNEK_GUIDED_FRACTION=0.8` is shown above for the record; it is the default from 2026-08-07, so
+passing it changes nothing.
 
 **Primary metric: steps to pf30 ≥ 40%**, the same speed metric batch 15 pre-registered, because the
 live hypothesis is about *early* learning. Secondary: `pooled_equal_effort` and
@@ -407,31 +504,6 @@ Risk to check on day one: an arm that learns too slowly never clears
 `SNEK_MIN_CHECKPOINT_SCORE=40` and so writes no checkpoint, which makes it unresumable and
 unmeasurable. Batch 1's hint points the other way, so this is a glance at the first few evals rather
 than a real concern.
-
-What each outcome means:
-
-| result | reading |
-|---|---|
-| handover unchanged, level unchanged | the shaping is **inert** — 0.001 is too small to matter either way, and it should come out for simplicity |
-| handover unchanged, level up | the shaping was a **drag on the ceiling** without being early scaffolding. The most interesting outcome, and the one the hypothesis predicts |
-| handover later, level unchanged or up | it was **early scaffolding only** — worth replacing with something that anneals off rather than deleting |
-| handover later, level down | it is **load-bearing**. Put it back and note that hand-designed guidance still earns its place here |
-
-**Evals will be the first close-out at `EVAL_MIN_ACHIEVABLE=95`.** Batch 14 was measured at 90, so
-best-checkpoint stays comparable (anything at or above a gate is measured full length under it) but
-**the graph-100% tier is not**, and batch 16 will have far fewer full-length rows. Read
-`pooled_equal_effort`, which is exact at any gate.
-
-### Housekeeping for these arms
-
-**`GUIDED_FRACTION=0.8` is the standing value** — batch 15 onward all share it, so leave it alone.
-
-**The 10M cap will not stop these arms in reasonable time.** Batch 14 took 12.6 h to reach 4.2-4.5M,
-so 10M is roughly 30 h. Left at the default deliberately: it self-terminates, so an unattended batch
-is safe. Stop them by hand once the curves flatten — and note batch 15 found two arms still gaining
-at 5.8M, so "flatten" means flat, not round-numbered.
-
-Launched without watchers.
 
 ## What five nulls leave for the batch after this one
 
@@ -500,7 +572,7 @@ table.
 | change | targets | prior |
 |---|---|---|
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
-| ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **promoted to batch 17** — see [the design](#next-up-batch-17--target_update_period-1000) |
+| ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **promoted to batch 18** — see [the design](#after-that-batch-18--target_update_period-1000) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
 | `FC_LAYERS=128,128` | capacity | low |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |

@@ -31,6 +31,71 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md \
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
+## Batch 16 — `FOOD_DISTANCE_REWARD=0`, the shaping term ablated, stopped at ~1.25M
+
+Four seeds, batch 14's config exactly minus the food-distance shaping — one variable, an exact
+control. **Stopped by hand at ~1.25M**, far short of batch 14/15's 4.2-5.8M, so read these charts for
+their *left* halves: the level metrics below (`strong_eval_fraction`, best-30) sit at a much shorter
+horizon than the batches beneath and are **not comparable to them at face value**. The close-out at
+`EVAL_MIN_ACHIEVABLE=95` is still to run. Design and the two interim reads:
+[`runs.md`](runs.md#stopped-2026-08-07-close-out-pending-batch-16--the-food-distance-shaping-term-ablated).
+
+**The ceiling did not move — a sixth flat result.** Peak trailing across the four arms reads
+94.98 / 94.82 / 94.68 / 94.36, mean **94.71**, inside 0.3 pp of the 94.8-95.0 band the previous five
+batches sit in. Removing the shaping neither raised nor lowered the peak.
+
+**What did change is the seed spread, and it is the one thing worth watching.** Steps to pf30 ≥ 40%
+came out 379-465k (sd 41k) against batch 14's 227-639k (sd 189k) — a **4.6x tighter** spread on the
+metric whose seed variance is this project's binding constraint. Flat mean (-5k, p=0.875), collapsed
+variance. Four samples cannot establish that; it is a hypothesis for the wider design, not a finding.
+
+| seed | pf30 ≥ 40% at | b14 control | peak trailing | best-30 | `sef` (short horizon) |
+|---|---|---|---|---|---|
+| 1 | 450k | 639k | 94.82 | 87.0% | 20.6% |
+| 2 | 400k | 227k | **94.98** | 85.0% | **30.7%** |
+| 3 | 379k | 530k | 94.36 | 72.7% | 10.6% |
+| 4 | 465k | 320k | 94.68 | 73.0% | 7.2% |
+| **mean** | **424k** | **429k** | **94.71** | **79.4%** | **17.3%** |
+
+### b16b-noshapeseed2 — shaping off, disc 0.9975 + shield 0.8, seed 2
+
+![b16b](charts/b16b-noshapeseed2.png)
+
+Step 1.26M · **peak trailing 94.98** (at 816k) · best 30-eval perfect 85.0% (at 919k) · `strong_eval_fraction` **30.7%** · recent-30 79.0%
+
+**Strongest of the batch and the flattest** — peaked at 816k and held 79% recent perfect at stop. At
+this ~1.25M horizon its `sef` matches batch 14's best arms, but the horizons are not comparable; the
+close-out is what settles level.
+
+### b16a-noshapeseed1 — shaping off, disc 0.9975 + shield 0.8, seed 1
+
+![b16a](charts/b16a-noshapeseed1.png)
+
+Step 1.25M · peak trailing 94.82 (at 837k) · **best 30-eval perfect 87.0%** (at 850k) · `strong_eval_fraction` 20.6% · recent-30 77.0%
+
+Highest best-30 window of the batch (87.0%), though both peak and best window land early (~840k) and
+it has plateaued since. Solid but unremarkable.
+
+### b16c-noshapeseed3 — shaping off, disc 0.9975 + shield 0.8, seed 3
+
+![b16c](charts/b16c-noshapeseed3.png)
+
+Step 1.26M · peak trailing 94.36 (at **1198k**) · best 30-eval perfect 72.7% (at 1221k) · `strong_eval_fraction` 10.6% · recent-30 67.0%
+
+**The latest-peaking arm** — best window at 1221k, at the very end — so unlike its siblings it may not
+have plateaued when stopped. Recovered from a mid-run dip to ~86% trailing back to 93.7%, which is
+what dragged its `sef` down despite a normal peak.
+
+### b16d-noshapeseed4 — shaping off, disc 0.9975 + shield 0.8, seed 4
+
+![b16d](charts/b16d-noshapeseed4.png)
+
+Step 1.26M · peak trailing 94.68 (at 946k) · best 30-eval perfect 73.0% (at 1032k) · `strong_eval_fraction` **7.2%** · recent-30 **55.7%**
+
+**Weakest of the batch** on `sef` and recent perfect (55.7%), though its peak trailing sits mid-pack —
+the gap is consistency, not ceiling. The same seed-4 slot that was the speed outlier in both batch 14
+and batch 16.
+
 ## Batch 15 — `N_STEP_UPDATE=3`, falsified on speed, and the longest arms on record
 
 Four seeds to 5.5-5.8M in 15.9 h — 1.3M further than any previous batch. n-step's predicted effect

@@ -18,6 +18,7 @@ _os.environ['SDL_AUDIODRIVER'] = 'dummy'
 # once per launch, against absl's checkpoint line costing ~2000 per run, so it is not worth
 # that trade.
 
+from forking_collector import ForkingCollector, validate_config
 from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
 from shielded_policy import ShieldedEpsilonGreedyPolicy
 from snake_environment import SnakeEnvironment
@@ -115,11 +116,34 @@ def main(argv):
     # from the non-fatal moves instead of all three. 0.0 reproduces batch 12 exactly. See
     # shielded_policy.py for why only the exploration draw is shielded and never the greedy
     # action, and training.guided_fraction_for() for why it stays 0 until bootstrap stands down.
-    guided_fraction = tuned('GUIDED_FRACTION', 0.5)
+    #
+    # 0.8 rather than the original 0.5: every arm from batch 15 onward has passed 0.8 explicitly,
+    # so the default now matches the standing value instead of a setting nothing uses. Note this
+    # makes the *default* a value that has never been isolated — 0.8 arrived alongside a discount
+    # change in batch 14 and has been carried forward since — so it is the standing choice by
+    # convention, not by measurement.
+    guided_fraction = tuned('GUIDED_FRACTION', 0.8)
     if not 0.0 <= guided_fraction <= 1.0:
         raise SystemExit(
             'SNEK_GUIDED_FRACTION={0} is not a probability. Use a value in [0.0, 1.0].'
             .format(guided_fraction))
+
+    # Forked endgame collection. Off at 1, which is "one branch — the main line", i.e. exactly
+    # today's collect loop. See forking_collector.py for what the branches are for; the short
+    # version is that the buffer holds the consequence of the action taken at an endgame decision
+    # point and never the consequence of the alternative, so `Q(s, a_good)` for the untaken safe
+    # action is trained on nothing and the argmax has no reason to flip.
+    #
+    # Read here rather than in snake_constants, unlike FOOD_DISTANCE_REWARD: these are consumed in
+    # this process only — the collector, its environment pool and the training environment all live
+    # in the parent — so there is no worker-process copy to go stale, and tuned() gets the
+    # `hyperparameter override:` line and the run_config entry for free.
+    fork_branches = tuned('FORK_BRANCHES', 1, int)
+    fork_prob = tuned('FORK_PROB', 0.5)
+    fork_min_length = tuned('FORK_MIN_LENGTH', 85, int)
+    fork_max_steps = tuned('FORK_MAX_STEPS', 60, int)
+    forking_enabled = validate_config(fork_branches, fork_prob, fork_min_length, fork_max_steps,
+                                      ZERO_OBS_INDICES)
 
     # Training never draws — use watch.py to see a policy play. Game.__init__ still calls
     # pygame.display.set_mode() regardless of its display flag, and reset() blits the
@@ -321,13 +345,34 @@ def main(argv):
                 rb_observer,
                 initial_populate_replay_buffer_steps)
 
+    # Hoisted out of the PyDriver call below so the forking collector shares the same wrapped
+    # policy object, and therefore the same tf.function trace. Two wrappers would mean two traces
+    # and an inference path that is only *probably* identical between the on and off paths.
+    eager_collect_policy = py_tf_eager_policy.PyTFEagerPolicy(
+        collect_policy, use_tf_function=True)
+
     # Create a driver to collect experience.
     collect_driver = py_driver.PyDriver(
         train_py_env,
-        py_tf_eager_policy.PyTFEagerPolicy(
-            collect_policy, use_tf_function=True),
+        eager_collect_policy,
         [rb_observer],
         max_steps=collect_steps_per_iteration)
+
+    # Built only when forking is on, and `None` otherwise, so training.py keeps calling PyDriver
+    # exactly as it always has. The environment pool is allocated once here rather than on demand:
+    # a branch that had to construct its environment mid-run would pay the pygame setup cost inside
+    # the training loop, and a pool that can run dry is an IndexError thousands of steps in.
+    forking_collector = None
+    if forking_enabled and not eval_only:
+        branch_envs = [SnakeEnvironment(discount=discount, display=False,
+                                        policy_name=policy_name)
+                       for _ in range(fork_branches - 1)]
+        forking_collector = ForkingCollector(
+            train_py_env, branch_envs, eager_collect_policy, replay_buffer,
+            max_branches=fork_branches, fork_prob=fork_prob,
+            fork_min_length=fork_min_length, fork_max_steps=fork_max_steps,
+            guided_flag=collect_policy.guided_episode,
+            seed=derive_seed(seed, stream=num_eval_episodes + 1))
 
     # The replay buffer holds 100k transitions, far more than the ~188 KB of agent
     # weights, so keeping it in the full history would mean gigabytes per policy. It
@@ -379,6 +424,12 @@ def main(argv):
                                 list(BOOTSTRAP_REWARD_THRESHOLDS), REFINE_PERFECT_TARGET,
                                 REFINE_TRAILING_WINDOW),
         'guided_fraction': guided_fraction,
+        'forking': ('off' if not forking_enabled else
+                    'up to {0} live branches including the main line, fork p={1} at length >= {2}, '
+                    'branch capped at {3}, one branch advanced per iteration'.format(
+                        fork_branches, fork_prob, fork_min_length,
+                        '{0} steps'.format(fork_max_steps) if fork_max_steps else 'its terminal '
+                                                                                 'state')),
         'exploration_shield': ('off' if guided_fraction == 0.0 else
                                '{0:.0%} of refinement-phase episodes draw the epsilon move from '
                                'non-fatal actions; greedy moves never shielded'
@@ -403,7 +454,8 @@ def main(argv):
     train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction_var, guided_fraction,
-          eval_only, policy_name, run_config, priority_signal, use_is_weights)
+          eval_only, policy_name, run_config, priority_signal, use_is_weights,
+          forking_collector)
 
     # todo: fix video creation by using the display surface
     # print(create_policy_eval_video(agent.policy, "trained-agent"))

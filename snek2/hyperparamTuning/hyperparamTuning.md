@@ -486,13 +486,13 @@ Notes that matter:
 | `SNEK_LEARNING_RATE` | 1e-5 | in-code comment suggests trying 1e-4 |
 | `SNEK_BATCH_SIZE` | 128 | |
 | `SNEK_DISCOUNT` | 0.99 | horizon ~100 steps; perfect games are much longer |
-| `SNEK_TARGET_UPDATE_PERIOD` | 8 | very frequent for DQN, where hundreds to thousands is standard; batch 17 tests 1000 |
+| `SNEK_TARGET_UPDATE_PERIOD` | 8 | very frequent for DQN, where hundreds to thousands is standard; batch 18 tests 1000 |
 | `SNEK_TARGET_UPDATE_TAU` | 1.0 | 1.0 = hard copy; <1 = soft/Polyak updates |
 | `SNEK_GRADIENT_CLIPPING` | 0.0 (off) | norm clip; 0 disables |
 | `SNEK_N_STEP_UPDATE` | 1 | n-step returns; buffer window is n+1 automatically |
 | `SNEK_INITIAL_EPSILON` | 0.4 | where the bootstrap phase starts; the refinement ceiling is this / 32 |
 | `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 32` |
-| `SNEK_GUIDED_FRACTION` | 0.5 | share of refinement-phase episodes whose epsilon move avoids fatal actions; 0 disables the shield |
+| `SNEK_GUIDED_FRACTION` | 0.8 | share of refinement-phase episodes whose epsilon move avoids fatal actions; 0 disables the shield. Raised 0.5 → 0.8 on 2026-08-07 to match what every arm from batch 15 on passes explicitly |
 | `SNEK_MAX_STEPS` | 10000000 | **absolute** step at which training stops, so a wave self-terminates |
 | `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
@@ -504,6 +504,10 @@ Notes that matter:
 | `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40.0 | below this a checkpoint is not written at all |
 | `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | penalty per move that increases the distance to food; 0 ablates the shaping |
+| `SNEK_FORK_BRANCHES` | 1 (off) | max live collect branches **including the main line**; 1 is today's single-line collect |
+| `SNEK_FORK_PROB` | 0.5 | chance of forking at an eligible endgame decision point |
+| `SNEK_FORK_MIN_LENGTH` | 85 | snake length at or above which forking is allowed |
+| `SNEK_FORK_MAX_STEPS` | 60 | steps a branch may run before it is dropped; 0 runs it to its terminal state |
 
 **`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added
 2026-08-05; before it, `num_iterations` was hardcoded to 1e9 and every batch had to be stopped by
@@ -547,6 +551,44 @@ the death and starve penalties.
 
 Changing `FOOD_REWARD`, `DEATH_REWARD`, `STARVE_REWARD` or `PERFECT_GAME_REWARD` would break
 `avg_score` comparability for real, and none of them is tunable.
+
+### Forked endgame collection — `SNEK_FORK_*`
+
+At an endgame decision point the buffer holds the consequence of the action the policy took and
+**never** the consequence of the alternative: measured over three arms at length ≥ 85, a mean of
+**2.06 safe actions** per such state, so ~1.06 per state are never tried. Forking snapshots the game
+at those points and plays the untaken safe actions in separate branch environments, so both
+continuations reach the buffer. Design and mechanics: `forking_collector.py`.
+
+**It is not a one-knob test, and a batch write-up must say so.** It changes what is collected, how
+much per game, and how the buffer's priority mass is distributed. Three things follow:
+
+| consequence | size | how to read it |
+|---|---|---|
+| the main line advances more slowly per `global_step` | **~1.9x fewer main-line episodes** at 4 branches, since the length gate confines forking to the endgame | primary at matched `global_step`; the `fork.main_steps` counter is the games-played axis |
+| branch transitions enter at max priority and are high-TD-error by construction | unmeasured; `td_loss` + `IS_WEIGHTS=0` means nothing corrects it | watch the branch share of *sampled batches*, not just of stored transitions |
+| buffer depth in games shrinks while depth in steps does not | 100k slots still span ~100k iterations | do **not** also raise `REPLAY_BUFFER_MAX_LENGTH` — that knob is itself unsettled |
+
+**Baselines already measured, so a null is still informative.** Across all 20 current-era arms'
+saved buffers: **20-34% of transitions at length ≥ 80**, 9-21% at ≥ 90, and **12-81% of collected
+episodes ending in a perfect game**. Batch 12, at epsilon 0.05, reads **0.0% / 0.0% / 0 of 3142** —
+which is the calibration proving the metric has full dynamic range. Reproduce with:
+
+```
+cd snek2 && /opt/miniconda3/envs/snek/bin/python -c "
+import numpy as np
+d = np.load('savedPolicies/<arm>/replay_buffer/buffer.npz', allow_pickle=True)['data'].item()
+obs = d['field1']; ln = np.round(obs[:, 0, 22] * 100).astype(int)
+print((ln >= 80).mean(), (ln >= 90).mean())"
+```
+
+Observation index 22 is exactly `snake_len / 100`, so a saved buffer is a direct census of endgame
+supply — no instrumentation needed, for a forking arm or a control.
+
+**Every eval row of a forking arm carries a `fork` key** in `runs/<policy>_evals.json` with forks,
+retirements, branch share of collect, main-line steps, and how many eligible points were skipped for
+lack of a free slot. A large `skipped_full` means the *cap* rather than `FORK_PROB` is choosing which
+points get explored.
 
 ### The epsilon schedule — rewritten 2026-08-04, and it breaks curve comparability
 

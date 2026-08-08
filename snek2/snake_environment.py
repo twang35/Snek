@@ -80,6 +80,36 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
     def get_score(self):
         return self._game.current_score
 
+    def snake_length(self):
+        """Head plus segments, which is what the forking collector gates branching on.
+
+        An integer, so the gate is an exact `>=` rather than a float comparison. Observation index
+        22 carries the same number as `snake_length / PERFECT_SCORE`, but reading it from the game
+        keeps the gate working under `SNEK_ZERO_OBS` and needs no scaling constant.
+        """
+        return len(self._game.snake_group)
+
+    def snapshot(self):
+        return self._game.snapshot()
+
+    def restore_from_snapshot(self, snapshot, time_step):
+        """Makes this environment a copy of whatever `snapshot` describes, mid-episode.
+
+        `time_step` is the TimeStep the snapshot was taken at, and assigning it is the reason this
+        belongs on the class rather than in the collector. `PyEnvironment.step` calls `self.reset()`
+        whenever `_current_time_step is None`, so a freshly built environment handed a restored game
+        would silently throw it away and start a new episode on its first step — a failure that
+        looks like a branch that never explored anything.
+
+        Reusing the parent's TimeStep object is exact, not an approximation: a restored game
+        produces a byte-identical observation, which
+        `tests/test_game_snapshot.py` asserts directly.
+        """
+        self._game.restore_snapshot(snapshot)
+        self._observations = self._game.get_observation()
+        self._current_time_step = time_step
+        return time_step
+
     def _reset(self):
         self._game.reset()
         self._observations = self._game.get_observation()

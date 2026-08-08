@@ -1,7 +1,63 @@
+import collections
 import random
 import snake_constants
 
 from state_helpers import *
+
+# Everything needed to rebuild a game elsewhere, as plain data. See Game.snapshot().
+GameSnapshot = collections.namedtuple('GameSnapshot', [
+    'body',                 # ordered body cells, head first
+    'head_move_dir',
+    'tail_last_move_dir',   # currently dead — see Game._build_snake()
+    'food',                 # (x, y), or None for the 'no food' sentinel
+    'current_score', 'current_step', 'last_food_step',
+    'finished', 'starved', 'perfect_game',
+])
+
+
+def direction_between(start, end):
+    """The move name that steps from `start` to `end`, which must be adjacent.
+
+    Raises rather than returning None, because every caller here is asserting adjacency as
+    much as it is asking for the direction.
+    """
+    delta = (end[0] - start[0], end[1] - start[1])
+    for name, vector in MOVE_VECTORS.items():
+        if vector == delta:
+            return name
+    raise ValueError('cells {0} and {1} are not adjacent'.format(start, end))
+
+
+def validate_snapshot(snapshot):
+    """Rejects a snapshot that could not have come from a live game.
+
+    Cheap next to a restore, and the alternative is silent: a body with a repeated cell
+    restores fine and then reports a self-collision on its very first groupcollide, which
+    reads as a policy that suddenly plays badly rather than as corrupt state.
+
+    Note a *finished* game is not restorable — on a death the head is left off the board, so
+    its snapshot fails the bounds check here. Nothing needs to restore one.
+    """
+    body = snapshot.body
+    if not body:
+        raise ValueError('a snapshot needs at least one body cell')
+    # A live snake never overlaps itself, so a repeated cell means the snapshot is of a *finished*
+    # game — a self-collision death leaves the head sitting on the body. Measured over 300 random
+    # episodes: 149 deaths by self-collision, 151 off the board, and **zero** overlapping bodies in
+    # 2743 live steps. This check earned its place on its first smoke run by catching the forking
+    # collector snapshotting a game that had already ended.
+    if len(set(body)) != len(body):
+        raise ValueError('snapshot body has a repeated cell, so this game has already ended: {0}'
+                         .format(body))
+    for cell in body:
+        if not (0 <= cell[0] <= SCREENTILES[0] and 0 <= cell[1] <= SCREENTILES[1]):
+            raise ValueError('snapshot body cell {0} is off the board'.format(cell))
+    for ahead, behind in zip(body, body[1:]):
+        direction_between(behind, ahead)
+    if snapshot.food is not None and tuple(snapshot.food) in set(body):
+        raise ValueError('snapshot food {0} sits on the body'.format(snapshot.food))
+    if snapshot.head_move_dir not in MOVE_VECTORS:
+        raise ValueError('unknown head_move_dir {0}'.format(snapshot.head_move_dir))
 
 
 # ----------- game objects ----------- #
@@ -69,7 +125,7 @@ class SnakeHead(SnakeSegment):
 
 
 class Food(pygame.sprite.Sprite):
-    def __init__(self, taken_up_group):
+    def __init__(self, taken_up_group, position=None):
         pygame.sprite.Sprite.__init__(self)
         self.image = self.image = pygame.Surface(TILE_SIZE).convert()
         self.image.fill(COLORKEY_COLOR)
@@ -77,6 +133,15 @@ class Food(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, FOOD_COLOR, TILE_RECT.center, FOOD_RADIUS)
 
         self.rect = self.image.get_rect()
+        # An explicit position is how a snapshot restores its food, and it deliberately
+        # short-circuits the sampling loop below rather than seeding it. That loop draws from
+        # the module-global `random`, so a restore that went through it would consume RNG the
+        # original game never consumed and shift every later food placement in the process.
+        # With no position the draws below are unchanged, in the same order.
+        if position is not None:
+            self.position = (position[0], position[1])
+            self.rect.topleft = (self.position[0] * TILE_SIZE[0], self.position[1] * TILE_SIZE[1])
+            return
         while True:
             self.position = (
                 random.randint(0, SCREENTILES[0]),
@@ -144,18 +209,26 @@ class Game:
     def set_display(self, enabled):
         self.display = enabled
 
+    def _new_groups(self):
+        """Fresh, empty sprite groups.
+
+        Shared by reset() and restore_snapshot() rather than written twice, for the reason in
+        _rebuild_grid's docstring: this file has already paid once for two builders that
+        disagreed with each other.
+        """
+        self.snake_group = pygame.sprite.Group()
+        self.snake_head_group = pygame.sprite.Group()
+        self.food_group = pygame.sprite.Group()
+        self.taken_up_group = pygame.sprite.Group()
+        self.all = pygame.sprite.RenderUpdates()
+
     def reset(self):
         pygame.display.set_caption(self.caption)
         self.bg = pygame.Surface(SCREENSIZE).convert()
         self.bg.fill(BACKGROUND_COLOR)
         self.screen.blit(self.bg, (0, 0))
 
-        self.snake_group = pygame.sprite.Group()
-        self.snake_head_group = pygame.sprite.Group()
-        self.food_group = pygame.sprite.Group()
-        self.taken_up_group = pygame.sprite.Group()
-
-        self.all = pygame.sprite.RenderUpdates()
+        self._new_groups()
         self.snake = SnakeHead(START_TILE, 'right', [self.snake_group, self.all, self.taken_up_group])
         self.snake_head_group.add(self.snake)
         self.head = self.snake
@@ -207,6 +280,107 @@ class Game:
                                          self.current_step,
                                          self.last_food_step,
                                          len(self.snake_group)))
+
+    def snapshot(self):
+        """Everything needed to rebuild this game elsewhere, as plain data.
+
+        `copy.deepcopy` cannot do this. Every sprite owns a pygame Surface, and Surface, Clock
+        and Font all refuse to pickle; `self.screen` is worse, because
+        pygame.display.set_mode() returns one process-global surface, so two Games share it and
+        no copy could own its own.
+
+        What is left out is either derived or write-only. `self.grid` is rebuilt from the snake
+        and food on every step, each sprite's image and rect come from its tile_pos, and
+        `total_steps` and SnakeHead.move_count are written but never read anywhere.
+        """
+        return GameSnapshot(
+            body=tuple(self.snake.get_positions()),
+            head_move_dir=self.head.move_dir,
+            tail_last_move_dir=self.tail.last_move_dir,
+            food=None if self.current_food == 'no food' else tuple(self.current_food.position),
+            current_score=self.current_score,
+            current_step=self.current_step,
+            last_food_step=self.last_food_step,
+            finished=self.finished,
+            starved=self.starved,
+            perfect_game=self.perfect_game)
+
+    def restore_snapshot(self, snapshot):
+        """Makes this game an independent copy of whatever `snapshot` describes.
+
+        Independent in the only sense that matters: it shares no sprite, group or grid with the
+        game the snapshot came from, so the two play on without touching each other. They do
+        share `self.screen`, because pygame allows one display surface per process — harmless
+        under SDL_VIDEODRIVER=dummy, which is the only way training ever runs, and each game
+        keeps its own `bg` to blit through.
+        """
+        validate_snapshot(snapshot)
+        if self.bg is None:
+            # A pooled Game that has never been reset() has no background, and step() blits
+            # through it on every call via all.clear().
+            self.bg = pygame.Surface(SCREENSIZE).convert()
+            self.bg.fill(BACKGROUND_COLOR)
+
+        self._new_groups()
+        self._build_snake(snapshot.body, snapshot.head_move_dir, snapshot.tail_last_move_dir)
+
+        if snapshot.food is None:
+            self.current_food = 'no food'
+        else:
+            self.current_food = Food(self.taken_up_group, position=snapshot.food)
+            self.food_group.add(self.current_food)
+            self.taken_up_group.add(self.current_food)
+            self.all.add(self.current_food)
+
+        self.current_score = snapshot.current_score
+        self.current_step = snapshot.current_step
+        self.last_food_step = snapshot.last_food_step
+        self.finished = snapshot.finished
+        self.starved = snapshot.starved
+        self.perfect_game = snapshot.perfect_game
+
+        self._rebuild_grid()
+
+    def _build_snake(self, body, head_move_dir, tail_last_move_dir):
+        """Builds a snake of arbitrary shape from ordered body cells, head first.
+
+        The general form of what reset() does. reset() can only make the fixed opening shape,
+        because add_segment() appends one cell at a time using the tail's last_move_dir.
+
+        **Each segment's move_dir is derived here, and it is the load-bearing field.** In
+        SnakeSegment.move() a segment advances with its *own* move_dir and only then inherits
+        its parent's, so a body whose directions are wrong walks apart on the very first step —
+        leaving them at the constructor's 'right' default mismatches immediately. The invariant
+        is that segment i's move_dir points at the cell of the segment ahead of it, which makes
+        it exactly `direction_between(body[i], body[i - 1])`.
+
+        `tail_last_move_dir` is restored for faithfulness but is **dead state today**: step()
+        moves the whole snake before the food block calls add_segment(), so the only reader of
+        `last_move_dir` always sees a value written by that move, never the one restored here.
+        Kept because a future reordering of step() would make it live again, and a snapshot that
+        silently dropped a field would be worse than one carrying a redundant one.
+        """
+        groups = [self.snake_group, self.all, self.taken_up_group]
+        self.snake = SnakeHead(body[0], head_move_dir, groups)
+        self.snake_head_group.add(self.snake)
+        self.head = self.snake
+
+        previous = self.snake
+        for cell in body[1:]:
+            segment = SnakeSegment(cell, groups)
+            segment.move_dir = direction_between(cell, previous.tile_pos)
+            segment.last_move_dir = segment.move_dir
+            segment.front_segment = previous
+            previous.behind_segment = segment
+            previous = segment
+
+        # No `previous.behind_segment = None` here on purpose: every segment in this loop is
+        # freshly constructed and SnakeSegment.__init__ already leaves both links None, so the
+        # assignment is dead. It was here, and no mutation of it could fail a test.
+        # `test_the_segment_chain_is_linked_both_ways_and_ends_at_the_tail` is what holds the
+        # invariant, so a change to the constructor still gets caught.
+        self.tail = previous
+        self.tail.last_move_dir = tail_last_move_dir
 
     # this function adds a segment at the end of the snake
     def add_segment(self):

@@ -77,7 +77,8 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
 def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction, configured_guided_fraction,
-          eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True):
+          eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True,
+          forking_collector=None):
     # (Optional) Optimize by wrapping some code in a graph using TF function.
     agent.train = common.function(agent.train)
     step = global_step.numpy()
@@ -126,7 +127,15 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
     for _ in range(remaining):
         # Collect a few steps and save to replay buffer.
         # To view q_values, breakpoint at line 160 in tf_agents/policies/q_policy.py
-        time_step, _ = collect_driver.run(time_step)
+        #
+        # The forking collector is a drop-in for the driver that advances one of several branches
+        # of the same game instead of only the main line, still one counted step per iteration —
+        # see forking_collector.py. `None` unless SNEK_FORK_BRANCHES is set above 1, so the default
+        # path is the PyDriver call it always was plus one `is None` test.
+        if forking_collector is None:
+            time_step, _ = collect_driver.run(time_step)
+        else:
+            time_step = forking_collector.run(time_step)
 
         # Sample a batch of data from the buffer and update the agent's network.
         loss_info = 0
@@ -150,7 +159,7 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
                               replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
                               guided_fraction, configured_guided_fraction, step,
-                              eval_only, initial_step, policy_name, run_config)
+                              eval_only, initial_step, policy_name, run_config, forking_collector)
 
 
 class TrainingMetrics:
@@ -191,9 +200,16 @@ class TrainingMetrics:
         self.num_of_percents += 1
 
 
-def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, epsilon):
-    """One row of the run report, and one point on the graph."""
-    return {
+def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, epsilon,
+                   forking_collector=None):
+    """One row of the run report, and one point on the graph.
+
+    A forking arm gets one extra key, `fork`, holding the collector's counters. It rides into
+    `runs/<policy>_evals.json` durably and is ignored everywhere else: `write_run_report` iterates
+    the fixed `EVAL_COLUMNS` list rather than the row's keys, and `build_summary` reads named keys.
+    Absent entirely on a non-forking arm, so nothing has to distinguish "0 forks" from "no forking".
+    """
+    row = {
         'step': int(step),
         'avg_score': round(avg_score, 2),
         'trailing_avg_score': round(trailing_avg_score, 2),
@@ -204,13 +220,16 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
         'perfect_percent': round(metrics.last_eval_perfect_percent * 100),
         'epsilon': round(float(epsilon.numpy()), 4),
     }
+    if forking_collector is not None:
+        row['fork'] = forking_collector.counters()
+    return row
 
 
 def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
                           global_step, epsilon, initial_epsilon, min_epsilon, guided_fraction,
                           configured_guided_fraction, step, eval_only, initial_step,
-                          policy_name, run_config):
+                          policy_name, run_config, forking_collector=None):
     debug = snake_constants.DEBUG_LOGGING
 
     if step % log_interval == 0:
@@ -313,7 +332,8 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
 
         # Built before reset() clears the min/max trackers below.
         merge_eval_row(metrics.eval_rows,
-                       build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, epsilon))
+                       build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics,
+                                      epsilon, forking_collector))
         summary = save_history(graph_history_path, metrics.eval_rows, metrics.resume_steps)
 
         if not debug:
@@ -338,6 +358,17 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
                           '  <- best so far' if is_new_best else
                           ('  no ckpt' if not keep_checkpoint else '')),
                       flush=True)
+                if forking_collector is not None:
+                    # On the same cadence as the line above, so a forking arm's log shows whether
+                    # branches are actually happening. `skipped` counts decision points that wanted
+                    # a branch and found no free slot — a large number means the cap, not the
+                    # probability, is deciding which points get explored.
+                    fork = forking_collector.counters()
+                    print('          forks {0}  live {1}  branch share {2:.0%}  '
+                          'ended {3}/trunc {4}  skipped {5}'.format(
+                              fork['forks'], fork['live_now'], fork['branch_share'],
+                              fork['terminated'], fork['truncated'], fork['skipped_full']),
+                          flush=True)
         # restart time because compute_avg_return() takes a while and messes up the timing
         metrics.reset()
 
