@@ -408,18 +408,35 @@ at length ≥ 85. "Only a few points" holds above ~95, not from 85.
 
 ### Pre-registration
 
-**Launch once batch 16's close-out lands**, because that verdict fixes one setting this batch has to
-inherit: whether `SNEK_FOOD_DISTANCE_REWARD` stays at 0 (if the shaping ablation is null or better) or
-goes back to 0.001 (if the shaping turns out load-bearing). The control has to match whichever it is.
+**`SNEK_FOOD_DISTANCE_REWARD=0` — decided, not conditional on batch 16's close-out.** The distance
+shaping stays off from here: the ablation's early read is a measured null (handover 11.5k against the
+control's 12.5k, three seeds landing in the same eval, with the arithmetic confound worth ~63 steps),
+so nothing suggests it is scaffolding the early game — and it prices every endgame detour at 0.001,
+which is the wrong bias for exactly the decisions this batch is trying to teach. A batch about
+endgame choice should not be run against a reward that mildly punishes the safe detour.
+
+**And that makes batch 16 the control**, since batch 16 is four seed-matched arms with the same
+shaping setting and forking off. **This batch therefore costs four slots rather than eight.**
 
 | item | value |
 |---|---|
-| config | `SNEK_FORK_BRANCHES=4 SNEK_FORK_PROB=0.5 SNEK_FORK_MIN_LENGTH=85 SNEK_FORK_MAX_STEPS=60`, plus batch 16's settled shaping value |
-| control | seed-matched arms at `SNEK_FORK_BRANCHES=1`, same everything else — **batch 16 itself is that control** if the shaping stays off, which saves four slots |
+| config | `SNEK_SEED=1..4 SNEK_FOOD_DISTANCE_REWARD=0 SNEK_FORK_BRANCHES=4 SNEK_FORK_PROB=0.5 SNEK_FORK_MIN_LENGTH=85 SNEK_FORK_MAX_STEPS=60 SNEK_DISCOUNT=0.9975 SNEK_PRIORITY_SIGNAL=td_loss SNEK_IS_WEIGHTS=0` |
+| control | **batch 16**, seed-matched — identical but for `FORK_BRANCHES=1` |
 | primary | `strong_eval_fraction` at a common `global_step` horizon, paired, exact permutation over 16 sign flips |
+| **horizon** | **~1.25M**, because that is where batch 16's arms stopped. Running longer is fine and probably wise, but the *paired* read is capped at the control's horizon |
 | early read | steps to pf30 ≥ 40% — a crossing, which is the read this project trusts early |
 | mechanism metrics | buffer share at len ≥ 80 (baseline **20-34%**), terminal and endgame-death adds per 100k, and the branch share of *sampled* batches |
-| abandon at 100k | if the branch share sits outside ~30-60% of collect, or the len ≥ 80 buffer share is not clearly above the control's |
+| check at 100k | branch share **above ~5% and rising**. Batch 16's arms first reached length 85 at 8-20k, so forks should be happening by then — a share near 0 means the gate is never being hit and the batch is testing nothing. Stop and lower `FORK_MIN_LENGTH` rather than let it run |
+| check at 500k | branch share in **~25-60%** of collect, which is where the cost model puts it once most episodes reach the endgame. Far outside means the arithmetic in this section is wrong and the confound is a different size than advertised |
+| abandon | the usual: ≥ 2 of 4 arms not crossing pf30 ≥ 40% by 800k (every batch-16 arm crossed by 465k), or a > 10 pp deficit with a mechanism to explain it |
+
+**‡ The horizon, decided at launch.** `strong_eval_fraction` is a fraction of an arm's *own* evals, so
+it is only comparable at a matched step count — and batch 16 stopped at ~1.25M, far short of batches 14
+and 15. **The cap is left at the 10M default and the arms run until their curves flatten, with the
+paired primary read at a 1.25M truncation.** Running past the control's horizon is free information and
+truncating for the paired read costs nothing, whereas stopping at 1.25M and later wanting more would
+mean a resume with its buffer and priority discontinuity. What is *not* legitimate is comparing a 4M
+forking arm against a 1.25M control and calling the difference forking.
 
 **‡ It is not a one-knob test, and the write-up must say so.** It changes what is collected, how much
 per game, and how priority mass is distributed. The three consequences, with sizes, are tabulated in
@@ -486,10 +503,13 @@ SNEK_SEED=1..4  SNEK_TARGET_UPDATE_PERIOD=1000  SNEK_DISCOUNT=0.9975  SNEK_GUIDE
 SNEK_PRIORITY_SIGNAL=td_loss  SNEK_IS_WEIGHTS=0
 ```
 
-**The control is batch 17**, seed-matched, with forking off and the shaping value batch 16 settles on.
-That is the whole reason for the ordering rule: each batch's control is the one before it, so the two
-knobs stay separable. **Do not launch this until batch 17 is closed out** — running it against batch
-16 instead would leave the target period confounded with forking.
+**The control is batch 17**, seed-matched, with forking off and `FOOD_DISTANCE_REWARD=0`. That is the
+whole reason for the ordering rule: each batch's control is the one before it, so the two knobs stay
+separable. **Do not launch this until batch 17 is closed out** — running it against batch 16 instead
+would leave the target period confounded with forking.
+
+Note batch 17 may itself be a `FORK_BRANCHES=1` control-free batch (it reuses batch 16 as its control),
+so if forking comes back null and is dropped, this batch's control reverts to batch 16.
 
 `SNEK_GUIDED_FRACTION=0.8` is shown above for the record; it is the default from 2026-08-07, so
 passing it changes nothing.

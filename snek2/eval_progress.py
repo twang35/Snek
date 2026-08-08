@@ -361,6 +361,12 @@ def summarize(runs, stale_after=180):
         'stages': stage_summary(runs),
         'screen_episodes': next((r.get('screen_episodes') for r in runs
                                  if r.get('screen_episodes')), None),
+        # The abandonment gate, for the threshold line on the perfect-% charts. Taken from the
+        # payload rather than the environment so a chart rendered later, or by `report`, shows the
+        # gate the *file* was measured under instead of whatever EVAL_MIN_ACHIEVABLE happens to be
+        # set to now. None for files that predate the gate.
+        'min_achievable': next((r.get('min_achievable') for r in runs
+                                if r.get('min_achievable')), None),
         # Prefer the writer's equal-effort figure when it exists. Pooling the rows themselves is
         # only an arm rate when every row has the same depth; under screening the deep rows are the
         # arm's best and pooling them reads high by construction.
@@ -424,10 +430,14 @@ def text_summary(policy_name, state):
     if state['active']:
         lines.append('  in flight:')
         for run, flight in sorted(state['active'], key=lambda p: p[1]['step']):
-            lines.append('    {0:<9} {1:>8}  round {2}/{3}  running {4:.0f}%  ({5} elapsed)'.format(
-                run['suffix'], flight['step'], flight['round'], flight['rounds_total'],
-                flight['running_percent'],
-                format_duration(max(0, time.time() - flight['started_at']))))
+            # Worker count included here since 2026-08-07, when the chart's worker axis came out:
+            # it is the only remaining place the number appears other than the x-axis label, and it
+            # is what makes "round 3/10" convertible into episodes.
+            lines.append('    {0:<9} {1:>8}  round {2}/{3} x {4}w  running {5:.0f}%  '
+                         '({6} elapsed)'.format(
+                             run['suffix'], flight['step'], flight['round'], flight['rounds_total'],
+                             flight_workers(run, flight), flight['running_percent'],
+                             format_duration(max(0, time.time() - flight['started_at']))))
     elif done < requested:
         lines.append('  nothing in flight')
 
@@ -435,6 +445,25 @@ def text_summary(policy_name, state):
         lines.append('  STALE: {0} last wrote {1} ago and is incomplete — process likely died'.format(
             run['suffix'], format_duration(age)))
     return '\n'.join(lines)
+
+
+def draw_threshold(axis, state):
+    """Marks the abandonment gate on a perfect-% axis, so the target is visible rather than implied.
+
+    The value comes from the payload's `min_achievable`, never a literal: the gate has been 0, 85, 90
+    and 95 across this project's files, and a line hardcoded at 95 would quietly mislabel every
+    earlier arm's chart. Nothing is drawn for a file with no gate, which is how batches 11 and 13
+    were measured.
+
+    Worth drawing because the gate is not a display preference — it is the rule that decides which
+    checkpoints get measured at full length, so a point below the line has been abandoned and a point
+    on or above it is a full-length measurement.
+    """
+    threshold = state.get('min_achievable')
+    if not threshold:
+        return
+    axis.axhline(threshold, color='#2ca02c', linestyle=(0, (6, 3)), linewidth=1.1, alpha=0.9,
+                 zorder=1, label='gate {0:.0f}%'.format(threshold))
 
 
 def render(policy_name, state, out_path):
@@ -471,37 +500,20 @@ def render(policy_name, state, out_path):
             top.plot(rounds, running, marker='o', markersize=3.5, linewidth=1.4,
                      label='{0} @{1}'.format(label, flight['step']))
             top.set_xlim(0.5, flight['rounds_total'] + 0.5)
-        # How many workers are contributing at each round, as a step line on its own axis. Not
-        # a section of its own — it is a one-line answer to "how much of the machine is on this
-        # right now", which the perfect-rate lines cannot show on their own: several lines at
-        # round 3 could be one process at 2 workers each still on its third round, or a second
-        # process at 10 workers just getting started.
-        #
-        # Deliberately workers, not process count — a process is essentially always 1 here (see
-        # EVAL_OUT_SUFFIX below for the sharded exception), while EVAL_WORKERS varies run to run,
-        # so a process count is almost always a flat, uninformative line at 1. A process's
-        # workers count toward round r once it has reported r rounds, so the line starts at
-        # however many are working and steps down as quicker processes finish their checkpoint.
+        # Worker counts are still needed for the x-axis formula below, but they are no longer drawn.
+        # There used to be a second y axis here carrying a step line of how many workers were still
+        # contributing at each round. It came out on 2026-08-07: for a single process — which is
+        # every run except a deliberate shard set — it is a flat line at EVAL_WORKERS that steps down
+        # once at the end, so it spent a whole axis, a colour and a legend entry restating a constant
+        # that the x-axis label already names. The count is in the in-flight text lines too.
         depths_and_workers = []
         for run, flight in state['active']:
             per_round = flight.get('per_round_perfect') or []
             if not per_round:
                 continue
             depths_and_workers.append((len(per_round), flight_workers(run, flight)))
-        if depths_and_workers:
-            deepest = max(depth for depth, _ in depths_and_workers)
-            per_round_workers = [sum(workers for depth, workers in depths_and_workers if depth >= r)
-                                  for r in range(1, deepest + 1)]
-            worker_axis = top.twinx()
-            worker_axis.step(range(1, deepest + 1), per_round_workers, where='mid',
-                             color='tab:gray', linewidth=1.2, linestyle=(0, (5, 2)),
-                             alpha=0.8, label='workers')
-            worker_axis.set_ylabel('workers evaluating', color='tab:gray', fontsize=8)
-            worker_axis.tick_params(axis='y', labelcolor='tab:gray', labelsize=7)
-            # Integer ticks only: a count of 2.5 workers is meaningless.
-            worker_axis.set_ylim(0, max(per_round_workers) + 1)
-            worker_axis.set_yticks(range(0, max(per_round_workers) + 2))
-            worker_axis.grid(False)
+
+        draw_threshold(top, state)
 
         if top.lines:
             top.legend(fontsize=7, loc='lower right', ncol=2, framealpha=0.85)
@@ -522,10 +534,6 @@ def render(policy_name, state, out_path):
         top.set_ylim(0, 100)
         top.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
         top.tick_params(labelsize=7)
-        # Keep the perfect-rate lines drawn over the worker step line, and let the twin axis
-        # show through: twinx() puts the new axes on top with an opaque patch by default.
-        top.set_zorder(2)
-        top.patch.set_visible(False)
 
     # --- 2. completed checkpoints by step ------------------------------------------------
     middle = figure.add_subplot(grid[next_row])
@@ -557,6 +565,7 @@ def render(policy_name, state, out_path):
         middle.scatter([best['step'] / 1000.0], [best['perfect_percent']], s=90, zorder=4,
                        facecolors='none', edgecolors='#d62728', linewidths=1.6,
                        label='best {0:.0f}% @{1}k'.format(best['perfect_percent'], best['step'] // 1000))
+        draw_threshold(middle, state)
         middle.legend(fontsize=7, loc='lower right', framealpha=0.85)
     else:
         # Otherwise matplotlib autoscales to 0.0-1.0 "thousands of steps", which reads as real

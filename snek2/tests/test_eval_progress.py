@@ -309,3 +309,63 @@ def test_pooled_falls_back_to_row_pooling_for_a_flat_run():
     assert abs(state['pooled'] - 75.0) < 0.001
     assert state['pooled_is_equal_effort'] is False
     assert 'equal effort' not in eval_progress.text_summary('arm', state)
+
+
+# ------------------------------------------------- the gate line on the perfect-% charts
+
+def test_summarize_exposes_the_gate_from_the_payload():
+    # Read from the file, not the environment: a chart rendered later, or by `report` over several
+    # arms at once, must show the gate each file was *measured* under. Batches 11 and 13 have none,
+    # 14-15 have 90, 16 on have 95, and a chart is often drawn long after the run.
+    rows = [result(1, perfect=70)]
+    assert eval_progress.summarize([run(rows, min_achievable=95.0)])['min_achievable'] == 95.0
+    assert eval_progress.summarize([run(rows, min_achievable=90.0)])['min_achievable'] == 90.0
+
+
+def test_summarize_reports_no_gate_for_an_ungated_file():
+    # `min_achievable` is written as None when abandonment is off, and absent entirely in files
+    # that predate it. Both must read as "no gate" so no line is drawn.
+    rows = [result(1, perfect=70)]
+    assert eval_progress.summarize([run(rows)])['min_achievable'] is None
+    assert eval_progress.summarize([run(rows, min_achievable=None)])['min_achievable'] is None
+
+
+def test_draw_threshold_marks_the_gate_and_labels_it_with_the_measured_value():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    for gate in (95.0, 90.0):
+        figure, axis = plt.subplots()
+        eval_progress.draw_threshold(axis, {'min_achievable': gate})
+        lines = axis.get_lines()
+        assert len(lines) == 1, 'expected exactly one gate line'
+        # A horizontal line at the gate, so both ends sit at the same y and that y is the gate.
+        assert lines[0].get_ydata()[0] == gate
+        assert lines[0].get_ydata()[-1] == gate
+        assert lines[0].get_linestyle() != '-', 'the gate line must be dashed, not solid'
+        assert '{0:.0f}%'.format(gate) in lines[0].get_label()
+        plt.close(figure)
+
+
+def test_draw_threshold_draws_nothing_without_a_gate():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    for state in ({}, {'min_achievable': None}, {'min_achievable': 0}):
+        figure, axis = plt.subplots()
+        eval_progress.draw_threshold(axis, state)
+        assert axis.get_lines() == [], state
+        plt.close(figure)
+
+
+def test_the_in_flight_line_reports_the_worker_count():
+    # The chart's worker axis came out on 2026-08-07, so this line and the x-axis label are the only
+    # places the count survives — and it is what turns "round 3/10" into an episode count.
+    flight = {'step': 5000, 'round': 3, 'rounds_total': 10, 'running_percent': 80.0,
+              'started_at': 1e12, 'per_round_perfect': [8, 8, 8]}
+    payload = run([result(1)], complete=False, num_workers=10)
+    state = eval_progress.summarize([payload])
+    state['active'] = [(payload, flight)]
+    assert 'round 3/10 x 10w' in eval_progress.text_summary('arm', state)
