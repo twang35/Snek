@@ -103,6 +103,14 @@ def main(argv):
             'epsilon would never decay. Lower the floor or raise SNEK_INITIAL_EPSILON.'
             .format(min_epsilon, initial_epsilon / (2.0 ** BOOTSTRAP_RUNGS)))
 
+    # Food-distance shaping is read in snake_constants rather than here, because it is consumed in
+    # the env worker processes — see the comment on FOOD_DISTANCE_REWARD. Printed here anyway, once
+    # from the parent, so that `grep 'hyperparameter override:'` on a log still shows every knob an
+    # arm was given; that grep is how a misconfigured control arm was caught before.
+    if FOOD_DISTANCE_REWARD != DEFAULT_FOOD_DISTANCE_REWARD:
+        print('hyperparameter override: FOOD_DISTANCE_REWARD = {0} (default {1})'.format(
+            FOOD_DISTANCE_REWARD, DEFAULT_FOOD_DISTANCE_REWARD))
+
     # Fraction of *refinement-phase* episodes in which the epsilon coin's random move is drawn
     # from the non-fatal moves instead of all three. 0.0 reproduces batch 12 exactly. See
     # shielded_policy.py for why only the exploration draw is shielded and never the greedy
@@ -131,8 +139,9 @@ def main(argv):
     # instead of needing a human to notice. 10M is deliberately generous — this is "well past
     # useful" rather than a planned horizon, and running over is cheaper than an arm dying
     # unattended. `b9b-disc9975b` ran **10.1M steps past its peak** overnight producing nothing,
-    # which is the failure this prevents. Raised from 5M after batch 14: all four arms were still
-    # gaining at 4.1-4.5M, so 5M was inside the useful range rather than past it.
+    # which is the failure this prevents. Raised from 5M after batch 14, where two of four arms
+    # produced their best window past 3.5M and `b14c` was still gaining in its final 4.0-4.5M band —
+    # so 5M was inside the useful range rather than past it.
     #
     # Absolute rather than per-run: `global_step` is restored on resume, so a relative count would
     # let an arm resumed at 4M run to 9M. See training.steps_remaining().

@@ -12,7 +12,25 @@ DEBUG_LOGGING = os.environ.get('SNEK_DEBUG', '0') not in ('0', '', 'false', 'Fal
 SCREEN_TO_DISPLAY = 0
 
 FOOD_REWARD = 1.0
-FOOD_DISTANCE_REWARD = 0.001
+# Distance shaping, subtracted on any ordinary move that increases the head's distance to the
+# food — so it is a penalty for moving away rather than a bonus for approaching, which are the
+# same thing up to a constant. See Snake.step() for the two cases it deliberately skips.
+#
+# Read from the environment so an arm can turn it off without editing files, like every other
+# hyperparameter. **Not** through `tuned()` in snek2.py: this value is consumed inside
+# `Snake.step`, which runs in the parallel env worker processes, and `from snake_constants import
+# *` binds a copy at import — an assignment in the parent would never reach a worker. Same reason
+# TILE_PIXELS and ZERO_OBS_INDICES are read here. `run_config` still records it, so
+# runs/<policy>.md shows what the arm actually ran with.
+#
+# **0.0 is the ablation, and it is clean.** The step keeps computing the distance and subtracts
+# exactly 0.0, so control flow, the food stream and every observation are untouched — the only
+# difference is the reward. Note it shifts `avg_reward`, which is what the bootstrap epsilon phase
+# thresholds on, so a shaping-off arm reaches the refinement phase slightly earlier for
+# measurement reasons on top of any real effect. `avg_score` is a food count and is unaffected.
+DEFAULT_FOOD_DISTANCE_REWARD = 0.001
+FOOD_DISTANCE_REWARD = float(os.environ.get('SNEK_FOOD_DISTANCE_REWARD',
+                                            DEFAULT_FOOD_DISTANCE_REWARD))
 DEATH_REWARD = -5.0  # maybe avoid deaths more?
 STARVE_REWARD = -0.5
 global PERFECT_GAME_REWARD

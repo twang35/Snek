@@ -284,7 +284,7 @@ import sys; sys.path.insert(0, 'tests'); import importlib
 total = fails = 0
 for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablation',
              'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
-             'test_run_report', 'test_shielded_policy']:
+             'test_run_report', 'test_shielded_policy', 'test_reward_shaping']:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1

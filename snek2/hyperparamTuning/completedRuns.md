@@ -203,7 +203,66 @@ batch 14, which shares the 0.8 and differs only by a discount that is a measured
 `best_full_length_row`'s half-depth fallback in production — its best is a 69/80 row abandoned by the
 90% gate, printed `[truncated]`. Working as designed, and a preview of what the 95% gate makes normal.
 
+### The design: why n=3, and which control
+
+Both earlier n-step arms (`b1c-nstep3`, `b2b-nstep2`) are **retracted rather than negative** — they
+trained on returns that summed straight through episode boundaries, because the per-step discount is
+the only truncation in `r_t + g·d_t·r_{t+1} + …` and terminal steps carried 0.9975 until 2026-08-02.
+Fixed at `snake_environment.py:126`.
+
+n=3 over n=2 because the usual reason to keep n small — an uncorrected n-step return is only exact
+if the intermediate actions were greedy — is negligible at this project's epsilon. Measured mean
+epsilon over the back half of each arm: **0.0034** (batch 13), **0.0039** (batch 14).
+
+| epsilon | P(non-greedy)/step | contaminated at n=2 | at n=3 |
+|---|---|---|---|
+| 0.0125 (refinement ceiling) | 0.83% | 0.83% | 1.66% |
+| **~0.004 (what arms actually run at)** | **0.27%** | **0.27%** | **0.53%** |
+| 0.002 (floor) | 0.13% | 0.13% | 0.27% |
+
+So n=2 → n=3 moves contamination from ~0.3% to ~0.5% of targets while the upside scales with n:
+propagating the +100 perfect-game reward back across a ~1780-step perfect game takes ~890 sequential
+backups at n=2 against ~593 at n=3. Add that n=4 arms resolve only a clear win, and n=3 is Rainbow's
+value and so the only choice with outside evidence behind it. The unresolved counter: priorities come
+from the n-step TD error, so larger n feeds larger-magnitude errors into `td_loss` + alpha 0.6 — it
+argues both ways, since bigger errors push Huber into its linear region.
+
+Config, and the control it implies:
+
+```
+SNEK_SEED=1..4  SNEK_DISCOUNT=0.995  SNEK_GUIDED_FRACTION=0.8  SNEK_N_STEP_UPDATE=3
+SNEK_PRIORITY_EXPONENT=0.6  SNEK_PRIORITY_SIGNAL=td_loss  SNEK_IS_WEIGHTS=0
+```
+
+| control | differs from batch 15 by | usable? |
+|---|---|---|
+| **batch 14** | discount (0.9975 → 0.995) **and** n | **yes** — the discount is measured null, so n is the only live variable |
+| batch 13 | `GUIDED_FRACTION` (0.5 → 0.8) **and** n | weaker — `GUIDED_FRACTION` has never been isolated |
+| batches 13+14 pooled, n=8 | both | for the primary, since 13 and 14 are indistinguishable |
+
+**‡ The residual risk this rests on**, stated because it still applies to any batch using batch 14 as
+a control: the discount null was measured *at* `GUIDED_FRACTION` 0.8 vs 0.5, so it is a null on the
+pair, not on each knob independently. Nothing suggests they interact — at epsilon ~0.003 the shield
+touches ~0.1% of steps — but "0.995 ≡ 0.9975" is not separately established at fixed
+`GUIDED_FRACTION=0.8`.
+
 ### The pre-registered primary failed; the evals are a null
+
+Pre-registered before the batch ran: n-step's predicted effect is faster credit propagation to the
+same asymptote, so the primary is **steps to pf30 ≥ 40%**, `strong_eval_fraction` secondary, and a
+higher ceiling *without* an earlier arrival would be a surprise worth writing up rather than a win.
+
+| seed | b14 (control) | b15 | delta |
+|---|---|---|---|
+| 1 | 639k | 620k | -19k |
+| 2 | 227k | **524k** | **+297k** |
+| 3 | 530k | **707k** | **+177k** |
+| 4 | 320k | 378k | +58k |
+| **mean** | **429k** | **557k** | **+128k slower**, p=0.250 |
+
+Note how little room seeds 2 and 4 had: 227k and 320k are close to the floor the bootstrap ladder
+itself sets, so a real speed gain would have shown up on the slow seeds. Batch 13's per-seed figures
+on the same metric, for the pooled n=8 baseline: 1525k / 246k / 807k / 179k, mean **689k**.
 
 | metric | b14 | b15 | delta | p |
 |---|---|---|---|---|
@@ -211,13 +270,29 @@ batch 14, which shares the 0.8 and differs only by a discount that is a measured
 | best ckpt | 92.25% | 92.30% | +0.05 pp | 1.000 |
 | `pooled_equal_effort` | 72.08% | 74.32% | +2.24 pp | 0.625 |
 | `strong_eval_fraction` (eq. effort) | 21.53% | 25.59% | +4.05 pp | 0.625 |
+| mean perfect | 53.64% | 55.76% | +2.13 pp | 0.625 |
+| mean perfect, back half | 62.39% | 63.01% | +0.62 pp | 1.000 |
+| `best_perfect30` | 82.50% | 83.17% | +0.67 pp | 0.875 |
+| mean trailing | 90.15 | 89.55 | -0.60 | 0.875 |
 | peak trailing | 94.74 | 94.64 | -0.10 | 0.875 |
+| drawdown | 23.75 pp | 20.42 pp | -3.33 pp | 1.000 |
 
 n-step's whole predicted mechanism was faster credit propagation, and it came out **slower**, 3 of 4
 seeds. Best checkpoint lands within 0.05 pp. **`N_STEP_UPDATE=5` is closed**, not queued: the case for
 a larger n was that the effect scales with n, so its absence at n=3 is the worst possible sign.
 Contamination cannot be blamed either — at the measured epsilon an n=3 return is exact for 99.5% of
 targets — so there is no predicted cost to attribute the null to.
+
+**‡ The 280k interim read was half wrong, in the same direction batch 14's was.** It reported the
+perfect rate down 11.9 pp; at equal effort the batch finished **up** 2.13 pp. What survived is the
+early deficit it was actually measuring — that is the +128k on the primary. So: **an early snapshot of
+level reverses, an early snapshot of timing does not. Read crossings early, read levels late.**
+
+**Full-length numbers look much better than the equal-effort ones, and the gap is the point.** `b15a`
+set a peak trailing score of 95.00 and a `strong_eval_fraction` of 39.9%, both records — but `sef` is
+a fraction of an arm's *own* evals and these arms ran 1.3-1.7M steps longer than batch 14's while
+still playing at 70-80% perfect. At matched steps the advantage is +4.05 pp at p=0.625. **The arms
+sustained a high level for 5.8M steps; they did not reach a better one.**
 
 ### ‡ The 97/100 does not survive re-measurement, and the ≥95% count is mostly noise
 
@@ -248,9 +323,19 @@ two, and it should be run on any checkpoint before it is called a record.
 - **`b15b` is the strongest arm ever measured on the arm-level figure** — `pooled_equal_effort`
   79.68%, against a previous best of 77.55% (`b14d`). That is a real result and it is not a
   selection artifact, since the figure truncates every checkpoint to 20 episodes.
-- **The horizon is longer than three batches of docs assumed.** 2 of 4 arms were still gaining in
-  their final 500k band at 5.5-6.0M, and `b15d`'s peak trailing score is at 5799k, its
-  second-to-last eval. `b15a` and `b15d` are the top resume candidates on record.
+- **The horizon is longer than three batches of docs assumed.** Final 500k band against each arm's
+  best prior band:
+
+  | arm | final band (5.5-6.0M) | best prior | |
+  |---|---|---|---|
+  | `b15a` | **80.6%** | 80.4% | still gaining |
+  | `b15d` | **75.8%** | 72.8% | still gaining |
+  | `b15b` | 62.3% | 78.5% | past peak |
+  | `b15c` | 53.7% | 59.7% | past peak |
+
+  `b15d`'s peak trailing score is at **5799k — its second-to-last eval**. Stopping at 5.8M truncated
+  two arms mid-climb; the 10M cap was not the wrong setting, the habit of stopping at a round number
+  is. `b15a` and `b15d` are the top resume candidates on record.
 - **The ceiling has not moved.** Peak trailing reads 94.92 / 94.80 / 94.90 / 95.00 across batches
   11 / 13 / 14 / 15 — flat inside 0.2 points while run length went 3.2M to 5.8M. Full-length
   `strong_eval_fraction` rising 19.5 → 21.6 → 30.5% is arms spending longer at a good level, not

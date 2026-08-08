@@ -486,7 +486,7 @@ Notes that matter:
 | `SNEK_LEARNING_RATE` | 1e-5 | in-code comment suggests trying 1e-4 |
 | `SNEK_BATCH_SIZE` | 128 | |
 | `SNEK_DISCOUNT` | 0.99 | horizon ~100 steps; perfect games are much longer |
-| `SNEK_TARGET_UPDATE_PERIOD` | 8 | very frequent for DQN; prime suspect for forgetting |
+| `SNEK_TARGET_UPDATE_PERIOD` | 8 | very frequent for DQN, where hundreds to thousands is standard; batch 17 tests 1000 |
 | `SNEK_TARGET_UPDATE_TAU` | 1.0 | 1.0 = hard copy; <1 = soft/Polyak updates |
 | `SNEK_GRADIENT_CLIPPING` | 0.0 (off) | norm clip; 0 disables |
 | `SNEK_N_STEP_UPDATE` | 1 | n-step returns; buffer window is n+1 automatically |
@@ -503,6 +503,7 @@ Notes that matter:
 | `SNEK_BETA_ANNEAL_STEPS` | 1000000 | |
 | `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40.0 | below this a checkpoint is not written at all |
+| `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | penalty per move that increases the distance to food; 0 ablates the shaping |
 
 **`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added
 2026-08-05; before it, `num_iterations` was hardcoded to 1e9 and every batch had to be stopped by
@@ -526,9 +527,26 @@ One interaction worth knowing: an arm whose score never clears `SNEK_MIN_CHECKPO
 writes a checkpoint, so it cannot resume at all and its cap counts from 0 again. That is
 pre-existing behaviour, but it means a *cap* on such an arm is per-launch in practice.
 
-Rewards (`snake_constants.py`) are deliberately **held fixed** so `avg_score` stays
-comparable across every run. Changing them invalidates comparison with everything
-already recorded here.
+Rewards (`snake_constants.py`) are otherwise **held fixed**. `FOOD_DISTANCE_REWARD` is the one
+exception, made tunable 2026-08-07 for batch 16, and the comparability cost is smaller than this
+section used to claim:
+
+| metric | affected by turning shaping off? |
+|---|---|
+| `avg_score`, perfect %, `best_perfect30`, `strong_eval_fraction` | **no** — score is a food count, and every eval metric derives from it |
+| `avg_reward` | **yes**, shifts up by the shaping an episode would have accrued |
+| where the bootstrap epsilon phase hands over | **yes, indirectly** — its thresholds are on `avg_reward` |
+
+So a shaping-off arm's *scores* are directly comparable with every arm on record, and only its
+reward column is on a different scale. The second row is the one to keep in mind when reading a
+shaping-off arm's early curve: a higher `avg_reward` for the same play clears the thresholds
+`[2, 5, 10, 15, 20]` marginally sooner, so some of any measured speed-up to the refinement phase
+is arithmetic rather than learning. Measure the size of that shift before crediting the change —
+`avg_reward - avg_score` at matched score isolates it, since with shaping off that gap is purely
+the death and starve penalties.
+
+Changing `FOOD_REWARD`, `DEATH_REWARD`, `STARVE_REWARD` or `PERFECT_GAME_REWARD` would break
+`avg_score` comparability for real, and none of them is tunable.
 
 ### The epsilon schedule — rewritten 2026-08-04, and it breaks curve comparability
 
