@@ -1,8 +1,8 @@
 {
-  "iso": "2026-08-08T23:44:42",
-  "ts": 1786257882.2920458,
+  "iso": "2026-08-08T23:45:11",
+  "ts": 1786257911.942939,
   "runtime": {
-    "max_trainers": 3,
+    "max_trainers": 4,
     "max_evals": 1,
     "eval_workers": 4,
     "poll_seconds": 30,
@@ -13,9 +13,7 @@
     "paused": false,
     "drain": false
   },
-  "config_notes": [
-    "max_trainers 4 clamped to 3"
-  ],
+  "config_notes": [],
   "counts": {
     "trainer": 0,
     "eval": 0
@@ -28,8 +26,8 @@
   },
   "disk_free_gb": 183.9,
   "load_avg": [
-    0.02978515625,
-    1.16015625,
-    3.7021484375
+    0.0166015625,
+    1.0478515625,
+    3.5830078125
   ]
 }
