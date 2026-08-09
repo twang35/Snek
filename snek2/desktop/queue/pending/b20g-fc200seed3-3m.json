@@ -1,0 +1,9 @@
+{
+  "id": "b20g-fc200seed3-3m",
+  "type": "train",
+  "policy": "b20g-fc200seed3",
+  "env": {"SNEK_FC_LAYERS":"200,100,50","SNEK_SEED":"3","SNEK_BETA_ANNEAL_STEPS":"300000","SNEK_TARGET_UPDATE_PERIOD":"1000","SNEK_FOOD_DISTANCE_REWARD":"0","SNEK_DISCOUNT":"0.9975","SNEK_GUIDED_FRACTION":"0.8","SNEK_FORK_BRANCHES":"4","SNEK_FORK_PROB":"0.5","SNEK_FORK_MIN_LENGTH":"85","SNEK_FORK_MAX_STEPS":"60"},
+  "max_steps": 3000000,
+  "priority": 10,
+  "notes": "batch 20 treatment 200,100,50 seed 3 -- resumes the ~1.77M checkpoint to 3M. New id (ledger holds b20g-fc200seed3 as failed); same policy restores the checkpoint."
+}
