@@ -336,7 +336,7 @@ each — prices the selection effect directly:
 
 1. **The reasoning that defended the 99 was circular** — the 26 deep rows reached full depth *because*
    they screened well, so their mean is inflated by the same mechanism as the max. Full account in
-   [`runs.md`](runs.md#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection).
+   [`archive/runs-archive.md`](archive/runs-archive.md#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection).
 2. **The record is real but small.** `b17b` @1190k pools to **95.17% over 600 fresh episodes** (CI
    93.1-96.6) against `b14a`'s 93.5%/200 and `b15b`'s 93.0%/300 — better, overlapping intervals, and
    reached at **1.19M steps** against 3.7M and 3.2M. **The speed is the unambiguous part.**

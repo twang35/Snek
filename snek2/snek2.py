@@ -186,7 +186,10 @@ def main(argv):
     # sampling at all.
     priority_exponent = tuned('PRIORITY_EXPONENT', 0.6)
     initial_importance_sampling_beta = tuned('IS_BETA', 0.4)
-    beta_anneal_steps = tuned('BETA_ANNEAL_STEPS', 1000000, int)
+    # 300k, not 1M: arms in this env do their productive learning well before 1M
+    # (batch 19's peaked ~0.9-1.1M), so a 1M anneal reaches beta=1.0 only near the
+    # end of the useful window. 300k puts full IS correction in place during it.
+    beta_anneal_steps = tuned('BETA_ANNEAL_STEPS', 300000, int)
     # theSchlong -- the version that reached a far higher perfect-game rate than
     # anything measured here -- differed from this file on three PER details at
     # once: alpha 0.8, Huber td_loss as the priority signal, and no importance

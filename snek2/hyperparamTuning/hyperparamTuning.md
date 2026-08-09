@@ -616,7 +616,7 @@ Notes that matter:
 | `SNEK_PRIORITY_SIGNAL` | `td_error` | or `td_loss` (element-wise Huber), which is what `theSchlong` used |
 | `SNEK_IS_WEIGHTS` | 1 | 0 disables importance sampling entirely, as `theSchlong` did |
 | `SNEK_IS_BETA` | 0.4 | ignored when `IS_WEIGHTS=0` |
-| `SNEK_BETA_ANNEAL_STEPS` | 1000000 | |
+| `SNEK_BETA_ANNEAL_STEPS` | 300000 | β reaches 1.0 during the productive window (arms peak ~0.9-1.1M); was 1M through batch 19 |
 | `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40.0 | below this a checkpoint is not written at all |
 | `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | penalty per move that increases the distance to food; 0 ablates the shaping |

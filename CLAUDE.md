@@ -186,6 +186,13 @@ finished and no slot is needed, say so as a recommendation.
 Stop an arm only when asked, or when the user asks for something that plainly needs a free slot —
 and then say which ones are stopping and why.
 
+**Before killing or relaunching any arm, check its wall-clock runtime and step, and never call an
+arm "fresh" from a hunch.** Elapsed session time is not real time — an arm that feels seconds old to
+a session can have trained for hours. This nearly killed a **3.5-hour, near-record b19 arm** whose
+config change would have been reverted for the loss: the fix was assumed clean because the launch
+"felt recent". Run `ps -o etime,lstart -p <pid>` and read `summary.step` from `runs/<policy>_evals.json`
+*first*, and let the numbers — not the sense of how long ago you launched it — decide whether it is safe.
+
 It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
 so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
 <change>` section with a stats line, a short reading, and the image. Captions for batches 1-10 are
