@@ -377,6 +377,26 @@ It is off by default anywhere but darwin, because on the desktop the runner daem
 `DISPLAY`/`XAUTHORITY`, which a systemd-launched trainer does not have. **Don't add a trainer-side
 launch there**; two owners means two windows per wave.
 
+**The viewer must exit through `chart_viewer.exit_now()`, and its signal handler must be installed
+*after* `subplots()`.** Otherwise killing it aborts the process — macOS pops a "python quit
+unexpectedly" crash-report dialog. Two separate causes, both real, both measured on 2026-08-09:
+
+- **Tk owns the OS-level SIGTERM handler**, because it installs its own while creating the figure's
+  window — inside the first `subplots()` call, not at import. Tcl's handler runs `Tcl_Exit` straight
+  off the signal trampoline, which destroys the windows, fires their `<Destroy>` bindings, and calls
+  back into Python with no thread state. An install that happens *before* the figure is dead code:
+  5 of 5 kills still aborted. `make_figure()` exists to keep the two together.
+- **Interpreter shutdown with a live Tk window** ends the same way — a late Tk event finds a
+  half-finalised interpreter. So `exit_now()` closes the figures *first*, while the interpreter is
+  fully alive, then `os._exit()`s to skip finalisation entirely. The viewer owns no state, so
+  skipping cleanup costs nothing.
+
+Both surface as `_Py_FatalError_TstateNULL` under `PythonCmd` in the crash report, so read the frames
+*below* it to tell them apart — `Tcl_Exit`/`_sigtramp` means the signal path. **It is race-dependent:
+one clean exit proves nothing.** Verify with a loop of ~5 kills and `ls ~/Library/Logs/DiagnosticReports
+| grep -c python` before and after. Retiring a viewer that predates this fix needs `kill -9`, which the
+kernel handles without reaching Python at all.
+
 **Window size is `SNEK_TILE_PIXELS` and is cosmetic only.** Every pixel constant derives from it.
 Observations are built from tile positions, verified by a fixed-seed hash coming out identical at
 10, 20, 25 and 40 pixels per tile. **It must be set in the environment before `snake_constants` is

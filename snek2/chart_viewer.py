@@ -26,6 +26,7 @@ import argparse
 import glob as globmod
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -144,6 +145,67 @@ def spawn_for_policy(policy_name):
         return None
 
 
+def exit_now(plt, code=0, exit_fn=None):
+    """Close the Tk windows, then leave *without* running interpreter shutdown.
+
+    Both halves matter. Tk delivers events for as long as its windows exist and each one
+    can call back into Python; if the interpreter has already cleared its thread state,
+    that callback aborts the process — `_Py_FatalError_TstateNULL` under `PythonCmd` inside
+    `Tk_HandleEvent`, which macOS reports as "python quit unexpectedly" with a crash-report
+    dialog. Seen twice on 2026-08-09 (pids 30193, 76128). Closing the figures first removes
+    the windows while the interpreter is fully alive, and `os._exit` then skips the
+    finalisation window in which a late event could arrive. It is race-dependent, so a
+    clean exit on one run does not mean the ordering is safe.
+
+    Skipping cleanup costs nothing here: the viewer owns no state, it only reads PNGs.
+    """
+    try:
+        plt.close('all')
+    except Exception:
+        pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()   # os._exit does not flush, and the exit line matters
+        except Exception:
+            pass
+    (exit_fn or os._exit)(code)
+
+
+def install_signal_exit(plt):
+    """Route SIGTERM/SIGINT through `exit_now`.
+
+    **Call this after the first figure exists, and after every figure rebuild.** Tk installs
+    its own OS-level SIGTERM handler when it creates its interpreter — which happens inside
+    the first `subplots()`, not at import — and that overwrites ours. Tcl's handler runs
+    `Tcl_Exit` straight off the signal trampoline: it finalises the Tcl thread, destroys the
+    windows, fires their `<Destroy>` bindings, and those call back into Python with no thread
+    state, which is the abort described in `exit_now`. Installing before the figure looks
+    right and does nothing — measured, 5 of 5 kills still aborted."""
+    def handle(_sig, _frame):
+        exit_now(plt)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, handle)
+        except (ValueError, OSError):   # not the main thread — not worth failing over
+            pass
+    return handle
+
+
+def make_figure(plt, rows, cols, scale, title):
+    """Build the chart grid, then (re)install the signal handler — one operation, in that
+    order, because separating them silently breaks the clean exit. See
+    `install_signal_exit`: Tk overwrites the OS-level handler while creating this window,
+    so any install that does not follow a `subplots()` call is dead code."""
+    fig, grid = plt.subplots(rows, cols, squeeze=False,
+                             figsize=(cols * 4.2 * scale, rows * 3.0 * scale))
+    try:
+        fig.canvas.manager.set_window_title(title)
+    except Exception:
+        pass
+    install_signal_exit(plt)
+    return fig, [ax for row in grid for ax in row]
+
+
 def build_parser():
     ap = argparse.ArgumentParser()
     ap.add_argument('files', nargs='*', help='PNG files to show (or use --glob)')
@@ -168,6 +230,7 @@ def main():
     plt.ion()
 
     fig = None
+    fignum = None
     axes = []
     absent_checks = 0
     # Startup grace: training (and its first PNG) may not exist for a few refreshes,
@@ -183,13 +246,8 @@ def main():
         if fig is None or len(axes) != rows * cols:
             if fig is not None:
                 plt.close(fig)
-            fig, grid = plt.subplots(rows, cols, squeeze=False,
-                                     figsize=(cols * 4.2 * args.scale, rows * 3.0 * args.scale))
-            try:
-                fig.canvas.manager.set_window_title(args.title)
-            except Exception:
-                pass
-            axes = [ax for row in grid for ax in row]
+            fig, axes = make_figure(plt, rows, cols, args.scale, args.title)
+            fignum = fig.number
         for ax in axes:
             ax.clear()
             ax.axis('off')
@@ -207,6 +265,12 @@ def main():
             # A draw failure never matters to anything but this window.
             sys.stderr.write('viewer draw error ({0}: {1})\n'.format(type(error).__name__, error))
 
+        # Closed by hand: without this the loop would spin on a destroyed figure, and
+        # every redraw is another chance to abort in Tk. Closing the window means done.
+        if fignum is not None and not plt.fignum_exists(fignum):
+            print('chart_viewer: window closed, exiting')
+            exit_now(plt)
+
         if args.watch:
             if _training_alive(args.watch):
                 absent_checks = 0
@@ -218,6 +282,7 @@ def main():
             time.sleep(1)
 
     print('chart_viewer: watched training gone, exiting')
+    exit_now(plt)
 
 
 if __name__ == '__main__':

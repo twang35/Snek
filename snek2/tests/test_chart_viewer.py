@@ -6,6 +6,7 @@ The drawing loop is not covered here — it needs a display. What is covered is 
 opens four windows for one wave or opens none at all.
 """
 import os
+import signal
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -235,6 +236,127 @@ def test_spawn_failure_is_swallowed():
         restore()
         chart_viewer.subprocess.run = saved_run
         chart_viewer.subprocess.Popen = saved_popen
+
+
+class _FakePlt:
+    """Stands in for pyplot: records close() and can be made to fail like a dead Tk."""
+    def __init__(self, raise_on_close=False):
+        self.closed = []
+        self.raise_on_close = raise_on_close
+
+    def close(self, what):
+        if self.raise_on_close:
+            raise RuntimeError('Tk is already gone')
+        self.closed.append(what)
+
+
+def test_exit_now_closes_windows_before_leaving():
+    """Order is the whole point: the Tk windows must be gone *before* the process exits,
+    or a late Tk event calls into a finalising interpreter and aborts (the macOS
+    "python quit unexpectedly" dialog)."""
+    plt = _FakePlt()
+    events = []
+    plt_close = plt.close
+
+    def close(what):
+        events.append('close')
+        plt_close(what)
+    plt.close = close
+    chart_viewer.exit_now(plt, exit_fn=lambda code: events.append('exit{0}'.format(code)))
+    assert events == ['close', 'exit0'], events
+    assert plt.closed == ['all']
+
+
+def test_exit_now_still_exits_when_closing_fails():
+    """A teardown that raises must not leave the viewer alive in a loop it cannot draw."""
+    codes = []
+    chart_viewer.exit_now(_FakePlt(raise_on_close=True), code=3, exit_fn=codes.append)
+    assert codes == [3]
+
+
+def test_install_signal_exit_handles_term_and_int():
+    """`kill <viewer pid>` is how a window gets swapped, so SIGTERM must go through the
+    clean path rather than landing mid Tk event."""
+    saved = {s: signal.getsignal(s) for s in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        handler = chart_viewer.install_signal_exit(_FakePlt())
+        for s in (signal.SIGINT, signal.SIGTERM):
+            assert signal.getsignal(s) is handler, s
+            assert signal.getsignal(s) not in (signal.SIG_DFL, signal.default_int_handler)
+    finally:
+        for s, h in saved.items():
+            signal.signal(s, h)
+
+
+def test_signal_handler_closes_windows():
+    """The installed handler must run the same close-then-exit path, not just exit."""
+    plt = _FakePlt()
+    saved = {s: signal.getsignal(s) for s in (signal.SIGINT, signal.SIGTERM)}
+    real_exit = os._exit
+    exits = []
+    os._exit = exits.append
+    try:
+        handler = chart_viewer.install_signal_exit(plt)
+        handler(signal.SIGTERM, None)
+        assert plt.closed == ['all']
+        assert exits == [0]
+    finally:
+        os._exit = real_exit
+        for s, h in saved.items():
+            signal.signal(s, h)
+
+
+def test_make_figure_installs_the_handler_after_building_the_window():
+    """Order, not just presence. Tk overwrites the OS-level SIGTERM handler while it creates
+    the figure's window, so installing first is dead code — measured: 5 of 5 kills still
+    aborted with the install before `subplots()`. This is why the two are one function."""
+    events = []
+
+    class _Grid(list):
+        pass
+
+    class _Fig:
+        number = 1
+        canvas = None
+
+    class _Plt:
+        def subplots(self, rows, cols, **_kw):
+            events.append('subplots')
+            return _Fig(), [[object() for _ in range(cols)] for _ in range(rows)]
+
+    saved = chart_viewer.install_signal_exit
+    chart_viewer.install_signal_exit = lambda _plt: events.append('install')
+    try:
+        fig, axes = chart_viewer.make_figure(_Plt(), 2, 2, 2.0, 'title')
+        assert events == ['subplots', 'install'], events
+        assert len(axes) == 4
+    finally:
+        chart_viewer.install_signal_exit = saved
+
+
+def test_make_figure_scales_both_dimensions():
+    """--scale 2 has to reach the figsize, or "double the size" silently does nothing."""
+    sizes = {}
+
+    class _Fig:
+        number = 1
+        canvas = None
+
+    class _Plt:
+        def subplots(self, rows, cols, figsize=None, **_kw):
+            sizes['figsize'] = figsize
+            return _Fig(), [[object() for _ in range(cols)] for _ in range(rows)]
+
+    saved = chart_viewer.install_signal_exit
+    chart_viewer.install_signal_exit = lambda _plt: None
+    try:
+        chart_viewer.make_figure(_Plt(), 2, 2, 1.0, 't')
+        one = sizes['figsize']
+        chart_viewer.make_figure(_Plt(), 2, 2, 2.0, 't')
+        two = sizes['figsize']
+        assert two == (one[0] * 2, one[1] * 2), (one, two)
+    finally:
+        chart_viewer.install_signal_exit = saved
 
 
 def test_laptop_defaults_are_one_second_and_double_size():
