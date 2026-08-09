@@ -8,9 +8,10 @@ Type=simple
 User=claw
 WorkingDirectory=/home/claw/Snek/snek2/desktop
 Environment=SNEK_RUNNER_HOST_ENV=/home/claw/Snek/snek2/desktop/config/host.env
-# 60% larger live chart windows on this box's monitor (uniform scale). Inherited
-# by every launched job through the runner's environment; unset elsewhere.
-Environment=SNEK_CHART_SCALE=1.6
+# Enlarge the live chart windows on this box's monitor (uniform dpi scale, tuned
+# by eye for the connected display). Inherited by every launched job through the
+# runner's environment; unset elsewhere so only this box's charts grow.
+Environment=SNEK_CHART_SCALE=3.07
 # The daemon is stdlib-only, so it runs on BASE miniconda python and can start
 # before the `snek` conda env is built. Jobs are launched with PYTHON_BIN from
 # host.env (the conda env python), which is what actually needs TensorFlow.
