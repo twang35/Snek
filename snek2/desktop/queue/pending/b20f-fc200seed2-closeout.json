@@ -3,7 +3,7 @@
   "type": "eval",
   "policy": "b20f-fc200seed2",
   "eval_args": ["top20"],
-  "eval_workers": 10,
+  "eval_workers": 4,
   "env": {"SNEK_FC_LAYERS": "200,100,50"},
   "priority": 20,
   "notes": "full closeout of the 3M treatment arm; SNEK_FC_LAYERS pins the 200,100,50 width for restore (FC trap). Runs only after the training wave drains (wave-barrier)."
