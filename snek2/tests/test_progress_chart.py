@@ -42,30 +42,31 @@ def rows(scores):
 def draw(scores, resume_steps=()):
     """Runs display_progress and returns its figure's axes, newest figure last.
 
-    display_progress closes its own figure, so the axes are captured by patching plt.subplots —
-    less invasive than changing production code to hand a figure back for testing.
+    display_progress builds its figure through the OO API (under_the_hood.Figure) rather than
+    pyplot, to avoid the per-eval matplotlib leak — so the figure is captured by patching that
+    Figure, less invasive than changing production code to hand one back for testing. The score
+    axis is the figure's first (the percent axis is the twinx() second).
     """
     captured = {}
-    real_subplots = plt.subplots
+    real_figure = under_the_hood.Figure
 
     def capture(*args, **kwargs):
-        figure, axis = real_subplots(*args, **kwargs)
+        figure = real_figure(*args, **kwargs)
         captured['figure'] = figure
-        captured['score_axis'] = axis
-        return figure, axis
+        return figure
 
     handle, path = tempfile.mkstemp(suffix='.png')
     os.close(handle)
-    plt.subplots = capture
+    under_the_hood.Figure = capture
     try:
         under_the_hood.display_progress(rows(scores), list(resume_steps), StubScreen(),
                                         graph_path=path)
     finally:
-        plt.subplots = real_subplots
+        under_the_hood.Figure = real_figure
         for leftover in (path, path + '.partial.png'):
             if os.path.exists(leftover):
                 os.remove(leftover)
-    return captured['figure'], captured['score_axis']
+    return captured['figure'], captured['figure'].axes[0]
 
 
 def horizontal_lines(axis):
@@ -181,26 +182,15 @@ def test_a_resume_draws_a_vertical_line_per_restart():
 
 
 def test_the_chart_is_written_and_the_window_updated():
-    captured = {}
-    real_subplots = plt.subplots
-
-    def capture(*args, **kwargs):
-        figure, axis = real_subplots(*args, **kwargs)
-        captured['figure'] = figure
-        return figure, axis
-
     directory = tempfile.mkdtemp()
     path = os.path.join(directory, 'nested', 'arm.png')
     screen = StubScreen()
-    plt.subplots = capture
-    try:
-        under_the_hood.display_progress(rows([50.0, 90.0]), [], screen, graph_path=path)
-    finally:
-        plt.subplots = real_subplots
+    # No figure capture needed: display_progress builds an OO Figure that is not registered
+    # with pyplot, so there is nothing to close -- it is collected when the call returns.
+    under_the_hood.display_progress(rows([50.0, 90.0]), [], screen, graph_path=path)
     assert screen.frames == 1
     assert os.path.exists(path), 'the PNG was not written'
     assert not os.path.exists(path + '.partial.png'), 'the temporary file was left behind'
-    plt.close(captured['figure'])
     os.remove(path)
     os.rmdir(os.path.dirname(path))
     os.rmdir(directory)

@@ -4,7 +4,8 @@ import snake_constants
 from snake_constants import *
 
 import imageio
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import numpy as np
 import os
 import random
@@ -208,7 +209,16 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     # the monitor; unset (1.0) elsewhere. Scaling dpi rather than figsize keeps
     # text and line weights proportional.
     chart_scale = float(os.environ.get('SNEK_CHART_SCALE', '1.0'))
-    fig, score_axis = plt.subplots(figsize=(3.65, 2.25), dpi=100 * chart_scale)
+    # Build the figure through the OO API (Figure + FigureCanvasAgg) rather than
+    # plt.subplots(). pyplot registers every figure in a process-global manager (Gcf)
+    # and a callback registry, and in this matplotlib version plt.close() does not fully
+    # release them -- so a new figure per eval leaked Line2D/Text/Transform artists and
+    # grew the trainer ~1 MB/eval (worse at high SNEK_CHART_SCALE, where it OOM'd the
+    # desktop). A bare Figure() is never registered, so it is freed when it goes out of
+    # scope and there is nothing to close. Do NOT switch this back to plt.subplots.
+    fig = Figure(figsize=(3.65, 2.25), dpi=100 * chart_scale)
+    FigureCanvasAgg(fig)
+    score_axis = fig.add_subplot(1, 1, 1)
     steps = [row['step'] for row in eval_rows]
     scores = [row['avg_score'] for row in eval_rows]
     perfect_percents = [row['perfect_percent'] for row in eval_rows]
@@ -289,7 +299,8 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
         partial = graph_path + '.partial.png'
         imageio.imwrite(partial, image)
         os.replace(partial, graph_path)
-    plt.close(fig)
+    # No plt.close(): this Figure was never registered with pyplot, so it is collected
+    # normally when the function returns. That is the whole point of the OO API above.
 
 
 def create_policy_eval_video(eval_py_env, eval_env, policy, filename, num_episodes=5, fps=30):
