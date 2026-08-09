@@ -181,8 +181,9 @@ def test_dedupe_allows_the_first_launch():
 
 
 def test_spawn_command_is_detached_and_watches_its_own_batch():
-    """The argv and the Popen flags are the contract: relative glob (so cwd must be the
-    snek2 dir), a watch pattern for this batch only, own session, closed fds."""
+    """The argv and the Popen flags are the contract: the batch whose live arms to show, a
+    watch pattern for this batch only, own session, closed fds, and a cwd holding the
+    relative `runs/` paths the viewer builds."""
     saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
     captured = {}
 
@@ -204,7 +205,7 @@ def test_spawn_command_is_detached_and_watches_its_own_batch():
         proc = chart_viewer.spawn_for_policy('b20c-fc50seed3')
         assert proc is not None
         argv, kw = captured['argv'], captured['kw']
-        assert argv[argv.index('--glob') + 1] == 'runs/b20*.png'
+        assert argv[argv.index('--arms') + 1] == 'b20'
         assert argv[argv.index('--watch') + 1] == 'snek2.py b20'
         assert argv[2].endswith('chart_viewer.py')
         assert kw['start_new_session'] is True
@@ -236,6 +237,209 @@ def test_spawn_failure_is_swallowed():
         restore()
         chart_viewer.subprocess.run = saved_run
         chart_viewer.subprocess.Popen = saved_popen
+
+
+def _fake_ps(lines):
+    """Stub subprocess.run so pgrep reports pids and ps returns `lines`."""
+    class _Res:
+        def __init__(self, out):
+            self.stdout = out
+
+    def run(args, **_kw):
+        if args[0] == 'pgrep':
+            return _Res(b'\n'.join(str(1000 + i).encode() for i in range(len(lines))) + b'\n')
+        return _Res('\n'.join(lines).encode())
+    return run
+
+
+TRAINERS = [
+    ' 1001 /opt/miniconda3/envs/snek/bin/python -u snek2.py b20i-fc200x50seed1',
+    ' 1002 /opt/miniconda3/envs/snek/bin/python -u snek2.py b20j-fc200x50seed2',
+]
+
+
+def test_live_arms_reads_policy_names_off_the_command_line():
+    """The window has to show the arms that were launched, not a batch-wide glob."""
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps(TRAINERS)
+    try:
+        assert chart_viewer.live_arms('b20') == ['b20i-fc200x50seed1', 'b20j-fc200x50seed2']
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_live_arms_does_not_merge_b2_into_b20():
+    """`'b20a'.startswith('b2')` is True, so a prefix test would quietly merge two batches.
+    Membership goes through batch_prefix instead."""
+    saved = chart_viewer.subprocess.run
+    lines = TRAINERS + [' 1003 python -u snek2.py b2a-oldarm']
+    chart_viewer.subprocess.run = _fake_ps(lines)
+    try:
+        assert chart_viewer.live_arms('b2') == ['b2a-oldarm']
+        assert 'b2a-oldarm' not in chart_viewer.live_arms('b20')
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_live_arms_excludes_other_batches_and_non_trainers():
+    saved = chart_viewer.subprocess.run
+    lines = TRAINERS + [
+        ' 1003 python -u snek2.py b21a-nextbatch',
+        ' 1004 python -u eval_checkpoints.py b20i-fc200x50seed1 top20',
+        ' 1005 curl -X POST https://telemetry/…snek2/snek2.py…',
+    ]
+    chart_viewer.subprocess.run = _fake_ps(lines)
+    try:
+        arms = chart_viewer.live_arms('b20')
+        assert arms == ['b20i-fc200x50seed1', 'b20j-fc200x50seed2'], arms
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_live_arms_ignores_a_bare_snek2_invocation():
+    """`snek2.py` with no policy argument must be skipped, not indexed past.
+
+    The bare line is paired with a real trainer deliberately: asserting only that the bare
+    line yields nothing passes even when the code raises IndexError, because live_arms
+    swallows exceptions and returns []. The real arm surviving is what proves it was skipped
+    rather than crashed over.
+    """
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps([' 1001 python -u snek2.py'] + TRAINERS)
+    try:
+        assert chart_viewer.live_arms('b20') == [
+            'b20i-fc200x50seed1', 'b20j-fc200x50seed2']
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_live_arms_only_takes_a_name_from_a_python_invocation():
+    """Mentioning the file is not running it.
+
+    `pgrep -f snek2.py` matches any command line containing the string, and plenty do: git
+    commands listing pathspecs, and the Airbnb git-telemetry curl whose JSON payload carries
+    repo paths — that class already misread trainer counts as 6 when 4 were running. The
+    fixture is the case that actually discriminates: a non-python command whose *next* token
+    is `b20z-notanarm`, which `batch_prefix` does read as a b20 arm, so nothing upstream
+    rejects it and only the python check can. (`b20zz-...` does *not* parse as an arm, so a
+    fixture using that name tests nothing — it is rejected before this code is reached.)
+    """
+    saved = chart_viewer.subprocess.run
+    assert chart_viewer.batch_prefix('b20z-notanarm') == 'b20', 'fixture must look like an arm'
+    noise = [' 1098 git ls-files snek2/snek2.py b20z-notanarm',
+             ' 1099 curl -X POST https://drnick/v1/tracking -d {"paths":["snek2/snek2.py"]}']
+    chart_viewer.subprocess.run = _fake_ps(noise + TRAINERS)
+    try:
+        arms = chart_viewer.live_arms('b20')
+        assert arms == ['b20i-fc200x50seed1', 'b20j-fc200x50seed2'], arms
+        assert 'b20z-notanarm' not in arms
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_live_arms_returns_empty_when_it_cannot_look():
+    """Unknown means "nothing to add" — never "drop the arms already on screen"."""
+    saved = chart_viewer.subprocess.run
+
+    def boom(*_a, **_kw):
+        raise OSError('no ps here')
+    chart_viewer.subprocess.run = boom
+    try:
+        assert chart_viewer.live_arms('b20') == []
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_wave_files_grows_as_siblings_start():
+    """A wave's four arms start seconds apart, so the panel set has to fill in."""
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS[:1])
+        assert chart_viewer.wave_files('b20', known) == ['runs/b20i-fc200x50seed1.png']
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS)
+        assert chart_viewer.wave_files('b20', known) == [
+            'runs/b20i-fc200x50seed1.png', 'runs/b20j-fc200x50seed2.png']
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_wave_files_keeps_an_arm_that_has_finished():
+    """The first arm to hit its cap must keep its panel — the finished curve is the reference
+    the still-running siblings are read against. Also means a transient ps failure or a race
+    cannot blank the window."""
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS)
+        chart_viewer.wave_files('b20', known)
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS[1:])   # seed1 reached 3M and exited
+        assert chart_viewer.wave_files('b20', known) == [
+            'runs/b20i-fc200x50seed1.png', 'runs/b20j-fc200x50seed2.png']
+        chart_viewer.subprocess.run = _fake_ps([])             # whole wave gone
+        assert len(chart_viewer.wave_files('b20', known)) == 2
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_wave_files_never_shows_a_finished_arm_from_an_earlier_wave():
+    """The bug this replaces: globbing runs/b20*.png matched eight finished arms plus the four
+    live ones, giving a window taller than the screen by wave 2."""
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps(TRAINERS)
+    try:
+        files = chart_viewer.wave_files('b20', [])
+        assert not any('fc50seed' in f for f in files), files
+        assert len(files) == 2
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_auto_launch_scopes_the_window_to_the_running_arms():
+    """The spawned argv must ask for the arms, not the batch glob, and dedupe on that."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+    captured = {}
+
+    class _Res:
+        stdout = b''
+
+    class _Proc:
+        pid = 1
+
+    chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
+    chart_viewer.subprocess.Popen = lambda argv, **kw: (captured.setdefault('argv', argv), _Proc())[1]
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    try:
+        chart_viewer.spawn_for_policy('b20i-fc200x50seed1')
+        argv = captured['argv']
+        assert argv[argv.index('--arms') + 1] == 'b20'
+        assert '--glob' not in argv, argv
+    finally:
+        restore()
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+
+
+def test_dedupe_keys_on_the_arms_flag_so_two_batches_get_two_windows():
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps(
+        [' 4242 python -u chart_viewer.py --arms b19 --watch snek2.py b19'])
+    try:
+        # _matching_commands strips chart_viewer lines, so ask viewer_running_for directly
+        # against a ps stub that keeps them.
+        class _Res:
+            def __init__(self, out):
+                self.stdout = out
+
+        def run(args, **_kw):
+            if args[0] == 'pgrep':
+                return _Res(b'4242\n')
+            return _Res(b'/py -u chart_viewer.py --arms b19 --watch snek2.py b19\n')
+        chart_viewer.subprocess.run = run
+        assert chart_viewer.viewer_running_for('--arms b19') is True
+        assert chart_viewer.viewer_running_for('--arms b20') is False
+    finally:
+        chart_viewer.subprocess.run = saved
 
 
 class _FakePlt:

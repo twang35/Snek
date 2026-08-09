@@ -366,11 +366,20 @@ progress shows up, and costs training nothing. `WATCH_FPS` caps the frame rate (
 20-30 to follow the moves).
 
 **A laptop training launch opens its own chart window** — `snek2.main()` calls
-`chart_viewer.spawn_for_policy()`, so no one has to remember to start one. It shows the *batch*, not
-the arm (`b20a-fc50seed1` → glob `runs/b20*.png`), so a wave of four arms shares one window and the
-first arm to start opens it; the dedupe matches on that glob, so a second batch still gets its own.
-It refreshes every 1s at 2x size, watches `snek2.py <prefix>` and exits on its own once the batch
-stops. `SNEK_CHART_VIEWER=0` turns it off; smoke runs and `eval_only` never open one.
+`chart_viewer.spawn_for_policy()`, so no one has to remember to start one. One window per *wave*: the
+first arm to start opens it and the other three share it, and the dedupe keys on `--arms <prefix>` so a
+second batch still gets its own. It refreshes every 1s at 2x size, watches `snek2.py <prefix>` and exits
+on its own once the batch stops. `SNEK_CHART_VIEWER=0` turns it off; smoke runs and `eval_only` never
+open one.
+
+**`--arms <prefix>` shows the arms that are *running*, not `runs/<prefix>*.png`.** The glob ages badly —
+by batch 20 wave 2 it matched eight finished arms plus four live ones, which at 2x scale is a window
+taller than the screen. `chart_viewer.live_arms()` reads policy names off the process list each refresh
+and the set is **sticky**: an arm that reaches its cap keeps its panel while its siblings run, which is
+the point, since the finished curve is the reference. Two traps it has to dodge, both with fixtures:
+`pgrep -f snek2.py` matches any command line *containing* the string (git pathspecs, the telemetry
+`curl`), so a name is only taken from a line that also runs `python`; and membership is
+`batch_prefix(policy) == prefix`, never `startswith`, because `'b20a'.startswith('b2')` is true.
 
 It is off by default anywhere but darwin, because on the desktop the runner daemon owns the viewer
 (`desktop/runner/runner.py::_ensure_viewer`) — it injects the graphical session's

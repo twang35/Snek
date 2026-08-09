@@ -15,8 +15,9 @@ On the laptop a training launch starts one of these itself — `snek2.main()` ca
 window. See that function for the gate and the dedupe.
 
 Usage:
-  python chart_viewer.py runs/b20e-*.png runs/b20f-*.png ...   # explicit files, or
-  python chart_viewer.py --glob 'runs/b20*.png'                # a glob, re-read each refresh
+  python chart_viewer.py --arms b20            # the b20 arms that are actually running
+  python chart_viewer.py runs/b20e-*.png ...   # explicit files, or
+  python chart_viewer.py --glob 'runs/b20*.png'   # a glob, re-read each refresh
     [--watch 'snek2.py b20']   pgrep -f pattern; exit once nothing matches (training stopped)
     [--interval 1]             refresh seconds
     [--scale 2]                window size multiplier
@@ -33,6 +34,80 @@ import tempfile
 import time
 
 
+def _matching_commands(pattern):
+    """Command lines of processes matching `pattern` (pgrep -f), excluding viewers.
+
+    Our own pid and every other `chart_viewer.py` are dropped, because the watched pattern
+    is an *argument* on the viewer's own command line -- a naive pgrep matches the viewer
+    itself. Uses `ps` for the cmdline text so it works on macOS (no /proc) as well as Linux.
+    Raises on failure; callers decide what an unanswerable check means, which differs
+    between "is training alive" (keep showing) and "which arms are live" (show none new).
+    """
+    res = subprocess.run(['pgrep', '-f', pattern],
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    mine = str(os.getpid())
+    pids = [p for p in res.stdout.decode().split() if p and p != mine]
+    if not pids:
+        return []
+    args = ['ps', '-o', 'pid=,command=']
+    for p in pids:
+        args += ['-p', p]
+    ps = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    return [line for line in ps.stdout.decode('utf-8', 'replace').splitlines()
+            if line.strip() and 'chart_viewer.py' not in line]
+
+
+def live_arms(prefix):
+    """Policy names of running trainers belonging to batch `prefix`.
+
+    This is what lets a window show *the arms that were launched* rather than every chart
+    the batch has ever produced. Globbing `runs/b20*.png` was the alternative and it ages
+    badly: by wave 2 that glob matched eight finished arms plus four live ones, which at 2x
+    scale is a window taller than the screen.
+
+    Membership is `batch_prefix(policy) == prefix`, not `startswith` -- `'b20a'.startswith('b2')`
+    is True, so a prefix test would quietly merge b2 into b20.
+
+    A name is only taken from something that is actually **running python**: the line must
+    contain a `python` token before the script, and the script token must be `snek2.py` or
+    `.../snek2.py`. Merely mentioning the file is not enough, because plenty of commands do --
+    `git ls-files snek2/snek2.py b20i-fc200x50seed1` would otherwise donate its next argument
+    as an arm name, and Airbnb git telemetry fires curl processes whose payload lists repo
+    paths. That class of false positive has already misread trainer counts twice here.
+    """
+    arms = []
+    try:
+        for line in _matching_commands('snek2.py'):
+            parts = line.split()
+            for i, token in enumerate(parts):
+                if not (token == 'snek2.py' or token.endswith('/snek2.py')):
+                    continue
+                if not any('python' in earlier for earlier in parts[:i]):
+                    break       # not a python invocation — this line names no arm
+                if i + 1 < len(parts):
+                    policy = parts[i + 1]
+                    if batch_prefix(policy) == prefix and policy not in arms:
+                        arms.append(policy)
+                    break
+    except Exception:
+        return []       # unknown means "nothing new to add", never "drop what we have"
+    return sorted(arms)
+
+
+def wave_files(prefix, known):
+    """PNG paths for batch `prefix`'s arms, adding any newly-seen live arm to `known`.
+
+    Sticky on purpose: `known` is mutated and never pruned, so an arm that reaches its step
+    cap keeps its panel while its siblings run. That is the point of watching a wave — the
+    finished curve is what the others get compared against — and it also means a transient
+    `ps` failure cannot blank the window.
+    """
+    for policy in live_arms(prefix):
+        if policy not in known:
+            known.append(policy)
+    return [os.path.join('runs', policy + '.png') for policy in sorted(known)]
+
+
 def _training_alive(pattern):
     """True while any process *other than this viewer* matches `pattern` (pgrep -f).
 
@@ -44,20 +119,7 @@ def _training_alive(pattern):
     if not pattern:
         return True
     try:
-        res = subprocess.run(['pgrep', '-f', pattern],
-                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        mine = str(os.getpid())
-        pids = [p for p in res.stdout.decode().split() if p and p != mine]
-        if not pids:
-            return False
-        args = ['ps', '-o', 'pid=,command=']
-        for p in pids:
-            args += ['-p', p]
-        ps = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        for line in ps.stdout.decode('utf-8', 'replace').splitlines():
-            if line.strip() and 'chart_viewer.py' not in line:
-                return True   # a real watched (training/eval) process
-        return False
+        return bool(_matching_commands(pattern))
     except Exception:
         return True
 
@@ -120,7 +182,7 @@ def spawn_for_policy(policy_name):
     if not viewer_enabled() or policy_name.startswith('smoke'):
         return None
     prefix = batch_prefix(policy_name)
-    pattern = 'runs/{0}*.png'.format(prefix)
+    pattern = '--arms {0}'.format(prefix)
     if viewer_running_for(pattern):
         return None
     try:
@@ -131,13 +193,13 @@ def spawn_for_policy(policy_name):
                                 'snek_chart_viewer_{0}.log'.format(prefix))
         log = open(log_path, 'ab')
         argv = [sys.executable, '-u', os.path.join(here, 'chart_viewer.py'),
-                '--glob', pattern,
+                '--arms', prefix,
                 '--watch', 'snek2.py {0}'.format(prefix),
                 '--title', 'snek {0} — live'.format(prefix)]
         proc = subprocess.Popen(argv, cwd=here, stdout=log, stderr=log,
                                 start_new_session=True, close_fds=True)
-        print('chart viewer: pid {0} watching {1} (log {2}; SNEK_CHART_VIEWER=0 to disable)'
-              .format(proc.pid, pattern, log_path))
+        print('chart viewer: pid {0} showing the live {1} arms '
+              '(log {2}; SNEK_CHART_VIEWER=0 to disable)'.format(proc.pid, prefix, log_path))
         return proc
     except Exception as error:
         print('chart viewer launch failed ({0}: {1}) — training continues'
@@ -211,6 +273,9 @@ def build_parser():
     ap.add_argument('files', nargs='*', help='PNG files to show (or use --glob)')
     ap.add_argument('--glob', default=None, help='glob for PNGs, re-evaluated each refresh')
     ap.add_argument('--watch', default=None, help='pgrep -f pattern; exit when no match remains')
+    ap.add_argument('--arms', default=None, metavar='PREFIX',
+                    help='show only the arms of batch PREFIX that are actually running '
+                         '(re-checked each refresh, and remembered once seen)')
     # 1s refresh and 2x size are the laptop defaults: a chart is rewritten once per eval,
     # so re-reading every second costs a stat plus a small PNG decode and shows a new point
     # as soon as it exists. The desktop runner passes its own --interval/--scale.
@@ -232,14 +297,18 @@ def main():
     fig = None
     fignum = None
     axes = []
+    wave_arms = []
     absent_checks = 0
     # Startup grace: training (and its first PNG) may not exist for a few refreshes,
     # so require the watch pattern to be absent on several consecutive checks first.
     GRACE = 6
 
     while True:
-        files = sorted(args.files) if args.files else (
-            sorted(globmod.glob(args.glob)) if args.glob else [])
+        if args.arms:
+            files = wave_files(args.arms, wave_arms)
+        else:
+            files = sorted(args.files) if args.files else (
+                sorted(globmod.glob(args.glob)) if args.glob else [])
         n = max(1, len(files))
         cols = 2 if n > 1 else 1
         rows = (n + cols - 1) // cols
