@@ -64,6 +64,13 @@ Batch 19's close-out also finished on the laptop overnight.
 > 16,403 params, 1.38× the control, depth 2. **Any eval or `watch.py` on these checkpoints needs
 > `SNEK_FC_LAYERS=200,50`.**
 
+> **Wave 2 `320` RUNNING (queued 2026-08-09, desktop `the-claw-den`).** Four fresh seeds,
+> `b20{m,n,o,p}-fc320seed{1-4}`, `SNEK_FC_LAYERS=320`, `SNEK_MAX_STEPS=3000000`, rest identical to the
+> control. The depth-1 arm (10,883 params, 0.92× control) — the cleanest single finding available: it
+> holds capacity roughly constant and removes all depth, so matching the control means depth contributes
+> nothing here. Their full closeouts are queued behind them at priority 20; the wave-barrier launches
+> them only once all four self-terminate at 3M. **Any eval / `watch.py` needs `SNEK_FC_LAYERS=320`.**
+
 #### Control at 3M — the numbers every shape is read against
 
 | arm | peak trailing | best-30 | `sef` | max drawdown | close-out pooled | best row |
