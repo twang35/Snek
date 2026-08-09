@@ -87,31 +87,44 @@ git switch master
 ## Part 3 — Install the runner (🤖 over SSH, or 🖥️ on the desktop)
 
 ```bash
+# git identity -- REQUIRED, or the daemon's commits to the bus branches fail
+# silently and nothing is ever published.
+git config --global user.name  "snek-runner"
+git config --global user.email "snek-runner@$(hostname)"
+
 # clone via the deploy remote so pushes use the deploy key
-git clone github-snek:twang35/Snek.git /home/snek/Snek
-cd /home/snek/Snek
+git clone github-snek:twang35/Snek.git /home/claw/Snek
+cd /home/claw/Snek
+
+# system libs for opencv's GUI (the live chart window)
+sudo apt-get install -y libgl1 libglib2.0-0
 
 # conda env
 source ~/miniconda3/etc/profile.d/conda.sh
 conda env create -f snek2/desktop/environment.yml
 conda activate snek
-python -c "import tensorflow, tf_agents, cpprb, pygame; print('env OK')"
+python -c "import tensorflow, tf_agents, cpprb, pygame, imageio, pyformulas, cv2; print('env OK')"
 
 # worktrees for the two desktop-written branches (outside the main checkout)
 git fetch origin ops-status results
-git worktree add -B ops-status /home/snek/snek-bus/status  origin/ops-status
-git worktree add -B results    /home/snek/snek-bus/results origin/results
+git worktree add -B ops-status /home/claw/snek-bus/status  origin/ops-status
+git worktree add -B results    /home/claw/snek-bus/results origin/results
 
-# host config
+# host config -- example already has this box's paths + DISPLAY/XAUTHORITY.
+# Adjust XAUTHORITY if the graphical session's cookie path differs (see the
+# comment in host.env.example for how to find it).
 cp snek2/desktop/config/host.env.example snek2/desktop/config/host.env
-#   edit host.env if the user/paths differ from the defaults
 
-# systemd service
+# systemd service (daemon runs on base python; jobs use the env python)
 sudo cp snek2/desktop/systemd/snek-runner.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now snek-runner
 systemctl status snek-runner --no-pager
 ```
+
+Live chart windows appear on the desktop's monitor via the `DISPLAY`/`XAUTHORITY`
+in `host.env`. Jobs still run and save their PNG charts if the display is
+unavailable (the window is best-effort).
 
 ---
 

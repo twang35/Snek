@@ -87,7 +87,16 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
     # Reset the train step.
     # agent.train_step_counter.assign(0)
 
-    screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
+    # Best-effort live results window. A headless box (no cv2 / no display) skips
+    # it and still writes the PNG + report every eval, so training runs fine on a
+    # server -- only the on-screen convenience is lost. pyformulas imports cv2
+    # lazily inside screen(), so the failure surfaces here rather than at import.
+    try:
+        screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
+    except Exception as _e:
+        print('live results window unavailable ({0}: {1}); charts still saved to disk'.format(
+            type(_e).__name__, _e))
+        screen = None
     # Every eval refreshes the window and these three files, so a run always leaves
     # behind its own graph and write-up without anyone having to screenshot it.
     graph_path = os.path.join(snake_constants.RUNS_DIR, '{0}.png'.format(policy_name))

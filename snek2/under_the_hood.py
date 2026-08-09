@@ -274,7 +274,8 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     # matplotlib produces RGB — so passing `image` straight through swapped red and blue in the
     # window, making the blue score trace look red and vice versa. The saved PNG was always
     # correct, which is why this went unnoticed. Reverse the channels for the window only.
-    screen.update(image[:, :, ::-1])
+    if screen is not None:  # None on a headless box; the PNG below is the durable chart
+        screen.update(image[:, :, ::-1])
     if graph_path is not None:
         # Same array that goes to the window, so the file always matches what's
         # on screen. Written beside the target and renamed so anything reading it

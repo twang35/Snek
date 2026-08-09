@@ -28,6 +28,16 @@ def build_command(job, host, runtime):
         env['OMP_NUM_THREADS'] = str(runtime['omp_num_threads'])
     env.update(job.env)  # per-job SNEK_* overrides win
 
+    # Put the job's live chart window on the desktop's session display, if host.env
+    # names one. The runner is a systemd service outside the graphical session, so a
+    # launched job only reaches the monitor with the session's DISPLAY + X authority.
+    # If it can't (display gone), training.py's window is best-effort and the job
+    # still runs and writes its PNG.
+    if host.get('DISPLAY'):
+        env.setdefault('DISPLAY', host['DISPLAY'])
+        if host.get('XAUTHORITY'):
+            env.setdefault('XAUTHORITY', host['XAUTHORITY'])
+
     if job.type == 'eval':
         argv = [py, '-u', 'eval_checkpoints.py', job.policy] + list(job.eval_args)
         env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 10))
