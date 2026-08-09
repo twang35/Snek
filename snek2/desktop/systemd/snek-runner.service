@@ -11,12 +11,17 @@ Environment=SNEK_RUNNER_HOST_ENV=/home/claw/Snek/snek2/desktop/config/host.env
 # Live chart window OFF on this box. An X11 session under memory pressure can
 # break and fatally XIO-crash a training run (all four arms died this way on
 # 2026-08-09); charts are still written as PNGs (runs/<policy>.png).
-# SNEK_CHART_SCALE left at the default 1.0: it only sets the PNG dpi, the decoupled
-# chart_viewer.py already scales the on-screen display, and a high value used to
-# amplify the (now-fixed) matplotlib per-eval leak in display_progress. Raise it only
-# if a sharper PNG is wanted -- it is cosmetic now, not a memory risk.
+# SNEK_CHART_SCALE sets the PNG render dpi (dpi = 100 * scale). The decoupled
+# chart_viewer.py only *magnifies* whatever raster the trainer wrote, so a low dpi
+# looks blurry blown up: at 1.0 the PNG is 365x225 px and the viewer's 1.5x window
+# upscales it. Set to 2.0 to match the laptop viewer's 2x magnification -- crisp,
+# and downsampled cleanly at the desktop viewer's 1.5x. It is cosmetic and safe to
+# raise now that the matplotlib per-eval leak in display_progress is fixed; the old
+# value used to amplify that leak, which no longer exists.
+# NOTE: env is baked at trainer launch, so a change here applies to *future* jobs,
+# not to arms already running.
 Environment=SNEK_CHART_WINDOW=0
-Environment=SNEK_CHART_SCALE=1.0
+Environment=SNEK_CHART_SCALE=2.0
 # The daemon is stdlib-only, so it runs on BASE miniconda python and can start
 # before the `snek` conda env is built. Jobs are launched with PYTHON_BIN from
 # host.env (the conda env python), which is what actually needs TensorFlow.
