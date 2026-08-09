@@ -1,6 +1,0 @@
-{
-  "id": "smoke-2",
-  "type": "smoke",
-  "max_steps": 3000,
-  "notes": "re-verify after adding imageio + pyformulas"
-}

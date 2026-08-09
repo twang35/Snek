@@ -1,6 +1,0 @@
-{
-  "id": "smoke-1",
-  "type": "smoke",
-  "max_steps": 3000,
-  "notes": "verify the box runs the trainer end to end; output isolated in savedPolicies/smoke/"
-}
