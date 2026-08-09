@@ -16,6 +16,7 @@ re-adopts still-running jobs by pid.
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 
@@ -94,7 +95,33 @@ class Runner:
             self._dispatch()
         for rj in self.running.values():
             launch.update_throughput(rj, self.host)
+        self._ensure_viewer()
         self._publish()
+
+    def _ensure_viewer(self):
+        """Best-effort: while trainers run, keep one decoupled chart viewer up on the
+        display. It is a *separate* process (never a child of a trainer), so it can
+        never affect training, and it exits itself when the trainers stop (--watch).
+        A launch failure is logged and ignored -- a chart is never worth a job."""
+        if not self.runtime.get('viewer', True) or not self.running:
+            return
+        try:
+            # One already up? (also catches the case across a daemon restart.)
+            if subprocess.run(['pgrep', '-f', 'chart_viewer.py'],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+                return
+            pngs = [os.path.join(self.host['SNEK_DIR'], 'runs', rj.policy + '.png')
+                    for rj in self.running.values() if rj.policy]
+            if not pngs:
+                return
+            os.makedirs(self.host['LOG_DIR'], exist_ok=True)
+            log = open(os.path.join(self.host['LOG_DIR'], 'chart_viewer.log'), 'ab')
+            argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
+                   ['--watch', 'snek2.py', '--interval', '10', '--title', 'snek training']
+            subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=dict(os.environ),
+                             stdout=log, stderr=log, start_new_session=True, close_fds=True)
+        except Exception as e:
+            sys.stderr.write('viewer launch failed: {0}\n'.format(e))
 
     def _apply_runtime(self):
         cfg, notes = cfgmod.parse_runtime_config(gitbus.read_runtime_text(self.host), self.host)

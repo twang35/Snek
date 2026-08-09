@@ -24,11 +24,12 @@ RUNTIME_DEFAULTS = {
     'disk_min_gb': 5,         # refuse to launch below this much free space
     'paused': False,          # finish running jobs, start nothing new
     'drain': False,           # alias of paused, kept separate for intent
+    'viewer': True,           # keep a decoupled chart viewer up while trainers run
 }
 
 _INT_KEYS = ('max_trainers', 'max_evals', 'eval_workers', 'poll_seconds',
              'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
-_BOOL_KEYS = ('paused', 'drain')
+_BOOL_KEYS = ('paused', 'drain', 'viewer')
 
 _REQUIRED_HOST = ('REPO_PATH', 'SNEK_DIR', 'PYTHON_BIN', 'GIT_REMOTE',
                   'OPS_BRANCH', 'STATUS_BRANCH', 'RESULTS_BRANCH',
