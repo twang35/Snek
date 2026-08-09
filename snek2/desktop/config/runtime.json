@@ -1,7 +1,7 @@
 {
-  "max_trainers": 2,
+  "max_trainers": 4,
   "max_evals": 1,
-  "eval_workers": 8,
+  "eval_workers": 4,
   "poll_seconds": 30,
   "tf_intraop_threads": 0,
   "omp_num_threads": 0,
