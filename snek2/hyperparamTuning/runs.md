@@ -14,11 +14,14 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 
 ## Batch 20 — FC layer shapes, on batch 19's base
 
-**Wave 1 done (2026-08-09), all eight arms stopped.** Per-arm numbers and charts:
+**Wave 1 control done and closed out; capacity half is re-running to 3M (2026-08-09).** Per-arm numbers
+and charts:
 [`charts.md`](charts.md#batch-20-wave-1--fc-layer-capacity-fc_layers-the-first-architecture-test-stopped-at-173-278m).
 Batch 19's close-out also finished on the laptop overnight.
 
-- **Control `50,100,50` (`b20a-d`, laptop)** ran to 2.49-2.78M and stopped clean.
+- **Control `50,100,50` (`b20a-d`, laptop) is finished and closed out.** Resumed from ~2.5M and all four
+  self-terminated at **3.000M**; close-out ran on the laptop 2026-08-09 in 45 min. It is now the
+  seed-matched control every later shape reads against.
 - **Capacity `200,100,50` (`b20e-h`, desktop, 2.66× params)** crashed together in the OOM→XIO cascade at
   **~1.75M** — checkpoints preserved, and no arm was on a bad trajectory (all `zero_since` null, still
   climbing). The cause is fixed since: the live chart window is off by default and replaced by the
@@ -29,14 +32,64 @@ Batch 19's close-out also finished on the laptop overnight.
 11 has held. But the two hosts stopped ~0.8M apart, so **this is not a matched-horizon comparison** and
 `strong_eval_fraction` (a fraction of each arm's own evals) is not comparable across the two columns yet.
 
-> **Decision pending — do not start without the user.** Either rerun the capacity arm to 2.5M for a clean
-> matched read, or truncate the control to ~1.75M and read the existing data. The desktop is safe to rerun
-> now, **but the max-eval-worker RAM test is still owed first** (message 22) so a safe `EVAL_WORKERS` can be
-> picked. **Wave 2 is on hold until wave 1's control is settled**, because every later shape reads against
-> it and the β-moved-with-architecture confound needs that control clean.
+> **Treatment rerun RUNNING (launched 2026-08-09, desktop).** The four `200,100,50` arms resumed from
+> their ~1.8M checkpoints to **3M** — daemon jobs `b20{e,f,g,h}-fc200seed{1-4}-3m` (new ids, same policies
+> so they restore their own checkpoints), one 4-trainer wave. Steady ~4.5 GB, charts on the monitor. ETA
+> ~8h from launch. **When done: fetch from the `results` branch into `runs/`, then read the treatment
+> against the control at a matched ~2.5M horizon.** Only then decide wave 2 — it stays on hold until this
+> control-vs-treatment comparison is settled (the β-moved-with-architecture confound needs it clean).
+>
+> Memory question that gated this is **answered**: 4 trainers × 10 *forked* self-eval workers cost only
+> ~4.2 GB (COW-shared TF), nowhere near the 14 GB ceiling — the overnight OOM was the cv2/XIO cascade, not
+> steady memory. Standalone (spawned) eval workers are the heavy ones: ~230 MB each, OOM-killer at ~52,
+> safe budget ~40.
+>
+> **Amended 2026-08-09: wave 2's `200,50` half went ahead anyway, at the user's direction.** The hold
+> above was about the *control* being settled, and it now is — `b20a-d` finished at 3M and closed out. The
+> treatment rerun only gates the **capacity** verdict (`200,100,50`), not the wide-early one, which reads
+> against the control. `320`, wave 2's other half, has **not** been run.
 
-**FC trap — permanent, not just for wave 1:** any eval / `watch.py` / close-out of a `200,100,50`
-checkpoint **must** pass `SNEK_FC_LAYERS=200,100,50`, or `restore()` silently mismatches the net (see below).
+> **Wave 2 `200,50` RUNNING (launched 2026-08-09, laptop).** Four seeds, `b20{i,j,k,l}-fc200x50seed{1-4}`,
+> `SNEK_MAX_STEPS=3000000`, all four confirmed on the `hyperparameter override:` line as `FC_LAYERS =
+> (200, 50)` with β=300k and the rest identical to `b20a-d`. Logs `/tmp/b20[ijkl]-fc200x50seed*.log`.
+> **Read against the control table below at a matched 3M** — both halves now run to 3M, which supersedes
+> the pre-registration's 2.5M `max_steps`; the *batch 19* secondary read still caps at ~2.0M.
+> 16,403 params, 1.38× the control, depth 2. **Any eval or `watch.py` on these checkpoints needs
+> `SNEK_FC_LAYERS=200,50`.**
+
+#### Control at 3M — the numbers every shape is read against
+
+| arm | peak trailing | best-30 | `sef` | max drawdown | close-out pooled | best row |
+|---|---|---|---|---|---|---|
+| `b20a` | 93.80 | 41.3 | 0.2% | 7.66 | 33.2% | 52.0% @2000k (n=25) |
+| `b20b` | 94.84 | 78.3 | 16.2% | 4.26 | 62.7% | 83.3% @1802k (n=36) |
+| `b20c` | 94.34 | 56.3 | 2.2% | 5.06 | 52.8% | 68.0% @1919k (n=25) |
+| `b20d` | 94.76 | 80.3 | 26.3% | 4.68 | **71.3%** | 89.7% @384k (n=58) |
+| mean | **94.44** | 64.05 | 11.2% | **5.41** | 55.0% | — |
+
+**No arm produced a full-length row.** At gate 95 every measurement was abandoned, deepest 58 of 100
+episodes, so the best-row column is a *bound* and is not comparable across arms or with earlier batches —
+`pooled_equal_effort` is the exact column. Nothing cleared 95%, so no hall-of-fame candidate; the record
+stays `b18b @1588000` at 97.6%.
+
+**‡ β=300k is a wash on ceiling and slightly *better* on drawdown** — matched at batch 19's 2.004M
+horizon, so the only difference is the β schedule:
+
+| | control (β=300k) | batch 19 (β=1M) |
+|---|---|---|
+| peak trailing | 94.41 | 94.16 |
+| best-30 | 64.05 | 63.27 |
+| `sef` | 12.17% | 13.82% |
+| max drawdown | **5.27** | 8.76 |
+
+So the β default change is neither validated nor falsified on the ceiling — every gap is well inside
+seed noise at n=4. What it does show is that **batch 19's anti-forgetting property survived both the β
+change and 800k extra steps**: drawdown is 5.41 at 3M, against batch 19's 8.76 at 2.18M and batch 18's
+~57. That was the premise of using batch 19 as the base, and it is holding.
+
+**FC trap — permanent, not just for wave 1:** any eval / `watch.py` / close-out of a `200,100,50` or
+`200,50` checkpoint **must** pass the matching `SNEK_FC_LAYERS`, or `restore()` silently mismatches the
+net (see below).
 
 **The question is the one thing nine batches of optimiser knobs have not moved: the ceiling.** Network
 architecture has **never been varied in this project** — `FC_LAYERS` has sat at `(50, 100, 50)` since
