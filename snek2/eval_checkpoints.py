@@ -1255,11 +1255,11 @@ def main(argv):
             if frame is None:
                 return
             if chart['screen'] is None:
-                # SNEK_CHART_WINDOW=0 turns the live window off entirely (headless,
-                # or an unreliable X session); the PNG is still written by
-                # live_frame() above. See training.py for why a live window is a
-                # fatal-XIO liability under memory pressure.
-                if os.environ.get('SNEK_CHART_WINDOW', '1') in ('0', '', 'false', 'False'):
+                # Off by default now (the decoupled chart_viewer.py is the way to
+                # watch); the PNG is still written by live_frame() above. Set
+                # SNEK_CHART_WINDOW=1 to opt back in. See training.py for why an
+                # in-process live window is a fatal-XIO liability under memory pressure.
+                if os.environ.get('SNEK_CHART_WINDOW', '0') in ('0', '', 'false', 'False'):
                     chart['off'] = True
                     return
                 import pyformulas

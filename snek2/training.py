@@ -87,14 +87,14 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
     # Reset the train step.
     # agent.train_step_counter.assign(0)
 
-    # Live results window. **Off entirely when SNEK_CHART_WINDOW=0**, which is the
-    # only safe mode on an X11 box under memory pressure: if the X session breaks
-    # (e.g. an OOM kill disrupts it), a live cv2 window raises a *fatal* XIO error
-    # that calls exit() below Python and cannot be caught -- which killed all four
-    # desktop arms at once on 2026-08-09. With the window off, the PNG + report are
-    # still written every eval, so nothing is lost but the on-screen convenience.
-    # When on, opening it is still best-effort (a failure degrades to None).
-    if os.environ.get('SNEK_CHART_WINDOW', '1') in ('0', '', 'false', 'False'):
+    # Live results window. **Off by default now** -- the decoupled chart_viewer.py
+    # is the way to watch charts (it only reads the PNGs written every eval, so it
+    # cannot affect training). The in-process cv2 window is the old way and is unsafe
+    # on an X11 box under memory pressure: if the X session breaks (e.g. an OOM kill
+    # disrupts it) it raises a *fatal* XIO error that calls exit() below Python and
+    # cannot be caught -- which killed all four desktop arms at once on 2026-08-09.
+    # Set SNEK_CHART_WINDOW=1 to opt back in; opening it is still best-effort.
+    if os.environ.get('SNEK_CHART_WINDOW', '0') in ('0', '', 'false', 'False'):
         screen = None
     else:
         try:

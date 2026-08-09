@@ -43,6 +43,7 @@ def main():
     ap.add_argument('--glob', default=None, help='glob for PNGs, re-evaluated each refresh')
     ap.add_argument('--watch', default=None, help='pgrep -f pattern; exit when no match remains')
     ap.add_argument('--interval', type=float, default=10.0)
+    ap.add_argument('--scale', type=float, default=1.0, help='multiply the window size')
     ap.add_argument('--title', default='snek charts')
     args = ap.parse_args()
 
@@ -68,7 +69,8 @@ def main():
         if fig is None or len(axes) != rows * cols:
             if fig is not None:
                 plt.close(fig)
-            fig, grid = plt.subplots(rows, cols, figsize=(cols * 4.2, rows * 3.0), squeeze=False)
+            fig, grid = plt.subplots(rows, cols, squeeze=False,
+                                     figsize=(cols * 4.2 * args.scale, rows * 3.0 * args.scale))
             try:
                 fig.canvas.manager.set_window_title(args.title)
             except Exception:

@@ -117,7 +117,8 @@ class Runner:
             os.makedirs(self.host['LOG_DIR'], exist_ok=True)
             log = open(os.path.join(self.host['LOG_DIR'], 'chart_viewer.log'), 'ab')
             argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
-                   ['--watch', 'snek2.py', '--interval', '10', '--title', 'snek training']
+                   ['--watch', 'snek2.py', '--interval', '1', '--scale', '1.5',
+                    '--title', 'snek training']
             subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=dict(os.environ),
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)
         except Exception as e:
