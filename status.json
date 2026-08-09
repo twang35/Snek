@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-08T22:28:41",
-  "ts": 1786253321.0780444,
+  "iso": "2026-08-08T22:29:13",
+  "ts": 1786253353.586688,
   "runtime": {
     "max_trainers": 2,
     "max_evals": 1,
@@ -15,17 +15,28 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 1,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "smoke-2",
+      "type": "smoke",
+      "policy": "smoke",
+      "pid": 19439,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
-    "smoke-1": "failed"
+    "smoke-1": "failed",
+    "smoke-2": "running"
   },
   "disk_free_gb": 184.1,
   "load_avg": [
-    0.1640625,
-    0.1171875,
-    0.09423828125
+    0.09033203125,
+    0.103515625,
+    0.0888671875
   ]
 }
