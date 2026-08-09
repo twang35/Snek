@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-09T15:18:58",
-  "ts": 1786313938.1197908,
+  "iso": "2026-08-09T15:19:30",
+  "ts": 1786313970.791487,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -16,10 +16,47 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 4,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b20m-fc320seed1",
+      "type": "train",
+      "policy": "b20m-fc320seed1",
+      "pid": 529127,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20n-fc320seed2",
+      "type": "train",
+      "policy": "b20n-fc320seed2",
+      "pid": 529128,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20o-fc320seed3",
+      "type": "train",
+      "policy": "b20o-fc320seed3",
+      "pid": 529129,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20p-fc320seed4",
+      "type": "train",
+      "policy": "b20p-fc320seed4",
+      "pid": 529130,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
     "smoke-1": "failed",
     "smoke-2": "failed",
@@ -35,12 +72,16 @@
     "b20e-fc200seed1-closeout": "done",
     "b20f-fc200seed2-closeout": "done",
     "b20g-fc200seed3-closeout": "done",
-    "b20h-fc200seed4-closeout": "done"
+    "b20h-fc200seed4-closeout": "done",
+    "b20m-fc320seed1": "running",
+    "b20n-fc320seed2": "running",
+    "b20o-fc320seed3": "running",
+    "b20p-fc320seed4": "running"
   },
   "disk_free_gb": 178.3,
   "load_avg": [
-    0.0810546875,
-    0.177734375,
-    1.64599609375
+    0.0966796875,
+    0.171875,
+    1.5888671875
   ]
 }
