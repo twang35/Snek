@@ -200,10 +200,11 @@ grep "hyperparameter override:" /tmp/b20a1.log        # laptop
 git show origin/ops-status:status.json                 # desktop: it appears under `running`
 ```
 
-**Two desktop caveats for whoever launches.** `runtime.json` currently has `max_trainers: 2`, so it must
-be raised to 4 on `ops` to fill the box. And **4 concurrent trainers there is unmeasured** — each trainer
-spawns 10 parallel eval-env processes on top of its own, and only *evals* were benchmarked (4 × 10 workers
-peaked at 12.8 GB of 14). Start at 2, sample RAM, then raise:
+**One desktop caveat for whoever launches.** `runtime.json` on `ops` is already at `max_trainers: 4`
+and `eval_workers: 4`, so no config change is needed — but **4 concurrent trainers there is
+unmeasured**. Each trainer spawns 10 parallel eval-env processes on top of its own, and only *evals*
+were benchmarked (4 × 10 workers peaked at 12.8 GB of 14). Queue all four, then sample RAM early and
+drop `max_trainers` if it is tight:
 
 ```
 ssh -i ~/.ssh/snek_desktop claw@the-claw-den 'free -m | awk "NR==2{print \$3\" MB used\"}"'
