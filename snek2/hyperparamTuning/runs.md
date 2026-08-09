@@ -32,17 +32,24 @@ Batch 19's close-out also finished on the laptop overnight.
 11 has held. But the two hosts stopped ~0.8M apart, so **this is not a matched-horizon comparison** and
 `strong_eval_fraction` (a fraction of each arm's own evals) is not comparable across the two columns yet.
 
-> **Treatment rerun RUNNING (launched 2026-08-09, desktop).** The four `200,100,50` arms resumed from
-> their ~1.8M checkpoints to **3M** — daemon jobs `b20{e,f,g,h}-fc200seed{1-4}-3m` (new ids, same policies
-> so they restore their own checkpoints), one 4-trainer wave. Steady ~4.5 GB, charts on the monitor. ETA
-> ~8h from launch. **When done: fetch from the `results` branch into `runs/`, then read the treatment
-> against the control at a matched ~2.5M horizon.** Only then decide wave 2 — it stays on hold until this
-> control-vs-treatment comparison is settled (the β-moved-with-architecture confound needs it clean).
+> **Treatment rerun DONE (2026-08-09) — capacity `200,100,50` did not move the ceiling.** All four arms
+> resumed from ~1.8M to **3M** and closed out (no OOM; results pulled from the `results` branch into
+> `runs/`). Read at a matched **3M** against the control:
 >
-> Memory question that gated this is **answered**: 4 trainers × 10 *forked* self-eval workers cost only
-> ~4.2 GB (COW-shared TF), nowhere near the 14 GB ceiling — the overnight OOM was the cv2/XIO cascade, not
-> steady memory. Standalone (spawned) eval workers are the heavy ones: ~230 MB each, OOM-killer at ~52,
-> safe budget ~40.
+> | mean of 4 | control `50,100,50` | capacity `200,100,50` | delta |
+> |---|---|---|---|
+> | peak trailing | 94.44 | 94.70 | +0.26 |
+> | best-30 | 64.0 | 71.4 | +7.4 |
+> | `sef` | 11.2% | 12.9% | +1.7 |
+> | close-out pooled (eq-effort, gate 95) | 55.0% | 64.6% | +9.6 |
+>
+> **Verdict: ceiling unmoved** — peak trailing 94.70 sits inside the flat 94.7-95.0 band nine batches have
+> held, for a net 2.66× wider. A *weak* consolidation edge (best-30 +7.4, pooled +9.6) is at/below the n=4
+> resolution floor (~10 pp): a hint, not a result — chasing it needs more seeds, not this n=4. (Max
+> drawdown not yet recomputed from the 3M rows.)
+>
+> The earlier OOM was a **matplotlib per-eval leak in the chart writer, now fixed** — not steady memory.
+> See the rendering section of [`CLAUDE.md`](../../CLAUDE.md).
 >
 > **Amended 2026-08-09: wave 2's `200,50` half went ahead anyway, at the user's direction.** The hold
 > above was about the *control* being settled, and it now is — `b20a-d` finished at 3M and closed out. The

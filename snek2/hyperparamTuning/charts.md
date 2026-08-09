@@ -36,65 +36,51 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
-## Batch 20 wave 1 — FC layer capacity (`FC_LAYERS`), the first architecture test, stopped at 1.73-2.78M
+## Batch 20 — FC-layer capacity (`200,100,50`) vs control (`50,100,50`), both to 3M
 
-Eight arms across two hosts: the control `50,100,50` re-baselined at β=300k (`b20a-d`, laptop) and the
-capacity arm `200,100,50`, 2.66× the parameters (`b20e-h`, desktop). This is the first time the network
-shape has been varied in the project, aimed at the one quantity nine batches of optimiser knobs never
-moved — the ceiling.
+The first time the network shape has been varied in the project, aimed at the one quantity nine batches
+of optimiser knobs never moved — the ceiling. Control `50,100,50` re-baselined at β=300k (`b20a-d`) and
+capacity `200,100,50`, 2.66× the parameters (`b20e-h`). Both ran to **3M** at a matched horizon — the
+capacity arms crashed once at ~1.75M on a since-fixed matplotlib chart-writer leak, then resumed to 3M.
 
-**Provisional, and not at a matched horizon.** The laptop control ran to 2.49-2.78M; the desktop
-treatment crashed in an OOM cascade at **~1.75M** (checkpoints preserved), so each treatment arm is
-~0.8M shorter than its seed-matched control. `strong_eval_fraction` is a fraction of each arm's own
-evals, so it is inflated for the longer control and the two columns are **not comparable** until the
-control is truncated to ~1.75M or the treatment is rerun to 2.5M — [pending](runs.md).
+**Verdict: 2.66× capacity did not move the ceiling.** Peak trailing **94.44** (control) vs **94.70**
+(capacity) — both inside the flat 94.7-95.0 band every batch has held since 11, for a net 2.66× wider.
+There is a *weak* consolidation edge (best-30 64.0 → 71.4, close-out pooled 55.0 → 64.6) but it sits
+at/below the n=4 resolution floor (~10 pp): a hint, not a result, and one more seeds — not this n=4 —
+would have to settle. Capacity-up is not the route to a higher ceiling.
 
-**The headline survives the caveat: 2.66× capacity did not move the ceiling.** Peak trailing sits at
-~94.5 for both shapes — control mean **94.44**, treatment mean **94.50** — squarely inside the 94.7-95.0
-band every batch has held since 11. best-30 is a wash too (control 64.0, treatment 65.6), and the
-treatment reached its level ~0.8M *sooner*, but from a crashed run that never got the extra steps to
-either confirm or give it back. Capacity-up is not, on this evidence, a route to a higher ceiling.
+All at 3M. Sorted by best-30. `sef` and close-out pooled (equal-effort, gate 95) are now comparable — same horizon.
 
-| arm | shape | host | step | peak trail | best-30 | `sef` | recent-30 |
-|---|---|---|---|---|---|---|---|
-| `b20d` | 50,100,50 | laptop | 2.73M | 94.76 | **80.3%** | 28.4% | 47.7% |
-| `b20b` | 50,100,50 | laptop | 2.78M | 94.84 | 78.3% | 16.0% | 63.7% |
-| `b20c` | 50,100,50 | laptop | 2.55M | 94.34 | 56.3% | 2.1% | 43.0% |
-| `b20a` | 50,100,50 | laptop | 2.49M | 93.80 | 41.3% | 0.2% | 24.0% |
-| `b20h` | 200,100,50 | desktop | 1.80M | **94.82** | 76.3% | 10.5% | **68.0%** |
-| `b20g` | 200,100,50 | desktop | 1.73M | 94.62 | 72.3% | 11.9% | 59.7% |
-| `b20e` | 200,100,50 | desktop | 1.75M | 94.56 | 68.3% | 7.5% | 44.0% |
-| `b20f` | 200,100,50 | desktop | 1.77M | 93.98 | 45.3% | 0.6% | 37.0% |
+| arm | shape | peak trail | best-30 | `sef` | close-out pooled |
+|---|---|---|---|---|---|
+| `b20g` | 200,100,50 | 94.76 | **81.7%** | 25.6% | **72.2%** |
+| `b20d` | 50,100,50 | 94.76 | 80.3% | 26.3% | 71.3% |
+| `b20b` | 50,100,50 | 94.84 | 78.3% | 16.2% | 62.7% |
+| `b20h` | 200,100,50 | **94.82** | 76.3% | 16.7% | 66.3% |
+| `b20e` | 200,100,50 | 94.56 | 68.3% | 7.4% | 61.9% |
+| `b20f` | 200,100,50 | 94.64 | 59.3% | 1.7% | 58.0% |
+| `b20c` | 50,100,50 | 94.34 | 56.3% | 2.2% | 52.8% |
+| `b20a` | 50,100,50 | 93.80 | 41.3% | 0.2% | 33.2% |
+| **mean — control** | 50,100,50 | 94.44 | 64.0% | 11.2% | 55.0% |
+| **mean — capacity** | 200,100,50 | 94.70 | 71.4% | 12.9% | 64.6% |
 
-### Control `50,100,50` (laptop), best first
+Per-arm numbers are in the table above; charts (3M) best-first within each shape.
 
-`b20d` — 2.73M, peak 94.76, best-30 **80.3%** @917k, `sef` 28.4%, recent-30 47.7%.
+### Control `50,100,50`
+
 ![b20d](charts/b20d-fc50seed4.png)
-
-`b20b` — 2.78M, peak 94.84, best-30 78.3% @1498k, `sef` 16.0%, recent-30 63.7%.
 ![b20b](charts/b20b-fc50seed2.png)
-
-`b20c` — 2.55M, peak 94.34, best-30 56.3% @1959k, `sef` 2.1%, recent-30 43.0%.
 ![b20c](charts/b20c-fc50seed3.png)
-
-`b20a` — 2.49M, peak 93.80, best-30 41.3% @1900k, `sef` 0.2%, recent-30 24.0% — the weakest arm of the eight.
 ![b20a](charts/b20a-fc50seed1.png)
 
-### Treatment `200,100,50` (desktop, 2.66× params), best first
+### Treatment `200,100,50` (2.66× params)
 
-All four crashed together at ~1.75M via the OOM→X-break→fatal-XIO cascade of 2026-08-09, not on their
-own trajectory — every one was healthy (`zero_since` null) and still climbing when it died.
+Resumed from the ~1.75M crash (a since-fixed chart-writer leak, not the arms) to 3M. `b20g` is the
+strongest arm of the batch (best-30 81.7%, close-out 72.2%); `b20f` is the laggard, mirroring `b20a`.
 
-`b20h` — 1.80M, peak **94.82**, best-30 76.3% @1755k, `sef` 10.5%, recent-30 **68.0%** — best of the treatment arms.
-![b20h](charts/b20h-fc200seed4.png)
-
-`b20g` — 1.73M, peak 94.62, best-30 72.3% @1689k, `sef` 11.9%, recent-30 59.7%.
 ![b20g](charts/b20g-fc200seed3.png)
-
-`b20e` — 1.75M, peak 94.56, best-30 68.3% @1000k, `sef` 7.5%, recent-30 44.0%.
+![b20h](charts/b20h-fc200seed4.png)
 ![b20e](charts/b20e-fc200seed1.png)
-
-`b20f` — 1.77M, peak 93.98, best-30 45.3% @1563k, `sef` 0.6%, recent-30 37.0% — the treatment's laggard, mirroring `b20a` in the control.
 ![b20f](charts/b20f-fc200seed2.png)
 
 ## Batch 19 — standard PER (`td_error` priority + IS on), falsified, stopped at 2.00-2.42M
