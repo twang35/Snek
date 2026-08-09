@@ -323,7 +323,7 @@ for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablat
              'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
              'test_run_report', 'test_shielded_policy', 'test_reward_shaping',
              'test_game_snapshot', 'test_replay_streams', 'test_forking_collector',
-             'test_progress_chart', 'test_eval_workers']:
+             'test_progress_chart', 'test_eval_workers', 'test_chart_viewer']:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1
@@ -364,6 +364,18 @@ PYTHONPATH=. python -u watch.py <policy_name> <step>    # pins one checkpoint
 It renders in its own process, reloads the newest checkpoint between episodes so a live arm's
 progress shows up, and costs training nothing. `WATCH_FPS` caps the frame rate (default 90; drop to
 20-30 to follow the moves).
+
+**A laptop training launch opens its own chart window** — `snek2.main()` calls
+`chart_viewer.spawn_for_policy()`, so no one has to remember to start one. It shows the *batch*, not
+the arm (`b20a-fc50seed1` → glob `runs/b20*.png`), so a wave of four arms shares one window and the
+first arm to start opens it; the dedupe matches on that glob, so a second batch still gets its own.
+It refreshes every 1s at 2x size, watches `snek2.py <prefix>` and exits on its own once the batch
+stops. `SNEK_CHART_VIEWER=0` turns it off; smoke runs and `eval_only` never open one.
+
+It is off by default anywhere but darwin, because on the desktop the runner daemon owns the viewer
+(`desktop/runner/runner.py::_ensure_viewer`) — it injects the graphical session's
+`DISPLAY`/`XAUTHORITY`, which a systemd-launched trainer does not have. **Don't add a trainer-side
+launch there**; two owners means two windows per wave.
 
 **Window size is `SNEK_TILE_PIXELS` and is cosmetic only.** Every pixel constant derives from it.
 Observations are built from tile positions, verified by a fixed-seed hash coming out identical at

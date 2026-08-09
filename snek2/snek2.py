@@ -18,6 +18,7 @@ _os.environ['SDL_AUDIODRIVER'] = 'dummy'
 # once per launch, against absl's checkpoint line costing ~2000 per run, so it is not worth
 # that trade.
 
+import chart_viewer
 from forking_collector import ForkingCollector, validate_config
 from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
 from shielded_policy import ShieldedEpsilonGreedyPolicy
@@ -453,6 +454,11 @@ def main(argv):
         'eval_only': eval_only,
         'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }
+
+    # A live chart window for this batch, in its own process. One per batch, so four arms
+    # launched together share it, and it exits by itself when the last of them stops.
+    if not eval_only:
+        chart_viewer.spawn_for_policy(policy_name)
 
     train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
