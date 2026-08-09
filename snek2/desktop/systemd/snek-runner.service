@@ -1,0 +1,21 @@
+[Unit]
+Description=Snek unattended training/eval runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=snek
+WorkingDirectory=/home/snek/Snek/snek2/desktop
+Environment=SNEK_RUNNER_HOST_ENV=/home/snek/Snek/snek2/desktop/config/host.env
+ExecStart=/home/snek/miniconda3/envs/snek/bin/python -u -m runner.runner
+Restart=always
+RestartSec=10
+
+# Stop ONLY the daemon on stop/restart, never its children. Launched trainings
+# are detached (setsid) and self-terminate via SNEK_MAX_STEPS, so a daemon
+# restart must not take them down with it.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

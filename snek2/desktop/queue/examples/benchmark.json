@@ -1,0 +1,6 @@
+{
+  "id": "cap-probe-1",
+  "type": "benchmark",
+  "max_steps": 30000,
+  "notes": "capacity probe: a short fixed run that reports steps/second in status.json. Queue several at once and sweep max_trainers / thread counts in runtime.json to find the box's real capacity."
+}

@@ -1,0 +1,14 @@
+{
+  "id": "b20a-example-seed1",
+  "type": "train",
+  "policy": "b20a-example-seed1",
+  "env": {
+    "SNEK_SEED": "1",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0"
+  },
+  "max_steps": 2000000,
+  "priority": 10,
+  "notes": "example train arm; env values are passed straight through as SNEK_* overrides"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "eval-b19a",
+  "type": "eval",
+  "policy": "b19a-stdperseed1",
+  "eval_args": ["top20"],
+  "eval_workers": 10,
+  "notes": "runs eval_checkpoints.py <policy> top20; eval_workers overrides the runtime default"
+}

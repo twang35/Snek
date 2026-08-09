@@ -1,0 +1,28 @@
+# Conda env for the desktop runner, derived from the laptop's `snek` env.
+# Linux-appropriate: the stack uses plain `tensorflow` (CPU), which installs on
+# Linux unchanged -- no tensorflow-macos/metal to swap.
+#
+# Notes:
+#  - numpy MUST stay < 2 (gym 0.23 and tf 2.15 break on numpy 2).
+#  - cpprb builds from source if no wheel matches; build-essential covers it.
+#  - GPU is off in snek2.py and useless for this tiny MLP, so this is CPU-only.
+#    If that ever changes, `pip install tensorflow[and-cuda]==2.15.1` instead.
+name: snek
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - numpy==1.26.4
+      - tensorflow==2.15.1
+      - tf-agents==0.18.0
+      - tensorflow-probability==0.22.1
+      - keras==2.15.0
+      - gym==0.23.0
+      - dm-tree==0.1.10
+      - pygame==2.1.3
+      - matplotlib==3.10.9
+      - pillow==12.3.0
+      - protobuf==4.25.9
+      - cpprb
