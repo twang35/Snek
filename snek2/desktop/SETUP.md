@@ -1,11 +1,33 @@
 # Setup runbook
 
+> ## ✅ Already done — this box is live
+>
+> **`the-claw-den` has been set up and verified (2026-08-08).** The daemon is
+> `active`, the queue drains, and a smoke job has completed end to end. **You do not
+> need to run anything below** unless you are rebuilding the box or adding a second
+> one. For day-to-day use go to [`README.md`](README.md).
+>
+> | | |
+> |---|---|
+> | host | `the-claw-den` (Tailscale name) |
+> | user | **`claw`** |
+> | reach it | `ssh -i ~/.ssh/snek_desktop claw@the-claw-den` |
+> | hardware | Ryzen 7 9700X, 8c/**16t**, **14 GiB RAM**, Ubuntu 24.04 |
+> | repo | `/home/claw/Snek` |
+> | conda | `/home/claw/miniconda3`, env `snek` |
+> | daemon | `systemctl status snek-runner` (runs on **base** python, jobs use the env python) |
+>
+> **Memory, not cores, is the binding constraint** — see
+> [measured capacity](README.md#measured-capacity--memory-is-the-limit).
+
 One-time. After this the box runs unattended and is driven from the laptop over
 git; SSH (over Tailscale) is only a backstop.
 
-Assumptions: **Ubuntu Server**, a dedicated user **`snek`**, repo at
-`/home/snek/Snek`, miniconda at `/home/snek/miniconda3`. Adjust paths in
-`config/host.env` and `systemd/snek-runner.service` if you change these.
+Assumptions below: **Ubuntu**, a dedicated user, its home holding the repo and
+miniconda. **On `the-claw-den` that user is `claw`**, so the paths are
+`/home/claw/Snek` and `/home/claw/miniconda3`; the commands use `$HOME` and
+`$USER` where they can so they work for any user name. Adjust `config/host.env`
+and `systemd/snek-runner.service` to match whatever you pick.
 
 Legend: 🖥️ = run **on the desktop**, 💻 = run **on the laptop**, 🤖 = I can run
 this over SSH once the box is reachable (or you can run it on the desktop).
@@ -93,8 +115,8 @@ git config --global user.name  "snek-runner"
 git config --global user.email "snek-runner@$(hostname)"
 
 # clone via the deploy remote so pushes use the deploy key
-git clone github-snek:twang35/Snek.git /home/claw/Snek
-cd /home/claw/Snek
+git clone github-snek:twang35/Snek.git $HOME/Snek
+cd $HOME/Snek
 
 # system libs for opencv's GUI (the live chart window)
 sudo apt-get install -y libgl1 libglib2.0-0
@@ -107,8 +129,8 @@ python -c "import tensorflow, tf_agents, cpprb, pygame, imageio, pyformulas, cv2
 
 # worktrees for the two desktop-written branches (outside the main checkout)
 git fetch origin ops-status results
-git worktree add -B ops-status /home/claw/snek-bus/status  origin/ops-status
-git worktree add -B results    /home/claw/snek-bus/results origin/results
+git worktree add -B ops-status $HOME/snek-bus/status  origin/ops-status
+git worktree add -B results    $HOME/snek-bus/results origin/results
 
 # host config -- example already has this box's paths + DISPLAY/XAUTHORITY.
 # Adjust XAUTHORITY if the graphical session's cookie path differs (see the
@@ -151,12 +173,38 @@ daemon self-terminated it at `max_steps`. Then remove the smoke file from
 ## Keeping the runner code current
 
 The daemon runs the code on the desktop's `master` checkout. To ship a runner
-change: merge it to `master`, then on the desktop `git -C /home/snek/Snek pull`
-and `sudo systemctl restart snek-runner`. The restart won't disturb running
-trainings (detached; `KillMode=process`).
+change: merge it to `master`, then on the desktop **hard-reset to origin** and
+restart. The checkout is a pull-only mirror, so a plain `git pull` can fail with
+"divergent branches" — reset instead of pull:
+
+```bash
+ssh -i ~/.ssh/snek_desktop claw@the-claw-den \
+  'git -C ~/Snek fetch origin master && git -C ~/Snek reset --hard origin/master && sudo systemctl restart snek-runner'
+```
+
+The restart won't disturb running trainings (detached; `KillMode=process`).
 
 ## If the box wedges (the one case git-only can't fix)
 
-SSH in over Tailscale: `ssh snek@<tailscale-name>`, then
-`journalctl -u snek-runner -n 100 --no-pager` and
-`sudo systemctl restart snek-runner`.
+```bash
+ssh -i ~/.ssh/snek_desktop claw@the-claw-den \
+  'journalctl -u snek-runner -n 100 --no-pager; sudo systemctl restart snek-runner'
+```
+
+## What went wrong during the real setup, so it isn't re-debugged
+
+Both are **fixed** — recorded because each cost a failed job and neither is
+obvious from a traceback.
+
+| symptom | cause | fix |
+|---|---|---|
+| daemon `active` but `status.json` never published | `claw` had no git `user.name`/`email`, so the daemon's bus commits failed — and the bus helper ran git with `check=False`, swallowing the error | set git identity (Part 3); `gitbus` now uses `check=True` so a commit failure surfaces (`057bd17`) |
+| `smoke-1`/`smoke-2`: `ModuleNotFoundError` for `imageio` / `cv2` | env spec lacked `imageio`, `opencv-python`, `pyformulas` (pulled in transitively by `under_the_hood`/`pyformulas`) | `environment.yml` pins all three, plus system `libgl1 libglib2.0-0` for opencv's GUI |
+| bench trainers died `Aborted (core dumped)` when launched with no `DISPLAY` | opencv's GUI build calls `abort()` **natively** when it can't reach a display — a SIGABRT the Python best-effort guard cannot catch | jobs get `DISPLAY=:0` + `XAUTHORITY` from `host.env` (the box has a monitor); the best-effort window only saves you if the display is genuinely gone |
+
+**The verification line in Part 3 is what catches this class**, so don't skip it —
+it imports every module a job needs, including the transitive ones:
+
+```bash
+python -c "import tensorflow, tf_agents, cpprb, pygame, imageio, pyformulas, cv2; print('env OK')"
+```
