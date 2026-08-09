@@ -1,0 +1,9 @@
+{
+  "id": "b20m-fc320seed1",
+  "type": "train",
+  "policy": "b20m-fc320seed1",
+  "env": {"SNEK_FC_LAYERS":"320","SNEK_SEED":"1","SNEK_BETA_ANNEAL_STEPS":"300000","SNEK_TARGET_UPDATE_PERIOD":"1000","SNEK_FOOD_DISTANCE_REWARD":"0","SNEK_DISCOUNT":"0.9975","SNEK_GUIDED_FRACTION":"0.8","SNEK_FORK_BRANCHES":"4","SNEK_FORK_PROB":"0.5","SNEK_FORK_MIN_LENGTH":"85","SNEK_FORK_MAX_STEPS":"60"},
+  "max_steps": 3000000,
+  "priority": 10,
+  "notes": "batch 20 wave 2 depth-1 shape 320 (10,883 params, 0.92x control) seed 1, to 3M. Isolates depth at matched capacity against wave 1's 50,100,50 control. FC trap: any eval/watch.py on this checkpoint MUST set SNEK_FC_LAYERS=320."
+}
