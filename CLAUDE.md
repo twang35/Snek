@@ -230,7 +230,7 @@ by git: you commit a job spec, it runs it, it pushes results back. Full docs in
 
 | | laptop | desktop `the-claw-den` |
 |---|---|---|
-| limit | **4 trainers** | `max_trainers` ≤ 4, `max_evals` ≤ 1 |
+| limit | **4 trainers** | `max_trainers` ≤ 4, `max_evals` ≤ 4 |
 | check | `pgrep -fl "python -u snek2.py"` | `git show origin/ops-status:status.json` |
 | queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch |
 
@@ -239,10 +239,18 @@ appear in it — so **"N arms running" is meaningless without naming the box**, 
 has to check both. The desktop's `running` and `counts` fields in `status.json` are the only authority
 for its side; its heartbeat `iso` tells you whether the daemon is alive at all.
 
-**Memory is the desktop's binding constraint, not cores** — 14 GiB, and four concurrent evals at 10
-workers peaked at 12.8 GB. This *inverts* the laptop's "`EVAL_WORKERS` is close to free" rule, because
-each worker is a process holding its own TensorFlow arena. Don't raise `max_evals` or `eval_workers`
-there without a `free -m` measurement.
+**Memory is the desktop's binding constraint, not cores** — 15 GB. Measured 2026-08-09, and the two
+worker kinds differ sharply:
+
+- **Standalone eval workers (`eval_checkpoints.py`) are *spawned*** — each loads its own TensorFlow
+  arena, **~230 MB/worker**. A single scaling eval hit the OOM-killer at ~52 workers; **safe budget
+  ~40 total** (≥3 GB headroom). So `HARD_MAX_EVALS=4` at `eval_workers` ≤ ~8 (≤32 total) is fine; the
+  old `12.8 GB at 4×10` figure was 40 spawned workers, i.e. the top of this range.
+- **Training self-eval workers are *forked*** (Linux COW-shares the parent's TF pages), so they are
+  nearly free: **4 trainers × 10 self-eval workers ≈ 4.2 GB total**. The overnight OOM was the
+  cv2/XIO chart cascade plus orphan accumulation, *not* steady memory.
+
+Still measure with `free -m` before pushing `max_evals`/`eval_workers` past those bands.
 
 **A finished desktop job is not in `snek2/runs/`** — it arrives on the `results` branch and needs one
 copy before any tuning tool can see it. The exact commands are in
@@ -352,6 +360,15 @@ thousand steps catches what assertions do not.
 A game window costs **~5.2ms per frame** and the game flips once per step. That is a round trip to
 the macOS window server, not our drawing code, so dirty rects do not help. Everything else
 `render()` does is 2-4us.
+
+**Two chart-write bugs fixed 2026-08-09 — the cause of the desktop OOM, and the "frozen" viewer.**
+(1) `under_the_hood.display_progress` built a figure with `plt.subplots()` every eval; pyplot's global
+figure manager kept the artists alive despite `plt.close()`, leaking ~0.45 MB/eval (×2.4 at
+`SNEK_CHART_SCALE=3.07`) → ~3 GB per 3M-step arm, which OOM'd the desktop. Fixed by building through the
+OO API (`Figure` + `FigureCanvasAgg`, no pyplot) so the figure is GC'd on return — verified with
+tracemalloc (growth → reclamation). Do not revert it to `plt.subplots`. (2) `eval_checkpoints.update_chart`
+used one `off` flag for both "no window" and "stop entirely", so `SNEK_CHART_WINDOW=0` wrote the eval PNG
+*once* and it looked frozen in `chart_viewer`; split into `window_off` (keeps writing the PNG) vs `off`.
 
 **To watch a policy play, run `watch.py` — never turn a window on inside a run:**
 

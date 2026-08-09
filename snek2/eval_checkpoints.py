@@ -1240,7 +1240,11 @@ def main(argv):
     # unattended run needs no configuration. live_frame() reads every result file for the policy,
     # so parallel EVAL_OUT_SUFFIX processes each show the whole job rather than their own slice.
     chart_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
-    chart = {'screen': None, 'last': 0.0, 'off': False}
+    # 'off' disables everything after a real error. 'window_off' disables only the live
+    # window (SNEK_CHART_WINDOW=0, the default) while live_frame() keeps writing the PNG on
+    # every update -- conflating the two once meant a headless eval wrote the chart a single
+    # time and it looked frozen (the decoupled chart_viewer.py then showed a stale snapshot).
+    chart = {'screen': None, 'last': 0.0, 'off': False, 'window_off': False}
 
     def update_chart(force=False):
         if chart['off']:
@@ -1254,13 +1258,15 @@ def main(argv):
             frame = eval_progress.live_frame(policy_name, chart_path)
             if frame is None:
                 return
+            if chart['window_off']:
+                return  # the PNG was written by live_frame() above; only the window is off
             if chart['screen'] is None:
-                # Off by default now (the decoupled chart_viewer.py is the way to
-                # watch); the PNG is still written by live_frame() above. Set
+                # Window off by default (the decoupled chart_viewer.py is the way to
+                # watch); live_frame() above still writes the PNG every update. Set
                 # SNEK_CHART_WINDOW=1 to opt back in. See training.py for why an
                 # in-process live window is a fatal-XIO liability under memory pressure.
                 if os.environ.get('SNEK_CHART_WINDOW', '0') in ('0', '', 'false', 'False'):
-                    chart['off'] = True
+                    chart['window_off'] = True
                     return
                 import pyformulas
                 chart['screen'] = pyformulas.screen(
