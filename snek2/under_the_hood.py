@@ -203,7 +203,12 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     evals from a starting step, because a resumed policy's history has gaps
     wherever it was stopped and restarted.
     """
-    fig, score_axis = plt.subplots(figsize=(3.65, 2.25))
+    # SNEK_CHART_SCALE enlarges the rendered chart uniformly (live window + PNG)
+    # without changing layout -- set on the desktop so the window is readable on
+    # the monitor; unset (1.0) elsewhere. Scaling dpi rather than figsize keeps
+    # text and line weights proportional.
+    chart_scale = float(os.environ.get('SNEK_CHART_SCALE', '1.0'))
+    fig, score_axis = plt.subplots(figsize=(3.65, 2.25), dpi=100 * chart_scale)
     steps = [row['step'] for row in eval_rows]
     scores = [row['avg_score'] for row in eval_rows]
     perfect_percents = [row['perfect_percent'] for row in eval_rows]

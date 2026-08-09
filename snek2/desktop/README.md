@@ -1,8 +1,16 @@
 # Desktop runner — unattended training/eval driven by git
 
-A dedicated box (Ryzen 7 9700X) runs snek trainings and evals on its own, driven
-entirely through git. You never log in to it in normal use: you commit a job, it
-runs it, it reports back. Setup is in [`SETUP.md`](SETUP.md).
+A dedicated box (Ryzen 7 9700X, 8c/16t, **14 GiB RAM**) runs snek trainings and
+evals on its own, driven entirely through git. You never log in to it in normal
+use: you commit a job, it runs it, it reports back.
+
+**It is set up and live** — `the-claw-den`, user `claw`, daemon `active`, verified
+2026-08-08. Setup details and the backstop SSH command are in
+[`SETUP.md`](SETUP.md); nothing there needs running again.
+
+**This box is a second compute host, not a replacement.** The laptop's own 4-trainer
+limit and the desktop's limits are separate pools — see
+[counting slots across two machines](#counting-slots-across-two-machines).
 
 **The GPU is not used.** snek2 disables it (`CUDA_VISIBLE_DEVICES=-1`) and the
 net is a tiny MLP, so this is a CPU workload — the value of the box is its cores
@@ -65,12 +73,72 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 
 **Pull results** — `git fetch origin results && git checkout results -- results/<job-id>`.
 
-## Capacity testing
+## Measured capacity — memory is the limit
+
+**Measured on the box 2026-08-08, four concurrent evals of one checkpoint:**
+
+| config | peak RAM used | verdict |
+|---|---|---|
+| 4 evals × **10** `EVAL_WORKERS` | **12,770 MB** of 14,336 | **too close** — ~1.5 GB headroom, no OOM but nothing else fits |
+| 4 evals × **4** `EVAL_WORKERS` | **7,296 MB** of 14,336 | comfortable |
+
+No OOM kills occurred in either run, so 12.8 GB is a real measurement rather than a
+survived near-miss — but it leaves no room for a trainer alongside. **That is why
+`HARD_MAX_EVALS=1`**: one eval at `eval_workers: 4` sits well inside budget and
+leaves the cores for trainers.
+
+**Cores are not the constraint, and this inverts the laptop's rule.** On the laptop
+`EVAL_WORKERS` is close to free and lowering it wastes CPU
+([eval cost](../../CLAUDE.md)); here each worker is a process holding its own
+TensorFlow arena, so worker count is the memory dial. Raise `max_evals` only with a
+`free -m` measurement in hand.
+
+### Capacity testing, if you re-measure
 
 Queue several `benchmark` jobs (short fixed runs that report steps/sec), then
 sweep `max_trainers` × `tf_intraop_threads` in `runtime.json` and watch aggregate
 steps/sec in `status.json`. The knee is the box's real capacity. `HARD_MAX_*` in
-`host.env` is the guardrail so a probe can't thrash the machine.
+`host.env` is the guardrail so a probe can't thrash the machine. **Sample RAM while
+it runs** — steps/sec alone will happily lead you past the memory cliff:
+
+```bash
+ssh -i ~/.ssh/snek_desktop claw@the-claw-den \
+  'for k in $(seq 1 150); do free -m | awk "NR==2{print \$3}"; sleep 1; done' | sort -n | tail -1
+```
+
+## Counting slots across two machines
+
+`CLAUDE.md`'s **"never more than 4 trainers"** rule and its `pgrep` check are
+**laptop-local** — they cannot see desktop jobs, and desktop jobs cannot see them.
+Treat the two as separate pools:
+
+| host | limit | how to check |
+|---|---|---|
+| laptop | 4 trainers | `pgrep -fl "python -u snek2.py"` |
+| desktop | `max_trainers` (≤ `HARD_MAX_TRAINERS=4`), `max_evals` (≤ 1) | `git show origin/ops-status:status.json` |
+
+**Neither check covers the other host**, so a status report that says "4 arms
+running" must say *which box*. The desktop's `counts` and `running` fields in
+`status.json` are the only authority for its side.
+
+## Getting a finished job into the analysis workflow
+
+`git checkout results -- results/<job-id>` lands artifacts at
+`results/<job-id>/<policy>*`. **The tuning tooling reads `snek2/runs/`**, so a
+finished job needs one manual move before `refresh_charts.sh`, `eval_progress.py`
+or any of the summary scripts will see it:
+
+```bash
+git fetch origin results
+git checkout origin/results -- results/<job-id>
+cp results/<job-id>/<policy>* snek2/runs/
+```
+
+Then treat it exactly like a locally-run arm. **Do not skip the copy and point tools
+at `results/`** — `refresh_charts.sh` globs `runs/*.png` only, so a job left in
+`results/` silently gets no chart and no caption, which is the same drift the
+[charts checklist](../hyperparamTuning/hyperparamTuning.md#when-you-stop-a-batch-of-arms)
+exists to prevent.
 
 ## Job spec
 

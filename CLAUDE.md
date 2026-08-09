@@ -211,15 +211,45 @@ looked like the charts were handled.
 
 ### Two rules that are easy to get wrong
 
-- **Never run more than 4 snek trainers at once**, counting human-started ones. Check with
-  `pgrep -fl "python -u snek2.py"`. **Not** `grep "[s]nek2.py"` — Airbnb git telemetry fires `curl`
-  processes whose JSON payload contains `snek2/snek2.py`, which read 6 trainers when 4 were
+- **Never run more than 4 snek trainers at once on this laptop**, counting human-started ones. Check
+  with `pgrep -fl "python -u snek2.py"`. **Not** `grep "[s]nek2.py"` — Airbnb git telemetry fires
+  `curl` processes whose JSON payload contains `snek2/snek2.py`, which read 6 trainers when 4 were
   running. The same class of trap caught `pgrep -fl watch` matching `watchdogd` and `watchman`.
+  **That `pgrep` is laptop-local and cannot see the desktop** — see below.
 - **This domain is very noisy** — the same config has produced 62.5 and 18.0. Never conclude from a
   single run; repeat promising configs 2-3 times. **n=4 cannot resolve an effect below ~10 pp.**
 
 Hyperparameters come from `SNEK_*` env vars (see `tuned()` in `snek2.py`), so variants run side by
 side without editing files.
+
+### There are two compute hosts — say which one you mean
+
+Since 2026-08-08 a dedicated desktop (`the-claw-den`) also runs trainings and evals, driven entirely
+by git: you commit a job spec, it runs it, it pushes results back. Full docs in
+[`snek2/desktop/README.md`](snek2/desktop/README.md).
+
+| | laptop | desktop `the-claw-den` |
+|---|---|---|
+| limit | **4 trainers** | `max_trainers` ≤ 4, `max_evals` ≤ 1 |
+| check | `pgrep -fl "python -u snek2.py"` | `git show origin/ops-status:status.json` |
+| queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch |
+
+**Neither check sees the other host.** The `pgrep` rule above is laptop-local, and desktop jobs never
+appear in it — so **"N arms running" is meaningless without naming the box**, and a progress report
+has to check both. The desktop's `running` and `counts` fields in `status.json` are the only authority
+for its side; its heartbeat `iso` tells you whether the daemon is alive at all.
+
+**Memory is the desktop's binding constraint, not cores** — 14 GiB, and four concurrent evals at 10
+workers peaked at 12.8 GB. This *inverts* the laptop's "`EVAL_WORKERS` is close to free" rule, because
+each worker is a process holding its own TensorFlow arena. Don't raise `max_evals` or `eval_workers`
+there without a `free -m` measurement.
+
+**A finished desktop job is not in `snek2/runs/`** — it arrives on the `results` branch and needs one
+copy before any tuning tool can see it. The exact commands are in
+[`snek2/desktop/README.md`](snek2/desktop/README.md#getting-a-finished-job-into-the-analysis-workflow).
+
+**Pushing to `ops` starts real work on another machine**, so it falls under the git rule above: queue a
+job only when the user has approved *that* job.
 
 ### Reading status: the summary block, not the log
 
