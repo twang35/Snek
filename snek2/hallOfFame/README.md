@@ -52,7 +52,7 @@ of thrown away. The earlier 700-episode figure of 94.57% is superseded by this, 
 **Its arm's close-out originally read 99/100 at a different step (1205000), and that did not
 survive.** Re-measured at 500 episodes, 1205k fell to **92.4%**, and all four of the arm's ≥98%
 rows fell a mean of 5.05 pp. The reason is in
-[`../hyperparamTuning/runs.md`](../hyperparamTuning/runs.md#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection):
+[`../hyperparamTuning/archive/runs-archive.md`](../hyperparamTuning/archive/runs-archive.md#-the-reasoning-error-a-selected-sample-cannot-defend-itself-against-selection):
 an argument that the arm's 26 full-length rows averaging 96.2% proved the 99 was real was
 **circular**, because those rows reached full depth by screening well. A position-chosen grid over
 the same region reads **84.06%**, not 96.2% — a 12 pp selection effect, measured.
@@ -331,6 +331,17 @@ cp savedPolicies/<arm>/ckpt-<step>.index \
 Then add a row to the table above with its **measured** rate over at least 100 episodes — not
 a graph point. A graph point is 10 episodes and reads in 10-point jumps; 90% graph points have
 measured anywhere from 22% to 82%.
+
+**‡ If the arm ran a non-default `SNEK_FC_LAYERS`, record the width in its row.** Every entry above
+is `50,100,50`, the default since batch 1, so width has never needed stating — **batch 20 changes
+that** by sweeping eight shapes. A checkpoint rebuilt at the wrong width restores with **no error**
+and simply leaves the mismatched layers unpopulated (`expect_partial()`), so it plays like a beginner
+— the same silent failure as the observation-vector era problem above, and unrecoverable information
+if the width is not written down. `watch.py` and `eval_checkpoints.py` both need the variable set:
+
+```
+SNEK_FC_LAYERS=<width> PYTHONPATH=. python -u watch.py <policy>
+```
 
 Note that training now **skips writing checkpoints below `SNEK_MIN_CHECKPOINT_SCORE`** (default
 40), because `max_to_keep` is a rolling window and a dead arm used to evict good checkpoints

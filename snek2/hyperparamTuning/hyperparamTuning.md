@@ -610,7 +610,7 @@ Notes that matter:
 | `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 32` |
 | `SNEK_GUIDED_FRACTION` | 0.8 | share of refinement-phase episodes whose epsilon move avoids fatal actions; 0 disables the shield. Raised 0.5 → 0.8 on 2026-08-07 to match what every arm from batch 15 on passes explicitly |
 | `SNEK_MAX_STEPS` | 10000000 | **absolute** step at which training stops, so a wave self-terminates |
-| `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
+| `SNEK_FC_LAYERS` | 50,100,50 | comma separated. **Changing it creates a new checkpoint era** — see the warning below |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
 | `SNEK_PRIORITY_EXPONENT` | 0.6 | alpha; 0.0 disables prioritization |
 | `SNEK_PRIORITY_SIGNAL` | `td_error` | or `td_loss` (element-wise Huber), which is what `theSchlong` used |
@@ -624,6 +624,20 @@ Notes that matter:
 | `SNEK_FORK_PROB` | 0.5 | chance of forking at an eligible endgame decision point |
 | `SNEK_FORK_MIN_LENGTH` | 85 | snake length at or above which forking is allowed |
 | `SNEK_FORK_MAX_STEPS` | 60 | steps a branch may run before it is dropped; 0 runs it to its terminal state |
+
+### ‡ `SNEK_FC_LAYERS` creates a checkpoint era, and a mismatch is silent
+
+**A checkpoint trained at one set of widths, rebuilt at another, restores with no error and simply
+leaves the mismatched layers unpopulated** — `restore()` is called with `expect_partial()`. The policy
+then plays like a beginner, which looks like a bad run rather than a loading bug.
+`under_the_hood.eval_fc_layer_params()` exists for exactly this reason: `eval_checkpoints.py` used to
+hardcode `(50, 100, 50)`, which was correct only because nobody had ever set the override.
+
+So whenever an arm sets `SNEK_FC_LAYERS`, **the same value must be set on every eval of its checkpoints
+and on any `watch.py` run.** This is the same failure class as the observation-vector trap that took a
+90.3% champion down to scoring 0, 0, 1 — see
+[`../hallOfFame/README.md`](../hallOfFame/README.md). Any hall-of-fame entry from a non-default width
+has to record that width alongside it.
 
 **`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added
 2026-08-05; before it, `num_iterations` was hardcoded to 1e9 and every batch had to be stopped by

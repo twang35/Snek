@@ -69,6 +69,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **98%** @1588k /100 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **highest selected row since `b17b`** — 9 of 9 full-length rows ≥95%. **Not re-measured**; collapsed to 13.9 trailing over 1714-2283k, then recovered to 86.8 |
+| `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
+| `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
+| `b18c-tgt1000seed3` ‡‡‡ § | **target period 1000**, forking on | 2.51M | 92% @2168k *trunc* | — | 74.75% /eq §§ | 84.3% | ‡‡‡ § weakest of batch 18; **no full-length row survived the gate**; best window in its last 350k |
+| `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | not measured | — | — | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
+| `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | not measured | — | — | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
+| `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | not measured | — | — | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
+| `b19c-stdperseed3` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.00M | not measured | — | — | 29.7% | ‡‡‡ § **`sef` 0.0% — not one eval ≥80% in 2005 evals**; never reached pf30 ≥ 40%; best window at 195k. Plateaued, never dead. No close-out run |
 | `b17b-forkseed2` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.57M | **95.2%** @1190k /600 | 93.5% /500 | **82.42%** /eq §§ | **92.7%** | ‡‡‡ § **the record**, re-measured: selected reads of 99/100 fell to 92.4-95.0 over 500. Reached ~95% at **1.19M** |
 | `b15b-nstep3seed2` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.75M | 97% @3245k | 96.3% | 79.7% /eq §§ | 89.3% | ‡‡‡ § previous best selected ckpt, but **93.0% over 300** |
 | `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ 96/100 selected, ~94% shrunk |
@@ -77,6 +85,8 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b13d-shieldseed4` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.51M | **95%** @986k | 93.3% | 77.2% /4800 † | 83.3% | ‡‡‡ § **2nd best ckpt on record**; peaked ~1M then lost 44 pp |
 | `b14d-disc9975seed4` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.46M | 93% @2559k | 93.0% | **77.6%** /eq §§ | **89.7%** | ‡‡‡ § **best arm on record for `strong_eval_fraction`, 39.3%**; only 11.7 pp drawdown |
 | `b17c-forkseed3` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.52M | 93% @1424k *trunc* | 92.6% | 73.33% /eq §§ | 82.0% | ‡‡‡ § **still climbing when stopped** — peak and best window in its last 140k |
+| `b16b-noshapeseed2` ‡‡‡ § | **shaping off** (`FOOD_DISTANCE_REWARD=0`), disc 0.9975 | 1.26M | 93% @913k *trunc* | — | **79.08%** /eq §§ | 85.0% | ‡‡‡ § best of batch 16, **the first non-null in six batches**; `sef` **30.5%**; peak trailing **94.98**, joint-highest on record |
+| `b16a-noshapeseed1` ‡‡‡ § | **shaping off** (`FOOD_DISTANCE_REWARD=0`), disc 0.9975 | 1.25M | 92% @1203k /100 | — | 76.89% /eq §§ | **87.0%** | ‡‡‡ § 2nd of batch 16; `sef` 20.6%. **The only batch-16 arm with a genuine 100-episode row** — `eval_progress.best_of` prefers a 93.3% /90ep row over it, which is the half-depth relaxation showing its edge |
 | `b13c-shieldseed3` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.67M | 92% @3367k | 90.7% | 75.9% /11400 † | **85.3%** | ‡‡‡ § best of batch 13 on the graph; best ckpt in its final 300k |
 | `b13b-shieldseed2` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.70M | 91% @1166k | 90.3% | 74.8% /7800 † | 82.3% | ‡‡‡ § fastest start on record: 72.3% pf30 by 350k |
 | `b14b-disc9975seed2` ‡‡‡ § | disc **0.9975**, shield 0.8 | 4.12M | 90% @2261k | — | 67.1% /eq §§ | 76.3% | ‡‡‡ § weakest of batch 14; **one full-length row survived the gate**; lost 47 pp |
@@ -84,7 +94,9 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b15d-nstep3seed4` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.81M | 91% @3671k | 90.3% | 73.5% /eq §§ | 86.3% | ‡‡‡ § **peak trailing at 5799k, its 2nd-to-last eval** — stopped mid-climb |
 | `b13a-shieldseed1` ‡‡‡ § | + eps handover 0.0125, shield 0.5 | 3.39M | 80% @2044k | 80.0% | 70.5% /3100 † | 78.0% | ‡‡‡ § weakest of batch 13, and the batch's slowest starter |
 | `b17d-forkseed4` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.51M | 86% @1260k *trunc* | 84.5% | 66.83% /eq §§ | 75.7% | ‡‡‡ § fastest starter of batch 17; best window at 679k then flat |
+| `b16c-noshapeseed3` ‡‡‡ § | **shaping off** (`FOOD_DISTANCE_REWARD=0`), disc 0.9975 | 1.26M | 85% @979k *trunc* | — | 69.67% /eq §§ | 72.7% | ‡‡‡ § 3rd of batch 16; `sef` 10.5%; **peak trailing came at 1198k, its last 60k** — stopped mid-climb; deepest row is 40 episodes |
 | `b15c-nstep3seed3` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.46M | 86% @3823k *trunc* | — | 66.4% /eq §§ | 75.7% | ‡‡‡ § weakest of batch 15; **no full-length row survived the gate** — best is a truncated 69/80 |
+| `b16d-noshapeseed4` ‡‡‡ § | **shaping off** (`FOOD_DISTANCE_REWARD=0`), disc 0.9975 | 1.26M | 80% @1010k *trunc* | — | 63.27% /eq §§ | 73.0% | ‡‡‡ § weakest of batch 16 and **the arm that keeps the result at p=0.250** — `sef` 7.0%, level with its batch-14 control's 7.9%; deepest row is 30 episodes |
 | `b11a-obs30seed1` ‡‡‡ | disc 0.995, **fourth env** | 3.19M | 94% @671k | 93.3% | 79.5% /4800 † | 85.7% | ‡‡‡ 2nd of batch 11; peaked at 678k, then lost 42 pp |
 | `b11d-obs30seed4` ‡‡‡ | disc 0.995, **fourth env** | 3.59M | 88% @3507k | 86.7% | 69.3% /4000 † | 78.3% | ‡‡‡ only arm still near peak when stopped |
 | `b11c-obs30seed3` ‡‡‡ | disc 0.995, **fourth env** | 3.23M | 87% @1706k | 84.7% | 69.0% /2300 † | 73.0% | ‡‡‡ weakest of batch 11 |
@@ -196,6 +208,122 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 19 — standard PER: **falsified, 4/4 seeds, on every comparable metric**
+
+**Ran 2026-08-08 15:54 to 23:19, four arms `b19a`-`b19d` at seeds 1-4, stopped by hand at 2.00-2.42M
+after 7h25m.** Charts in
+[`charts.md`](charts.md#batch-19--standard-per-td_error-priority--is-on-falsified-stopped-at-200-242m).
+**No close-out evals were run**, at the user's direction — the training comparison is decisive on its
+own and the arms are not champion candidates.
+
+### The design, and why batch 18 is a clean control
+
+**One knob-group changed:** the priority signal went `td_loss` → **`td_error`** (so priority is
+`|TD error|`) and importance sampling turned **on**, β annealing 0.4 → 1.0 over 1M steps. Huber stayed
+the network loss (`element_wise_huber_loss`, unchanged). Everything else is batch 18 byte-for-byte, so
+**batch 18 is the seed-matched control**. No code edit was needed — `td_error`, `IS_WEIGHTS=1` and
+`IS_BETA=0.4` are all `snek2.py` defaults, so the launch just *dropped* batch 18's two PER overrides,
+confirmed by the startup logs showing no `PRIORITY_SIGNAL`/`IS_WEIGHTS` override on any arm.
+
+```
+SNEK_SEED=1..4  SNEK_TARGET_UPDATE_PERIOD=1000
+SNEK_FOOD_DISTANCE_REWARD=0  SNEK_DISCOUNT=0.9975  SNEK_GUIDED_FRACTION=0.8
+SNEK_FORK_BRANCHES=4  SNEK_FORK_PROB=0.5  SNEK_FORK_MIN_LENGTH=85  SNEK_FORK_MAX_STEPS=60
+# PER left at snek2.py defaults: td_error priority, IS on, beta 0.4 -> 1.0 over 1M
+```
+
+**What it isolated:** whether standard proportional PER (`|δ|` priority + full IS correction) beats the
+effective-α≈1.2 `td_loss`/no-IS config the project has run since batch 5. LR was kept at the default
+1e-5 because IS weights are mean-normalised, so the tuned LR is preserved. **β anneal:** these arms ran
+the **1M** schedule, the default at launch; the default was changed to 300k later the same day, which
+does not affect them — they were fully annealed by ~1M.
+
+### The pre-registered comparison, at a matched 2.004M horizon
+
+`b19c` is the shortest arm at 2.004M, so both batches truncate there. Exact paired permutation over all
+16 sign flips.
+
+| metric | b18 (`td_loss`, no IS) | b19 (standard PER) | delta | p |
+|---|---|---|---|---|
+| **`strong_eval_fraction`** (primary) | **31.60%** | **13.82%** | **-17.78 pp** | **0.125** (4/4) |
+| `best_perfect30` | 85.52% | 63.27% | **-22.25 pp** | **0.125** (4/4) |
+| mean perfect, back half | 68.86% | 48.88% | **-19.98 pp** | **0.125** (4/4) |
+| peak trailing | 94.85 | 94.16 | **-0.69** | **0.125** (4/4) |
+| **max drawdown** | 55.52 | **8.76** | **-46.76** | **0.125** (4/4) |
+| steps to pf30 ≥ 40% | 299.5k | 324.7k (3 arms) | slower 3/3 | — |
+
+0.125 is the **floor** at n=4, so every seed moved the same way on all five pooled metrics.
+**`b19c` never reached pf30 ≥ 40%**, so that row has no fourth pair and is left unpooled rather than
+imputed; the three seeds that did reach it were all slower.
+
+| seed | step | peak trailing | best-30 | `sef` | recent-30 | max drawdown |
+|---|---|---|---|---|---|---|
+| 4 | 2423k | **94.86** | **85.7%** | **40.2%** | **56.0%** | 12.84 |
+| 1 | 2192k | 94.66 | 71.0% | 8.0% | 43.3% | **4.94** |
+| 2 | 2116k | 94.40 | 66.7% | 4.6% | 51.3% | 10.20 |
+| 3 | 2004k | 92.72 | 29.7% | **0.0%** | 14.3% | 7.04 |
+| **mean** | | **94.16** | **63.3%** | **13.2%** | **41.2%** | **8.76** |
+
+### What it establishes
+
+**The pre-registered "clearly worse" branch fired, so this reproduces `b5c` cleanly for the first
+time and closes the partial-IS-correction candidate.** `b5c` had paired IS with `td_loss` + alpha 0.8
+*and* a fast anneal, so it never isolated IS; this batch does, and the long-standing `td_loss`/no-IS
+default now has a real defence rather than an inherited one.
+
+**‡ The ceiling moved for the first time in nine batches — downward.** Peak trailing read 94.8-95.0
+for every batch from 11 through 18 regardless of config. Here it is 94.16 mean, lower on 4/4. The
+magnitude is small but the invariance breaking at all is the notable part.
+
+**‡ The drawdown result is the real finding hiding in a negative batch.** Max drawdown fell 55.52 →
+**8.76**, 4/4 — the largest movement in the table and the strongest anti-forgetting result on record.
+It is not one bad control seed: three of four batch-18 arms drop 24-85 points, `b18b` collapsing to
+13.9 trailing over 1714k-2283k before recovering to 86.8. **But the arms buy it by sitting lower, not
+by holding a high level** — `sef` more than halved. Since reducing catastrophic forgetting is a *means*
+here and not the goal, that does not pay for −17.78 pp. **It does make the β anneal a candidate to pair
+with any future change that raises the level**, which is the one thing worth carrying forward.
+
+**Seed 4 is the exception and bounds the claim.** `b19d` is level with its control on every column, so
+the finding is a distribution shifting left rather than a mechanism that cannot work. One seed in four
+paid nothing.
+
+**What this is not:** a verdict on `td_error` alone or IS alone. The two moved together, so a config
+wanting `|δ|` priority *without* the IS correction is untested — and given the drawdown result, that is
+the version of the experiment with a live hypothesis behind it.
+
+## Batch 18 — `TARGET_UPDATE_PERIOD` 1000: the strongest speed result, and 20 rows ≥95%
+
+**Ran 2026-08-08 00:50 to 09:04, four arms stopped by hand at 2.40-2.61M; close-out evals finished
+2026-08-08 17:50.** Design, the paired training comparison against batch 17 and the per-seed table are
+in [`charts.md`](charts.md#batch-18--target_update_period1000-forking-retained-stopped-at-240-261m)
+and [`archive/runs-archive.md`](archive/runs-archive.md#closed-batch-18--target_update_period-1000-forking-retained);
+only the close-out is new here. Gate **95**, so `measured` is `pooled_equal_effort`.
+
+| arm | rows | episodes | eq-effort | 100-ep rows | ≥90% | ≥95% | top-3 | best full row |
+|---|---|---|---|---|---|---|---|---|
+| `b18a` | 599 | 21,101 | **81.87%** | 6 | 6 | 5 | 95.3% | 96.0% @1289k |
+| `b18b` | 310 | 11,429 | 78.52% | **9** | **9** | **9** | **97.0%** | **98.0% @1588k** |
+| `b18c` | 275 | 8,245 | 74.75% | **0** | 0 | 0 | — | none — best is 92.3% /91ep @2168k |
+| `b18d` | 693 | 21,584 | 80.22% | 6 | 6 | 6 | 96.0% | 96.0% @1105k |
+
+**Two things stand out, and the second is the more solid one.**
+
+**`b18b` @1588k reads 98.0% over 100 episodes — the highest selected row since `b17b`'s 99/100 — and
+it must not be called a record.** Every selected high in this project has shrunk on re-measurement:
+`b17b`'s 99/100 fell to ~93% over 6,600 fresh episodes, `b15b`'s 97/100 to 93.0%, `b11b`'s 96/100 to
+~94%. The standing record is `b17b` @1190000 at **94.24% over 5,120 fresh episodes**, and nothing in
+this close-out beats it *as measured*. What would settle it is a fresh-episode re-measure of
+`b18b` @1588000 — that is the highest-value pending measurement in the investigation.
+
+**The consistency across seeds is the real result: eq-effort 74.75-81.87, a 7.1-point spread.** Batch
+17 spanned 46.25-82.42 and batch 14 67.1-77.6. Batch 18's mean of **78.84%** sits just under `b17b`'s
+single 82.42% while every arm clears 74% — the first batch where the weakest seed is not a write-off.
+`pooled_equal_effort` is the one column selection cannot inflate, so this comparison is safe.
+
+**`b18c` produced no full-length row at all**, so its 92.3% comes from a 91-episode abandoned row and
+reads noisier than the rest. It is still the batch's weakest arm on every other column, so the gate is
+reporting a real difference rather than hiding one.
 
 ## Batch 17 — forked endgame collection: **a null that produced the project record**
 
@@ -728,7 +856,8 @@ checkpoints per arm to 1-28. See
 **Ran 2026-08-05, four arms to 3.4-3.7M, stopped healthy, measured 2026-08-05.** Same environment
 and config as batch 11 (‡‡‡, 30-value vector) except the epsilon schedule: handover 0.0125,
 `GUIDED_FRACTION=0.5`. Graphs in
-[`charts.md`](charts.md#batch-13--the-lower-handover-plus-the-shield-and-an-exact-null).
+[`archive/charts-archive.md`](archive/charts-archive.md#batch-13--the-lower-handover-plus-the-shield-and-an-exact-null)
+(retired from `charts.md` when batch 19 landed).
 
 | seed | best ckpt | top-3 | eq-effort | graph-100% tier | best30 | SEF | final eps |
 |---|---|---|---|---|---|---|---|

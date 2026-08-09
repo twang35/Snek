@@ -50,7 +50,7 @@ close-out's ranking among its own best rows carries no information.
 measured on step counts rather than on a selected eval.
 
 The checkpoint is in `savedPolicies/b17b-forkseed2/` and is worth promoting to
-[`../hallOfFame/`](../hallOfFame/README.md) as a 95.17%/600 champion — a stronger provenance than any
+[`../hallOfFame/`](../../hallOfFame/README.md) as a 95.17%/600 champion — a stronger provenance than any
 current entry, all of which rest on 100-300 episodes.
 
 ## ‡ The reasoning error: a selected sample cannot defend itself against selection
@@ -79,7 +79,7 @@ claim about a region needs a position-chosen sample.
 **And the region is not flat.** `1140k` reads **12.0%** on the blind grid — a total collapse 30k steps
 from a 95% checkpoint, which the close-out never saw because it never screened well enough to be
 selected. See
-[policy quality changes materially within 1000 training steps](findings.md#policy-quality-changes-materially-within-1000-training-steps).
+[policy quality changes materially within 1000 training steps](../findings.md#policy-quality-changes-materially-within-1000-training-steps).
 
 ## The previous record: three checkpoints read 96-97%, and all three are really ~93-94%
 
@@ -92,14 +92,14 @@ produced. It does not move the record. **Every champion, corrected, lands in the
 | `b14a` @3702k | 96/100 | 93.5% (CI 89.2-96.2) | re-measured: 91/100, pooled 187/200 |
 | `b11b` @855k | 96/100 | ~94.0% | shrunk against a Beta prior on its 104 unselected graph-100% rows |
 
-All three are in [`../hallOfFame/`](../hallOfFame/README.md) and all three load on `master`. Their
+All three are in [`../hallOfFame/`](../../hallOfFame/README.md) and all three load on `master`. Their
 intervals overlap almost entirely, so **the honest statement is that five batches have produced the
 same ~93-94% policy three times**, not a rising record.
 
 **Re-measure, do not shrink.** Re-measurement confirms the copy loads *and* sharpens the estimate,
 and it is the only option left for a gated close-out, since a gate destroys the unselected
 graph-100% rows the shrinkage prior needs — see
-[`findings.md`](findings.md#three-measurement-caveats).
+[`findings.md`](../findings.md#three-measurement-caveats).
 
 **‡ A high selected reading is mostly sampling luck, and the numbers say how much.** `b15b`'s 94
 full-length rows have **mean 90.7% and median 90.0%**. For a population centred at 90%, a 100-episode
@@ -113,12 +113,12 @@ checkpoint fail to restore; **`450e66e` is the last commit with the 26-value vec
 measured mid-run over 30 episodes and shrinks to ~87%, and its own arm's close-out found 93%
 @1695000 over a full 100 — treat those two as one policy family measured twice rather than a record
 and a near-miss. Full batch results:
-[`archive/batches1-11.md`](archive/batches1-11.md).
+[`archive/batches1-11.md`](batches1-11.md).
 
 ## Reference: the 2026-08-03 changes, and what they froze
 
 Batch 10's own write-up moved to
-[`archive/batches1-11.md`](archive/batches1-11.md) once batch 13 made batch 11 the baseline.
+[`archive/batches1-11.md`](batches1-11.md) once batch 13 made batch 11 the baseline.
 The two subsections below stayed here because they are not about batch 10 — they describe the eval
 protocol and the observation vector every current arm runs on.
 
@@ -152,7 +152,7 @@ does the opposite of what it looks like.**
 
 **Superseded in spirit on 2026-08-08:** the old advice ended "to be gentler on the machine, run fewer
 arms, not fewer workers." Being gentle is no longer the goal — see
-[evals run hot on purpose](hyperparamTuning.md#-evals-run-hot-on-purpose). The mechanical finding
+[evals run hot on purpose](../hyperparamTuning.md#-evals-run-hot-on-purpose). The mechanical finding
 stands; the priority it served does not.
 
 **Early abandonment was rejected in 2026-08-03 and shipped on 2026-08-05**, and the reversal is
@@ -168,14 +168,14 @@ killed it: the gate sits above the whole blob, so nearly all of it is out of con
 Measured on batch 13's first 505 full-length rows, full-length work drops to 71% / 52% / **31%** at
 gates of 85 / 90 / 95. **The gate is 95**, since that is the bar a checkpoint has to clear to be worth
 keeping at all; what it costs is in
-[`hyperparamTuning.md`](hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy).
+[`hyperparamTuning.md`](../hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy).
 
 A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
 count mid-run cost only the checkpoint in flight rather than the 333 already measured.
 
 ## The environment changed again on 2026-08-03: two new observations
 
-A fourth environment (‡‡‡ in [`completedRuns.md`](completedRuns.md)). The vector went from **26
+A fourth environment (‡‡‡ in [`completedRuns.md`](../completedRuns.md)). The vector went from **26
 values to 30**, in two steps.
 
 #### Indices 26-28: following the tail
@@ -258,18 +258,18 @@ numbers are final and cannot be extended.**
 one of them an optimiser knob. **Batch 16 went after the reward function instead and is the first
 non-null**, which is the single most useful thing this table says. Batch 17 went after the *collect
 distribution*, the third category, and came back null at the dose it delivered. Per-batch write-ups
-are in [`completedRuns.md`](completedRuns.md):
+are in [`completedRuns.md`](../completedRuns.md):
 
 | batch | what it changed | verdict |
 |---|---|---|
 | **18** | `TARGET_UPDATE_PERIOD` 8 -> **1000** | **the primary metric moved** — 102k faster to pf30 >= 40%, **4/4 seeds** (p=0.125), and drawdown *improved* 20.8 points against a pre-registered risk that it would worsen. Levels +6.7 pp but not separating. Close-out pending |
-| [**17**](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record) | `SNEK_FORK_BRANCHES=4` — forked endgame collection | **null on the config, record on one arm** — `sef` -1.67 pp (p=0.875) and eq-effort -5.02 pp, both dragged entirely by `b17a`; the other three seeds are **+3.3 to +3.7 pp on eq-effort, 3/3**. And `b17b` produced **99/100 @1205k with a 96.2% region**, the best policy ever measured here |
-| [**16**](completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches) | `FOOD_DISTANCE_REWARD=0` | **the first signal** — `sef` +11.35 pp at a matched 1.25M (p=0.250), `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). Consolidation, not speed or ceiling. Needs replication |
-| [15](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
-| [14](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
-| [13](completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
-| [12](completedRuns.md#batch-12--the-deadlock-abandoned-at-1m-of-25m) | eps handover 0.05 | **deadlocked**, abandoned 4/4 |
-| [11](archive/batches1-11.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference) | the 30-value vector itself | +4 to +5 pp vs batch 10, not significant |
+| [**17**](../completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record) | `SNEK_FORK_BRANCHES=4` — forked endgame collection | **null on the config, record on one arm** — `sef` -1.67 pp (p=0.875) and eq-effort -5.02 pp, both dragged entirely by `b17a`; the other three seeds are **+3.3 to +3.7 pp on eq-effort, 3/3**. And `b17b` produced **99/100 @1205k with a 96.2% region**, the best policy ever measured here |
+| [**16**](../completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches) | `FOOD_DISTANCE_REWARD=0` | **the first signal** — `sef` +11.35 pp at a matched 1.25M (p=0.250), `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). Consolidation, not speed or ceiling. Needs replication |
+| [15](../completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
+| [14](../completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
+| [13](../completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
+| [12](../completedRuns.md#batch-12--the-deadlock-abandoned-at-1m-of-25m) | eps handover 0.05 | **deadlocked**, abandoned 4/4 |
+| [11](batches1-11.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference) | the 30-value vector itself | +4 to +5 pp vs batch 10, not significant |
 
 **The 0.995 baseline now has n=8** (batches 11 + 13), and batch 14 adds n=4 at 0.9975 that is indistinguishable from it.
 
@@ -295,7 +295,7 @@ sits near it.
 
 **Ran 2026-08-07 19:55 to 2026-08-08 00:45, four arms `b17a`-`b17d` at seeds 1-4, stopped by hand at
 1.41-1.57M.** Full write-up, per-seed numbers and the mechanism audit:
-[`completedRuns.md`](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record).
+[`completedRuns.md`](../completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record).
 **Closed out 2026-08-08 at `EVAL_MIN_ACHIEVABLE=95`, matching batch 16's protocol exactly** — an
 earlier launch at 90 was restarted at 95 after ~4 minutes and no completed rows, because
 same-protocol-as-the-control beats better-protocol when the whole point is a paired comparison.
@@ -326,7 +326,7 @@ carry forward rather than re-derive:
 
 **Outstanding, and the highest-value item on this page:** re-measure `b17b` @1205k and @1248k with
 `EVAL_MIN_ACHIEVABLE=0` over fresh episodes, then promote to
-[`../hallOfFame/`](../hallOfFame/README.md). Until that lands the record is "a ≥95% policy exists",
+[`../hallOfFame/`](../../hallOfFame/README.md). Until that lands the record is "a ≥95% policy exists",
 not "99%".
 
 **Forking stays *on* for batch 18** at the user's direction, which makes batch 18 a clean one-knob
@@ -366,7 +366,7 @@ forking arm against a 1.25M control and calling the difference forking.
 
 **‡ It is not a one-knob test, and the write-up must say so.** It changes what is collected, how much
 per game, and how priority mass is distributed. The three consequences, with sizes, are tabulated in
-[`hyperparamTuning.md`](hyperparamTuning.md#forked-endgame-collection--snek_fork_). The one most likely
+[`hyperparamTuning.md`](../hyperparamTuning.md#forked-endgame-collection--snek_fork_). The one most likely
 to produce a *negative* result: branch transitions enter at max priority and are high-TD-error by
 construction, and the standing config runs `td_loss` with `IS_WEIGHTS=0`, so nothing corrects the
 resulting over-sampling.
@@ -382,7 +382,7 @@ window), against 0 violations in 400k pairs from three unforked arms.
 
 **Ran 2026-08-08 00:50 to 09:04, four arms `b18a`-`b18d` at seeds 1-4, stopped by hand at
 2.40-2.61M.** Charts in
-[`charts.md`](charts.md#batch-18--target_update_period1000-forking-retained-stopped-at-240-261m);
+[`charts.md`](../charts.md#batch-18--target_update_period1000-forking-retained-stopped-at-240-261m);
 close-out evals started 2026-08-08 11:5x. Designed 2026-08-07 and swapped behind the forking batch so
 the branching idea got measured first.
 
@@ -448,7 +448,7 @@ the soft-update route (`TARGET_UPDATE_TAU=0.005` at period 1) is next instead.
 It got the **opposite on drawdown** — 27.4 against the baseline's 19.2 — and what it did do was learn
 **much faster early**: score ~55 by 15k steps where `b1a-base` needed ~25k, and an earlier first
 perfect game. Full write-up in
-[`archive/batches1-11.md`](archive/batches1-11.md#target_update_period200-hypothesis-not-supported-but-interesting).
+[`archive/batches1-11.md`](batches1-11.md#target_update_period200-hypothesis-not-supported-but-interesting).
 
 Two reasons that is a weak hint rather than a finding: it was **stopped at 104k**, well short of the
 ~250k minimum horizon, and it ran on the 20-value vector under the old epsilon ladder with none of
@@ -516,7 +516,7 @@ Be precise about the gain, because an earlier version of this section was not: *
 only on a low-variance metric.** On `best_perfect30` it is 8.7 pp, and 5 pp there would need ~37
 arms per group, which is not reachable. On `strong_eval_fraction` n=12 gives 5.9 pp and n=8 gives
 7.2 pp. See the table in
-[`hyperparamTuning.md`](hyperparamTuning.md#the-primary-metric-strong_eval_fraction-the-share-of-an-arms-evals-at-80).
+[`hyperparamTuning.md`](../hyperparamTuning.md#the-primary-metric-strong_eval_fraction-the-share-of-an-arms-evals-at-80).
 
 Open question the cap does not answer: whether arms that peak at ~700k would have gone higher with
 more steps, or whether the peak is the ceiling. `b11d` peaked at 3468k and was the only arm still
@@ -541,6 +541,6 @@ different ways. Running any of these at n=4 would produce another unreadable bat
 **Seed count is the binding constraint, not the number of knobs tried.** Six single-seed
 conclusions in this document have been overturned or weakened — most recently gradient
 clipping, which looked like batch 8's headline twice before failing at 1 of 3. Nothing goes in
-[`findings.md`](findings.md) as established without n=3, which is why batch 10 spent all four
+[`findings.md`](../findings.md) as established without n=3, which is why batch 10 spent all four
 slots on one value rather than splitting them.
 

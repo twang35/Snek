@@ -9,7 +9,75 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-08 | 13 | batch 19 landed; batch 13 became the seventh-newest |
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
+
+---
+
+## Batch 13 — the lower handover plus the shield, and an exact null
+
+Four seeds, handover 0.0125 and `GUIDED_FRACTION=0.5`, run to 3.4-3.7M. **The schedule works and
+the outcome is unchanged.** Epsilon descended on skill to 0.0023-0.0050, all four passed the
+pre-registered 350k check, and `best_perfect30` came out at a mean of **82.2% against batch 11's
+82.2%** — an exact null, p = 1.000 on an exact paired permutation test.
+
+Read these charts against batch 11's below and the difference is that there is no difference. What
+*is* gone is batch 12's shape: no arm here peaks early and then decays to 55.
+
+| seed | b13 best30 | b11 best30 | diff |
+|---|---|---|---|
+| 1 | 78.0% | 85.7% | -7.7 |
+| 2 | 82.3% | 91.7% | -9.4 |
+| 3 | 85.3% | 73.0% | +12.3 |
+| 4 | 83.3% | 78.3% | +5.0 |
+| **mean** | **82.2%** | **82.2%** | **+0.0** |
+
+Per-seed swings of ±12 pp around a zero mean is what n=4 looks like on this metric, and it is the
+clearest statement in this file of why seed count is the binding constraint.
+
+### b13c-shieldseed3 — handover 0.0125 + shield, seed 3
+
+![b13c](../charts/b13c-shieldseed3.png)
+
+Step 3.67M · peak trailing 94.8 (at 3185k) · **best 30-eval perfect 85.3%** (at 2864k) · `strong_eval_fraction` **26.5%** · trailing-30 at stop 72.3%
+
+Best of the batch, and the arm that inverts batch 11's seed ordering: seed 3 was batch 11's weakest
+at 73.0% and is batch 13's strongest at 85.3%. Same seed, same config but the schedule — a +12.3 pp
+swing that means nothing on its own and is exactly why the batch mean is what gets reported.
+
+Still near its peak at 3.19M when stopped, with the smallest gap in the batch between peak trailing
+and where it ended.
+
+### b13d-shieldseed4 — handover 0.0125 + shield, seed 4
+
+![b13d](../charts/b13d-shieldseed4.png)
+
+Step 3.51M · peak trailing 94.5 (at 980k) · best 30-eval perfect 83.3% (at 1005k) · `strong_eval_fraction` 14.5% · trailing-30 at stop **39.0%**
+
+Peaked earliest in the batch at ~1M and gave up **44.3 pp** by 3.5M — the largest drawdown here, and
+the reason the shield cannot be credited with fixing the post-peak decline: batch 11's seed 4 was
+its *most* stable arm at 5.6 pp. The paired drawdown comparison is -1.0 pp at p = 0.875, i.e.
+nothing.
+
+### b13b-shieldseed2 — handover 0.0125 + shield, seed 2
+
+![b13b](../charts/b13b-shieldseed2.png)
+
+Step 3.70M · peak trailing 94.8 (at 1919k) · best 30-eval perfect 82.3% (at 1508k) · `strong_eval_fraction` 25.4% · trailing-30 at stop 67.0%
+
+**The fastest start on record**: trailing 92.4 with a 72.3% perfect rate by step 350k, where batch
+12's arms were at 0%. Whatever else the epsilon change did or did not do, that is the deadlock
+being decisively absent.
+
+### b13a-shieldseed1 — handover 0.0125 + shield, seed 1
+
+![b13a](../charts/b13a-shieldseed1.png)
+
+Step 3.39M · peak trailing 94.5 (at 2661k) · best 30-eval perfect 78.0% (at 2679k) · `strong_eval_fraction` 11.5% · trailing-30 at stop 70.7%
+
+Weakest of the batch and the slowest to get going — 2.0% perfect at 350k, the only arm that would
+have looked marginal against the abandon condition. Its best work came latest of the four, at 2.68M,
+and it held most of it: a 7.3 pp drawdown against its own seed's 42.4 pp in batch 11.
 
 ---
 
