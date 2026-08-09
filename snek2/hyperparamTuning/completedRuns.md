@@ -69,14 +69,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **98%** @1588k /100 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **highest selected row since `b17b`** — 9 of 9 full-length rows ≥95%. **Not re-measured**; collapsed to 13.9 trailing over 1714-2283k, then recovered to 86.8 |
+| `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **97.6%** @1588k /700 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **THE PROJECT RECORD** — 97.6% over 700 fresh episodes (CI 96.1-98.5), beating `b17b` by +3.33 pp, p=0.0002. **The first selected high here that did not shrink** (98/100 -> 97.4%/500). A narrow peak: @1578k reads 91.6%. In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
 | `b18c-tgt1000seed3` ‡‡‡ § | **target period 1000**, forking on | 2.51M | 92% @2168k *trunc* | — | 74.75% /eq §§ | 84.3% | ‡‡‡ § weakest of batch 18; **no full-length row survived the gate**; best window in its last 350k |
-| `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | not measured | — | — | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
-| `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | not measured | — | — | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
-| `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | not measured | — | — | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
-| `b19c-stdperseed3` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.00M | not measured | — | — | 29.7% | ‡‡‡ § **`sef` 0.0% — not one eval ≥80% in 2005 evals**; never reached pf30 ≥ 40%; best window at 195k. Plateaued, never dead. No close-out run |
+| `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | 91% @1536k *trunc* | — | 75.46% /eq §§ | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
+| `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | 77% @1485k *trunc* | — | 61.49% /eq §§ | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
+| `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | 76% @937k *trunc* | — | 51.59% /eq §§ | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
+| `b19c-stdperseed3` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.00M | 36% @169k *trunc* | — | 23.75% /eq §§ | 29.7% | ‡‡‡ § **`sef` 0.0% — not one eval ≥80% in 2005 evals**; never reached pf30 ≥ 40%; best window at 195k. Plateaued, never dead. No close-out run |
 | `b17b-forkseed2` ‡‡‡ § | **forking on**, disc 0.9975, shaping off | 1.57M | **95.2%** @1190k /600 | 93.5% /500 | **82.42%** /eq §§ | **92.7%** | ‡‡‡ § **the record**, re-measured: selected reads of 99/100 fell to 92.4-95.0 over 500. Reached ~95% at **1.19M** |
 | `b15b-nstep3seed2` ‡‡‡ § | **n=3**, disc 0.995, shield 0.8 | 5.75M | 97% @3245k | 96.3% | 79.7% /eq §§ | 89.3% | ‡‡‡ § previous best selected ckpt, but **93.0% over 300** |
 | `b11b-obs30seed2` ‡‡‡ | disc 0.995, **fourth env** | 3.56M | **96%** @855k | **95.3%** | **81.0%** /10400 † | **91.7%** | ‡‡‡ 96/100 selected, ~94% shrunk |
@@ -307,14 +307,46 @@ only the close-out is new here. Gate **95**, so `measured` is `pooled_equal_effo
 | `b18c` | 275 | 8,245 | 74.75% | **0** | 0 | 0 | — | none — best is 92.3% /91ep @2168k |
 | `b18d` | 693 | 21,584 | 80.22% | 6 | 6 | 6 | 96.0% | 96.0% @1105k |
 
-**Two things stand out, and the second is the more solid one.**
+**Two things stand out, and both held up.**
 
-**`b18b` @1588k reads 98.0% over 100 episodes — the highest selected row since `b17b`'s 99/100 — and
-it must not be called a record.** Every selected high in this project has shrunk on re-measurement:
-`b17b`'s 99/100 fell to ~93% over 6,600 fresh episodes, `b15b`'s 97/100 to 93.0%, `b11b`'s 96/100 to
-~94%. The standing record is `b17b` @1190000 at **94.24% over 5,120 fresh episodes**, and nothing in
-this close-out beats it *as measured*. What would settle it is a fresh-episode re-measure of
-`b18b` @1588000 — that is the highest-value pending measurement in the investigation.
+### ‡ `b18b` @1588000 is the project record: 97.6% over 700 fresh episodes
+
+**Verified 2026-08-09.** The close-out row read 98.0%/100 and was written up here as a candidate that
+"must not be called a record", on the grounds that every selected high in this project had shrunk —
+`b17b` 99/100 → 94.2% over 5,120, `b15b` 97/100 → 93.0%, `b11b` 96/100 → ~94%. **That expectation was
+wrong for this checkpoint**, and it is the first time:
+
+| measurement | result |
+|---|---|
+| 500 fresh episodes, gate off, flat protocol | 487/500 = **97.4%** (95.6-98.5) |
+| 200 fresh, on the hall-of-fame copy | 196/200 = **98.0%** (95.0-99.2) |
+| **pooled** | **683/700 = 97.57%** (CI **96.1-98.5**) |
+
+**Against `b17b`'s 94.24%/5,120: +3.33 pp, z=3.67, p=0.0002, intervals non-overlapping.** Promoted to
+[`../hallOfFame/`](../hallOfFame/README.md#-b18b-1588000--the-first-selected-high-that-did-not-shrink)
+with the copy verified to load and play.
+
+**All nine of the batch's >95% checkpoints were re-measured at 500 episodes each**, which is what makes
+@1588000 readable as an outlier rather than a loose protocol — the other eight shrank by 2.0 to 10.6 pp:
+
+| checkpoint | selected | 500 ep | delta |
+|---|---|---|---|
+| `b18b` @1588000 | 98.0 | **97.4** | **−0.6** |
+| `b18b` @1601000 | 97.0 | 95.0 | −2.0 |
+| `b18b` @1600000 | 96.0 | 92.8 | −3.2 |
+| `b18b` @561000 | 96.0 | 92.2 | −3.8 |
+| `b18b` @1578000 | 96.0 | 91.6 | −4.4 |
+| `b18d` @1111000 | 96.0 | 90.4 | −5.6 |
+| `b18d` @1105000 | 96.0 | 89.6 | −6.4 |
+| `b18d` @2292000 | 96.0 | 85.6 | −10.4 |
+| `b18a` @1289000 | 96.0 | 85.4 | −10.6 |
+
+Mean shrinkage **−5.2 pp**; pooled over all nine, 4100/4500 = **91.11%**.
+
+**‡ It is a narrow peak, not a strong region.** `@1578000` sits 10k steps earlier and reads 91.6%, and
+`@1600000` 12k later reads 92.8%. So `TARGET_UPDATE_PERIOD=1000` is not demonstrated to produce a
+better *region* — only this checkpoint. A blind every-10k grid over 1.55-1.62M is the outstanding test,
+the same one that deflated `b17b`'s apparent region to 84%.
 
 **The consistency across seeds is the real result: eq-effort 74.75-81.87, a 7.1-point spread.** Batch
 17 spanned 46.25-82.42 and batch 14 67.1-77.6. Batch 18's mean of **78.84%** sits just under `b17b`'s
@@ -783,7 +815,7 @@ two, and it should be run on any checkpoint before it is called a record.
 **Ran 2026-08-05 19:34 to 2026-08-06 08:12 (12.6 h), four arms to 4.17M / 4.13M / 4.16M / 4.46M,
 stopped by hand ~2 h short of the 5M cap, measured 2026-08-06.** `DISCOUNT=0.9975`,
 `GUIDED_FRACTION=0.8`, otherwise batch 13's config. Graphs in
-[`charts.md`](charts.md#batch-14--discount09975-at-guided_fraction08-and-a-third-null).
+[`archive/charts-archive.md`](archive/charts-archive.md#batch-14--discount09975-at-guided_fraction08-and-a-third-null).
 
 | seed | best ckpt | top-3 | eq-effort | best30 | SEF | drawdown | final eps |
 |---|---|---|---|---|---|---|---|

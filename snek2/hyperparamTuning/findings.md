@@ -34,10 +34,13 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
-| **The record is ~95%** — `b17b-forkseed2` @1190k, **95.17% over 600 fresh episodes** (CI 93.1-96.6) | **measured 2026-08-08**; up from ~93-94% but with **overlapping intervals** — better, not a different class |
+| **The record is 97.6%** — `b18b-tgt1000seed2` @1588k, **683/700 fresh episodes** (CI 96.1-98.5) | **measured 2026-08-09**. Beats `b17b`'s 94.24%/5120 by **+3.33 pp, p=0.0002**, intervals **non-overlapping** — the first move in the ceiling that is a different class, not a better sample |
+| **A selected high can survive re-measurement** — @1588k was selected at 98/100 and re-measures at 97.4%/500, a **0.6 pp** change | **first instance**, 2026-08-09. Every prior one shrank (99→94.2, 97→93.0, 96→93.5, 96→~94); across nine batch-18 checkpoints >95% the mean shrinkage was **−5.2 pp**, so this is an outlier, not a new norm |
+| The record is a **narrow peak, not a region** — @1578k is 10k steps away and reads **91.6%/500** | **standing caveat** — a position-chosen grid is still the only way to claim a region |
+| ~~The record is ~95%, `b17b` @1190k at 95.17%/600~~ | **superseded 2026-08-09** by `b18b` @1588k. The `b17b` figure itself was later refined to 94.24% over 5,120 |
 | ~~The record is ~96%, `b17b` @1205k reads 99/100~~ | **falsified by re-measurement the same day** — 99/100 → **92.4% over 500**; all four ≥98% rows shrank a mean of **5.05 pp** |
 | The previous record was ~93-94% — `b15b` @3245k (93.0% /300), `b14a` @3702k (93.5% /200), `b11b` @855k | **narrowly superseded 2026-08-08** |
-| **~95% is reachable at ~1.2M steps**, not millions | **measured** — `b17b` @1190k against `b15b`'s 3.2M and `b14a`'s 3.7M for ~93.5%; the clearest gain of the batch |
+| **The frontier is reachable at ~1.2-1.6M steps**, not millions | **measured** — `b17b` @1190k for 94.2% and `b18b` @1588k for 97.6%, against `b15b`'s 3.2M and `b14a`'s 3.7M for ~93.5%. The higher record did **not** cost more steps |
 | Two of the four record jumps came from the **horizon** and the **env audit**, not hyperparameters | **established** |
 | An arm has a lifetime: peak ~2.5-3M steps, dead by ~7M | **established**, 2 arms to the end |
 | Arms peak by ~3.4M | **falsified** — 2 of batch 14's 4 peaked past 3.5M, and 2 of batch 15's were still gaining at **5.5-6.0M**; the old rule tracked where humans stopped arms |
@@ -543,7 +546,15 @@ does not help, which rules out CPU contention.
   that began identically; it was never an assumption that they would stay identical. This is the
   mechanism behind the already-established finding that a seed is not a stable unit of quality.
 - **Never report a re-run as confirming an exact number**, and never expect a resume to continue the
-  original trajectory — the buffer and RNG state are not checkpointed either.
+  original trajectory — the RNG state is not checkpointed.
+- **‡ The replay buffer *is* checkpointed, corrected 2026-08-09.** This line previously said the
+  buffer was not saved either, which is wrong: `training.py` calls `replay_buffer.save()` every
+  `10 * eval_interval` steps and `snek2.py` calls `replay_buffer.restore()` at startup, printing
+  `restored replay buffer: N transitions`. **A resume is warm-started, not cold**, which matters
+  whenever a resume's early behaviour is being interpreted. Two caveats that remain true: the save is
+  gated on the same `MIN_CHECKPOINT_SCORE` condition as the policy checkpoint, so an arm that never
+  clears the bar has no buffer to restore; and because it saves 10x less often than the policy, the
+  restored buffer can be **up to 10k steps older** than the restored weights.
 - **Bit-reproducibility would require replacing cpprb** with a seedable buffer. Not worth it for
   tuning; it would matter only for debugging a specific divergence.
 

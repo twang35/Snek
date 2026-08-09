@@ -9,21 +9,57 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: **94.2% over 5,120 episodes**, `b17b-forkseed2-ckpt1190000`
+## The current record: **97.6% over 700 episodes**, `b18b-tgt1000seed2-ckpt1588000`
 
-Batches 11-17 train on the **30-value observation vector** — the current one, after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these six entries are the
-only ones in this folder that load on `master` as it stands.** All six came from a batch close-out
-rather than a mid-run measurement.
+Batches 11-18 train on the **30-value observation vector** — the current one, after the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these eight entries are the
+only ones in this folder that load on `master` as it stands.** All came from a batch close-out
+rather than a mid-run measurement. Every entry here is the default `FC_LAYERS=50,100,50`.
 
 | checkpoint | measured | config |
 |---|---|---|
-| **`b17b-forkseed2-ckpt1190000`** | **4825/5120 = 94.2%** (CI **93.6-94.8**) — the most heavily measured checkpoint in the project, see below | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
+| **`b18b-tgt1000seed2-ckpt1588000`** | **683/700 = 97.6%** (CI **96.1-98.5**) — **the record**, and the first selected high in this project to survive re-measurement; see below | `TARGET_UPDATE_PERIOD=1000`, forking on, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `td_loss`/no-IS, `SNEK_SEED=2` |
+| `b18b-tgt1000seed2-ckpt1601000` | 663/700 = **94.7%** (CI 92.8-96.1) — 13k steps after the record and 2.9 pp below it | same as above |
+| `b17b-forkseed2-ckpt1190000` | **4825/5120 = 94.2%** (CI **93.6-94.8**) — the most heavily measured checkpoint in the project, see below | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
 | `b15b-nstep3seed2-ckpt3245000` | **97/100** selected, **182/200** on an independent re-run → **93.0% over 300** (CI 89.5-95.4) | `N_STEP_UPDATE=3`, `DISCOUNT=0.995`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=2` |
 | `b14a-disc9975seed1-ckpt3702000` | 96/100 selected, **91/100** on an independent re-run → **93.5% over 200** (CI 89.2-96.2) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=1` |
 | `b11b-obs30seed2-ckpt855000` | 96/100 (CI 90.2-98.4), top-3 95.3%, **~94% shrunk** | `DISCOUNT=0.995`, `SNEK_SEED=2` |
 | `b13d-shieldseed4-ckpt986000` | 95/100 (CI 88.8-97.8), top-3 93.3% | + eps handover 0.0125, `GUIDED_FRACTION=0.5`, `SNEK_SEED=4` |
 | `b11a-obs30seed1-ckpt671000` | 94/100 (CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
+
+### ‡ `b18b` @1588000 — the first selected high that did *not* shrink
+
+Added 2026-08-09. Promoted under the standing rule: **a checkpoint that beats the all-time best on
+re-measurement belongs here.** Two independent runs, 700 fresh episodes, no selection between them:
+
+| measurement | result | why it exists |
+|---|---|---|
+| 500 fresh episodes, gate off, flat protocol | 487/500 = **97.4%** (95.6-98.5) | the verification of the close-out's 98/100 |
+| 200 fresh, **on the copy in this folder** | 196/200 = **98.0%** (95.0-99.2) | confirms the copy loads and plays, per this folder's standard |
+| **pooled** | **683/700 = 97.57%** (CI **96.1-98.5**) | the figure to quote |
+
+**It beats `b17b`'s 94.24% with non-overlapping intervals** (96.1-98.5 against 93.6-94.8), so this is a
+real move in the ceiling rather than a sampling artifact — the first since the 30-value vector landed.
+
+**Why it matters more than the number.** Every previous selected high in this project shrank on
+re-measurement: `b17b` 99/100 → 94.2%, `b15b` 97/100 → 93.0%, `b14a` 96/100 → 93.5%, `b11b` 96/100 →
+~94%. This one was selected at 98/100 and re-measures at 97.6% over 7x the episodes — **a 0.6 pp
+change**. It is the first checkpoint here whose close-out row was approximately correct.
+
+**‡ It is a narrow peak, not a strong region, and that is the caveat on the entry.** The eight
+neighbouring checkpoints measured in the same sweep are all well below it:
+
+| step | 500-episode rate | distance from the record |
+|---|---|---|
+| **1588000** | **97.4%** | — |
+| 1601000 | 95.0% | +13k |
+| 1600000 | 92.8% | +12k |
+| 1578000 | 91.6% | **−10k** |
+| 561000 | 92.2% | far |
+
+**1578000 is 10k steps away and reads 5.8 pp lower**, so nothing here licenses a claim about the
+*region* — only about this checkpoint. That is the same lesson `b17b` taught, and it survives the
+better result: a selected row describes the checkpoint the screen liked, never its neighbourhood.
 
 ### ‡ `b17b` @1190000 — the first entry measured deeply *before* being called a record
 

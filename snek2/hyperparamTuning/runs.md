@@ -201,37 +201,67 @@ ssh -i ~/.ssh/snek_desktop claw@the-claw-den 'free -m | awk "NR==2{print \$3\" M
 
 ## Record status
 
-**~94%, and the ceiling has not moved in seven batches.** The record is `b17b-forkseed2` @1190000 —
-**94.24%** over 5,120 fresh episodes (CI 93.6-94.8), level with the old record (`b14a` 93.5%/200,
-`b15b` 93.0%/300) once measured properly. **The one real gain is speed:** it reached the frontier at
-**1.19M steps** where `b15b` needed 3.2M and `b14a` 3.7M. Read the speed, not the level.
+**NEW RECORD, 2026-08-09: `b18b-tgt1000seed2` @1588000 — 97.6% over 700 fresh episodes** (683/700,
+CI **96.1-98.5**). It beats the previous record, `b17b-forkseed2` @1190000 at 94.24%/5,120
+(CI 93.6-94.8), with **non-overlapping intervals** — the first genuine move in the ceiling since the
+30-value vector landed. Promoted to
+[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-976-over-700-episodes-b18b-tgt1000seed2-ckpt1588000),
+copy verified to load and play.
 
-**A high selected reading is mostly sampling luck** — `b17b`'s 99/100 close-out rows re-measure to
-~93%, and a *blind* grid over the same region reads **84%** against the selected rows' 96%. The rule:
-an arm's selected full-length rows describe the checkpoints the screen liked, never the region — any
-regional claim needs a position-chosen sample. Full derivation and the selection-reasoning error:
-[`archive/runs-archive.md`](archive/runs-archive.md); measurement caveats:
-[`findings.md`](findings.md#three-measurement-caveats).
+**It is also the first selected high in this project that did not shrink.** Selected at 98/100, it
+re-measures at **97.4% over 500** — a 0.6 pp change, against `b17b` 99→94.2, `b15b` 97→93.0,
+`b14a` 96→93.5, `b11b` 96→~94. Nine batch-18 checkpoints above 95% were re-measured at 500 episodes
+each and the mean shrinkage was **−5.2 pp**, so @1588000 is a clear outlier in the good direction
+rather than a loose protocol.
 
-**Batch 19 makes it nine batches flat.** Peak trailing 94.66 / 94.40 / 92.72 / 94.86 at ~2M, so
-standard PER did not move the ceiling either — it moved how much of the time an arm sits near it, and
-downward. Batch 18's peaks were 94.92-94.96.
+**But it is a narrow peak, not a strong region.** `@1578000` — 10k steps earlier — reads **91.6%**,
+5.8 pp lower. The old rule survives the better result: a selected row describes the checkpoint the
+screen liked, never its neighbourhood. Any regional claim still needs a position-chosen sample.
+Full derivation of that error: [`archive/runs-archive.md`](archive/runs-archive.md); measurement
+caveats: [`findings.md`](findings.md#three-measurement-caveats).
 
-**Batch 20 wave 1 is the first architecture test, and the ceiling still did not move.** 2.66× the
-parameters (`200,100,50`) held peak trailing at 94.50 mean against the `50,100,50` control's 94.44 —
-inside the same band. Provisional: the capacity arms crashed at ~1.75M, ~0.8M short of the control, so
-a matched read is still owed. But nothing about capacity-up points upward.
+### Max progression across batches
+
+Best checkpoint per batch, at most three each, newest first. **Two columns, because they say
+different things:** `selected` is the close-out's own best row and reads high by construction;
+`re-measured` is a later independent sample and is the only column that can be compared across
+batches. `*trunc*` means no full-length row survived the gate, so the figure is shorter and noisier.
+
+| batch | change | best selected | re-measured |
+|---|---|---|---|
+| **20** w1 | `FC_LAYERS` 2.66x | *no close-out yet* | — |
+| **19** | standard PER + IS | 91% @1536k *trunc* · 77% @1485k *trunc* · 76% @937k *trunc* | **none reached full length** |
+| **18** | `TARGET_UPDATE_PERIOD` 1000 | **98% @1588k** · 97% @1601k · 96% @1289k | **97.6% /700** ← **record** · 94.7% /700 · 85.4% /500 |
+| 17 | forked endgame collection | 99% @1248k · 99% @1205k · 98% @1231k | **94.24% /5120** · region grid 84% |
+| 16 | `FOOD_DISTANCE_REWARD=0` | 93% @913k *trunc* · 92% @1203k · 85% @979k *trunc* | — |
+| 15 | `N_STEP_UPDATE=3` | 97% @3245k · 95% @4697k · 91% @3671k | **93.0% /300** |
+| 14 | `DISCOUNT=0.9975` | 96% @3702k · 93% @2559k · 90% @2261k | **93.5% /200** |
+| 13 | eps handover + shield | 95% @986k · 92% @3367k · 91% @1166k | — |
+| 12 | eps handover 0.05 | *deadlocked, not measured* | — |
+| 11 | the 30-value vector | 96% @855k · 94% @671k · 88% @3507k | **~94%** (shrunk) |
+| 10 ‡‡ | `DISCOUNT=0.995` | 93% @1695k · 90% @1501k · 85% @2344k | 74.9% /66000 pooled |
+| ≤9 | earlier environments | `b8f` 92%, `b9d` 70%, `b7f` 51%, `b4c` 50% | not comparable |
+
+**Read the re-measured column and the story is short: 94.2% for a year of batches, then 97.6%.**
+Batches 11-19 all train on the same 30-value vector so they are comparable to each other; batch 10
+(‡‡) and everything below it are earlier environments where the same checkpoint scores differently,
+which is why those rows are not a trend line.
+
+**The selected column is nearly flat from batch 11 on** — 93-99% in every batch that produced a
+full-length row — which is exactly why it cannot be used to judge progress. Batch 17's three 98-99%
+rows re-measured to 94.2%; batch 18's 98% re-measured to 97.6%. Same selected number, 3.4 pp apart in
+reality.
 
 **Outstanding, highest-value, in order:**
 
-1. **Re-measure `b18b-tgt1000seed2` @1588000 over fresh episodes.** Its close-out row is
-   **98.0% over 100** with 9 of 9 full-length rows ≥95% — the highest selected reading since `b17b`'s
-   99/100. Selected highs have shrunk every single time (`b17b` 99→~93, `b15b` 97→93.0, `b11b`
-   96→~94), so this is a candidate and not a record until it is measured against the standing
-   94.24%/5,120. See [`completedRuns.md`](completedRuns.md#batch-18--target_update_period-1000-the-strongest-speed-result-and-20-rows-95).
-2. ~~Promote `b17b-forkseed2` @1190000 to `../hallOfFame/`~~ — **already done 2026-08-08**, and this
-   entry was stale. It is the folder's current-record entry with a full write-up:
-   [`../hallOfFame/README.md`](../hallOfFame/README.md#the-current-record-942-over-5120-episodes-b17b-forkseed2-ckpt1190000).
+1. **Decide batch 20 wave 1's horizon** — rerun the capacity arm to 2.5M, or truncate the control to
+   ~1.75M and read what exists. Wave 2 is blocked on it. See the decision note above.
+2. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
+   open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
+   lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test
+   that deflated `b17b`'s apparent region to 84%.
+3. **The 11 batch-18 checkpoints at exactly 95.0%** were excluded from the 500-episode sweep, which
+   took ">95%" literally. ~9 minutes of eval if a fuller picture of the region is wanted.
 
 ## Closed batches (11-19)
 
@@ -265,7 +295,7 @@ table.
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
 | ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **closed as batch 18** — primary moved, 4/4 seeds; see [`completedRuns.md`](completedRuns.md) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
-| ~~`FC_LAYERS=128,128`~~ | capacity | **superseded by batch 20**, which sweeps eight shapes rather than one — see [above](#next-up-batch-20--fc-layer-shapes-on-batch-19s-base). Prior was "low", and the nine-batch flat ceiling is why |
+| ~~`FC_LAYERS=128,128`~~ | capacity | **superseded by batch 20**, which sweeps eight shapes rather than one — see [above](#batch-20--fc-layer-shapes-on-batch-19s-base). Prior was "low", and the nine-batch flat ceiling is why |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |
 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | experience diversity | low — the 500k result was ambiguous |
 
