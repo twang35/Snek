@@ -26,13 +26,30 @@ import time
 
 
 def _training_alive(pattern):
-    """True while any process matches `pattern` (pgrep -f). If we cannot tell, keep
+    """True while any process *other than this viewer* matches `pattern` (pgrep -f).
+
+    The watched pattern is itself part of the viewer's own command line -- it is an
+    argument -- so a naive pgrep matches the viewer and it would never exit. Drop our
+    own pid and any chart_viewer.py process from the match. Uses `ps` for the cmdline
+    check so it works on macOS (no /proc) as well as Linux. If we cannot tell, keep
     showing rather than exit prematurely."""
     if not pattern:
         return True
     try:
-        return subprocess.run(['pgrep', '-f', pattern],
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+        res = subprocess.run(['pgrep', '-f', pattern],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        mine = str(os.getpid())
+        pids = [p for p in res.stdout.decode().split() if p and p != mine]
+        if not pids:
+            return False
+        args = ['ps', '-o', 'pid=,command=']
+        for p in pids:
+            args += ['-p', p]
+        ps = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        for line in ps.stdout.decode('utf-8', 'replace').splitlines():
+            if line.strip() and 'chart_viewer.py' not in line:
+                return True   # a real watched (training/eval) process
+        return False
     except Exception:
         return True
 

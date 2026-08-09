@@ -3,8 +3,9 @@ whole box from git:
 
   1. fetch origin; re-read runtime.json (clamped; bad config -> keep last good)
   2. reap finished jobs; publish their artifacts to `results`
-  3. reconcile: launch pending jobs (by id, against a local ledger) up to the
-     live concurrency limits, unless paused/draining or disk is low
+  3. reconcile: if the box is idle, open one wave -- same-type jobs (train OR eval,
+     never both) up to that type's limit; while any job runs, launch nothing (no
+     backfill), so waves have clean boundaries. Skipped if paused/draining or disk low
   4. refresh throughput; publish status.json to `ops-status`
 
 The loop body is wrapped so a bad job, a transient git error, or a malformed
@@ -110,16 +111,35 @@ class Runner:
             if subprocess.run(['pgrep', '-f', 'chart_viewer.py'],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 return
-            pngs = [os.path.join(self.host['SNEK_DIR'], 'runs', rj.policy + '.png')
-                    for rj in self.running.values() if rj.policy]
+            # Trainers write runs/<policy>.png; evals write evals/<policy>_eval_progress.png.
+            # Show whichever chart each running job actually produces, so eval waves are
+            # covered as well as training waves.
+            pngs = []
+            for rj in self.running.values():
+                if not rj.policy:
+                    continue
+                if rj.job.category == 'eval':
+                    pngs.append(os.path.join(self.host['SNEK_DIR'], 'evals',
+                                             rj.policy + '_eval_progress.png'))
+                else:
+                    pngs.append(os.path.join(self.host['SNEK_DIR'], 'runs', rj.policy + '.png'))
             if not pngs:
                 return
             os.makedirs(self.host['LOG_DIR'], exist_ok=True)
             log = open(os.path.join(self.host['LOG_DIR'], 'chart_viewer.log'), 'ab')
+            # The runner is a systemd service outside the graphical session, so its own
+            # environment has no DISPLAY -- the viewer only reaches the monitor if we pass
+            # the session's DISPLAY + X authority, exactly as launch.build_command does for
+            # jobs. Without this a daemon-launched viewer opens nothing.
+            env = dict(os.environ)
+            if self.host.get('DISPLAY'):
+                env.setdefault('DISPLAY', self.host['DISPLAY'])
+                if self.host.get('XAUTHORITY'):
+                    env.setdefault('XAUTHORITY', self.host['XAUTHORITY'])
             argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
-                   ['--watch', 'snek2.py', '--interval', '1', '--scale', '1.5',
-                    '--title', 'snek training']
-            subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=dict(os.environ),
+                   ['--watch', 'snek2.py|eval_checkpoints.py', '--interval', '1', '--scale', '1.5',
+                    '--title', 'snek desktop']
+            subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=env,
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)
         except Exception as e:
             sys.stderr.write('viewer launch failed: {0}\n'.format(e))
@@ -143,7 +163,6 @@ class Runner:
             self.config_notes = self.config_notes + \
                 ['disk low ({0} GB < {1}) -- not launching'.format(free, self.runtime['disk_min_gb'])]
             return
-        counts = self._counts()
         limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
         desired = []
         for name, text in gitbus.read_pending_jobs(self.host):
@@ -159,12 +178,25 @@ class Runner:
             if state in TERMINAL or job.id in self.running:
                 continue
             desired.append(job)
+        # Wave-barrier scheduling: a "wave" is a set of same-type jobs launched together,
+        # up to that type's limit, and NOTHING new starts until the whole wave finishes.
+        # So trainings and evals never overlap, and a freed slot is not backfilled mid-wave
+        # -- the box idles on the stragglers until the slowest job in the wave is done, then
+        # the next wave opens. We still parse pending specs while a wave runs (above), so a
+        # malformed one is marked failed promptly, but we launch nothing until idle.
+        if self.running or not desired:
+            self._save_ledger()
+            return
+        # The highest-priority pending job picks the wave's type; only jobs of that type
+        # join it, up to that type's limit.
         desired.sort(key=lambda j: j.priority)
+        wave_category = desired[0].category
+        launched = 0
         for job in desired:
-            if counts[job.category] >= limits[job.category]:
+            if job.category != wave_category or launched >= limits[wave_category]:
                 continue
             self._launch(job)
-            counts[job.category] += 1
+            launched += 1
         self._save_ledger()
 
     def _launch(self, job):
