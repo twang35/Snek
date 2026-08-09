@@ -425,7 +425,28 @@ def text_summary(policy_name, state):
         # screens several land on 20/20, so an unfiltered top 5 was five lucky screens at 100.0%
         # sitting under a `best` of 95% — the filtered answer.
         deep = deep_rows(state['completed'])
-        note = '' if len(deep) == len(state['completed']) else '  (full-length rows only)'
+        # Two different caveats, and depth outranks filtering.
+        #
+        # A flat "(full-length rows only)" was wrong whenever the abandonment gate stopped every
+        # row short of the target — at gate 95 that is the normal case, and batches 19 and 20
+        # both closed out with *no* full-length row in any arm. It read as a 100-episode
+        # guarantee sitting on top of a 58-episode measurement.
+        #
+        # Depth is checked first and regardless of whether anything was filtered, because the
+        # filtering test alone stays silent in the worst case: when every row is shallow *and*
+        # within half the deepest, nothing is excluded, so b20b printed no caveat at all over a
+        # 36-episode 83.3%. Absence of a note has to mean full length or it means nothing.
+        #
+        # `target_episodes` is the payload's episodes_per_checkpoint, the same source the chart's
+        # full/partial split uses; it falls back to the deepest row for files predating it.
+        deepest = max(row['episodes'] for row in state['completed'])
+        target = state.get('target_episodes') or deepest
+        if deepest < target:
+            note = '  (best depth {0} of {1} episodes — none full length)'.format(deepest, target)
+        elif len(deep) != len(state['completed']):
+            note = '  (full-length rows only)'
+        else:
+            note = ''
         lines.append('  top 5:{0}'.format(note))
         top = sorted(deep, key=lambda r: -r['perfect_percent'])[:5]
         for rank, row in enumerate(top, 1):

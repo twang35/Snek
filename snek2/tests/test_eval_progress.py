@@ -283,6 +283,58 @@ def test_top_five_has_no_caveat_when_every_row_is_full_length():
     assert 'full-length rows only' not in eval_progress.text_summary('arm', state)
 
 
+def test_top_five_does_not_claim_full_length_when_the_gate_abandoned_every_row():
+    """The caveat must not promise a depth no row has.
+
+    Batch 20's close-out is the case: at gate 95 every row in all four arms was abandoned, the
+    deepest at 58 of 100 episodes, and the summary still printed "(full-length rows only)" over
+    it — which reads as a 100-episode measurement and is how an 89.7% on 58 episodes gets quoted
+    as if it were confirmed.
+    """
+    rows = ([result(1000 + i, episodes=20, perfect=20) for i in range(8)]
+            + [result(9000, episodes=58, perfect=52)])
+    state = eval_progress.summarize(
+        [run(rows, checkpoints_requested=9, episodes_per_checkpoint=100)])
+    text = eval_progress.text_summary('arm', state)
+    assert 'none full length' in text and 'full-length rows only' not in text, text
+    assert '58 of 100 episodes' in text, text
+
+
+def test_top_five_flags_shallow_rows_even_when_none_were_filtered_out():
+    """The worst case, and the one the filtering test misses.
+
+    b20b's rows were 20-36 episodes: every one short of the 100 target, but all within half the
+    deepest, so nothing was excluded and the caveat never fired — an 83.3% on 36 episodes
+    printed with no qualifier at all. Absence of a note has to mean full length.
+    """
+    rows = [result(1000 + i, episodes=20 + 2 * i, perfect=15 + i) for i in range(9)]
+    state = eval_progress.summarize(
+        [run(rows, checkpoints_requested=9, episodes_per_checkpoint=100)])
+    text = eval_progress.text_summary('arm', state)
+    assert len(eval_progress.deep_rows(rows)) == len(rows), 'fixture must filter nothing'
+    assert 'none full length' in text, text
+    assert '36 of 100 episodes' in text, text
+
+
+def test_top_five_still_says_full_length_when_the_deep_rows_reached_the_target():
+    """The mixed-depth case the caveat was written for still reports it as full length."""
+    rows = ([result(1000 + i, episodes=20, perfect=20) for i in range(8)]
+            + [result(9000, episodes=100, perfect=95)])
+    state = eval_progress.summarize(
+        [run(rows, checkpoints_requested=9, episodes_per_checkpoint=100)])
+    assert 'full-length rows only' in eval_progress.text_summary('arm', state)
+
+
+def test_top_five_caveat_falls_back_when_the_target_was_never_recorded():
+    """Files predating episodes_per_checkpoint have no target, so the deepest row is the target
+    and the old wording is still the honest one."""
+    rows = ([result(1000 + i, episodes=20, perfect=20) for i in range(8)]
+            + [result(9000, episodes=100, perfect=95)])
+    state = eval_progress.summarize([run(rows, checkpoints_requested=9)])
+    assert state['target_episodes'] is None
+    assert 'full-length rows only' in eval_progress.text_summary('arm', state)
+
+
 def test_deep_rows_is_every_row_under_one_uniform_episode_count():
     rows = [result(1, episodes=100), result(2, episodes=100)]
     assert eval_progress.deep_rows(rows) == rows
