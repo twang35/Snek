@@ -30,7 +30,7 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up          # follow the login URL; note the machine name it prints
 
 # 4. Let the laptop's Claude SSH in: paste the LAPTOP's public key here.
-#    (get it on the laptop with:  cat ~/.ssh/id_ed25519.pub  -- see Part 2)
+#    (get it on the laptop with:  cat ~/.ssh/snek_desktop.pub  -- see Part 2)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 echo 'PASTE_LAPTOP_PUBLIC_KEY_HERE' >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
@@ -70,9 +70,11 @@ queue + runtime.json); `ops-status` and `results` are orphan branches so they
 don't drag the codebase along.
 
 ```bash
-# laptop public key for Part 1 step 4 (generate if you don't have one):
-[ -f ~/.ssh/id_ed25519.pub ] || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
-cat ~/.ssh/id_ed25519.pub
+# laptop public key for Part 1 step 4 -- a dedicated key, already generated as
+# ~/.ssh/snek_desktop (kept separate from the YubiKey so SSH needs no touch).
+# The laptop connects with `ssh -i ~/.ssh/snek_desktop` (a Host alias gets added
+# to ~/.ssh/config once the Tailscale name is known).
+cat ~/.ssh/snek_desktop.pub
 
 git branch ops master && git push origin ops
 git switch --orphan ops-status && git commit --allow-empty -m "init ops-status" && git push origin ops-status
