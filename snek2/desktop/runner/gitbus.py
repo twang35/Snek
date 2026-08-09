@@ -79,6 +79,8 @@ def _commit_and_push(worktree, branch, host, message):
     # Nothing staged -> nothing to do (git commit would error out).
     if not _git(['status', '--porcelain'], cwd=worktree).strip():
         return
-    _git(['commit', '-q', '-m', message], cwd=worktree)
+    # check=True so a failure (e.g. missing git identity) raises instead of being
+    # swallowed -- the caller logs it to the journal rather than going silent.
+    _git(['commit', '-q', '-m', message], cwd=worktree, check=True)
     # Single writer, so force-with-lease is safe and never needs a merge.
-    _git(['push', '--force-with-lease', host['GIT_REMOTE'], 'HEAD:' + branch], cwd=worktree)
+    _git(['push', '--force-with-lease', host['GIT_REMOTE'], 'HEAD:' + branch], cwd=worktree, check=True)

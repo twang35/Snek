@@ -175,8 +175,8 @@ class Runner:
                     arts.append(os.path.join(runs, f))
         try:
             gitbus.publish_results(self.host, rj.job, arts)
-        except Exception:
-            pass  # best-effort; the job is still recorded done in the ledger/status
+        except Exception as e:  # best-effort, but say so in the journal, not silently
+            sys.stderr.write('publish_results({0}) failed: {1}\n'.format(rj.job.id, e))
 
     def _publish(self):
         status = {
