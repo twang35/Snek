@@ -12,10 +12,31 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Next up: batch 20 — FC layer shapes, on batch 19's base
+## Batch 20 — FC layer shapes, on batch 19's base
 
-**Designed 2026-08-08, not yet launched.** Nothing is running on the laptop; the desktop is idle with
-an empty queue. Batch 19's arms were stopped at 2.00-2.42M and are the control.
+**Wave 1 done (2026-08-09), all eight arms stopped.** Per-arm numbers and charts:
+[`charts.md`](charts.md#batch-20-wave-1--fc-layer-capacity-fc_layers-the-first-architecture-test-stopped-at-173-278m).
+Batch 19's close-out also finished on the laptop overnight.
+
+- **Control `50,100,50` (`b20a-d`, laptop)** ran to 2.49-2.78M and stopped clean.
+- **Capacity `200,100,50` (`b20e-h`, desktop, 2.66× params)** crashed together in the OOM→XIO cascade at
+  **~1.75M** — checkpoints preserved, and no arm was on a bad trajectory (all `zero_since` null, still
+  climbing). The cause is fixed since: the live chart window is off by default and replaced by the
+  decoupled `chart_viewer.py`.
+
+**Provisional read: 2.66× capacity did not move the ceiling.** Peak trailing **94.44** (control) vs
+**94.50** (capacity), best-30 64.0 vs 65.6 — both inside the flat 94.7-95.0 band that every batch since
+11 has held. But the two hosts stopped ~0.8M apart, so **this is not a matched-horizon comparison** and
+`strong_eval_fraction` (a fraction of each arm's own evals) is not comparable across the two columns yet.
+
+> **Decision pending — do not start without the user.** Either rerun the capacity arm to 2.5M for a clean
+> matched read, or truncate the control to ~1.75M and read the existing data. The desktop is safe to rerun
+> now, **but the max-eval-worker RAM test is still owed first** (message 22) so a safe `EVAL_WORKERS` can be
+> picked. **Wave 2 is on hold until wave 1's control is settled**, because every later shape reads against
+> it and the β-moved-with-architecture confound needs that control clean.
+
+**FC trap — permanent, not just for wave 1:** any eval / `watch.py` / close-out of a `200,100,50`
+checkpoint **must** pass `SNEK_FC_LAYERS=200,100,50`, or `restore()` silently mismatches the net (see below).
 
 **The question is the one thing nine batches of optimiser knobs have not moved: the ceiling.** Network
 architecture has **never been varied in this project** — `FC_LAYERS` has sat at `(50, 100, 50)` since
@@ -142,69 +163,37 @@ and on any `watch.py` run.** This is the same failure class that once took a 90.
 scoring 0, 0, 1. Batch 20's checkpoints are a new era: if any of them earns a
 [`../hallOfFame/`](../hallOfFame/README.md) entry, the entry has to record its width.
 
-### Launching it — wave 1 is 8 arms
+### Launching a wave — the mechanics (reused every wave)
 
-**Naming:** `b20a-fcbaseseed<N>` for the `50,100,50` re-baseline, `b20b-fc200x100x50seed<N>` for the
-capacity arm. `x` stands in for the comma so the policy name stays a clean directory name.
+**Naming:** `b20<letter>-fc<shape>seed<N>`, with `x` standing in for the comma so the policy name stays
+a clean directory name — e.g. `b20b-fc200x100x50seed1`. Wave 1 used `b20a-fc50seed<N>` (control) and
+`b20e-h-fc200seed<N>` (capacity).
 
-| arm | shape | host | seeds |
-|---|---|---|---|
-| `b20a-fcbaseseed1..4` | `50,100,50` | laptop | 1-4 |
-| `b20b-fc200x100x50seed1..4` | `200,100,50` | desktop | 1-4 |
-
-**Laptop** — one command per seed. Only `SNEK_SEED` and the policy name change between the four:
+**Laptop** — one command per seed; only `SNEK_FC_LAYERS`, `SNEK_SEED` and the policy name change:
 
 ```
 cd snek2
-SNEK_FC_LAYERS=50,100,50 SNEK_SEED=1 SNEK_BETA_ANNEAL_STEPS=300000 \
+SNEK_FC_LAYERS=<shape> SNEK_SEED=1 SNEK_BETA_ANNEAL_STEPS=300000 \
 SNEK_TARGET_UPDATE_PERIOD=1000 SNEK_FOOD_DISTANCE_REWARD=0 SNEK_DISCOUNT=0.9975 \
 SNEK_GUIDED_FRACTION=0.8 SNEK_FORK_BRANCHES=4 SNEK_FORK_PROB=0.5 \
 SNEK_FORK_MIN_LENGTH=85 SNEK_FORK_MAX_STEPS=60 SNEK_MAX_STEPS=2500000 \
-/opt/miniconda3/envs/snek/bin/python -u snek2.py b20a-fcbaseseed1 > /tmp/b20a1.log 2>&1 &
+/opt/miniconda3/envs/snek/bin/python -u snek2.py b20<letter>-fc<shape>seed1 > /tmp/b20.log 2>&1 &
 ```
 
-Setting `SNEK_FC_LAYERS=50,100,50` explicitly on the baseline arm is not redundant — it is what makes
-the arm's `hyperparameter override:` startup line prove which width it ran.
+Set `SNEK_FC_LAYERS` explicitly even on the `50,100,50` control — it is what makes the arm's
+`hyperparameter override:` startup line prove which width it ran.
 
 **Desktop** — one JSON per arm in `queue/pending/` on the `ops` branch
-([how](../desktop/README.md#driving-it-from-the-laptop)), seeds 1-4:
+([how](../desktop/README.md#driving-it-from-the-laptop)); same env block plus `"SNEK_FC_LAYERS": "<shape>"`,
+`max_steps` 2500000, and a `notes` reminder that any eval/`watch.py` on the checkpoints must set the same
+`SNEK_FC_LAYERS`. Confirm config landed: `grep "hyperparameter override:" /tmp/b20.log` (laptop) or
+`git show origin/ops-status:status.json` (desktop, under `running`).
 
-```json
-{
-  "id": "b20b-fc200x100x50seed1",
-  "type": "train",
-  "policy": "b20b-fc200x100x50seed1",
-  "max_steps": 2500000,
-  "priority": 10,
-  "env": {
-    "SNEK_FC_LAYERS": "200,100,50",
-    "SNEK_SEED": "1",
-    "SNEK_BETA_ANNEAL_STEPS": "300000",
-    "SNEK_TARGET_UPDATE_PERIOD": "1000",
-    "SNEK_FOOD_DISTANCE_REWARD": "0",
-    "SNEK_DISCOUNT": "0.9975",
-    "SNEK_GUIDED_FRACTION": "0.8",
-    "SNEK_FORK_BRANCHES": "4",
-    "SNEK_FORK_PROB": "0.5",
-    "SNEK_FORK_MIN_LENGTH": "85",
-    "SNEK_FORK_MAX_STEPS": "60"
-  },
-  "notes": "batch 20 wave 1 capacity arm. Any eval or watch.py on these checkpoints MUST set SNEK_FC_LAYERS=200,100,50"
-}
-```
-
-**Confirm each arm got its config** — the one log line worth grepping:
-
-```
-grep "hyperparameter override:" /tmp/b20a1.log        # laptop
-git show origin/ops-status:status.json                 # desktop: it appears under `running`
-```
-
-**One desktop caveat for whoever launches.** `runtime.json` on `ops` is already at `max_trainers: 4`
-and `eval_workers: 4`, so no config change is needed — but **4 concurrent trainers there is
-unmeasured**. Each trainer spawns 10 parallel eval-env processes on top of its own, and only *evals*
-were benchmarked (4 × 10 workers peaked at 12.8 GB of 14). Queue all four, then sample RAM early and
-drop `max_trainers` if it is tight:
+**Desktop concurrency — corrected by the wave-1 crash.** Wave 1 ran `max_trainers: 4` with the live
+chart window **on**, and all four capacity arms died together at ~1.75M: an OOM disrupted the X session,
+and the in-process cv2 window raised a fatal XIO error that took the arms with it. Two things changed as
+a result — the live window is off by default now (decoupled viewer instead), and the **max-eval-worker
+RAM test is still owed** before trusting `max_trainers: 4` again. Sample RAM early on any desktop wave:
 
 ```
 ssh -i ~/.ssh/snek_desktop claw@the-claw-den 'free -m | awk "NR==2{print \$3\" MB used\"}"'
@@ -227,6 +216,11 @@ regional claim needs a position-chosen sample. Full derivation and the selection
 **Batch 19 makes it nine batches flat.** Peak trailing 94.66 / 94.40 / 92.72 / 94.86 at ~2M, so
 standard PER did not move the ceiling either — it moved how much of the time an arm sits near it, and
 downward. Batch 18's peaks were 94.92-94.96.
+
+**Batch 20 wave 1 is the first architecture test, and the ceiling still did not move.** 2.66× the
+parameters (`200,100,50`) held peak trailing at 94.50 mean against the `50,100,50` control's 94.44 —
+inside the same band. Provisional: the capacity arms crashed at ~1.75M, ~0.8M short of the control, so
+a matched read is still owed. But nothing about capacity-up points upward.
 
 **Outstanding, highest-value, in order:**
 

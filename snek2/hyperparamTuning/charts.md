@@ -36,6 +36,67 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
+## Batch 20 wave 1 — FC layer capacity (`FC_LAYERS`), the first architecture test, stopped at 1.73-2.78M
+
+Eight arms across two hosts: the control `50,100,50` re-baselined at β=300k (`b20a-d`, laptop) and the
+capacity arm `200,100,50`, 2.66× the parameters (`b20e-h`, desktop). This is the first time the network
+shape has been varied in the project, aimed at the one quantity nine batches of optimiser knobs never
+moved — the ceiling.
+
+**Provisional, and not at a matched horizon.** The laptop control ran to 2.49-2.78M; the desktop
+treatment crashed in an OOM cascade at **~1.75M** (checkpoints preserved), so each treatment arm is
+~0.8M shorter than its seed-matched control. `strong_eval_fraction` is a fraction of each arm's own
+evals, so it is inflated for the longer control and the two columns are **not comparable** until the
+control is truncated to ~1.75M or the treatment is rerun to 2.5M — [pending](runs.md).
+
+**The headline survives the caveat: 2.66× capacity did not move the ceiling.** Peak trailing sits at
+~94.5 for both shapes — control mean **94.44**, treatment mean **94.50** — squarely inside the 94.7-95.0
+band every batch has held since 11. best-30 is a wash too (control 64.0, treatment 65.6), and the
+treatment reached its level ~0.8M *sooner*, but from a crashed run that never got the extra steps to
+either confirm or give it back. Capacity-up is not, on this evidence, a route to a higher ceiling.
+
+| arm | shape | host | step | peak trail | best-30 | `sef` | recent-30 |
+|---|---|---|---|---|---|---|---|
+| `b20d` | 50,100,50 | laptop | 2.73M | 94.76 | **80.3%** | 28.4% | 47.7% |
+| `b20b` | 50,100,50 | laptop | 2.78M | 94.84 | 78.3% | 16.0% | 63.7% |
+| `b20c` | 50,100,50 | laptop | 2.55M | 94.34 | 56.3% | 2.1% | 43.0% |
+| `b20a` | 50,100,50 | laptop | 2.49M | 93.80 | 41.3% | 0.2% | 24.0% |
+| `b20h` | 200,100,50 | desktop | 1.80M | **94.82** | 76.3% | 10.5% | **68.0%** |
+| `b20g` | 200,100,50 | desktop | 1.73M | 94.62 | 72.3% | 11.9% | 59.7% |
+| `b20e` | 200,100,50 | desktop | 1.75M | 94.56 | 68.3% | 7.5% | 44.0% |
+| `b20f` | 200,100,50 | desktop | 1.77M | 93.98 | 45.3% | 0.6% | 37.0% |
+
+### Control `50,100,50` (laptop), best first
+
+`b20d` — 2.73M, peak 94.76, best-30 **80.3%** @917k, `sef` 28.4%, recent-30 47.7%.
+![b20d](charts/b20d-fc50seed4.png)
+
+`b20b` — 2.78M, peak 94.84, best-30 78.3% @1498k, `sef` 16.0%, recent-30 63.7%.
+![b20b](charts/b20b-fc50seed2.png)
+
+`b20c` — 2.55M, peak 94.34, best-30 56.3% @1959k, `sef` 2.1%, recent-30 43.0%.
+![b20c](charts/b20c-fc50seed3.png)
+
+`b20a` — 2.49M, peak 93.80, best-30 41.3% @1900k, `sef` 0.2%, recent-30 24.0% — the weakest arm of the eight.
+![b20a](charts/b20a-fc50seed1.png)
+
+### Treatment `200,100,50` (desktop, 2.66× params), best first
+
+All four crashed together at ~1.75M via the OOM→X-break→fatal-XIO cascade of 2026-08-09, not on their
+own trajectory — every one was healthy (`zero_since` null) and still climbing when it died.
+
+`b20h` — 1.80M, peak **94.82**, best-30 76.3% @1755k, `sef` 10.5%, recent-30 **68.0%** — best of the treatment arms.
+![b20h](charts/b20h-fc200seed4.png)
+
+`b20g` — 1.73M, peak 94.62, best-30 72.3% @1689k, `sef` 11.9%, recent-30 59.7%.
+![b20g](charts/b20g-fc200seed3.png)
+
+`b20e` — 1.75M, peak 94.56, best-30 68.3% @1000k, `sef` 7.5%, recent-30 44.0%.
+![b20e](charts/b20e-fc200seed1.png)
+
+`b20f` — 1.77M, peak 93.98, best-30 45.3% @1563k, `sef` 0.6%, recent-30 37.0% — the treatment's laggard, mirroring `b20a` in the control.
+![b20f](charts/b20f-fc200seed2.png)
+
 ## Batch 19 — standard PER (`td_error` priority + IS on), falsified, stopped at 2.00-2.42M
 
 Four seeds, batch 18's config byte-for-byte with the two PER overrides *dropped* — priority signal
@@ -442,84 +503,5 @@ it can be.
 abandoned by the 90% gate, so its best checkpoint is a truncated 69/80 and
 `best_full_length_row`'s half-depth fallback ran in production for the first time. At the 95% gate
 this becomes the normal case rather than the exception.
-
-## Batch 14 — `DISCOUNT=0.9975` at `GUIDED_FRACTION=0.8`, and a third null
-
-Four seeds run to 4.1-4.5M, the longest arms on the current vector. **Null against batch 13 on every
-metric** — `pooled_equal_effort` 72.08% against 72.07%, best checkpoint +2.8 pp at p=1.000, and
-`strong_eval_fraction` +2.1 pp with per-seed diffs from -16.2 to +24.8. Full write-up:
-[`completedRuns.md`](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet).
-
-**The one result worth keeping is a chart-shape result, and it is about horizon.** Two arms produced
-their best window past 3.5M and `b14c` was still climbing when stopped — which is why the step cap
-moved 5M → 10M. Every earlier batch was killed by hand near 3.5M, so the long-standing "arms peak
-between ~1M and ~3.4M" reading was partly describing the stopping habit.
-
-| seed | b14 best30 | b13 best30 | diff | peak window |
-|---|---|---|---|---|
-| 1 | 79.7% | 78.0% | +1.7 | **3707k** |
-| 2 | 76.3% | 82.3% | -6.0 | 2282k |
-| 3 | 87.7% | 85.3% | +2.3 | **4135k** |
-| 4 | **89.7%** | 83.3% | +6.3 | 2700k |
-| **mean** | **83.3%** | **82.2%** | **+1.1** | |
-
-**Do not read the graph-100% tier off these arms.** Batch 14 is the first batch measured under
-`EVAL_MIN_ACHIEVABLE=90`, which censors that tier from below and inflates it by ~15 pp — see
-[`hyperparamTuning.md`](hyperparamTuning.md#taking-the-arm-level-pooled-rate).
-
-### b14d-disc9975seed4 — disc 0.9975 + shield 0.8, seed 4
-
-![b14d](charts/b14d-disc9975seed4.png)
-
-Step 4.46M · peak trailing **94.9** (at 2554k) · **best 30-eval perfect 89.7%** (at 2700k) · `strong_eval_fraction` **39.3%** · trailing-30 at stop 78.0%
-
-**The strongest arm the project has recorded on the primary metric** — 39.3% of its evals at ≥80%,
-against a previous best of 30.5% (`b11b`). It is also the flattest good arm here: its mean perfect
-rate climbed monotonically through 2.5-3.0M (peaking at 81.1% per 500k band) and never fell below
-67% afterwards, for only 11.7 pp of drawdown from peak to stop.
-
-Its best checkpoint is 93% @2559k, below `b14a`'s 96%, which is the usual split between an arm that
-holds a high level and an arm that spikes once.
-
-### b14a-disc9975seed1 — disc 0.9975 + shield 0.8, seed 1
-
-![b14a](charts/b14a-disc9975seed1.png)
-
-Step 4.17M · peak trailing 94.8 (at 3794k) · best 30-eval perfect 79.7% (at 3707k) · `strong_eval_fraction` 20.0% · trailing-30 at stop 54.7%
-
-**Produced a 96/100 checkpoint at 3702000, tying `b11b` for the best selected measurement on
-record** — and then gave back 25 pp by the time it stopped. Both facts are the arm: its peak window
-is the *latest* of any arm on this vector, and it was already falling apart 400k later.
-
-The 96% does not survive a second look at full strength. An independent 100-episode re-measurement
-of the same checkpoint read **91/100**, so the honest pooled estimate is **187/200 = 93.5%** (CI
-89.2-96.2). That gap is the winner's curse made visible — this checkpoint was the maximum over 176
-attempted full-length measurements in this arm.
-
-### b14c-disc9975seed3 — disc 0.9975 + shield 0.8, seed 3
-
-![b14c](charts/b14c-disc9975seed3.png)
-
-Step 4.16M · peak trailing 94.8 (at 2105k) · **best 30-eval perfect 87.7%** (at 4135k) · `strong_eval_fraction` 17.8% · trailing-30 at stop 82.0%
-
-**The arm that moved the step cap.** Its best 30-eval window is at 4135k — the last one it ran — and
-its final 4.0-4.5M band is its strongest of the whole run at 75.9% mean perfect against a 62.6%
-previous best. It was still improving when it was stopped, and a 5M cap would have cut it mid-climb.
-
-Only 5.7 pp of drawdown, the smallest in the batch, for the same reason: it never peaked.
-
-### b14b-disc9975seed2 — disc 0.9975 + shield 0.8, seed 2
-
-![b14b](charts/b14b-disc9975seed2.png)
-
-Step 4.12M · peak trailing 94.5 (at 2053k) · best 30-eval perfect 76.3% (at 2282k) · `strong_eval_fraction` **9.3%** · trailing-30 at stop 29.3%
-
-Weakest of the batch and the clearest decay curve on the current vector: peaked at 2.05M, then lost
-**47 pp** of perfect rate over the next 2M steps. Its epsilon reads 0.0064 at stop against its
-siblings' 0.002-0.0036, which is the anti-ratchet buying exploration back in response — working as
-designed, and not enough to arrest the slide.
-
-It is also the arm that shows what the 90% gate costs: **one** full-length row survived the whole
-close-out, so it has a best checkpoint (90%) and no meaningful top-3.
 
 ---
