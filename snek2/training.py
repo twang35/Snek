@@ -87,16 +87,22 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
     # Reset the train step.
     # agent.train_step_counter.assign(0)
 
-    # Best-effort live results window. A headless box (no cv2 / no display) skips
-    # it and still writes the PNG + report every eval, so training runs fine on a
-    # server -- only the on-screen convenience is lost. pyformulas imports cv2
-    # lazily inside screen(), so the failure surfaces here rather than at import.
-    try:
-        screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
-    except Exception as _e:
-        print('live results window unavailable ({0}: {1}); charts still saved to disk'.format(
-            type(_e).__name__, _e))
+    # Live results window. **Off entirely when SNEK_CHART_WINDOW=0**, which is the
+    # only safe mode on an X11 box under memory pressure: if the X session breaks
+    # (e.g. an OOM kill disrupts it), a live cv2 window raises a *fatal* XIO error
+    # that calls exit() below Python and cannot be caught -- which killed all four
+    # desktop arms at once on 2026-08-09. With the window off, the PNG + report are
+    # still written every eval, so nothing is lost but the on-screen convenience.
+    # When on, opening it is still best-effort (a failure degrades to None).
+    if os.environ.get('SNEK_CHART_WINDOW', '1') in ('0', '', 'false', 'False'):
         screen = None
+    else:
+        try:
+            screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
+        except Exception as _e:
+            print('live results window unavailable ({0}: {1}); charts still saved to disk'.format(
+                type(_e).__name__, _e))
+            screen = None
     # Every eval refreshes the window and these three files, so a run always leaves
     # behind its own graph and write-up without anyone having to screenshot it.
     graph_path = os.path.join(snake_constants.RUNS_DIR, '{0}.png'.format(policy_name))

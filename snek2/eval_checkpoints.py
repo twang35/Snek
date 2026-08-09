@@ -1255,6 +1255,13 @@ def main(argv):
             if frame is None:
                 return
             if chart['screen'] is None:
+                # SNEK_CHART_WINDOW=0 turns the live window off entirely (headless,
+                # or an unreliable X session); the PNG is still written by
+                # live_frame() above. See training.py for why a live window is a
+                # fatal-XIO liability under memory pressure.
+                if os.environ.get('SNEK_CHART_WINDOW', '1') in ('0', '', 'false', 'False'):
+                    chart['off'] = True
+                    return
                 import pyformulas
                 chart['screen'] = pyformulas.screen(
                     np.zeros(frame.shape[:2], dtype=np.uint8),

@@ -8,9 +8,11 @@ Type=simple
 User=claw
 WorkingDirectory=/home/claw/Snek/snek2/desktop
 Environment=SNEK_RUNNER_HOST_ENV=/home/claw/Snek/snek2/desktop/config/host.env
-# Enlarge the live chart windows on this box's monitor (uniform dpi scale, tuned
-# by eye for the connected display). Inherited by every launched job through the
-# runner's environment; unset elsewhere so only this box's charts grow.
+# Live chart window OFF on this box. An X11 session under memory pressure can
+# break and fatally XIO-crash a training run (all four arms died this way on
+# 2026-08-09); charts are still written as PNGs (runs/<policy>.png). SNEK_CHART_SCALE
+# is kept for the PNG dpi and for if the live window is ever re-enabled.
+Environment=SNEK_CHART_WINDOW=0
 Environment=SNEK_CHART_SCALE=3.07
 # The daemon is stdlib-only, so it runs on BASE miniconda python and can start
 # before the `snek` conda env is built. Jobs are launched with PYTHON_BIN from
