@@ -1,0 +1,8 @@
+{
+  "id": "b20e-fc200seed1",
+  "type": "train",
+  "policy": "b20e-fc200seed1",
+  "env": {"SNEK_FC_LAYERS":"200,100,50","SNEK_SEED":"1","SNEK_BETA_ANNEAL_STEPS":"300000","SNEK_TARGET_UPDATE_PERIOD":"1000","SNEK_FOOD_DISTANCE_REWARD":"0","SNEK_DISCOUNT":"0.9975","SNEK_GUIDED_FRACTION":"0.8","SNEK_FORK_BRANCHES":"4","SNEK_FORK_PROB":"0.5","SNEK_FORK_MIN_LENGTH":"85","SNEK_FORK_MAX_STEPS":"60","EVAL_WORKERS":"6"},
+  "priority": 10,
+  "notes": "batch 20 wave-1 treatment 200,100,50 seed 1; EVAL_WORKERS 6 (reduced from 10 for 14GB OOM safety)"
+}
