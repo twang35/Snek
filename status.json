@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-10T12:51:25",
-  "ts": 1786391485.0928018,
+  "iso": "2026-08-10T12:51:59",
+  "ts": 1786391519.3626485,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,19 +17,9 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "b20w-fc60x30x30x30x30seed3-closeout",
-      "type": "eval",
-      "policy": "b20w-fc60x30x30x30x30seed3",
-      "pid": 1290162,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 985
-    }
-  ],
+  "running": [],
   "ledger": {
     "smoke-1": "failed",
     "smoke-2": "failed",
@@ -68,13 +58,13 @@
     "b20t-fc25x50x25seed4-closeout": "done",
     "b20u-fc60x30x30x30x30seed1-closeout": "done",
     "b20v-fc60x30x30x30x30seed2-closeout": "done",
-    "b20w-fc60x30x30x30x30seed3-closeout": "running",
+    "b20w-fc60x30x30x30x30seed3-closeout": "done",
     "b20x-fc60x30x30x30x30seed4-closeout": "done"
   },
   "disk_free_gb": 174.0,
   "load_avg": [
-    3.53759765625,
-    4.81787109375,
-    6.57861328125
+    3.12109375,
+    4.607421875,
+    6.45263671875
   ]
 }
