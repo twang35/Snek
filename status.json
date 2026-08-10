@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-10T12:57:59",
-  "ts": 1786391879.080533,
+  "iso": "2026-08-10T12:58:01",
+  "ts": 1786391881.59207,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -12,7 +12,8 @@
     "disk_min_gb": 5,
     "paused": false,
     "drain": false,
-    "viewer": true
+    "viewer": true,
+    "auto_closeout": true
   },
   "config_notes": [],
   "counts": {
@@ -63,8 +64,8 @@
   },
   "disk_free_gb": 174.0,
   "load_avg": [
-    0.05029296875,
-    1.482421875,
-    4.42333984375
+    0.0458984375,
+    1.45751953125,
+    4.3994140625
   ]
 }
