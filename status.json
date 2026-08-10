@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-10T12:34:57",
-  "ts": 1786390497.0273972,
+  "iso": "2026-08-10T12:34:59",
+  "ts": 1786390499.911878,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,17 +17,44 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 4
   },
   "running": [
     {
-      "id": "b20r-fc25x50x25seed2-closeout",
+      "id": "b20u-fc60x30x30x30x30seed1-closeout",
       "type": "eval",
-      "policy": "b20r-fc25x50x25seed2",
-      "pid": 1283537,
+      "policy": "b20u-fc60x30x30x30x30seed1",
+      "pid": 1290160,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 463
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20v-fc60x30x30x30x30seed2-closeout",
+      "type": "eval",
+      "policy": "b20v-fc60x30x30x30x30seed2",
+      "pid": 1290161,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20w-fc60x30x30x30x30seed3-closeout",
+      "type": "eval",
+      "policy": "b20w-fc60x30x30x30x30seed3",
+      "pid": 1290162,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20x-fc60x30x30x30x30seed4-closeout",
+      "type": "eval",
+      "policy": "b20x-fc60x30x30x30x30seed4",
+      "pid": 1290163,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -63,14 +90,18 @@
     "b20s-fc25x50x25seed3": "done",
     "b20t-fc25x50x25seed4": "done",
     "b20q-fc25x50x25seed1-closeout": "done",
-    "b20r-fc25x50x25seed2-closeout": "running",
+    "b20r-fc25x50x25seed2-closeout": "done",
     "b20s-fc25x50x25seed3-closeout": "done",
-    "b20t-fc25x50x25seed4-closeout": "done"
+    "b20t-fc25x50x25seed4-closeout": "done",
+    "b20u-fc60x30x30x30x30seed1-closeout": "running",
+    "b20v-fc60x30x30x30x30seed2-closeout": "running",
+    "b20w-fc60x30x30x30x30seed3-closeout": "running",
+    "b20x-fc60x30x30x30x30seed4-closeout": "running"
   },
   "disk_free_gb": 174.0,
   "load_avg": [
-    3.978515625,
-    7.9326171875,
-    6.04541015625
+    3.65966796875,
+    7.80078125,
+    6.0126953125
   ]
 }
