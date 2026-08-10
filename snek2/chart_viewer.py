@@ -124,7 +124,7 @@ def _training_alive(pattern):
         return True
 
 
-BATCH_RE = re.compile(r'^(b\d+)[a-z]?-')
+BATCH_RE = re.compile(r'^(b\d+)[a-z]*-')
 
 
 def batch_prefix(policy_name):
@@ -132,7 +132,12 @@ def batch_prefix(policy_name):
 
     One window per *batch*, not per arm, because a wave launches four arms within
     seconds of each other and four windows would be unreadable. A name that is not a
-    `b<n><letter>-` arm (`train`, `eval`) is its own prefix and gets a window of its own."""
+    `b<n><letters>-` arm (`train`, `eval`) is its own prefix and gets a window of its own.
+
+    The arm suffix is `[a-z]*`, not a single letter: a batch with more than 26 arms rolls
+    into double letters (`b20aa-`, `b20ab-`, ...), and those must still group under `b20`,
+    not be read as their own batch. Batch 20 does exactly this — nine shapes at four seeds is
+    36 arms."""
     m = BATCH_RE.match(policy_name)
     return m.group(1) if m else policy_name
 
@@ -171,6 +176,78 @@ def viewer_running_for(glob_pattern):
         return True
 
 
+# Where the per-batch claim lock lives. A module constant rather than an inline
+# `tempfile.gettempdir()` so tests can point it somewhere private: they exercise real
+# prefixes like `b20`, and a test that wrote the real lock could suppress or steal the
+# window of a wave that is actually training.
+LOCK_DIR = tempfile.gettempdir()
+
+
+def lock_path(prefix):
+    return os.path.join(LOCK_DIR, 'snek_chart_viewer_{0}.lock'.format(prefix))
+
+
+def claim_viewer_slot(prefix):
+    """Atomically claim the right to open batch `prefix`'s window. True if we won it.
+
+    **A check-then-spawn dedupe is not enough, and this shipped broken.** A wave's four
+    trainers launch in the same second, so all four ran `viewer_running_for` before any of
+    them had spawned anything, all four saw nothing, and all four opened a window. `O_EXCL`
+    is the fix because the create and the test are one operation.
+
+    A lock left behind by a dead holder is taken over rather than honoured, so nothing
+    suppresses the window forever. The pid written here is only a placeholder — the caller
+    replaces it with the *viewer's* pid via `hold_viewer_slot` once the spawn succeeds, and
+    calls `release_viewer_slot` if it fails. That ordering matters: the question the lock
+    answers is "is a viewer up for this batch", so pointing it at a trainer would keep the
+    claim alive after the viewer had been killed, and drop it when the trainer merely
+    finished."""
+    lock = lock_path(prefix)
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return True
+    except FileExistsError:
+        pass
+    except Exception:
+        return True     # cannot lock (odd tmpdir) -> fall back to the pgrep check alone
+    try:
+        with open(lock) as fh:
+            holder = int(fh.read().strip() or 0)
+    except Exception:
+        holder = 0
+    if holder:
+        try:
+            os.kill(holder, 0)      # signal 0 only tests existence
+            return False            # a live claimant owns this batch's window
+        except OSError:
+            pass
+    try:                            # stale: the claimant is gone, so take it over
+        with open(lock, 'w') as fh:
+            fh.write(str(os.getpid()))
+        return True
+    except Exception:
+        return False
+
+
+def hold_viewer_slot(prefix, pid):
+    """Point the claim at the viewer we just started, so liveness tracks the window."""
+    try:
+        with open(lock_path(prefix), 'w') as fh:
+            fh.write(str(pid))
+    except Exception:
+        pass        # the claim still holds under our own pid; not worth failing over
+
+
+def release_viewer_slot(prefix):
+    """Give the claim back, so another arm of the same wave can try after a failed spawn."""
+    try:
+        os.remove(lock_path(prefix))
+    except Exception:
+        pass
+
+
 def spawn_for_policy(policy_name):
     """Best-effort live chart window for a training launch. Returns the Popen, or None.
 
@@ -183,7 +260,9 @@ def spawn_for_policy(policy_name):
         return None
     prefix = batch_prefix(policy_name)
     pattern = '--arms {0}'.format(prefix)
-    if viewer_running_for(pattern):
+    # Both checks are needed: pgrep catches a viewer started by hand or by an earlier wave
+    # whose lock has since been cleaned out of tmp, and the lock closes the race pgrep loses.
+    if viewer_running_for(pattern) or not claim_viewer_slot(prefix):
         return None
     try:
         here = os.path.dirname(os.path.abspath(__file__))
@@ -198,10 +277,12 @@ def spawn_for_policy(policy_name):
                 '--title', 'snek {0} — live'.format(prefix)]
         proc = subprocess.Popen(argv, cwd=here, stdout=log, stderr=log,
                                 start_new_session=True, close_fds=True)
+        hold_viewer_slot(prefix, proc.pid)
         print('chart viewer: pid {0} showing the live {1} arms '
               '(log {2}; SNEK_CHART_VIEWER=0 to disable)'.format(proc.pid, prefix, log_path))
         return proc
     except Exception as error:
+        release_viewer_slot(prefix)
         print('chart viewer launch failed ({0}: {1}) — training continues'
               .format(type(error).__name__, error))
         return None

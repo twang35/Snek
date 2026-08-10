@@ -177,17 +177,27 @@ below.
 
 30 inputs → 3 actions (`left/right/forward`), ReLU, He init. Parameter counts include biases.
 
-| shape | params | vs control | depth | what it isolates |
-|---|---|---|---|---|
-| `50,100,50` (control) | 11,853 | 1.00x | 3 | batch 19 itself — already run |
-| `200,100,50` | 31,503 | **2.66x** | 3 | capacity up, shape preserved |
-| `200,50` | 16,403 | 1.38x | 2 | **wide-early**: conjunctions of engineered features |
-| `320` | 10,883 | 0.92x | **1** | **depth, at matched capacity** |
-| `25,50,25` | 3,428 | **0.29x** | 3 | is capacity binding at all |
-| `60,30,30,30,30` | 6,573 | 0.55x | **5** | deep and narrow |
-| `93,93` | 11,907 | 1.00x | 2 | fills the iso-param depth ladder |
-| `100,200,100` | 43,703 | 3.69x | 3 | escalation, only if `200,100,50` moves |
-| `100,50,50` | 10,853 | 0.92x | 3 | lowest priority — a reshuffle at the same depth |
+**Each shape owns a fixed block of batch letters** (`b20<letter>-fc<shape>seed<N>`, one letter per
+seed), assigned here so two hosts never reuse a letter — which happened once, `b20q-t` naming *both*
+`25,50,25` and `60,30,30,30,30`, resolved by renaming the latter to `u-x`.
+
+| shape | params | vs control | depth | arms | what it isolates |
+|---|---|---|---|---|---|
+| `50,100,50` (control) | 11,853 | 1.00x | 3 | `b20a-d` ✓ | batch 19 itself — already run |
+| `200,100,50` | 31,503 | **2.66x** | 3 | `b20e-h` ✓ | capacity up, shape preserved |
+| `200,50` | 16,403 | 1.38x | 2 | `b20i-l` ✓ | **wide-early**: conjunctions of engineered features |
+| `320` | 10,883 | 0.92x | **1** | `b20m-p` ✓ | **depth, at matched capacity** |
+| `25,50,25` | 3,428 | **0.29x** | 3 | `b20q-t` (running, desktop) | is capacity binding at all |
+| `60,30,30,30,30` | 6,573 | 0.55x | **5** | `b20u-x` (running, laptop) | deep and narrow |
+| `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † | fills the iso-param depth ladder |
+| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † | escalation, only if `200,100,50` moves |
+| `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † | lowest priority — a reshuffle at the same depth |
+
+**† past `x` the letters roll into double letters (`aa`, `ab`, …), still batch 20.** The six shapes above
+consume `a-x`, so the last three continue at `aa` rather than opening a new batch — nine shapes at four
+seeds is 36 arms, more than the 26 single letters. `batch_prefix` groups `[a-z]*`, so `b20aa-` reads as
+`b20` (fixed 2026-08-10, with a test); `y,z` are left spare so each shape keeps a clean four-letter
+block.
 
 **Wide-early is the one with a mechanism behind it.** The observation is already high-level — per-action
 safety triples, tail-following flags, food direction — so what the net needs is *conjunctions* of those

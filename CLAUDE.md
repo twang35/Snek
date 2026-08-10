@@ -384,8 +384,19 @@ progress shows up, and costs training nothing. `WATCH_FPS` caps the frame rate (
 
 **A laptop training launch opens its own chart window** — `snek2.main()` calls
 `chart_viewer.spawn_for_policy()`, so no one has to remember to start one. One window per *wave*: the
-first arm to start opens it and the other three share it, and the dedupe keys on `--arms <prefix>` so a
-second batch still gets its own. It refreshes every 1s at 2x size, watches `snek2.py <prefix>` and exits
+first arm to start opens it and the other three share it, and the dedupe keys on the batch prefix so a
+second batch still gets its own.
+
+**The dedupe needs the `O_EXCL` claim lock, not just the `pgrep` check — a check-then-spawn dedupe
+shipped and opened four windows.** A wave's four trainers launch inside the same second, so all four ran
+the `pgrep` check before any had spawned, all four saw nothing, and all four opened a window.
+`claim_viewer_slot()` closes that race because create-and-test is one operation. Both checks are kept:
+`pgrep` catches a viewer started by hand or by an earlier wave whose lock has aged out of tmp. The lock
+holds the **viewer's** pid, not the trainer's — pointed at the trainer it would keep the claim alive
+after the window was killed and drop it when the trainer merely finished — and a failed spawn releases
+it. A stale lock naming a dead pid is taken over, so nothing suppresses the window permanently.
+**Sequential calls in one process cannot test this**; race it with several live processes that hold the
+claim, the way a trainer does. It refreshes every 1s at 2x size, watches `snek2.py <prefix>` and exits
 on its own once the batch stops. `SNEK_CHART_VIEWER=0` turns it off; smoke runs and `eval_only` never
 open one.
 

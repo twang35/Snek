@@ -204,11 +204,14 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     evals from a starting step, because a resumed policy's history has gaps
     wherever it was stopped and restarted.
     """
-    # SNEK_CHART_SCALE enlarges the rendered chart uniformly (live window + PNG)
-    # without changing layout -- set on the desktop so the window is readable on
-    # the monitor; unset (1.0) elsewhere. Scaling dpi rather than figsize keeps
-    # text and line weights proportional.
-    chart_scale = float(os.environ.get('SNEK_CHART_SCALE', '1.0'))
+    # SNEK_CHART_SCALE sets the PNG render dpi (dpi = 100 * scale). The decoupled
+    # chart_viewer.py only *magnifies* the PNG (~1.5-2x), so a low dpi looks blurry blown
+    # up. Default 2.0 keeps the on-screen chart crisp on both hosts without anyone setting
+    # an env var; scaling dpi rather than figsize keeps text and line weights proportional.
+    # Cosmetic and safe to raise now that the per-eval matplotlib leak below is fixed -- a
+    # high value used to amplify it. Override with the env var if a sharper/lighter PNG is
+    # wanted. (env baked at launch, so a change only affects new runs, not ones already up.)
+    chart_scale = float(os.environ.get('SNEK_CHART_SCALE', '2.0'))
     # Build the figure through the OO API (Figure + FigureCanvasAgg) rather than
     # plt.subplots(). pyplot registers every figure in a process-global manager (Gcf)
     # and a callback registry, and in this matplotlib version plt.close() does not fully

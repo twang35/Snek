@@ -8,10 +8,21 @@ opens four windows for one wave or opens none at all.
 import os
 import signal
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import chart_viewer
+
+# Point the claim lock at a private directory for the whole module. These tests use real
+# batch prefixes (b20), and writing the real lock could steal or suppress the window of a
+# wave that is actually training on this machine.
+chart_viewer.LOCK_DIR = tempfile.mkdtemp(prefix='snek-viewer-test-')
+
+
+def _clear_locks():
+    for name in os.listdir(chart_viewer.LOCK_DIR):
+        os.remove(os.path.join(chart_viewer.LOCK_DIR, name))
 
 
 def _with_env(**kv):
@@ -38,6 +49,16 @@ def test_batch_prefix_groups_a_wave():
         assert chart_viewer.batch_prefix(arm) == 'b20', arm
     assert chart_viewer.batch_prefix('b9b-disc9975b') == 'b9'
     assert chart_viewer.batch_prefix('b18b-tgt1000seed2') == 'b18'
+
+
+def test_batch_prefix_groups_double_letter_arms():
+    """Past 26 arms a batch rolls into double letters, which must still group under the
+    batch, not be read as their own. Batch 20 has 36 arms (nine shapes x four seeds)."""
+    for arm in ('b20aa-fc93x93seed1', 'b20ab-fc93x93seed2', 'b20al-fc100x50x50seed4'):
+        assert chart_viewer.batch_prefix(arm) == 'b20', arm
+    # the single-letter arms of the same batch still group with the double-letter ones
+    assert chart_viewer.batch_prefix('b20x-fc60x30x30x30x30seed4') == \
+        chart_viewer.batch_prefix('b20aa-fc93x93seed1') == 'b20'
 
 
 def test_batch_prefix_keeps_batches_apart():
@@ -113,6 +134,7 @@ def test_spawn_skipped_when_disabled_and_for_smoke():
 
     chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
     chart_viewer.subprocess.Popen = record
+    _clear_locks()
     restore = _with_env(SNEK_CHART_VIEWER='0')
     try:
         chart_viewer.spawn_for_policy('b20a-fc50seed1')
@@ -200,6 +222,7 @@ def test_spawn_command_is_detached_and_watches_its_own_batch():
 
     chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
     chart_viewer.subprocess.Popen = fake_popen
+    _clear_locks()
     restore = _with_env(SNEK_CHART_VIEWER='1')
     try:
         proc = chart_viewer.spawn_for_policy('b20c-fc50seed3')
@@ -230,6 +253,7 @@ def test_spawn_failure_is_swallowed():
         raise OSError('exec failed')
 
     chart_viewer.subprocess.Popen = boom
+    _clear_locks()
     restore = _with_env(SNEK_CHART_VIEWER='1')
     try:
         assert chart_viewer.spawn_for_policy('b20a-fc50seed1') is None
@@ -408,6 +432,7 @@ def test_auto_launch_scopes_the_window_to_the_running_arms():
 
     chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
     chart_viewer.subprocess.Popen = lambda argv, **kw: (captured.setdefault('argv', argv), _Proc())[1]
+    _clear_locks()
     restore = _with_env(SNEK_CHART_VIEWER='1')
     try:
         chart_viewer.spawn_for_policy('b20i-fc200x50seed1')
@@ -418,6 +443,114 @@ def test_auto_launch_scopes_the_window_to_the_running_arms():
         restore()
         chart_viewer.subprocess.run = saved_run
         chart_viewer.subprocess.Popen = saved_popen
+
+
+def test_only_one_of_a_waves_arms_claims_the_viewer_slot():
+    """The bug that shipped: four trainers start in the same second, all four run the pgrep
+    check before any has spawned, and four windows open. The claim has to be atomic."""
+    lock = chart_viewer.lock_path('b98')
+    if os.path.exists(lock):
+        os.remove(lock)
+    try:
+        claims = [chart_viewer.claim_viewer_slot('b98') for _ in range(4)]
+        assert claims == [True, False, False, False], claims
+    finally:
+        if os.path.exists(lock):
+            os.remove(lock)
+
+
+def test_the_lock_ends_up_pointing_at_the_viewer_not_the_trainer():
+    """Liveness has to track the *window*. Pointed at the trainer, the claim would outlive a
+    killed viewer (no replacement) and be dropped when the trainer merely finished."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+
+    class _Res:
+        stdout = b''
+
+    class _Proc:
+        pid = 4242
+
+    chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
+    chart_viewer.subprocess.Popen = lambda argv, **kw: _Proc()
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    try:
+        chart_viewer.spawn_for_policy('b20a-fc50seed1')
+        with open(chart_viewer.lock_path('b20')) as fh:
+            assert fh.read().strip() == '4242', 'lock should name the viewer pid'
+        assert str(os.getpid()) != '4242'
+    finally:
+        restore()
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+        _clear_locks()
+
+
+def test_a_failed_spawn_releases_the_claim():
+    """Otherwise one arm's failure silently costs the whole wave its window."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+
+    class _Res:
+        stdout = b''
+
+    def boom(*_a, **_kw):
+        raise OSError('exec failed')
+
+    chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
+    chart_viewer.subprocess.Popen = boom
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    try:
+        assert chart_viewer.spawn_for_policy('b20a-fc50seed1') is None
+        assert not os.path.exists(chart_viewer.lock_path('b20')), 'claim was not released'
+        # ...so the next arm of the wave can still get a window
+        assert chart_viewer.claim_viewer_slot('b20') is True
+    finally:
+        restore()
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+        _clear_locks()
+
+
+def test_a_dead_claimants_lock_is_taken_over():
+    """A crashed or killed viewer must not suppress the window forever."""
+    lock = chart_viewer.lock_path('b97')
+    with open(lock, 'w') as fh:
+        fh.write('999999')          # a pid that cannot be alive
+    try:
+        assert chart_viewer.claim_viewer_slot('b97') is True
+        # ...and having taken it over, we now hold it against the next caller
+        assert chart_viewer.claim_viewer_slot('b97') is False
+    finally:
+        if os.path.exists(lock):
+            os.remove(lock)
+
+
+def test_a_live_claimant_keeps_the_slot():
+    """Our own pid is alive, so a second caller must be refused."""
+    lock = chart_viewer.lock_path('b96')
+    if os.path.exists(lock):
+        os.remove(lock)
+    try:
+        assert chart_viewer.claim_viewer_slot('b96') is True
+        assert chart_viewer.claim_viewer_slot('b96') is False
+    finally:
+        if os.path.exists(lock):
+            os.remove(lock)
+
+
+def test_two_batches_claim_independently():
+    locks = [chart_viewer.lock_path(b) for b in ('b95', 'b94')]
+    for p in locks:
+        if os.path.exists(p):
+            os.remove(p)
+    try:
+        assert chart_viewer.claim_viewer_slot('b95') is True
+        assert chart_viewer.claim_viewer_slot('b94') is True
+    finally:
+        for p in locks:
+            if os.path.exists(p):
+                os.remove(p)
 
 
 def test_dedupe_keys_on_the_arms_flag_so_two_batches_get_two_windows():
