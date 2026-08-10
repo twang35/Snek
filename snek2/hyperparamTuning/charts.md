@@ -36,6 +36,51 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
+## Batch 20 wave 2 — depth-1 (`320`) against the control, both to 3M
+
+A single hidden layer of 320 units: 10,883 params, **0.92×** the control, and depth 3 → 1. It holds
+capacity roughly constant and strips out all depth, so it is the cleanest architecture test available —
+if it matches the control, depth is contributing nothing.
+
+**Verdict: it matches the control — depth buys nothing here.** Peak trailing **94.67** against 94.44, all
+four seeds inside the flat 94.4-94.9 band. The consolidation columns all read higher (`sef` 16.5 vs 11.2,
+best-30 74.7 vs 64.1, pooled 65.1 vs 55.0) and, unlike `200,50`, they go the *right* way — but none of it
+reaches significance.
+
+**‡ 3 of 4 seeds favour the shape on every column, but the magnitude is one seed.** Seed-matched paired
+differences (`320` − control):
+
+| metric | by seed | mean | p (exact paired, 16 flips) | seeds favouring `320` |
+|---|---|---|---|---|
+| peak trailing | +0.82 / +0.02 / +0.10 / +0.00 | +0.23 | 0.250 | 4 of 4 |
+| `sef` | +12.7 / +6.9 / +1.7 / −0.1 | +5.30 | 0.250 | 3 of 4 |
+| best-30 | +31.7 / +3.0 / +8.0 / −0.3 | +10.60 | 0.250 | 3 of 4 |
+| pooled | +32.1 / +7.6 / −1.0 / +1.7 | +10.10 | 0.250 | 3 of 4 |
+
+The consistency is better than `200,50`'s (1 of 4), but `p` bottoms out at 0.250 at n=4, and seed 1 —
+where the control `b20a` is the batch's weakest arm — supplies most of every mean (excluding it, the
+pooled edge is +2.8).
+
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`, `SNEK_FC_LAYERS=320`.
+
+| arm | peak trail | best-30 | `sef` | max drawdown | close-out pooled | best row |
+|---|---|---|---|---|---|---|
+| `b20n` | **94.86** | **81.3%** | 23.1% | 6.10 | 70.3% | 87.0% @2896k (n=54) |
+| `b20p` | 94.76 | 80.0% | **26.2%** | 6.44 | **73.0%** | 89.3% @2321k (n=56) |
+| `b20m` | 94.62 | 73.0% | 12.9% | **5.24** | 65.3% | 82.4% @2935k (n=34) |
+| `b20o` | 94.44 | 64.3% | 3.9% | 11.96 | 51.8% | 69.2% @2807k (n=26) |
+| **mean — `320`** | 94.67 | 74.7% | 16.5% | 7.44 | 65.1% | — |
+| **mean — control** | 94.44 | 64.0% | 11.2% | 5.41 | 55.0% | — |
+
+**No arm produced a full-length row** (deepest 26-56 of 100), so `best row` is a bound — `pooled` is the
+exact column. Nothing reached 95%. Drawdown rose to 7.44, driven by `b20o` (11.96), still batch-19
+territory and far from batch 18's ~57 — the base's anti-forgetting property holds under this shape too.
+
+![b20n](charts/b20n-fc320seed2.png)
+![b20p](charts/b20p-fc320seed4.png)
+![b20m](charts/b20m-fc320seed1.png)
+![b20o](charts/b20o-fc320seed3.png)
+
 ## Batch 20 wave 2 — wide-early (`200,50`) against the control, both to 3M
 
 The wide-early shape: two layers, 200 units first, 16,403 params (1.38× the control). The mechanism

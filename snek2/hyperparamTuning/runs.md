@@ -70,12 +70,25 @@ Batch 19's close-out also finished on the laptop overnight.
 > [`completedRuns.md`](completedRuns.md#batch-20-wave-2--wide-early-20050-null-on-the-ceiling-behind-the-control-on-the-primary-metric).
 > **Any eval or `watch.py` on these checkpoints needs `SNEK_FC_LAYERS=200,50`.**
 
-> **Wave 2 `320` RUNNING (queued 2026-08-09, desktop `the-claw-den`).** Four fresh seeds,
-> `b20{m,n,o,p}-fc320seed{1-4}`, `SNEK_FC_LAYERS=320`, `SNEK_MAX_STEPS=3000000`, rest identical to the
-> control. The depth-1 arm (10,883 params, 0.92× control) — the cleanest single finding available: it
-> holds capacity roughly constant and removes all depth, so matching the control means depth contributes
-> nothing here. Their full closeouts are queued behind them at priority 20; the wave-barrier launches
-> them only once all four self-terminate at 3M. **Any eval / `watch.py` needs `SNEK_FC_LAYERS=320`.**
+> **Wave 2 `320` DONE (2026-08-10) — depth-1 matches the control; depth is contributing nothing.** Four
+> seeds `b20{m,n,o,p}` to the 3M cap on the desktop, closed out in ~32 min. Peak trailing **94.67** vs the
+> control's 94.44 (p=0.250, all four inside the flat 94.4-94.9 band); `sef` 16.5% vs 11.2%, best-30 74.7
+> vs 64.1, pooled 65.1% vs 55.0% — every consolidation column reads higher and **3 of 4 seeds favour the
+> shape**, but nothing is significant and the size of the gap is largely seed 1, where control `b20a` is
+> the batch's weak arm (pooled gap drops to +2.8 excluding it). Drawdown 7.44 vs 5.41 (seed-3-driven,
+> still batch-19 territory). **The pre-registered read holds: removing all depth at matched capacity did
+> not hurt, so depth buys nothing here** — the cleanest architectural finding batch 20 has produced. Full
+> write-up:
+> [`completedRuns.md`](completedRuns.md#batch-20-wave-2--depth-1-320-depth-contributes-nothing-at-matched-capacity).
+> **Any eval or `watch.py` on these checkpoints needs `SNEK_FC_LAYERS=320`.**
+
+> **Wave 3 `25,50,25` RUNNING (queued 2026-08-10, desktop `the-claw-den`).** Four fresh seeds
+> `b20{q,r,s,t}-fc25x50x25seed{1-4}`, `SNEK_FC_LAYERS=25,50,25`, `SNEK_MAX_STEPS=3000000`, rest identical
+> to the control. The small net (3,428 params, **0.29× control**, depth 3) — tests whether capacity is
+> binding at all: if it holds the ceiling with under a third of the parameters, capacity is not the
+> constraint, which after `320` (depth doesn't matter) and `200,100,50` (2.66× didn't help) is the way
+> the evidence is pointing. Closeouts queued behind at priority 20 (wave-barrier). **Any eval / `watch.py`
+> needs `SNEK_FC_LAYERS=25,50,25`.**
 
 #### Control at 3M — the numbers every shape is read against
 

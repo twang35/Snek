@@ -77,6 +77,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b20l-fc200x50seed4` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 86% @2940k *trunc* | — | **64.75%** /eq §§ | 72.3% | ‡‡‡ § highest `sef` (13.9%) and smallest drawdown (7.18) of wave 2; **best checkpoint at 2940k, its last 60k** — still climbing when capped |
 | `b20j-fc200x50seed2` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 83% @2001k *trunc* | — | 59.31% /eq §§ | 69.3% | ‡‡‡ § mid of wave 2; `sef` 9.9% against its control's 16.2%; largest drawdown of the wave, 9.76 |
 | `b20k-fc200x50seed3` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 72% @1073k *trunc* | — | 48.50% /eq §§ | 55.3% | ‡‡‡ § weakest of wave 2, `sef` 1.9%; only 20 checkpoints cleared selection and the deepest row is 25 episodes. Mirrors control `b20c` (2.2%) — seed 3 is weak under both shapes |
+| `b20p-fc320seed4` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 89% @2321k *trunc* | — | **73.03%** /eq §§ | 80.0% | ‡‡‡ § best of the `320` seeds; `sef` 26.2%, peak 94.76. Edges its control `b20d` (71.3%) despite one fewer layer |
+| `b20n-fc320seed2` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 87% @2896k *trunc* | — | 70.32% /eq §§ | **81.3%** | ‡‡‡ § **highest peak (94.86) and best-30 of the shape**; `sef` 23.1%. Beats its control `b20b` (62.7%) |
+| `b20m-fc320seed1` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 82% @2935k *trunc* | — | 65.31% /eq §§ | 73.0% | ‡‡‡ § **the seed that lifts the shape's mean** — its control `b20a` is the batch's weak arm (33.2%), so this +32 pp gap is a control weakness, not a shape strength. `sef` 12.9% |
+| `b20o-fc320seed3` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 69% @2807k *trunc* | — | 51.83% /eq §§ | 64.3% | ‡‡‡ § weakest of the `320` seeds, `sef` 3.9%, largest drawdown of the wave (11.96). Mirrors control `b20c` — seed 3 is weak under every shape |
 | `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | 91% @1536k *trunc* | — | 75.46% /eq §§ | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
 | `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | 77% @1485k *trunc* | — | 61.49% /eq §§ | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
 | `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | 76% @937k *trunc* | — | 51.59% /eq §§ | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
@@ -269,6 +273,69 @@ rows is truncated and is a bound. Nothing reached 95%, so no hall-of-fame candid
 
 Drawdown rose from 5.41 to 8.56 — still batch-19 territory (8.76) and nowhere near batch 18's ~57, so
 the base's anti-forgetting property holds under this shape.
+
+## Batch 20 wave 2 — depth-1 `320`: **depth contributes nothing at matched capacity**
+
+**Ran 2026-08-09/10 on the desktop `the-claw-den`, four arms `b20m`-`b20p` at seeds 1-4, all to the 3M
+cap; close-out ~32 min (four parallel, `EVAL_WORKERS=4`).** One operational wrinkle: the arms were
+relaunched once at ~240k, resuming from their checkpoints, to adopt the crisp-chart env — no training was
+lost. Charts in
+[`charts.md`](charts.md#batch-20-wave-2--depth-1-320-against-the-control-both-to-3m).
+
+### The design
+
+`FC_LAYERS=320` — a single hidden layer, 10,883 params against the control's 11,853 (**0.92×**). It holds
+capacity roughly constant and removes all depth (3 layers → 1), so it is the cleanest single architecture
+finding available: **match the control and depth is contributing nothing here.** One variable against
+wave 1's seed-matched control, same 3M, same β=300k.
+
+```
+SNEK_FC_LAYERS=320  SNEK_SEED=1..4  SNEK_BETA_ANNEAL_STEPS=300000
+SNEK_TARGET_UPDATE_PERIOD=1000  SNEK_FOOD_DISTANCE_REWARD=0  SNEK_DISCOUNT=0.9975
+SNEK_GUIDED_FRACTION=0.8  SNEK_FORK_BRANCHES=4  SNEK_FORK_PROB=0.5
+SNEK_FORK_MIN_LENGTH=85  SNEK_FORK_MAX_STEPS=60  SNEK_MAX_STEPS=3000000
+```
+
+### The result
+
+| mean of 4 | control `50,100,50` | `320` | delta |
+|---|---|---|---|
+| peak trailing | 94.44 | 94.67 | +0.23 |
+| `sef` (primary) | 11.2% | 16.5% | +5.3 |
+| best-30 | 64.1% | 74.7% | +10.6 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 65.1% | +10.1 |
+| max drawdown | 5.41 | 7.44 | +2.0 |
+
+**Depth-1 matches the control — the cleanest read in batch 20.** Peak trailing moves 0.23 inside the band
+nine batches have held; all four seeds land in 94.44-94.86. Removing every hidden layer but one, at 92% of
+the parameters, cost nothing on the ceiling. Unlike `200,50`, the consolidation columns all tick the
+*right* way and 3 of 4 seeds favour the shape — but none of it is significant.
+
+**‡ Every gap is inside the control's own seed spread, and the magnitude is one seed.** Paired per-seed
+differences, exact paired permutation over 16 sign flips:
+
+| metric | by seed (1/2/3/4) | mean | p | favouring `320` |
+|---|---|---|---|---|
+| peak trailing | +0.82 / +0.02 / +0.10 / +0.00 | +0.23 | 0.250 | 4 of 4 |
+| `sef` | +12.7 / +6.9 / +1.7 / −0.1 | +5.30 | 0.250 | 3 of 4 |
+| best-30 | +31.7 / +3.0 / +8.0 / −0.3 | +10.60 | 0.250 | 3 of 4 |
+| pooled | +32.1 / +7.6 / −1.0 / +1.7 | +10.10 | 0.250 | 3 of 4 |
+
+The consistency is real — 3-4 of 4 seeds favour the shape on every column, better than `200,50`'s 1 of 4 —
+but **p bottoms out at 0.250** (n=4 cannot reach significance with one delta at ~0), and seed 1 supplies
+the bulk of every mean. Seed 1's control (`b20a`) is the batch's weakest arm (`sef` 0.2%, pooled 33.2%),
+so its +32 pp pooled gap is a control weakness; **excluding seed 1 the pooled edge is +2.8**. This is the
+same lesson `200,50` taught: at n=4 the design cannot resolve an architecture effect smaller than the
+control's own seed variance (pooled 33.2-71.3%), and none of the three shapes has produced one that large.
+
+**No full-length rows** (deepest 26-56 of 100 under gate 95), so every `best ckpt` is a truncated bound.
+Nothing reached 95%, so no hall-of-fame candidate. Drawdown rose to 7.44 — one seed (`b20o`, 11.96) drives
+it, still batch-19 territory and far from batch 18's ~57, so the base's anti-forgetting property holds.
+
+**What batch 20 now shows across three shapes:** 2.66× capacity (`200,100,50`) did not raise the ceiling,
+1.38× wide-early (`200,50`) did not, and removing all depth (`320`) did not lower it. The ceiling is
+invariant to architecture across a 0.92×-2.66× parameter range and depth 1-3 — pointing at capacity *not*
+being the binding constraint, which `25,50,25` (0.29×) tests directly next.
 
 ## Batch 19 — standard PER: **falsified, 4/4 seeds, on every comparable metric**
 
