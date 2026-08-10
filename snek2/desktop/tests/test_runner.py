@@ -234,6 +234,64 @@ def test_sticky_wave_resets_on_category_flip():
     assert all('/runs/' not in p for p in got)
 
 
+def _runner(auto_closeout=True):
+    """A Runner with a throwaway ledger and no box behind it -- enough to exercise the pure
+    ledger-driven logic (_auto_closeout_jobs) without git or spawn."""
+    h = _host()
+    fd, path = tempfile.mkstemp(suffix='.ledger')
+    os.close(fd); os.unlink(path)          # a missing ledger loads as {}
+    h['LEDGER_PATH'] = path
+    r = runnermod.Runner(h)
+    r.runtime['auto_closeout'] = auto_closeout
+    return r
+
+
+def test_wants_closeout_only_for_successful_training():
+    assert runnermod.wants_closeout('train', True, True) is True
+    assert runnermod.wants_closeout('train', False, True) is False   # failed run: no checkpoint
+    assert runnermod.wants_closeout('eval', True, True) is False      # never close out an eval
+    assert runnermod.wants_closeout('smoke', True, True) is False     # throwaway
+    assert runnermod.wants_closeout('benchmark', True, True) is False
+    assert runnermod.wants_closeout('train', True, False) is False    # feature disabled
+
+
+def test_auto_closeout_synthesizes_eval_inheriting_env():
+    r = _runner()
+    r.ledger['b20a-fc25seed1'] = {'state': 'done', 'type': 'train',
+                                  'policy': 'b20a-fc25seed1', 'closeout': 'pending',
+                                  'env': {'SNEK_FC_LAYERS': '25,50,25', 'SNEK_SEED': '1'}}
+    jobs = r._auto_closeout_jobs()
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.id == 'b20a-fc25seed1-closeout' and j.type == 'eval'
+    assert j.policy == 'b20a-fc25seed1'
+    assert j.env.get('SNEK_FC_LAYERS') == '25,50,25'   # the FC trap: width must carry over
+    assert j.eval_args == ['top20']
+    assert j.priority == runnermod.AUTO_CLOSEOUT_PRIORITY
+    assert j.priority < 100                             # beats a default-priority training
+
+
+def test_auto_closeout_skips_when_eval_done_running_or_unmarked():
+    r = _runner()
+    # unmarked done training -> nothing (no retroactive closeouts for pre-feature arms)
+    r.ledger['old'] = {'state': 'done', 'type': 'train', 'policy': 'old-arm'}
+    assert r._auto_closeout_jobs() == []
+    # marked, but its closeout already ran -> skip (idempotent, no second eval)
+    r.ledger['p1'] = {'state': 'done', 'type': 'train', 'policy': 'p1', 'closeout': 'pending'}
+    r.ledger['p1-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p1'}
+    # marked, but its closeout is currently running -> skip
+    r.ledger['p2'] = {'state': 'done', 'type': 'train', 'policy': 'p2', 'closeout': 'pending'}
+    r.running['p2-closeout'] = object()
+    ids = [j.id for j in r._auto_closeout_jobs()]
+    assert ids == [], ids
+
+
+def test_auto_closeout_disabled_yields_nothing():
+    r = _runner(auto_closeout=False)
+    r.ledger['p'] = {'state': 'done', 'type': 'train', 'policy': 'p', 'closeout': 'pending'}
+    assert r._auto_closeout_jobs() == []
+
+
 def test_viewer_scale_is_larger_for_eval_waves():
     # Eval charts get a ~30% bigger window; anything with a trainer in it stays smaller.
     # `category` is the comma-joined set _ensure_viewer builds, so only a pure eval wave

@@ -24,9 +24,21 @@ import time
 from . import config as cfgmod
 from . import gitbus
 from . import launch
-from .job import parse_job, JobError
+from .job import parse_job, Job, JobError
 
 TERMINAL = ('done', 'failed')
+
+# A synthesized closeout eval outranks any pending training (default priority 100) so, when a
+# training wave drains, its closeouts form the next wave before any new training starts. That
+# is the whole point of auto-closeout: never train the next thing before evaluating the last.
+AUTO_CLOSEOUT_PRIORITY = 10
+
+
+def wants_closeout(job_type, ok, auto_closeout_enabled):
+    """Whether a just-finished job should get an automatic closeout eval. Only a *training*
+    that finished successfully -- smoke and benchmark runs share the 'trainer' category but
+    are throwaway, and a failed run has no checkpoint worth measuring."""
+    return bool(auto_closeout_enabled) and ok and job_type == 'train'
 
 
 class _StubJob:
@@ -88,6 +100,11 @@ class Runner:
                 rec['state'] = 'done'
                 rec['finished'] = time.time()
                 rec['note'] = 'completed while runner was down'
+                # Exit code is unknown across reparenting, so success is assumed (above); on
+                # that same assumption a training finished during downtime still earns its
+                # closeout, so auto-closeout does not silently skip a restart-straddling arm.
+                if wants_closeout(rec.get('type'), True, self.runtime.get('auto_closeout', True)):
+                    rec['closeout'] = 'pending'
         self._save_ledger()
 
     # -------------------------------------------------------------------- loop
@@ -181,6 +198,30 @@ class Runner:
             c[rj.job.category] += 1
         return c
 
+    def _auto_closeout_jobs(self):
+        """Closeout evals to run for trainings that finished under auto-closeout and have not
+        been evaluated yet -- synthesized fresh each dispatch, never persisted as specs.
+
+        Driven entirely off the ledger, so it survives a daemon restart: the `closeout:
+        pending` marker and the training's stored `env` both persist. Idempotent because the
+        synthesized job's id is `<policy>-closeout`; once that eval is running or terminal the
+        guard below skips it, so the still-'pending' marker cannot launch a second one. It
+        inherits the training's whole env, which carries SNEK_FC_LAYERS -- without it the
+        restore silently mismatches the architecture (the FC trap) and the arm scores ~0."""
+        if not self.runtime.get('auto_closeout', True):
+            return []
+        jobs = []
+        for rec in self.ledger.values():
+            if rec.get('closeout') != 'pending' or not rec.get('policy'):
+                continue
+            eval_id = rec['policy'] + '-closeout'
+            if self.ledger.get(eval_id, {}).get('state') in TERMINAL or eval_id in self.running:
+                continue
+            jobs.append(Job(id=eval_id, type='eval', policy=rec['policy'],
+                            env=dict(rec.get('env') or {}), eval_args=['top20'],
+                            priority=AUTO_CLOSEOUT_PRIORITY))
+        return jobs
+
     def _dispatch(self):
         free = _disk_free_gb(self.host['REPO_PATH'])
         if free is not None and free < self.runtime['disk_min_gb']:
@@ -202,6 +243,10 @@ class Runner:
             if state in TERMINAL or job.id in self.running:
                 continue
             desired.append(job)
+        # Auto-closeouts join the same pool. A manual spec of the same id (should not happen
+        # while auto-closeout is on, but can coexist) is kept over the synthesized one.
+        seen = {job.id for job in desired}
+        desired += [j for j in self._auto_closeout_jobs() if j.id not in seen]
         # Wave-barrier scheduling: a "wave" is a set of same-type jobs launched together,
         # up to that type's limit, and NOTHING new starts until the whole wave finishes.
         # So trainings and evals never overlap, and a freed slot is not backfilled mid-wave
@@ -233,7 +278,10 @@ class Runner:
             return
         self.running[job.id] = rj
         self.ledger[job.id] = {'state': 'running', 'type': job.type, 'policy': rj.policy,
-                               'pid': rj.pid, 'log': rj.log_path, 'started': rj.started}
+                               'pid': rj.pid, 'log': rj.log_path, 'started': rj.started,
+                               # Kept so an auto-closeout can rebuild the exact env after the
+                               # daemon restarts -- crucially SNEK_FC_LAYERS (the FC trap).
+                               'env': job.env}
 
     def _reap(self):
         for jid in list(self.running):
@@ -245,6 +293,8 @@ class Runner:
             rec = self.ledger.setdefault(jid, {})
             rec.update({'state': 'done' if ok else 'failed', 'type': rj.job.type,
                         'policy': rj.policy, 'finished': time.time(), 'returncode': rc})
+            if wants_closeout(rj.job.type, ok, self.runtime.get('auto_closeout', True)):
+                rec['closeout'] = 'pending'   # picked up by _auto_closeout_jobs next dispatch
             del self.running[jid]
             if ok:
                 self._publish_results(rj)

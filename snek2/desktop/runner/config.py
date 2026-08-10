@@ -25,11 +25,12 @@ RUNTIME_DEFAULTS = {
     'paused': False,          # finish running jobs, start nothing new
     'drain': False,           # alias of paused, kept separate for intent
     'viewer': True,           # keep a decoupled chart viewer up while trainers run
+    'auto_closeout': True,    # a finished training auto-queues its closeout eval (runs next)
 }
 
 _INT_KEYS = ('max_trainers', 'max_evals', 'eval_workers', 'poll_seconds',
              'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
-_BOOL_KEYS = ('paused', 'drain', 'viewer')
+_BOOL_KEYS = ('paused', 'drain', 'viewer', 'auto_closeout')
 
 _REQUIRED_HOST = ('REPO_PATH', 'SNEK_DIR', 'PYTHON_BIN', 'GIT_REMOTE',
                   'OPS_BRANCH', 'STATUS_BRANCH', 'RESULTS_BRANCH',
