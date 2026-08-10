@@ -1,0 +1,10 @@
+{
+  "id": "b20t-fc25x50x25seed4-closeout",
+  "type": "eval",
+  "policy": "b20t-fc25x50x25seed4",
+  "eval_args": ["top20"],
+  "eval_workers": 4,
+  "env": {"SNEK_FC_LAYERS": "25,50,25"},
+  "priority": 20,
+  "notes": "full closeout of the 3M 25,50,25 arm; SNEK_FC_LAYERS=25,50,25 pins the width for restore (FC trap). Runs only after the training wave drains (wave-barrier)."
+}

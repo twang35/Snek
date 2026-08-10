@@ -1,0 +1,9 @@
+{
+  "id": "b20r-fc25x50x25seed2",
+  "type": "train",
+  "policy": "b20r-fc25x50x25seed2",
+  "env": {"SNEK_FC_LAYERS":"25,50,25","SNEK_SEED":"2","SNEK_BETA_ANNEAL_STEPS":"300000","SNEK_TARGET_UPDATE_PERIOD":"1000","SNEK_FOOD_DISTANCE_REWARD":"0","SNEK_DISCOUNT":"0.9975","SNEK_GUIDED_FRACTION":"0.8","SNEK_FORK_BRANCHES":"4","SNEK_FORK_PROB":"0.5","SNEK_FORK_MIN_LENGTH":"85","SNEK_FORK_MAX_STEPS":"60"},
+  "max_steps": 3000000,
+  "priority": 10,
+  "notes": "batch 20 wave 3 shape 25,50,25 (3,428 params, 0.29x control, depth 3) seed 2, to 3M. Tests whether capacity is binding at all -- a much smaller net at the control's depth. FC trap: any eval/watch.py MUST set SNEK_FC_LAYERS=25,50,25."
+}
