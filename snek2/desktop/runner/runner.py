@@ -50,6 +50,7 @@ class Runner:
         self.config_notes = []
         self.ledger = self._load_ledger()
         self.running = {}          # job_id -> RunningJob
+        self._viewer_pngs = None   # the PNG set the live viewer was launched with, or None
         self.stop = False
         self._reattach()
 
@@ -100,31 +101,37 @@ class Runner:
         self._publish()
 
     def _ensure_viewer(self):
-        """Best-effort: while trainers run, keep one decoupled chart viewer up on the
-        display. It is a *separate* process (never a child of a trainer), so it can
-        never affect training, and it exits itself when the trainers stop (--watch).
-        A launch failure is logged and ignored -- a chart is never worth a job."""
+        """Best-effort: while jobs run, keep one decoupled chart viewer up on the display,
+        bound to the charts the *currently running* jobs produce. It is a *separate* process
+        (never a child of a job), so it can never affect a run, and it exits itself when the
+        jobs stop (--watch). A launch failure is logged and ignored -- a chart is never worth
+        a job.
+
+        The viewer's arg list is fixed at launch, so when a wave flips from training to eval
+        the file set changes (runs/<policy>.png -> evals/<policy>_eval_progress.png) and a
+        viewer left running keeps showing the finished training charts. Seen 2026-08-10. So we
+        track the set the live viewer was launched with and relaunch whenever it no longer
+        matches what the running jobs need."""
         if not self.runtime.get('viewer', True) or not self.running:
             return
         try:
-            # One already up? (also catches the case across a daemon restart.)
-            if subprocess.run(['pgrep', '-f', 'chart_viewer.py'],
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            desired = viewer_png_paths(
+                [(rj.job.category, rj.policy) for rj in self.running.values()],
+                self.host['SNEK_DIR'])
+            if not desired:
                 return
-            # Trainers write runs/<policy>.png; evals write evals/<policy>_eval_progress.png.
-            # Show whichever chart each running job actually produces, so eval waves are
-            # covered as well as training waves.
-            pngs = []
-            for rj in self.running.values():
-                if not rj.policy:
-                    continue
-                if rj.job.category == 'eval':
-                    pngs.append(os.path.join(self.host['SNEK_DIR'], 'evals',
-                                             rj.policy + '_eval_progress.png'))
-                else:
-                    pngs.append(os.path.join(self.host['SNEK_DIR'], 'runs', rj.policy + '.png'))
-            if not pngs:
+            viewer_running = subprocess.run(
+                ['pgrep', '-f', 'chart_viewer.py'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            if not viewer_should_relaunch(viewer_running, self._viewer_pngs, desired):
                 return
+            # Wrong file set (a wave flipped, or an arm finished), or unknown across a daemon
+            # restart: drop any existing viewer and launch one bound to the current set. The
+            # pgrep/pkill pattern is not in the daemon's own argv, so it cannot self-match.
+            if viewer_running:
+                subprocess.run(['pkill', '-f', 'chart_viewer.py'],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            pngs = desired
             os.makedirs(self.host['LOG_DIR'], exist_ok=True)
             log = open(os.path.join(self.host['LOG_DIR'], 'chart_viewer.log'), 'ab')
             # The runner is a systemd service outside the graphical session, so its own
@@ -141,6 +148,7 @@ class Runner:
                     '--title', 'snek desktop']
             subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=env,
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)
+            self._viewer_pngs = pngs
         except Exception as e:
             sys.stderr.write('viewer launch failed: {0}\n'.format(e))
 
@@ -258,6 +266,37 @@ class Runner:
             gitbus.publish_status(self.host, json.dumps(status, indent=2))
         except Exception as e:
             sys.stderr.write('publish_status failed: {0}\n'.format(e))
+
+
+def viewer_png_paths(running_jobs, snek_dir):
+    """Sorted PNG paths the chart viewer should show for the given running jobs.
+
+    Each job's chart lives at a category-specific path: an eval writes
+    evals/<policy>_eval_progress.png, a trainer writes runs/<policy>.png. `running_jobs`
+    is an iterable of (category, policy) pairs; policies that are falsy are skipped.
+    Sorted so the result is comparable across polls -- the set changes when a wave flips
+    train->eval, which is exactly when the viewer's fixed arg list has gone stale."""
+    pngs = []
+    for category, policy in running_jobs:
+        if not policy:
+            continue
+        if category == 'eval':
+            pngs.append(os.path.join(snek_dir, 'evals', policy + '_eval_progress.png'))
+        else:
+            pngs.append(os.path.join(snek_dir, 'runs', policy + '.png'))
+    return sorted(pngs)
+
+
+def viewer_should_relaunch(viewer_running, current_pngs, desired_pngs):
+    """Whether to (re)launch the viewer. Launch when nothing is up; relaunch when the live
+    viewer is bound to a different file set than the running jobs now need, because the
+    viewer's arg list is fixed at launch and cannot follow a train->eval transition. Never
+    launch for an empty set."""
+    if not desired_pngs:
+        return False
+    if not viewer_running:
+        return True
+    return current_pngs != desired_pngs
 
 
 def _log_has_traceback(log_path):

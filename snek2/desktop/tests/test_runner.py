@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from runner import config as cfg
 from runner import job as jobmod
 from runner import launch
+from runner import runner as runnermod
 
 
 def _host():
@@ -172,6 +173,39 @@ def test_build_threads_injected():
     argv, env, log, policy = launch.build_command(j, _host(), r)
     assert env['TF_NUM_INTRAOP_THREADS'] == '4'
     assert env['OMP_NUM_THREADS'] == '4'
+
+
+# ------------------------------------------------------- viewer file tracking
+def test_viewer_png_paths_maps_category_to_dir():
+    # A trainer's chart is runs/<policy>.png; an eval's is evals/<policy>_eval_progress.png.
+    paths = runnermod.viewer_png_paths([('trainer', 'b20a-x'), ('eval', 'b20b-y')], '/snek')
+    assert paths == ['/snek/evals/b20b-y_eval_progress.png', '/snek/runs/b20a-x.png']
+
+
+def test_viewer_png_paths_skips_empty_policy_and_sorts():
+    paths = runnermod.viewer_png_paths([('trainer', None), ('trainer', 'p2'),
+                                        ('trainer', 'p1')], '/snek')
+    assert paths == ['/snek/runs/p1.png', '/snek/runs/p2.png']
+
+
+def test_viewer_relaunches_on_train_to_eval_flip():
+    # The whole bug: same four policies, but the wave went from training to eval. The file
+    # set changes even though the arms are identical, so a viewer bound to the training PNGs
+    # must be relaunched -- otherwise it keeps showing the finished training charts.
+    pols = ['b20m', 'b20n', 'b20o', 'b20p']
+    train = runnermod.viewer_png_paths([('trainer', p) for p in pols], '/snek')
+    ev = runnermod.viewer_png_paths([('eval', p) for p in pols], '/snek')
+    assert train != ev
+    assert runnermod.viewer_should_relaunch(True, train, ev) is True
+    # ...and once it is showing the eval set, it stays put.
+    assert runnermod.viewer_should_relaunch(True, ev, ev) is False
+
+
+def test_viewer_launches_when_none_running_and_never_for_empty():
+    assert runnermod.viewer_should_relaunch(False, None, ['/snek/runs/p.png']) is True
+    assert runnermod.viewer_should_relaunch(False, None, []) is False
+    # Unknown current set (across a daemon restart) with a viewer up -> relaunch to be safe.
+    assert runnermod.viewer_should_relaunch(True, None, ['/snek/runs/p.png']) is True
 
 
 if __name__ == '__main__':
