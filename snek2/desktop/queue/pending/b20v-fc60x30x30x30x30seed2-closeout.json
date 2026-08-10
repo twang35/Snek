@@ -1,0 +1,10 @@
+{
+  "id": "b20v-fc60x30x30x30x30seed2-closeout",
+  "type": "eval",
+  "policy": "b20v-fc60x30x30x30x30seed2",
+  "eval_args": ["top20"],
+  "eval_workers": 4,
+  "env": {"SNEK_FC_LAYERS": "60,30,30,30,30"},
+  "priority": 30,
+  "notes": "full closeout of the 3M 60,30,30,30,30 arm (trained on the laptop, checkpoints rsynced to the desktop). SNEK_FC_LAYERS=60,30,30,30,30 pins the width for restore (FC trap). priority 30 so it runs after the 25,50,25 closeouts."
+}
