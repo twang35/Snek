@@ -1,0 +1,21 @@
+{
+  "id": "b20ae-fc100x200x100seed1",
+  "type": "train",
+  "policy": "b20ae-fc100x200x100seed1",
+  "env": {
+    "SNEK_FC_LAYERS": "100,200,100",
+    "SNEK_SEED": "1",
+    "SNEK_BETA_ANNEAL_STEPS": "300000",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60"
+  },
+  "max_steps": 3000000,
+  "priority": 110,
+  "notes": "batch 20 shape 100,200,100 (43,703 params, 3.69x control, depth 3) seed 1, to 3M. escalation above the 2.66x capacity arm; tests whether more capacity ever moves the ceiling. Auto-closeout runs after the wave drains. FC trap: any eval/watch.py MUST set SNEK_FC_LAYERS=100,200,100."
+}

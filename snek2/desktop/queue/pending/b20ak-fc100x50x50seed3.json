@@ -1,0 +1,21 @@
+{
+  "id": "b20ak-fc100x50x50seed3",
+  "type": "train",
+  "policy": "b20ak-fc100x50x50seed3",
+  "env": {
+    "SNEK_FC_LAYERS": "100,50,50",
+    "SNEK_SEED": "3",
+    "SNEK_BETA_ANNEAL_STEPS": "300000",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60"
+  },
+  "max_steps": 3000000,
+  "priority": 120,
+  "notes": "batch 20 shape 100,50,50 (10,853 params, 0.92x control, depth 3) seed 3, to 3M. reshuffle at matched capacity and depth -- another depth-3 layout near the control's params. Auto-closeout runs after the wave drains. FC trap: any eval/watch.py MUST set SNEK_FC_LAYERS=100,50,50."
+}

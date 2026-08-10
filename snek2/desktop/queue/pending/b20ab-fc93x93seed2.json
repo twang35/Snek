@@ -1,0 +1,21 @@
+{
+  "id": "b20ab-fc93x93seed2",
+  "type": "train",
+  "policy": "b20ab-fc93x93seed2",
+  "env": {
+    "SNEK_FC_LAYERS": "93,93",
+    "SNEK_SEED": "2",
+    "SNEK_BETA_ANNEAL_STEPS": "300000",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60"
+  },
+  "max_steps": 3000000,
+  "priority": 100,
+  "notes": "batch 20 shape 93,93 (11,907 params, 1.00x control, depth 2) seed 2, to 3M. iso-param depth-2 rung -- fills the depth ladder at the control's capacity. Auto-closeout runs after the wave drains. FC trap: any eval/watch.py MUST set SNEK_FC_LAYERS=93,93."
+}
