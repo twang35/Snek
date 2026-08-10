@@ -132,9 +132,10 @@ measured. So an architecture effect has to exceed the control's seed variance be
 neither shape tried comes close. Chasing the remaining shapes at n=4 will keep producing numbers of this
 kind; resolving a real effect of this size needs more seeds per shape, not more shapes.
 
-**What is not yet tested:** `320` (depth 1 at matched capacity) is the cleanest single question in the
-batch's design and has not been run. `25,50,25` (0.29×, is capacity binding at all) and
-`60,30,30,30,30` (depth 5) are in flight as of 2026-08-10.
+**Still open as of 2026-08-10:** `320` (depth 1 at matched capacity, the batch's cleanest single
+question) has trained to 3M on the desktop as `b20m-p` and its close-out is running — numbers not in
+yet. `60,30,30,30,30` (depth 5) is launching on the laptop as `b20q-t`; `25,50,25` (0.29×, whether
+capacity binds at all) is queued for the desktop after `320`.
 
 ## The food-distance shaping was a drag on consistency — the first signal in six batches
 

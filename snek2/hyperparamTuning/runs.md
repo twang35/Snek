@@ -60,7 +60,7 @@ Batch 19's close-out also finished on the laptop overnight.
 > **Amended 2026-08-09: wave 2's `200,50` half went ahead anyway, at the user's direction.** The hold
 > above was about the *control* being settled, and it now is — `b20a-d` finished at 3M and closed out. The
 > treatment rerun only gates the **capacity** verdict (`200,100,50`), not the wide-early one, which reads
-> against the control. `320`, wave 2's other half, has **not** been run.
+> against the control. (`320`, wave 2's other half, has since run on the desktop — see the block below.)
 
 > **Wave 2 `200,50` DONE (2026-08-09/10) — null on the ceiling, behind the control on `sef`.** Four seeds
 > `b20{i,j,k,l}` to the 3M cap, closed out unattended in 25 min. Peak trailing **94.55** vs the control's
