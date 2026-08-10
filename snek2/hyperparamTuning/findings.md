@@ -52,6 +52,9 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
+| **Network shape does not move the ceiling** — 2 shapes against a seed-matched control at 3M | **measured 2026-08-10**, batch 20. Peak trailing 94.44 (`50,100,50`) / 94.55 (`200,50`) / 94.70 (`200,100,50`) across a **2.66× parameter range** — a 0.26 spread inside the flat band nine batches have held. See below |
+| A wider or wide-early net raises consolidation (`best-30`, pooled) | **not supported** — the apparent edges are **1 of 4** seeds for `200,50` (p=1.000) and **2 of 4** for `200,100,50` (p=0.500), and in both cases the seeds carrying them are where the *control* is weakest |
+| **‡ Batch 20's control seed spread is wider than any between-shape gap it measured** | **established** — control `sef` spans 0.2-26.3%, pooled 33.2-71.3%. At n=4 this design cannot see an architecture effect smaller than that |
 | **Removing the food-distance shaping raises how long an arm stays good** | **the first non-null in six batches** — batch 16 `sef` +11.35 pp at a matched 1.25M (p=0.250) and `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). **Needs replication**; see below |
 | `DISCOUNT=0.995` matches the best ceiling and survives 3 of 3 seeds | **measured**, ~2.3x expected value |
 | Higher discount is monotonically better | **falsified** — 0.999 died 2 of 2 |
@@ -93,6 +96,45 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
 
 ---
+
+## Network shape: two shapes measured, no movement in the ceiling, and the control's seed spread is the limit
+
+`FC_LAYERS` sat at `(50, 100, 50)` from batch 1 to batch 19 with no measurement behind it. Batch 20 is
+the first test. Two shapes are done, both against the same seed-matched control at a matched 3M under
+β=300k:
+
+| shape | params | vs control | peak trailing | `sef` | best-30 | close-out pooled | max drawdown |
+|---|---|---|---|---|---|---|---|
+| `50,100,50` (control) | 11,853 | 1.00× | 94.44 | 11.2% | 64.0% | 55.0% | 5.41 |
+| `200,50` (wide-early) | 16,403 | 1.38× | 94.55 | **8.60%** | 67.4% | 59.3% | 8.56 |
+| `200,100,50` (capacity) | 31,503 | **2.66×** | 94.70 | 12.9% | 71.4% | 64.6% | 8.31 |
+
+**The ceiling did not move.** 0.26 points of peak trailing across a 2.66× parameter range, all three
+inside the 94.4-95.0 band every batch since 11 has produced. Nothing in either shape's close-out
+reached 95%, and neither produced a single full-length row under gate 95.
+
+**‡ The consolidation columns look monotone in capacity and that is an artifact.** `best-30` and pooled
+both order control < `200,50` < `200,100,50`, which is a tempting story. The paired per-seed differences
+kill it:
+
+| comparison | pooled diffs by seed | mean | p (exact paired) | favouring the shape |
+|---|---|---|---|---|
+| `200,50` − control | +31.3 / −3.4 / −4.3 / −6.5 | +4.27 | 1.000 | **1 of 4** |
+| `200,100,50` − control | +28.7 / −4.7 / +19.4 / −5.0 | +9.59 | 0.500 | **2 of 4** |
+
+Both means are carried by the seeds where the control happens to be weak — seed 1 (`b20a`, `sef` 0.2%)
+and seed 3 (`b20c`, 2.2%). Every other seed favours the control. On `sef`, the primary metric and the
+one with the lowest between-seed variance, `200,50` is *behind* the control (−2.62, 1 of 4 seeds).
+
+**The transferable lesson is about the design, not the architecture.** The control's own four seeds span
+`sef` **0.2-26.3%** and pooled **33.2-71.3%** — a spread larger than any between-shape gap batch 20 has
+measured. So an architecture effect has to exceed the control's seed variance before n=4 can see it, and
+neither shape tried comes close. Chasing the remaining shapes at n=4 will keep producing numbers of this
+kind; resolving a real effect of this size needs more seeds per shape, not more shapes.
+
+**What is not yet tested:** `320` (depth 1 at matched capacity) is the cleanest single question in the
+batch's design and has not been run. `25,50,25` (0.29×, is capacity binding at all) and
+`60,30,30,30,30` (depth 5) are in flight as of 2026-08-10.
 
 ## The food-distance shaping was a drag on consistency — the first signal in six batches
 

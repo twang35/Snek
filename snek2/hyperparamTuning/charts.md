@@ -36,7 +36,51 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
-## Batch 20 — FC-layer capacity (`200,100,50`) vs control (`50,100,50`), both to 3M
+## Batch 20 wave 2 — wide-early (`200,50`) against the control, both to 3M
+
+The wide-early shape: two layers, 200 units first, 16,403 params (1.38× the control). The mechanism
+was that the observation is already high-level, so what the net needs is *conjunctions* of engineered
+features rather than a deep hierarchy — and conjunctions want width in the first layer.
+
+**Verdict: it did not move the ceiling either, and it is behind the control on the primary metric.**
+Peak trailing **94.55** against the control's 94.44 — a 0.11 gap inside a band nine batches have held.
+`sef` **8.60%** against 11.2%, i.e. *worse* on the metric with the lowest between-seed variance.
+
+**‡ The apparent best-30 and pooled gains are one seed, and that seed is a control weakness.**
+Seed-matched paired differences (`200,50` − control) are what settles this:
+
+| metric | by seed | mean | p (exact paired, 16 flips) | seeds favouring `200,50` |
+|---|---|---|---|---|
+| `sef` | +8.5 / −6.3 / −0.3 / −12.4 | −2.62 | 0.625 | **1 of 4** |
+| best-30 | +31.4 / −9.0 / −1.0 / −8.0 | +3.35 | 1.000 | **1 of 4** |
+| pooled | +31.3 / −3.4 / −4.3 / −6.5 | +4.27 | 1.000 | **1 of 4** |
+
+Every positive mean is carried by seed 1 alone, where the control arm `b20a` is the batch's weakest
+(`sef` 0.2%, pooled 33.2%). Three of four seeds favour the control on all three metrics.
+
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`, `SNEK_FC_LAYERS=200,50`.
+
+| arm | peak trail | best-30 | `sef` | max drawdown | close-out pooled | best row |
+|---|---|---|---|---|---|---|
+| `b20i` | 94.64 | **72.7%** | 8.7% | 9.48 | 64.5% | 87.0% @2818k (n=46) |
+| `b20l` | **94.82** | 72.3% | **13.9%** | **7.18** | **64.8%** | 85.7% @2940k (n=42) |
+| `b20j` | 94.58 | 69.3% | 9.9% | 9.76 | 59.3% | 83.3% @2001k (n=42) |
+| `b20k` | 94.18 | 55.3% | 1.9% | 7.84 | 48.5% | 72.0% @1073k (n=25) |
+| **mean — `200,50`** | 94.55 | 67.4% | 8.60% | 8.56 | 59.3% | — |
+| **mean — control** | 94.44 | 64.0% | 11.2% | 5.41 | 55.0% | — |
+
+**No arm produced a full-length row** (deepest 25-46 of 100), so `best row` is a bound, not a
+measurement — `pooled` is the exact column. Nothing reached 95%.
+
+Drawdown rose from the control's 5.41 to 8.56 but stayed in batch 19 territory (8.76), nowhere near
+batch 18's ~57 — so the base's anti-forgetting property survives this shape too.
+
+![b20i](charts/b20i-fc200x50seed1.png)
+![b20l](charts/b20l-fc200x50seed4.png)
+![b20j](charts/b20j-fc200x50seed2.png)
+![b20k](charts/b20k-fc200x50seed3.png)
+
+## Batch 20 wave 1 — FC-layer capacity (`200,100,50`) vs control (`50,100,50`), both to 3M
 
 The first time the network shape has been varied in the project, aimed at the one quantity nine batches
 of optimiser knobs never moved — the ceiling. Control `50,100,50` re-baselined at β=300k (`b20a-d`) and
@@ -45,9 +89,15 @@ capacity arms crashed once at ~1.75M on a since-fixed matplotlib chart-writer le
 
 **Verdict: 2.66× capacity did not move the ceiling.** Peak trailing **94.44** (control) vs **94.70**
 (capacity) — both inside the flat 94.7-95.0 band every batch has held since 11, for a net 2.66× wider.
-There is a *weak* consolidation edge (best-30 64.0 → 71.4, close-out pooled 55.0 → 64.6) but it sits
-at/below the n=4 resolution floor (~10 pp): a hint, not a result, and one more seeds — not this n=4 —
-would have to settle. Capacity-up is not the route to a higher ceiling.
+There is an apparent consolidation edge (best-30 64.0 → 71.4, close-out pooled 55.0 → 64.6) which the
+original write-up called "a hint, not a result".
+
+**‡ Downgraded 2026-08-10: it is not even a directional hint.** The paired per-seed differences are
+**+28.7 / −4.7 / +19.4 / −5.0** on pooled — **2 of 4** seeds, exact paired p=**0.500** — and the two
+seeds carrying it are seeds 1 and 3, exactly where the *control* is weakest (`b20a` `sef` 0.2%, `b20c`
+2.2%). The same check on wave 2's `200,50` shows the same shape at 1 of 4. So the edge is control seed
+variance, not capacity: the control's four seeds span `sef` 0.2-26.3% and pooled 33.2-71.3%, which is
+wider than any between-shape gap in the batch. Capacity-up is not the route to a higher ceiling.
 
 All at 3M. Sorted by best-30. `sef` and close-out pooled (equal-effort, gate 95) are now comparable — same horizon.
 

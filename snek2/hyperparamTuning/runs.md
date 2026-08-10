@@ -16,7 +16,7 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 
 **Wave 1 control done and closed out; capacity half is re-running to 3M (2026-08-09).** Per-arm numbers
 and charts:
-[`charts.md`](charts.md#batch-20-wave-1--fc-layer-capacity-fc_layers-the-first-architecture-test-stopped-at-173-278m).
+[`charts.md`](charts.md#batch-20-wave-1--fc-layer-capacity-20010050-vs-control-5010050-both-to-3m).
 Batch 19's close-out also finished on the laptop overnight.
 
 - **Control `50,100,50` (`b20a-d`, laptop) is finished and closed out.** Resumed from ~2.5M and all four
@@ -45,8 +45,14 @@ Batch 19's close-out also finished on the laptop overnight.
 >
 > **Verdict: ceiling unmoved** — peak trailing 94.70 sits inside the flat 94.7-95.0 band nine batches have
 > held, for a net 2.66× wider. A *weak* consolidation edge (best-30 +7.4, pooled +9.6) is at/below the n=4
-> resolution floor (~10 pp): a hint, not a result — chasing it needs more seeds, not this n=4. (Max
-> drawdown not yet recomputed from the 3M rows.)
+> resolution floor (~10 pp): a hint, not a result — chasing it needs more seeds, not this n=4.
+>
+> **‡ Downgraded 2026-08-10: not even a directional hint.** Paired pooled diffs are
+> **+28.7 / −4.7 / +19.4 / −5.0** — **2 of 4** seeds, exact paired p=**0.500** — and the two carrying it are
+> seeds 1 and 3, where the *control* is weakest (`b20a` `sef` 0.2%, `b20c` 2.2%). Wave 2 shows the same
+> shape at 1 of 4. The control's own seed spread (`sef` 0.2-26.3%, pooled 33.2-71.3%) is wider than any
+> between-shape gap in the batch. Max drawdown, the gap this note used to flag, is **8.31 mean**
+> (9.68 / 7.14 / 4.88 / 11.54) — level with wave 2's 8.56 and batch 19's 8.76.
 >
 > The earlier OOM was a **matplotlib per-eval leak in the chart writer, now fixed** — not steady memory.
 > See the rendering section of [`CLAUDE.md`](../../CLAUDE.md).
@@ -56,13 +62,13 @@ Batch 19's close-out also finished on the laptop overnight.
 > treatment rerun only gates the **capacity** verdict (`200,100,50`), not the wide-early one, which reads
 > against the control. `320`, wave 2's other half, has **not** been run.
 
-> **Wave 2 `200,50` RUNNING (launched 2026-08-09, laptop).** Four seeds, `b20{i,j,k,l}-fc200x50seed{1-4}`,
-> `SNEK_MAX_STEPS=3000000`, all four confirmed on the `hyperparameter override:` line as `FC_LAYERS =
-> (200, 50)` with β=300k and the rest identical to `b20a-d`. Logs `/tmp/b20[ijkl]-fc200x50seed*.log`.
-> **Read against the control table below at a matched 3M** — both halves now run to 3M, which supersedes
-> the pre-registration's 2.5M `max_steps`; the *batch 19* secondary read still caps at ~2.0M.
-> 16,403 params, 1.38× the control, depth 2. **Any eval or `watch.py` on these checkpoints needs
-> `SNEK_FC_LAYERS=200,50`.**
+> **Wave 2 `200,50` DONE (2026-08-09/10) — null on the ceiling, behind the control on `sef`.** Four seeds
+> `b20{i,j,k,l}` to the 3M cap, closed out unattended in 25 min. Peak trailing **94.55** vs the control's
+> 94.44; `sef` **8.60%** vs 11.2%. best-30 and pooled read higher (+3.4, +4.3) but **1 of 4 seeds**
+> favours the shape and p=1.000 — the mean is seed 1 alone, where control `b20a` is the batch's weakest
+> arm. Full write-up:
+> [`completedRuns.md`](completedRuns.md#batch-20-wave-2--wide-early-20050-null-on-the-ceiling-behind-the-control-on-the-primary-metric).
+> **Any eval or `watch.py` on these checkpoints needs `SNEK_FC_LAYERS=200,50`.**
 
 > **Wave 2 `320` RUNNING (queued 2026-08-09, desktop `the-claw-den`).** Four fresh seeds,
 > `b20{m,n,o,p}-fc320seed{1-4}`, `SNEK_FC_LAYERS=320`, `SNEK_MAX_STEPS=3000000`, rest identical to the

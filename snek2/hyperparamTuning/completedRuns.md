@@ -73,6 +73,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
 | `b18c-tgt1000seed3` ‡‡‡ § | **target period 1000**, forking on | 2.51M | 92% @2168k *trunc* | — | 74.75% /eq §§ | 84.3% | ‡‡‡ § weakest of batch 18; **no full-length row survived the gate**; best window in its last 350k |
+| `b20i-fc200x50seed1` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 87% @2818k *trunc* | — | 64.47% /eq §§ | 72.7% | ‡‡‡ § best of wave 2 on best-30; **the only seed where the shape beats its control**, and only because control `b20a` is the batch's weakest arm. `sef` 8.7% |
+| `b20l-fc200x50seed4` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 86% @2940k *trunc* | — | **64.75%** /eq §§ | 72.3% | ‡‡‡ § highest `sef` (13.9%) and smallest drawdown (7.18) of wave 2; **best checkpoint at 2940k, its last 60k** — still climbing when capped |
+| `b20j-fc200x50seed2` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 83% @2001k *trunc* | — | 59.31% /eq §§ | 69.3% | ‡‡‡ § mid of wave 2; `sef` 9.9% against its control's 16.2%; largest drawdown of the wave, 9.76 |
+| `b20k-fc200x50seed3` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 72% @1073k *trunc* | — | 48.50% /eq §§ | 55.3% | ‡‡‡ § weakest of wave 2, `sef` 1.9%; only 20 checkpoints cleared selection and the deepest row is 25 episodes. Mirrors control `b20c` (2.2%) — seed 3 is weak under both shapes |
 | `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | 91% @1536k *trunc* | — | 75.46% /eq §§ | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
 | `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | 77% @1485k *trunc* | — | 61.49% /eq §§ | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
 | `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | 76% @937k *trunc* | — | 51.59% /eq §§ | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
@@ -208,6 +212,63 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 20 wave 2 — wide-early `200,50`: **null on the ceiling, behind the control on the primary metric**
+
+**Ran 2026-08-09 15:12 to 22:54, four arms `b20i`-`b20l` at seeds 1-4, all self-terminating at the 3M
+cap after ~7h40m; close-out 22:54-23:19 (25 min, four parallel, `EVAL_WORKERS=4`).** Charts in
+[`charts.md`](charts.md#batch-20-wave-2--wide-early-20050-against-the-control-both-to-3m). Launched and
+closed out unattended by a watcher that waited for the cap, so no arm was stopped by hand.
+
+### The design
+
+`FC_LAYERS=200,50` — two layers, wide first, 16,403 params against the control's 11,853 (1.38×). One
+variable against wave 1's control, which is seed-matched and ran to the same 3M under the same β=300k.
+
+```
+SNEK_FC_LAYERS=200,50  SNEK_SEED=1..4  SNEK_BETA_ANNEAL_STEPS=300000
+SNEK_TARGET_UPDATE_PERIOD=1000  SNEK_FOOD_DISTANCE_REWARD=0  SNEK_DISCOUNT=0.9975
+SNEK_GUIDED_FRACTION=0.8  SNEK_FORK_BRANCHES=4  SNEK_FORK_PROB=0.5
+SNEK_FORK_MIN_LENGTH=85  SNEK_FORK_MAX_STEPS=60  SNEK_MAX_STEPS=3000000
+```
+
+**What it isolated:** whether *width early* buys anything, on the argument that the observation is
+already high-level so the net needs conjunctions of engineered features rather than a deep hierarchy.
+
+### The result
+
+| mean of 4 | control `50,100,50` | `200,50` | delta |
+|---|---|---|---|
+| peak trailing | 94.44 | 94.55 | +0.11 |
+| `sef` (primary) | 11.2% | **8.60%** | **−2.6** |
+| best-30 | 64.0% | 67.4% | +3.4 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 59.3% | +4.3 |
+| max drawdown | 5.41 | 8.56 | +3.15 |
+
+**Null on the ceiling and negative on the primary metric.** Peak trailing moves 0.11 inside a band nine
+batches have held, and `sef` — the metric with the lowest between-seed variance, so the one that resolves
+the smallest effect — goes the *wrong* way.
+
+**‡ The best-30 and pooled deltas are a single seed, and it is a control weakness rather than a shape
+strength.** Paired per-seed differences, exact paired permutation over 16 sign flips:
+
+| metric | by seed | mean | p | favouring `200,50` |
+|---|---|---|---|---|
+| `sef` | +8.5 / −6.3 / −0.3 / −12.4 | −2.62 | 0.625 | 1 of 4 |
+| best-30 | +31.4 / −9.0 / −1.0 / −8.0 | +3.35 | 1.000 | 1 of 4 |
+| pooled | +31.3 / −3.4 / −4.3 / −6.5 | +4.27 | 1.000 | 1 of 4 |
+
+Seed 1 supplies every positive mean, and seed 1's control (`b20a`) is the weakest arm in the batch
+(`sef` 0.2%, pooled 33.2%). **The control's own seed spread — `sef` 0.2-26.3%, pooled 33.2-71.3% — is
+wider than any between-shape gap batch 20 has produced.** That is the finding worth carrying forward:
+at n=4 this design cannot see an architecture effect smaller than its control's seed variance, and none
+of the three shapes tried has produced one that large.
+
+**No full-length rows again** (deepest 25-46 of 100 under gate 95), so every `best ckpt` in the canonical
+rows is truncated and is a bound. Nothing reached 95%, so no hall-of-fame candidate.
+
+Drawdown rose from 5.41 to 8.56 — still batch-19 territory (8.76) and nowhere near batch 18's ~57, so
+the base's anti-forgetting property holds under this shape.
 
 ## Batch 19 — standard PER: **falsified, 4/4 seeds, on every comparable metric**
 
