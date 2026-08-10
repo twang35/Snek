@@ -51,6 +51,8 @@ class Runner:
         self.ledger = self._load_ledger()
         self.running = {}          # job_id -> RunningJob
         self._viewer_pngs = None   # the PNG set the live viewer was launched with, or None
+        self._wave_pngs = []       # sticky panel set for the current wave (grows, never shrinks)
+        self._wave_category = None # the wave's category, so a train->eval flip resets the set
         self.stop = False
         self._reattach()
 
@@ -111,23 +113,37 @@ class Runner:
         the file set changes (runs/<policy>.png -> evals/<policy>_eval_progress.png) and a
         viewer left running keeps showing the finished training charts. Seen 2026-08-10. So we
         track the set the live viewer was launched with and relaunch whenever it no longer
-        matches what the running jobs need."""
+        matches what the running jobs need.
+
+        The panel set is *sticky within a wave*: an arm that reaches its cap and exits keeps
+        its panel until the whole wave drains, so a wave of four never collapses to the two
+        still training. The viewer tags the finished ones `(completed)`. `sticky_wave_pngs`
+        only unions -- it never drops -- so a finished arm does not trigger a relaunch; the
+        set resets when the wave flips category (train->eval) or the box goes idle."""
         if not self.runtime.get('viewer', True) or not self.running:
+            # Idle between waves: forget the wave so the next one starts from its own arms,
+            # not unioned onto the previous batch's (a trainer->trainer flip keeps category).
+            self._wave_pngs, self._wave_category = [], None
             return
         try:
-            desired = viewer_png_paths(
-                [(rj.job.category, rj.policy) for rj in self.running.values()],
-                self.host['SNEK_DIR'])
-            if not desired:
+            running_jobs = [(rj.job.category, rj.policy) for rj in self.running.values()]
+            current = viewer_png_paths(running_jobs, self.host['SNEK_DIR'])
+            if not current:
                 return
+            # Wave-barrier scheduling runs one category at a time, so the wave's category is
+            # simply that of whatever is running; sorted+joined stays deterministic regardless.
+            category = ','.join(sorted({c for c, _ in running_jobs}))
+            desired = sticky_wave_pngs(self._wave_pngs, self._wave_category, category, current)
+            self._wave_pngs, self._wave_category = desired, category
             viewer_running = subprocess.run(
                 ['pgrep', '-f', 'chart_viewer.py'],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
             if not viewer_should_relaunch(viewer_running, self._viewer_pngs, desired):
                 return
-            # Wrong file set (a wave flipped, or an arm finished), or unknown across a daemon
-            # restart: drop any existing viewer and launch one bound to the current set. The
-            # pgrep/pkill pattern is not in the daemon's own argv, so it cannot self-match.
+            # Wrong file set (the wave flipped category, or a new arm joined it), or unknown
+            # across a daemon restart: drop any existing viewer and launch one bound to the
+            # current set. A finished arm does not land here -- the sticky set kept its panel.
+            # The pgrep/pkill pattern is not in the daemon's own argv, so it cannot self-match.
             if viewer_running:
                 subprocess.run(['pkill', '-f', 'chart_viewer.py'],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -285,6 +301,20 @@ def viewer_png_paths(running_jobs, snek_dir):
         else:
             pngs.append(os.path.join(snek_dir, 'runs', policy + '.png'))
     return sorted(pngs)
+
+
+def sticky_wave_pngs(prev_pngs, prev_category, category, current_pngs):
+    """Union this wave's currently-running PNGs into the set already on screen, so a finished
+    arm keeps its panel until the whole wave drains (the viewer marks it `(completed)`) rather
+    than the window shrinking to just the arms still going.
+
+    Only grows within a wave. Resets to the current set when the wave's category flips
+    (`trainer` -> `eval`, an entirely new set of charts under evals/), and `prev_category`
+    None -- a fresh daemon, or the idle gap between waves -- resets too, so a following wave
+    of the same category does not inherit the previous batch's panels."""
+    if prev_category != category or not prev_pngs:
+        return sorted(current_pngs)
+    return sorted(set(prev_pngs) | set(current_pngs))
 
 
 def viewer_should_relaunch(viewer_running, current_pngs, desired_pngs):

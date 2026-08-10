@@ -108,6 +108,43 @@ def wave_files(prefix, known):
     return [os.path.join('runs', policy + '.png') for policy in sorted(known)]
 
 
+def policy_from_png(path):
+    """The policy a chart PNG belongs to: `runs/b20q-fc25.png` -> `b20q-fc25`, and
+    `evals/b20q-fc25_eval_progress.png` -> `b20q-fc25`. The two layouts are the trainer's
+    chart and the eval's chart; both encode the policy as the stem so a panel can be tied
+    back to the process that produces it."""
+    base = os.path.basename(path)
+    if base.endswith('_eval_progress.png'):
+        return base[:-len('_eval_progress.png')]
+    if base.endswith('.png'):
+        return base[:-len('.png')]
+    return base
+
+
+def running_policies():
+    """Policy names that currently have a live trainer OR eval process, or None if unknown.
+
+    This is what lets a panel be tagged `(completed)`: the viewer keeps a wave's finished
+    charts on screen (sticky `wave_files`, and the desktop runner unions the set too), so it
+    needs a live signal for which of those arms are still going. A policy counts as running
+    when its name appears as a whitespace token on the command line of a `snek2.py` (trainer)
+    or `eval_checkpoints.py` (eval) process -- both put the policy right after the script.
+
+    Token match, never substring, so `...seed1` is not read as running because `...seed11`
+    is; policy names here are long and unique enough that a token collision does not occur.
+    Returns None if the process list cannot be read, and the caller then marks nothing
+    completed -- a false `(completed)` on a live arm is worse than a missing one on a dead
+    arm, which the panel's frozen curve already shows."""
+    tokens = set()
+    for pattern in ('snek2.py', 'eval_checkpoints.py'):
+        try:
+            for line in _matching_commands(pattern):
+                tokens.update(line.split())
+        except Exception:
+            return None
+    return tokens
+
+
 def _training_alive(pattern):
     """True while any process *other than this viewer* matches `pattern` (pgrep -f).
 
@@ -401,12 +438,20 @@ def main():
         for ax in axes:
             ax.clear()
             ax.axis('off')
+        live = running_policies()
         for i, path in enumerate(files):
+            label = policy_from_png(path)
+            # A panel we still show but whose arm is gone is a finished run of the wave --
+            # kept on screen as the reference the live ones are compared against, so it must
+            # read as done rather than look like a stalled arm. `live is None` means the
+            # process list was unreadable this refresh; tag nothing then.
+            if live is not None and label and label not in live:
+                label += ' (completed)'
             try:
                 axes[i].imshow(mpimg.imread(path))
-                axes[i].set_title(os.path.basename(path).replace('.png', ''), fontsize=8)
+                axes[i].set_title(label, fontsize=8)
             except Exception:
-                axes[i].set_title(os.path.basename(path) + ' (waiting…)', fontsize=8)
+                axes[i].set_title(label + ' (waiting…)', fontsize=8)
         try:
             fig.tight_layout()
             fig.canvas.draw_idle()

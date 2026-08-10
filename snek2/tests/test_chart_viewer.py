@@ -406,6 +406,81 @@ def test_wave_files_keeps_an_arm_that_has_finished():
         chart_viewer.subprocess.run = saved
 
 
+def test_policy_from_png_strips_both_chart_layouts():
+    """A panel is tied back to its arm through the PNG name. The trainer writes
+    runs/<policy>.png; the eval writes evals/<policy>_eval_progress.png. Both must resolve to
+    the bare policy so completion can be looked up against the process list."""
+    assert chart_viewer.policy_from_png('runs/b20q-fc25x50x25seed1.png') == 'b20q-fc25x50x25seed1'
+    assert chart_viewer.policy_from_png(
+        '/snek/evals/b20q-fc25x50x25seed1_eval_progress.png') == 'b20q-fc25x50x25seed1'
+
+
+def _fake_ps_by_pattern(lines):
+    """Stub subprocess.run so `pgrep -f PAT` matches only lines containing PAT, the way the
+    real pgrep does. `_fake_ps` ignores the pattern and returns every line, which cannot tell
+    a scan of one process kind from a scan of both -- so running_policies would look correct
+    even if it dropped a pattern. Here each pid maps to one line, pgrep returns the pids whose
+    line contains the pattern, and ps returns exactly those pids' lines."""
+    numbered = {1000 + i: line for i, line in enumerate(lines)}
+
+    class _Res:
+        def __init__(self, out):
+            self.stdout = out
+
+    def run(args, **_kw):
+        if args[0] == 'pgrep':
+            pat = args[2]
+            hits = [pid for pid, line in numbered.items() if pat in line]
+            return _Res(('\n'.join(str(p) for p in hits) + '\n').encode())
+        wanted = [args[i + 1] for i, a in enumerate(args) if a == '-p']
+        return _Res('\n'.join(numbered[int(p)] for p in wanted).encode())
+    return run
+
+
+def test_running_policies_collects_trainers_and_evals():
+    """The completed tag needs to know an arm is *gone*, and an arm is present as either a
+    trainer (snek2.py) or an eval (eval_checkpoints.py). Both patterns must be scanned, so a
+    panel is not called completed while its eval is still measuring it. The pattern-aware fake
+    is what makes this bite: were the eval scan dropped, seed2's eval-only line would vanish."""
+    saved = chart_viewer.subprocess.run
+    lines = [' 1001 python -u snek2.py b20q-fc25seed1',
+             ' 1002 python -u eval_checkpoints.py b20r-fc25seed2 top20']
+    chart_viewer.subprocess.run = _fake_ps_by_pattern(lines)
+    try:
+        live = chart_viewer.running_policies()
+        assert 'b20q-fc25seed1' in live
+        assert 'b20r-fc25seed2' in live
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_running_policies_is_token_exact_not_substring():
+    """`seed1` must not read as running because `seed11` is — a token match, not `in`. A wave
+    with both would otherwise leave the finished seed1 falsely un-tagged."""
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps([' 1001 python -u snek2.py b20q-fc25seed11'])
+    try:
+        live = chart_viewer.running_policies()
+        assert 'b20q-fc25seed11' in live
+        assert 'b20q-fc25seed1' not in live      # the finished sibling stays taggable
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_running_policies_is_none_when_it_cannot_look():
+    """Unreadable process list -> None, so the caller tags nothing. A false (completed) on a
+    live arm is worse than a missing one, whose frozen curve already shows it stopped."""
+    saved = chart_viewer.subprocess.run
+
+    def boom(*_a, **_kw):
+        raise OSError('no ps here')
+    chart_viewer.subprocess.run = boom
+    try:
+        assert chart_viewer.running_policies() is None
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
 def test_wave_files_never_shows_a_finished_arm_from_an_earlier_wave():
     """The bug this replaces: globbing runs/b20*.png matched eight finished arms plus the four
     live ones, giving a window taller than the screen by wave 2."""

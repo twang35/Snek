@@ -208,6 +208,39 @@ def test_viewer_launches_when_none_running_and_never_for_empty():
     assert runnermod.viewer_should_relaunch(True, None, ['/snek/runs/p.png']) is True
 
 
+def test_sticky_wave_keeps_a_finished_arm():
+    # Four arms train; one hits its cap and its trainer exits, so viewer_png_paths now lists
+    # only three. The sticky set must still carry the fourth, so the window shows four panels
+    # (the finished one tagged completed) instead of collapsing to the arms still running.
+    pols = ['b20q', 'b20r', 'b20s', 'b20t']
+    full = runnermod.viewer_png_paths([('trainer', p) for p in pols], '/snek')
+    prev = runnermod.sticky_wave_pngs([], None, 'trainer', full)
+    assert prev == full
+    three = runnermod.viewer_png_paths([('trainer', p) for p in pols[:3]], '/snek')
+    kept = runnermod.sticky_wave_pngs(prev, 'trainer', 'trainer', three)
+    assert kept == full, kept          # the exited arm's panel is retained
+    # ...and because the set did not shrink, no relaunch is triggered by an arm finishing.
+    assert runnermod.viewer_should_relaunch(True, prev, kept) is False
+
+
+def test_sticky_wave_resets_on_category_flip():
+    # A train->eval flip is a wholly new set of charts (runs/ -> evals/); the finished
+    # training panels must not be unioned onto the eval window.
+    pols = ['b20q', 'b20r']
+    train = runnermod.viewer_png_paths([('trainer', p) for p in pols], '/snek')
+    ev = runnermod.viewer_png_paths([('eval', p) for p in pols], '/snek')
+    got = runnermod.sticky_wave_pngs(train, 'trainer', 'eval', ev)
+    assert got == ev, got
+    assert all('/runs/' not in p for p in got)
+
+
+def test_sticky_wave_resets_when_idle_or_fresh():
+    # prev_category None -- a fresh daemon, or the idle gap between waves that clears the
+    # tracking -- starts the next wave from its own arms, never the previous batch's.
+    new = runnermod.viewer_png_paths([('trainer', 'b21a')], '/snek')
+    assert runnermod.sticky_wave_pngs(['/snek/runs/b20a.png'], None, 'trainer', new) == new
+
+
 if __name__ == '__main__':
     mod = sys.modules[__name__]
     tests = [t for t in dir(mod) if t.startswith('test')]
