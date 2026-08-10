@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-10T10:59:19",
-  "ts": 1786384759.960809,
+  "iso": "2026-08-10T10:59:52",
+  "ts": 1786384792.6370156,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -25,36 +25,36 @@
       "type": "train",
       "policy": "b20q-fc25x50x25seed1",
       "pid": 891400,
-      "step": 2727000,
-      "steps_per_sec": 60.8,
-      "elapsed_s": 33789
+      "step": 2729000,
+      "steps_per_sec": 61.2,
+      "elapsed_s": 33822
     },
     {
       "id": "b20r-fc25x50x25seed2",
       "type": "train",
       "policy": "b20r-fc25x50x25seed2",
       "pid": 891401,
-      "step": 2840000,
-      "steps_per_sec": 91.2,
-      "elapsed_s": 33789
+      "step": 2843000,
+      "steps_per_sec": 91.8,
+      "elapsed_s": 33822
     },
     {
       "id": "b20s-fc25x50x25seed3",
       "type": "train",
       "policy": "b20s-fc25x50x25seed3",
       "pid": 891402,
-      "step": 2556000,
-      "steps_per_sec": 60.8,
-      "elapsed_s": 33789
+      "step": 2559000,
+      "steps_per_sec": 91.8,
+      "elapsed_s": 33822
     },
     {
       "id": "b20t-fc25x50x25seed4",
       "type": "train",
       "policy": "b20t-fc25x50x25seed4",
       "pid": 891403,
-      "step": 2857000,
-      "steps_per_sec": 91.2,
-      "elapsed_s": 33789
+      "step": 2859000,
+      "steps_per_sec": 61.2,
+      "elapsed_s": 33822
     }
   ],
   "ledger": {
@@ -92,8 +92,8 @@
   },
   "disk_free_gb": 175.5,
   "load_avg": [
-    8.42041015625,
-    8.1748046875,
-    8.23583984375
+    9.98828125,
+    8.57373046875,
+    8.3662109375
   ]
 }
