@@ -234,6 +234,15 @@ def test_sticky_wave_resets_on_category_flip():
     assert all('/runs/' not in p for p in got)
 
 
+def test_viewer_scale_is_larger_for_eval_waves():
+    # Eval charts get a ~30% bigger window; anything with a trainer in it stays smaller.
+    # `category` is the comma-joined set _ensure_viewer builds, so only a pure eval wave
+    # is 'eval' -- a mixed set (should not happen under the wave-barrier, but be safe) is not.
+    assert runnermod.viewer_scale('eval') == '1.95'
+    assert runnermod.viewer_scale('trainer') == '1.5'
+    assert runnermod.viewer_scale('eval,trainer') == '1.5'
+
+
 def test_sticky_wave_resets_when_idle_or_fresh():
     # prev_category None -- a fresh daemon, or the idle gap between waves that clears the
     # tracking -- starts the next wave from its own arms, never the previous batch's.

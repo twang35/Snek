@@ -160,8 +160,8 @@ class Runner:
                 if self.host.get('XAUTHORITY'):
                     env.setdefault('XAUTHORITY', self.host['XAUTHORITY'])
             argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
-                   ['--watch', 'snek2.py|eval_checkpoints.py', '--interval', '1', '--scale', '1.5',
-                    '--title', 'snek desktop']
+                   ['--watch', 'snek2.py|eval_checkpoints.py', '--interval', '1',
+                    '--scale', viewer_scale(category), '--title', 'snek desktop']
             subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=env,
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)
             self._viewer_pngs = pngs
@@ -301,6 +301,15 @@ def viewer_png_paths(running_jobs, snek_dir):
         else:
             pngs.append(os.path.join(snek_dir, 'runs', policy + '.png'))
     return sorted(pngs)
+
+
+def viewer_scale(category):
+    """Window-size multiplier for the desktop viewer, by wave category. Eval charts run a
+    bit larger (1.95 vs 1.5, ~30% up) because their detail -- the per-checkpoint eval points
+    packed along 3M steps -- is what gets read closely; the training curve is coarser and
+    fine at 1.5. `category` is the comma-joined set from `_ensure_viewer`, so a pure eval wave
+    is exactly 'eval'; anything with a trainer in it stays at the smaller size."""
+    return '1.95' if category == 'eval' else '1.5'
 
 
 def sticky_wave_pngs(prev_pngs, prev_category, category, current_pngs):
