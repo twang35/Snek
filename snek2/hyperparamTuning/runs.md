@@ -12,6 +12,23 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
+## Batch 21 / 22 — PER importance-sampling β (fc 50,100,50, on batch 20's control)
+
+**Batch 21 (β→0.5) done on the laptop; close-out queued on the desktop. Batch 22 (IS off) queued on the
+desktop.** These isolate how much importance-sampling correction to apply — `td_error` priority, α=0.6,
+otherwise the batch-20 control. Gradient concentration ESS/N, measured on the end-of-run buffers, walks
+down the β ladder: **β→1.0 ≈1.0** (b20 control, near-uniform) → **β→0.5 ≈0.86** (b21) → **IS off ≈0.38**
+(b22) → the no-IS extreme already run is b18's ≈0.21.
+
+- **b21 (`b21a-d`, β→0.5) — done, 4×3M on the laptop.** Beats the β→1.0 control on the training graph
+  (best-30 74.1 vs 64.0, `sef` 14.3 vs 11.2, 3/4 seeds) but n=4 cannot resolve it, and it trails b18's
+  no-IS consolidation by a wide margin. Ceiling unmoved (peak 94.69). Full read in
+  [`completedRuns.md`](completedRuns.md). Checkpoints rsynced to the desktop; close-out `b21a-d-closeout`
+  queued at priority 10 — the next eval wave.
+- **b22 (`b22a-d`, IS off) — queued (desktop), priority 200.** Same config with `SNEK_IS_WEIGHTS=0`, so the
+  gradient carries full `|δ|^0.6` prioritisation. Tests whether more concentration keeps helping. Runs
+  after the b20 `100,50,50` wave.
+
 ## Batch 20 — FC layer shapes, on batch 19's base
 
 **Wave 1 control done and closed out; capacity half is re-running to 3M (2026-08-09).** Per-arm numbers
@@ -199,8 +216,8 @@ seed), assigned here so two hosts never reuse a letter — which happened once, 
 | `320` | 10,883 | 0.92x | **1** | `b20m-p` ✓ | **depth, at matched capacity** |
 | `25,50,25` | 3,428 | **0.29x** | 3 | `b20q-t` ✓ | is capacity binding at all — **yes: ceiling drops, 4/4** |
 | `60,30,30,30,30` | 6,573 | 0.55x | **5** | `b20u-x` ✓ | deep and narrow — matches ceiling, forgets more |
-| `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † ⟳ | fills the iso-param depth ladder — **running (desktop)** |
-| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † ⟳ | escalation above the 2.66x arm — **queued (desktop)** |
+| `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † ✓ | fills the iso-param depth ladder — **done: null, matches control (peak −0.03)** |
+| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † ⟳ | escalation above the 2.66x arm — **running (desktop), ~2.7M** |
 | `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † ⟳ | reshuffle at matched capacity/depth — **queued (desktop)** |
 
 **† past `x` the letters roll into double letters (`aa`, `ab`, …), still batch 20.** The six shapes above

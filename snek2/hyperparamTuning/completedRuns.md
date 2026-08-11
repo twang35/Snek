@@ -89,6 +89,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b20t-fc25x50x25seed4` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 60% @1530k *trunc* | — | 45.25% /eq §§ | 57.0% | ‡‡‡ § 2nd of the shape; smallest drawdown of the small net (6.22); `sef` 2.0% against control `b20d`'s 26.3% |
 | `b20s-fc25x50x25seed3` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 56% @739k *trunc* | — | 39.50% /eq §§ | 46.7% | ‡‡‡ § `sef` 0.2%; **peak 93.36, below the nine-batch band** — the capacity cut showing on the ceiling |
 | `b20q-fc25x50x25seed1` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 44% @897k *trunc* | — | 30.25% /eq §§ | 41.3% | ‡‡‡ § **weakest arm in batch 20**: peak 93.08 (lowest), `sef` 0.0%, drawdown 16.3 (worst). 0.29× is not enough capacity here |
+| `b20aa-fc93x93seed1` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 82% @2908k *trunc* | — | 65.57% /eq §§ | 74.3% | ‡‡‡ § best of the `93,93` seeds, but **the seed flatters the shape** — its control `b20a` is the batch's weak arm (33.2 pooled), so the +33 best-30 gap is a control weakness. peak 94.78, `sef` 15.6% |
+| `b20ad-fc93x93seed4` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 79% @2912k *trunc* | — | 56.15% /eq §§ | 66.7% | ‡‡‡ § 2nd of the shape; peak 94.44, inside the control band; `sef` 10.0% |
+| `b20ab-fc93x93seed2` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 56% @2661k *trunc* | — | 42.00% /eq §§ | 54.0% | ‡‡‡ § `sef` 0.7%; behind its control `b20b` (62.7 pooled) |
+| `b20ac-fc93x93seed3` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 56% @2663k *trunc* | — | 42.25% /eq §§ | 50.7% | ‡‡‡ § weakest of the shape; `sef` 0.6%, peak 94.08. Mirrors control `b20c` — seed 3 is weak under both |
+| `b21b-beta05seed2` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | **80.7%** | ‡‡‡ § best of b21; peak 94.78, `sef` 21.6%. β→0.5 sits above the β→1.0 control on `sef` and best-30 — see the batch 21 write-up |
+| `b21d-beta05seed4` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | 76.3% | ‡‡‡ § 2nd of b21; **peak 94.80, batch's highest**; `sef` 16.5% |
+| `b21c-beta05seed3` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | 70.7% | ‡‡‡ § peak 94.64, `sef` 11.1% |
+| `b21a-beta05seed1` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | 68.7% | ‡‡‡ § weakest of b21; peak 94.52, `sef` 8.2% |
 | `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | 91% @1536k *trunc* | — | 75.46% /eq §§ | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
 | `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | 77% @1485k *trunc* | — | 61.49% /eq §§ | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
 | `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | 76% @937k *trunc* | — | 51.59% /eq §§ | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
@@ -224,6 +232,37 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 21 — partial IS (β→0.5): **beats the β→1.0 control, still far behind no-IS**
+
+**Trained on the laptop, four arms `b21a`-`b21d` at seeds 1-4, all to the 3M cap. Close-out queued on
+the desktop (checkpoints rsynced there), so the numbers below are the training graph, not a close-out.**
+Charts in [`charts.md`](charts.md) (batch 21 section).
+
+### The design
+
+One knob off batch 20's control: importance-sampling β annealed to **0.5** instead of 1.0, `td_error`
+priority and α=0.6 unchanged (fc 50,100,50, `SNEK_IS_BETA_FINAL=0.5`). At β=1 the IS weight cancels the
+prioritised sampling and the gradient is near-uniform (ESS/N ≈0.95-1.0); at β=0.5 it leaves `|δ|^{0.30}`
+of prioritisation on the gradient (**ESS/N ≈0.86**, measured on the four end-of-run buffers, tight
+0.856-0.866). The aim: keep IS's anti-forgetting effect while letting the valuable end-game transitions
+pull harder.
+
+### The result — vs the β→1.0 control (`b20a-d`)
+
+| mean of 4 | control β→1.0 | b21 β→0.5 | delta | p (16 flips) | favour b21 |
+|---|---|---|---|---|---|
+| peak trailing | 94.44 | 94.69 | +0.25 | 0.375 | 3/4 |
+| `sef` (primary) | 11.2% | 14.3% | +3.1 | 0.625 | 3/4 |
+| best-30 | 64.0% | 74.1% | +10.1 | 0.375 | 3/4 |
+
+**β→0.5 is directionally better than β→1.0 — best-30 +10 pp, `sef` +3, 3 of 4 seeds — but n=4 cannot
+resolve it** (p 0.375-0.625, seed 4 flips). It is nowhere near batch 18 (`td_loss`, IS off: best-30
+87.3%, `sef` 34.6%, ESS/N 0.21), the strongest consolidation on record. Across the three points now
+measured — β→1.0 (ESS/N ≈1.0) < β→0.5 (0.86) ≪ no-IS (0.21) — **more prioritisation on the gradient
+tracks better learning**. That is what **batch 22** (`td_error`, IS off, ESS/N ≈0.38, queued on the
+desktop) is meant to pin down. Peak trailing is flat across all three (94.4-94.9): the ceiling is
+unmoved, only the consolidation differs.
 
 ## Batch 20 wave 2 — wide-early `200,50`: **null on the ceiling, behind the control on the primary metric**
 
@@ -443,6 +482,38 @@ and 0.55× — and architecture (width, depth, shape) does not raise the ceiling
 preserves it.** Two narrow shapes also consolidate worse (drawdown 11-12 vs 5.4, 4/4 seeds each), so
 shrinking or deepening the net costs steadiness before it costs the ceiling. The ceiling nine batches of
 optimiser knobs could not move is not an approximation-capacity limit.
+
+## Batch 20 wave 3 — iso-param depth-2 `93,93`: **null — matches the control on every column**
+
+**Ran on the desktop `the-claw-den`, four arms `b20aa`-`b20ad` at seeds 1-4, all to the 3M cap; close-out
+under gate 95, `EVAL_WORKERS=4`.** Charts in
+[`charts.md`](charts.md#batch-20-wave-3--iso-param-depth-2-9393-against-the-control-both-to-3m).
+
+### The design
+
+`FC_LAYERS=93,93` — two hidden layers of 93, **11,907 params, 1.00× the control**, at depth 2 against the
+control's depth 3. It fills the iso-param depth rung between the control (depth 3) and `320` (depth 1):
+hold capacity fixed, cut one layer — does depth matter? After `320` matched the control, the prediction
+was null.
+
+### The result
+
+| mean of 4 | control `50,100,50` | `93,93` | delta | p (16 flips) |
+|---|---|---|---|---|
+| peak trailing | 94.44 | 94.41 | −0.03 | 1.000 |
+| `sef` (primary) | 11.2% | 6.7% | −4.5 | 0.375 |
+| best-30 | 64.0% | 61.4% | −2.6 | 0.875 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 51.5% | −3.5 | 0.875 |
+
+**A null — the ceiling does not move (peak −0.03) and no metric separates from the control at n=4.** Only
+1 of 4 seeds favours `93,93` on each column, but the means are small and the p-values sit far from the
+0.125 floor, so the direction is noise, not a deficit. The one large swing is seed 1 (`b20aa` +33 best-30)
+and it is a **control weakness**: `b20a` is the batch's weak arm (33.2 pooled), the same seed-1 pattern
+every b20 shape shows. **Depth 2 at matched capacity behaves like the control**, exactly as `320` (depth 1)
+did — depth is not the lever, and only `25,50,25`'s 0.29× capacity cut has moved the ceiling.
+
+**No full-length rows** (deepest 25-38 of 100 under gate 95), so best-checkpoint is a bound and `pooled` is
+exact. Nothing near 95%, no hall-of-fame candidate.
 
 ## Batch 19 — standard PER: **falsified, 4/4 seeds, on every comparable metric**
 

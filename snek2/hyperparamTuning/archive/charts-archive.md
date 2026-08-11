@@ -9,9 +9,104 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-11 | 15 | batch 21 landed; batch 15 became the seventh-newest |
 | 2026-08-09 | 14 | batch 20 landed; batch 14 became the seventh-newest |
 | 2026-08-08 | 13 | batch 19 landed; batch 13 became the seventh-newest |
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
+
+---
+
+## Batch 15 — `N_STEP_UPDATE=3`, falsified on speed, and the longest arms on record
+
+Four seeds to 5.5-5.8M in 15.9 h — 1.3M further than any previous batch. n-step's predicted effect
+was faster credit propagation, and **the pre-registered metric moved the wrong way**: steps to
+pf30 ≥ 40% came out **128k later** than batch 14's control, 3 of 4 seeds slower (p=0.250). The evals
+agree it is a null — best checkpoint +0.05 pp (p=1.000), `pooled_equal_effort` +2.24 pp (p=0.625).
+Full write-up:
+[`completedRuns.md`](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).
+
+**Read these four charts for their right-hand halves, which no earlier batch has.** Two arms were
+still gaining in their final 500k band at 5.5-6.0M, and `b15d`'s peak trailing score is at its
+second-to-last eval. The long-standing "arms peak by ~3.4M" reading is now falsified three batches
+running.
+
+**What has *not* moved is the ceiling.** Peak trailing score across the five batches on this vector
+reads 94.92 / 94.80 / 94.90 / 95.00 (b11, b13, b14, b15) — flat inside 0.2 points, with `b15a`'s
+95.00 beating `b11b` by 0.08 after 2.2M more steps. Whatever the extra horizon buys, it is not a
+higher peak.
+
+| seed | pf30 ≥ 40% at | b14 control | best ckpt | eq-effort | `sef` (full) |
+|---|---|---|---|---|---|
+| 1 | 620k | 639k | 95% | 77.7% | **39.9%** |
+| 2 | **524k** | 227k | **97%** | **79.7%** | 39.0% |
+| 3 | **707k** | 530k | 86% *trunc* | 66.4% | 9.4% |
+| 4 | 378k | 320k | 91% | 73.5% | 33.8% |
+| **mean** | **557k** | **429k** | **92.3%** | **74.3%** | **30.5%** |
+
+### b15a-nstep3seed1 — n=3, disc 0.995 + shield 0.8, seed 1
+
+![b15a](charts/b15a-nstep3seed1.png)
+
+Step 5.79M · **peak trailing 95.00** (at 4716k) · **best 30-eval perfect 89.7%** (at 4705k) · `strong_eval_fraction` **39.9%** · final band 80.6%
+
+**The best arm this project has produced on two measures** — the highest peak trailing score on the
+current vector (95.00, past `b11b`'s 94.92) and the highest `strong_eval_fraction` on record (39.9%,
+past `b14d`'s 39.3%). It is also **still gaining in its final band**, 80.6% mean perfect over
+5.5-6.0M against an 80.4% previous best, so it was stopped mid-climb.
+
+Both records come with the run-length caveat: `strong_eval_fraction` is a share of the arm's own
+evals, and this arm spent 1.3M more steps than `b14d` playing at 70-80% perfect. At equal effort the
+batch advantage is +4.05 pp at p=0.625. What the chart does show unambiguously is a **shape no
+earlier arm has** — a slow, monotone climb that had not turned over by 5.8M.
+
+### b15b-nstep3seed2 — n=3, disc 0.995 + shield 0.8, seed 2
+
+![b15b](charts/b15b-nstep3seed2.png)
+
+Step 5.75M · peak trailing 94.94 (at 4524k) · best 30-eval perfect 89.3% (at 4595k) · `strong_eval_fraction` 39.0% · final band 62.3%
+
+**The best arm this project has measured**, and the arm that cost n=3 the primary. Its
+`pooled_equal_effort` is **79.68%**, past `b14d`'s 77.55%, and its best checkpoint read **97/100** —
+the highest selected measurement on record. Yet it reached pf30 ≥ 40% at **524k against `b14b`'s
+227k**, the +297k that drives the batch mean. The slowest starter in the comparison finished on top,
+which is why "steps to a milestone" and "final level" are separate questions.
+
+**The 97/100 is really ~93%.** Re-measured over 200 fresh episodes it read 182/200 = 91.0%, pooling
+to **279/300 = 93.0%** (CI 89.5-95.4) — the same haircut `b14a`'s 96/100 took. This arm also holds 8
+of the batch's 9 rows at ≥95%, but its 94 full-length rows have **mean 90.7%**, and a population
+centred at 90% throws ~5.4 readings of ≥95 per 94 rows by noise alone. The high count is a tail, not
+a cluster of near-perfect policies.
+
+Held 78% mean perfect across **four** consecutive bands from 3.0M to 5.0M (78.1 / 78.4 / 78.2 /
+78.5), then dropped to 62.3% in its final band. Past peak when stopped.
+
+### b15d-nstep3seed4 — n=3, disc 0.995 + shield 0.8, seed 4
+
+![b15d](charts/b15d-nstep3seed4.png)
+
+Step 5.81M · peak trailing 94.70 (at **5799k**) · best 30-eval perfect 86.3% (at 3687k) · `strong_eval_fraction` 33.8% · final band **75.8%**
+
+**Its peak trailing score is at 5799k — the second-to-last eval it ever ran.** Also still gaining in
+its final band (75.8% against a 72.8% previous best). This is the single clearest piece of evidence
+in the project that stopping at a round number truncates arms: nothing about this curve suggests it
+was finished.
+
+### b15c-nstep3seed3 — n=3, disc 0.995 + shield 0.8, seed 3
+
+![b15c](charts/b15c-nstep3seed3.png)
+
+Step 5.46M · peak trailing 94.38 (at 3808k) · best 30-eval perfect 75.7% (at 2046k) · `strong_eval_fraction` **9.4%** · final band 53.7%
+
+Weakest of the batch by a wide margin and the reason the batch spread is -9.7 to +22.9 pp. Its best
+30-eval window is at 2046k, earlier than any sibling, and it never exceeded 60% mean perfect in any
+band. **Same config as `b15a`'s 39.9%, adjacent seed, 30 pp apart on the primary metric** — which is
+the seed-variance problem that has made five consecutive batches unreadable, stated as compactly as
+it can be.
+
+**The first arm in five batches with no full-length eval row at all.** Every 100-episode target was
+abandoned by the 90% gate, so its best checkpoint is a truncated 69/80 and
+`best_full_length_row`'s half-depth fallback ran in production for the first time. At the 95% gate
+this becomes the normal case rather than the exception.
 
 ---
 
