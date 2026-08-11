@@ -77,7 +77,9 @@ def recorded_fc(dir_name):
         for line in handle:
             match = re.match(r'\|\s*fc_layer_params\s*\|\s*\(([^)]*)\)\s*\|', line)
             if match:
-                return [int(w) for w in match.group(1).split(',')]
+                # A single-layer arm is recorded as the Python tuple repr '(320,)', whose trailing
+                # comma leaves an empty token after split — skip the blanks.
+                return [int(w) for w in match.group(1).split(',') if w.strip()]
     return None
 
 
