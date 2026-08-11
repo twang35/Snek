@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-11T01:05:11",
-  "ts": 1786435511.7036157,
+  "iso": "2026-08-11T01:05:46",
+  "ts": 1786435546.768787,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,18 +17,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 4,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b20aa-fc93x93seed1-closeout",
-      "type": "eval",
-      "policy": "b20aa-fc93x93seed1",
-      "pid": 478432,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1315
+      "id": "b20ae-fc100x200x100seed1",
+      "type": "train",
+      "policy": "b20ae-fc100x200x100seed1",
+      "pid": 496092,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20af-fc100x200x100seed2",
+      "type": "train",
+      "policy": "b20af-fc100x200x100seed2",
+      "pid": 496093,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ag-fc100x200x100seed3",
+      "type": "train",
+      "policy": "b20ag-fc100x200x100seed3",
+      "pid": 496094,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ah-fc100x200x100seed4",
+      "type": "train",
+      "policy": "b20ah-fc100x200x100seed4",
+      "pid": 496095,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -75,15 +102,19 @@
     "b20ab-fc93x93seed2": "done",
     "b20ac-fc93x93seed3": "done",
     "b20ad-fc93x93seed4": "done",
-    "b20aa-fc93x93seed1-closeout": "running",
+    "b20aa-fc93x93seed1-closeout": "done",
     "b20ab-fc93x93seed2-closeout": "done",
     "b20ac-fc93x93seed3-closeout": "done",
-    "b20ad-fc93x93seed4-closeout": "done"
+    "b20ad-fc93x93seed4-closeout": "done",
+    "b20ae-fc100x200x100seed1": "running",
+    "b20af-fc100x200x100seed2": "running",
+    "b20ag-fc100x200x100seed3": "running",
+    "b20ah-fc100x200x100seed4": "running"
   },
   "disk_free_gb": 171.0,
   "load_avg": [
-    3.0869140625,
-    4.07373046875,
-    5.806640625
+    2.177734375,
+    3.75830078125,
+    5.63720703125
   ]
 }
