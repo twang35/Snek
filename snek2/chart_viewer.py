@@ -374,22 +374,51 @@ def install_signal_exit(plt):
 # A window taller (or wider) than the screen opens with its lower rows *below* the display,
 # which reads as missing charts — a 2x2 wave at scale 2.0 is 12in = 1200px tall and a laptop's
 # built-in Retina panel is ~900 usable points, so the bottom row of a four-arm wave was clipped
-# and looked like three charts. These budgets (inches at matplotlib's 100 dpi) keep a multi-row
-# grid inside a laptop screen; a single panel is well under them and is left untouched.
-MAX_FIG_W_IN = 15.0
-MAX_FIG_H_IN = 9.0
+# and looked like three charts. These budgets (inches at matplotlib's 100 dpi) are a laptop-safe
+# fallback for when the real screen size can't be read: a 2x2 lands at 8in = 800px tall, inside a
+# built-in panel's usable height even after the menu bar and title bar. `fit_figure_to_screen`
+# then shrinks further to whatever display the window actually opened on. A single panel is well
+# under these and is left untouched.
+MAX_FIG_W_IN = 14.0
+MAX_FIG_H_IN = 8.0
+
+# A shrink of 9.0in was tried first and was still clipped: it left no room for the title bar and
+# assumed the window opens on the larger external display, which it need not.
+
+
+def clamp_dims(w, h, max_w, max_h):
+    """Shrink (w, h) uniformly so both fit within (max_w, max_h); aspect preserved, never grown."""
+    shrink = min(1.0, max_w / w, max_h / h)
+    return w * shrink, h * shrink
 
 
 def figure_dims(rows, cols, scale):
-    """Panel-grid size in inches, shrunk uniformly (aspect preserved) to fit the screen budget.
+    """Panel-grid size in inches, shrunk uniformly (aspect preserved) to the laptop-safe budget.
 
     Uniform, not per-axis: clamping width and height independently would distort the charts.
     The shrink is 1.0 whenever the requested size already fits, so single panels and the
     desktop's own --scale are unchanged unless they would overflow."""
-    w = cols * 4.2 * scale
-    h = rows * 3.0 * scale
-    shrink = min(1.0, MAX_FIG_W_IN / w, MAX_FIG_H_IN / h)
-    return w * shrink, h * shrink
+    return clamp_dims(cols * 4.2 * scale, rows * 3.0 * scale, MAX_FIG_W_IN, MAX_FIG_H_IN)
+
+
+def fit_figure_to_screen(fig, w_in, h_in):
+    """Best-effort second shrink to the display the window actually opened on.
+
+    `figure_dims` is a fixed laptop-safe fallback; this reads the real screen from Tk and shrinks
+    to 95% of its width and 88% of its height (leaving the menu/title bars), so a small screen is
+    handled and a large external one keeps the fallback size. Only ever shrinks. Wrapped in a bare
+    except because it touches the Tk backend, which is not guaranteed present, and a failure here
+    must not stop the viewer from drawing."""
+    try:
+        win = fig.canvas.manager.window
+        dpi = fig.get_dpi()
+        screen_w = win.winfo_screenwidth() / dpi
+        screen_h = win.winfo_screenheight() / dpi
+        fit_w, fit_h = clamp_dims(w_in, h_in, screen_w * 0.95, screen_h * 0.88)
+        if (fit_w, fit_h) != (w_in, h_in):
+            fig.set_size_inches(fit_w, fit_h)
+    except Exception:
+        pass
 
 
 def make_figure(plt, rows, cols, scale, title):
@@ -397,8 +426,9 @@ def make_figure(plt, rows, cols, scale, title):
     order, because separating them silently breaks the clean exit. See
     `install_signal_exit`: Tk overwrites the OS-level handler while creating this window,
     so any install that does not follow a `subplots()` call is dead code."""
-    fig, grid = plt.subplots(rows, cols, squeeze=False,
-                             figsize=figure_dims(rows, cols, scale))
+    dims = figure_dims(rows, cols, scale)
+    fig, grid = plt.subplots(rows, cols, squeeze=False, figsize=dims)
+    fit_figure_to_screen(fig, *dims)
     try:
         fig.canvas.manager.set_window_title(title)
     except Exception:

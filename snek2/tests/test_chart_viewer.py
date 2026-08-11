@@ -792,6 +792,66 @@ def test_figure_dims_leaves_a_fitting_grid_untouched():
     assert chart_viewer.figure_dims(2, 2, 1.0) == (8.4, 6.0)   # 2x2 at scale 1 also fits
 
 
+def test_clamp_dims_shrinks_uniformly_and_never_grows():
+    """The shrink is the tighter of the two ratios and applies to both dims, so aspect holds;
+    a size already inside the budget is returned untouched rather than scaled up to fill it."""
+    # height is the binding constraint (12 vs 8 is tighter than 16.8 vs 14)
+    w, h = chart_viewer.clamp_dims(16.8, 12.0, 14.0, 8.0)
+    assert (round(w, 6), round(h, 6)) == (11.2, 8.0)
+    assert abs(w / h - 16.8 / 12.0) < 1e-9          # aspect preserved
+    # already fits -> unchanged, not enlarged to the budget
+    assert chart_viewer.clamp_dims(8.4, 6.0, 14.0, 8.0) == (8.4, 6.0)
+
+
+def test_fit_figure_to_screen_shrinks_to_a_small_display():
+    """The real-screen fit must clamp a 2x2 wave to a laptop panel and be a no-op on a screen
+    that already has room, reading width/height straight off Tk in pixels / dpi."""
+    class _Win:
+        def __init__(self, w, h):
+            self._w, self._h = w, h
+
+        def winfo_screenwidth(self):
+            return self._w
+
+        def winfo_screenheight(self):
+            return self._h
+
+    class _Canvas:
+        def __init__(self, win):
+            self.manager = type('M', (), {'window': win})()
+
+    class _Fig:
+        def __init__(self, win):
+            self.canvas = _Canvas(win)
+            self.size = None
+
+        def get_dpi(self):
+            return 100.0
+
+        def set_size_inches(self, w, h):
+            self.size = (w, h)
+
+    # 900px-tall panel: 8.0in figure * 0.88 = 7.04in budget -> must shrink below the fallback
+    small = _Fig(_Win(1440, 900))
+    chart_viewer.fit_figure_to_screen(small, 11.2, 8.0)
+    assert small.size is not None
+    assert small.size[1] <= 900 / 100.0 * 0.88 + 1e-9
+    assert abs(small.size[0] / small.size[1] - 11.2 / 8.0) < 1e-9   # aspect preserved
+
+    # a tall external display has room -> no resize call at all
+    big = _Fig(_Win(3008, 1692))
+    chart_viewer.fit_figure_to_screen(big, 11.2, 8.0)
+    assert big.size is None
+
+
+def test_fit_figure_to_screen_survives_a_missing_backend():
+    """It touches the Tk backend, which may be absent; a failure must be swallowed so the
+    viewer still draws rather than dying on a headless canvas."""
+    class _Fig:
+        canvas = None
+    chart_viewer.fit_figure_to_screen(_Fig(), 11.2, 8.0)   # must not raise
+
+
 def test_laptop_defaults_are_one_second_and_double_size():
     """The user's asked-for defaults, pinned so a later edit cannot quietly undo them.
     An auto-launched viewer passes neither flag, so these values are what it runs with."""
