@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-11T00:42:41",
-  "ts": 1786434161.2252882,
+  "iso": "2026-08-11T00:43:16",
+  "ts": 1786434196.2738442,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,18 +17,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 4
   },
   "running": [
     {
-      "id": "b20ab-fc93x93seed2",
-      "type": "train",
+      "id": "b20aa-fc93x93seed1-closeout",
+      "type": "eval",
+      "policy": "b20aa-fc93x93seed1",
+      "pid": 478432,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ab-fc93x93seed2-closeout",
+      "type": "eval",
       "policy": "b20ab-fc93x93seed2",
-      "pid": 10722,
-      "step": 2996000,
-      "steps_per_sec": 122.9,
-      "elapsed_s": 36794
+      "pid": 478433,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ac-fc93x93seed3-closeout",
+      "type": "eval",
+      "policy": "b20ac-fc93x93seed3",
+      "pid": 478434,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ad-fc93x93seed4-closeout",
+      "type": "eval",
+      "policy": "b20ad-fc93x93seed4",
+      "pid": 478435,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -72,14 +99,18 @@
     "b20w-fc60x30x30x30x30seed3-closeout": "done",
     "b20x-fc60x30x30x30x30seed4-closeout": "done",
     "b20aa-fc93x93seed1": "done",
-    "b20ab-fc93x93seed2": "running",
+    "b20ab-fc93x93seed2": "done",
     "b20ac-fc93x93seed3": "done",
-    "b20ad-fc93x93seed4": "done"
+    "b20ad-fc93x93seed4": "done",
+    "b20aa-fc93x93seed1-closeout": "running",
+    "b20ab-fc93x93seed2-closeout": "running",
+    "b20ac-fc93x93seed3-closeout": "running",
+    "b20ad-fc93x93seed4-closeout": "running"
   },
-  "disk_free_gb": 171.1,
+  "disk_free_gb": 171.0,
   "load_avg": [
-    2.39013671875,
-    3.25830078125,
-    4.916015625
+    2.37548828125,
+    3.16455078125,
+    4.82275390625
   ]
 }
