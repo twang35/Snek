@@ -59,7 +59,15 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | `DISCOUNT=0.995` matches the best ceiling and survives 3 of 3 seeds | **measured**, ~2.3x expected value |
 | Higher discount is monotonically better | **falsified** — 0.999 died 2 of 2 |
 | `0.995` vs `0.9975` on the current environment | **falsified as a difference** — batch 14 null vs 13, `pooled_equal_effort` +0.01 pp, n=4 paired |
-| `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic |
+| `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic, and now **measured**: the log-log slope of Huber against `\|δ\|` is 1.92-1.99 on 8 arms, so alpha 0.6 + `td_loss` is an effective **1.15-1.20** |
+| **The two priority signals prioritize the *same* transitions** | **established** — Huber is monotone in `\|δ\|`, so the ranking is identical; top-1000 Jaccard is **1.0000** on 8 of 8 arms. The signal changes how much mass the top gets, never which rows are at the top |
+| **‡ IS at β=1.0 cancels prioritization outright, so batches 19-20 were uniform replay past their anneal** | **measured 2026-08-10** — expected update `∝ raw^(α(1−β))`, flat at β=1.0. Realised ESS/N **0.951** against a 0.975 same-effort noise floor, versus **0.213** for batch 18. See below |
+| **‡‡ Batch 20 never learned to read observation 15-17, "is it safe to chase the food"** | **measured 2026-08-10**, the sharpest mechanism found. Counterfactual ΔQ **+11.70 vs +0.228** (4/4, p=0.125); **6.9x** on the conservative safe-actions-only version; `b20a`'s weight is *negative*. The flag fires in only 5-7% of endgame states, so under β=1.0 uniform replay its weights stay undertrained — the index-29 hazard in a milder, costlier form. See below |
+| Batch 20's low endgame Q means the terminal reward propagates slowly | **superseded the same day** — it is not lagging, it is **undiscriminating**: ~2-3 for winnable and doomed boards alike, against batch 18's 34-66 vs 18-35 |
+| **‡‡ Losses are never trapped positions — the food is reachable until the last 0-2 moves, 75/75** | **measured 2026-08-10** by exact search over 360 greedy episodes, 0 simulator mismatches. Kills the "routing mistake tens of moves earlier" hypothesis outright |
+| **‡‡ Starvation is now the modal failure: 55% of losses in both batches, at median length 98** | **measured 2026-08-10** — and recorded nowhere. `b8f` in 2026-08-02's diagnostics starved **0** times in 360 episodes under the same rule. **The binding constraint is finishing from length 96-98 inside the starve budget** |
+| Removing the food-distance shaping may have bought `sef` and paid in starvations | **untested, motivated** — the modal failure is now failing to go get reachable food, and every arm since batch 16 has the shaping off. Confounded by era; see below |
+| `td_error` + `IS_WEIGHTS=0` sits halfway up the concentration ladder | **predicted, untested** — ESS/N 0.454 between batch 18's 0.213 and uniform's 1.0. The one PER cell with a live hypothesis |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
 | `GRADIENT_CLIPPING=10` on 0.995 helps | **falsified** — 1 of 3 seeds, no ceiling gain |
 | n-step returns help | **falsified on speed** — batch 15 at n=3 reached pf30 >= 40% **128k later** than its control, 3 of 4 seeds slower; evals null too (best ckpt +0.05 pp, p=1.000) |
@@ -420,6 +428,402 @@ Two caveats that weakened the original version of this finding:
 Full per-arm tables and the batch-by-batch derivation:
 [`archive/findings-superseded.md`](archive/findings-superseded.md).
 
+## ‡ Measured: batches 19-20 compared aggressive PER against *uniform replay*
+
+Measured 2026-08-10 from the saved replay buffers and final checkpoints of batch 18 and batch 20
+wave 1 — eight arms, all `(50, 100, 50)`, all alpha 0.6, differing only in the two PER knobs. The
+script is
+[`perDiagnostics/per_priorities.py`](perDiagnostics/per_priorities.py); the chart is
+[`charts/per-b18-vs-b20-priorities.png`](charts/per-b18-vs-b20-priorities.png).
+
+The question was whether `td_loss` priorities put *different states* in the buffer's top than
+`td_error` does. **They cannot, and the real difference is elsewhere.**
+
+| claim | verdict |
+|---|---|
+| The signals rank different transitions | **false, by construction** — Huber is monotone in `\|δ\|`, top-1000 Jaccard **1.0000** on 8/8 arms |
+| The signals concentrate the update differently | **true, and large** — realised ESS/N **0.213** vs **0.951** |
+| Batch 19/20's IS correction left prioritization partly intact | **false past the anneal** — β=1.0 is uniform in expectation |
+| The buffers held different states | **only mildly**, and downstream of policy quality |
+| Batch 18's value function is better fit | **false — it is worse fit and shaped differently**, 4/4 seeds |
+
+### The effect being explained is real, and it is the largest config effect on record
+
+`sef` is a share of each arm's own evals, so the two batches have to be truncated to a common
+horizon — batch 20 ran 400-600k steps longer. At **2.401M**, exact paired permutation over 16 sign
+flips:
+
+| metric | b18 (`td_loss`, no IS) | b20 (`td_error`, IS) | delta | p |
+|---|---|---|---|---|
+| **`strong_eval_fraction`** | **33.84%** | 12.45% | **+21.39 pp** | **0.125** (4/4) |
+| `best_perfect30` | 87.25% | 64.08% | **+23.17 pp** | **0.125** (4/4) |
+| peak trailing | 94.94 | 94.41 | +0.52 | **0.125** (4/4) |
+| max drawdown | 55.52 | 5.41 | +50.11 | **0.125** (4/4) |
+
+0.125 is the floor at n=4. This reproduces the batch 18 vs 19 table almost exactly (`sef` −17.78
+there, −21.39 here) on a **different** control batch, so the two PER knobs now have eight seeds
+behind them rather than four.
+
+### What the signal actually changes: mass, not membership
+
+`element_wise_huber_loss` is strictly increasing in `|td_error|`, so both signals induce the
+**identical ordering** — verified as a top-1000 Jaccard of exactly 1.0000 on every arm. The
+log-log slope of Huber against `|δ|` measures **1.92-1.99**, confirming the effective-exponent
+arithmetic empirically for the first time: alpha 0.6 + `td_loss` is an effective **1.15-1.20**.
+
+What differs is the share of the update the top rows receive. The quantity that matters is
+sampling probability **times** the IS weight, because that product is what reaches the gradient:
+`p ∝ raw^α` and cpprb's mean-normalised weights give `w ∝ p^-β`, so
+
+    exposure  ∝  raw^(α(1 − β))
+
+**At β=1.0 the exponent is zero and prioritization cancels exactly.** Not "weakens" — cancels, in
+expectation. Realised exposure over 768,000 actual cpprb draws, against a same-effort uniform
+noise floor:
+
+| config | top 1% of the update | ESS/N |
+|---|---|---|
+| uniform noise floor (flat priorities) | 1.46% | 0.975 |
+| **b18**: `td_loss`, no IS | **14.98%** | **0.213** |
+| `td_error`, no IS — **never run** | 8.67% | 0.454 |
+| b19/b20 early: `td_error`, IS β=0.4 | 3.94% | 0.764 |
+| **b19/b20 past the anneal**: `td_error`, IS β=1.0 | 1.83% | **0.951** |
+
+Batch 20 reached β=1.0 at **300k** steps and batch 19 at **1M**, and every arm in both peaked after
+its own anneal completed — batch 19 at 1299-1932k, batch 20 at 332-2493k, with `b20d`'s 332k the only
+close call. **So neither batch tested "standard PER" against "aggressive PER" — past the anneal they
+tested uniform replay against an effective-alpha-1.2 prioritized buffer**, and batch 19's
+"standard PER falsified" is better read as *uniform replay is worse here, 8 seeds*. Batch 18's
+update behaves as though the buffer were **21%** of its size; batch 20's uses all of it evenly.
+
+One residue the algebra misses: `normalize_is_weights` divides by the **batch** mean rather than a
+global constant, so cancellation is per-batch and imperfect. `td_loss` + IS at β=1.0 reads ESS/N
+0.868, clearly above the floor, and the gap grows with priority skew. It does not change the
+reading above, where `td_error` at β=1.0 sits within noise of uniform.
+
+### Where the concentrated mass goes
+
+The top of the buffer is **the last few moves of a nearly-finished game**. Top-100 by priority has
+mean snake length **94.6-96.3** against a buffer mean of 66.5-70.1, and the largest `|δ|` rows are
+almost all "ate food at length 97-98" — one or two foods from the 100-point payoff. Share of the
+expected update by category, on batch 18's buffers:
+
+| category | in buffer | b18 signal | `td_error` α=.6 | β=1.0 | mean `\|δ\|` |
+|---|---|---|---|---|---|
+| ate food | 4.48% | **11.22%** | 8.15% | 4.48% | 1.645 |
+| ordinary, len ≥ 80 | 46.75% | **56.59%** | 52.13% | 46.75% | 0.730 |
+| ordinary, len < 80 | 48.51% | **31.69%** | 39.33% | 48.51% | 0.360 |
+| died (wall/body) | 0.194% | 0.405% | 0.313% | 0.194% | 1.403 |
+| won the game | 0.055% | **0.046%** | 0.051% | 0.055% | 0.410 |
+| starved | 0.005% | 0.053% | 0.029% | 0.005% | 7.398 |
+
+**Prioritization does not chase wins — it deprioritizes them.** A won game is the one outcome the
+network predicts *well* (mean `|δ|` 0.410, below the 0.573 arm mean), so it gets slightly less than
+its buffer share. What the sharper signal buys is food transitions at 2.5x and late-game ordinary
+moves at 1.2x, paid for by early-game moves dropping to 0.65x. Starvation is the most mispredicted
+event in the buffer by a wide margin and is far too rare to matter.
+
+### The buffers are similar; the value functions are opposites
+
+Buffer composition differs about as much as two policies of different quality would predict, and
+no more — batch 18's last 100k transitions hold **3.4x** the wins (0.055% vs 0.016%) and **half**
+the deaths (0.194% vs 0.404%). Endgame share is comparable (46.8% vs 50.8% at length ≥ 80), so the
+"buffer holds no endgame experience" idea stays falsified for both.
+
+The networks are the opposite of similar. Batch 18's arms show **4.4x** the mean `|td_error|`
+(0.52-0.64 vs 0.12-0.17), and **crossing the arms settles that this lives in the network rather than
+the data**: run each seed's two checkpoints over both seeds' buffers and every network keeps its own
+level, 4/4 seeds. Each fits its own buffer slightly better, as expected, but the batch gap survives
+the swap intact. Some of the gap is scale — batch 18's Q values are ~3x larger — and normalising by
+mean max-Q leaves batch 18 still worse fit, 0.0173 vs 0.0124, 4/4.
+
+**The shape is the finding, and it is scale-free.** Mean max-Q against snake length:
+
+| network | len 10 | len 50 | len 85 | len 95 | len 97 |
+|---|---|---|---|---|---|
+| `b18a` | 29.15 | 37.34 | 39.63 | 42.71 | **43.32** |
+| `b18c` | 19.98 | 35.43 | 39.84 | 42.71 | **38.95** |
+| `b18d` | 20.25 | 34.27 | 43.20 | 43.09 | **48.55** |
+| `b18b` | 26.72 | 30.40 | 26.44 | 22.37 | 21.72 |
+| `b20a` | 28.90 | 16.65 | 6.33 | 3.64 | **3.09** |
+| `b20b` | 30.76 | 18.58 | 8.92 | 5.09 | **4.16** |
+| `b20c` | 29.42 | 16.76 | 6.56 | 4.02 | **3.09** |
+| `b20d` | 30.33 | 18.45 | 8.04 | 4.76 | **3.92** |
+
+Three of four batch-18 arms **rise** with length — the value function says a longer snake is closer
+to the payoff, which can only be true if the terminal 100 is being counted, because the remaining
+*food* is worth less at length 90 than at length 10. All four batch-20 arms instead **decline
+steadily from length ~10 to 98**, by **6.04-7.93x** between lengths 10 and 95, reaching 0.12, −0.04,
+0.10 and 0.20 at length 98. The separation is total: at length 95 batch 18 spans 22.4-43.1 and batch
+20 spans 3.6-5.1, with no overlap in either direction. Both then dip at 98 and spike at 99-100, so
+the terminal reward is represented in the states that *collect* it and the difference is how far back
+it has propagated.
+
+**‡ But batch 20's low endgame values are not obviously an error — they may be correct pessimism**, and
+this is the reading to prefer. The grid holds 100 cells and the snake starts at 5, so length 98 means
+93 food eaten with two to go, and `b20a`'s final eval averages **93.2** food at a 20% perfect rate.
+Length 98 is *literally where these arms stop*. A value of 0.12 for arriving there is close to right
+for a policy that is about to fail, and batch 18's 12-29 is close to right for one that often
+finishes. So the profile is a faithful readout of each policy's own endgame competence rather than an
+independent defect.
+
+**What survives that, and makes it more than a restatement of the score:** batch 20 is not failing to
+*reach* the endgame. It spends **more** time at length ≥ 98 than batch 18 does — 3.34%, 5.31%, 6.25%,
+8.17% against 3.64%, 3.91%, 3.73%, 3.11% — so 3 of 4 batch-20 arms have more endgame experience in
+the buffer than any batch-18 arm, and still value it at zero. So **endgame coverage is not the
+mechanism** — the transitions are there and are being sampled in proportion.
+
+What the update concentration plausibly buys instead is gradient on the *rare* endgame states, and the
+section below identifies which ones: the 5-7% where observation 15-17 fires. Under β=1.0 those get
+exactly their population share, which turns out not to be enough to train the weight that reads them.
+This paragraph originally proposed "propagation speed through the endgame"; that reading is
+**superseded** by the counterfactual measurement below, which finds the value function undiscriminating
+rather than lagging.
+
+`b18b` is the honest exception — its profile declines like batch 20's, though only by 1.19x and from
+a level three times higher, and it is the batch-18 arm with the worst drawdown (85.08).
+
+### ‡ The gap is decided before the last move, not at it
+
+**Retracted 2026-08-10, within a day of being written: this section first claimed "the whole gap is
+one move wide."** That was wrong, and the measurement that refutes it is in the same buffers.
+
+Transitions at snake length **99** are the last move of the game: the board is one cell short, so the
+action either wins 100 or dies. They are directly countable, and the conversion rates separate the
+batches completely.
+
+| arm | attempts | wins | deaths | converted |
+|---|---|---|---|---|
+| `b18d` | 83 | 56 | 27 | **67.5%** |
+| `b18a` | 89 | 59 | 30 | **66.3%** |
+| `b18c` | 104 | 65 | 39 | **62.5%** |
+| `b18b` | 74 | 41 | 33 | **55.4%** |
+| `b20b` | 55 | 22 | 33 | 40.0% |
+| `b20c` | 79 | 22 | 57 | 27.8% |
+| `b20a` | 45 | 7 | 38 | 15.6% |
+| `b20d` | 106 | 14 | 92 | 13.2% |
+| **pooled** | | | | **63.1%** (221/350) vs **22.8%** (65/285) |
+
+**4/4 with no overlap**, and the attempt counts are comparable — 350 against 285 — so batch 20 arrives
+at the final move nearly as often and converts it a third as well. `b20d` gets there the most times of
+any arm in either batch, 106, and converts 14.
+
+**But splitting those attempts by whether a winning move was even legal shows there is no decision
+left to make.** Observation indices 18-20 flag, per action, "does this move win the game", and they
+fire only when the snake is exactly one food short:
+
+| | states with a winning move | won | states with none | won |
+|---|---|---|---|---|
+| batch 18, all four arms | 221 | **221** | 132 | **0** |
+| batch 20, all four arms | 65 | **65** | 224 | **0** |
+
+**286 of 286 winnable positions were won and 285 of 285 unwinnable ones were lost, in both batches.**
+Play at length 99 is already perfect and identical; the conversion rate is not measuring last-move
+skill at all, it is measuring **whether the arm arrived in a position that was still winnable.** By
+length 99 the game is decided.
+
+So the failure is upstream, and the observations locate roughly where. Tail reachability — at least one
+move that is safe and keeps the tail reachable — sits at **98.5-99.8% for every arm of both batches at
+every length from 85 to 98**, so neither batch is trapping itself in the sense that signal measures.
+What does differ is whether the food can be chased *safely*, head, food and tail in one region:
+
+| length | 85 | 90 | 95 | 98 |
+|---|---|---|---|---|
+| batch 18 mean | **27.9%** | 20.9% | 12.8% | 6.9% |
+| batch 20 mean | 17.5% | 15.2% | 9.6% | 5.1% |
+
+Batch 18's boards more often admit a safe route to the food, and the gap is already open at length 85,
+roughly ten food from the end.
+
+**That gap is suggestive, not decisive, and the reason is in the same table.** At length 98 both
+batches sit at 5-7% — the food is usually *not* safely chaseable for either of them — yet batch 18
+still converts 63%. So a low food-chase rate plainly does not prevent winning, and the 85-98 gap
+cannot be read as the mechanism. What is established is narrower and still useful:
+
+- **The last move is not a target.** Play there is already perfect and identical in both batches.
+- **What differs is the rate of arriving winnable**, which is a property of everything upstream.
+- **Where upstream is unknown.** These proxies do not pin it, and the length-99 result shows how
+  easily a downstream readout can look like a cause.
+
+**That measurement has now been run** — see the next section. It did not find an early point of no
+return, because it found that **there is no trapped position to find.**
+
+### ‡‡ Ran it: the board is never a dead end, and the modal loss is starvation at length 98
+
+Measured 2026-08-10 with [`perDiagnostics/point_of_no_return.py`](perDiagnostics/point_of_no_return.py),
+360 greedy episodes over six shards, **0 simulator mismatches** against the live game. For every lost
+episode it walks back from the death and asks, by exact breadth-first search over real game states,
+the last point at which the current food could still be eaten. Three criteria, because they separate
+different causes:
+
+| criterion | question | last held, moves before death |
+|---|---|---|
+| **`geom`** | is the food reachable at all, ignoring the starve clock | **median 0, max 2, 100% of 75 losses** |
+| `reach` | reachable *within* the remaining starve budget | median 9-15 |
+| `safe` | `reach`, and the tail still reachable after eating | median 20-82, over half censored |
+
+**`geom` holds until the very last move in every single loss, for both checkpoints.** The snake is
+never sealed into a pocket with no path to the food. That kills the trapped-position hypothesis, and
+with it the premise of this whole line of questioning: there is no long chain of consequence between
+a routing mistake and the death, because there is no routing mistake of that kind.
+
+What there is instead, and it splits almost evenly:
+
+| | b18b HoF @1588k | b20d final @3000k |
+|---|---|---|
+| episodes | 240 | 120 |
+| perfect | **229 (95.4%)** | 56 (46.7%) |
+| **starved** | 6 | **35** |
+| collision | 5 | 29 |
+| loss rate | **4.6%** | **53.3%** |
+| starvations as a share of losses | **55%** | **55%** |
+| median length at death, starvations | 82 | **98** |
+| median length at death, collisions | 98 | 98 |
+
+- **Starvation, 55% of losses in both.** Dies at median length 98 for `b20d` — two food short — with the
+  food geometrically reachable at **every step including the last**. The snake burns its entire starve
+  budget without going to get a reachable meal. That is dithering, not entrapment.
+- **Collision, 45%.** Dies at median length 98 with a food-reaching sequence available **1-2 moves**
+  earlier, so the fatal move had a non-fatal food-reaching alternative.
+
+`b18b`'s 95.4% perfect over 240 fresh episodes is a useful side-check on the record: consistent with
+the recorded 97.6% (CI 96.1-98.5) to within sampling, on different food.
+
+**‡ Starvation being the modal failure is new and is recorded nowhere.** The 2026-08-02 diagnostics on
+`b8f-disc9975seed2` @3149000 measured 360 episodes and found **288 perfect, 72 collisions, 0
+starvations** ([`diagnostics/README.md`](diagnostics/README.md)). The starvation *rule* is unchanged —
+`533556c` split the observation from the rule and its docstring records that the rule fires at the same
+moment — so the failure mode has genuinely shifted. The likely reason is that these policies now reach
+length 96-98 routinely, which `b8f` did not (its fatal decisions sat at median length 83), so they now
+have somewhere to get stuck. **The binding constraint is finishing from length 96-98 inside the starve
+budget**, which is a narrower target than "the endgame".
+
+**A candidate that falls straight out, with its confound named.** Every arm in batches 16 onward runs
+`SNEK_FOOD_DISTANCE_REWARD=0`; removing that shaping is [the one non-null in six
+batches](#status-at-a-glance). Its job was to pull the snake towards food, and the modal failure is now
+*not going to get reachable food*. So the shaping removal may have bought `sef` and paid for it in
+starvations, which nobody measured either way. `b8f` had the shaping and starved zero times in 360
+episodes — but it is a different environment era and never reached length 96, so that is a motivating
+coincidence, not evidence. The clean test is this same script on a batch-16 arm against a
+shaping-enabled control, which is cheap and needs no new training.
+
+**What this does not establish.** The full point of no return is still unpinned. `geom` asks only "can
+this food be eaten", not "can the game still be won", so a state can pass it and be doomed two food
+later. `safe` is the criterion strong enough to answer that, and it is **not trustworthy here**: it
+tests tail reachability on the static body, and [`diagnostics/README.md`](diagnostics/README.md) already
+records that the static test flags a fatal move only **22.1%** of the time against **94.1%** for the
+advanced-tail variant. So `safe` is biased pessimistic, which is consistent with it being censored in
+over half the losses, and its 20-82 move figure should not be quoted as the distance.
+
+### ‡‡ The best mechanism found: batch 20 never learned to read "is it safe to chase the food"
+
+Observation indices **15-17** are, per action, "head, food and tail all end up in one region" — the
+signal added specifically so a policy could tell a reachable meal from one that seals it in. The
+question is whether a board where it fires is valued higher, and it separates the batches more
+sharply than anything else measured. Mean max-Q over lengths 95-98, split by whether any action is
+chase-safe:
+
+| arm | n | Q, chase-safe available | Q, none | delta |
+|---|---|---|---|---|
+| `b18a` | 12,265 | **65.95** | 34.25 | **+31.71** |
+| `b18d` | 9,502 | **63.78** | 35.27 | **+28.51** |
+| `b18c` | 11,680 | **53.89** | 34.44 | **+19.44** |
+| `b18b` | 16,491 | **33.53** | 18.39 | **+15.14** |
+| `b20b` | 20,406 | 5.03 | 2.98 | +2.05 |
+| `b20c` | 22,068 | 3.30 | 1.89 | +1.41 |
+| `b20a` | 9,006 | 2.59 | 1.27 | +1.33 |
+| `b20d` | 19,452 | 3.26 | 2.03 | +1.23 |
+| **mean** | | | | **+23.70 vs +1.50**, 4/4, p=0.125 |
+
+**A correlational split cannot show the network reads the input**, so the load-bearing measurement is
+a counterfactual: flip index 15+a on the real board, hold everything else at its measured value, and
+re-read that action's Q. Index 6+a (is the move survivable) gets the same treatment as a positive
+control, because every network must weigh that one.
+
+| | idx 15-17 (chase-safe) | idx 6-8 (is safe) | ratio |
+|---|---|---|---|
+| batch 18 mean | **+11.70** | +12.39 | **1.051** |
+| batch 20 mean | **+0.228** | +5.587 | **0.045** |
+| | 4/4, p=0.125 | 4/4, p=0.125 | 4/4, p=0.125 |
+
+**Batch 18's networks weigh "the food is safely reachable" about as heavily as "this move will not
+kill me". Batch 20's weigh it at 4.5% of that** — and `b20a`'s weight is **negative** (−0.97), so it
+treats a safely reachable meal as marginally bad. That is a wrong weight, not merely an untrained one.
+
+The ratio matters because batch 20's Q values are ~3x smaller overall, which shrinks every derivative.
+The control absorbs that: the is-safe sensitivity differs by only 2.2x, tracking the scale gap, while
+the chase-safe sensitivity differs by 51x.
+
+**Robustness.** Setting `chase=1` on a move the board says is fatal is a contradictory input, so the
+whole measurement was repeated on **safe actions only**, where the flag is meaningful. The effect
+shrinks but survives: **+3.708 vs +0.541, 4/4, p=0.125** — a 6.9x gap rather than 51x. Take 6.9x as
+the conservative figure. Do **not** normalise this restricted version by the wall-hug flag at 23-25 as
+a control: its sensitivity is near zero (−0.50 to +1.15), so the ratio is unstable and reads p=0.625
+purely from dividing by noise.
+
+**This supersedes the slow-propagation reading of the length-98 dip.** Batch 20's Q at 98 is not low
+because the terminal reward has not arrived; it is low *and flat* because the network cannot tell a
+winnable board from a doomed one and assigns ~2-3 to both. Batch 18 assigns 34-66 against 18-35. The
+value function is not lagging, it is **undiscriminating** — and routing through the endgame is exactly
+the decision that needs that discrimination.
+
+**Why prioritization is the plausible cause.** Index 15-17 fires in only **5-7%** of endgame states.
+Under β=1.0 those transitions receive exactly their population share of the update, so the weights on
+a rare-but-decisive input stay weakly determined. This is the same hazard the root `CLAUDE.md` records
+for index 29 (1 in 99.95% of states) and for the `game_over` input whose unconstrained weights turned a
+90.3% champion into one scoring 0 — **rare rather than constant, so a milder form, but pointed at the
+one input that predicts the 100-point reward.** It also reframes the next experiment: what
+`IS_WEIGHTS=0` would be buying is not faster backups but enough gradient on the rare informative
+states to fix a weight.
+
+### The record checkpoint, specifically
+
+`hallOfFame/b18b-tgt1000seed2-ckpt1588000`, the 97.6% record, restored and confirmed at
+`global_step 1588000`:
+
+| length | n | mean max-Q | Q chase-safe | Q none |
+|---|---|---|---|---|
+| 95 | 4,695 | 19.71 | **26.40** | 18.92 |
+| 98 | 3,815 | 9.85 | **32.94** | 8.42 |
+| 99 | 74 | 53.10 | — | — |
+
+**Its mean Q at length 98 is 9.85, and that average is misleading** — 222 of 3,815 boards offer a safe
+chase and are valued at 32.94, while the other 94% are valued at 8.42, correctly, because they are
+losing positions. So "the value function goes flat at the endgame" was partly an artefact of averaging
+over a state distribution that is overwhelmingly unfavourable.
+
+At length 99, **41 of 74 states have a winning move and their mean max-Q is 99.73** — the terminal 100
+is learned essentially exactly, with no propagation deficit at the final step. Note also that the
+chase-safe flag is **structurally 0 at length 99** for every arm: with one cell free there is no region
+containing head, food and tail, so indices 18-20 take over the job. The two blocks are complementary
+rather than redundant, which is worth knowing before anyone prunes either.
+
+Measured with `perDiagnostics/per_priorities.py`'s sibling probes; the buffer boards come from ~2.40M
+while this checkpoint is from 1.588M, so they are real length-98 boards but not the ones it would
+generate itself.
+
+### What this does not establish
+
+- **Two knobs moved together.** Batch 18 changed the signal *and* dropped IS, so nothing here
+  attributes the outcome to one. The concentration ladder prices them separately (0.213 → 0.454 →
+  0.951), which is what makes `td_error` + `IS_WEIGHTS=0` worth running: it is a **pre-registered
+  midpoint**, and the docs already wanted it for the drawdown result.
+- **Priorities were recomputed, not recovered.** `save_transitions()` resets them to the max, so
+  these are fresh priorities under each arm's final network. Real in-buffer priorities were
+  **staler** and therefore flatter, so treat the concentration figures as the sharpest the config
+  could be.
+- **One snapshot per arm, after its peak** — the final 100k transitions at 2.4-2.6M (b18) and 3.0M
+  (b20). The direction is 4/4 on every comparison, but nothing here tracks how the picture evolves,
+  and the value-shape gap could as easily be a *consequence* of batch 20 winning less as a cause.
+- **Sample sizes per cell of the Q table run 251 to 8,056, and the thin end is the *early* game,
+  not the endgame** — length 10 rests on 251-493 rows against length 98's 3,003-8,056. The buffer is
+  the last 100k transitions of a policy that spends most of its time long, so the early game is a
+  few dozen steps per episode and the endgame is hundreds. Length 99 holds 45-107 real decision
+  points. **Length 100 is 25-32 rows and every one is a boundary frame** — `step_type` LAST, reward
+  0, `next_step_type` FIRST — so the policy never acts there and that column's Q is unconstrained,
+  the same shape as the `game_over` trap in the root `CLAUDE.md`. Read the spike at the end of the
+  curve as length **99** only.
+
 ## Falsified: epsilon reaching 0.0 does not cause the collapse
 
 The hypothesis was that the epsilon ladder's last rung (`epsilon.assign(0.0)` once
@@ -641,6 +1045,17 @@ remains unexplained is *why* propagation did not speed up, and the most likely a
 propagation was never the binding constraint. Do not try `n=5`: the reason for preferring larger n
 was that the effect scales with n, and the effect is absent at n=3 in the direction it should be
 largest.
+
+**‡ 2026-08-10 supports "never the binding constraint", from the other end.** The +100 is the reward
+n-step exists to move, and at the final decision **286 of 286 winnable positions were won and 285 of
+285 unwinnable ones lost, identically in both PER families** — so there is no terminal-value error at
+the end of the chain for a faster backup to correct, and what separates arms is arriving winnable.
+Note also that batch 15 ran n=3 on the `td_loss` + no-IS family, which converts the last move at
+55-67%; n=3 has **never** been tried on the uniform-replay family that converts at 13-40%. That is a
+real gap in coverage, but it is not a reason to expect a win, and n=3 there would confound the
+propagation change with a priority change, since larger n-step errors feed a sharper effective
+exponent. See
+[above](#-the-gap-is-decided-before-the-last-move-not-at-it).
 
 Design and full numbers in
 [`completedRuns.md`](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).

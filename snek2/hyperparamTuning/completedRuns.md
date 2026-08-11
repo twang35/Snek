@@ -420,6 +420,15 @@ paid nothing.
 wanting `|δ|` priority *without* the IS correction is untested — and given the drawdown result, that is
 the version of the experiment with a live hypothesis behind it.
 
+**‡ Amended 2026-08-10: the label "standard PER" overstates what ran.** Measuring the saved buffers
+found that the expected update is proportional to `raw^(α(1−β))`, so **at β=1.0 prioritization cancels
+exactly** — realised ESS/N 0.951 against a 0.975 uniform noise floor. These arms were fully annealed
+by ~1M and every one of them peaked after that, so past the anneal this batch compared batch 18's
+effective-α≈1.2 buffer against **uniform replay**, not against a milder prioritization. The result
+above stands and got stronger — batch 20 wave 1 reproduces it on four fresh seeds at a matched 2.401M
+(`sef` −21.39 pp, 4/4) — but read it as *uniform replay is worse here, 8 seeds*. Full measurement in
+[`findings.md`](findings.md#-measured-batches-19-20-compared-aggressive-per-against-uniform-replay).
+
 ## Batch 18 — `TARGET_UPDATE_PERIOD` 1000: the strongest speed result, and 20 rows ≥95%
 
 **Ran 2026-08-08 00:50 to 09:04, four arms stopped by hand at 2.40-2.61M; close-out evals finished
