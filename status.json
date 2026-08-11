@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-11T12:40:09",
-  "ts": 1786477209.4146867,
+  "iso": "2026-08-11T12:40:43",
+  "ts": 1786477243.7569647,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,17 +18,44 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 4
   },
   "running": [
     {
-      "id": "b21b-beta05seed2-closeout",
+      "id": "b20ae-fc100x200x100seed1-closeout",
       "type": "eval",
-      "policy": "b21b-beta05seed2",
-      "pid": 1003991,
+      "policy": "b20ae-fc100x200x100seed1",
+      "pid": 1032912,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2192
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20af-fc100x200x100seed2-closeout",
+      "type": "eval",
+      "policy": "b20af-fc100x200x100seed2",
+      "pid": 1032913,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ag-fc100x200x100seed3-closeout",
+      "type": "eval",
+      "policy": "b20ag-fc100x200x100seed3",
+      "pid": 1032914,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ah-fc100x200x100seed4-closeout",
+      "type": "eval",
+      "policy": "b20ah-fc100x200x100seed4",
+      "pid": 1032915,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -84,14 +111,18 @@
     "b20ag-fc100x200x100seed3": "done",
     "b20ah-fc100x200x100seed4": "done",
     "b21a-beta05seed1-closeout": "done",
-    "b21b-beta05seed2-closeout": "running",
+    "b21b-beta05seed2-closeout": "done",
     "b21c-beta05seed3-closeout": "done",
-    "b21d-beta05seed4-closeout": "done"
+    "b21d-beta05seed4-closeout": "done",
+    "b20ae-fc100x200x100seed1-closeout": "running",
+    "b20af-fc100x200x100seed2-closeout": "running",
+    "b20ag-fc100x200x100seed3-closeout": "running",
+    "b20ah-fc100x200x100seed4-closeout": "running"
   },
   "disk_free_gb": 160.1,
   "load_avg": [
-    3.515625,
-    4.63671875,
-    7.34423828125
+    2.07958984375,
+    4.15380859375,
+    7.08154296875
   ]
 }
