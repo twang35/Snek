@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-11T13:38:57",
-  "ts": 1786480737.879454,
+  "iso": "2026-08-11T13:39:32",
+  "ts": 1786480772.1175745,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,18 +17,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 4,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b20ah-fc100x200x100seed4-closeout",
-      "type": "eval",
-      "policy": "b20ah-fc100x200x100seed4",
-      "pid": 1032915,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 3494
+      "id": "b20ai-fc100x50x50seed1",
+      "type": "train",
+      "policy": "b20ai-fc100x50x50seed1",
+      "pid": 1078716,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20aj-fc100x50x50seed2",
+      "type": "train",
+      "policy": "b20aj-fc100x50x50seed2",
+      "pid": 1078717,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20ak-fc100x50x50seed3",
+      "type": "train",
+      "policy": "b20ak-fc100x50x50seed3",
+      "pid": 1078718,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20al-fc100x50x50seed4",
+      "type": "train",
+      "policy": "b20al-fc100x50x50seed4",
+      "pid": 1078719,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -90,12 +117,16 @@
     "b20ae-fc100x200x100seed1-closeout": "done",
     "b20af-fc100x200x100seed2-closeout": "done",
     "b20ag-fc100x200x100seed3-closeout": "done",
-    "b20ah-fc100x200x100seed4-closeout": "running"
+    "b20ah-fc100x200x100seed4-closeout": "done",
+    "b20ai-fc100x50x50seed1": "running",
+    "b20aj-fc100x50x50seed2": "running",
+    "b20ak-fc100x50x50seed3": "running",
+    "b20al-fc100x50x50seed4": "running"
   },
   "disk_free_gb": 160.0,
   "load_avg": [
-    3.6943359375,
-    4.02197265625,
-    5.32421875
+    2.65966796875,
+    3.74462890625,
+    5.18310546875
   ]
 }
