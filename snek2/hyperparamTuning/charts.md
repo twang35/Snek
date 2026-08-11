@@ -36,6 +36,94 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
+## Batch 20 wave 3 — small-capacity (`25,50,25`) against the control, both to 3M
+
+The smallest net in the sweep: 3,428 params, **0.29×** the control, depth 3. The pre-registered question
+was whether capacity is binding at all — if under a third of the parameters holds the ceiling, it is not.
+
+**Verdict: it does not hold the ceiling — capacity finally binds.** Peak trailing **93.75** vs the
+control's 94.44, the first shape in batch 20 to move peak at all: all four seeds lower, two of them
+(`b20q` 93.08, `b20s` 93.36) below the flat 94.4-94.9 band every batch since 11 has held. Every
+consolidation column drops too (`sef` 2.1 vs 11.2, best-30 52.8 vs 64.1, pooled 43.1 vs 55.0), and
+drawdown roughly doubles (11.1 vs 5.4). All four seeds favour the control on every column.
+
+**‡ The first directional result in the batch, at the n=4 floor.** Seed-matched paired differences
+(`25,50,25` − control):
+
+| metric | by seed | mean | p (exact paired, 16 flips) | seeds favouring `25,50,25` |
+|---|---|---|---|---|
+| peak trailing | −0.72 / −0.36 / −0.98 / −0.70 | −0.69 | 0.125 | 0 of 4 |
+| `sef` | −0.2 / −9.9 / −2.0 / −24.3 | −9.10 | 0.125 | 0 of 4 |
+| best-30 | 0.0 / −12.0 / −9.6 / −23.3 | −11.23 | 0.250 | 0 of 4 |
+| pooled | −3.0 / −5.2 / −13.3 / −26.1 | −11.89 | 0.125 | 0 of 4 |
+| max drawdown | +8.6 / +6.6 / +6.1 / +1.5 | +5.71 | 0.125 | 0 of 4 (all worse) |
+
+p bottoms out at the n=4 floor (0.125) on four of five metrics, every seed pointing the same way — the
+cleanest signal batch 20 has produced. Unlike the shapes at or above the control's capacity, cutting to
+0.29× lowers the ceiling *and* worsens consolidation.
+
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`, `SNEK_FC_LAYERS=25,50,25`.
+
+| arm | peak trail | best-30 | `sef` | max drawdown | close-out pooled | best row |
+|---|---|---|---|---|---|---|
+| `b20r` | **94.48** | **66.3%** | **6.3%** | 10.84 | **57.4%** | 76.0% @1874k (n=25) |
+| `b20t` | 94.06 | 57.0% | 2.0% | **6.22** | 45.3% | 60.0% @1530k (n=25) |
+| `b20s` | 93.36 | 46.7% | 0.2% | 11.16 | 39.5% | 56.0% @739k (n=25) |
+| `b20q` | 93.08 | 41.3% | 0.0% | 16.30 | 30.3% | 44.0% @897k (n=25) |
+| **mean — `25,50,25`** | 93.75 | 52.8% | 2.1% | 11.13 | 43.1% | — |
+| **mean — control** | 94.44 | 64.0% | 11.2% | 5.41 | 55.0% | — |
+
+**No full-length rows** (deepest 25-29 of 100 under gate 95), so `best row` is a bound and `pooled` is the
+exact column. Nothing near 95%. Drawdown mean 11.1 is the batch's worst so far, but still batch-19
+territory, far from batch 18's ~57.
+
+![b20r](charts/b20r-fc25x50x25seed2.png)
+![b20t](charts/b20t-fc25x50x25seed4.png)
+![b20s](charts/b20s-fc25x50x25seed3.png)
+![b20q](charts/b20q-fc25x50x25seed1.png)
+
+## Batch 20 wave 3 — deep-narrow (`60,30,30,30,30`) against the control, both to 3M
+
+Five narrow layers: 6,573 params, **0.55×** the control, depth **5** — the deepest shape in the sweep,
+testing whether depth helps once width is small.
+
+**Verdict: it matches the ceiling but forgets more.** Peak trailing **94.25** vs 94.44 — inside the band,
+essentially a match (−0.18, p 0.375). Consolidation is a wash (pooled 51.6 vs 55.0, p 0.5; one seed
+favours it). What moves cleanly is drawdown: **12.3 vs 5.4, all four seeds worse** — deeper-and-narrower
+holds the level but is markedly less steady.
+
+**‡ Only drawdown separates from noise.** Seed-matched paired differences (`60,30,30,30,30` − control):
+
+| metric | by seed | mean | p (exact paired, 16 flips) | seeds favouring the shape |
+|---|---|---|---|---|
+| peak trailing | −0.20 / −0.44 / +0.32 / −0.40 | −0.18 | 0.375 | 1 of 4 |
+| `sef` | −0.1 / −14.0 / +9.7 / −21.7 | −6.53 | 0.375 | 1 of 4 |
+| best-30 | −0.6 / −18.0 / +17.0 / −17.3 | −4.73 | 0.375 | 1 of 4 |
+| pooled | −2.5 / −8.9 / +9.9 / −12.1 | −3.41 | 0.500 | 1 of 4 |
+| max drawdown | +5.1 / +9.3 / +5.8 / +7.4 | +6.89 | 0.125 | 0 of 4 (all worse) |
+
+The ceiling and consolidation gaps are seed-3-carried noise (p ≥ 0.375); drawdown is worse on all four
+seeds at p=0.125.
+
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`, `SNEK_FC_LAYERS=60,30,30,30,30`.
+Trained on the laptop; checkpoints rsynced to the desktop for the close-out.
+
+| arm | peak trail | best-30 | `sef` | max drawdown | close-out pooled | best row |
+|---|---|---|---|---|---|---|
+| `b20w` | **94.66** | **73.3%** | **11.9%** | **10.88** | **62.7%** | 78.6% @1945k (n=28) |
+| `b20x` | 94.36 | 63.0% | 4.6% | 12.04 | 59.2% | 75.0% @1139k (n=28) |
+| `b20v` | 94.40 | 60.3% | 2.2% | 13.58 | 53.8% | 77.4% @2436k (n=31) |
+| `b20u` | 93.60 | 40.7% | 0.1% | 12.74 | 30.8% | 56.0% @2534k (n=25) |
+| **mean — `60,30,30,30,30`** | 94.25 | 59.3% | 4.7% | 12.31 | 51.6% | — |
+| **mean — control** | 94.44 | 64.0% | 11.2% | 5.41 | 55.0% | — |
+
+**No full-length rows** (deepest 25-36 of 100), so `best row` is a bound. Nothing near 95%.
+
+![b20w](charts/b20w-fc60x30x30x30x30seed3.png)
+![b20x](charts/b20x-fc60x30x30x30x30seed4.png)
+![b20v](charts/b20v-fc60x30x30x30x30seed2.png)
+![b20u](charts/b20u-fc60x30x30x30x30seed1.png)
+
 ## Batch 20 wave 2 — depth-1 (`320`) against the control, both to 3M
 
 A single hidden layer of 320 units: 10,883 params, **0.92×** the control, and depth 3 → 1. It holds

@@ -82,13 +82,23 @@ Batch 19's close-out also finished on the laptop overnight.
 > [`completedRuns.md`](completedRuns.md#batch-20-wave-2--depth-1-320-depth-contributes-nothing-at-matched-capacity).
 > **Any eval or `watch.py` on these checkpoints needs `SNEK_FC_LAYERS=320`.**
 
-> **Wave 3 `25,50,25` RUNNING (queued 2026-08-10, desktop `the-claw-den`).** Four fresh seeds
-> `b20{q,r,s,t}-fc25x50x25seed{1-4}`, `SNEK_FC_LAYERS=25,50,25`, `SNEK_MAX_STEPS=3000000`, rest identical
-> to the control. The small net (3,428 params, **0.29× control**, depth 3) — tests whether capacity is
-> binding at all: if it holds the ceiling with under a third of the parameters, capacity is not the
-> constraint, which after `320` (depth doesn't matter) and `200,100,50` (2.66× didn't help) is the way
-> the evidence is pointing. Closeouts queued behind at priority 20 (wave-barrier). **Any eval / `watch.py`
-> needs `SNEK_FC_LAYERS=25,50,25`.**
+> **Wave 3 `25,50,25` DONE (2026-08-10) — capacity finally binds; the ceiling drops.** Four seeds
+> `b20{q,r,s,t}` to the 3M cap on the desktop. Peak trailing **93.75** vs the control's 94.44 — the first
+> shape in batch 20 to move peak at all, and it moves it **down**, 4/4 seeds, p=0.125 (two seeds below the
+> nine-batch band). Every consolidation column drops (`sef` 2.1 vs 11.2, pooled 43.1 vs 55.0) and drawdown
+> doubles (11.1 vs 5.4). **At 0.29× the net cannot reach the control's ceiling** — the direct answer to
+> "is capacity binding at all." Full write-up:
+> [`completedRuns.md`](completedRuns.md#batch-20-wave-3--small-capacity-255025-capacity-finally-binds--the-ceiling-drops).
+> **Any eval / `watch.py` needs `SNEK_FC_LAYERS=25,50,25`.**
+
+> **Wave 3 `60,30,30,30,30` DONE (2026-08-10) — matches the ceiling, forgets more.** Four seeds
+> `b20{u,v,w,x}` (laptop-trained, renamed from a `q-t` collision; closed out on the desktop) to the 3M
+> cap. Peak trailing **94.25** vs 94.44 — inside the band (−0.18, p 0.375), a match; pooled/`sef`/best-30
+> a wash (1/4 seeds favour it). The one clean signal is drawdown: **12.3 vs 5.4, 4/4 seeds worse.** So
+> depth 5 at 0.55× holds the level but is less steady — the knee where capacity binds sits between 0.55×
+> and `25,50,25`'s 0.29×, not at the control. Full write-up:
+> [`completedRuns.md`](completedRuns.md#batch-20-wave-3--deep-narrow-6030303030-matches-the-ceiling-forgets-more).
+> **Any eval / `watch.py` needs `SNEK_FC_LAYERS=60,30,30,30,30`.**
 
 #### Control at 3M — the numbers every shape is read against
 
@@ -187,11 +197,11 @@ seed), assigned here so two hosts never reuse a letter — which happened once, 
 | `200,100,50` | 31,503 | **2.66x** | 3 | `b20e-h` ✓ | capacity up, shape preserved |
 | `200,50` | 16,403 | 1.38x | 2 | `b20i-l` ✓ | **wide-early**: conjunctions of engineered features |
 | `320` | 10,883 | 0.92x | **1** | `b20m-p` ✓ | **depth, at matched capacity** |
-| `25,50,25` | 3,428 | **0.29x** | 3 | `b20q-t` (running, desktop) | is capacity binding at all |
-| `60,30,30,30,30` | 6,573 | 0.55x | **5** | `b20u-x` (running, laptop) | deep and narrow |
-| `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † | fills the iso-param depth ladder |
-| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † | escalation, only if `200,100,50` moves |
-| `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † | lowest priority — a reshuffle at the same depth |
+| `25,50,25` | 3,428 | **0.29x** | 3 | `b20q-t` ✓ | is capacity binding at all — **yes: ceiling drops, 4/4** |
+| `60,30,30,30,30` | 6,573 | 0.55x | **5** | `b20u-x` ✓ | deep and narrow — matches ceiling, forgets more |
+| `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † ⟳ | fills the iso-param depth ladder — **running (desktop)** |
+| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † ⟳ | escalation above the 2.66x arm — **queued (desktop)** |
+| `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † ⟳ | reshuffle at matched capacity/depth — **queued (desktop)** |
 
 **† past `x` the letters roll into double letters (`aa`, `ab`, …), still batch 20.** The six shapes above
 consume `a-x`, so the last three continue at `aa` rather than opening a new batch — nine shapes at four
@@ -325,7 +335,7 @@ batches. `*trunc*` means no full-length row survived the gate, so the figure is 
 
 | batch | change | best selected | re-measured |
 |---|---|---|---|
-| **20** w1 | `FC_LAYERS` 2.66x | *no close-out yet* | — |
+| **20** | `FC_LAYERS` shapes (5 of 9 closed) | 89% @2321k *trunc* (`b20p`, 320) · 87% @2896k *trunc* · 87% @2818k *trunc* | **none reached full length** |
 | **19** | standard PER + IS | 91% @1536k *trunc* · 77% @1485k *trunc* · 76% @937k *trunc* | **none reached full length** |
 | **18** | `TARGET_UPDATE_PERIOD` 1000 | **98% @1588k** · 97% @1601k · 96% @1289k | **97.6% /700** ← **record** · 94.7% /700 · 85.4% /500 |
 | 17 | forked endgame collection | 99% @1248k · 99% @1205k · 98% @1231k | **94.24% /5120** · region grid 84% |
@@ -350,8 +360,12 @@ reality.
 
 **Outstanding, highest-value, in order:**
 
-1. **Decide batch 20 wave 1's horizon** — rerun the capacity arm to 2.5M, or truncate the control to
-   ~1.75M and read what exists. Wave 2 is blocked on it. See the decision note above.
+1. **Batch 20's last 3 shapes are running on the desktop (queued 2026-08-10).** Five shapes are already
+   in — the ceiling is invariant at or above the control's capacity, capacity binds only below it (knee
+   between 0.29x and 0.55x), and no shape raised the ceiling. The remaining `93,93` / `100,200,100` /
+   `100,50,50` (12 arms, `b20aa-al`, 3M each, priorities 100/110/120 so they run in that order) close out
+   the planned nine-shape sweep; auto-closeout evals each wave. Expected null on the ceiling — `93,93`
+   (iso-param depth-2 rung) is the one most likely to add anything the five in hand do not.
 2. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
    open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
    lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test

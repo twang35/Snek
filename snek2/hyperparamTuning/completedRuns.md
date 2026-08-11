@@ -81,6 +81,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b20n-fc320seed2` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 87% @2896k *trunc* | — | 70.32% /eq §§ | **81.3%** | ‡‡‡ § **highest peak (94.86) and best-30 of the shape**; `sef` 23.1%. Beats its control `b20b` (62.7%) |
 | `b20m-fc320seed1` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 82% @2935k *trunc* | — | 65.31% /eq §§ | 73.0% | ‡‡‡ § **the seed that lifts the shape's mean** — its control `b20a` is the batch's weak arm (33.2%), so this +32 pp gap is a control weakness, not a shape strength. `sef` 12.9% |
 | `b20o-fc320seed3` ‡‡‡ § | **`FC_LAYERS=320`** (depth-1, 0.92× params), β anneal 300k | 3.00M | 69% @2807k *trunc* | — | 51.83% /eq §§ | 64.3% | ‡‡‡ § weakest of the `320` seeds, `sef` 3.9%, largest drawdown of the wave (11.96). Mirrors control `b20c` — seed 3 is weak under every shape |
+| `b20w-fc60x30x30x30x30seed3` ‡‡‡ § | **`FC_LAYERS=60,30,30,30,30`** (deep-narrow, depth 5, 0.55× params), β 300k | 3.00M | 79% @1945k *trunc* | — | **62.67%** /eq §§ | **73.3%** | ‡‡‡ § best of the deep-narrow seeds; **the seed that matches its control `b20c`** (peak 94.66, `sef` 11.9%). The shape holds the ceiling here but drawdown is 10.9 vs the control's 5.1 |
+| `b20x-fc60x30x30x30x30seed4` ‡‡‡ § | **`FC_LAYERS=60,30,30,30,30`** (deep-narrow, depth 5, 0.55× params), β 300k | 3.00M | 75% @1139k *trunc* | — | 59.19% /eq §§ | 63.0% | ‡‡‡ § 2nd of the shape; `sef` 4.6% against its control `b20d`'s 26.3%; drawdown 12.0 |
+| `b20v-fc60x30x30x30x30seed2` ‡‡‡ § | **`FC_LAYERS=60,30,30,30,30`** (deep-narrow, depth 5, 0.55× params), β 300k | 3.00M | 77% @2436k *trunc* | — | 53.75% /eq §§ | 60.3% | ‡‡‡ § best row in its last ~560k — **still climbing when capped**; largest drawdown of the shape (13.58); `sef` 2.2% |
+| `b20u-fc60x30x30x30x30seed1` ‡‡‡ § | **`FC_LAYERS=60,30,30,30,30`** (deep-narrow, depth 5, 0.55× params), β 300k | 3.00M | 56% @2534k *trunc* | — | 30.75% /eq §§ | 40.7% | ‡‡‡ § weakest of the shape; `sef` 0.1%, peak 93.60. Mirrors control `b20a` — seed 1 is weak under every shape |
+| `b20r-fc25x50x25seed2` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 76% @1874k *trunc* | — | **57.44%** /eq §§ | **66.3%** | ‡‡‡ § best of the small-net seeds and **the only one to reach the control band** (peak 94.48); `sef` 6.3%. Even the best seed trails its control `b20b` (pooled 62.7%) |
+| `b20t-fc25x50x25seed4` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 60% @1530k *trunc* | — | 45.25% /eq §§ | 57.0% | ‡‡‡ § 2nd of the shape; smallest drawdown of the small net (6.22); `sef` 2.0% against control `b20d`'s 26.3% |
+| `b20s-fc25x50x25seed3` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 56% @739k *trunc* | — | 39.50% /eq §§ | 46.7% | ‡‡‡ § `sef` 0.2%; **peak 93.36, below the nine-batch band** — the capacity cut showing on the ceiling |
+| `b20q-fc25x50x25seed1` ‡‡‡ § | **`FC_LAYERS=25,50,25`** (small, depth 3, **0.29×** params), β 300k | 3.00M | 44% @897k *trunc* | — | 30.25% /eq §§ | 41.3% | ‡‡‡ § **weakest arm in batch 20**: peak 93.08 (lowest), `sef` 0.0%, drawdown 16.3 (worst). 0.29× is not enough capacity here |
 | `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | 91% @1536k *trunc* | — | 75.46% /eq §§ | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
 | `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | 77% @1485k *trunc* | — | 61.49% /eq §§ | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
 | `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | 76% @937k *trunc* | — | 51.59% /eq §§ | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
@@ -332,10 +340,109 @@ control's own seed variance (pooled 33.2-71.3%), and none of the three shapes ha
 Nothing reached 95%, so no hall-of-fame candidate. Drawdown rose to 7.44 — one seed (`b20o`, 11.96) drives
 it, still batch-19 territory and far from batch 18's ~57, so the base's anti-forgetting property holds.
 
-**What batch 20 now shows across three shapes:** 2.66× capacity (`200,100,50`) did not raise the ceiling,
-1.38× wide-early (`200,50`) did not, and removing all depth (`320`) did not lower it. The ceiling is
-invariant to architecture across a 0.92×-2.66× parameter range and depth 1-3 — pointing at capacity *not*
-being the binding constraint, which `25,50,25` (0.29×) tests directly next.
+## Batch 20 wave 3 — small-capacity `25,50,25`: **capacity finally binds — the ceiling drops**
+
+**Ran 2026-08-10 on the desktop `the-claw-den`, four arms `b20q`-`b20t` at seeds 1-4, all to the 3M cap;
+close-out under gate 95, `EVAL_WORKERS=4`.** Charts in
+[`charts.md`](charts.md#batch-20-wave-3--small-capacity-255025-against-the-control-both-to-3m).
+
+### The design
+
+`FC_LAYERS=25,50,25` — the control's shape scaled down to **3,428 params, 0.29× the control**, depth
+unchanged at 3. This arm asks the direct question the earlier shapes only implied: *is capacity binding at
+all?* If under a third of the parameters holds the ceiling, it is not — and after `200,100,50` (2.66× did
+not help) and `320` (depth-1 matched), that was the way the evidence pointed. One variable against the
+seed-matched control, same 3M, same β=300k.
+
+### The result
+
+| mean of 4 | control `50,100,50` | `25,50,25` | delta |
+|---|---|---|---|
+| peak trailing | 94.44 | **93.75** | **−0.69** |
+| `sef` (primary) | 11.2% | 2.1% | −9.1 |
+| best-30 | 64.0% | 52.8% | −11.2 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 43.1% | −11.9 |
+| max drawdown | 5.41 | 11.13 | +5.7 |
+
+**This is the first shape in batch 20 to move the ceiling, and it moves it down.** Peak trailing drops 0.69
+— outside the flat 94.4-94.9 band every batch since 11 has held — and two of the four seeds (`b20q` 93.08,
+`b20s` 93.36) sit clearly below it. Every consolidation column falls with it and drawdown roughly doubles.
+**All four seeds favour the control on every column.**
+
+**‡ The cleanest directional result batch 20 has produced.** Exact paired permutation over 16 sign flips:
+
+| metric | by seed (1/2/3/4) | mean | p | favouring `25,50,25` |
+|---|---|---|---|---|
+| peak trailing | −0.72 / −0.36 / −0.98 / −0.70 | −0.69 | 0.125 | 0 of 4 |
+| `sef` | −0.2 / −9.9 / −2.0 / −24.3 | −9.10 | 0.125 | 0 of 4 |
+| best-30 | 0.0 / −12.0 / −9.6 / −23.3 | −11.23 | 0.250 | 0 of 4 |
+| pooled | −3.0 / −5.2 / −13.3 / −26.1 | −11.89 | 0.125 | 0 of 4 |
+| drawdown | +8.6 / +6.6 / +6.1 / +1.5 | +5.71 | 0.125 | 0 of 4 (all worse) |
+
+p is at the n=4 floor (0.125) on four of five metrics — the strongest this design can register — and every
+seed points the same way. Where `320` and `200,50` produced seed-driven noise straddling zero, `25,50,25`
+is uniform and directional. **At 0.29× the capacity is binding: the net can no longer reach the ceiling the
+control reaches, and it consolidates and holds worse while trying.**
+
+**No full-length rows** (deepest 25-29 of 100 under gate 95), so best-checkpoint is a bound; `pooled` is
+exact. Nothing near 95%, no hall-of-fame candidate. Drawdown mean 11.13 is the batch's worst but still
+batch-19 territory, far from batch 18's ~57 — the base's anti-forgetting property is dented, not broken.
+
+## Batch 20 wave 3 — deep-narrow `60,30,30,30,30`: **matches the ceiling, forgets more**
+
+**Trained on the laptop, seeds 1-4 `b20u`-`b20x` (renamed from a `q-t` collision with the desktop's
+`25,50,25`), all to the 3M cap; checkpoints rsynced to the desktop and closed out there under gate 95,
+`EVAL_WORKERS=4`.** Charts in
+[`charts.md`](charts.md#batch-20-wave-3--deep-narrow-6030303030-against-the-control-both-to-3m).
+
+### The design
+
+`FC_LAYERS=60,30,30,30,30` — **6,573 params, 0.55× the control**, but depth **5**, the deepest shape in the
+sweep. It tests depth from the other side of `320`: where `320` removed all depth at matched capacity, this
+stacks five narrow layers below capacity. The final layer was widened from a proposed `,10` to `,30` so the
+three Q-values are not forced through 10 ReLU units where dead units would cost the representation
+permanently.
+
+### The result
+
+| mean of 4 | control `50,100,50` | `60,30,30,30,30` | delta |
+|---|---|---|---|
+| peak trailing | 94.44 | 94.25 | −0.18 |
+| `sef` (primary) | 11.2% | 4.7% | −6.5 |
+| best-30 | 64.0% | 59.3% | −4.7 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 51.6% | −3.4 |
+| max drawdown | 5.41 | 12.31 | +6.9 |
+
+**It matches the control on the ceiling and forgets about twice as much.** Peak trailing 94.25 is inside
+the band (−0.18, p 0.375), and pooled/`sef`/best-30 are all within the control's own seed spread — one seed
+(3) favours the shape, the rest do not. The one column that separates cleanly is drawdown: **worse on all
+four seeds, +6.9, p 0.125.**
+
+**‡ Only drawdown clears noise.** Exact paired permutation over 16 sign flips:
+
+| metric | by seed (1/2/3/4) | mean | p | favouring the shape |
+|---|---|---|---|---|
+| peak trailing | −0.20 / −0.44 / +0.32 / −0.40 | −0.18 | 0.375 | 1 of 4 |
+| `sef` | −0.1 / −14.0 / +9.7 / −21.7 | −6.53 | 0.375 | 1 of 4 |
+| best-30 | −0.6 / −18.0 / +17.0 / −17.3 | −4.73 | 0.375 | 1 of 4 |
+| pooled | −2.5 / −8.9 / +9.9 / −12.1 | −3.41 | 0.500 | 1 of 4 |
+| drawdown | +5.1 / +9.3 / +5.8 / +7.4 | +6.89 | 0.125 | 0 of 4 (all worse) |
+
+At 0.55× and depth 5 the ceiling still holds — so the knee where capacity starts to bind is between this
+and `25,50,25`'s 0.29×, not at the control. Depth 5 buys nothing and costs steadiness: the same
+higher-drawdown signature `25,50,25` shows, so it tracks narrowness/depth rather than capacity alone.
+
+**No full-length rows** (deepest 25-36 of 100), best-checkpoint a bound, nothing near 95%.
+
+**What batch 20 now shows across five shapes.** At or above the control's capacity — 2.66×
+(`200,100,50`), 1.38× wide-early (`200,50`), depth-1 (`320`, 0.92×) — the ceiling does not move, and depth
+1 vs 3 makes no difference. Going below: at 0.55× and depth 5 (`60,30,30,30,30`) the ceiling still holds; at
+0.29× (`25,50,25`) it finally drops, 4/4 seeds, p 0.125. **So capacity is not the binding constraint
+anywhere at or above the control — the control sits comfortably above the knee, which lies between 0.29×
+and 0.55× — and architecture (width, depth, shape) does not raise the ceiling within the range that
+preserves it.** Two narrow shapes also consolidate worse (drawdown 11-12 vs 5.4, 4/4 seeds each), so
+shrinking or deepening the net costs steadiness before it costs the ceiling. The ceiling nine batches of
+optimiser knobs could not move is not an approximation-capacity limit.
 
 ## Batch 19 — standard PER: **falsified, 4/4 seeds, on every comparable metric**
 
