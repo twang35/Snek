@@ -187,8 +187,15 @@ def main(argv):
     # sampling at all.
     priority_exponent = tuned('PRIORITY_EXPONENT', 0.6)
     initial_importance_sampling_beta = tuned('IS_BETA', 0.4)
+    # The anneal target, 1.0 by default. beta below 1.0 leaves IS *partial*: it holds
+    # the effective update exponent at alpha*(1-beta) rather than driving it to 0, so
+    # prioritization still reaches the gradient. Measured 2026-08-10: beta=1.0 cancels
+    # prioritization outright (ESS/N 0.951 vs uniform's 0.975), which made batches 19-20
+    # uniform replay past the anneal. IS_BETA_FINAL=0.5 keeps some bias correction for
+    # forgetting while leaving alpha*(1-beta)=0.3 of the priority signal on the update.
+    final_importance_sampling_beta = tuned('IS_BETA_FINAL', 1.0)
     # 300k, not 1M: arms in this env do their productive learning well before 1M
-    # (batch 19's peaked ~0.9-1.1M), so a 1M anneal reaches beta=1.0 only near the
+    # (batch 19's peaked ~0.9-1.1M), so a 1M anneal reaches the target only near the
     # end of the useful window. 300k puts full IS correction in place during it.
     beta_anneal_steps = tuned('BETA_ANNEAL_STEPS', 300000, int)
     # theSchlong -- the version that reached a far higher perfect-game rate than
@@ -335,6 +342,7 @@ def main(argv):
         capacity=replay_buffer_max_length,
         alpha=priority_exponent,
         initial_beta=initial_importance_sampling_beta,
+        final_beta=final_importance_sampling_beta,
         beta_anneal_steps=beta_anneal_steps,
         # n_step_update=n needs n+1 consecutive steps per sampled item.
         sequence_length=n_step_update + 1
@@ -442,8 +450,9 @@ def main(argv):
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
         'priority_exponent (alpha)': priority_exponent,
         'priority_signal': priority_signal,
-        'importance_sampling_beta': '{0} -> 1.0 over {1} steps'.format(
-            initial_importance_sampling_beta, beta_anneal_steps) if use_is_weights else 'disabled',
+        'importance_sampling_beta': '{0} -> {1} over {2} steps'.format(
+            initial_importance_sampling_beta, final_importance_sampling_beta,
+            beta_anneal_steps) if use_is_weights else 'disabled',
         'max_steps': max_steps,
         'initial_populate_steps': initial_populate_replay_buffer_steps,
         'eval': '{0} episodes every {1} steps'.format(num_eval_episodes, eval_interval),
