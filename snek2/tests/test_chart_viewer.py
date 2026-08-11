@@ -852,9 +852,10 @@ def test_fit_figure_to_screen_survives_a_missing_backend():
     chart_viewer.fit_figure_to_screen(_Fig(), 11.2, 8.0)   # must not raise
 
 
-def test_laptop_defaults_are_one_second_and_double_size():
+def test_laptop_defaults_are_one_second_and_scaled_up():
     """The user's asked-for defaults, pinned so a later edit cannot quietly undo them.
-    An auto-launched viewer passes neither flag, so these values are what it runs with."""
+    An auto-launched viewer passes neither flag, so these values are what it runs with.
+    Scale was raised from 2.0 to 2.6 (a 30% bigger window) on request."""
     args = chart_viewer.build_parser().parse_args([])
     assert args.interval == 1.0
-    assert args.scale == 2.0
+    assert args.scale == 2.6

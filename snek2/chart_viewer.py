@@ -374,16 +374,16 @@ def install_signal_exit(plt):
 # A window taller (or wider) than the screen opens with its lower rows *below* the display,
 # which reads as missing charts — a 2x2 wave at scale 2.0 is 12in = 1200px tall and a laptop's
 # built-in Retina panel is ~900 usable points, so the bottom row of a four-arm wave was clipped
-# and looked like three charts. These budgets (inches at matplotlib's 100 dpi) are a laptop-safe
-# fallback for when the real screen size can't be read: a 2x2 lands at 8in = 800px tall, inside a
-# built-in panel's usable height even after the menu bar and title bar. `fit_figure_to_screen`
-# then shrinks further to whatever display the window actually opened on. A single panel is well
-# under these and is left untouched.
-MAX_FIG_W_IN = 14.0
-MAX_FIG_H_IN = 8.0
+# and looked like three charts. `fit_figure_to_screen` is the real guard against that: it shrinks
+# to the display the window actually opened on. These budgets (inches at matplotlib's 100 dpi) set
+# the *target* size on a roomy screen, where the screen fit does not bind: a 2x2 lands at 10.4in =
+# 1040px. A built-in panel is smaller than that, so there the screen fit clamps it down to ~88% of
+# the panel height instead. A single panel is under the budgets, so its size comes from the scale.
+MAX_FIG_W_IN = 18.2
+MAX_FIG_H_IN = 10.4
 
-# A shrink of 9.0in was tried first and was still clipped: it left no room for the title bar and
-# assumed the window opens on the larger external display, which it need not.
+# These budgets and the default scale below were raised 30% on request (from 14.0/8.0 and 2.0); an
+# earlier 8.0in was itself a fix for a 9.0in that still clipped a built-in panel.
 
 
 def clamp_dims(w, h, max_w, max_h):
@@ -449,7 +449,7 @@ def build_parser():
     # so re-reading every second costs a stat plus a small PNG decode and shows a new point
     # as soon as it exists. The desktop runner passes its own --interval/--scale.
     ap.add_argument('--interval', type=float, default=1.0)
-    ap.add_argument('--scale', type=float, default=2.0, help='multiply the window size')
+    ap.add_argument('--scale', type=float, default=2.6, help='multiply the window size')
     ap.add_argument('--title', default='snek charts')
     return ap
 
