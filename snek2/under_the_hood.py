@@ -79,29 +79,15 @@ def dense_layer(num_units):
             scale=2.0, mode='fan_in', distribution='truncated_normal'))
 
 
-def eval_fc_layer_params():
-    """Layer widths for rebuilding a trained network, honouring SNEK_FC_LAYERS.
-
-    Training reads its widths from the same variable, so anything that restores a checkpoint
-    has to read it too. eval_checkpoints.py used to hardcode (50, 100, 50), which was right
-    for every run so far only because nobody has set the override — and a mismatch would not
-    have been loud, because restore() is called with expect_partial() and would simply not
-    populate the layers it could not match.
-    """
-    raw = os.environ.get('SNEK_FC_LAYERS')
-    if raw is None:
-        return 50, 100, 50
-    return tuple(int(width) for width in raw.split(','))
-
-
-def build_q_net(num_actions, fc_layer_params=None):
+def build_q_net(num_actions, fc_layer_params):
     """The Q-network training builds, so restored weights line up.
 
-    Shared by eval_checkpoints.py and watch.py. Keeping a second copy of the architecture is
-    how the two quietly drift apart.
+    Shared by snek2.main, eval_agent.py and watch.py — one architecture, built in one place, since a
+    second copy is how they quietly drift apart. ``fc_layer_params`` is required: a fresh run reads
+    it from SNEK_FC_LAYERS, and anything restoring a checkpoint reads it from that checkpoint's
+    arch.json (see policy_arch.py), so the shape can no longer default silently to (50, 100, 50) and
+    mis-restore. That silent default, driven off an unset SNEK_FC_LAYERS, was the exact bite.
     """
-    if fc_layer_params is None:
-        fc_layer_params = eval_fc_layer_params()
     dense_layers = [dense_layer(num_units) for num_units in fc_layer_params]
     q_values_layer = tf.keras.layers.Dense(
         num_actions,

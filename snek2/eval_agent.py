@@ -11,10 +11,12 @@ Two settings here are load-bearing:
 
 - **`epsilon_greedy=0.0`.** Eval is greedy; epsilon only ever shapes the collect policy. Every
   number this project reports is a greedy measurement.
-- **`build_q_net`** is shared with training and `watch.py` and reads `SNEK_FC_LAYERS` the way
-  training does. This used to be hardcoded to `(50, 100, 50)` here while training took the
-  override, so a run with `SNEK_FC_LAYERS` set was measured against the wrong network — silently,
-  because `expect_partial()` suppresses the shape complaint.
+- **`build_q_net`** is shared with training and `watch.py`. Its shape used to be read from
+  `SNEK_FC_LAYERS` (hardcoded `(50, 100, 50)` here before that), so a checkpoint trained with the
+  override was measured against the wrong network — silently, because `expect_partial()` suppresses
+  the shape complaint. Now the shape comes from the checkpoint's own `arch.json` via
+  `policy_arch.assert_restorable`, which also fails loudly if the observation length or meaning-era
+  disagrees, so there is nothing left to forget to set.
 
 The optimizer and `target_update_period` are required by the agent's constructor and are never used:
 nothing here trains. They are left at training's values so the checkpoint's variable set matches.
@@ -24,22 +26,31 @@ from tf_agents.agents.dqn import dqn_agent
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
+import policy_arch
+from snake_environment import OBS_ERA
 from snek2 import build_q_net
 
 
-def build_eval_agent(tf_env, py_env):
-    """Returns `(agent, checkpoint, global_step)` for greedy evaluation.
+def build_eval_agent(tf_env, py_env, policy_dir):
+    """Returns `(agent, checkpoint, global_step)` for greedy evaluation of the policy in `policy_dir`.
 
     `tf_env` supplies the time-step and action specs; `py_env` supplies the raw action spec used to
-    count actions. Both come from the same `SnakeEnvironment`, so passing a spec env and its TF
-    wrapper is the normal call.
+    count actions and the observation length. Both come from the same `SnakeEnvironment`, so passing
+    a spec env and its TF wrapper is the normal call.
+
+    `policy_dir` is the checkpoint directory. Its `arch.json` is required and checked against this
+    environment (`policy_arch.assert_restorable`) before the network is built from the *recorded*
+    layer widths, so a missing sidecar or a shape/observation mismatch stops here rather than
+    restoring silently.
 
     The returned `checkpoint` mirrors the keys `common.Checkpointer` uses in `snek2.py`, which is
     what lets a specific `ckpt-<step>` be restored rather than only the latest.
     """
     action_tensor_spec = tensor_spec.from_spec(py_env.action_spec())
     num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
-    q_net = build_q_net(num_actions)
+    obs_len = int(py_env.observation_spec().shape[0])
+    arch = policy_arch.assert_restorable(policy_dir, num_actions, obs_len, OBS_ERA)
+    q_net = build_q_net(num_actions, arch['fc_layer_params'])
 
     global_step = tf.compat.v1.train.get_or_create_global_step()
     agent = dqn_agent.DdqnAgent(

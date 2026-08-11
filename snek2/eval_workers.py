@@ -231,7 +231,7 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
 
         py_env = SnakeEnvironment(discount=0.99, display=False, policy_name=policy_name)
         tf_env = tf_py_environment.TFPyEnvironment(py_env)
-        agent, checkpoint, global_step = build_eval_agent(tf_env, py_env)
+        agent, checkpoint, global_step = build_eval_agent(tf_env, py_env, ckpt_dir)
         policy_action = common.function(agent.policy.action)
 
         def one_episode():

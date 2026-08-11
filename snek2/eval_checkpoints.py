@@ -1060,7 +1060,7 @@ def main(argv):
     # One definition, shared with every independent worker in eval_workers.py. A second copy of
     # this construction is the failure mode this project has hit twice: expect_partial() hides a
     # mismatch, so two builders that drift produce a policy that loads silently and plays badly.
-    agent, checkpoint, global_step = build_eval_agent(spec_tf_env, spec_env)
+    agent, checkpoint, global_step = build_eval_agent(spec_tf_env, spec_env, ckpt_dir)
 
     def make_headless_worker():
         os.environ['SDL_VIDEODRIVER'] = 'dummy'

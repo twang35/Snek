@@ -133,6 +133,18 @@ So **when the observation changes, record which indices changed meaning in the h
 and name the last commit whose observation matches those checkpoints.** Era markers: `e4514a8` =
 20 values, `450e66e` = 26, `b09c616` = the current 30.
 
+**`arch.json` now makes both traps loud (`policy_arch.py`, 2026-08-11).** Every policy dir carries a
+one-file sidecar — `fc_layer_params`, `num_actions`, `obs_len`, `obs_era` — written once at training
+start (not per checkpoint). Training, `eval_checkpoints`, `eval_workers` and `watch.py` all rebuild
+the *recorded* network from it and **hard-fail** (`ArchMismatch`) if it is missing or if the live
+env's observation length or era disagrees; a resume also fails if `SNEK_FC_LAYERS` disagrees with the
+sidecar. So `SNEK_FC_LAYERS` is no longer read at eval/watch time, and the era must be bumped in one
+place — `snake_environment.OBS_ERA` — whenever the observation's *meaning* changes at constant length
+(the `game_over` trap). Existing dirs were backfilled from their own checkpoint tensor shapes by
+`backfill_arch.py`, which read the true per-era lengths (b2-b9 = 20, b10 = 26, b11+ = 30). **Copy
+`arch.json` with any checkpoint** — into `hallOfFame/`, or rsynced to the desktop — or it will not
+load.
+
 **Append new per-action blocks after the existing ones**, never interleaved. The frozen diagnostics
 in `hyperparamTuning/diagnostics/` read `head_with_tail` at `obs[9 + 2 * i]`. That is why the
 vector's order is chronological rather than logical. **Not every block is a per-action triple** —
@@ -331,7 +343,8 @@ for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablat
              'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
              'test_run_report', 'test_shielded_policy', 'test_reward_shaping',
              'test_game_snapshot', 'test_replay_streams', 'test_forking_collector',
-             'test_progress_chart', 'test_eval_workers', 'test_chart_viewer']:
+             'test_progress_chart', 'test_eval_workers', 'test_chart_viewer',
+             'test_policy_arch']:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1

@@ -347,10 +347,12 @@ Resuming needs `savedPolicies/<arm>/replay_buffer/` from the original run, and n
 does not persist priorities across save/restore anyway, so a resume starts from uniform
 priorities regardless.
 
-Each entry is two files, ~190 KB total: `ckpt-<step>.index` and
-`ckpt-<step>.data-00000-of-00001`. Both are required, and the `checkpoint` file from
-`savedPolicies/` is not — that one only records which checkpoint is "latest", and restoring by
-explicit step does not consult it.
+Each entry is three files, ~190 KB total: `ckpt-<step>.index`, `ckpt-<step>.data-00000-of-00001`
+and `arch.json`. All three are required — **`arch.json` records the layer widths, action count and
+observation era the weights were built for, and a restore now hard-fails without it** (see
+`policy_arch.py`), which is what turns the two silent failures below into loud ones. The `checkpoint`
+file from `savedPolicies/` is *not* needed — that one only records which checkpoint is "latest", and
+restoring by explicit step does not consult it.
 
 ## Adding an entry
 
@@ -361,23 +363,33 @@ cd /Users/tony_wang/Projects/Snek/snek2
 mkdir -p hallOfFame/<arm>-ckpt<step>
 cp savedPolicies/<arm>/ckpt-<step>.index \
    savedPolicies/<arm>/ckpt-<step>.data-00000-of-00001 \
+   savedPolicies/<arm>/arch.json \
    hallOfFame/<arm>-ckpt<step>/
 ```
+
+**Copy `arch.json` too — it is now required.** Without it the copy will not load at all
+(`ArchMismatch: no arch.json`), which is the point: the width and observation era can no longer be
+lost. It is one file per policy dir, so the same `arch.json` is correct for every step of that arm.
 
 Then add a row to the table above with its **measured** rate over at least 100 episodes — not
 a graph point. A graph point is 10 episodes and reads in 10-point jumps; 90% graph points have
 measured anywhere from 22% to 82%.
 
-**‡ If the arm ran a non-default `SNEK_FC_LAYERS`, record the width in its row.** Every entry above
-is `50,100,50`, the default since batch 1, so width has never needed stating — **batch 20 changes
-that** by sweeping eight shapes. A checkpoint rebuilt at the wrong width restores with **no error**
-and simply leaves the mismatched layers unpopulated (`expect_partial()`), so it plays like a beginner
-— the same silent failure as the observation-vector era problem above, and unrecoverable information
-if the width is not written down. `watch.py` and `eval_checkpoints.py` both need the variable set:
+**‡ Still record a non-default `SNEK_FC_LAYERS` in the row, but `arch.json` now enforces it.** Every
+entry above is `50,100,50`, the default since batch 1, so width has never needed stating — **batch 20
+changes that** by sweeping eight shapes. A checkpoint rebuilt at the wrong width used to restore with
+**no error**, leaving the mismatched layers unpopulated (`expect_partial()`) so it played like a
+beginner — the same silent failure as the observation-vector era problem above. `arch.json` closes
+it: the restorer reads the width (and observation length and era) from the sidecar and rebuilds the
+*recorded* network, hard-failing on any mismatch, so **`SNEK_FC_LAYERS` is no longer read at eval or
+watch time** and there is nothing to remember to set:
 
 ```
-SNEK_FC_LAYERS=<width> PYTHONPATH=. python -u watch.py <policy>
+PYTHONPATH=. python -u watch.py <policy>
 ```
+
+The row entry stays useful as human-readable documentation, but a forgotten one is no longer able to
+mis-measure a checkpoint.
 
 Note that training now **skips writing checkpoints below `SNEK_MIN_CHECKPOINT_SCORE`** (default
 40), because `max_to_keep` is a rolling window and a dead arm used to evict good checkpoints

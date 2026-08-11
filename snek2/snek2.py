@@ -19,10 +19,11 @@ _os.environ['SDL_AUDIODRIVER'] = 'dummy'
 # that trade.
 
 import chart_viewer
+import policy_arch
 from forking_collector import ForkingCollector, validate_config
 from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
 from shielded_policy import ShieldedEpsilonGreedyPolicy
-from snake_environment import SnakeEnvironment
+from snake_environment import OBS_ERA, SnakeEnvironment
 from training import *
 
 import os
@@ -31,7 +32,6 @@ from tf_agents.agents.dqn import dqn_agent
 from tf_agents.drivers import py_driver
 from tf_agents.environments import parallel_py_environment
 from tf_agents.environments import tf_py_environment
-from tf_agents.networks import sequential
 from tf_agents.policies import py_tf_eager_policy
 from tf_agents.specs import tensor_spec
 from tf_agents.system import system_multiprocessing
@@ -296,17 +296,11 @@ def main(argv):
     # maybe_update_epsilon(). A Variable is read on every call instead.
     epsilon = tf.Variable(initial_epsilon, dtype=tf.float32, trainable=False, name='epsilon')
 
-    # QNetwork consists of a sequence of Dense layers followed by a dense layer
-    # with `num_actions` units to generate one q_value per available action as
-    # its output.
-    dense_layers = [dense_layer(num_units) for num_units in fc_layer_params]
-    q_values_layer = tf.keras.layers.Dense(
-        num_actions,
-        activation=None,
-        kernel_initializer=tf.keras.initializers.RandomUniform(
-            minval=-0.03, maxval=0.03),
-        bias_initializer=tf.keras.initializers.Constant(0.0))
-    q_net = sequential.Sequential(dense_layers + [q_values_layer])
+    # QNetwork consists of a sequence of Dense layers followed by a dense layer with `num_actions`
+    # units to generate one q_value per available action as its output. Built through the shared
+    # build_q_net so training, eval and watch.py cannot drift to different architectures — and so the
+    # fc_layer_params written into arch.json below are exactly the ones the net was built from.
+    q_net = build_q_net(num_actions, fc_layer_params)
 
     agent = dqn_agent.DdqnAgent(
         train_env.time_step_spec(),
@@ -406,6 +400,20 @@ def main(argv):
     )
 
     replay_buffer_dir = os.path.join(POLICY_DIR + policy_name, 'replay_buffer')
+
+    # arch.json records the architecture and observation era this checkpoint is built for, so
+    # nothing can restore it into a differently-shaped or differently-meaning network without a loud
+    # failure (policy_arch.py). A fresh policy writes it; a resume asserts the environment still
+    # matches *before* restoring — the guard that catches a resume under a changed SNEK_FC_LAYERS
+    # before it loads weights into the wrong net.
+    policy_dir = POLICY_DIR + policy_name
+    obs_len = int(train_py_env.observation_spec().shape[0])
+    if policy_arch.read_arch(policy_dir) is None:
+        policy_arch.write_arch(policy_dir, policy_arch.build_arch(
+            fc_layer_params, num_actions, obs_len, OBS_ERA))
+    else:
+        policy_arch.assert_restorable(policy_dir, num_actions, obs_len, OBS_ERA)
+        policy_arch.assert_config_matches(policy_dir, fc_layer_params)
 
     train_checkpointer.initialize_or_restore()
     global_step = tf.compat.v1.train.get_global_step()

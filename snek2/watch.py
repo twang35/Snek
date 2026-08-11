@@ -62,9 +62,10 @@ from tf_agents.environments import tf_py_environment
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
+import policy_arch
 import snake_constants
 from snake_constants import POLICY_DIR
-from snake_environment import SnakeEnvironment
+from snake_environment import OBS_ERA, SnakeEnvironment
 from snek2 import build_q_net
 
 
@@ -115,11 +116,15 @@ def main(argv):
 
     action_tensor_spec = tensor_spec.from_spec(env.action_spec())
     num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
+    # arch.json decides the layer widths and is checked against this env, so watching a checkpoint
+    # cannot silently rebuild the wrong network the way an unset SNEK_FC_LAYERS once did.
+    arch = policy_arch.assert_restorable(
+        ckpt_dir, num_actions, int(env.observation_spec().shape[0]), OBS_ERA)
     global_step = tf.compat.v1.train.get_or_create_global_step()
     agent = dqn_agent.DdqnAgent(
         tf_env.time_step_spec(),
         tf_env.action_spec(),
-        q_network=build_q_net(num_actions),
+        q_network=build_q_net(num_actions, arch['fc_layer_params']),
         epsilon_greedy=0.0,  # watching the greedy policy, same as an eval
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
         td_errors_loss_fn=common.element_wise_huber_loss,
