@@ -44,21 +44,23 @@ gives. The aim: keep IS's anti-forgetting effect while letting end-game transiti
 
 **Verdict: better than the β→1.0 control, well short of no-IS.** Best-30 74.1 vs the control's 64.0 (+10 pp)
 and `sef` 14.3 vs 11.2, 3 of 4 seeds favouring β→0.5 — directional but n=4 cannot resolve it (p 0.375-0.625).
-Still far below batch 18 (no IS: best-30 87.3, `sef` 34.6, ESS/N 0.21). Peak trailing 94.69 is flat with every
-batch since 11, so the ceiling is unmoved — only consolidation differs. **Batch 22** (`td_error`, IS off,
-ESS/N ≈0.38) tests the next point down. Trained on the laptop; **close-out queued on the desktop**, so numbers
-are the training graph.
+The desktop close-out confirms the direction: **pooled (eq-effort, gate 95) 64.3 vs 55.0 (+9.3), 3 of 4
+seeds.** Still far below batch 18 (no IS: best-30 87.3, `sef` 34.6, ESS/N 0.21). Peak trailing 94.69 is flat
+with every batch since 11, so the ceiling is unmoved — only consolidation differs. **Batch 22** (`td_error`,
+IS off, ESS/N ≈0.38) tests the next point down. Trained on the laptop, close-out on the desktop.
 
-All at 3M, sorted by best-30.
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
 
-| arm | peak trail | best-30 | `sef` | max single |
-|---|---|---|---|---|
-| `b21b` | 94.78 | **80.7%** | **21.6%** | 100% |
-| `b21d` | **94.80** | 76.3% | 16.5% | 100% |
-| `b21c` | 94.64 | 70.7% | 11.1% | 100% |
-| `b21a` | 94.52 | 68.7% | 8.2% | 100% |
-| **mean — b21 β→0.5** | 94.69 | 74.1% | 14.3% | — |
-| **mean — control β→1.0** | 94.44 | 64.0% | 11.2% | — |
+| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
+|---|---|---|---|---|---|
+| `b21b` | 94.78 | **80.7%** | **21.6%** | **68.8%** | 89.3% @2525k (n=56) |
+| `b21d` | **94.80** | 76.3% | 16.5% | 66.0% | 84.1% @2392k (n=44) |
+| `b21c` | 94.64 | 70.7% | 11.1% | 62.8% | 82.5% @2203k (n=40) |
+| `b21a` | 94.52 | 68.7% | 8.2% | 59.5% | 81.6% @1263k (n=38) |
+| **mean — b21 β→0.5** | 94.69 | 74.1% | 14.3% | 64.3% | — |
+| **mean — control β→1.0** | 94.44 | 64.0% | 11.2% | 55.0% | — |
+
+**No full-length rows** (deepest 38-56 of 100 under gate 95), so `best row` is a bound and `pooled` is exact.
 
 ![b21b](charts/b21b-beta05seed2.png)
 ![b21d](charts/b21d-beta05seed4.png)
@@ -152,6 +154,39 @@ Trained on the laptop; checkpoints rsynced to the desktop for the close-out.
 ![b20x](charts/b20x-fc60x30x30x30x30seed4.png)
 ![b20v](charts/b20v-fc60x30x30x30x30seed2.png)
 ![b20u](charts/b20u-fc60x30x30x30x30seed1.png)
+
+## Batch 20 — capacity escalation (`100,200,100`, 3.69×) against the control, both to 3M
+
+The largest net in the sweep: 43,703 params, **3.69×** the control, depth 3. It escalates above the 2.66×
+(`200,100,50`) arm to ask whether *any* amount of extra capacity moves the ceiling, given 2.66× did not.
+Ran on the desktop `the-claw-den`, seeds 1-4.
+
+**Verdict: null on the ceiling, the seed-1 pattern again.** Peak trailing **94.61** vs the control's 94.44
+(+0.17, p 0.875) — inside the flat 94.4-94.9 band. Consolidation reads up (best-30 71.3 vs 64.0, pooled
+63.4 vs 55.0), but the rise is one seed: `b20ae` (+36 best-30, +35 pooled) against control arm `b20a`, the
+batch's weak seed (41.3 best-30, 33.2 pooled). The other three seeds are flat-to-mixed (best-30 −9 / −1 /
++3) and no p clears the 0.125 floor. **3.69× behaves like the control**, the same reading `200,100,50`
+(2.66×) gave — closing the capacity question: across 0.92× / 1.00× / 1.38× / 2.66× / 3.69× nothing moved the
+ceiling, only cutting to 0.29× (`25,50,25`) did, downward.
+
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`, `SNEK_FC_LAYERS=100,200,100`.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
+|---|---|---|---|---|---|
+| `b20ah` | **94.88** | **83.0%** | **32.9%** | **74.6%** | 91.8% @1470k (n=73) |
+| `b20ae` | 94.76 | 77.7% | 21.8% | 67.8% | 89.1% @1561k (n=55) |
+| `b20af` | 94.60 | 69.3% | 10.2% | 63.1% | 82.9% @1918k (n=35) |
+| `b20ag` | 94.18 | 55.3% | 1.4% | 48.3% | 64.0% @551k (n=25) |
+| **mean — `100,200,100`** | 94.61 | 71.3% | 16.6% | 63.4% | — |
+| **mean — control** | 94.44 | 64.0% | 11.2% | 55.0% | — |
+
+**No full-length rows** (deepest 25-82 of 100 under gate 95), so `best row` is a bound and `pooled` is exact.
+Nothing near 95%.
+
+![b20ah](charts/b20ah-fc100x200x100seed4.png)
+![b20ae](charts/b20ae-fc100x200x100seed1.png)
+![b20af](charts/b20af-fc100x200x100seed2.png)
+![b20ag](charts/b20ag-fc100x200x100seed3.png)
 
 ## Batch 20 wave 3 — iso-param depth-2 (`93,93`) against the control, both to 3M
 

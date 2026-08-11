@@ -93,10 +93,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b20ad-fc93x93seed4` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 79% @2912k *trunc* | — | 56.15% /eq §§ | 66.7% | ‡‡‡ § 2nd of the shape; peak 94.44, inside the control band; `sef` 10.0% |
 | `b20ab-fc93x93seed2` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 56% @2661k *trunc* | — | 42.00% /eq §§ | 54.0% | ‡‡‡ § `sef` 0.7%; behind its control `b20b` (62.7 pooled) |
 | `b20ac-fc93x93seed3` ‡‡‡ § | **`FC_LAYERS=93,93`** (iso-param depth-2, 1.00× params), β 300k | 3.00M | 56% @2663k *trunc* | — | 42.25% /eq §§ | 50.7% | ‡‡‡ § weakest of the shape; `sef` 0.6%, peak 94.08. Mirrors control `b20c` — seed 3 is weak under both |
-| `b21b-beta05seed2` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | **80.7%** | ‡‡‡ § best of b21; peak 94.78, `sef` 21.6%. β→0.5 sits above the β→1.0 control on `sef` and best-30 — see the batch 21 write-up |
-| `b21d-beta05seed4` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | 76.3% | ‡‡‡ § 2nd of b21; **peak 94.80, batch's highest**; `sef` 16.5% |
-| `b21c-beta05seed3` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | 70.7% | ‡‡‡ § peak 94.64, `sef` 11.1% |
-| `b21a-beta05seed1` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | — *closeout queued* | — | — | 68.7% | ‡‡‡ § weakest of b21; peak 94.52, `sef` 8.2% |
+| `b20ah-fc100x200x100seed4` ‡‡‡ § | **`FC_LAYERS=100,200,100`** (3.69× params, depth 3), β 300k | 3.00M | 92% @1470k *trunc* | — | **74.57%** /eq §§ | **83.0%** | ‡‡‡ § best of the shape; peak 94.88, `sef` 32.9%; best window at 1.47M |
+| `b20ae-fc100x200x100seed1` ‡‡‡ § | **`FC_LAYERS=100,200,100`** (3.69× params, depth 3), β 300k | 3.00M | 89% @1561k *trunc* | — | 67.76% /eq §§ | 77.7% | ‡‡‡ § **the seed that lifts the shape's mean** — control `b20a` is the batch's weak arm (33.2 pooled), so the +36 best-30 gap is a control weakness. `sef` 21.8% |
+| `b20af-fc100x200x100seed2` ‡‡‡ § | **`FC_LAYERS=100,200,100`** (3.69× params, depth 3), β 300k | 3.00M | 83% @1918k *trunc* | — | 63.05% /eq §§ | 69.3% | ‡‡‡ § peak 94.60, `sef` 10.2%; ~flat against its control `b20b` |
+| `b20ag-fc100x200x100seed3` ‡‡‡ § | **`FC_LAYERS=100,200,100`** (3.69× params, depth 3), β 300k | 3.00M | 64% @551k *trunc* | — | 48.25% /eq §§ | 55.3% | ‡‡‡ § weakest of the shape; `sef` 1.4%, peak 94.18. Mirrors control `b20c` — seed 3 weak under every shape |
+| `b21b-beta05seed2` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | 89% @2525k *trunc* | — | **68.79%** /eq §§ | **80.7%** | ‡‡‡ § best of b21; peak 94.78, `sef` 21.6%. β→0.5 sits above the β→1.0 control on every column — see the batch 21 write-up |
+| `b21d-beta05seed4` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | 84% @2392k *trunc* | — | 66.01% /eq §§ | 76.3% | ‡‡‡ § 2nd of b21; **peak 94.80, batch's highest**; `sef` 16.5% |
+| `b21c-beta05seed3` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | 83% @2203k *trunc* | — | 62.80% /eq §§ | 70.7% | ‡‡‡ § peak 94.64, `sef` 11.1% |
+| `b21a-beta05seed1` ‡‡‡ § | **partial IS** (`td_error` + IS, β 0.4→**0.5**), fc 50,100,50 | 3.00M | 82% @1263k *trunc* | — | 59.50% /eq §§ | 68.7% | ‡‡‡ § weakest of b21; peak 94.52, `sef` 8.2% |
 | `b19d-stdperseed4` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.42M | 91% @1536k *trunc* | — | 75.46% /eq §§ | **85.7%** | ‡‡‡ § **the seed that escaped batch 19** — level with its `b18d` control on every column (`sef` 40.2 vs 41.6). No close-out run |
 | `b19a-stdperseed1` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.19M | 77% @1485k *trunc* | — | 61.49% /eq §§ | 71.0% | ‡‡‡ § `sef` 8.0% against its control's 41.2%; **smallest drawdown in batches 18-19, 4.94**. No close-out run |
 | `b19b-stdperseed2` ‡‡‡ § | **standard PER** (`td_error` + IS on, β→1.0), period 1000 | 2.12M | 76% @937k *trunc* | — | 51.59% /eq §§ | 66.7% | ‡‡‡ § slowest consolidator: pf30 ≥ 60% at 1861k against its control's 310k. **Still improving when stopped**. No close-out run |
@@ -235,9 +239,9 @@ they had not finished improving** — see [`findings.md`](findings.md).
 
 ## Batch 21 — partial IS (β→0.5): **beats the β→1.0 control, still far behind no-IS**
 
-**Trained on the laptop, four arms `b21a`-`b21d` at seeds 1-4, all to the 3M cap. Close-out queued on
-the desktop (checkpoints rsynced there), so the numbers below are the training graph, not a close-out.**
-Charts in [`charts.md`](charts.md) (batch 21 section).
+**Trained on the laptop, four arms `b21a`-`b21d` at seeds 1-4, all to the 3M cap; checkpoints rsynced to
+the desktop and closed out there under gate 95, `EVAL_WORKERS=4`.** Charts in
+[`charts.md`](charts.md) (batch 21 section).
 
 ### The design
 
@@ -255,14 +259,17 @@ pull harder.
 | peak trailing | 94.44 | 94.69 | +0.25 | 0.375 | 3/4 |
 | `sef` (primary) | 11.2% | 14.3% | +3.1 | 0.625 | 3/4 |
 | best-30 | 64.0% | 74.1% | +10.1 | 0.375 | 3/4 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 64.3% | +9.3 | 0.250 | 3/4 |
 
-**β→0.5 is directionally better than β→1.0 — best-30 +10 pp, `sef` +3, 3 of 4 seeds — but n=4 cannot
-resolve it** (p 0.375-0.625, seed 4 flips). It is nowhere near batch 18 (`td_loss`, IS off: best-30
-87.3%, `sef` 34.6%, ESS/N 0.21), the strongest consolidation on record. Across the three points now
-measured — β→1.0 (ESS/N ≈1.0) < β→0.5 (0.86) ≪ no-IS (0.21) — **more prioritisation on the gradient
+**β→0.5 is directionally better than β→1.0 — best-30 +10 pp, close-out pooled +9 pp, 3 of 4 seeds — but
+n=4 cannot resolve it** (p 0.25-0.63, seed 4 flips on the graph metrics). The close-out agrees with the
+training graph, so the edge is not a graph artefact. It is nowhere near batch 18 (`td_loss`, IS off:
+best-30 87.3%, `sef` 34.6%, ESS/N 0.21), the strongest consolidation on record. Across the three points
+now measured — β→1.0 (ESS/N ≈1.0) < β→0.5 (0.86) ≪ no-IS (0.21) — **more prioritisation on the gradient
 tracks better learning**. That is what **batch 22** (`td_error`, IS off, ESS/N ≈0.38, queued on the
-desktop) is meant to pin down. Peak trailing is flat across all three (94.4-94.9): the ceiling is
-unmoved, only the consolidation differs.
+desktop) is meant to pin down. Best checkpoints 82-89% (all under the 95 gate, so `*trunc*`); peak
+trailing is flat across all three points (94.4-94.9), so the ceiling is unmoved — only consolidation
+differs.
 
 ## Batch 20 wave 2 — wide-early `200,50`: **null on the ceiling, behind the control on the primary metric**
 
@@ -482,6 +489,36 @@ and 0.55× — and architecture (width, depth, shape) does not raise the ceiling
 preserves it.** Two narrow shapes also consolidate worse (drawdown 11-12 vs 5.4, 4/4 seeds each), so
 shrinking or deepening the net costs steadiness before it costs the ceiling. The ceiling nine batches of
 optimiser knobs could not move is not an approximation-capacity limit.
+
+## Batch 20 — capacity escalation `100,200,100` (3.69×): **null on the ceiling, the seed-1 pattern again**
+
+**Ran on the desktop `the-claw-den`, four arms `b20ae`-`b20ah` at seeds 1-4, all to the 3M cap; close-out
+under gate 95, `EVAL_WORKERS=4`.** Charts in [`charts.md`](charts.md) (100,200,100 section).
+
+### The design
+
+`FC_LAYERS=100,200,100` — 43,703 params, **3.69× the control** at depth 3, the largest net in the sweep.
+It escalates above the 2.66× (`200,100,50`) arm to ask whether *any* amount of extra capacity moves the
+ceiling, given 2.66× did not.
+
+### The result
+
+| mean of 4 | control `50,100,50` | `100,200,100` | delta | p (16 flips) | favour shape |
+|---|---|---|---|---|---|
+| peak trailing | 94.44 | 94.61 | +0.17 | 0.875 | 2/4 |
+| `sef` (primary) | 11.2% | 16.6% | +5.4 | 0.625 | 2/4 |
+| best-30 | 64.0% | 71.3% | +7.3 | 0.750 | 2/4 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 63.4% | +8.4 | 0.625 | 3/4 |
+
+**Null on the ceiling — peak +0.17 stays inside the flat 94.4-94.9 band.** The consolidation means rise,
+but the rise is one seed: `b20ae` (+36 best-30, +35 pooled) against control arm `b20a`, the batch's weak
+seed (33.2 pooled). The other three seeds are flat-to-mixed (best-30 −9 / −1 / +3) and the p-values sit
+far from the 0.125 floor. **3.69× behaves like the control**, the same reading `200,100,50` (2.66×) gave.
+This closes the capacity question: across 0.92× / 1.00× / 1.38× / 2.66× / 3.69× nothing moved the ceiling
+— only cutting to 0.29× (`25,50,25`) did, downward.
+
+**No full-length rows** (deepest 25-73 of 100 under gate 95), so best-checkpoint is a bound and `pooled`
+is exact. Nothing at the 95 gate; no hall-of-fame candidate.
 
 ## Batch 20 wave 3 — iso-param depth-2 `93,93`: **null — matches the control on every column**
 

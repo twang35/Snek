@@ -14,7 +14,7 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 
 ## Batch 21 / 22 — PER importance-sampling β (fc 50,100,50, on batch 20's control)
 
-**Batch 21 (β→0.5) done on the laptop; close-out queued on the desktop. Batch 22 (IS off) queued on the
+**Batch 21 (β→0.5) done and closed out on the desktop. Batch 22 (IS off) queued on the
 desktop.** These isolate how much importance-sampling correction to apply — `td_error` priority, α=0.6,
 otherwise the batch-20 control. Gradient concentration ESS/N, measured on the end-of-run buffers, walks
 down the β ladder: **β→1.0 ≈1.0** (b20 control, near-uniform) → **β→0.5 ≈0.86** (b21) → **IS off ≈0.38**
@@ -23,8 +23,8 @@ down the β ladder: **β→1.0 ≈1.0** (b20 control, near-uniform) → **β→0
 - **b21 (`b21a-d`, β→0.5) — done, 4×3M on the laptop.** Beats the β→1.0 control on the training graph
   (best-30 74.1 vs 64.0, `sef` 14.3 vs 11.2, 3/4 seeds) but n=4 cannot resolve it, and it trails b18's
   no-IS consolidation by a wide margin. Ceiling unmoved (peak 94.69). Full read in
-  [`completedRuns.md`](completedRuns.md). Checkpoints rsynced to the desktop; close-out `b21a-d-closeout`
-  queued at priority 10 — the next eval wave.
+  [`completedRuns.md`](completedRuns.md). **Closed out on the desktop: pooled (eq-effort, gate 95) 64.3 vs
+  the control's 55.0 (+9.3), 3/4 seeds** — confirms the training-graph direction, still short of no-IS.
 - **b22 (`b22a-d`, IS off) — queued (desktop), priority 200.** Same config with `SNEK_IS_WEIGHTS=0`, so the
   gradient carries full `|δ|^0.6` prioritisation. Tests whether more concentration keeps helping. Runs
   after the b20 `100,50,50` wave.
@@ -217,8 +217,8 @@ seed), assigned here so two hosts never reuse a letter — which happened once, 
 | `25,50,25` | 3,428 | **0.29x** | 3 | `b20q-t` ✓ | is capacity binding at all — **yes: ceiling drops, 4/4** |
 | `60,30,30,30,30` | 6,573 | 0.55x | **5** | `b20u-x` ✓ | deep and narrow — matches ceiling, forgets more |
 | `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † ✓ | fills the iso-param depth ladder — **done: null, matches control (peak −0.03)** |
-| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † ⟳ | escalation above the 2.66x arm — **running (desktop), ~2.7M** |
-| `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † ⟳ | reshuffle at matched capacity/depth — **queued (desktop)** |
+| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † ✓ | escalation above the 2.66x arm — **done: null on the ceiling (peak +0.17, p 0.875)** |
+| `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † ⟳ | reshuffle at matched capacity/depth — **running (desktop), ~0.1M** |
 
 **† past `x` the letters roll into double letters (`aa`, `ab`, …), still batch 20.** The six shapes above
 consume `a-x`, so the last three continue at `aa` rather than opening a new batch — nine shapes at four
@@ -377,12 +377,12 @@ reality.
 
 **Outstanding, highest-value, in order:**
 
-1. **Batch 20's last 3 shapes are running on the desktop (queued 2026-08-10).** Five shapes are already
-   in — the ceiling is invariant at or above the control's capacity, capacity binds only below it (knee
-   between 0.29x and 0.55x), and no shape raised the ceiling. The remaining `93,93` / `100,200,100` /
-   `100,50,50` (12 arms, `b20aa-al`, 3M each, priorities 100/110/120 so they run in that order) close out
-   the planned nine-shape sweep; auto-closeout evals each wave. Expected null on the ceiling — `93,93`
-   (iso-param depth-2 rung) is the one most likely to add anything the five in hand do not.
+1. **Batch 20's last shape `100,50,50` is running on the desktop (~0.1M, 2026-08-11).** Eight shapes are
+   already in — the ceiling is invariant at or above the control's capacity, capacity binds only below it
+   (knee between 0.29x and 0.55x), and no shape raised the ceiling. `93,93` (null, peak −0.03) and
+   `100,200,100` (null, peak +0.17, the largest 3.69× net) both closed out as expected. The last arm
+   `100,50,50` (`b20ai-al`, 3M each) is a reshuffle at matched capacity/depth — expected null — and closes
+   the planned nine-shape sweep; auto-closeout evals the wave.
 2. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
    open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
    lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test
