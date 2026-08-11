@@ -121,6 +121,29 @@ def policy_from_png(path):
     return base
 
 
+def panel_title(label, live, readable):
+    """The title for one panel — the fix for a panel that read `(completed) (waiting…)` at once.
+
+    `live` is the set of running-policy tokens, or None when the process list could not be read
+    this refresh. `readable` is whether the panel's PNG loaded. The two status tags are mutually
+    exclusive by construction here, which they were not when the caller appended `(completed)` and
+    then the draw-failure path appended `(waiting…)` on top:
+
+    - a finished arm (name absent from `live`) reads **`(completed)`**, whether or not its chart
+      still loads — an eval that started later may have archived the PNG, and a missing chart on a
+      done arm is not the same as one still being written;
+    - a live arm with no chart yet reads **`(waiting…)`**;
+    - `live is None` (unknown) or a healthy chart on a live arm gets no tag — a false `(completed)`
+      on a running arm is worse than none.
+    """
+    done = live is not None and bool(label) and label not in live
+    if done:
+        return label + ' (completed)'
+    if not readable and live is not None:
+        return label + ' (waiting…)'
+    return label
+
+
 def running_policies():
     """Policy names that currently have a live trainer OR eval process, or None if unknown.
 
@@ -492,17 +515,12 @@ def main():
         live = running_policies()
         for i, path in enumerate(files):
             label = policy_from_png(path)
-            # A panel we still show but whose arm is gone is a finished run of the wave --
-            # kept on screen as the reference the live ones are compared against, so it must
-            # read as done rather than look like a stalled arm. `live is None` means the
-            # process list was unreadable this refresh; tag nothing then.
-            if live is not None and label and label not in live:
-                label += ' (completed)'
             try:
                 axes[i].imshow(mpimg.imread(path))
-                axes[i].set_title(label, fontsize=8)
+                readable = True
             except Exception:
-                axes[i].set_title(label + ' (waiting…)', fontsize=8)
+                readable = False
+            axes[i].set_title(panel_title(label, live, readable), fontsize=8)
         try:
             fig.tight_layout()
             fig.canvas.draw_idle()

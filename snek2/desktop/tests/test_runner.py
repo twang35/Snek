@@ -234,6 +234,19 @@ def test_sticky_wave_resets_on_category_flip():
     assert all('/runs/' not in p for p in got)
 
 
+def test_sticky_wave_resets_on_a_new_same_category_wave():
+    # The desktop bug: batch 21's eval close-out drained and batch 20's eval close-out launched
+    # in the same dispatch, so `_ensure_viewer` never saw the idle poll that clears the set.
+    # Both waves are category 'eval', so the category key alone unioned b21 onto b20 and the
+    # (by then archived) b21 PNGs stuck on screen reading `(completed) (waiting…)`. A running
+    # set disjoint from the previous one is the new-wave signal that must reset it.
+    b21 = runnermod.viewer_png_paths([('eval', p) for p in ['b21a', 'b21b', 'b21c', 'b21d']], '/snek')
+    b20 = runnermod.viewer_png_paths([('eval', p) for p in ['b20ae', 'b20af', 'b20ah']], '/snek')
+    got = runnermod.sticky_wave_pngs(b21, 'eval', 'eval', b20)
+    assert got == b20, got                 # b21 dropped, not unioned onto the new wave
+    assert all('b21' not in p for p in got)
+
+
 def _runner(auto_closeout=True):
     """A Runner with a throwaway ledger and no box behind it -- enough to exercise the pure
     ledger-driven logic (_auto_closeout_jobs) without git or spawn."""

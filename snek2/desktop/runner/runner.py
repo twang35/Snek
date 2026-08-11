@@ -369,9 +369,18 @@ def sticky_wave_pngs(prev_pngs, prev_category, category, current_pngs):
 
     Only grows within a wave. Resets to the current set when the wave's category flips
     (`trainer` -> `eval`, an entirely new set of charts under evals/), and `prev_category`
-    None -- a fresh daemon, or the idle gap between waves -- resets too, so a following wave
-    of the same category does not inherit the previous batch's panels."""
-    if prev_category != category or not prev_pngs:
+    None -- a fresh daemon, or the idle gap between waves -- resets too.
+
+    It **also** resets when the running arms are disjoint from the previous set, which is the
+    signal for a new wave of the *same* category — two eval waves back to back (a batch's
+    close-out, then the next batch's), or trainer->trainer. Relying on `prev_category` alone
+    let those union: when one `_dispatch` reaps the finished wave and launches the next in the
+    same poll, `_ensure_viewer` never sees the idle gap that would have cleared the set, so the
+    old batch's now-archived PNGs stayed on screen reading `(completed) (waiting…)`. Within a
+    wave the running set only shrinks as arms finish, so it always overlaps the accumulated
+    set and this branch does not fire; across waves the policies never repeat (the ledger runs
+    each id once), so the two sets are always disjoint."""
+    if prev_category != category or not prev_pngs or set(current_pngs).isdisjoint(prev_pngs):
         return sorted(current_pngs)
     return sorted(set(prev_pngs) | set(current_pngs))
 

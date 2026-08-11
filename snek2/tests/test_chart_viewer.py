@@ -792,6 +792,24 @@ def test_figure_dims_leaves_a_fitting_grid_untouched():
     assert chart_viewer.figure_dims(2, 2, 1.0) == (8.4, 6.0)   # 2x2 at scale 1 also fits
 
 
+def test_panel_title_never_shows_completed_and_waiting_together():
+    """The desktop bug: a finished arm whose eval PNG a later wave had archived read
+    `(completed) (waiting…)` at once. A done arm is `(completed)` whether or not its chart
+    loads; `(waiting…)` is only a live arm with no chart yet; and the two never coincide."""
+    live = {'b20ah-fc100x200x100seed4'}  # only this arm still running
+    pt = chart_viewer.panel_title
+    # finished arm, chart archived/missing -> completed only, NOT "(completed) (waiting…)"
+    assert pt('b21a-beta05seed1', live, False) == 'b21a-beta05seed1 (completed)'
+    # finished arm, chart present -> completed
+    assert pt('b21a-beta05seed1', live, True) == 'b21a-beta05seed1 (completed)'
+    # live arm, chart not written yet -> waiting
+    assert pt('b20ah-fc100x200x100seed4', live, False) == 'b20ah-fc100x200x100seed4 (waiting…)'
+    # live arm, chart present -> no tag
+    assert pt('b20ah-fc100x200x100seed4', live, True) == 'b20ah-fc100x200x100seed4'
+    # process list unreadable (None): never tag, even with a missing chart
+    assert pt('b21a-beta05seed1', None, False) == 'b21a-beta05seed1'
+
+
 def test_clamp_dims_shrinks_uniformly_and_never_grows():
     """The shrink is the tighter of the two ratios and applies to both dims, so aspect holds;
     a size already inside the budget is returned untouched rather than scaled up to fill it."""
