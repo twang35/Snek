@@ -747,7 +747,10 @@ def test_make_figure_installs_the_handler_after_building_the_window():
 
 
 def test_make_figure_scales_both_dimensions():
-    """--scale 2 has to reach the figsize, or "double the size" silently does nothing."""
+    """--scale 2 has to reach the figsize, or "double the size" silently does nothing.
+
+    Uses a single panel, which is well inside the screen budget, so this isolates scale
+    propagation from the multi-row clamp that `figure_dims` applies (tested separately)."""
     sizes = {}
 
     class _Fig:
@@ -762,13 +765,31 @@ def test_make_figure_scales_both_dimensions():
     saved = chart_viewer.install_signal_exit
     chart_viewer.install_signal_exit = lambda _plt: None
     try:
-        chart_viewer.make_figure(_Plt(), 2, 2, 1.0, 't')
+        chart_viewer.make_figure(_Plt(), 1, 1, 1.0, 't')
         one = sizes['figsize']
-        chart_viewer.make_figure(_Plt(), 2, 2, 2.0, 't')
+        chart_viewer.make_figure(_Plt(), 1, 1, 2.0, 't')
         two = sizes['figsize']
         assert two == (one[0] * 2, one[1] * 2), (one, two)
     finally:
         chart_viewer.install_signal_exit = saved
+
+
+def test_figure_dims_clamps_a_multirow_wave_to_the_screen():
+    """A 2x2 wave at the laptop default scale 2.0 is 16.8x12.0in; unclamped its 1200px height
+    opens the bottom row below a laptop screen and it reads as a missing chart. figure_dims must
+    shrink it to fit the height budget while preserving aspect ratio."""
+    w, h = chart_viewer.figure_dims(2, 2, 2.0)
+    assert h <= chart_viewer.MAX_FIG_H_IN + 1e-9
+    assert w <= chart_viewer.MAX_FIG_W_IN + 1e-9
+    # uniform shrink -> aspect unchanged from the requested 16.8 x 12.0
+    assert abs(w / h - 16.8 / 12.0) < 1e-9
+
+
+def test_figure_dims_leaves_a_fitting_grid_untouched():
+    """Single panels and any grid already inside the budget must not be shrunk, so the
+    clamp never makes a window that already fit smaller than asked."""
+    assert chart_viewer.figure_dims(1, 1, 2.0) == (8.4, 6.0)   # under budget, unchanged
+    assert chart_viewer.figure_dims(2, 2, 1.0) == (8.4, 6.0)   # 2x2 at scale 1 also fits
 
 
 def test_laptop_defaults_are_one_second_and_double_size():

@@ -371,13 +371,34 @@ def install_signal_exit(plt):
     return handle
 
 
+# A window taller (or wider) than the screen opens with its lower rows *below* the display,
+# which reads as missing charts — a 2x2 wave at scale 2.0 is 12in = 1200px tall and a laptop's
+# built-in Retina panel is ~900 usable points, so the bottom row of a four-arm wave was clipped
+# and looked like three charts. These budgets (inches at matplotlib's 100 dpi) keep a multi-row
+# grid inside a laptop screen; a single panel is well under them and is left untouched.
+MAX_FIG_W_IN = 15.0
+MAX_FIG_H_IN = 9.0
+
+
+def figure_dims(rows, cols, scale):
+    """Panel-grid size in inches, shrunk uniformly (aspect preserved) to fit the screen budget.
+
+    Uniform, not per-axis: clamping width and height independently would distort the charts.
+    The shrink is 1.0 whenever the requested size already fits, so single panels and the
+    desktop's own --scale are unchanged unless they would overflow."""
+    w = cols * 4.2 * scale
+    h = rows * 3.0 * scale
+    shrink = min(1.0, MAX_FIG_W_IN / w, MAX_FIG_H_IN / h)
+    return w * shrink, h * shrink
+
+
 def make_figure(plt, rows, cols, scale, title):
     """Build the chart grid, then (re)install the signal handler — one operation, in that
     order, because separating them silently breaks the clean exit. See
     `install_signal_exit`: Tk overwrites the OS-level handler while creating this window,
     so any install that does not follow a `subplots()` call is dead code."""
     fig, grid = plt.subplots(rows, cols, squeeze=False,
-                             figsize=(cols * 4.2 * scale, rows * 3.0 * scale))
+                             figsize=figure_dims(rows, cols, scale))
     try:
         fig.canvas.manager.set_window_title(title)
     except Exception:
