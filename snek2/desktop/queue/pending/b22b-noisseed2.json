@@ -1,0 +1,23 @@
+{
+  "id": "b22b-noisseed2",
+  "type": "train",
+  "policy": "b22b-noisseed2",
+  "env": {
+    "SNEK_FC_LAYERS": "50,100,50",
+    "SNEK_PRIORITY_SIGNAL": "td_error",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_PRIORITY_EXPONENT": "0.6",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60",
+    "SNEK_SEED": "2"
+  },
+  "max_steps": 3000000,
+  "priority": 200,
+  "notes": "batch 22: the b21 config (fc 50,100,50, td_error priority, alpha 0.6) with importance sampling OFF (SNEK_IS_WEIGHTS=0). Keeps prioritized sampling but drops the IS correction, so the gradient carries full |delta|^0.6 prioritization (measured ESS/N ~0.38) vs b21 beta->0.5 (~0.86) and b20 beta->1.0 (~1.0). Beta knobs omitted: inert when IS is off. Seeds match b21 for a seed-for-seed compare. priority 200 so it queues behind the running b20 100,50,50 wave. Auto-closeout runs after the wave drains. FC is the default 50,100,50."
+}

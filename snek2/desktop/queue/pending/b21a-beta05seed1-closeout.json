@@ -1,0 +1,10 @@
+{
+  "id": "b21a-beta05seed1-closeout",
+  "type": "eval",
+  "policy": "b21a-beta05seed1",
+  "eval_args": [
+    "top20"
+  ],
+  "priority": 10,
+  "notes": "batch 21 closeout (fc 50,100,50, td_error priority alpha 0.6, IS beta->0.5). Trained on the laptop; checkpoints + graph staged to the desktop by rsync. Default FC, so no SNEK_FC_LAYERS needed for the eval."
+}
