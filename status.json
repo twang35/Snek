@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T00:22:42",
-  "ts": 1786519362.4836755,
+  "iso": "2026-08-12T00:23:16",
+  "ts": 1786519396.4742346,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,42 +17,48 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 4
   },
   "running": [
-    {
-      "id": "b20aj-fc100x50x50seed2",
-      "type": "train",
-      "policy": "b20aj-fc100x50x50seed2",
-      "pid": 1078717,
-      "step": 2997000,
-      "steps_per_sec": 92.7,
-      "elapsed_s": 38590
-    }
-  ],
-  "queued": [
     {
       "id": "b20ai-fc100x50x50seed1-closeout",
       "type": "eval",
       "policy": "b20ai-fc100x50x50seed1",
-      "priority": 10,
-      "status": "queued"
+      "pid": 1590161,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b20aj-fc100x50x50seed2-closeout",
+      "type": "eval",
+      "policy": "b20aj-fc100x50x50seed2",
+      "pid": 1590162,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
       "id": "b20ak-fc100x50x50seed3-closeout",
       "type": "eval",
       "policy": "b20ak-fc100x50x50seed3",
-      "priority": 10,
-      "status": "queued"
+      "pid": 1590163,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
       "id": "b20al-fc100x50x50seed4-closeout",
       "type": "eval",
       "policy": "b20al-fc100x50x50seed4",
-      "priority": 10,
-      "status": "queued"
-    },
+      "pid": 1590164,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
+  "queued": [
     {
       "id": "b22a-noisseed1",
       "type": "train",
@@ -143,14 +149,18 @@
     "b20ag-fc100x200x100seed3-closeout": "done",
     "b20ah-fc100x200x100seed4-closeout": "done",
     "b20ai-fc100x50x50seed1": "done",
-    "b20aj-fc100x50x50seed2": "running",
+    "b20aj-fc100x50x50seed2": "done",
     "b20ak-fc100x50x50seed3": "done",
-    "b20al-fc100x50x50seed4": "done"
+    "b20al-fc100x50x50seed4": "done",
+    "b20ai-fc100x50x50seed1-closeout": "running",
+    "b20aj-fc100x50x50seed2-closeout": "running",
+    "b20ak-fc100x50x50seed3-closeout": "running",
+    "b20al-fc100x50x50seed4-closeout": "running"
   },
   "disk_free_gb": 157.8,
   "load_avg": [
-    1.943359375,
-    2.40625,
-    4.2841796875
+    2.0068359375,
+    2.36865234375,
+    4.2109375
   ]
 }
