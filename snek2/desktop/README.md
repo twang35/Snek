@@ -23,7 +23,7 @@ Each branch has exactly one writer, so there are never merge conflicts.
 | branch | writer | carries |
 |---|---|---|
 | `ops` | laptop | job specs in `queue/pending/`, and `config/runtime.json` |
-| `ops-status` | desktop | `status.json` — heartbeat, running jobs, steps/sec, ledger |
+| `ops-status` | desktop | `status.json` — heartbeat, running jobs, steps/sec, the queue, ledger |
 | `results` | desktop | each finished job's `runs/<policy>*` artifacts, pushed at completion |
 
 `master` stays your curated log; the bus branches carry the churn. The desktop
@@ -70,6 +70,12 @@ and reports the error in `status.json`, so a bad commit can't wedge the box.
 ```
 git fetch origin ops-status && git show origin/ops-status:status.json
 ```
+
+`running` is what is on the box now; **`queued` is every parsed pending spec waiting for the
+next wave, in the order it will launch** (priority, then auto-closeouts), each tagged
+`"status": "queued"` — so a glance shows what is still lined up, not only what is running. A
+launched job leaves `queued` and appears in `running` the same poll; a malformed spec never
+reaches `queued` — it lands in the `ledger` as `failed`.
 
 **Pull results** — `git fetch origin results && git checkout results -- results/<job-id>`.
 

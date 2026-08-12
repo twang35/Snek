@@ -5,6 +5,7 @@ real box and is not exercised here.
 Run directly:  PYTHONPATH=.. python test_runner.py    (from snek2/desktop/tests)
 or import and call the test_* functions like the snek2/tests suite.
 """
+import json
 import os
 import sys
 import tempfile
@@ -319,6 +320,63 @@ def test_sticky_wave_resets_when_idle_or_fresh():
     # tracking -- starts the next wave from its own arms, never the previous batch's.
     new = runnermod.viewer_png_paths([('trainer', 'b21a')], '/snek')
     assert runnermod.sticky_wave_pngs(['/snek/runs/b20a.png'], None, 'trainer', new) == new
+
+
+def _stub_pending(monkey_jobs):
+    """Point gitbus.read_pending_jobs at a fixed list of (filename, json-text) specs."""
+    texts = [(name, json.dumps(spec)) for name, spec in monkey_jobs]
+    runnermod.gitbus.read_pending_jobs = lambda host: list(texts)
+
+
+def test_scan_pending_orders_by_priority_and_drops_running_and_terminal():
+    r = _runner(auto_closeout=False)
+    _stub_pending([
+        ('c.json', {'id': 'c', 'type': 'train', 'policy': 'c', 'priority': 50}),
+        ('a.json', {'id': 'a', 'type': 'train', 'policy': 'a', 'priority': 10}),
+        ('b.json', {'id': 'b', 'type': 'train', 'policy': 'b', 'priority': 30}),
+        ('gone.json', {'id': 'gone', 'type': 'train', 'policy': 'gone', 'priority': 5}),
+        ('live.json', {'id': 'live', 'type': 'train', 'policy': 'live', 'priority': 1}),
+    ])
+    r.ledger['gone'] = {'state': 'done'}   # terminal -> not queued
+    r.running['live'] = object()            # already running -> not queued
+    got = [j.id for j in r._scan_pending()]
+    assert got == ['a', 'b', 'c'], got      # priority order, terminal + running excluded
+
+
+def test_scan_pending_marks_a_malformed_spec_failed_and_persists():
+    r = _runner(auto_closeout=False)
+    _stub_pending([('bad.json', {'id': 'bad', 'type': 'not-a-type'})])
+    assert r._scan_pending() == []
+    assert r.ledger['bad']['state'] == 'failed'
+    # persisted synchronously, since a scan can run while dispatch is skipped (paused/drain)
+    with open(r.host['LEDGER_PATH']) as fh:
+        assert json.load(fh)['bad']['state'] == 'failed'
+
+
+def test_scan_pending_includes_auto_closeouts_in_priority_order():
+    r = _runner(auto_closeout=True)
+    r.ledger['p'] = {'state': 'done', 'type': 'train', 'policy': 'p', 'closeout': 'pending'}
+    _stub_pending([('t.json', {'id': 't', 'type': 'train', 'policy': 't', 'priority': 100})])
+    got = [j.id for j in r._scan_pending()]
+    # the synthesized closeout (priority AUTO_CLOSEOUT_PRIORITY < 100) sorts ahead of the training
+    assert got == ['p-closeout', 't'], got
+
+
+def test_publish_status_lists_the_queue_in_order():
+    r = _runner(auto_closeout=False)
+    r.host['REPO_PATH'] = '/'   # _publish reads disk-free for this path
+    captured = {}
+    runnermod.gitbus.publish_status = lambda host, text: captured.setdefault('text', text)
+    _stub_pending([
+        ('b.json', {'id': 'b', 'type': 'train', 'policy': 'b', 'priority': 30}),
+        ('a.json', {'id': 'a', 'type': 'eval', 'policy': 'a', 'priority': 10}),
+    ])
+    r._queued = r._scan_pending()
+    r._publish()
+    status = json.loads(captured['text'])
+    assert [q['id'] for q in status['queued']] == ['a', 'b']
+    assert all(q['status'] == 'queued' for q in status['queued'])
+    assert status['queued'][0]['type'] == 'eval'
 
 
 if __name__ == '__main__':

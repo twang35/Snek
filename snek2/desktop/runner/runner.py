@@ -65,6 +65,7 @@ class Runner:
         self._viewer_pngs = None   # the PNG set the live viewer was launched with, or None
         self._wave_pngs = []       # sticky panel set for the current wave (grows, never shrinks)
         self._wave_category = None # the wave's category, so a train->eval flip resets the set
+        self._queued = []          # launchable jobs waiting for the next wave, priority order
         self.stop = False
         self._reattach()
 
@@ -112,6 +113,9 @@ class Runner:
         gitbus.fetch(self.host)
         self._apply_runtime()
         self._reap()
+        # Scan every poll -- not only when dispatching -- so status.json's `queued` list stays
+        # current while a wave occupies the box or the daemon is paused/draining.
+        self._queued = self._scan_pending()
         if not (self.runtime['paused'] or self.runtime['drain']):
             self._dispatch()
         for rj in self.running.values():
@@ -222,14 +226,15 @@ class Runner:
                             priority=AUTO_CLOSEOUT_PRIORITY))
         return jobs
 
-    def _dispatch(self):
-        free = _disk_free_gb(self.host['REPO_PATH'])
-        if free is not None and free < self.runtime['disk_min_gb']:
-            self.config_notes = self.config_notes + \
-                ['disk low ({0} GB < {1}) -- not launching'.format(free, self.runtime['disk_min_gb'])]
-            return
-        limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
+    def _scan_pending(self):
+        """The launchable jobs waiting for the next wave, sorted by priority -- the order
+        `_dispatch` draws from and the order status.json lists them in. Parses every pending
+        spec, marks a malformed one failed in the ledger (persisting that immediately, since
+        this runs even when dispatch is skipped), and drops any job already terminal or
+        running. Auto-closeouts join the same pool; a manual spec of the same id (should not
+        happen while auto-closeout is on, but can coexist) is kept over the synthesized one."""
         desired = []
+        marked = False
         for name, text in gitbus.read_pending_jobs(self.host):
             try:
                 job = parse_job(text, name)
@@ -238,27 +243,37 @@ class Runner:
                 if self.ledger.get(jid, {}).get('state') != 'failed':
                     self.ledger[jid] = {'state': 'failed', 'type': 'unknown',
                                         'error': str(e), 'finished': time.time()}
+                    marked = True
                 continue
             state = self.ledger.get(job.id, {}).get('state')
             if state in TERMINAL or job.id in self.running:
                 continue
             desired.append(job)
-        # Auto-closeouts join the same pool. A manual spec of the same id (should not happen
-        # while auto-closeout is on, but can coexist) is kept over the synthesized one.
         seen = {job.id for job in desired}
         desired += [j for j in self._auto_closeout_jobs() if j.id not in seen]
+        desired.sort(key=lambda j: j.priority)
+        if marked:
+            self._save_ledger()
+        return desired
+
+    def _dispatch(self):
+        free = _disk_free_gb(self.host['REPO_PATH'])
+        if free is not None and free < self.runtime['disk_min_gb']:
+            self.config_notes = self.config_notes + \
+                ['disk low ({0} GB < {1}) -- not launching'.format(free, self.runtime['disk_min_gb'])]
+            return
+        limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
+        desired = self._queued
         # Wave-barrier scheduling: a "wave" is a set of same-type jobs launched together,
         # up to that type's limit, and NOTHING new starts until the whole wave finishes.
         # So trainings and evals never overlap, and a freed slot is not backfilled mid-wave
         # -- the box idles on the stragglers until the slowest job in the wave is done, then
-        # the next wave opens. We still parse pending specs while a wave runs (above), so a
-        # malformed one is marked failed promptly, but we launch nothing until idle.
+        # the next wave opens. We still scan pending specs while a wave runs (in poll_once),
+        # so a malformed one is marked failed promptly, but we launch nothing until idle.
         if self.running or not desired:
-            self._save_ledger()
             return
         # The highest-priority pending job picks the wave's type; only jobs of that type
-        # join it, up to that type's limit.
-        desired.sort(key=lambda j: j.priority)
+        # join it, up to that type's limit. `desired` is already priority-sorted.
         wave_category = desired[0].category
         launched = 0
         for job in desired:
@@ -324,6 +339,12 @@ class Runner:
                          'steps_per_sec': rj.steps_per_sec,
                          'elapsed_s': round(time.time() - rj.started)}
                         for rj in self.running.values()],
+            # Everything parsed and waiting for the next wave, in the order it will launch, so
+            # a glance at status.json shows what is still queued -- not just what is running.
+            # Launched jobs move to `running` in the same poll, so drop them here.
+            'queued': [{'id': j.id, 'type': j.type, 'policy': j.policy,
+                        'priority': j.priority, 'status': 'queued'}
+                       for j in self._queued if j.id not in self.running],
             'ledger': {k: v.get('state') for k, v in self.ledger.items()},
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
             'load_avg': list(os.getloadavg()),
