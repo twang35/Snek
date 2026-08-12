@@ -1,0 +1,23 @@
+{
+  "id": "b25c-fc200x100x100noisseed3",
+  "type": "train",
+  "policy": "b25c-fc200x100x100noisseed3",
+  "env": {
+    "SNEK_FC_LAYERS": "200,100,100",
+    "SNEK_PRIORITY_SIGNAL": "td_error",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_PRIORITY_EXPONENT": "0.6",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60",
+    "SNEK_SEED": "3"
+  },
+  "max_steps": 3000000,
+  "priority": 210,
+  "notes": "batch 25: identical to b24 (b22 config, importance sampling OFF) but with fc 200,100,100 in place of 320. Seeds 1-4 match b22. priority 210 so it runs after b24 and b24's closeouts."
+}
