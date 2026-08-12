@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T10:42:04",
-  "ts": 1786556524.01115,
+  "iso": "2026-08-12T10:42:38",
+  "ts": 1786556558.2129655,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,7 +17,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
@@ -26,27 +26,18 @@
       "type": "train",
       "policy": "b22b-noisseed2",
       "pid": 1595969,
-      "step": 2982000,
-      "steps_per_sec": 92.1,
-      "elapsed_s": 36758
+      "step": 2985000,
+      "steps_per_sec": 87.7,
+      "elapsed_s": 36792
     },
     {
       "id": "b22c-noisseed3",
       "type": "train",
       "policy": "b22c-noisseed3",
       "pid": 1595970,
-      "step": 2957000,
-      "steps_per_sec": 92.1,
-      "elapsed_s": 36758
-    },
-    {
-      "id": "b22d-noisseed4",
-      "type": "train",
-      "policy": "b22d-noisseed4",
-      "pid": 1595971,
-      "step": 2999000,
-      "steps_per_sec": 92.1,
-      "elapsed_s": 36758
+      "step": 2960000,
+      "steps_per_sec": 87.7,
+      "elapsed_s": 36792
     }
   ],
   "ledger": {
@@ -120,15 +111,15 @@
     "b22a-noisseed1": "done",
     "b22b-noisseed2": "running",
     "b22c-noisseed3": "running",
-    "b22d-noisseed4": "running",
+    "b22d-noisseed4": "done",
     "b23a-beta01seed1-closeout": "queued",
     "b23b-beta01seed2-closeout": "queued",
     "b23c-beta01seed3-closeout": "queued",
     "b23d-beta01seed4-closeout": "queued",
     "b22a-noisseed1-closeout": "queued",
+    "b22d-noisseed4-closeout": "queued",
     "b22b-noisseed2-closeout": "queued",
     "b22c-noisseed3-closeout": "queued",
-    "b22d-noisseed4-closeout": "queued",
     "b24a-fc320noisseed1": "queued",
     "b24b-fc320noisseed2": "queued",
     "b24c-fc320noisseed3": "queued",
@@ -148,8 +139,8 @@
   },
   "disk_free_gb": 151.6,
   "load_avg": [
-    6.7333984375,
-    6.52734375,
-    7.02783203125
+    4.75390625,
+    6.056640625,
+    6.8505859375
   ]
 }
