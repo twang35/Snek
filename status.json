@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T15:09:48",
-  "ts": 1786572588.7719874,
+  "iso": "2026-08-12T15:10:23",
+  "ts": 1786572623.1378622,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,7 +18,7 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 2
+    "eval": 1
   },
   "running": [
     {
@@ -28,16 +28,7 @@
       "pid": 2238028,
       "step": 3000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 5720
-    },
-    {
-      "id": "b22d-noisseed4-closeout",
-      "type": "eval",
-      "policy": "b22d-noisseed4",
-      "pid": 2238031,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 5720
+      "elapsed_s": 5755
     }
   ],
   "ledger": {
@@ -119,7 +110,7 @@
     "b22a-noisseed1-closeout": "running",
     "b22b-noisseed2-closeout": "done",
     "b22c-noisseed3-closeout": "done",
-    "b22d-noisseed4-closeout": "running",
+    "b22d-noisseed4-closeout": "done",
     "b24a-fc320noisseed1": "queued",
     "b24b-fc320noisseed2": "queued",
     "b24c-fc320noisseed3": "queued",
@@ -139,8 +130,8 @@
   },
   "disk_free_gb": 152.9,
   "load_avg": [
-    7.9677734375,
-    10.330078125,
-    12.19970703125
+    6.02490234375,
+    9.5810546875,
+    11.87841796875
   ]
 }
