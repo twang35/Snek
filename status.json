@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T12:12:45",
-  "ts": 1786561965.6272142,
+  "iso": "2026-08-12T12:13:20",
+  "ts": 1786562000.1418982,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,7 +18,7 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 2
+    "eval": 1
   },
   "running": [
     {
@@ -28,16 +28,7 @@
       "pid": 2103298,
       "step": 3000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 4979
-    },
-    {
-      "id": "b23d-beta01seed4-closeout",
-      "type": "eval",
-      "policy": "b23d-beta01seed4",
-      "pid": 2103300,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 4979
+      "elapsed_s": 5014
     }
   ],
   "ledger": {
@@ -115,7 +106,7 @@
     "b23a-beta01seed1-closeout": "done",
     "b23b-beta01seed2-closeout": "running",
     "b23c-beta01seed3-closeout": "done",
-    "b23d-beta01seed4-closeout": "running",
+    "b23d-beta01seed4-closeout": "done",
     "b22a-noisseed1-closeout": "queued",
     "b22b-noisseed2-closeout": "queued",
     "b22c-noisseed3-closeout": "queued",
@@ -139,8 +130,8 @@
   },
   "disk_free_gb": 151.6,
   "load_avg": [
-    8.96484375,
-    11.5126953125,
-    14.33740234375
+    8.41552734375,
+    11.14208984375,
+    14.1240234375
   ]
 }
