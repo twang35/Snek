@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T16:14:34",
-  "ts": 1786576474.8302,
+  "iso": "2026-08-12T16:15:07",
+  "ts": 1786576507.1664367,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -26,36 +26,36 @@
       "type": "train",
       "policy": "b24a-fc320noisseed1",
       "pid": 2350082,
-      "step": 125000,
-      "steps_per_sec": 60.9,
-      "elapsed_s": 1370
+      "step": 128000,
+      "steps_per_sec": 92.8,
+      "elapsed_s": 1403
     },
     {
       "id": "b24b-fc320noisseed2",
       "type": "train",
       "policy": "b24b-fc320noisseed2",
       "pid": 2350083,
-      "step": 134000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 1370
+      "step": 137000,
+      "steps_per_sec": 92.8,
+      "elapsed_s": 1403
     },
     {
       "id": "b24c-fc320noisseed3",
       "type": "train",
       "policy": "b24c-fc320noisseed3",
       "pid": 2350084,
-      "step": 129000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 1370
+      "step": 132000,
+      "steps_per_sec": 92.8,
+      "elapsed_s": 1403
     },
     {
       "id": "b24d-fc320noisseed4",
       "type": "train",
       "policy": "b24d-fc320noisseed4",
       "pid": 2350085,
-      "step": 134000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 1370
+      "step": 137000,
+      "steps_per_sec": 92.8,
+      "elapsed_s": 1403
     }
   ],
   "ledger": {
@@ -157,8 +157,8 @@
   },
   "disk_free_gb": 152.8,
   "load_avg": [
-    10.71484375,
-    9.791015625,
-    8.248046875
+    10.2255859375,
+    9.76318359375,
+    8.28759765625
   ]
 }
