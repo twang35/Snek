@@ -71,11 +71,14 @@ and reports the error in `status.json`, so a bad commit can't wedge the box.
 git fetch origin ops-status && git show origin/ops-status:status.json
 ```
 
-`running` is what is on the box now; the **`ledger`** map now also carries every parsed
-pending spec as a `queued` entry **at the front, in the order the next wave will launch**
-(priority, then auto-closeouts) — so a glance at the ledger shows what is still lined up, not
-only what has run. A launched job moves from `queued` to `running` the same poll; a malformed
-spec never shows as `queued` — it lands in the ledger as `failed`.
+`running` is what is on the box now; the **`ledger`** map now also carries the pending queue as
+`queued` entries **at the front, in the order the wave-barrier scheduler will actually launch
+them** — including the **closeout eval each queued training will spawn**, slotted where it will
+run (a closeout has priority 10, so a batch's closeouts always form the next wave before the
+following training batch). So the queued section reads `batchA trainings → batchA closeouts →
+batchB trainings → batchB closeouts …`, even though those closeout specs do not exist as files
+yet. A launched job moves from `queued` to `running` the same poll; a malformed spec never
+shows as `queued` — it lands in the ledger as `failed`.
 
 **Pull results** — `git fetch origin results && git checkout results -- results/<job-id>`.
 

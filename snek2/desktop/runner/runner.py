@@ -329,12 +329,23 @@ class Runner:
 
     def _ledger_view(self):
         """The id->state map published in status.json, with the pending queue folded in as
-        `queued` entries at the front, in the order the next wave will launch them (priority,
-        then auto-closeouts). So a glance at the ledger shows what is still lined up, not only
-        what has run. A launched job moves into `running` and drops out of `_queued` the same
-        poll; a real ledger state wins over the synthetic `queued` on the rare id overlap
-        (a job re-queued while its prior run is still settling), since it is applied last."""
-        view = {j.id: 'queued' for j in self._queued if j.id not in self.running}
+        `queued` entries at the front, in the order the wave-barrier scheduler will actually
+        launch them -- including the closeout evals each queued training will spawn, which run
+        before the next training batch (see `anticipated_queue`). So a glance at the ledger
+        shows the whole expected run order, not only the specs that exist as files today.
+
+        A launched job moves into `running` and drops out of `_queued` the same poll; a real
+        ledger state wins over the synthetic `queued` on the rare id overlap (a job re-queued
+        while its prior run is still settling), since it is applied last."""
+        limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
+        auto = self.runtime.get('auto_closeout', True)
+        queued = [{'id': j.id, 'type': j.type, 'policy': j.policy, 'priority': j.priority}
+                  for j in self._queued if j.id not in self.running]
+        running = [{'id': jid, 'type': rj.job.type, 'policy': rj.policy}
+                   for jid, rj in self.running.items()]
+        existing = set(self.ledger) | set(self.running) | {j['id'] for j in queued}
+        order = anticipated_queue(queued, running, limits, auto, existing)
+        view = {j['id']: 'queued' for j in order}
         view.update({k: v.get('state') for k, v in self.ledger.items()})
         return view
 
@@ -358,6 +369,62 @@ class Runner:
             gitbus.publish_status(self.host, json.dumps(status, indent=2))
         except Exception as e:
             sys.stderr.write('publish_status failed: {0}\n'.format(e))
+
+
+def anticipated_queue(queued, running, limits, auto_closeout, existing_ids):
+    """Simulate the wave-barrier scheduler forward over the pending queue and return the jobs
+    in the order they are expected to launch -- with each queued training's closeout eval
+    inserted where it will actually run, before the next training batch.
+
+    Modelled straight from `_dispatch`: repeatedly form a wave from the highest-priority job's
+    category, up to that category's limit, drain it, and let every training in it spawn a
+    closeout (priority `AUTO_CLOSEOUT_PRIORITY` = 10, below any training) that competes in the
+    next wave. Because a closeout outranks a queued training, a batch's closeouts always slot
+    in ahead of the following batch -- the exact interleaving the box will run.
+
+    `queued` and `running` are lists of dicts with id/type/policy (queued also has priority);
+    `queued` is the real pending set (already includes closeouts synthesized for *finished*
+    trainings), `running` seeds anticipated closeouts for trainings on the box now, which drain
+    before any queued wave. `existing_ids` is every id already known (ledger, running, queued),
+    so a closeout that already exists somewhere is never invented twice. Returns the ordered
+    list of queued/anticipated job dicts (never the running jobs themselves)."""
+    def category(job_type):
+        return 'eval' if job_type == 'eval' else 'trainer'
+
+    seen = set(existing_ids)
+
+    def closeout_for(policy):
+        """A fresh closeout dict for `policy`, or None if one already exists or is not wanted."""
+        cid = (policy or '') + '-closeout'
+        if not policy or cid in seen:
+            return None
+        seen.add(cid)
+        return {'id': cid, 'type': 'eval', 'policy': policy, 'priority': AUTO_CLOSEOUT_PRIORITY}
+
+    pool = [dict(j) for j in queued]
+    for r in running:                                  # closeouts for trainings running now
+        if wants_closeout(r.get('type'), True, auto_closeout):
+            c = closeout_for(r.get('policy'))
+            if c:
+                pool.append(c)
+
+    order = []
+    while pool:
+        pool.sort(key=lambda j: j['priority'])
+        wave_type = category(pool[0]['type'])
+        wave = []
+        for job in pool:
+            if category(job['type']) == wave_type and len(wave) < limits[wave_type]:
+                wave.append(job)
+        wave_ids = {job['id'] for job in wave}
+        order.extend(wave)
+        pool = [job for job in pool if job['id'] not in wave_ids]
+        for job in wave:                               # each training in the wave spawns one
+            if wants_closeout(job['type'], True, auto_closeout):
+                c = closeout_for(job['policy'])
+                if c:
+                    pool.append(c)
+    return order
 
 
 def viewer_png_paths(running_jobs, snek_dir):

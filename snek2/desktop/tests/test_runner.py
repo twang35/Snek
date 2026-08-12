@@ -381,6 +381,61 @@ def test_publish_status_folds_the_queue_into_the_ledger_in_order():
     assert ledger['done-arm'] == 'done'
 
 
+AUTO = runnermod.AUTO_CLOSEOUT_PRIORITY
+
+
+def test_anticipated_queue_interleaves_a_closeout_batch_between_training_batches():
+    # Two training batches queued; each batch's closeouts run before the next batch's training,
+    # because a closeout (priority 10) outranks a queued training (200).
+    queued = [{'id': p, 'type': 'train', 'policy': p, 'priority': 200}
+              for p in ('a1', 'a2', 'b1', 'b2')]
+    order = runnermod.anticipated_queue(
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'a1', 'a2', 'b1', 'b2'})
+    assert [j['id'] for j in order] == [
+        'a1', 'a2', 'a1-closeout', 'a2-closeout',
+        'b1', 'b2', 'b1-closeout', 'b2-closeout'], [j['id'] for j in order]
+
+
+def test_anticipated_queue_seeds_closeouts_for_trainings_running_now():
+    # A training on the box now will spawn a closeout that runs before the queued batch.
+    queued = [{'id': 'b1', 'type': 'train', 'policy': 'b1', 'priority': 200}]
+    running = [{'id': 'r1', 'type': 'train', 'policy': 'r1'}]
+    order = runnermod.anticipated_queue(
+        queued, running, {'trainer': 2, 'eval': 2}, True, {'b1', 'r1'})
+    assert [j['id'] for j in order] == ['r1-closeout', 'b1', 'b1-closeout'], \
+        [j['id'] for j in order]
+
+
+def test_anticipated_queue_omits_closeouts_when_auto_closeout_off():
+    queued = [{'id': 'a1', 'type': 'train', 'policy': 'a1', 'priority': 200}]
+    order = runnermod.anticipated_queue(queued, [], {'trainer': 2, 'eval': 2}, False, {'a1'})
+    assert [j['id'] for j in order] == ['a1']
+
+
+def test_anticipated_queue_never_invents_an_existing_closeout_twice():
+    # The real closeout for a finished training already sits in the queue; do not duplicate it.
+    queued = [{'id': 'p', 'type': 'train', 'policy': 'p', 'priority': 200},
+              {'id': 'p-closeout', 'type': 'eval', 'policy': 'p', 'priority': AUTO}]
+    order = runnermod.anticipated_queue(
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'p', 'p-closeout'})
+    ids = [j['id'] for j in order]
+    assert ids.count('p-closeout') == 1, ids
+
+
+def test_ledger_view_anticipates_closeouts_for_a_queued_training():
+    r = _runner(auto_closeout=True)
+    r.runtime['max_trainers'] = 2
+    r.runtime['max_evals'] = 2
+
+    class _J:
+        def __init__(self, jid, pri):
+            self.id, self.policy, self.priority, self.type = jid, jid, pri, 'train'
+    r._queued = [_J('t1', 200), _J('t2', 200)]
+    view = r._ledger_view()
+    assert list(view.keys()) == ['t1', 't2', 't1-closeout', 't2-closeout'], list(view.keys())
+    assert all(view[k] == 'queued' for k in view)
+
+
 def test_ledger_view_lets_a_real_state_win_over_queued_on_overlap():
     # A job re-queued while its prior run is still in the ledger keeps its real state, not
     # the synthetic 'queued' -- the real states are applied last.
