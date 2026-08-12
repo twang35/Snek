@@ -362,9 +362,10 @@ def test_scan_pending_includes_auto_closeouts_in_priority_order():
     assert got == ['p-closeout', 't'], got
 
 
-def test_publish_status_lists_the_queue_in_order():
+def test_publish_status_folds_the_queue_into_the_ledger_in_order():
     r = _runner(auto_closeout=False)
     r.host['REPO_PATH'] = '/'   # _publish reads disk-free for this path
+    r.ledger['done-arm'] = {'state': 'done', 'type': 'train'}   # history stays in the ledger
     captured = {}
     runnermod.gitbus.publish_status = lambda host, text: captured.setdefault('text', text)
     _stub_pending([
@@ -373,10 +374,22 @@ def test_publish_status_lists_the_queue_in_order():
     ])
     r._queued = r._scan_pending()
     r._publish()
-    status = json.loads(captured['text'])
-    assert [q['id'] for q in status['queued']] == ['a', 'b']
-    assert all(q['status'] == 'queued' for q in status['queued'])
-    assert status['queued'][0]['type'] == 'eval'
+    ledger = json.loads(captured['text'])['ledger']
+    # queued jobs appear as state 'queued', in launch order, ahead of the run history
+    assert list(ledger.keys()) == ['a', 'b', 'done-arm'], list(ledger.keys())
+    assert ledger['a'] == 'queued' and ledger['b'] == 'queued'
+    assert ledger['done-arm'] == 'done'
+
+
+def test_ledger_view_lets_a_real_state_win_over_queued_on_overlap():
+    # A job re-queued while its prior run is still in the ledger keeps its real state, not
+    # the synthetic 'queued' -- the real states are applied last.
+    r = _runner(auto_closeout=False)
+    r.ledger['x'] = {'state': 'running', 'type': 'train'}
+    class _J:  # minimal stand-in for a queued Job
+        id, policy, priority, type = 'x', 'x', 100, 'train'
+    r._queued = [_J()]
+    assert r._ledger_view()['x'] == 'running'
 
 
 if __name__ == '__main__':

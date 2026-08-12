@@ -23,7 +23,7 @@ Each branch has exactly one writer, so there are never merge conflicts.
 | branch | writer | carries |
 |---|---|---|
 | `ops` | laptop | job specs in `queue/pending/`, and `config/runtime.json` |
-| `ops-status` | desktop | `status.json` — heartbeat, running jobs, steps/sec, the queue, ledger |
+| `ops-status` | desktop | `status.json` — heartbeat, running jobs, steps/sec, ledger (incl. the queue) |
 | `results` | desktop | each finished job's `runs/<policy>*` artifacts, pushed at completion |
 
 `master` stays your curated log; the bus branches carry the churn. The desktop
@@ -71,11 +71,11 @@ and reports the error in `status.json`, so a bad commit can't wedge the box.
 git fetch origin ops-status && git show origin/ops-status:status.json
 ```
 
-`running` is what is on the box now; **`queued` is every parsed pending spec waiting for the
-next wave, in the order it will launch** (priority, then auto-closeouts), each tagged
-`"status": "queued"` — so a glance shows what is still lined up, not only what is running. A
-launched job leaves `queued` and appears in `running` the same poll; a malformed spec never
-reaches `queued` — it lands in the `ledger` as `failed`.
+`running` is what is on the box now; the **`ledger`** map now also carries every parsed
+pending spec as a `queued` entry **at the front, in the order the next wave will launch**
+(priority, then auto-closeouts) — so a glance at the ledger shows what is still lined up, not
+only what has run. A launched job moves from `queued` to `running` the same poll; a malformed
+spec never shows as `queued` — it lands in the ledger as `failed`.
 
 **Pull results** — `git fetch origin results && git checkout results -- results/<job-id>`.
 

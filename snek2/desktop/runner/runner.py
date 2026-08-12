@@ -327,6 +327,17 @@ class Runner:
         except Exception as e:  # best-effort, but say so in the journal, not silently
             sys.stderr.write('publish_results({0}) failed: {1}\n'.format(rj.job.id, e))
 
+    def _ledger_view(self):
+        """The id->state map published in status.json, with the pending queue folded in as
+        `queued` entries at the front, in the order the next wave will launch them (priority,
+        then auto-closeouts). So a glance at the ledger shows what is still lined up, not only
+        what has run. A launched job moves into `running` and drops out of `_queued` the same
+        poll; a real ledger state wins over the synthetic `queued` on the rare id overlap
+        (a job re-queued while its prior run is still settling), since it is applied last."""
+        view = {j.id: 'queued' for j in self._queued if j.id not in self.running}
+        view.update({k: v.get('state') for k, v in self.ledger.items()})
+        return view
+
     def _publish(self):
         status = {
             'iso': time.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -339,13 +350,7 @@ class Runner:
                          'steps_per_sec': rj.steps_per_sec,
                          'elapsed_s': round(time.time() - rj.started)}
                         for rj in self.running.values()],
-            # Everything parsed and waiting for the next wave, in the order it will launch, so
-            # a glance at status.json shows what is still queued -- not just what is running.
-            # Launched jobs move to `running` in the same poll, so drop them here.
-            'queued': [{'id': j.id, 'type': j.type, 'policy': j.policy,
-                        'priority': j.priority, 'status': 'queued'}
-                       for j in self._queued if j.id not in self.running],
-            'ledger': {k: v.get('state') for k, v in self.ledger.items()},
+            'ledger': self._ledger_view(),
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
             'load_avg': list(os.getloadavg()),
         }
