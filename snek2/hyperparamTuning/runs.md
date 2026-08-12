@@ -35,6 +35,12 @@ buffer) → **IS off ≈0.38** (b22) → the no-IS extreme already run is b18's 
   0.30 at b21 and the full 0.6 with IS off. It asks whether dialing β toward 0 approaches the IS-off
   behaviour smoothly, or whether even a little correction (0.1) still buys the b21 consolidation edge.
   Seeds match b21/b22 for a seed-for-seed compare.
+  **`b23b`'s 217-242k collapse was investigated in place at ~550k and it is not an escape from a local
+  minimum** — the three sibling seeds make the same level shift over the same steps and `b23d` gains
+  more with no collapse at all. Full read in
+  [`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum);
+  arms were left running. At 550k the batch is tracking b18 almost seed-for-seed (`sef` 0.2 / 21.1 /
+  0.2 / 8.7 against b18's 0.9 / 19.8 / 0.0 / 15.4), which is the comparison to settle when it finishes.
 
 ## Batch 20 — FC layer shapes, on batch 19's base
 

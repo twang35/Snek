@@ -344,7 +344,7 @@ for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablat
              'test_run_report', 'test_shielded_policy', 'test_reward_shaping',
              'test_game_snapshot', 'test_replay_streams', 'test_forking_collector',
              'test_progress_chart', 'test_eval_workers', 'test_chart_viewer',
-             'test_policy_arch']:
+             'test_policy_arch', 'test_input_sensitivity', 'test_behaviour_profile']:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1

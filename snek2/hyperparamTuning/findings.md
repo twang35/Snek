@@ -63,7 +63,15 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | `td_loss` + alpha 0.8 + no IS is effectively alpha 1.6 | **established** — arithmetic, and now **measured**: the log-log slope of Huber against `\|δ\|` is 1.92-1.99 on 8 arms, so alpha 0.6 + `td_loss` is an effective **1.15-1.20** |
 | **The two priority signals prioritize the *same* transitions** | **established** — Huber is monotone in `\|δ\|`, so the ranking is identical; top-1000 Jaccard is **1.0000** on 8 of 8 arms. The signal changes how much mass the top gets, never which rows are at the top |
 | **‡ IS at β=1.0 cancels prioritization outright, so batches 19-20 were uniform replay past their anneal** | **measured 2026-08-10** — expected update `∝ raw^(α(1−β))`, flat at β=1.0. Realised ESS/N **0.951** against a 0.975 same-effort noise floor, versus **0.213** for batch 18. See below |
-| **‡‡ Batch 20 never learned to read observation 15-17, "is it safe to chase the food"** | **measured 2026-08-10**, the sharpest mechanism found. Counterfactual ΔQ **+11.70 vs +0.228** (4/4, p=0.125); **6.9x** on the conservative safe-actions-only version; `b20a`'s weight is *negative*. The flag fires in only 5-7% of endgame states, so under β=1.0 uniform replay its weights stay undertrained — the index-29 hazard in a milder, costlier form. See below |
+| **‡‡ Batch 20 never learned to read observation 15-17, "is it safe to chase the food"** | **measured 2026-08-10** and still correct. Counterfactual ΔQ **+11.70 vs +0.228** (4/4, p=0.125); **6.9x** on the conservative safe-actions-only version; `b20a`'s weight is *negative* |
+| ~~Reading observation 15-17 is the mechanism behind batch 18's perfect rate~~ | **‡ demoted 2026-08-11** — the reading rises with steps in every arm and *anti*-correlates with skill inside batch 18 (worst two arms hold the highest ratios); corr with `sef` across 8 arms **+0.04**. `b23b` reads it like batch 20 and scores like batch 18. It marks how much prioritisation survives IS, not skill |
+| **‡‡ The elite-vs-mediocre difference is endgame hunting speed, not blunders** | **measured 2026-08-11**, 12 checkpoints × the same 100 games. p90 steps per meal at length 95-99: **5-13 for the records, 86-226 for batch 20's peaks**; `steps_per_food` at 85-94 correlates **−0.967** with perfect rate. Packing, fragmentation and straightness all move with it — one factor, not five |
+| **‡‡ A perfect game is 95 consecutive meals, so 99% needs a 5× cut in per-meal error** | **arithmetic on measured rates** — the record checkpoint already plays **1,850 meals per mistake**; 99% needs one per **9,450**. Reframes the objective: the remaining gap is per-meal reliability in the ~5 meals played at length 95+ |
+| **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
+| **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
+| **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
+| **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
+| **‡‡ The seed decides which arm in a wave wins, and it does not wash out** | **measured 2026-08-11** — seed 2 or 4 is the best arm in **18 of 18** config waves at 550k, mean `sef` gap **+5.41 pp**, exact paired **p=0.00005**; still +8.73 pp at 2M. Comparable to the largest config effect on record. Paired designs difference it out; nothing else does |
 | Batch 20's low endgame Q means the terminal reward propagates slowly | **superseded the same day** — it is not lagging, it is **undiscriminating**: ~2-3 for winnable and doomed boards alike, against batch 18's 34-66 vs 18-35 |
 | **‡‡ Losses are never trapped positions — the food is reachable until the last 0-2 moves, 75/75** | **measured 2026-08-10** by exact search over 360 greedy episodes, 0 simulator mismatches. Kills the "routing mistake tens of moves earlier" hypothesis outright |
 | **‡‡ Starvation is now the modal failure: 55% of losses in both batches, at median length 98** | **measured 2026-08-10** — and recorded nowhere. `b8f` in 2026-08-02's diagnostics starved **0** times in 360 episodes under the same rule. **The binding constraint is finishing from length 96-98 inside the starve budget** |
@@ -721,7 +729,24 @@ records that the static test flags a fatal move only **22.1%** of the time again
 advanced-tail variant. So `safe` is biased pessimistic, which is consistent with it being censored in
 over half the losses, and its 20-82 move figure should not be quoted as the distance.
 
-### ‡‡ The best mechanism found: batch 20 never learned to read "is it safe to chase the food"
+### ‡‡ Batch 20 never learned to read "is it safe to chase the food" — but reading it does not make an arm good
+
+> **‡ Demoted 2026-08-11, and the demotion is the useful part.** This was written up as "the best
+> mechanism found" for the batch-18 gap. Tracking the same counterfactual *over training* on eight
+> arms breaks that reading. The chase/is-safe ratio **rises monotonically with steps in every arm
+> measured**, and **inside batch 18 it is anti-correlated with skill**: at a matched 1.0M the two
+> worst arms carry the two highest ratios (`b18c` 0.635 at sef 7.4, `b18a` 0.577 at 14.8) and the two
+> best carry the lowest (`b18d` 0.189 at 27.2, `b18b` 0.273 at 26.5). Across all eight arms the
+> correlation with sef is **+0.04** — nothing. `b23b` is the clincher: at 540k it reads the flag like
+> a batch-20 arm (ratio 0.154) and performs like a batch-18 one (sef 26.6 at 550k, against `b18b`'s
+> 26.5 at 1.0M).
+>
+> So the batch-18-vs-batch-20 contrast below is real and correctly measured, but it is a **marker of
+> how much prioritisation survives the IS correction, not a cause of the perfect rate**. The ratio at
+> a matched ~500k walks down the β ladder exactly as the concentration figures do — b18 (no IS) mean
+> 0.205, b23 (β→0.1) mean 0.110, b20 (β→1.0) ~0.02. Measured with
+> `perDiagnostics/input_sensitivity_over_time.py`; chart in
+> [`charts/drawdown-b23b-vs-b18.png`](charts/drawdown-b23b-vs-b18.png) panel C.
 
 Observation indices **15-17** are, per action, "head, food and tail all end up in one region" — the
 signal added specifically so a policy could tell a reachable meal from one that seals it in. The
@@ -780,7 +805,9 @@ for index 29 (1 in 99.95% of states) and for the `game_over` input whose unconst
 90.3% champion into one scoring 0 — **rare rather than constant, so a milder form, but pointed at the
 one input that predicts the 100-point reward.** It also reframes the next experiment: what
 `IS_WEIGHTS=0` would be buying is not faster backups but enough gradient on the rare informative
-states to fix a weight.
+states to fix a weight. **That last sentence is the part the demotion above bites**: more gradient on
+the rare states does reliably raise this reading, and raising this reading does not raise the perfect
+rate, so `IS_WEIGHTS=0` has to be justified by the concentration ladder rather than by this input.
 
 ### The record checkpoint, specifically
 
@@ -829,6 +856,210 @@ generate itself.
   0, `next_step_type` FIRST — so the policy never acts there and that column's Q is unconstrained,
   the same shape as the `game_over` trap in the root `CLAUDE.md`. Read the spike at the end of the
   curve as length **99** only.
+
+## ‡‡ What the record checkpoints do differently: they find food in the endgame, and that is nearly all of it
+
+Twelve checkpoints spanning 30-95% perfect, each played over **the same 100 greedy games** so the
+comparison is paired and the game set cancels. `perDiagnostics/behaviour_profile.py` logs, per step,
+the observation values of the action the policy *actually chose*. Chart:
+[`charts/champion-vs-mediocre.png`](charts/champion-vs-mediocre.png).
+
+The separation is almost entirely one quantity — **how long a meal takes at length 95-99**:
+
+| checkpoint | perfect % | p90 steps/meal at 95-99 | meals over 200 steps | budget left, worst tenth |
+|---|---|---|---|---|
+| `b17b` @1190k | 95 | **5.0** | 0.2% | **495** |
+| `b18b` @1588k | 93 | **5.5** | 1.0% | **495** |
+| `b11b` @855k | 92 | **5.5** | 0.2% | **495** |
+| `b13d` @986k | 89 | **5.4** | 0.2% | **495** |
+| `b15b` @3245k | 87 | 7.9 | 0.6% | 492 |
+| `b14a` @3702k | 86 | 13.4 | 2.5% | 487 |
+| `b23b` @549k | 80 | 45.2 | 0.2% | 455 |
+| `b20d` peak | 78 | **85.8** | 2.2% | 414 |
+| `b20b` peak | 72 | **92.5** | 5.0% | 408 |
+| `b20c` peak | 36 | **226.2** | **11.3%** | **274** |
+| `b20a` peak | 30 | **175.4** | 9.1% | 325 |
+
+The records reach the food in **2 moves at the median and 5-6 at the 90th percentile**. The batch-20
+peaks take **86-226 moves at the 90th percentile**, and one meal in ten costs `b20c` more than 200
+moves against a 500-step budget. That is the starvation finding made mechanical: the mediocre
+policies are not trapped and are not making fatal blunders, they are **wandering**, and at length 96+
+wandering runs out the clock.
+
+Across all twelve, `steps_per_food` at 85-94 correlates **−0.967** with perfect rate. Every other
+marker moves with it: packing (`hug` +0.944), fragmentation (`regions` −0.942), straight-line movement
+(`forward` +0.917), tail reachability (+0.899). These are one factor, not five.
+
+**Within the top seven** (all 85-95%, so the two failures cannot drive it) most of those markers wash
+out — and the one that survives is **realised chase-safety**: the share of chosen moves that keep
+head, food and tail in one region. Pearson **+0.860** at 85-94 and **+0.822** at 95-99, the only
+marker strong in both bands. Note what this is *not*: it is not the Q-sensitivity to observation
+15-17, which the section below demotes for failing to predict skill. **The network does not need to
+value the flag; the policy needs to keep the property true.** With n=7 across ~18 tested
+correlations, treat it as the best available lead rather than as established.
+
+**The arithmetic of what is left.** A perfect game is **95 consecutive meals**, so the per-meal error
+rate is the quantity that matters and it compounds brutally:
+
+| checkpoint | perfect % | per-meal failure | needed for 99% | reduction |
+|---|---|---|---|---|
+| `b17b` @1190k | 95 | 0.054% | 0.011% | **5.1×** |
+| `b18b` @1588k | 93 | 0.076% | 0.011% | 7.2× |
+| `b20d` peak | 78 | 0.261% | 0.011% | 24.7× |
+| `b20a` peak | 30 | 1.259% | 0.011% | 119× |
+
+So the best checkpoint on record already plays 1,850 meals per mistake, and a 99% perfect rate needs
+one per 9,450. **Chasing perfect-game percentage points understates how good the policy already is
+and how much is left**: 5× on per-meal reliability, concentrated in the ~5 meals per game played at
+length 95+. The reason those meals are special is not skill but geometry — the free space is a thin
+corridor, so a wrong turn costs a long detour under a clock that no longer scales with length (the
+budget caps at 500 from length 50 up).
+
+## ‡‡ There is no lucky checkpoint: an arm's best is set by its median
+
+From the project's own close-out measurements — 3,712 full-depth rows (≥100 episodes, not abandoned)
+across 68 files, no new compute:
+
+| arm | rows | best | median | ≥90% | ≥95% |
+|---|---|---|---|---|---|
+| `b18b-tgt1000seed2` | 9 | 97.4 | **95.0** | **100%** | **67%** |
+| `b17b-forkseed2` | 39 | 97.0 | **95.0** | 77% | 59% |
+| `b15b-nstep3seed2` | 94 | 97.0 | 90.0 | 69% | 9% |
+| `b11b-obs30seed2` | 204 | 96.0 | 83.0 | 19% | 1% |
+| `b13d-shieldseed4` | 148 | 95.0 | 79.0 | 3% | 1% |
+| `b10d-disc995seed4` | 660 | 93.0 | 75.5 | **0%** | 0% |
+| `b10b-disc995seed2` | 624 | 90.0 | 72.0 | **0%** | 0% |
+
+**An arm's best measured checkpoint is predicted by its median at r=+0.971.** `b10b` had 624
+checkpoints measured at full depth and **not one cleared 90%**; `b18b` had nine and **all nine did**.
+There is no lottery to win inside a mediocre arm — the high checkpoints live in arms that are high
+everywhere, and `b18b` held ≥90% across **1.2M steps** of measured rows.
+
+The practical consequence is that **screening more checkpoints is not a route to a better policy**,
+which matters because that is where a lot of close-out compute goes. Raising an arm's median is the
+only thing that moves its best.
+
+### ‡ And the corollary: most of a selected high is selection
+
+Two measured checkpoints of the same arm **less than 20k steps apart differ by no more than binomial
+noise** — mean |Δperfect| 5.90 pp against a 6.48 pp noise floor at these episode counts. Only past
+~50k does real signal exceed noise. So a 100-episode read cannot resolve neighbouring checkpoints at
+all, and picking the maximum of many such reads buys mostly luck:
+
+| checkpoints screened | pp the max reads high, all truly at 90% |
+|---|---|
+| 5 | +3.4 |
+| 20 | +5.2 |
+| 50 | +6.1 |
+| 100 | +6.7 |
+
+This **fully accounts for the shrinkage this project has documented four times** — `b17b` 99/100 →
+94.2%, `b15b` 97/100 → 93.0%, `b14a` 96/100 → 93.5%, mean **−5.05 to −5.2 pp**. No extra mechanism is
+needed, and in particular the "the record is a narrow peak, not a region" reading is not required by
+the data: neighbouring checkpoints are indistinguishable at the depth used to call them different.
+
+**Confirmed against fresh games, with one caveat that cuts the other way.** Re-measuring the two most
+heavily measured entries on games neither had seen:
+
+| checkpoint | recorded | fresh /200 | delta |
+|---|---|---|---|
+| `b17b` @1190k | 94.24% /5120 | **95.5%** | +1.3 |
+| `b18b` @1588k | 97.57% /700 | **94.0%** | −3.6 |
+
+`b17b`'s 5,120-episode figure reproduces within noise, which is the check that says the protocol here
+matches the project's. `b18b`'s reads 3.6 pp low, about 2σ — **suggestive that even the 700-episode
+record figure is a little optimistic, not conclusive.** The five remaining hall-of-fame entries also
+read 2.0-7.5 pp below their recorded values, but those share one game set that the two cross-checks
+show runs ~1-2 pp hard, and they are therefore **not seven independent observations** — an earlier
+draft of this section quoted a paired p-value over them, which was wrong for exactly that reason.
+
+## ‡‡ Falsified: a drawdown is not how a policy escapes a local minimum
+
+`b23b` collapsed from score 94 to 4 over 217-242k and came out the other side with a much higher
+perfect rate — trailing-30 perfect ran ~35% before, bottomed at 9.7%, and reached 55% by 300k and
+75% by 550k. The hypothesis that suggested itself is that the collapse *is* the escape: a forced
+excursion that breaks a mediocre optimum. **It is not.** Five measurements, one direction.
+
+| question | measurement | answer |
+|---|---|---|
+| Did the endgame value structure reorganise? | dQ from flipping "safe to chase food" (obs 15-17) on 5,973 fixed boards | **no** — 0.993 → 0.990 → 1.020 across 218k/223k/236k, on a smooth curve from 0.90 at 180k to 1.11 at 300k |
+| Did the network start reading different inputs? | mean gradient per input, all 30 | **no** — the same rank order before and after, everything scaling together (total mass 96 → 170) |
+| Did the greedy policy churn faster? | share of the 5,973 boards changing argmax per 2,000 steps | **mildly** — 0.034 inside vs 0.020 before, but the run's two *largest* churn events (0.055, 0.048) happen at score 93 |
+| Was the rise the drawdown's doing? | the three sibling seeds, same config, no collapse | **no** — `b23d` gained **+48.6 pp** with no drawdown at all, against `b23b`'s +40.9 |
+| Is it a batch-18 pattern too? | four dip windows, 2,000-step ladders | **no** — churn 1.10-1.33× in dips, and the chase-reading slope is *unchanged* (faster in 2 windows, slower in 1, flat in 1) |
+
+The sibling control is the decisive one. All four `b23` arms make the same level shift over the same
+steps — `b23a` +27.1, `b23c` +25.8, `b23d` +48.6, `b23b` +40.9 pp between 150-215k and 450-550k —
+so the rise is ordinary continued learning that `b23b`'s collapse briefly interrupted, not a
+consequence of it. Chart: [`charts/drawdown-b23b-vs-b18.png`](charts/drawdown-b23b-vs-b18.png).
+
+**What a drawdown actually is: the mid-game breaks, not the endgame.** Fresh greedy episodes per
+checkpoint, `perDiagnostics/point_of_no_return.py`, 0 simulator mismatches:
+
+| checkpoint | episodes | perfect % | starved | collision | median length at death | starve share of losses |
+|---|---|---|---|---|---|---|
+| 200k, healthy, before | 160 | 46.9 | 73 | 12 | **96** | 86% |
+| 216k, entering the collapse | 80 | 20.0 | 62 | 2 | **30** | 97% |
+| 300k, recovered | 80 | 61.2 | 30 | 1 | **97** | 97% |
+| 549k, now | 160 | 76.2 | 19 | 19 | **98** | 50% |
+
+Outside the collapse the policy reaches length 96-98 and loses to the starve clock at the very end,
+which is the failure mode already on record. Inside it, the median death length is **30** and 97% of
+losses are starvation — the snake stops finishing the *mid* game and starves early. So a drawdown is
+not a reorganisation of endgame skill; it is a temporary loss of the ability to keep eating, and the
+endgame machinery sits untouched underneath it, which is exactly why recovery is fast.
+
+The one thing that did improve monotonically is the **failure mix**: starvation falls from 86% of
+losses at 200k to 50% at 549k, while collisions rise from 12 to 19 in the same number of episodes.
+Progress toward a high perfect rate looks like trading starvations for collisions, not like escaping
+an optimum — and it puts a number on how much headroom the starve clock still holds.
+
+**Two caveats.** `SNEK_MIN_CHECKPOINT_SCORE=40` gates on `max(avg_score, trailing_avg_score)`, so the
+entry and exit of a collapse are always checkpointed but a deep trough is thin: `b23b`'s 26-eval
+collapse left only 218k, 223k and 236k. The three agree with each other and with the smooth curve
+through them, but a transient excursion *between* them cannot be excluded — and pre-gate arms with
+full trough coverage (`b8d`, `b10c`) are the 20- and 26-value observation eras, where indices 15-17
+do not exist at all. Second, the rollout rows are **one checkpoint each**, and checkpoint-to-
+checkpoint variance is large in this project; the 200k row reads 46.9% where the training graph's
+eval at that step read 50%, which is agreement, but the before/after gap should be read against the
+training curve rather than these two numbers.
+
+## ‡‡ The seed, not the config, decides which arm in a wave wins — and it holds to 2M steps
+
+Grouping every four-arm wave since the observation era froze by its config tag, and scoring
+`strong_eval_fraction` at a matched horizon:
+
+| horizon | waves | mean sef(seed 2,4) − sef(seed 1,3) | positive | exact paired p |
+|---|---|---|---|---|
+| 550k | 18 | **+5.41 pp** | 16/18 (one tie at 0.00, one at −0.09) | **0.00005** |
+| 1.0M | 16 | **+7.70 pp** | 15/16 | 0.00040 |
+| 1.5M | 14 | **+8.82 pp** | 13/14 | 0.00122 |
+| 2.0M | 14 | **+8.73 pp** | 12/14 | 0.00122 |
+
+**Seed 2 or seed 4 was the best arm in 18 of 18 waves at 550k**, across `disc995`, `obs30`,
+`shield`, `disc9975`, `nstep3`, `noshape`, `fork`, `tgt1000`, `stdper`, five FC shapes, `beta05` and
+`beta01` — every config change of the last thirteen batches. Mean sef at 550k by seed: **0.6, 7.1,
+0.6, 6.5**. Exact two-sided paired permutation over all 2^n sign flips.
+
+This matters for how results here are read:
+
+- **The effect is comparable to the largest config effect on record.** Batch 18's signal change is
+  ~+21 pp of sef; the seed is worth ~+9 pp and it never fails to show up.
+- **It is a ceiling effect, not just a slow start.** It *grows* from 550k to 1.5M rather than washing
+  out, so "give the bad seeds more steps" does not fix it.
+- **It does not invalidate the config comparisons**, which is the good news: every batch since 10 has
+  used the same four seeds, so the paired designs already difference it out. What it does invalidate
+  is any comparison across a *different* seed subset, and it explains part of what this project has
+  been calling domain noise — "the same config produced 62.5 and 18.0" is partly which seed ran.
+- **The mechanism is open, and it is genuinely odd** that it exists at all: a seed does not reproduce
+  a run here, because `cpprb`'s sampling RNG is unseeded and two same-seed arms diverge inside 1,000
+  steps (see the section below). Whatever seeds 2 and 4 confer therefore survives that divergence.
+  Initial weights are the obvious candidate — identical per seed for every 30-value `50,100,50` arm —
+  but `b10` is 26 values with a differently shaped first layer and still shows +6.7, which an
+  init-only story does not explain.
+
+The cheap follow-up is **seeds 5-12 on one fixed config**: it prices the seed distribution properly,
+says whether 2 and 4 are unusually good or 1 and 3 unusually bad, and costs no new code.
 
 ## Falsified: epsilon reaching 0.0 does not cause the collapse
 

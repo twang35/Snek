@@ -181,15 +181,18 @@ def verify_step(before, action, after):
 
 
 def load_agent(target):
-    py_env = SnakeEnvironment(discount=0.9975, display=False, policy_name='smoke')
-    py_env.reset()
-    tf_env = tf_py_environment.TFPyEnvironment(py_env)
-    agent, checkpoint, global_step = build_eval_agent(tf_env, py_env)
+    # The checkpoint is resolved before the agent is built, because `build_eval_agent` needs the
+    # directory holding `arch.json` to rebuild the recorded network. A bare policy name means its
+    # newest checkpoint; a `ckpt-<step>` path pins one, and its directory is the policy's.
     path = target
     if not os.path.basename(target).startswith('ckpt-'):
         path = tf.train.latest_checkpoint(os.path.join('savedPolicies', target))
         if path is None:
             raise SystemExit('no checkpoint for ' + target)
+    py_env = SnakeEnvironment(discount=0.9975, display=False, policy_name='smoke')
+    py_env.reset()
+    tf_env = tf_py_environment.TFPyEnvironment(py_env)
+    agent, checkpoint, global_step = build_eval_agent(tf_env, py_env, os.path.dirname(path))
     checkpoint.restore(path).expect_partial()
     return py_env, tf_env, agent, path, int(global_step.numpy())
 

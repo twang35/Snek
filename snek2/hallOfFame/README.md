@@ -27,6 +27,20 @@ rather than a mid-run measurement. Every entry here is the default `FC_LAYERS=50
 | `b13d-shieldseed4-ckpt986000` | 95/100 (CI 88.8-97.8), top-3 93.3% | + eps handover 0.0125, `GUIDED_FRACTION=0.5`, `SNEK_SEED=4` |
 | `b11a-obs30seed1-ckpt671000` | 94/100 (CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
 
+> **‡ Re-measured 2026-08-11 on games none of these had seen, and the numbers above are a ceiling.**
+> 100-200 fresh greedy episodes each, via `hyperparamTuning/perDiagnostics/behaviour_profile.py`:
+> `b17b` @1190k read **95.5% /200** against its recorded 94.24% /5120 — agreement, and the check that
+> validates the protocol. `b18b` @1588k read **94.0% /200** against its recorded 97.57% /700, about 2σ
+> low. The other five read **2.0-7.5 pp** below their recorded figures, though they shared one game set
+> that the two cross-checks show runs ~1-2 pp hard, so they are not independent observations.
+>
+> **Read the entries below as selected highs.** Selecting the maximum of 20-50 hundred-episode reads
+> inflates by 5-6 pp on its own, which is enough to explain the whole shrinkage history without any
+> other mechanism — see
+> [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md#-and-the-corollary-most-of-a-selected-high-is-selection).
+> Nothing here needs changing: the entries are the right checkpoints to keep, and the ranking among
+> them is roughly preserved. It is the absolute percentages that are optimistic.
+
 ### ‡ `b18b` @1588000 — the first selected high that did *not* shrink
 
 Added 2026-08-09. Promoted under the standing rule: **a checkpoint that beats the all-time best on

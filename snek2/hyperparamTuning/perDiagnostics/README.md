@@ -4,6 +4,10 @@
 |---|---|---|
 | `per_priorities.py` | `<out_dir> [policy ...]` | what the PER priority signal does to the sampling distribution, and each arm's value profile against snake length |
 | `point_of_no_return.py` | `<policy-or-ckpt> <episodes> <seed> <out.json>` | per lost episode, the last point at which the food was still reachable — and the outcome split, which is where the starvation finding came from |
+| `input_sensitivity_over_time.py` | `<out.json> <policy> <steps> [boards-policy]` | how one arm's reading of a given observation input, and its greedy action, change over training — the before/during/after of a drawdown |
+| `drawdown_chart.py` | `<sens_dir> <out.png>` | draws the four-panel figure from the above; no measurement of its own |
+| `behaviour_profile.py` | `<out.json> <ckpt-or-policy> <episodes> <seed>` | what a checkpoint *does*: steps per meal, starve headroom, packing and realised chase-safety, by snake length — the elite-vs-mediocre comparison |
+| `champion_chart.py` | `<bp_dir> <measured.json> <out.png>` | draws that comparison plus the selection-noise panels |
 
 `point_of_no_return.py` shards across seeds like the `diagnostics/` scripts do; six processes take
 six cores and ~5 minutes for 360 episodes. It **checks its own simulator against the live game on
@@ -14,6 +18,26 @@ trustworthy, and it is the reason to be suspicious if a future run reports anyth
 [`../findings.md`](../findings.md#-measured-batches-19-20-compared-aggressive-per-against-uniform-replay)
 that batches 19 and 20 compared aggressive PER against *uniform replay* rather than against
 standard PER.
+
+`input_sensitivity_over_time.py` is behind the drawdown result in
+[`../findings.md`](../findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum),
+and it is what demoted the chase-flag mechanism from a cause to a marker. Two things it needs to be
+used honestly:
+
+- **The board set must be held fixed across the whole ladder**, which is why it defaults to a
+  finished arm's buffer rather than the arm being measured. It also has to span the **whole game**:
+  an endgame-only board set read 99% action agreement straight through a collapse from score 94 to 4,
+  which says only that the collapse was not in the endgame.
+- **Churn is only comparable at equal step gaps.** Agreement saturates, so dividing `1 - agree` by
+  the gap flatters long gaps — and `SNEK_MIN_CHECKPOINT_SCORE` makes the gaps long exactly inside a
+  trough. Filter to one gap width before comparing windows.
+
+`behaviour_profile.py` runs **every checkpoint on the same seeds on purpose**. A greedy policy plus a
+seed reproduces the same food sequence, so a set of checkpoints sharing seeds faces the same games and
+the comparison between them is paired — game-set difficulty cancels exactly. The cost is that the
+*absolute* rate carries that game set's difficulty: seeds 21,22 turned out to run ~1-2 pp hard against
+seeds 31,32. **So compare columns freely, and cross-check on a second seed pair before quoting any
+single number as a policy's rate.**
 
 Kept separate from [`../diagnostics/`](../diagnostics/), which is frozen alongside
 `claudeFeatureRecommendations.md` and is about the observation vector. This one is **not frozen** —
