@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T00:28:52",
-  "ts": 1786519732.0396469,
+  "iso": "2026-08-12T00:29:26",
+  "ts": 1786519766.4828951,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,25 +17,48 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 4,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b20ai-fc100x50x50seed1-closeout",
-      "type": "eval",
-      "policy": "b20ai-fc100x50x50seed1",
-      "pid": 1590161,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 336
+      "id": "b22a-noisseed1",
+      "type": "train",
+      "policy": "b22a-noisseed1",
+      "pid": 1595968,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b22b-noisseed2",
+      "type": "train",
+      "policy": "b22b-noisseed2",
+      "pid": 1595969,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b22c-noisseed3",
+      "type": "train",
+      "policy": "b22c-noisseed3",
+      "pid": 1595970,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b22d-noisseed4",
+      "type": "train",
+      "policy": "b22d-noisseed4",
+      "pid": 1595971,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "b22a-noisseed1": "queued",
-    "b22b-noisseed2": "queued",
-    "b22c-noisseed3": "queued",
-    "b22d-noisseed4": "queued",
     "smoke-1": "failed",
     "smoke-2": "failed",
     "smoke-3": "done",
@@ -99,15 +122,19 @@
     "b20aj-fc100x50x50seed2": "done",
     "b20ak-fc100x50x50seed3": "done",
     "b20al-fc100x50x50seed4": "done",
-    "b20ai-fc100x50x50seed1-closeout": "running",
+    "b20ai-fc100x50x50seed1-closeout": "done",
     "b20aj-fc100x50x50seed2-closeout": "done",
     "b20ak-fc100x50x50seed3-closeout": "done",
-    "b20al-fc100x50x50seed4-closeout": "done"
+    "b20al-fc100x50x50seed4-closeout": "done",
+    "b22a-noisseed1": "running",
+    "b22b-noisseed2": "running",
+    "b22c-noisseed3": "running",
+    "b22d-noisseed4": "running"
   },
   "disk_free_gb": 157.8,
   "load_avg": [
-    10.0517578125,
-    10.72900390625,
-    7.65380859375
+    6.0908203125,
+    9.70263671875,
+    7.4091796875
   ]
 }
