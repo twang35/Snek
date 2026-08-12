@@ -15,7 +15,7 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 ## Batch 21 / 22 / 23 — PER importance-sampling β (fc 50,100,50, on batch 20's control)
 
 **Batch 21 (β→0.5) done and closed out. Batch 22 (IS off) running on the desktop. Batch 23 (β 0→0.1)
-done on the laptop — close-out queued on the desktop.** These isolate how much importance-sampling correction to
+done and closed out — pooled 75.7, the best point on the β ladder so far.** These isolate how much importance-sampling correction to
 apply — `td_error` priority, α=0.6, otherwise the batch-20 control. Gradient concentration ESS/N,
 measured on the end-of-run buffers, walks down the β ladder: **β→1.0 ≈1.0** (b20 control, near-uniform)
 → **β→0.5 ≈0.86** (b21) → **β→0.1** (b23, effective exponent α·(1−β)=0.54, ESS/N to be measured on its
@@ -29,16 +29,17 @@ buffer) → **IS off ≈0.38** (b22) → the no-IS extreme already run is b18's 
 - **b22 (`b22a-d`, IS off) — running (desktop), 4×3M.** Same config with `SNEK_IS_WEIGHTS=0`, so the
   gradient carries full `|δ|^0.6` prioritisation (ESS/N ≈0.38). Tests whether more concentration keeps
   helping. Launched once the b20 `100,50,50` wave drained; close-out auto-fires when it finishes.
-- **b23 (`b23a-d`, β 0→0.1) — done (laptop), 4×3M; close-out queued (desktop).** IS on, β annealed from
-  **0 to 0.1** over 300k (`SNEK_IS_BETA=0`, `SNEK_IS_BETA_FINAL=0.1`); otherwise identical to b21/b22. Keeps
-  **α·(1−β)=0.54** of the priority signal at the target, vs 0.30 at b21 and the full 0.6 with IS off.
-  **Training-graph read: β→0.1 lands at the no-IS consolidation level** — mean best-30 **85.8**, `sef`
-  **33.1**, essentially level with b18 (87.3 / 34.6) and well above b21 (74.1 / 14.3) and the control
-  (64.0 / 11.2); `sef` climbs monotonically down the β ladder (control 11.2 → b21 14.3 → b23 33.1 → b18
-  34.6). Peak trailing 94.90, ceiling unmoved. n=4, so the queued desktop close-out is the verdict.
-  Charts + per-arm table in [`charts.md`](charts.md). (The `b23b` 217-242k collapse was investigated in
-  place and is **not** an escape from a local minimum — all four seeds make the same level shift; full
-  read in [`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum).)
+- **b23 (`b23a-d`, β 0→0.1) — done and closed out.** IS on, β annealed from **0 to 0.1** over 300k
+  (`SNEK_IS_BETA=0`, `SNEK_IS_BETA_FINAL=0.1`); otherwise identical to b21/b22. Keeps **α·(1−β)=0.54** of
+  the priority signal at the target, vs 0.30 at b21 and the full 0.6 with IS off. **Close-out confirms the
+  training graph: pooled 75.7** (eq-effort, gate 95), +20.7 over the control and +11.4 over b21, higher on
+  all four seeds than either — closing most of the gap to b18's no-IS ~78.8. So β→0.1 sits at the no-IS
+  consolidation level, and the ladder is monotone: control 55.0 → b21 64.3 → b23 75.7 → b18 ~78.8. `b23b`
+  holds five full-length checkpoints ≥95/100 around 777k (best 97/100), a hall-of-fame candidate pending
+  re-measurement. Full read in [`completedRuns.md`](completedRuns.md); charts in [`charts.md`](charts.md).
+  (The `b23b` 217-242k collapse was investigated in place and is **not** an escape from a local minimum —
+  all four seeds make the same level shift;
+  [`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum).)
 
 ## Batch 24 / 25 — FC width under IS-off (`SNEK_IS_WEIGHTS=0`, otherwise b22)
 

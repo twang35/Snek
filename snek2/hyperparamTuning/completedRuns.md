@@ -73,6 +73,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
 | `b18c-tgt1000seed3` ‡‡‡ § | **target period 1000**, forking on | 2.51M | 92% @2168k *trunc* | — | 74.75% /eq §§ | 84.3% | ‡‡‡ § weakest of batch 18; **no full-length row survived the gate**; best window in its last 350k |
+| `b23b-beta01seed2` ‡‡‡ § | **IS β anneal 0→0.1** (`SNEK_IS_BETA_FINAL=0.1`), td_error, fc 50,100,50 | 3.00M | **97%** @777k /100 | 96.3% | **82.07%** /eq §§ | 91.0% | ‡‡‡ § **best of the β ladder** — five full-length ckpts ≥95/100 clustered at ~777k, pooled 82.1 (highest eq-effort of any β-ladder arm). Hall-of-fame candidate pending re-measurement |
+| `b23a-beta01seed1` ‡‡‡ § | **IS β anneal 0→0.1**, td_error, fc 50,100,50 | 3.00M | 80% @1039k /20 *trunc* | — | 77.17% /eq §§ | 87.0% | ‡‡‡ § 2nd on pooled; no full-length row cleared gate 95, so best row is a 20-ep screen. `sef` 23.5% |
+| `b23d-beta01seed4` ‡‡‡ § | **IS β anneal 0→0.1**, td_error, fc 50,100,50 | 3.00M | 75% @603k /20 *trunc* | — | 72.11% /eq §§ | 82.3% | ‡‡‡ § just edges its control `b20d` (71.3), the control's strongest arm; `sef` 28.7% |
+| `b23c-beta01seed3` ‡‡‡ § | **IS β anneal 0→0.1**, td_error, fc 50,100,50 | 3.00M | 75% @1393k /20 *trunc* | — | 71.45% /eq §§ | 83.0% | ‡‡‡ § weakest of b23 on pooled but still above b21's mean (64.3); `sef` 24.0% |
 | `b20i-fc200x50seed1` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 87% @2818k *trunc* | — | 64.47% /eq §§ | 72.7% | ‡‡‡ § best of wave 2 on best-30; **the only seed where the shape beats its control**, and only because control `b20a` is the batch's weakest arm. `sef` 8.7% |
 | `b20l-fc200x50seed4` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 86% @2940k *trunc* | — | **64.75%** /eq §§ | 72.3% | ‡‡‡ § highest `sef` (13.9%) and smallest drawdown (7.18) of wave 2; **best checkpoint at 2940k, its last 60k** — still climbing when capped |
 | `b20j-fc200x50seed2` ‡‡‡ § | **`FC_LAYERS=200,50`** (wide-early, 1.38× params), β anneal 300k | 3.00M | 83% @2001k *trunc* | — | 59.31% /eq §§ | 69.3% | ‡‡‡ § mid of wave 2; `sef` 9.9% against its control's 16.2%; largest drawdown of the wave, 9.76 |
@@ -236,6 +240,45 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 23 — β annealed 0→0.1: **the best point on the β ladder, near the no-IS extreme**
+
+**Trained on the laptop, four arms `b23a`-`b23d` at seeds 1-4, all to the 3M cap; checkpoints rsynced to
+the desktop and closed out there under gate 95, `EVAL_WORKERS=4`.** Charts in
+[`charts.md`](charts.md) (batch 23 section).
+
+### The design
+
+One step further down the IS-β ladder than b21: importance-sampling β annealed from **0 to 0.1** over 300k
+(`SNEK_IS_BETA=0`, `SNEK_IS_BETA_FINAL=0.1`), `td_error` priority and α=0.6 unchanged (fc 50,100,50). At the
+anneal target the update keeps **α·(1−β)=0.54** of the priority signal on the gradient — between b21's 0.30
+(β→0.5) and the full 0.6 with IS off (b22). Seeds match b21/b22 for a seed-for-seed compare.
+
+### The result — vs the β→1.0 control (`b20a-d`) and vs b21 (β→0.5)
+
+| mean of 4 | control β→1.0 | b21 β→0.5 | b23 β→0.1 | b23 − control | b23 − b21 |
+|---|---|---|---|---|---|
+| peak trailing | 94.44 | 94.69 | 94.90 | +0.46 | +0.21 |
+| `sef` (primary) | 11.2% | 14.3% | 33.1% | +21.9 | +18.8 |
+| best-30 | 64.0% | 74.1% | 85.8% | +21.8 | +11.7 |
+| close-out pooled (eq-effort, gate 95) | 55.0% | 64.3% | 75.7% | +20.7 | +11.4 |
+
+**β→0.1 is the strongest point measured on the β ladder, and the close-out backs the graph — pooled 75.7,
++20.7 over the control and +11.4 over b21, higher on all four seeds than either** (seed-for-seed pooled
+77.2 / 82.1 / 71.5 / 72.1 vs control 33.2 / 62.7 / 52.8 / 71.3 and vs b21 59.5 / 68.8 / 62.8 / 66.0; exact
+sign-test p=0.0625 each, the n=4 floor). It closes most of the gap to batch 18 (`td_loss`, IS off, ESS/N
+0.21: pooled ~78.8, best-30 87.3%, `sef` 34.6%), the strongest consolidation on record. The four points now
+measured make a monotone ladder — pooled control 55.0 (ESS/N ≈1.0) → b21 64.3 (0.86) → **b23 75.7 (0.54)** →
+b18 ~78.8 (0.21): **more prioritisation on the gradient tracks better learning**, and even a little IS
+correction (β=0.1) barely costs anything relative to none. **b22** (`td_error`, IS off, ESS/N ≈0.38) is the
+remaining point, still training on the desktop.
+
+**`b23b` produced the batch's standout region — five full-length checkpoints ≥95/100 clustered at ~777k
+(best 97/100, top-3 96.3%), pooled 82.1** — the highest eq-effort of any β-ladder arm and a dense strong
+region rather than a lone selected high, so it is a genuine hall-of-fame candidate pending the folder's
+re-measurement protocol. The other three cleared no full-length row under gate 95 (best rows are 20-episode
+screens, 75-80%), so their `pooled` is the figure to read. Peak trailing 94.78-95.00 across the batch — the
+ceiling is unmoved, as it has been since batch 11; only consolidation differs.
 
 ## Batch 21 — partial IS (β→0.5): **beats the β→1.0 control, still far behind no-IS**
 
