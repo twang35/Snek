@@ -415,6 +415,15 @@ def clamp_dims(w, h, max_w, max_h):
     return w * shrink, h * shrink
 
 
+def grid_shape(n):
+    """(rows, cols) for `n` panels: a single column for one, otherwise two columns.
+
+    Pulled out of the render loop so the rebuild decision can be tested without a display."""
+    cols = 2 if n > 1 else 1
+    rows = (n + cols - 1) // cols
+    return rows, cols
+
+
 def figure_dims(rows, cols, scale):
     """Panel-grid size in inches, shrunk uniformly (aspect preserved) to the laptop-safe budget.
 
@@ -490,6 +499,7 @@ def main():
     fignum = None
     axes = []
     wave_arms = []
+    rendered_files = None
     absent_checks = 0
     # Startup grace: training (and its first PNG) may not exist for a few refreshes,
     # so require the watch pattern to be absent on several consecutive checks first.
@@ -501,14 +511,21 @@ def main():
         else:
             files = sorted(args.files) if args.files else (
                 sorted(globmod.glob(args.glob)) if args.glob else [])
+        if os.environ.get('SNEK_VIEWER_DEBUG'):
+            sys.stderr.write('{0:.0f} viewer refresh: {1} panels {2}\n'.format(
+                time.time(), len(files), [policy_from_png(f) for f in files]))
+            sys.stderr.flush()
         n = max(1, len(files))
-        cols = 2 if n > 1 else 1
-        rows = (n + cols - 1) // cols
-        if fig is None or len(axes) != rows * cols:
+        rows, cols = grid_shape(n)
+        # Rebuild when the panel *set* changes, not only when the axis count does: a late arm can
+        # arrive without changing rows*cols (3 -> 4 both want a 2x2), and rebuilding on the set
+        # guarantees the new arm gets a panel rather than relying on positional reuse.
+        if fig is None or len(axes) != rows * cols or files != rendered_files:
             if fig is not None:
                 plt.close(fig)
             fig, axes = make_figure(plt, rows, cols, args.scale, args.title)
             fignum = fig.number
+        rendered_files = files
         for ax in axes:
             ax.clear()
             ax.axis('off')
@@ -524,7 +541,6 @@ def main():
         try:
             fig.tight_layout()
             fig.canvas.draw_idle()
-            plt.pause(0.2)
         except Exception as error:
             # A draw failure never matters to anything but this window.
             sys.stderr.write('viewer draw error ({0}: {1})\n'.format(type(error).__name__, error))
@@ -542,8 +558,20 @@ def main():
                 absent_checks += 1
                 if absent_checks >= GRACE:
                     break
-        for _ in range(int(max(1, args.interval))):
-            time.sleep(1)
+
+        # Pump GUI events across the interval with flush_events rather than plt.pause. plt.pause
+        # starts a *nested* Tk event loop, which under a four-arm launch's CPU load has wedged the
+        # whole refresh — freezing the panel set at whatever incomplete state startup produced, so a
+        # late arm never got its panel (the recurring missing-chart bug). flush_events only drains
+        # the pending events, so a stall in one drain cannot stop the next refresh; the short sleeps
+        # keep the window responsive without blocking event processing for the full interval.
+        deadline = time.time() + max(1.0, float(args.interval))
+        while time.time() < deadline:
+            try:
+                fig.canvas.flush_events()
+            except Exception:
+                pass
+            time.sleep(0.1)
 
     print('chart_viewer: watched training gone, exiting')
     exit_now(plt)

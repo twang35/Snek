@@ -877,3 +877,53 @@ def test_laptop_defaults_are_one_second_and_scaled_up():
     args = chart_viewer.build_parser().parse_args([])
     assert args.interval == 1.0
     assert args.scale == 2.6
+
+
+def test_grid_shape_one_column_for_one_two_otherwise():
+    """The panel grid: a lone arm is one column, any wave is two, and the row count rounds up.
+    A four-arm and a three-arm wave both want a 2x2, which is why a late fourth arm changes the
+    set without changing the axis count -- the case the set-change rebuild exists for."""
+    assert chart_viewer.grid_shape(1) == (1, 1)
+    assert chart_viewer.grid_shape(2) == (1, 2)
+    assert chart_viewer.grid_shape(3) == (2, 2)
+    assert chart_viewer.grid_shape(4) == (2, 2)
+    assert chart_viewer.grid_shape(5) == (3, 2)
+
+
+def test_wave_files_accumulates_a_late_arm():
+    """The recurring missing-chart bug: a fourth arm that appears after the grid is built must
+    still get a panel. wave_files is sticky and re-scans every refresh, so once live_arms reports
+    the late arm it joins the set and never falls back out -- proving the drop was the refresh loop
+    wedging, not the arm detection. `known` is mutated in place across refreshes, as in main()."""
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS)          # two arms
+        first = chart_viewer.wave_files('b20', known)
+        assert [chart_viewer.policy_from_png(f) for f in first] == [
+            'b20i-fc200x50seed1', 'b20j-fc200x50seed2']
+        late = TRAINERS + [' 1003 /opt/miniconda3/envs/snek/bin/python -u snek2.py b20k-fc200x50seed3']
+        chart_viewer.subprocess.run = _fake_ps(late)              # a third appears
+        second = chart_viewer.wave_files('b20', known)
+        assert [chart_viewer.policy_from_png(f) for f in second] == [
+            'b20i-fc200x50seed1', 'b20j-fc200x50seed2', 'b20k-fc200x50seed3']
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_wave_files_keeps_an_arm_when_a_scan_transiently_fails():
+    """A ps hiccup returns nothing that refresh; the sticky set must not blank an arm's panel."""
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS)
+        chart_viewer.wave_files('b20', known)
+
+        def boom(*_a, **_k):
+            raise OSError('ps unavailable')
+        chart_viewer.subprocess.run = boom
+        held = chart_viewer.wave_files('b20', known)
+        assert [chart_viewer.policy_from_png(f) for f in held] == [
+            'b20i-fc200x50seed1', 'b20j-fc200x50seed2']
+    finally:
+        chart_viewer.subprocess.run = saved
