@@ -329,14 +329,16 @@ class Runner:
 
     def _ledger_view(self):
         """The id->state map published in status.json, with the pending queue folded in as
-        `queued` entries at the front, in the order the wave-barrier scheduler will actually
-        launch them -- including the closeout evals each queued training will spawn, which run
-        before the next training batch (see `anticipated_queue`). So a glance at the ledger
-        shows the whole expected run order, not only the specs that exist as files today.
+        `queued` entries **at the end** -- after the run history and the running jobs -- in the
+        order the wave-barrier scheduler will actually launch them, including the closeout evals
+        each queued training will spawn, which run before the next training batch (see
+        `anticipated_queue`). So a glance at the tail of the ledger shows the whole expected run
+        order, not only the specs that exist as files today.
 
         A launched job moves into `running` and drops out of `_queued` the same poll; a real
         ledger state wins over the synthetic `queued` on the rare id overlap (a job re-queued
-        while its prior run is still settling), since it is applied last."""
+        while its prior run is still settling) -- `setdefault` keeps the real state and its
+        position, appending only ids the history does not already carry."""
         limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
         auto = self.runtime.get('auto_closeout', True)
         queued = [{'id': j.id, 'type': j.type, 'policy': j.policy, 'priority': j.priority}
@@ -345,8 +347,9 @@ class Runner:
                    for jid, rj in self.running.items()]
         existing = set(self.ledger) | set(self.running) | {j['id'] for j in queued}
         order = anticipated_queue(queued, running, limits, auto, existing)
-        view = {j['id']: 'queued' for j in order}
-        view.update({k: v.get('state') for k, v in self.ledger.items()})
+        view = {k: v.get('state') for k, v in self.ledger.items()}
+        for job in order:                              # queued at the end, in run order
+            view.setdefault(job['id'], 'queued')
         return view
 
     def _publish(self):

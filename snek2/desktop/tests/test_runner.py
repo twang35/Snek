@@ -375,8 +375,8 @@ def test_publish_status_folds_the_queue_into_the_ledger_in_order():
     r._queued = r._scan_pending()
     r._publish()
     ledger = json.loads(captured['text'])['ledger']
-    # queued jobs appear as state 'queued', in launch order, ahead of the run history
-    assert list(ledger.keys()) == ['a', 'b', 'done-arm'], list(ledger.keys())
+    # run history first, then queued jobs (state 'queued') at the end in launch order
+    assert list(ledger.keys()) == ['done-arm', 'a', 'b'], list(ledger.keys())
     assert ledger['a'] == 'queued' and ledger['b'] == 'queued'
     assert ledger['done-arm'] == 'done'
 
@@ -434,6 +434,20 @@ def test_ledger_view_anticipates_closeouts_for_a_queued_training():
     view = r._ledger_view()
     assert list(view.keys()) == ['t1', 't2', 't1-closeout', 't2-closeout'], list(view.keys())
     assert all(view[k] == 'queued' for k in view)
+
+
+def test_ledger_view_places_queued_after_history_and_running():
+    r = _runner(auto_closeout=False)
+    r.ledger['hist'] = {'state': 'done'}
+    r.ledger['run1'] = {'state': 'running', 'type': 'train'}
+
+    class _J:
+        def __init__(self, jid):
+            self.id, self.policy, self.priority, self.type = jid, jid, 200, 'train'
+    r._queued = [_J('q1')]
+    view = r._ledger_view()
+    assert list(view.keys()) == ['hist', 'run1', 'q1'], list(view.keys())
+    assert view['q1'] == 'queued' and view['run1'] == 'running' and view['hist'] == 'done'
 
 
 def test_ledger_view_lets_a_real_state_win_over_queued_on_overlap():
