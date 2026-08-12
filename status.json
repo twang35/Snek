@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T15:51:09",
-  "ts": 1786575069.957375,
+  "iso": "2026-08-12T15:51:44",
+  "ts": 1786575104.5326447,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,18 +17,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 4,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b22a-noisseed1-closeout",
-      "type": "eval",
-      "policy": "b22a-noisseed1",
-      "pid": 2238028,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 8202
+      "id": "b24a-fc320noisseed1",
+      "type": "train",
+      "policy": "b24a-fc320noisseed1",
+      "pid": 2350082,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b24b-fc320noisseed2",
+      "type": "train",
+      "policy": "b24b-fc320noisseed2",
+      "pid": 2350083,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b24c-fc320noisseed3",
+      "type": "train",
+      "policy": "b24c-fc320noisseed3",
+      "pid": 2350084,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b24d-fc320noisseed4",
+      "type": "train",
+      "policy": "b24d-fc320noisseed4",
+      "pid": 2350085,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -107,14 +134,14 @@
     "b23b-beta01seed2-closeout": "done",
     "b23c-beta01seed3-closeout": "done",
     "b23d-beta01seed4-closeout": "done",
-    "b22a-noisseed1-closeout": "running",
+    "b22a-noisseed1-closeout": "done",
     "b22b-noisseed2-closeout": "done",
     "b22c-noisseed3-closeout": "done",
     "b22d-noisseed4-closeout": "done",
-    "b24a-fc320noisseed1": "queued",
-    "b24b-fc320noisseed2": "queued",
-    "b24c-fc320noisseed3": "queued",
-    "b24d-fc320noisseed4": "queued",
+    "b24a-fc320noisseed1": "running",
+    "b24b-fc320noisseed2": "running",
+    "b24c-fc320noisseed3": "running",
+    "b24d-fc320noisseed4": "running",
     "b24a-fc320noisseed1-closeout": "queued",
     "b24b-fc320noisseed2-closeout": "queued",
     "b24c-fc320noisseed3-closeout": "queued",
@@ -130,8 +157,8 @@
   },
   "disk_free_gb": 152.9,
   "load_avg": [
-    3.99462890625,
-    4.0546875,
-    4.56201171875
+    3.30078125,
+    3.88671875,
+    4.486328125
   ]
 }
