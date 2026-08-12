@@ -1,0 +1,10 @@
+{
+  "id": "b23b-beta01seed2-closeout",
+  "type": "eval",
+  "policy": "b23b-beta01seed2",
+  "eval_args": [
+    "top20"
+  ],
+  "priority": 10,
+  "notes": "batch 23 closeout (fc 50,100,50, td_error priority alpha 0.6, IS beta annealed 0->0.1 by 300k). Trained on the laptop; checkpoints + graph staged to the desktop by rsync. Default FC and arch.json present, so no SNEK_FC_LAYERS needed."
+}
