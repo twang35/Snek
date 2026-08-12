@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T04:02:25",
-  "ts": 1786532545.7323415,
+  "iso": "2026-08-12T04:02:58",
+  "ts": 1786532578.5557203,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -26,36 +26,36 @@
       "type": "train",
       "policy": "b22a-noisseed1",
       "pid": 1595968,
-      "step": 1098000,
-      "steps_per_sec": 92.7,
-      "elapsed_s": 12779
+      "step": 1101000,
+      "steps_per_sec": 91.4,
+      "elapsed_s": 12812
     },
     {
       "id": "b22b-noisseed2",
       "type": "train",
       "policy": "b22b-noisseed2",
       "pid": 1595969,
-      "step": 1117000,
-      "steps_per_sec": 61.8,
-      "elapsed_s": 12779
+      "step": 1120000,
+      "steps_per_sec": 91.4,
+      "elapsed_s": 12812
     },
     {
       "id": "b22c-noisseed3",
       "type": "train",
       "policy": "b22c-noisseed3",
       "pid": 1595970,
-      "step": 1048000,
-      "steps_per_sec": 92.7,
-      "elapsed_s": 12779
+      "step": 1051000,
+      "steps_per_sec": 91.4,
+      "elapsed_s": 12812
     },
     {
       "id": "b22d-noisseed4",
       "type": "train",
       "policy": "b22d-noisseed4",
       "pid": 1595971,
-      "step": 1097000,
-      "steps_per_sec": 92.7,
-      "elapsed_s": 12779
+      "step": 1100000,
+      "steps_per_sec": 91.4,
+      "elapsed_s": 12812
     }
   ],
   "ledger": {
@@ -153,8 +153,8 @@
   },
   "disk_free_gb": 155.5,
   "load_avg": [
-    9.8828125,
-    9.35693359375,
-    9.16845703125
+    10.22119140625,
+    9.4697265625,
+    9.21142578125
   ]
 }
