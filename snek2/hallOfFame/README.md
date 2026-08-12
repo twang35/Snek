@@ -12,13 +12,14 @@ rotation and are not deleted by anything.
 ## The current record: **97.6% over 700 episodes**, `b18b-tgt1000seed2-ckpt1588000`
 
 Batches 11-18 train on the **30-value observation vector** — the current one, after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these eight entries are the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these nine entries are the
 only ones in this folder that load on `master` as it stands.** All came from a batch close-out
 rather than a mid-run measurement. Every entry here is the default `FC_LAYERS=50,100,50`.
 
 | checkpoint | measured | config |
 |---|---|---|
 | **`b18b-tgt1000seed2-ckpt1588000`** | **683/700 = 97.6%** (CI **96.1-98.5**) — **the record**, and the first selected high in this project to survive re-measurement; see below | `TARGET_UPDATE_PERIOD=1000`, forking on, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `td_loss`/no-IS, `SNEK_SEED=2` |
+| `b17b-forkseed2-ckpt1248000` | **483/500 = 96.6%** (CI 94.6-97.9) on fresh episodes — 2nd-highest measured here; a 99/100 close-out read re-measured at 500, and **95/100 on the copy in this folder** (CI 88.8-97.8), confirming it loads and plays. Not the record — below `b18b` @1588k and CIs overlap — but higher than `b17b` @1190k, so the better step of this arm. Added 2026-08-12 | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
 | `b18b-tgt1000seed2-ckpt1601000` | 663/700 = **94.7%** (CI 92.8-96.1) — 13k steps after the record and 2.9 pp below it | same as above |
 | `b17b-forkseed2-ckpt1190000` | **4825/5120 = 94.2%** (CI **93.6-94.8**) — the most heavily measured checkpoint in the project, see below | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
 | `b15b-nstep3seed2-ckpt3245000` | **97/100** selected, **182/200** on an independent re-run → **93.0% over 300** (CI 89.5-95.4) | `N_STEP_UPDATE=3`, `DISCOUNT=0.995`, `GUIDED_FRACTION=0.8`, `SNEK_SEED=2` |
@@ -26,6 +27,13 @@ rather than a mid-run measurement. Every entry here is the default `FC_LAYERS=50
 | `b11b-obs30seed2-ckpt855000` | 96/100 (CI 90.2-98.4), top-3 95.3%, **~94% shrunk** | `DISCOUNT=0.995`, `SNEK_SEED=2` |
 | `b13d-shieldseed4-ckpt986000` | 95/100 (CI 88.8-97.8), top-3 93.3% | + eps handover 0.0125, `GUIDED_FRACTION=0.5`, `SNEK_SEED=4` |
 | `b11a-obs30seed1-ckpt671000` | 94/100 (CI 87.5-97.2), top-3 93.3%, ~90% shrunk | `DISCOUNT=0.995`, `SNEK_SEED=1` |
+
+**2026-08-12 — the shrink pattern held again.** Ten high close-out reads (five each from `b23b` and
+`b17b`) re-measured at **500 fresh episodes**: every 96-99/100 read fell to **92.4-96.6%**. `b17b`
+@1248k held highest (96.6%, added above); the new β-ladder arm `b23b` topped out at 95.2% (@771k), and
+its close-out-*selected* step (@777k, 97/100) was the **worst** of its cluster on fresh episodes
+(92.4%) — a clean example of why a selected high must be re-measured before it is trusted. Nothing beat
+the 97.6% record.
 
 > **‡ Re-measured 2026-08-11 on games none of these had seen, and the numbers above are a ceiling.**
 > 100-200 fresh greedy episodes each, via `hyperparamTuning/perDiagnostics/behaviour_profile.py`:
