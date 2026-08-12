@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T00:26:32",
-  "ts": 1786519592.7594492,
+  "iso": "2026-08-12T00:26:36",
+  "ts": 1786519596.0406423,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -27,8 +27,8 @@
       "policy": "b20ai-fc100x50x50seed1",
       "pid": 1590161,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 196
+      "steps_per_sec": null,
+      "elapsed_s": 200
     },
     {
       "id": "b20aj-fc100x50x50seed2-closeout",
@@ -36,8 +36,8 @@
       "policy": "b20aj-fc100x50x50seed2",
       "pid": 1590162,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 196
+      "steps_per_sec": null,
+      "elapsed_s": 200
     },
     {
       "id": "b20ak-fc100x50x50seed3-closeout",
@@ -45,8 +45,8 @@
       "policy": "b20ak-fc100x50x50seed3",
       "pid": 1590163,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 196
+      "steps_per_sec": null,
+      "elapsed_s": 200
     },
     {
       "id": "b20al-fc100x50x50seed4-closeout",
@@ -54,41 +54,15 @@
       "policy": "b20al-fc100x50x50seed4",
       "pid": 1590164,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 196
-    }
-  ],
-  "queued": [
-    {
-      "id": "b22a-noisseed1",
-      "type": "train",
-      "policy": "b22a-noisseed1",
-      "priority": 200,
-      "status": "queued"
-    },
-    {
-      "id": "b22b-noisseed2",
-      "type": "train",
-      "policy": "b22b-noisseed2",
-      "priority": 200,
-      "status": "queued"
-    },
-    {
-      "id": "b22c-noisseed3",
-      "type": "train",
-      "policy": "b22c-noisseed3",
-      "priority": 200,
-      "status": "queued"
-    },
-    {
-      "id": "b22d-noisseed4",
-      "type": "train",
-      "policy": "b22d-noisseed4",
-      "priority": 200,
-      "status": "queued"
+      "steps_per_sec": null,
+      "elapsed_s": 200
     }
   ],
   "ledger": {
+    "b22a-noisseed1": "queued",
+    "b22b-noisseed2": "queued",
+    "b22c-noisseed3": "queued",
+    "b22d-noisseed4": "queued",
     "smoke-1": "failed",
     "smoke-2": "failed",
     "smoke-3": "done",
