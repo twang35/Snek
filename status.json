@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-11T23:54:24",
-  "ts": 1786517664.9933214,
+  "iso": "2026-08-11T23:54:59",
+  "ts": 1786517699.357468,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,48 +17,46 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b20ai-fc100x50x50seed1",
-      "type": "train",
-      "policy": "b20ai-fc100x50x50seed1",
-      "pid": 1078716,
-      "step": 2997000,
-      "steps_per_sec": 61.0,
-      "elapsed_s": 36893
-    },
     {
       "id": "b20aj-fc100x50x50seed2",
       "type": "train",
       "policy": "b20aj-fc100x50x50seed2",
       "pid": 1078717,
-      "step": 2846000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 36893
+      "step": 2848000,
+      "steps_per_sec": 58.2,
+      "elapsed_s": 36927
     },
     {
       "id": "b20ak-fc100x50x50seed3",
       "type": "train",
       "policy": "b20ak-fc100x50x50seed3",
       "pid": 1078718,
-      "step": 2944000,
-      "steps_per_sec": 61.0,
-      "elapsed_s": 36893
+      "step": 2947000,
+      "steps_per_sec": 87.3,
+      "elapsed_s": 36927
     },
     {
       "id": "b20al-fc100x50x50seed4",
       "type": "train",
       "policy": "b20al-fc100x50x50seed4",
       "pid": 1078719,
-      "step": 2904000,
-      "steps_per_sec": 61.0,
-      "elapsed_s": 36893
+      "step": 2907000,
+      "steps_per_sec": 87.3,
+      "elapsed_s": 36927
     }
   ],
   "queued": [
+    {
+      "id": "b20ai-fc100x50x50seed1-closeout",
+      "type": "eval",
+      "policy": "b20ai-fc100x50x50seed1",
+      "priority": 10,
+      "status": "queued"
+    },
     {
       "id": "b22a-noisseed1",
       "type": "train",
@@ -148,15 +146,15 @@
     "b20af-fc100x200x100seed2-closeout": "done",
     "b20ag-fc100x200x100seed3-closeout": "done",
     "b20ah-fc100x200x100seed4-closeout": "done",
-    "b20ai-fc100x50x50seed1": "running",
+    "b20ai-fc100x50x50seed1": "done",
     "b20aj-fc100x50x50seed2": "running",
     "b20ak-fc100x50x50seed3": "running",
     "b20al-fc100x50x50seed4": "running"
   },
   "disk_free_gb": 157.9,
   "load_avg": [
-    9.39013671875,
-    8.62744140625,
-    8.576171875
+    9.908203125,
+    8.830078125,
+    8.64501953125
   ]
 }
