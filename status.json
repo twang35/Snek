@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-12T14:41:27",
-  "ts": 1786570887.2193477,
+  "iso": "2026-08-12T14:42:01",
+  "ts": 1786570921.7193513,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,7 +18,7 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 4
+    "eval": 3
   },
   "running": [
     {
@@ -28,16 +28,7 @@
       "pid": 2238028,
       "step": 3000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 4019
-    },
-    {
-      "id": "b22b-noisseed2-closeout",
-      "type": "eval",
-      "policy": "b22b-noisseed2",
-      "pid": 2238029,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 4019
+      "elapsed_s": 4053
     },
     {
       "id": "b22c-noisseed3-closeout",
@@ -46,7 +37,7 @@
       "pid": 2238030,
       "step": 3000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 4019
+      "elapsed_s": 4053
     },
     {
       "id": "b22d-noisseed4-closeout",
@@ -55,7 +46,7 @@
       "pid": 2238031,
       "step": 3000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 4019
+      "elapsed_s": 4053
     }
   ],
   "ledger": {
@@ -135,7 +126,7 @@
     "b23c-beta01seed3-closeout": "done",
     "b23d-beta01seed4-closeout": "done",
     "b22a-noisseed1-closeout": "running",
-    "b22b-noisseed2-closeout": "running",
+    "b22b-noisseed2-closeout": "done",
     "b22c-noisseed3-closeout": "running",
     "b22d-noisseed4-closeout": "running",
     "b24a-fc320noisseed1": "queued",
@@ -157,8 +148,8 @@
   },
   "disk_free_gb": 152.9,
   "load_avg": [
-    18.90185546875,
-    18.0615234375,
-    17.798828125
+    16.65576171875,
+    17.60546875,
+    17.6552734375
   ]
 }
