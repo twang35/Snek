@@ -11,8 +11,9 @@ whole box from git:
 The loop body is wrapped so a bad job, a transient git error, or a malformed
 config can never kill the daemon -- in normal operation the box has no SSH
 backstop, so staying up is the first requirement. Launched jobs are detached and
-self-terminate via SNEK_MAX_STEPS, so the daemon never kills anything; a restart
-re-adopts still-running jobs by pid.
+self-terminate via SNEK_MAX_STEPS, so the daemon never kills anything; a daemon
+restart re-adopts still-running jobs by pid, while a *machine* reboot (a boot-id
+mismatch) marks them `interrupted` so they relaunch and resume -- see `_reattach`.
 """
 import json
 import os
@@ -27,6 +28,11 @@ from . import launch
 from .job import parse_job, Job, JobError
 
 TERMINAL = ('done', 'failed')
+
+# `interrupted` is deliberately NOT terminal. A job the machine killed has not finished, so it
+# must stay launchable: `_scan_pending` re-launches it from its still-present spec (a training
+# resumes from its checkpoint, since SNEK_MAX_STEPS is absolute), and `_auto_closeout_jobs`
+# re-synthesizes a closeout whose previous attempt was cut short. Both are the recovery.
 
 # A synthesized closeout eval outranks any pending training (default priority 100) so, when a
 # training wave drains, its closeouts form the next wave before any new training starts. That
@@ -85,25 +91,53 @@ class Runner:
         os.replace(tmp, self.host['LEDGER_PATH'])
 
     def _reattach(self):
-        """Re-adopt jobs the ledger says were running whose pid is still alive;
-        mark the rest done (they finished while the daemon was down -- exit code
-        is unknown across reparenting, so success is assumed unless later checks
-        say otherwise)."""
+        """Re-adopt jobs the ledger says were running, or classify the ones that are gone.
+
+        **The boot id is what separates a daemon restart from a machine reboot**, and the two
+        need opposite handling. Jobs are detached (`setsid`), so across a *daemon* restart they
+        really do keep running and a dead pid means the job genuinely finished. A *reboot* kills
+        every child, so the same dead pid means the job was cut off partway -- and calling that
+        `done` is wrong twice over: a truncated training got published as a finished arm (with a
+        closeout eval measuring the partial arm), and a truncated closeout consumed its own
+        `closeout: pending` marker, so the arm was never evaluated again. Both were silent.
+
+        Recording `/proc/sys/kernel/random/boot_id` at launch makes the distinction exact, and
+        it closes a second hole: on a boot-id mismatch we never consult the pid at all, so a
+        recycled pid cannot be mistaken for a live job. That mattered because pids restart low
+        after a reboot, and a false match would have re-adopted a phantom that never exits --
+        which the wave barrier (`if self.running: return`) turns into an idle box forever.
+        """
+        boot = boot_id()
         for jid, rec in self.ledger.items():
             if rec.get('state') != 'running':
                 continue
+            rec_boot = rec.get('boot')
+            rebooted = bool(boot and rec_boot and rec_boot != boot)
             pid = rec.get('pid')
-            if pid and launch.pid_alive(pid):
+            if not rebooted and pid and launch.pid_alive(pid):
+                # Still ours and still alive. Stamp the current boot id onto a record that
+                # predates this field so the *next* restart can classify it properly.
+                if boot and not rec_boot:
+                    rec['boot'] = boot
                 self.running[jid] = launch.RunningJob(
                     _StubJob(jid, rec), rec.get('policy'), pid,
                     rec.get('log', ''), popen=None, started=rec.get('started'))
+            elif rebooted:
+                rec['state'] = 'interrupted'
+                rec['finished'] = time.time()
+                rec['note'] = 'killed by a reboot, not finished'
+                rec['restarts'] = int(rec.get('restarts') or 0) + 1
+                # No `closeout: pending` here -- the arm is unfinished, so it earns its closeout
+                # when it actually completes, not now. `interrupted` is non-terminal, so the
+                # relaunch happens on the next dispatch.
             else:
                 rec['state'] = 'done'
                 rec['finished'] = time.time()
                 rec['note'] = 'completed while runner was down'
-                # Exit code is unknown across reparenting, so success is assumed (above); on
-                # that same assumption a training finished during downtime still earns its
-                # closeout, so auto-closeout does not silently skip a restart-straddling arm.
+                # Same boot, dead pid: the job ran to its own end while the daemon was down.
+                # Exit code is unknown across reparenting, so success is assumed; on that same
+                # assumption the arm still earns its closeout, so auto-closeout does not
+                # silently skip a restart-straddling arm.
                 if wants_closeout(rec.get('type'), True, self.runtime.get('auto_closeout', True)):
                     rec['closeout'] = 'pending'
         self._save_ledger()
@@ -291,12 +325,20 @@ class Runner:
                                    'error': 'spawn failed: {0}'.format(e),
                                    'finished': time.time()}
             return
+        prior = self.ledger.get(job.id) or {}
         self.running[job.id] = rj
         self.ledger[job.id] = {'state': 'running', 'type': job.type, 'policy': rj.policy,
                                'pid': rj.pid, 'log': rj.log_path, 'started': rj.started,
+                               # The boot this pid belongs to. Without it a pid outliving a
+                               # reboot reads as a live job -- see _reattach.
+                               'boot': boot_id(),
                                # Kept so an auto-closeout can rebuild the exact env after the
                                # daemon restarts -- crucially SNEK_FC_LAYERS (the FC trap).
                                'env': job.env}
+        # Carried across the relaunch so a box that reboots repeatedly is visible in
+        # status.json as a climbing count rather than as a job that looks freshly started.
+        if prior.get('restarts'):
+            self.ledger[job.id]['restarts'] = prior['restarts']
 
     def _reap(self):
         for jid in list(self.running):
@@ -491,6 +533,30 @@ def viewer_should_relaunch(viewer_running, current_pngs, desired_pngs):
     if not viewer_running:
         return True
     return current_pngs != desired_pngs
+
+
+BOOT_ID_PATH = '/proc/sys/kernel/random/boot_id'
+_BOOT_ID = []   # one-element cache; the value cannot change without the process dying
+
+
+def boot_id():
+    """This boot's kernel id, or None where the kernel does not publish one.
+
+    Cached, because it is read on every launch and cannot change while the daemon lives -- a
+    new boot is a new process by definition.
+
+    **None means "cannot tell", and every caller degrades to the old pid-only behaviour** rather
+    than guessing. That keeps the daemon working on a box without procfs (a mac, a container),
+    where the reboot case cannot arise the same way; it also means a record written before this
+    field existed is classified exactly as it was before, instead of being read as a reboot
+    because its `boot` key is absent."""
+    if not _BOOT_ID:
+        try:
+            with open(BOOT_ID_PATH) as fh:
+                _BOOT_ID.append(fh.read().strip() or None)
+        except OSError:
+            _BOOT_ID.append(None)
+    return _BOOT_ID[0]
 
 
 def _log_has_traceback(log_path):

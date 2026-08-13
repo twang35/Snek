@@ -7,12 +7,16 @@ or import and call the test_* functions like the snek2/tests suite.
 """
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from runner import config as cfg
+from runner import gitbus
 from runner import job as jobmod
 from runner import launch
 from runner import runner as runnermod
@@ -459,6 +463,222 @@ def test_ledger_view_lets_a_real_state_win_over_queued_on_overlap():
         id, policy, priority, type = 'x', 'x', 100, 'train'
     r._queued = [_J()]
     assert r._ledger_view()['x'] == 'running'
+
+
+# ------------------------------------------------- boot id: reboot vs daemon restart
+def _ledger_runner(**recs):
+    r = _runner()
+    r.ledger.update(recs)
+    return r
+
+
+def test_boot_id_returns_none_where_the_kernel_publishes_nothing():
+    # Cached in a module-level list, so the cache has to be cleared between probes.
+    real = runnermod.BOOT_ID_PATH
+    runnermod._BOOT_ID[:] = []
+    runnermod.BOOT_ID_PATH = '/definitely/not/a/path'
+    try:
+        assert runnermod.boot_id() is None
+    finally:
+        runnermod.BOOT_ID_PATH = real
+        runnermod._BOOT_ID[:] = []
+
+
+def test_boot_id_reads_and_caches_the_file():
+    real = runnermod.BOOT_ID_PATH
+    with tempfile.NamedTemporaryFile('w', delete=False) as fh:
+        fh.write('abc-123\n')
+        path = fh.name
+    runnermod._BOOT_ID[:] = []
+    runnermod.BOOT_ID_PATH = path
+    try:
+        assert runnermod.boot_id() == 'abc-123'
+        os.unlink(path)                      # gone, but the cache answers anyway
+        assert runnermod.boot_id() == 'abc-123'
+    finally:
+        runnermod.BOOT_ID_PATH = real
+        runnermod._BOOT_ID[:] = []
+
+
+def _reattach_with(rec, boot, pid_alive):
+    """Runs _reattach over one running record under a chosen boot id and pid liveness."""
+    real_boot, real_alive = runnermod.boot_id, launch.pid_alive
+    runnermod.boot_id = lambda: boot
+    launch.pid_alive = lambda _pid: pid_alive
+    try:
+        r = _runner()
+        r.ledger['j'] = dict(rec)
+        r._reattach()
+        return r
+    finally:
+        runnermod.boot_id, launch.pid_alive = real_boot, real_alive
+
+
+def test_a_reboot_marks_a_training_interrupted_and_withholds_the_closeout():
+    # The whole point: a training the machine killed is NOT done, so it must not be published
+    # as a finished arm and must not spend its closeout on a partial checkpoint set.
+    rec = {'state': 'running', 'type': 'train', 'policy': 'p', 'pid': 4242, 'boot': 'BOOT-A'}
+    r = _reattach_with(rec, boot='BOOT-B', pid_alive=False)
+    got = r.ledger['j']
+    assert got['state'] == 'interrupted', got
+    assert 'closeout' not in got, got            # withheld until the arm actually finishes
+    assert got['restarts'] == 1
+    assert r.running == {}
+    assert r._auto_closeout_jobs() == []         # nothing to evaluate yet
+
+
+def test_a_reboot_ignores_a_live_pid_because_it_may_be_recycled():
+    # pids restart low after a boot, so a stored pid can match an unrelated process. On a
+    # boot-id mismatch the pid is not consulted at all -- otherwise the runner adopts a
+    # phantom that never exits and the wave barrier idles the box forever.
+    rec = {'state': 'running', 'type': 'train', 'policy': 'p', 'pid': 1, 'boot': 'BOOT-A'}
+    r = _reattach_with(rec, boot='BOOT-B', pid_alive=True)
+    assert r.ledger['j']['state'] == 'interrupted'
+    assert r.running == {}
+
+
+def test_an_interrupted_closeout_is_resynthesized_rather_than_consumed():
+    # A closeout cut short by a reboot used to read `done`, which made
+    # _auto_closeout_jobs skip it forever -- the arm was never evaluated again.
+    r = _runner()
+    r.ledger['p'] = {'state': 'done', 'type': 'train', 'policy': 'p', 'closeout': 'pending',
+                     'env': {'SNEK_FC_LAYERS': '320'}}
+    r.ledger['p-closeout'] = {'state': 'interrupted', 'type': 'eval', 'policy': 'p'}
+    jobs = r._auto_closeout_jobs()
+    assert [j.id for j in jobs] == ['p-closeout'], jobs
+    assert jobs[0].env.get('SNEK_FC_LAYERS') == '320'   # the FC trap survives the retry
+
+
+def test_an_interrupted_job_is_not_terminal_so_its_spec_relaunches():
+    r = _runner()
+    r.ledger['t1'] = {'state': 'interrupted', 'type': 'train', 'policy': 't1'}
+    r.ledger['t2'] = {'state': 'done', 'type': 'train', 'policy': 't2'}
+    jobs = [jobmod.Job(id='t1', type='train', policy='t1', env={}, priority=100),
+            jobmod.Job(id='t2', type='train', policy='t2', env={}, priority=100)]
+    real = runnermod.gitbus.read_pending_jobs
+    runnermod.gitbus.read_pending_jobs = lambda host: [
+        (j.id + '.json', json.dumps({'id': j.id, 'type': 'train', 'policy': j.policy}))
+        for j in jobs]
+    try:
+        ids = [j.id for j in r._scan_pending()]
+    finally:
+        runnermod.gitbus.read_pending_jobs = real
+    assert 't1' in ids, ids          # interrupted -> relaunched, which is the recovery
+    assert 't2' not in ids, ids      # done -> terminal, never relaunched
+
+
+def test_a_daemon_restart_on_the_same_boot_still_reads_a_dead_pid_as_finished():
+    # The original behaviour, which must survive: detached jobs outlive a daemon restart, so
+    # same boot + dead pid means the job genuinely ran to its end and earns its closeout.
+    rec = {'state': 'running', 'type': 'train', 'policy': 'p', 'pid': 4242, 'boot': 'BOOT-A'}
+    r = _reattach_with(rec, boot='BOOT-A', pid_alive=False)
+    got = r.ledger['j']
+    assert got['state'] == 'done', got
+    assert got['closeout'] == 'pending'
+
+
+def test_a_daemon_restart_readopts_a_live_job_and_backfills_a_missing_boot_id():
+    # A record written before the boot field existed re-adopts on the pid as before, and gets
+    # stamped so the *next* restart can classify it properly.
+    rec = {'state': 'running', 'type': 'train', 'policy': 'p', 'pid': 4242}
+    r = _reattach_with(rec, boot='BOOT-A', pid_alive=True)
+    assert r.ledger['j']['state'] == 'running'
+    assert r.ledger['j']['boot'] == 'BOOT-A'
+    assert 'j' in r.running
+
+
+def test_no_boot_id_available_falls_back_to_the_pid_only_behaviour():
+    # On a box with no procfs, boot_id() is None and nothing may be inferred from it.
+    rec = {'state': 'running', 'type': 'train', 'policy': 'p', 'pid': 4242, 'boot': 'BOOT-A'}
+    assert _reattach_with(rec, boot=None, pid_alive=False).ledger['j']['state'] == 'done'
+    assert _reattach_with(rec, boot=None, pid_alive=True).ledger['j']['state'] == 'running'
+
+
+def test_restarts_carries_across_a_relaunch():
+    r = _runner()
+    r.ledger['j'] = {'state': 'interrupted', 'type': 'train', 'policy': 'p', 'restarts': 2}
+    real = launch.spawn
+    launch.spawn = lambda job, host, runtime: launch.RunningJob(job, 'p', 999, '/l')
+    try:
+        r._launch(jobmod.Job(id='j', type='train', policy='p', env={}, priority=100))
+    finally:
+        launch.spawn = real
+    assert r.ledger['j']['restarts'] == 2
+    assert r.ledger['j']['state'] == 'running'
+
+
+def test_a_fresh_launch_records_the_boot_id():
+    r = _runner()
+    real_spawn, real_boot = launch.spawn, runnermod.boot_id
+    launch.spawn = lambda job, host, runtime: launch.RunningJob(job, 'p', 999, '/l')
+    runnermod.boot_id = lambda: 'BOOT-Z'
+    try:
+        r._launch(jobmod.Job(id='j', type='train', policy='p', env={}, priority=100))
+    finally:
+        launch.spawn, runnermod.boot_id = real_spawn, real_boot
+    assert r.ledger['j']['boot'] == 'BOOT-Z'
+    assert 'restarts' not in r.ledger['j']     # a first run carries no counter
+
+
+# --------------------------------------------------------- stale git lock clearing
+def _worktree_repo():
+    """A real git repo plus a linked worktree, so --git-path resolves the way it does on the box
+    (a worktree's .git is a *file*, and its locks live in .git/worktrees/<name>/)."""
+    root = tempfile.mkdtemp()
+    main, wt = os.path.join(root, 'main'), os.path.join(root, 'wt')
+    os.makedirs(main)
+    run = lambda *a: subprocess.run(list(a), cwd=main, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, check=True)
+    run('git', 'init', '-q')
+    run('git', 'config', 'user.email', 't@t')
+    run('git', 'config', 'user.name', 't')
+    open(os.path.join(main, 'f'), 'w').write('x')
+    run('git', 'add', 'f')
+    run('git', 'commit', '-qm', 'init')
+    run('git', 'worktree', 'add', '-q', '-b', 'side', wt)
+    return root, wt
+
+
+def test_clear_stale_locks_removes_an_old_index_lock_in_a_worktree():
+    root, wt = _worktree_repo()
+    try:
+        lock = gitbus._git(['rev-parse', '--git-path', 'index.lock'], cwd=wt).strip()
+        if not os.path.isabs(lock):
+            lock = os.path.join(wt, lock)
+        open(lock, 'w').close()
+        os.utime(lock, (time.time() - 3600, time.time() - 3600))
+        assert os.path.exists(lock)
+        assert gitbus.clear_stale_locks(wt) == [lock]
+        assert not os.path.exists(lock)
+        # And git works again afterwards, which is the actual point.
+        open(os.path.join(wt, 'g'), 'w').write('y')
+        gitbus._git(['add', 'g'], cwd=wt)
+        assert gitbus._git(['status', '--porcelain'], cwd=wt).strip()
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_clear_stale_locks_leaves_a_young_lock_alone():
+    # A live git holds index.lock for milliseconds; deleting a fresh one would corrupt a
+    # concurrent write, so the age gate is the safety property being pinned here.
+    root, wt = _worktree_repo()
+    try:
+        lock = gitbus._git(['rev-parse', '--git-path', 'index.lock'], cwd=wt).strip()
+        if not os.path.isabs(lock):
+            lock = os.path.join(wt, lock)
+        open(lock, 'w').close()
+        assert gitbus.clear_stale_locks(wt) == []
+        assert os.path.exists(lock)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_clear_stale_locks_is_a_noop_with_no_locks():
+    root, wt = _worktree_repo()
+    try:
+        assert gitbus.clear_stale_locks(wt) == []
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
 
 
 if __name__ == '__main__':

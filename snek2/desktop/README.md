@@ -36,6 +36,57 @@ status. Jobs are launched **detached**, so a daemon restart never kills a runnin
 trainer; they self-terminate via `SNEK_MAX_STEPS`. A local ledger makes launches
 idempotent across restarts (a job id never runs twice).
 
+## Rebooting the box, and what recovers by itself
+
+**The safe way is to drain first**: set `"drain": true` in `runtime.json` on `ops`, wait for the
+running wave to finish, then reboot. Nothing below applies if you do that.
+
+If the box goes down mid-job — a reboot, a power cut, an OOM — **the data is safe and the job
+recovers itself, but you lose the steps since the last checkpoint.** Everything durable is written
+`<path>.partial` then `os.replace`d, which is atomic, so a reader never sees a torn file and a
+crash leaves either the old complete file or the new one:
+
+| what | written every | at risk |
+|---|---|---|
+| agent checkpoint | 1,000 steps (score ≥ 40) | ~10 s of training |
+| replay buffer (~20 MB) | 10,000 steps, same gate | ~100 s, and only warm-starts the resume |
+| `runs/<policy>_evals.json`, `.md`, `.png` | every eval | one eval |
+| `_checkpoint_evals.json` | every checkpoint measured | one checkpoint's episodes |
+| the runner's ledger | every state change | nothing |
+
+`max_to_keep=10000` means no checkpoint is ever evicted, so even a damaged newest one leaves
+thousands of earlier ones intact — and `initialize_or_restore` fails loudly rather than restoring
+something half-written.
+
+**On the next boot the daemon comes back (`Restart=always`, `WantedBy=multi-user.target`) and
+classifies each job the ledger says was running, by comparing the record's boot id against
+`/proc/sys/kernel/random/boot_id`:**
+
+| record's boot | pid | verdict | what happens next |
+|---|---|---|---|
+| **differs** (machine rebooted) | not consulted | `interrupted` | relaunched on the next dispatch — a training **resumes from its checkpoint** (`SNEK_MAX_STEPS` is absolute), an eval re-runs |
+| same (daemon restarted only) | alive | `running` | re-adopted by pid, exactly as before |
+| same | dead | `done` | the detached job ran to its own end; a training earns its closeout |
+
+So a reboot costs wall clock and nothing else. Watch `restarts` in the ledger entry: it counts
+interruptions and carries across the relaunch, so a box rebooting in a loop shows a climbing
+number instead of looking freshly started each time.
+
+**The boot id is load-bearing in two ways, and both were silent bugs before 2026-08-13.** Without
+it a dead pid after a reboot read as `done`, so (1) a truncated training was published to `results`
+as a finished arm *and* spent its `closeout: pending` measuring the partial checkpoint set, and
+(2) a truncated closeout marked itself terminal, which made `_auto_closeout_jobs` skip that arm
+forever — it was never evaluated again, and nothing said so. It also closes a pid-reuse hole: pids
+restart low after a boot, so a stored low pid could match an unrelated process, and re-adopting
+that phantom would idle the box permanently behind the wave barrier.
+
+**A killed git leaves a lock, and that used to freeze the heartbeat.** `publish_status` commits and
+pushes every poll, so the daemon is inside a git write for a slice of every 30 seconds; killed
+there, the `index.lock` outlives it and every later `git add` fails. The daemon kept running and
+kept dispatching, but `status.json` never updated again — indistinguishable from a dead daemon.
+`gitbus.clear_stale_locks` now sweeps locks older than 60 s from both bus worktrees before each
+write. The age gate is what makes it safe: a live git holds the lock for milliseconds.
+
 ## Driving it from the laptop
 
 **Launch jobs** — drop one JSON file per job into `queue/pending/` on `ops` and

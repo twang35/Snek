@@ -283,6 +283,16 @@ copy before any tuning tool can see it. The exact commands are in
 **Pushing to `ops` starts real work on another machine**, so it falls under the git rule above: queue a
 job only when the user has approved *that* job.
 
+**A reboot mid-job recovers by itself, and `interrupted` is the state that says so.** The daemon
+compares each running record's boot id against `/proc/sys/kernel/random/boot_id`: a mismatch means
+the machine rebooted, so the job is marked **`interrupted`** — non-terminal, therefore relaunched on
+the next dispatch, with a training resuming from its checkpoint. Same boot plus a dead pid still
+means `done`, because detached jobs really do outlive a daemon restart. **Read `interrupted` as
+"lost wall clock, nothing else"** and check the entry's `restarts` count; before 2026-08-13 the same
+situation read `done`, which published truncated arms as finished and silently consumed their
+close-outs. Draining first (`"drain": true` in `runtime.json`) avoids the whole path. Full table:
+[`snek2/desktop/README.md`](snek2/desktop/README.md#rebooting-the-box-and-what-recovers-by-itself).
+
 ### Reading status: the summary block, not the log
 
 Training runs **quiet** — one compact line per 10 evals. `SNEK_DEBUG=1` restores the original
