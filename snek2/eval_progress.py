@@ -400,6 +400,27 @@ def format_duration(seconds):
     return '{0}h{1:02d}m'.format(seconds // 3600, (seconds % 3600) // 60)
 
 
+def format_step_k(step):
+    """A checkpoint step as comma-grouped thousands: 1320000 -> '1,320k'."""
+    return '{0:,}k'.format(step // 1000)
+
+
+def in_flight_title(active):
+    """Title for the in-flight panel, naming the checkpoint step(s) actually running.
+
+    'In flight' used to report only counts -- "1 checkpoint, 1 process" -- which never said *which*
+    checkpoint. Include the step(s): a single one reads '@1,320k'; several distinct steps (a shard
+    set, or two processes on different checkpoints) join with '/'. The checkpoint and process counts
+    stay as they were -- one entry per live process.
+    """
+    count = len(active)
+    steps = sorted({flight['step'] for _, flight in active})
+    steps_label = '/'.join(format_step_k(step) for step in steps)
+    return 'In flight: running perfect rate by round ({0} checkpoint{1} @{2}, {3} process{4})'.format(
+        count, '' if count == 1 else 's', steps_label,
+        count, '' if count == 1 else 'es')
+
+
 def text_summary(policy_name, state):
     lines = []
     done, requested = state['done'], state['requested']
@@ -559,9 +580,7 @@ def render(policy_name, state, out_path):
 
         if top.lines:
             top.legend(fontsize=7, loc='lower right', ncol=2, framealpha=0.85)
-        top.set_title('In flight: running perfect rate by round ({0} checkpoint{1}, {2} process{3})'.format(
-            len(state['active']), '' if len(state['active']) == 1 else 's',
-            len(state['active']), '' if len(state['active']) == 1 else 'es'), fontsize=10)
+        top.set_title(in_flight_title(state['active']), fontsize=10)
         # EVAL_WORKERS varies run to run (2 and 10 have both been used this project), so the old
         # hardcoded "10 rounds x 10 workers = 100 episodes" was only ever right by coincidence.
         worker_counts = sorted({workers for _, workers in depths_and_workers})

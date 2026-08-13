@@ -691,3 +691,34 @@ def test_an_arm_where_nothing_reached_full_length_has_no_solid_points():
     solid, hollow = marker_split(rows, target_episodes=100)
     assert solid == 0, 'nothing reached 100 episodes, so nothing should be solid'
     assert hollow == 3, hollow
+
+
+# ------------------------------------------------------------- in-flight title
+
+def test_format_step_k_groups_thousands():
+    assert eval_progress.format_step_k(1320000) == '1,320k'
+    assert eval_progress.format_step_k(777000) == '777k'
+
+
+def test_in_flight_title_names_the_single_checkpoint():
+    # The whole point of the change: the title must say *which* checkpoint, not just a count.
+    active = [({'suffix': '_t'}, {'step': 1320000})]
+    title = eval_progress.in_flight_title(active)
+    assert '1 checkpoint @1,320k' in title, title
+    assert '1 process' in title, title
+
+
+def test_in_flight_title_lists_distinct_steps_sorted_for_several_processes():
+    active = [({'suffix': '_a'}, {'step': 1320000}),
+              ({'suffix': '_b'}, {'step': 450000})]
+    title = eval_progress.in_flight_title(active)
+    assert '@450k/1,320k' in title, title  # sorted ascending, joined with '/'
+    assert '2 checkpoints' in title and '2 processes' in title, title
+
+
+def test_in_flight_title_collapses_duplicate_steps():
+    # A shard set: two processes on the same checkpoint -> the step appears once, not '900k/900k'.
+    active = [({'suffix': '_r0'}, {'step': 900000}),
+              ({'suffix': '_r1'}, {'step': 900000})]
+    title = eval_progress.in_flight_title(active)
+    assert '@900k' in title and '900k/900k' not in title, title
