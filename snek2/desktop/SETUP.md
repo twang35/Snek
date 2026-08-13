@@ -9,10 +9,10 @@
 >
 > | | |
 > |---|---|
-> | host | `the-claw-den` (Tailscale name) |
+> | host | `the-claw-den`, reached as `the-claw-den.local` (mDNS) on the home LAN |
 > | user | **`claw`** |
-> | reach it | `ssh -i ~/.ssh/snek_desktop claw@the-claw-den` |
-> | hardware | Ryzen 7 9700X, 8c/**16t**, **14 GiB RAM**, Ubuntu 24.04 |
+> | reach it | `ssh the-claw-den` — via the [`~/.ssh/config` alias](#laptop-side-ssh-access-and-how-to-rebuild-it) |
+> | hardware | Ryzen 7 9700X, 8c/**16t**, **15,030 MB RAM** (`free -m`), Ubuntu 24.04 |
 > | repo | `/home/claw/Snek` |
 > | conda | `/home/claw/miniconda3`, env `snek` |
 > | daemon | `systemctl status snek-runner` (runs on **base** python, jobs use the env python) |
@@ -21,7 +21,8 @@
 > [measured capacity](README.md#measured-capacity--memory-is-the-limit).
 
 One-time. After this the box runs unattended and is driven from the laptop over
-git; SSH (over Tailscale) is only a backstop.
+git; SSH is only a backstop, and since 2026-08-13 it reaches the box **over the
+home LAN only** — see [Laptop-side SSH access](#laptop-side-ssh-access-and-how-to-rebuild-it).
 
 Assumptions below: **Ubuntu**, a dedicated user, its home holding the repo and
 miniconda. **On `the-claw-den` that user is `claw`**, so the paths are
@@ -36,26 +37,38 @@ this over SSH once the box is reachable (or you can run it on the desktop).
 
 ## Part 1 — Desktop bootstrap (🖥️, physical, once)
 
-Gets the box on the network with SSH + Tailscale so I can take over. **These are
-the commands you run on the desktop.**
+Gets the box on the network with SSH so I can take over. **These are the commands
+you run on the desktop.**
 
 ```bash
 # 1. System packages
 sudo apt update
-sudo apt install -y git build-essential curl openssh-server
+sudo apt install -y git build-essential curl openssh-server avahi-daemon
 
 # 2. SSH server on
 sudo systemctl enable --now ssh
 
-# 3. Tailscale (secure reachability, no port-forwarding)
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up          # follow the login URL; note the machine name it prints
+# 3. mDNS, so the laptop can find the box as <hostname>.local without a static
+#    IP or any port-forwarding. Ubuntu desktop has avahi already; just confirm.
+sudo systemctl enable --now avahi-daemon
+systemctl is-active avahi-daemon          # must print: active
+hostname                                  # the name the laptop will use, + .local
 
 # 4. Let the laptop's Claude SSH in: paste the LAPTOP's public key here.
 #    (get it on the laptop with:  cat ~/.ssh/snek_desktop.pub  -- see Part 2)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 echo 'PASTE_LAPTOP_PUBLIC_KEY_HERE' >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
+
+# 4b. Key-only SSH. MUST come after step 4 -- disabling passwords before the
+#     laptop's key is in authorized_keys locks out every remote login.
+#     `sshd -t` validates before the reload, so a typo cannot lock you out either.
+sudo tee /etc/ssh/sshd_config.d/10-snek-hardening.conf >/dev/null <<'EOF'
+PasswordAuthentication no
+PermitRootLogin no
+EOF
+sudo sshd -t && sudo systemctl reload ssh
+sudo sshd -T | grep -E '^(passwordauthentication|permitrootlogin)'   # expect: no, no
 
 # 5. Passwordless sudo for this user (so I can install packages/services over SSH)
 echo "$USER ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/snek-runner
@@ -80,8 +93,8 @@ EOF
 chmod 600 ~/.ssh/config
 ```
 
-Then tell me the **Tailscale machine name** from step 3. That's all I need — I do
-the rest over SSH. (Or keep going below and run it yourself.)
+Then tell me the **hostname** from step 3 — `<hostname>.local` is all I need, and I
+do the rest over SSH. (Or keep going below and run it yourself.)
 
 ---
 
@@ -94,8 +107,7 @@ don't drag the codebase along.
 ```bash
 # laptop public key for Part 1 step 4 -- a dedicated key, already generated as
 # ~/.ssh/snek_desktop (kept separate from the YubiKey so SSH needs no touch).
-# The laptop connects with `ssh -i ~/.ssh/snek_desktop` (a Host alias gets added
-# to ~/.ssh/config once the Tailscale name is known).
+# Set up the Host alias too: see "Laptop-side SSH access" below.
 cat ~/.ssh/snek_desktop.pub
 
 git branch ops master && git push origin ops
@@ -169,6 +181,94 @@ daemon self-terminated it at `max_steps`. Then remove the smoke file from
 `queue/pending/` on `ops` so it isn't reconsidered.
 
 ---
+
+## Laptop-side SSH access (and how to rebuild it)
+
+**Tailscale was removed on 2026-08-13** (not an approved app on the work laptop). It
+was only ever the transport — name resolution and NAT traversal — so the swap to
+plain OpenSSH over the LAN changed no command. What it did cost is **off-LAN shell
+access**: see [Reaching the box](README.md#reaching-the-box).
+
+Two things live outside this repo and are **not backed up**: `~/.ssh/config` (whose
+other entries are all machine-generated `DO NOT EDIT` blocks that Airbnb tooling can
+regenerate) and the private key `~/.ssh/snek_desktop`. So this section is the
+canonical copy — everything needed to get back in is here.
+
+### The alias
+
+Restores in one command:
+
+```bash
+cat >> ~/.ssh/config <<'EOF'
+Host the-claw-den
+  HostName the-claw-den.local
+  HostKeyAlias the-claw-den
+  User claw
+  IdentityFile ~/.ssh/snek_desktop
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config
+```
+
+Three lines are load-bearing, not style:
+
+- **`HostKeyAlias the-claw-den`** pins the `known_hosts` lookup to the alias rather
+  than the real hostname, so the existing entry keeps working and a later change of
+  address never re-triggers host-key verification.
+- **`IdentitiesOnly yes`** stops ssh offering the YubiKey first — `snek_desktop`
+  exists so SSH needs no touch.
+- **`HostName the-claw-den.local`** is mDNS, so it survives the desktop's DHCP lease
+  changing. The box is on **Wi-Fi** with a dynamic lease, so its address is not stable.
+
+With the stanza in place **both call shapes work** — `ssh the-claw-den` and the older
+explicit `ssh -i ~/.ssh/snek_desktop claw@the-claw-den` that appears throughout these
+docs. That is why the transport change rewrote no commands.
+
+### If `~/.ssh/config` is gone — no-config fallback
+
+Fully self-contained, every option the alias supplies given explicitly:
+
+```bash
+# mDNS name, needs no config file at all
+ssh -i ~/.ssh/snek_desktop -o HostKeyAlias=the-claw-den -o IdentitiesOnly=yes claw@the-claw-den.local
+
+# if mDNS is also unavailable, the literal address
+# (Wi-Fi DHCP -- was 192.168.0.79 on 2026-08-13, so confirm before trusting it)
+ssh -i ~/.ssh/snek_desktop -o HostKeyAlias=the-claw-den -o IdentitiesOnly=yes claw@192.168.0.79
+```
+
+`-o HostKeyAlias=the-claw-den` is what lets one `known_hosts` entry serve every form.
+Dropping it costs only a first-connection prompt, not a failure. Add `-F /dev/null` to
+prove a command truly depends on no config file.
+
+If neither name nor address works, find the box from the laptop with
+`dscacheutil -q host -a name the-claw-den.local`, or `arp -a | grep 192.168.0`.
+
+### If the key is gone — the irreplaceable half
+
+**`~/.ssh/snek_desktop` is the one thing no fallback above can work around**, because
+the desktop authorises that specific key. If `~/.ssh` is wiped, the key goes with it
+and every command here fails identically, which reads like a network fault but is not.
+**There is no password fallback** — the box is key-only since 2026-08-13
+(`sshd_config.d/10-snek-hardening.conf`, Part 1 step 4b).
+
+Recovery is a fresh keypair installed from the desktop's **physical console** — the box
+has a monitor and keyboard, and that is the true out-of-band path:
+
+```bash
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/snek_desktop -C snek-laptop   # on the laptop
+cat ~/.ssh/snek_desktop.pub                                        # then type/paste it
+# at the desktop console, as claw:
+#   echo '<that public key>' >> ~/.ssh/authorized_keys
+```
+
+Two rules that keep the console from being the *only* way back:
+
+- **Never commit the private key** to this repo. The public key is harmless; the
+  private key is not, and this repo is on GitHub.
+- **Keep a copy of `~/.ssh/snek_desktop` somewhere you control** — a password manager
+  or an encrypted backup. This is a manual step nothing in the repo can do for you,
+  and it is the difference between a one-minute fix and a trip to the desk.
 
 ## Keeping the runner code current
 

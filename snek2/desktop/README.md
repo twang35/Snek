@@ -1,12 +1,29 @@
 # Desktop runner — unattended training/eval driven by git
 
-A dedicated box (Ryzen 7 9700X, 8c/16t, **14 GiB RAM**) runs snek trainings and
+A dedicated box (Ryzen 7 9700X, 8c/16t, **15,030 MB RAM** per `free -m`) runs snek trainings and
 evals on its own, driven entirely through git. You never log in to it in normal
 use: you commit a job, it runs it, it reports back.
 
 **It is set up and live** — `the-claw-den`, user `claw`, daemon `active`, verified
 2026-08-08. Setup details and the backstop SSH command are in
 [`SETUP.md`](SETUP.md); nothing there needs running again.
+
+## Reaching the box
+
+**The git bus works from anywhere; the SSH backstop is home-LAN only.** Tailscale was
+removed on 2026-08-13, so `ssh the-claw-den` resolves by mDNS (`the-claw-den.local`)
+and only works on the home network. The alias, the no-config fallback command and the
+key-recovery path are in
+[`SETUP.md`](SETUP.md#laptop-side-ssh-access-and-how-to-rebuild-it).
+
+Off the home network you can still do almost everything, because none of it touches
+SSH — queue jobs, edit `runtime.json`, read `status.json`, pull `results`. What you
+cannot do until you are home is [deploy code](#deploying-a-code-change-to-the-desktop),
+read `journalctl`, or sample `free -m`.
+
+**So a box that looks unreachable from the office is usually just off-LAN, not broken.**
+Check the `iso` heartbeat in `status.json` before assuming anything is wrong — if it is
+current, the daemon is fine and only your shell access is absent.
 
 **This box is a second compute host, not a replacement.** The laptop's own 4-trainer
 limit and the desktop's limits are separate pools — see
@@ -137,21 +154,37 @@ same poll; a malformed spec never shows as `queued` — it lands in the ledger a
 
 **Measured on the box 2026-08-08, four concurrent evals of one checkpoint:**
 
-| config | peak RAM used | verdict |
-|---|---|---|
-| 4 evals × **10** `EVAL_WORKERS` | **12,770 MB** of 14,336 | **too close** — ~1.5 GB headroom, no OOM but nothing else fits |
-| 4 evals × **4** `EVAL_WORKERS` | **7,296 MB** of 14,336 | comfortable |
+Total RAM is **15,030 MB** as `free -m` reports it (`MemTotal` 15,390,836 kB, ~14.7 GiB).
+
+| config | spawned workers | peak RAM used | verdict |
+|---|---|---|---|
+| 4 evals × **10** `EVAL_WORKERS` | 40 | **12,770 MB** of 15,030 | **at the ceiling** — only ~2.3 GB free, below the ≥3 GB target |
+| 4 evals × **4** `EVAL_WORKERS` | 16 | **7,296 MB** of 15,030 | comfortable, and the current setting |
 
 No OOM kills occurred in either run, so 12.8 GB is a real measurement rather than a
-survived near-miss — but it leaves no room for a trainer alongside. **That is why
-`HARD_MAX_EVALS=1`**: one eval at `eval_workers: 4` sits well inside budget and
-leaves the cores for trainers.
+survived near-miss — but surviving is not the bar.
+
+**The dial is total spawned workers, not the number of eval jobs.** Each standalone eval
+worker is its own process holding its own TensorFlow arena at ~230 MB, so what matters is
+the product `max_evals × eval_workers`. Three points fix the scale:
+
+| total spawned workers | what happens |
+|---|---|
+| ~52 | **OOM-killed** in a scaling test |
+| ~40 | survives, but only ~2.3 GB headroom — a **ceiling, not an operating point** |
+| **≤32** | the operating band: `HARD_MAX_EVALS=4` at `eval_workers` ≤ ~8, keeping ≥3 GB headroom |
+
+Live setting is 4 × 4 = **16**, comfortably inside. `HARD_MAX_EVALS=4` guards the job count;
+nothing guards the *product*, so that is the number to check by hand before raising either knob.
 
 **Cores are not the constraint, and this inverts the laptop's rule.** On the laptop
 `EVAL_WORKERS` is close to free and lowering it wastes CPU
-([eval cost](../../CLAUDE.md)); here each worker is a process holding its own
-TensorFlow arena, so worker count is the memory dial. Raise `max_evals` only with a
-`free -m` measurement in hand.
+([eval cost](../../CLAUDE.md)); here worker count is the memory dial. Raise `max_evals` or
+`eval_workers` only with a `free -m` measurement in hand.
+
+**Training self-eval workers are different — they are forked, not spawned**, so Linux
+COW-shares the parent's TF pages and they are nearly free: 4 trainers × 10 self-eval
+workers ≈ 4.2 GB total. Only the standalone `eval_checkpoints.py` workers cost ~230 MB each.
 
 ### Capacity testing, if you re-measure
 
@@ -175,7 +208,7 @@ Treat the two as separate pools:
 | host | limit | how to check |
 |---|---|---|
 | laptop | 4 trainers | `pgrep -fl "python -u snek2.py"` |
-| desktop | `max_trainers` (≤ `HARD_MAX_TRAINERS=4`), `max_evals` (≤ 1) | `git show origin/ops-status:status.json` |
+| desktop | `max_trainers` (≤ `HARD_MAX_TRAINERS=4`), `max_evals` (≤ `HARD_MAX_EVALS=4`) | `git show origin/ops-status:status.json` |
 
 **Neither check covers the other host**, so a status report that says "4 arms
 running" must say *which box*. The desktop's `counts` and `running` fields in
@@ -221,6 +254,33 @@ running the daemon's exact sequence inside a real worktree of `origin/results`.
 **So the rule belongs in the tracked `.gitignore`, never in `.git/info/exclude`.** That one
 lives in the *common* git dir and is shared by every linked worktree, so the same pattern
 there does reach `RESULTS_WORKTREE` and does break publishing — measured, not assumed.
+
+## Staging a laptop-trained policy for a desktop eval
+
+**The git bus carries job specs and results, never checkpoints** — weights are far too
+large for it. So evaluating a policy that trained on the *laptop* needs the files copied
+over first, and that copy is the one routine task that requires the LAN.
+
+```bash
+# checkpoints -- exclude the replay buffer: an eval never reads it, and it changes live
+rsync -a --exclude='replay_buffer' \
+  snek2/savedPolicies/<policy> the-claw-den:/home/claw/Snek/snek2/savedPolicies/
+
+# the graph JSON the top20 selector reads
+rsync -a snek2/runs/<policy>_evals.json the-claw-den:/home/claw/Snek/snek2/runs/
+```
+
+Then push an `eval` spec (`type: eval`, `eval_args: ["top20"]`, `priority: 10`) to
+`queue/pending/` on `ops` as usual.
+
+Three things to know, each of which has cost a failed job:
+
+- **`arch.json` must ride along**, or the restore hard-fails with `ArchMismatch`
+  (`policy_arch.py`). `rsync -a <policy>` carries it because it lives in the policy dir —
+  so never add it to `--exclude`.
+- **Auto-closeout does not fire for these.** It triggers on a desktop *wave barrier*, and
+  a laptop-trained arm never trained on the desktop. Queue the eval by hand.
+- **A ~4-arm wave is ~2.3 GB** (~574 MB/arm), a couple of minutes over the LAN.
 
 ## Deploying a code change to the desktop
 

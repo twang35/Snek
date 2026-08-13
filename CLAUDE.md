@@ -263,13 +263,21 @@ appear in it — so **"N arms running" is meaningless without naming the box**, 
 has to check both. The desktop's `running` and `counts` fields in `status.json` are the only authority
 for its side; its heartbeat `iso` tells you whether the daemon is alive at all.
 
-**Memory is the desktop's binding constraint, not cores** — 15 GB. Measured 2026-08-09, and the two
-worker kinds differ sharply:
+**The git bus works from anywhere, but `ssh the-claw-den` is home-LAN only** — Tailscale was removed
+on 2026-08-13, so the name resolves by mDNS. Queueing, retuning, `status.json` and `results` are
+unaffected; deploying code, `journalctl` and `free -m` have to wait until you are home. A box that
+seems unreachable is usually just off-LAN, so **read the `iso` heartbeat before calling it broken**.
+Alias, no-config fallback and key recovery:
+[`snek2/desktop/SETUP.md`](snek2/desktop/SETUP.md#laptop-side-ssh-access-and-how-to-rebuild-it).
+
+**Memory is the desktop's binding constraint, not cores** — **15,030 MB** as `free -m` reports it
+(`MemTotal` 15,390,836 kB, ~14.7 GiB). Measured 2026-08-09, and the two worker kinds differ sharply:
 
 - **Standalone eval workers (`eval_checkpoints.py`) are *spawned*** — each loads its own TensorFlow
-  arena, **~230 MB/worker**. A single scaling eval hit the OOM-killer at ~52 workers; **safe budget
-  ~40 total** (≥3 GB headroom). So `HARD_MAX_EVALS=4` at `eval_workers` ≤ ~8 (≤32 total) is fine; the
-  old `12.8 GB at 4×10` figure was 40 spawned workers, i.e. the top of this range.
+  arena, **~230 MB/worker**. A single scaling eval hit the OOM-killer at ~52 workers, and **~40 is the
+  ceiling, not the operating point**: the `12.8 GB at 4×10` measurement was 40 spawned workers and
+  left only **~2.3 GB** of the 15,030 MB free. **Operate at ≤32 total** — `HARD_MAX_EVALS=4` at
+  `eval_workers` ≤ ~8 — which is what keeps the ≥3 GB headroom this band is chosen for.
 - **Training self-eval workers are *forked*** (Linux COW-shares the parent's TF pages), so they are
   nearly free: **4 trainers × 10 self-eval workers ≈ 4.2 GB total**. The overnight OOM was the
   cv2/XIO chart cascade plus orphan accumulation, *not* steady memory.
