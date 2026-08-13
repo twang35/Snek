@@ -200,6 +200,28 @@ at `results/`** — `refresh_charts.sh` globs `runs/*.png` only, so a job left i
 [charts checklist](../hyperparamTuning/hyperparamTuning.md#when-you-stop-a-batch-of-arms)
 exists to prevent.
 
+**Delete the staging copy once it is in `runs/`.** `git checkout` also *stages* what it
+writes, so an untracked-and-staged `results/` sitting in a checkout is what aborts the
+ff-merge in [the deploy section](#deploying-a-code-change-to-the-desktop) below. It is
+redundant the moment the `cp` lands — byte-identical to `snek2/runs/`, and still on the
+`results` branch either way. `/results/` is gitignored at the repo root since 2026-08-13,
+so it no longer shows up in `git status`; that hides the clutter, it does not reclaim the
+disk (~2.5 MB per arm), so still `rm -rf results/` when done. Unstage first if you have
+not committed: `git restore --staged results/`.
+
+**That ignore rule cannot reach this box's bus worktrees — and the obvious alternative
+can.** The daemon publishes with `git add -A results/<job-id>` and then tests `git status
+--porcelain`; both skip ignored files, so a rule that *did* reach `RESULTS_WORKTREE` would
+make `_commit_and_push` find nothing staged and return early — **results would stop being
+published with no error anywhere**, while the ledger kept saying `done`. Two things keep
+that from happening: gitignore lookup never walks above a working tree's own root, and the
+`results` branch is orphan-style (just `results/`, no `.gitignore` of its own). Verified by
+running the daemon's exact sequence inside a real worktree of `origin/results`.
+
+**So the rule belongs in the tracked `.gitignore`, never in `.git/info/exclude`.** That one
+lives in the *common* git dir and is shared by every linked worktree, so the same pattern
+there does reach `RESULTS_WORKTREE` and does break publishing — measured, not assumed.
+
 ## Deploying a code change to the desktop
 
 The daemon runs `runner.runner` from the **`master` checkout** at `/home/claw/Snek`. So code
