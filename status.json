@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-13T08:39:08",
-  "ts": 1786635548.5498734,
+  "iso": "2026-08-13T08:39:41",
+  "ts": 1786635581.2794724,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -26,36 +26,36 @@
       "type": "train",
       "policy": "b25a-fc200x100x100noisseed1",
       "pid": 3167665,
-      "step": 17000,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 163
+      "step": 20000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 196
     },
     {
       "id": "b25b-fc200x100x100noisseed2",
       "type": "train",
       "policy": "b25b-fc200x100x100noisseed2",
       "pid": 3167666,
-      "step": 16000,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 163
+      "step": 19000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 196
     },
     {
       "id": "b25c-fc200x100x100noisseed3",
       "type": "train",
       "policy": "b25c-fc200x100x100noisseed3",
       "pid": 3167667,
-      "step": 18000,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 163
+      "step": 21000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 196
     },
     {
       "id": "b25d-fc200x100x100noisseed4",
       "type": "train",
       "policy": "b25d-fc200x100x100noisseed4",
       "pid": 3167668,
-      "step": 18000,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 163
+      "step": 21000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 196
     }
   ],
   "ledger": {
@@ -153,12 +153,20 @@
     "b25a-fc200x100x100noisseed1-closeout": "queued",
     "b25b-fc200x100x100noisseed2-closeout": "queued",
     "b25c-fc200x100x100noisseed3-closeout": "queued",
-    "b25d-fc200x100x100noisseed4-closeout": "queued"
+    "b25d-fc200x100x100noisseed4-closeout": "queued",
+    "b26a-fc100x100noisseed1": "queued",
+    "b26b-fc100x100noisseed2": "queued",
+    "b26c-fc100x100noisseed3": "queued",
+    "b26d-fc100x100noisseed4": "queued",
+    "b26a-fc100x100noisseed1-closeout": "queued",
+    "b26b-fc100x100noisseed2-closeout": "queued",
+    "b26c-fc100x100noisseed3-closeout": "queued",
+    "b26d-fc100x100noisseed4-closeout": "queued"
   },
   "disk_free_gb": 150.4,
   "load_avg": [
-    7.5986328125,
-    5.53955078125,
-    5.30078125
+    7.56787109375,
+    5.8134765625,
+    5.40478515625
   ]
 }
