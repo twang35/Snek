@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-13T08:49:29",
-  "ts": 1786636169.3917842,
+  "iso": "2026-08-13T08:50:02",
+  "ts": 1786636202.1241872,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -26,36 +26,36 @@
       "type": "train",
       "policy": "b25a-fc200x100x100noisseed1",
       "pid": 3167665,
-      "step": 66000,
-      "steps_per_sec": 61.0,
-      "elapsed_s": 784
+      "step": 69000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 817
     },
     {
       "id": "b25b-fc200x100x100noisseed2",
       "type": "train",
       "policy": "b25b-fc200x100x100noisseed2",
       "pid": 3167666,
-      "step": 69000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 784
+      "step": 72000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 817
     },
     {
       "id": "b25c-fc200x100x100noisseed3",
       "type": "train",
       "policy": "b25c-fc200x100x100noisseed3",
       "pid": 3167667,
-      "step": 67000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 784
+      "step": 69000,
+      "steps_per_sec": 61.1,
+      "elapsed_s": 817
     },
     {
       "id": "b25d-fc200x100x100noisseed4",
       "type": "train",
       "policy": "b25d-fc200x100x100noisseed4",
       "pid": 3167668,
-      "step": 69000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 784
+      "step": 72000,
+      "steps_per_sec": 91.7,
+      "elapsed_s": 817
     }
   ],
   "ledger": {
@@ -150,6 +150,10 @@
     "b25b-fc200x100x100noisseed2": "running",
     "b25c-fc200x100x100noisseed3": "running",
     "b25d-fc200x100x100noisseed4": "running",
+    "b24a-fc320noisseed1-hof500": "queued",
+    "b24b-fc320noisseed2-hof500": "queued",
+    "b24c-fc320noisseed3-hof500": "queued",
+    "b24d-fc320noisseed4-hof500": "queued",
     "b25a-fc200x100x100noisseed1-closeout": "queued",
     "b25b-fc200x100x100noisseed2-closeout": "queued",
     "b25c-fc200x100x100noisseed3-closeout": "queued",
@@ -165,8 +169,8 @@
   },
   "disk_free_gb": 150.2,
   "load_avg": [
-    8.72412109375,
-    8.693359375,
-    7.17041015625
+    9.16015625,
+    8.85693359375,
+    7.2841796875
   ]
 }
