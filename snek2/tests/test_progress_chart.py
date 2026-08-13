@@ -39,8 +39,15 @@ def rows(scores):
             for index, score in enumerate(scores)]
 
 
-def draw(scores, resume_steps=()):
-    """Runs display_progress and returns its figure's axes, newest figure last.
+def perfect_rows(percents):
+    """Eval rows carrying the given perfect-game percents, one every 1000 steps."""
+    return [{'step': (index + 1) * 1000, 'avg_score': 90.0, 'perfect_percent': percent,
+             'trailing_avg_score': 90.0, 'epsilon': 0.002}
+            for index, percent in enumerate(percents)]
+
+
+def render(eval_rows, resume_steps=()):
+    """Runs display_progress on explicit rows and returns (figure, score_axis).
 
     display_progress builds its figure through the OO API (under_the_hood.Figure) rather than
     pyplot, to avoid the per-eval matplotlib leak — so the figure is captured by patching that
@@ -59,7 +66,7 @@ def draw(scores, resume_steps=()):
     os.close(handle)
     under_the_hood.Figure = capture
     try:
-        under_the_hood.display_progress(rows(scores), list(resume_steps), StubScreen(),
+        under_the_hood.display_progress(eval_rows, list(resume_steps), StubScreen(),
                                         graph_path=path)
     finally:
         under_the_hood.Figure = real_figure
@@ -67,6 +74,11 @@ def draw(scores, resume_steps=()):
             if os.path.exists(leftover):
                 os.remove(leftover)
     return captured['figure'], captured['figure'].axes[0]
+
+
+def draw(scores, resume_steps=()):
+    """Runs display_progress on rows built from `scores`; see `render`."""
+    return render(rows(scores), resume_steps)
 
 
 def horizontal_lines(axis):
@@ -178,6 +190,55 @@ def test_a_resume_draws_a_vertical_line_per_restart():
         if len(xdata) == 2 and xdata[0] == xdata[1]:
             verticals.append(xdata[0])
     assert sorted(verticals) == [2000, 5000], verticals
+    plt.close(figure)
+
+
+# ----------------------------------------------------------- the trailing-average trend line
+
+def test_trailing_average_is_a_causal_moving_mean():
+    # Element i is the mean of the last `window` values up to and including i; the window is
+    # shorter at the start where fewer values exist. The last element never depends on values
+    # after it — that is what "trailing, not centred" buys.
+    assert under_the_hood.trailing_average([10, 20, 30], 5) == [10, 15, 20]
+    assert under_the_hood.trailing_average([0, 0, 0, 0, 100], 5) == [0, 0, 0, 0, 20]
+
+
+def test_trailing_average_window_only_looks_back():
+    # A window of 2 over a step change lags the change, it does not anticipate it: the point at
+    # the jump averages the jump with the value before, never with the one after.
+    assert under_the_hood.trailing_average([0, 0, 100, 100], 2) == [0, 0, 50, 100]
+
+
+def test_trailing_average_of_nothing_is_nothing():
+    assert under_the_hood.trailing_average([], 5) == []
+
+
+def test_the_trend_line_is_on_the_percent_axis_bold_and_above_the_raw_trace():
+    """The whole point of the overlay: a bold smoothed line the eye can follow through the noisy
+    thin raw trace, on the same axis and colour so it reads as the same quantity, drawn on top."""
+    percents = [10.0, 90.0, 20.0, 80.0, 95.0, 30.0, 70.0]
+    figure, score_axis = render(perfect_rows(percents))
+    percent_axis = [axis for axis in figure.axes if axis is not score_axis][0]
+
+    # Window 10 must match display_progress's overlay; change both together if it moves.
+    expected_trend = [round(v, 6) for v in under_the_hood.trailing_average(percents, 10)]
+    assert expected_trend != [round(v, 6) for v in percents], \
+        'chosen percents must make the trend differ from the raw trace, or the test proves nothing'
+
+    raw = trend = None
+    for line in percent_axis.get_lines():
+        ydata = [round(v, 6) for v in line.get_ydata()]
+        if len(ydata) != len(percents):
+            continue  # skip the 2-point dashed guides
+        if ydata == [round(v, 6) for v in percents]:
+            raw = line
+        elif ydata == expected_trend:
+            trend = line
+    assert raw is not None, 'the raw perfect-% trace is missing'
+    assert trend is not None, 'the trailing-average trend line is missing'
+    assert trend.get_linewidth() > raw.get_linewidth(), 'the trend must be bolder than the raw trace'
+    assert trend.get_zorder() > raw.get_zorder(), 'the trend must draw on top of the raw trace'
+    assert 'red' in str(trend.get_color()), 'the trend belongs to the red perfect-% family'
     plt.close(figure)
 
 

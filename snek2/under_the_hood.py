@@ -183,6 +183,22 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
     return episode_rewards, episode_scores, last_rewards, total_steps
 
 
+def trailing_average(values, window):
+    """Trailing moving average: element i is the mean of the last `window` values up to and
+    including i, with a shorter window at the very start where fewer values exist yet.
+
+    Trailing rather than centred on purpose -- the chart is read live, so the newest point must
+    reflect only evals already seen; a centred average would pull the latest point toward values
+    that do not exist yet. Used to overlay a readable perfect-rate trend on the thin, noisy raw
+    trace in display_progress.
+    """
+    averaged = []
+    for i in range(len(values)):
+        chunk = values[max(0, i - window + 1):i + 1]
+        averaged.append(sum(chunk) / len(chunk))
+    return averaged
+
+
 def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     """Draws the whole history of a policy, across however many runs made it.
 
@@ -245,6 +261,20 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     for level in (20, 40, 60, 80):
         percent_axis.axhline(level, color=percent_color, linestyle=(0, (4, 3)),
                              linewidth=0.5, alpha=0.55, zorder=1)
+
+    # A trailing 10-eval moving average of the perfect-game %, drawn over the thin raw trace.
+    # Late in a long run the 0.3pt red line packs thousands of evals into ~300px and smears into a
+    # band with no readable level; this answers "what has the perfect rate been lately" at a glance.
+    # Same axis and same red family as the trace it summarises -- it is the smoothed version of that
+    # signal, not a new quantity -- just darker so it reads as the level through the noise. Width
+    # 0.4 is only a hair over the raw trace's 0.3 on purpose: a 10-eval average still wiggles at
+    # this density, and a bold line just reprints the noise heavier (tried 1.1, too heavy). darkred
+    # over tab:red gives the contrast instead. zorder 3 keeps it above both traces (2) and the
+    # dashed guides (1). Window 10 chosen against 5 on a real ~3000-eval arm: 5 barely smoothed.
+    if perfect_percents:
+        percent_trend = trailing_average(perfect_percents, 10)
+        percent_axis.plot(steps, percent_trend, color='darkred', linewidth=0.4,
+                          alpha=0.9, zorder=3)
 
     # The perfect-game score (MAX_POSSIBLE_SCORE, 95 on a 10x10 board — a perfect game triggers at
     # 95 food eaten, since the snake starts with START_SEGMENTS + 1 cells already on the board).
