@@ -49,24 +49,29 @@ shape) — width is the only change. It asks the question batch 20 could not ans
 control: **does width matter once the prioritisation is fixed at IS-off?** The seed-matched control is
 b22 (`50,100,50`, IS off). Trained on the desktop.
 
-**Strong on the training graph — the first hint that width and prioritisation interact. Close-out
-running; pooled pending.** All four peak at **95.00** — the top of the flat 94.7-95.0 band, so the
-ceiling is unmoved, just sitting at it — with mean best-30 **96.2** and `sef` **66.0**, far above b22's
-86.2 / 30.5 at the same IS-off setting. If the close-out pooled backs this, width adds real
-consolidation on top of IS-off, which would be the project's first architecture result. **Three caveats
-hold until the pooled lands:** `sef` is inflated by run length, n=4 cannot resolve below ~10 pp, and
-batch 20's `320` looked strong on the graph too before its pooled gap proved to be seed noise.
+**Width raises consolidation under IS-off — the close-out confirms the training-graph hint. The honest
+500-episode number is still pending.** All four peak at **95.00**, so width does not move the ceiling.
+But the close-out pools **87.9** (eq-effort, gate 95): **+12.2 over the b22 control's 75.7, and higher on
+every seed** — and above every prior gate-95 arm, the b18b record's 78.5 included. Two arms hold a
+**100.0% full-length checkpoint (n=100)**, and **199 checkpoints across the batch clear 97% at n=100**.
+This is the project's first sign that width and prioritisation interact: width paid nothing under β→1.0
+(batch 20), and it pays here under IS-off.
 
-All at the 3M cap, sorted by best-30. **Close-out running on the desktop** (gate 95, `EVAL_WORKERS=4`) —
-`pooled` and `best row` fill in when it finishes.
+**Two caveats hold until the HOF-500 lands (running now).** The n=100 best rows are selection-inflated —
+b23b's selected 97%/100 shrank to **92.4%/500** — so the honest peak is the 500-episode re-measurement of
+every ≥97% checkpoint, not the figures below. And n=4 still cannot resolve below ~10 pp, although +12.2
+higher on all four seeds is a cleaner signal than batch 20's within-batch confound.
+
+All at the 3M cap, sorted by close-out pooled. Close-out ran on the desktop (gate 95, `EVAL_WORKERS=4`);
+`best row` is the top full-length checkpoint at n=100.
 
 | arm | peak trail | best-30 | `sef` | close-out pooled | best row |
 |---|---|---|---|---|---|
-| `b24b` | 95.00 | **96.7%** | **73.2%** | *running* | — |
-| `b24d` | 95.00 | 96.7% | 62.9% | *running* | — |
-| `b24c` | 95.00 | 96.0% | 67.4% | *running* | — |
-| `b24a` | 95.00 | 95.3% | 60.5% | *running* | — |
-| **mean — b24 fc320 IS-off** | **95.00** | **96.2%** | **66.0%** | *pending* | — |
+| `b24a` | 95.00 | 95.3% | 60.5% | **89.03** | **100.0%** @1633k /100 |
+| `b24b` | 95.00 | **96.7%** | **73.2%** | 88.84 | 99.0% @1031k /100 |
+| `b24c` | 95.00 | 96.0% | 67.4% | 87.68 | **100.0%** @2126k /100 |
+| `b24d` | 95.00 | 96.7% | 62.9% | 85.97 | 99.0% @1292k /100 |
+| **mean — b24 fc320 IS-off** | **95.00** | **96.2%** | **66.0%** | **87.9** | — |
 | **mean — b22 fc50,100,50 IS-off** | 94.88 | 86.2% | 30.5% | 75.7% | — |
 
 ![b24b](charts/b24b-fc320noisseed2.png)

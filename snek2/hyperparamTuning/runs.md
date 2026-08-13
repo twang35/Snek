@@ -12,46 +12,46 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Batch 24 / 25 — FC width under IS-off (`SNEK_IS_WEIGHTS=0`, otherwise b22)
+## Batch 25 / 26 — more FC shapes under IS-off, and b24's HOF-500
 
-**b24 is running on the desktop; b25 is queued behind it.** Both take b22's exact IS-off config —
-`td_error` priority α=0.6, `SNEK_IS_WEIGHTS=0`, target 1000, disc 0.9975, guided 0.8, fork 4/0.5/85/60,
-food-distance off, seeds 1-4, 3M — and vary **only** the network width. That makes them batch 20's width
-question re-asked under IS-off prioritisation instead of under the β→1.0 control.
+**b24 closed with the project's first architecture result.** Width `320` under IS-off pools **87.9**
+(eq-effort, gate 95) — **+12.2 over the b22 control and higher on all four seeds** — with the ceiling
+unmoved at peak 95.00
+([write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-width-raises-consolidation-once-prioritisation-is-fixed--the-first-architecture-result-pending-hof-500)).
+Two arms hold a **100%/100** checkpoint and **199 checkpoints clear 97%/100**, so a **500-episode HOF
+re-measurement of every ≥97% checkpoint is running now** on the desktop (gate-97 early-abandon) to get the
+honest peak and any challenge to the 97.6%/700 record. b25 and b26 carry the width question to two more
+shapes under the same IS-off base.
 
-**What each outcome would mean.** Batch 20 answered the width question under β→1.0 and found nothing:
-nine shapes, no ceiling movement, and the consolidation columns exposed as seed noise
-([`findings.md`](findings.md#network-shape-the-sweep-is-complete--nine-shapes-and-architecture-never-raises-the-ceiling)).
-The β ladder then found the real consolidation lever — IS correction, worth +20.7 pooled from β→1.0 to
-β→0.1. So batch 24/25 asks the one architecture question batch 20 could not: **does width matter once the
-prioritisation is fixed?** A null replicates batch 20's finding under a stronger base and closes width for
-good. A gain would mean the two interact — width only pays when the gradient is prioritised — which would
-be the first architecture result in the project.
+- **b24 HOF-500 — running (desktop), priority 8.** Four eval jobs, one per b24 arm, 500 episodes each,
+  gate 97 with early abandonment. Ahead of everything else in the queue.
+- **b25 (`b25a-d-r2`, fc 200,100,100) — queued (desktop), priority 210.** 3-layer, ~1.6× the control. A
+  first b25 attempt reached ~112k and was killed so the HOF-500 could run first; it is re-queued from
+  scratch under `-r2` names, because a killed job reaps `failed` and cannot relaunch under its old id.
+- **b26 (`b26a-d`, fc 100,100) — queued (desktop), priority 220.** A shallower two-layer shape. Runs after
+  b25 and its close-outs.
 
-**Read it against b22, not against batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
-control for both arms: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88.
+**Read b25/b26 against b22, not batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
+control: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88. b24 has answered the yes/no; b25 and b26
+ask whether the gain is width itself or just more parameters, and whether it survives at shapes other than
+one wide layer.
 
-- **b24 (`b24a-d`, fc 320) — running (desktop), priority 200.** One wide layer, matching batch 20's `320`
-  shape, which was that batch's apparent (and later downgraded) best. At **~440-475k of 3M** as of
-  2026-08-12 17:15, ~83 min in, all four arms alive.
-- **b25 (`b25a-d`, fc 200,100,100) — queued (desktop), priority 210.** 3-layer wide, ~1.6× the control.
-  Runs after b24 and its close-outs.
+**The pooled gap is still an n=4 signal, not a settled ceiling.** b24's +12.2 is higher on all four
+seed-matched controls (p=0.0625, the n=4 floor), which is cleaner than batch 20's within-batch confound —
+but `320` once read +10.1 pooled in batch 20 and that was noise. So b25/b26 are replication, and the HOF-500
+is what turns the /100 highs into an honest number.
 
-**Beware the pooled comparison this batch is set up to invite.** `320` read +10.1 pooled over the control
-in batch 20 and that was noise — an iso-capacity shape (`100,50,50`) landed 18.8 pp on the *other* side of
-the control at the same parameter count. So a ~10 pp pooled gap here is **not** a result at n=4; peak
-trailing and drawdown are the columns to read, and a consolidation claim needs more seeds.
+Scheduler order (desktop `status.json` ledger): b24 HOF-500 → b25 (r2) → b25 close-outs → b26 → b26
+close-outs. Check with `git show origin/ops-status:status.json`.
 
-Scheduler order (desktop `status.json` ledger): b24 training → b24 close-outs → b25 → b25 close-outs, all
-auto-closed-out. Check with `git show origin/ops-status:status.json`.
+## Batches 20-24 are closed — where their descriptions went
 
-## Batches 20-23 are closed — where their descriptions went
-
-All four batches finished and closed out, so per the bookkeeping rule at the end of this file their
+All five batches finished and closed out, so per the bookkeeping rule at the end of this file their
 descriptions moved to [`completedRuns.md`](completedRuns.md):
 
 | batch | change | verdict | design + results |
 |---|---|---|---|
+| **24** | **fc `320`** under IS-off | **first architecture result** — width raises consolidation once prioritisation is fixed: pooled **87.9**, +12.2 over the control, all 4 seeds. Ceiling unmoved. HOF-500 pending | [write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-width-raises-consolidation-once-prioritisation-is-fixed--the-first-architecture-result-pending-hof-500) |
 | **23** | IS β annealed **0→0.1** | **the best point on the β ladder** — pooled **75.7**, +20.7 over the control, higher on all 4 seeds | [write-up](completedRuns.md#batch-23--β-annealed-001-the-best-point-on-the-β-ladder-near-the-no-is-extreme) |
 | **22** | IS **off** (`SNEK_IS_WEIGHTS=0`) | **dead heat with β→0.1** — pooled 75.7. The consolidation gain saturates by β→0.1 | [write-up](completedRuns.md#batch-22--is-off-a-dead-heat-with-β01--the-consolidation-gain-saturates) |
 | **21** | partial IS (β→**0.5**) | beats the β→1.0 control (pooled 64.3 vs 55.0, 3/4 seeds), well short of no-IS | [write-up](completedRuns.md#batch-21--partial-is-β05-beats-the-β10-control-still-far-behind-no-is) |
@@ -100,6 +100,7 @@ batches. `*trunc*` means no full-length row survived the gate, so the figure is 
 
 | batch | change | best selected | re-measured |
 |---|---|---|---|
+| **24** | **fc `320`** under IS-off | **100% @1633k /100** (`b24a`) · 100% @2126k /100 (`b24c`) · 99% @1031k /100 (`b24b`) | **HOF-500 running** (every ≥97% ckpt at 500 ep) |
 | **20** | `FC_LAYERS` shapes (**all 9 closed**) | 92% @1470k *trunc* (`b20ah`, 100,200,100) · 91% @1435k *trunc* · 91% @2935k *trunc* (`b20g`) | **none reached full length** — 0 of 36 arms |
 | **19** | standard PER + IS | 91% @1536k *trunc* · 77% @1485k *trunc* · 76% @937k *trunc* | **none reached full length** |
 | **18** | `TARGET_UPDATE_PERIOD` 1000 | **98% @1588k** · 97% @1601k · 96% @1289k | **97.6% /700** ← **record** · 94.7% /700 · 85.4% /500 |
@@ -128,12 +129,14 @@ reality.
 1. **`CHASE_SAFE_SHAPING` is the highest-value untested change, and its hold has expired.** It was
    approved 2026-08-11 and held until the then-running batches closed out; batches 20-23 are all closed and
    only the desktop is busy. It targets endgame food-finding — the modal failure since batch 16 — which is
-   the one place a *ceiling* gain could still come from, now that architecture is closed and the β ladder
+   the one place a *ceiling* gain could still come from, now that architecture is closed for the ceiling (b24 raised consolidation, not peak) and the β ladder
    has flattened. Plan: [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md).
    The laptop's four slots are free.
-2. **Batch 24/25 will not settle the width question at n=4 if it reads on pooled alone** — see the warning
-   in the batch 24/25 section. If b24 comes back with a ~10 pp pooled gap and nothing on peak, the honest
-   next step is more seeds on b24, not a third width.
+2. **b24 landed the pooled gap this warning was about (+12.2, all 4 seeds, nothing on peak), so the honest
+   next step is more seeds on `320`, not only more widths.** b25/b26 test a different question — width
+   versus parameter count — which is worth it, but they do not firm up the `320` gap. Two confirmations are
+   owed before the width×IS-off interaction is called established: the **HOF-500** for the honest peak, and
+   **4 more `320` seeds** to move the pooled sign-test off its n=4 floor (p=0.0625).
 3. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
    open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
    lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test
@@ -141,13 +144,14 @@ reality.
 4. **The 11 batch-18 checkpoints at exactly 95.0%** were excluded from the 500-episode sweep, which
    took ">95%" literally. ~9 minutes of eval if a fuller picture of the region is wanted.
 
-## Closed batches (11-23)
+## Closed batches (11-24)
 
 One line each; full write-ups and per-seed numbers in [`completedRuns.md`](completedRuns.md),
 superseded detail in [`archive/runs-archive.md`](archive/runs-archive.md).
 
 | batch | change | verdict |
 |---|---|---|
+| **24** | **fc `320`** under IS-off | **first architecture result** — width raises consolidation once prioritisation is fixed: pooled 87.9, +12.2 over the control, all 4 seeds. Ceiling unmoved (peak 95.00). HOF-500 pending |
 | **23** | IS β annealed 0→**0.1** | **the best point on the β ladder** — pooled 75.7, +20.7 over the control, higher on all 4 seeds |
 | **22** | IS **off** | **dead heat with b23** at pooled 75.7 — the consolidation gain saturates by β→0.1 |
 | **21** | partial IS (β→**0.5**) | beats the β→1.0 control (64.3 vs 55.0, 3/4 seeds), well short of no-IS |

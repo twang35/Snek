@@ -54,7 +54,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 |---|---|
 | **Architecture does not raise the ceiling** — **all 9 shapes** against a seed-matched control at 3M, depths 1-5, **12.7× param range** | **complete 2026-08-12**, batch 20. Peak trailing spans 93.75-94.69 across the whole range and **no shape produced a single full-length row under gate 95**. `FC_LAYERS` is closed as a tuning direction. See below |
 | **Capacity binds only *below* the control** — knee between 0.29× and 0.55× | **established** — `25,50,25` at 0.29× is the first shape to move the ceiling, and **down**: peak −0.69, pooled −11.9, **4/4 seeds worse, p 0.125**. `60,30,30,30,30` at 0.55× still holds it (−0.18, p 0.375) |
-| A wider or wide-early net raises consolidation (`best-30`, pooled) | **not supported** — the apparent edges are **1 of 4** seeds for `200,50` (p=1.000) and **2-3 of 4** for `200,100,50`/`320` (p ≥ 0.25), carried by the control's weak seeds. Sub-capacity nets also forget ~2× more (drawdown 11-12 vs 5.4) |
+| A wider or wide-early net raises consolidation (`best-30`, pooled) | **not supported under β→1.0** (batch 20) — the apparent edges are **1 of 4** seeds for `200,50` (p=1.000) and **2-3 of 4** for `200,100,50`/`320` (p ≥ 0.25), carried by the control's weak seeds. Sub-capacity nets also forget ~2× more (drawdown 11-12 vs 5.4). **But reopened under IS-off** — batch 24's `320` reads **+12.2 pooled higher on all 4 seed-matched controls** (b22), cleaner than batch 20's within-batch confound. **Provisional** (n=4 p=0.0625, /100 selection-inflated); HOF-500 and 4 more `320` seeds owed before it is called established |
 | **‡ Two nets of the same size straddle the control by 18.8 pp on pooled** | **established 2026-08-12** — `100,50,50` 46.3% and `320` 65.1% differ by 0.3% in params. The consolidation columns in batch 20 measure seed draw, not architecture; a ~10 pp pooled gap at n=4 is indistinguishable from an iso-capacity relabelling |
 | **‡ Batch 20's control seed spread is wider than any between-shape gap it measured** | **established** — control `sef` spans 0.2-26.3%, pooled 33.2-71.3%. At n=4 this design cannot see an architecture effect smaller than that |
 | **Removing the food-distance shaping raises how long an arm stays good** | **the first non-null in six batches** — batch 16 `sef` +11.35 pp at a matched 1.25M (p=0.250) and `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). **Needs replication**; see below |
@@ -177,6 +177,16 @@ variance before n=4 can see it, and none does. The only shapes that cleared that
 raised the ceiling, and the smaller nets lowered it. **`FC_LAYERS` is closed as a tuning direction** —
 the constraint is elsewhere, which is what the β ladder (batches 21-23) went after next and where it
 found real movement in consolidation.
+
+**Reopened for consolidation under IS-off (batch 24).** This whole sweep ran under the β→1.0 control
+(β=300k anneal), the weakest base on the ladder. Batch 24 re-ran the `320` shape under IS-off — the
+strongest base — and it reads **pooled 87.9, +12.2 over the b22 control and higher on all four
+seed-matched seeds** (p=0.0625). The **ceiling conclusion is untouched** (peak 95.00, unmoved), but "the
+consolidation columns are pure seed noise" and "`FC_LAYERS` is closed" were established under β→1.0 and do
+**not** carry to IS-off unchanged: width and prioritisation appear to interact, so width pays only when the
+gradient is prioritised. This stays **provisional** — n=4 at the sign-test floor, best rows /100 and
+selection-inflated — until the HOF-500 gives the honest peak and 4 more `320` seeds move it off the floor.
+Full result: [`completedRuns.md`](completedRuns.md#batch-24--fc-width-320-under-is-off-width-raises-consolidation-once-prioritisation-is-fixed--the-first-architecture-result-pending-hof-500).
 
 ## The food-distance shaping was a drag on consistency — the first signal in six batches
 

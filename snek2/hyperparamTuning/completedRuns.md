@@ -72,6 +72,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b24a-fc320noisseed1` ‡‡‡ § | **fc 320** (one wide layer), IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **100%** @1633k /100 | 99.7% | **89.03%** /eq §§ | 95.3% | ‡‡‡ § **highest pooled ever at gate 95**, and one of two b24 arms with a 100%/100 full-length checkpoint. **The /100 best row is selection-inflated — HOF-500 running for the honest number** (b23b's 97%/100 shrank to 92.4%/500). Far above the b22 control (75.7) |
+| `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 99% @1031k /100 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § 2nd on pooled; **most full-length rows of the batch (167 cleared gate 95)**. HOF-500 pending |
+| `b24c-fc320noisseed3` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **100%** @2126k /100 | 99.3% | 87.68% /eq §§ | 96.0% | ‡‡‡ § the batch's other 100%/100 checkpoint, late at 2126k. HOF-500 pending |
+| `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 99% @1292k /100 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § weakest of b24 on pooled, yet 85.97 still tops every non-b24 gate-95 arm. HOF-500 pending |
 | `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **97.6%** @1588k /700 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **THE PROJECT RECORD** — 97.6% over 700 fresh episodes (CI 96.1-98.5), beating `b17b` by +3.33 pp, p=0.0002. **The first selected high here that did not shrink** (98/100 -> 97.4%/500). A narrow peak: @1578k reads 91.6%. In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
@@ -251,6 +255,51 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 24 — FC width `320` under IS-off: **width raises consolidation once prioritisation is fixed — the first architecture result, pending HOF-500**
+
+**Trained on the desktop, four arms `b24a`-`b24d` at seeds 1-4, all to the 3M cap; closed out on the desktop
+under gate 95, `EVAL_WORKERS=4`.** Charts in [`charts.md`](charts.md) (batch 24 section). A 500-episode
+re-measurement of every ≥97% checkpoint (HOF-500) is running — the honest peak and any record challenge come
+from that, not from the /100 rows here.
+
+### The design
+
+Batch 22's exact IS-off config — `td_error` priority α=0.6, `SNEK_IS_WEIGHTS=0`, target 1000, disc 0.9975,
+guided 0.8, fork 4/0.5/85/60, food-distance off — with the network widened to a single **`320`** layer (batch
+20's `320` shape). Width is the only change. The seed-matched control is b22 (`50,100,50`, IS off). It asks the
+one architecture question batch 20 could not: **does width matter once the prioritisation is fixed at IS-off?**
+Batch 20 asked width under the β→1.0 control and found nothing — nine shapes, no ceiling movement, the
+consolidation columns exposed as seed noise.
+
+### The result — vs the b22 control (IS off, `50,100,50`)
+
+| mean of 4 | b22 control (fc 50,100,50) | b24 (fc 320) | b24 − control |
+|---|---|---|---|
+| peak trailing | 94.88 | 95.00 | +0.12 |
+| `sef` (primary) | 30.5% | 66.0% | +35.5 |
+| best-30 | 86.2% | 96.2% | +10.0 |
+| close-out pooled (eq-effort, gate 95) | 75.7% | **87.9%** | **+12.2** |
+
+**Width raises consolidation under IS-off, and the close-out backs the graph — pooled 87.9, +12.2 over the
+control and higher on all four seeds** (seed-for-seed 89.03 / 88.84 / 87.68 / 85.97 vs control 78.89 / 72.51 /
+75.04 / 76.27; exact sign-test p=0.0625, the n=4 floor). That is the highest pooled of any gate-95 arm on
+record — above the b18b record's 78.5. **Peak trailing is unmoved at 95.00**, the top of the flat 94.7-95.0
+band that has held since batch 11: width does not raise the ceiling, only how much of the run sits near it.
+This is the project's first sign that **width and prioritisation interact** — width paid nothing under β→1.0
+(batch 20) and pays here under IS-off.
+
+**Two arms produced a 100.0% full-length checkpoint (n=100) — `b24a` @1633k and `b24c` @2126k — and 199
+checkpoints across the batch clear 97% at n=100.** These /100 figures are selection-inflated, so they are not
+a record claim: b23b's close-out-selected 97%/100 shrank to **92.4%/500**. The HOF-500 re-measures every ≥97%
+checkpoint at 500 fresh episodes with a gate-97 early-abandon, so shrinking ones bail fast and only genuine
+≥97%/500 holders run full length; that number, not the ones above, decides whether any b24 checkpoint
+challenges the 97.6%/700 record.
+
+**Caveats.** n=4 cannot resolve below ~10 pp, and batch 20's `320` looked strong on the graph before its
+pooled gap proved to be seed noise. But that was a within-batch iso-capacity confound; here the gap is +12.2
+higher on all four **seed-matched** controls, a cleaner signal. The finding is provisional until the HOF-500
+lands — it is a consolidation gain at n=4, not a new ceiling.
 
 ## Batch 23 — β annealed 0→0.1: **the best point on the β ladder, near the no-IS extreme**
 
