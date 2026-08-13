@@ -1,6 +1,6 @@
 # Charts
 
-Progress graphs for the most recent batches — **20 through 23**, a cap of six, newest first. Per-arm
+Progress graphs for the most recent batches — **20 through 24**, a cap of six, newest first. Per-arm
 numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each.
 
@@ -42,6 +42,45 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
 training graphs. Anything *else* the check prints is a real gap.
 
+## Batch 24 — FC width `320` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4
+
+Batch 22's exact IS-off config with the network widened to a single `320` layer (batch 20's `320`
+shape) — width is the only change. It asks the question batch 20 could not answer under the β→1.0
+control: **does width matter once the prioritisation is fixed at IS-off?** The seed-matched control is
+b22 (`50,100,50`, IS off). Trained on the desktop.
+
+**Strong on the training graph — the first hint that width and prioritisation interact. Close-out
+running; pooled pending.** All four peak at **95.00** — the top of the flat 94.7-95.0 band, so the
+ceiling is unmoved, just sitting at it — with mean best-30 **96.2** and `sef` **66.0**, far above b22's
+86.2 / 30.5 at the same IS-off setting. If the close-out pooled backs this, width adds real
+consolidation on top of IS-off, which would be the project's first architecture result. **Three caveats
+hold until the pooled lands:** `sef` is inflated by run length, n=4 cannot resolve below ~10 pp, and
+batch 20's `320` looked strong on the graph too before its pooled gap proved to be seed noise.
+
+All at the 3M cap, sorted by best-30. **Close-out running on the desktop** (gate 95, `EVAL_WORKERS=4`) —
+`pooled` and `best row` fill in when it finishes.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
+|---|---|---|---|---|---|
+| `b24b` | 95.00 | **96.7%** | **73.2%** | *running* | — |
+| `b24d` | 95.00 | 96.7% | 62.9% | *running* | — |
+| `b24c` | 95.00 | 96.0% | 67.4% | *running* | — |
+| `b24a` | 95.00 | 95.3% | 60.5% | *running* | — |
+| **mean — b24 fc320 IS-off** | **95.00** | **96.2%** | **66.0%** | *pending* | — |
+| **mean — b22 fc50,100,50 IS-off** | 94.88 | 86.2% | 30.5% | 75.7% | — |
+
+![b24b](charts/b24b-fc320noisseed2.png)
+**b24b-fc320noisseed2**
+
+![b24d](charts/b24d-fc320noisseed4.png)
+**b24d-fc320noisseed4**
+
+![b24c](charts/b24c-fc320noisseed3.png)
+**b24c-fc320noisseed3**
+
+![b24a](charts/b24a-fc320noisseed1.png)
+**b24a-fc320noisseed1**
+
 ## Batch 23 — β annealed 0→0.1, `td_error` priority, fc 50,100,50
 
 One step further down the IS-β ladder than batch 21: β annealed from **0 to 0.1** over 300k
@@ -55,9 +94,11 @@ best-30 **85.8**, `sef` **33.1** (n=4, `sef` spread 23.5-56.0). The desktop clos
 either** (sign-test p=0.0625 each, the n=4 floor) — closing most of the gap to b18's no-IS ~78.8 (ESS/N
 0.21, a different base). Both metrics climb monotonically down the β ladder: pooled control 55.0 → b21
 64.3 → **b23 75.7** → b18 ~78.8; `sef` 11.2 → 14.3 → **33.1** → 34.6. Peak trailing **94.90** is flat with
-every batch since 11 — ceiling unmoved, only consolidation differs. `b23b` holds a dense strong region —
-**five full-length checkpoints ≥95/100 around 777k, best 97/100** — a hall-of-fame candidate pending the
-re-measurement protocol.
+every batch since 11 — ceiling unmoved, only consolidation differs. `b23b` holds a dense strong region on
+the graph — **five full-length checkpoints ≥95/100 around 777k, best 97/100** — and looked like a
+hall-of-fame candidate, but the re-measurement protocol falsified it: at **500 fresh episodes the
+close-out-selected @777k reads 92.4%**, the *worst* of its own cluster (textbook selection bias) and well
+below the 97.6% record. No b23 checkpoint enters the hall of fame.
 
 All at the 3M cap, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
 
