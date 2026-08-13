@@ -72,10 +72,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b24a-fc320noisseed1` ‡‡‡ § | **fc 320** (one wide layer), IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **100%** @1633k /100 | 99.7% | **89.03%** /eq §§ | 95.3% | ‡‡‡ § **highest pooled ever at gate 95**, and one of two b24 arms with a 100%/100 full-length checkpoint. **The /100 best row is selection-inflated — HOF-500 running for the honest number** (b23b's 97%/100 shrank to 92.4%/500). Far above the b22 control (75.7) |
-| `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 99% @1031k /100 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § 2nd on pooled; **most full-length rows of the batch (167 cleared gate 95)**. HOF-500 pending |
-| `b24c-fc320noisseed3` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **100%** @2126k /100 | 99.3% | 87.68% /eq §§ | 96.0% | ‡‡‡ § the batch's other 100%/100 checkpoint, late at 2126k. HOF-500 pending |
-| `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 99% @1292k /100 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § weakest of b24 on pooled, yet 85.97 still tops every non-b24 gate-95 arm. HOF-500 pending |
+| `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **98.0%** @1342k /500 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § **THE NEW RECORD** — 98.0% over 500 fresh episodes (490/500, CI [96.4,98.9]), and it *rose* on re-measurement (97.0/100 → 98.0/500), the genuine-region signature. 3 of its 51 ≥97%/100 checkpoints held ≥97%/500 (early, 0.9-1.36M). In [`../hallOfFame/`](../hallOfFame/README.md) |
+| `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **98.0%** @2860k /500 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § **new record (tied)** — 98.0%/500 (490/500, CI [96.4,98.9]); 3 of 59 ≥97%/100 checkpoints held ≥97%/500, all late (2.74-2.86M). In [`../hallOfFame/`](../hallOfFame/README.md) |
+| `b24c-fc320noisseed3` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 97.4% @2982k /500 | 99.3% | 87.68% /eq §§ | 96.0% | ‡‡‡ § 3 of 46 ≥97%/100 checkpoints held ≥97%/500 (best 97.4%, CI [95.6,98.5], late 2.95-2.98M); **both its 100%/100 highs shrank below 97%/500**. Not added to HOF (below the record) |
+| `b24a-fc320noisseed1` ‡‡‡ § | **fc 320** (one wide layer), IS off, td_error | 3.00M | — /500 (0 held) | 99.7% | **89.03%** /eq §§ | 95.3% | ‡‡‡ § **highest pooled ever at gate 95 (89.03)**, yet **0 of its 43 ≥97%/100 checkpoints held ≥97%/500** — its 100%/100 @1633k produced no survivor. The batch's cleanest selection-inflation lesson: strong consolidation, no record-tier peak |
 | `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **97.6%** @1588k /700 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **THE PROJECT RECORD** — 97.6% over 700 fresh episodes (CI 96.1-98.5), beating `b17b` by +3.33 pp, p=0.0002. **The first selected high here that did not shrink** (98/100 -> 97.4%/500). A narrow peak: @1578k reads 91.6%. In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
@@ -256,12 +256,12 @@ arms peaked at ~2.5-3M and were stopped well past it. Everything below them was 
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
 
-## Batch 24 — FC width `320` under IS-off: **width raises consolidation once prioritisation is fixed — the first architecture result, pending HOF-500**
+## Batch 24 — FC width `320` under IS-off: **the first architecture result, and a new record**
 
 **Trained on the desktop, four arms `b24a`-`b24d` at seeds 1-4, all to the 3M cap; closed out on the desktop
-under gate 95, `EVAL_WORKERS=4`.** Charts in [`charts.md`](charts.md) (batch 24 section). A 500-episode
-re-measurement of every ≥97% checkpoint (HOF-500) is running — the honest peak and any record challenge come
-from that, not from the /100 rows here.
+under gate 95, `EVAL_WORKERS=4`, then HOF-500 re-measured (every ≥97%/100 checkpoint at 500 fresh episodes,
+gate-97 early-abandon).** Charts in [`charts.md`](charts.md) (batch 24 section). The record and any HOF claim
+come from the HOF-500 rows, not the /100 close-out rows.
 
 ### The design
 
@@ -289,17 +289,35 @@ band that has held since batch 11: width does not raise the ceiling, only how mu
 This is the project's first sign that **width and prioritisation interact** — width paid nothing under β→1.0
 (batch 20) and pays here under IS-off.
 
-**Two arms produced a 100.0% full-length checkpoint (n=100) — `b24a` @1633k and `b24c` @2126k — and 199
-checkpoints across the batch clear 97% at n=100.** These /100 figures are selection-inflated, so they are not
-a record claim: b23b's close-out-selected 97%/100 shrank to **92.4%/500**. The HOF-500 re-measures every ≥97%
-checkpoint at 500 fresh episodes with a gate-97 early-abandon, so shrinking ones bail fast and only genuine
-≥97%/500 holders run full length; that number, not the ones above, decides whether any b24 checkpoint
-challenges the 97.6%/700 record.
+### The HOF-500 — a new record, and the selection-inflation lesson at scale
 
-**Caveats.** n=4 cannot resolve below ~10 pp, and batch 20's `320` looked strong on the graph before its
-pooled gap proved to be seed noise. But that was a within-batch iso-capacity confound; here the gap is +12.2
-higher on all four **seed-matched** controls, a cleaner signal. The finding is provisional until the HOF-500
-lands — it is a consolidation gain at n=4, not a new ceiling.
+The /100 close-out was flashy — two 100.0% full-length checkpoints (`b24a` @1633k, `b24c` @2126k) and **199
+checkpoints ≥97%/100** across the batch. The HOF-500 re-measured all 199 at 500 fresh episodes and shows how
+much of that was selection: **only 9 held ≥97%/500.**
+
+| arm | ≥97%/500 held / ≥97%/100 candidates | best HOF-500 row |
+|---|---|---|
+| `b24d` | 3 / 51 | **98.0%** @1342k (490/500, CI [96.4,98.9]) |
+| `b24b` | 3 / 59 | **98.0%** @2860k (490/500, CI [96.4,98.9]) |
+| `b24c` | 3 / 46 | 97.4% @2982k (CI [95.6,98.5]) |
+| `b24a` | **0** / 43 | — (all abandoned) |
+
+**`b24d` @1342k is the new record: 98.0% over 500 fresh episodes**, narrowly ahead of `b18b` @1588k
+(97.6%/700) — a lead on the point estimate with overlapping intervals, taken as confirmed under the folder's
+500-episode standard. `b24b` @2860k ties it at 98.0%/500. The tell that both are real regions, not lucky
+draws: `b24d` @1342k *rose* on re-measurement (97.0/100 → 98.0/500), the same signature that marked `b18b`
+(98/100 → 97.4/500). Both are in [`../hallOfFame/`](../hallOfFame/README.md).
+
+**And the counter-lesson: `b24a` produced the batch's two flashiest /100 numbers and zero survivors.** Its
+100%/100 @1633k held 0 of 43 ≥97%/100 checkpoints at 500 episodes — a clean demonstration that a selected
+100%/100 is mostly selection. The survivors cluster by seed (b24b/b24c late at 2.7-3.0M, b24d early at
+0.9-1.36M), so the strong region's location is seed-dependent, not a batch-wide step.
+
+**Caveats on the consolidation finding.** n=4 cannot resolve below ~10 pp, and batch 20's `320` looked strong
+on the graph before its pooled gap proved to be seed noise. But that was a within-batch iso-capacity confound;
+here the gap is +12.2 higher on all four **seed-matched** controls, and the HOF-500 confirms the batch owns 9
+genuine ≥97%/500 checkpoints rather than only inflated /100 highs. Still a consolidation gain at n=4, not a
+raised ceiling — the peak is unmoved at 95.00.
 
 ## Batch 23 — β annealed 0→0.1: **the best point on the β ladder, near the no-IS extreme**
 

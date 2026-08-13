@@ -12,20 +12,18 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Batch 25 / 26 — more FC shapes under IS-off, and b24's HOF-500
+## Batch 25 / 26 — more FC shapes under IS-off (b24 done, new record)
 
-**b24 closed with the project's first architecture result.** Width `320` under IS-off pools **87.9**
-(eq-effort, gate 95) — **+12.2 over the b22 control and higher on all four seeds** — with the ceiling
-unmoved at peak 95.00
-([write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-width-raises-consolidation-once-prioritisation-is-fixed--the-first-architecture-result-pending-hof-500)).
-Two arms hold a **100%/100** checkpoint and **199 checkpoints clear 97%/100**, so a **500-episode HOF
-re-measurement of every ≥97% checkpoint is running now** on the desktop (gate-97 early-abandon) to get the
-honest peak and any challenge to the 97.6%/700 record. b25 and b26 carry the width question to two more
+**b24 closed with the project's first architecture result — and a new record.** Width `320` under IS-off
+pools **87.9** (eq-effort, gate 95) — **+12.2 over the b22 control and higher on all four seeds** — with the
+ceiling unmoved at peak 95.00
+([write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-the-first-architecture-result-and-a-new-record)).
+The HOF-500 re-measured all 199 ≥97%/100 checkpoints and **9 held ≥97%/500**: the new record is **`b24d`
+@1342k at 98.0%/500** (490/500, CI [96.4,98.9], it *rose* from 97.0/100), tied by **`b24b` @2860k 98.0%/500**;
+both are in [`../hallOfFame/`](../hallOfFame/README.md). b25 and b26 carry the width question to two more
 shapes under the same IS-off base.
 
-- **b24 HOF-500 — running (desktop), priority 8.** Four eval jobs, one per b24 arm, 500 episodes each,
-  gate 97 with early abandonment. Ahead of everything else in the queue.
-- **b25 (`b25a-d-r2`, fc 200,100,100) — queued (desktop), priority 210.** 3-layer, ~1.6× the control. A
+- **b25 (`b25a-d-r2`, fc 200,100,100) — next up (desktop), priority 210.** 3-layer, ~1.6× the control. A
   first b25 attempt reached ~112k and was killed so the HOF-500 could run first; it is re-queued from
   scratch under `-r2` names, because a killed job reaps `failed` and cannot relaunch under its old id.
 - **b26 (`b26a-d`, fc 100,100) — queued (desktop), priority 220.** A shallower two-layer shape. Runs after
@@ -38,11 +36,12 @@ one wide layer.
 
 **The pooled gap is still an n=4 signal, not a settled ceiling.** b24's +12.2 is higher on all four
 seed-matched controls (p=0.0625, the n=4 floor), which is cleaner than batch 20's within-batch confound —
-but `320` once read +10.1 pooled in batch 20 and that was noise. So b25/b26 are replication, and the HOF-500
-is what turns the /100 highs into an honest number.
+but `320` once read +10.1 pooled in batch 20 and that was noise. The HOF-500 confirmed the batch owns 9
+genuine ≥97%/500 checkpoints (not just inflated /100 highs), which firms up the *consolidation* claim; b25/b26
+are the replication that separates width from parameter count.
 
-Scheduler order (desktop `status.json` ledger): b24 HOF-500 → b25 (r2) → b25 close-outs → b26 → b26
-close-outs. Check with `git show origin/ops-status:status.json`.
+Scheduler order (desktop `status.json` ledger): b25 (r2) → b25 close-outs → b26 → b26 close-outs. Check with
+`git show origin/ops-status:status.json`.
 
 ## Batches 20-24 are closed — where their descriptions went
 
@@ -51,7 +50,7 @@ descriptions moved to [`completedRuns.md`](completedRuns.md):
 
 | batch | change | verdict | design + results |
 |---|---|---|---|
-| **24** | **fc `320`** under IS-off | **first architecture result** — width raises consolidation once prioritisation is fixed: pooled **87.9**, +12.2 over the control, all 4 seeds. Ceiling unmoved. HOF-500 pending | [write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-width-raises-consolidation-once-prioritisation-is-fixed--the-first-architecture-result-pending-hof-500) |
+| **24** | **fc `320`** under IS-off | **first architecture result + a new record** — pooled **87.9**, +12.2 over the control, all 4 seeds (ceiling unmoved). HOF-500: `b24d` @1342k **98.0%/500**, the new record | [write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-the-first-architecture-result-and-a-new-record) |
 | **23** | IS β annealed **0→0.1** | **the best point on the β ladder** — pooled **75.7**, +20.7 over the control, higher on all 4 seeds | [write-up](completedRuns.md#batch-23--β-annealed-001-the-best-point-on-the-β-ladder-near-the-no-is-extreme) |
 | **22** | IS **off** (`SNEK_IS_WEIGHTS=0`) | **dead heat with β→0.1** — pooled 75.7. The consolidation gain saturates by β→0.1 | [write-up](completedRuns.md#batch-22--is-off-a-dead-heat-with-β01--the-consolidation-gain-saturates) |
 | **21** | partial IS (β→**0.5**) | beats the β→1.0 control (pooled 64.3 vs 55.0, 3/4 seeds), well short of no-IS | [write-up](completedRuns.md#batch-21--partial-is-β05-beats-the-β10-control-still-far-behind-no-is) |
@@ -72,22 +71,27 @@ from a local minimum; all four seeds make the same level shift
 
 ## Record status
 
-**NEW RECORD, 2026-08-09: `b18b-tgt1000seed2` @1588000 — 97.6% over 700 fresh episodes** (683/700,
-CI **96.1-98.5**). It beats the previous record, `b17b-forkseed2` @1190000 at 94.24%/5,120
-(CI 93.6-94.8), with **non-overlapping intervals** — the first genuine move in the ceiling since the
-30-value vector landed. Promoted to
-[`../hallOfFame/`](../hallOfFame/README.md#the-current-record-976-over-700-episodes-b18b-tgt1000seed2-ckpt1588000),
-copy verified to load and play.
+**NEW RECORD, 2026-08-13: `b24d-fc320noisseed4` @1342000 — 98.0% over 500 fresh episodes** (490/500,
+CI **96.4-98.9**). It edges the prior record, `b18b-tgt1000seed2` @1588000 at 97.6%/700 (CI 96.1-98.5), on
+the point estimate — intervals overlap, so it is a narrow lead, **taken as confirmed under the folder's
+500-episode standard** (we are not re-running for the 700-vs-500 difference). It is the first record to come
+from a non-default architecture (`fc 320`, not `50,100,50`). `b24b-fc320noisseed2` @2860000 ties it at
+98.0%/500. Both promoted to [`../hallOfFame/`](../hallOfFame/README.md), copies verified to load and play.
 
-**It is also the first selected high in this project that did not shrink.** Selected at 98/100, it
-re-measures at **97.4% over 500** — a 0.6 pp change, against `b17b` 99→94.2, `b15b` 97→93.0,
-`b14a` 96→93.5, `b11b` 96→~94. Nine batch-18 checkpoints above 95% were re-measured at 500 episodes
-each and the mean shrinkage was **−5.2 pp**, so @1588000 is a clear outlier in the good direction
-rather than a loose protocol.
+**Like `b18b` before it, `b24d` @1342k is a checkpoint that did *not* shrink** — it read 97.0/100 in the
+close-out and **rose** to 98.0%/500 on re-measurement, the genuine-region signature. That is the exception,
+not the rule: of the batch's 199 ≥97%/100 checkpoints only 9 held ≥97%/500, and `b24a`'s two 100%/100 highs
+produced zero survivors. Selection inflates a /100 high by ~5-6 pp, which is why every HOF add must clear the
+500-episode re-measurement first (see [`../hallOfFame/`](../hallOfFame/README.md)).
 
-**But it is a narrow peak, not a strong region.** `@1578000` — 10k steps earlier — reads **91.6%**,
-5.8 pp lower. The old rule survives the better result: a selected row describes the checkpoint the
-screen liked, never its neighbourhood. Any regional claim still needs a position-chosen sample.
+**The prior record, `b18b` @1588000 (97.6%/700), still stands as the deepest-measured strong checkpoint** and
+was itself the first selected high that did not shrink (98/100 → 97.4%/500, a 0.6 pp change, against `b17b`
+99→94.2, `b15b` 97→93.0, `b14a` 96→93.5, `b11b` 96→~94).
+
+**But `b18b` @1588k is a narrow peak, not a strong region.** `@1578000` — 10k steps earlier — reads
+**91.6%**, 5.8 pp lower. The old rule survives every better result: a selected row describes the checkpoint
+the screen liked, never its neighbourhood — and the same caution applies to `b24d` @1342k, whose neighbours
+have not been position-sampled. Any regional claim still needs a position-chosen sample.
 Full derivation of that error: [`archive/runs-archive.md`](archive/runs-archive.md); measurement
 caveats: [`findings.md`](findings.md#three-measurement-caveats).
 
@@ -100,7 +104,7 @@ batches. `*trunc*` means no full-length row survived the gate, so the figure is 
 
 | batch | change | best selected | re-measured |
 |---|---|---|---|
-| **24** | **fc `320`** under IS-off | **100% @1633k /100** (`b24a`) · 100% @2126k /100 (`b24c`) · 99% @1031k /100 (`b24b`) | **HOF-500 running** (every ≥97% ckpt at 500 ep) |
+| **24** | **fc `320`** under IS-off | 100% @1633k /100 (`b24a`) · 100% @2126k /100 (`b24c`) · 99% @1031k /100 (`b24b`) | **98.0% /500** ← **new record** (`b24d` @1342k) · 98.0% /500 (`b24b` @2860k) · 97.4% /500 (`b24c` @2982k) |
 | **20** | `FC_LAYERS` shapes (**all 9 closed**) | 92% @1470k *trunc* (`b20ah`, 100,200,100) · 91% @1435k *trunc* · 91% @2935k *trunc* (`b20g`) | **none reached full length** — 0 of 36 arms |
 | **19** | standard PER + IS | 91% @1536k *trunc* · 77% @1485k *trunc* · 76% @937k *trunc* | **none reached full length** |
 | **18** | `TARGET_UPDATE_PERIOD` 1000 | **98% @1588k** · 97% @1601k · 96% @1289k | **97.6% /700** ← **record** · 94.7% /700 · 85.4% /500 |
@@ -134,9 +138,10 @@ reality.
    The laptop's four slots are free.
 2. **b24 landed the pooled gap this warning was about (+12.2, all 4 seeds, nothing on peak), so the honest
    next step is more seeds on `320`, not only more widths.** b25/b26 test a different question — width
-   versus parameter count — which is worth it, but they do not firm up the `320` gap. Two confirmations are
-   owed before the width×IS-off interaction is called established: the **HOF-500** for the honest peak, and
-   **4 more `320` seeds** to move the pooled sign-test off its n=4 floor (p=0.0625).
+   versus parameter count — which is worth it, but they do not firm up the `320` gap. The HOF-500 is done and
+   confirmed 9 genuine ≥97%/500 checkpoints (and a new record); what is still owed before the width×IS-off
+   interaction is called established is **4 more `320` seeds**, to move the pooled sign-test off its n=4 floor
+   (p=0.0625).
 3. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
    open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
    lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test
@@ -151,7 +156,7 @@ superseded detail in [`archive/runs-archive.md`](archive/runs-archive.md).
 
 | batch | change | verdict |
 |---|---|---|
-| **24** | **fc `320`** under IS-off | **first architecture result** — width raises consolidation once prioritisation is fixed: pooled 87.9, +12.2 over the control, all 4 seeds. Ceiling unmoved (peak 95.00). HOF-500 pending |
+| **24** | **fc `320`** under IS-off | **first architecture result + new record** — pooled 87.9, +12.2 over the control, all 4 seeds (ceiling unmoved, 95.00). HOF-500: `b24d` @1342k **98.0%/500**, the new record |
 | **23** | IS β annealed 0→**0.1** | **the best point on the β ladder** — pooled 75.7, +20.7 over the control, higher on all 4 seeds |
 | **22** | IS **off** | **dead heat with b23** at pooled 75.7 — the consolidation gain saturates by β→0.1 |
 | **21** | partial IS (β→**0.5**) | beats the β→1.0 control (64.3 vs 55.0, 3/4 seeds), well short of no-IS |

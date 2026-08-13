@@ -9,16 +9,25 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: **97.6% over 700 episodes**, `b18b-tgt1000seed2-ckpt1588000`
+## The current record: **98.0% over 500 episodes**, `b24d-fc320noisseed4-ckpt1342000`
 
-Batches 11-18 train on the **30-value observation vector** — the current one, after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these nine entries are the
-only ones in this folder that load on `master` as it stands.** All came from a batch close-out
-rather than a mid-run measurement. Every entry here is the default `FC_LAYERS=50,100,50`.
+Batches 11-24 train on the **30-value observation vector** — the current one (era `b09c616`), after the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these eleven entries all load on
+`master` as it stands.** Each came from a batch close-out or, for batch 24, its 500-episode HOF
+re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the two batch-24 entries are the first
+non-default architecture here (`fc 320`)** and load because `arch.json` (copied in with each) rebuilds the
+recorded net — see [`../CLAUDE.md`](../CLAUDE.md) on the `arch.json` sidecar.
+
+**Every entry must clear a fresh ≥95-episode re-measurement before it is added** — the 500-episode HOF eval
+for batch 24, a close-out re-measure for the rest — because a selected /100 high is inflated ~5-6 pp by
+selection and mostly does not survive (see the batch-24 note below: 199 ≥97%/100 candidates, only 9 held
+≥97%/500). A checkpoint enters this folder on its *re-measured* number, never its close-out /100.
 
 | checkpoint | measured | config |
 |---|---|---|
-| **`b18b-tgt1000seed2-ckpt1588000`** | **683/700 = 97.6%** (CI **96.1-98.5**) — **the record**, and the first selected high in this project to survive re-measurement; see below | `TARGET_UPDATE_PERIOD=1000`, forking on, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `td_loss`/no-IS, `SNEK_SEED=2` |
+| **`b24d-fc320noisseed4-ckpt1342000`** | **490/500 = 98.0%** (CI **96.4-98.9**) — **the record**; it *rose* from 97.0/100 on re-measurement, the genuine-region signature. First non-default-arch record (`fc 320`). Added 2026-08-13; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=4` |
+| `b24b-fc320noisseed2-ckpt2860000` | **490/500 = 98.0%** (CI 96.4-98.9) — ties the record from a second seed, a late checkpoint (2.86M). Added 2026-08-13 | same as above except `SNEK_SEED=2` |
+| **`b18b-tgt1000seed2-ckpt1588000`** | **683/700 = 97.6%** (CI **96.1-98.5**) — the prior record and deepest-measured strong checkpoint; the first selected high in this project to survive re-measurement; see below | `TARGET_UPDATE_PERIOD=1000`, forking on, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `td_loss`/no-IS, `SNEK_SEED=2` |
 | `b17b-forkseed2-ckpt1248000` | **483/500 = 96.6%** (CI 94.6-97.9) on fresh episodes — 2nd-highest measured here; a 99/100 close-out read re-measured at 500, and **95/100 on the copy in this folder** (CI 88.8-97.8), confirming it loads and plays. Not the record — below `b18b` @1588k and CIs overlap — but higher than `b17b` @1190k, so the better step of this arm. Added 2026-08-12 | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
 | `b18b-tgt1000seed2-ckpt1601000` | 663/700 = **94.7%** (CI 92.8-96.1) — 13k steps after the record and 2.9 pp below it | same as above |
 | `b17b-forkseed2-ckpt1190000` | **4825/5120 = 94.2%** (CI **93.6-94.8**) — the most heavily measured checkpoint in the project, see below | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
@@ -48,6 +57,30 @@ the 97.6% record.
 > [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md#-and-the-corollary-most-of-a-selected-high-is-selection).
 > Nothing here needs changing: the entries are the right checkpoints to keep, and the ranking among
 > them is roughly preserved. It is the absolute percentages that are optimistic.
+
+### ‡ `b24d` @1342000 — the new record, and the first from a wide (`fc 320`) net
+
+Added 2026-08-13. Promoted under the standing rule: **a checkpoint that beats the all-time best on
+re-measurement belongs here.** It came out of batch 24's 500-episode HOF eval (gate 97, early-abandon), which
+re-measured every one of the batch's **199 ≥97%/100 checkpoints** and kept only the 9 that held ≥97% over 500
+fresh episodes.
+
+| measurement | result | why it exists |
+|---|---|---|
+| close-out, 100 episodes (desktop) | 97/100 = **97.0%** | the selected /100 read — near the batch's best, not the flashiest |
+| **HOF-500, 500 fresh episodes, gate 97 (desktop)** | 490/500 = **98.0%** (96.4-98.9) | the record figure — it *rose* 1 pp rather than shrinking |
+| 100 fresh, **on the copy in this folder** (laptop) | 93/100 = **93.0%** (86.3-96.6), avg score 94.5 | confirms the copy loads via `arch.json` and plays like a champion |
+
+**It edges `b18b` @1588k (97.6%/700) on the point estimate; the intervals overlap**, so it is a narrow lead
+taken as confirmed under this folder's 500-episode standard (we did not re-run for the 700-vs-500 gap). The
+tell that it is a real region, not a lucky draw, is that it **rose** on re-measurement (97.0/100 → 98.0/500)
+— the same signature `b18b` showed (98/100 → 97.4/500), and the opposite of the batch's inflated highs: `b24a`
+produced two 100.0%/100 checkpoints and **zero** survivors at 500 episodes. `b24b` @2860k ties this at
+98.0%/500 from a second seed, so it is in the folder too. Both are **`fc 320`, the first non-default
+architecture here** — they load only because `arch.json` (era `b09c616`, `obs_len` 30) rebuilds the recorded
+320-wide net; a copy without it would fail loudly (`ArchMismatch`) rather than silently, per the 2026-08-11
+sidecar. Full batch write-up:
+[`../hyperparamTuning/completedRuns.md`](../hyperparamTuning/completedRuns.md#batch-24--fc-width-320-under-is-off-the-first-architecture-result-and-a-new-record).
 
 ### ‡ `b18b` @1588000 — the first selected high that did *not* shrink
 
@@ -378,7 +411,25 @@ restoring by explicit step does not consult it.
 
 ## Adding an entry
 
-When a run produces a checkpoint worth keeping:
+**Step 0 — confirm the checkpoint with a fresh re-measurement first. This is not optional.** A checkpoint's
+close-out /100 read is a *selected* high, inflated ~5-6 pp by selection, and mostly does not survive: batch
+24 offered 199 checkpoints at ≥97%/100 and only 9 held ≥97%/500, while `b24a`'s two 100.0%/100 highs held
+**zero**. So a candidate earns its place on its **re-measured** number over **≥95 fresh episodes at the
+folder's standard — the 500-episode HOF eval** (gate 97, early-abandon), which is exactly what admitted the
+batch-24 entries:
+
+```
+cd /Users/tony_wang/Projects/Snek/snek2
+EVAL_EPISODES=500 EVAL_MIN_ACHIEVABLE=97 EVAL_SCREEN_EPISODES=0 EVAL_INDEPENDENT=1 EVAL_OUT_SUFFIX=_hof500 \
+  PYTHONPATH=. python -u eval_checkpoints.py <arm> <step> [<step> ...]
+```
+
+The gate-97 early-abandon stops any checkpoint the moment >15 losses put 97% out of reach, so shrinking
+candidates bail in seconds and only genuine ≥97%/500 holders run full length. **A checkpoint that does not
+clear the gate does not enter the folder.** (On the desktop this is a queued eval job with the same env — see
+[`../desktop/README.md`](../desktop/README.md); batch 24's ran there as four parallel jobs.)
+
+**Step 1 — copy the confirmed checkpoint in:**
 
 ```
 cd /Users/tony_wang/Projects/Snek/snek2
@@ -389,17 +440,28 @@ cp savedPolicies/<arm>/ckpt-<step>.index \
    hallOfFame/<arm>-ckpt<step>/
 ```
 
+**Step 2 — verify the *copy* loads and plays, not just the original.** Stage the copy under a throwaway
+`savedPolicies/` name and re-measure ~100 episodes; it must read like a champion, not a beginner (the silent
+arch/era load traps below both surfaced exactly here):
+
+```
+mkdir -p savedPolicies/hofverify && cp hallOfFame/<arm>-ckpt<step>/* savedPolicies/hofverify/
+EVAL_EPISODES=100 EVAL_SCREEN_EPISODES=0 EVAL_MIN_ACHIEVABLE=0 EVAL_OUT_SUFFIX=_hofverify \
+  PYTHONPATH=. python -u eval_checkpoints.py hofverify <step>
+rm -rf savedPolicies/hofverify runs/hofverify_checkpoint_evals_hofverify.json
+```
+
+Then add a row to the table above with its **re-measured** rate (the HOF-500 figure), not a close-out /100 or
+a graph point. A graph point is 10 episodes and reads in 10-point jumps; 90% graph points have measured
+anywhere from 22% to 82%.
+
 **Copy `arch.json` too — it is now required.** Without it the copy will not load at all
 (`ArchMismatch: no arch.json`), which is the point: the width and observation era can no longer be
 lost. It is one file per policy dir, so the same `arch.json` is correct for every step of that arm.
 
-Then add a row to the table above with its **measured** rate over at least 100 episodes — not
-a graph point. A graph point is 10 episodes and reads in 10-point jumps; 90% graph points have
-measured anywhere from 22% to 82%.
-
-**‡ Still record a non-default `SNEK_FC_LAYERS` in the row, but `arch.json` now enforces it.** Every
-entry above is `50,100,50`, the default since batch 1, so width has never needed stating — **batch 20
-changes that** by sweeping eight shapes. A checkpoint rebuilt at the wrong width used to restore with
+**‡ Still record a non-default `SNEK_FC_LAYERS` in the row, but `arch.json` now enforces it.** Entries were
+all `50,100,50`, the default since batch 1, until batch 24's two `fc 320` records — so width now genuinely
+varies between entries and the row must state it. A checkpoint rebuilt at the wrong width used to restore with
 **no error**, leaving the mismatched layers unpopulated (`expect_partial()`) so it played like a
 beginner — the same silent failure as the observation-vector era problem above. `arch.json` closes
 it: the restorer reads the width (and observation length and era) from the sidecar and rebuilds the

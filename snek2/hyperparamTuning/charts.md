@@ -49,30 +49,29 @@ shape) — width is the only change. It asks the question batch 20 could not ans
 control: **does width matter once the prioritisation is fixed at IS-off?** The seed-matched control is
 b22 (`50,100,50`, IS off). Trained on the desktop.
 
-**Width raises consolidation under IS-off — the close-out confirms the training-graph hint. The honest
-500-episode number is still pending.** All four peak at **95.00**, so width does not move the ceiling.
-But the close-out pools **87.9** (eq-effort, gate 95): **+12.2 over the b22 control's 75.7, and higher on
-every seed** — and above every prior gate-95 arm, the b18b record's 78.5 included. Two arms hold a
-**100.0% full-length checkpoint (n=100)**, and **199 checkpoints across the batch clear 97% at n=100**.
+**Width raises consolidation under IS-off, and the batch set a new record.** All four peak at **95.00**, so
+width does not move the ceiling. But the close-out pools **87.9** (eq-effort, gate 95): **+12.2 over the b22
+control's 75.7, and higher on every seed** — above every prior gate-95 arm, the b18b record's 78.5 included.
 This is the project's first sign that width and prioritisation interact: width paid nothing under β→1.0
 (batch 20), and it pays here under IS-off.
 
-**Two caveats hold until the HOF-500 lands (running now).** The n=100 best rows are selection-inflated —
-b23b's selected 97%/100 shrank to **92.4%/500** — so the honest peak is the 500-episode re-measurement of
-every ≥97% checkpoint, not the figures below. And n=4 still cannot resolve below ~10 pp, although +12.2
-higher on all four seeds is a cleaner signal than batch 20's within-batch confound.
+**The HOF-500 re-measured all 199 ≥97%/100 checkpoints; 9 held ≥97%/500 and the batch took the record.** The
+new record is **`b24d` @1342k, 98.0%/500** (490/500, CI [96.4,98.9]), edging `b18b` @1588k (97.6%/700) and
+tied by `b24b` @2860k (98.0%/500). The /100 rows were badly inflated — `b24a`'s two 100%/100 highs produced
+**0 survivors** at 500 episodes (b23b's 97%/100 → 92.4%/500 was the same pattern) — so read the `best HOF-500`
+column, not `best /100`.
 
-All at the 3M cap, sorted by close-out pooled. Close-out ran on the desktop (gate 95, `EVAL_WORKERS=4`);
-`best row` is the top full-length checkpoint at n=100.
+All at the 3M cap, sorted by close-out pooled. Close-out and HOF-500 ran on the desktop (gate 95 / gate 97,
+`EVAL_WORKERS=4`).
 
-| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
-|---|---|---|---|---|---|
-| `b24a` | 95.00 | 95.3% | 60.5% | **89.03** | **100.0%** @1633k /100 |
-| `b24b` | 95.00 | **96.7%** | **73.2%** | 88.84 | 99.0% @1031k /100 |
-| `b24c` | 95.00 | 96.0% | 67.4% | 87.68 | **100.0%** @2126k /100 |
-| `b24d` | 95.00 | 96.7% | 62.9% | 85.97 | 99.0% @1292k /100 |
-| **mean — b24 fc320 IS-off** | **95.00** | **96.2%** | **66.0%** | **87.9** | — |
-| **mean — b22 fc50,100,50 IS-off** | 94.88 | 86.2% | 30.5% | 75.7% | — |
+| arm | peak trail | best-30 | `sef` | close-out pooled | best /100 | best HOF-500 |
+|---|---|---|---|---|---|---|
+| `b24a` | 95.00 | 95.3% | 60.5% | **89.03** | **100.0%** @1633k | — (0 of 43 held) |
+| `b24b` | 95.00 | **96.7%** | **73.2%** | 88.84 | 99.0% @1031k | **98.0%** @2860k |
+| `b24c` | 95.00 | 96.0% | 67.4% | 87.68 | **100.0%** @2126k | 97.4% @2982k |
+| `b24d` | 95.00 | 96.7% | 62.9% | 85.97 | 99.0% @1292k | **98.0%** @1342k ← **record** |
+| **mean — b24 fc320 IS-off** | **95.00** | **96.2%** | **66.0%** | **87.9** | — | — |
+| **mean — b22 fc50,100,50 IS-off** | 94.88 | 86.2% | 30.5% | 75.7% | — | — |
 
 ![b24b](charts/b24b-fc320noisseed2.png)
 **b24b-fc320noisseed2**
