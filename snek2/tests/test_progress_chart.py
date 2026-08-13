@@ -193,6 +193,25 @@ def test_a_resume_draws_a_vertical_line_per_restart():
     plt.close(figure)
 
 
+# ----------------------------------------------------------- the x-axis step label
+
+def test_the_x_label_shows_the_latest_step():
+    # rows() spaces evals every 1000 steps, so three of them end at step 3000 -> "3k steps".
+    figure, score_axis = draw([10.0, 50.0, 90.0])
+    assert score_axis.get_xlabel() == 'Iterations (3k steps)', score_axis.get_xlabel()
+    plt.close(figure)
+
+
+def test_the_x_label_groups_thousands_with_a_comma():
+    # The latest step is the last row's, and thousands are comma-grouped so a mid-millions run
+    # reads cleanly rather than as a wall of digits.
+    rows_in = [{'step': 2685000, 'avg_score': 90.0, 'perfect_percent': 50.0,
+                'trailing_avg_score': 90.0, 'epsilon': 0.002}]
+    figure, score_axis = render(rows_in)
+    assert score_axis.get_xlabel() == 'Iterations (2,685k steps)', score_axis.get_xlabel()
+    plt.close(figure)
+
+
 # ----------------------------------------------------------- the trailing-average trend line
 
 def test_trailing_average_is_a_causal_moving_mean():

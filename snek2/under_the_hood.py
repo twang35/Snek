@@ -238,7 +238,14 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     # whole band one color; chosen by comparing 0.3/0.5/0.8/1.2 side by side on a real arm.
     score_axis.plot(steps, scores, color=score_color, linewidth=0.3)
     score_axis.set_ylabel('Average Score', color=score_color, fontsize=label_size)
-    score_axis.set_xlabel('Iterations', fontsize=label_size)
+    # Put the latest step in the x label so how far the run has progressed reads at a glance --
+    # late in training the traces fill the plot and the axis's own "1e6" offset is coarse, so
+    # otherwise there is no number on the chart saying where it is now. Comma-grouped thousands:
+    # 2685000 -> "Iterations (2,685k steps)".
+    xlabel = 'Iterations'
+    if steps:
+        xlabel = 'Iterations ({:,}k steps)'.format(steps[-1] // 1000)
+    score_axis.set_xlabel(xlabel, fontsize=label_size)
     score_axis.tick_params(axis='y', labelcolor=score_color, labelsize=tick_size)
     score_axis.tick_params(axis='x', labelsize=tick_size)
     # score_axis.set_ylim(top=250)
