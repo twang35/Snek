@@ -1237,8 +1237,12 @@ def main(argv):
     # so it advances every round; a frame is ~0.1s against a ~4s round.
     #
     # Always on, deliberately — update_chart() disables itself if no window can be opened, so an
-    # unattended run needs no configuration. live_frame() reads every result file for the policy,
-    # so parallel EVAL_OUT_SUFFIX processes each show the whole job rather than their own slice.
+    # unattended run needs no configuration. The chart is scoped to this job's suffixes — its own
+    # EVAL_OUT_SUFFIX plus any it resumes — so parallel EVAL_OUT_SUFFIX processes still show the
+    # whole job, but a *different* eval that left a result file on this arm is not merged in. That
+    # last case is why the scoping is explicit: load_runs' mtime-window guess pulled a close-out
+    # finished <1h earlier into an HOF re-measurement's live chart, reading ~1700 checkpoints.
+    chart_suffixes = {suffix} | set(resume_suffixes(os.environ.get('EVAL_RESUME'), suffix))
     chart_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
     # 'off' disables everything after a real error. 'window_off' disables only the live
     # window (SNEK_CHART_WINDOW=0, the default) while live_frame() keeps writing the PNG on
@@ -1255,7 +1259,7 @@ def main(argv):
         chart['last'] = now
         try:
             import eval_progress
-            frame = eval_progress.live_frame(policy_name, chart_path)
+            frame = eval_progress.live_frame(policy_name, chart_path, suffixes=chart_suffixes)
             if frame is None:
                 return
             if chart['window_off']:

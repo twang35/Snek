@@ -91,17 +91,21 @@ from snake_constants import EVALS_DIR, RUNS_DIR
 MERGED_SUFFIXES = ('_merged', '_closeout')
 
 
-def load_runs(policy_name, window=None, include_all=False):
+def load_runs(policy_name, window=None, include_all=False, suffixes=None):
     """Result files belonging to the *current* job for this policy.
 
     An arm accumulates result files across sessions — `b8f-disc9975seed2` has eight — and
     summing all of them answers the wrong question: it reports lifetime totals and
     double-counts any checkpoint measured more than once. Progress means "this job".
 
-    A job is identified by write time: every file whose mtime is within `window` seconds of
-    the newest one. That groups the parallel chunks of one run correctly, because they all
-    keep writing while they work, and excludes runs from previous days. `include_all` overrides
-    it for the lifetime view.
+    A job is identified one of two ways. When the caller knows the job's `suffixes` — the
+    running eval knows its own `EVAL_OUT_SUFFIX` and any it is resuming — it passes them and
+    only those files count. Otherwise the job is guessed by write time: every file whose mtime
+    is within `window` seconds of the newest one. The guess groups a run's parallel chunks
+    correctly but misfires when a *different* eval on the same arm finished less than `window`
+    ago — a close-out just before an HOF re-measurement — because its stale, much larger file
+    lands inside the window and inflates the live chart. The explicit set is exact and is why
+    the running eval passes it. `include_all` overrides both for the lifetime view.
     """
     if window is None:
         window = float(os.environ.get('EVAL_PROGRESS_WINDOW', 3600))
@@ -111,6 +115,8 @@ def load_runs(policy_name, window=None, include_all=False):
     for path in sorted(glob.glob(pattern)):
         suffix = os.path.basename(path).split('_checkpoint_evals')[1][:-len('.json')]
         if suffix in MERGED_SUFFIXES:
+            continue
+        if suffixes is not None and suffix not in suffixes:
             continue
         try:
             mtime = os.path.getmtime(path)
@@ -131,7 +137,7 @@ def load_runs(policy_name, window=None, include_all=False):
             payload['complete'] = True
         candidates.append(payload)
 
-    if not candidates or include_all:
+    if not candidates or include_all or suffixes is not None:
         return candidates
     newest = max(run['mtime'] for run in candidates)
     return [run for run in candidates if newest - run['mtime'] <= window]
@@ -694,7 +700,7 @@ def render(policy_name, state, out_path):
     os.replace(partial, out_path)
 
 
-def live_frame(policy_name, out_path=None, include_all=False):
+def live_frame(policy_name, out_path=None, include_all=False, suffixes=None):
     """Renders the progress chart and returns it as an RGB array, or None if there is nothing yet.
 
     For the live window eval_checkpoints.py opens. Costs ~0.1s a frame, which is why it can be
@@ -709,7 +715,7 @@ def live_frame(policy_name, out_path=None, include_all=False):
     save: the panel count used to drop from three to two between checkpoints, and the window jumped
     several times a minute.
     """
-    runs = load_runs(policy_name, include_all=include_all)
+    runs = load_runs(policy_name, include_all=include_all, suffixes=suffixes)
     if not runs:
         return None
     if out_path is None:

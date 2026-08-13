@@ -722,3 +722,68 @@ def test_in_flight_title_collapses_duplicate_steps():
               ({'suffix': '_r1'}, {'step': 900000})]
     title = eval_progress.in_flight_title(active)
     assert '@900k' in title and '900k/900k' not in title, title
+
+
+# --------------------------------------------------- load_runs: which files count as "this job"
+# These write real result files and point RUNS_DIR at a temp dir, because the behaviour under test
+# is the glob-and-filter in load_runs, not summarize()'s handling of run dicts.
+import json
+import os
+import tempfile
+
+
+def _write_result_file(directory, policy, suffix, results, mtime):
+    path = os.path.join(directory, '{0}_checkpoint_evals{1}.json'.format(policy, suffix))
+    with open(path, 'w') as handle:
+        json.dump({'results': results, 'complete': True, 'updated_at': mtime}, handle)
+    os.utime(path, (mtime, mtime))
+    return path
+
+
+def _with_temp_runs_dir(body):
+    directory = tempfile.mkdtemp()
+    real = eval_progress.RUNS_DIR
+    eval_progress.RUNS_DIR = directory
+    try:
+        body(directory)
+    finally:
+        eval_progress.RUNS_DIR = real
+        for name in os.listdir(directory):
+            os.remove(os.path.join(directory, name))
+        os.rmdir(directory)
+
+
+def test_load_runs_suffix_scope_excludes_a_recent_other_eval_the_window_would_merge():
+    # The HOF bug, reproduced: a close-out (many rows, no suffix) finished 44 min before an
+    # _hof500 re-measurement started. Both are inside the 1h mtime window, so the unscoped view
+    # merges them and the live chart reads ~1700 checkpoints. Passing the running job's own
+    # suffix set drops the close-out and leaves only the nine rows it has actually measured.
+    def body(directory):
+        closeout = [result(s) for s in range(1000, 1000 + 1646)]
+        hof = [result(s) for s in range(2000, 2009)]
+        base = 1_000_000.0
+        _write_result_file(directory, 'b24b', '', closeout, base)            # the close-out
+        _write_result_file(directory, 'b24b', '_hof500', hof, base + 2653)   # 44 min later
+
+        merged = eval_progress.load_runs('b24b', window=3600)
+        assert sorted(r['suffix'] for r in merged) == ['(none)', '_hof500'], \
+            'the mtime window should merge both, which is the misfire being fixed'
+
+        scoped = eval_progress.load_runs('b24b', suffixes={'_hof500'})
+        assert [r['suffix'] for r in scoped] == ['_hof500']
+        assert sum(len(r['results']) for r in scoped) == 9, \
+            'only the HOF file counts once scoped to its suffix'
+    _with_temp_runs_dir(body)
+
+
+def test_load_runs_suffix_scope_keeps_the_jobs_own_parallel_shards():
+    # The scope must not throw the baby out: a job split across two suffixed workers passes both
+    # of its own suffixes and both shards still load, even with an unrelated file on the arm.
+    def body(directory):
+        base = 1_000_000.0
+        _write_result_file(directory, 'b24b', '_w0', [result(1)], base)
+        _write_result_file(directory, 'b24b', '_w1', [result(2)], base)
+        _write_result_file(directory, 'b24b', '', [result(9)], base)  # unrelated, must be dropped
+        scoped = eval_progress.load_runs('b24b', suffixes={'_w0', '_w1'})
+        assert sorted(r['suffix'] for r in scoped) == ['_w0', '_w1']
+    _with_temp_runs_dir(body)
