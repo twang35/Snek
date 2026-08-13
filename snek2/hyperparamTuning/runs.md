@@ -12,341 +12,63 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Batch 21 / 22 / 23 — PER importance-sampling β (fc 50,100,50, on batch 20's control)
-
-**Batch 21 (β→0.5) done and closed out. Batch 22 (IS off) running on the desktop. Batch 23 (β 0→0.1)
-done and closed out — pooled 75.7, the best point on the β ladder so far.** These isolate how much importance-sampling correction to
-apply — `td_error` priority, α=0.6, otherwise the batch-20 control. Gradient concentration ESS/N,
-measured on the end-of-run buffers, walks down the β ladder: **β→1.0 ≈1.0** (b20 control, near-uniform)
-→ **β→0.5 ≈0.86** (b21) → **β→0.1** (b23, effective exponent α·(1−β)=0.54, ESS/N to be measured on its
-buffer) → **IS off ≈0.38** (b22) → the no-IS extreme already run is b18's ≈0.21.
-
-- **b21 (`b21a-d`, β→0.5) — done, 4×3M on the laptop.** Beats the β→1.0 control on the training graph
-  (best-30 74.1 vs 64.0, `sef` 14.3 vs 11.2, 3/4 seeds) but n=4 cannot resolve it, and it trails b18's
-  no-IS consolidation by a wide margin. Ceiling unmoved (peak 94.69). Full read in
-  [`completedRuns.md`](completedRuns.md). **Closed out on the desktop: pooled (eq-effort, gate 95) 64.3 vs
-  the control's 55.0 (+9.3), 3/4 seeds** — confirms the training-graph direction, still short of no-IS.
-- **b22 (`b22a-d`, IS off) — running (desktop), 4×3M.** Same config with `SNEK_IS_WEIGHTS=0`, so the
-  gradient carries full `|δ|^0.6` prioritisation (ESS/N ≈0.38). Tests whether more concentration keeps
-  helping. Launched once the b20 `100,50,50` wave drained; close-out auto-fires when it finishes.
-- **b23 (`b23a-d`, β 0→0.1) — done and closed out.** IS on, β annealed from **0 to 0.1** over 300k
-  (`SNEK_IS_BETA=0`, `SNEK_IS_BETA_FINAL=0.1`); otherwise identical to b21/b22. Keeps **α·(1−β)=0.54** of
-  the priority signal at the target, vs 0.30 at b21 and the full 0.6 with IS off. **Close-out confirms the
-  training graph: pooled 75.7** (eq-effort, gate 95), +20.7 over the control and +11.4 over b21, higher on
-  all four seeds than either — closing most of the gap to b18's no-IS ~78.8. So β→0.1 sits at the no-IS
-  consolidation level, and the ladder is monotone: control 55.0 → b21 64.3 → b23 75.7 → b18 ~78.8. `b23b`
-  holds five full-length checkpoints ≥95/100 around 777k (best 97/100), a hall-of-fame candidate pending
-  re-measurement. Full read in [`completedRuns.md`](completedRuns.md); charts in [`charts.md`](charts.md).
-  (The `b23b` 217-242k collapse was investigated in place and is **not** an escape from a local minimum —
-  all four seeds make the same level shift;
-  [`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum).)
-
 ## Batch 24 / 25 — FC width under IS-off (`SNEK_IS_WEIGHTS=0`, otherwise b22)
 
-**Both queued on the desktop, behind b22 and the close-out evals.** They take b22's exact IS-off config
-(`td_error` α=0.6, IS off, target 1000, disc 0.9975, guided 0.8, fork 4/0.5/85/60, food-distance off,
-seeds 1-4, 3M) and vary only the network width — batch 20's width question, now under IS-off
-prioritisation instead of the β→1.0 control. If IS-off is the consolidation win the β ladder points to,
-this asks whether width then adds anything on top.
+**b24 is running on the desktop; b25 is queued behind it.** Both take b22's exact IS-off config —
+`td_error` priority α=0.6, `SNEK_IS_WEIGHTS=0`, target 1000, disc 0.9975, guided 0.8, fork 4/0.5/85/60,
+food-distance off, seeds 1-4, 3M — and vary **only** the network width. That makes them batch 20's width
+question re-asked under IS-off prioritisation instead of under the β→1.0 control.
 
-- **b24 (`b24a-d`, fc 320) — queued (desktop), priority 200.** One wide layer, matching b20's `320` shape.
-- **b25 (`b25a-d`, fc 200,100,100) — queued (desktop), priority 210.** Runs after b24 and its close-out.
+**What each outcome would mean.** Batch 20 answered the width question under β→1.0 and found nothing:
+nine shapes, no ceiling movement, and the consolidation columns exposed as seed noise
+([`findings.md`](findings.md#network-shape-the-sweep-is-complete--nine-shapes-and-architecture-never-raises-the-ceiling)).
+The β ladder then found the real consolidation lever — IS correction, worth +20.7 pooled from β→1.0 to
+β→0.1. So batch 24/25 asks the one architecture question batch 20 could not: **does width matter once the
+prioritisation is fixed?** A null replicates batch 20's finding under a stronger base and closes width for
+good. A gain would mean the two interact — width only pays when the gradient is prioritised — which would
+be the first architecture result in the project.
 
-Scheduler order (from the desktop `status.json` ledger, run order): b23 close-outs → b22 close-outs →
-b24 → b24 close-outs → b25 → b25 close-outs.
+**Read it against b22, not against batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
+control for both arms: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88.
 
-## Batch 20 — FC layer shapes, on batch 19's base
+- **b24 (`b24a-d`, fc 320) — running (desktop), priority 200.** One wide layer, matching batch 20's `320`
+  shape, which was that batch's apparent (and later downgraded) best. At **~440-475k of 3M** as of
+  2026-08-12 17:15, ~83 min in, all four arms alive.
+- **b25 (`b25a-d`, fc 200,100,100) — queued (desktop), priority 210.** 3-layer wide, ~1.6× the control.
+  Runs after b24 and its close-outs.
 
-**Wave 1 control done and closed out; capacity half is re-running to 3M (2026-08-09).** Per-arm numbers
-and charts:
-[`charts.md`](charts.md#batch-20-wave-1--fc-layer-capacity-20010050-vs-control-5010050-both-to-3m).
-Batch 19's close-out also finished on the laptop overnight.
+**Beware the pooled comparison this batch is set up to invite.** `320` read +10.1 pooled over the control
+in batch 20 and that was noise — an iso-capacity shape (`100,50,50`) landed 18.8 pp on the *other* side of
+the control at the same parameter count. So a ~10 pp pooled gap here is **not** a result at n=4; peak
+trailing and drawdown are the columns to read, and a consolidation claim needs more seeds.
 
-- **Control `50,100,50` (`b20a-d`, laptop) is finished and closed out.** Resumed from ~2.5M and all four
-  self-terminated at **3.000M**; close-out ran on the laptop 2026-08-09 in 45 min. It is now the
-  seed-matched control every later shape reads against.
-- **Capacity `200,100,50` (`b20e-h`, desktop, 2.66× params)** crashed together in the OOM→XIO cascade at
-  **~1.75M** — checkpoints preserved, and no arm was on a bad trajectory (all `zero_since` null, still
-  climbing). The cause is fixed since: the live chart window is off by default and replaced by the
-  decoupled `chart_viewer.py`.
+Scheduler order (desktop `status.json` ledger): b24 training → b24 close-outs → b25 → b25 close-outs, all
+auto-closed-out. Check with `git show origin/ops-status:status.json`.
 
-**Provisional read: 2.66× capacity did not move the ceiling.** Peak trailing **94.44** (control) vs
-**94.50** (capacity), best-30 64.0 vs 65.6 — both inside the flat 94.7-95.0 band that every batch since
-11 has held. But the two hosts stopped ~0.8M apart, so **this is not a matched-horizon comparison** and
-`strong_eval_fraction` (a fraction of each arm's own evals) is not comparable across the two columns yet.
+## Batches 20-23 are closed — where their descriptions went
 
-> **Treatment rerun DONE (2026-08-09) — capacity `200,100,50` did not move the ceiling.** All four arms
-> resumed from ~1.8M to **3M** and closed out (no OOM; results pulled from the `results` branch into
-> `runs/`). Read at a matched **3M** against the control:
->
-> | mean of 4 | control `50,100,50` | capacity `200,100,50` | delta |
-> |---|---|---|---|
-> | peak trailing | 94.44 | 94.70 | +0.26 |
-> | best-30 | 64.0 | 71.4 | +7.4 |
-> | `sef` | 11.2% | 12.9% | +1.7 |
-> | close-out pooled (eq-effort, gate 95) | 55.0% | 64.6% | +9.6 |
->
-> **Verdict: ceiling unmoved** — peak trailing 94.70 sits inside the flat 94.7-95.0 band nine batches have
-> held, for a net 2.66× wider. A *weak* consolidation edge (best-30 +7.4, pooled +9.6) is at/below the n=4
-> resolution floor (~10 pp): a hint, not a result — chasing it needs more seeds, not this n=4.
->
-> **‡ Downgraded 2026-08-10: not even a directional hint.** Paired pooled diffs are
-> **+28.7 / −4.7 / +19.4 / −5.0** — **2 of 4** seeds, exact paired p=**0.500** — and the two carrying it are
-> seeds 1 and 3, where the *control* is weakest (`b20a` `sef` 0.2%, `b20c` 2.2%). Wave 2 shows the same
-> shape at 1 of 4. The control's own seed spread (`sef` 0.2-26.3%, pooled 33.2-71.3%) is wider than any
-> between-shape gap in the batch. Max drawdown, the gap this note used to flag, is **8.31 mean**
-> (9.68 / 7.14 / 4.88 / 11.54) — level with wave 2's 8.56 and batch 19's 8.76.
->
-> The earlier OOM was a **matplotlib per-eval leak in the chart writer, now fixed** — not steady memory.
-> See the rendering section of [`CLAUDE.md`](../../CLAUDE.md).
->
-> **Amended 2026-08-09: wave 2's `200,50` half went ahead anyway, at the user's direction.** The hold
-> above was about the *control* being settled, and it now is — `b20a-d` finished at 3M and closed out. The
-> treatment rerun only gates the **capacity** verdict (`200,100,50`), not the wide-early one, which reads
-> against the control. (`320`, wave 2's other half, has since run on the desktop — see the block below.)
+All four batches finished and closed out, so per the bookkeeping rule at the end of this file their
+descriptions moved to [`completedRuns.md`](completedRuns.md):
 
-> **Wave 2 `200,50` DONE (2026-08-09/10) — null on the ceiling, behind the control on `sef`.** Four seeds
-> `b20{i,j,k,l}` to the 3M cap, closed out unattended in 25 min. Peak trailing **94.55** vs the control's
-> 94.44; `sef` **8.60%** vs 11.2%. best-30 and pooled read higher (+3.4, +4.3) but **1 of 4 seeds**
-> favours the shape and p=1.000 — the mean is seed 1 alone, where control `b20a` is the batch's weakest
-> arm. Full write-up:
-> [`completedRuns.md`](completedRuns.md#batch-20-wave-2--wide-early-20050-null-on-the-ceiling-behind-the-control-on-the-primary-metric).
-> **Any eval or `watch.py` on these checkpoints needs `SNEK_FC_LAYERS=200,50`.**
+| batch | change | verdict | design + results |
+|---|---|---|---|
+| **23** | IS β annealed **0→0.1** | **the best point on the β ladder** — pooled **75.7**, +20.7 over the control, higher on all 4 seeds | [write-up](completedRuns.md#batch-23--β-annealed-001-the-best-point-on-the-β-ladder-near-the-no-is-extreme) |
+| **22** | IS **off** (`SNEK_IS_WEIGHTS=0`) | **dead heat with β→0.1** — pooled 75.7. The consolidation gain saturates by β→0.1 | [write-up](completedRuns.md#batch-22--is-off-a-dead-heat-with-β01--the-consolidation-gain-saturates) |
+| **21** | partial IS (β→**0.5**) | beats the β→1.0 control (pooled 64.3 vs 55.0, 3/4 seeds), well short of no-IS | [write-up](completedRuns.md#batch-21--partial-is-β05-beats-the-β10-control-still-far-behind-no-is) |
+| **20** | `FC_LAYERS`, **nine shapes** | **architecture never raises the ceiling**; capacity binds only below ~0.55× | [the sweep's design](completedRuns.md#batch-20--the-design-of-the-nine-shape-sweep-complete-2026-08-12) |
 
-> **Wave 2 `320` DONE (2026-08-10) — depth-1 matches the control; depth is contributing nothing.** Four
-> seeds `b20{m,n,o,p}` to the 3M cap on the desktop, closed out in ~32 min. Peak trailing **94.67** vs the
-> control's 94.44 (p=0.250, all four inside the flat 94.4-94.9 band); `sef` 16.5% vs 11.2%, best-30 74.7
-> vs 64.1, pooled 65.1% vs 55.0% — every consolidation column reads higher and **3 of 4 seeds favour the
-> shape**, but nothing is significant and the size of the gap is largely seed 1, where control `b20a` is
-> the batch's weak arm (pooled gap drops to +2.8 excluding it). Drawdown 7.44 vs 5.41 (seed-3-driven,
-> still batch-19 territory). **The pre-registered read holds: removing all depth at matched capacity did
-> not hurt, so depth buys nothing here** — the cleanest architectural finding batch 20 has produced. Full
-> write-up:
-> [`completedRuns.md`](completedRuns.md#batch-20-wave-2--depth-1-320-depth-contributes-nothing-at-matched-capacity).
-> **Any eval or `watch.py` on these checkpoints needs `SNEK_FC_LAYERS=320`.**
+**The β ladder is the live result to build on.** Gradient concentration ESS/N walks down it — **β→1.0
+≈1.0** (batch 20's control, near-uniform) → **β→0.5 ≈0.86** (b21) → **β→0.1** (b23, effective exponent
+α·(1−β)=0.54) → **IS off ≈0.38** (b22) → b18's no-IS ≈0.21 — and pooled climbs monotonically with it:
+**55.0 → 64.3 → {75.7, 75.7} → ~78.8**, then **flattens at the bottom**. Most of the consolidation is
+bought by β→0.1; going all the way to IS-off adds nothing measurable. **The ceiling is unmoved throughout**
+(peak 94.4-94.9), so the ladder buys time-near-the-ceiling, not a higher one.
 
-> **Wave 3 `25,50,25` DONE (2026-08-10) — capacity finally binds; the ceiling drops.** Four seeds
-> `b20{q,r,s,t}` to the 3M cap on the desktop. Peak trailing **93.75** vs the control's 94.44 — the first
-> shape in batch 20 to move peak at all, and it moves it **down**, 4/4 seeds, p=0.125 (two seeds below the
-> nine-batch band). Every consolidation column drops (`sef` 2.1 vs 11.2, pooled 43.1 vs 55.0) and drawdown
-> doubles (11.1 vs 5.4). **At 0.29× the net cannot reach the control's ceiling** — the direct answer to
-> "is capacity binding at all." Full write-up:
-> [`completedRuns.md`](completedRuns.md#batch-20-wave-3--small-capacity-255025-capacity-finally-binds--the-ceiling-drops).
-> **Any eval / `watch.py` needs `SNEK_FC_LAYERS=25,50,25`.**
-
-> **Wave 3 `60,30,30,30,30` DONE (2026-08-10) — matches the ceiling, forgets more.** Four seeds
-> `b20{u,v,w,x}` (laptop-trained, renamed from a `q-t` collision; closed out on the desktop) to the 3M
-> cap. Peak trailing **94.25** vs 94.44 — inside the band (−0.18, p 0.375), a match; pooled/`sef`/best-30
-> a wash (1/4 seeds favour it). The one clean signal is drawdown: **12.3 vs 5.4, 4/4 seeds worse.** So
-> depth 5 at 0.55× holds the level but is less steady — the knee where capacity binds sits between 0.55×
-> and `25,50,25`'s 0.29×, not at the control. Full write-up:
-> [`completedRuns.md`](completedRuns.md#batch-20-wave-3--deep-narrow-6030303030-matches-the-ceiling-forgets-more).
-> **Any eval / `watch.py` needs `SNEK_FC_LAYERS=60,30,30,30,30`.**
-
-#### Control at 3M — the numbers every shape is read against
-
-| arm | peak trailing | best-30 | `sef` | max drawdown | close-out pooled | best row |
-|---|---|---|---|---|---|---|
-| `b20a` | 93.80 | 41.3 | 0.2% | 7.66 | 33.2% | 52.0% @2000k (n=25) |
-| `b20b` | 94.84 | 78.3 | 16.2% | 4.26 | 62.7% | 83.3% @1802k (n=36) |
-| `b20c` | 94.34 | 56.3 | 2.2% | 5.06 | 52.8% | 68.0% @1919k (n=25) |
-| `b20d` | 94.76 | 80.3 | 26.3% | 4.68 | **71.3%** | 89.7% @384k (n=58) |
-| mean | **94.44** | 64.05 | 11.2% | **5.41** | 55.0% | — |
-
-**No arm produced a full-length row.** At gate 95 every measurement was abandoned, deepest 58 of 100
-episodes, so the best-row column is a *bound* and is not comparable across arms or with earlier batches —
-`pooled_equal_effort` is the exact column. Nothing cleared 95%, so no hall-of-fame candidate; the record
-stays `b18b @1588000` at 97.6%.
-
-**‡ β=300k is a wash on ceiling and slightly *better* on drawdown** — matched at batch 19's 2.004M
-horizon, so the only difference is the β schedule:
-
-| | control (β=300k) | batch 19 (β=1M) |
-|---|---|---|
-| peak trailing | 94.41 | 94.16 |
-| best-30 | 64.05 | 63.27 |
-| `sef` | 12.17% | 13.82% |
-| max drawdown | **5.27** | 8.76 |
-
-So the β default change is neither validated nor falsified on the ceiling — every gap is well inside
-seed noise at n=4. What it does show is that **batch 19's anti-forgetting property survived both the β
-change and 800k extra steps**: drawdown is 5.41 at 3M, against batch 19's 8.76 at 2.18M and batch 18's
-~57. That was the premise of using batch 19 as the base, and it is holding.
-
-**FC trap — permanent, not just for wave 1:** any eval / `watch.py` / close-out of a `200,100,50` or
-`200,50` checkpoint **must** pass the matching `SNEK_FC_LAYERS`, or `restore()` silently mismatches the
-net (see below).
-
-**The question is the one thing nine batches of optimiser knobs have not moved: the ceiling.** Network
-architecture has **never been varied in this project** — `FC_LAYERS` has sat at `(50, 100, 50)` since
-batch 1 and there is not a single measurement of it in [`findings.md`](findings.md).
-
-### Why batch 19 is the base, even though it lost
-
-At the user's direction, and the reasoning is sound. Batch 19 was falsified on level but it **cut max
-drawdown from 55.52 to 8.76, 4/4 seeds** — the strongest anti-forgetting result on record. The premise
-of batch 20 is that **consistency and ceiling are separable**: keep the config that learns steadily and
-change the function approximator to see whether a different shape lifts the level without giving the
-steadiness back.
-
-That makes the target explicit: **a higher ceiling at batch-19 drawdown**. An arm that raises `sef` or
-peak trailing while drawdown climbs back toward batch 18's 55 has not answered the question — it has
-just walked back to batch 18.
-
-### ‡ Two variables move against batch 19, on purpose — and that shapes the whole design
-
-**β anneal goes to 300k**, the current default, at the user's direction. Batch 19 ran the **1M**
-schedule, so **batch 20 differs from batch 19 in two ways, not one**: `FC_LAYERS` and
-`BETA_ANNEAL_STEPS`. This is a deliberate choice — 300k puts the full IS correction inside the window
-where arms actually learn, which is the whole argument in the `snek2.py` comment — but it has a
-consequence that must not be glossed over:
-
-> **No batch-20 vs batch-19 difference can be attributed to architecture alone.** The β schedule moved
-> too. What *is* clean is the comparison **among batch-20 shapes**, since they share β=300k and differ
-> only in `FC_LAYERS`.
-
-**That is why wave 1 re-baselines.** Running the control shape `50,100,50` at β=300k costs four arms and
-buys two things: it isolates the β change against batch 19 (never measured — 300k is a new default that
-no arm has run), and it becomes the true seed-matched control every later shape is read against. Without
-it, every architecture result in this batch is confounded.
-
-**Pin β explicitly rather than relying on the default.** The default already drifted once between
-batch 19's launch and this design, which is exactly how a batch ends up testing something nobody
-intended.
-
-```
-SNEK_FC_LAYERS=<shape>  SNEK_SEED=1..4
-SNEK_BETA_ANNEAL_STEPS=300000
-SNEK_TARGET_UPDATE_PERIOD=1000  SNEK_FOOD_DISTANCE_REWARD=0
-SNEK_DISCOUNT=0.9975  SNEK_GUIDED_FRACTION=0.8
-SNEK_FORK_BRANCHES=4  SNEK_FORK_PROB=0.5  SNEK_FORK_MIN_LENGTH=85  SNEK_FORK_MAX_STEPS=60
-# PER otherwise at defaults, as batch 19 ran it: td_error priority, IS on, beta 0.4 -> 1.0
-```
-
-`SNEK_FC_LAYERS` must also be set on **every eval and `watch.py`** for these checkpoints — see the trap
-below.
-
-### The shapes, and what each one is for
-
-30 inputs → 3 actions (`left/right/forward`), ReLU, He init. Parameter counts include biases.
-
-**Each shape owns a fixed block of batch letters** (`b20<letter>-fc<shape>seed<N>`, one letter per
-seed), assigned here so two hosts never reuse a letter — which happened once, `b20q-t` naming *both*
-`25,50,25` and `60,30,30,30,30`, resolved by renaming the latter to `u-x`.
-
-| shape | params | vs control | depth | arms | what it isolates |
-|---|---|---|---|---|---|
-| `50,100,50` (control) | 11,853 | 1.00x | 3 | `b20a-d` ✓ | batch 19 itself — already run |
-| `200,100,50` | 31,503 | **2.66x** | 3 | `b20e-h` ✓ | capacity up, shape preserved |
-| `200,50` | 16,403 | 1.38x | 2 | `b20i-l` ✓ | **wide-early**: conjunctions of engineered features |
-| `320` | 10,883 | 0.92x | **1** | `b20m-p` ✓ | **depth, at matched capacity** |
-| `25,50,25` | 3,428 | **0.29x** | 3 | `b20q-t` ✓ | is capacity binding at all — **yes: ceiling drops, 4/4** |
-| `60,30,30,30,30` | 6,573 | 0.55x | **5** | `b20u-x` ✓ | deep and narrow — matches ceiling, forgets more |
-| `93,93` | 11,907 | 1.00x | 2 | `b20aa-ad` † ✓ | fills the iso-param depth ladder — **done: null, matches control (peak −0.03)** |
-| `100,200,100` | 43,703 | 3.69x | 3 | `b20ae-ah` † ✓ | escalation above the 2.66x arm — **done: null on the ceiling (peak +0.17, p 0.875)** |
-| `100,50,50` | 10,853 | 0.92x | 3 | `b20ai-al` † ⟳ | reshuffle at matched capacity/depth — **running (desktop), ~0.1M** |
-
-**† past `x` the letters roll into double letters (`aa`, `ab`, …), still batch 20.** The six shapes above
-consume `a-x`, so the last three continue at `aa` rather than opening a new batch — nine shapes at four
-seeds is 36 arms, more than the 26 single letters. `batch_prefix` groups `[a-z]*`, so `b20aa-` reads as
-`b20` (fixed 2026-08-10, with a test); `y,z` are left spare so each shape keeps a clean four-letter
-block.
-
-**Wide-early is the one with a mechanism behind it.** The observation is already high-level — per-action
-safety triples, tail-following flags, food direction — so what the net needs is *conjunctions* of those
-features ("safe left AND food left AND tail not adjacent"), not a deep hierarchy. Conjunctions want
-width in the first layer, which is what `200,50` and `200,100,50` supply.
-
-**`320` is the cleanest single finding available.** It holds parameters constant and removes all depth.
-If it matches the control, depth is contributing nothing here, and every future architecture question
-gets simpler.
-
-**`60,30,30,30,10` was proposed and is deliberately widened to `...,30`.** A 10-unit final layer forces
-all three Q-values through 10 ReLU units, where dead units cost a large share of the representation
-permanently. Five layers at `lr 1e-5` with no normalisation will also learn slowly early, which lands
-on the speed metric regardless of the final level.
-
-### Waves — 4 seeds per shape, two shapes at a time
-
-**Never fewer than 4 seeds per shape.** This domain does not resolve below ~10 pp at n=4, so four
-shapes at one seed each would resolve nothing. Laptop (4 trainers) plus desktop (up to 4) runs two
-shapes concurrently, ~7h per wave.
-
-| wave | shapes | why this pairing |
-|---|---|---|
-| **1** | **`50,100,50`** (re-baseline at β=300k) + **`200,100,50`** | the control every later shape needs, run alongside the strongest ceiling candidate. Also measures the β change on its own |
-| 2 | `200,50` + `320` | wide-early against depth-1, both read against wave 1's new control |
-| 3 | `25,50,25` + `93,93` | is capacity binding at all, and the iso-param depth-2 rung |
-| 4 | `60,30,30,30,30` | deep-and-narrow; only worth a wave if 2-3 showed any depth signal |
-| — | `100,200,100` | escalate only if `200,100,50` moves the ceiling upward |
-
-**Wave 1 pairs the re-baseline with a ceiling candidate rather than running two candidates**, because
-β=300k moved with the architecture and something has to hold it still. It leads on capacity-up rather
-than the scientifically cleaner `320` because the stated goal is a higher ceiling, and a smaller or
-equal-capacity net is not a plausible route to one.
-
-**If wave 1's `50,100,50` at β=300k beats batch 19 on its own**, that is a result in itself — the β
-default change validated — and it also means every later shape has a stronger bar to clear.
-
-### Pre-registration
-
-| item | value |
-|---|---|
-| **control** | **wave 1's `50,100,50` at β=300k**, seed-matched — the only comparison that isolates `FC_LAYERS`. Batch 19 is a *secondary* reference and differs by β as well |
-| horizon | batch 19 reached 2.00-2.42M, so the paired read against it caps at **~2.0M**. Run to `max_steps` 2,500,000 so arms can pass it |
-| **co-primary (ceiling)** | **peak trailing** and `best_perfect30`. Batch 19: peak 94.16 mean (94.66 / 94.40 / 92.72 / 94.86); batches 11-18 all sat at 94.8-95.0 |
-| **co-primary (must not regress)** | **max drawdown**, running-max definition. Batch 19: 4.94-12.84, mean **8.76**. A shape that raises the ceiling while drawdown exceeds ~25 has not answered the question |
-| secondary | `strong_eval_fraction` — batch 19 was **13.82%** at 2.004M against batch 18's 31.60%. Recovering that *while* holding drawdown down is the jackpot outcome |
-| test | exact paired permutation over the 16 sign flips, as batches 16-19 |
-| abandon | **≥3 of 4** arms not crossing pf30 ≥ 40% by 800k — note `b19c` never crossed at all, so the control itself fails a 2-of-4 rule; or drawdown above ~25 on 3+ arms, which kills the premise |
-
-### ‡ The trap that will silently ruin the evals
-
-**`restore()` is called with `expect_partial()`, so a checkpoint trained at one width rebuilt at another
-loads with no error and simply leaves the mismatched layers unpopulated** — the policy then plays like a
-beginner. `under_the_hood.eval_fc_layer_params()` exists because `eval_checkpoints.py` used to hardcode
-`(50, 100, 50)`.
-
-So **`SNEK_FC_LAYERS` must be set identically on the training job, on every eval of its checkpoints,
-and on any `watch.py` run.** This is the same failure class that once took a 90.3% champion down to
-scoring 0, 0, 1. Batch 20's checkpoints are a new era: if any of them earns a
-[`../hallOfFame/`](../hallOfFame/README.md) entry, the entry has to record its width.
-
-### Launching a wave — the mechanics (reused every wave)
-
-**Naming:** `b20<letter>-fc<shape>seed<N>`, with `x` standing in for the comma so the policy name stays
-a clean directory name — e.g. `b20b-fc200x100x50seed1`. Wave 1 used `b20a-fc50seed<N>` (control) and
-`b20e-h-fc200seed<N>` (capacity).
-
-**Laptop** — one command per seed; only `SNEK_FC_LAYERS`, `SNEK_SEED` and the policy name change:
-
-```
-cd snek2
-SNEK_FC_LAYERS=<shape> SNEK_SEED=1 SNEK_BETA_ANNEAL_STEPS=300000 \
-SNEK_TARGET_UPDATE_PERIOD=1000 SNEK_FOOD_DISTANCE_REWARD=0 SNEK_DISCOUNT=0.9975 \
-SNEK_GUIDED_FRACTION=0.8 SNEK_FORK_BRANCHES=4 SNEK_FORK_PROB=0.5 \
-SNEK_FORK_MIN_LENGTH=85 SNEK_FORK_MAX_STEPS=60 SNEK_MAX_STEPS=2500000 \
-/opt/miniconda3/envs/snek/bin/python -u snek2.py b20<letter>-fc<shape>seed1 > /tmp/b20.log 2>&1 &
-```
-
-Set `SNEK_FC_LAYERS` explicitly even on the `50,100,50` control — it is what makes the arm's
-`hyperparameter override:` startup line prove which width it ran.
-
-**Desktop** — one JSON per arm in `queue/pending/` on the `ops` branch
-([how](../desktop/README.md#driving-it-from-the-laptop)); same env block plus `"SNEK_FC_LAYERS": "<shape>"`,
-`max_steps` 2500000, and a `notes` reminder that any eval/`watch.py` on the checkpoints must set the same
-`SNEK_FC_LAYERS`. Confirm config landed: `grep "hyperparameter override:" /tmp/b20.log` (laptop) or
-`git show origin/ops-status:status.json` (desktop, under `running`).
-
-**Desktop concurrency — corrected by the wave-1 crash.** Wave 1 ran `max_trainers: 4` with the live
-chart window **on**, and all four capacity arms died together at ~1.75M: an OOM disrupted the X session,
-and the in-process cv2 window raised a fatal XIO error that took the arms with it. Two things changed as
-a result — the live window is off by default now (decoupled viewer instead), and the **max-eval-worker
-RAM test is still owed** before trusting `max_trainers: 4` again. Sample RAM early on any desktop wave:
-
-```
-ssh -i ~/.ssh/snek_desktop claw@the-claw-den 'free -m | awk "NR==2{print \$3\" MB used\"}"'
-```
+`b23b` holds five full-length checkpoints ≥95/100 around 777k (best 97/100). It was **not** a
+hall-of-fame candidate after re-measurement — the selected @777k reads 92.4% over 500 fresh episodes, the
+worst of its own cluster. The `b23b` 217-242k collapse was investigated in place and is **not** an escape
+from a local minimum; all four seeds make the same level shift
+([`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum)).
 
 ## Record status
 
@@ -378,7 +100,7 @@ batches. `*trunc*` means no full-length row survived the gate, so the figure is 
 
 | batch | change | best selected | re-measured |
 |---|---|---|---|
-| **20** | `FC_LAYERS` shapes (5 of 9 closed) | 89% @2321k *trunc* (`b20p`, 320) · 87% @2896k *trunc* · 87% @2818k *trunc* | **none reached full length** |
+| **20** | `FC_LAYERS` shapes (**all 9 closed**) | 92% @1470k *trunc* (`b20ah`, 100,200,100) · 91% @1435k *trunc* · 91% @2935k *trunc* (`b20g`) | **none reached full length** — 0 of 36 arms |
 | **19** | standard PER + IS | 91% @1536k *trunc* · 77% @1485k *trunc* · 76% @937k *trunc* | **none reached full length** |
 | **18** | `TARGET_UPDATE_PERIOD` 1000 | **98% @1588k** · 97% @1601k · 96% @1289k | **97.6% /700** ← **record** · 94.7% /700 · 85.4% /500 |
 | 17 | forked endgame collection | 99% @1248k · 99% @1205k · 98% @1231k | **94.24% /5120** · region grid 84% |
@@ -403,26 +125,33 @@ reality.
 
 **Outstanding, highest-value, in order:**
 
-1. **Batch 20's last shape `100,50,50` is running on the desktop (~0.1M, 2026-08-11).** Eight shapes are
-   already in — the ceiling is invariant at or above the control's capacity, capacity binds only below it
-   (knee between 0.29x and 0.55x), and no shape raised the ceiling. `93,93` (null, peak −0.03) and
-   `100,200,100` (null, peak +0.17, the largest 3.69× net) both closed out as expected. The last arm
-   `100,50,50` (`b20ai-al`, 3M each) is a reshuffle at matched capacity/depth — expected null — and closes
-   the planned nine-shape sweep; auto-closeout evals the wave.
-2. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
+1. **`CHASE_SAFE_SHAPING` is the highest-value untested change, and its hold has expired.** It was
+   approved 2026-08-11 and held until the then-running batches closed out; batches 20-23 are all closed and
+   only the desktop is busy. It targets endgame food-finding — the modal failure since batch 16 — which is
+   the one place a *ceiling* gain could still come from, now that architecture is closed and the β ladder
+   has flattened. Plan: [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md).
+   The laptop's four slots are free.
+2. **Batch 24/25 will not settle the width question at n=4 if it reads on pooled alone** — see the warning
+   in the batch 24/25 section. If b24 comes back with a ~10 pp pooled gap and nothing on peak, the honest
+   next step is more seeds on b24, not a third width.
+3. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
    open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
    lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test
    that deflated `b17b`'s apparent region to 84%.
-3. **The 11 batch-18 checkpoints at exactly 95.0%** were excluded from the 500-episode sweep, which
+4. **The 11 batch-18 checkpoints at exactly 95.0%** were excluded from the 500-episode sweep, which
    took ">95%" literally. ~9 minutes of eval if a fuller picture of the region is wanted.
 
-## Closed batches (11-19)
+## Closed batches (11-23)
 
 One line each; full write-ups and per-seed numbers in [`completedRuns.md`](completedRuns.md),
 superseded detail in [`archive/runs-archive.md`](archive/runs-archive.md).
 
 | batch | change | verdict |
 |---|---|---|
+| **23** | IS β annealed 0→**0.1** | **the best point on the β ladder** — pooled 75.7, +20.7 over the control, higher on all 4 seeds |
+| **22** | IS **off** | **dead heat with b23** at pooled 75.7 — the consolidation gain saturates by β→0.1 |
+| **21** | partial IS (β→**0.5**) | beats the β→1.0 control (64.3 vs 55.0, 3/4 seeds), well short of no-IS |
+| **20** | `FC_LAYERS`, nine shapes, 12.7× param range, depths 1-5 | **architecture never raises the ceiling** (peak 93.75-94.69 across the range, 0 full-length rows in 36 arms). Capacity binds only below ~0.55×. Consolidation columns exposed as seed noise |
 | **19** | standard PER (`td_error` + IS on, β→1.0) | **falsified** — worse on all 5 pooled metrics, 4/4 seeds, p=0.125. Drawdown 55.5 → 8.8, but at a lower level |
 | 18 | `TARGET_UPDATE_PERIOD` 8 → 1000 | primary moved: 102k faster to pf30≥40%, 4/4 seeds; drawdown improved. **Close-out done** — tightest eq-effort spread of any batch (74.8-81.9), 20 rows ≥95% |
 | 17 | `FORK_BRANCHES=4` forked endgame collection | null on config (one seed carried it), **project record on `b17b`**; dose ~60% of design |
@@ -434,9 +163,12 @@ superseded detail in [`archive/runs-archive.md`](archive/runs-archive.md).
 | 11 | the 30-value vector itself | +4-5 pp vs 10, not significant |
 
 **The binding constraint is seed variance, not ideas** — n=4 resolves nothing below ~10 pp, and peak
-trailing reads 94.7-95.0 flat across batches 11-18. Nothing has raised the ceiling; batch 16 raised
-how much of the time an arm sits near it. **Batch 19 is the first batch to move peak trailing at all,
-4/4 seeds, and it moved it down** to 94.16 — the invariance is breakable, just not yet upward.
+trailing reads 93.8-95.0 flat across batches 11-23. Nothing has raised the ceiling; batches 16 and 21-23
+raised how much of the *time* an arm sits near it. **Two things have moved peak trailing downward** —
+batch 19's full IS correction (94.16, 4/4 seeds) and batch 20's 0.29× net (93.75, 4/4) — so the invariance
+is breakable, just not yet upward. **Thirteen batches of optimiser, PER and architecture knobs have not
+raised the ceiling once**, which is the argument for the reward-shaping direction at the top of the
+backlog.
 
 ## Standing backlog
 
@@ -445,11 +177,11 @@ table.
 
 | change | targets | prior |
 |---|---|---|
-| `CHASE_SAFE_SHAPING` — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **designed, deferred** — full plan in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md). Approved 2026-08-11, held until the current batches close out |
+| `CHASE_SAFE_SHAPING` — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **the top item, and ready to launch** — full plan in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md). Approved 2026-08-11 and held until the running batches closed out; **20-23 are now closed and the laptop's four slots are free** |
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
 | ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **closed as batch 18** — primary moved, 4/4 seeds; see [`completedRuns.md`](completedRuns.md) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
-| ~~`FC_LAYERS=128,128`~~ | capacity | **superseded by batch 20**, which sweeps eight shapes rather than one — see [above](#batch-20--fc-layer-shapes-on-batch-19s-base). Prior was "low", and the nine-batch flat ceiling is why |
+| ~~`FC_LAYERS=128,128`~~ | capacity | **closed by batch 20**, which swept nine shapes rather than one: none raised the ceiling — [findings](findings.md#network-shape-the-sweep-is-complete--nine-shapes-and-architecture-never-raises-the-ceiling). Width under IS-off is the one loose end, and batches 24/25 are on it |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |
 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | experience diversity | low — the 500k result was ambiguous |
 
@@ -458,8 +190,10 @@ the in-code comment already suggests 1e-4. With a stable target it may train sev
 times faster; on its own with `TARGET_UPDATE_PERIOD=8` it would probably make
 instability worse. The order matters.
 
-**Epsilon ladder shape — rewritten 2026-08-04, and it is now the highest-value untested
-change on this page.** The old ladder ran **96.8% of batches 10-11's training steps at epsilon
+**Epsilon ladder shape — rewritten 2026-08-04, and still never measured in isolation.** Every batch from
+13 on has run the new ladder, so it is baked into all of them and no arm separates it from the config it
+shipped with; that is why it stays on this page even though the code change is long done.
+The old ladder ran **96.8% of batches 10-11's training steps at epsilon
 exactly 0.0**, bottoming out at median step 15000 while 7 of 8 arms were still at 0% perfect
 games, because its rungs were calibrated to `avg_reward` values a non-winning policy clears.
 Replaced with two phases — `avg_reward` bootstrap to `INITIAL_EPSILON`/8, then a geometric
@@ -522,6 +256,15 @@ The reason to keep the description live rather than only the status table: the d
 rationale is what tells a future session whether a surprising result is informative or
 just an arm that was never going to answer anything.
 
-Verify what's actually running with `pgrep -fl "python -u snek2.py"`. Not
-`grep "[s]nek2.py"` — git telemetry `curl` processes carry `snek2/snek2.py` in their
-payload and inflate the count.
+**Verify what is running on both hosts — neither check sees the other**, so a count is meaningless
+without naming the box:
+
+| host | check |
+|---|---|
+| laptop (4 trainers max) | `pgrep -fl "python -u snek2.py"` |
+| desktop `the-claw-den` | `git show origin/ops-status:status.json` — read `counts`, `running`, and the `iso` heartbeat |
+
+Not `grep "[s]nek2.py"` on the laptop — git telemetry `curl` processes carry `snek2/snek2.py` in their
+payload and inflate the count. And `git fetch` first: `git show origin/ops-status:...` serves whatever
+was last fetched, which on 2026-08-12 was **17 hours stale** and showed four finished evals as still
+running.

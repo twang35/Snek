@@ -12,7 +12,15 @@ the only place that reflects which.
 | file | what is in it |
 |---|---|
 | [`batches1-11.md`](batches1-11.md) | per-batch write-ups and chart captions for batches 1-11 |
+| [`batches12-15.md`](batches12-15.md) | per-batch narratives for batches 12-15, retired 2026-08-12 |
+| [`runs-archive.md`](runs-archive.md) | superseded status and planning detail moved out of `runs.md` |
+| [`charts-archive.md`](charts-archive.md) | chart sections retired from `charts.md` past its six-batch cap |
 | [`findings-superseded.md`](findings-superseded.md) | findings about replaced observation vectors, and batch 1-8 config results later settled |
+
+**Two files here are appended to routinely, not once**: `charts-archive.md` every time `charts.md`
+passes six batches, and `batches12-15.md`/`batches1-11.md` whenever a batch narrative is retired. The
+procedure, including the `../` link repair that is silent if skipped, is in
+[`../hyperparamTuning.md`](../hyperparamTuning.md#when-you-stop-a-batch-of-arms).
 
 ## What was kept live instead
 

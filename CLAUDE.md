@@ -175,8 +175,8 @@ Everything is in **`snek2/hyperparamTuning/`**:
 | `findings.md` | what is established, what is falsified. Read before proposing an experiment |
 | `completedRuns.md` | every arm: config, final numbers, verdict. The canonical arm table |
 | `failureModes.md` | the four ways a policy degrades and how to tell them apart |
-| `charts.md` + `charts/` | progress graph per arm, batch 11 onward |
-| `archive/` | batches 1-10 and superseded findings. **History only — do not read into context** |
+| `charts.md` + `charts/` | progress graph per arm, the six newest batches (older captions in `archive/charts-archive.md`) |
+| `archive/` | retired batch narratives (1-11, 12-15), retired chart sections, superseded findings. **History only — do not read into context** |
 
 Keep the split clean: `runs.md` is current state and forward plan only, results go to
 `completedRuns.md`, conclusions to `findings.md`, anything about *how to measure or judge* to
@@ -207,19 +207,31 @@ config change would have been reverted for the loss: the fix was assumed clean b
 
 It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
 so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
-<change>` section with a stats line, a short reading, and the image. Captions for batches 1-10 are
-in `archive/batches1-11.md`, so check both:
+<change>` section with a stats line, a short reading, and the image. Older captions live in
+`archive/batches1-11.md` and `archive/charts-archive.md`, so check all three:
 
 ```
 cd snek2/hyperparamTuning
 ls charts/*.png | sed 's|.*/||;s|\.png||' | sort > /tmp/have
-grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md \
-  | sed 's|charts/||;s|\.png||' | sort -u > /tmp/doc
+grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/charts-archive.md \
+  | sed 's|.*charts/||;s|\.png||' | sort -u > /tmp/doc
 comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 ```
 
+**Both details in that snippet are load-bearing.** `archive/charts-archive.md` has to be in the grep or
+every retired arm reads as undocumented, and the `sed` must be `s|.*charts/||` — archived captions link
+`../charts/x.png`, which the shorter `s|charts/||` leaves as `../x`. **Three PNGs will always be listed**
+(`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities`): they are diagnostic figures
+referenced from `findings.md`, not arm charts.
+
 This drifted once: batches 5-7 reached 12 undocumented arms because `refresh_charts.sh` succeeding
 looked like the charts were handled.
+
+**Retiring a section needs the `../` link repair, and it was skipped every time until 2026-08-12** —
+sixteen links inside `archive/charts-archive.md` pointed at `charts/…` and `completedRuns.md` from one
+directory too deep, and five links *into* retired sections still pointed at `charts.md`. Both classes
+render as normal text or 404 rather than erroring, so nothing surfaces them. After any move, re-resolve
+every `](file.md#anchor)` in the tuning docs against the real headings.
 
 ### Two rules that are easy to get wrong
 

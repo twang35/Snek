@@ -9,6 +9,8 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-12 | 19 | batch 20's `100,50,50` closed the nine-shape sweep; batch 19 became the seventh-newest |
+| 2026-08-12 | 18 | retired with 19 in the same pass — `charts.md` was holding seven batch sections |
 | 2026-08-12 | 17 | batch 22 landed; batch 17 became the seventh-newest |
 | 2026-08-12 | 16 | batch 23 landed; batch 16 became the seventh-newest |
 | 2026-08-11 | 15 | batch 21 landed; batch 15 became the seventh-newest |
@@ -18,11 +20,187 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 ---
 
+## Batch 19 — standard PER (`td_error` priority + IS on), falsified, stopped at 2.00-2.42M
+
+Four seeds, batch 18's config byte-for-byte with the two PER overrides *dropped* — priority signal
+`td_loss` → **`td_error`**, importance sampling **off → on** with β annealing 0.4 → 1.0 over 1M steps.
+A clean one-knob-group test with batch 18 as the seed-matched control. **It is the clearest negative
+since batch 12's deadlock: every comparable metric moved against it, 4 of 4 seeds, p=0.125** — the
+floor at n=4. Paired against batch 18 truncated to a matched **2.004M** (`b19c` is the shortest arm):
+
+| metric | b18 (`td_loss`, no IS) | b19 (standard PER) | delta | p |
+|---|---|---|---|---|
+| **`strong_eval_fraction`** (primary) | **31.60%** | **13.82%** | **-17.78 pp** | **0.125** (4/4) |
+| `best_perfect30` | 85.52% | 63.27% | **-22.25 pp** | **0.125** (4/4) |
+| mean perfect, back half | 68.86% | 48.88% | **-19.98 pp** | **0.125** (4/4) |
+| peak trailing | 94.85 | 94.16 | **-0.69** | **0.125** (4/4) |
+| **max drawdown** | 55.52 | **8.76** | **-46.76** | **0.125** (4/4) |
+| steps to pf30 ≥ 40% | 299.5k | 324.7k (3 arms) | slower on 3/3 | — |
+
+**`b19c` never reached pf30 ≥ 40% at all**, so that row has no fourth pair and is left unpooled rather
+than filled in — the three seeds that did reach it were all slower (508k vs 460k, 244k vs 180k, 222k vs
+216k).
+
+**‡ The ceiling moved for the first time in nine batches, and it moved down.** Peak trailing has read
+94.8-95.0 for every batch from 11 through 18 regardless of config; here it is 94.66 / 94.40 / 92.72 /
+94.86, mean **94.16**, and lower on 4 of 4 seeds. A −0.69 mean is small in absolute terms, but it is
+the first config to shift a quantity that eight consecutive batches could not budge — in the wrong
+direction.
+
+**‡ The drawdown result is real, large, and does not rescue the batch.** Max drawdown fell from
+55.52 to **8.76**, 4/4 — by far the biggest movement in the table and the strongest anti-forgetting
+result the project has. But the arms achieve it by sitting *lower*, not by holding a high level:
+recent-30 is 43.3 / 51.3 / 14.3 / 56.0 against the control's much higher figures, and `sef` more than
+halved. Flat curves at a worse level is what a full IS correction damping the replay signal looks
+like. Since reducing catastrophic forgetting is a *means* in this project and not the goal, a −17.78 pp
+primary is not paid for by a smaller drawdown — but the β anneal is now a candidate to pair with any
+future change that raises the level.
+
+**Full-length numbers, comparable to batch 18 above and to nothing below it.** These arms ran to
+2.0-2.4M, so `sef` is inflated by run length relative to any shorter batch.
+
+| seed | step | peak trailing | best-30 | `sef` | recent-30 | max drawdown |
+|---|---|---|---|---|---|---|
+| 4 | 2423k | **94.86** | **85.7%** | **40.2%** | **56.0%** | 12.84 |
+| 1 | 2192k | 94.66 | 71.0% | 8.0% | 43.3% | **4.94** |
+| 2 | 2116k | 94.40 | 66.7% | 4.6% | 51.3% | 10.20 |
+| 3 | 2004k | 92.72 | 29.7% | **0.0%** | 14.3% | 7.04 |
+| **mean** | | **94.16** | **63.3%** | **13.2%** | **41.2%** | **8.76** |
+
+### b19d-stdperseed4 — standard PER, seed 4
+
+2423k steps, peak trailing **94.86**, best-30 **85.7%** @1944k, `sef` **40.2%**, recent-30 56.0%,
+max drawdown 12.84.
+
+![b19d](../charts/b19d-stdperseed4.png)
+
+**The seed that escaped, and it is why the batch is a falsification rather than a catastrophe.** It is
+level with its batch-18 control on every column (`sef` 40.2 against 41.6, peak 94.86 against 94.92),
+so whatever standard PER costs, one seed in four does not pay it. Read against the other three, this
+arm is the evidence that the damage is a *distribution* shifting left rather than a mechanism that
+cannot work.
+
+### b19a-stdperseed1 — standard PER, seed 1
+
+2192k steps, peak trailing 94.66 @1299k, best-30 71.0% @1301k, `sef` 8.0%, recent-30 43.3%,
+max drawdown **4.94** — the smallest in the batch.
+
+![b19a](../charts/b19a-stdperseed1.png)
+
+Peaked early at 1.30M and then held a visibly flat, slightly declining band for 900k steps without
+ever collapsing. Its control `b18a` reached `sef` 41.2% against this arm's 8.0% while suffering a 56.6
+drawdown, so the pair is the whole batch in miniature: far steadier, far worse.
+
+### b19b-stdperseed2 — standard PER, seed 2
+
+2116k steps, peak trailing 94.40 @1889k, best-30 66.7% @1914k, `sef` 4.6%, recent-30 51.3%,
+max drawdown 10.20.
+
+![b19b](../charts/b19b-stdperseed2.png)
+
+**The slowest consolidator of the four:** it did not reach pf30 ≥ 60% until 1861k where its control
+did so at 310k, a 1.55M gap. It was still improving when stopped — peak trailing and best-30 both land
+in its final 250k — so this is an arm whose curve had not finished, and the one place the batch's
+horizon is a genuine caveat rather than a formality.
+
+### b19c-stdperseed3 — standard PER, seed 3
+
+2004k steps, peak trailing 92.72 @1500k, best-30 **29.7%** @195k, `sef` **0.0%**, recent-30 14.3%,
+max drawdown 7.04.
+
+![b19c](../charts/b19c-stdperseed3.png)
+
+**Not one eval at ≥80% perfect in 2005 evals**, and its best 30-eval window came at **195k** — the
+opening of the run. It never reached pf30 ≥ 40%, and peak trailing 92.72 is more than two points below
+anything else in batches 18-19. It was never dead (`zero_since` null, trailing 88.7 at the end) and it
+never collapsed — so it is **none of the four failure modes** in
+[`failureModes.md`](../failureModes.md): it learned to play well, plateaued just short of finishing, and
+stayed there. The nearest thing on record is batch 12's deadlock, which was much worse. Seed 3 was
+also batch 18's weakest arm, so the seed carries some of this — but `b18c` still managed `sef` 24.3%.
+
+## Batch 18 — `TARGET_UPDATE_PERIOD=1000`, forking retained, stopped at 2.40-2.61M
+
+Four seeds, batch 17's config exactly with the target period taken from 8 to **1000** — a clean
+one-knob test, because forking stayed on in both. **The pre-registered primary metric moved, and it is
+the strongest speed result this project has:** steps to pf30 >= 40% is **102k earlier, 4 of 4 seeds,
+p=0.125** — the floor at n=4. Paired against batch 17 truncated to a matched 1.406M:
+
+| metric | b17 (period 8) | b18 (period 1000) | delta | p |
+|---|---|---|---|---|
+| **steps to pf30 >= 40%** (primary) | 402k | **300k** | **-102.2k** | **0.125** (4/4) |
+| **max drawdown** | 73.97 | **53.20** | **-20.76** | 0.375 |
+| `strong_eval_fraction` | 17.56% | 24.29% | +6.73 pp | 0.625 |
+| `best_perfect30` | 76.08% | 82.75% | +6.67 pp | 0.625 |
+| mean perfect, back half | 57.83% | 64.02% | +6.19 pp | 0.750 |
+| peak trailing | 94.56 | 94.69 | +0.14 | 0.875 |
+
+**‡ The one prior data point predicted the opposite on drawdown and was wrong.** `b1b-tgt200` (batch 1,
+period 200) got a *worse* drawdown than its baseline, 27.4 against 19.2, and that was recorded as the
+risk to watch. At period 1000 the drawdown **improved by 20.8 points**, 3 of 4 seeds. The batch-1 hint
+was right about "longer learns faster early" and wrong about the cost.
+
+**Full-length numbers, which are not comparable to the batches below.** These arms ran to 2.4-2.6M
+against batch 17's 1.4-1.6M, and `sef` is a fraction of an arm's *own* evals, so the figures below are
+inflated by run length relative to any shorter batch. `b18d` at **47.9%** and `b18a` at **41.4%** are
+nonetheless the two highest `sef` readings ever recorded here, against `b15a`'s 39.9% at 5.79M.
+
+| seed | step | pf30 >= 40% at | b17 control | peak trailing | best-30 | `sef` (full) | max drawdown |
+|---|---|---|---|---|---|---|---|
+| 1 | 2612k | 460k | 560k | 94.92 | 88.0% | **41.4%** | 56.58 |
+| 2 | 2401k | **180k** | 332k | 94.96 | 86.0% | 25.0% | 85.08 |
+| 3 | 2510k | 342k | 386k | 94.94 | 84.3% | 24.3% | 56.14 |
+| 4 | 2597k | 216k | 329k | 94.92 | **91.0%** | **47.9%** | **32.62** |
+| **mean** | | **300k** | **402k** | **94.94** | **87.3%** | **34.7%** | **57.6** |
+
+**The ceiling still has not moved — an eighth flat result.** Peak trailing reads 94.92 / 94.96 / 94.94 /
+94.92, mean **94.94**, inside 0.4 of every batch from 11 on. Whatever the target period does, it is not
+raising the maximum an arm reaches.
+
+### b18d-tgt1000seed4 — period 1000, forking on, seed 4
+
+![b18d](../charts/b18d-tgt1000seed4.png)
+
+Step 2.60M · peak trailing 94.92 (at 2346k) · **best 30-eval perfect 91.0%** (at 2369k) · `strong_eval_fraction` **47.9%** · recent-30 79.0%
+
+**The steadiest arm on record.** 47.9% of its evals at >=80% perfect is the highest ever, and its max
+drawdown of **32.62** is less than half the batch-17 mean — the red trace stays high instead of
+collapsing and recovering. Reached pf30 >= 40% at 216k against its control's 329k.
+
+### b18a-tgt1000seed1 — period 1000, forking on, seed 1
+
+![b18a](../charts/b18a-tgt1000seed1.png)
+
+Step 2.61M · peak trailing 94.92 (at 1605k) · best 30-eval perfect 88.0% (at **2480k**) · `strong_eval_fraction` 41.4% · recent-30 64.0%
+
+Second-highest `sef` ever, and still finding its best window at 2480k — near the end of the run. Its
+seed-1 counterpart in batch 17 was the arm that made that batch a null, so **the pairing that looked
+worst going in came out +40 pp on `sef`**. One seed, but worth noting against the temptation to read
+seed identity as arm quality.
+
+### b18c-tgt1000seed3 — period 1000, forking on, seed 3
+
+![b18c](../charts/b18c-tgt1000seed3.png)
+
+Step 2.51M · peak trailing 94.94 (at 2161k) · best 30-eval perfect 84.3% (at 2168k) · `strong_eval_fraction` 24.3% · recent-30 **79.3%**
+
+**Highest recent-30 of the batch at the moment it was stopped**, with peak and best window both inside
+its last 350k — the arm most plausibly cut short.
+
+### b18b-tgt1000seed2 — period 1000, forking on, seed 2
+
+![b18b](../charts/b18b-tgt1000seed2.png)
+
+Step 2.40M · peak trailing 94.96 (at 1575k) · best 30-eval perfect 86.0% (at 1600k) · `strong_eval_fraction` 25.0% · recent-30 56.3%
+
+**Fastest start on record: pf30 >= 40% at 180k.** Also the batch's worst drawdown at 85.08, and the
+weakest recent-30 — it peaked around 1.6M and gave a lot back. The two facts together are the case for
+reading this batch on speed rather than on stability.
+
 ## Batch 17 — forked endgame collection (`SNEK_FORK_*`), a null, stopped at 1.41-1.57M
 
 Four seeds, batch 16's config exactly plus forking at length ≥ 85 — one variable, an exact control.
 **A null**: `strong_eval_fraction` -1.67 pp at a matched 1.245M (p=0.875). Full write-up in
-[`completedRuns.md`](completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record).
+[`completedRuns.md`](../completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record).
 
 **These four charts are the clearest picture of the seed-variance problem in this document.** Same
 config, adjacent seeds, and the batch spans `sef` **1.4% to 36.6%** — a 26x spread that is entirely
@@ -42,7 +220,7 @@ fraction of an arm's own evals.
 
 ### b17b-forkseed2 — forking on, disc 0.9975 + shield 0.8, seed 2
 
-![b17b](charts/b17b-forkseed2.png)
+![b17b](../charts/b17b-forkseed2.png)
 
 Step 1.57M · **peak trailing 95.00** (at 1280k) · **best 30-eval perfect 92.7%** (at 1223k) · `strong_eval_fraction` **36.6%** · recent-30 71.0% · **best ckpt 95.17% @1190k over 600 fresh episodes**
 
@@ -57,11 +235,11 @@ by ~1.7 pp, not to 96%. A position-chosen grid over 1110-1270k reads **84.06%**,
 the same region's selected rows, and one point in it (**1140k**) reads **12.0%**: the high-perfect
 stretch on the right of this chart is **not** the plateau the close-out implied. `pooled_equal_effort`
 **82.42%** is unaffected and is still a record. See
-[`completedRuns.md`](completedRuns.md#-the-close-out-b17b-is-the-best-policy-this-project-has-measured-by-a-clear-margin).
+[`completedRuns.md`](../completedRuns.md#-the-close-out-b17b-is-the-best-policy-this-project-has-measured-by-a-clear-margin).
 
 ### b17d-forkseed4 — forking on, disc 0.9975 + shield 0.8, seed 4
 
-![b17d](charts/b17d-forkseed4.png)
+![b17d](../charts/b17d-forkseed4.png)
 
 Step 1.51M · peak trailing 94.60 (at 1007k) · best 30-eval perfect 75.7% (at **679k**) · `strong_eval_fraction` 20.7% · recent-30 68.3%
 
@@ -70,7 +248,7 @@ Fastest starter of the batch (pf30 ≥ 40% at 329k) and its best window came ear
 
 ### b17c-forkseed3 — forking on, disc 0.9975 + shield 0.8, seed 3
 
-![b17c](charts/b17c-forkseed3.png)
+![b17c](../charts/b17c-forkseed3.png)
 
 Step 1.52M · peak trailing 94.78 (at **1386k**) · best 30-eval perfect 82.0% (at **1388k**) · `strong_eval_fraction` 16.4% · recent-30 73.3%
 
@@ -80,7 +258,7 @@ steps, and its `sef` went 6.7% → 16.4% over the last 500k. Also carries the ba
 
 ### b17a-forkseed1 — forking on, disc 0.9975 + shield 0.8, seed 1
 
-![b17a](charts/b17a-forkseed1.png)
+![b17a](../charts/b17a-forkseed1.png)
 
 Step 1.41M · peak trailing 93.86 (at 1144k) · best 30-eval perfect 54.0% (at 1166k) · `strong_eval_fraction` **1.4%** · recent-30 26.7%
 
@@ -99,7 +277,7 @@ their *left* halves: the level metrics below (`strong_eval_fraction`, best-30) s
 horizon than the batches beneath and are **not comparable to them at face value** — the comparison that
 is valid truncates batch 14 to the same 1.25M, and doing that makes this **the first non-null in six
 batches**. Closed out at `EVAL_MIN_ACHIEVABLE=95`; full write-up in
-[`completedRuns.md`](completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches).
+[`completedRuns.md`](../completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches).
 
 **The ceiling did not move — a sixth flat result.** Peak trailing across the four arms reads
 94.98 / 94.82 / 94.68 / 94.36, mean **94.71**, inside 0.3 pp of the 94.8-95.0 band the previous five
@@ -120,7 +298,7 @@ variance. Four samples cannot establish that; it is a hypothesis for the wider d
 
 ### b16b-noshapeseed2 — shaping off, disc 0.9975 + shield 0.8, seed 2
 
-![b16b](charts/b16b-noshapeseed2.png)
+![b16b](../charts/b16b-noshapeseed2.png)
 
 Step 1.26M · **peak trailing 94.98** (at 816k) · best 30-eval perfect 85.0% (at 919k) · `strong_eval_fraction` **30.7%** · recent-30 79.0%
 
@@ -130,7 +308,7 @@ close-out is what settles level.
 
 ### b16a-noshapeseed1 — shaping off, disc 0.9975 + shield 0.8, seed 1
 
-![b16a](charts/b16a-noshapeseed1.png)
+![b16a](../charts/b16a-noshapeseed1.png)
 
 Step 1.25M · peak trailing 94.82 (at 837k) · **best 30-eval perfect 87.0%** (at 850k) · `strong_eval_fraction` 20.6% · recent-30 77.0%
 
@@ -139,7 +317,7 @@ it has plateaued since. Solid but unremarkable.
 
 ### b16c-noshapeseed3 — shaping off, disc 0.9975 + shield 0.8, seed 3
 
-![b16c](charts/b16c-noshapeseed3.png)
+![b16c](../charts/b16c-noshapeseed3.png)
 
 Step 1.26M · peak trailing 94.36 (at **1198k**) · best 30-eval perfect 72.7% (at 1221k) · `strong_eval_fraction` 10.6% · recent-30 67.0%
 
@@ -149,7 +327,7 @@ what dragged its `sef` down despite a normal peak.
 
 ### b16d-noshapeseed4 — shaping off, disc 0.9975 + shield 0.8, seed 4
 
-![b16d](charts/b16d-noshapeseed4.png)
+![b16d](../charts/b16d-noshapeseed4.png)
 
 Step 1.26M · peak trailing 94.68 (at 946k) · best 30-eval perfect 73.0% (at 1032k) · `strong_eval_fraction` **7.2%** · recent-30 **55.7%**
 
@@ -164,7 +342,7 @@ was faster credit propagation, and **the pre-registered metric moved the wrong w
 pf30 ≥ 40% came out **128k later** than batch 14's control, 3 of 4 seeds slower (p=0.250). The evals
 agree it is a null — best checkpoint +0.05 pp (p=1.000), `pooled_equal_effort` +2.24 pp (p=0.625).
 Full write-up:
-[`completedRuns.md`](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).
+[`completedRuns.md`](batches12-15.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).
 
 **Read these four charts for their right-hand halves, which no earlier batch has.** Two arms were
 still gaining in their final 500k band at 5.5-6.0M, and `b15d`'s peak trailing score is at its
@@ -186,7 +364,7 @@ higher peak.
 
 ### b15a-nstep3seed1 — n=3, disc 0.995 + shield 0.8, seed 1
 
-![b15a](charts/b15a-nstep3seed1.png)
+![b15a](../charts/b15a-nstep3seed1.png)
 
 Step 5.79M · **peak trailing 95.00** (at 4716k) · **best 30-eval perfect 89.7%** (at 4705k) · `strong_eval_fraction` **39.9%** · final band 80.6%
 
@@ -202,7 +380,7 @@ earlier arm has** — a slow, monotone climb that had not turned over by 5.8M.
 
 ### b15b-nstep3seed2 — n=3, disc 0.995 + shield 0.8, seed 2
 
-![b15b](charts/b15b-nstep3seed2.png)
+![b15b](../charts/b15b-nstep3seed2.png)
 
 Step 5.75M · peak trailing 94.94 (at 4524k) · best 30-eval perfect 89.3% (at 4595k) · `strong_eval_fraction` 39.0% · final band 62.3%
 
@@ -223,7 +401,7 @@ Held 78% mean perfect across **four** consecutive bands from 3.0M to 5.0M (78.1 
 
 ### b15d-nstep3seed4 — n=3, disc 0.995 + shield 0.8, seed 4
 
-![b15d](charts/b15d-nstep3seed4.png)
+![b15d](../charts/b15d-nstep3seed4.png)
 
 Step 5.81M · peak trailing 94.70 (at **5799k**) · best 30-eval perfect 86.3% (at 3687k) · `strong_eval_fraction` 33.8% · final band **75.8%**
 
@@ -234,7 +412,7 @@ was finished.
 
 ### b15c-nstep3seed3 — n=3, disc 0.995 + shield 0.8, seed 3
 
-![b15c](charts/b15c-nstep3seed3.png)
+![b15c](../charts/b15c-nstep3seed3.png)
 
 Step 5.46M · peak trailing 94.38 (at 3808k) · best 30-eval perfect 75.7% (at 2046k) · `strong_eval_fraction` **9.4%** · final band 53.7%
 
@@ -256,7 +434,7 @@ this becomes the normal case rather than the exception.
 Four seeds run to 4.1-4.5M, the longest arms on the current vector. **Null against batch 13 on every
 metric** — `pooled_equal_effort` 72.08% against 72.07%, best checkpoint +2.8 pp at p=1.000, and
 `strong_eval_fraction` +2.1 pp with per-seed diffs from -16.2 to +24.8. Full write-up:
-[`completedRuns.md`](../completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet).
+[`completedRuns.md`](batches12-15.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet).
 
 **The one result worth keeping is a chart-shape result, and it is about horizon.** Two arms produced
 their best window past 3.5M and `b14c` was still climbing when stopped — which is why the step cap
@@ -410,7 +588,7 @@ an exploration tax on the measurement.
 
 **`strong_eval_fraction` is 0.0% in all four arms**, against 25.2 / 30.5 / 0.0 / 8.2% for batch 11
 at the same 1M steps. The mechanism, the fix, and the two wrong turns taken diagnosing it are in
-[`completedRuns.md`](../completedRuns.md#-the-new-schedule-deadlocks-all-four-arms-are-failing-44-at-1m-steps). These
+[`completedRuns.md`](batches12-15.md#-the-new-schedule-deadlocks-all-four-arms-are-failing-44-at-1m-steps). These
 arms are kept as the measured cost of sitting at epsilon 0.05: not a wasted batch, a negative
 result with four seeds behind it.
 

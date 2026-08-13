@@ -52,9 +52,10 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
-| **Architecture does not raise the ceiling** — 5 shapes against a seed-matched control at 3M, depths 1-5, 9× param range | **measured 2026-08-10**, batch 20. At and above the control's capacity (`320` depth-1, `200,50`, `200,100,50` at 2.66×) peak trailing stays 94.4-94.9, no full-length row under gate 95. See below |
+| **Architecture does not raise the ceiling** — **all 9 shapes** against a seed-matched control at 3M, depths 1-5, **12.7× param range** | **complete 2026-08-12**, batch 20. Peak trailing spans 93.75-94.69 across the whole range and **no shape produced a single full-length row under gate 95**. `FC_LAYERS` is closed as a tuning direction. See below |
 | **Capacity binds only *below* the control** — knee between 0.29× and 0.55× | **established** — `25,50,25` at 0.29× is the first shape to move the ceiling, and **down**: peak −0.69, pooled −11.9, **4/4 seeds worse, p 0.125**. `60,30,30,30,30` at 0.55× still holds it (−0.18, p 0.375) |
 | A wider or wide-early net raises consolidation (`best-30`, pooled) | **not supported** — the apparent edges are **1 of 4** seeds for `200,50` (p=1.000) and **2-3 of 4** for `200,100,50`/`320` (p ≥ 0.25), carried by the control's weak seeds. Sub-capacity nets also forget ~2× more (drawdown 11-12 vs 5.4) |
+| **‡ Two nets of the same size straddle the control by 18.8 pp on pooled** | **established 2026-08-12** — `100,50,50` 46.3% and `320` 65.1% differ by 0.3% in params. The consolidation columns in batch 20 measure seed draw, not architecture; a ~10 pp pooled gap at n=4 is indistinguishable from an iso-capacity relabelling |
 | **‡ Batch 20's control seed spread is wider than any between-shape gap it measured** | **established** — control `sef` spans 0.2-26.3%, pooled 33.2-71.3%. At n=4 this design cannot see an architecture effect smaller than that |
 | **Removing the food-distance shaping raises how long an arm stays good** | **the first non-null in six batches** — batch 16 `sef` +11.35 pp at a matched 1.25M (p=0.250) and `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). **Needs replication**; see below |
 | `DISCOUNT=0.995` matches the best ceiling and survives 3 of 3 seeds | **measured**, ~2.3x expected value |
@@ -114,29 +115,36 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 ---
 
-## Network shape: five shapes measured — the ceiling is capacity-bounded below ~0.55×, and architecture never raises it
+## Network shape: the sweep is complete — nine shapes, and architecture never raises the ceiling
 
 `FC_LAYERS` sat at `(50, 100, 50)` from batch 1 to batch 19 with no measurement behind it. Batch 20 is
-the first test — five shapes spanning a **9× parameter range and depths 1-5**, each against the same
-seed-matched control at a matched 3M under β=300k, closed out under gate 95:
+the first test, and it is now **finished**: nine shapes spanning a **12.7× parameter range and depths
+1-5**, each against the same seed-matched control at a matched 3M under β=300k, closed out under gate 95:
 
 | shape | params | vs control | depth | peak trailing | `sef` | best-30 | pooled | drawdown |
 |---|---|---|---|---|---|---|---|---|
 | `25,50,25` (small) | 3,428 | **0.29×** | 3 | **93.75** | 2.1% | 52.8% | 43.1% | 11.13 |
 | `60,30,30,30,30` (deep-narrow) | 6,573 | 0.55× | **5** | 94.25 | 4.7% | 59.3% | 51.6% | 12.31 |
+| `100,50,50` (reshuffle) | 10,853 | 0.92× | 3 | 94.16 | 1.9% | 51.2% | 46.3% | 6.35 |
 | `320` (depth-1) | 10,883 | 0.92× | **1** | 94.67 | 16.5% | 74.7% | 65.1% | 7.44 |
-| `50,100,50` (control) | 11,853 | 1.00× | 3 | 94.44 | 11.2% | 64.0% | 55.0% | 5.41 |
-| `200,50` (wide-early) | 16,403 | 1.38× | 2 | 94.55 | 8.60% | 67.4% | 59.3% | 8.56 |
-| `200,100,50` (capacity) | 31,503 | **2.66×** | 3 | 94.70 | 12.9% | 71.4% | 64.6% | 8.31 |
+| `50,100,50` (control) | 11,853 | 1.00× | 3 | 94.44 | 11.2% | 64.0% | 55.0% | 5.42 |
+| `93,93` (iso-param depth-2) | 11,907 | 1.00× | 2 | 94.41 | 6.7% | 61.4% | 51.5% | 6.60 |
+| `200,50` (wide-early) | 16,403 | 1.38× | 2 | 94.56 | 8.6% | 67.4% | 59.3% | 8.56 |
+| `200,100,50` (capacity) | 31,503 | **2.66×** | 3 | 94.69 | 12.8% | 71.4% | 64.6% | 8.31 |
+| `100,200,100` (escalation) | 43,703 | **3.69×** | 3 | 94.61 | 16.6% | 71.3% | 63.4% | 7.83 |
 
-**Two conclusions, both firm across the sweep:**
+**Peak trailing spans 93.75-94.69 across a 12.7× parameter range.** Every shape at or above 0.55× sits
+inside the 94.16-94.69 band; the sole shape to leave it does so downward. That is the whole architecture
+result in one line.
+
+**Three conclusions, all firm across the sweep:**
 
 1. **Architecture does not raise the ceiling.** At and above the control's capacity — `320` (depth 1),
-   `200,50` (depth 2), `200,100,50` (2.66× capacity) — peak trailing stays inside the 94.4-95.0 band every
-   batch since 11 has held, and no shape produced a single full-length row under gate 95. Removing all
-   depth (`320`, depth 1) cost nothing; adding 2.66× capacity bought nothing. Where the consolidation
-   columns tick up (`320`, `200,100,50`) the paired per-seed differences are seed-driven noise straddling
-   zero (p ≥ 0.25, 3-4 of 4 seeds but carried by the control's weak seeds 1 and 3), never a real effect.
+   `93,93` (depth 2), `200,50` (depth 2), `200,100,50` (2.66×), `100,200,100` (3.69×) — peak trailing stays
+   inside the band every batch since 11 has held, and **not one of the nine shapes produced a single
+   full-length row under gate 95**. Removing all depth cost nothing; 3.69× capacity bought nothing. Where
+   the consolidation columns tick up the paired per-seed differences are seed-driven noise straddling zero
+   (p ≥ 0.25, 2-3 of 4 seeds, carried by the control's weak seeds 1 and 3), never a real effect.
 
 2. **Capacity binds only *below* the control, with a knee between 0.29× and 0.55×.** `25,50,25` at 0.29×
    is the first shape in the batch to move the ceiling, and it moves it **down** — peak −0.69, `sef` −9.1,
@@ -144,6 +152,15 @@ seed-matched control at a matched 3M under β=300k, closed out under gate 95:
    is the cleanest directional result batch 20 produced. `60,30,30,30,30` at 0.55× still holds the ceiling
    (peak −0.18, p 0.375), so the knee sits between the two — the net stops being able to reach the control's
    ceiling somewhere under 0.55× the parameters.
+
+3. **‡ The consolidation columns are noise, and the sweep now prices that directly.** `100,50,50` and
+   `320` differ in capacity by **0.3%** (10,853 vs 10,883 params) and land on **pooled 46.3% and 65.1%** —
+   an 18.8 pp spread that **brackets the control from both sides**. Two nets of the same size disagree by
+   more than any shape disagrees with the control, so `sef`/best-30/pooled across this batch are measuring
+   seed draw, not architecture. This is the independent confirmation of the per-seed downgrades already
+   applied to `320` (+10.1) and `200,100,50` (+9.6), and it is why the batch's verdict rests on peak
+   trailing and drawdown. **The corollary is a warning for future batches: a ~10 pp pooled gap at n=4 in
+   this design is indistinguishable from an iso-capacity relabelling.**
 
 **Depth costs steadiness below capacity.** Both sub-capacity shapes forget about twice as much as the
 control (drawdown 11-12 vs 5.4), and the deep-narrow `60,30,30,30,30` is worst — worse on all four seeds,
@@ -156,8 +173,10 @@ enough capacity.
 span `sef` **0.2-26.3%** and pooled **33.2-71.3%** — a spread larger than any between-shape gap among the
 shapes at or above the control's capacity. An architecture effect there has to exceed the control's seed
 variance before n=4 can see it, and none does. The only shapes that cleared that bar are the two that
-*under*-provision capacity, and they clear it by getting worse. **Keep `50,100,50`**: nothing raised the
-ceiling and the smaller nets lowered it.
+*under*-provision capacity, and they clear it by getting worse. **Keep `50,100,50`**: nine shapes, none
+raised the ceiling, and the smaller nets lowered it. **`FC_LAYERS` is closed as a tuning direction** —
+the constraint is elsewhere, which is what the β ladder (batches 21-23) went after next and where it
+found real movement in consolidation.
 
 ## The food-distance shaping was a drag on consistency — the first signal in six batches
 
@@ -273,7 +292,7 @@ The ceiling claim made for it originally would have been wrong — `0.9975` beat
 Batch 14 ran 0.9975 against batch 13's 0.995 at n=4 paired and came back null on every metric that
 survives its abandonment gate — `pooled_equal_effort` **72.08% against 72.07%**, best checkpoint
 +2.75 pp at p=1.000, `best_perfect30` +1.08 pp at p=0.625. Write-up:
-[`completedRuns.md`](completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet).
+[`completedRuns.md`](archive/batches12-15.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet).
 
 That closes the question batch 9 left open at n=2, and it closes it against a specific hypothesis
 worth recording as dead: **the 2026-08-03 endgame observations do not need a longer horizon to be
@@ -1295,7 +1314,7 @@ exponent. See
 [above](#-the-gap-is-decided-before-the-last-move-not-at-it).
 
 Design and full numbers in
-[`completedRuns.md`](completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).
+[`completedRuns.md`](archive/batches12-15.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93).
 The checkpoint evals agree: best checkpoint +0.05 pp at p=1.000, `pooled_equal_effort` +2.24 pp at
 p=0.625.
 

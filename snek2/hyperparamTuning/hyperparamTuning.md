@@ -553,6 +553,19 @@ lines, which is still readable end to end. The archive is history only and is ne
 normal work, so nothing is lost by moving a section there — the live file is the one that has to stay
 short enough to actually be read.
 
+**`completedRuns.md` needs the same treatment, less often.** Its narratives grow ~60-100 lines a batch
+and it passed 1,700 lines on 2026-08-12. When that happens, retire the **oldest batch narratives** to
+`archive/batches<N>-<M>.md` — batches 1-11 and 12-15 are already there — and keep roughly **batch 16
+onward live**. Two rules: **the canonical arm table never moves** (it is one row per arm and is the
+thing every other doc cites), and the retired file gets the same `../` link repair plus a check of
+everything that linked *into* the moved sections. `findings.md` and both archive files linked into the
+batch 12-15 narratives, and all nine of those links broke silently on the move.
+
+**Verify links by resolving them, not by reading them.** Slugs with `β`, `→`, `0.1` or `≥` in the
+heading are impossible to get right by hand — three of the ones written on 2026-08-12 were wrong on the
+first try. Resolve every `](target#anchor)` in the tuning docs against the actual headings after any
+move; a wrong anchor renders as ordinary link text and never errors.
+
 ### Launching a run
 
 Hyperparameters are overridden through `SNEK_*` environment variables, read by

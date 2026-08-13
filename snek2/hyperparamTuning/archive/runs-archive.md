@@ -265,10 +265,10 @@ are in [`completedRuns.md`](../completedRuns.md):
 | **18** | `TARGET_UPDATE_PERIOD` 8 -> **1000** | **the primary metric moved** — 102k faster to pf30 >= 40%, **4/4 seeds** (p=0.125), and drawdown *improved* 20.8 points against a pre-registered risk that it would worsen. Levels +6.7 pp but not separating. Close-out pending |
 | [**17**](../completedRuns.md#batch-17--forked-endgame-collection-a-null-that-produced-the-project-record) | `SNEK_FORK_BRANCHES=4` — forked endgame collection | **null on the config, record on one arm** — `sef` -1.67 pp (p=0.875) and eq-effort -5.02 pp, both dragged entirely by `b17a`; the other three seeds are **+3.3 to +3.7 pp on eq-effort, 3/3**. And `b17b` produced **99/100 @1205k with a 96.2% region**, the best policy ever measured here |
 | [**16**](../completedRuns.md#batch-16--the-food-distance-shaping-ablated-the-first-non-null-in-six-batches) | `FOOD_DISTANCE_REWARD=0` | **the first signal** — `sef` +11.35 pp at a matched 1.25M (p=0.250), `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). Consolidation, not speed or ceiling. Needs replication |
-| [15](../completedRuns.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
-| [14](../completedRuns.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
-| [13](../completedRuns.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
-| [12](../completedRuns.md#batch-12--the-deadlock-abandoned-at-1m-of-25m) | eps handover 0.05 | **deadlocked**, abandoned 4/4 |
+| [15](batches12-15.md#batch-15--n_step_update3-falsified-on-speed-null-on-level-and-a-97100-that-is-really-93) | `N_STEP_UPDATE=3` | **falsified on speed** — 128k slower to pf30 ≥ 40%; evals null, best ckpt +0.05 pp |
+| [14](batches12-15.md#batch-14--disc-09975-at-guided-08-and-the-widest-seed-spread-yet) | `DISCOUNT=0.9975`, `GUIDED_FRACTION=0.8` | null vs 13; `pooled_equal_effort` +0.01 pp |
+| [13](batches12-15.md#batch-13--the-epsilon-rewrite-plus-the-exploration-shield-an-exact-null) | eps handover 0.0125 + shield 0.5 | null vs 11 on five metrics |
+| [12](batches12-15.md#batch-12--the-deadlock-abandoned-at-1m-of-25m) | eps handover 0.05 | **deadlocked**, abandoned 4/4 |
 | [11](batches1-11.md#batch-11--the-same-config-on-the-30-value-vector-no-significant-difference) | the 30-value vector itself | +4 to +5 pp vs batch 10, not significant |
 
 **The 0.995 baseline now has n=8** (batches 11 + 13), and batch 14 adds n=4 at 0.9975 that is indistinguishable from it.
@@ -382,7 +382,7 @@ window), against 0 violations in 400k pairs from three unforked arms.
 
 **Ran 2026-08-08 00:50 to 09:04, four arms `b18a`-`b18d` at seeds 1-4, stopped by hand at
 2.40-2.61M.** Charts in
-[`charts.md`](../charts.md#batch-18--target_update_period1000-forking-retained-stopped-at-240-261m);
+[`charts-archive.md`](charts-archive.md#batch-18--target_update_period1000-forking-retained-stopped-at-240-261m);
 close-out evals started 2026-08-08 11:5x. Designed 2026-08-07 and swapped behind the forking batch so
 the branching idea got measured first.
 
