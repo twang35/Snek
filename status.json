@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-13T10:49:34",
-  "ts": 1786643374.3091767,
+  "iso": "2026-08-13T10:50:09",
+  "ts": 1786643409.0353785,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,18 +18,9 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 2
+    "eval": 1
   },
   "running": [
-    {
-      "id": "b24b-fc320noisseed2-hof500",
-      "type": "eval",
-      "policy": "b24b-fc320noisseed2",
-      "pid": 3192690,
-      "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 6252
-    },
     {
       "id": "b24d-fc320noisseed4-hof500",
       "type": "eval",
@@ -37,7 +28,7 @@
       "pid": 3192692,
       "step": 3000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 6252
+      "elapsed_s": 6287
     }
   ],
   "ledger": {
@@ -133,7 +124,7 @@
     "b25c-fc200x100x100noisseed3": "failed",
     "b25d-fc200x100x100noisseed4": "failed",
     "b24a-fc320noisseed1-hof500": "done",
-    "b24b-fc320noisseed2-hof500": "running",
+    "b24b-fc320noisseed2-hof500": "done",
     "b24c-fc320noisseed3-hof500": "done",
     "b24d-fc320noisseed4-hof500": "running",
     "b25a-fc200x100x100noisseed1-r2": "queued",
@@ -155,8 +146,8 @@
   },
   "disk_free_gb": 150.0,
   "load_avg": [
-    8.60009765625,
-    8.62939453125,
-    10.92578125
+    7.3134765625,
+    8.33056640625,
+    10.74072265625
   ]
 }
