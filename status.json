@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-13T09:04:49",
-  "ts": 1786637089.6880417,
+  "iso": "2026-08-13T09:05:22",
+  "ts": 1786637122.3627095,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,45 +17,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
-    "eval": 0
+    "trainer": 0,
+    "eval": 4
   },
   "running": [
     {
-      "id": "b25a-fc200x100x100noisseed1",
-      "type": "train",
-      "policy": "b25a-fc200x100x100noisseed1",
-      "pid": 3167665,
-      "step": 137000,
-      "steps_per_sec": 61.1,
-      "elapsed_s": 1705
+      "id": "b24a-fc320noisseed1-hof500",
+      "type": "eval",
+      "policy": "b24a-fc320noisseed1",
+      "pid": 3192689,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
-      "id": "b25b-fc200x100x100noisseed2",
-      "type": "train",
-      "policy": "b25b-fc200x100x100noisseed2",
-      "pid": 3167666,
-      "step": 144000,
-      "steps_per_sec": 61.1,
-      "elapsed_s": 1705
+      "id": "b24b-fc320noisseed2-hof500",
+      "type": "eval",
+      "policy": "b24b-fc320noisseed2",
+      "pid": 3192690,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
-      "id": "b25c-fc200x100x100noisseed3",
-      "type": "train",
-      "policy": "b25c-fc200x100x100noisseed3",
-      "pid": 3167667,
-      "step": 136000,
-      "steps_per_sec": 91.6,
-      "elapsed_s": 1705
+      "id": "b24c-fc320noisseed3-hof500",
+      "type": "eval",
+      "policy": "b24c-fc320noisseed3",
+      "pid": 3192691,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
-      "id": "b25d-fc200x100x100noisseed4",
-      "type": "train",
-      "policy": "b25d-fc200x100x100noisseed4",
-      "pid": 3167668,
-      "step": 143000,
-      "steps_per_sec": 91.6,
-      "elapsed_s": 1705
+      "id": "b24d-fc320noisseed4-hof500",
+      "type": "eval",
+      "policy": "b24d-fc320noisseed4",
+      "pid": 3192692,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -146,18 +146,14 @@
     "b24b-fc320noisseed2-closeout": "done",
     "b24c-fc320noisseed3-closeout": "done",
     "b24d-fc320noisseed4-closeout": "done",
-    "b25a-fc200x100x100noisseed1": "running",
-    "b25b-fc200x100x100noisseed2": "running",
-    "b25c-fc200x100x100noisseed3": "running",
-    "b25d-fc200x100x100noisseed4": "running",
-    "b24a-fc320noisseed1-hof500": "queued",
-    "b24b-fc320noisseed2-hof500": "queued",
-    "b24c-fc320noisseed3-hof500": "queued",
-    "b24d-fc320noisseed4-hof500": "queued",
-    "b25a-fc200x100x100noisseed1-closeout": "queued",
-    "b25b-fc200x100x100noisseed2-closeout": "queued",
-    "b25c-fc200x100x100noisseed3-closeout": "queued",
-    "b25d-fc200x100x100noisseed4-closeout": "queued",
+    "b25a-fc200x100x100noisseed1": "failed",
+    "b25b-fc200x100x100noisseed2": "failed",
+    "b25c-fc200x100x100noisseed3": "failed",
+    "b25d-fc200x100x100noisseed4": "failed",
+    "b24a-fc320noisseed1-hof500": "running",
+    "b24b-fc320noisseed2-hof500": "running",
+    "b24c-fc320noisseed3-hof500": "running",
+    "b24d-fc320noisseed4-hof500": "running",
     "b25a-fc200x100x100noisseed1-r2": "queued",
     "b25b-fc200x100x100noisseed2-r2": "queued",
     "b25c-fc200x100x100noisseed3-r2": "queued",
@@ -177,8 +173,8 @@
   },
   "disk_free_gb": 150.1,
   "load_avg": [
-    7.5966796875,
-    8.380859375,
-    7.9482421875
+    6.50634765625,
+    8.03515625,
+    7.84814453125
   ]
 }
