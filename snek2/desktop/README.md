@@ -149,6 +149,54 @@ at `results/`** — `refresh_charts.sh` globs `runs/*.png` only, so a job left i
 [charts checklist](../hyperparamTuning/hyperparamTuning.md#when-you-stop-a-batch-of-arms)
 exists to prevent.
 
+## Deploying a code change to the desktop
+
+The daemon runs `runner.runner` from the **`master` checkout** at `/home/claw/Snek`. So code
+reaches the box the same way results come back — through git, not scp.
+
+```bash
+# laptop: push the commit
+git push origin master
+
+# desktop: fast-forward the checkout, then confirm HEAD moved
+ssh -i ~/.ssh/snek_desktop claw@the-claw-den
+cd /home/claw/Snek
+git fetch origin master && git merge --ff-only origin/master
+git log --oneline -1
+```
+
+**Restart only for daemon code.** A change under `runner/` needs
+`sudo systemctl restart snek-runner` (passwordless) to take effect. The restart is safe for
+running jobs — the unit is `KillMode=process` and jobs are detached and re-adopted from the
+ledger, so no trainer or eval dies. A change to trainer/eval code (`snek2.py`,
+`under_the_hood.py`, a `SNEK_*` default) needs **no restart**: each job is a fresh process that
+reads the on-disk code at launch. **A job already running keeps the old code** until it stops;
+the next job gets the change.
+
+### The fast-forward often aborts — two collisions, both lossless to fix
+
+The desktop writes `runs/<policy>*` artifacts, and the laptop later commits the same files to
+`master`. So the incoming commit and the desktop working tree hold the same paths, and the
+merge stops. **Remove or stash a file only after you show it is byte-identical to the incoming
+version. Back up any that differ — that is real run data.**
+
+- **"untracked working tree files would be overwritten"** — the desktop copy is *untracked*;
+  the commit adds it as *tracked*. Per path, confirm identical, then remove:
+  ```bash
+  git show origin/master:"$f" | cmp -s - "$f" && rm "$f"   # silent = identical
+  ```
+- **"local changes would be overwritten by merge"** — the path is *tracked* and the desktop
+  wrote a fuller version than its HEAD held (e.g. an eval file grown to the 3M-step cap). If the
+  working copy already matches the incoming bytes, stash it (recoverable) and merge:
+  ```bash
+  git show origin/master:"$f" | cmp -s - "$f"              # confirm identical first
+  git stash push -m backup -- "$f" && git merge --ff-only origin/master
+  ```
+
+**`| tail` hides a failed merge.** A pipe drops the command's exit code, so a scripted deploy
+sails past an abort and restarts the daemon on the *old* code. Read `git log --oneline -1` after
+the merge — do not trust piped output.
+
 ## Job spec
 
 ```json
