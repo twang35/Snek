@@ -1,0 +1,23 @@
+{
+  "id": "b25b-fc200x100x100noisseed2-r2",
+  "type": "train",
+  "policy": "b25b-fc200x100x100noisseed2-r2",
+  "env": {
+    "SNEK_FC_LAYERS": "200,100,100",
+    "SNEK_PRIORITY_SIGNAL": "td_error",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_PRIORITY_EXPONENT": "0.6",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60",
+    "SNEK_SEED": "2"
+  },
+  "max_steps": 3000000,
+  "priority": 210,
+  "notes": "batch 25 RE-RUN from scratch (fresh -r2 policy name, new dir). The first b25 attempt was killed at ~112k so the b24 HOF-500 evals (priority 8) could run first; those must not train the partial. Identical config to the original b25 / b24 (b22 config, importance sampling OFF, fc 200,100,100). priority 210 keeps b25 ahead of b26 (220) and behind the HOF evals."
+}
