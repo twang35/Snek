@@ -1,0 +1,23 @@
+{
+  "id": "b26b-fc100x100noisseed2",
+  "type": "train",
+  "policy": "b26b-fc100x100noisseed2",
+  "env": {
+    "SNEK_FC_LAYERS": "100,100",
+    "SNEK_PRIORITY_SIGNAL": "td_error",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_PRIORITY_EXPONENT": "0.6",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_GUIDED_FRACTION": "0.8",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_FORK_PROB": "0.5",
+    "SNEK_FORK_MIN_LENGTH": "85",
+    "SNEK_FORK_MAX_STEPS": "60",
+    "SNEK_SEED": "2"
+  },
+  "max_steps": 3000000,
+  "priority": 220,
+  "notes": "batch 26: the b22/b24 config -- td_error priority (alpha 0.6), importance sampling OFF (SNEK_IS_WEIGHTS=0), target 1000, discount 0.9975, guided 0.8, fork 4/0.5/85/60, food-distance off -- but with fc 100,100 in place of 50,100,50 (b22) / 320 (b24) / 200,100,100 (b25). Continues the FC-width-under-IS-off sweep at a two-layer 100,100 shape. Seeds 1-4 match b22/b24/b25. priority 220: queues behind b24 and b25. Auto-closeout runs after the wave drains. Any eval/watch.py rebuilds the net from arch.json, so no SNEK_FC_LAYERS needed."
+}
