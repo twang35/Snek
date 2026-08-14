@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-13T20:52:27",
-  "ts": 1786679547.460984,
+  "iso": "2026-08-13T20:52:36",
+  "ts": 1786679556.2783358,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -13,7 +13,8 @@
     "paused": false,
     "drain": false,
     "viewer": true,
-    "auto_closeout": true
+    "auto_closeout": true,
+    "auto_hof": true
   },
   "config_notes": [],
   "counts": {
@@ -27,8 +28,8 @@
       "policy": "b25a-fc200x100x100noisseed1-r2",
       "pid": 3768258,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1318
+      "steps_per_sec": null,
+      "elapsed_s": 1327
     },
     {
       "id": "b25b-fc200x100x100noisseed2-r2-closeout",
@@ -36,8 +37,8 @@
       "policy": "b25b-fc200x100x100noisseed2-r2",
       "pid": 3768259,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1318
+      "steps_per_sec": null,
+      "elapsed_s": 1327
     },
     {
       "id": "b25c-fc200x100x100noisseed3-r2-closeout",
@@ -45,8 +46,8 @@
       "policy": "b25c-fc200x100x100noisseed3-r2",
       "pid": 3768260,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1318
+      "steps_per_sec": null,
+      "elapsed_s": 1327
     },
     {
       "id": "b25d-fc200x100x100noisseed4-r2-closeout",
@@ -54,8 +55,8 @@
       "policy": "b25d-fc200x100x100noisseed4-r2",
       "pid": 3768261,
       "step": 3000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1318
+      "steps_per_sec": null,
+      "elapsed_s": 1327
     }
   ],
   "ledger": {
@@ -162,6 +163,10 @@
     "b25b-fc200x100x100noisseed2-r2-closeout": "running",
     "b25c-fc200x100x100noisseed3-r2-closeout": "running",
     "b25d-fc200x100x100noisseed4-r2-closeout": "running",
+    "b25a-fc200x100x100noisseed1-r2-hof": "queued",
+    "b25b-fc200x100x100noisseed2-r2-hof": "queued",
+    "b25c-fc200x100x100noisseed3-r2-hof": "queued",
+    "b25d-fc200x100x100noisseed4-r2-hof": "queued",
     "b26a-fc100x100noisseed1": "queued",
     "b26b-fc100x100noisseed2": "queued",
     "b26c-fc100x100noisseed3": "queued",
@@ -169,12 +174,16 @@
     "b26a-fc100x100noisseed1-closeout": "queued",
     "b26b-fc100x100noisseed2-closeout": "queued",
     "b26c-fc100x100noisseed3-closeout": "queued",
-    "b26d-fc100x100noisseed4-closeout": "queued"
+    "b26d-fc100x100noisseed4-closeout": "queued",
+    "b26a-fc100x100noisseed1-hof": "queued",
+    "b26b-fc100x100noisseed2-hof": "queued",
+    "b26c-fc100x100noisseed3-hof": "queued",
+    "b26d-fc100x100noisseed4-hof": "queued"
   },
   "disk_free_gb": 143.1,
   "load_avg": [
-    18.82080078125,
-    18.87744140625,
-    15.88427734375
+    18.8486328125,
+    18.88232421875,
+    15.91845703125
   ]
 }
