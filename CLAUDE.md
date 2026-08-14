@@ -53,6 +53,27 @@ moment a commit also touches code, config, or anything that changes program beha
 change reverts to the code rule above and waits for approval. Chart images that accompany a
 `charts.md` edit ride along with the docs commit.
 
+**Diagnostics and tests: commit and push without waiting** (standing authorization, 2026-08-14, for
+the stated reason that the user does not read these diffs). Two directories plus one file pattern:
+
+| path | why it is safe to push unreviewed |
+|---|---|
+| `snek2/hyperparamTuning/perDiagnostics/*.py` | measurement only; nothing in the training, eval or watch path imports them |
+| `snek2/hyperparamTuning/diagnostics/*.py` | same, and frozen besides |
+| `snek2/tests/*.py` | assertions about behaviour, never behaviour |
+
+**The same only-if rule applies, and it is the important half.** A commit qualifies only when it
+touches *nothing else*. A test that arrives alongside the change it pins — which is the normal case,
+since CLAUDE.md asks for a test in the same pass as the logic — is part of a **code** change and
+waits with it. So the split is: a diagnostic or a test written to *measure or pin existing*
+behaviour goes straight up; a test written for behaviour being changed in the same working tree does
+not.
+
+Two things this does not license. A diagnostic still may not write into anything in the
+never-delete table below, and a **new** script gets its row in
+[`perDiagnostics/README.md`](snek2/hyperparamTuning/perDiagnostics/README.md) in the same push —
+an undocumented tool is how `refresh_charts.sh` drifted to 12 undocumented arms.
+
 Read-only git commands are fine at any time.
 
 ## Training runs
