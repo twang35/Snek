@@ -38,13 +38,22 @@ Reserve `conda run` for short one-shot commands where only the final output matt
 
 ## Git workflow
 
-**Leave finished work uncommitted.** Do not `git commit`, `git push` or even `git add` until the
-user explicitly approves *that* change — "push" or "commit this" is the go-ahead and applies only
-to the change in front of you. The reason is review: the user reads diffs in their editor, and
-committing or staging moves the change out of the working tree where it is visible.
+**Code: leave finished work uncommitted.** Do not `git commit`, `git push` or even `git add` a
+**code** change until the user explicitly approves *that* change — "push" or "commit this" is the
+go-ahead and applies only to the change in front of you. The reason is review: the user reads diffs
+in their editor, and committing or staging moves the change out of the working tree where it is
+visible. So the loop for code is: make the edit, describe what changed, stop and wait.
 
-So the loop is: make the edit, describe what changed, stop and wait. Read-only git commands are
-fine at any time.
+**Documentation and instructions: commit and push without waiting** (standing authorization,
+2026-08-14). Any change that is *only* Markdown — `CLAUDE.md`, the tuning docs (`runs.md`,
+`charts.md`, `completedRuns.md`, `findings.md`, …) and their chart PNGs, the `README.md`s and
+`SETUP.md` — is committed and pushed as soon as it is done, no confirmation needed. This includes
+progress-update doc edits and instruction changes like this one. **The exception is docs-only:** the
+moment a commit also touches code, config, or anything that changes program behaviour, the whole
+change reverts to the code rule above and waits for approval. Chart images that accompany a
+`charts.md` edit ride along with the docs commit.
+
+Read-only git commands are fine at any time.
 
 ## Training runs
 
