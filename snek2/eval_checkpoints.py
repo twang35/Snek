@@ -23,7 +23,10 @@ Usage:
     EVAL_RESUME=1 ... top20
 
 Selection (`top20`, `top`, `top:20`) ranks on the single 10-episode graph eval, breaking ties
-on the surrounding rate:
+on the surrounding rate. Selection (`above:98`, `above`) instead reads a *prior close-out's*
+100-episode measurement and takes every checkpoint whose `perfect_percent` is at or above the
+threshold — the HOF re-measure path, which reconfirms already-excellent checkpoints rather than
+re-discovering them from the noisy graph (see select_checkpoints_above):
 
 - every checkpoint at **>=90%** is measured, even past N
 - remaining slots go to the best of the rest down to **>=60%**
@@ -735,6 +738,12 @@ ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, eve
 MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
 DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
 
+# `above:N` with no N given. A HOF re-measure of the checkpoints a close-out already found
+# excellent; the desktop's auto-HOF passes `above:98` explicitly. This is a *measured* rate on
+# the close-out's 100-episode result, not a graph single-eval, so it is on a different scale from
+# the constants above and never mixes with them.
+DEFAULT_ABOVE_THRESHOLD = 98.0
+
 # Screen depth: every selected checkpoint gets this many episodes, then only the best
 # DEFAULT_CONFIRM_COUNT go on to EVAL_EPISODES. 0 gives the flat one-pass protocol.
 DEFAULT_SCREEN_EPISODES = 20
@@ -855,6 +864,46 @@ def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=1
         {c['step']: {'selected_by': c['selected_by'],
                      'single_eval': c['single'],
                      'surrounding': round(c['smoothed'], 1)} for c in chosen}
+
+
+def select_checkpoints_above(policy_name, available, threshold, source_suffix=''):
+    """Checkpoints whose *measured* perfect rate in the close-out result file is >= `threshold`.
+
+    Unlike `select_top_checkpoints`, which ranks on the 10-episode graph point, this reads the
+    close-out's own `<policy>_checkpoint_evals<source_suffix>.json` — the 100-episode measurement.
+    A HOF re-measure exists to reconfirm the checkpoints the close-out already found excellent, so
+    the strong measured rate is the right selector, not the noisy graph value the close-out itself
+    selected on. The desktop close-out writes no `EVAL_OUT_SUFFIX`, so `source_suffix=''` names the
+    file it produced; the HOF re-measure writes under its own suffix and so never reads its own output.
+
+    Every close-out row at or above the threshold is taken — including 20-episode screens that read
+    high — because "test everything the close-out flagged" is the whole point, and the re-measure is
+    what settles a lucky screen. Returns `([], {})` when nothing qualifies, which is the normal
+    outcome for most arms and must not be an error: the caller exits 0. An `abandoned` row can never
+    qualify (its rate sits below the close-out gate, which is <= threshold) and is skipped for clarity.
+
+    A meta dict without a `single_eval` key makes each step skip screening (`skips_screening`) and go
+    straight to full length — exactly right here, and moot when the HOF pass runs `EVAL_SCREEN_EPISODES=0`.
+    """
+    path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, source_suffix))
+    if not os.path.exists(path):
+        raise SystemExit('no close-out result file to select from: {0}'.format(path))
+    with open(path) as handle:
+        payload = json.load(handle)
+    results = payload.get('results', [])
+    chosen = sorted((r for r in results
+                     if not r.get('abandoned')
+                     and r.get('perfect_percent', 0) >= threshold
+                     and r['step'] in available),
+                    key=lambda r: r['step'])
+    print('HOF selection from {0}: {1} of {2} close-out checkpoints scored >= {3:g}%'.format(
+        os.path.basename(path), len(chosen), len(results), threshold))
+    for r in chosen:
+        print('    {0:>8}  close-out {1:>5.1f}%  ({2} episodes)'.format(
+            r['step'], r['perfect_percent'], r.get('episodes')))
+    selected_by = {r['step']: {'selected_by': 'above{0:g}'.format(threshold),
+                               'closeout_percent': r['perfect_percent']} for r in chosen}
+    return [r['step'] for r in chosen], selected_by
 
 
 def merge_checkpoint_evals(policy_name, suffixes=None, out_suffix='_merged'):
@@ -983,6 +1032,16 @@ def main(argv):
         rest = argv[2][len('top'):].lstrip(':=')
         count = int(rest) if rest else (int(argv[3]) if len(argv) > 3 else DEFAULT_COUNT)
         requested_steps, selected_by = select_top_checkpoints(policy_name, available, count)
+    elif argv[2].startswith('above'):
+        rest = argv[2][len('above'):].lstrip(':=')
+        threshold = float(rest) if rest else (
+            float(argv[3]) if len(argv) > 3 else DEFAULT_ABOVE_THRESHOLD)
+        requested_steps, selected_by = select_checkpoints_above(policy_name, available, threshold)
+        # No qualifying checkpoint is the common case, not a failure: exit clean so the job is
+        # marked done rather than failed (and never re-tried on the desktop).
+        if not requested_steps:
+            print('no close-out checkpoint reached {0:g}% — nothing to re-measure'.format(threshold))
+            return 0
     else:
         requested_steps = [int(a) for a in argv[2:]]
         selected_by = {step: {'selected_by': 'explicit'} for step in requested_steps}

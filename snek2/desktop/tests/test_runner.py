@@ -94,6 +94,15 @@ def test_runtime_bool_must_be_bool():
     assert out is None
 
 
+def test_runtime_auto_hof_defaults_on_and_takes_a_bool():
+    out, _ = cfg.parse_runtime_config('{"max_trainers": 2}', _host())
+    assert out['auto_hof'] is True                        # on unless disabled, like auto_closeout
+    out, _ = cfg.parse_runtime_config('{"auto_hof": false}', _host())
+    assert out['auto_hof'] is False
+    out, errs = cfg.parse_runtime_config('{"auto_hof": 1}', _host())
+    assert out is None and any('auto_hof' in e for e in errs)
+
+
 # --------------------------------------------------------------------- jobs
 def test_parse_train_job():
     j = jobmod.parse_job('{"id": "b20a", "type": "train", "policy": "b20a-x",'
@@ -170,6 +179,21 @@ def test_build_eval_command_uses_worker_count():
     argv, env, log, policy = launch.build_command(j, _host(), r)
     assert argv == ['/py', '-u', 'eval_checkpoints.py', 'b19a', 'top20']
     assert env['EVAL_WORKERS'] == '10'
+
+
+def test_build_eval_command_passes_hof_env_and_args_through():
+    # The synthesized HOF job's argv and its 500-episode env must reach the process untouched,
+    # while EVAL_WORKERS still comes from the runtime (the "4 parallel" of a regular eval).
+    j = jobmod.parse_job(json.dumps({
+        'id': 'p-hof', 'type': 'eval', 'policy': 'p', 'eval_args': ['above:98'],
+        'env': {'EVAL_EPISODES': '500', 'EVAL_SCREEN_EPISODES': '0',
+                'EVAL_MIN_ACHIEVABLE': '98', 'EVAL_OUT_SUFFIX': '_hof500'}}))
+    r = _runtime(); r['eval_workers'] = 4
+    argv, env, log, policy = launch.build_command(j, _host(), r)
+    assert argv == ['/py', '-u', 'eval_checkpoints.py', 'p', 'above:98']
+    assert env['EVAL_EPISODES'] == '500' and env['EVAL_SCREEN_EPISODES'] == '0'
+    assert env['EVAL_MIN_ACHIEVABLE'] == '98' and env['EVAL_OUT_SUFFIX'] == '_hof500'
+    assert env['EVAL_WORKERS'] == '4'
 
 
 def test_build_threads_injected():
@@ -310,6 +334,160 @@ def test_auto_closeout_disabled_yields_nothing():
     assert r._auto_closeout_jobs() == []
 
 
+# ----------------------------------------------- auto-HOF: the link after the closeout
+class _FakeRJ:
+    """The bit of launch.RunningJob that _reap touches, with no subprocess behind it."""
+    def __init__(self, jid, jtype, policy, alive=False, rc=0):
+        self.job = jobmod.Job(id=jid, type=jtype, policy=policy, env={}, priority=10)
+        self.policy = policy
+        self.log_path = '/nonexistent.log'
+        self._alive, self._rc = alive, rc
+
+    def is_alive(self):
+        return self._alive
+
+    def returncode(self):
+        return self._rc
+
+
+def test_wants_hof_only_for_a_successful_closeout_eval():
+    assert runnermod.wants_hof('p-closeout', 'eval', True, True) is True
+    assert runnermod.wants_hof('p-closeout', 'eval', False, True) is False  # failed: no result file
+    assert runnermod.wants_hof('p-hof', 'eval', True, True) is False         # no HOF-of-a-HOF
+    assert runnermod.wants_hof('manual-top20', 'eval', True, True) is False  # a hand-queued eval
+    assert runnermod.wants_hof('p', 'train', True, True) is False            # a training gets a closeout
+    assert runnermod.wants_hof('p-closeout', 'eval', True, False) is False   # feature disabled
+
+
+def test_auto_hof_synthesizes_a_500ep_flat_eval_inheriting_env():
+    r = _runner()
+    r.ledger['b25a-fc320seed1-closeout'] = {
+        'state': 'done', 'type': 'eval', 'policy': 'b25a-fc320seed1', 'hof': 'pending',
+        'env': {'SNEK_FC_LAYERS': '320', 'SNEK_SEED': '1'}}
+    jobs = r._auto_hof_jobs()
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.id == 'b25a-fc320seed1-hof' and j.type == 'eval'
+    assert j.policy == 'b25a-fc320seed1'
+    assert j.eval_args == ['above:98']                 # selects the closeout's >=98% checkpoints
+    assert j.env['SNEK_FC_LAYERS'] == '320'            # FC trap survives both hops (train->closeout->hof)
+    assert j.env['EVAL_EPISODES'] == '500'
+    assert j.env['EVAL_SCREEN_EPISODES'] == '0'        # flat, no screening
+    assert j.env['EVAL_INDEPENDENT'] == '1'
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == '98'
+    assert j.env['EVAL_OUT_SUFFIX'] == '_hof500'       # a distinct file, never clobbers the closeout
+    assert j.priority == runnermod.AUTO_HOF_PRIORITY
+    assert runnermod.AUTO_CLOSEOUT_PRIORITY < j.priority < 100  # after the closeout, before a training
+
+
+def test_auto_hof_recipe_wins_over_an_inherited_eval_env():
+    # The training env could carry stale EVAL_* knobs; the 500-episode recipe must override them.
+    r = _runner()
+    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending',
+                              'env': {'EVAL_EPISODES': '100', 'EVAL_OUT_SUFFIX': '_stale'}}
+    j = r._auto_hof_jobs()[0]
+    assert j.env['EVAL_EPISODES'] == '500'
+    assert j.env['EVAL_OUT_SUFFIX'] == '_hof500'
+
+
+def test_auto_hof_skips_when_done_running_or_unmarked():
+    r = _runner()
+    # a finished closeout with no hof marker (a pre-feature arm) -> nothing retroactive
+    r.ledger['old-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'old'}
+    assert r._auto_hof_jobs() == []
+    # marked, but its hof already ran -> skip (idempotent)
+    r.ledger['p1-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p1', 'hof': 'pending'}
+    r.ledger['p1-hof'] = {'state': 'done', 'type': 'eval', 'policy': 'p1'}
+    # marked, but its hof is running -> skip
+    r.ledger['p2-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p2', 'hof': 'pending'}
+    r.running['p2-hof'] = object()
+    assert [j.id for j in r._auto_hof_jobs()] == []
+
+
+def test_auto_hof_disabled_yields_nothing():
+    r = _runner()
+    r.runtime['auto_hof'] = False
+    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending'}
+    assert r._auto_hof_jobs() == []
+
+
+def test_reap_marks_a_finished_closeout_for_its_hof():
+    r = _runner()
+    r._publish_results = lambda rj: None               # no git behind this test
+    r.running['p-closeout'] = _FakeRJ('p-closeout', 'eval', 'p', alive=False, rc=0)
+    r._reap()
+    assert r.ledger['p-closeout']['state'] == 'done'
+    assert r.ledger['p-closeout'].get('hof') == 'pending'   # .get so a missing marker asserts, not KeyErrors
+    assert [j.id for j in r._auto_hof_jobs()] == ['p-hof']
+
+
+def test_reap_does_not_hof_a_plain_eval_or_a_failed_closeout():
+    r = _runner()
+    r._publish_results = lambda rj: None
+    r.running['manual-top20'] = _FakeRJ('manual-top20', 'eval', 'x', alive=False, rc=0)
+    r.running['q-closeout'] = _FakeRJ('q-closeout', 'eval', 'q', alive=False, rc=1)  # failed
+    r._reap()
+    assert 'hof' not in r.ledger['manual-top20']       # a hand-queued eval never triggers one
+    assert r.ledger['q-closeout']['state'] == 'failed'
+    assert 'hof' not in r.ledger['q-closeout']          # a failed closeout has no result to select from
+
+
+def test_scan_pending_includes_auto_hofs_in_priority_order():
+    r = _runner()
+    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending'}
+    _stub_pending([('t.json', {'id': 't', 'type': 'train', 'policy': 't', 'priority': 100})])
+    got = [j.id for j in r._scan_pending()]
+    assert got == ['p-hof', 't'], got                  # the hof (priority 11) sorts ahead of the training
+
+
+def test_scan_pending_queues_a_closeout_and_a_hof_together():
+    r = _runner()
+    r.ledger['a'] = {'state': 'done', 'type': 'train', 'policy': 'a', 'closeout': 'pending'}
+    r.ledger['b-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'b', 'hof': 'pending'}
+    _stub_pending([])
+    got = [j.id for j in r._scan_pending()]
+    assert got == ['a-closeout', 'b-hof'], got         # closeout (10) before hof (11)
+
+
+def test_a_dead_closeout_across_a_daemon_restart_queues_its_hof():
+    # Same boot, dead pid: the detached closeout ran to its end while the daemon was down, so it
+    # earns its HOF re-measure the same way a straddling training earns its closeout.
+    real_boot, real_alive = runnermod.boot_id, launch.pid_alive
+    runnermod.boot_id = lambda: 'BOOT-A'
+    launch.pid_alive = lambda _pid: False
+    try:
+        r = _runner()
+        r.ledger['p-closeout'] = {'state': 'running', 'type': 'eval', 'policy': 'p',
+                                  'pid': 4242, 'boot': 'BOOT-A', 'env': {'SNEK_FC_LAYERS': '320'}}
+        r._reattach()
+    finally:
+        runnermod.boot_id, launch.pid_alive = real_boot, real_alive
+    got = r.ledger['p-closeout']
+    assert got['state'] == 'done' and got['hof'] == 'pending', got
+    jobs = r._auto_hof_jobs()
+    assert [j.id for j in jobs] == ['p-hof']
+    assert jobs[0].env['SNEK_FC_LAYERS'] == '320'      # the FC trap survives the restart
+
+
+def test_a_reboot_withholds_a_closeouts_hof_until_it_actually_finishes():
+    # A closeout the machine killed is not done, so it must not spend its (partial) result on a
+    # HOF re-measure -- it re-runs, and only the finished re-run earns the hof.
+    real_boot, real_alive = runnermod.boot_id, launch.pid_alive
+    runnermod.boot_id = lambda: 'BOOT-B'
+    launch.pid_alive = lambda _pid: False
+    try:
+        r = _runner()
+        r.ledger['p-closeout'] = {'state': 'running', 'type': 'eval', 'policy': 'p',
+                                  'pid': 4242, 'boot': 'BOOT-A'}
+        r._reattach()
+    finally:
+        runnermod.boot_id, launch.pid_alive = real_boot, real_alive
+    got = r.ledger['p-closeout']
+    assert got['state'] == 'interrupted', got
+    assert 'hof' not in got, got
+    assert r._auto_hof_jobs() == []
+
+
 def test_viewer_scale_is_larger_for_eval_waves():
     # Eval charts get a ~30% bigger window; anything with a trainer in it stays smaller.
     # `category` is the comma-joined set _ensure_viewer builds, so only a pure eval wave
@@ -389,25 +567,28 @@ AUTO = runnermod.AUTO_CLOSEOUT_PRIORITY
 
 
 def test_anticipated_queue_interleaves_a_closeout_batch_between_training_batches():
-    # Two training batches queued; each batch's closeouts run before the next batch's training,
-    # because a closeout (priority 10) outranks a queued training (200).
+    # Two training batches queued; each batch's closeouts, then its HOF re-measures, run before
+    # the next batch's training -- a closeout (priority 10) and a HOF (11) both outrank a queued
+    # training (200), and the HOF trails its own closeout because it is only spawned once the
+    # closeout has been placed in a wave.
     queued = [{'id': p, 'type': 'train', 'policy': p, 'priority': 200}
               for p in ('a1', 'a2', 'b1', 'b2')]
     order = runnermod.anticipated_queue(
         queued, [], {'trainer': 2, 'eval': 2}, True, {'a1', 'a2', 'b1', 'b2'})
     assert [j['id'] for j in order] == [
-        'a1', 'a2', 'a1-closeout', 'a2-closeout',
-        'b1', 'b2', 'b1-closeout', 'b2-closeout'], [j['id'] for j in order]
+        'a1', 'a2', 'a1-closeout', 'a2-closeout', 'a1-hof', 'a2-hof',
+        'b1', 'b2', 'b1-closeout', 'b2-closeout', 'b1-hof', 'b2-hof'], [j['id'] for j in order]
 
 
 def test_anticipated_queue_seeds_closeouts_for_trainings_running_now():
-    # A training on the box now will spawn a closeout that runs before the queued batch.
+    # A training on the box now will spawn a closeout, which in turn spawns a HOF, all before
+    # the queued batch.
     queued = [{'id': 'b1', 'type': 'train', 'policy': 'b1', 'priority': 200}]
     running = [{'id': 'r1', 'type': 'train', 'policy': 'r1'}]
     order = runnermod.anticipated_queue(
         queued, running, {'trainer': 2, 'eval': 2}, True, {'b1', 'r1'})
-    assert [j['id'] for j in order] == ['r1-closeout', 'b1', 'b1-closeout'], \
-        [j['id'] for j in order]
+    assert [j['id'] for j in order] == [
+        'r1-closeout', 'r1-hof', 'b1', 'b1-closeout', 'b1-hof'], [j['id'] for j in order]
 
 
 def test_anticipated_queue_omits_closeouts_when_auto_closeout_off():
@@ -426,6 +607,35 @@ def test_anticipated_queue_never_invents_an_existing_closeout_twice():
     assert ids.count('p-closeout') == 1, ids
 
 
+def test_anticipated_queue_chains_a_hof_after_each_closeout():
+    queued = [{'id': 't', 'type': 'train', 'policy': 't', 'priority': 200}]
+    order = runnermod.anticipated_queue(queued, [], {'trainer': 2, 'eval': 2}, True, {'t'})
+    assert [j['id'] for j in order] == ['t', 't-closeout', 't-hof'], [j['id'] for j in order]
+
+
+def test_anticipated_queue_seeds_a_hof_for_a_closeout_running_now():
+    running = [{'id': 'r-closeout', 'type': 'eval', 'policy': 'r'}]
+    order = runnermod.anticipated_queue(
+        [], running, {'trainer': 2, 'eval': 2}, True, {'r-closeout'})
+    assert [j['id'] for j in order] == ['r-hof'], [j['id'] for j in order]
+
+
+def test_anticipated_queue_omits_hofs_when_auto_hof_off():
+    queued = [{'id': 't', 'type': 'train', 'policy': 't', 'priority': 200}]
+    order = runnermod.anticipated_queue(
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'t'}, auto_hof=False)
+    assert [j['id'] for j in order] == ['t', 't-closeout'], [j['id'] for j in order]
+
+
+def test_anticipated_queue_never_invents_an_existing_hof_twice():
+    queued = [{'id': 'p-closeout', 'type': 'eval', 'policy': 'p', 'priority': AUTO},
+              {'id': 'p-hof', 'type': 'eval', 'policy': 'p', 'priority': runnermod.AUTO_HOF_PRIORITY}]
+    order = runnermod.anticipated_queue(
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'p-closeout', 'p-hof'})
+    ids = [j['id'] for j in order]
+    assert ids.count('p-hof') == 1, ids
+
+
 def test_ledger_view_anticipates_closeouts_for_a_queued_training():
     r = _runner(auto_closeout=True)
     r.runtime['max_trainers'] = 2
@@ -436,7 +646,8 @@ def test_ledger_view_anticipates_closeouts_for_a_queued_training():
             self.id, self.policy, self.priority, self.type = jid, jid, pri, 'train'
     r._queued = [_J('t1', 200), _J('t2', 200)]
     view = r._ledger_view()
-    assert list(view.keys()) == ['t1', 't2', 't1-closeout', 't2-closeout'], list(view.keys())
+    assert list(view.keys()) == ['t1', 't2', 't1-closeout', 't2-closeout',
+                                 't1-hof', 't2-hof'], list(view.keys())
     assert all(view[k] == 'queued' for k in view)
 
 

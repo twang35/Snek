@@ -39,12 +39,40 @@ TERMINAL = ('done', 'failed')
 # is the whole point of auto-closeout: never train the next thing before evaluating the last.
 AUTO_CLOSEOUT_PRIORITY = 10
 
+# A HOF re-measure runs after its closeout (11 < a training's 100, so it still beats the next
+# training batch, and 11 > 10 so a closeout that is *also* pending in the same eval wave slots
+# first). It never races its own closeout: the `hof: pending` marker is only set once the
+# closeout has reaped, so its result file is complete before the HOF job can be synthesized.
+AUTO_HOF_PRIORITY = 11
+
+# The HOF re-measure: 500 episodes, flat (no screening), abandoning anything that cannot reach
+# 98%. `above:98` reads the closeout's own result file and takes every checkpoint measured at
+# >=98% there. A distinct EVAL_OUT_SUFFIX keeps this off the closeout's file so neither clobbers
+# the other and the closeout's 100-episode rows are never mistaken for finished HOF work.
+HOF_THRESHOLD = 98
+HOF_EVAL_ARGS = ['above:{0}'.format(HOF_THRESHOLD)]
+HOF_EVAL_ENV = {
+    'EVAL_EPISODES': '500',
+    'EVAL_SCREEN_EPISODES': '0',
+    'EVAL_INDEPENDENT': '1',
+    'EVAL_MIN_ACHIEVABLE': str(HOF_THRESHOLD),
+    'EVAL_OUT_SUFFIX': '_hof500',
+}
+
 
 def wants_closeout(job_type, ok, auto_closeout_enabled):
     """Whether a just-finished job should get an automatic closeout eval. Only a *training*
     that finished successfully -- smoke and benchmark runs share the 'trainer' category but
     are throwaway, and a failed run has no checkpoint worth measuring."""
     return bool(auto_closeout_enabled) and ok and job_type == 'train'
+
+
+def wants_hof(job_id, job_type, ok, hof_enabled):
+    """Whether a just-finished job should get an automatic HOF re-measure. Only a *successful
+    closeout eval* qualifies, identified by the `<policy>-closeout` id the runner synthesizes --
+    so a manual top20 eval does not trigger one, and the HOF job's own `<policy>-hof` id never
+    does (no HOF-of-a-HOF). A failed closeout has no trustworthy result file to select from."""
+    return bool(hof_enabled) and ok and job_type == 'eval' and str(job_id).endswith('-closeout')
 
 
 class _StubJob:
@@ -137,9 +165,12 @@ class Runner:
                 # Same boot, dead pid: the job ran to its own end while the daemon was down.
                 # Exit code is unknown across reparenting, so success is assumed; on that same
                 # assumption the arm still earns its closeout, so auto-closeout does not
-                # silently skip a restart-straddling arm.
+                # silently skip a restart-straddling arm. A closeout that finished the same way
+                # earns its HOF re-measure by the identical argument.
                 if wants_closeout(rec.get('type'), True, self.runtime.get('auto_closeout', True)):
                     rec['closeout'] = 'pending'
+                elif wants_hof(jid, rec.get('type'), True, self.runtime.get('auto_hof', True)):
+                    rec['hof'] = 'pending'
         self._save_ledger()
 
     # -------------------------------------------------------------------- loop
@@ -260,6 +291,33 @@ class Runner:
                             priority=AUTO_CLOSEOUT_PRIORITY))
         return jobs
 
+    def _auto_hof_jobs(self):
+        """HOF re-measures to run for closeouts that finished under auto-hof and have not been
+        re-measured yet -- the exact mirror of `_auto_closeout_jobs`, one link further down the
+        chain (training -> closeout -> hof).
+
+        The `hof: pending` marker is set on the *closeout's* ledger record (id `<policy>-closeout`),
+        so `rec['env']` here is the env the closeout ran under, which itself inherited the
+        training's -- the FC trap survives both hops. The synthesized job's id is `<policy>-hof`;
+        once it is running or terminal the guard skips it, so a still-'pending' marker cannot launch
+        a second one. Its env forces the 500-episode flat recipe over the inherited one, and its
+        `above:98` arg selects from the closeout result file (see select_checkpoints_above)."""
+        if not self.runtime.get('auto_hof', True):
+            return []
+        jobs = []
+        for rec in self.ledger.values():
+            if rec.get('hof') != 'pending' or not rec.get('policy'):
+                continue
+            hof_id = rec['policy'] + '-hof'
+            if self.ledger.get(hof_id, {}).get('state') in TERMINAL or hof_id in self.running:
+                continue
+            env = dict(rec.get('env') or {})
+            env.update(HOF_EVAL_ENV)               # the HOF recipe wins over the inherited env
+            jobs.append(Job(id=hof_id, type='eval', policy=rec['policy'],
+                            env=env, eval_args=list(HOF_EVAL_ARGS),
+                            priority=AUTO_HOF_PRIORITY))
+        return jobs
+
     def _scan_pending(self):
         """The launchable jobs waiting for the next wave, sorted by priority -- the order
         `_dispatch` draws from and the order status.json lists them in. Parses every pending
@@ -285,6 +343,8 @@ class Runner:
             desired.append(job)
         seen = {job.id for job in desired}
         desired += [j for j in self._auto_closeout_jobs() if j.id not in seen]
+        seen = {job.id for job in desired}
+        desired += [j for j in self._auto_hof_jobs() if j.id not in seen]
         desired.sort(key=lambda j: j.priority)
         if marked:
             self._save_ledger()
@@ -352,6 +412,8 @@ class Runner:
                         'policy': rj.policy, 'finished': time.time(), 'returncode': rc})
             if wants_closeout(rj.job.type, ok, self.runtime.get('auto_closeout', True)):
                 rec['closeout'] = 'pending'   # picked up by _auto_closeout_jobs next dispatch
+            elif wants_hof(jid, rj.job.type, ok, self.runtime.get('auto_hof', True)):
+                rec['hof'] = 'pending'        # picked up by _auto_hof_jobs next dispatch
             del self.running[jid]
             if ok:
                 self._publish_results(rj)
@@ -373,9 +435,9 @@ class Runner:
         """The id->state map published in status.json, with the pending queue folded in as
         `queued` entries **at the end** -- after the run history and the running jobs -- in the
         order the wave-barrier scheduler will actually launch them, including the closeout evals
-        each queued training will spawn, which run before the next training batch (see
-        `anticipated_queue`). So a glance at the tail of the ledger shows the whole expected run
-        order, not only the specs that exist as files today.
+        each queued training will spawn -- and the HOF re-measure each of *those* spawns -- which
+        run before the next training batch (see `anticipated_queue`). So a glance at the tail of
+        the ledger shows the whole expected run order, not only the specs that exist as files today.
 
         A launched job moves into `running` and drops out of `_queued` the same poll; a real
         ledger state wins over the synthetic `queued` on the rare id overlap (a job re-queued
@@ -383,12 +445,13 @@ class Runner:
         position, appending only ids the history does not already carry."""
         limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
         auto = self.runtime.get('auto_closeout', True)
+        auto_hof = self.runtime.get('auto_hof', True)
         queued = [{'id': j.id, 'type': j.type, 'policy': j.policy, 'priority': j.priority}
                   for j in self._queued if j.id not in self.running]
         running = [{'id': jid, 'type': rj.job.type, 'policy': rj.policy}
                    for jid, rj in self.running.items()]
         existing = set(self.ledger) | set(self.running) | {j['id'] for j in queued}
-        order = anticipated_queue(queued, running, limits, auto, existing)
+        order = anticipated_queue(queued, running, limits, auto, existing, auto_hof)
         view = {k: v.get('state') for k, v in self.ledger.items()}
         for job in order:                              # queued at the end, in run order
             view.setdefault(job['id'], 'queued')
@@ -416,23 +479,25 @@ class Runner:
             sys.stderr.write('publish_status failed: {0}\n'.format(e))
 
 
-def anticipated_queue(queued, running, limits, auto_closeout, existing_ids):
+def anticipated_queue(queued, running, limits, auto_closeout, existing_ids, auto_hof=True):
     """Simulate the wave-barrier scheduler forward over the pending queue and return the jobs
-    in the order they are expected to launch -- with each queued training's closeout eval
-    inserted where it will actually run, before the next training batch.
+    in the order they are expected to launch -- with each queued training's closeout eval, and
+    each closeout's HOF re-measure, inserted where they will actually run.
 
     Modelled straight from `_dispatch`: repeatedly form a wave from the highest-priority job's
     category, up to that category's limit, drain it, and let every training in it spawn a
-    closeout (priority `AUTO_CLOSEOUT_PRIORITY` = 10, below any training) that competes in the
-    next wave. Because a closeout outranks a queued training, a batch's closeouts always slot
-    in ahead of the following batch -- the exact interleaving the box will run.
+    closeout (priority `AUTO_CLOSEOUT_PRIORITY` = 10) and every closeout spawn a HOF re-measure
+    (priority `AUTO_HOF_PRIORITY` = 11) that compete in the next wave. Both outrank a queued
+    training (100), so a batch's closeouts, then its HOFs, always slot in ahead of the following
+    batch -- the exact interleaving the box will run. The HOF trails its closeout because it is
+    only spawned once that closeout has been placed in a wave, never in the same one.
 
     `queued` and `running` are lists of dicts with id/type/policy (queued also has priority);
     `queued` is the real pending set (already includes closeouts synthesized for *finished*
-    trainings), `running` seeds anticipated closeouts for trainings on the box now, which drain
-    before any queued wave. `existing_ids` is every id already known (ledger, running, queued),
-    so a closeout that already exists somewhere is never invented twice. Returns the ordered
-    list of queued/anticipated job dicts (never the running jobs themselves)."""
+    trainings, and HOFs for *finished* closeouts), `running` seeds anticipated closeouts for
+    trainings on the box now and HOFs for closeouts on the box now. `existing_ids` is every id
+    already known (ledger, running, queued), so a job that already exists somewhere is never
+    invented twice. Returns the ordered list of queued/anticipated job dicts."""
     def category(job_type):
         return 'eval' if job_type == 'eval' else 'trainer'
 
@@ -446,12 +511,28 @@ def anticipated_queue(queued, running, limits, auto_closeout, existing_ids):
         seen.add(cid)
         return {'id': cid, 'type': 'eval', 'policy': policy, 'priority': AUTO_CLOSEOUT_PRIORITY}
 
+    def hof_for(policy):
+        """A fresh HOF dict for `policy`, or None if one already exists or is not wanted."""
+        hid = (policy or '') + '-hof'
+        if not policy or hid in seen:
+            return None
+        seen.add(hid)
+        return {'id': hid, 'type': 'eval', 'policy': policy, 'priority': AUTO_HOF_PRIORITY}
+
+    def spawned_by(job):
+        """The follow-on a just-placed job triggers: a training -> its closeout, a closeout ->
+        its HOF. None otherwise. Keeps the running-seed and wave-drain paths in step."""
+        if wants_closeout(job.get('type'), True, auto_closeout):
+            return closeout_for(job.get('policy'))
+        if wants_hof(job.get('id'), job.get('type'), True, auto_hof):
+            return hof_for(job.get('policy'))
+        return None
+
     pool = [dict(j) for j in queued]
-    for r in running:                                  # closeouts for trainings running now
-        if wants_closeout(r.get('type'), True, auto_closeout):
-            c = closeout_for(r.get('policy'))
-            if c:
-                pool.append(c)
+    for r in running:                                  # follow-ons for jobs on the box now
+        nxt = spawned_by(r)
+        if nxt:
+            pool.append(nxt)
 
     order = []
     while pool:
@@ -464,11 +545,10 @@ def anticipated_queue(queued, running, limits, auto_closeout, existing_ids):
         wave_ids = {job['id'] for job in wave}
         order.extend(wave)
         pool = [job for job in pool if job['id'] not in wave_ids]
-        for job in wave:                               # each training in the wave spawns one
-            if wants_closeout(job['type'], True, auto_closeout):
-                c = closeout_for(job['policy'])
-                if c:
-                    pool.append(c)
+        for job in wave:                               # each job in the wave spawns its follow-on
+            nxt = spawned_by(job)
+            if nxt:
+                pool.append(nxt)
     return order
 
 

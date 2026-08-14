@@ -429,6 +429,15 @@ candidates bail in seconds and only genuine ≥97%/500 holders run full length. 
 clear the gate does not enter the folder.** (On the desktop this is a queued eval job with the same env — see
 [`../desktop/README.md`](../desktop/README.md); batch 24's ran there as four parallel jobs.)
 
+**The desktop now runs a `_hof500` re-measurement automatically** after every close-out (`auto_hof`, see
+[`../desktop/README.md`](../desktop/README.md#the-eval-chain-training--closeout--hof-re-measure)): it
+selects the close-out's **≥98%** checkpoints and re-runs them at 500 episodes with **gate 98**. So a
+desktop arm usually already has its `<arm>_checkpoint_evals_hof500.json` waiting on the `results` branch —
+step 0 is done for you *for the ≥98% band*. Two caveats before you trust it for admission: the auto run's
+**gate is 98, not the folder's 97**, so a genuine 97–98%/500 holder is early-abandoned there and still needs
+a hand re-measure at gate 97; and the automation only **measures** — it never copies anything in. Steps 1-2
+below are always by hand.
+
 **Step 1 — copy the confirmed checkpoint in:**
 
 ```

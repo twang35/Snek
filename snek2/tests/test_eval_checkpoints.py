@@ -854,3 +854,57 @@ def test_the_deeper_partial_wins_when_two_files_hold_the_same_step():
     finally:
         os.remove(first)
         os.remove(second)
+
+
+# --------------------------------------------------------- select_checkpoints_above (HOF)
+
+def test_select_above_takes_only_checkpoints_at_or_above_the_threshold():
+    pol = '_hoftest_above'
+    path = write_result_file(pol, '', [
+        row(1000, perfect=97),   # 97.0% -> below 98, excluded
+        row(2000, perfect=98),   # 98.0% -> at the bar, included
+        row(3000, perfect=100),  # 100%  -> included
+    ])
+    try:
+        steps, meta = eval_checkpoints.select_checkpoints_above(pol, {1000, 2000, 3000}, 98)
+    finally:
+        os.remove(path)
+    assert steps == [2000, 3000], steps
+    assert meta[2000]['closeout_percent'] == 98.0
+    assert meta[2000]['selected_by'] == 'above98'
+    # No single_eval key -> the step skips screening and goes straight to full length.
+    assert 'single_eval' not in meta[2000]
+
+
+def test_select_above_skips_abandoned_and_missing_checkpoints():
+    pol = '_hoftest_above2'
+    rows = [row(1000, perfect=99),
+            row(2000, episodes=30, perfect=30),   # 100% but its checkpoint file is gone
+            {'step': 3000, 'episodes': 40, 'perfect_games': 40, 'perfect_percent': 100.0,
+             'abandoned': True}]                   # abandoned rows never qualify, even at 100%
+    path = write_result_file(pol, '', rows)
+    try:
+        # 3000 IS available, so its exclusion is the abandoned filter, not a missing checkpoint;
+        # 2000 is absent from `available`, standing in for an evicted checkpoint.
+        steps, _ = eval_checkpoints.select_checkpoints_above(pol, {1000, 3000}, 98)
+    finally:
+        os.remove(path)
+    assert steps == [1000], steps
+
+
+def test_select_above_returns_empty_when_nothing_qualifies():
+    pol = '_hoftest_above3'
+    path = write_result_file(pol, '', [row(1000, perfect=90), row(2000, perfect=95)])
+    try:
+        steps, meta = eval_checkpoints.select_checkpoints_above(pol, {1000, 2000}, 98)
+    finally:
+        os.remove(path)
+    assert steps == [] and meta == {}
+
+
+def test_select_above_missing_file_is_an_error():
+    try:
+        eval_checkpoints.select_checkpoints_above('_hoftest_no_such_policy', {1}, 98)
+        assert False, 'expected SystemExit'
+    except SystemExit:
+        pass

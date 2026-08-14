@@ -53,6 +53,36 @@ status. Jobs are launched **detached**, so a daemon restart never kills a runnin
 trainer; they self-terminate via `SNEK_MAX_STEPS`. A local ledger makes launches
 idempotent across restarts (a job id never runs twice).
 
+## The eval chain: training → closeout → HOF re-measure
+
+The daemon synthesizes two follow-on evals, each off a ledger marker, never as spec files:
+
+| link | trigger | synthesized job | what it runs |
+|---|---|---|---|
+| **closeout** | a training finishes OK (`auto_closeout`) | `<policy>-closeout`, priority 10 | `eval_checkpoints.py <policy> top20` |
+| **HOF re-measure** | a closeout finishes OK (`auto_hof`) | `<policy>-hof`, priority 11 | `eval_checkpoints.py <policy> above:98` at 500 episodes, flat |
+
+The HOF re-measure reconfirms the checkpoints a closeout already found excellent. `above:98` reads
+the closeout's own `runs/<policy>_checkpoint_evals.json` and takes every checkpoint measured there
+at **≥98%**; the job runs those at **`EVAL_EPISODES=500 EVAL_SCREEN_EPISODES=0 EVAL_INDEPENDENT=1
+EVAL_MIN_ACHIEVABLE=98`** and writes **`EVAL_OUT_SUFFIX=_hof500`** — a separate file, so it never
+clobbers the closeout's result and the closeout's 100-episode rows are never mistaken for finished
+HOF work. Worker count is the runtime's `eval_workers` (the usual 4), like any eval.
+
+Three properties that matter:
+
+- **The HOF never races its own closeout.** The `hof: pending` marker is set only when the closeout
+  *reaps*, so its result file is complete (atomic `os.replace`) before the HOF job can be synthesized.
+- **No HOF-of-a-HOF, no HOF off a hand-queued eval.** The trigger keys on the `<policy>-closeout`
+  id the daemon itself mints; a `<policy>-hof` id and a manual `top20` eval both fail the check.
+- **Most arms produce an empty HOF.** If no closeout checkpoint reached 98%, `above:98` selects
+  nothing and the job exits 0 (marked `done`, not `failed`) — the common case.
+
+Turn either link off in `runtime.json` (`auto_closeout` / `auto_hof`); both default on. The
+`_hof500` files come back on the `results` branch like any other artifact. **Promotion into
+`hallOfFame/` is still the manual, verified process** in [`hallOfFame/README.md`](../hallOfFame/README.md)
+— this automation only produces the re-measurement; it never copies a checkpoint in.
+
 ## Rebooting the box, and what recovers by itself
 
 **The safe way is to drain first**: set `"drain": true` in `runtime.json` on `ops`, wait for the
@@ -129,6 +159,8 @@ applies within one poll, no restart:
 | `nice` | launch priority |
 | `disk_min_gb` | refuse to launch below this much free space |
 | `paused` / `drain` | finish current jobs, start nothing new |
+| `auto_closeout` | a finished training auto-queues its `top20` closeout eval (default on) |
+| `auto_hof` | a finished closeout auto-queues a 500-episode HOF re-measure of its ≥98% checkpoints (default on) |
 
 A malformed `runtime.json` is rejected — the daemon keeps the last good config
 and reports the error in `status.json`, so a bad commit can't wedge the box.
@@ -141,12 +173,13 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 
 `running` is what is on the box now; the **`ledger`** map carries the run history and, **at its
 end, the pending queue** as `queued` entries **in the order the wave-barrier scheduler will
-actually launch them** — including the **closeout eval each queued training will spawn**,
-slotted where it will run (a closeout has priority 10, so a batch's closeouts always form the
-next wave before the following training batch). So the tail of the ledger reads `batchA
-trainings → batchA closeouts → batchB trainings → batchB closeouts …`, even though those
-closeout specs do not exist as files yet. A launched job moves from `queued` to `running` the
-same poll; a malformed spec never shows as `queued` — it lands in the ledger as `failed`.
+actually launch them** — including the **closeout eval each queued training will spawn** and the
+**HOF re-measure each closeout will spawn**, slotted where they will run (a closeout has priority
+10 and a HOF 11, both below a training's 100, so a batch's closeouts then its HOFs always form the
+next waves before the following training batch). So the tail of the ledger reads `batchA
+trainings → batchA closeouts → batchA HOFs → batchB trainings …`, even though those closeout and
+HOF specs do not exist as files yet. A launched job moves from `queued` to `running` the same
+poll; a malformed spec never shows as `queued` — it lands in the ledger as `failed`.
 
 **Pull results** — `git fetch origin results && git checkout results -- results/<job-id>`.
 
@@ -278,8 +311,10 @@ Three things to know, each of which has cost a failed job:
 - **`arch.json` must ride along**, or the restore hard-fails with `ArchMismatch`
   (`policy_arch.py`). `rsync -a <policy>` carries it because it lives in the policy dir —
   so never add it to `--exclude`.
-- **Auto-closeout does not fire for these.** It triggers on a desktop *wave barrier*, and
-  a laptop-trained arm never trained on the desktop. Queue the eval by hand.
+- **Auto-closeout does not fire for these**, and so neither does the auto-HOF that chains off a
+  closeout. Both trigger on a desktop job finishing, and a laptop-trained arm never trained here.
+  Queue the eval by hand (and, if you want the HOF re-measure, run the `hallOfFame/README.md`
+  recipe by hand too).
 - **A ~4-arm wave is ~2.3 GB** (~574 MB/arm), a couple of minutes over the LAN.
 
 ## Deploying a code change to the desktop

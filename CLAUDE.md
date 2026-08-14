@@ -288,6 +288,14 @@ Still measure with `free -m` before pushing `max_evals`/`eval_workers` past thos
 copy before any tuning tool can see it. The exact commands are in
 [`snek2/desktop/README.md`](snek2/desktop/README.md#getting-a-finished-job-into-the-analysis-workflow).
 
+**The desktop chains two evals off every training: `training → closeout (top20) → HOF re-measure`.**
+When a closeout finishes, `auto_hof` (default on) queues a `<policy>-hof` job that re-runs the
+closeout's **≥98%** checkpoints at **500 episodes, flat, `EVAL_MIN_ACHIEVABLE=98`**, writing
+`_hof500`. It only produces the re-measurement — **promotion into `hallOfFame/` is still the manual,
+verified process**. Most arms have no ≥98% checkpoint, so the HOF job exits `done` with nothing
+measured; that is normal, not a failure. Turn it off with `auto_hof: false`. Full mechanism:
+[`snek2/desktop/README.md`](snek2/desktop/README.md#the-eval-chain-training--closeout--hof-re-measure).
+
 **Pushing to `ops` starts real work on another machine**, so it falls under the git rule above: queue a
 job only when the user has approved *that* job.
 
