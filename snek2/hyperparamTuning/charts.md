@@ -1,8 +1,9 @@
 # Charts
 
-Progress graphs for the most recent batches — **20 through 24**, a cap of six, newest first. Per-arm
+Progress graphs for the most recent batches — **20 through 25**, a cap of six, newest first. Per-arm
 numbers live in
-[`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each.
+[`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
+here **while it is still running**, with training-only numbers, not just once it has closed.
 
 **Older sections are retired, not deleted.** Batches 1-11 are in
 [`archive/batches1-11.md`](archive/batches1-11.md) and anything retired since is in
@@ -41,6 +42,42 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 `champion-vs-mediocre`, `drawdown-b23b-vs-b18` and `per-b18-vs-b20-priorities` are diagnostic figures
 referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
 training graphs. Anything *else* the check prints is a real gap.
+
+## Batch 25 — FC `200,100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *in progress*
+
+b22's exact IS-off config with a 3-layer `200,100,100` net (~1.6× the control's params) — the second
+shape in the width follow-up after b24's `320` result. It asks whether b24's consolidation lift is width
+itself or just more parameters, and whether it survives at a shape other than one wide layer. Seed-matched
+control is b22 (`50,100,50`, IS off). Trained on the desktop.
+
+**Training is done for all four; the close-out and HOF-500 are still running — the numbers below are
+training self-eval only.** All four trained clean to the 3M cap (none died, each reached a 100% single
+eval) and the graph **reproduces b24's consolidation lift**: mean `sef` **63.8** vs the control's 30.5,
+near b24's 66.0, with peak unmoved at 95.0. **`sef`, best-30 and peak are self-eval / graph figures; the
+close-out pooled and the HOF-500 that settle the batch are marked *running* and will replace these
+placeholders at close.** b25 is the first batch to auto-chain the HOF re-measure (`auto_hof`, 2026-08-13).
+Sorted by `sef`.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | best HOF-500 |
+|---|---|---|---|---|---|
+| `b25c` | 95.00 | 93.7% | **66.9%** | *running* | *running* |
+| `b25a` | 95.00 | 93.7% | 63.2% | *running* | *running* |
+| `b25b` | 95.00 | **95.3%** | 62.7% | *running* | *running* |
+| `b25d` | 95.00 | 94.3% | 62.2% | *running* | *running* |
+| **mean — b25 fc200,100,100 IS-off** | **95.00** | **94.3%** | **63.8%** | *running* | *running* |
+| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 | — |
+
+![b25c](charts/b25c-fc200x100x100noisseed3-r2.png)
+**b25c-fc200x100x100noisseed3-r2**
+
+![b25a](charts/b25a-fc200x100x100noisseed1-r2.png)
+**b25a-fc200x100x100noisseed1-r2**
+
+![b25b](charts/b25b-fc200x100x100noisseed2-r2.png)
+**b25b-fc200x100x100noisseed2-r2**
+
+![b25d](charts/b25d-fc200x100x100noisseed4-r2.png)
+**b25d-fc200x100x100noisseed4-r2**
 
 ## Batch 24 — FC width `320` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4
 

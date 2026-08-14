@@ -205,10 +205,16 @@ config change would have been reverted for the loss: the fix was assumed clean b
 "felt recent". Run `ps -o etime,lstart -p <pid>` and read `summary.step` from `runs/<policy>_evals.json`
 *first*, and let the numbers — not the sense of how long ago you launched it — decide whether it is safe.
 
-It also means updating **`charts.md` as well as `runs.md`**. `refresh_charts.sh` only copies PNGs,
-so a new arm silently ends up with an image and no entry. Every arm needs a `### <policy> —
-<change>` section with a stats line, a short reading, and the image. Older captions live in
-`archive/batches1-11.md` and `archive/charts-archive.md`, so check all three:
+It also means updating **`charts.md` as well as `runs.md`**, and **this is not deferrable to batch
+close.** **Any time you touch the tuning docs or run a progress update, refresh `charts.md` in the
+same pass — whether or not the arms have finished.** An in-progress batch gets its section *now*,
+carrying whatever readings exist (training self-eval peak/best-30/`sef`), with the close-out pooled
+and any HOF-500 marked *running* until they land. The file's whole job is to show every current arm's
+graph **in one place**, so a running batch with no chart entry is a bug, not a "wait until it closes"
+state — this has been missed repeatedly, on the mistaken theory that charts belong only to batch close.
+`refresh_charts.sh` only copies PNGs, so a new arm silently ends up with an image and no entry. Every
+arm needs a `### <policy> — <change>` section with a stats line, a short reading, and the image. Older
+captions live in `archive/batches1-11.md` and `archive/charts-archive.md`, so check all three:
 
 ```
 cd snek2/hyperparamTuning
@@ -515,6 +521,11 @@ batch's section at the top, and retire the oldest so it holds at most six batche
 `hyperparamTuning/archive/charts-archive.md`, PNGs left in `charts/`). Full checklist, including what
 each caption has to say and why the cap is six:
 [`snek2/hyperparamTuning/hyperparamTuning.md`](snek2/hyperparamTuning/hyperparamTuning.md#when-you-stop-a-batch-of-arms).
+
+**Stop time is the *finalization*, not the only time `charts.md` moves.** Per the progress-update rule
+above, the file is kept current throughout a batch's life, so by the time arms are killed the section
+usually already exists with training-only numbers — stopping just fills in the close-out/HOF-500 figures
+and retires the oldest batch. Never treat an unfinished batch as a reason to leave `charts.md` alone.
 
 **`refresh_charts.sh` does not edit `charts.md`.** It copies images only, so a clean run of it looks
 like the charts are handled when no caption has been written. That drifted once to **12 undocumented

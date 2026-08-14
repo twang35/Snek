@@ -16,7 +16,7 @@ than any single run.
 | [`completedRuns.md`](completedRuns.md) | every finished arm: config, final numbers, verdict | when an arm finishes |
 | [`findings.md`](findings.md) | what is established, what has been falsified | when something is learned |
 | [`failureModes.md`](failureModes.md) | the four ways a policy degrades, and how to tell them apart | rarely |
-| [`charts.md`](charts.md) | progress graph for every arm, with captions | when charts are refreshed |
+| [`charts.md`](charts.md) | progress graph for every arm, with captions | every progress update / docs change, finished or not |
 | `charts/` | snapshot copies of the graphs | via `refresh_charts.sh` |
 
 **Start with [`runs.md`](runs.md)** if you are picking this up mid-flight — it says
@@ -514,18 +514,32 @@ only 4 were running, which would have looked like the cap was already blown.
 A human-started `python snek2.py train` counts against the budget. Leave it
 alone; never touch `snek2/savedPolicies/train*`.
 
+### Keep `charts.md` current while a batch runs — not only at stop
+
+**`charts.md` is refreshed on every progress update and every time the tuning docs are touched, whether
+or not the arms have finished.** The file's job is to show every current arm's graph *in one place*, so
+an arm training right now still gets its section — with its training self-eval readings (peak trailing,
+best-30, `sef`), and the close-out pooled and any HOF-500 marked *running* until they land. **Do not
+defer the section to batch close**; a running batch with no chart entry is the exact drift this rule
+prevents, and it has been missed repeatedly. The steps are the same as the stop checklist below — run
+`refresh_charts.sh`, add or upkeep the batch's section, run the completeness check — minus the
+retire-the-oldest move, which happens only when a *new* batch pushes the count past six.
+
 ### When you stop a batch of arms
 
-**A batch is not stopped until its charts are filed.** This list exists because the charts drifted
-once to twelve undocumented arms, and because a successful `refresh_charts.sh` *looks* like the charts
-are handled when it has only copied images — it never edits `charts.md`.
+**A batch is not stopped until its charts are filed** — and by stop time the section usually already
+exists (see above), so this is the *finalization*: fill in the close-out/HOF-500 numbers and retire the
+oldest. This list exists because the charts drifted once to twelve undocumented arms, and because a
+successful `refresh_charts.sh` *looks* like the charts are handled when it has only copied images — it
+never edits `charts.md`.
 
 Do these in order, the moment the arms are killed:
 
 1. **`zsh hyperparamTuning/refresh_charts.sh`** — copies every `runs/*.png` into
    `hyperparamTuning/charts/` and prints the step each one reached, which is what the captions quote.
-2. **Add the batch's section to the top of [`charts.md`](charts.md)**, newest first: a batch-level
-   table, then one subsection per arm ordered best result first, each with its step, peak trailing,
+2. **Add or finalize the batch's section at the top of [`charts.md`](charts.md)** (it is usually
+   already there from progress updates — see above), newest first: a batch-level table, then one
+   subsection per arm ordered best result first, each with its step, peak trailing,
    best-30, `sef` and recent-30. Say plainly which figures are comparable to the batches below and
    which are not — `sef` is a fraction of an arm's *own* evals, so a longer batch reads higher for
    free and the number is only meaningful against a matched truncation.
