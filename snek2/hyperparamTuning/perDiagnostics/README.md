@@ -5,6 +5,7 @@
 | `per_priorities.py` | `<out_dir> [policy ...]` | what the PER priority signal does to the sampling distribution, and each arm's value profile against snake length |
 | `point_of_no_return.py` | `<policy-or-ckpt> <episodes> <seed> <out.json>` | per lost episode, the last point at which the food was still reachable — and the outcome split, which is where the starvation finding came from |
 | `eat_and_survive.py` | `<policy-or-ckpt> <episodes> <seed> <out.json>` | whether eating that food was **survivable**, over every route to it — the retraction of the above script's "never a dead end" reading |
+| `endgame_packing.py` | `<policy-or-ckpt> <episodes> <seed> <out.json>` | how fragmented the free space is per meal from length 80 up, and whether the food that spawned could be eaten safely — the packing finding |
 | `input_sensitivity_over_time.py` | `<out.json> <policy> <steps> [boards-policy]` | how one arm's reading of a given observation input, and its greedy action, change over training — the before/during/after of a drawdown |
 | `drawdown_chart.py` | `<sens_dir> <out.png>` | draws the four-panel figure from the above; no measurement of its own |
 | `behaviour_profile.py` | `<out.json> <ckpt-or-policy> <episodes> <seed>` | what a checkpoint *does*: steps per meal, starve headroom, packing and realised chase-safety, by snake length — the elite-vs-mediocre comparison |
@@ -14,6 +15,21 @@
 six cores and ~5 minutes for 360 episodes. It **checks its own simulator against the live game on
 every step** and reports `mismatches`, which must be 0 — that is the guard that makes its search
 trustworthy, and it is the reason to be suspicious if a future run reports anything else.
+
+**A route enumeration without a node cap will take the laptop out.** The breadth-first search in
+`eat_and_survive.eat_routes` keys its frontier on the **whole body**, so one key is several KB at
+endgame lengths. Run per loss on a nearly-full board that is fine; `endgame_packing.py` calls it per
+*step* from length 90, where ten free cells give enough branching that an uncapped search reached
+**9.2 GB of RSS in 90 seconds**, and four shards at once left the machine struggling. `ROUTE_NODE_CAP`
+and the tighter `SAFE_ROUTE_*` bounds exist for that, and both make a negative verdict inexact rather
+than wrong — which is why `endgame_packing.py` records `spawn_exact` and reports safe-meal rates as
+lower bounds. **Run these two scripts one process at a time**; sequentially, six shards of 30 episodes
+take about four minutes at ~500 MB.
+
+**Never filter to the exact rows to compute those rates.** A safe verdict returns the moment a
+surviving route is found, so it is *always* exact; keeping only exact rows keeps every positive and
+drops some negatives, which inflates the rate. Report over all rows with the `neg exact` share beside
+it.
 
 **Its `geom` column is not a survivability test, and reading it as one was wrong for four days.**
 `eat_and_survive.py` imports that script's movement rule and guard rather than copying them, so the

@@ -68,6 +68,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | ~~Reading observation 15-17 is the mechanism behind batch 18's perfect rate~~ | **‡ demoted 2026-08-11** — the reading rises with steps in every arm and *anti*-correlates with skill inside batch 18 (worst two arms hold the highest ratios); corr with `sef` across 8 arms **+0.04**. `b23b` reads it like batch 20 and scores like batch 18. It marks how much prioritisation survives IS, not skill |
 | **‡‡ The elite-vs-mediocre difference is endgame hunting speed, not blunders** | **measured 2026-08-11**, 12 checkpoints × the same 100 games. p90 steps per meal at length 95-99: **5-13 for the records, 86-226 for batch 20's peaks**; `steps_per_food` at 85-94 correlates **−0.967** with perfect rate. Packing, fragmentation and straightness all move with it — one factor, not five |
 | **‡‡ A perfect game is 95 consecutive meals, so 99% needs a 5× cut in per-meal error** | **arithmetic on measured rates** — the record checkpoint already plays **1,850 meals per mistake**; 99% needs one per **9,450**. Reframes the objective: the remaining gap is per-meal reliability in the ~5 meals played at length 95+ |
+| **‡‡ Free space in one piece at length 90-94 separates the records from a dud by 87 points** | **measured 2026-08-14** — one-piece share **92% / 77% / 5%** for `b24d` / `b18b` / `b20d`, per meal, identical food, exact (one flood fill, no search). The gap opens **ten meals before the end**, and all three reach those lengths equally often. Largest per-policy separation on record here |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
@@ -792,6 +793,46 @@ moves earlier, not by the move being chosen. That is a computable form of this f
 "what differs is the rate of arriving winnable", and it is the argument for
 [`CHASE_SAFE_SHAPING`](../plans/chase-safe-reward-shaping.md) rather than against it: the flag reading
 0 through 95-99 is the board having no safe meal, not the flag going blind.
+
+### ‡‡ The packing property: the records keep their free space in one piece, and it separates them by 87 points
+
+Measured 2026-08-14 with [`perDiagnostics/endgame_packing.py`](perDiagnostics/endgame_packing.py), 60
+episodes per checkpoint on **identical food streams** (seeds 201/202), **one sample per meal** so a
+dithering policy cannot weight its own statistics, 0 simulator mismatches. `regions` counts connected
+components of free space with the food counted as free, so **1 means the remaining space is a single
+pocket**. It is one bitwise flood fill — no search, exact.
+
+| checkpoint | perfect | one-piece @90-94 | @95-97 | @98 | mean regions @90-94 | safe meal at spawn @90-94 |
+|---|---|---|---|---|---|---|
+| `b24d` @1342k | 98.0% | **92%** | 96% | 98% | 1.09 | 97% |
+| `b18b` @1588k | 97.6% | **77%** | 88% | 100% | 1.31 | 93% |
+| `b20d` @3000k | ~47% | **5%** | 16% | 58% | 3.75 | 64% |
+
+- **The gap opens at length 90-94, about ten meals before the end** — upstream of every loss this
+  project has pinned. 87 points between `b24d` and `b20d`, against the ~10 pp effect this folder can
+  resolve at n=4.
+- **Not a "reaches the endgame less often" artifact.** All three reach 90-94 about equally often (290,
+  299, 292 meals in 60 episodes). `b20d` arrives at the same lengths *fragmented*, it does not arrive
+  less.
+- **Fragmentation is what puts food where eating it kills.** Food spawns uniformly on a free cell, so
+  a shredded board is a board where the food lands in a pocket: food with no open neighbour is **0-1%**
+  for the records and **24%** for `b20d` at 90-94. That is the upstream cause of the trapped positions
+  retracted above.
+- **The two records order correctly** — `b24d` (98.0%) is better packed than `b18b` (97.6%) at every
+  band. n=2, so this is an observation, not a result.
+- **This does not contradict "`lg(num_groups)` points the wrong way".** That finding compares the
+  *three actions* at one fatal decision, where splitting space is often the correct move — cleaning a
+  pocket while the tail still adjoins it. This compares *policies* at meal spawns. Locally splitting is
+  fine; chronically fragmented is fatal.
+- **Read within a band only.** With two free cells at length 98, adjacency is far likelier than 6-10
+  cells forming one region, so the baseline moves with length. The length-99 row is uninformative by
+  construction: one free cell, always one region, always no open neighbour.
+
+**Why it matters beyond diagnosis.** "Free space in one piece" is a bounded state function that is
+already computed every step — `count_groups` runs for the observation — so it is available as the
+graded potential [`chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md) holds in
+reserve, and as a candidate observation. It is also the first quantity measured here that separates
+elite from mediocre **before** the endgame it decides.
 
 ### ‡‡ Batch 20 never learned to read "is it safe to chase the food" — but reading it does not make an arm good
 

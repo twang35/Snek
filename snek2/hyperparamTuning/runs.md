@@ -217,6 +217,7 @@ table.
 | change | targets | prior |
 |---|---|---|
 | `CHASE_SAFE_SHAPING` — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **the top item, and ready to launch** — full plan in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md). Approved 2026-08-11 and held until the running batches closed out; **20-23 are now closed and the laptop's four slots are free** |
+| **Free space in one piece** — as a graded potential and/or an observation | endgame packing, which is what decides whether the food lands somewhere edible | **new 2026-08-14**, and the largest per-policy separation on record: one-piece share at length 90-94 is **92% / 77% / 5%** for `b24d` / `b18b` / `b20d` ([findings](findings.md#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points)). `count_groups` already runs every step, so both forms are nearly free. **Correlational, n=3 checkpoints** |
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
 | ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **closed as batch 18** — primary moved, 4/4 seeds; see [`completedRuns.md`](completedRuns.md) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
