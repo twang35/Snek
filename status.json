@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-14T13:38:49",
-  "ts": 1786739929.1330686,
+  "iso": "2026-08-14T13:39:38",
+  "ts": 1786739978.4650614,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,18 +18,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 4
   },
   "running": [
     {
-      "id": "b26d-fc100x100noisseed4",
-      "type": "train",
+      "id": "b26a-fc100x100noisseed1-closeout",
+      "type": "eval",
+      "policy": "b26a-fc100x100noisseed1",
+      "pid": 434499,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b26b-fc100x100noisseed2-closeout",
+      "type": "eval",
+      "policy": "b26b-fc100x100noisseed2",
+      "pid": 434500,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b26c-fc100x100noisseed3-closeout",
+      "type": "eval",
+      "policy": "b26c-fc100x100noisseed3",
+      "pid": 434501,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b26d-fc100x100noisseed4-closeout",
+      "type": "eval",
       "policy": "b26d-fc100x100noisseed4",
-      "pid": 4113662,
-      "step": 2998000,
-      "steps_per_sec": 92.5,
-      "elapsed_s": 36400
+      "pid": 434502,
+      "step": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -143,11 +170,11 @@
     "b26a-fc100x100noisseed1": "done",
     "b26b-fc100x100noisseed2": "done",
     "b26c-fc100x100noisseed3": "done",
-    "b26d-fc100x100noisseed4": "running",
-    "b26a-fc100x100noisseed1-closeout": "queued",
-    "b26b-fc100x100noisseed2-closeout": "queued",
-    "b26c-fc100x100noisseed3-closeout": "queued",
-    "b26d-fc100x100noisseed4-closeout": "queued",
+    "b26d-fc100x100noisseed4": "done",
+    "b26a-fc100x100noisseed1-closeout": "running",
+    "b26b-fc100x100noisseed2-closeout": "running",
+    "b26c-fc100x100noisseed3-closeout": "running",
+    "b26d-fc100x100noisseed4-closeout": "running",
     "b26a-fc100x100noisseed1-hof": "queued",
     "b26b-fc100x100noisseed2-hof": "queued",
     "b26c-fc100x100noisseed3-hof": "queued",
@@ -155,8 +182,8 @@
   },
   "disk_free_gb": 140.3,
   "load_avg": [
-    2.12451171875,
-    2.103515625,
-    2.24609375
+    1.197265625,
+    1.85302734375,
+    2.15234375
   ]
 }
