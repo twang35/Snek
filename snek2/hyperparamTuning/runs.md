@@ -23,24 +23,29 @@ The HOF-500 re-measured all 199 ≥97%/100 checkpoints and **9 held ≥97%/500**
 both are in [`../hallOfFame/`](../hallOfFame/README.md). b25 and b26 carry the width question to two more
 shapes under the same IS-off base.
 
-- **b25 (`b25a-d-r2`, fc 200,100,100) — trained to 3M; close-outs running, auto-HOF to follow (desktop).**
-  3-layer, ~1.6× the control. All four seeds trained clean to the cap — none died, each reached a 100%
-  single eval — and the training graph **reproduces b24's consolidation lift**: mean `sef` **63.8** against
-  the b22 control's 30.5, within reach of b24's 66.0, peak unmoved at 95.0. **These are self-eval / graph
-  numbers; the close-out pooled and the HOF-500 that settle it are still running** — b25 is the first batch
-  to auto-chain the HOF re-measure (deployed 2026-08-13).
+- **b25 (`b25a-d-r2`, fc 200,100,100) — fully evaluated (desktop); the first auto-HOF chain ran end to end.**
+  3-layer, ~1.6× the control. Close-out (gate 95) pools a mean **86.0** — **+10.3 over the b22 control's
+  75.7, within 1.9 of b24's 87.9** — so **the consolidation lift replicates at a 3-layer shape**: it tracks
+  capacity, not width per se. Peak unmoved at 95.0. **The HOF-500 (gate 98) held nothing** — every ≥98%/100
+  candidate was abandoned, none reaching 98%/500; the strongest, `b25b` @911k, was still 97.2% when gate-98
+  stopped it at 392 episodes. **No b25 checkpoint enters the hall on the auto run**, though `b25b` @911k is a
+  plausible ~97%/500 holder a hand gate-97 re-measure could still promote (the auto run's gate is 98).
+  Charts in [`charts.md`](charts.md).
 
-| training self-eval, mean of 4 | b22 control (`50,100,50`) | b24 (`320`) | **b25 (`200,100,100`)** |
+| mean of 4 | b22 control (`50,100,50`) | b24 (`320`) | **b25 (`200,100,100`)** |
 |---|---|---|---|
 | peak trailing | 94.88 | 95.00 | **95.00** |
-| `sef` (primary) | 30.5 | 66.0 | **63.8** |
+| `sef` (training) | 30.5 | 66.0 | **63.8** |
 | best-30 | 86.2 | 96.2 | **94.3** |
-| close-out pooled (eq-effort, gate 95) | 75.7 | 87.9 | *running* |
+| close-out pooled (eq-effort, gate 95) | 75.7 | 87.9 | **86.0** |
 
-  Per seed (`sef` / best-30): a 63.2 / 93.7 · b 62.7 / 95.3 · c 66.9 / 93.7 · d 62.2 / 94.3.
+  Per seed — close-out pooled: a 85.6 · b 85.5 · c 87.2 · d 85.9. HOF-500 best partial (all abandoned at
+  gate 98): a 92.7% · b **97.2%** · c 95.3% · d 96.4%.
 
-- **b26 (`b26a-d`, fc 100,100) — queued (desktop), priority 220.** A shallower two-layer shape. Runs after
-  b25's close-outs and their HOF re-measures.
+- **b26 (`b26a-d`, fc 100,100) — running (desktop), ~1.8-2.0M of 3M.** A shallower two-layer shape — does the
+  lift survive without the depth/capacity b24 and b25 had? All four alive; mid-run `sef` is at a partial
+  horizon and **not comparable** to the 3M numbers above. `b26b` leads (recent-30 91.0); `b26d` lags
+  (recent-30 31.7, not dead). Charts (mid-run) in [`charts.md`](charts.md).
 
 **Read b25/b26 against b22, not batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
 control: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88. b24 has answered the yes/no; b25 and b26
@@ -51,12 +56,15 @@ one wide layer.
 seed-matched controls (p=0.0625, the n=4 floor), which is cleaner than batch 20's within-batch confound —
 but `320` once read +10.1 pooled in batch 20 and that was noise. The HOF-500 confirmed the batch owns 9
 genuine ≥97%/500 checkpoints (not just inflated /100 highs), which firms up the *consolidation* claim; b25/b26
-are the replication that separates width from parameter count.
+are the replication that separates width from parameter count. **b25 has now replicated the pooled lift (86.0,
++10.3) at a 3-layer shape — so the gain tracks capacity, not width specifically — but produced no ≥98%/500
+checkpoint, so the *record* is still b24's alone.** b26 (`100,100`) tests whether a shallower net still gets it.
 
-Scheduler order (desktop `status.json` ledger): b25 close-outs (running) → **b25 HOFs** → b26 → b26
-close-outs → **b26 HOFs**. The HOF step is new — every close-out now auto-queues a 500-episode, gate-98
-re-measure of its ≥98% checkpoints (`auto_hof`, on by default, 2026-08-13); it only measures, promotion
-into `hallOfFame/` stays manual. Check with `git show origin/ops-status:status.json`.
+Scheduler order (desktop `status.json` ledger): **b26 (running) → b26 close-outs → b26 HOFs**. b25 is fully
+done — training → close-out → HOF, all four arms — and was the **first live run of the auto-HOF chain**,
+which worked end to end. The HOF step auto-queues a 500-episode, gate-98 re-measure of each close-out's ≥98%
+checkpoints (`auto_hof`, on by default, 2026-08-13); it only measures, promotion into `hallOfFame/` stays
+manual. Check with `git show origin/ops-status:status.json`.
 
 ## Batches 20-24 are closed — where their descriptions went
 

@@ -578,7 +578,7 @@ predates the sidecar and was never backfilled** — and there it fails loudly ra
 **Ran on the desktop `the-claw-den`, four arms `b20ai`-`b20al` at seeds 1-4, all to the 3M cap; close-out
 2026-08-12, gate 95, `EVAL_WORKERS=4`, ~5.5 min per arm (597 episodes of 2,400 planned — 45 of 45
 measurements abandoned early).** Charts in
-[`charts.md`](charts.md#batch-20--matched-capacity-reshuffle-1005050-against-the-control-both-to-3m).
+[`charts.md`](archive/charts-archive.md#batch-20--matched-capacity-reshuffle-1005050-against-the-control-both-to-3m).
 **This was the ninth and last shape**, so batch 20 is complete.
 
 ### The design
@@ -640,7 +640,7 @@ is the exact column. Nothing near 95%, no hall-of-fame candidate.
 
 **Ran 2026-08-09 15:12 to 22:54, four arms `b20i`-`b20l` at seeds 1-4, all self-terminating at the 3M
 cap after ~7h40m; close-out 22:54-23:19 (25 min, four parallel, `EVAL_WORKERS=4`).** Charts in
-[`charts.md`](charts.md#batch-20-wave-2--wide-early-20050-against-the-control-both-to-3m). Launched and
+[`charts.md`](archive/charts-archive.md#batch-20-wave-2--wide-early-20050-against-the-control-both-to-3m). Launched and
 closed out unattended by a watcher that waited for the cap, so no arm was stopped by hand.
 
 ### The design
@@ -699,7 +699,7 @@ the base's anti-forgetting property holds under this shape.
 cap; close-out ~32 min (four parallel, `EVAL_WORKERS=4`).** One operational wrinkle: the arms were
 relaunched once at ~240k, resuming from their checkpoints, to adopt the crisp-chart env — no training was
 lost. Charts in
-[`charts.md`](charts.md#batch-20-wave-2--depth-1-320-against-the-control-both-to-3m).
+[`charts.md`](archive/charts-archive.md#batch-20-wave-2--depth-1-320-against-the-control-both-to-3m).
 
 ### The design
 
@@ -755,7 +755,7 @@ it, still batch-19 territory and far from batch 18's ~57, so the base's anti-for
 
 **Ran 2026-08-10 on the desktop `the-claw-den`, four arms `b20q`-`b20t` at seeds 1-4, all to the 3M cap;
 close-out under gate 95, `EVAL_WORKERS=4`.** Charts in
-[`charts.md`](charts.md#batch-20-wave-3--small-capacity-255025-against-the-control-both-to-3m).
+[`charts.md`](archive/charts-archive.md#batch-20-wave-3--small-capacity-255025-against-the-control-both-to-3m).
 
 ### The design
 
@@ -804,7 +804,7 @@ batch-19 territory, far from batch 18's ~57 — the base's anti-forgetting prope
 **Trained on the laptop, seeds 1-4 `b20u`-`b20x` (renamed from a `q-t` collision with the desktop's
 `25,50,25`), all to the 3M cap; checkpoints rsynced to the desktop and closed out there under gate 95,
 `EVAL_WORKERS=4`.** Charts in
-[`charts.md`](charts.md#batch-20-wave-3--deep-narrow-6030303030-against-the-control-both-to-3m).
+[`charts.md`](archive/charts-archive.md#batch-20-wave-3--deep-narrow-6030303030-against-the-control-both-to-3m).
 
 ### The design
 
@@ -889,7 +889,7 @@ is exact. Nothing at the 95 gate; no hall-of-fame candidate.
 
 **Ran on the desktop `the-claw-den`, four arms `b20aa`-`b20ad` at seeds 1-4, all to the 3M cap; close-out
 under gate 95, `EVAL_WORKERS=4`.** Charts in
-[`charts.md`](charts.md#batch-20-wave-3--iso-param-depth-2-9393-against-the-control-both-to-3m).
+[`charts.md`](archive/charts-archive.md#batch-20-wave-3--iso-param-depth-2-9393-against-the-control-both-to-3m).
 
 ### The design
 
