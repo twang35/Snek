@@ -43,25 +43,29 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
 training graphs. Anything *else* the check prints is a real gap.
 
-## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *in progress (~1.8M/3M)*
+## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *close-outs running*
 
 The third shape in the width follow-up: a shallow **two-layer `100,100`** net, after b24 (`320`) and b25
 (`200,100,100`) both lifted consolidation. It asks whether a shallower shape still gets the gain, or whether
-it needs the depth/capacity those two had. Seed-matched control is b22 (`50,100,50`, IS off). Training on the
+it needs the depth/capacity those two had. Seed-matched control is b22 (`50,100,50`, IS off). Trained on the
 desktop.
 
-**Mid-run — all four are ~1.8-2.0M of 3M and still training, so the numbers below are self-eval at that
-partial horizon and are NOT comparable to the completed batches' 3M `sef`** (a fraction of an arm's own
-evals rises with run length, so a shorter run reads lower for free). All four are alive — no dead stretch.
-`b26b` leads and looks like the others (recent-30 91.0); `b26d` lags with a recent dip (recent-30 31.7) but
-has not died. The charts and these numbers refresh at the next update. Sorted by current `sef`.
+**All four reached the 3M cap and finished training — numbers below are the full-horizon self-eval and are
+comparable to the completed batches.** Three of four learned well (`sef` 44-58, best-30 88-94); `b26d` is a
+weak seed (`sef` 13.8, best-30 79.7, peaking early at 1.07M then fading) but never died. Mean `sef` **42.1**
+sits above the b22 control's 30.5 but **well short of b25's 63.8** at the deeper shape, and mean best-30
+**88.4** is barely over control's 86.2 — an early hint that the shallow `100,100` captures much less of the
+consolidation lift than b24/b25's wider or deeper shapes. **The close-out (gate 95) is running now on the
+desktop; pooled perfect-game % and the auto-HOF-500 land at the next update.** Sorted by `sef`.
 
-| arm | step | peak trail | best-30 | `sef` (mid-run) | recent-30 |
-|---|---|---|---|---|---|
-| `b26b` | 1.98M | 94.94 | **92.0%** | **57.8%** | **91.0** |
-| `b26c` | 1.83M | 94.94 | 91.3% | 41.2% | 75.3 |
-| `b26a` | 1.87M | 94.78 | 87.0% | 30.9% | 80.3 |
-| `b26d` | 1.76M | 94.84 | 79.7% | 20.4% | 31.7 |
+| arm | peak trail | best-30 | `sef` (3M) | close-out pooled |
+|---|---|---|---|---|
+| `b26b` | 95.00 | **93.7%** @1982k | **58.0%** | *running* |
+| `b26c` | 94.96 | 92.0% @2231k | 52.1% | *running* |
+| `b26a` | 94.92 | 88.0% @2349k | 44.6% | *running* |
+| `b26d` | 94.84 | 79.7% @1073k | 13.8% | *running* |
+| **mean — b26 fc100,100 IS-off** | **94.93** | **88.4%** | **42.1%** | *running* |
+| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 |
 
 ![b26b](charts/b26b-fc100x100noisseed2.png)
 **b26b-fc100x100noisseed2**

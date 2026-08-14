@@ -42,10 +42,12 @@ shapes under the same IS-off base.
   Per seed — close-out pooled: a 85.6 · b 85.5 · c 87.2 · d 85.9. HOF-500 best partial (all abandoned at
   gate 98): a 92.7% · b **97.2%** · c 95.3% · d 96.4%.
 
-- **b26 (`b26a-d`, fc 100,100) — running (desktop), ~1.8-2.0M of 3M.** A shallower two-layer shape — does the
-  lift survive without the depth/capacity b24 and b25 had? All four alive; mid-run `sef` is at a partial
-  horizon and **not comparable** to the 3M numbers above. `b26b` leads (recent-30 91.0); `b26d` lags
-  (recent-30 31.7, not dead). Charts (mid-run) in [`charts.md`](charts.md).
+- **b26 (`b26a-d`, fc 100,100) — training done at 3M; close-outs running (desktop).** A shallower two-layer
+  shape — does the lift survive without the depth/capacity b24 and b25 had? Three of four learned well (`sef`
+  44-58, best-30 88-94); `b26d` is a weak seed (`sef` 13.8, best-30 79.7) but never died. Full-horizon mean
+  `sef` **42.1** clears the b22 control's 30.5 but falls **well short of b25's 63.8**, and mean best-30 **88.4**
+  is barely over control's 86.2 — an early hint the shallow shape captures much less of the lift. Close-out
+  pooled % and the auto-HOF-500 land next. Charts (3M) in [`charts.md`](charts.md).
 
 **Read b25/b26 against b22, not batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
 control: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88. b24 has answered the yes/no; b25 and b26
@@ -60,7 +62,7 @@ are the replication that separates width from parameter count. **b25 has now rep
 +10.3) at a 3-layer shape — so the gain tracks capacity, not width specifically — but produced no ≥98%/500
 checkpoint, so the *record* is still b24's alone.** b26 (`100,100`) tests whether a shallower net still gets it.
 
-Scheduler order (desktop `status.json` ledger): **b26 (running) → b26 close-outs → b26 HOFs**. b25 is fully
+Scheduler order (desktop `status.json` ledger): **b26 close-outs (running) → b26 HOFs**. b25 is fully
 done — training → close-out → HOF, all four arms — and was the **first live run of the auto-HOF chain**,
 which worked end to end. The HOF step auto-queues a 500-episode, gate-98 re-measure of each close-out's ≥98%
 checkpoints (`auto_hof`, on by default, 2026-08-13); it only measures, promotion into `hallOfFame/` stays
