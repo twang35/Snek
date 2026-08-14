@@ -23,11 +23,24 @@ The HOF-500 re-measured all 199 ≥97%/100 checkpoints and **9 held ≥97%/500**
 both are in [`../hallOfFame/`](../hallOfFame/README.md). b25 and b26 carry the width question to two more
 shapes under the same IS-off base.
 
-- **b25 (`b25a-d-r2`, fc 200,100,100) — next up (desktop), priority 210.** 3-layer, ~1.6× the control. A
-  first b25 attempt reached ~112k and was killed so the HOF-500 could run first; it is re-queued from
-  scratch under `-r2` names, because a killed job reaps `failed` and cannot relaunch under its old id.
+- **b25 (`b25a-d-r2`, fc 200,100,100) — trained to 3M; close-outs running, auto-HOF to follow (desktop).**
+  3-layer, ~1.6× the control. All four seeds trained clean to the cap — none died, each reached a 100%
+  single eval — and the training graph **reproduces b24's consolidation lift**: mean `sef` **63.8** against
+  the b22 control's 30.5, within reach of b24's 66.0, peak unmoved at 95.0. **These are self-eval / graph
+  numbers; the close-out pooled and the HOF-500 that settle it are still running** — b25 is the first batch
+  to auto-chain the HOF re-measure (deployed 2026-08-13).
+
+| training self-eval, mean of 4 | b22 control (`50,100,50`) | b24 (`320`) | **b25 (`200,100,100`)** |
+|---|---|---|---|
+| peak trailing | 94.88 | 95.00 | **95.00** |
+| `sef` (primary) | 30.5 | 66.0 | **63.8** |
+| best-30 | 86.2 | 96.2 | **94.3** |
+| close-out pooled (eq-effort, gate 95) | 75.7 | 87.9 | *running* |
+
+  Per seed (`sef` / best-30): a 63.2 / 93.7 · b 62.7 / 95.3 · c 66.9 / 93.7 · d 62.2 / 94.3.
+
 - **b26 (`b26a-d`, fc 100,100) — queued (desktop), priority 220.** A shallower two-layer shape. Runs after
-  b25 and its close-outs.
+  b25's close-outs and their HOF re-measures.
 
 **Read b25/b26 against b22, not batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
 control: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88. b24 has answered the yes/no; b25 and b26
@@ -40,8 +53,10 @@ but `320` once read +10.1 pooled in batch 20 and that was noise. The HOF-500 con
 genuine ≥97%/500 checkpoints (not just inflated /100 highs), which firms up the *consolidation* claim; b25/b26
 are the replication that separates width from parameter count.
 
-Scheduler order (desktop `status.json` ledger): b25 (r2) → b25 close-outs → b26 → b26 close-outs. Check with
-`git show origin/ops-status:status.json`.
+Scheduler order (desktop `status.json` ledger): b25 close-outs (running) → **b25 HOFs** → b26 → b26
+close-outs → **b26 HOFs**. The HOF step is new — every close-out now auto-queues a 500-episode, gate-98
+re-measure of its ≥98% checkpoints (`auto_hof`, on by default, 2026-08-13); it only measures, promotion
+into `hallOfFame/` stays manual. Check with `git show origin/ops-status:status.json`.
 
 ## Batches 20-24 are closed — where their descriptions went
 
