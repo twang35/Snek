@@ -157,7 +157,12 @@ reality.
 
 1. **`CHASE_SAFE_SHAPING` is the highest-value untested change, and its hold has expired.** It was
    approved 2026-08-11 and held until the then-running batches closed out; batches 20-23 are all closed and
-   only the desktop is busy. It targets endgame food-finding — the modal failure since batch 16 — which is
+   only the desktop is busy. **Better supported as of 2026-08-14**: the endgame failure is not failing to
+   *go and get* a safe meal but arriving at boards where there is none — eating the reachable food is fatal
+   in 54% of losses
+   ([`findings.md`](findings.md#-retracted-2026-08-14-the-positions-are-trapped--geom-counts-routes-that-eat-and-die)),
+   so safe-chaseability is the right quantity to shape and distance-to-food is not. It targets endgame
+   food-finding — the modal failure since batch 16 — which is
    the one place a *ceiling* gain could still come from, now that architecture is closed for the ceiling (b24 raised consolidation, not peak) and the β ladder
    has flattened. Plan: [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md).
    The laptop's four slots are free.

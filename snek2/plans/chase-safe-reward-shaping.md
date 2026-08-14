@@ -241,7 +241,13 @@ check in advance.
   unresolved. A well-packed snake is chase-safe *because* it is well packed.
 - **n = 4 cannot resolve an effect below ~10 pp.** The same config has produced 62.5 and 18.0 here. A
   null means "not large", not "no effect".
-- **The signal lands in the mid-game, not the endgame.** If the arms come back null and Phase 0
+- **The signal lands in the mid-game, not the endgame.** **Strengthened 2026-08-14**, and the risk is
+  smaller than it reads: Φ sitting near 0 through 95-99 is the board genuinely having no safe meal —
+  eating the reachable food leaves the head no legal move in **54%** of losses
+  ([`findings.md`](../hyperparamTuning/findings.md#-retracted-2026-08-14-the-positions-are-trapped--geom-counts-routes-that-eat-and-die)).
+  So a graded *distance*-to-food potential is the wrong fallback; it would pull the snake onto meals
+  that kill it. If a graded version is wanted, grade the **region the head and tail share**, as below.
+  If the arms come back null and Phase 0
   confirms Φ ≈ 0 through 85-99, the follow-up is a **graded** potential: the share of open cells in the
   region the head and tail share, which `count_groups` already returns as a bitmask, so it costs one
   `bin(region).count('1')`. That is a different hypothesis — packing, not reachability — and it should

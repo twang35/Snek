@@ -4,6 +4,7 @@
 |---|---|---|
 | `per_priorities.py` | `<out_dir> [policy ...]` | what the PER priority signal does to the sampling distribution, and each arm's value profile against snake length |
 | `point_of_no_return.py` | `<policy-or-ckpt> <episodes> <seed> <out.json>` | per lost episode, the last point at which the food was still reachable — and the outcome split, which is where the starvation finding came from |
+| `eat_and_survive.py` | `<policy-or-ckpt> <episodes> <seed> <out.json>` | whether eating that food was **survivable**, over every route to it — the retraction of the above script's "never a dead end" reading |
 | `input_sensitivity_over_time.py` | `<out.json> <policy> <steps> [boards-policy]` | how one arm's reading of a given observation input, and its greedy action, change over training — the before/during/after of a drawdown |
 | `drawdown_chart.py` | `<sens_dir> <out.png>` | draws the four-panel figure from the above; no measurement of its own |
 | `behaviour_profile.py` | `<out.json> <ckpt-or-policy> <episodes> <seed>` | what a checkpoint *does*: steps per meal, starve headroom, packing and realised chase-safety, by snake length — the elite-vs-mediocre comparison |
@@ -13,6 +14,12 @@
 six cores and ~5 minutes for 360 episodes. It **checks its own simulator against the live game on
 every step** and reports `mismatches`, which must be 0 — that is the guard that makes its search
 trustworthy, and it is the reason to be suspicious if a future run reports anything else.
+
+**Its `geom` column is not a survivability test, and reading it as one was wrong for four days.**
+`eat_and_survive.py` imports that script's movement rule and guard rather than copying them, so the
+two cannot drift into measuring different games, and it enumerates *every* eating route because the
+shortest one is often the fatal one. Its shard seeds are recorded in the payload — the original run's
+were not, which is why the retraction is on 70 fresh losses rather than the same 75.
 
 `per_priorities.py` is behind the finding in
 [`../findings.md`](../findings.md#-measured-batches-19-20-compared-aggressive-per-against-uniform-replay)

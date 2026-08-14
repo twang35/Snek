@@ -74,8 +74,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
 | **‡‡ The seed decides which arm in a wave wins, and it does not wash out** | **measured 2026-08-11** — seed 2 or 4 is the best arm in **18 of 18** config waves at 550k, mean `sef` gap **+5.41 pp**, exact paired **p=0.00005**; still +8.73 pp at 2M. Comparable to the largest config effect on record. Paired designs difference it out; nothing else does |
 | Batch 20's low endgame Q means the terminal reward propagates slowly | **superseded the same day** — it is not lagging, it is **undiscriminating**: ~2-3 for winnable and doomed boards alike, against batch 18's 34-66 vs 18-35 |
-| **‡‡ Losses are never trapped positions — the food is reachable until the last 0-2 moves, 75/75** | **measured 2026-08-10** by exact search over 360 greedy episodes, 0 simulator mismatches. Kills the "routing mistake tens of moves earlier" hypothesis outright |
-| **‡‡ Starvation is now the modal failure: 55% of losses in both batches, at median length 98** | **measured 2026-08-10** — and recorded nowhere. `b8f` in 2026-08-02's diagnostics starved **0** times in 360 episodes under the same rule. **The binding constraint is finishing from length 96-98 inside the starve budget** |
+| ~~**‡‡ Losses are never trapped positions — the food is reachable until the last 0-2 moves, 75/75**~~ | **retracted 2026-08-14** — `geom` asked only whether a path to the food exists, never whether eating it is survivable. Eating leaves the head **no legal move in 54%** of losses, and the food cell has **no open neighbour in 86%**. The positions are trapped; the test could not see it. See below |
+| **‡‡ Starvation is now the modal failure: 55% of losses in both batches, at median length 98** | **measured 2026-08-10**, and **reinterpreted 2026-08-14** — it is not dithering. In **22 of 38** starvations eating the reachable meal would have killed the snake, so there was no safe meal to go and get. **The binding constraint is finishing from length 96-98 inside the starve budget** |
 | Removing the food-distance shaping may have bought `sef` and paid in starvations | **untested, motivated** — the modal failure is now failing to go get reachable food, and every arm since batch 16 has the shaping off. Confounded by era; see below |
 | `td_error` + `IS_WEIGHTS=0` sits halfway up the concentration ladder | **predicted, untested** — ESS/N 0.454 between batch 18's 0.213 and uniform's 1.0. The one PER cell with a live hypothesis |
 | No prioritization setting tested so far survives reliably | **established**, 7 seeds |
@@ -690,10 +690,10 @@ cannot be read as the mechanism. What is established is narrower and still usefu
 - **Where upstream is unknown.** These proxies do not pin it, and the length-99 result shows how
   easily a downstream readout can look like a cause.
 
-**That measurement has now been run** — see the next section. It did not find an early point of no
-return, because it found that **there is no trapped position to find.**
+**That measurement has now been run** — see the next section. It read as "there is no trapped position
+to find", and **that reading was retracted 2026-08-14**: the test could not see the traps.
 
-### ‡‡ Ran it: the board is never a dead end, and the modal loss is starvation at length 98
+### ‡‡ Ran it: the modal loss is starvation at length 98 — and the "never a dead end" reading is retracted below
 
 Measured 2026-08-10 with [`perDiagnostics/point_of_no_return.py`](perDiagnostics/point_of_no_return.py),
 360 greedy episodes over six shards, **0 simulator mismatches** against the live game. For every lost
@@ -707,10 +707,10 @@ different causes:
 | `reach` | reachable *within* the remaining starve budget | median 9-15 |
 | `safe` | `reach`, and the tail still reachable after eating | median 20-82, over half censored |
 
-**`geom` holds until the very last move in every single loss, for both checkpoints.** The snake is
-never sealed into a pocket with no path to the food. That kills the trapped-position hypothesis, and
-with it the premise of this whole line of questioning: there is no long chain of consequence between
-a routing mistake and the death, because there is no routing mistake of that kind.
+**`geom` holds until the very last move in every single loss, for both checkpoints.** A *path* to the
+food is always there. **This was read as killing the trapped-position hypothesis, and that reading is
+retracted** — a path existing says nothing about whether following it is survivable, and in the
+majority of these losses it is not. See the retraction at the end of this section.
 
 What there is instead, and it splits almost evenly:
 
@@ -759,6 +759,39 @@ tests tail reachability on the static body, and [`diagnostics/README.md`](diagno
 records that the static test flags a fatal move only **22.1%** of the time against **94.1%** for the
 advanced-tail variant. So `safe` is biased pessimistic, which is consistent with it being censored in
 over half the losses, and its 20-82 move figure should not be quoted as the distance.
+
+### ‡‡ Retracted 2026-08-14: the positions *are* trapped — `geom` counts routes that eat and die
+
+**`geom` returns success on the first move sequence that reaches the food and asks nothing about the
+board it leaves behind.** Eating is the one move that does not vacate the tail (`add_segment` refills
+the tile), so arriving on a food with no open neighbour fills the pocket's last cell with a head that
+has nowhere to go. Measured with
+[`perDiagnostics/eat_and_survive.py`](perDiagnostics/eat_and_survive.py), same two checkpoints and
+protocol, **0 simulator mismatches**, 70 losses (the shard seeds behind the original 75 were never
+recorded, so this is a fresh food draw at matching loss rates), enumerating **every** eating route
+rather than the shortest:
+
+| at the last state where the food was reachable | pooled n=69 | b18b @1588k | b20d @3000k |
+|---|---|---|---|
+| head has **no legal move** after eating | **37 (54%)** | 2 of 7 | 35 of 62 |
+| dies within 5 moves of eating | **39 (57%)** | 2 of 7 | 37 of 62 |
+| can eat and survive ≥100 moves | 30 (43%) | 5 of 7 | 25 of 62 |
+| food cell had **no open neighbour** | **59 (86%)** | 4 of 7 | 55 of 62 |
+
+The split is sharp, not graded: 37 sealed instantly, 2 dead within five moves, 30 fine for 100+.
+
+**Two consequences.** The starvation reading above becomes entrapment one food earlier — in 22 of 38
+starvations there was no survivable meal, so the snake was not declining one. And **"no routing
+mistake tens of moves earlier" does not hold**: walking back 40 moves and asking whether *any* state
+offered a survivable meal, **36 of 70 losses had none in the whole window**, while the other 34 had one
+up to the last 0-2 moves.
+
+**What it points at.** At length 98 the board holds two free cells and whether eating is survivable
+depends on whether they are arranged so the head can enter one and still move — set by packing many
+moves earlier, not by the move being chosen. That is a computable form of this file's open
+"what differs is the rate of arriving winnable", and it is the argument for
+[`CHASE_SAFE_SHAPING`](../plans/chase-safe-reward-shaping.md) rather than against it: the flag reading
+0 through 95-99 is the board having no safe meal, not the flag going blind.
 
 ### ‡‡ Batch 20 never learned to read "is it safe to chase the food" — but reading it does not make an arm good
 
