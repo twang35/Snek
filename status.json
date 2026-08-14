@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-13T20:13:03",
-  "ts": 1786677183.196263,
+  "iso": "2026-08-13T20:13:47",
+  "ts": 1786677227.564987,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -17,7 +17,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
@@ -26,27 +26,18 @@
       "type": "train",
       "policy": "b25a-fc200x100x100noisseed1-r2",
       "pid": 3280448,
-      "step": 2891000,
-      "steps_per_sec": 86.9,
-      "elapsed_s": 33706
+      "step": 2895000,
+      "steps_per_sec": 90.1,
+      "elapsed_s": 33751
     },
     {
       "id": "b25b-fc200x100x100noisseed2-r2",
       "type": "train",
       "policy": "b25b-fc200x100x100noisseed2-r2",
       "pid": 3280449,
-      "step": 2915000,
-      "steps_per_sec": 86.9,
-      "elapsed_s": 33706
-    },
-    {
-      "id": "b25c-fc200x100x100noisseed3-r2",
-      "type": "train",
-      "policy": "b25c-fc200x100x100noisseed3-r2",
-      "pid": 3280450,
-      "step": 2998000,
-      "steps_per_sec": 86.9,
-      "elapsed_s": 33706
+      "step": 2920000,
+      "steps_per_sec": 112.7,
+      "elapsed_s": 33751
     }
   ],
   "ledger": {
@@ -147,12 +138,12 @@
     "b24d-fc320noisseed4-hof500": "done",
     "b25a-fc200x100x100noisseed1-r2": "running",
     "b25b-fc200x100x100noisseed2-r2": "running",
-    "b25c-fc200x100x100noisseed3-r2": "running",
+    "b25c-fc200x100x100noisseed3-r2": "done",
     "b25d-fc200x100x100noisseed4-r2": "done",
+    "b25c-fc200x100x100noisseed3-r2-closeout": "queued",
     "b25d-fc200x100x100noisseed4-r2-closeout": "queued",
     "b25a-fc200x100x100noisseed1-r2-closeout": "queued",
     "b25b-fc200x100x100noisseed2-r2-closeout": "queued",
-    "b25c-fc200x100x100noisseed3-r2-closeout": "queued",
     "b26a-fc100x100noisseed1": "queued",
     "b26b-fc100x100noisseed2": "queued",
     "b26c-fc100x100noisseed3": "queued",
@@ -164,8 +155,8 @@
   },
   "disk_free_gb": 143.2,
   "load_avg": [
-    7.83984375,
-    8.33447265625,
-    8.69482421875
+    6.3056640625,
+    7.85302734375,
+    8.51416015625
   ]
 }
