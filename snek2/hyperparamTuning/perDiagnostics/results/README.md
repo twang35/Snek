@@ -12,6 +12,13 @@ payload and the seed for anything a doc quotes.**
 |---|---|---|
 | `eat_and_survive-b18b-{101..104}.json`, `-b20d-{101,102}.json` | [`../eat_and_survive.py`](../eat_and_survive.py) | [the retraction](../../findings.md#-retracted-2026-08-14-the-positions-are-trapped--geom-counts-routes-that-eat-and-die) |
 | `endgame_packing-{b18b,b24d,b20d}-{201,202}.json` | [`../endgame_packing.py`](../endgame_packing.py) | [the packing finding](../../findings.md#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points) |
+| `plasticity-<arm>.json` (9), `probe-<arm>.json` (9), `plasticity_summary.json`, `plasticity-analysis.txt` | [`../plasticity.py`](../plasticity.py), [`../plasticity_probe.py`](../plasticity_probe.py) | [the plasticity falsification](../../findings.md#-falsified-2026-08-14-there-is-no-plasticity-loss--the-collapsed-networks-fit-a-new-target-better-than-their-own-peak) |
+
+**The plasticity ladders are the reason to keep this directory for a second measurement**: five arms are
+local at a 10k stride, four are desktop-trained and were measured from checkpoint ladders **staged in
+`/tmp`, which are gone**. Re-measuring `b20m`, `b24b`, `b24d` or `b20ah` means re-staging ~11 MB per arm
+from the desktop first. `plasticity-analysis.txt` is the exact printed output the findings section
+quotes, so the numbers can be checked without re-running anything.
 
 Each payload carries its own `target`, `checkpoint`, `global_step`, `seed`, `episodes`, `outcomes` and
 `mismatches`, so a shard is reproducible from the file alone. **`mismatches` is 0 in all twelve** —

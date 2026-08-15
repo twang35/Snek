@@ -262,6 +262,17 @@ rather than at the ceiling.
   `avg_reward` enough to move the bootstrap epsilon thresholds a long way — but the batch-16 result is
   a standing argument for looking at the rest of the reward function rather than at another optimiser
   knob. See [`hyperparamTuning.md`](hyperparamTuning.md#available-knobs).
+- **Plasticity interventions — resets, ReDo, shrink-and-perturb, L2-to-init** — **closed 2026-08-14
+  before being tried.** These are the standard response to the shape of this project's curves, and the
+  mechanism they target is measurably absent: across 9 arms dormancy *falls* from a fresh-net control,
+  centred srank ends at 95-99% of it, and a direct fit-a-new-target probe reads **0.96-1.52× a fresh
+  net** with a paired 3M change of −0.021 to +0.022. `b20d` collapses 80.3 → 42.7 while its probe fit
+  **rises**. See
+  [`findings.md`](findings.md#-falsified-2026-08-14-there-is-no-plasticity-loss--the-collapsed-networks-fit-a-new-target-better-than-their-own-peak).
+  The one real ageing signature is weight growth (1.4-2.7× init) with movement decay (3-10×), nearly all
+  of it inside the first 500k — a **shrinking effective step size**, whose fixes are weight decay or a
+  larger late learning rate, not resets. That variant is not planned either while `LEARNING_RATE` and
+  `CHASE_SAFE_SHAPING` are ahead of it in the backlog.
 - **Reverting to `PyUniformReplayBuffer`** — cpprb is ~2.4x faster with no measured
   learning cost, so cheaper experiments come from keeping it.
 - **An LR schedule** — no evidence of optimization instability; degradation is gradual

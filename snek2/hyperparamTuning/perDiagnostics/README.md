@@ -10,6 +10,9 @@
 | `drawdown_chart.py` | `<sens_dir> <out.png>` | draws the four-panel figure from the above; no measurement of its own |
 | `behaviour_profile.py` | `<out.json> <ckpt-or-policy> <episodes> <seed>` | what a checkpoint *does*: steps per meal, starve headroom, packing and realised chase-safety, by snake length — the elite-vs-mediocre comparison |
 | `champion_chart.py` | `<bp_dir> <measured.json> <out.png>` | draws that comparison plus the selection-noise panels |
+| `plasticity.py` | `<out.json> <policy> [stride] [extra] [boards]` | the three published loss-of-plasticity signatures against step — dormant units, feature rank, weight norm — each against a fresh net of the same shape |
+| `plasticity_probe.py` | `<out.json> <policy> [stride] [extra] [boards]` | whether the checkpoint can still **fit a new target**, which is the question the signatures are only correlates of |
+| `plasticity_analysis.py` | `<payload_dir> [out.png\|-] [probe_dir]` | the tables and figure from both: control→peak→end, drawdown events, flat stretches, early-vs-late, and the paired probe trend |
 
 `point_of_no_return.py` shards across seeds like the `diagnostics/` scripts do; six processes take
 six cores and ~5 minutes for 360 episodes. It **checks its own simulator against the live game on
@@ -61,6 +64,36 @@ the comparison between them is paired — game-set difficulty cancels exactly. T
 *absolute* rate carries that game set's difficulty: seeds 21,22 turned out to run ~1-2 pp hard against
 seeds 31,32. **So compare columns freely, and cross-check on a second seed pair before quoting any
 single number as a policy's rate.**
+
+## The three plasticity scripts: four traps, all of them silent
+
+Behind [the falsification](../findings.md#-falsified-2026-08-14-there-is-no-plasticity-loss--the-collapsed-networks-fit-a-new-target-better-than-their-own-peak).
+Every one of these produced a full table of plausible numbers while being wrong:
+
+- **The fresh-net control is the reference for everything, and it wobbled.** `tf.random.set_seed` does
+  not determine an initialiser draw — the op-level seed comes off a per-process op counter — so two runs
+  of the same arm read dormant 0.111 and 0.139. `plasticity.seeded_reinit` clones each layer's *own*
+  initialiser config with an explicit seed, which also cannot drift from `under_the_hood.dense_layer`.
+  The control is now 15 seeded draws and identical across processes; the trained rows always were.
+- **Raw stable rank pins near 1.1 for a fresh net and a trained one alike**, because post-ReLU features
+  carry a large DC offset that dominates σ₁. The centred ranks are the sensitive ones. Kumar et al.'s
+  srank on Φ is kept beside them for comparability, not as the primary reading.
+- **The weight-norm baseline has to be per-initialiser.** Hidden layers are `VarianceScaling(2, fan_in)`
+  and the head is `RandomUniform(±0.03)`; one shared constant puts the head an order of magnitude below
+  its own initialisation forever, so a real 30× head growth reads as 3×.
+- **The probe measured output scale, not plasticity, on the first attempt** — `fit = -283`, because a
+  trained net emits Q values of order 1 against a raw teacher target of variance 0.003. The target is
+  standardised and the student's head zeroed so every network starts at `mse_start = 1.0` exactly.
+
+Two things to hold onto when reading probe output. `relative` is **only comparable at equal budget**:
+400 Adam steps puts a fresh net at 0.038 and the ratio at 8-9×, 2000 puts it at 0.53 and the ratio at
+1.05-1.52×. And the per-checkpoint sd printed beside each row is the spread **across teachers**, which is
+large and common to every checkpoint — a *change* between checkpoints is paired and must be read from
+`plasticity_analysis.probe_table`, not against that sd.
+
+`plasticity.py` accepts **any directory holding `arch.json` and `ckpt-*`**, which is how the
+desktop-trained arms were measured: a 50k ladder is ~11 MB of a 527 MB policy directory. Stage those
+**outside `savedPolicies/`** — a directory in there with holes reads as a real arm to every other tool.
 
 Kept separate from [`../diagnostics/`](../diagnostics/), which is frozen alongside
 `claudeFeatureRecommendations.md` and is about the observation vector. This one is **not frozen** —

@@ -256,9 +256,9 @@ comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 
 **Both details in that snippet are load-bearing.** `archive/charts-archive.md` has to be in the grep or
 every retired arm reads as undocumented, and the `sed` must be `s|.*charts/||` — archived captions link
-`../charts/x.png`, which the shorter `s|charts/||` leaves as `../x`. **Three PNGs will always be listed**
-(`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities`): they are diagnostic figures
-referenced from `findings.md`, not arm charts.
+`../charts/x.png`, which the shorter `s|charts/||` leaves as `../x`. **Four PNGs will always be listed**
+(`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities`, `plasticity-metrics`): they
+are diagnostic figures referenced from `findings.md`, not arm charts.
 
 This drifted once: batches 5-7 reached 12 undocumented arms because `refresh_charts.sh` succeeding
 looked like the charts were handled.

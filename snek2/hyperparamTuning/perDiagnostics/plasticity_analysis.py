@@ -27,10 +27,11 @@ somewhere else.
 Usage, from `snek2/`:
 
     PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -u \
-        hyperparamTuning/perDiagnostics/plasticity_analysis.py <payload_dir> [out.png]
+        hyperparamTuning/perDiagnostics/plasticity_analysis.py <payload_dir> [out.png|-] [probe_dir]
 
 Reads every `*.json` in `<payload_dir>` that looks like a plasticity payload. Writes a summary next to
-it as `plasticity_summary.json`, and the four-panel figure if a path is given.
+it as `plasticity_summary.json`, and the figure if a path is given (`-` to skip it). `<probe_dir>` adds
+`plasticity_probe.py`'s table, read **paired across teachers** — see `probe_table`.
 """
 import json
 import os
@@ -265,7 +266,8 @@ def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     directory = sys.argv[1]
-    chart_path = sys.argv[2] if len(sys.argv) > 2 else None
+    chart_path = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != '-' else None
+    probe_dir = sys.argv[3] if len(sys.argv) > 3 else None
 
     payloads = load_payloads(directory)
     if not payloads:
@@ -311,7 +313,7 @@ def main():
                           '%.2f' % row['stable_rank_c'], '%.3f' % row['growth_hidden'],
                           '%.4f' % row['move'] if row.get('move') is not None else '-'))
 
-    print('\n=== question 2: the metrics at the point each arm first reached a 50%% perfect rate')
+    print('\n=== question 2: the metrics at the point each arm first reached a 50% perfect rate')
     print('    (an arm that never got there has no endgame row — that is the comparison)')
     print('%-30s %8s %9s %8s %6s %8s %8s %9s' % ('arm', 'params', 'crossed@', 'dormant', 'dead',
                                                  'srank_c', 'growth', 'move/100k'))
@@ -382,13 +384,84 @@ def main():
                   handle, indent=1, default=float)
     print('\nwrote %s' % out_path)
 
+    if probe_dir:
+        probe_table(probe_dir)
+
     if chart_path:
-        draw(payloads, curves, arms, chart_path)
+        draw(payloads, curves, arms, chart_path, probe_dir)
         print('wrote %s' % chart_path)
 
 
 def fmt(value, spec):
     return '-' if value is None else spec % value
+
+
+def probe_table(directory):
+    """`plasticity_probe.py`'s payloads, read **paired across teachers**.
+
+    Every checkpoint of an arm is fitted to the same teachers, so the difference between two
+    checkpoints is a paired comparison and the teacher-to-teacher spread — which is large, sd 0.04 to
+    0.10 — cancels. Reading the printed per-checkpoint sd as the error bar on a *change* would hide
+    every real trend behind noise that is common to both sides of it.
+
+    Reports, per arm: the fresh control, the first and last checkpoint, and the paired first->last
+    change with its own sd. `d_fit` is the change in the network's ability to adapt; `d_frozen` is the
+    change in what its features support unchanged.
+    """
+    payloads = {}
+    for name in sorted(os.listdir(directory)):
+        if not name.endswith('.json'):
+            continue
+        try:
+            with open(os.path.join(directory, name)) as handle:
+                payload = json.load(handle)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and payload.get('probe_steps'):
+            payloads[payload['policy']] = payload
+    if not payloads:
+        return
+    print('\n=== the direct probe: can the checkpoint still fit a new target?')
+    print('    fit/frozen are shares of target variance removed; rel* are against a fresh net of the')
+    print('    same shape. d_* are paired first->last changes over the same teachers.')
+    print('%-30s %7s %7s %7s %6s %6s %8s %8s' % ('arm', 'fresh', 'first', 'last', 'rel1', 'relN',
+                                                 'd_fit', 'd_froz'))
+    for arm in sorted(payloads):
+        payload = payloads[arm]
+        rows = payload['rows']
+        control = next((r for r in rows if r.get('fresh')), None)
+        trained = sorted((r for r in rows if not r.get('fresh')), key=lambda r: r['step'])
+        if not control or len(trained) < 2:
+            continue
+        first, last = trained[0], trained[-1]
+        paired = [b - a for a, b in zip(first.get('fits', []), last.get('fits', []))]
+        paired_frozen = [b - a for a, b in zip(first.get('frozens', []), last.get('frozens', []))]
+        print('%-30s %7.4f %7.4f %7.4f %6.2f %6.2f %8s %8s' % (
+            arm, control['fit'], first['fit'], last['fit'], first['relative'], last['relative'],
+            '%+.4f' % float(np.mean(paired)) if paired else '-',
+            '%+.4f' % float(np.mean(paired_frozen)) if paired_frozen else '-'))
+        if paired:
+            print('%-30s %7s %7s %7s %6s %6s %8s %8s   <- sd of the paired change'
+                  % ('', '', '', '', '', '', '%.4f' % float(np.std(paired)),
+                     '%.4f' % float(np.std(paired_frozen)) if paired_frozen else '-'))
+    print('\n    per-checkpoint trend across the whole ladder (per 1M steps, paired per teacher):')
+    print('%-30s %10s %10s %8s' % ('arm', 'fit/M', 'frozen/M', 'teachers'))
+    for arm in sorted(payloads):
+        payload = payloads[arm]
+        trained = sorted((r for r in payload['rows'] if not r.get('fresh')),
+                         key=lambda r: r['step'])
+        repeats = len(trained[0].get('fits', [])) if trained else 0
+        slopes, frozen_slopes = [], []
+        for index in range(repeats):
+            slopes.append(per_million([(r['step'], r['fits'][index]) for r in trained
+                                       if index < len(r.get('fits', []))]))
+            frozen_slopes.append(per_million([(r['step'], r['frozens'][index]) for r in trained
+                                              if index < len(r.get('frozens', []))]))
+        slopes = [s for s in slopes if s is not None]
+        frozen_slopes = [s for s in frozen_slopes if s is not None]
+        print('%-30s %10s %10s %8d' % (
+            arm, fmt(float(np.mean(slopes)) if slopes else None, '%+.4f'),
+            fmt(float(np.mean(frozen_slopes)) if frozen_slopes else None, '%+.4f'), repeats))
 
 
 def report_early_late(matched):
@@ -433,18 +506,41 @@ def per_point(group, key):
     return float(np.mean(values)) if values else None
 
 
-def draw(payloads, curves, arms, path):
-    """Trailing rate over four plasticity metrics, one column per arm group, shared step axis."""
+def draw(payloads, curves, arms, path, probe_dir=None):
+    """The trailing rate, the three signatures, and the direct probe — one shared step axis.
+
+    The probe panel is the one that carries the conclusion, so it is drawn on the same axis as the
+    perfect-rate curve above it: a collapse in the top panel with a flat line in the bottom panel is
+    the whole result, and putting them in separate figures would let a reader miss it.
+    """
     import matplotlib
     matplotlib.use('Agg')
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
+    probes = {}
+    if probe_dir:
+        for name in sorted(os.listdir(probe_dir)):
+            if not name.endswith('.json'):
+                continue
+            try:
+                with open(os.path.join(probe_dir, name)) as handle:
+                    payload = json.load(handle)
+            except ValueError:
+                continue
+            if isinstance(payload, dict) and payload.get('probe_steps'):
+                probes[payload['policy']] = payload
+
     panels = [('trailing', 'trailing-30 perfect %', None),
               ('dormant_all', 'dormant fraction', 'dormant'),
-              ('srank_c', 'centred srank', 'srank_c'),
+              # As a fraction of the layer's width, not the raw count: a 320-wide arm sits at
+              # srank 220 and a 30-wide one at 22, so raw counts put every narrow arm on one
+              # flat line at the bottom of the panel.
+              ('srank_c_frac', 'centred srank / width', 'srank_c_frac'),
               ('growth_hidden', 'hidden weight growth', 'growth'),
               ('move', 'kernel movement /100k', None)]
+    if probes:
+        panels.append(('relative', 'probe: fit vs a fresh net', None))
     figure = Figure(figsize=(13, 3.0 * len(panels)), dpi=110)
     colours = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd', '#ff7f0e', '#8c564b', '#17becf',
                '#e377c2', '#7f7f7f']
@@ -459,6 +555,15 @@ def draw(payloads, curves, arms, path):
                 curve = curves[arm['policy']]
                 axis.plot([s / 1e6 for s, _ in curve], [v for _, v in curve], color=colour,
                           linewidth=0.9, label=label)
+                continue
+            if key == 'relative':
+                probe = probes.get(arm['policy'])
+                if not probe:
+                    continue
+                points = sorted((r['step'], r['relative']) for r in probe['rows']
+                                if not r.get('fresh') and r.get('relative') is not None)
+                axis.plot([s / 1e6 for s, _ in points], [v for _, v in points], color=colour,
+                          linewidth=1.3, marker='o', markersize=2.5, label=label)
                 continue
             series = [(r['step'], r[key]) for r in trained if r.get(key) is not None]
             axis.plot([s / 1e6 for s, _ in series], [v for _, v in series], color=colour,
@@ -475,6 +580,10 @@ def draw(payloads, curves, arms, path):
             axis.legend(fontsize=7, ncol=3, loc='upper right')
             axis.set_title('Plasticity metrics against step. Dotted = that arm\'s fresh-net control; '
                            'dashed vertical = its peak.', fontsize=10)
+        if key == 'relative':
+            # 1.0 is the fresh net. Above it the trained network fits a new target *better* than an
+            # untrained one, which is the opposite of plasticity loss.
+            axis.axhline(1.0, color='black', linestyle='-', linewidth=0.8, alpha=0.6)
         if index == len(panels) - 1:
             axis.set_xlabel('training step (millions)', fontsize=9)
     figure.tight_layout()

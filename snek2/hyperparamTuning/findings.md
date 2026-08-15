@@ -74,6 +74,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
 | **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
 | **‡‡ The seed decides which arm in a wave wins, and it does not wash out** | **measured 2026-08-11** — seed 2 or 4 is the best arm in **18 of 18** config waves at 550k, mean `sef` gap **+5.41 pp**, exact paired **p=0.00005**; still +8.73 pp at 2M. Comparable to the largest config effect on record. Paired designs difference it out; nothing else does |
+| **‡‡ There is no plasticity loss — a collapsed network fits a new target *better* than its own peak did** | **falsified 2026-08-14** on 9 arms, all three published signatures plus a direct fit-a-new-target probe. Dormancy *falls* from the fresh control, centred srank ends at 95-99% of it, and the probe reads **0.96-1.52× a fresh net** with a paired 3M change of **-0.021 to +0.022**. `b20d` collapses 80.3 → 42.7 while its probe fit rises 0.546 → 0.555. **Closes resets / ReDo / shrink-and-perturb as directions.** See below |
+| **‡‡ The one real ageing signature is weight growth with movement decay, not lost capacity** | **measured 2026-08-14** — hidden norms reach **1.4-2.7×** initialisation and kernel movement falls **3-10×**, nearly all of it inside the first 500k. A shrinking effective step size along the current trajectory; the probe hands the network a fresh optimiser and it fits fine |
 | Batch 20's low endgame Q means the terminal reward propagates slowly | **superseded the same day** — it is not lagging, it is **undiscriminating**: ~2-3 for winnable and doomed boards alike, against batch 18's 34-66 vs 18-35 |
 | ~~**‡‡ Losses are never trapped positions — the food is reachable until the last 0-2 moves, 75/75**~~ | **retracted 2026-08-14** — `geom` asked only whether a path to the food exists, never whether eating it is survivable. Eating leaves the head **no legal move in 54%** of losses, and the food cell has **no open neighbour in 86%**. The positions are trapped; the test could not see it. See below |
 | **‡‡ Starvation is now the modal failure: 55% of losses in both batches, at median length 98** | **measured 2026-08-10**, and **reinterpreted 2026-08-14** — it is not dithering. In **22 of 38** starvations eating the reachable meal would have killed the snake, so there was no safe meal to go and get. **The binding constraint is finishing from length 96-98 inside the starve budget** |
@@ -1128,6 +1130,89 @@ do not exist at all. Second, the rollout rows are **one checkpoint each**, and c
 checkpoint variance is large in this project; the 200k row reads 46.9% where the training graph's
 eval at that step read 50%, which is agreement, but the before/after gap should be read against the
 training curve rather than these two numbers.
+
+## ‡‡ Falsified 2026-08-14: there is no plasticity loss — the collapsed networks fit a new target *better* than their own peak
+
+The loss-of-plasticity literature describes this project's shape almost exactly: an arm peaks around
+1-3M steps, declines, and thirteen batches of optimiser, PER and architecture knobs have not moved the
+ceiling once. So the three published signatures were measured against step on **9 arms**, plus a direct
+probe that asks the question the signatures are only correlates of.
+
+**Every part of it comes back negative, and two parts come back with the sign reversed.**
+
+| the claim | what the measurement says |
+|---|---|
+| dormant units accumulate | **no** — dormancy *falls* from the fresh-net control in 9 of 9 arms (`b18b` 0.171 → 0.090) and is flat after ~500k. `dead` and `const` likewise |
+| the feature matrix collapses onto a subspace | **no** — centred srank ends at **95-99% of its fresh value** in every arm, and *rises* over the second half in 5 of 9 |
+| weights grow until the effective step size vanishes | **the one true signature** — hidden-layer norm reaches **1.4-2.7×** its initialisation, and kernel movement falls 3-10× |
+| the network loses the ability to fit a new target | **no, and reversed** — the direct probe reads **0.96-1.52× a fresh net of the same shape**, and the paired first→last change over 3M steps is **-0.021 to +0.022** on a fit of ~0.6 |
+| this is why some arms never recover from forgetting | **no, and reversed** — see the two collapse cases below |
+
+Instruments: [`perDiagnostics/plasticity.py`](perDiagnostics/plasticity.py) for the signatures,
+[`plasticity_probe.py`](perDiagnostics/plasticity_probe.py) for the probe,
+[`plasticity_analysis.py`](perDiagnostics/plasticity_analysis.py) for the tables and the figure. All
+three read a fixed board set from one finished arm's buffer, so nothing moves underfoot; each reports a
+**fresh net of the same shape** as its control, which is the only way to say whether srank 41 is high.
+
+![plasticity metrics against step](charts/plasticity-metrics.png)
+
+Top panel: the perfect rate, collapsing repeatedly. Bottom panel: the same networks' ability to fit a
+new target, flat and above 1.0 throughout. That pair is the finding.
+
+### The two collapse cases, which are the decisive ones
+
+`b20d-fc50seed4` peaks at **80.3** @917k and falls to **42.7** by 2.75M — a 44.7 pp drawdown it never
+recovers from. `b24d-fc320noisseed4` peaks at **96.0** @1342k and ends at **60.3**.
+
+| arm | trailing at peak → end | probe `fit` at peak → end | `fit_frozen` |
+|---|---|---|---|
+| `b20d-fc50seed4` | 80.3 → 42.7 | 0.5458 → **0.5551** | 0.4413 → **0.4429** |
+| `b24d-fc320noisseed4` | 96.0 → 60.3 | 0.6995 → **0.7060** | 0.6500 → **0.6562** |
+
+Both go **up**. The network that has forgotten how to play is marginally *better* at learning something
+new than the network that held the record. Whatever catastrophic forgetting is here, it is not the
+network losing capacity to learn — the capacity is intact and slightly improved, and the policy is
+simply somewhere else.
+
+### The four questions this was built to answer
+
+1. **Does plasticity loss precede the peak?** There is nothing to precede it. Between the mid-rise, the
+   peak and the end, dormancy moves ≤0.01 and srank ≤2 counts in every arm.
+2. **Did the wide configs lose plasticity before reaching endgame?** No, and the arm that never reached
+   it is the counter-example. `b20u-fc60x30x30x30x30seed1` **never crossed 50%** (peak 40.7) and has the
+   **highest** relative plasticity of all nine, **1.46-1.52×** fresh. Its failure is not capacity. The
+   `320` and `100,200,100` arms cross 50% at 117k-261k with growth still at 1.19-1.37.
+3. **Around 1M, or still plastic at 3M?** All the movement is in the **first half and mostly the first
+   500k** — dormancy drifts -0.005 to -0.015 per 1M in the first half against -0.005 to +0.003 in the
+   second, and kernel movement -0.13 to -0.33 against -0.001 to -0.03. Nothing degrades between 1M and
+   3M; the metrics have simply stopped moving. **Still plastic at 3M.**
+4. **Later drawdowns vs earlier ones, and flat stretches.** 20 drawdown events across the 9 arms, split
+   at the median peak step at **comparable depth** (30.2 early vs 25.5 late): `d_dormant` +0.002 early
+   vs -0.001 late, `d_srank` -0.5 vs +1.2, and per point of depth both are ~0. Late drawdowns happen in
+   a network that is moving ~2.5× less (mean `move` 0.136 early vs 0.055 late), but that is the global
+   step trend, not a property of the drawdown. Across **21 flat stretches** (≤10 pp over ≥300k) dormancy
+   is flat or falling in 17 — so plasticity does not quietly decay where the perfect rate is still.
+
+### What it does establish, and what to do with it
+
+The one real signature is **weight growth with movement decay**: hidden norms at 1.4-2.7× init and
+kernel movement down 3-10× by 1M steps. That is a **shrinking effective step size**, not lost capacity —
+consistent with the probe, since the probe gives the network a fresh Adam optimiser and finds it fits
+fine. It predicts that an arm late in training moves slowly *along its current trajectory*, which is a
+different problem with different fixes (weight decay, L2-to-init, larger late learning rate) than
+plasticity loss (resets, shrink-and-perturb, ReDo).
+
+**So resets, ReDo and shrink-and-perturb are not worth trying on this problem**, and that is the
+practical value here: they are the standard response to the shape of these curves, they would have been
+the natural next batch, and the mechanism they target is measurably absent. The endgame results in this
+file — packing, per-meal reliability, hunting speed — are where the ceiling is.
+
+**Two caveats.** The probe's `relative` is only comparable at equal budget: at 400 Adam steps a fresh
+net reads 0.038 and the ratio is 8-9×, at 2000 it reads 0.53 and the ratio is 1.05-1.52×. Both agree on
+direction, which is why either can be trusted, but no number here transfers to a different budget. And
+`fit_frozen` — what the existing features support *without* changing them — does fall slowly in the
+narrow arms (`b20u` -0.021/1M, ~-12% over 3M), so representation quality is not perfectly static; it is
+just not what limits these arms, since `b20u` is both the worst arm and the most plastic one.
 
 ## ‡‡ The seed, not the config, decides which arm in a wave wins — and it holds to 2M steps
 
