@@ -4,6 +4,10 @@
 at the same time — a resumed arm can even produce both — so the fallbacks matter as much as the
 new fields do.
 """
+import os
+import shutil
+import tempfile
+
 import eval_progress
 
 
@@ -787,3 +791,36 @@ def test_load_runs_suffix_scope_keeps_the_jobs_own_parallel_shards():
         scoped = eval_progress.load_runs('b24b', suffixes={'_w0', '_w1'})
         assert sorted(r['suffix'] for r in scoped) == ['_w0', '_w1']
     _with_temp_runs_dir(body)
+
+
+# ---------------------------------------------------- render resolution (HiDPI crispness)
+
+def test_render_dpi_defaults_to_110_and_follows_the_env_knob():
+    """chart_viewer only magnifies this PNG, so the source dpi is what decides crispness on a
+    HiDPI panel. The default must stay 110 (the desktop's 1x display and the standalone window
+    rely on it); SNEK_EVAL_CHART_DPI raises it, and a higher dpi means more source pixels at the
+    same figsize -- which is how eval_checkpoints makes the laptop charts crisp without resizing
+    the window."""
+    from PIL import Image
+    state = eval_progress.summarize([run([result(1000), result(2000)])])
+    directory = tempfile.mkdtemp(prefix='snek-dpi-test-')
+    saved = os.environ.get('SNEK_EVAL_CHART_DPI')
+    try:
+        os.environ.pop('SNEK_EVAL_CHART_DPI', None)
+        low = os.path.join(directory, 'low.png')
+        eval_progress.render('b30e-chase10fc200x100x100seed1', state, low)
+        assert round(Image.open(low).info['dpi'][0]) == 110
+
+        os.environ['SNEK_EVAL_CHART_DPI'] = '220'
+        high = os.path.join(directory, 'high.png')
+        eval_progress.render('b30e-chase10fc200x100x100seed1', state, high)
+        assert round(Image.open(high).info['dpi'][0]) == 220
+        # Same figsize, double the dpi -> ~double the pixels, i.e. a crisper source, not a bigger
+        # chart in inches. This is the property that keeps chart_viewer's window size unchanged.
+        assert Image.open(high).size[0] > Image.open(low).size[0]
+    finally:
+        if saved is None:
+            os.environ.pop('SNEK_EVAL_CHART_DPI', None)
+        else:
+            os.environ['SNEK_EVAL_CHART_DPI'] = saved
+        shutil.rmtree(directory, ignore_errors=True)

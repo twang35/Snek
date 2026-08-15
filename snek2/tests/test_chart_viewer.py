@@ -264,6 +264,157 @@ def test_spawn_failure_is_swallowed():
         chart_viewer.subprocess.Popen = saved_popen
 
 
+def test_viewer_dpi_is_2x_on_darwin_and_1x_elsewhere():
+    """Retina Macs need 2x because the Tk backend reports device_pixel_ratio 1 there, so a 1x
+    figure is upscaled by the compositor and blurs. Linux's 1x display must stay at 100 — the
+    desktop's window would otherwise render double the pixels and shrink."""
+    assert chart_viewer.viewer_dpi('darwin') == chart_viewer.VIEWER_HIDPI_DPI
+    assert chart_viewer.viewer_dpi('darwin') == 200
+    assert chart_viewer.viewer_dpi('linux') == 100
+    # An explicit --dpi wins on either platform.
+    assert chart_viewer.viewer_dpi('darwin', 150) == 150
+    assert chart_viewer.viewer_dpi('linux', 300) == 300
+
+
+def test_is_verification_policy_covers_the_throwaway_set():
+    for name in ('smoke', 'smoke-x', 'champion_1500000', 'bench-abc'):
+        assert chart_viewer.is_verification_policy(name) is True, name
+    for name in ('b30e-chase10fc200x100x100seed1', 'train', 'b28a-chase20g85seed1'):
+        assert chart_viewer.is_verification_policy(name) is False, name
+
+
+def test_eval_spawn_skipped_when_disabled_and_for_verification():
+    """No verification eval and no disabled run may reach Popen; a real close-out does.
+
+    The stub records rather than raises, for the same reason the training test does: every
+    Exception in `spawn_for_eval` is swallowed, so a raising stub would be invisible."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+    calls = []
+
+    class _Res:
+        stdout = b''       # no viewer running, so only the gate can stop a launch
+
+    class _Proc:
+        pid = 999
+
+    chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
+    chart_viewer.subprocess.Popen = lambda argv, **_kw: calls.append(argv) or _Proc()
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='0')
+    try:
+        chart_viewer.spawn_for_eval('b30e-chase10fc200x100x100seed1')
+        assert calls == [], 'launched a viewer with SNEK_CHART_VIEWER=0'
+        restore()
+        restore = _with_env(SNEK_CHART_VIEWER='1')
+        for name in ('smoke', 'champion_1500000', 'bench-abc'):
+            chart_viewer.spawn_for_eval(name)
+        assert calls == [], 'launched a viewer for a verification eval'
+        # ...and the same stubs do launch for a real arm, so the skips above are the gate, not a
+        # stub that never spawns.
+        chart_viewer.spawn_for_eval('b30e-chase10fc200x100x100seed1')
+        assert len(calls) == 1
+    finally:
+        restore()
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+
+
+def test_eval_spawn_is_gated_off_the_desktop():
+    """The desktop-safety contract: on non-darwin `viewer_enabled()` is off by default, so an eval
+    launched there never opens a second viewer alongside the runner daemon's."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+    saved_platform = sys.platform
+    calls = []
+
+    class _Res:
+        stdout = b''
+
+    chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
+    chart_viewer.subprocess.Popen = lambda argv, **_kw: calls.append(argv)
+    _clear_locks()
+    os.environ.pop('SNEK_CHART_VIEWER', None)     # no override: platform default decides
+    try:
+        sys.platform = 'linux'
+        assert chart_viewer.spawn_for_eval('b30e-chase10fc200x100x100seed1') is None
+        assert calls == [], 'opened a viewer on a non-darwin host'
+    finally:
+        sys.platform = saved_platform
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+
+
+def test_eval_spawn_globs_evals_and_watches_the_eval_processes():
+    """The argv contract: show the wave's eval PNGs by glob (not `--arms`, which reads trainers),
+    watch this batch's eval processes so it self-exits, and detach into its own session."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+    captured = {}
+
+    class _Res:
+        stdout = b''
+
+    class _Proc:
+        pid = 999
+
+    def fake_popen(argv, **kw):
+        captured['argv'], captured['kw'] = argv, kw
+        return _Proc()
+
+    chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
+    chart_viewer.subprocess.Popen = fake_popen
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    try:
+        proc = chart_viewer.spawn_for_eval('b30e-chase10fc200x100x100seed1')
+        assert proc is not None
+        argv, kw = captured['argv'], captured['kw']
+        assert '--arms' not in argv, 'eval viewer must glob files, not scan trainers'
+        assert argv[argv.index('--glob') + 1] == os.path.join('evals', 'b30*_eval_progress.png')
+        assert argv[argv.index('--watch') + 1] == 'eval_checkpoints.py b30'
+        assert argv[2].endswith('chart_viewer.py')
+        assert kw['start_new_session'] is True
+        assert kw['close_fds'] is True
+        assert os.path.isfile(os.path.join(kw['cwd'], 'chart_viewer.py'))
+    finally:
+        restore()
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+
+
+def test_eval_spawn_dedupes_on_the_eval_glob():
+    """A viewer already showing this batch's eval charts suppresses a second one; a different
+    batch is unaffected. Faked `ps` stands in for the live viewer."""
+    saved_run, saved_popen = chart_viewer.subprocess.run, chart_viewer.subprocess.Popen
+    popened = []
+
+    class _Res:
+        def __init__(self, out):
+            self.stdout = out
+
+    def fake_run(args, **_kw):
+        if args[0] == 'pgrep':
+            return _Res(b'4242\n')
+        return _Res(b'/py -u chart_viewer.py --glob evals/b30*_eval_progress.png '
+                    b'--watch eval_checkpoints.py b30\n')
+
+    class _Proc:
+        pid = 999
+
+    chart_viewer.subprocess.run = fake_run
+    chart_viewer.subprocess.Popen = lambda argv, **_kw: popened.append(argv) or _Proc()
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    try:
+        assert chart_viewer.spawn_for_eval('b30f-chase10fc200x100x100seed2') is None
+        assert popened == [], 'opened a second viewer for a batch already shown'
+        # A different batch is not suppressed by b30's viewer.
+        assert chart_viewer.spawn_for_eval('b28a-chase20g85seed1') is not None
+        assert len(popened) == 1
+    finally:
+        restore()
+        chart_viewer.subprocess.run = saved_run
+        chart_viewer.subprocess.Popen = saved_popen
+
+
 def _fake_ps(lines):
     """Stub subprocess.run so pgrep reports pids and ps returns `lines`."""
     class _Res:

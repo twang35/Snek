@@ -690,12 +690,20 @@ def render(policy_name, state, out_path):
     # ‡ No bbox_inches='tight' here, deliberately. Tight crops to the drawn content, so the PNG's
     # pixel dimensions changed whenever a label, legend or the text block changed width — and the
     # live window sizes itself from the image, so it kept resizing even at a fixed figsize. Fixed
-    # margins instead: every frame is exactly 9.5x9.0in at 110dpi, so the window holds still and
-    # each panel stays where it was in the previous frame.
+    # margins instead: every frame is exactly 9.5x9.0in, so the window holds still and each panel
+    # stays where it was in the previous frame.
     # top=0.925 (was 0.945) leaves room between the suptitle and the top panel's own title — at
     # 0.945 the "In flight: ..." title crowded right up against the "— eval progress" suptitle.
     figure.subplots_adjust(left=0.07, right=0.985, top=0.925, bottom=0.045)
-    figure.savefig(partial, dpi=110)
+    # SNEK_EVAL_CHART_DPI (default 110) is the render resolution. chart_viewer.py only *magnifies*
+    # this PNG, so on a HiDPI (Retina) panel 110 dpi is blown up ~2x and looks soft — the training
+    # chart is crisp on the same laptop because under_the_hood renders it at 200 dpi. eval_checkpoints
+    # raises this to 220 on the laptop so the source carries enough pixels to stay sharp at the *same*
+    # window size (chart_viewer's window is fixed by figure_dims, not by the source px). The dpi is
+    # still one constant per process, so a standalone window is the same size on every frame — only
+    # larger. The 1x desktop display keeps the 110 default (smaller PNGs, no memory cost).
+    dpi = int(os.environ.get('SNEK_EVAL_CHART_DPI', '110'))
+    figure.savefig(partial, dpi=dpi)
     plt.close(figure)
     os.replace(partial, out_path)
 

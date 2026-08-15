@@ -510,6 +510,62 @@ def spawn_for_policy(policy_name):
         return None
 
 
+def is_verification_policy(policy_name):
+    """Throwaway evals nobody watches: smokes, `champion_*` and `bench-*` verification runs.
+
+    The same set the never-delete table treats as disposable, so none of them earns a window."""
+    return (policy_name.startswith('smoke') or policy_name.startswith('champion')
+            or policy_name.startswith('bench'))
+
+
+def spawn_for_eval(policy_name):
+    """Best-effort live chart window for an eval (close-out / HOF) launch. Returns the Popen or None.
+
+    The training counterpart is `spawn_for_policy`; this differs only in what it points the viewer
+    at. An eval writes `evals/<policy>_eval_progress.png` (not `runs/<policy>.png`), a wave of evals
+    is a set of *files* rather than live trainers, and there is no arm registry to read — so the
+    viewer is launched with `--glob evals/<prefix>*_eval_progress.png` and
+    `--watch eval_checkpoints.py <prefix>`, which shows every arm of the wave and exits when the last
+    eval process stops. Verification evals (smoke / champion_* / bench-*) get no window.
+
+    Darwin-only via `viewer_enabled()` — the same gate as training — so this never fires on the
+    desktop, where the runner daemon owns the viewer (it injects the graphical session's
+    DISPLAY/XAUTHORITY; two owners would open two windows per wave). Every failure path is swallowed:
+    a chart is never worth an eval."""
+    if not viewer_enabled() or is_verification_policy(policy_name):
+        return None
+    prefix = batch_prefix(policy_name)
+    # A lock namespace of its own (`<prefix>-eval`), so a training viewer's leftover claim never
+    # suppresses an eval window, nor this one a later trainer's. The glob is relative and resolves
+    # against the viewer's cwd (the snek2 dir), exactly as the training path's `runs/` glob does.
+    slot = '{0}-eval'.format(prefix)
+    glob_arg = os.path.join('evals', '{0}*_eval_progress.png'.format(prefix))
+    # pgrep catches a viewer opened by an earlier arm of the same wave whose lock has aged out of
+    # tmp; the O_EXCL claim closes the race four arms starting in one second would otherwise lose.
+    if viewer_running_for('--glob {0}'.format(glob_arg)) or not claim_viewer_slot(slot):
+        return None
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        log_path = os.path.join(tempfile.gettempdir(),
+                                'snek_chart_viewer_{0}-eval.log'.format(prefix))
+        log = open(log_path, 'ab')
+        argv = [sys.executable, '-u', os.path.join(here, 'chart_viewer.py'),
+                '--glob', glob_arg,
+                '--watch', 'eval_checkpoints.py {0}'.format(prefix),
+                '--title', 'snek {0} eval — live'.format(prefix)]
+        proc = subprocess.Popen(argv, cwd=here, stdout=log, stderr=log,
+                                start_new_session=True, close_fds=True)
+        hold_viewer_slot(slot, proc.pid)
+        print('chart viewer: pid {0} showing the live {1} eval charts '
+              '(log {2}; SNEK_CHART_VIEWER=0 to disable)'.format(proc.pid, prefix, log_path))
+        return proc
+    except Exception as error:
+        release_viewer_slot(slot)
+        print('chart viewer launch failed ({0}: {1}) — eval continues'
+              .format(type(error).__name__, error))
+        return None
+
+
 def exit_now(plt, code=0, exit_fn=None):
     """Close the Tk windows, then leave *without* running interpreter shutdown.
 
@@ -615,13 +671,33 @@ def fit_figure_to_screen(fig, w_in, h_in):
         pass
 
 
-def make_figure(plt, rows, cols, scale, title):
+# Darwin's built-in panels are 2x Retina, but the conda Tk build reports `device_pixel_ratio` 1
+# (Tk scaling 1.0) — so matplotlib renders the figure at 1x and the macOS compositor upscales it,
+# which is what makes every laptop chart look soft however sharp the source PNG is. Rendering the
+# figure at 2x dpi gives it the pixels the panel actually has, so it is crisp at the same perceived
+# (logical) size. `fit_figure_to_screen` already divides screen px by the real dpi, so the window
+# still fits. Linux keeps 100: its 1x display shows the figure pixel-for-pixel and 2x would only
+# waste pixels and shrink the window. Measured 2026-08-15: dpr=1 on the built-in Retina panel.
+VIEWER_HIDPI_DPI = 200
+
+
+def viewer_dpi(platform, override=None):
+    """The dpi to render the viewer's figure at. 2x on darwin (see `VIEWER_HIDPI_DPI`), 100
+    elsewhere; an explicit `--dpi` wins either way. Pure so the platform rule is testable without
+    a display."""
+    if override:
+        return override
+    return VIEWER_HIDPI_DPI if platform == 'darwin' else 100
+
+
+def make_figure(plt, rows, cols, scale, title, dpi=None):
     """Build the chart grid, then (re)install the signal handler — one operation, in that
     order, because separating them silently breaks the clean exit. See
     `install_signal_exit`: Tk overwrites the OS-level handler while creating this window,
     so any install that does not follow a `subplots()` call is dead code."""
     dims = figure_dims(rows, cols, scale)
-    fig, grid = plt.subplots(rows, cols, squeeze=False, figsize=dims)
+    fig, grid = plt.subplots(rows, cols, squeeze=False, figsize=dims,
+                             dpi=viewer_dpi(sys.platform, dpi))
     fit_figure_to_screen(fig, *dims)
     try:
         fig.canvas.manager.set_window_title(title)
@@ -645,6 +721,8 @@ def build_parser():
     ap.add_argument('--interval', type=float, default=1.0)
     ap.add_argument('--scale', type=float, default=2.6, help='multiply the window size')
     ap.add_argument('--title', default='snek charts')
+    ap.add_argument('--dpi', type=int, default=None,
+                    help='figure render dpi; default 200 on darwin (Retina), 100 elsewhere')
     return ap
 
 
@@ -689,7 +767,7 @@ def main():
         if fig is None or len(axes) != rows * cols or files != rendered_files:
             if fig is not None:
                 plt.close(fig)
-            fig, axes = make_figure(plt, rows, cols, args.scale, args.title)
+            fig, axes = make_figure(plt, rows, cols, args.scale, args.title, args.dpi)
             fignum = fig.number
         rendered_files = files
         for ax in axes:

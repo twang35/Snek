@@ -499,6 +499,18 @@ progress shows up, and costs training nothing. `WATCH_FPS` caps the frame rate (
 first arm to start opens it and the other three share it, and the dedupe keys on the batch prefix so a
 second batch still gets its own.
 
+**A laptop *eval* now does the same** (2026-08-15) — `eval_checkpoints.main()` calls
+`chart_viewer.spawn_for_eval()`, which globs `evals/<prefix>*_eval_progress.png` and watches
+`eval_checkpoints.py <prefix>`, so a four-arm close-out opens **one** window (own `<prefix>-eval` lock
+namespace) and it self-exits when the last arm stops. Darwin-only via `viewer_enabled()` and skipped for
+verification evals (`smoke`/`champion_*`/`bench-*`), so the desktop is untouched — its runner daemon
+stays the sole viewer owner there. **Two knobs make the laptop charts crisp on the Retina panel, where
+the Tk backend reports `device_pixel_ratio` 1** (so matplotlib renders at 1x and macOS upscales →
+blur): the viewer renders its figure at `viewer_dpi()` = **200** on darwin (100 elsewhere; `--dpi`
+overrides), and `eval_checkpoints` raises the source PNG to `SNEK_EVAL_CHART_DPI=220` on darwin (default
+110, so desktop/standalone are unchanged). The *display* dpi is the real lever — a higher source alone
+still looks soft because `chart_viewer` downsamples it into the display figure.
+
 **The dedupe needs the `O_EXCL` claim lock, not just the `pgrep` check — a check-then-spawn dedupe
 shipped and opened four windows.** A wave's four trainers launch inside the same second, so all four ran
 the `pgrep` check before any had spawned, all four saw nothing, and all four opened a window.

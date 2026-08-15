@@ -991,6 +991,20 @@ def main(argv):
         return 1
     archive_existing_eval_pngs()
     policy_name = argv[1]
+    # Live chart window on the laptop only. `viewer_enabled()` is darwin-gated, so this is a no-op
+    # on the desktop, where the runner daemon owns the viewer (`desktop/runner/runner.py`) — two
+    # owners would open two windows per wave. It runs after archive_existing_eval_pngs() so the
+    # viewer globs the fresh charts, and it is best-effort: a chart is never worth an eval.
+    if sys.platform == 'darwin':
+        # HiDPI: chart_viewer only magnifies the PNG, and 110 dpi looks soft blown up on a Retina
+        # panel while the 200-dpi training chart stays crisp. 220 gives the source enough pixels to
+        # match, at the same window size. setdefault so an explicit SNEK_EVAL_CHART_DPI still wins.
+        os.environ.setdefault('SNEK_EVAL_CHART_DPI', '220')
+        try:
+            import chart_viewer
+            chart_viewer.spawn_for_eval(policy_name)
+        except Exception as error:
+            print('chart viewer skipped ({0}: {1})'.format(type(error).__name__, error))
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     # 4, lowered from 10 on 2026-08-08. Measured on the real close-out shape (4 parallel eval
     # processes, 800 episodes each): with independent workers 4 gives 117s against 118s at 5 and
