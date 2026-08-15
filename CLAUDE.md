@@ -655,6 +655,15 @@ has to be run against the archive files too.
 
 ## Eval cost
 
+**Run a close-out or a HOF eval as 4 parallel processes, each with at least 4 workers** (standing
+instruction, 2026-08-15). Give every arm in a wave its own `eval_checkpoints.py` process and start all
+four at the same time. Set `EVAL_WORKERS` to 4 or more on each. The HOF-500 re-measure runs the same
+way. This is the measured throughput point — 4 processes × 4 workers fill the 14 cores (~12.7 busy), and
+it is how the desktop already closes out. **Do not run the arms one after another**; that leaves most
+cores idle and runs several times slower. 16 spawned workers hold ~3.7 GB, inside the band on both hosts.
+Each process writes its own `<policy>_checkpoint_evals.json`, so the results do not collide; only the
+`evals/` chart PNG is shared, and that is cosmetic.
+
 **`EVAL_WORKERS` is close to free, and lowering it to save CPU does the opposite.** Measured
 seconds per episode: **1.03 at 2 workers, 0.33 at 10, 0.30 at 20.** TensorFlow's thread pool costs
 about a core whether its batch has 2 rows or 20, so a small count pays full inference overhead for
