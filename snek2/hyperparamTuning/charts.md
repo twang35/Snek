@@ -44,18 +44,6 @@ diagnostic figures referenced from [`findings.md`](findings.md) and
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
 
-## ⚠ The flat-red-line charts below are a fixed instrumentation bug, kept as evidence
-
-`b27a-d` and `b30a-d` have **no red line at all**, and it was never their policies. The perfect-game counter
-compared the episode's final reward with `PERFECT_GAME_REWARD`, and the chase-safe shaping shifts that reward
-by `−c` at the winning step, so `perfect_percent` read 0 in all 310+ evals while their `max_score` fields
-recorded filled boards from step 9k. The same zero pinned epsilon at 0.0125. **Both batches were relaunched
-on the fixed counter as `b27e-h` and `b30e-h`**, whose charts show a red line within minutes; the void arms'
-charts are kept here as the evidence. The whole story is in
-[`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter),
-and [`runs.md`](runs.md#-batches-27-and-30-were-relaunched--the-perfect-game-counter-was-reward-based-2026-08-14)
-has what happens to the runs.
-
 ## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *b30e-h running on the laptop*
 
 b27's config with one change, the net: **`200,100,100`** instead of `320`. Everything else is identical —
@@ -92,32 +80,6 @@ exists.
 
 ![b30h](charts/b30h-chase10fc200x100x100seed4.png)
 **b30h-chase10fc200x100x100seed4**
-
-### Batch 30's void first attempt — `b30a-d`, stopped at ~138k with a flat red line
-
-Killed at 137-139k steps once the counter bug was found, and their checkpoints deleted. The score curves are
-worth one look: these arms were learning *normally* — trailing 88.4-93.5 at ~138k against `b25`'s 86-89 at
-108k — which is why the 2×2 was relaunched rather than abandoned. Their `perfect_percent` is 0 throughout and
-means nothing.
-
-| arm | step | trailing | perfect % |
-|---|---|---|---|
-| `b30a-chase10fc200x100x100seed1` | 138k | 90.5 | **0, miscounted** |
-| `b30b-chase10fc200x100x100seed2` | 137k | 89.2 | **0, miscounted** |
-| `b30c-chase10fc200x100x100seed3` | 138k | 88.4 | **0, miscounted** |
-| `b30d-chase10fc200x100x100seed4` | 139k | 90.2 | **0, miscounted** |
-
-![b30a](charts/b30a-chase10fc200x100x100seed1.png)
-**b30a-chase10fc200x100x100seed1** — score to ~91, red axis empty for all 139 evals.
-
-![b30b](charts/b30b-chase10fc200x100x100seed2.png)
-**b30b-chase10fc200x100x100seed2**
-
-![b30c](charts/b30c-chase10fc200x100x100seed3.png)
-**b30c-chase10fc200x100x100seed3**
-
-![b30d](charts/b30d-chase10fc200x100x100seed4.png)
-**b30d-chase10fc200x100x100seed4**
 
 ## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *b27e-h on the desktop*
 
@@ -168,32 +130,6 @@ queued behind these four and now run on fixed code.
 ![b27h](charts/b27h-chase10g85seed4.png)
 **b27h-chase10g85seed4** — first filled board at step 8k, and the first arm whose epsilon left the 0.0125
 ceiling.
-
-### Batch 27's void first attempt — `b27a-d`, stopped at 309-326k with a flat red line
-
-Killed once the counter bug was found. Every graph shows the same shape: a healthy blue score curve settling
-at 90-93 and **no red line at all**, while each arm's own `max_score` field recorded a **filled board**
-between steps 9k and 16k. Epsilon sat at 0.0125 the whole way, so these are not readings on the shaping —
-they are the clearest picture of the bug.
-
-| arm | step | trailing | first filled board | perfect % | epsilon |
-|---|---|---|---|---|---|
-| `b27a-chase10g85seed1` | 309k | 92.6 | step 16k | **0, miscounted** | 0.0125 |
-| `b27b-chase10g85seed2` | 326k | 91.7 | step 14k | **0, miscounted** | 0.0125 |
-| `b27c-chase10g85seed3` | 319k | 90.5 | step 13k | **0, miscounted** | 0.0125 |
-| `b27d-chase10g85seed4` | 318k | 93.0 | step 9k | **0, miscounted** | 0.0125 |
-
-![b27a](charts/b27a-chase10g85seed1.png)
-**b27a-chase10g85seed1** — score rises to ~93 and holds; the perfect-game axis is empty for all 310 evals.
-
-![b27b](charts/b27b-chase10g85seed2.png)
-**b27b-chase10g85seed2**
-
-![b27c](charts/b27c-chase10g85seed3.png)
-**b27c-chase10g85seed3**
-
-![b27d](charts/b27d-chase10g85seed4.png)
-**b27d-chase10g85seed4** — first filled board at step 9k, the earliest of the eight void arms.
 
 ## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *closed, HOF-500 empty*
 
