@@ -42,12 +42,12 @@ shapes under the same IS-off base.
   Per seed — close-out pooled: a 85.6 · b 85.5 · c 87.2 · d 85.9. HOF-500 best partial (all abandoned at
   gate 98): a 92.7% · b **97.2%** · c 95.3% · d 96.4%.
 
-- **b26 (`b26a-d`, fc 100,100) — training done at 3M; close-outs running (desktop).** A shallower two-layer
-  shape — does the lift survive without the depth/capacity b24 and b25 had? Three of four learned well (`sef`
-  44-58, best-30 88-94); `b26d` is a weak seed (`sef` 13.8, best-30 79.7) but never died. Full-horizon mean
-  `sef` **42.1** clears the b22 control's 30.5 but falls **well short of b25's 63.8**, and mean best-30 **88.4**
-  is barely over control's 86.2 — an early hint the shallow shape captures much less of the lift. Close-out
-  pooled % and the auto-HOF-500 land next. Charts (3M) in [`charts.md`](charts.md).
+- **b26 (`b26a-d`, fc 100,100) — closed out (desktop); HOF-500 running but empty.** A shallower two-layer
+  shape — does the lift survive without the depth/capacity b24 and b25 had? **No: it does not carry it.**
+  Close-out pooled mean **79.2** is only **+3.5 over the b22 control's 75.7** (per seed: b 83.8 · c 83.2 ·
+  a 80.0 · d 69.6), against b24's +12.2 and b25's +10.3. `b26d` is a weak seed (`sef` 13.8, pooled 69.6) but
+  never died. **No ≥98%/100 checkpoint** — best full-length is `b26b`/`b26c` at 97.0% — so the auto-HOF-500
+  (gate 98) selects nothing and lands empty; the record stays b24's. Charts (3M) in [`charts.md`](charts.md).
 
 **Read b25/b26 against b22, not batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
 control: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88. b24 has answered the yes/no; b25 and b26
@@ -60,9 +60,12 @@ but `320` once read +10.1 pooled in batch 20 and that was noise. The HOF-500 con
 genuine ≥97%/500 checkpoints (not just inflated /100 highs), which firms up the *consolidation* claim; b25/b26
 are the replication that separates width from parameter count. **b25 has now replicated the pooled lift (86.0,
 +10.3) at a 3-layer shape — so the gain tracks capacity, not width specifically — but produced no ≥98%/500
-checkpoint, so the *record* is still b24's alone.** b26 (`100,100`) tests whether a shallower net still gets it.
+checkpoint, so the *record* is still b24's alone.** **b26 (`100,100`) has now answered the shallow case: it
+does *not* carry the lift — pooled 79.2, only +3.5 over control — so the gain needs real capacity (one wide
+`320` layer or a deep `200,100,100`), not just any net wider than the control.**
 
-Scheduler order (desktop `status.json` ledger): **b26 close-outs (running) → b26 HOFs**. b25 is fully
+Scheduler order (desktop `status.json` ledger): **b26 HOFs (running, empty — no ≥98% checkpoint)**, then the
+queue is clear. b25 is fully
 done — training → close-out → HOF, all four arms — and was the **first live run of the auto-HOF chain**,
 which worked end to end. The HOF step auto-queues a 500-episode, gate-98 re-measure of each close-out's ≥98%
 checkpoints (`auto_hof`, on by default, 2026-08-13); it only measures, promotion into `hallOfFame/` stays

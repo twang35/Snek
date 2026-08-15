@@ -43,29 +43,30 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
 training graphs. Anything *else* the check prints is a real gap.
 
-## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *close-outs running*
+## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *close-outs done, HOF-500 running (empty)*
 
 The third shape in the width follow-up: a shallow **two-layer `100,100`** net, after b24 (`320`) and b25
 (`200,100,100`) both lifted consolidation. It asks whether a shallower shape still gets the gain, or whether
 it needs the depth/capacity those two had. Seed-matched control is b22 (`50,100,50`, IS off). Trained on the
 desktop.
 
-**All four reached the 3M cap and finished training — numbers below are the full-horizon self-eval and are
-comparable to the completed batches.** Three of four learned well (`sef` 44-58, best-30 88-94); `b26d` is a
-weak seed (`sef` 13.8, best-30 79.7, peaking early at 1.07M then fading) but never died. Mean `sef` **42.1**
-sits above the b22 control's 30.5 but **well short of b25's 63.8** at the deeper shape, and mean best-30
-**88.4** is barely over control's 86.2 — an early hint that the shallow `100,100` captures much less of the
-consolidation lift than b24/b25's wider or deeper shapes. **The close-out (gate 95) is running now on the
-desktop; pooled perfect-game % and the auto-HOF-500 land at the next update.** Sorted by `sef`.
+**All four trained to the 3M cap and closed out (gate 95).** The shallow shape **does not carry the lift**:
+close-out pooled mean **79.2** is only **+3.5 over the b22 control's 75.7** — against b24's +12.2 (`320`) and
+b25's +10.3 (`200,100,100`). Three seeds learned well (`sef` 44-58); `b26d` is a weak seed (`sef` 13.8,
+pooled 69.6) but never died. **No arm produced a ≥98%/100 checkpoint** — the best full-length reads are
+`b26b`/`b26c` at 97.0%/100 — so the auto-HOF-500 (gate 98, running now) selects nothing and lands empty; the
+record stays b24's. This places the width follow-up cleanly: the consolidation gain needs capacity (`320`
+one wide layer, or `200,100,100` deep), and a shallow `100,100` is too small to buy more than a marginal
+lift. Sorted by close-out pooled.
 
-| arm | peak trail | best-30 | `sef` (3M) | close-out pooled |
-|---|---|---|---|---|
-| `b26b` | 95.00 | **93.7%** @1982k | **58.0%** | *running* |
-| `b26c` | 94.96 | 92.0% @2231k | 52.1% | *running* |
-| `b26a` | 94.92 | 88.0% @2349k | 44.6% | *running* |
-| `b26d` | 94.84 | 79.7% @1073k | 13.8% | *running* |
-| **mean — b26 fc100,100 IS-off** | **94.93** | **88.4%** | **42.1%** | *running* |
-| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 |
+| arm | peak trail | best-30 | `sef` (3M) | close-out pooled | best full-length |
+|---|---|---|---|---|---|
+| `b26b` | 95.00 | **93.7%** @1982k | **58.0%** | **83.8** | 97.0% @1948k |
+| `b26c` | 94.96 | 92.0% @2231k | 52.1% | 83.2 | 97.0% @1969k |
+| `b26a` | 94.92 | 88.0% @2349k | 44.6% | 80.0 | 95.0% @2904k |
+| `b26d` | 94.84 | 79.7% @1073k | 13.8% | 69.6 | none ≥95% (all ab.) |
+| **mean — b26 fc100,100 IS-off** | **94.93** | **88.4%** | **42.1%** | **79.2** | 0 of 4 held ≥98%/100 |
+| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 | — |
 
 ![b26b](charts/b26b-fc100x100noisseed2.png)
 **b26b-fc100x100noisseed2**
