@@ -12,6 +12,39 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
+## ⚠ Both shaping batches are invalid — the perfect-game counter was reward-based (2026-08-14)
+
+**Read this before anything below it.** Every perfect-game counter identified a win by comparing the
+episode's final reward with `PERFECT_GAME_REWARD`, and the chase-safe term shifts that reward by `−c`. So
+`perfect_percent` read **0 for every eval of b27 and b30** while the arms were filling boards from step 9k,
+and because `training.epsilon_for` takes the trailing perfect rate as its skill signal, **epsilon stayed
+pinned at 0.0125** — the refinement ceiling — instead of annealing. Full account, numbers and fix:
+[`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter).
+
+| | state |
+|---|---|
+| **b30a-d (laptop)** | **stopped** at 137-139k steps, on request. Not restarted until the fix ships |
+| **b27a-d (desktop)** | still training at 309-326k when the bug was found — **contaminated, recommend stopping** |
+| **b28, b29 (queued)** | would inherit the bug: the desktop runs whatever code is deployed there |
+| **the queued b27 close-outs / HOF-500** | would measure 0% perfect on every checkpoint. Wasted compute |
+
+**The fix is written and tested but uncommitted** (code, so it waits for review): counting moves to
+`state_helpers.is_perfect_score(score)` in `under_the_hood`, `eval_workers` and `eval_checkpoints`, plus
+`tests/test_perfect_game_counting.py` — 10 tests, both surviving mutants caught, full suite 23 modules /
+596 tests / 0 failed.
+
+**Nothing about the shaping itself is in question yet.** Φ, the potential, the telescoping and the fork
+handling all behave as designed; what failed was reading the result. The shaped arms' *score* curves were
+in fact healthy (b30 trailing 88.4-93.5 at ~138k, against b25's 86-89 at 108k), so the 2×2 is still worth
+running — from scratch, with the counter fixed and epsilon free to anneal.
+
+**Relaunch plan once the fix is in:** re-run b27 and b30 as new arms (`-r2` suffix or fresh names) rather
+than resuming, because the weights and the replay buffer carry 300k+ steps trained under an exploration
+schedule that was never going to descend — which is the one thing a seed-matched comparison against b24/b25
+cannot absorb. A resume also starts slow: `epsilon_for` is stateless and recomputes from restored history,
+whose stored perfect rate is 0 for every past eval, so epsilon would hold at 0.0125 for the first ~30 evals
+of the resumed run before the trailing window clears.
+
 ## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27 running on the desktop)
 
 **The shaping shipped 2026-08-14 and batch 27 is training.** `Snake.step` now adds

@@ -192,6 +192,28 @@ passed a literal-based version because two blocks coincidentally held the same v
 `test_state_helpers.py` hardcodes the count as a tripwire, so adding a block fails until the count,
 the layout docstring and the era markers are all updated together.
 
+## A perfect game is identified by its **score**, never by its reward
+
+`state_helpers.is_perfect_score(score)` is the single definition, and `Snake.check_perfect_game` plus
+all three counters — `under_the_hood.compute_avg_return`, `eval_workers`, `eval_checkpoints` — go
+through it. **Never compare a final reward with `PERFECT_GAME_REWARD`**; an `ast` tripwire in
+`tests/test_perfect_game_counting.py` fails if that comparison reappears.
+
+The rule is written in the cost of learning it. All three counters used to test
+`final_reward == PERFECT_GAME_REWARD`, so the moment `CHASE_SAFE_SHAPING` shipped — it pays `−c·Φ(s)`
+at the winning step, as potential-based shaping must — a perfect game paid **99.9 instead of 100** and
+every counter read **0%**. Eight arms across two hosts trained blind for 300k+ steps while filling
+boards from step 9k, and because `training.epsilon_for`'s refinement phase is driven by the trailing
+perfect rate, **epsilon stayed pinned at its 0.0125 ceiling** instead of annealing — so the runs were
+handicapped, not just mismeasured. The tell was in their own reports: `max_score` read `95/95`, and 95
+*is* a filled board.
+
+Two general lessons worth carrying past this bug. **A reward is a sum of terms**, so anything derived
+from it breaks silently when a term is added — identify outcomes from state, not from reward. And
+**`perfect_percent` is not only a report**: it feeds the exploration schedule, so breaking the
+measurement changes the training. Full account:
+[`findings.md`](snek2/hyperparamTuning/findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter).
+
 ## Hyperparameter tuning
 
 An ongoing, resumable investigation into configs that reach the highest perfect-game percentage
@@ -427,7 +449,7 @@ for name in mods:
 print(len(mods), 'modules,', total, 'tests,', fails, 'failed')"
 ```
 
-As of 2026-08-14 that reads **22 modules, 566 tests, 0 failed**. A module count below 22 means the glob
+As of 2026-08-14 that reads **23 modules, 596 tests, 0 failed**. A module count below 23 means the glob
 did not run from `snek2/`.
 
 **A passing suite is not coverage of the change you just made.** `group_obs` took a third signature

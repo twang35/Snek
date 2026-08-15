@@ -24,6 +24,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
+| **‡‡ A perfect game was identified by its final reward, so the chase-safe shaping made every counter read 0%** | **found and fixed 2026-08-14**. b27 and b30 trained blind for 300k+ steps *and* had their epsilon pinned at 0.0125, because the schedule's skill signal is the perfect rate. Counting is off the **score** now. See below |
 | The vector is **30 values**; only batch 11+ checkpoints load on `master` (`450e66e` = 26, `e4514a8` = 20) | **breaking** |
 | A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **standing hazard** |
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
@@ -437,6 +438,69 @@ binomial expectation. An earlier warning here, built on `b4c` @869000 reading 51
 three runs, should be read as "one checkpoint once behaved strangely" rather than a property of
 the instrument. Pooling over many checkpoints is still what shrinks the interval (±1.3 at 6300
 episodes).
+
+## ‡‡ A perfect game was identified by its final reward, and the shaping term silenced every counter
+
+**Found 2026-08-14, after the user asked why the desktop batch had no perfect games at all.** It was not
+the charts and it was not the policies: b27 and b30 were winning boards and nothing was counting it.
+
+Three counters asked the same question the same wrong way — `final_reward == PERFECT_GAME_REWARD`, an
+exact float comparison:
+
+| site | what it feeds |
+|---|---|
+| `under_the_hood.compute_avg_return` | `perfect_percent` on every training eval → the graph's red line, `best_perfect30`, `sef`, `max_single_eval` |
+| `eval_workers` (independent path) | every close-out and HOF-500 row |
+| `eval_checkpoints` (batched path) | the same, with `EVAL_INDEPENDENT=0` |
+
+`CHASE_SAFE_SHAPING` adds `c·(γΦ(s′) − Φ(s))` to every step including the last, and `Φ(terminal) = 0` is
+what the invariance theorem requires — so **a perfect game pays `100 − c·Φ(s)`**, which is **99.9** at
+`c=0.10` whenever the pre-win board was chase-safe. It always is: at length 99 exactly one cell is free,
+the head's only legal move is into it, and in the tail-chasing endgame the tail borders it too. Measured
+on a constructed full-tour board — Φ = 1.0, reward 99.9, at gates 0, 85 and 95 alike.
+
+**What it cost.** Both live batches, for their whole run so far:
+
+| arm | step | trailing score | first filled board | perfect % ever | epsilon |
+|---|---|---|---|---|---|
+| `b27a-chase10g85seed1` | 309k | 92.6 | step **16k** | **0** in 310 evals | 0.0125 |
+| `b27b-chase10g85seed2` | 326k | 91.7 | step **14k** | **0** in 327 evals | 0.0125 |
+| `b27c-chase10g85seed3` | 319k | 90.5 | step **13k** | **0** in 320 evals | 0.0125 |
+| `b27d-chase10g85seed4` | 318k | 93.0 | step **9k** | **0** in 319 evals | 0.0125 |
+| `b30a-d` (laptop) | 137-139k | 88.4-93.5 | step 81-100k | **0** in ~110 evals each | 0.0125 |
+
+The `max_score` column is what gives it away: it reads `95/95`, and 95 *is* a perfect game, since
+`check_perfect_game` fires at exactly that score. An arm cannot record a filled board and 0% perfect
+games. Seed-matched controls at the same step were already reporting 10-20% (`b25a` first non-zero at
+**25k**, `b24a` at **14k**).
+
+**The damage is not only to the measurement, and this is the part that decides what to do with the runs.**
+`training.epsilon_for`'s refinement phase is driven by the **trailing perfect rate**, so a rate stuck at 0
+returns the phase ceiling — `initial_epsilon / 2**5` = **0.0125** — forever. All eight arms sat there:
+b27 for 318k+ steps, against `b25a` which was at 0.0088 and descending by 108k. A forced random move every
+~80 steps is what [batch 12](#falsified-epsilon-reaching-00-does-not-cause-the-collapse) measured as
+ruinous in the endgame. **So b27 and b30 are not merely unmeasured, they are handicapped, and neither is a
+valid test of the shaping.**
+
+**Why nothing caught it.** The shaping's own 24 tests pin the reward at every terminal branch *including*
+`PERFECT_GAME_REWARD − c`, correctly; nothing connected that value to the three consumers that compare it
+with `==`. The `Snake.step` comment even predicted the arithmetic — "a perfect game therefore pays −c at
+the winning step. Required, and negligible against PERFECT_GAME_REWARD = 100" — negligible to the
+gradient, fatal to an equality test. And [the Phase 0 diagnostic](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)
+saw this exact transition and set it aside as bookkeeping: *"all 56 of `b18b`'s flips at 98-99 are the
+episode ending"*. That flip is the one that changed the reward.
+
+**The fix, and the rule that follows from it.** `state_helpers.is_perfect_score(score)` is now the single
+definition, used by `Snake.check_perfect_game` and all three counters; `run_parallel_eval_episodes` no
+longer even returns the final reward. **A reward is a sum of terms and any new term shifts it; a score is
+a count of food.** Never identify an outcome by comparing a reward. `tests/test_perfect_game_counting.py`
+pins the predicate, the shaped winning step, the counter, and — because two of the three sites are inside
+a spawned worker and a batched step loop that no unit test reaches — an `ast` tripwire that fails if
+`PERFECT_GAME_REWARD` reappears in an `==` anywhere in the four modules.
+
+One further hazard found while mutation-testing the fix: shifting `check_perfect_game` by one food does
+not raise, it **hangs**. The board ends full with no perfect game declared, and `Food.__init__` spins
+forever looking for a free cell. Another reason the rule and the counters share one definition.
 
 ## ‡ Measured: the chase-safe potential is nearly static for a record policy and busy for a bad one
 
