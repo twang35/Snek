@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-15T11:20:19",
-  "ts": 1786818019.2356472,
+  "iso": "2026-08-15T11:21:16",
+  "ts": 1786818076.0468218,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -27,36 +27,36 @@
       "type": "train",
       "policy": "b28a-chase20g85seed1",
       "pid": 1301840,
-      "step": 1114000,
-      "steps_per_sec": 79.0,
-      "elapsed_s": 11866
+      "step": 1119000,
+      "steps_per_sec": 88.0,
+      "elapsed_s": 11923
     },
     {
       "id": "b28b-chase20g85seed2",
       "type": "train",
       "policy": "b28b-chase20g85seed2",
       "pid": 1301841,
-      "step": 1181000,
-      "steps_per_sec": 79.0,
-      "elapsed_s": 11866
+      "step": 1187000,
+      "steps_per_sec": 105.6,
+      "elapsed_s": 11923
     },
     {
       "id": "b28c-chase20g85seed3",
       "type": "train",
       "policy": "b28c-chase20g85seed3",
       "pid": 1301842,
-      "step": 1099000,
-      "steps_per_sec": 94.8,
-      "elapsed_s": 11866
+      "step": 1104000,
+      "steps_per_sec": 88.0,
+      "elapsed_s": 11923
     },
     {
       "id": "b28d-chase20g85seed4",
       "type": "train",
       "policy": "b28d-chase20g85seed4",
       "pid": 1301843,
-      "step": 1188000,
-      "steps_per_sec": 110.6,
-      "elapsed_s": 11866
+      "step": 1195000,
+      "steps_per_sec": 123.2,
+      "elapsed_s": 11923
     }
   ],
   "ledger": {
@@ -222,8 +222,8 @@
   },
   "disk_free_gb": 137.3,
   "load_avg": [
-    10.287109375,
-    9.296875,
-    9.09814453125
+    8.865234375,
+    9.10009765625,
+    9.04345703125
   ]
 }
