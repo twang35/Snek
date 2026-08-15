@@ -71,32 +71,80 @@ landed (full numbers and graphs in [`charts.md`](charts.md)):
 **Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
 + forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
 
-## C51 pilot — four arms running on the laptop since 15:06 (2026-08-15)
+## C51 pilot — eight arms on the laptop, handing off to batch `b31` by itself (2026-08-15)
 
 Distributional RL, phase 3 of
 [`../plans/distributional-c51.md`](../plans/distributional-c51.md). The implementation is committed
-(`245cf914`); phase 4 — the real batch — is deliberately not started.
+(`245cf914`).
 
 | | |
 |---|---|
-| arms | `c51pilot-lr1e5seed{1,2}`, `c51pilot-lr5e5seed{1,2}` — seed-matched across the two rates |
-| config | b25's verbatim (`fc 200,100,100`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping) plus `ALGO=c51`, 51 atoms over `[-5, 120]` |
+| wave A, 15:06 | `c51pilot-lr1e5seed{1,2}`, `c51pilot-lr5e5seed{1,2}` |
+| wave B, 16:41 | `c51pilotB-lr1e4seed{1,2}`, `c51pilotB-lr25e4seed{1,2}` |
+| config | b25's verbatim (`fc 200,100,100`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping) plus `ALGO=c51`, 51 atoms over `[-5, 120]`. Seeds matched across all four rates |
 | cap | **600k steps** — a screen, not a result |
-| launcher | `hyperparamTuning/launch_c51_pilot.sh`, which waited on `eval_checkpoints.py b30` so the pilot did not share 14 cores with a close-out |
+| launchers | `launch_c51_pilot.sh` (wave A, which waited out b30's close-out), then the generic `launch_c51_wave.sh` (wave B) |
 
 **What it is asking**, in order: does a categorical agent learn this task at all; how many steps to its
 first perfect game against b25's ~9k; is the loss scale sane at 1e-5 (a cross-entropy starts at
 `ln 51 ≈ 3.93`, where the Huber TD loss starts near 0, so the same learning rate is not obviously the same
-step size). **The gate to phase 4 is one learning rate**, and the stop rule is pre-registered: if neither
-rate reaches its first perfect game by ~300k while the control did, stop and report rather than sweep.
+step size). **The gate to phase 4 is one learning rate.**
 
-**First readings, 15:20 — the screen has already separated the two rates.** Both `5e-5` arms won a game
-inside **15k and 20k steps** (best single episode 95/95, peak trailing 46.5 and 63.3); neither `1e-5` arm
-has a win at 51-83k, best episode 60/95. That is the predicted under-stepping — the rate that suits a
-Huber TD error is too small for a cross-entropy over 51 atoms — and it answers the pilot's first question
-*yes*: a categorical agent learns this task, at the same order as b25's ~9k first win. Graphs and the full
-table are in [`charts.md`](charts.md#c51-pilot--distributional-rl-learning-rate-screen--four-arms-running-on-the-laptop).
-**Nothing here is a comparison against b25** — 40-80k of a 600k screen, `sef` still 0 for all four.
+**Eight trainers on a 14-core laptop is deliberate**, and measured before launching: ~2.3 GB per arm
+(0.4 GB parent + 1.9 GB across 11 forked self-eval workers) against 36 GB of RAM, and a swap-in rate of
+244 pages per 20 s, so the cost is throughput — roughly half the steps/s per arm — and not paging. It is
+also the one place this project's "never more than 4 trainers" rule is knowingly suspended; it was the
+user's call, for this screen only.
+
+### The handoff to `b31` runs unattended
+
+**`launch_c51_batch.sh b31` is detached and waiting.** When the last pilot arm stops it picks the rate,
+launches four seeds at 2M, regenerates the tables below, and commits. Written this way because cron jobs
+in this tool are session-only and fire only while the REPL is idle, so nothing scheduled can be relied on
+once the session closes — a detached `nohup` can.
+
+| step | what it does | what it refuses to do |
+|---|---|---|
+| wait | polls until no `snek2.py c51pilot` trainer remains (one substring covers both waves) | it excludes `chart_viewer` from that `pgrep`, or it would wait forever on the window rather than the arms |
+| slots | waits for the laptop's 4-trainer limit to be free | if something else is still training after 6 h it **exits without launching** rather than breaking the limit |
+| pick | [`pick_c51_lr.py`](pick_c51_lr.py)'s pre-registered rule — mean `best_perfect30` at a **common horizon**, then `sef`, then `peak_trailing` | if fewer than two rates have usable data it refuses, and the launcher falls back to `5e-5` so a batch still starts |
+| launch | `b31a-d`, 4 seeds, 2M, the chosen rate, otherwise identical to the pilots — so `b25a-d` is the seed-matched control | staggers the four by 5 s rather than leaning on the chart viewer's claim lock with nobody watching |
+| docs | regenerates the marked region in this file and `charts.md`, then commits and pushes | a push failure is logged, not retried — the commit is local and recoverable |
+
+**Three guards in the picker exist because a dry run got the answer wrong.** At an early horizon every arm
+reads `best_perfect30` 0.0 *and* `sef` 0.0, and a two-level rule then picked whichever rate came out of a
+dict first — it chose the slowest rate over the fastest, so `peak_trailing` is now the third key. An arm
+that dies early no longer sets everyone's horizon (it would have judged seven healthy arms at 13k of 600k).
+And an arm with no eval series is excluded and named rather than counted as a zero, so a failed launch
+cannot vote against its own rate.
+
+<!-- C51-PILOT-STATUS:BEGIN -->
+*Generated by `pick_c51_lr.py` at 2026-08-15 16:49, when the last pilot arm stopped — the numbers below are read straight off the eval series, and the prose around this block is hand-written.*
+
+**Compared at a common horizon of 325k steps**, the lowest final step any arm reached, because both metrics accumulate over an arm's own evals and a longer arm would otherwise win on horizon alone.
+
+| lr | seeds | mean best-30 | mean `sef` | mean peak trail |
+|---|---|---|---|---|
+| 5e-05 **← chosen** | 2 | 69.5 | 7.8 | 90.74 |
+| 1e-05 | 2 | 20.4 | 0.0 | 86.10 |
+| 0.0001 | 2 | 0.0 | 0.0 | 35.13 |
+| 0.00025 | 2 | 0.0 | 0.0 | 25.88 |
+
+| arm | lr | seed | step | best-30 | `sef` | peak trail | first perfect |
+|---|---|---|---|---|---|---|---|
+| `c51pilot-lr5e5seed2` | 5e-05 | 2 | 325k | 71.7 | 9.8 | 91.14 | 20k |
+| `c51pilot-lr5e5seed1` | 5e-05 | 1 | 325k | 67.3 | 5.8 | 90.34 | 15k |
+| `c51pilot-lr1e5seed2` | 1e-05 | 2 | 325k | 27.7 | 0.0 | 86.22 | 92k |
+| `c51pilot-lr1e5seed1` | 1e-05 | 1 | 325k | 13.0 | 0.0 | 85.98 | 141k |
+| `c51pilotB-lr1e4seed1` | 0.0001 | 1 | 23k | 0.0 | 0.0 | 39.48 | 8k |
+| `c51pilotB-lr1e4seed2` | 0.0001 | 2 | 27k | 0.0 | 0.0 | 30.78 | none |
+| `c51pilotB-lr25e4seed1` | 0.00025 | 1 | 26k | 0.0 | 0.0 | 26.96 | none |
+| `c51pilotB-lr25e4seed2` | 0.00025 | 2 | 29k | 0.0 | 0.0 | 24.80 | none |
+
+**Stopped short of the cap, so they do not set the horizon:** `c51pilotB-lr1e4seed1`, `c51pilotB-lr1e4seed2`, `c51pilotB-lr25e4seed1`, `c51pilotB-lr25e4seed2` — an arm that stopped well before the others failed, and letting it define the comparison span would discard the rest of the data. It is still ranked, at its own final step.
+
+**Chosen: `5e-05`** — best_perfect30 69.5 against 20.4 for the next rate (1e-05).
+<!-- C51-PILOT-STATUS:END -->
 
 **`SNEK_CHART_VIEWER=0` on all four, one window opened by hand.** `chart_viewer.batch_prefix` groups only
 `b<n><letters>-` names, so four `c51pilot-*` arms would open four windows; the launcher uses the
