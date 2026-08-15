@@ -18,6 +18,7 @@ _os.environ['SDL_AUDIODRIVER'] = 'dummy'
 # once per launch, against absl's checkpoint line costing ~2000 per run, so it is not worth
 # that trade.
 
+import categorical_agent
 import chart_viewer
 import policy_arch
 from forking_collector import ForkingCollector, validate_config
@@ -220,10 +221,48 @@ def main(argv):
     # the corrections were never validated past 30k steps. These two knobs make
     # the old behaviour reachable so the three can be tested rather than assumed.
     priority_signal = tuned('PRIORITY_SIGNAL', 'td_error', str)
-    if priority_signal not in ('td_error', 'td_loss'):
-        raise ValueError('SNEK_PRIORITY_SIGNAL must be td_error or td_loss, got ' + priority_signal)
     # 0 reproduces theSchlong, which applied no IS correction at all.
     use_is_weights = bool(tuned('IS_WEIGHTS', 1, int))
+
+    # ----------------------------------------------------------------- algorithm
+    # `ddqn` is every arm before batch 31: a scalar head trained on Huber TD error. `c51` predicts a
+    # *distribution* over the return on a fixed grid and trains it by cross-entropy — see
+    # categorical_agent.py and plans/distributional-c51.md. The default stays `ddqn` so every existing
+    # launch line, and every resume of an existing policy, is untouched.
+    algo = tuned('ALGO', categorical_agent.DDQN_ALGO, str)
+    if algo not in categorical_agent.ALGOS:
+        raise SystemExit('SNEK_ALGO must be one of {0}, got {1!r}'
+                         .format(categorical_agent.ALGOS, algo))
+    is_categorical = algo == categorical_agent.C51_ALGO
+
+    # The support. 51 atoms over [-5, 120] at 2.5 spacing: -5 is exactly the reachable minimum return
+    # (a one-step death), and 120 sits 14% above the largest return measured over three champion
+    # checkpoints. `check_support` below is what enforces that story rather than trusting these numbers.
+    num_atoms = tuned('NUM_ATOMS', 51, int)
+    v_min = tuned('V_MIN', -5.0)
+    v_max = tuned('V_MAX', 120.0)
+    # Select the target atoms with the online network's argmax, as DdqnAgent — the control — does.
+    # Upstream C51 selects with the target network; 0 reproduces that.
+    c51_double = bool(tuned('C51_DOUBLE', 1, int))
+    # Rewrite the head bias so the initial expected Q is 0 instead of the grid midpoint (57.5 here),
+    # which is where a scalar head starts. Off by default: standard init is what the literature runs,
+    # and this knob exists to measure the confound rather than to assume it away.
+    c51_zero_init = bool(tuned('C51_ZERO_INIT', 0, int))
+    c51_allow_clipping = bool(tuned('C51_ALLOW_CLIPPING', 0, int))
+    support_warnings = []
+    # A distributional agent has no TD error, so the scalar knob's two values both resolve to the KL.
+    # Resolved even for a ddqn arm's validation, so one branch owns the whole knob.
+    if is_categorical:
+        c51_priority_signal = categorical_agent.priority_signal_for(priority_signal)
+        support_warnings = categorical_agent.check_support(
+            v_min, v_max, num_atoms, allow_clipping=c51_allow_clipping)
+        for warning in support_warnings:
+            print('c51 support: ' + warning, flush=True)
+    else:
+        c51_priority_signal = None
+        if priority_signal not in ('td_error', 'td_loss'):
+            raise ValueError('SNEK_PRIORITY_SIGNAL must be td_error or td_loss, got '
+                             + priority_signal)
 
     # policy_name = 'eval'
     policy_name = 'train'
@@ -315,20 +354,43 @@ def main(argv):
     # units to generate one q_value per available action as its output. Built through the shared
     # build_q_net so training, eval and watch.py cannot drift to different architectures — and so the
     # fc_layer_params written into arch.json below are exactly the ones the net was built from.
-    q_net = build_q_net(num_actions, fc_layer_params)
-
-    agent = dqn_agent.DdqnAgent(
-        train_env.time_step_spec(),
-        train_env.action_spec(),
-        q_network=q_net,
-        epsilon_greedy=epsilon,
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-        td_errors_loss_fn=common.element_wise_huber_loss,
-        target_update_period=agent_target_update_period,
-        target_update_tau=target_update_tau,
-        gradient_clipping=gradient_clipping or None,
-        n_step_update=n_step_update,
-        train_step_counter=global_step)
+    #
+    # The c51 branch swaps the head and the loss and nothing else: same trunk widths, same
+    # initializers (CategoricalQNetwork's encoding network defaults to the same VarianceScaling
+    # dense_layer() passes), same optimizer, same target-update schedule, same PER buffer.
+    if is_categorical:
+        q_net = build_categorical_q_net(
+            train_env.observation_spec(), action_tensor_spec, fc_layer_params, num_atoms,
+            v_min=v_min, v_max=v_max, zero_init=c51_zero_init)
+        agent = categorical_agent.SnekCategoricalDqnAgent(
+            train_env.time_step_spec(),
+            train_env.action_spec(),
+            categorical_q_network=q_net,
+            min_q_value=v_min,
+            max_q_value=v_max,
+            epsilon_greedy=epsilon,
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            target_update_period=agent_target_update_period,
+            target_update_tau=target_update_tau,
+            gradient_clipping=gradient_clipping or None,
+            n_step_update=n_step_update,
+            train_step_counter=global_step,
+            double=c51_double,
+            priority_signal=c51_priority_signal)
+    else:
+        q_net = build_q_net(num_actions, fc_layer_params)
+        agent = dqn_agent.DdqnAgent(
+            train_env.time_step_spec(),
+            train_env.action_spec(),
+            q_network=q_net,
+            epsilon_greedy=epsilon,
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            td_errors_loss_fn=common.element_wise_huber_loss,
+            target_update_period=agent_target_update_period,
+            target_update_tau=target_update_tau,
+            gradient_clipping=gradient_clipping or None,
+            n_step_update=n_step_update,
+            train_step_counter=global_step)
 
     agent.initialize()
 
@@ -423,12 +485,20 @@ def main(argv):
     # before it loads weights into the wrong net.
     policy_dir = POLICY_DIR + policy_name
     obs_len = int(train_py_env.observation_spec().shape[0])
+    #
+    # For a c51 arm the support goes in too, and it is the *more* dangerous field: changing
+    # SNEK_V_MAX on a resume restores every weight cleanly and silently relabels what the atoms mean,
+    # where a changed layer width at least produces a shape error somewhere.
     if policy_arch.read_arch(policy_dir) is None:
         policy_arch.write_arch(policy_dir, policy_arch.build_arch(
-            fc_layer_params, num_actions, obs_len, OBS_ERA))
+            fc_layer_params, num_actions, obs_len, OBS_ERA, algo=algo,
+            num_atoms=num_atoms if is_categorical else None,
+            v_min=v_min if is_categorical else None,
+            v_max=v_max if is_categorical else None))
     else:
         policy_arch.assert_restorable(policy_dir, num_actions, obs_len, OBS_ERA)
-        policy_arch.assert_config_matches(policy_dir, fc_layer_params)
+        policy_arch.assert_config_matches(policy_dir, fc_layer_params, algo=algo,
+                                          num_atoms=num_atoms, v_min=v_min, v_max=v_max)
 
     train_checkpointer.initialize_or_restore()
     global_step = tf.compat.v1.train.get_global_step()
@@ -470,9 +540,17 @@ def main(argv):
                                'non-fatal actions; greedy moves never shielded'
                                .format(guided_fraction)),
         'fc_layer_params': fc_layer_params,
+        'algo': ('ddqn, scalar head, Huber TD error' if not is_categorical else
+                 'c51 (distributional), {0} atoms over [{1}, {2}] at {3:.3f} spacing, '
+                 'cross-entropy loss, {4} target selection, {5} init'.format(
+                     num_atoms, v_min, v_max, (v_max - v_min) / (num_atoms - 1),
+                     'double (online argmax)' if c51_double else 'single (target argmax)',
+                     'zero-expected-Q' if c51_zero_init else 'standard')),
         'replay_buffer': 'cpprb prioritized, capacity {0}'.format(replay_buffer_max_length),
         'priority_exponent (alpha)': priority_exponent,
-        'priority_signal': priority_signal,
+        'priority_signal': (priority_signal if not is_categorical else
+                            '{0} (SNEK_PRIORITY_SIGNAL={1}; a distributional agent has no TD error)'
+                            .format(c51_priority_signal, priority_signal)),
         'importance_sampling_beta': '{0} -> {1} over {2} steps'.format(
             initial_importance_sampling_beta, final_importance_sampling_beta,
             beta_anneal_steps) if use_is_weights else 'disabled',
@@ -492,6 +570,10 @@ def main(argv):
         'eval_only': eval_only,
         'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }
+    # The support warning is a judgement (a v_max below the derived maximum return), so it belongs in
+    # the run report rather than only in the console scrollback the launch line loses.
+    if support_warnings:
+        run_config['c51_support_note'] = '; '.join(support_warnings)
 
     # A live chart window for this batch, in its own process. One per batch, so four arms
     # launched together share it, and it exits by itself when the last of them stops.

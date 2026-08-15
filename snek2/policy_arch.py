@@ -19,7 +19,18 @@ checkpoint is copied into ``hallOfFame/`` or rsynced to the desktop.
 import json
 import os
 
+import numpy as np
+
 ARCH_FILENAME = 'arch.json'
+
+# Read for `algo` when the field is absent. Every policy directory written before C51 existed has no
+# such key, and there are ~100 of them plus every `hallOfFame/` entry, so "missing means ddqn" is what
+# keeps them all loading. New directories record the field explicitly either way.
+DEFAULT_ALGO = 'ddqn'
+CATEGORICAL_ALGO = 'c51'
+# Only meaningful for the categorical algorithm, and only written for it — a scalar arm's sidecar does
+# not carry three null fields.
+CATEGORICAL_FIELDS = ('num_atoms', 'v_min', 'v_max')
 
 
 class ArchMismatch(Exception):
@@ -33,18 +44,77 @@ def arch_path(policy_dir):
     return os.path.join(policy_dir, ARCH_FILENAME)
 
 
-def build_arch(fc_layer_params, num_actions, obs_len, obs_era):
+def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo=DEFAULT_ALGO,
+               num_atoms=None, v_min=None, v_max=None):
     """The canonical dict.
 
     ``fc_layer_params`` is stored as a list — JSON has no tuples and every reader iterates it, so
     the round trip compares list-to-list.
+
+    ``algo`` is always recorded, so a future third algorithm cannot be confused with an old file. The
+    three categorical fields are written **only** for ``c51``, because a scalar arm carrying
+    ``"num_atoms": null`` is noise and because their absence is then a positive signal rather than an
+    ambiguity.
+
+    ``v_min``/``v_max`` are as load-bearing as the layer widths, and this is the only place they are
+    durably written. A categorical policy's greedy action is ``argmax_a sum_i z_i p_i(s, a)``, so
+    restoring correct weights against the wrong support yields a **different policy** with no shape
+    mismatch anywhere — the silent-failure class this file exists for, arriving through a new door.
     """
-    return {
+    arch = {
         'fc_layer_params': [int(width) for width in fc_layer_params],
         'num_actions': int(num_actions),
         'obs_len': int(obs_len),
         'obs_era': str(obs_era),
+        'algo': str(algo),
     }
+    if str(algo) == CATEGORICAL_ALGO:
+        if num_atoms is None or v_min is None or v_max is None:
+            raise ValueError('a {0} arch needs num_atoms, v_min and v_max'.format(CATEGORICAL_ALGO))
+        arch['num_atoms'] = int(num_atoms)
+        arch['v_min'] = float(v_min)
+        arch['v_max'] = float(v_max)
+    return arch
+
+
+def algo_of(arch):
+    """The algorithm this checkpoint was trained with, ``ddqn`` for a pre-C51 sidecar."""
+    return arch.get('algo', DEFAULT_ALGO)
+
+
+def is_categorical(arch):
+    return algo_of(arch) == CATEGORICAL_ALGO
+
+
+def support_from_arch(arch):
+    """The atom support as a numpy array, or ``None`` for a scalar arm.
+
+    The one place the support is reconstructed, so every reader — eval, watch, diagnostics — gets the
+    grid the checkpoint was *trained* on rather than whatever the environment is currently configured
+    for. Pair it with ``under_the_hood.expected_q``.
+    """
+    if not is_categorical(arch):
+        return None
+    return np.linspace(float(arch['v_min']), float(arch['v_max']), int(arch['num_atoms']))
+
+
+def refuse_categorical(policy_dir, tool):
+    """Stop `tool` from running against a c51 policy, loudly. Returns the arch when it is scalar.
+
+    For the diagnostics whose measurement is *about* a scalar head — an absolute TD error, a Huber
+    loss, a teacher-student fit against a same-shaped scalar network. Each would run on a categorical
+    checkpoint and print numbers, because a logit is a float like any other, and those numbers would
+    mean nothing. Refusing is the cheap half of porting them; a wrong plot in `findings.md` is the
+    expensive half.
+    """
+    arch = require_arch(policy_dir)
+    if is_categorical(arch):
+        raise SystemExit(
+            '{0} does not support SNEK_ALGO={1} policies ({2}). Its measurement assumes a scalar Q '
+            'head — there is no TD error to take the absolute value of, and a same-shaped fresh '
+            'network is a different object. Port it or pick a ddqn arm.'
+            .format(tool, CATEGORICAL_ALGO, policy_dir))
+    return arch
 
 
 def read_arch(policy_dir):
@@ -81,6 +151,31 @@ def require_arch(policy_dir):
     return arch
 
 
+def _categorical_problems(arch):
+    """Internal consistency of the algorithm fields, independent of the live environment.
+
+    A hand-edited or half-written sidecar is the case this catches: ``algo: c51`` with no support is
+    unusable, and support fields on a ``ddqn`` arm mean someone changed the algorithm without
+    retraining. Both are cheap to detect and expensive to debug from the resulting policy.
+    """
+    problems = []
+    algo = algo_of(arch)
+    present = [field for field in CATEGORICAL_FIELDS if arch.get(field) is not None]
+    if algo == CATEGORICAL_ALGO:
+        missing = [field for field in CATEGORICAL_FIELDS if arch.get(field) is None]
+        if missing:
+            problems.append('algo {0!r} but {1} missing'.format(algo, ', '.join(missing)))
+        else:
+            if int(arch['num_atoms']) < 2:
+                problems.append('num_atoms {0} < 2'.format(arch['num_atoms']))
+            if float(arch['v_min']) >= float(arch['v_max']):
+                problems.append('v_min {0} >= v_max {1}'.format(arch['v_min'], arch['v_max']))
+    elif present:
+        problems.append('algo {0!r} but carries categorical fields {1} — the sidecar was edited '
+                        'without retraining'.format(algo, ', '.join(present)))
+    return problems
+
+
 def assert_restorable(policy_dir, num_actions, obs_len, obs_era):
     """Require ``arch.json`` and check every field that decides weight shape or meaning against the
     live environment.
@@ -99,25 +194,45 @@ def assert_restorable(policy_dir, num_actions, obs_len, obs_era):
     if arch.get('obs_era') != str(obs_era):
         problems.append('obs_era {0!r} != env {1!r} (observation meaning changed at constant '
                         'length)'.format(arch.get('obs_era'), obs_era))
+    problems.extend(_categorical_problems(arch))
     if problems:
         raise ArchMismatch('{0} in {1} does not match this environment: {2}'
                            .format(ARCH_FILENAME, policy_dir, '; '.join(problems)))
     return arch
 
 
-def assert_config_matches(policy_dir, fc_layer_params):
-    """On a training *resume*, the checkpoint's arch is authoritative and the env's
-    ``SNEK_FC_LAYERS`` is the thing that might be wrong.
+def assert_config_matches(policy_dir, fc_layer_params, algo=DEFAULT_ALGO, num_atoms=None,
+                          v_min=None, v_max=None):
+    """On a training *resume*, the checkpoint's arch is authoritative and the env knobs are the thing
+    that might be wrong.
 
     Fail loudly if they disagree — a resume under a changed knob is how a near-record arm was almost
     reverted for a loss (CLAUDE.md). Returns the arch on success.
+
+    The support is checked as well as the shape, and it is the *more* dangerous of the two: changing
+    ``SNEK_FC_LAYERS`` at least produces a shape error somewhere downstream, whereas changing
+    ``SNEK_V_MAX`` on a resume restores every weight cleanly and silently relabels what the atoms
+    mean. Only ``num_atoms`` would be caught by shape alone.
     """
     arch = require_arch(policy_dir)
+    problems = []
     recorded = [int(width) for width in arch['fc_layer_params']]
     wanted = [int(width) for width in fc_layer_params]
     if recorded != wanted:
+        problems.append('recorded fc_layer_params {0} != SNEK_FC_LAYERS {1}'.format(recorded, wanted))
+    if algo_of(arch) != str(algo):
+        problems.append('recorded algo {0!r} != SNEK_ALGO {1!r}'.format(algo_of(arch), str(algo)))
+    elif is_categorical(arch):
+        for field, wanted_value, knob in (('num_atoms', num_atoms, 'SNEK_NUM_ATOMS'),
+                                          ('v_min', v_min, 'SNEK_V_MIN'),
+                                          ('v_max', v_max, 'SNEK_V_MAX')):
+            if wanted_value is None:
+                problems.append('resuming a {0} arm needs {1}'.format(CATEGORICAL_ALGO, knob))
+            elif float(arch[field]) != float(wanted_value):
+                problems.append('recorded {0} {1} != {2} {3}'
+                                .format(field, arch[field], knob, wanted_value))
+    if problems:
         raise ArchMismatch(
-            'resuming {0}: recorded fc_layer_params {1} != SNEK_FC_LAYERS {2}. The checkpoint was '
-            'trained with the recorded shape; drop the override or resume a matching run.'
-            .format(policy_dir, recorded, wanted))
+            'resuming {0}: {1}. The checkpoint was trained with the recorded values; drop the '
+            'override or resume a matching run.'.format(policy_dir, '; '.join(problems)))
     return arch

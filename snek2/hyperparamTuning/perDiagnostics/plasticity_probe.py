@@ -65,6 +65,7 @@ import numpy as np
 import tensorflow as tf
 from tf_agents.environments import tf_py_environment
 
+import policy_arch
 from eval_agent import build_eval_agent
 from input_sensitivity_over_time import load_boards, parse_steps, DEFAULT_BOARDS, POLICY_DIR
 from plasticity import build_ladder, layer_stack, seeded_reinit, trailing_curve
@@ -240,6 +241,9 @@ def main():
 
     obs, _ = load_boards(boards_policy)
     ckpt_dir = policy if os.path.isdir(policy) else os.path.join(POLICY_DIR, policy)
+    # The teacher and the scratch student are scalar nets of the arm's own shape, which a categorical
+    # head is not. Refuse before the ladder is built.
+    policy_arch.refuse_categorical(ckpt_dir, 'plasticity_probe.py')
     arm = os.path.basename(os.path.normpath(ckpt_dir))
     ladder, skipped = build_ladder(ckpt_dir, stride, extra)
     curve = trailing_curve(arm)

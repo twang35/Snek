@@ -80,6 +80,7 @@ import numpy as np
 import tensorflow as tf
 from tf_agents.environments import tf_py_environment
 
+import policy_arch
 from eval_agent import build_eval_agent
 from input_sensitivity_over_time import load_boards, parse_steps, DEFAULT_BOARDS, POLICY_DIR
 from snake_environment import SnakeEnvironment
@@ -383,6 +384,9 @@ def main():
     # A name under savedPolicies/, or a directory anywhere. The eval curve is keyed on the arm name
     # either way, which is why a staged ladder keeps the arm's directory name.
     ckpt_dir = policy if os.path.isdir(policy) else os.path.join(POLICY_DIR, policy)
+    # The fresh-network comparison builds a same-shaped *scalar* net, and the layer walk expects a
+    # plain Sequential. Neither holds for a categorical head, so refuse before doing any work.
+    policy_arch.refuse_categorical(ckpt_dir, 'plasticity.py')
     arm = os.path.basename(os.path.normpath(ckpt_dir))
     ladder, skipped = build_ladder(ckpt_dir, stride, extra)
     curve = trailing_curve(arm)

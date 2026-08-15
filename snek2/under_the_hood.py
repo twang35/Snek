@@ -13,7 +13,11 @@ import random
 import time
 
 import tensorflow as tf
+from tf_agents.networks import categorical_q_network
 from tf_agents.networks import sequential
+from tf_agents.utils import common
+
+import categorical_agent
 
 
 # Share of the perfect-game score an arm has to reach before display_progress draws the
@@ -96,6 +100,106 @@ def build_q_net(num_actions, fc_layer_params):
         kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.03, maxval=0.03),
         bias_initializer=tf.keras.initializers.Constant(0.0))
     return sequential.Sequential(dense_layers + [q_values_layer])
+
+
+def build_categorical_q_net(observation_spec, action_spec, fc_layer_params, num_atoms,
+                            v_min=None, v_max=None, zero_init=False):
+    """The C51 network, built in one place for the same reason `build_q_net` is.
+
+    Uses `tf_agents`' `CategoricalQNetwork`, whose hidden layers come out **identical** to
+    `dense_layer()` above: `encoding_network` defaults its kernel initializer to
+    `VarianceScaling(scale=2.0, mode='fan_in', distribution='truncated_normal')`, which is exactly what
+    `dense_layer` passes. So a c51 arm and its ddqn control differ in the head and the loss, not in how
+    their trunks are initialised. The head differs from `build_q_net`'s only in a constant bias (-0.2
+    against 0.0), which cancels in the per-action softmax over atoms.
+
+    Unlike `build_q_net` this needs the specs, because the output has to be checked against
+    `(num_actions, num_atoms)` and the network reshapes to it.
+
+    `zero_init` applies the bias ramp described in `categorical_agent.zero_init_lambda` — see
+    `apply_zero_init`. It needs `v_min`/`v_max` because the correction depends on the support, which the
+    network itself does not carry.
+    """
+    num_actions = int(action_spec.maximum - action_spec.minimum + 1)
+    net = categorical_q_network.CategoricalQNetwork(
+        observation_spec, action_spec, num_atoms=int(num_atoms),
+        fc_layer_params=tuple(fc_layer_params))
+    # Built here rather than left to the agent, so the head bias exists to be rewritten below and so a
+    # shape complaint surfaces at build time rather than inside a training step.
+    net.create_variables()
+    if zero_init:
+        apply_zero_init(net, num_actions, int(num_atoms), v_min, v_max)
+    return net
+
+
+def categorical_head_bias(net, num_actions, num_atoms):
+    """The head's bias variable, located by shape rather than by attribute path.
+
+    `CategoricalQNetwork` wraps a private `QNetwork` whose private `q_value_layer` holds the head, and
+    reaching through both names would break silently on a `tf_agents` rename. A bias of length
+    `num_actions * num_atoms` is unambiguous in practice — and when it is not (a hidden layer of
+    exactly that width), this raises rather than picking one.
+    """
+    wanted = num_actions * num_atoms
+    matches = [variable for variable in net.trainable_variables
+               if variable.shape.rank == 1 and int(variable.shape[0]) == wanted
+               and 'bias' in variable.name]
+    if len(matches) != 1:
+        raise ValueError(
+            'expected exactly one bias of length {0} (num_actions {1} x num_atoms {2}) in the '
+            'categorical head, found {3}: {4}. A hidden layer of that exact width would do this — '
+            'change the width or the atom count.'
+            .format(wanted, num_actions, num_atoms, len(matches),
+                    [variable.name for variable in matches]))
+    return matches[0]
+
+
+def apply_zero_init(net, num_actions, num_atoms, v_min, v_max):
+    """Rewrites the head bias so the network's initial *expected* Q is 0 rather than the grid midpoint.
+
+    A categorical head starts with near-uniform atom logits, so its initial expected Q is
+    `(v_min + v_max) / 2` — 57.5 on the shipped grid, against a scalar head that starts near 0. That is
+    a second difference between a c51 arm and its ddqn control on top of the algorithm, and this removes
+    it. Off by default: standard initialisation is what the literature does, and this is the knob that
+    lets the confound be measured rather than assumed away.
+
+    The flat head is action-major (`CategoricalQNetwork.call` reshapes `[-1, num_actions, num_atoms]`),
+    so the per-atom ramp is tiled once per action.
+    """
+    if v_min is None or v_max is None:
+        raise ValueError('zero_init needs v_min and v_max; the network does not carry its support')
+    rate = categorical_agent.zero_init_lambda(float(v_min), float(v_max), num_atoms)
+    support = np.linspace(float(v_min), float(v_max), num_atoms)
+    ramp = -rate * (support - float(v_min))
+    bias = categorical_head_bias(net, num_actions, num_atoms)
+    bias.assign(np.tile(ramp, num_actions).astype(bias.dtype.as_numpy_dtype))
+    return rate
+
+
+def expected_q(net, observations, support=None, step_type=None):
+    """`Q(s, .)` from either network kind, so a caller does not branch on the algorithm.
+
+    A scalar net already returns Q. A categorical net returns `[batch, num_actions, num_atoms]` logits,
+    reduced here through `common.convert_q_logits_to_values` — the same call `CategoricalQPolicy` uses,
+    so this cannot disagree with the greedy action the policy actually takes.
+
+    `support` is required for a categorical net and rejected for a scalar one, both loudly. Passing the
+    wrong one silently would reproduce this project's favourite failure: a number that looks like a Q
+    value and is not. Get it from `policy_arch.support_from_arch`.
+    """
+    if step_type is None:
+        # StepType.MID, matching what the diagnostics already pass by hand.
+        step_type = tf.fill([tf.shape(observations)[0]], 1)
+    is_categorical = hasattr(net, 'num_atoms')
+    if is_categorical and support is None:
+        raise ValueError('this is a categorical network ({0} atoms); expected_q needs its support. '
+                         'Use policy_arch.support_from_arch(arch).'.format(net.num_atoms))
+    if not is_categorical and support is not None:
+        raise ValueError('a support was given for a scalar Q network, which would silently ignore it')
+    output, _ = net(observations, step_type=step_type)
+    if not is_categorical:
+        return output
+    return common.convert_q_logits_to_values(output, tf.constant(support, dtype=tf.float32))
 
 
 def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_episodes=10):

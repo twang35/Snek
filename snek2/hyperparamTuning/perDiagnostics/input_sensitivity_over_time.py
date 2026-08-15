@@ -59,8 +59,10 @@ import numpy as np
 import tensorflow as tf
 from tf_agents.environments import tf_py_environment
 
+import policy_arch
 from eval_agent import build_eval_agent
 from snake_environment import SnakeEnvironment
+from under_the_hood import expected_q
 
 POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'savedPolicies')
 DEFAULT_BOARDS = 'b18b-tgt1000seed2'
@@ -121,19 +123,24 @@ def load_boards(boards_policy, seed=0):
     return np.concatenate(picks), np.concatenate(lengths)
 
 
-def q_values(agent, obs):
-    """Greedy-time Q for a batch of observations, MID step type throughout."""
+def q_values(agent, obs, support=None):
+    """Greedy-time Q for a batch of observations, MID step type throughout.
+
+    Through `under_the_hood.expected_q`, so a c51 checkpoint reports `sum_i z_i p_i(s, a)` — the same
+    reduction its own policy takes its argmax over — rather than a raw logit that would look like a Q
+    value and not be one. `support` comes from the checkpoint's `arch.json` and is required for a
+    categorical net; `expected_q` raises if it is missing or if it is supplied for a scalar one.
+    """
     out = []
     for start in range(0, len(obs), BATCH):
         chunk = obs[start:start + BATCH]
-        q, _ = agent._q_network(
-            tf.convert_to_tensor(chunk),
-            step_type=tf.fill([len(chunk)], 1))
+        q = expected_q(agent._q_network, tf.convert_to_tensor(chunk), support=support,
+                       step_type=tf.fill([len(chunk)], 1))
         out.append(q.numpy())
     return np.concatenate(out)
 
 
-def saliency(agent, obs):
+def saliency(agent, obs, support=None):
     """Mean |d max_a Q / d obs_i| per input, averaged over boards.
 
     The counterfactual flip only works on the binary flags. Indices 0-5 (food direction and
@@ -146,13 +153,14 @@ def saliency(agent, obs):
         chunk = tf.convert_to_tensor(obs[start:start + BATCH])
         with tf.GradientTape() as tape:
             tape.watch(chunk)
-            q, _ = agent._q_network(chunk, step_type=tf.fill([len(chunk)], 1))
+            q = expected_q(agent._q_network, chunk, support=support,
+                           step_type=tf.fill([len(chunk)], 1))
             best = tf.reduce_max(q, axis=1)
         total += np.abs(tape.gradient(best, chunk).numpy()).sum(axis=0)
     return total / len(obs)
 
 
-def sensitivities(agent, obs):
+def sensitivities(agent, obs, support=None):
     """Per flag, the mean dQ of flipping that flag 0 -> 1, pooled over the three actions.
 
     Also returns the mean max-Q, which is the scale the deltas should be read against.
@@ -165,9 +173,10 @@ def sensitivities(agent, obs):
             lo[:, first + action] = 0.0
             hi = obs.copy()
             hi[:, first + action] = 1.0
-            deltas.append(q_values(agent, hi)[:, action] - q_values(agent, lo)[:, action])
+            deltas.append(q_values(agent, hi, support)[:, action]
+                          - q_values(agent, lo, support)[:, action])
         result['d_' + name] = np.stack(deltas, axis=1).mean(axis=1)
-    q = q_values(agent, obs)
+    q = q_values(agent, obs, support)
     result['max_q'] = q.max(axis=1)
     result['argmax'] = q.argmax(axis=1)
     return result
@@ -189,6 +198,9 @@ def main():
     py_env.reset()
     tf_env = tf_py_environment.TFPyEnvironment(py_env)
     agent, checkpoint, global_step = build_eval_agent(tf_env, py_env, ckpt_dir)
+    # None for a scalar arm, which is what expected_q wants there. Read once: the support is a
+    # property of the policy directory, not of a checkpoint inside it.
+    support = policy_arch.support_from_arch(policy_arch.require_arch(ckpt_dir))
 
     endgame = (lengths >= ENDGAME[0]) & (lengths <= ENDGAME[1])
     rows = []
@@ -207,7 +219,7 @@ def main():
             # network, which is exactly the kind of result that survives review.
             raise SystemExit('ckpt-%d restored global_step %d' % (step, restored))
 
-        s = sensitivities(agent, obs)
+        s = sensitivities(agent, obs, support)
         row = {'step': step}
         for key in ('d_chase', 'd_safe', 'd_win', 'max_q'):
             row[key] = float(s[key][endgame].mean())
@@ -216,7 +228,7 @@ def main():
             str(L): {key: float(s[key][lengths == L].mean())
                      for key in ('d_chase', 'd_safe', 'd_win', 'max_q')}
             for L in sorted(set(lengths.tolist()))}
-        row['grad'] = [float(g) for g in saliency(agent, obs)]
+        row['grad'] = [float(g) for g in saliency(agent, obs, support)]
         if argmaxes:
             same = s['argmax'] == argmaxes[-1]
             row['agree_prev'] = float(same.mean())

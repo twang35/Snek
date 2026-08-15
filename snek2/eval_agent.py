@@ -20,15 +20,23 @@ Two settings here are load-bearing:
 
 The optimizer and `target_update_period` are required by the agent's constructor and are never used:
 nothing here trains. They are left at training's values so the checkpoint's variable set matches.
+
+**Which agent to build is read off `arch.json`, never off the environment.** A c51 checkpoint restored
+into a scalar network fails on shape, which is fine — but a c51 checkpoint restored against the *wrong
+support* would load perfectly and evaluate a different policy, since the greedy action is
+`argmax_a sum_i z_i p_i(s, a)`. So the algorithm and the support both come from the sidecar the
+checkpoint was written with, and `SNEK_ALGO`/`SNEK_V_MAX` are not read here at all — the same rule
+`SNEK_FC_LAYERS` already follows.
 """
 import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
+import categorical_agent
 import policy_arch
 from snake_environment import OBS_ERA
-from snek2 import build_q_net
+from snek2 import build_categorical_q_net, build_q_net
 
 
 def build_eval_agent(tf_env, py_env, policy_dir):
@@ -50,18 +58,33 @@ def build_eval_agent(tf_env, py_env, policy_dir):
     num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
     obs_len = int(py_env.observation_spec().shape[0])
     arch = policy_arch.assert_restorable(policy_dir, num_actions, obs_len, OBS_ERA)
-    q_net = build_q_net(num_actions, arch['fc_layer_params'])
-
     global_step = tf.compat.v1.train.get_or_create_global_step()
-    agent = dqn_agent.DdqnAgent(
-        tf_env.time_step_spec(),
-        tf_env.action_spec(),
-        q_network=q_net,
-        epsilon_greedy=0.0,
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
-        td_errors_loss_fn=common.element_wise_huber_loss,
-        target_update_period=8,
-        train_step_counter=global_step)
+
+    if policy_arch.is_categorical(arch):
+        q_net = build_categorical_q_net(
+            tf_env.observation_spec(), action_tensor_spec, arch['fc_layer_params'],
+            arch['num_atoms'])
+        agent = categorical_agent.SnekCategoricalDqnAgent(
+            tf_env.time_step_spec(),
+            tf_env.action_spec(),
+            categorical_q_network=q_net,
+            min_q_value=arch['v_min'],
+            max_q_value=arch['v_max'],
+            epsilon_greedy=0.0,
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+            target_update_period=8,
+            train_step_counter=global_step)
+    else:
+        q_net = build_q_net(num_actions, arch['fc_layer_params'])
+        agent = dqn_agent.DdqnAgent(
+            tf_env.time_step_spec(),
+            tf_env.action_spec(),
+            q_network=q_net,
+            epsilon_greedy=0.0,
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+            td_errors_loss_fn=common.element_wise_huber_loss,
+            target_update_period=8,
+            train_step_counter=global_step)
     agent.initialize()
 
     checkpoint = tf.train.Checkpoint(agent=agent, policy=agent.policy, global_step=global_step)

@@ -51,6 +51,7 @@ os.environ.setdefault('SNEK_FC_LAYERS', '50,100,50')
 import tensorflow as tf
 from tf_agents.environments import tf_py_environment
 
+import policy_arch
 from eval_agent import build_eval_agent
 from snake_constants import PERFECT_SCORE
 from snake_environment import SnakeEnvironment
@@ -146,6 +147,9 @@ def concentration(p):
 
 
 def measure(policy, agent, checkpoint, global_step):
+    # Every number below is a scalar-head quantity — |TD error|, Huber td_loss, max Q. A c51 arm has
+    # none of them, so it is refused here rather than measured wrongly.
+    policy_arch.refuse_categorical(os.path.join(POLICY_DIR, policy), 'per_priorities.py')
     latest = tf.train.latest_checkpoint(os.path.join(POLICY_DIR, policy))
     if latest is None:
         raise SystemExit('no checkpoint under ' + os.path.join(POLICY_DIR, policy))

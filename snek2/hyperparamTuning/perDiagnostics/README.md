@@ -25,6 +25,27 @@ through the recorded per-step `d`, and it changes neither the greedy action nor 
 Phase 0 run found the returns are *not* concentrated near zero at γ=0.9975 — 60% of a champion's states
 are above 25 — which falsified the premise the C51 plan's support section was built on.
 
+## `SNEK_ALGO=c51` arms: which scripts read them
+
+Everything that goes through `eval_agent.build_eval_agent` and only *plays* — `behaviour_profile.py`,
+`chase_safe_potential.py`, `point_of_no_return.py`, `endgame_packing.py`, `eat_and_survive.py` — works
+on a categorical policy with no change, because the builder reads the algorithm and the atom support
+out of that policy's `arch.json` and returns the right greedy agent either way.
+
+Three scripts read the *scalar head itself* and are refused, loudly, by
+`policy_arch.refuse_categorical`:
+
+| script | why it cannot run | port cost |
+|---|---|---|
+| `per_priorities.py` | every column is a scalar quantity — `abs_td_error`, Huber `td_loss`, `qmax` | rewrite the measurement as KL/CE priorities |
+| `plasticity.py` | compares against a **fresh scalar net of the same shape**, and walks a plain `Sequential` | the layer walk plus a categorical fresh net |
+| `plasticity_probe.py` | teacher and scratch student are both scalar nets | same |
+
+`input_sensitivity_over_time.py` **is** ported: its `q_values`/`saliency`/`sensitivities` go through
+`under_the_hood.expected_q`, which returns `sum_i z_i p_i(s, a)` for a categorical net — the same
+reduction the policy's own argmax uses — and raises rather than guessing if the support is missing.
+A raw logit is a float like any other, so nothing else would have surfaced the error.
+
 `point_of_no_return.py` shards across seeds like the `diagnostics/` scripts do; six processes take
 six cores and ~5 minutes for 360 episodes. It **checks its own simulator against the live game on
 every step** and reports `mismatches`, which must be 0 — that is the guard that makes its search

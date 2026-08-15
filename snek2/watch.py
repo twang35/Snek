@@ -57,16 +57,13 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
 
 import tensorflow as tf
-from tf_agents.agents.dqn import dqn_agent
 from tf_agents.environments import tf_py_environment
-from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
-import policy_arch
 import snake_constants
+from eval_agent import build_eval_agent
 from snake_constants import POLICY_DIR
-from snake_environment import OBS_ERA, SnakeEnvironment
-from snek2 import build_q_net
+from snake_environment import SnakeEnvironment
 
 
 def available_steps(ckpt_dir):
@@ -114,26 +111,12 @@ def main(argv):
         snake_constants.FPS_LIMIT = fps
     tf_env = tf_py_environment.TFPyEnvironment(env)
 
-    action_tensor_spec = tensor_spec.from_spec(env.action_spec())
-    num_actions = action_tensor_spec.maximum - action_tensor_spec.minimum + 1
-    # arch.json decides the layer widths and is checked against this env, so watching a checkpoint
-    # cannot silently rebuild the wrong network the way an unset SNEK_FC_LAYERS once did.
-    arch = policy_arch.assert_restorable(
-        ckpt_dir, num_actions, int(env.observation_spec().shape[0]), OBS_ERA)
-    global_step = tf.compat.v1.train.get_or_create_global_step()
-    agent = dqn_agent.DdqnAgent(
-        tf_env.time_step_spec(),
-        tf_env.action_spec(),
-        q_network=build_q_net(num_actions, arch['fc_layer_params']),
-        epsilon_greedy=0.0,  # watching the greedy policy, same as an eval
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
-        td_errors_loss_fn=common.element_wise_huber_loss,
-        target_update_period=8,
-        train_step_counter=global_step)
-    agent.initialize()
-    # Mirrors the keys common.Checkpointer writes in snek2.py, so one ckpt-<step> can be
-    # restored by name rather than only the latest.
-    checkpoint = tf.train.Checkpoint(agent=agent, policy=agent.policy, global_step=global_step)
+    # Through build_eval_agent, which is where the greedy agent for a saved policy is built: it reads
+    # the layer widths, the algorithm and (for c51) the atom support out of arch.json and checks the
+    # sidecar against this environment first. Watching used to build its own DdqnAgent, which meant a
+    # c51 checkpoint would have been watched as a scalar one — the third copy of a construction this
+    # repo has already been bitten by twice.
+    agent, checkpoint, global_step = build_eval_agent(tf_env, env, ckpt_dir)
     policy_action = common.function(agent.policy.action)
 
     loaded_step = None
