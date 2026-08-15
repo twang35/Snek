@@ -10,6 +10,7 @@
 | `drawdown_chart.py` | `<sens_dir> <out.png>` | draws the four-panel figure from the above; no measurement of its own |
 | `behaviour_profile.py` | `<out.json> <ckpt-or-policy> <episodes> <seed>` | what a checkpoint *does*: steps per meal, starve headroom, packing and realised chase-safety, by snake length — the elite-vs-mediocre comparison |
 | `champion_chart.py` | `<bp_dir> <measured.json> <out.png>` | draws that comparison plus the selection-noise panels |
+| `chase_safe_potential.py` | `<out.json> <ckpt-or-policy> <episodes-per-seed> <seed[,seed...]>` | how often "head, food and tail in one region" **flips**, per length band — the Phase 0 calibration for `CHASE_SAFE_SHAPING`'s `c`, and the step/flip shares that decide whether to length-gate it |
 | `plasticity.py` | `<out.json> <policy> [stride] [extra] [boards]` | the three published loss-of-plasticity signatures against step — dormant units, feature rank, weight norm — each against a fresh net of the same shape |
 | `plasticity_probe.py` | `<out.json> <policy> [stride] [extra] [boards]` | whether the checkpoint can still **fit a new target**, which is the question the signatures are only correlates of |
 | `plasticity_analysis.py` | `<payload_dir> [out.png\|-] [probe_dir]` | the tables and figure from both: control→peak→end, drawdown events, flat stretches, early-vs-late, and the paired probe trend |
