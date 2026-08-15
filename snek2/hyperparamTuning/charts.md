@@ -104,12 +104,13 @@ training numbers, shaped first, b25-r2 control at the matched ≤2M horizon in p
 | `b30h-chase10fc200x100x100seed4` | 4 | 92.3 (`b25d` 91.7, +0.6) | 55.0 (54.2, +0.8) | 95.00 |
 | **mean** | | **92.9 (93.6, −0.7)** | **56.9 (58.6, −1.7)** | — |
 
-**A laptop close-out was started and stopped mid-run** (4 parallel `top20` processes, gate 95, started
-09:35 on 2026-08-15, killed ~13:29 with all four still `complete=false`). So b30 still has **no** pooled
-figure and no **≥98%/500 count**, the decisive metric for the shaping×architecture 2×2. The four
-checkpoints still need a completed close-out — the partial `_checkpoint_evals.json` files are not
-final and must not be pooled. Numbers land in `completedRuns.md` and the pooled/HOF line here once a
-close-out runs to completion.
+**Close-out running (resumed) on the laptop.** A first pass (4 parallel `top20`, gate 95) was killed
+~13:29 on 2026-08-15 with all four `complete=false` after screening ~80-100% of each arm; it was
+relaunched with `EVAL_RESUME=1`, which reused every banked measurement (~75k episodes across the four —
+18-22 full-length rows skipped, 551-631 partial screens topped up rather than re-measured) and is
+finishing the remaining ~140 checkpoints per arm. Until it lands b30 still has **no** pooled figure and
+no **≥98%/500 count**, the decisive metric for the shaping×architecture 2×2. Numbers land in
+`completedRuns.md` and the pooled/HOF line here once the four processes reach `complete=true`.
 
 ![b30e](charts/b30e-chase10fc200x100x100seed1.png)
 **b30e-chase10fc200x100x100seed1**
