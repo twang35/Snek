@@ -1,12 +1,24 @@
 # Distributional RL — C51 (categorical DQN)
 
-**Status:** proposed 2026-08-15. **Phase 0 is done** and picked the support — `v_min = -5`,
-`v_max = 120`, `num_atoms = 51`, spacing exactly 2.5 — while **falsifying the premise the support
-section rested on** ([results](#phase-0-results--the-support-measured-2026-08-15)). The control moved from `b24` to `b25`
-on 2026-08-15 for the head-size reason [below](#the-phase-34-launch-line). **No code is written yet:
-phase 1 is held pending review of the phase-0 numbers.** Phases 3-4 are held until the desktop's
-shaping queue (b28, then b29) closes, so the shaping result lands first; nothing about phases 1-2
-depends on that.
+**Status:** proposed 2026-08-15, **phases 0-2 done and phase 3 armed the same day. Phase 4 is
+deliberately not started** — the real batch is to be shaped with the user.
+
+- **Phase 0** picked the support — `v_min = -5`, `v_max = 120`, `num_atoms = 51`, spacing exactly 2.5 —
+  while **falsifying the premise the support section rested on**
+  ([results](#phase-0-results--the-support-measured-2026-08-15)). The control moved from `b24` to `b25`
+  for the head-size reason [below](#the-phase-34-launch-line).
+- **Phase 1** shipped as `categorical_agent.py` plus edits to `under_the_hood.py`, `policy_arch.py`,
+  `snek2.py`, `eval_agent.py`, `watch.py` and four diagnostics; `training.py` needed **no change**, as
+  designed. Suite **24 modules / 643 tests / 0 failed**, and all **18** mutants in the table below fail a
+  test. **The code is uncommitted pending review** (CLAUDE.md's code rule).
+- **Phase 2** ran end to end: a 3000-step `smoke` arm trains, writes `arch.json` with `algo=c51` and its
+  support, resumes cleanly, refuses a resume under a changed `V_MAX` or a changed `ALGO`, is watchable
+  through `watch.py`, and is measurable by `eval_checkpoints.py`. Throughput at `fc 200,100,100` is
+  **within ~10% of ddqn** (9000 steps: c51 146/151 s, ddqn 165/166 s — c51 *faster*, which is inside the
+  noise of episode-length variation with a close-out competing for cores, so read it as "no meaningful
+  slowdown" rather than as a speedup).
+- **Phase 3** is armed but waiting: `hyperparamTuning/launch_c51_pilot.sh` launches the four pilot arms
+  when b30's close-out exits, per this file's own host note.
 
 A throwaway feasibility probe was also run against this repo's own environment and specs, and its
 results are in [what the probe established](#what-the-probe-already-established) — they remove most of

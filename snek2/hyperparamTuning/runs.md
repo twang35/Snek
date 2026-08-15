@@ -61,10 +61,35 @@ landed (full numbers and graphs in [`charts.md`](charts.md)):
   (0.003-0.005), no zero stretch. The `c=0.20` dose rung, and a dead heat with the control this early
   (matched ≤275k best-30 **56.9 vs 57.4**). Since both `c=0.10` batches came back null, **b28 is the arm
   that decides "wrong idea" vs "dose too small to see."**
-- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: idle.**
+- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: b30e-g's close-out is finishing (~60% of
+  its measurements at 14:53); the C51 pilot below is armed and launches when it exits.**
 
 **Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
 + forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
+
+## C51 pilot — four arms, armed on the laptop (2026-08-15)
+
+Distributional RL, implemented through phase 3 of
+[`../plans/distributional-c51.md`](../plans/distributional-c51.md). **The code is written and tested but
+uncommitted**, pending review; phase 4 — the real batch — is deliberately not started.
+
+| | |
+|---|---|
+| arms | `c51pilot-lr1e5seed{1,2}`, `c51pilot-lr5e5seed{1,2}` — seed-matched across the two rates |
+| config | b25's verbatim (`fc 200,100,100`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping) plus `ALGO=c51`, 51 atoms over `[-5, 120]` |
+| cap | **600k steps** — a screen, not a result |
+| launcher | `hyperparamTuning/launch_c51_pilot.sh`, waiting on `eval_checkpoints.py b30` so the pilot does not share 14 cores with a close-out |
+
+**What it is asking**, in order: does a categorical agent learn this task at all; how many steps to its
+first perfect game against b25's ~9k; is the loss scale sane at 1e-5 (a cross-entropy starts at
+`ln 51 ≈ 3.93`, where the Huber TD loss starts near 0, so the same learning rate is not obviously the same
+step size). **The gate to phase 4 is one learning rate**, and the stop rule is pre-registered: if neither
+rate reaches its first perfect game by ~300k while the control did, stop and report rather than sweep.
+
+**`SNEK_CHART_VIEWER=0` on all four, one window opened by hand.** `chart_viewer.batch_prefix` groups only
+`b<n><letters>-` names, so four `c51pilot-*` arms would open four windows; the launcher uses the
+`--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
+and the four owed `320` seeds are ahead of C51 in the backlog below.
 
 ## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27e-h running on the desktop)
 
