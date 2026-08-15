@@ -499,6 +499,34 @@ the point, since the finished curve is the reference. Two traps it has to dodge,
 `curl`), so a name is only taken from a line that also runs `python`; and membership is
 `batch_prefix(policy) == prefix`, never `startswith`, because `'b20a'.startswith('b2')` is true.
 
+**A process scan alone cannot decide the panel set, and b30 opened on 3 of 4 arms because it did**
+(2026-08-14). Whether an arm had a panel depended on a `pgrep`/`ps` snapshot landing after that arm's
+`exec` — for four trainers launched inside one second, with the window opened by whichever of them
+reached `main()` first, that is a race with **no repair path**: an arm the scan missed reappears only if
+a later scan happens to see it. So every trainer now **registers itself** in
+`<tmpdir>/snek_chart_viewer_<prefix>.arms` (`register_arm`, one `<epoch>\tpolicy` line, `O_APPEND` so
+four simultaneous writers cannot clobber each other), and `wave_files` unions the registry with the
+process scan. Each source covers the other's blind spot — the registry cannot miss an arm that launched,
+the scan still catches one resumed by hand. **Registration happens before the dedupe returns**, because
+the three arms that *lose* the lock are exactly the ones that must still appear in the window the winner
+opens. Entries age out after `ARM_REGISTRY_TTL` (12 h) so tomorrow's wave does not inherit today's arms,
+and `MAX_WAVE_PANELS` (8) caps the window whatever the file says.
+
+**A killed viewer stays a zombie for hours, and `kill -0` calls a zombie alive.** The viewer is spawned
+by a trainer that never `wait()`s for it, so it sits in state `ZN` until that trainer exits. Both dedupe
+paths believed it: the claim lock read "a live viewer owns this batch" and `viewer_running_for` matched
+its still-intact `--arms b30` argv, so **killing a window locked the batch out of ever reopening one** —
+the exact opposite of the "nothing suppresses the window permanently" property above. `pid_state()` /
+`zombie()` fix both sites. When restarting a window by hand, expect the old pid to linger in `pgrep`
+output; that is the zombie, not a second viewer, and `ps -o stat=` tells them apart.
+
+**A `kill` that seems not to work may have worked.** `kill -0 <pid>` succeeds on a zombie, so a
+wait-for-exit loop written on it never finishes. Read `ps -o stat=` instead.
+
+**A test in `tests/test_chart_viewer.py` must stub `subprocess.Popen`, not only `subprocess.run`.** A
+fixture that asserted a spawn was *blocked* opened three real b30 windows on the laptop when the
+assertion failed — on top of a wave that was training. Stub both, so a wrong test cannot open a window.
+
 It is off by default anywhere but darwin, because on the desktop the runner daemon owns the viewer
 (`desktop/runner/runner.py::_ensure_viewer`) — it injects the graphical session's
 `DISPLAY`/`XAUTHORITY`, which a systemd-launched trainer does not have. **Don't add a trainer-side

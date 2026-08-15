@@ -9,6 +9,7 @@ import os
 import signal
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -925,5 +926,314 @@ def test_wave_files_keeps_an_arm_when_a_scan_transiently_fails():
         held = chart_viewer.wave_files('b20', known)
         assert [chart_viewer.policy_from_png(f) for f in held] == [
             'b20i-fc200x50seed1', 'b20j-fc200x50seed2']
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+# ---------------------------------------------------------------- the arm registry
+#
+# The bug these pin: on 2026-08-14 a four-arm laptop wave opened a window showing three of them.
+# Discovery was a process-list snapshot only, so a panel existed if and only if some `ps` landed
+# while that arm's process was visible — and nothing repaired a miss. The registry makes each
+# trainer state its own name before any scan runs.
+
+
+def test_register_arm_records_every_sibling_of_a_wave():
+    """All four arms of a wave register, including the three that lose the viewer lock."""
+    _clear_locks()
+    for policy in ('b30a-chase10seed1', 'b30b-chase10seed2',
+                   'b30c-chase10seed3', 'b30d-chase10seed4'):
+        chart_viewer.register_arm(policy)
+    assert chart_viewer.registered_arms('b30') == [
+        'b30a-chase10seed1', 'b30b-chase10seed2', 'b30c-chase10seed3', 'b30d-chase10seed4']
+
+
+def test_registered_arms_survives_a_scan_that_sees_nothing():
+    """**The 3-of-4 bug.** Even with the process list empty every registered arm gets a panel."""
+    _clear_locks()
+    for policy in ('b30a-chase10seed1', 'b30b-chase10seed2',
+                   'b30c-chase10seed3', 'b30d-chase10seed4'):
+        chart_viewer.register_arm(policy)
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps([])      # no trainer visible to ps at all
+        files = chart_viewer.wave_files('b30', known)
+    finally:
+        chart_viewer.subprocess.run = saved
+    assert [chart_viewer.policy_from_png(f) for f in files] == [
+        'b30a-chase10seed1', 'b30b-chase10seed2', 'b30c-chase10seed3', 'b30d-chase10seed4']
+
+
+def test_wave_files_unions_the_registry_with_the_process_scan():
+    """Each source covers the other's blind spot: an arm resumed by hand never registers, and an
+    arm the scan misses is still in the registry."""
+    _clear_locks()
+    chart_viewer.register_arm('b20i-fc200x50seed1')
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps(TRAINERS[1:])    # only seed2 is visible
+        files = chart_viewer.wave_files('b20', known)
+    finally:
+        chart_viewer.subprocess.run = saved
+    assert [chart_viewer.policy_from_png(f) for f in files] == [
+        'b20i-fc200x50seed1', 'b20j-fc200x50seed2']
+
+
+def test_registered_arms_ignores_another_batch_and_junk_lines():
+    """The file is keyed by prefix, but a hand-edited or half-written line must not cost the
+    window — and membership is `batch_prefix(policy) == prefix`, never `startswith`.
+
+    `b300a-` is the case that makes the difference load-bearing: `'b300a-x'.startswith('b30')` is
+    True, so a prefix test would pull batch 300's arm into batch 30's window. It reaches this file
+    only by hand-editing or a truncated write, which is exactly what the other lines here are."""
+    _clear_locks()
+    chart_viewer.register_arm('b30a-chase10seed1')
+    chart_viewer.register_arm('b3a-oldarm')          # its own prefix, its own file
+    with open(chart_viewer.arms_path('b30'), 'a') as handle:
+        handle.write('{0:.0f}\tb300a-otherbatch\n'.format(time.time()))
+        handle.write('not-a-timestamp\tb30z-junkstamp\n')
+        handle.write('no-tab-at-all\n')
+        handle.write('\n')
+    assert chart_viewer.registered_arms('b30') == ['b30a-chase10seed1']
+
+
+def test_registered_arms_ages_out_a_previous_wave():
+    """A second wave under the same prefix must not inherit yesterday's arms as extra panels —
+    the failure mode of the `runs/b20*.png` glob this whole mechanism replaced."""
+    _clear_locks()
+    now = 1_800_000_000.0
+    with open(chart_viewer.arms_path('b30'), 'a') as handle:
+        handle.write('{0:.0f}\tb30a-yesterday\n'.format(now - chart_viewer.ARM_REGISTRY_TTL - 60))
+        handle.write('{0:.0f}\tb30a-today\n'.format(now - 30))
+    assert chart_viewer.registered_arms('b30', now=now) == ['b30a-today']
+
+
+def test_registered_arms_ignores_a_stamp_from_the_future():
+    """A clock that jumped backwards would otherwise pin a panel for a whole TTL."""
+    _clear_locks()
+    now = 1_800_000_000.0
+    with open(chart_viewer.arms_path('b30'), 'a') as handle:
+        handle.write('{0:.0f}\tb30a-fromthefuture\n'.format(now + 3600))
+        handle.write('{0:.0f}\tb30b-nowish\n'.format(now - 5))
+    assert chart_viewer.registered_arms('b30', now=now) == ['b30b-nowish']
+
+
+def test_registered_arms_dedupes_a_resumed_arm():
+    """A resume registers the same name again; one panel, not two."""
+    _clear_locks()
+    chart_viewer.register_arm('b30a-chase10seed1')
+    chart_viewer.register_arm('b30a-chase10seed1')
+    assert chart_viewer.registered_arms('b30') == ['b30a-chase10seed1']
+
+
+def test_wave_files_caps_the_panel_count():
+    """A prefix that accumulates arms inside the TTL must not grow a window taller than the
+    screen — the cap is what `--arms` was introduced to guarantee."""
+    _clear_locks()
+    for i in range(chart_viewer.MAX_WAVE_PANELS + 4):
+        chart_viewer.register_arm('b30{0}-arm{1}'.format(chr(ord('a') + i), i))
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        chart_viewer.subprocess.run = _fake_ps([])
+        files = chart_viewer.wave_files('b30', known)
+    finally:
+        chart_viewer.subprocess.run = saved
+    assert len(files) == chart_viewer.MAX_WAVE_PANELS
+
+
+def test_register_arm_never_raises_when_the_registry_is_unwritable():
+    """A registry write is never worth a training run."""
+    saved = chart_viewer.LOCK_DIR
+    chart_viewer.LOCK_DIR = '/nonexistent-dir-for-snek-test'
+    try:
+        chart_viewer.register_arm('b30a-chase10seed1')       # must not raise
+        assert chart_viewer.registered_arms('b30') == []
+    finally:
+        chart_viewer.LOCK_DIR = saved
+
+
+def test_spawn_registers_the_arm_even_when_another_viewer_owns_the_window():
+    """The three arms that lose the lock are exactly the ones that must still be registered."""
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    saved = chart_viewer.subprocess.run
+
+    def no_viewer_but_holder_alive(args, **_kw):
+        """pgrep finds no viewer process; the lock's holder reads as a live one."""
+        class _Res:
+            def __init__(self, out):
+                self.stdout = out
+        if args[0] == 'ps' and 'stat=' in args:
+            return _Res(b'S')
+        return _Res(b'')
+    # Popen is stubbed as well as `run`, and that is not belt-and-braces: when this assertion
+    # failed during development the *real* spawn went through and opened three live b30 windows on
+    # the laptop, on top of a wave that was training. A test in this file must not be able to open
+    # a window even when it is wrong.
+    saved_popen = chart_viewer.subprocess.Popen
+
+    def no_popen(*_a, **_kw):
+        raise AssertionError('spawn_for_policy must not launch a viewer here')
+    try:
+        chart_viewer.claim_viewer_slot('b30')               # someone else owns the window
+        chart_viewer.subprocess.run = no_viewer_but_holder_alive
+        chart_viewer.subprocess.Popen = no_popen
+        assert chart_viewer.spawn_for_policy('b30b-chase10seed2') is None
+    finally:
+        chart_viewer.subprocess.run = saved
+        chart_viewer.subprocess.Popen = saved_popen
+        restore()
+    assert chart_viewer.registered_arms('b30') == ['b30b-chase10seed2']
+
+
+def test_smoke_runs_do_not_register():
+    """Smoke output is verification, not an arm anyone watches — and `smoke` is its own prefix."""
+    _clear_locks()
+    restore = _with_env(SNEK_CHART_VIEWER='1')
+    try:
+        assert chart_viewer.spawn_for_policy('smoke') is None
+    finally:
+        restore()
+    assert chart_viewer.registered_arms('smoke') == []
+
+
+# ---------------------------------------------------------------- zombie viewers hold no claim
+#
+# A viewer is spawned by a trainer that never wait()s for it, so an exited viewer stays a zombie
+# for as long as its parent trainer runs. `kill(pid, 0)` succeeds on a zombie, so the claim lock
+# read "a live viewer owns this batch" for the rest of the wave and no trainer could reopen the
+# window — the one property claim_viewer_slot promises it does not have. Found 2026-08-14.
+
+
+def _fake_ps_stat(state):
+    """Stub subprocess.run so `ps -o stat=` reports `state` for any pid."""
+    class _Res:
+        def __init__(self, out):
+            self.stdout = out
+
+    def run(args, **_kw):
+        if args[0] == 'ps' and 'stat=' in args:
+            return _Res(state.encode())
+        return _Res(b'')
+    return run
+
+
+def test_pid_alive_is_false_for_a_zombie():
+    """The measured case: state `ZN`, and `kill -0` says alive."""
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps_stat('ZN')
+    try:
+        assert chart_viewer.pid_alive(os.getpid()) is False
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_pid_alive_is_true_for_a_running_process():
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps_stat('S+')
+    try:
+        assert chart_viewer.pid_alive(os.getpid()) is True
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_pid_alive_is_false_for_a_pid_that_does_not_exist():
+    assert chart_viewer.pid_alive(2 ** 30) is False
+
+
+def test_pid_alive_is_false_when_ps_knows_nothing():
+    """Exited between the kill test and the ps: not alive."""
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps_stat('')
+    try:
+        assert chart_viewer.pid_alive(os.getpid()) is False
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_pid_alive_assumes_alive_when_ps_cannot_run():
+    """A duplicate window is what the lock exists to prevent, so an unanswerable check keeps
+    the claim rather than opening a second one."""
+    saved = chart_viewer.subprocess.run
+
+    def boom(*_a, **_k):
+        raise OSError('ps unavailable')
+    chart_viewer.subprocess.run = boom
+    try:
+        assert chart_viewer.pid_alive(os.getpid()) is True
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_a_zombie_viewers_lock_is_taken_over():
+    """**The window must be reopenable.** A lock naming a zombie viewer is stale, so the next
+    trainer of the batch wins the claim instead of being locked out for the rest of the wave."""
+    _clear_locks()
+    with open(chart_viewer.lock_path('b30'), 'w') as handle:
+        handle.write(str(os.getpid()))       # a "viewer" pid that ps will call a zombie
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps_stat('ZN')
+    try:
+        assert chart_viewer.claim_viewer_slot('b30') is True
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_a_live_viewers_lock_is_honoured():
+    """The dedupe still has to hold: a running viewer keeps its claim."""
+    _clear_locks()
+    with open(chart_viewer.lock_path('b30'), 'w') as handle:
+        handle.write(str(os.getpid()))
+    saved = chart_viewer.subprocess.run
+    chart_viewer.subprocess.run = _fake_ps_stat('S')
+    try:
+        assert chart_viewer.claim_viewer_slot('b30') is False
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_dedupe_ignores_a_zombie_viewer():
+    """A viewer that exited keeps its `--arms b30` argv until its parent trainer reaps it, so the
+    pgrep dedupe would report a window that closed hours ago and refuse to open a new one. This
+    is the same zombie defect as the claim lock's, at the second of the two sites."""
+    saved = chart_viewer.subprocess.run
+
+    class _Res:
+        def __init__(self, out):
+            self.stdout = out
+
+    def zombie_viewer(args, **_kw):
+        if args[0] == 'pgrep':
+            return _Res(b'4242\n')
+        if args[0] == 'ps' and 'stat=' in args:
+            return _Res(b'ZN')                          # the only viewer is a zombie
+        return _Res(b'python chart_viewer.py --arms b30\n')
+    chart_viewer.subprocess.run = zombie_viewer
+    try:
+        assert chart_viewer.viewer_running_for('--arms b30') is False
+    finally:
+        chart_viewer.subprocess.run = saved
+
+
+def test_dedupe_still_sees_a_live_viewer():
+    """The dedupe's whole job: one window per batch while a viewer is actually up."""
+    saved = chart_viewer.subprocess.run
+
+    class _Res:
+        def __init__(self, out):
+            self.stdout = out
+
+    def live_viewer(args, **_kw):
+        if args[0] == 'pgrep':
+            return _Res(b'4242\n')
+        if args[0] == 'ps' and 'stat=' in args:
+            return _Res(b'S')
+        return _Res(b'python chart_viewer.py --arms b30\n')
+    chart_viewer.subprocess.run = live_viewer
+    try:
+        assert chart_viewer.viewer_running_for('--arms b30') is True
     finally:
         chart_viewer.subprocess.run = saved

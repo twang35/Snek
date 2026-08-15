@@ -94,17 +94,92 @@ def live_arms(prefix):
     return sorted(arms)
 
 
+def arms_path(prefix):
+    """Where batch `prefix`'s trainers register themselves. Beside the claim lock, same TTL story."""
+    return os.path.join(LOCK_DIR, 'snek_chart_viewer_{0}.arms'.format(prefix))
+
+
+def register_arm(policy_name):
+    """Record that `policy_name` is an arm of its batch, for the viewer to read.
+
+    **This is the fix for a window that opened on 3 of 4 arms**, 2026-08-14. `live_arms` is a
+    *snapshot* of the process list, and every arm's panel depended on that snapshot landing after
+    the arm's `exec` — for a wave of four launched inside the same second, with the viewer spawned
+    by whichever arm reached `main()` first, that is a race with no repair path: an arm the scan
+    missed only reappears if a later scan sees it, and a `pgrep`/`ps` hiccup or an arm still in
+    Python's import phase can lose it for good. The registry removes the timing dependence — each
+    trainer states its own name, once, before any scan happens.
+
+    Append-only with `O_APPEND` so four simultaneous trainers cannot clobber each other: each line
+    is a single small write, which POSIX makes atomic at the end of the file. Every trainer calls
+    this, not only the one that wins the viewer lock — the winner opens the window, but all four
+    have to be *in* it.
+
+    Lines are `<epoch>\\t<policy>`; the timestamp is what lets a later wave of the same batch
+    prefix age the previous one out (see `registered_arms`). Failures are swallowed: a registry
+    write is never worth a training run.
+    """
+    try:
+        with open(arms_path(batch_prefix(policy_name)), 'a') as handle:
+            handle.write('{0:.0f}\t{1}\n'.format(time.time(), policy_name))
+    except Exception:
+        pass
+
+
+# How long a registered arm keeps its panel. Long enough that a wave (~6 h to a 2M cap) is never
+# cut short, short enough that tomorrow's wave under the same prefix does not inherit today's
+# arms as extra panels — the `runs/b20*.png` glob this file replaced grew to eight stale panels
+# plus four live ones exactly that way.
+ARM_REGISTRY_TTL = 12 * 3600
+# Hard cap on panels, whatever the registry says. A window taller than the screen shows nothing.
+MAX_WAVE_PANELS = 8
+
+
+def registered_arms(prefix, now=None):
+    """Arms that registered under `prefix` within `ARM_REGISTRY_TTL`, oldest first, deduped.
+
+    Unreadable or malformed lines are skipped rather than raised on: this is a convenience index
+    rebuilt by every launch, so a corrupt line costs one panel and never the window.
+    """
+    now = time.time() if now is None else now
+    found = []
+    try:
+        with open(arms_path(prefix)) as handle:
+            lines = handle.read().splitlines()
+    except Exception:
+        return []
+    for line in lines:
+        stamp, _, policy = line.partition('\t')
+        if not policy:
+            continue
+        try:
+            age = now - float(stamp)
+        except ValueError:
+            continue
+        if age > ARM_REGISTRY_TTL or age < -60:
+            continue        # stale, or a clock that ran backwards further than a skew
+        if batch_prefix(policy) == prefix and policy not in found:
+            found.append(policy)
+    return found
+
+
 def wave_files(prefix, known):
-    """PNG paths for batch `prefix`'s arms, adding any newly-seen live arm to `known`.
+    """PNG paths for batch `prefix`'s arms, adding any newly-seen arm to `known`.
+
+    Two sources, unioned, because each covers the other's blind spot: the **registry** is what
+    the trainers wrote about themselves, so it cannot miss an arm that launched (the 3-of-4 bug),
+    and the **process scan** still catches an arm started by hand or resumed without going through
+    `spawn_for_policy`.
 
     Sticky on purpose: `known` is mutated and never pruned, so an arm that reaches its step
     cap keeps its panel while its siblings run. That is the point of watching a wave — the
     finished curve is what the others get compared against — and it also means a transient
     `ps` failure cannot blank the window.
     """
-    for policy in live_arms(prefix):
+    for policy in registered_arms(prefix) + live_arms(prefix):
         if policy not in known:
             known.append(policy)
+    del known[MAX_WAVE_PANELS:]
     return [os.path.join('runs', policy + '.png') for policy in sorted(known)]
 
 
@@ -224,6 +299,12 @@ def viewer_running_for(glob_pattern):
         res = subprocess.run(['pgrep', '-f', 'chart_viewer.py'],
                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         pids = [p for p in res.stdout.decode().split() if p and p != str(os.getpid())]
+        # Zombies drop out here for the same reason they do in `pid_alive`: an exited viewer keeps
+        # its argv — `--arms b30` and all — until its parent trainer reaps it, so a substring match
+        # on `ps` output reports the window of a viewer that closed hours ago. This site was missed
+        # when `pid_alive` was added and it blocked the b30 restart on its own. State-only, not
+        # `pid_alive`: the pid came from `pgrep` a moment ago, so `kill` adds nothing here.
+        pids = [p for p in pids if not zombie(pid_state(int(p)))]
         if not pids:
             return False
         args = ['ps', '-o', 'command=']
@@ -245,6 +326,52 @@ LOCK_DIR = tempfile.gettempdir()
 
 def lock_path(prefix):
     return os.path.join(LOCK_DIR, 'snek_chart_viewer_{0}.lock'.format(prefix))
+
+
+def pid_state(pid):
+    """First word of `ps -o stat=` for `pid`: a state like `S`, `R` or `ZN`.
+
+    `''` means ps knows nothing about the pid (it is gone), `None` means ps itself could not be
+    run and the caller has to decide what that means. Split out from `pid_alive` because the two
+    callers want different fallbacks — see each."""
+    try:
+        res = subprocess.run(['ps', '-o', 'stat=', '-p', str(pid)],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except Exception:
+        return None
+    text = res.stdout.decode('utf-8', 'replace').strip()
+    return text.split()[0] if text else ''
+
+
+def zombie(state):
+    """True if `state` is a ps state word for a zombie. `None`/`''` are not zombies."""
+    return bool(state) and state.startswith('Z')
+
+
+def pid_alive(pid):
+    """True if `pid` is a process that could still be showing a window — **zombies are dead.**
+
+    `os.kill(pid, 0)` alone is not the right test here, and that shipped broken: a viewer is
+    spawned by a trainer that never `wait()`s for it, so when the viewer exits it stays a zombie
+    for as long as its parent trainer runs — hours. `kill(pid, 0)` succeeds on a zombie, so the
+    claim lock read "a live viewer owns this batch's window" for the rest of the wave, and no
+    trainer could ever reopen it. That is exactly the "nothing suppresses the window forever"
+    property `claim_viewer_slot` claims to have. Found 2026-08-14 while restarting b30's window:
+    the killed viewer sat in state `ZN` and `kill -0` still reported it alive.
+
+    An unanswerable `ps` falls back to the `kill` result: refusing to open a second window is the
+    safer error, since a duplicate window is the thing the lock exists to prevent.
+    """
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    state = pid_state(pid)
+    if state is None:
+        return True         # cannot tell — keep the claim rather than risk a second window
+    if state == '':
+        return False        # ps knows nothing about it; it exited between the two checks
+    return not zombie(state)
 
 
 def claim_viewer_slot(prefix):
@@ -277,12 +404,8 @@ def claim_viewer_slot(prefix):
             holder = int(fh.read().strip() or 0)
     except Exception:
         holder = 0
-    if holder:
-        try:
-            os.kill(holder, 0)      # signal 0 only tests existence
-            return False            # a live claimant owns this batch's window
-        except OSError:
-            pass
+    if holder and pid_alive(holder):
+        return False                # a live claimant owns this batch's window
     try:                            # stale: the claimant is gone, so take it over
         with open(lock, 'w') as fh:
             fh.write(str(os.getpid()))
@@ -319,6 +442,10 @@ def spawn_for_policy(policy_name):
     if not viewer_enabled() or policy_name.startswith('smoke'):
         return None
     prefix = batch_prefix(policy_name)
+    # Before the dedupe, and unconditionally: the three trainers that *lose* the lock still have
+    # to appear in the window the winner opens. Registering after the `return None` below is how
+    # a wave ends up showing only the arms a process scan happened to catch.
+    register_arm(policy_name)
     pattern = '--arms {0}'.format(prefix)
     # Both checks are needed: pgrep catches a viewer started by hand or by an earlier wave
     # whose lock has since been cleaned out of tmp, and the lock closes the race pgrep loses.
@@ -511,7 +638,11 @@ def main():
         else:
             files = sorted(args.files) if args.files else (
                 sorted(globmod.glob(args.glob)) if args.glob else [])
-        if os.environ.get('SNEK_VIEWER_DEBUG'):
+        # Always log a *change* to the panel set, not only under SNEK_VIEWER_DEBUG. The 3-of-4
+        # window on 2026-08-14 could not be diagnosed after the fact because the log was empty:
+        # one line per change is nothing (a wave produces two or three), and it is the only record
+        # of what the window actually showed. The env var still adds a line per refresh.
+        if files != rendered_files or os.environ.get('SNEK_VIEWER_DEBUG'):
             sys.stderr.write('{0:.0f} viewer refresh: {1} panels {2}\n'.format(
                 time.time(), len(files), [policy_from_png(f) for f in files]))
             sys.stderr.flush()
