@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-15T07:36:38",
-  "ts": 1786804598.2292206,
+  "iso": "2026-08-15T07:38:14",
+  "ts": 1786804694.6802323,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -19,18 +19,9 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 2
+    "eval": 1
   },
   "running": [
-    {
-      "id": "b27g-chase10g85seed3-hof",
-      "type": "eval",
-      "policy": "b27g-chase10g85seed3",
-      "pid": 1274273,
-      "step": 2000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 387
-    },
     {
       "id": "b27h-chase10g85seed4-hof",
       "type": "eval",
@@ -38,7 +29,7 @@
       "pid": 1274274,
       "step": 2000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 387
+      "elapsed_s": 484
     }
   ],
   "ledger": {
@@ -175,7 +166,7 @@
     "b27h-chase10g85seed4-closeout": "done",
     "b27e-chase10g85seed1-hof": "done",
     "b27f-chase10g85seed2-hof": "done",
-    "b27g-chase10g85seed3-hof": "running",
+    "b27g-chase10g85seed3-hof": "done",
     "b27h-chase10g85seed4-hof": "running",
     "b28a-chase20g85seed1": "queued",
     "b28b-chase20g85seed2": "queued",
@@ -204,8 +195,8 @@
   },
   "disk_free_gb": 138.4,
   "load_avg": [
-    8.1337890625,
-    7.322265625,
-    6.00244140625
+    5.8203125,
+    6.81689453125,
+    5.9619140625
   ]
 }
