@@ -599,6 +599,16 @@ claim was learning-speed variance attributed to a flag that was a no-op at the t
 
 ## Stopping a batch: file the charts before anything else
 
+**A trainer does not stop on SIGTERM — use `kill -9`, and verify.** Measured 2026-08-14 on both hosts:
+eight arms took a plain `kill` and kept stepping, the laptop's four advancing another ~25k steps over two
+minutes while the session assumed they were shutting down. Nothing in `snek2.py` installs a handler; the
+TF-Agents worker layer swallows it. `kill -9` is safe because every durable file is written `.partial`
+then `os.replace`d, and checkpoints land every 1,000 steps. Also **do not test liveness with `kill -0`**
+— it succeeds on a zombie; read `ps -o stat=`, and expect forked self-eval workers to outlive the parent
+briefly (`pkill -9 -f "python -u snek2.py <prefix>"` finishes the job). On the desktop, **pause the queue
+before killing** or the freed slots refill within one poll:
+[procedure](snek2/desktop/README.md#rebooting-the-box-and-what-recovers-by-itself).
+
 **When arms are killed, `charts.md` is updated in the same pass** — refresh the images, add the new
 batch's section at the top, and retire the oldest so it holds at most six batches (moved verbatim to
 `hyperparamTuning/archive/charts-archive.md`, PNGs left in `charts/`). Full checklist, including what
