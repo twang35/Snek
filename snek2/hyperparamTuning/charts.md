@@ -127,7 +127,7 @@ control in parentheses:
 ![b28d](charts/b28d-chase20g85seed4.png)
 **b28d-chase20g85seed4**
 
-## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *done at the 2M cap (laptop)*
+## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *done: close-out + HOF-500 null (laptop)*
 
 b27's config with one change, the net: **`200,100,100`** instead of `320`. Everything else is identical —
 `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance
@@ -167,11 +167,17 @@ the four) and finished the remainder.
 seed-matched control on `fc 200,100,100`, which is the *same direction and about the same size* as b27's
 85.2 vs 87.9 on `fc 320`. Two architectures, two nulls-or-worse.
 
-**The ≥98% column is at 100 episodes, not 500, and the two are not interchangeable** — b25's own
-`99.0%/100` rows re-measured to 92.7-96.4% under the 500-episode gate-98 pass, which is the
-selection-inflation this project already documented. **b30 still has no HOF-500 figure**: the laptop does
-not auto-chain that pass. Running it is what would settle the shaping×architecture 2×2 on the decisive
-metric, and it is a free slot's worth of work whenever one exists.
+**HOF-500 re-measure (gate 98, flat, laptop, 15:33 on 2026-08-15): 0 of the 10 close-out checkpoints
+clear ≥98%/500.** Every `99%/100` and `98%/100` row deflated below the gate at 500 episodes — b30e best
+**96.1%** @651k, b30g **95.3%** @709k, b30f **90.9%** @643k, all abandoned — the selection-inflation this
+project documents (`100`-episode tops read high because they are the arm's best). Its seed-matched control
+**`b25`-r2 is also 0** (25 checkpoints, best 97.2%), so on `fc 200,100,100` shaped and unshaped are a
+**dead heat at zero records**.
+
+**That completes the shaping×architecture 2×2 on the decisive metric.** On `fc 320` the control (`b24`)
+held **two** records and the shaped arm (`b27`) **none**; on `fc 200,100,100` neither reaches one.
+Chase-safe shaping produces no record-tier checkpoint on either net and removes the control's records on
+the wider one — **null-to-negative, confirmed on two architectures.**
 
 ![b30e](charts/b30e-chase10fc200x100x100seed1.png)
 **b30e-chase10fc200x100x100seed1**
