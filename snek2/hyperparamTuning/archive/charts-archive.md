@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-15 | 23 | batch 28 landed; batch 23 became the seventh-newest |
 | 2026-08-14 | 22 | batch 30 launched on the laptop; batch 22 became the seventh-newest |
 | 2026-08-14 | 21 | batch 27 launched; batch 21 became the seventh-newest |
 | 2026-08-14 | 20 | batch 26 landed; batch 20 became the seventh-newest |
@@ -20,6 +21,55 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-09 | 14 | batch 20 landed; batch 14 became the seventh-newest |
 | 2026-08-08 | 13 | batch 19 landed; batch 13 became the seventh-newest |
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
+
+---
+
+## Batch 23 — β annealed 0→0.1, `td_error` priority, fc 50,100,50
+
+One step further down the IS-β ladder than batch 21: β annealed from **0 to 0.1** over 300k
+(`SNEK_IS_BETA=0`, `SNEK_IS_BETA_FINAL=0.1`), so the update keeps **α·(1−β)=0.54** of the priority
+signal at the target — between b21's 0.30 (β→0.5) and the full 0.6 with IS off. Otherwise batch 20's
+control. It asks whether dialing β toward 0 approaches the no-IS behaviour smoothly.
+
+**β→0.1 lands at the no-IS consolidation level, and the close-out confirms it.** Training graph: mean
+best-30 **85.8**, `sef` **33.1** (n=4, `sef` spread 23.5-56.0). The desktop close-out then reads **pooled
+75.7** (eq-effort, gate 95) — **+20.7 over the control, +11.4 over b21, and higher on all four seeds than
+either** (sign-test p=0.0625 each, the n=4 floor) — closing most of the gap to b18's no-IS ~78.8 (ESS/N
+0.21, a different base). Both metrics climb monotonically down the β ladder: pooled control 55.0 → b21
+64.3 → **b23 75.7** → b18 ~78.8; `sef` 11.2 → 14.3 → **33.1** → 34.6. Peak trailing **94.90** is flat with
+every batch since 11 — ceiling unmoved, only consolidation differs. `b23b` holds a dense strong region on
+the graph — **five full-length checkpoints ≥95/100 around 777k, best 97/100** — and looked like a
+hall-of-fame candidate, but the re-measurement protocol falsified it: at **500 fresh episodes the
+close-out-selected @777k reads 92.4%**, the *worst* of its own cluster (textbook selection bias) and well
+below the 97.6% record. No b23 checkpoint enters the hall of fame.
+
+All at the 3M cap, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
+|---|---|---|---|---|---|
+| `b23b` | **95.00** | **91.0%** | **56.0%** | **82.1%** | **97.0% @777k (n=100)** |
+| `b23a` | **95.00** | 87.0% | 23.5% | 77.2% | 80.0% @1039k (n=20) |
+| `b23c` | 94.78 | 83.0% | 24.0% | 71.5% | 75.0% @1393k (n=20) |
+| `b23d` | 94.82 | 82.3% | 28.7% | 72.1% | 75.0% @603k (n=20) |
+| **mean — b23 β→0.1** | 94.90 | 85.8% | 33.1% | **75.7%** | — |
+| **mean — b21 β→0.5** | 94.69 | 74.1% | 14.3% | 64.3% | — |
+| **mean — control β→1.0** | 94.44 | 64.0% | 11.2% | 55.0% | — |
+| **mean — b18 no IS** | — | 87.3% | 34.6% | ~78.8% | — |
+
+**Only `b23b` cleared gate 95 at full length** (12 rows, top-3 96.3%); the other three have no full-length
+row, so their `best row` is a 20-episode screen (a bound), while `pooled` is exact.
+
+![b23b](../charts/b23b-beta01seed2.png)
+**b23b-beta01seed2**
+
+![b23a](../charts/b23a-beta01seed1.png)
+**b23a-beta01seed1**
+
+![b23c](../charts/b23c-beta01seed3.png)
+**b23c-beta01seed3**
+
+![b23d](../charts/b23d-beta01seed4.png)
+**b23d-beta01seed4**
 
 ---
 

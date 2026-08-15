@@ -44,32 +44,69 @@ diagnostic figures referenced from [`findings.md`](findings.md) and
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
 
-## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *b30e-h running on the laptop*
+## Batch 28 — chase-safe shaping at **`c=0.20`**, gate 85 (b24 config) — *b28a-d running on the desktop*
+
+The dose rung above b27. Identical to it — `fc 320`, gate 85, IS off, `td_error`, target 1000, discount
+0.9975, `FORK_BRANCHES=4`, 2M cap, seeds 1-4, the same `b24a-d` control — with the shaping coefficient
+**doubled to `c=0.20`**. Its job is the one ambiguity a single dose cannot resolve: **b27 came back null**
+(below — pooled 85.2 vs the control's 87.9, and **0 of 4** record-tier checkpoints against the control's
+two), so b28 separates *"chase-safe is the wrong idea"* from *"`c=0.10` was too small to see."*
+
+**Status at 08:46 on 2026-08-15: 262-275k of 2M (~13%), all four healthy** — epsilons off the 0.0125
+ceiling (0.003-0.005), no dead or zero stretch, peak trailing ~93.7. **A dead heat with the control this
+early, exactly like b27 was**: at the matched ≤275k horizon mean best-30 **56.9 vs 57.4 (−0.5), 2 of 4
+seeds ahead**, `sef` ~3 for both (near zero this early). Nothing to read yet — best-30 at 13% of the cap
+measures *when* an arm started winning, not the endgame consolidation this batch is about. Shaped first,
+control in parentheses:
+
+| arm | step | best-30 (control) | `sef` (control) |
+|---|---|---|---|
+| `b28b-chase20g85seed2` | 275k | **65.3** (`b24b` 58.3, +7.0) | 5.4 (2.2) |
+| `b28d-chase20g85seed4` | 269k | 63.3 (`b24d` 73.7, −10.4) | 6.7 (13.8) |
+| `b28c-chase20g85seed3` | 274k | 53.3 (`b24c` 58.7, −5.4) | 0.0 (1.8) |
+| `b28a-chase20g85seed1` | 262k | 45.7 (`b24a` 39.0, +6.7) | 0.4 (0.0) |
+
+**The verdict is the 2M close-out's ≥98%/500 count, read against b24's two records — not best-30 at 275k.**
+`b29` (gate 75) is queued behind these four.
+
+![b28a](charts/b28a-chase20g85seed1.png)
+**b28a-chase20g85seed1**
+
+![b28b](charts/b28b-chase20g85seed2.png)
+**b28b-chase20g85seed2**
+
+![b28c](charts/b28c-chase20g85seed3.png)
+**b28c-chase20g85seed3**
+
+![b28d](charts/b28d-chase20g85seed4.png)
+**b28d-chase20g85seed4**
+
+## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *done at the 2M cap (laptop)*
 
 b27's config with one change, the net: **`200,100,100`** instead of `320`. Everything else is identical —
 `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance
 shaping, **2M cap**, seeds 1-4. Together with b24/b25/b27 it makes a **2×2 of shaping × architecture**, so
 the shaping result stops depending on one net.
 
-**Status at 01:12 on 2026-08-15: 0.93-0.98M of 2M (about half-way).** All four arms are healthy — trailing
-90-94, epsilons well off the 0.0125 ceiling, no dead or zero stretch — which is the first thing to want from
-a *potential-based* term: it is not destabilizing the policy. **On consolidation the shaped wave is a shade
-ahead of its b25 control, but inside the noise floor**: at the matched ~0.95M horizon, mean `sef` **42.9 vs
-36.0 (+6.9), 4 of 4 seeds ahead**, and mean best-30 **92.9 vs 90.9 (+2.0), 2 of 4 ahead**. That is below the
-~10 pp `n=4` resolution and points the *opposite* way to b27 (below), so it is not yet a signal. Seed-by-seed
-at the matched horizon, shaped first, control in parentheses:
+**Done at the 2M cap on the laptop, all four — and the early edge washed out.** At ~0.95M this wave read
+`sef` **+6.9, 4 of 4 ahead** of its b25 control; **carried to the full 2M cap the lead is gone.** Matched
+at ≤2M, mean best-30 **92.9 vs 93.6 (−0.7)** and mean `sef` **56.9 vs 58.6 (−1.7)** — a dead heat, if
+anything a shade behind, and now pointing the *same* way as b27. The +6.9 was the ~10 pp `n=4` noise
+resolving as the control caught up, not a shaping effect. All four healthy throughout (peak trailing ~95,
+no dead or zero stretch), so the potential-based term is not destabilizing — it just is not helping. Final
+training numbers, shaped first, b25-r2 control at the matched ≤2M horizon in parentheses:
 
-| arm | seed | step | trailing | best-30 (control) | `sef` (control) |
-|---|---|---|---|---|---|
-| `b30e-chase10fc200x100x100seed1` | 1 | 934k | 92.6 | **93.7** (`b25a` 88.7, **+5.0**) | 44.3 (37.5, +6.8) |
-| `b30g-chase10fc200x100x100seed3` | 3 | 957k | 89.7 | 93.3 (`b25c` 93.3, +0.0) | 42.1 (38.2, +3.9) |
-| `b30f-chase10fc200x100x100seed2` | 2 | 929k | 94.4 | 92.3 (`b25b` 94.7, −2.4) | 40.4 (34.6, +5.8) |
-| `b30h-chase10fc200x100x100seed4` | 4 | 980k | 91.8 | 92.3 (`b25d` 87.0, **+5.3**) | 44.8 (33.6, **+11.2**) |
+| arm | seed | best-30 (control) | `sef` (control) | peak trail |
+|---|---|---|---|---|
+| `b30e-chase10fc200x100x100seed1` | 1 | 93.7 (`b25a` 93.7, +0.0) | 58.4 (61.4, −3.0) | 95.00 |
+| `b30g-chase10fc200x100x100seed3` | 3 | 93.3 (`b25c` 93.7, −0.4) | 58.3 (61.0, −2.7) | 95.00 |
+| `b30f-chase10fc200x100x100seed2` | 2 | 92.3 (`b25b` 95.3, −3.0) | 55.9 (57.9, −2.0) | 94.92 |
+| `b30h-chase10fc200x100x100seed4` | 4 | 92.3 (`b25d` 91.7, +0.6) | 55.0 (54.2, +0.8) | 95.00 |
+| **mean** | | **92.9 (93.6, −0.7)** | **56.9 (58.6, −1.7)** | — |
 
-The one clean signal is that all four beat their control on `sef`, but the best-30 spread within the wave
-(92.3 to 93.7) is far tighter than usual this early and the per-seed deltas swing both ways — the
-[seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
-still dominates at n=4. **The verdict is the 2M close-out's ≥98%/500 count, not best-30 at 1M.**
+**No close-out ran — the laptop does not auto-chain evals**, so b30 has no pooled figure and, more to the
+point, **no ≥98%/500 count**, the decisive metric. To finish the shaping×architecture 2×2 the four
+checkpoints need a close-out — rsync to the desktop and queue it, or run it on the now-idle laptop.
 
 ![b30e](charts/b30e-chase10fc200x100x100seed1.png)
 **b30e-chase10fc200x100x100seed1**
@@ -83,7 +120,7 @@ still dominates at n=4. **The verdict is the 2M close-out's ≥98%/500 count, no
 ![b30h](charts/b30h-chase10fc200x100x100seed4.png)
 **b30h-chase10fc200x100x100seed4**
 
-## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *b27e-h on the desktop*
+## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *done, close-out null*
 
 The first arms to carry the new shaping term. `Snake.step` adds `c·(γΦ(s′) − Φ(s))` with **Φ = 1 iff the
 head and tail share a free region that also holds the food, and the snake is ≥85 long**; potential-based,
@@ -93,31 +130,28 @@ seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24
 checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
 [the plan](../plans/chase-safe-reward-shaping.md) and [`runs.md`](runs.md).
 
-**Status at 01:12 on 2026-08-15: 1.19-1.27M of 2M, ~92 steps/s, ~2-2.5 h to the cap.** All four are healthy —
-trailing 93.6-94.1, no dead or zero stretch — so, as with b30, the potential-based term is not destabilizing
-the policy. **But here the read runs the *other* way: a clear edge to the control.** At the matched ~1.2M
-horizon, mean best-30 **88.7 vs 93.0 (−4.2), 0 of 4 seeds ahead**, and mean `sef` **30.5 vs 42.2 (−11.7)**.
-Judge on `best_perfect30` and the ≥98%/500 count, not peak trailing, which is capped at 95.00 and where all
-four controls already sit
-([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)).
-Seed-by-seed at the matched horizon, shaped first, control in parentheses:
+**Done at the 2M cap, closed out on the desktop — and it is a null.** The close-out pools **85.6 / 84.2 /
+83.2 / 88.0** (eq-effort, gate 95), **mean 85.2**, against the b24 control's **~87.9** — a shade *below*, not
+above. And on the metric that matters, **no b27 seed produced a ≥98%/500 checkpoint**: the auto-chained
+HOF-500 re-measure (gate 98, 500 episodes) found `b27e` empty, `b27f` a single 92.6% partial, `b27g` best
+96.6%, `b27h` best **97.5%** (435 ep) — all short of the bar the control cleared **twice** (`b24b`, `b24d`
+both 98.0%/500, the record). So `c=0.10` chase-safe shaping on `fc 320` did not reproduce the record, let
+alone beat it. All four healthy throughout (trailing 93.6-94.1, no dead or zero stretch), so the term is
+not destabilizing — it simply bought nothing. Close-out and HOF-500, shaped first, b24 control in
+parentheses:
 
-| arm | step | trailing | best-30 (control) | `sef` (control) |
-|---|---|---|---|---|
-| `b27h-chase10g85seed4` | 1275k | 93.9 | 93.0 (`b24d` 95.7, −2.7) | 34.3 (56.7, −22.4) |
-| `b27f-chase10g85seed2` | 1229k | 93.6 | 90.3 (`b24b` 96.7, −6.4) | 32.4 (55.2, −22.8) |
-| `b27e-chase10g85seed1` | 1237k | 93.7 | 88.3 (`b24a` 89.7, −1.4) | 37.4 (18.7, +18.7) |
-| `b27g-chase10g85seed3` | 1199k | 94.1 | 83.3 (`b24c` 89.7, −6.4) | 17.9 (38.2, −20.3) |
+| arm | close-out pooled (control) | HOF-500 best (≥98% held) |
+|---|---|---|
+| `b27h-chase10g85seed4` | **88.0** (`b24d` 85.97) | 97.5% @1945k, 435 ep — **0 held** |
+| `b27e-chase10g85seed1` | 85.6 (`b24a` 89.03) | none reached the gate |
+| `b27f-chase10g85seed2` | 84.2 (`b24b` 88.84) | 92.6% @1431k (partial) — 0 held |
+| `b27g-chase10g85seed3` | 83.2 (`b24c` ~87.8) | 96.6% @1975k — 0 held |
+| **mean** | **85.2 (≈87.9)** | **0 of 4 ≥98%/500 (control: 2 of 4)** |
 
-The one shaped `sef` win (`b27e` +18.7) is a control-weakness artifact — `b24a` is the slow control seed,
-still at `sef` 18.7 here — while `b27e`'s best-30 is itself −1.4 behind. **b27 down −4.2 and b30 up +2.0 on
-the same shaping is two n=4 batches pointing opposite ways, i.e. noise, not a shaping effect yet.** The
-[seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
-still dominates. **The verdict is the 2M close-out's ≥98%/500 count.**
-
-Graphs are copied off the desktop by hand (`scp the-claw-den:~/Snek/snek2/runs/b27*.png`), since a desktop
-job publishes to the `results` branch only when it finishes. **b28** (`c=0.20`) and **b29** (gate 75) are
-queued behind these four and now run on fixed code.
+Read together with b30 (same `c=0.10`, other net, also a dead-heat-to-slightly-behind after the early edge
+washed out), **both architectures agree that `c=0.10` chase-safe shaping does not help.** Whether that is
+the idea or the dose is exactly what **b28** (`c=0.20`, above) is running to answer; **b29** (gate 75) is
+queued behind it.
 
 ![b27e](charts/b27e-chase10g85seed1.png)
 **b27e-chase10g85seed1**
@@ -254,50 +288,3 @@ All at the 3M cap, sorted by close-out pooled. Close-out and HOF-500 ran on the 
 
 ![b24a](charts/b24a-fc320noisseed1.png)
 **b24a-fc320noisseed1**
-
-## Batch 23 — β annealed 0→0.1, `td_error` priority, fc 50,100,50
-
-One step further down the IS-β ladder than batch 21: β annealed from **0 to 0.1** over 300k
-(`SNEK_IS_BETA=0`, `SNEK_IS_BETA_FINAL=0.1`), so the update keeps **α·(1−β)=0.54** of the priority
-signal at the target — between b21's 0.30 (β→0.5) and the full 0.6 with IS off. Otherwise batch 20's
-control. It asks whether dialing β toward 0 approaches the no-IS behaviour smoothly.
-
-**β→0.1 lands at the no-IS consolidation level, and the close-out confirms it.** Training graph: mean
-best-30 **85.8**, `sef` **33.1** (n=4, `sef` spread 23.5-56.0). The desktop close-out then reads **pooled
-75.7** (eq-effort, gate 95) — **+20.7 over the control, +11.4 over b21, and higher on all four seeds than
-either** (sign-test p=0.0625 each, the n=4 floor) — closing most of the gap to b18's no-IS ~78.8 (ESS/N
-0.21, a different base). Both metrics climb monotonically down the β ladder: pooled control 55.0 → b21
-64.3 → **b23 75.7** → b18 ~78.8; `sef` 11.2 → 14.3 → **33.1** → 34.6. Peak trailing **94.90** is flat with
-every batch since 11 — ceiling unmoved, only consolidation differs. `b23b` holds a dense strong region on
-the graph — **five full-length checkpoints ≥95/100 around 777k, best 97/100** — and looked like a
-hall-of-fame candidate, but the re-measurement protocol falsified it: at **500 fresh episodes the
-close-out-selected @777k reads 92.4%**, the *worst* of its own cluster (textbook selection bias) and well
-below the 97.6% record. No b23 checkpoint enters the hall of fame.
-
-All at the 3M cap, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
-
-| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
-|---|---|---|---|---|---|
-| `b23b` | **95.00** | **91.0%** | **56.0%** | **82.1%** | **97.0% @777k (n=100)** |
-| `b23a` | **95.00** | 87.0% | 23.5% | 77.2% | 80.0% @1039k (n=20) |
-| `b23c` | 94.78 | 83.0% | 24.0% | 71.5% | 75.0% @1393k (n=20) |
-| `b23d` | 94.82 | 82.3% | 28.7% | 72.1% | 75.0% @603k (n=20) |
-| **mean — b23 β→0.1** | 94.90 | 85.8% | 33.1% | **75.7%** | — |
-| **mean — b21 β→0.5** | 94.69 | 74.1% | 14.3% | 64.3% | — |
-| **mean — control β→1.0** | 94.44 | 64.0% | 11.2% | 55.0% | — |
-| **mean — b18 no IS** | — | 87.3% | 34.6% | ~78.8% | — |
-
-**Only `b23b` cleared gate 95 at full length** (12 rows, top-3 96.3%); the other three have no full-length
-row, so their `best row` is a 20-episode screen (a bound), while `pooled` is exact.
-
-![b23b](charts/b23b-beta01seed2.png)
-**b23b-beta01seed2**
-
-![b23a](charts/b23a-beta01seed1.png)
-**b23a-beta01seed1**
-
-![b23c](charts/b23c-beta01seed3.png)
-**b23c-beta01seed3**
-
-![b23d](charts/b23d-beta01seed4.png)
-**b23d-beta01seed4**

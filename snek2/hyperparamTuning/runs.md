@@ -43,37 +43,28 @@ you want them removed as well. The registry rule is now liveness-based
 ([the mechanism](../../CLAUDE.md#rendering-is-off-by-default--use-watchpy-to-see-a-game)); the desktop was
 checked and needs no change, since its daemon passes explicit PNG paths and reads no registry.
 
-**The fix is confirmed end to end on live arms, not only in tests.** At 22:00, ~30 minutes in, all eight arms
-have a perfect-game rate and an epsilon that has left the ceiling — the two things b27a-d could not produce in
-320k steps:
+**Progress update, 2026-08-15 08:46 — b27 and b30 are done; b28 is running; the fix held throughout.**
+All twelve fixed-counter arms trained with a real perfect rate and a descending epsilon — the two things
+b27a-d could not produce in 320k steps — so the counter fix is confirmed end to end. Where each batch
+landed (full numbers and graphs in [`charts.md`](charts.md)):
 
-| wave | step | best-30 | max single eval | epsilon range |
-|---|---|---|---|---|
-| `b27e-h` (desktop) | 152-162k | 13.0 / 21.0 / 29.7 / 35.3 | 40-70% | 0.0058-0.0093 |
-| `b30e-h` (laptop) | 70-73k | 2.3 / 10.7 / 2.7 / 20.3 | 10-70% | 0.0078-0.0119 |
+- **b27e-h (desktop): done at 2M, closed out — a null.** Pooled mean **85.2** (eq-effort, gate 95) vs the
+  b24 control's ~87.9 (a shade *below*), and **0 of 4** seeds produced a ≥98%/500 checkpoint — best `b27h`
+  **97.5%** — against the control's **two** 98.0%/500 records. `c=0.10` on `fc 320` did not reproduce the
+  record, let alone beat it.
+- **b30e-h (laptop): done at 2M — the early edge washed out, and no close-out ran.** Matched at ≤2M the
+  shaped wave reads best-30 **92.9 vs 93.6 (−0.7)** and `sef` **56.9 vs 58.6 (−1.7)** against the b25-r2
+  control — a dead heat, reversing the +6.9 `sef` lead it showed at 0.95M. The laptop does not auto-chain
+  evals, so **b30 has no pooled / no ≥98%-500 figure**; finishing the shaping×architecture 2×2 needs a
+  close-out (rsync the four checkpoints to the desktop and queue, or run it on the now-idle laptop).
+- **b28a-d (desktop): running, 262-275k of 2M (~13%), all four healthy** — epsilons off the ceiling
+  (0.003-0.005), no zero stretch. The `c=0.20` dose rung, and a dead heat with the control this early
+  (matched ≤275k best-30 **56.9 vs 57.4**). Since both `c=0.10` batches came back null, **b28 is the arm
+  that decides "wrong idea" vs "dose too small to see."**
+- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: idle.**
 
-**Progress update, 22:05.** Both waves are healthy and both are **too early to judge** (b27 at ~8% of its 2M
-cap, b30 at ~3.5%); the reads below exist so a later session can see what was true here, not to decide
-anything. Controls recomputed at the matched horizon with `run_report.build_summary`:
-
-| comparison | shaped | control | seeds ahead |
-|---|---|---|---|
-| b27e-h vs **b24a-d** at ≤152k | mean best-30 **24.8** | **30.3** | 1 of 4 |
-| ↳ excluding seed 4 (`b24d` reads 57.3 there and holds the record) | **21.2** | **21.4** | 1 of 3 |
-| b30e-h vs **b25a-d** at ≤66k | mean best-30 **9.0** | **9.7** | 2 of 4 |
-
-So: a dead heat on `fc 200,100,100`, and a control edge on `fc 320` that is one early-blooming seed. Neither is
-a signal — the within-wave spread (2.3 to 35.3) dwarfs the between-wave difference, and `best_perfect30` this
-early measures *when an arm started winning* rather than the consolidation these batches are about. The seed
-ordering is identical in both b27 and b24 (4 > 3 > 2 > 1), which reproduces
-[the seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
-at n=8. Next checkpoint worth reading: **b27 at ~500k**, and the close-outs the desktop chains automatically.
-
-**Timing.** b27e-h reach 2M in ~5.5 h at 91.7 steps/s; b30e-h in ~10 h at ~52 steps/s. Desktop memory is
-5.3 GB used of 15,030 MB with 9.7 GB available, so the four trainers plus their forked self-evals are well
-inside the band. b28 and b29 remain queued (32 entries including their chained evals).
-
-**b28 (`c=0.20`) and b29 (gate 75) are still queued behind b27e-h**, unchanged, and now run on fixed code.
+**Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
++ forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
 
 ## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27e-h running on the desktop)
 
@@ -92,8 +83,8 @@ best HOF-500 checkpoints land at 1.03-1.39M and 2.86M, and 2M buys three batches
 
 | batch | `c` | gate | priority | what a lift here means |
 |---|---|---|---|---|
-| **b27** (running) | 0.10 | 85 | 10 | the calibrated dose — one quarter of a meal's reward spread over the ~2.5 genuine flips a struggling policy makes per endgame meal |
-| **b28** (queued) | **0.20** | 85 | 20 | the dose ladder. If b27 is null, this separates "wrong idea" from "too small to see" — the one ambiguity a single-dose test cannot resolve |
+| **b27** (done — null) | 0.10 | 85 | 10 | the calibrated dose — one quarter of a meal's reward spread over the ~2.5 genuine flips a struggling policy makes per endgame meal. **Result: pooled 85.2 vs control ~87.9, 0 of 4 ≥98%/500. No lift.** |
+| **b28** (running) | **0.20** | 85 | 20 | the dose ladder. b27 *was* null, so this separates "wrong idea" from "too small to see" — the one ambiguity a single-dose test cannot resolve |
 | **b29** (queued) | 0.10 | **75** | 30 | the gate ladder. 75 starts shaping ~10 meals earlier, where the packing decisions that *create* the endgame are made |
 
 **`c = 0.10` is measured, not assumed** ([Phase 0](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)):
@@ -130,13 +121,12 @@ endgame fork would have started its shaping from the *parent's* stale Φ. `resto
 recomputes it. 24 tests in `tests/test_reward_shaping.py` pin the behaviour, each verified to fail against
 a mutated implementation.
 
-Desktop status: **b27e-h running** (4 trainers, the box's cap, priority 10), b28 and b29 queued behind
-them at priority 20/30, each with close-out and HOF-500 auto-chained. ~6 h per batch at 92.5 steps/s.
+Desktop status (2026-08-15): **b28a-d running** (4 trainers, the box's cap), **b29 queued** behind them,
+each with close-out and HOF-500 auto-chained. b27e-h finished and closed out; ~6 h per batch at ~92 steps/s.
 Check with `git show origin/ops-status:status.json`.
 
-**Both hosts are full**: b27e-h on the desktop, **b30e-h on the laptop** (the same shaping on
-`fc 200,100,100`, below). `pgrep -fl "python -u snek2.py"` sees only the laptop's four; the desktop's
-`status.json` sees only its own.
+**The laptop is idle** — b30e-h finished at the 2M cap. Its close-out was never run (the laptop does not
+auto-chain evals), so b30 still owes a close-out before the shaping×architecture 2×2 is complete.
 
 ## Batch 30 — the same shaping on `fc 200,100,100` (b30e-h running on the laptop)
 
