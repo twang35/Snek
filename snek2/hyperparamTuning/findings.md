@@ -37,6 +37,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **The record is 97.6%** — `b18b-tgt1000seed2` @1588k, **683/700 fresh episodes** (CI 96.1-98.5) | **measured 2026-08-09**. Beats `b17b`'s 94.24%/5120 by **+3.33 pp, p=0.0002**, intervals **non-overlapping** — the first move in the ceiling that is a different class, not a better sample |
 | **A selected high can survive re-measurement** — @1588k was selected at 98/100 and re-measures at 97.4%/500, a **0.6 pp** change | **first instance**, 2026-08-09. Every prior one shrank (99→94.2, 97→93.0, 96→93.5, 96→~94); across nine batch-18 checkpoints >95% the mean shrinkage was **−5.2 pp**, so this is an outlier, not a new norm |
 | The record is a **narrow peak, not a region** — @1578k is 10k steps away and reads **91.6%/500** | **standing caveat** — a position-chosen grid is still the only way to claim a region |
+| **‡‡ `peak_trailing` is saturated: capped at 95, and all four b24 arms read exactly 95.00** | **measured 2026-08-14**, 36,012 evals. It is a mean of *food eaten*, which moves **2.2 points across 60 pp of perfect rate** — a 100%-perfect arm and `b24a` read the same number. **Stop using it as the ceiling metric**; `max_single_eval` is 100 on 12 of 12 arms and carries no information at all. See below |
+| **‡ `best_perfect30` ordered batch 24's hall-of-fame outcomes 4 of 4** | **observation**, n=4 — 96.7/96.7 produced the two ≥98%/500 holders, 96.0 a 97.4% near-miss, 95.3 **zero** full-length rows despite two 100%/100 highs. The leading indicator of a record is the *width* of the strong region |
 | ~~The record is ~95%, `b17b` @1190k at 95.17%/600~~ | **superseded 2026-08-09** by `b18b` @1588k. The `b17b` figure itself was later refined to 94.24% over 5,120 |
 | ~~The record is ~96%, `b17b` @1205k reads 99/100~~ | **falsified by re-measurement the same day** — 99/100 → **92.4% over 500**; all four ≥98% rows shrank a mean of **5.05 pp** |
 | The previous record was ~93-94% — `b15b` @3245k (93.0% /300), `b14a` @3702k (93.5% /200), `b11b` @855k | **narrowly superseded 2026-08-08** |
@@ -397,6 +399,56 @@ binomial expectation. An earlier warning here, built on `b4c` @869000 reading 51
 three runs, should be read as "one checkpoint once behaved strangely" rather than a property of
 the instrument. Pooling over many checkpoints is still what shrinks the interval (±1.3 at 6300
 episodes).
+
+## ‡‡ Peak trailing is a saturated metric — it is capped at 95 and four arms already sit on the cap
+
+Measured 2026-08-14 over the 12 arms of batches 22-24 (36,012 evals). `trailing_avg_score` is the mean
+`avg_score` of the last **5** evals (`training.trailing_avg_window`), `avg_score` is **food eaten**, and
+`MAX_POSSIBLE_SCORE` is **95** — so 95.00 is a hard ceiling meaning 50 consecutive perfect episodes.
+
+| metric | max | batches 22-24 | headroom |
+|---|---|---|---|
+| `peak_trailing` | **95** | **95.00 on all four b24 arms**, and on 2 of 4 b23 arms | **none** |
+| `max_single_eval` | 100 | **100 on 12 of 12 arms** | none |
+| `best_perfect30` | 100 | 82.3-96.7 | real |
+| `strong_eval_fraction` | 100 | 22.5-73.2 | real |
+
+**And below the cap it is compressed to nearly nothing.** Pooled over b24's evals, mean `avg_score`
+against that eval's perfect rate:
+
+| perfect % | 0 | 20 | 40 | 60 | 80 | 90 | 100 |
+|---|---|---|---|---|---|---|---|
+| mean `avg_score` | 65.9 | 89.6 | 91.1 | 90.8 | 91.8 | 93.4 | 95.0 |
+
+**2.2 points of score across 60 pp of perfect rate**, and non-monotone inside it. The cause is that a
+*failed* endgame episode still eats ~88-90 food, so food count cannot separate policies that differ
+enormously in what this project is trying to maximise.
+
+**Two consequences, and the first is a caution about this file.** Peak trailing is quoted throughout as
+the ceiling evidence — "peak trailing spans 93.75-94.69 across a 12.7× parameter range", "the ceiling
+unmoved at 95.00". Those statements are true and they remain the correct *reading*, because the
+substantive ceiling claims rest on other evidence (batch 20 produced **0** full-length rows under gate
+95 in 36 arms; the re-measured column moves 94.2 → 97.6 → 98.0). But **peak trailing itself can no
+longer register an improvement** — a hypothetical 100%-perfect arm reads 95.00, exactly what `b24a`
+reads — so it must stop being used as the ceiling metric. Where a saturating indicator is wanted, the
+*count* of trailing-95.00 windows still discriminates: 0 · 0 · 0 · 0 (b22), 1 · 2 · 0 · 0 (b23),
+7 · 22 · 10 · 17 (b24).
+
+**‡ And `best_perfect30` ordered batch 24's hall-of-fame outcomes 4 for 4.** Read from the arms' own
+HOF-500 payloads on the `results` branch:
+
+| arm | `best_perfect30` | full-length rows at 500 episodes | ≥98%/500 |
+|---|---|---|---|
+| `b24b` | **96.7** | 3 | **1** (98.0%) |
+| `b24d` | **96.7** | 3 | **1** (98.0%, the record) |
+| `b24c` | 96.0 | 3 | 0 (best 97.4%) |
+| `b24a` | 95.3 | **0** | 0 — despite two 100%/100 highs |
+
+n=4 across a 1.4-point range, so this is an observation and not a result. It is still the only training
+metric on record that separates an arm which produced a hall-of-fame checkpoint from one that produced
+none, and it says the leading indicator of a record is **the width of the strong region, not the height
+of the best point** — the same thing [there is no lucky checkpoint](#-there-is-no-lucky-checkpoint-an-arms-best-is-set-by-its-median)
+found from the checkpoint side.
 
 ## Policy quality changes materially within 1000 training steps
 

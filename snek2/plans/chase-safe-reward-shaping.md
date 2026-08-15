@@ -56,6 +56,28 @@ the record checkpoints, so the term goes quiet exactly where perfect games are w
 correct — the mid-game is where the packing that decides the endgame happens — but see the graded
 fallback under [Risks](#risks).
 
+## ‡ What it could move, and by which route — added 2026-08-14
+
+Three routes, in descending order of how likely they are:
+
+| route | what moves | prior |
+|---|---|---|
+| **Denser credit assignment** → the strong region gets wider | `best_perfect30`, `sef`, pooled, and therefore the *number* of hall-of-fame tickets | **most likely.** Every effect this project has found — batches 16, 21-24 — moved this axis and left the peak alone |
+| **Better mid-game packing** → the endgame arrives winnable more often | the per-episode perfect rate at convergence, i.e. the ceiling | **the one that would be new.** Supported by the 92%/77%/5% packing separation, but causally unproven, and Φ is quiet through 85-99 |
+| Null, or slower learning from a badly scaled `c` | nothing, or variance | real. The term is a per-step signal on a correlational marker |
+
+**Why a hall-of-fame checkpoint follows from the first route rather than the third.** A new record needs
+one checkpoint at ≥98% over 500 fresh episodes. Batch 24 turned **199** ≥97%/100 checkpoints into 9 that
+held ≥97%/500 and 2 at 98.0% — and the arm that produced none (`b24a`) is the arm with the lowest
+`best_perfect30`, not the one with the lowest peak. So the odds of a record are set by how wide and how
+dense the strong region is, which is exactly what routes 1 and 2 widen and what `best_perfect30`
+measures.
+
+**One theory point that is easy to state backwards.** "Potential-based shaping leaves the optimal policy
+unchanged" is a statement about the exact solution of the MDP. Under function approximation and a 3M-step
+budget the policy actually *found* does change — that is the entire reason to add the term. The theorem
+buys safety (it cannot make the thing being optimised worse), not inertness.
+
 ## The form
 
 ```
@@ -299,8 +321,11 @@ recorded net from the sidecar, so nothing has to be passed by hand — but any c
 
 | measure | source | what it decides |
 |---|---|---|
-| pooled eq-effort at gate 95, and peak trailing | close-out `_checkpoint_evals.json` | whether it worked, and whether it moved the **ceiling** or only consolidation |
-| `sef` at a matched horizon | `runs/<policy>_evals.json` | the low-variance training metric, for the seed-by-seed pairing |
+| **‡ `best_perfect30` at a matched horizon, seed by seed** | `runs/<policy>_evals.json` | **the target.** On the perfect rate itself, max 100, control at 95.3-96.7 so there is headroom — and it ordered b24's HOF outcomes 4 of 4 |
+| `sef` at a matched horizon | `runs/<policy>_evals.json` | **the test statistic.** sd 5.8 against `best_perfect30`'s 8.6, so it is what can actually resolve an effect at n=4 |
+| **‡ count of full-length ≥98%/500 rows** | the auto-HOF chain | **the decisive artifact** — a new hall-of-fame checkpoint is the outcome this is for. Control: 1 · 1 · 0 · 0 across b24b/d/c/a |
+| pooled eq-effort at gate 95 | close-out `_checkpoint_evals.json` | consolidation, the axis every effect found here has moved |
+| **‡ NOT `peak_trailing`** | — | capped at 95 and all four controls sit on 95.00, so it cannot register a gain. Report the *count* of trailing-95.00 windows instead (b24: 7 · 22 · 10 · 17) |
 | realised chase-safety and p90 steps per meal at 95-99, `headroom_p10` | `behaviour_profile.py` | whether it worked *for the stated reason* — the term should raise the behaviour it shapes |
 | **‡ one-piece share at length 90-94** | `endgame_packing.py` | the largest per-policy separation on record (92% / 77% / 5%). If chase-safety rises and packing does not, the term bought the marker without the property |
 | starvation share | `point_of_no_return.py` | the open `findings.md` item on what batch 16's removal cost |

@@ -469,6 +469,28 @@ and an earlier claim in [`runs.md`](runs.md) that "n=12 at 2M would detect ~5 pp
 a low-variance metric — on best-30 it is 8.7 pp. Choosing the metric is the only lever that moves
 this materially; adding arms runs into a square root.
 
+### ‡ Do not judge a ceiling on `peak_trailing` — it is capped at 95 and already pegged
+
+Added 2026-08-14. `trailing_avg_score` is the mean **`avg_score`** of the last 5 evals, `avg_score` is
+food eaten, and `MAX_POSSIBLE_SCORE` is **95**, so `peak_trailing` cannot exceed 95.00 — and all four
+batch-24 arms reach exactly that. Below the cap it moves **2.2 points across 60 pp of perfect rate**,
+because a failed endgame episode still eats ~88-90 food. `max_single_eval` is worse: 100 on 12 of 12
+recent arms. Full numbers:
+[`findings.md`](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap).
+
+**What to use instead, by the question being asked:**
+
+| question | metric | why |
+|---|---|---|
+| did the config move the arm? | `strong_eval_fraction` | lowest between-seed sd (5.8), so it resolves the smallest effect — still the primary |
+| did it move what we actually want? | `best_perfect30` | on the perfect rate itself, max 100, currently 96.7 so there is headroom. **The noisiest of the candidates** (sd 8.6, 15.1 pp at n=4), so read it as the target, not the test |
+| will it produce a hall-of-fame checkpoint? | **count of full-length ≥98% rows in the HOF-500 chain** | the literal criterion. `best_perfect30` is its best training-time predictor (4 of 4 on batch 24) |
+| is the arm winning whole 50-episode stretches? | **count of trailing-95.00 windows** | the discriminating form of the saturated metric: 0-0-0-0 for b22, 7-22-10-17 for b24 |
+
+Peak trailing keeps one honest job — **a cheap sanity check that an arm reached the endgame at all**, and
+a comparable number for arms far from the cap. It is quoted as ceiling evidence throughout the older
+findings; those readings hold on other evidence, but do not extend them.
+
 ### Comparing arms fairly
 
 **Always compare at matched step counts, never by wall-clock or by "where they got
