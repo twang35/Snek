@@ -119,6 +119,28 @@ So a reboot costs wall clock and nothing else. Watch `restarts` in the ledger en
 interruptions and carries across the relaunch, so a box rebooting in a loop shows a climbing
 number instead of looking freshly started each time.
 
+**Abandoning a wave: pause first, then `kill -9`, and the exit code is what suppresses the chain**
+(done 2026-08-14, when batch 27 had to be thrown away mid-run for
+[the perfect-game counter bug](../hyperparamTuning/findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)).
+Three things that pass unnoticed if the order is wrong:
+
+- **Pause before killing.** Slots free within one poll, and an unpaused daemon fills them from
+  `queue/pending/` immediately — which is how the *next* batch inherits whatever made you abandon
+  this one. Set `"paused": true` in `runtime.json`, wait for `status.json` to echo it back
+  (`runtime.paused` is published, so this is checkable), and only then kill.
+- **`kill -9`, not `kill`.** The trainer does not stop on SIGTERM — TF-Agents' worker layer swallows
+  it — and it keeps stepping while you assume it is shutting down. Confirmed on both hosts the same
+  day: four laptop arms and four desktop arms all advanced ~25k further steps after SIGTERM.
+- **A non-zero exit marks the job `failed`, and `failed` suppresses the eval chain.** The four
+  killed arms' `-closeout` and `-hof` entries vanished from the ledger, because `_auto_closeout_jobs`
+  fires off a `done` marker. That is the outcome you want when the run is being discarded — a
+  graceful stop would instead have earned four close-outs of arms you no longer trust. It also means
+  `failed` in the ledger does not always mean something broke; check whether a human killed it.
+
+Forked self-eval workers outlive the parent for a moment, so finish with `pkill -9 -f "snek2.py <prefix>"`
+and confirm with `free -m`. **`pgrep -f snek2.py` will match its own shell** — the two "leftovers" after
+that cleanup were `bash -c ps -o … $(pgrep …)`, not trainers.
+
 **The boot id is load-bearing in two ways, and both were silent bugs before 2026-08-13.** Without
 it a dead pid after a reboot read as `done`, so (1) a truncated training was published to `results`
 as a finished arm *and* spent its `closeout: pending` measuring the partial checkpoint set, and

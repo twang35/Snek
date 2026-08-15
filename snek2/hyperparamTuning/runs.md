@@ -23,10 +23,14 @@ pinned at 0.0125** — the refinement ceiling — instead of annealing. Full acc
 
 | | state |
 |---|---|
-| **b30a-d (laptop)** | **stopped** at 137-139k steps, on request. Not restarted until the fix ships |
-| **b27a-d (desktop)** | still training at 309-326k when the bug was found — **contaminated, recommend stopping** |
-| **b28, b29 (queued)** | would inherit the bug: the desktop runs whatever code is deployed there |
-| **the queued b27 close-outs / HOF-500** | would measure 0% perfect on every checkpoint. Wasted compute |
+| **b30a-d (laptop)** | **stopped** at 137-139k steps. Laptop is free — `pgrep -fl "python -u snek2.py"` is empty |
+| **b27a-d (desktop)** | **stopped** at 309-326k steps. Ledger reads `failed`, which is the kill, not a crash |
+| **b27's close-outs / HOF-500** | **gone** — the eval chain fires off a `done` marker, so killing the arms dropped all eight follow-on jobs |
+| **b28, b29 (still queued)** | **the desktop queue is paused** (`"paused": true` on `ops`, echoed by `status.json` at 21:17). They would otherwise have started on unfixed code within one poll |
+
+Desktop is idle with 12.1 GB free. **Unpausing is a deliberate step** — do it only after the fix is
+deployed there ([how](../desktop/README.md#deploying-a-code-change-to-the-desktop)), because b28 and b29
+carry the same shaping and would reproduce the bug exactly.
 
 **The fix is written and tested but uncommitted** (code, so it waits for review): counting moves to
 `state_helpers.is_perfect_score(score)` in `under_the_hood`, `eval_workers` and `eval_checkpoints`, plus

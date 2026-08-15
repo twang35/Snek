@@ -38,10 +38,11 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
-**Three PNGs in `charts/` are not arm charts and will always appear in that list** —
-`champion-vs-mediocre`, `drawdown-b23b-vs-b18` and `per-b18-vs-b20-priorities` are diagnostic figures
-referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
-training graphs. Anything *else* the check prints is a real gap.
+**Four PNGs in `charts/` are not arm charts and will always appear in that list** —
+`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities` and `plasticity-metrics` are
+diagnostic figures referenced from [`findings.md`](findings.md) and
+[`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
+real gap.
 
 ## ⚠ Every graph in batches 27 and 30 has a flat red line, and it is an instrumentation bug
 
@@ -96,7 +97,7 @@ seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24
 checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
 [the plan](../plans/chase-safe-reward-shaping.md) and [`runs.md`](runs.md).
 
-**Status at 2026-08-14 21:00: all four still training at 309-326k, and all four are contaminated** by the
+**Status: all four stopped at 21:18 on 2026-08-14, at 309-326k steps, all four contaminated** by the
 counter bug in the banner at the top of this file. Every graph below shows the same thing — a healthy blue
 score curve settling at 90-93 and **no red line at all**, because `perfect_percent` was 0 in all 310-327
 evals while each arm's own `max_score` field recorded a **filled board** between steps 9k and 16k. Epsilon
@@ -110,8 +111,9 @@ sat at 0.0125 the whole way, so these are not readings on the shaping.
 | `b27d-chase10g85seed4` | 318k | 93.0 | step 9k | **0, miscounted** | 0.0125 | `b24d` (86.0, 96.7) — holds the record |
 
 Graphs copied off the desktop by hand (`scp the-claw-den:~/Snek/snek2/runs/b27*.png`) rather than waiting
-for the `results` branch, because the flat red axis is the evidence. **b28** (`c=0.20`) and **b29** (gate 75)
-are still queued and would inherit the same bug until the fix is deployed there.
+for the `results` branch, because the flat red axis is the evidence — a killed job publishes nothing. **b28**
+(`c=0.20`) and **b29** (gate 75) are still queued behind a **paused** daemon; they carry the same shaping and
+would reproduce the bug until the fix is deployed there.
 
 ![b27a](charts/b27a-chase10g85seed1.png)
 **b27a-chase10g85seed1** — score rises to ~93 and holds; the perfect-game axis is empty for all 310 evals.
