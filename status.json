@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-14T17:16:45",
-  "ts": 1786753005.122605,
+  "iso": "2026-08-14T17:18:08",
+  "ts": 1786753088.3002505,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -19,46 +19,9 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 4
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "b26a-fc100x100noisseed1-hof",
-      "type": "eval",
-      "policy": "b26a-fc100x100noisseed1",
-      "pid": 612458,
-      "step": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
-    },
-    {
-      "id": "b26b-fc100x100noisseed2-hof",
-      "type": "eval",
-      "policy": "b26b-fc100x100noisseed2",
-      "pid": 612459,
-      "step": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
-    },
-    {
-      "id": "b26c-fc100x100noisseed3-hof",
-      "type": "eval",
-      "policy": "b26c-fc100x100noisseed3",
-      "pid": 612460,
-      "step": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
-    },
-    {
-      "id": "b26d-fc100x100noisseed4-hof",
-      "type": "eval",
-      "policy": "b26d-fc100x100noisseed4",
-      "pid": 612461,
-      "step": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
-    }
-  ],
+  "running": [],
   "ledger": {
     "smoke-1": "failed",
     "smoke-2": "failed",
@@ -175,15 +138,15 @@
     "b26b-fc100x100noisseed2-closeout": "done",
     "b26c-fc100x100noisseed3-closeout": "done",
     "b26d-fc100x100noisseed4-closeout": "done",
-    "b26a-fc100x100noisseed1-hof": "running",
-    "b26b-fc100x100noisseed2-hof": "running",
-    "b26c-fc100x100noisseed3-hof": "running",
-    "b26d-fc100x100noisseed4-hof": "running"
+    "b26a-fc100x100noisseed1-hof": "done",
+    "b26b-fc100x100noisseed2-hof": "done",
+    "b26c-fc100x100noisseed3-hof": "done",
+    "b26d-fc100x100noisseed4-hof": "done"
   },
   "disk_free_gb": 140.3,
   "load_avg": [
-    3.419921875,
-    3.99560546875,
-    5.21728515625
+    0.8974609375,
+    3.0537109375,
+    4.78271484375
   ]
 }
