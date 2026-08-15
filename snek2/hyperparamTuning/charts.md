@@ -1,6 +1,6 @@
 # Charts
 
-Progress graphs for the most recent batches — **22 through 27**, a cap of six, newest first. Per-arm
+Progress graphs for the most recent batches — **23 through 27 plus 30**, a cap of six, newest first. Per-arm
 numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
@@ -42,6 +42,36 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 `champion-vs-mediocre`, `drawdown-b23b-vs-b18` and `per-b18-vs-b20-priorities` are diagnostic figures
 referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
 training graphs. Anything *else* the check prints is a real gap.
+
+## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *running on the laptop*
+
+b27's config with one change, the net: **`200,100,100`** instead of `320`. Everything else is identical —
+`c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance
+shaping, **2M cap**, seeds 1-4. Together with b24/b25/b27 it makes a **2×2 of shaping × architecture**, so
+the shaping result stops depending on one net. Launched 2026-08-14 on the laptop.
+
+**Status: all four training, ~8k steps.** The graphs below are the first few evals and say nothing yet —
+nothing here is judgeable below ~250k. **Control is `b25a-d` read at a matched 2M** (best-30 93.7 / 95.3 /
+93.7 / 91.7, `sef` 61.4 / 57.9 / 61.0 / 54.2 per seed), not b25's published 3M numbers.
+
+| arm | net | `c` | gate | status |
+|---|---|---|---|---|
+| `b30a-chase10fc200x100x100seed1` | 200,100,100 | 0.10 | 85 | running |
+| `b30b-chase10fc200x100x100seed2` | 200,100,100 | 0.10 | 85 | running |
+| `b30c-chase10fc200x100x100seed3` | 200,100,100 | 0.10 | 85 | running |
+| `b30d-chase10fc200x100x100seed4` | 200,100,100 | 0.10 | 85 | running — its control `b25d` is the weak seed of its wave |
+
+![b30a](charts/b30a-chase10fc200x100x100seed1.png)
+**b30a-chase10fc200x100x100seed1**
+
+![b30b](charts/b30b-chase10fc200x100x100seed2.png)
+**b30b-chase10fc200x100x100seed2**
+
+![b30c](charts/b30c-chase10fc200x100x100seed3.png)
+**b30c-chase10fc200x100x100seed3**
+
+![b30d](charts/b30d-chase10fc200x100x100seed4.png)
+**b30d-chase10fc200x100x100seed4**
 
 ## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *running on the desktop*
 
@@ -238,43 +268,3 @@ row, so their `best row` is a 20-episode screen (a bound), while `pooled` is exa
 
 ![b23d](charts/b23d-beta01seed4.png)
 **b23d-beta01seed4**
-
-## Batch 22 — IS off (`SNEK_IS_WEIGHTS=0`), `td_error` priority, fc 50,100,50
-
-The bottom of the IS-β ladder short of the no-IS extreme: importance sampling **off**, so the gradient
-carries the full `|δ|^0.6` prioritisation (**ESS/N ≈0.38**). Same config as b21/b23 — IS is the only
-knob. Trained on the desktop, closed out under gate 95.
-
-**Done at 3M — and IS-off is a dead heat with β→0.1.** Close-out **pooled 75.7** (eq-effort, gate 95),
-identical to b23's 75.7, with best-30 86.2 vs 85.8 and `sef` 30.5 vs 33.1 — indistinguishable. So the
-consolidation gain **saturates by β→0.1**: taking the last of the IS correction off buys nothing more.
-The ladder is control 55.0 → b21 64.3 → **{b23 β→0.1, b22 IS-off} 75.7** → b18 ~78.8 (a different base).
-Peak trailing 94.88, ceiling unmoved. `b22a` reached a 96/100 full-length checkpoint @1075k and `b22d` a
-95/100 @2275k — below the 97.6% record and, by the shrink pattern, not record candidates.
-
-All at the 3M cap, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
-
-| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
-|---|---|---|---|---|---|
-| `b22d` | **94.94** | **88.3%** | 25.6% | 76.3% | 95.0% @2275k (n=100) |
-| `b22a` | 94.88 | 87.0% | **46.3%** | **78.9%** | **96.0% @1075k (n=100)** |
-| `b22c` | 94.92 | 86.7% | 27.5% | 75.0% | 80.0% @866k (n=20) |
-| `b22b` | 94.78 | 83.0% | 22.5% | 72.5% | — (no full-length row) |
-| **mean — b22 IS off** | 94.88 | 86.2% | 30.5% | **75.7%** | — |
-| **mean — b23 β→0.1** | 94.90 | 85.8% | 33.1% | 75.7% | — |
-| **mean — b18 no IS** | — | 87.3% | 34.6% | ~78.8% | — |
-
-**`b22a` and `b22d` cleared gate 95 at full length; `b22b`/`b22c` did not** (best rows are screens or
-bounds), so their `pooled` is the figure to read.
-
-![b22d](charts/b22d-noisseed4.png)
-**b22d-noisseed4**
-
-![b22a](charts/b22a-noisseed1.png)
-**b22a-noisseed1**
-
-![b22c](charts/b22c-noisseed3.png)
-**b22c-noisseed3**
-
-![b22b](charts/b22b-noisseed2.png)
-**b22b-noisseed2**

@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-14 | 22 | batch 30 launched on the laptop; batch 22 became the seventh-newest |
 | 2026-08-14 | 21 | batch 27 launched; batch 21 became the seventh-newest |
 | 2026-08-14 | 20 | batch 26 landed; batch 20 became the seventh-newest |
 | 2026-08-12 | 19 | batch 20's `100,50,50` closed the nine-shape sweep; batch 19 became the seventh-newest |
@@ -21,6 +22,46 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 22 — IS off (`SNEK_IS_WEIGHTS=0`), `td_error` priority, fc 50,100,50
+
+The bottom of the IS-β ladder short of the no-IS extreme: importance sampling **off**, so the gradient
+carries the full `|δ|^0.6` prioritisation (**ESS/N ≈0.38**). Same config as b21/b23 — IS is the only
+knob. Trained on the desktop, closed out under gate 95.
+
+**Done at 3M — and IS-off is a dead heat with β→0.1.** Close-out **pooled 75.7** (eq-effort, gate 95),
+identical to b23's 75.7, with best-30 86.2 vs 85.8 and `sef` 30.5 vs 33.1 — indistinguishable. So the
+consolidation gain **saturates by β→0.1**: taking the last of the IS correction off buys nothing more.
+The ladder is control 55.0 → b21 64.3 → **{b23 β→0.1, b22 IS-off} 75.7** → b18 ~78.8 (a different base).
+Peak trailing 94.88, ceiling unmoved. `b22a` reached a 96/100 full-length checkpoint @1075k and `b22d` a
+95/100 @2275k — below the 97.6% record and, by the shrink pattern, not record candidates.
+
+All at the 3M cap, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
+|---|---|---|---|---|---|
+| `b22d` | **94.94** | **88.3%** | 25.6% | 76.3% | 95.0% @2275k (n=100) |
+| `b22a` | 94.88 | 87.0% | **46.3%** | **78.9%** | **96.0% @1075k (n=100)** |
+| `b22c` | 94.92 | 86.7% | 27.5% | 75.0% | 80.0% @866k (n=20) |
+| `b22b` | 94.78 | 83.0% | 22.5% | 72.5% | — (no full-length row) |
+| **mean — b22 IS off** | 94.88 | 86.2% | 30.5% | **75.7%** | — |
+| **mean — b23 β→0.1** | 94.90 | 85.8% | 33.1% | 75.7% | — |
+| **mean — b18 no IS** | — | 87.3% | 34.6% | ~78.8% | — |
+
+**`b22a` and `b22d` cleared gate 95 at full length; `b22b`/`b22c` did not** (best rows are screens or
+bounds), so their `pooled` is the figure to read.
+
+![b22d](../charts/b22d-noisseed4.png)
+**b22d-noisseed4**
+
+![b22a](../charts/b22a-noisseed1.png)
+**b22a-noisseed1**
+
+![b22c](../charts/b22c-noisseed3.png)
+**b22c-noisseed3**
+
+![b22b](../charts/b22b-noisseed2.png)
+**b22b-noisseed2**
 
 ## Batch 21 — partial IS (β 0.4→0.5), `td_error` priority, fc 50,100,50
 

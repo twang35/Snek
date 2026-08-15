@@ -60,6 +60,50 @@ Desktop status: **b27a-d running** (4 trainers, the box's cap), b28 and b29 queu
 priority 20/30, each with close-out and HOF-500 auto-chained. ~6 h per batch at 92.5 steps/s.
 Check with `git show origin/ops-status:status.json`.
 
+**Both hosts are now full**: b27 on the desktop, **b30 on the laptop** (the same shaping on
+`fc 200,100,100`, below). `pgrep -fl "python -u snek2.py"` sees only the laptop's four; the desktop's
+`status.json` sees only its own.
+
+## Batch 30 — the same shaping on `fc 200,100,100` (running on the laptop)
+
+Launched 2026-08-14 on the laptop, 4 arms, seeds 1-4: **b27's config with the net changed to
+`200,100,100`** — `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975,
+`FORK_BRANCHES=4`, no food-distance shaping, **2M cap**. Nothing else differs from b27.
+
+**Why it is worth four laptop slots: it completes a 2×2** and the shaping question stops depending on
+one architecture.
+
+| | no shaping | `c=0.10`, gate 85 |
+|---|---|---|
+| **`fc 320`** | **b24** (closed — pooled 87.9, the record) | **b27** (running, desktop) |
+| **`fc 200,100,100`** | **b25** (closed — pooled 86.0, no ≥98%/500) | **b30** (running, laptop) |
+
+If shaping helps on both nets the effect is about the reward, not the architecture; if it helps only on
+`320`, the interesting quantity is the interaction, and that is a different experiment from either
+column alone. It also gives the shaping a second, independent read at n=4 for free — b25 and b24 were
+both measured at 3M, but every arm's own summary can be recomputed at any horizon.
+
+**Read it against `b25a-d` at a matched 2M, seed by seed** — not against b25's published 3M numbers.
+Recomputed from `runs/b25*_evals.json` with `run_report.build_summary` truncated at 2M, with b24 (b27's
+control) alongside:
+
+| seed | b25 best-30 @2M | b25 `sef` @2M | b24 best-30 @2M | b24 `sef` @2M |
+|---|---|---|---|---|
+| 1 | 93.7 | 61.4 | 94.0 | 46.7 |
+| 2 | 95.3 | 57.9 | 96.7 | 65.1 |
+| 3 | 93.7 | 61.0 | 96.0 | 57.0 |
+| 4 | 91.7 | 54.2 | 96.7 | 64.1 |
+| **mean** | **93.6** | **58.6** | **95.8** | **58.2** |
+
+Two things that table says before b30 produces a number. **`320` is ahead of `200,100,100` on best-30 at
+2M (95.8 vs 93.6) while `sef` is a dead heat** — consistent with the widest-layer ordering and with
+`best_perfect30` being the sharper metric at this level. And **b25d is the weak seed of its wave** (91.7 /
+54.2), so a b30d that merely matches its own control is not a null.
+
+Same judging rule as b27: **`best_perfect30` primary, `sef` alongside, ≥98%/500 count decisive, never
+`peak_trailing`** — three of these four controls already sit on the 95.00 cap. Close-outs are by hand on
+the laptop (`eval_checkpoints.py`), since the auto-chain is a desktop feature.
+
 ## Batches 20-26 are closed — where their descriptions went
 
 All seven batches finished and closed out, so per the bookkeeping rule at the end of this file their
