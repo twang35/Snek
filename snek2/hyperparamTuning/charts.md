@@ -1,6 +1,6 @@
 # Charts
 
-Progress graphs for the most recent batches — **21 through 26**, a cap of six, newest first. Per-arm
+Progress graphs for the most recent batches — **22 through 27**, a cap of six, newest first. Per-arm
 numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
@@ -43,7 +43,33 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 referenced from [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not
 training graphs. Anything *else* the check prints is a real gap.
 
-## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *close-outs done, HOF-500 running (empty)*
+## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *running on the desktop*
+
+The first arms to carry the new shaping term. `Snake.step` adds `c·(γΦ(s′) − Φ(s))` with **Φ = 1 iff the
+head and tail share a free region that also holds the food, and the snake is ≥85 long**; potential-based,
+so the optimal policy is untouched and only the gradient on the way there changes. Everything else is
+b24's config — `fc 320`, IS off, `td_error`, target period 1000, discount 0.9975, `FORK_BRANCHES=4`,
+seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24 ran 3M; its record
+checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
+[the plan](../plans/chase-safe-reward-shaping.md) and [`runs.md`](runs.md).
+
+**Status: all four arms training, ~27k steps at launch+206s (92.5 steps/s, ~6 h to the cap).** No
+readings yet — nothing is judgeable below ~250k. **Judge these on `best_perfect30` and the ≥98%/500 count,
+not peak trailing**, which is capped at 95.00 and where all four control arms already sit
+([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)).
+
+| arm | `c` | gate | status | control |
+|---|---|---|---|---|
+| `b27a-chase10g85seed1` | 0.10 | 85 | running | `b24a` (pooled 89.0, best-30 95.3) |
+| `b27b-chase10g85seed2` | 0.10 | 85 | running | `b24b` (88.8, 96.7) |
+| `b27c-chase10g85seed3` | 0.10 | 85 | running | `b24c` (87.7, 96.0) |
+| `b27d-chase10g85seed4` | 0.10 | 85 | running | `b24d` (86.0, 96.7) — holds the record |
+
+**No images yet.** These arms train on the desktop, so their graphs arrive on the `results` branch when
+the jobs publish; the charts land here in the same pass that fills in the close-out numbers. **b28**
+(`c=0.20`) and **b29** (gate 75) are queued behind them and get their own sections when they start.
+
+## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *closed, HOF-500 empty*
 
 The third shape in the width follow-up: a shallow **two-layer `100,100`** net, after b24 (`320`) and b25
 (`200,100,100`) both lifted consolidation. It asks whether a shallower shape still gets the gain, or whether
@@ -55,9 +81,12 @@ close-out pooled mean **79.2** is only **+3.5 over the b22 control's 75.7** — 
 b25's +10.3 (`200,100,100`). Three seeds learned well (`sef` 44-58); `b26d` is a weak seed (`sef` 13.8,
 pooled 69.6) but never died. **No arm produced a ≥98%/100 checkpoint** — the best full-length reads are
 `b26b`/`b26c` at 97.0%/100 — so the auto-HOF-500 (gate 98, running now) selects nothing and lands empty; the
-record stays b24's. This places the width follow-up cleanly: the consolidation gain needs capacity (`320`
-one wide layer, or `200,100,100` deep), and a shallow `100,100` is too small to buy more than a marginal
-lift. Sorted by close-out pooled.
+record stays b24's. **‡ This is also the arm that separates width from size, and it retracts b25's reading.** `100,100`
+has **1.14× the control's parameters — more than b24's `320` at 0.94×** — and gets a quarter of the lift,
+so "the gain tracks capacity" is wrong. The ordering that holds is the **widest layer**: 320 → +12.2,
+200 → +10.3, 100 → +3.5, 50 → 0
+([finding](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)).
+Sorted by close-out pooled.
 
 | arm | peak trail | best-30 | `sef` (3M) | close-out pooled | best full-length |
 |---|---|---|---|---|---|
@@ -82,15 +111,17 @@ lift. Sorted by close-out pooled.
 
 ## Batch 25 — FC `200,100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4
 
-b22's exact IS-off config with a 3-layer `200,100,100` net (~1.6× the control's params) — the second
+b22's exact IS-off config with a 3-layer `200,100,100` net (36,804 params, **3.09×** the control) — the second
 shape in the width follow-up after b24's `320` result. It asks whether b24's consolidation lift is width
 itself or just more parameters, and whether it survives at a shape other than one wide layer. Seed-matched
 control is b22 (`50,100,50`, IS off). Trained on the desktop.
 
 **Fully evaluated — and the first auto-HOF chain ran end to end (training → close-out → HOF-500).** The
 close-out (gate 95) pools a mean **86.0** — **+10.3 over the b22 control's 75.7, within 1.9 of b24's
-87.9** — so the consolidation lift **replicates at a 3-layer `200,100,100` shape**, which points at
-capacity rather than width itself. Peak is unmoved at 95.0. **But the HOF-500 (gate 98) held nothing: every
+87.9** — so the consolidation lift **replicates at a 3-layer `200,100,100` shape**. (This section first
+read that as "capacity rather than width"; **b26 falsified it** — `100,100` carries more parameters than
+b24's `320` and gets +3.5. The shapes order by widest layer, and `200,100,100` costs 3.09× the control's
+parameters to land *below* `320`'s 0.94×.) Peak is unmoved at 95.0. **But the HOF-500 (gate 98) held nothing: every
 arm's ≥98%/100 candidates were abandoned, none reaching 98% over 500** — the /100 highs inflated exactly as
 b24's did. The strongest was `b25b` @911k, still 97.2% when gate-98 stopped it at 392 episodes; that is a
 plausible ~97%/500 holder the folder's gate-97 standard would have run to completion, so it needs a hand
@@ -247,41 +278,3 @@ bounds), so their `pooled` is the figure to read.
 
 ![b22b](charts/b22b-noisseed2.png)
 **b22b-noisseed2**
-
-## Batch 21 — partial IS (β 0.4→0.5), `td_error` priority, fc 50,100,50
-
-One knob off batch 20's control: IS β annealed to **0.5** not 1.0, so the gradient keeps `|δ|^{0.30}` of
-prioritisation (**ESS/N ≈0.86** on the four end-of-run buffers) instead of the near-uniform ≈1.0 that β=1
-gives. The aim: keep IS's anti-forgetting effect while letting end-game transitions pull harder.
-
-**Verdict: better than the β→1.0 control, well short of no-IS.** Best-30 74.1 vs the control's 64.0 (+10 pp)
-and `sef` 14.3 vs 11.2, 3 of 4 seeds favouring β→0.5 — directional but n=4 cannot resolve it (p 0.375-0.625).
-The desktop close-out confirms the direction: **pooled (eq-effort, gate 95) 64.3 vs 55.0 (+9.3), 3 of 4
-seeds.** Still far below batch 18 (no IS: best-30 87.3, `sef` 34.6, ESS/N 0.21). Peak trailing 94.69 is flat
-with every batch since 11, so the ceiling is unmoved — only consolidation differs. **Batch 22** (`td_error`,
-IS off, ESS/N ≈0.38) tests the next point down. Trained on the laptop, close-out on the desktop.
-
-All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
-
-| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
-|---|---|---|---|---|---|
-| `b21b` | 94.78 | **80.7%** | **21.6%** | **68.8%** | 89.3% @2525k (n=56) |
-| `b21d` | **94.80** | 76.3% | 16.5% | 66.0% | 84.1% @2392k (n=44) |
-| `b21c` | 94.64 | 70.7% | 11.1% | 62.8% | 82.5% @2203k (n=40) |
-| `b21a` | 94.52 | 68.7% | 8.2% | 59.5% | 81.6% @1263k (n=38) |
-| **mean — b21 β→0.5** | 94.69 | 74.1% | 14.3% | 64.3% | — |
-| **mean — control β→1.0** | 94.44 | 64.0% | 11.2% | 55.0% | — |
-
-**No full-length rows** (deepest 38-56 of 100 under gate 95), so `best row` is a bound and `pooled` is exact.
-
-![b21b](charts/b21b-beta05seed2.png)
-**b21b-beta05seed2**
-
-![b21d](charts/b21d-beta05seed4.png)
-**b21d-beta05seed4**
-
-![b21c](charts/b21c-beta05seed3.png)
-**b21c-beta05seed3**
-
-![b21a](charts/b21a-beta05seed1.png)
-**b21a-beta05seed1**

@@ -456,19 +456,34 @@ than ~3%, say so before proposing arms.
 
 **The base config is batch 24's, not batch 23's.** When this was written b23 was the best config on
 record; b24 has since beaten it by **+12.2 pooled on all four seeds** with a new record (`b24d` @1342k,
-98.0%/500), and b25/b26 established that the lift tracks capacity rather than width. Shaping the weaker
-base would answer a question about a config nobody will run again. So: **`fc 320`, IS off, target 1000,
-disc 0.9975, 3M steps** — b24 exactly — plus the one new knob.
+98.0%/500), and b25/b26 showed the lift orders by the **widest layer** (320 → +12.2, 200 → +10.3,
+100 → +3.5) rather than by parameter count. Shaping the weaker base would answer a question about a config
+nobody will run again. So: **`fc 320`, IS off, target 1000, disc 0.9975** — b24 exactly — plus the one new
+knob, at a **2M** cap rather than b24's 3M (b24's record checkpoints land at 1.03-1.39M, so 2M buys three
+batches for the price of two).
 
-4 arms, seeds 1-4, **`b27a-d`**:
+4 arms, seeds 1-4, **`b27a-d`** — this is what was launched on 2026-08-14:
 
 ```
 SNEK_FC_LAYERS=320 SNEK_IS_WEIGHTS=0 SNEK_TARGET_UPDATE_PERIOD=1000 \
-  SNEK_DISCOUNT=0.9975 SNEK_FOOD_DISTANCE_REWARD=0 \
-  SNEK_CHASE_SAFE_SHAPING=<c> SNEK_MAX_STEPS=3000000 SNEK_SEED=<n> \
-  PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -u snek2.py b27<x>-chasesafeseed<n> \
+  SNEK_DISCOUNT=0.9975 SNEK_FOOD_DISTANCE_REWARD=0 SNEK_FORK_BRANCHES=4 \
+  SNEK_CHASE_SAFE_SHAPING=0.1 SNEK_CHASE_SAFE_GATE=85 \
+  SNEK_MAX_STEPS=2000000 SNEK_SEED=<n> \
+  PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -u snek2.py b27<x>-chase10g85seed<n> \
   > /tmp/b27<x>.log 2>&1 &
 ```
+
+**`SNEK_FORK_BRANCHES=4` is not optional in that line, and it was nearly left out.** b24 and b22 both run
+4 branches; the code default was `1` until it was raised to 4 on 2026-08-14, so an arm launched without the
+knob would have differed from its control in the collector as well as the reward — invisibly, since nothing
+in the summary block reports it. Any arm resumed or replicated from a spec written before the raise still
+needs it spelled out.
+
+**Two more batches were queued behind b27 in the same pass**, both b27's config with one value changed:
+**b28** at `SNEK_CHASE_SAFE_SHAPING=0.2` (the dose ladder — it is what separates "wrong idea" from "dose
+too small" if b27 reads null) and **b29** at `SNEK_CHASE_SAFE_GATE=75` (the gate ladder — shaping starts
+~10 meals earlier, where the packing decisions that create the endgame are made). Priorities 10 / 20 / 30,
+each with close-out and HOF-500 auto-chained.
 
 `SNEK_FOOD_DISTANCE_REWARD=0` **stays** — batch 17 onward runs the distance shaping off, and mixing two
 shaping terms with opposite intent would answer nothing.
@@ -478,7 +493,7 @@ observation, same 3M horizon, four finished seeds with close-outs and an HOF-500
 the pairing **seed by seed** — seeds 2 and 4 produce the best arm in 18 of 18 config waves (+5.41 pp at
 550k), so a wave-mean against a wave-mean is confounded by seed.
 
-**Run it on the desktop.** `the-claw-den` is idle, four trainers fit, and the queued path chains
+**It ran on the desktop.** `the-claw-den` is idle, four trainers fit, and the queued path chains
 `training → close-out (top20) → HOF-500` automatically — which for a batch whose whole question is
 "does the ceiling move" is the difference between a result and a result three days later. The laptop's
 four slots are free too and would work, but every close-out would then be launched by hand. Queueing is

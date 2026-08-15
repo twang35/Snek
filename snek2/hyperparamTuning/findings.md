@@ -57,7 +57,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 |---|---|
 | **Architecture does not raise the ceiling** — **all 9 shapes** against a seed-matched control at 3M, depths 1-5, **12.7× param range** | **complete 2026-08-12**, batch 20. Peak trailing spans 93.75-94.69 across the whole range and **no shape produced a single full-length row under gate 95**. `FC_LAYERS` is closed as a tuning direction. See below |
 | **Capacity binds only *below* the control** — knee between 0.29× and 0.55× | **established** — `25,50,25` at 0.29× is the first shape to move the ceiling, and **down**: peak −0.69, pooled −11.9, **4/4 seeds worse, p 0.125**. `60,30,30,30,30` at 0.55× still holds it (−0.18, p 0.375) |
-| A wider or wide-early net raises consolidation (`best-30`, pooled) | **not supported under β→1.0** (batch 20) — the apparent edges are **1 of 4** seeds for `200,50` (p=1.000) and **2-3 of 4** for `200,100,50`/`320` (p ≥ 0.25), carried by the control's weak seeds. Sub-capacity nets also forget ~2× more (drawdown 11-12 vs 5.4). **But reopened under IS-off** — batch 24's `320` reads **+12.2 pooled higher on all 4 seed-matched controls** (b22), cleaner than batch 20's within-batch confound. **Provisional** (n=4, p=0.0625); the HOF-500 confirmed 9 genuine ≥97%/500 checkpoints and a new record (`b24d` @1342k, 98.0%/500), so the gain is real consolidation not /100 inflation — but **4 more `320` seeds** are still owed to move it off the n=4 floor |
+| A wider or wide-early net raises consolidation (`best-30`, pooled) | **not supported under β→1.0** (batch 20) — the apparent edges are **1 of 4** seeds for `200,50` (p=1.000) and **2-3 of 4** for `200,100,50`/`320` (p ≥ 0.25), carried by the control's weak seeds. Sub-capacity nets also forget ~2× more (drawdown 11-12 vs 5.4). **But reopened under IS-off** — batch 24's `320` reads **+12.2 pooled higher on all 4 seed-matched controls** (b22), cleaner than batch 20's within-batch confound. **Provisional** (n=4, p=0.0625); the HOF-500 confirmed 9 genuine ≥97%/500 checkpoints and a new record (`b24d` @1342k, 98.0%/500), so the gain is real consolidation not /100 inflation — but **4 more `320` seeds** are still owed to move it off the n=4 floor. **Refined 2026-08-14 by b25/b26:** the lift is **the widest layer, not the size** — `200,100,100` at 3.09× the params gives +10.3, `100,100` at 1.14× gives only +3.5, and `320` is the *smallest* of the four nets |
 | **‡ Two nets of the same size straddle the control by 18.8 pp on pooled** | **established 2026-08-12** — `100,50,50` 46.3% and `320` 65.1% differ by 0.3% in params. The consolidation columns in batch 20 measure seed draw, not architecture; a ~10 pp pooled gap at n=4 is indistinguishable from an iso-capacity relabelling |
 | **‡ Batch 20's control seed spread is wider than any between-shape gap it measured** | **established** — control `sef` spans 0.2-26.3%, pooled 33.2-71.3%. At n=4 this design cannot see an architecture effect smaller than that |
 | **Removing the food-distance shaping raises how long an arm stays good** | **the first non-null in six batches** — batch 16 `sef` +11.35 pp at a matched 1.25M (p=0.250) and `best_perfect30` +12.58 pp with 4/4 seeds (p=0.125). **Needs replication**; see below |
@@ -196,6 +196,42 @@ move it off. The HOF-500 has settled the *peak* question, though: 9 of the batch
 held ≥97%/500, and `b24d` @1342k took the record at **98.0%/500** — so the consolidation is real, deeply
 measured, not /100 selection inflation.
 Full result: [`completedRuns.md`](completedRuns.md#batch-24--fc-width-320-under-is-off-the-first-architecture-result-and-a-new-record).
+
+**Two more shapes have since run under IS-off, and they say the lift is width rather than size** —
+`200,100,100` (b25) +10.3 at 3.09× the control's parameters, `100,100` (b26) only +3.5 at 1.14×. See
+the correction immediately below.
+
+## ‡‡ Corrected 2026-08-14: the IS-off architecture lift tracks the widest layer, not the parameter count
+
+Batches 24-26 ran three shapes against the same b22 IS-off control. b25's write-up read the
+replication as "so the gain tracks capacity, not width per se". **b26 falsifies that, and the
+parameter counts were never actually run until now:**
+
+| shape | params | ×control | widest layer | depth | pooled (gate 95) | lift vs b22 |
+|---|---|---|---|---|---|---|
+| `320` (b24) | 11,204 | **0.94×** | **320** | 1 | **87.9** | **+12.2** |
+| `200,100,100` (b25) | 36,804 | **3.09×** | 200 | 3 | 86.0 | +10.3 |
+| `100,100` (b26) | 13,604 | 1.14× | 100 | 2 | 79.2 | +3.5 |
+| `50,100,50` (b22 control) | 11,904 | 1.00× | 50 | 3 | 75.7 | — |
+
+**Parameter count is not even monotone with the result.** `320` is the *smallest* of the four nets and
+gets the largest lift; `100,100` has 21% *more* parameters than `320` and gets a quarter of it; `3.09×`
+lands between them. Widest layer orders all four rows without an inversion — 320 > 200 > 100 > 50 gives
++12.2 > +10.3 > +3.5 > 0.
+
+Two caveats that keep this a correction rather than a law. **Width and depth are not separated here**:
+`320` is also the only depth-1 net, so "one wide layer" and "widest layer 320" are the same arm. And
+each row is n=4, where a ~10 pp pooled gap is not resolvable — but the *ordering* holds across four
+shapes × four seeds, and the falsified claim (capacity) requires `100,100` to beat `320`, which it
+does not.
+
+**Counts are from `under_the_hood.build_q_net` at `obs_len=30`, `num_actions=4`.** They run ~970 above
+the numbers in the nine-shape table earlier in this file, which were computed at an obs length of 29;
+the ratios there are unaffected.
+
+**What this changes for the next architecture arm:** the implied test is a *wider* first layer — `512`
+under the b24 config — not a larger net. `200,100,100` at 3.09× already shows that spending the
+parameters on depth returns less than spending them on width.
 
 ## The food-distance shaping was a drag on consistency — the first signal in six batches
 

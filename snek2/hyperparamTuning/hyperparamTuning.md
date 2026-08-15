@@ -701,7 +701,7 @@ Notes that matter:
 | `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | penalty per move that increases the distance to food; 0 ablates the shaping |
 | `SNEK_CHASE_SAFE_SHAPING` | 0.0 (off) | `c` in the potential-based term `c·(γΦ′−Φ)`, Φ = head, food and tail in one region. **0.0 is a clean ablation** — the block is skipped and `count_groups` draws no randomness, so the food stream is untouched. `c` is calibrated, not free: see [Phase 0](../plans/chase-safe-reward-shaping.md#-phase-0-results-2026-08-14) |
 | `SNEK_CHASE_SAFE_GATE` | 85 | snake length below which Φ is identically 0, so the term only acts in the endgame. `0` selects the ungated form. Keeps the invariance — the theorem holds for any bounded Φ — and makes the telescope exactly 0, since the opening board is below any gate |
-| `SNEK_FORK_BRANCHES` | 1 (off) | max live collect branches **including the main line**; 1 is today's single-line collect |
+| `SNEK_FORK_BRANCHES` | **4** | max live collect branches **including the main line**; `1` is off (plain single-line collect). **Default raised 1 → 4 on 2026-08-14**: every arm from batch 17 on passed 4 explicitly, so the old default described no run that existed and an arm launched without the knob silently differed from its batch |
 | `SNEK_FORK_PROB` | 0.5 | chance of forking at an eligible endgame decision point |
 | `SNEK_FORK_MIN_LENGTH` | 85 | snake length at or above which forking is allowed |
 | `SNEK_FORK_MAX_STEPS` | 60 | steps a branch may run before it is dropped; 0 runs it to its terminal state |

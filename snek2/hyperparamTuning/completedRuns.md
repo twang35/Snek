@@ -76,6 +76,14 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **98.0%** @2860k /500 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § **new record (tied)** — 98.0%/500 (490/500, CI [96.4,98.9]); 3 of 59 ≥97%/100 checkpoints held ≥97%/500, all late (2.74-2.86M). In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b24c-fc320noisseed3` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 97.4% @2982k /500 | 99.3% | 87.68% /eq §§ | 96.0% | ‡‡‡ § 3 of 46 ≥97%/100 checkpoints held ≥97%/500 (best 97.4%, CI [95.6,98.5], late 2.95-2.98M); **both its 100%/100 highs shrank below 97%/500**. Not added to HOF (below the record) |
 | `b24a-fc320noisseed1` ‡‡‡ § | **fc 320** (one wide layer), IS off, td_error | 3.00M | — /500 (0 held) | 99.7% | **89.03%** /eq §§ | 95.3% | ‡‡‡ § **highest pooled ever at gate 95 (89.03)**, yet **0 of its 43 ≥97%/100 checkpoints held ≥97%/500** — its 100%/100 @1633k produced no survivor. The batch's cleanest selection-inflation lesson: strong consolidation, no record-tier peak |
+| `b25c-fc200x100x100noisseed3-r2` ‡‡‡ § | **fc 200,100,100** (3 layers, ~1.6× params), IS off, td_error | 3.00M | 99.0% @818k /100 | 98.3% | **87.22%** /eq §§ | 93.7% | ‡‡‡ § best of b25 on pooled, and the batch's highest `sef` (66.9%). HOF-500 held nothing: best partial 95.3% @827k, abandoned at 258 episodes under gate 98 |
+| `b25d-fc200x100x100noisseed4-r2` ‡‡‡ § | **fc 200,100,100**, IS off, td_error | 3.00M | 99.0% @2431k /100 | 98.3% | 85.92% /eq §§ | 94.3% | ‡‡‡ § HOF-500 best partial 96.4% @2431k (304 episodes, abandoned). Its peak arrives late — peak trailing 95.00 at 2426k |
+| `b25a-fc200x100x100noisseed1-r2` ‡‡‡ § | **fc 200,100,100**, IS off, td_error | 3.00M | 99.0% @802k /100 | 98.7% | 85.59% /eq §§ | 93.7% | ‡‡‡ § its 99%/100 @802k re-measured to **92.7%** before gate 98 abandoned it — the batch's clearest selection-inflation row |
+| `b25b-fc200x100x100noisseed2-r2` ‡‡‡ § | **fc 200,100,100**, IS off, td_error | 3.00M | 99.0% @890k /100 | 98.7% | 85.54% /eq §§ | **95.3%** | ‡‡‡ § **the batch's one plausible hall candidate**: @911k was still **97.2% at 392 episodes** when gate 98 stopped it. Gate 97 would have run it to 500; not promoted, since the auto chain's gate is 98 |
+| `b26b-fc100x100noisseed2` ‡‡‡ § | **fc 100,100** (2 layers, 0.62× the b24 net), IS off, td_error | 3.00M | 97.0% @1948k /100 | 96.7% | **83.83%** /eq §§ | 93.7% | ‡‡‡ § best of b26 on every column; `sef` 58.0%. **No ≥98%/100 checkpoint**, so the auto HOF-500 selected nothing |
+| `b26c-fc100x100noisseed3` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 97.0% @1969k /100 | 96.0% | 83.18% /eq §§ | 92.0% | ‡‡‡ § 2nd of b26; only 7 full-length rows cleared gate 95, against b25c's 64 — the shallow shape spends much less time in the measurable band |
+| `b26a-fc100x100noisseed1` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 95.0% @2904k /100 | 95.0% | 80.02% /eq §§ | 88.0% | ‡‡‡ § just 2 full-length rows, both at the gate exactly. Peak trailing 94.92 — the first b24-family arm not to reach 95.00 |
+| `b26d-fc100x100noisseed4` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | — *trunc* (0 full-length) | — | 69.64% /eq §§ | 79.7% | ‡‡‡ § the weak seed of b26 (`sef` **13.8%**) — never died, never reached the measurable band. Below the b22 control's mean, which is what makes b26's small lift a shape result rather than a seed accident |
 | `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **97.6%** @1588k /700 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **THE PROJECT RECORD** — 97.6% over 700 fresh episodes (CI 96.1-98.5), beating `b17b` by +3.33 pp, p=0.0002. **The first selected high here that did not shrink** (98/100 -> 97.4%/500). A narrow peak: @1578k reads 91.6%. In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
@@ -255,6 +263,88 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 26 — FC `100,100` under IS-off: **the shallow shape does not carry the lift**
+
+Design, and what it isolates: b22's exact IS-off config (`SNEK_IS_WEIGHTS=0`, `td_error` priority,
+`TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping, 3M cap,
+seeds 1-4) with the network changed to a **two-layer `100,100`** — **13,604 parameters, 1.14× the
+control and 1.21× b24's `320`**. It is the third shape in the width follow-up, after b24 (`320`,
++12.2) and b25 (`200,100,100`, +10.3), and it asks the one question those two leave open: **is the
+consolidation lift bought by size, or by the width of the widest layer?**
+
+**The shallow shape does not carry it** — pooled **79.2** is only **+3.5 over the b22 control's
+75.7**, a quarter of b24's gain, and one seed (`b26d`, `sef` 13.8%) lands *below* the control mean.
+No arm produced a ≥98%/100 checkpoint, so the auto HOF-500 selected nothing and the record stays
+b24's.
+
+**And this is the arm that separates the two explanations, against what b25's write-up first
+concluded.** `100,100` has *more* parameters than b24's `320` and gets a quarter of the lift, while
+`320` is the *smallest* of the four nets and gets the most. Parameter count is not even monotone with
+the result; the widest layer is:
+
+| shape | params | ×control | widest layer | pooled lift vs b22 |
+|---|---|---|---|---|
+| `320` | 11,204 | **0.94×** | **320** | **+12.2** |
+| `200,100,100` | 36,804 | 3.09× | 200 | +10.3 |
+| `100,100` | 13,604 | 1.14× | 100 | +3.5 |
+| `50,100,50` (control) | 11,904 | 1.00× | 50 | — |
+
+Counted with `under_the_hood.build_q_net` at `obs_len=30`, `num_actions=4`. **So "the lift tracks
+capacity" is wrong and is retracted** — see
+[`findings.md`](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count).
+The next architecture arm this implies is a *wider* first layer (`512`), not a bigger net.
+
+| mean of 4 | b22 control (`50,100,50`) | b24 (`320`) | b25 (`200,100,100`) | **b26 (`100,100`)** |
+|---|---|---|---|---|
+| peak trailing | 94.88 | 95.00 | 95.00 | **94.93** |
+| `sef` (training) | 30.5 | 66.0 | 63.8 | **42.1** |
+| best-30 | 86.2 | 96.2 | 94.3 | **88.4** |
+| close-out pooled (eq-effort, gate 95) | 75.7 | 87.9 | 86.0 | **79.2** |
+| ≥98%/500 checkpoints | — | **2** | 0 | **0** |
+
+Per seed — close-out pooled: b 83.8 · c 83.2 · a 80.0 · d 69.6. Full-length rows clearing gate 95:
+15 · 7 · 2 · 0, against b25's 81 · 64 · 50 · 47 — the shallow net simply spends far less of the run
+in the band a close-out can measure.
+
+**The reading for the ceiling is unchanged and now three-shapes deep**: peak trailing is 94.84-95.00
+across `50,100,50`, `100,100`, `200,100,100` and `320`. Architecture buys time near the ceiling and
+never the ceiling itself — the result batch 20 reached under β→1.0 and this family confirms under
+IS-off. Charts: [`charts.md`](charts.md).
+
+## Batch 25 — FC `200,100,100` under IS-off: **the lift replicates at a second shape — but no record**
+
+Design: identical to batch 26 above except the net is a **3-layer `200,100,100`** — 36,804
+parameters, **3.09× the control** (not the "~1.6×" this folder said before the count was actually
+run) — launched as `-r2` after the first four arms failed at launch. It asks whether b24's `320`
+result survives at a shape other than one wide layer.
+
+**It does.** Close-out pools **86.0**, +10.3 over the control and within 1.9 of b24's 87.9. Peak is
+unmoved at 95.00 on all four seeds. **The original reading of this — "so the gain tracks capacity,
+not width" — did not survive b26**, which has more parameters than b24 and gets +3.5; what the two
+arms share is a wide first layer (200 and 320). See the b26 section above and
+[`findings.md`](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count).
+
+**But the batch produced no hall entry, and the reason is the gate rather than the arms.** The
+HOF-500 runs at gate 98; every ≥98%/100 candidate was abandoned before 500 episodes. The strongest,
+`b25b` @911k, was still **97.2% at 392 episodes** when the gate stopped it — a plausible ~97%/500
+holder that the folder's own gate-97 standard would have measured to completion. It is the one
+outstanding hand re-measure this batch leaves behind.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | HOF-500 (gate 98) |
+|---|---|---|---|---|---|
+| `b25c` | 95.00 | 93.7% | **66.9%** | **87.2** | best partial 95.3% @827k (ab.) |
+| `b25d` | 95.00 | 94.3% | 62.2% | 85.9 | best partial 96.4% @2431k (ab.) |
+| `b25a` | 95.00 | 93.7% | 63.2% | 85.6 | best partial 92.7% @802k (ab.) |
+| `b25b` | 95.00 | **95.3%** | 62.7% | 85.5 | best partial **97.2%** @911k, 392 ep (ab.) |
+| **mean — b25** | **95.00** | **94.3%** | **63.8%** | **86.0** | 0 of 4 held ≥98%/500 |
+| **mean — b22 control** | 94.88 | 86.2% | 30.5% | 75.7 | — |
+
+**This batch was also the first end-to-end run of the auto-HOF chain** (training → close-out →
+HOF-500, `auto_hof` on by default since 2026-08-13), and the chain worked: it queued, measured and
+published without a hand step. Its one lesson is the gate — a chain fixed at 98 cannot promote a
+97%-class checkpoint, so a strong arm can finish with an empty HOF job and still be worth a manual
+gate-97 pass. Charts: [`charts.md`](charts.md).
 
 ## Batch 24 — FC width `320` under IS-off: **the first architecture result, and a new record**
 

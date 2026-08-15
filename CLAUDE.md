@@ -408,24 +408,27 @@ reasoning does not survive in the diff.
 
 **pytest is not installed**, so run them directly:
 
+**Discover the modules with a glob, never a hardcoded list.** The list this snippet used to carry had
+drifted to 18 of the 22 modules — it silently skipped `test_eat_and_survive` and the three
+`test_plasticity*` files, 51 tests, and reported "515 tests, 0 failed" as if that were the suite:
+
 ```
 cd snek2
 PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -c "
-import sys; sys.path.insert(0, 'tests'); import importlib
+import sys, glob, os; sys.path.insert(0, 'tests'); import importlib
+mods = [os.path.basename(p)[:-3] for p in sorted(glob.glob('tests/test_*.py'))]
 total = fails = 0
-for name in ['test_state_helpers', 'test_observation_spec', 'test_seed_and_ablation',
-             'test_eval_checkpoints', 'test_eval_progress', 'test_epsilon_schedule',
-             'test_run_report', 'test_shielded_policy', 'test_reward_shaping',
-             'test_game_snapshot', 'test_replay_streams', 'test_forking_collector',
-             'test_progress_chart', 'test_eval_workers', 'test_chart_viewer',
-             'test_policy_arch', 'test_input_sensitivity', 'test_behaviour_profile']:
+for name in mods:
     mod = importlib.import_module(name)
     for t in [x for x in dir(mod) if x.startswith('test')]:
         total += 1
         try: getattr(mod, t)()
         except Exception as e: print('FAIL', name, t, type(e).__name__, e); fails += 1
-print(total, 'tests,', fails, 'failed')"
+print(len(mods), 'modules,', total, 'tests,', fails, 'failed')"
 ```
+
+As of 2026-08-14 that reads **22 modules, 566 tests, 0 failed**. A module count below 22 means the glob
+did not run from `snek2/`.
 
 **A passing suite is not coverage of the change you just made.** `group_obs` took a third signature
 and all 24 existing tests passed before and after, because every fixture was an open board where

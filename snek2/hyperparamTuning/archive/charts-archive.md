@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-14 | 21 | batch 27 launched; batch 21 became the seventh-newest |
 | 2026-08-14 | 20 | batch 26 landed; batch 20 became the seventh-newest |
 | 2026-08-12 | 19 | batch 20's `100,50,50` closed the nine-shape sweep; batch 19 became the seventh-newest |
 | 2026-08-12 | 18 | retired with 19 in the same pass — `charts.md` was holding seven batch sections |
@@ -20,6 +21,44 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 21 — partial IS (β 0.4→0.5), `td_error` priority, fc 50,100,50
+
+One knob off batch 20's control: IS β annealed to **0.5** not 1.0, so the gradient keeps `|δ|^{0.30}` of
+prioritisation (**ESS/N ≈0.86** on the four end-of-run buffers) instead of the near-uniform ≈1.0 that β=1
+gives. The aim: keep IS's anti-forgetting effect while letting end-game transitions pull harder.
+
+**Verdict: better than the β→1.0 control, well short of no-IS.** Best-30 74.1 vs the control's 64.0 (+10 pp)
+and `sef` 14.3 vs 11.2, 3 of 4 seeds favouring β→0.5 — directional but n=4 cannot resolve it (p 0.375-0.625).
+The desktop close-out confirms the direction: **pooled (eq-effort, gate 95) 64.3 vs 55.0 (+9.3), 3 of 4
+seeds.** Still far below batch 18 (no IS: best-30 87.3, `sef` 34.6, ESS/N 0.21). Peak trailing 94.69 is flat
+with every batch since 11, so the ceiling is unmoved — only consolidation differs. **Batch 22** (`td_error`,
+IS off, ESS/N ≈0.38) tests the next point down. Trained on the laptop, close-out on the desktop.
+
+All at 3M, sorted by best-30. Close-out under gate 95, `EVAL_WORKERS=4`.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | best row |
+|---|---|---|---|---|---|
+| `b21b` | 94.78 | **80.7%** | **21.6%** | **68.8%** | 89.3% @2525k (n=56) |
+| `b21d` | **94.80** | 76.3% | 16.5% | 66.0% | 84.1% @2392k (n=44) |
+| `b21c` | 94.64 | 70.7% | 11.1% | 62.8% | 82.5% @2203k (n=40) |
+| `b21a` | 94.52 | 68.7% | 8.2% | 59.5% | 81.6% @1263k (n=38) |
+| **mean — b21 β→0.5** | 94.69 | 74.1% | 14.3% | 64.3% | — |
+| **mean — control β→1.0** | 94.44 | 64.0% | 11.2% | 55.0% | — |
+
+**No full-length rows** (deepest 38-56 of 100 under gate 95), so `best row` is a bound and `pooled` is exact.
+
+![b21b](../charts/b21b-beta05seed2.png)
+**b21b-beta05seed2**
+
+![b21d](../charts/b21d-beta05seed4.png)
+**b21d-beta05seed4**
+
+![b21c](../charts/b21c-beta05seed3.png)
+**b21c-beta05seed3**
+
+![b21a](../charts/b21a-beta05seed1.png)
+**b21a-beta05seed1**
 
 ## Batch 20 — matched-capacity reshuffle (`100,50,50`) against the control, both to 3M
 

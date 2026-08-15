@@ -12,77 +12,76 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## Batch 25 / 26 — more FC shapes under IS-off (b24 done, new record)
+## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27 running on the desktop)
 
-**b24 closed with the project's first architecture result — and a new record.** Width `320` under IS-off
-pools **87.9** (eq-effort, gate 95) — **+12.2 over the b22 control and higher on all four seeds** — with the
-ceiling unmoved at peak 95.00
-([write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-the-first-architecture-result-and-a-new-record)).
-The HOF-500 re-measured all 199 ≥97%/100 checkpoints and **9 held ≥97%/500**: the new record is **`b24d`
-@1342k at 98.0%/500** (490/500, CI [96.4,98.9], it *rose* from 97.0/100), tied by **`b24b` @2860k 98.0%/500**;
-both are in [`../hallOfFame/`](../hallOfFame/README.md). b25 and b26 carry the width question to two more
-shapes under the same IS-off base.
+**The shaping shipped 2026-08-14 and batch 27 is training.** `Snake.step` now adds
+`c·(γΦ(s′) − Φ(s))` where **Φ = 1 iff the head and the tail share a free region that also contains the
+food, and the snake is at least `SNEK_CHASE_SAFE_GATE` long** — the length gate is variant B of the plan.
+Potential-based, so by Ng/Harada/Russell the optimal policy is unchanged for any bounded Φ and any `c`;
+what changes is the gradient the agent sees on the way there, and the PER priorities of the transitions
+that flip Φ. Everything is in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md).
 
-- **b25 (`b25a-d-r2`, fc 200,100,100) — fully evaluated (desktop); the first auto-HOF chain ran end to end.**
-  3-layer, ~1.6× the control. Close-out (gate 95) pools a mean **86.0** — **+10.3 over the b22 control's
-  75.7, within 1.9 of b24's 87.9** — so **the consolidation lift replicates at a 3-layer shape**: it tracks
-  capacity, not width per se. Peak unmoved at 95.0. **The HOF-500 (gate 98) held nothing** — every ≥98%/100
-  candidate was abandoned, none reaching 98%/500; the strongest, `b25b` @911k, was still 97.2% when gate-98
-  stopped it at 392 episodes. **No b25 checkpoint enters the hall on the auto run**, though `b25b` @911k is a
-  plausible ~97%/500 holder a hand gate-97 re-measure could still promote (the auto run's gate is 98).
-  Charts in [`charts.md`](charts.md).
+All twelve arms are **b24's config plus the one knob** — `fc 320`, `IS_WEIGHTS=0`, `td_error`,
+`TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping, seeds 1-4 —
+so **`b24a-d` is the seed-matched control at zero extra compute**. The cap is **2M**, not b24's 3M: b24's
+best HOF-500 checkpoints land at 1.03-1.39M and 2.86M, and 2M buys three batches for the price of two.
 
-| mean of 4 | b22 control (`50,100,50`) | b24 (`320`) | **b25 (`200,100,100`)** |
-|---|---|---|---|
-| peak trailing | 94.88 | 95.00 | **95.00** |
-| `sef` (training) | 30.5 | 66.0 | **63.8** |
-| best-30 | 86.2 | 96.2 | **94.3** |
-| close-out pooled (eq-effort, gate 95) | 75.7 | 87.9 | **86.0** |
+| batch | `c` | gate | priority | what a lift here means |
+|---|---|---|---|---|
+| **b27** (running) | 0.10 | 85 | 10 | the calibrated dose — one quarter of a meal's reward spread over the ~2.5 genuine flips a struggling policy makes per endgame meal |
+| **b28** (queued) | **0.20** | 85 | 20 | the dose ladder. If b27 is null, this separates "wrong idea" from "too small to see" — the one ambiguity a single-dose test cannot resolve |
+| **b29** (queued) | 0.10 | **75** | 30 | the gate ladder. 75 starts shaping ~10 meals earlier, where the packing decisions that *create* the endgame are made |
 
-  Per seed — close-out pooled: a 85.6 · b 85.5 · c 87.2 · d 85.9. HOF-500 best partial (all abandoned at
-  gate 98): a 92.7% · b **97.2%** · c 95.3% · d 96.4%.
+**`c = 0.10` is measured, not assumed** ([Phase 0](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)):
+Φ flips **~35 times an episode for `b20d`** and **~4.6 for the records**, so the term self-attenuates as a
+policy improves — it is a scaffold that fades. At 0.10 the total shaping over an episode is ~0.25 of a
+single meal's reward for a struggling policy, and the discounted sum telescopes to exactly
+`−c·Φ(s₀)` = **0** here, since the opening board (length 5) is below any gate.
 
-- **b26 (`b26a-d`, fc 100,100) — closed out (desktop); HOF-500 running but empty.** A shallower two-layer
-  shape — does the lift survive without the depth/capacity b24 and b25 had? **No: it does not carry it.**
-  Close-out pooled mean **79.2** is only **+3.5 over the b22 control's 75.7** (per seed: b 83.8 · c 83.2 ·
-  a 80.0 · d 69.6), against b24's +12.2 and b25's +10.3. `b26d` is a weak seed (`sef` 13.8, pooled 69.6) but
-  never died. **No ≥98%/100 checkpoint** — best full-length is `b26b`/`b26c` at 97.0% — so the auto-HOF-500
-  (gate 98) selects nothing and lands empty; the record stays b24's. Charts (3M) in [`charts.md`](charts.md).
+**Two things Phase 0 established that the design had wrong.** Gating does *not* buy a larger `c` — flips
+are concentrated at length ≥85 for the binding policy, so gating **halves** the calibrated dose
+(0.203 → 0.097). And **Φ is structurally 0 at length 99 and near-0 at 98**: the last two or three meals
+cannot be shaped by this quantity at any `c`, which is exactly where
+[the starvation finding](findings.md) says the losses are. So b27 is a test of whether *reaching* length
+96-98 more reliably raises the perfect rate — not a fix for the final meals.
 
-**Read b25/b26 against b22, not batch 20's control.** b22 (`50,100,50`, IS off) is the seed-matched
-control: pooled **75.7**, best-30 86.2, `sef` 30.5, peak 94.88. b24 has answered the yes/no; b25 and b26
-ask whether the gain is width itself or just more parameters, and whether it survives at shapes other than
-one wide layer.
+**Judge these on `best_perfect30` and the count of ≥98%/500 checkpoints, not on peak trailing.** Peak is
+capped at 95.00 and all four b24 arms already sit on the cap
+([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)),
+so it cannot move even if a shaped arm plays perfectly. `sef` alongside, at the matched 2M horizon.
 
-**The pooled gap is still an n=4 signal, not a settled ceiling.** b24's +12.2 is higher on all four
-seed-matched controls (p=0.0625, the n=4 floor), which is cleaner than batch 20's within-batch confound —
-but `320` once read +10.1 pooled in batch 20 and that was noise. The HOF-500 confirmed the batch owns 9
-genuine ≥97%/500 checkpoints (not just inflated /100 highs), which firms up the *consolidation* claim; b25/b26
-are the replication that separates width from parameter count. **b25 has now replicated the pooled lift (86.0,
-+10.3) at a 3-layer shape — so the gain tracks capacity, not width specifically — but produced no ≥98%/500
-checkpoint, so the *record* is still b24's alone.** **b26 (`100,100`) has now answered the shallow case: it
-does *not* carry the lift — pooled 79.2, only +3.5 over control — so the gain needs real capacity (one wide
-`320` layer or a deep `200,100,100`), not just any net wider than the control.**
+**The implementation caught a live defect the design would have shipped.** The potential is per-episode
+state, and `Game.snapshot()` does not carry it — with `FORK_BRANCHES=4` forking at length ≥85, every
+endgame fork would have started its shaping from the *parent's* stale Φ. `restore_snapshot()` now
+recomputes it. 24 tests in `tests/test_reward_shaping.py` pin the behaviour, each verified to fail against
+a mutated implementation.
 
-Scheduler order (desktop `status.json` ledger): **b26 HOFs (running, empty — no ≥98% checkpoint)**, then the
-queue is clear. b25 is fully
-done — training → close-out → HOF, all four arms — and was the **first live run of the auto-HOF chain**,
-which worked end to end. The HOF step auto-queues a 500-episode, gate-98 re-measure of each close-out's ≥98%
-checkpoints (`auto_hof`, on by default, 2026-08-13); it only measures, promotion into `hallOfFame/` stays
-manual. Check with `git show origin/ops-status:status.json`.
+Desktop status: **b27a-d running** (4 trainers, the box's cap), b28 and b29 queued behind them at
+priority 20/30, each with close-out and HOF-500 auto-chained. ~6 h per batch at 92.5 steps/s.
+Check with `git show origin/ops-status:status.json`.
 
-## Batches 20-24 are closed — where their descriptions went
+## Batches 20-26 are closed — where their descriptions went
 
-All five batches finished and closed out, so per the bookkeeping rule at the end of this file their
+All seven batches finished and closed out, so per the bookkeeping rule at the end of this file their
 descriptions moved to [`completedRuns.md`](completedRuns.md):
 
 | batch | change | verdict | design + results |
 |---|---|---|---|
+| **26** | **fc `100,100`** under IS-off | **does not carry the lift** — pooled 79.2, only +3.5 over the control, at **more** parameters than b24's `320`. The arm that showed the lift is width, not size | [write-up](completedRuns.md#batch-26--fc-100100-under-is-off-the-shallow-shape-does-not-carry-the-lift) |
+| **25** | **fc `200,100,100`** under IS-off | **the lift replicates** — pooled 86.0, +10.3, all 4 seeds; peak unmoved. No hall entry: the auto chain's gate-98 abandoned every candidate, `b25b` @911k still 97.2% at 392 episodes | [write-up](completedRuns.md#batch-25--fc-200100100-under-is-off-the-lift-replicates-at-a-second-shape--but-no-record) |
 | **24** | **fc `320`** under IS-off | **first architecture result + a new record** — pooled **87.9**, +12.2 over the control, all 4 seeds (ceiling unmoved). HOF-500: `b24d` @1342k **98.0%/500**, the new record | [write-up](completedRuns.md#batch-24--fc-width-320-under-is-off-the-first-architecture-result-and-a-new-record) |
 | **23** | IS β annealed **0→0.1** | **the best point on the β ladder** — pooled **75.7**, +20.7 over the control, higher on all 4 seeds | [write-up](completedRuns.md#batch-23--β-annealed-001-the-best-point-on-the-β-ladder-near-the-no-is-extreme) |
 | **22** | IS **off** (`SNEK_IS_WEIGHTS=0`) | **dead heat with β→0.1** — pooled 75.7. The consolidation gain saturates by β→0.1 | [write-up](completedRuns.md#batch-22--is-off-a-dead-heat-with-β01--the-consolidation-gain-saturates) |
 | **21** | partial IS (β→**0.5**) | beats the β→1.0 control (pooled 64.3 vs 55.0, 3/4 seeds), well short of no-IS | [write-up](completedRuns.md#batch-21--partial-is-β05-beats-the-β10-control-still-far-behind-no-is) |
 | **20** | `FC_LAYERS`, **nine shapes** | **architecture never raises the ceiling**; capacity binds only below ~0.55× | [the sweep's design](completedRuns.md#batch-20--the-design-of-the-nine-shape-sweep-complete-2026-08-12) |
+
+**‡ The width result now has three shapes behind it, and "it tracks capacity" is retracted.** Pooled lift
+over the b22 control orders by **widest layer**, not by size: `320` **+12.2** at 0.94× the control's
+parameters, `200,100,100` **+10.3** at 3.09×, `100,100` **+3.5** at 1.14×. The smallest of the four nets
+wins and the second-largest gets almost nothing, so parameter count is not even monotone with the result
+([finding](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)).
+**The architecture arm this implies is `fc 512` under the b24 config** — a wider first layer, not a bigger
+net — and it is now the strongest remaining consolidation direction after the shaping batches.
 
 **The β ladder is the live result to build on.** Gradient concentration ESS/N walks down it — **β→1.0
 ≈1.0** (batch 20's control, near-uniform) → **β→0.5 ≈0.86** (b21) → **β→0.1** (b23, effective exponent
@@ -158,43 +157,35 @@ reality.
 
 **Outstanding, highest-value, in order:**
 
-1. **`CHASE_SAFE_SHAPING` is the highest-value untested change, and its hold has expired.** It was
-   approved 2026-08-11 and held until the then-running batches closed out; batches 20-23 are all closed and
-   only the desktop is busy. **Better supported as of 2026-08-14**: the endgame failure is not failing to
-   *go and get* a safe meal but arriving at boards where there is none — eating the reachable food is fatal
-   in 54% of losses
-   ([`findings.md`](findings.md#-retracted-2026-08-14-the-positions-are-trapped--geom-counts-routes-that-eat-and-die)),
-   so safe-chaseability is the right quantity to shape and distance-to-food is not. It targets endgame
-   food-finding — the modal failure since batch 16 — which is
-   the one place a *ceiling* gain could still come from, now that architecture is closed for the ceiling (b24 raised consolidation, not peak) and the β ladder
-   has flattened. Plan: [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md),
-   **revised 2026-08-14 and ready to execute** — the arms are now **b24's config** (`fc 320`, IS off, 3M)
-   plus the one knob, seed-matched against `b24a-d` at no new compute cost, rather than the batch-23 base
-   the plan was first written against. The revision also caught a live defect in the design: the potential
-   is per-episode state that `Game.snapshot()` does not carry, and b24's config runs `FORK_BRANCHES=4`
-   with forks at length ≥85, so every other endgame fork would have started its shaping from a stale
-   value. Both hosts are idle; the desktop is preferred because it chains close-out and HOF-500
-   automatically.
-2. **b24 landed the pooled gap this warning was about (+12.2, all 4 seeds, nothing on peak), so the honest
-   next step is more seeds on `320`, not only more widths.** b25/b26 test a different question — width
-   versus parameter count — which is worth it, but they do not firm up the `320` gap. The HOF-500 is done and
-   confirmed 9 genuine ≥97%/500 checkpoints (and a new record); what is still owed before the width×IS-off
-   interaction is called established is **4 more `320` seeds**, to move the pooled sign-test off its n=4 floor
-   (p=0.0625).
-3. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
+1. **`CHASE_SAFE_SHAPING` is shipped and running as b27/b28/b29 — nothing is owed here until they close.**
+   Design, Phase 0 measurement and implementation notes:
+   [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md); the batch description is
+   at the top of this file. The next decision point is b27's close-out against `b24a-d`.
+2. **`fc 512` under the b24 config is now the strongest untested architecture arm.** b25/b26 turned the
+   width result into an ordering on the *widest layer* — 320 → +12.2, 200 → +10.3, 100 → +3.5, 50 → 0 —
+   with parameter count not even monotone
+   ([finding](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)).
+   `512` is the only cheap way to ask whether that ordering keeps going or has a knee, and it needs no new
+   control: `b24a-d` is seed-matched. Order it behind the shaping batches, which own the queue.
+3. **4 more `320` seeds are still owed before the width×IS-off interaction is called established.** b24's
+   +12.2 is at the n=4 sign-test floor (p=0.0625). b25/b26 answered a different question (which property
+   carries the lift) and do not firm up the `320` gap itself.
+4. **Consider a position-chosen grid around `b18b` @1588000.** The record is a narrow peak, so the
    open question is whether `TARGET_UPDATE_PERIOD=1000` produces a better *region* or just got one
    lucky checkpoint. A blind every-10k grid over 1.55-1.62M would settle it, and it is the same test
    that deflated `b17b`'s apparent region to 84%.
-4. **The 11 batch-18 checkpoints at exactly 95.0%** were excluded from the 500-episode sweep, which
+5. **The 11 batch-18 checkpoints at exactly 95.0%** were excluded from the 500-episode sweep, which
    took ">95%" literally. ~9 minutes of eval if a fuller picture of the region is wanted.
 
-## Closed batches (11-24)
+## Closed batches (11-26)
 
 One line each; full write-ups and per-seed numbers in [`completedRuns.md`](completedRuns.md),
 superseded detail in [`archive/runs-archive.md`](archive/runs-archive.md).
 
 | batch | change | verdict |
 |---|---|---|
+| **26** | **fc `100,100`** under IS-off | **does not carry the lift** — pooled 79.2, +3.5 over the control, at 1.14× its parameters (more than b24's `320`). The arm that separates width from size |
+| **25** | **fc `200,100,100`** under IS-off | **the lift replicates** — pooled 86.0, +10.3, 4/4 seeds, at 3.09× the parameters. Peak unmoved; no hall entry (gate-98 abandoned every candidate) |
 | **24** | **fc `320`** under IS-off | **first architecture result + new record** — pooled 87.9, +12.2 over the control, all 4 seeds (ceiling unmoved, 95.00). HOF-500: `b24d` @1342k **98.0%/500**, the new record |
 | **23** | IS β annealed 0→**0.1** | **the best point on the β ladder** — pooled 75.7, +20.7 over the control, higher on all 4 seeds |
 | **22** | IS **off** | **dead heat with b23** at pooled 75.7 — the consolidation gain saturates by β→0.1 |
@@ -214,9 +205,9 @@ superseded detail in [`archive/runs-archive.md`](archive/runs-archive.md).
 trailing reads 93.8-95.0 flat across batches 11-23. Nothing has raised the ceiling; batches 16 and 21-23
 raised how much of the *time* an arm sits near it. **Two things have moved peak trailing downward** —
 batch 19's full IS correction (94.16, 4/4 seeds) and batch 20's 0.29× net (93.75, 4/4) — so the invariance
-is breakable, just not yet upward. **Thirteen batches of optimiser, PER and architecture knobs have not
-raised the ceiling once**, which is the argument for the reward-shaping direction at the top of the
-backlog.
+is breakable, just not yet upward. **Fifteen batches of optimiser, PER and architecture knobs have not
+raised the ceiling once** — peak trailing reads 94.84-95.00 across `50,100,50`, `100,100`,
+`200,100,100` and `320` — which is the argument behind the reward-shaping batches now running (b27-b29).
 
 ## Standing backlog
 
@@ -225,12 +216,13 @@ table.
 
 | change | targets | prior |
 |---|---|---|
-| `CHASE_SAFE_SHAPING` — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **the top item, and ready to build** — full plan in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md), approved 2026-08-11, **revised 2026-08-14**: batch 24's config as the base and `b24a-d` as the seed-matched control, plus the `restore_snapshot` fix the fork path needs. **20-26 are closed and both hosts are idle** |
+| ~~`CHASE_SAFE_SHAPING`~~ — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **shipped and running 2026-08-14** as **b27** (`c` 0.10, gate 85), **b28** (`c` 0.20) and **b29** (gate 75) — see the batch description at the top of this file and the [plan](../plans/chase-safe-reward-shaping.md) |
 | **Free space in one piece** — as a graded potential and/or an observation | endgame packing, which is what decides whether the food lands somewhere edible | **new 2026-08-14**, and the largest per-policy separation on record: one-piece share at length 90-94 is **92% / 77% / 5%** for `b24d` / `b18b` / `b20d` ([findings](findings.md#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points)). `count_groups` already runs every step, so both forms are nearly free. **Correlational, n=3 checkpoints** |
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
 | ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **closed as batch 18** — primary moved, 4/4 seeds; see [`completedRuns.md`](completedRuns.md) |
 | `TARGET_UPDATE_TAU=0.005`, period 1 | smoothness (soft target updates) | medium |
 | ~~`FC_LAYERS=128,128`~~ | capacity | **closed by batch 20**, which swept nine shapes rather than one: none raised the ceiling — [findings](findings.md#network-shape-the-sweep-is-complete--nine-shapes-and-architecture-never-raises-the-ceiling). Width under IS-off is the one loose end, and batches 24/25 are on it |
+| **`FC_LAYERS=512`** under the b24 config | consolidation — how far the widest-layer ordering goes | **new 2026-08-14, and the top architecture item.** b24/b25/b26 order the lift by widest layer (320 → +12.2, 200 → +10.3, 100 → +3.5) with parameter count non-monotone ([finding](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)). `b24a-d` is already the seed-matched control, so the arm costs four trainings and nothing else |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |
 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | experience diversity | low — the 500k result was ambiguous |
 
