@@ -1,8 +1,8 @@
 # Potential-based reward shaping on realised chase-safety
 
-**Status:** approved 2026-08-11, **not implemented**. The hold has expired — batches 20-26 are all
-closed and both hosts are idle as of 2026-08-14, so this is the top backlog item and the design below
-is ready to execute. **Revised 2026-08-14** in four places, each marked **‡**: the control moved from
+**Status:** approved 2026-08-11. **Phase 0 done 2026-08-14 — `c = 0.10`, Variant B (length-gated at 85).
+The five edits are not written yet.** The hold has expired: batches 20-26 are all closed and both hosts
+are idle, so this is the top backlog item and the design below is ready to execute. **Revised 2026-08-14** in four places, each marked **‡**: the control moved from
 batch 23 to batch 24, the potential has to survive a fork, Phase 0 shrank because
 `behaviour_profile.py` already answered half of it, and `c` now has an arithmetic rule rather than a
 prior.
@@ -47,8 +47,11 @@ champion-vs-mediocre finding (seeds 21 and 22, averaged):
 | b23b, mid-run | 0.86 | 0.50 | 0.30 | 0.12 |
 | b20a-d peaks | 0.78-0.85 | 0.33-0.47 | 0.12-0.24 | 0.05-0.09 |
 
-**Wide dynamic range, and it separates elite from mediocre at every length.** So the potential flips
-often and the term is not degenerate.
+**Wide dynamic range, and it separates elite from mediocre at every length**, so the potential is not
+degenerate. ~~So the potential flips often.~~ **‡ That inference was wrong and Phase 0 falsified it:** a
+base rate near 0.5 says nothing about how often the value *changes*, and the records turn out to flip only
+**0.21-0.63 times per meal**. Base rate and flip rate are independent, which is why `c` needed measuring
+at all — see [Phase 0 results](#-phase-0-results-2026-08-14).
 
 **One consequence for the design, and it is the main open risk.** The shaping signal is largest where Φ
 is near 0.5, which is the **mid-game (50-84)**. Through 85-99 the flag is 0 most of the time even for
@@ -334,6 +337,72 @@ way the batch lands.
 **Report the flip rates, the chosen `c` and both sanity checks before writing any arm launch**, so the
 value rests on a principle rather than a prior.
 
+### ‡ Phase 0 results 2026-08-14
+
+**`c = 0.10`, and Variant B is confirmed.**
+
+Ran with [`perDiagnostics/chase_safe_potential.py`](../hyperparamTuning/perDiagnostics/chase_safe_potential.py),
+60 episodes per checkpoint (30 each on seeds 201/202), payloads in
+[`perDiagnostics/results/`](../hyperparamTuning/perDiagnostics/results/README.md). Φ was validated first
+against the observation the policy already reads — `obs[15 + a]` on the post-move board, **4,460
+agreements and 0 disagreements** under the `b24d` greedy policy across every band including coiled
+endgame boards, with three mutations each producing disagreements.
+
+**Genuine flips per meal** — genuine excludes the one mandatory terminal `Φ→0` per episode and, for the
+gated form, the one gate crossing, since neither is a signal a policy can act on:
+
+| band | `b24d` (98.0%) | `b18b` (97.6%) | `b20d` (~47%) | Φ base rate, records vs `b20d` |
+|---|---|---|---|---|
+| 10-49 | 0.38 | 0.25 | 0.58 | 0.88 / 0.92 vs 0.77 |
+| 50-84 | 0.52 | 0.63 | **1.44** | 0.72 / 0.67 vs 0.34 |
+| 85-89 | 0.27 | 0.41 | **2.52** | 0.52 / 0.46 vs **0.15** |
+| 90-94 | 0.45 | 0.21 | **2.72** | 0.37 / 0.49 vs **0.09** |
+| 95-97 | 0.33 | 0.38 | **3.61** | 0.33 / 0.24 vs **0.05** |
+| 98-99 | **0.02** | **0.00** | 0.04 | 0.20 / — vs 0.01 |
+
+| | `b24d` | `b18b` | `b20d` |
+|---|---|---|---|
+| share of steps at length ≥85 | 0.109 | 0.108 | **0.412** |
+| share of flips at length ≥85 | 0.144 | 0.141 | 0.324 |
+| **c, variant A** (global) | 0.591 | 0.617 | **0.203** |
+| **c, variant B** (gate 85) | 0.805 | 0.870 | **0.097** |
+
+**Four results, and three of them were not what this plan predicted.**
+
+1. **The deepest endgame is confirmed unshapeable.** At 98-99 the genuine rate is **0.00-0.04 per meal**
+   — 57 of `b24d`'s 59 flips there and **all 56** of `b18b`'s are the terminal `Φ→0`. A band can show 40
+   flips per 100 steps and carry no signal at all, which is exactly why the decomposition was added. The
+   structural-zero prediction holds; a gate above ~95 would shape nothing.
+2. **Φ is far more static than the prior assumed.** The plan expected 2-3 flips per meal; the records
+   read **0.21-0.63**, five to ten times lower. Read alone that is the "inert" branch of this file's own
+   decision table.
+3. **‡ But the dose is self-attenuating, and that is the result.** `b20d` — the regime training spends
+   most of its steps in — flips **2.5-3.6 times per endgame meal** and spends **41.2%** of its steps at
+   length ≥85, against the records' 10.8%. So the gated term fires ~**35 times per episode** for a
+   struggling policy and ~**4.6** for a record one. It is loud exactly where the arm is bad at the
+   endgame and goes quiet as it gets good — the benign feedback this plan predicted, now measured rather
+   than assumed. The "inert" reading applies to the *converged* policy, where potential-based shaping is
+   provably neutral anyway.
+4. **‡ Correction: gating does *not* buy a larger `c`.** The Variant B section above argued it would,
+   assuming mid-game flip traffic was consuming the budget. It is not — for the policy that binds the
+   calibration, the flips are *concentrated* at ≥85 (2.5-3.6 per meal against 1.44 in the mid-game), so
+   gating raises the rate per shaped meal and **halves** `c`, 0.203 → 0.097. The gate's benefit is the
+   one the user asked for and nothing more: it leaves the early game untouched.
+
+**So `c = 0.10`**, from `b20d`'s gated rate of 2.567 genuine flips per meal (`0.25 / 2.567 = 0.097`).
+Calibrating on the highest rate bounds the dose, per the rule above, and it lands on both the clamp
+ceiling and this plan's original prior of 0.1 by two independent routes.
+
+**One honesty note for reading the outcome.** At c = 0.10 the gated term contributes ~3.4 of total
+|shaping| per episode against ~95 of food, so **a null would be ambiguous between "wrong idea" and "dose
+too small"**. The follow-up if the batch is null *and* shows no harm is a dose ladder at 0.05 / 0.20, not
+a different potential — and the 25% budget would still permit up to ~0.20 on `b20d`'s rate.
+
+**A bonus result worth its own line.** Φ's base rate at length 85-94 is **0.52 / 0.46 for the records
+against 0.145 / 0.091 for `b20d`** — a 3-5× separation at exactly the band where the packing gap opens.
+That is independent support that the quantity is worth shaping, measured on state rather than on chosen
+moves.
+
 ### ‡ Variant B — a length-gated Φ, if the signal is wanted only in the near-endgame
 
 Added 2026-08-14, from the observation that early-game competence needs no help. **`c` is a single global
@@ -350,8 +419,11 @@ function of state, and a length gate is one. Two properties it gains:
 
 - **Total discounted shaping becomes exactly 0.** The telescope is `−c·Φ(s₀)`, and Φ(s₀) = 0 because the
   snake starts at length 5. Nothing to offset at all.
-- **A larger `c` fits the same safety budget**, because the mid-game's flip traffic no longer competes for
-  it. That is what "focus `c` on the long tail" actually cashes out as.
+- ~~**A larger `c` fits the same safety budget**, because the mid-game's flip traffic no longer competes
+  for it.~~ **‡ Falsified by Phase 0, 2026-08-14.** The flips are *concentrated* at ≥85 for the policy
+  that binds the calibration, not in the mid-game, so gating **halves** `c` (0.203 → 0.097). The gate's
+  only benefit is leaving the early game untouched — which is the point, but it costs signal strength per
+  flip rather than buying it. See [Phase 0 results](#-phase-0-results-2026-08-14).
 
 **One hard constraint on how deep the gate can usefully sit.** Φ is **structurally 0 at length 99** — one
 free cell cannot hold head, food and tail — and near-structurally 0 at 98, where indices 18-20 take over

@@ -1,0 +1,556 @@
+{
+  "target": "hallOfFame/b18b-tgt1000seed2-ckpt1588000",
+  "checkpoint": "ckpt-1588000",
+  "step": 1588000,
+  "seeds": [
+    201,
+    202
+  ],
+  "episodes_per_seed": 30,
+  "outcomes": {
+    "perfect": 56,
+    "starved": 4
+  },
+  "perfect_score": 100,
+  "total_steps": 97651,
+  "calibration": {
+    "budget": 0.25,
+    "gate": 85,
+    "variant_a": {
+      "flips": 2179,
+      "genuine_flips": 2123,
+      "meals": 5243,
+      "flips_per_meal": 0.4049208468434103,
+      "c": 0.6174046161092793
+    },
+    "variant_b": {
+      "flips": 358,
+      "genuine_flips": 252,
+      "meals_at_or_above_gate": 877,
+      "flips_per_meal": 0.28734321550741165,
+      "c": 0.8700396825396824
+    },
+    "share_steps_at_or_above_gate": 0.10774083214713623,
+    "share_flips_at_or_above_gate": 0.1413492427719137
+  },
+  "bands": {
+    "10-49": {
+      "n_steps": 38819,
+      "share_steps": 0.397527931101576,
+      "phi_mean": 0.9213271851412967,
+      "flips": 566,
+      "flips_terminal": 0,
+      "flips_genuine": 566,
+      "flips_gate_cross": 0,
+      "flips_per_100": 1.4580488935830391,
+      "genuine_per_100": 1.4580488935830391,
+      "meals": 2301,
+      "flips_per_meal": 0.2459800086918731,
+      "genuine_per_meal": 0.2459800086918731,
+      "flips_gated_per_meal": 0.0,
+      "steps_per_meal": 16.870491090830075
+    },
+    "50-84": {
+      "n_steps": 48311,
+      "share_steps": 0.4947312367512878,
+      "phi_mean": 0.672289954668709,
+      "flips": 1305,
+      "flips_terminal": 0,
+      "flips_genuine": 1305,
+      "flips_gate_cross": 50,
+      "flips_per_100": 2.701248162944257,
+      "genuine_per_100": 2.701248162944257,
+      "meals": 2065,
+      "flips_per_meal": 0.6319612590799032,
+      "genuine_per_meal": 0.6319612590799032,
+      "flips_gated_per_meal": 0.024213075060532687,
+      "steps_per_meal": 23.395157384987893
+    },
+    "85-89": {
+      "n_steps": 5323,
+      "share_steps": 0.0545104504818179,
+      "phi_mean": 0.45575803118542174,
+      "flips": 122,
+      "flips_terminal": 0,
+      "flips_genuine": 122,
+      "flips_gate_cross": 0,
+      "flips_per_100": 2.2919406349802744,
+      "genuine_per_100": 2.2919406349802744,
+      "meals": 295,
+      "flips_per_meal": 0.4135593220338983,
+      "genuine_per_meal": 0.4135593220338983,
+      "flips_gated_per_meal": 0.4135593220338983,
+      "steps_per_meal": 18.044067796610168
+    },
+    "90-94": {
+      "n_steps": 2785,
+      "share_steps": 0.02851993323161053,
+      "phi_mean": 0.48797127468581686,
+      "flips": 63,
+      "flips_terminal": 0,
+      "flips_genuine": 63,
+      "flips_gate_cross": 0,
+      "flips_per_100": 2.2621184919210053,
+      "genuine_per_100": 2.2621184919210053,
+      "meals": 295,
+      "flips_per_meal": 0.2135593220338983,
+      "genuine_per_meal": 0.2135593220338983,
+      "flips_gated_per_meal": 0.2135593220338983,
+      "steps_per_meal": 9.440677966101696
+    },
+    "95-97": {
+      "n_steps": 2273,
+      "share_steps": 0.023276771359228274,
+      "phi_mean": 0.2424109106907171,
+      "flips": 67,
+      "flips_terminal": 0,
+      "flips_genuine": 67,
+      "flips_gate_cross": 0,
+      "flips_per_100": 2.9476462824461063,
+      "genuine_per_100": 2.9476462824461063,
+      "meals": 175,
+      "flips_per_meal": 0.38285714285714284,
+      "genuine_per_meal": 0.38285714285714284,
+      "flips_gated_per_meal": 0.38285714285714284,
+      "steps_per_meal": 12.98857142857143
+    },
+    "98-99": {
+      "n_steps": 140,
+      "share_steps": 0.001433677074479524,
+      "phi_mean": 1.0,
+      "flips": 56,
+      "flips_terminal": 56,
+      "flips_genuine": 0,
+      "flips_gate_cross": 0,
+      "flips_per_100": 40.0,
+      "genuine_per_100": 0.0,
+      "meals": 112,
+      "flips_per_meal": 0.5,
+      "genuine_per_meal": 0.0,
+      "flips_gated_per_meal": 0.5,
+      "steps_per_meal": 1.25
+    }
+  },
+  "per_episode": [
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1924,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1720,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "starved",
+      "final_length": 95,
+      "steps": 3137,
+      "score": 90
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1532,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1606,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1589,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1627,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1489,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1552,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1342,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1638,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1371,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1969,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1885,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1795,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1417,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1209,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1567,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1756,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 2340,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1836,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "starved",
+      "final_length": 9,
+      "steps": 137,
+      "score": 4
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1759,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1864,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1421,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 2269,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 2121,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1523,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1510,
+      "score": 95
+    },
+    {
+      "seed": 201,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1389,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1515,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1152,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1429,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1262,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1700,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1537,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1845,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 2164,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1518,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1581,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1584,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1435,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1311,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1579,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1550,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1442,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1600,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "starved",
+      "final_length": 97,
+      "steps": 2458,
+      "score": 92
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1468,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "starved",
+      "final_length": 97,
+      "steps": 2898,
+      "score": 92
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1745,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1818,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1738,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1247,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1839,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 2371,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1652,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1473,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1914,
+      "score": 95
+    },
+    {
+      "seed": 202,
+      "outcome": "perfect",
+      "final_length": 100,
+      "steps": 1362,
+      "score": 95
+    }
+  ]
+}

@@ -72,6 +72,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ The elite-vs-mediocre difference is endgame hunting speed, not blunders** | **measured 2026-08-11**, 12 checkpoints × the same 100 games. p90 steps per meal at length 95-99: **5-13 for the records, 86-226 for batch 20's peaks**; `steps_per_food` at 85-94 correlates **−0.967** with perfect rate. Packing, fragmentation and straightness all move with it — one factor, not five |
 | **‡‡ A perfect game is 95 consecutive meals, so 99% needs a 5× cut in per-meal error** | **arithmetic on measured rates** — the record checkpoint already plays **1,850 meals per mistake**; 99% needs one per **9,450**. Reframes the objective: the remaining gap is per-meal reliability in the ~5 meals played at length 95+ |
 | **‡‡ Free space in one piece at length 90-94 separates the records from a dud by 87 points** | **measured 2026-08-14** — one-piece share **92% / 77% / 5%** for `b24d` / `b18b` / `b20d`, per meal, identical food, exact (one flood fill, no search). The gap opens **ten meals before the end**, and all three reach those lengths equally often. Largest per-policy separation on record here |
+| **‡ The chase-safe potential self-attenuates: ~35 flips per episode for a dud, ~4.6 for a record** | **measured 2026-08-14**, 60 episodes × 3 checkpoints. Genuine flips per endgame meal are **2.5-3.6** for `b20d` against **0.21-0.63** for the records, which spend 10.8% of steps at length ≥85 against `b20d`'s 41.2%. Sets `c = 0.10`. **98-99 carries 0.00-0.04 — the last meals cannot be shaped by this quantity.** See below |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
@@ -400,6 +401,47 @@ binomial expectation. An earlier warning here, built on `b4c` @869000 reading 51
 three runs, should be read as "one checkpoint once behaved strangely" rather than a property of
 the instrument. Pooling over many checkpoints is still what shrinks the interval (±1.3 at 6300
 episodes).
+
+## ‡ Measured: the chase-safe potential is nearly static for a record policy and busy for a bad one
+
+Measured 2026-08-14 with
+[`perDiagnostics/chase_safe_potential.py`](perDiagnostics/chase_safe_potential.py), 60 episodes per
+checkpoint on identical food streams (seeds 201/202), payloads kept. This is the state form of
+observation 15-17 — "do the head, the food and the tail share one open region **now**" — and it was
+validated against `obs[15 + a]` on the post-move board first: **4,460 agreements, 0 disagreements** under
+the `b24d` greedy policy across every length band, with three deliberate mutations each producing
+disagreements.
+
+| genuine flips per meal | `b24d` (98.0%) | `b18b` (97.6%) | `b20d` (~47%) |
+|---|---|---|---|
+| 50-84 | 0.52 | 0.63 | **1.44** |
+| 85-89 | 0.27 | 0.41 | **2.52** |
+| 90-94 | 0.45 | 0.21 | **2.72** |
+| 95-97 | 0.33 | 0.38 | **3.61** |
+| 98-99 | **0.02** | **0.00** | 0.04 |
+| share of steps at length ≥85 | 0.109 | 0.108 | **0.412** |
+
+"Genuine" excludes the mandatory terminal transition, and that exclusion is load-bearing: **all 56 of
+`b18b`'s flips at 98-99 are the episode ending**, which is how a band with a constant Φ reads 40 flips
+per 100 steps.
+
+- **The deepest endgame carries no signal at all** — 0.00-0.04 genuine flips per meal at 98-99. With one
+  free cell no region can hold head, food and tail, and at two cells it is nearly as rare, so the last
+  two or three meals are outside the reach of anything built on this quantity.
+- **A record policy's Φ barely moves: 0.21-0.63 flips per meal.** `b20d` moves 4-10× faster in the
+  endgame *and* spends **41.2%** of its steps at length ≥85 against the records' 10.8% — it thrashes
+  there, at 107 and 165 steps per meal in the top two bands.
+- **Φ's base rate at 85-94 separates the records from `b20d` by 3-5×** (0.52/0.46 against 0.145/0.091),
+  at exactly the band where [the packing gap opens](#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points).
+  Independent support for that finding, measured on state rather than on chosen moves.
+- **For `b20d` in the deep endgame Φ is ~0.05 and ~0.01**, meaning there is essentially never a safely
+  chaseable meal — the state form of [the entrapment retraction](#-retracted-2026-08-14-the-positions-are-trapped--geom-counts-routes-that-eat-and-die).
+
+**Why this matters beyond the calibration it was run for.** A potential-based term on Φ would fire ~35
+times per episode for a struggling policy and ~4.6 for a record one, so **the dose self-attenuates as an
+arm improves** — loud where the endgame is being played badly, quiet once it is not. That is the shape a
+learning aid should have, and it is now measured rather than assumed. It also sets `c = 0.10`; see
+[the plan](../plans/chase-safe-reward-shaping.md#-phase-0-results-2026-08-14).
 
 ## ‡‡ Peak trailing is a saturated metric — it is capped at 95 and four arms already sit on the cap
 

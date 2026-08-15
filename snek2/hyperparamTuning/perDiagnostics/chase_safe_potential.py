@@ -207,6 +207,19 @@ def main():
                     tally[(band, 'phi')] += phi
                     tally[(band, 'flips')] += int(phi_next != phi)
                     tally[(band, 'flips_gated')] += int(gated_next != gated)
+                    # Two kinds of flip carry no information and have to be separable, or the top
+                    # band reads busy when it is not. A *terminal* flip is the mandatory
+                    # Phi(terminal) = 0 the invariance requires: exactly one per episode, and for a
+                    # perfect game it lands in the 98-99 row, which is how a band with a constant
+                    # Phi can still show 40 flips per 100 steps. A *gate-crossing* flip exists only
+                    # because the gated potential is 0 below the gate, so it fires once per episode
+                    # at length 84->85 and says nothing about the board.
+                    if done and phi_next != phi:
+                        tally[(band, 'flips_terminal')] += 1
+                    if done and gated_next != gated:
+                        tally[(band, 'flips_gated_terminal')] += 1
+                    if (length >= GATE) != (new_length >= GATE) and gated_next != gated:
+                        tally[(band, 'flips_gate_cross')] += 1
                     if new_length > length:
                         meal_band = band_of(new_length)
                         if meal_band is not None:
@@ -229,14 +242,20 @@ def main():
     for name, _, _ in BANDS:
         steps_in = tally[(name, 'steps')]
         meals_in = tally[(name, 'meals')]
+        genuine = tally[(name, 'flips')] - tally[(name, 'flips_terminal')]
         bands[name] = {
             'n_steps': steps_in,
             'share_steps': divide(steps_in, total_steps),
             'phi_mean': divide(tally[(name, 'phi')], steps_in),
             'flips': tally[(name, 'flips')],
+            'flips_terminal': tally[(name, 'flips_terminal')],
+            'flips_genuine': genuine,
+            'flips_gate_cross': tally[(name, 'flips_gate_cross')],
             'flips_per_100': divide(tally[(name, 'flips')], steps_in, 100.0),
+            'genuine_per_100': divide(genuine, steps_in, 100.0),
             'meals': meals_in,
             'flips_per_meal': divide(tally[(name, 'flips')], meals_in),
+            'genuine_per_meal': divide(genuine, meals_in),
             'flips_gated_per_meal': divide(tally[(name, 'flips_gated')], meals_in),
             'steps_per_meal': divide(steps_in, meals_in),
         }
@@ -248,12 +267,19 @@ def main():
     meals_a = sum(tally[(name, 'meals')] for name, _, _ in BANDS)
     flips_b = sum(tally[(name, 'flips_gated')] for name, _, _ in BANDS)
     meals_b = sum(tally[(name, 'meals')] for name in gated_bands)
-    rate_a, rate_b = divide(flips_a, meals_a), divide(flips_b, meals_b)
+    # Genuine = the board actually changed its chase-safety. Excludes the one mandatory terminal
+    # flip per episode, and for the gated form the one gate crossing as well, since neither is a
+    # signal the policy can act on and both would otherwise inflate a thin rate.
+    genuine_a = flips_a - sum(tally[(name, 'flips_terminal')] for name, _, _ in BANDS)
+    genuine_b = (flips_b - sum(tally[(name, 'flips_gated_terminal')] for name, _, _ in BANDS)
+                 - sum(tally[(name, 'flips_gate_cross')] for name, _, _ in BANDS))
+    rate_a, rate_b = divide(genuine_a, meals_a), divide(genuine_b, meals_b)
     calibration = {
         'budget': BUDGET, 'gate': GATE,
-        'variant_a': {'flips': flips_a, 'meals': meals_a, 'flips_per_meal': rate_a,
-                      'c': BUDGET / rate_a if rate_a else None},
-        'variant_b': {'flips': flips_b, 'meals_at_or_above_gate': meals_b,
+        'variant_a': {'flips': flips_a, 'genuine_flips': genuine_a, 'meals': meals_a,
+                      'flips_per_meal': rate_a, 'c': BUDGET / rate_a if rate_a else None},
+        'variant_b': {'flips': flips_b, 'genuine_flips': genuine_b,
+                      'meals_at_or_above_gate': meals_b,
                       'flips_per_meal': rate_b, 'c': BUDGET / rate_b if rate_b else None},
         'share_steps_at_or_above_gate': divide(
             sum(tally[(name, 'steps')] for name in gated_bands), total_steps),
@@ -270,21 +296,22 @@ def main():
     with open(out_path, 'w') as handle:
         json.dump(summary, handle, indent=2)
 
-    print('\n%-8s %8s %8s %9s %9s %8s %9s %9s'
-          % ('band', 'steps', 'share', 'phi', 'flip/100', 'meals', 'flip/meal', 'step/meal'))
+    print('\n%-8s %8s %7s %8s %8s %9s %7s %9s %9s'
+          % ('band', 'steps', 'share', 'phi', 'gen/100', 'gen/meal', 'meals', 'step/meal', 'term'))
     for name, _, _ in BANDS:
         row = bands[name]
         fmt = lambda value, spec: ('%' + spec) % value if value is not None else '        -'
-        print('%-8s %8d %8s %9s %9s %8d %9s %9s'
-              % (name, row['n_steps'], fmt(row['share_steps'], '8.3f'),
-                 fmt(row['phi_mean'], '9.3f'), fmt(row['flips_per_100'], '9.2f'),
-                 row['meals'], fmt(row['flips_per_meal'], '9.2f'),
-                 fmt(row['steps_per_meal'], '9.1f')))
+        print('%-8s %8d %7s %8s %8s %9s %7d %9s %9d'
+              % (name, row['n_steps'], fmt(row['share_steps'], '7.3f'),
+                 fmt(row['phi_mean'], '8.3f'), fmt(row['genuine_per_100'], '8.2f'),
+                 fmt(row['genuine_per_meal'], '9.2f'), row['meals'],
+                 fmt(row['steps_per_meal'], '9.1f'), row['flips_terminal']))
     print('\noutcomes: %s' % dict(outcomes))
     for variant in ('variant_a', 'variant_b'):
         entry = calibration[variant]
-        print('%s: %.3f flips/meal -> c = %s'
-              % (variant, entry['flips_per_meal'] or 0.0,
+        print('%s: %d genuine flips of %d, %.3f genuine/meal -> c = %s'
+              % (variant, entry['genuine_flips'], entry['flips'],
+                 entry['flips_per_meal'] or 0.0,
                  ('%.3f' % entry['c']) if entry['c'] else 'n/a'))
     print('share of steps at length >= %d: %.3f; share of flips there: %.3f'
           % (GATE, calibration['share_steps_at_or_above_gate'] or 0.0,
