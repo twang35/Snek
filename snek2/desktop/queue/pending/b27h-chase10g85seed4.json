@@ -1,0 +1,19 @@
+{
+  "id": "b27h-chase10g85seed4",
+  "type": "train",
+  "policy": "b27h-chase10g85seed4",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "4",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "85"
+  },
+  "max_steps": 2000000,
+  "priority": 10,
+  "notes": "re-run of b27d after the perfect-game counter fix (b72a5a84). The original a-d arms reported 0% perfect for 310+ evals because every counter compared the final reward with PERFECT_GAME_REWARD, which this shaping shifts by -c at the winning step; that also pinned epsilon at the 0.0125 refinement ceiling, so they were handicapped as well as unmeasured. Fresh policy rather than a resume: the weights and buffer carry 320k steps under an exploration schedule that was never going to descend. Config is unchanged from a-d and identical to b24d apart from the shaping, so b24d is still the seed-matched control."
+}
