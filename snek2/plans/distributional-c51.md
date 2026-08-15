@@ -1,7 +1,7 @@
 # Distributional RL — C51 (categorical DQN)
 
 **Status:** proposed 2026-08-15. **Phase 0 is done** and picked the support — `v_min = -5`,
-`v_max = 195`, `num_atoms = 81`, spacing exactly 2.5 — while **falsifying the premise the support
+`v_max = 120`, `num_atoms = 51`, spacing exactly 2.5 — while **falsifying the premise the support
 section rested on** ([results](#phase-0-results--the-support-measured-2026-08-15)). The control moved from `b24` to `b25`
 on 2026-08-15 for the head-size reason [below](#the-phase-34-launch-line). **No code is written yet:
 phase 1 is held pending review of the phase-0 numbers.** Phases 3-4 are held until the desktop's
@@ -161,13 +161,16 @@ the atom count is a free choice rather than a constraint.
   analytic minimum is exactly `DEATH_REWARD` (a one-step death; any earlier death is discounted toward
   zero).
 
-### The support: sized to the reward function, not to the measurement (revised 2026-08-15)
+### The support, settled after two revisions (2026-08-15)
 
-**Chosen: `v_min = -5`, `v_max = 195`, `num_atoms = 81` — spacing exactly 2.5.** The first draft used
-the *measured* range (`-6`, `110`, 51 atoms); both bounds moved, and each for a reason the measurement
-alone did not supply.
+**Chosen: `v_min = -5`, `v_max = 120`, `num_atoms = 51` — spacing exactly 2.5.** Settled 2026-08-15
+after two revisions: the first draft used the *measured* range (`-6`, `110`, 51 atoms), the second the
+γ-free theoretical bound (`-5`, `195`, 81 atoms), and this is a deliberate step back from the second.
+It keeps everything that mattered — the same 2.5 spacing, the same 35 atoms across the bulk, the
+correct `v_min` — and trades clip-proofness above 120 for 9,090 fewer parameters. See
+[why 120 and not 194](#why-120-rather-than-the-theoretical-194).
 
-**`v_max` covers the theoretical maximum instead of the observed one.** The bound is exact and comes
+**The theoretical maximum is exactly 194.** The bound comes
 from the reward function: a perfect game pays `FOOD_REWARD` for 94 foods and then
 `PERFECT_GAME_REWARD` for the 95th — **not both**, because `Snake.py:517` *overwrites*
 `reward = FOOD_REWARD` with the win — so the undiscounted maximum return is `94·1 + 100 = 194`, and it
@@ -180,24 +183,33 @@ is attained from the opening state in the limiting case where every food spawns 
 | γ=0.99 | 99.00 | 56.62 | 36.45 | 26.02 | 9.46 | 4.75 |
 
 `m` is steps per meal; the record averages ~19, which is why its *measured* max of 104.4 comes from
-near-win states rather than from `s0`. **The decisive argument for 194 over the measured 110 is that it
-is γ-independent.** `SNEK_DISCOUNT` is a live knob — 0.99, 0.995 and 0.9975 have all shipped — and a
-grid sized to 0.9975's observed distribution silently becomes wrong for an arm that changes it. Sized
-to the rewards, the grid is a property of the MDP.
+near-win states rather than from `s0`. **The reason to prefer a derived bound over the measured one is
+that it is γ-independent**: `SNEK_DISCOUNT` is a live knob — 0.99, 0.995 and 0.9975 have all shipped —
+and a grid sized to 0.9975's observed distribution silently becomes wrong for an arm that changes it.
 
-**It is nearly free, because the price is paid in atoms rather than resolution.** At fixed spacing 2.5,
-on the `b25` trunk:
+#### Why 120 rather than the theoretical 194
 
-| grid | N | head params | total | vs ddqn control | atoms across the p5-p95 bulk |
+At fixed spacing 2.5 on the `b25` trunk, `v_max` buys clip-proofness and costs only head parameters —
+resolution is identical in every row, because spacing is what is being held fixed:
+
+| grid | N | total params | vs ddqn control | atoms across the bulk | clipping needs |
 |---|---|---|---|---|---|
-| `[-5, 110]` (measured) | 47 | 14,241 | 50,641 | 1.38× | 35 |
-| `[-5, 162.5]` (γ=0.9975 bound) | 68 | 20,604 | 57,004 | 1.55× | 35 |
-| **`[-5, 195]`** (γ-free bound) | **81** | 24,543 | **60,943** | **1.66×** | **35** |
+| `[-5, 110]` (measured max + 5%) | 47 | 50,641 | 1.38× | 35 | 2.98 steps/meal |
+| **`[-5, 120]`** (chosen) | **51** | **51,853** | **1.41×** | **35** | **2.80 steps/meal** |
+| `[-5, 162.5]` (γ=0.9975 bound) | 68 | 57,004 | 1.55× | 35 | never at γ≤0.9975 |
+| `[-5, 195]` (γ-free bound) | 81 | 60,943 | 1.66× | 35 | never |
 
-10,302 extra parameters against the confound we already cut from 10.73× to 1.41×, and the resolution
-where returns actually live is identical. Clipping becomes impossible rather than merely unlikely,
-which matters because the states that would clip are precisely the near-win ones, and losing the
-*contrast between actions* there is the one failure that would hurt most.
+**120 is not clip-proof, and the honest statement of the risk is that last column.** A return above 120
+requires a policy averaging under **2.80 steps per meal** — about **7× faster than the record's ~19** —
+against a measured maximum of 104.38 across three checkpoints including the 98%/500 record, so the
+headroom is 15%. The value ceiling is also self-limiting rather than distorting: a bootstrap target is
+`r + γ·d·z_i`, so with the support capped at 120 the network cannot push its own estimates past it,
+and everything below is untouched.
+
+What 120 keeps, against the wider grids: the same 2.5 spacing, the same ~35 atoms across the p5-p95
+bulk, and `-5`/`0`/`100`/`120` all landing on atoms. What it gives up: the 120-194 band, which no
+measured policy comes within 15 units of. It also happens to halve the initial-optimism confound
+below — the grid midpoint is 57.5 rather than 95.0.
 
 **`v_min` is `-5` exactly, and the code proves nothing lower is reachable.** `Snake.step` *assigns*
 each outcome reward rather than accumulating (`Snake.py:513-559`), so death, starve, food and the win
@@ -209,9 +221,33 @@ shaping, which does fire on a terminal step as `-c·Φ(s)`. With both at 0 — w
 since `project_distribution` clamps to the closed interval. So the margin `-6` bought nothing and cost
 a little: at `-5` the death outcome lands on **one** atom instead of being split across two.
 
-Spacing 2.5 is chosen so the reward quanta land on atoms: `-5` is atom 0, `0` is atom 2, and `100` — the
-win — is atom 42. An arm that turns shaping back on needs `v_min ≤ DEATH_REWARD − c`, which is the
-startup guard's job rather than a permanent margin.
+An arm that turns shaping back on needs `v_min ≤ DEATH_REWARD − c`, which is the startup guard's job
+rather than a permanent margin.
+
+#### Atoms landing on `0` and `100` is nearly cosmetic — do not count it as a reason
+
+Spacing 2.5 puts `-5` on atom 0, `0` on atom 2, `100` on atom 42 and `120` on atom 50. That reads like a
+design virtue and mostly is not, because **every predicted value is fractional** and alignment has
+nothing to do with predictions — only with where *target* mass is placed. Three cases:
+
+- **Non-terminal steps (~99.9% of transitions): alignment does nothing.** The target support is
+  `r + 0.9975·z_i`, and the γ contraction takes every atom off the grid regardless — `z = 100` maps to
+  99.75, which splits 0.10/0.90 across atoms 97.5 and 100. Fractional, exactly as expected.
+- **Terminal steps: this is the only place exact values arise at all.** At `d = 0` the target support
+  collapses to `r` for every atom, so the target is a point mass at the literal reward — and the rewards
+  *are* round. A death gives a **one-hot** target at `-5`; a win a one-hot target at `100`. Off-grid, the
+  same target would split across two atoms with an irreducible cross-entropy equal to that split's
+  entropy. And the alignment is partial anyway: `STARVE_REWARD = -0.5` splits 0.20/0.80 for a floor of
+  **0.5004 nats**, and `FOOD_REWARD = 1.0` is not on an atom either.
+- **The one thing that floor would have mattered for is already fixed.** With cross-entropy as the PER
+  priority, a permanently split target carries a permanent priority floor and gets over-sampled forever.
+  [Using the KL](#the-priority-signal-kl-not-cross-entropy) subtracts `H(target)`, so the signal reaches
+  0 either way — which absorbs most of the benefit alignment would have had.
+
+The residual benefit is **interpretability**: with `100` on an atom, "probability this state wins" reads
+straight off atom 42 and death mass off atom 0, with no binning error, which matters only because this
+folder does write diagnostics that inspect network internals. Keep the alignment because it is free;
+never choose a grid for it.
 
 Note throughout that `project_distribution` *interpolates* between neighbouring atoms, so the
 represented **mean is exact** at any spacing; what atoms buy is distributional detail.
@@ -233,16 +269,28 @@ not planned" keeps `FOOD_REWARD`/`DEATH_REWARD`/`STARVE_REWARD`/`PERFECT_GAME_RE
 they rescale `avg_reward`, which is what `BOOTSTRAP_REWARD_THRESHOLDS` fires on — a rescale would
 silently move the epsilon schedule and confound the arm.
 
-**Two loud guards still ship**, now on the derived bounds rather than a hand-written constant:
-`v_max ≥ 194` — computed as `(MAX_POSSIBLE_SCORE − 1)·FOOD_REWARD + PERFECT_GAME_REWARD`, so it tracks
-a reward change instead of going stale — and `v_min ≤ DEATH_REWARD − CHASE_SAFE_SHAPING`. Both refuse to
-start unless `SNEK_C51_ALLOW_CLIPPING=1`. Silent clipping of the win value is exactly the class of
-failure `arch.json` exists to prevent.
+#### The startup guards, in three levels
 
-### The one new confound the wide grid creates: initial optimism
+Choosing `v_max = 120` deliberately below the derived 194 means a single hard "must cover the
+theoretical max" guard would refuse to start the arm this plan is for. So the guard separates a bound
+that is never worth violating from a trade-off that is, and **the escape hatch must not silently
+disable both**:
+
+| condition | level | why |
+|---|---|---|
+| `v_min > DEATH_REWARD − CHASE_SAFE_SHAPING` | **hard fail** | costs nothing to satisfy and there is no reason to violate it; a clipped death value is a wrong terminal target |
+| `v_max` < the **measured** max, 105 | **hard fail** | clipping returns that real policies demonstrably reach is a mistake, not a trade |
+| `v_max` < the **derived** bound, 194 | **warn once, and record it** | a judgement, which is what `120` is. The line prints the derived bound, the measured max, the headroom, and the steps-per-meal a policy would need to exceed the grid, and `run_config` carries it into `runs/<policy>.md` |
+
+`SNEK_C51_ALLOW_CLIPPING=1` overrides only the two hard fails. Both derived numbers are **computed from
+the reward constants** — `(MAX_POSSIBLE_SCORE − 1)·FOOD_REWARD + PERFECT_GAME_REWARD` for the bound — so
+they move when a reward does instead of going stale, which is the failure the first draft's hand-written
+`101` would have had.
+
+### The one new confound the grid creates: initial optimism
 
 **A categorical head's initial expected Q is the grid's midpoint**, because the atom logits start
-near-uniform. That is **95.0** for `[-5, 195]`, against a ddqn head that starts at Q ≈ 0 (its final
+near-uniform. That is **57.5** for `[-5, 120]`, against a ddqn head that starts at Q ≈ 0 (its final
 layer is `RandomUniform(±0.03)`). So a c51 arm begins believing every state is worth about what a
 guaranteed perfect game is worth, and **the size of that optimism scales with `v_max`** — i.e. with the
 choice just made above.
@@ -254,8 +302,10 @@ arm and its control**, which is exactly what this folder's protocol exists to pr
 - **Default: standard uniform init**, as in the paper, and measure in phase 2 how many steps the
   optimism takes to wash out. Simple, matches the literature, keeps the confound visible in the write-up.
 - **`SNEK_C51_ZERO_INIT=1`: a downward bias ramp on the atom logits** so the initial expected Q is 0,
-  matching ddqn. Computed: `bias_i = -λ·(z_i − v_min)` with **λ = 0.1622** puts E[Q] at 0.0000 for this
-  grid, with 87% of the initial mass on the bottom 5 atoms. Three lines in the network builder.
+  matching ddqn. Computed: `bias_i = -λ·(z_i − v_min)` with **λ = 0.1622** puts E[Q] at 0.0000, with 70%
+  of the initial mass on the bottom 3 atoms. Three lines in the network builder, and note λ barely
+  depends on `v_max` — the mass concentrates in the bottom ~9 atoms either way — so the constant
+  survives a grid change, which is also why it must be **computed at build time rather than pasted in**.
 
 Recommendation: **ship the knob, default it off, and decide from phase 2** — if the optimism visibly
 delays the first learning, the ramp becomes the default for phase 4 and the write-up says so.
@@ -291,9 +341,9 @@ choice can change which experience gets replayed, not just how hard.
 | knob | default | meaning |
 |---|---|---|
 | `SNEK_ALGO` | `ddqn` | `ddqn` or `c51`. Anything else exits at startup |
-| `SNEK_NUM_ATOMS` | 81 | size of the support grid, [chosen from the measurement](#phase-0-results--the-support-measured-2026-08-15). Ignored unless `ALGO=c51` |
-| `SNEK_V_MIN` / `SNEK_V_MAX` | -5.0 / 195.0 | support bounds, guarded as above |
-| `SNEK_C51_ZERO_INIT` | 0 | 1 ramps the atom-logit biases so the initial expected Q is 0 rather than the grid midpoint — see [initial optimism](#the-one-new-confound-the-wide-grid-creates-initial-optimism) |
+| `SNEK_NUM_ATOMS` | 51 | size of the support grid, [chosen from the measurement](#phase-0-results--the-support-measured-2026-08-15). Ignored unless `ALGO=c51` |
+| `SNEK_V_MIN` / `SNEK_V_MAX` | -5.0 / 120.0 | support bounds, guarded as above |
+| `SNEK_C51_ZERO_INIT` | 0 | 1 ramps the atom-logit biases so the initial expected Q is 0 rather than the grid midpoint — see [initial optimism](#the-one-new-confound-the-grid-creates-initial-optimism) |
 | `SNEK_C51_DOUBLE` | 1 | 1 = action for the target atoms chosen by the **online** net (Rainbow-style double, matching today's `DdqnAgent`); 0 = upstream's target-net selection |
 | `SNEK_C51_ALLOW_CLIPPING` | 0 | escape hatch for the two support guards |
 | `SNEK_PRIORITY_SIGNAL` | `td_error` | gains `ce` as a third value, meaningful only for c51 |
@@ -342,8 +392,8 @@ test fails" rule.
 | **with a desynced target net**, the selected atoms are the online argmax's row | switching to target-net selection. **Must desync first** — see the probe finding, the mutant survives otherwise |
 | loss at init ≈ `ln(num_atoms)` | a support/atom-count mismatch between net and agent |
 | a `discount == 0` transition puts target mass at the reward, not spread over the support | anything that breaks the terminal-bootstrap contract `snake_environment.to_tensor_time_step` is built on |
-| `v_max` below the derived **194** or `v_min` above `DEATH_REWARD - CHASE_SAFE_SHAPING` raises unless the escape hatch is set | dropping the clipping guards, and the too-weak 101 bound the first draft's analytic version would have allowed |
-| the derived bound equals 194 for the shipped rewards, and *moves* when `PERFECT_GAME_REWARD` or `MAX_POSSIBLE_SCORE` is changed in the fixture | hard-coding 194, which would go stale silently |
+| `v_max` below the **measured** 105, or `v_min` above `DEATH_REWARD - CHASE_SAFE_SHAPING`, raises unless the escape hatch is set — while `v_max = 120` starts and *warns* | collapsing the three guard levels into one, which would refuse to start the arm this plan is for, or into none |
+| the derived bound equals 194 for the shipped rewards, and *moves* when `PERFECT_GAME_REWARD` or `MAX_POSSIBLE_SCORE` is changed in the fixture | hard-coding 194 or 105, which would go stale silently |
 | `SNEK_C51_ZERO_INIT=1` puts the initial expected Q within a tolerance of 0, and the default leaves it at the midpoint | the ramp silently doing nothing, which would look identical in every metric |
 | the shield masks fatal exploration moves over a *categorical* greedy policy | a regression in `ShieldedEpsilonGreedyPolicy`'s `info_spec` contract |
 | arch: missing `algo` reads as `ddqn`; c51-vs-ddqn mismatch raises; atoms/support mismatch fails a resume; round trip keeps all four fields | every silent-restore path this repo has already been bitten by twice |
@@ -354,7 +404,7 @@ Then the full suite: **24 modules** (up from 23), ~610 tests, 0 failed.
 
 | phase | work | gate to the next |
 |---|---|---|
-| **0** | **done 2026-08-15** — [`return_distribution.py`](../hyperparamTuning/perDiagnostics/return_distribution.py), 3 checkpoints × 60 episodes × 116,454 states. Support chosen, the section's own premise falsified, and the bounds then re-derived from the reward function rather than the sample: [results](#phase-0-results--the-support-measured-2026-08-15) | `v_min = -5`, `v_max = 195`, `num_atoms = 81` |
+| **0** | **done 2026-08-15** — [`return_distribution.py`](../hyperparamTuning/perDiagnostics/return_distribution.py), 3 checkpoints × 60 episodes × 116,454 states. Support chosen, the section's own premise falsified, and the bounds then re-derived from the reward function rather than the sample: [results](#phase-0-results--the-support-measured-2026-08-15) | `v_min = -5`, `v_max = 120`, `num_atoms = 51` |
 | **1** | the edits and tests above, plus mutation checks | full suite green; every mutant fails |
 | **2** | `snek2.py smoke` with `SNEK_ALGO=c51 SNEK_MIN_CHECKPOINT_SCORE=0 SNEK_MAX_STEPS=3000`: trains, writes `arch.json` with `algo=c51`, checkpoints, `watch.py smoke` loads it, and a one-checkpoint eval measures it. Record steps/s against a matched ddqn smoke | it runs end to end on both hosts' code path. **Note the eval displaces every `evals/` PNG** (CLAUDE.md) — check what is at the top level first and restore afterwards |
 | **3** | pilot: one wave of 4 arms, `{lr 1e-5, lr 5e-5} × 2 seeds` at the chosen support, `SNEK_MAX_STEPS=600000`. A **screen, not a result** — does it learn at all, how fast to the first perfect game, is the loss scale sane at 1e-5 | pick one rate. If neither reaches its first perfect game by ~300k while the control did, stop and report rather than sweeping |
@@ -368,7 +418,7 @@ so do not reserve it):
 
 ```
 cd snek2
-SNEK_ALGO=c51 SNEK_NUM_ATOMS=81 SNEK_V_MIN=-5 SNEK_V_MAX=195 \
+SNEK_ALGO=c51 SNEK_NUM_ATOMS=51 SNEK_V_MIN=-5 SNEK_V_MAX=120 \
   SNEK_FC_LAYERS=200,100,100 SNEK_IS_WEIGHTS=0 SNEK_TARGET_UPDATE_PERIOD=1000 \
   SNEK_DISCOUNT=0.9975 SNEK_FOOD_DISTANCE_REWARD=0 SNEK_FORK_BRANCHES=4 \
   SNEK_MAX_STEPS=2000000 SNEK_SEED=<n> \
@@ -378,13 +428,13 @@ SNEK_ALGO=c51 SNEK_NUM_ATOMS=81 SNEK_V_MIN=-5 SNEK_V_MAX=195 \
 
 **The control is `b25`, not the record `b24`, and the reason is the head.** A C51 head is
 `last_layer_width × 3·num_atoms`, and `fc 320` is the one shape whose widest layer is also its *last*,
-so it pays for the head at 320 wide while `200,100,100` pays at 100. At the chosen 81 atoms that is the
-difference between 1.66× and 8.09×:
+so it pays for the head at 320 wide while `200,100,100` pays at 100. At the chosen 51 atoms that is the
+difference between 1.41× and 5.42×:
 
-| fc | ddqn | c51 N=51 | **c51 N=81 (chosen)** | c51 N=111 |
+| fc | ddqn | **c51 N=51 (chosen)** | c51 N=81 | c51 N=111 |
 |---|---|---|---|---|
 | `50,100,50` | 11,853 | 19,503 (1.65×) | 23,853 (2.01×) | 28,683 (2.42×) |
-| **`200,100,100`** | 36,703 | 51,853 (1.41×) | **60,943 (1.66×)** | 70,033 (1.91×) |
+| **`200,100,100`** | 36,703 | **51,853 (1.41×)** | 60,943 (1.66×) | 70,033 (1.91×) |
 | `320` | 10,883 | 59,033 (5.42×) | 88,003 (8.09×) | 116,813 (10.73×) |
 
 `200,100,100` also carries **+10.3 of b24's +12.2** on the IS-off lift, and that lift tracks the widest
@@ -446,9 +496,9 @@ seed draw.
    time — with `alpha` as the named follow-up if the batch is ambiguous. Note the phase-4 control is
    `IS_WEIGHTS=0`, so the IS-weight path is not even exercised there; the fix matters for the default
    config and for not shipping a knob that silently does nothing.
-3. **Head-size confound — now 1.66×, down from 10.73×.** C51 multiplies the head by `num_atoms`, and
-   choosing the `b25` trunk is what shrinks it: 60,943 parameters against the control's 36,703, where
-   the record's `fc 320` trunk would have cost 8.09× at the same atom count. The licence to treat that as harmless is batch 20's nine-shape sweep ("architecture never
+3. **Head-size confound — now 1.41×, down from 10.73×.** C51 multiplies the head by `num_atoms`, and
+   choosing the `b25` trunk plus 51 atoms is what shrinks it: 51,853 parameters against the control's
+   36,703, where the record's `fc 320` trunk would have cost 5.42× at the same atom count. The licence to treat that as harmless is batch 20's nine-shape sweep ("architecture never
    raises the ceiling") and the b24/b25/b26 finding that the lift tracks the *widest layer*, not the
    parameter count — b25 itself already runs at 3.09× b22's parameters. It still belongs in the
    write-up as a stated confound.
