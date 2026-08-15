@@ -167,8 +167,14 @@ reality.
    so safe-chaseability is the right quantity to shape and distance-to-food is not. It targets endgame
    food-finding — the modal failure since batch 16 — which is
    the one place a *ceiling* gain could still come from, now that architecture is closed for the ceiling (b24 raised consolidation, not peak) and the β ladder
-   has flattened. Plan: [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md).
-   The laptop's four slots are free.
+   has flattened. Plan: [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md),
+   **revised 2026-08-14 and ready to execute** — the arms are now **b24's config** (`fc 320`, IS off, 3M)
+   plus the one knob, seed-matched against `b24a-d` at no new compute cost, rather than the batch-23 base
+   the plan was first written against. The revision also caught a live defect in the design: the potential
+   is per-episode state that `Game.snapshot()` does not carry, and b24's config runs `FORK_BRANCHES=4`
+   with forks at length ≥85, so every other endgame fork would have started its shaping from a stale
+   value. Both hosts are idle; the desktop is preferred because it chains close-out and HOF-500
+   automatically.
 2. **b24 landed the pooled gap this warning was about (+12.2, all 4 seeds, nothing on peak), so the honest
    next step is more seeds on `320`, not only more widths.** b25/b26 test a different question — width
    versus parameter count — which is worth it, but they do not firm up the `320` gap. The HOF-500 is done and
@@ -219,7 +225,7 @@ table.
 
 | change | targets | prior |
 |---|---|---|
-| `CHASE_SAFE_SHAPING` — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **the top item, and ready to launch** — full plan in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md). Approved 2026-08-11 and held until the running batches closed out; **20-23 are now closed and the laptop's four slots are free** |
+| `CHASE_SAFE_SHAPING` — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **the top item, and ready to build** — full plan in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md), approved 2026-08-11, **revised 2026-08-14**: batch 24's config as the base and `b24a-d` as the seed-matched control, plus the `restore_snapshot` fix the fork path needs. **20-26 are closed and both hosts are idle** |
 | **Free space in one piece** — as a graded potential and/or an observation | endgame packing, which is what decides whether the food lands somewhere edible | **new 2026-08-14**, and the largest per-policy separation on record: one-piece share at length 90-94 is **92% / 77% / 5%** for `b24d` / `b18b` / `b20d` ([findings](findings.md#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points)). `count_groups` already runs every step, so both forms are nearly free. **Correlational, n=3 checkpoints** |
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
 | ~~`TARGET_UPDATE_PERIOD`~~ | early learning speed, target stability | **closed as batch 18** — primary moved, 4/4 seeds; see [`completedRuns.md`](completedRuns.md) |

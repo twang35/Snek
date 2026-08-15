@@ -1,7 +1,11 @@
 # Potential-based reward shaping on realised chase-safety
 
-**Status:** approved 2026-08-11, **not implemented**. Deferred on purpose — the user wants to finish
-several more batches first, and batches 21-23 are mid-ladder on PER importance-sampling β.
+**Status:** approved 2026-08-11, **not implemented**. The hold has expired — batches 20-26 are all
+closed and both hosts are idle as of 2026-08-14, so this is the top backlog item and the design below
+is ready to execute. **Revised 2026-08-14** in four places, each marked **‡**: the control moved from
+batch 23 to batch 24, the potential has to survive a fork, Phase 0 shrank because
+`behaviour_profile.py` already answered half of it, and `c` now has an arithmetic rule rather than a
+prior.
 
 **One line:** replace the food-distance shaping — already off since batch 17 — with a potential-based
 term on "are the head, the food and the tail in one region", the one property that still separated the
@@ -72,7 +76,7 @@ Two conditions carry the guarantee, and both are easy to break silently:
 
 ---
 
-## The edits — five files, ~70 lines
+## The edits — five files, ~80 lines
 
 ### 1. `state_helpers.py` — the state-level potential
 
@@ -151,6 +155,31 @@ Three things this gets right by construction:
 - **A perfect game pays −c** at the winning step, because Φ(terminal) = 0. Required by the theory, and
   negligible against `PERFECT_GAME_REWARD = 100`.
 
+#### ‡ The potential is per-episode state, so `restore_snapshot` has to rebuild it — added 2026-08-14
+
+**`Game.snapshot()` does not carry `chase_safe_potential`, and the branch envs are a reused pool.**
+`ForkingCollector._fork` pops an env off `self._pool`, calls `restore_from_snapshot`, and `_retire`
+puts it back — so without a fix a forked branch computes its first `F` against the potential left
+behind by whatever branch episode last used that env. That injects an arbitrary constant of up to
+`±c` into the branch's return and **breaks the telescope on branch streams**, which is where the
+invariance guarantee lives.
+
+**This is live, not hypothetical.** The base config below is batch 24's, and it runs
+`FORK_BRANCHES=4` with `fork_prob=0.5` at `fork_min_length=85` — so the corruption would land on
+roughly every other endgame fork, i.e. exactly the transitions this term exists to improve.
+
+The fix is one line at the end of `restore_snapshot`, beside its `_rebuild_grid()`:
+
+```python
+self.chase_safe_potential = float(chase_safe_state(self.grid, self.head.tile_pos,
+                                                   self.tail.tile_pos, self.current_food))
+```
+
+**Recompute rather than add a snapshot field.** Φ is a pure function of grid, head, tail and food,
+all of which the snapshot already restores exactly, so recomputing is byte-identical to carrying the
+value — and it leaves `GameSnapshot`, `validate_snapshot` and `test_game_snapshot.py` untouched. The
+cost is one `count_groups` per fork, against one per step.
+
 `if CHASE_SAFE_SHAPING:` is a **performance gate only**. `count_groups` draws no randomness, so
 skipping it cannot shift the food stream, and at c = 0 the term adds exactly 0.0 either way. So 0.0
 remains a clean ablation in the same sense `FOOD_DISTANCE_REWARD=0` is.
@@ -188,6 +217,8 @@ extend directly.
 | shaped rewards over an episode sum to the γ-weighted telescope | the invariance property, end to end |
 | Φ = 0 on all three endings: death, starvation, perfect game | the condition the theory requires |
 | `SnakeEnvironment(discount=x)._game.shaping_discount == x` | the thread-through, the silent-breakage risk |
+| **‡ `restore_snapshot` leaves the potential equal to Φ of the restored board** — assert it against a game deliberately left holding the wrong value first | the fork gap above, which no other test can see |
+| **‡ a restored branch's first shaped reward equals the parent's next shaped reward** | the same gap, end to end, on the path the collector actually takes |
 
 One more in `tests/test_observation_spec.py`:
 
@@ -201,33 +232,77 @@ One more in `tests/test_observation_spec.py`:
 branch, swap `head_groups & tail_groups` for `head_groups` alone, and drop the `+1` grid offset in
 `food_bit`. Check the failure *type* as well: a `TypeError` means a stale test, not passing code.
 
-## Phase 0 — two measurements before any code is worth writing
+## ‡ Phase 0 — one measurement, because half of it is already done
 
-**Base rate and flip rate of Φ per length band.** A ~20-line scratchpad script: 20 greedy episodes with
-one hall-of-fame checkpoint and one b20 peak, reporting Φ's mean and its 0↔1 transition rate. This sets
-`c` on a principle instead of a guess — pick `c` so the summed absolute shaping between two meals is
-**≲ 20-30% of `FOOD_REWARD = 1.0`**. Prior is c ≈ 0.1; the flip rate decides.
+**The base rate is measured.** The table above is `behaviour_profile.py` output, and it already shows Φ
+is non-degenerate with a wide per-band range. Nothing needs re-running for it.
+
+**Only the flip rate is missing, and it is what sets `c`.** A ~20-line scratchpad script: 20 greedy
+episodes on **`b24d` @1342k** (the 98.0%/500 record, in `hallOfFame/`) and **`b20d` @3000k** (the
+mediocre reference the packing and entrapment findings both use), reporting Φ's 0↔1 transition count
+**per meal interval** by length band. Both checkpoints are already local and both diagnostics that use
+them run at `discount=0.9975`, so this is a copy of `behaviour_profile.py`'s harness with the
+per-action read replaced by `chase_safe_state`.
+
+**The rule that turns that number into `c`.** Target summed |shaping| between two meals at **≲ 25% of
+`FOOD_REWARD = 1.0`**, and a flip costs `c` while a held Φ costs only `c·(1−γ)` = 0.0025c per step at
+γ = 0.9975 — negligible, ~1/4 of the old distance penalty even summed over a 1,500-step episode. So
+flips dominate and
+
+```
+c = 0.25 / mean flips per meal interval,   clamped to [0.02, 0.10]
+```
+
+At 2-3 flips per meal that is c ≈ 0.10 (the old prior); at 5-6 it is c ≈ 0.05. **Report the number and
+the resulting `c` before writing any arm launch**, so the value is on a principle rather than a guess.
 
 **Cost.** Time 2,000 steps with the term on and off. Expect ~+15% on observation build — one more
 `count_groups` against the three `group_obs` already runs — and no measurable change in steps/second,
 since an 11x observation speedup once moved eval wall clock by approximately nothing. If it is worse
 than ~3%, say so before proposing arms.
 
-## Validation design — pre-registered
+## ‡ Validation design — pre-registered, and the control moved to batch 24
 
-4 laptop arms, seeds 1-4, batch 23's launch block plus `SNEK_CHASE_SAFE_SHAPING=<c>` and
-`SNEK_MAX_STEPS=2500000`. `SNEK_FOOD_DISTANCE_REWARD=0` **stays** — batch 17 onward runs shaping off,
-and mixing two shaping terms with opposite intent would answer nothing.
+**The base config is batch 24's, not batch 23's.** When this was written b23 was the best config on
+record; b24 has since beaten it by **+12.2 pooled on all four seeds** with a new record (`b24d` @1342k,
+98.0%/500), and b25/b26 established that the lift tracks capacity rather than width. Shaping the weaker
+base would answer a question about a config nobody will run again. So: **`fc 320`, IS off, target 1000,
+disc 0.9975, 3M steps** — b24 exactly — plus the one new knob.
 
-**Seed-matched against batch 23 as the control.** b23 is the current config and tracks b18 nearly
-seed-for-seed, so it is a valid control at no new compute cost. Read the pairing **seed by seed**:
-seeds 2 and 4 produce the best arm in 18 of 18 config waves (+5.41 pp at 550k), so a wave-mean against
-a wave-mean would be confounded by seed.
+4 arms, seeds 1-4, **`b27a-d`**:
+
+```
+SNEK_FC_LAYERS=320 SNEK_IS_WEIGHTS=0 SNEK_TARGET_UPDATE_PERIOD=1000 \
+  SNEK_DISCOUNT=0.9975 SNEK_FOOD_DISTANCE_REWARD=0 \
+  SNEK_CHASE_SAFE_SHAPING=<c> SNEK_MAX_STEPS=3000000 SNEK_SEED=<n> \
+  PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -u snek2.py b27<x>-chasesafeseed<n> \
+  > /tmp/b27<x>.log 2>&1 &
+```
+
+`SNEK_FOOD_DISTANCE_REWARD=0` **stays** — batch 17 onward runs the distance shaping off, and mixing two
+shaping terms with opposite intent would answer nothing.
+
+**Seed-matched against `b24a-d` as the control**, at no new compute cost: same code era, same
+observation, same 3M horizon, four finished seeds with close-outs and an HOF-500 already measured. Read
+the pairing **seed by seed** — seeds 2 and 4 produce the best arm in 18 of 18 config waves (+5.41 pp at
+550k), so a wave-mean against a wave-mean is confounded by seed.
+
+**Run it on the desktop.** `the-claw-den` is idle, four trainers fit, and the queued path chains
+`training → close-out (top20) → HOF-500` automatically — which for a batch whose whole question is
+"does the ceiling move" is the difference between a result and a result three days later. The laptop's
+four slots are free too and would work, but every close-out would then be launched by hand. Queueing is
+a **separate approval**, per `CLAUDE.md`: pushing to `ops` starts real work on another machine.
+
+**One eval-era note.** `fc 320` is a checkpoint era: `arch.json` records it and every eval rebuilds the
+recorded net from the sidecar, so nothing has to be passed by hand — but any checkpoint copied out of
+`savedPolicies/` must take `arch.json` with it.
 
 | measure | source | what it decides |
 |---|---|---|
-| `sef` at a matched horizon | `runs/<policy>_evals.json` | whether it worked |
-| p90 steps per meal at 95-99, `headroom_p10` | `behaviour_profile.py` | whether it worked *for the stated reason* |
+| pooled eq-effort at gate 95, and peak trailing | close-out `_checkpoint_evals.json` | whether it worked, and whether it moved the **ceiling** or only consolidation |
+| `sef` at a matched horizon | `runs/<policy>_evals.json` | the low-variance training metric, for the seed-by-seed pairing |
+| realised chase-safety and p90 steps per meal at 95-99, `headroom_p10` | `behaviour_profile.py` | whether it worked *for the stated reason* — the term should raise the behaviour it shapes |
+| **‡ one-piece share at length 90-94** | `endgame_packing.py` | the largest per-policy separation on record (92% / 77% / 5%). If chase-safety rises and packing does not, the term bought the marker without the property |
 | starvation share | `point_of_no_return.py` | the open `findings.md` item on what batch 16's removal cost |
 
 If `sef` moves and p90 does not, the outcome is real and the story is wrong. If p90 drops toward the
@@ -252,6 +327,18 @@ check in advance.
   region the head and tail share, which `count_groups` already returns as a bitmask, so it costs one
   `bin(region).count('1')`. That is a different hypothesis — packing, not reachability — and it should
   not be built alongside the binary version.
+- **‡ The graded packing potential now has its own case, and it still must not be built alongside this.**
+  The 2026-08-14 packing finding — one-piece share at length 90-94 of **92% / 77% / 5%** for `b24d` /
+  `b18b` / `b20d` — is a larger separation than realised chase-safety's, and it is upstream: fragmenting
+  the board is *why* the food lands where eating it kills. So the fallback below is no longer only a
+  fallback; it is a competing first choice. It stays a **separate batch** because running both terms at
+  once would leave a moved `sef` unattributable, which is the confound that already cost this project
+  batch 10. The order given here — binary chase-safety first — follows the user's request and the
+  approved plan; if the graded version is preferred instead, swap them rather than merging them.
+- **‡ The result is now coupled to `fc 320`.** Shaping is measured on top of batch 24's capacity, so a
+  null means "no large effect on this base", not "no effect". That is the right trade — the base is the
+  strongest on record and its controls are already paid for — but the interaction is untested and a
+  positive result should be re-run on `50,100,50` before it is called a property of the term.
 - **`avg_reward` shifts slightly**, and the bootstrap epsilon phase thresholds on it. The term
   telescopes, so the shift is bounded by about `c` per episode against ~95 food points, far smaller
   than the distance term's documented shift. `avg_score` is a food count and is unaffected.
@@ -268,5 +355,16 @@ Nothing in `savedPolicies/`, `runs/`, `evals/` or `hallOfFame/`.
 
 ## Order of work when this is picked up
 
-Phase 0 measurements → the five edits → the tests → the mutation pass → report the diff and the
-measured cost, uncommitted. The arm launch is a **separate** approval, because it starts real training.
+1. **Phase 0** — the flip-rate script, and `c` from the rule above. Cheap, read-only, no code change.
+2. **The five edits**, including the `restore_snapshot` line the fork gap needs.
+3. **The tests**, then the mutation pass — flip the sign, drop the γ, drop the Φ(terminal) branch, drop
+   the `restore_snapshot` line, and confirm a *named* test fails each time, checking the failure type.
+4. **The cost measurement** — 2,000 steps with the term on and off. Φ is a genuine fourth
+   `count_groups` per step: `food_space_obs` avoided being one on purpose, and `group_obs`' three calls
+   are on per-action post-move grids, so none of them is reusable for the state-level Φ. Expect ~+15% on
+   observation build and no measurable change in steps/second. **If it is worse than ~3% end to end, say
+   so before proposing arms.**
+5. **Report the diff and the measured cost, uncommitted** — the code rule in `CLAUDE.md`.
+
+The arm launch is a **separate** approval, and queueing it on the desktop is a second one, because
+pushing to `ops` starts real work on another machine.
