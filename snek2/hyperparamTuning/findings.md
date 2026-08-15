@@ -39,6 +39,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | The record is a **narrow peak, not a region** — @1578k is 10k steps away and reads **91.6%/500** | **standing caveat** — a position-chosen grid is still the only way to claim a region |
 | **‡‡ `peak_trailing` is saturated: capped at 95, and all four b24 arms read exactly 95.00** | **measured 2026-08-14**, 36,012 evals. It is a mean of *food eaten*, which moves **2.2 points across 60 pp of perfect rate** — a 100%-perfect arm and `b24a` read the same number. **Stop using it as the ceiling metric**; `max_single_eval` is 100 on 12 of 12 arms and carries no information at all. See below |
 | **‡ `best_perfect30` ordered batch 24's hall-of-fame outcomes 4 of 4** | **observation**, n=4 — 96.7/96.7 produced the two ≥98%/500 holders, 96.0 a 97.4% near-miss, 95.3 **zero** full-length rows despite two 100%/100 highs. The leading indicator of a record is the *width* of the strong region |
+| **‡ The metric variance ranking inverts near the ceiling** — `best_perfect30` resolves **~3.6 pp** paired at n=4 against `sef`'s ~21.3 | **re-measured 2026-08-14** on batches 22-24. Between-seed sd at b24's level is **0.67** for `best_perfect30` and **5.59** for `sef`, reversing the batch-11 table that made `sef` primary. Wins on signal-to-noise too (3.9 vs 2.3), so it is not only cap compression. **3.8 pp of headroom left** |
 | ~~The record is ~95%, `b17b` @1190k at 95.17%/600~~ | **superseded 2026-08-09** by `b18b` @1588k. The `b17b` figure itself was later refined to 94.24% over 5,120 |
 | ~~The record is ~96%, `b17b` @1205k reads 99/100~~ | **falsified by re-measurement the same day** — 99/100 → **92.4% over 500**; all four ≥98% rows shrank a mean of **5.05 pp** |
 | The previous record was ~93-94% — `b15b` @3245k (93.0% /300), `b14a` @3702k (93.5% /200), `b11b` @855k | **narrowly superseded 2026-08-08** |
@@ -449,6 +450,22 @@ metric on record that separates an arm which produced a hall-of-fame checkpoint 
 none, and it says the leading indicator of a record is **the width of the strong region, not the height
 of the best point** — the same thing [there is no lucky checkpoint](#-there-is-no-lucky-checkpoint-an-arms-best-is-set-by-its-median)
 found from the checkpoint side.
+
+**‡ And it is now the *sharpest* metric here, not the noisiest.** The sd table that made `sef` the primary
+in 2026-08-04 was measured on batch 11, at a much lower and more dispersed level:
+
+| | `best_perfect30` | `strong_eval_fraction` |
+|---|---|---|
+| between-seed sd, b22 / b23 / b24 | 2.28 / 4.02 / **0.67** | 10.75 / 15.48 / 5.59 |
+| seed-paired b24−b22: mean, sd | **+9.93, 2.56** | +35.53, 15.35 |
+| resolves at n=4 paired | **~3.6 pp** | ~21.3 pp |
+
+**~6× sharper in the paired design**, and ahead on signal-to-noise as well as scale (effect/sd 3.9 against
+2.3), so it is not merely the variance compression that comes with sitting near a cap. An sd from four
+points carries ~±40% of its own uncertainty, so read the ratio as a strong hint rather than a
+calibration — and note `best_perfect30` has **3.8 pp of headroom**, so it is on the same road
+`peak_trailing` has already finished travelling. How to use it:
+[`hyperparamTuning.md`](hyperparamTuning.md#-the-variance-ranking-above-inverts-near-the-ceiling--re-measured-2026-08-14).
 
 ## Policy quality changes materially within 1000 training steps
 

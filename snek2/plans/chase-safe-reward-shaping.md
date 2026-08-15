@@ -321,8 +321,8 @@ recorded net from the sidecar, so nothing has to be passed by hand — but any c
 
 | measure | source | what it decides |
 |---|---|---|
-| **‡ `best_perfect30` at a matched horizon, seed by seed** | `runs/<policy>_evals.json` | **the target.** On the perfect rate itself, max 100, control at 95.3-96.7 so there is headroom — and it ordered b24's HOF outcomes 4 of 4 |
-| `sef` at a matched horizon | `runs/<policy>_evals.json` | **the test statistic.** sd 5.8 against `best_perfect30`'s 8.6, so it is what can actually resolve an effect at n=4 |
+| **‡ `best_perfect30` at a matched horizon, seed by seed** | `runs/<policy>_evals.json` | **the primary — target and test both.** On the perfect rate itself, control at 95.3-96.7 with 3.8 pp of headroom; it ordered b24's HOF outcomes 4 of 4; and against a b24-class control it resolves **~3.6 pp** paired at n=4, ~6× sharper than `sef` |
+| `sef` at a matched horizon | `runs/<policy>_evals.json` | reported alongside for continuity — but at this level its paired sd is 15.35, so it resolves only ~21 pp and cannot decide this batch |
 | **‡ count of full-length ≥98%/500 rows** | the auto-HOF chain | **the decisive artifact** — a new hall-of-fame checkpoint is the outcome this is for. Control: 1 · 1 · 0 · 0 across b24b/d/c/a |
 | pooled eq-effort at gate 95 | close-out `_checkpoint_evals.json` | consolidation, the axis every effect found here has moved |
 | **‡ NOT `peak_trailing`** | — | capped at 95 and all four controls sit on 95.00, so it cannot register a gain. Report the *count* of trailing-95.00 windows instead (b24: 7 · 22 · 10 · 17) |

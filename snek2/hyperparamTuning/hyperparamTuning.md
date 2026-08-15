@@ -463,6 +463,12 @@ intended behaviour (the decline is real and should cost the arm something), but 
 horizon has to be fixed before comparing, exactly as the pre-registered best-30 comparison already
 required.
 
+**‡ These variances are level-dependent, and the ranking inverts near the ceiling.** Re-measured on
+batches 22-24 on 2026-08-14: `best_perfect30`'s between-seed sd falls to **0.67** at b24's level while
+`sef`'s is **5.59**, and in a seed-paired design `best_perfect30` resolves ~3.6 pp against `sef`'s ~21.3.
+The table below still governs arms far from the ceiling; see
+[the subsection under the peak-trailing warning](#-the-variance-ranking-above-inverts-near-the-ceiling--re-measured-2026-08-14).
+
 **The honest ceiling.** At these variances, detecting a **5 pp** effect needs n≈17 arms per group
 on the new metric and n≈37 on the old one. Nothing feasible here resolves 5 pp on `best_perfect30`,
 and an earlier claim in [`runs.md`](runs.md) that "n=12 at 2M would detect ~5 pp" was true only for
@@ -482,10 +488,34 @@ recent arms. Full numbers:
 
 | question | metric | why |
 |---|---|---|
-| did the config move the arm? | `strong_eval_fraction` | lowest between-seed sd (5.8), so it resolves the smallest effect — still the primary |
-| did it move what we actually want? | `best_perfect30` | on the perfect rate itself, max 100, currently 96.7 so there is headroom. **The noisiest of the candidates** (sd 8.6, 15.1 pp at n=4), so read it as the target, not the test |
+| did it move what we actually want? | **`best_perfect30`** | on the perfect rate itself, max 100, control at 95.3-96.7 so there is headroom — **and at this level it is also the sharpest test**, see below |
+| did the config move the arm? | `strong_eval_fraction` | the standing primary, and still the right choice for arms *far* from the ceiling, where `best_perfect30`'s max-statistic variance dominates |
 | will it produce a hall-of-fame checkpoint? | **count of full-length ≥98% rows in the HOF-500 chain** | the literal criterion. `best_perfect30` is its best training-time predictor (4 of 4 on batch 24) |
 | is the arm winning whole 50-episode stretches? | **count of trailing-95.00 windows** | the discriminating form of the saturated metric: 0-0-0-0 for b22, 7-22-10-17 for b24 |
+
+#### ‡ The variance ranking above inverts near the ceiling — re-measured 2026-08-14
+
+The sd table in the previous section is a **batch-11** measurement, at a level where arms spanned a wide
+range. It does not describe batches 22-24. Between-seed sd of four identical configs, per batch, and the
+seed-paired b24−b22 differences the chase-safe plan's design uses:
+
+| | `best_perfect30` | `strong_eval_fraction` |
+|---|---|---|
+| b22 mean (sd) | 86.2 (**2.28**) | 30.5 (10.75) |
+| b23 mean (sd) | 85.8 (**4.02**) | 33.0 (15.48) |
+| b24 mean (sd) | 96.2 (**0.67**) | 66.0 (5.59) |
+| paired b24−b22: mean, sd of pairs | **+9.93, 2.56** | +35.53, 15.35 |
+| **resolves at n=4 paired** | **~3.6 pp** | ~21.3 pp |
+
+**`best_perfect30` is roughly 6× sharper in the paired design at this level**, and it wins on
+signal-to-noise as well as on scale (effect/sd 3.9 against 2.3), so this is not just the compression that
+comes with sitting near a cap. Two caveats. An sd from four points is itself very uncertain (~±40%), so
+treat the ratio as a strong hint rather than a calibration. And `best_perfect30` has **3.8 pp of headroom
+left** — it is on the same road `peak_trailing` already reached the end of, and will need replacing once
+arms sit above ~99.
+
+**So for a batch launched against a b24-class control, pre-register `best_perfect30` as the primary and
+report `sef` alongside.** For an arm nowhere near the ceiling, the batch-11 ranking still applies.
 
 Peak trailing keeps one honest job — **a cheap sanity check that an arm reached the endgame at all**, and
 a comparable number for arms far from the cap. It is quoted as ceiling evidence throughout the older
