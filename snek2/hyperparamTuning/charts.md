@@ -51,23 +51,25 @@ b27's config with one change, the net: **`200,100,100`** instead of `320`. Every
 shaping, **2M cap**, seeds 1-4. Together with b24/b25/b27 it makes a **2×2 of shaping × architecture**, so
 the shaping result stops depending on one net.
 
-**Status at 22:05 on 2026-08-14: ~70-73k steps of 2M, ~52 steps/s, so ~10 h to the cap.** Every arm has a
-red line and an epsilon below the 0.0125 ceiling. **Far too early for a verdict** — nothing here is judgeable
-below ~250k — but the control read is worth recording now, because it is a **dead heat**: `b25a-d`
-recomputed at the same 66k horizon means **best-30 9.7** against b30e-h's **9.0**, with 2 of 4 seeds ahead.
-Seed-by-seed at ≤66k, shaped first:
+**Status at 01:12 on 2026-08-15: 0.93-0.98M of 2M (about half-way).** All four arms are healthy — trailing
+90-94, epsilons well off the 0.0125 ceiling, no dead or zero stretch — which is the first thing to want from
+a *potential-based* term: it is not destabilizing the policy. **On consolidation the shaped wave is a shade
+ahead of its b25 control, but inside the noise floor**: at the matched ~0.95M horizon, mean `sef` **42.9 vs
+36.0 (+6.9), 4 of 4 seeds ahead**, and mean best-30 **92.9 vs 90.9 (+2.0), 2 of 4 ahead**. That is below the
+~10 pp `n=4` resolution and points the *opposite* way to b27 (below), so it is not yet a signal. Seed-by-seed
+at the matched horizon, shaped first, control in parentheses:
 
-| arm | seed | step | trailing | best-30 @66k | control @66k | max single eval | epsilon |
-|---|---|---|---|---|---|---|---|
-| `b30h-chase10fc200x100x100seed4` | 4 | 70k | 91.6 | **20.3** | `b25d` 7.0 | 70% | 0.0078 |
-| `b30f-chase10fc200x100x100seed2` | 2 | 73k | 88.8 | **10.7** | `b25b` 3.3 | 30% | 0.0098 |
-| `b30g-chase10fc200x100x100seed3` | 3 | 73k | 83.7 | 2.7 | `b25c` 17.7 | 20% | 0.0118 |
-| `b30e-chase10fc200x100x100seed1` | 1 | 72k | 87.0 | 2.3 | `b25a` 10.7 | 10% | 0.0119 |
+| arm | seed | step | trailing | best-30 (control) | `sef` (control) |
+|---|---|---|---|---|---|
+| `b30e-chase10fc200x100x100seed1` | 1 | 934k | 92.6 | **93.7** (`b25a` 88.7, **+5.0**) | 44.3 (37.5, +6.8) |
+| `b30g-chase10fc200x100x100seed3` | 3 | 957k | 89.7 | 93.3 (`b25c` 93.3, +0.0) | 42.1 (38.2, +3.9) |
+| `b30f-chase10fc200x100x100seed2` | 2 | 929k | 94.4 | 92.3 (`b25b` 94.7, −2.4) | 40.4 (34.6, +5.8) |
+| `b30h-chase10fc200x100x100seed4` | 4 | 980k | 91.8 | 92.3 (`b25d` 87.0, **+5.3**) | 44.8 (33.6, **+11.2**) |
 
-`b30h` is ahead of the control seed that was b25's weakest, and `b30e`/`b30g` are behind theirs — the spread
-*within* each wave (2.3 to 20.3) is far larger than the difference between waves, which is the usual shape
-this early and the reason [the seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
-exists.
+The one clean signal is that all four beat their control on `sef`, but the best-30 spread within the wave
+(92.3 to 93.7) is far tighter than usual this early and the per-seed deltas swing both ways — the
+[seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
+still dominates at n=4. **The verdict is the 2M close-out's ≥98%/500 count, not best-30 at 1M.**
 
 ![b30e](charts/b30e-chase10fc200x100x100seed1.png)
 **b30e-chase10fc200x100x100seed1**
@@ -91,28 +93,27 @@ seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24
 checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
 [the plan](../plans/chase-safe-reward-shaping.md) and [`runs.md`](runs.md).
 
-**Status at 22:00 on 2026-08-14: 152-162k steps of 2M, 91.7 steps/s, ~5.5 h to the cap.** All four have a
-red line and an epsilon that has left the ceiling (0.0058-0.0093, tracking the controls). **Too early for a
-verdict** — judge on `best_perfect30` and the ≥98%/500 count, not peak trailing, which is capped at 95.00 and
-where all four control arms already sit
+**Status at 01:12 on 2026-08-15: 1.19-1.27M of 2M, ~92 steps/s, ~2-2.5 h to the cap.** All four are healthy —
+trailing 93.6-94.1, no dead or zero stretch — so, as with b30, the potential-based term is not destabilizing
+the policy. **But here the read runs the *other* way: a clear edge to the control.** At the matched ~1.2M
+horizon, mean best-30 **88.7 vs 93.0 (−4.2), 0 of 4 seeds ahead**, and mean `sef` **30.5 vs 42.2 (−11.7)**.
+Judge on `best_perfect30` and the ≥98%/500 count, not peak trailing, which is capped at 95.00 and where all
+four controls already sit
 ([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)).
+Seed-by-seed at the matched horizon, shaped first, control in parentheses:
 
-**The early read is a slight edge to the *control*, and one seed carries it.** `b24a-d` recomputed at the
-same 152k horizon means **best-30 30.3** against b27e-h's **24.8** — but `b24d` alone reads **57.3** there
-(it is the record holder and an early bloomer), and dropping the fourth seed from both makes it 21.4 control
-vs 21.2 shaped, i.e. nothing. Seed-by-seed at ≤152k, shaped first:
+| arm | step | trailing | best-30 (control) | `sef` (control) |
+|---|---|---|---|---|
+| `b27h-chase10g85seed4` | 1275k | 93.9 | 93.0 (`b24d` 95.7, −2.7) | 34.3 (56.7, −22.4) |
+| `b27f-chase10g85seed2` | 1229k | 93.6 | 90.3 (`b24b` 96.7, −6.4) | 32.4 (55.2, −22.8) |
+| `b27e-chase10g85seed1` | 1237k | 93.7 | 88.3 (`b24a` 89.7, −1.4) | 37.4 (18.7, +18.7) |
+| `b27g-chase10g85seed3` | 1199k | 94.1 | 83.3 (`b24c` 89.7, −6.4) | 17.9 (38.2, −20.3) |
 
-| arm | step | trailing | best-30 @152k | control @152k | max single eval | epsilon |
-|---|---|---|---|---|---|---|
-| `b27h-chase10g85seed4` | 159k | 92.1 | 35.3 | `b24d` **57.3** | 70% | 0.0058 |
-| `b27g-chase10g85seed3` | 162k | 90.9 | **29.7** | `b24c` 26.7 | 60% | 0.0063 |
-| `b27f-chase10g85seed2` | 160k | 90.2 | 21.0 | `b24b` 22.7 | 60% | 0.0077 |
-| `b27e-chase10g85seed1` | 152k | 88.7 | 13.0 | `b24a` 14.7 | 40% | 0.0093 |
-
-Two things worth noting even at this stage. **The seed ordering is identical in both waves** (4 > 3 > 2 > 1),
-which is [the seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
-reproducing at n=8. And **`best_perfect30` this early is mostly "how soon did it start winning"**, not the
-consolidation the batch is about — b24's own arms were at 14.7-57.3 here and finished pooled 86-89.
+The one shaped `sef` win (`b27e` +18.7) is a control-weakness artifact — `b24a` is the slow control seed,
+still at `sef` 18.7 here — while `b27e`'s best-30 is itself −1.4 behind. **b27 down −4.2 and b30 up +2.0 on
+the same shaping is two n=4 batches pointing opposite ways, i.e. noise, not a shaping effect yet.** The
+[seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
+still dominates. **The verdict is the 2M close-out's ≥98%/500 count.**
 
 Graphs are copied off the desktop by hand (`scp the-claw-den:~/Snek/snek2/runs/b27*.png`), since a desktop
 job publishes to the `results` branch only when it finishes. **b28** (`c=0.20`) and **b29** (gate 75) are
