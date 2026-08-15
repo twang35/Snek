@@ -12,46 +12,54 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## ⚠ Both shaping batches are invalid — the perfect-game counter was reward-based (2026-08-14)
+## ⚠ Batches 27 and 30 were relaunched — the perfect-game counter was reward-based (2026-08-14)
 
 **Read this before anything below it.** Every perfect-game counter identified a win by comparing the
 episode's final reward with `PERFECT_GAME_REWARD`, and the chase-safe term shifts that reward by `−c`. So
-`perfect_percent` read **0 for every eval of b27 and b30** while the arms were filling boards from step 9k,
-and because `training.epsilon_for` takes the trailing perfect rate as its skill signal, **epsilon stayed
-pinned at 0.0125** — the refinement ceiling — instead of annealing. Full account, numbers and fix:
+`perfect_percent` read **0 for every eval of b27a-d and b30a-d** while the arms were filling boards from
+step 9k, and because `training.epsilon_for` takes the trailing perfect rate as its skill signal, **epsilon
+stayed pinned at 0.0125** — the refinement ceiling — instead of annealing. Full account, numbers and fix:
 [`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter).
 
-| | state |
-|---|---|
-| **b30a-d (laptop)** | **stopped** at 137-139k steps. Laptop is free — `pgrep -fl "python -u snek2.py"` is empty |
-| **b27a-d (desktop)** | **stopped** at 309-326k steps. Ledger reads `failed`, which is the kill, not a crash |
-| **b27's close-outs / HOF-500** | **gone** — the eval chain fires off a `done` marker, so killing the arms dropped all eight follow-on jobs |
-| **b28, b29 (still queued)** | **the desktop queue is paused** (`"paused": true` on `ops`, echoed by `status.json` at 21:17). They would otherwise have started on unfixed code within one poll |
+**The fix shipped as `b72a5a84`** — counting moves to `state_helpers.is_perfect_score(score)`, and
+`tests/test_perfect_game_counting.py` pins it (10 tests, both mutants caught, suite 23 modules / 596 tests /
+0 failed). Deployed to the desktop the same evening; both boxes now run it.
 
-Desktop is idle with 12.1 GB free. **Unpausing is a deliberate step** — do it only after the fix is
-deployed there ([how](../desktop/README.md#deploying-a-code-change-to-the-desktop)), because b28 and b29
-carry the same shaping and would reproduce the bug exactly.
+| batch | void arms | live arms | where |
+|---|---|---|---|
+| **27** | `b27a-d`, killed at 309-326k | **`b27e-h`** (seeds 1-4), launched 21:31 | desktop, priority 10, close-outs and HOF-500 auto-chained |
+| **30** | `b30a-d`, killed at 137-139k | **`b30e-h`** (seeds 1-4), launched 21:40 | laptop, one chart window on `--arms b30` |
 
-**The fix is written and tested but uncommitted** (code, so it waits for review): counting moves to
-`state_helpers.is_perfect_score(score)` in `under_the_hood`, `eval_workers` and `eval_checkpoints`, plus
-`tests/test_perfect_game_counting.py` — 10 tests, both surviving mutants caught, full suite 23 modules /
-596 tests / 0 failed.
+**Fresh policies, not resumes.** The void arms' weights and buffers carry 320k steps trained under an
+exploration schedule that was never going to descend, which is the one thing a seed-matched comparison
+against b24/b25 cannot absorb.
 
-**Nothing about the shaping itself is in question yet.** Φ, the potential, the telescoping and the fork
-handling all behave as designed; what failed was reading the result. The shaped arms' *score* curves were
-in fact healthy (b30 trailing 88.4-93.5 at ~138k, against b25's 86-89 at 108k), so the 2×2 is still worth
-running — from scratch, with the counter fixed and epsilon free to anneal.
+**Batch 30's checkpoints were deleted and the wave relaunched a second time** (21:40), because the first
+relaunch's chart window opened with **eight panels**: the viewer's arm registry admitted anything inside a
+12 h TTL, and the killed a-d arms were 71 minutes old. `savedPolicies/b30[a-h]` (~330 MB) and the tmp
+registry are gone; **`runs/b30a-d*` is kept** — those graphs, reports and eval series are the measured
+record of the counter bug, committed at `1cd5a03b`, and `charts/` holds its own copies by design. Say so if
+you want them removed as well. The registry rule is now liveness-based
+([the mechanism](../../CLAUDE.md#rendering-is-off-by-default--use-watchpy-to-see-a-game)); the desktop was
+checked and needs no change, since its daemon passes explicit PNG paths and reads no registry.
 
-**Relaunch plan once the fix is in:** re-run b27 and b30 as new arms (`-r2` suffix or fresh names) rather
-than resuming, because the weights and the replay buffer carry 300k+ steps trained under an exploration
-schedule that was never going to descend — which is the one thing a seed-matched comparison against b24/b25
-cannot absorb. A resume also starts slow: `epsilon_for` is stateless and recomputes from restored history,
-whose stored perfect rate is 0 for every past eval, so epsilon would hold at 0.0125 for the first ~30 evals
-of the resumed run before the trailing window clears.
+**The fix is confirmed end to end on live arms, not only in tests.** Within 15 minutes of launch:
 
-## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27 running on the desktop)
+| arm | first filled board | first non-zero perfect % | epsilon |
+|---|---|---|---|
+| `b27g-chase10g85seed3` | step 11k | **20% at step 11k** — the same eval | 0.0121, descending |
+| `b27h-chase10g85seed4` | step 8k | **10% at step 8k** — the same eval | 0.0089, descending |
 
-**The shaping shipped 2026-08-14 and batch 27 is training.** `Snake.step` now adds
+Both numbers are what b27a-d could not produce in 320k steps: the counter fires on the eval that filled the
+board, and epsilon has left the ceiling it was stuck on. `b27e`/`b27f` had not won a board yet at 18k, which
+is ordinary.
+
+**b28 (`c=0.20`) and b29 (gate 75) are still queued behind b27e-h**, unchanged, and now run on fixed code.
+
+## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27e-h running on the desktop)
+
+**The shaping shipped 2026-08-14; batch 27 is on its second launch** (`b27e-h` — a-d were void, see the
+banner above). `Snake.step` now adds
 `c·(γΦ(s′) − Φ(s))` where **Φ = 1 iff the head and the tail share a free region that also contains the
 food, and the snake is at least `SNEK_CHASE_SAFE_GATE` long** — the length gate is variant B of the plan.
 Potential-based, so by Ng/Harada/Russell the optimal policy is unchanged for any bounded Φ and any `c`;
@@ -77,10 +85,20 @@ single meal's reward for a struggling policy, and the discounted sum telescopes 
 
 **Two things Phase 0 established that the design had wrong.** Gating does *not* buy a larger `c` — flips
 are concentrated at length ≥85 for the binding policy, so gating **halves** the calibrated dose
-(0.203 → 0.097). And **Φ is structurally 0 at length 99 and near-0 at 98**: the last two or three meals
-cannot be shaped by this quantity at any `c`, which is exactly where
+(0.203 → 0.097). And **Φ almost never *changes* at length 98-99** — 0.00-0.04 genuine flips per meal — so
+the last two or three meals get no gradient from this quantity at any `c`, which is exactly where
 [the starvation finding](findings.md) says the losses are. So b27 is a test of whether *reaching* length
-96-98 more reliably raises the perfect rate — not a fix for the final meals.
+96-98 more reliably raises the perfect rate, not a fix for the final meals.
+
+**Corrected 2026-08-14: "no flips at 98-99" is not "Φ is 0 there", and reading it that way is what let the
+counter bug ship.** This section used to say Φ was *structurally 0* at length 99. Measured on a constructed
+full-tour board, **Φ(s) = 1** on the pre-win board: with one cell free the food occupies it, the head's only
+legal move is into it, and in the tail-chasing endgame the tail borders it too, so head, food and tail do
+share a region. What is 0 at length 99 is the **per-action flag** at `obs[15 + a]`, which is computed on the
+*post-move* board — after the winning move there is no food and no free cell
+([the Phase 0 note](findings.md#the-record-checkpoint-specifically) is about that flag). The consequence is
+concrete: the winning transition **is** shaped, paying exactly `−c`, which is the value that stopped every
+perfect-game counter from recognising a win.
 
 **Judge these on `best_perfect30` and the count of ≥98%/500 checkpoints, not on peak trailing.** Peak is
 capped at 95.00 and all four b24 arms already sit on the cap
@@ -93,18 +111,18 @@ endgame fork would have started its shaping from the *parent's* stale Φ. `resto
 recomputes it. 24 tests in `tests/test_reward_shaping.py` pin the behaviour, each verified to fail against
 a mutated implementation.
 
-Desktop status: **b27a-d running** (4 trainers, the box's cap), b28 and b29 queued behind them at
-priority 20/30, each with close-out and HOF-500 auto-chained. ~6 h per batch at 92.5 steps/s.
+Desktop status: **b27e-h running** (4 trainers, the box's cap, priority 10), b28 and b29 queued behind
+them at priority 20/30, each with close-out and HOF-500 auto-chained. ~6 h per batch at 92.5 steps/s.
 Check with `git show origin/ops-status:status.json`.
 
-**Both hosts are now full**: b27 on the desktop, **b30 on the laptop** (the same shaping on
+**Both hosts are full**: b27e-h on the desktop, **b30e-h on the laptop** (the same shaping on
 `fc 200,100,100`, below). `pgrep -fl "python -u snek2.py"` sees only the laptop's four; the desktop's
 `status.json` sees only its own.
 
-## Batch 30 — the same shaping on `fc 200,100,100` (running on the laptop)
+## Batch 30 — the same shaping on `fc 200,100,100` (b30e-h running on the laptop)
 
-Launched 2026-08-14 on the laptop, 4 arms, seeds 1-4: **b27's config with the net changed to
-`200,100,100`** — `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975,
+Relaunched 2026-08-14 at 21:35 as **`b30e-h`** on the laptop, 4 arms, seeds 1-4 (a-d were void, see the
+banner above): **b27's config with the net changed to `200,100,100`** — `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975,
 `FORK_BRANCHES=4`, no food-distance shaping, **2M cap**. Nothing else differs from b27.
 
 **Why it is worth four laptop slots: it completes a 2×2** and the shaping question stops depending on

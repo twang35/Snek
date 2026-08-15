@@ -44,39 +44,65 @@ diagnostic figures referenced from [`findings.md`](findings.md) and
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
 
-## ⚠ Every graph in batches 27 and 30 has a flat red line, and it is an instrumentation bug
+## ⚠ The flat-red-line charts below are a fixed instrumentation bug, kept as evidence
 
-The perfect-game counter compared the episode's final reward with `PERFECT_GAME_REWARD`, and the chase-safe
-shaping shifts that reward by `−c` at the winning step. So **`perfect_percent` is 0 in every eval of these
-eight arms** even though their `max_score` fields record filled boards from step 9k. Read the blue score
-curve on these charts and ignore the red axis entirely. The same zero also pinned epsilon at 0.0125, so the
-arms are not valid tests of the shaping either — the whole story is in
+`b27a-d` and `b30a-d` have **no red line at all**, and it was never their policies. The perfect-game counter
+compared the episode's final reward with `PERFECT_GAME_REWARD`, and the chase-safe shaping shifts that reward
+by `−c` at the winning step, so `perfect_percent` read 0 in all 310+ evals while their `max_score` fields
+recorded filled boards from step 9k. The same zero pinned epsilon at 0.0125. **Both batches were relaunched
+on the fixed counter as `b27e-h` and `b30e-h`**, whose charts show a red line within minutes; the void arms'
+charts are kept here as the evidence. The whole story is in
 [`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter),
-and [`runs.md`](runs.md#-both-shaping-batches-are-invalid--the-perfect-game-counter-was-reward-based-2026-08-14)
+and [`runs.md`](runs.md#-batches-27-and-30-were-relaunched--the-perfect-game-counter-was-reward-based-2026-08-14)
 has what happens to the runs.
 
-## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *stopped at ~138k, counter bug*
+## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *b30e-h running on the laptop*
 
 b27's config with one change, the net: **`200,100,100`** instead of `320`. Everything else is identical —
 `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance
 shaping, **2M cap**, seeds 1-4. Together with b24/b25/b27 it makes a **2×2 of shaping × architecture**, so
-the shaping result stops depending on one net. Launched 2026-08-14 on the laptop.
+the shaping result stops depending on one net.
 
-**Status: stopped 2026-08-14 at 137-139k steps**, ~32 min in, after the perfect-game counter turned out to
-be reward-based (banner above). Nothing here is a reading on the shaping. What the score curve *does* say is
-that the shaped arms were learning normally — trailing 88.4-93.5 at ~138k against `b25`'s 86-89 at 108k —
-which is why the 2×2 is worth relaunching rather than abandoning. **Control remains `b25a-d` read at a
-matched horizon** (best-30 93.7 / 95.3 / 93.7 / 91.7 at 2M, `sef` 61.4 / 57.9 / 61.0 / 54.2).
+**Status: `b30e-h` launched 21:40 on 2026-08-14, ~15k steps.** Too early to read — nothing here is judgeable
+below ~250k — but `b30f` recorded **10% perfect at step 6k**, which is the counter working. **Control is
+`b25a-d` read at a matched horizon** (best-30 93.7 / 95.3 / 93.7 / 91.7 at 2M, `sef` 61.4 / 57.9 / 61.0 /
+54.2), not b25's published 3M numbers.
 
-| arm | net | `c` | gate | step | trailing | perfect % | status |
-|---|---|---|---|---|---|---|---|
-| `b30a-chase10fc200x100x100seed1` | 200,100,100 | 0.10 | 85 | 138k | 90.5 | **0, miscounted** | stopped |
-| `b30b-chase10fc200x100x100seed2` | 200,100,100 | 0.10 | 85 | 137k | 89.2 | **0, miscounted** | stopped |
-| `b30c-chase10fc200x100x100seed3` | 200,100,100 | 0.10 | 85 | 138k | 88.4 | **0, miscounted** | stopped |
-| `b30d-chase10fc200x100x100seed4` | 200,100,100 | 0.10 | 85 | 139k | 90.2 | **0, miscounted** | stopped — its control `b25d` is the weak seed of its wave |
+| arm | seed | step | trailing | first perfect eval | epsilon |
+|---|---|---|---|---|---|
+| `b30e-chase10fc200x100x100seed1` | 1 | 17k | 70.9 | not yet | 0.0125 |
+| `b30f-chase10fc200x100x100seed2` | 2 | 15k | 73.8 | **10% at 6k** | 0.0120 |
+| `b30g-chase10fc200x100x100seed3` | 3 | 17k | 58.7 | not yet | 0.0125 |
+| `b30h-chase10fc200x100x100seed4` | 4 | 15k | 73.0 | not yet | 0.0125 — its control `b25d` is the weak seed of its wave |
+
+![b30e](charts/b30e-chase10fc200x100x100seed1.png)
+**b30e-chase10fc200x100x100seed1**
+
+![b30f](charts/b30f-chase10fc200x100x100seed2.png)
+**b30f-chase10fc200x100x100seed2** — the first red mark of the relaunch, at step 6k.
+
+![b30g](charts/b30g-chase10fc200x100x100seed3.png)
+**b30g-chase10fc200x100x100seed3**
+
+![b30h](charts/b30h-chase10fc200x100x100seed4.png)
+**b30h-chase10fc200x100x100seed4**
+
+### Batch 30's void first attempt — `b30a-d`, stopped at ~138k with a flat red line
+
+Killed at 137-139k steps once the counter bug was found, and their checkpoints deleted. The score curves are
+worth one look: these arms were learning *normally* — trailing 88.4-93.5 at ~138k against `b25`'s 86-89 at
+108k — which is why the 2×2 was relaunched rather than abandoned. Their `perfect_percent` is 0 throughout and
+means nothing.
+
+| arm | step | trailing | perfect % |
+|---|---|---|---|
+| `b30a-chase10fc200x100x100seed1` | 138k | 90.5 | **0, miscounted** |
+| `b30b-chase10fc200x100x100seed2` | 137k | 89.2 | **0, miscounted** |
+| `b30c-chase10fc200x100x100seed3` | 138k | 88.4 | **0, miscounted** |
+| `b30d-chase10fc200x100x100seed4` | 139k | 90.2 | **0, miscounted** |
 
 ![b30a](charts/b30a-chase10fc200x100x100seed1.png)
-**b30a-chase10fc200x100x100seed1**
+**b30a-chase10fc200x100x100seed1** — score to ~91, red axis empty for all 139 evals.
 
 ![b30b](charts/b30b-chase10fc200x100x100seed2.png)
 **b30b-chase10fc200x100x100seed2**
@@ -87,7 +113,7 @@ matched horizon** (best-30 93.7 / 95.3 / 93.7 / 91.7 at 2M, `sef` 61.4 / 57.9 / 
 ![b30d](charts/b30d-chase10fc200x100x100seed4.png)
 **b30d-chase10fc200x100x100seed4**
 
-## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *desktop, counter bug*
+## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *b27e-h on the desktop*
 
 The first arms to carry the new shaping term. `Snake.step` adds `c·(γΦ(s′) − Φ(s))` with **Φ = 1 iff the
 head and tail share a free region that also holds the food, and the snake is ≥85 long**; potential-based,
@@ -97,23 +123,49 @@ seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24
 checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
 [the plan](../plans/chase-safe-reward-shaping.md) and [`runs.md`](runs.md).
 
-**Status: all four stopped at 21:18 on 2026-08-14, at 309-326k steps, all four contaminated** by the
-counter bug in the banner at the top of this file. Every graph below shows the same thing — a healthy blue
-score curve settling at 90-93 and **no red line at all**, because `perfect_percent` was 0 in all 310-327
-evals while each arm's own `max_score` field recorded a **filled board** between steps 9k and 16k. Epsilon
-sat at 0.0125 the whole way, so these are not readings on the shaping.
+**Status: `b27e-h` launched 21:31 on 2026-08-14, at 74-80k steps.** Still far too early to judge — but all
+four have a red line, and `b27h` is at **70% on a single eval with epsilon down to 0.0064**, which is the
+schedule annealing on a real skill signal for the first time in this batch. **Judge on `best_perfect30` and
+the ≥98%/500 count, not peak trailing**, which is capped at 95.00 and where all four control arms already sit
+([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)).
 
-| arm | step | trailing | first filled board | perfect % | epsilon | control |
+| arm | step | trailing | first perfect eval | best single eval | epsilon | control |
 |---|---|---|---|---|---|---|
-| `b27a-chase10g85seed1` | 309k | 92.6 | step 16k | **0, miscounted** | 0.0125 | `b24a` (pooled 89.0, best-30 95.3) |
-| `b27b-chase10g85seed2` | 326k | 91.7 | step 14k | **0, miscounted** | 0.0125 | `b24b` (88.8, 96.7) |
-| `b27c-chase10g85seed3` | 319k | 90.5 | step 13k | **0, miscounted** | 0.0125 | `b24c` (87.7, 96.0) |
-| `b27d-chase10g85seed4` | 318k | 93.0 | step 9k | **0, miscounted** | 0.0125 | `b24d` (86.0, 96.7) — holds the record |
+| `b27h-chase10g85seed4` | 74k | 90.4 | 10% at **8k** | **70%** | 0.0064 | `b24d` (pooled 86.0, best-30 96.7) — holds the record |
+| `b27g-chase10g85seed3` | 80k | 84.4 | 20% at 11k | 30% | 0.0099 | `b24c` (87.7, 96.0) |
+| `b27f-chase10g85seed2` | 76k | 86.1 | 10% at 40k | 10% | 0.0118 | `b24b` (88.8, 96.7) |
+| `b27e-chase10g85seed1` | 76k | 82.8 | 10% at 37k | 10% | 0.0118 | `b24a` (89.0, 95.3) |
 
-Graphs copied off the desktop by hand (`scp the-claw-den:~/Snek/snek2/runs/b27*.png`) rather than waiting
-for the `results` branch, because the flat red axis is the evidence — a killed job publishes nothing. **b28**
-(`c=0.20`) and **b29** (gate 75) are still queued behind a **paused** daemon; they carry the same shaping and
-would reproduce the bug until the fix is deployed there.
+Graphs are copied off the desktop by hand (`scp the-claw-den:~/Snek/snek2/runs/b27*.png`), since a desktop
+job publishes to the `results` branch only when it finishes. **b28** (`c=0.20`) and **b29** (gate 75) are
+queued behind these four and now run on fixed code.
+
+![b27e](charts/b27e-chase10g85seed1.png)
+**b27e-chase10g85seed1**
+
+![b27f](charts/b27f-chase10g85seed2.png)
+**b27f-chase10g85seed2**
+
+![b27g](charts/b27g-chase10g85seed3.png)
+**b27g-chase10g85seed3**
+
+![b27h](charts/b27h-chase10g85seed4.png)
+**b27h-chase10g85seed4** — first filled board at step 8k, and the first arm whose epsilon left the 0.0125
+ceiling.
+
+### Batch 27's void first attempt — `b27a-d`, stopped at 309-326k with a flat red line
+
+Killed once the counter bug was found. Every graph shows the same shape: a healthy blue score curve settling
+at 90-93 and **no red line at all**, while each arm's own `max_score` field recorded a **filled board**
+between steps 9k and 16k. Epsilon sat at 0.0125 the whole way, so these are not readings on the shaping —
+they are the clearest picture of the bug.
+
+| arm | step | trailing | first filled board | perfect % | epsilon |
+|---|---|---|---|---|---|
+| `b27a-chase10g85seed1` | 309k | 92.6 | step 16k | **0, miscounted** | 0.0125 |
+| `b27b-chase10g85seed2` | 326k | 91.7 | step 14k | **0, miscounted** | 0.0125 |
+| `b27c-chase10g85seed3` | 319k | 90.5 | step 13k | **0, miscounted** | 0.0125 |
+| `b27d-chase10g85seed4` | 318k | 93.0 | step 9k | **0, miscounted** | 0.0125 |
 
 ![b27a](charts/b27a-chase10g85seed1.png)
 **b27a-chase10g85seed1** — score rises to ~93 and holds; the perfect-game axis is empty for all 310 evals.
@@ -125,7 +177,7 @@ would reproduce the bug until the fix is deployed there.
 **b27c-chase10g85seed3**
 
 ![b27d](charts/b27d-chase10g85seed4.png)
-**b27d-chase10g85seed4** — first filled board at step 9k, the earliest of the eight shaped arms.
+**b27d-chase10g85seed4** — first filled board at step 9k, the earliest of the eight void arms.
 
 ## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *closed, HOF-500 empty*
 

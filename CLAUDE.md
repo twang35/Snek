@@ -531,8 +531,36 @@ four simultaneous writers cannot clobber each other), and `wave_files` unions th
 process scan. Each source covers the other's blind spot — the registry cannot miss an arm that launched,
 the scan still catches one resumed by hand. **Registration happens before the dedupe returns**, because
 the three arms that *lose* the lock are exactly the ones that must still appear in the window the winner
-opens. Entries age out after `ARM_REGISTRY_TTL` (12 h) so tomorrow's wave does not inherit today's arms,
-and `MAX_WAVE_PANELS` (8) caps the window whatever the file says.
+opens. `MAX_WAVE_PANELS` (8) caps the window whatever the file says.
+
+**What separates one wave from the next is liveness, not age — a TTL cannot do it, and b30 opened on
+*eight* arms because it tried** (2026-08-14, the same evening as the 3-of-4 fix above). The rule was "admit
+any entry inside `ARM_REGISTRY_TTL`", 12 h; b30 was killed and relaunched **71 minutes** later, so the
+registry offered the four dead arms alongside the four new ones. No age threshold can tell those apart —
+71 minutes is equally plausible as "a wave that started slowly" and as "the wave I replaced". So
+`registered_arms` now admits an entry only if it is **younger than `ARM_REGISTRY_GRACE` (120 s)** — a
+starting arm, which no scan can see yet, and the registry's entire reason to exist — **or its policy has a
+live trainer**, since after those first seconds the process list is the authority on "running".
+`ARM_REGISTRY_TTL` stays as a backstop on file growth only.
+
+**That does not weaken the sticky panel, because stickiness never lived in the registry.** `wave_files`
+accumulates into its caller's `known` list and never prunes it, so an arm admitted while running keeps its
+panel after it finishes — which is why "drop anything not running" is the right rule *here* and would be
+the wrong rule there. Both halves have fixtures, and both mutants (removing the liveness test, removing the
+grace period) fail tests.
+
+**Relaunching a batch under the same prefix needs the tmp state cleared, and the window started by hand.**
+`rm ${TMPDIR}snek_chart_viewer_<prefix>.{arms,lock,log}` before relaunching. A trainer only tries to spawn
+a viewer once, at startup, and `viewer_running_for` matches **any** command line containing
+`chart_viewer.py --arms <prefix>` — including a shell loop *waiting* for the viewer, which is how a wave
+ends up with no window at all. To open one afterwards, go through the real path rather than hand-rolling
+argv, so the lock and the registry stay consistent:
+`PYTHONPATH=. python -c "import chart_viewer; chart_viewer.spawn_for_policy('<one-arm>')"`.
+
+**The desktop is immune to this whole class, by a different design.** The runner daemon passes the viewer
+**explicit PNG paths** for the running jobs (`_ensure_viewer` + `sticky_wave_pngs`) and never `--arms`, so
+it reads no registry; the set resets when the box goes idle between waves or when the running arms are
+disjoint from the previous set. Its window showed 4 panels through the same relaunch that gave the laptop 8.
 
 **A killed viewer stays a zombie for hours, and `kill -0` calls a zombie alive.** The viewer is spawned
 by a trainer that never `wait()`s for it, so it sits in state `ZN` until that trainer exits. Both dedupe
