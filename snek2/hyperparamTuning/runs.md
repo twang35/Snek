@@ -43,16 +43,35 @@ you want them removed as well. The registry rule is now liveness-based
 ([the mechanism](../../CLAUDE.md#rendering-is-off-by-default--use-watchpy-to-see-a-game)); the desktop was
 checked and needs no change, since its daemon passes explicit PNG paths and reads no registry.
 
-**The fix is confirmed end to end on live arms, not only in tests.** Within 15 minutes of launch:
+**The fix is confirmed end to end on live arms, not only in tests.** At 22:00, ~30 minutes in, all eight arms
+have a perfect-game rate and an epsilon that has left the ceiling — the two things b27a-d could not produce in
+320k steps:
 
-| arm | first filled board | first non-zero perfect % | epsilon |
+| wave | step | best-30 | max single eval | epsilon range |
+|---|---|---|---|---|
+| `b27e-h` (desktop) | 152-162k | 13.0 / 21.0 / 29.7 / 35.3 | 40-70% | 0.0058-0.0093 |
+| `b30e-h` (laptop) | 70-73k | 2.3 / 10.7 / 2.7 / 20.3 | 10-70% | 0.0078-0.0119 |
+
+**Progress update, 22:05.** Both waves are healthy and both are **too early to judge** (b27 at ~8% of its 2M
+cap, b30 at ~3.5%); the reads below exist so a later session can see what was true here, not to decide
+anything. Controls recomputed at the matched horizon with `run_report.build_summary`:
+
+| comparison | shaped | control | seeds ahead |
 |---|---|---|---|
-| `b27g-chase10g85seed3` | step 11k | **20% at step 11k** — the same eval | 0.0121, descending |
-| `b27h-chase10g85seed4` | step 8k | **10% at step 8k** — the same eval | 0.0089, descending |
+| b27e-h vs **b24a-d** at ≤152k | mean best-30 **24.8** | **30.3** | 1 of 4 |
+| ↳ excluding seed 4 (`b24d` reads 57.3 there and holds the record) | **21.2** | **21.4** | 1 of 3 |
+| b30e-h vs **b25a-d** at ≤66k | mean best-30 **9.0** | **9.7** | 2 of 4 |
 
-Both numbers are what b27a-d could not produce in 320k steps: the counter fires on the eval that filled the
-board, and epsilon has left the ceiling it was stuck on. `b27e`/`b27f` had not won a board yet at 18k, which
-is ordinary.
+So: a dead heat on `fc 200,100,100`, and a control edge on `fc 320` that is one early-blooming seed. Neither is
+a signal — the within-wave spread (2.3 to 35.3) dwarfs the between-wave difference, and `best_perfect30` this
+early measures *when an arm started winning* rather than the consolidation these batches are about. The seed
+ordering is identical in both b27 and b24 (4 > 3 > 2 > 1), which reproduces
+[the seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
+at n=8. Next checkpoint worth reading: **b27 at ~500k**, and the close-outs the desktop chains automatically.
+
+**Timing.** b27e-h reach 2M in ~5.5 h at 91.7 steps/s; b30e-h in ~10 h at ~52 steps/s. Desktop memory is
+5.3 GB used of 15,030 MB with 9.7 GB available, so the four trainers plus their forked self-evals are well
+inside the band. b28 and b29 remain queued (32 entries including their chained evals).
 
 **b28 (`c=0.20`) and b29 (gate 75) are still queued behind b27e-h**, unchanged, and now run on fixed code.
 

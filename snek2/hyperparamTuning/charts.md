@@ -63,17 +63,23 @@ b27's config with one change, the net: **`200,100,100`** instead of `320`. Every
 shaping, **2M cap**, seeds 1-4. Together with b24/b25/b27 it makes a **2×2 of shaping × architecture**, so
 the shaping result stops depending on one net.
 
-**Status: `b30e-h` launched 21:40 on 2026-08-14, ~15k steps.** Too early to read — nothing here is judgeable
-below ~250k — but `b30f` recorded **10% perfect at step 6k**, which is the counter working. **Control is
-`b25a-d` read at a matched horizon** (best-30 93.7 / 95.3 / 93.7 / 91.7 at 2M, `sef` 61.4 / 57.9 / 61.0 /
-54.2), not b25's published 3M numbers.
+**Status at 22:05 on 2026-08-14: ~70-73k steps of 2M, ~52 steps/s, so ~10 h to the cap.** Every arm has a
+red line and an epsilon below the 0.0125 ceiling. **Far too early for a verdict** — nothing here is judgeable
+below ~250k — but the control read is worth recording now, because it is a **dead heat**: `b25a-d`
+recomputed at the same 66k horizon means **best-30 9.7** against b30e-h's **9.0**, with 2 of 4 seeds ahead.
+Seed-by-seed at ≤66k, shaped first:
 
-| arm | seed | step | trailing | first perfect eval | epsilon |
-|---|---|---|---|---|---|
-| `b30e-chase10fc200x100x100seed1` | 1 | 17k | 70.9 | not yet | 0.0125 |
-| `b30f-chase10fc200x100x100seed2` | 2 | 15k | 73.8 | **10% at 6k** | 0.0120 |
-| `b30g-chase10fc200x100x100seed3` | 3 | 17k | 58.7 | not yet | 0.0125 |
-| `b30h-chase10fc200x100x100seed4` | 4 | 15k | 73.0 | not yet | 0.0125 — its control `b25d` is the weak seed of its wave |
+| arm | seed | step | trailing | best-30 @66k | control @66k | max single eval | epsilon |
+|---|---|---|---|---|---|---|---|
+| `b30h-chase10fc200x100x100seed4` | 4 | 70k | 91.6 | **20.3** | `b25d` 7.0 | 70% | 0.0078 |
+| `b30f-chase10fc200x100x100seed2` | 2 | 73k | 88.8 | **10.7** | `b25b` 3.3 | 30% | 0.0098 |
+| `b30g-chase10fc200x100x100seed3` | 3 | 73k | 83.7 | 2.7 | `b25c` 17.7 | 20% | 0.0118 |
+| `b30e-chase10fc200x100x100seed1` | 1 | 72k | 87.0 | 2.3 | `b25a` 10.7 | 10% | 0.0119 |
+
+`b30h` is ahead of the control seed that was b25's weakest, and `b30e`/`b30g` are behind theirs — the spread
+*within* each wave (2.3 to 20.3) is far larger than the difference between waves, which is the usual shape
+this early and the reason [the seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
+exists.
 
 ![b30e](charts/b30e-chase10fc200x100x100seed1.png)
 **b30e-chase10fc200x100x100seed1**
@@ -123,18 +129,28 @@ seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24
 checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
 [the plan](../plans/chase-safe-reward-shaping.md) and [`runs.md`](runs.md).
 
-**Status: `b27e-h` launched 21:31 on 2026-08-14, at 74-80k steps.** Still far too early to judge — but all
-four have a red line, and `b27h` is at **70% on a single eval with epsilon down to 0.0064**, which is the
-schedule annealing on a real skill signal for the first time in this batch. **Judge on `best_perfect30` and
-the ≥98%/500 count, not peak trailing**, which is capped at 95.00 and where all four control arms already sit
+**Status at 22:00 on 2026-08-14: 152-162k steps of 2M, 91.7 steps/s, ~5.5 h to the cap.** All four have a
+red line and an epsilon that has left the ceiling (0.0058-0.0093, tracking the controls). **Too early for a
+verdict** — judge on `best_perfect30` and the ≥98%/500 count, not peak trailing, which is capped at 95.00 and
+where all four control arms already sit
 ([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)).
 
-| arm | step | trailing | first perfect eval | best single eval | epsilon | control |
+**The early read is a slight edge to the *control*, and one seed carries it.** `b24a-d` recomputed at the
+same 152k horizon means **best-30 30.3** against b27e-h's **24.8** — but `b24d` alone reads **57.3** there
+(it is the record holder and an early bloomer), and dropping the fourth seed from both makes it 21.4 control
+vs 21.2 shaped, i.e. nothing. Seed-by-seed at ≤152k, shaped first:
+
+| arm | step | trailing | best-30 @152k | control @152k | max single eval | epsilon |
 |---|---|---|---|---|---|---|
-| `b27h-chase10g85seed4` | 74k | 90.4 | 10% at **8k** | **70%** | 0.0064 | `b24d` (pooled 86.0, best-30 96.7) — holds the record |
-| `b27g-chase10g85seed3` | 80k | 84.4 | 20% at 11k | 30% | 0.0099 | `b24c` (87.7, 96.0) |
-| `b27f-chase10g85seed2` | 76k | 86.1 | 10% at 40k | 10% | 0.0118 | `b24b` (88.8, 96.7) |
-| `b27e-chase10g85seed1` | 76k | 82.8 | 10% at 37k | 10% | 0.0118 | `b24a` (89.0, 95.3) |
+| `b27h-chase10g85seed4` | 159k | 92.1 | 35.3 | `b24d` **57.3** | 70% | 0.0058 |
+| `b27g-chase10g85seed3` | 162k | 90.9 | **29.7** | `b24c` 26.7 | 60% | 0.0063 |
+| `b27f-chase10g85seed2` | 160k | 90.2 | 21.0 | `b24b` 22.7 | 60% | 0.0077 |
+| `b27e-chase10g85seed1` | 152k | 88.7 | 13.0 | `b24a` 14.7 | 40% | 0.0093 |
+
+Two things worth noting even at this stage. **The seed ordering is identical in both waves** (4 > 3 > 2 > 1),
+which is [the seed finding](findings.md#-the-seed-not-the-config-decides-which-arm-in-a-wave-wins--and-it-holds-to-2m-steps)
+reproducing at n=8. And **`best_perfect30` this early is mostly "how soon did it start winning"**, not the
+consolidation the batch is about — b24's own arms were at 14.7-57.3 here and finished pooled 86-89.
 
 Graphs are copied off the desktop by hand (`scp the-claw-den:~/Snek/snek2/runs/b27*.png`), since a desktop
 job publishes to the `results` branch only when it finishes. **b28** (`c=0.20`) and **b29** (gate 75) are
