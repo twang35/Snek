@@ -1,0 +1,20 @@
+{
+ "target": "hallOfFame/b18b-tgt1000seed2-ckpt1588000/ckpt-1588000",
+ "checkpoint": "ckpt-1588000",
+ "global_step": 1588000,
+ "seed": 104,
+ "episodes": 60,
+ "mismatches": 0,
+ "board": "10x10",
+ "survival_depths": [
+  100,
+  50,
+  20,
+  5,
+  1
+ ],
+ "outcomes": {
+  "perfect": 60
+ },
+ "losses": []
+}
