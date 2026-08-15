@@ -222,6 +222,54 @@ def test_build_ladder_snaps_to_real_checkpoints_and_reports_the_rest(tmp=None):
         assert all(os.path.exists(os.path.join(directory, 'ckpt-%d.index' % s)) for s in ladder)
 
 
+class _FakeAgent(object):
+    """`fresh_baseline` only ever touches `_q_network`, so the real agent is not needed."""
+
+    def __init__(self, net):
+        self._q_network = net
+
+
+def test_the_fresh_control_is_reproducible_and_reports_a_standard_error():
+    """The control is the reference every trained row is read against, so it must not wobble.
+
+    Unseeded and at 5 draws it moved its own mean by 0.174 -> 0.143 dormant between two runs of the
+    same arm, against a trained-vs-fresh difference of 0.08. Two calls must now agree exactly, and
+    the reported `stderr` must be the sd over draws divided by sqrt(draws) — the printed row is the
+    bar a departure has to clear, and the sd is ~4x looser than that.
+    """
+    rng = np.random.default_rng(3)
+    obs = rng.random((64, 30)).astype(np.float32)
+    fc = [16, 8]
+    first = plasticity.fresh_baseline(_FakeAgent(built_net(tuple(fc))), obs, fc, draws=3)
+    second = plasticity.fresh_baseline(_FakeAgent(built_net(tuple(fc))), obs, fc, draws=3)
+    # To 1e-9, not bit-exact: TF's threaded matmul reorders its reduction, so the same weights give
+    # the same activations to ~1e-16. That is eight orders of magnitude below the ~0.08 effect.
+    for key in ('dormant_all', 'srank_c', 'stable_rank_c', 'growth_hidden', 'growth_head'):
+        assert abs(first[key] - second[key]) <= 1e-9 * max(1.0, abs(first[key])), \
+            (key, first[key], second[key])
+    assert first['draws'] == 3 and first['seed'] == plasticity.FRESH_SEED
+    # The redraw must still be the *real* initialisation, or the control is a different network from
+    # the one training starts at: a mis-cloned initialiser would move these off 1.0 silently.
+    assert 0.9 < first['growth_hidden'] < 1.1, first['growth_hidden']
+    assert 0.9 < first['growth_head'] < 1.1, first['growth_head']
+    for key, spread in first['spread'].items():
+        assert abs(first['stderr'][key] - spread / np.sqrt(3)) < 1e-12, key
+    # A different seed must give a different draw, or the seeding is not reaching the initialiser and
+    # "reproducible" would be true for the uninteresting reason that nothing is random.
+    other = plasticity.fresh_baseline(_FakeAgent(built_net(tuple(fc))), obs, fc, draws=3, seed=7)
+    assert other['growth_hidden'] != first['growth_hidden']
+
+
+def test_the_control_leaves_the_agents_own_network_in_place():
+    # fresh_baseline swaps a random net onto the agent to measure it. If it failed to put the trained
+    # one back, every row after the control would be measuring noise.
+    net = built_net((16, 8))
+    agent = _FakeAgent(net)
+    rng = np.random.default_rng(4)
+    plasticity.fresh_baseline(agent, rng.random((32, 30)).astype(np.float32), [16, 8], draws=2)
+    assert agent._q_network is net
+
+
 def test_parse_steps_round_trip():
     # Imported from input_sensitivity_over_time, so this pins the contract this script relies on.
     assert plasticity.parse_steps('1000,3000-5000:1000') == [1000, 3000, 4000, 5000]

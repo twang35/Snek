@@ -18,6 +18,12 @@ measures the three standard signatures against training step, over a **fixed** b
 printed as `step -1`: an untrained net of the same shape on the same boards. Every number below is
 read as a departure from it, which is the only way to say whether `srank 41` is high or low.
 
+**That control is averaged over 15 *seeded* draws, and both parts were forced by measurement.** The
+trained rows are byte-identical between two runs of the same arm, but an unseeded 5-draw control moved
+its own mean by 0.174 -> 0.143 dormant and 40.6 -> 42.2 srank_c between those same two runs — a third
+of the trained-vs-fresh difference it exists to measure. The printed second row is the **standard
+error** of the control, which is the bar a departure has to clear.
+
 **`wnorm` is normalised against the initialisation each layer actually got**, not a constant. Hidden
 layers use `VarianceScaling(2.0, fan_in)`, whose expected ‖W‖_F is `sqrt(2 · units)`; the Q head uses
 `RandomUniform(±0.03)`, whose expected ‖W‖_F is `0.03 · sqrt(fan_in · units / 3)`. Both read ~1.00 on
@@ -95,7 +101,12 @@ SNAP = 5000
 # Trailing window the project smooths perfect-rate with everywhere else.
 TRAILING = 30
 # Random initialisations averaged for the fresh-network control row.
-FRESH_DRAWS = 5
+FRESH_DRAWS = 15
+# Seed for those draws. **Measured:** at 5 unseeded draws the control's own mean moved 0.174 -> 0.143
+# dormant and 40.6 -> 42.2 srank_c between two runs of the same arm — a third of the trained-vs-fresh
+# difference it is the reference for. Seeding makes the control identical for every arm of a given
+# shape, so a cross-arm comparison is against one number rather than a fresh random variable.
+FRESH_SEED = 20260814
 
 
 def layer_stack(q_net):
@@ -295,6 +306,68 @@ def build_ladder(ckpt_dir, stride, extra):
     return sorted(set(ladder)), skipped
 
 
+def seeded_reinit(net, seed):
+    """Redraw every weight in `net` from its own initialiser, with an explicit seed.
+
+    **`tf.random.set_seed` is not enough**, and this was measured rather than assumed: two calls with
+    the same global seed produced dormant 0.111 and 0.139, because an op-level seed is derived from a
+    per-process op counter, so the draw depends on how many ops have been created before it. Seeding
+    each initialiser directly removes that dependence.
+
+    The initialisers are **cloned from the layers' own configs** — `VarianceScaling(2.0, fan_in)` for
+    the hidden layers and `RandomUniform(±0.03)` for the head — so this cannot drift from
+    `under_the_hood.dense_layer`. Anything with no `seed` in its config (the `Zeros` biases) is left to
+    produce its one deterministic answer.
+    """
+    for index, layer in enumerate(net.layers):
+        fresh = []
+        for offset, (initialiser, variable) in enumerate(
+                ((layer.kernel_initializer, layer.kernel),
+                 (layer.bias_initializer, layer.bias))):
+            config = initialiser.get_config()
+            if 'seed' in config:
+                config['seed'] = seed + 1000 * index + offset
+                initialiser = initialiser.__class__.from_config(config)
+            fresh.append(initialiser(variable.shape, dtype=variable.dtype).numpy())
+        layer.set_weights(fresh)
+
+
+def fresh_baseline(agent, obs, fc, draws=FRESH_DRAWS, seed=FRESH_SEED):
+    """The untrained control row: same shape, same boards, no training.
+
+    **Averaged over `draws` initialisations and seeded**, because a single draw is itself a random
+    variable — two runs of the same arm read dormant 0.230 and 0.170 on the same shape. Unseeded, the
+    *mean* of 5 draws still moved 0.174 -> 0.143 between two runs, against a trained-vs-fresh
+    difference of 0.08, so the reference was contributing a third of the effect it was meant to
+    measure. Seeding the draws makes it one fixed number per shape; `spread` is kept so a reader can
+    see how much of any departure is real.
+    """
+    fresh_rows = []
+    saved = agent._q_network
+    try:
+        for draw in range(draws):
+            fresh = build_q_net(3, tuple(fc))
+            fresh(tf.zeros([2, obs.shape[1]], tf.float32), step_type=tf.fill([2], 1))
+            seeded_reinit(fresh, seed + 100000 * draw)
+            agent._q_network = fresh
+            drawn = measure(agent, obs)
+            del drawn['kernels']
+            fresh_rows.append(drawn)
+    finally:
+        agent._q_network = saved
+    scalars = ['dormant_all', 'dead_all', 'constant_all', 'srank', 'srank_c', 'stable_rank',
+               'stable_rank_c', 'growth_hidden', 'growth_head', 'srank_frac', 'srank_c_frac']
+    baseline = {key: float(np.mean([r[key] for r in fresh_rows])) for key in scalars}
+    baseline['spread'] = {key: float(np.std([r[key] for r in fresh_rows])) for key in scalars}
+    # The standard error of the mean is what a departure has to clear, and it is the number the
+    # printed sd row would otherwise be mistaken for.
+    baseline['stderr'] = {key: baseline['spread'][key] / np.sqrt(draws) for key in scalars}
+    baseline.update({'step': -1, 'trailing': None, 'fresh': True, 'move': None,
+                     'draws': draws, 'seed': seed, 'layers': fresh_rows[0]['layers'],
+                     'weights': fresh_rows[0]['weights']})
+    return baseline
+
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
@@ -330,41 +403,20 @@ def main():
         'step', 'trailing', 'dormant', 'dead', 'const', 'srank_c', 'stable_c', 'growth', 'g_head',
         'move/100k')
 
-    # The fresh-network control, measured before any restore: same shape, same boards, no training.
-    # **Averaged over FRESH_DRAWS initialisations, not one.** A single draw is itself a random
-    # variable — two smoke runs read dormant 0.230 and 0.170 on the same shape — so a one-draw control
-    # would move between arms and make cross-arm comparison meaningless. The spread is kept so the
-    # reader can see how much of a departure is real.
-    fresh_rows = []
-    saved = agent._q_network
-    try:
-        for _ in range(FRESH_DRAWS):
-            fresh = build_q_net(3, tuple(fc))
-            fresh(tf.zeros([2, obs.shape[1]], tf.float32), step_type=tf.fill([2], 1))
-            agent._q_network = fresh
-            drawn = measure(agent, obs)
-            del drawn['kernels']
-            fresh_rows.append(drawn)
-    finally:
-        agent._q_network = saved
-    scalars = ['dormant_all', 'dead_all', 'constant_all', 'srank', 'srank_c', 'stable_rank',
-               'stable_rank_c', 'growth_hidden', 'growth_head', 'srank_frac', 'srank_c_frac']
-    baseline = {key: float(np.mean([r[key] for r in fresh_rows])) for key in scalars}
-    baseline['spread'] = {key: float(np.std([r[key] for r in fresh_rows])) for key in scalars}
-    baseline.update({'step': -1, 'trailing': None, 'fresh': True, 'move': None,
-                     'draws': FRESH_DRAWS, 'layers': fresh_rows[0]['layers'],
-                     'weights': fresh_rows[0]['weights']})
+    baseline = fresh_baseline(agent, obs, fc)
     rows.append(baseline)
     print(header, flush=True)
     print('%9s %8s %8.3f %6.3f %6.3f %7.1f %8.2f %8.3f %8.3f %9s   <- fresh net x%d, the control'
           % ('fresh', '-', baseline['dormant_all'], baseline['dead_all'],
              baseline['constant_all'], baseline['srank_c'], baseline['stable_rank_c'],
              baseline['growth_hidden'], baseline['growth_head'], '-', FRESH_DRAWS), flush=True)
-    print('%9s %8s %8.3f %6.3f %6.3f %7.1f %8.2f %8.3f %8.3f %9s   <- its sd over draws'
-          % ('', '', baseline['spread']['dormant_all'], baseline['spread']['dead_all'],
-             baseline['spread']['constant_all'], baseline['spread']['srank_c'],
-             baseline['spread']['stable_rank_c'], baseline['spread']['growth_hidden'],
-             baseline['spread']['growth_head'], '-'), flush=True)
+    # The standard error of that mean, not the sd: this is the bar a departure from the control has to
+    # clear, and it is ~4x tighter than the per-draw spread at 15 draws.
+    print('%9s %8s %8.3f %6.3f %6.3f %7.1f %8.2f %8.3f %8.3f %9s   <- se of the control'
+          % ('', '', baseline['stderr']['dormant_all'], baseline['stderr']['dead_all'],
+             baseline['stderr']['constant_all'], baseline['stderr']['srank_c'],
+             baseline['stderr']['stable_rank_c'], baseline['stderr']['growth_hidden'],
+             baseline['stderr']['growth_head'], '-'), flush=True)
 
     previous = None
     for step in ladder:
