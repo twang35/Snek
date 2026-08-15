@@ -161,6 +161,7 @@ from eval_agent import build_eval_agent
 from eval_workers import IndependentWorkerPool
 from snake_constants import EVALS_ARCHIVE_DIR, EVALS_DIR, POLICY_DIR, RUNS_DIR
 from snake_environment import SnakeEnvironment
+from state_helpers import is_perfect_score
 
 
 def backup_previous_results(out_path):
@@ -613,7 +614,9 @@ def run_round(parallel_env, policy_action, worker_envs):
             promises = [worker_envs[i].call('get_score') for i in indices]
             for i, promise in zip(indices, promises):
                 scores[i] = promise()
-                perfect[i] = step_rewards[i] == snake_constants.PERFECT_GAME_REWARD
+                # From the score, not `step_rewards[i]`: a shaping term moves the winning step's
+                # reward off `PERFECT_GAME_REWARD`. See `state_helpers.is_perfect_score`.
+                perfect[i] = is_perfect_score(scores[i])
         done |= is_last
 
     return scores.tolist(), perfect.tolist(), rewards.tolist(), steps

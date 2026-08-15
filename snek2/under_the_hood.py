@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 import snake_constants
 from snake_constants import *
+from state_helpers import is_perfect_score
 
 import imageio
 from matplotlib.figure import Figure
@@ -116,11 +117,10 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
     """
     start_time = time.time()
 
-    rewards, scores, last_rewards_array, total_steps = run_parallel_eval_episodes(
+    rewards, scores, total_steps = run_parallel_eval_episodes(
         parallel_environment, policy, num_episodes)
     episode_rewards = rewards.tolist()
     episode_scores = scores.tolist()
-    last_rewards = last_rewards_array.tolist()
 
     for episode_reward in episode_rewards:
         if metrics.min_reward > episode_reward:
@@ -134,7 +134,9 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
         if metrics.max_score < episode_score:
             metrics.max_score = episode_score
 
-    perfect_games = sum(1 for reward in last_rewards if reward == snake_constants.PERFECT_GAME_REWARD)
+    # Counted off the score, never off `last_rewards`. See `state_helpers.is_perfect_score`: the
+    # reward test this replaces read 0% perfect for every shaped arm, which also pinned epsilon.
+    perfect_games = sum(1 for score in episode_scores if is_perfect_score(score))
 
     if snake_constants.DEBUG_LOGGING:
         print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
@@ -149,12 +151,18 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
 
 
 def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
+    """One greedy episode per worker. Returns per-episode totals, scores and the step count.
+
+    It used to return each episode's *final* reward as a fourth array, for the sole purpose of
+    identifying perfect games by `== PERFECT_GAME_REWARD`. Removed with that test rather than left
+    unused: the array is exactly the wrong signal to leave lying around, since any new reward term
+    shifts it while looking harmless. `state_helpers.is_perfect_score` has the history.
+    """
     worker_envs = parallel_environment.pyenv.envs
 
     time_step = parallel_environment.reset()
     episode_rewards = np.zeros(num_parallel, dtype=np.float32)
     episode_scores = np.zeros(num_parallel, dtype=np.float32)
-    last_rewards = np.zeros(num_parallel, dtype=np.float32)
     done = np.zeros(num_parallel, dtype=bool)
     total_steps = 0
 
@@ -177,10 +185,9 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
             score_promises = [worker_envs[i].call('get_score') for i in finished_indices]
             for i, promise in zip(finished_indices, score_promises):
                 episode_scores[i] = promise()
-            last_rewards[newly_done] = rewards[newly_done]
         done = done | newly_done
 
-    return episode_rewards, episode_scores, last_rewards, total_steps
+    return episode_rewards, episode_scores, total_steps
 
 
 def trailing_average(values, window):

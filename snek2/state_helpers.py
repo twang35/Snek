@@ -516,6 +516,28 @@ def chase_safe_state(grid, head_pos, tail_pos, current_food):
     return 1 if any(regions[index] & food_bit for index in escape) else 0
 
 
+def is_perfect_score(score):
+    """True when `score` is a filled board. The one definition of "this episode was perfect".
+
+    `Snake.check_perfect_game` is the game rule and it fires at exactly one score, so score and
+    perfect-game are the same fact — which is why this can be asked of a finished episode that
+    nobody watched. Every counter must ask it this way rather than testing the final reward
+    against `PERFECT_GAME_REWARD`, and that is not a style preference:
+
+    **Reward equality broke the moment a shaping term was added.** `CHASE_SAFE_SHAPING` pays
+    `-c * Phi(s)` at the winning step (Phi(terminal) = 0, as the theory requires), so a perfect
+    game returns 99.9 rather than 100 whenever the pre-win board was chase-safe — which is the
+    tail-chasing endgame every competent policy plays. Three counters compared with `==` and all
+    three read 0% perfect games for arms that were winning boards from step 9k: batch 27 on the
+    desktop and batch 30 on the laptop both trained blind, and the training loop's epsilon
+    schedule, which is driven by the trailing perfect rate, sat pinned at its refinement ceiling
+    of 0.0125 for 300k+ steps instead of annealing toward the floor.
+
+    A reward is a sum of terms and any new term shifts it. A score is a count of food.
+    """
+    return int(round(score)) == int(MAX_POSSIBLE_SCORE)
+
+
 def starve_budget(snake_len):
     """Steps this snake may go without food. A game rule, not an observation."""
     return max(MIN_STARVE_BUDGET,

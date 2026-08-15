@@ -225,9 +225,9 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
         from tf_agents.environments import tf_py_environment
         from tf_agents.utils import common
 
-        import snake_constants
         from eval_agent import build_eval_agent
         from snake_environment import SnakeEnvironment
+        from state_helpers import is_perfect_score
 
         py_env = SnakeEnvironment(discount=0.99, display=False, policy_name=policy_name)
         tf_env = tf_py_environment.TFPyEnvironment(py_env)
@@ -246,10 +246,11 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
                 steps += 1
                 if bool(time_step.is_last().numpy()[0]):
                     # Read the score before the next reset overwrites it, exactly as the batched
-                    # path does with its `call('get_score')`.
-                    return (py_env.get_score(),
-                            reward == snake_constants.PERFECT_GAME_REWARD,
-                            total_reward, steps)
+                    # path does with its `call('get_score')`. The score is also what decides
+                    # whether this was a perfect game — never the final reward, which a shaping
+                    # term shifts off `PERFECT_GAME_REWARD`. See `state_helpers.is_perfect_score`.
+                    score = py_env.get_score()
+                    return score, is_perfect_score(score), total_reward, steps
 
         results.put((TAG_READY, rank))
 

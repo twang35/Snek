@@ -596,7 +596,14 @@ class Game:
         return self.finished, reward
 
     def check_perfect_game(self):
-        return (self.current_score + START_SEGMENTS + 1) == PERFECT_SCORE
+        """The game rule, and the same test every perfect-game counter outside this file uses.
+
+        Was `(self.current_score + START_SEGMENTS + 1) == PERFECT_SCORE`, which is the identical
+        condition — `MAX_POSSIBLE_SCORE` is defined as `PERFECT_SCORE - START_SEGMENTS - 1`. Routed
+        through `is_perfect_score` so the rule and the counters cannot drift apart, and so the
+        docstring explaining why the counters may not use the reward has one home.
+        """
+        return is_perfect_score(self.current_score)
 
     def _font(self, size):
         """Cached pygame.font.Font by size.
