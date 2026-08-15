@@ -480,6 +480,42 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
     return observations, food_observations, wall_hug_observations
 
 
+def chase_safe_state(grid, head_pos, tail_pos, current_food):
+    """1 when the head, the food and the tail all sit in one open region of `grid`.
+
+    The *state* form of the per-action flag at observation indices 15-17, and the potential
+    function behind `CHASE_SAFE_SHAPING`. `group_obs` asks "would this move leave them in one
+    region"; a potential needs "are they in one region **now**". Kept separate rather than folded
+    into `group_obs`, which short-circuits fatal moves and builds a post-move grid per action —
+    neither of which applies to a state.
+
+    **Do not substitute `obs[15 + a]` for this.** On a step that ate, the food has already
+    respawned by the time the potential is read, while the per-action flag was computed against
+    the food that was just consumed. That mismatch is the whole reason this exists as its own
+    function; the old distance-shaping term needed an explicit exclusion for the same situation.
+
+    The head and tail cells are occupied, so they get `get_adjacent_groups`; the food cell is open
+    and belongs to a region of its own, so it gets containment. Testing the food against the
+    *intersection* rather than against the head's regions alone is the point — the head can
+    neighbour two regions at once, and reaching the food through one while the tail is only
+    reachable through the other is exactly the trap the flag names. See `group_obs`' comment.
+
+    Returns an int, so a caller that wants a float converts once. Measured to agree with
+    `obs[15 + a]` on the post-move board over 4,460 consecutive greedy decisions with zero
+    disagreements, and `tests/test_observation_spec.py` pins the agreement on fixtures.
+    """
+    if current_food == 'no food':
+        return 0
+    cols = grid.shape[1]
+    regions, _ = count_groups(grid)
+    escape = (get_adjacent_groups(regions, cols, head_pos)
+              & get_adjacent_groups(regions, cols, tail_pos))
+    if not escape:
+        return 0
+    food_bit = 1 << ((current_food.position[1] + 1) * cols + (current_food.position[0] + 1))
+    return 1 if any(regions[index] & food_bit for index in escape) else 0
+
+
 def starve_budget(snake_len):
     """Steps this snake may go without food. A game rule, not an observation."""
     return max(MIN_STARVE_BUDGET,

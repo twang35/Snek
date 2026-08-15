@@ -1,7 +1,8 @@
 # Potential-based reward shaping on realised chase-safety
 
-**Status:** approved 2026-08-11. **Phase 0 done 2026-08-14 — `c = 0.10`, Variant B (length-gated at 85).
-The five edits are not written yet.** The hold has expired: batches 20-26 are all closed and both hosts
+**Status:** approved 2026-08-11. **Phase 0 done and the code shipped 2026-08-14** — `c = 0.10`, Variant B
+(length-gated at 85), knobs `SNEK_CHASE_SAFE_SHAPING` and `SNEK_CHASE_SAFE_GATE`, default off. See
+[implementation notes](#-implementation-notes-2026-08-14) for the measured cost and the mutation pass. The hold has expired: batches 20-26 are all closed and both hosts
 are idle, so this is the top backlog item and the design below is ready to execute. **Revised 2026-08-14** in four places, each marked **‡**: the control moved from
 batch 23 to batch 24, the potential has to survive a fork, Phase 0 shrank because
 `behaviour_profile.py` already answered half of it, and `c` now has an arithmetic rule rather than a
@@ -551,6 +552,45 @@ incomparable, including the 97.6% record and all 3,712 measured rows. Potential-
 the task and the optimal policy unchanged, so it costs nothing from the measurement history.
 
 Nothing in `savedPolicies/`, `runs/`, `evals/` or `hallOfFame/`.
+
+## ‡ Implementation notes 2026-08-14
+
+Shipped as described, with two departures worth recording and one thing the mutation pass caught.
+
+**The gate became a knob** (`SNEK_CHASE_SAFE_GATE`, default 85) rather than a constant, because the
+batches queued alongside this vary it. The length test runs *before* the flood fill, which is why the
+gated form is nearly free.
+
+**`Game.__init__` gained `discount=1.0`** and `SnakeEnvironment` passes its own through. The frozen
+diagnostics build a `Game` directly and get 1.0, which never reaches a shaped arm because they all run
+with shaping off.
+
+**Measured cost**, 6,000 steps including one observation build each — the plan asked for this and set
+~3% end to end as the threshold to report back on:
+
+| | seconds | vs off |
+|---|---|---|
+| shaping off | 0.304 | — |
+| c=0.1, **gate 85** | 0.308 | **+1.3%** |
+| c=0.1, ungated | 0.363 | +19.1% |
+
+The +19.1% is the predicted fourth `count_groups` and it is the honest worst case. The gated figure is
+measured under random play, which never reaches length 85, so it is really the cost of the length
+comparison; the true gated cost is about `0.11 × 19% ≈ 2%` of the observation path for a policy that
+spends 10.9% of its steps above the gate — and less than that end to end, since the observation build is
+a fraction of a training step. Inside the threshold.
+
+**24 tests, and the mutation pass found a vacuous one.** Six mutations — flipped sign, dropped γ, dropped
+`Φ(terminal)=0`, dropped the `restore_snapshot` recompute, dropped the gate, dropped the `+1` padding
+offset — each failed a named test with an `AssertionError`. But **swapping `head_groups & tail_groups`
+for `head_groups` alone failed nothing**, because in both sealed-pocket fixtures the head does not
+neighbour the pocket either, so the two rules agree. Fixed by adding `HEAD_ONLY_TRAP`: a full row of body
+seals row 0, the head sits on the junction touching both regions, the tail touches only the lower one, so
+food in row 0 must read 0 and the head-only rule reads 1. That mutation now fails exactly one test. This
+is the same trap `CLAUDE.md` records for `group_obs`, and it recurred on the first attempt.
+
+Full suite: **566 tests, 0 failed.** End-to-end smoke run under the exact batch config confirmed the
+override line prints both knobs and `runs/<policy>.md` records them.
 
 ## Order of work when this is picked up
 

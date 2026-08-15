@@ -23,7 +23,11 @@ class SnakeEnvironment(py_environment.PyEnvironment, metaclass=ABCMeta):
 
     def __init__(self, discount=1.0, display=True, limit_fps=False, policy_name=''):
         super().__init__()
-        self._game = Game(display=display, limit_fps=limit_fps, policy_name=policy_name)
+        # `discount` reaches the game as well as the TimeStep, because the potential-based shaping
+        # term needs the agent's gamma — see Game.shaping_discount for why it is threaded rather
+        # than re-read from the environment.
+        self._game = Game(display=display, limit_fps=limit_fps, policy_name=policy_name,
+                          discount=discount)
         self._discount = np.asarray(discount)
         self._observations = None
         self._total_steps = 0

@@ -31,6 +31,39 @@ FOOD_REWARD = 1.0
 DEFAULT_FOOD_DISTANCE_REWARD = 0.001
 FOOD_DISTANCE_REWARD = float(os.environ.get('SNEK_FOOD_DISTANCE_REWARD',
                                             DEFAULT_FOOD_DISTANCE_REWARD))
+# Potential-based shaping on "are the head, the food and the tail in one region" — the coefficient
+# `c` in `F = c * (gamma * Phi(s') - Phi(s))`. Read from the environment for the same reason
+# FOOD_DISTANCE_REWARD is: the term is consumed inside `Snake.step`, which runs in the parallel env
+# worker processes, and `from snake_constants import *` binds a copy at import, so an assignment in
+# the parent would never reach a worker.
+#
+# **0.0 is off and is a clean ablation.** The whole block is skipped, and `count_groups` draws no
+# randomness, so skipping it cannot shift the food stream — at 0.0 the reward is bit-identical to a
+# build without the term. Default 0.0, so every existing arm and every historical number is
+# unaffected.
+#
+# **`c` is not a free parameter.** Measured 2026-08-14: the discounted shaping telescopes to exactly
+# `-c * Phi(s0)`, so `c` is invisible in the return and has to be calibrated against the
+# per-transition reward instead. Genuine Phi flips run 2.5-3.6 per meal for a struggling policy, and
+# holding the budget at ~25% of FOOD_REWARD per meal gives 0.10. See
+# ../plans/chase-safe-reward-shaping.md.
+DEFAULT_CHASE_SAFE_SHAPING = 0.0
+CHASE_SAFE_SHAPING = float(os.environ.get('SNEK_CHASE_SAFE_SHAPING',
+                                          DEFAULT_CHASE_SAFE_SHAPING))
+# Snake length below which the potential is identically 0, so no shaping is paid there at all.
+# Defaults to 85 because that is the variant Phase 0 selected: a record policy spends only ~10.8%
+# of its steps at or above it while a struggling one spends 41.2%, so the dose lands on the endgame
+# and the early game — which needs no help — is left untouched. 85 also matches FORK_MIN_LENGTH, so
+# the shaped transitions are the ones the forking collector already oversamples.
+#
+# **The gate keeps the invariance**: the theorem holds for any bounded function of state, and a
+# length gate is one. It also makes the telescope exactly 0, since a length-5 opening board is below
+# any gate, so `Phi(s0) = 0`.
+#
+# `SNEK_CHASE_SAFE_GATE=0` selects the ungated form (variant A in the plan). Irrelevant when
+# CHASE_SAFE_SHAPING is 0.0, since the whole term is skipped.
+DEFAULT_CHASE_SAFE_GATE = 85
+CHASE_SAFE_GATE = int(os.environ.get('SNEK_CHASE_SAFE_GATE', DEFAULT_CHASE_SAFE_GATE))
 DEATH_REWARD = -5.0  # maybe avoid deaths more?
 STARVE_REWARD = -0.5
 global PERFECT_GAME_REWARD

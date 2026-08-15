@@ -234,3 +234,405 @@ def test_the_step_that_ends_the_episode_is_not_penalised():
     assert away_deaths, 'need a death that increased the distance to food, or this asserts nothing'
     for step in away_deaths:
         assert step['reward'] == -5.0, step
+
+
+# ============================================================ chase-safe potential shaping
+#
+# `F = c * (gamma * Phi(s') - Phi(s))`, with Phi = 1 when the head, the food and the tail share one
+# open region, gated to snake lengths at or above CHASE_SAFE_GATE.
+#
+# **The fixtures below are coiled on purpose.** On an open board every variant of the region test
+# agrees — the head, the tail and the food are all in the one region whatever the rule is — so an
+# open-board fixture asserts nothing about this potential. That is the exact trap `../CLAUDE.md`
+# records for `group_obs`, where 24 tests passed across a signature change because every board was
+# open. `SEALED_POCKET` and `TAIL_UNSEALS` both have a one-cell region that only the intersection
+# test gets right.
+
+GAMMA = 0.9975
+
+# Food at (9,9), whose only two neighbours (9,8) and (8,9) are both body, so it is a sealed one-cell
+# region. The sealing triple sits in the *middle* of the snake — the only route between (9,8) and
+# (8,9) that avoids the food is through (8,8) — so neither end touches the pocket, and the cell the
+# tail vacates is in the main region. Phi = 0, and it stays 0 across a move.
+SEALED_POCKET = ((9, 4), (9, 5), (9, 6), (9, 7), (9, 8), (8, 8), (8, 9), (7, 9), (6, 9), (5, 9))
+SEALED_FOOD = (9, 9)
+SEALED_FACING = 'up'          # (9,4) was entered from (9,5), so forward is (9,3)
+
+# The same pocket, but now (9,8) is the *tail*. It is adjacent to the pocket, the head is not, so
+# the intersection excludes the pocket and Phi = 0 — and one forward move vacates (9,8), which
+# joins the pocket to the main region and flips Phi to 1. The 0->1 case with no hand-set state.
+TAIL_UNSEALS = ((5, 9), (6, 9), (7, 9), (8, 9), (8, 8), (9, 8))
+TAIL_UNSEALS_FACING = 'left'  # (5,9) was entered from (6,9), so forward is (4,9)
+
+OPEN_BOARD = ((5, 5), (4, 5), (3, 5))
+OPEN_FOOD = (8, 8)
+OPEN_FACING = 'right'
+
+# **The fixture that discriminates the intersection from the head's regions alone**, which the two
+# above do not: a full row of body seals row 0 off from the rest, and the head at (0,1) sits on the
+# junction so it neighbours *both* regions while the tail at (9,5) neighbours only the lower one.
+# With food in row 0 the correct answer is 0 — the head can reach that food and then has no route
+# back to its tail, which is the entire point of the flag. Testing the food against the head's
+# regions alone returns 1 here.
+#
+# Added after a mutation pass: swapping `head_groups & tail_groups` for `head_groups` alone was
+# caught by **no test** against the sealed-pocket fixtures, because in those the head does not
+# neighbour the pocket either and both rules agree.
+HEAD_ONLY_TRAP = ((0, 1), (1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1),
+                  (9, 2), (9, 3), (9, 4), (9, 5))
+HEAD_ONLY_TRAP_FOOD = (5, 0)      # in the sealed top row: reachable by the head, no way back
+HEAD_ONLY_TRAP_SAFE_FOOD = (5, 5)  # in the lower region, which both head and tail touch
+HEAD_ONLY_TRAP_FACING = 'left'
+
+
+def build_chase_game(c, gate=0, distance_shaping=0.0):
+    """A fresh `Snake` module whose chase-safe knobs are `c` and `gate`.
+
+    Reloaded rather than assigned, for the reason `build_game` documents: `Snake.py` does
+    `from state_helpers import *` and `state_helpers` does `from snake_constants import *`, so both
+    bind their own copy of each constant at import.
+
+    The distance shaping is forced to 0.0 as well, so a reward is the chase-safe term alone. That
+    matches every arm from batch 17 on, and leaving it at its 0.001 default would put an unrelated
+    penalty on some of the moves these tests assert exact values for.
+    """
+    previous = {name: os.environ.get(name) for name in
+                ('SNEK_CHASE_SAFE_SHAPING', 'SNEK_CHASE_SAFE_GATE', 'SNEK_FOOD_DISTANCE_REWARD')}
+    os.environ['SNEK_CHASE_SAFE_SHAPING'] = repr(c)
+    os.environ['SNEK_CHASE_SAFE_GATE'] = str(gate)
+    os.environ['SNEK_FOOD_DISTANCE_REWARD'] = repr(distance_shaping)
+    try:
+        import snake_constants
+        import state_helpers
+        import Snake
+        importlib.reload(snake_constants)
+        importlib.reload(state_helpers)
+        importlib.reload(Snake)
+        assert Snake.CHASE_SAFE_SHAPING == c, Snake.CHASE_SAFE_SHAPING
+        assert Snake.CHASE_SAFE_GATE == gate, Snake.CHASE_SAFE_GATE
+        return Snake
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def restored(module, body, food, facing, discount=GAMMA, score=0, step=0):
+    """A `Game` holding a hand-built board, with the potential set from it by `restore_snapshot`."""
+    game = module.Game(display=False, discount=discount)
+    snapshot = module.GameSnapshot(
+        body=tuple(body), head_move_dir=facing, tail_last_move_dir=facing, food=food,
+        current_score=score, current_step=step, last_food_step=step,
+        finished=False, starved=False, perfect_game=False)
+    game.restore_snapshot(snapshot)
+    return game
+
+
+# -------------------------------------------------------------------------- the knobs
+
+def test_chase_safe_shaping_defaults_to_off():
+    """0.0, so every existing arm and every historical number is unaffected by this feature."""
+    import snake_constants
+    importlib.reload(snake_constants)
+    assert snake_constants.CHASE_SAFE_SHAPING == 0.0
+    assert snake_constants.DEFAULT_CHASE_SAFE_SHAPING == 0.0
+    # The gate default is the variant Phase 0 selected, so turning the term on gets the validated
+    # form rather than the ungated one.
+    assert snake_constants.CHASE_SAFE_GATE == 85
+
+
+def test_both_chase_safe_knobs_reach_the_module_that_consumes_them():
+    # Snake.py holds its own copy from `import *`, which is the failure this asserts against.
+    module = build_chase_game(0.1, gate=75)
+    try:
+        assert module.CHASE_SAFE_SHAPING == 0.1
+        assert module.CHASE_SAFE_GATE == 75
+    finally:
+        restore()
+
+
+# ------------------------------------------------------------------- the potential itself
+
+def test_the_potential_is_zero_when_the_food_is_sealed_off_from_the_tail():
+    """The intersection is what makes this 0: the head reaches the main region, the tail reaches
+    both, and the food is in neither's shared one. Testing the food against the head's regions
+    alone would call this 1 — the trap `group_obs`' comment describes."""
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, SEALED_POCKET, SEALED_FOOD, SEALED_FACING)
+        assert game._chase_safe_potential() == 0.0
+        # The same board with the food out in the open is 1, so the 0 above is about the pocket and
+        # not about the fixture being broken.
+        game = restored(module, SEALED_POCKET, (0, 0), SEALED_FACING)
+        assert game._chase_safe_potential() == 1.0
+    finally:
+        restore()
+
+
+def test_the_potential_tests_the_food_against_the_intersection_not_the_head_alone():
+    """The head neighbours two regions at once here. Food in the one the tail cannot reach is a
+    trap, not a meal — reaching it seals the snake in with it — so the correct answer is 0.
+
+    This is the assertion the sealed-pocket fixtures cannot make, since there the head does not
+    neighbour the pocket either and both rules agree. Verified by mutation: `head_groups` alone
+    fails this and nothing else.
+    """
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, HEAD_ONLY_TRAP, HEAD_ONLY_TRAP_FOOD, HEAD_ONLY_TRAP_FACING)
+        assert game._chase_safe_potential() == 0.0, 'food the tail cannot reach is not chase-safe'
+        # The same board with the food in the region both ends share is 1, so the 0 is about the
+        # intersection and not about the fixture being unreachable in general.
+        game = restored(module, HEAD_ONLY_TRAP, HEAD_ONLY_TRAP_SAFE_FOOD, HEAD_ONLY_TRAP_FACING)
+        assert game._chase_safe_potential() == 1.0
+    finally:
+        restore()
+
+
+def test_the_gate_zeroes_the_potential_below_the_length_threshold():
+    """Below the gate the potential is 0 whatever the board says, which is what confines the term
+    to the endgame. Above it, the same board reads its true chase-safety."""
+    module = build_chase_game(0.1, gate=len(OPEN_BOARD) + 1)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game._chase_safe_potential() == 0.0, 'a snake shorter than the gate must read 0'
+    finally:
+        restore()
+    module = build_chase_game(0.1, gate=len(OPEN_BOARD))
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game._chase_safe_potential() == 1.0, 'at the gate the board decides'
+    finally:
+        restore()
+
+
+def test_the_potential_is_zero_whenever_the_term_is_off():
+    """So `c = 0` skips the flood fill entirely rather than computing a value nobody adds."""
+    module = build_chase_game(0.0, gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game._chase_safe_potential() == 0.0
+    finally:
+        restore()
+
+
+# ------------------------------------------------------------------------- the arithmetic
+
+def test_the_potential_going_up_pays_exactly_c_times_gamma():
+    """0 -> 1 on a real move, engineered rather than hand-set: the tail vacates (9,8), which joins
+    the sealed pocket to the main region. Two-sided, unlike the distance term it replaces."""
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, TAIL_UNSEALS, SEALED_FOOD, TAIL_UNSEALS_FACING)
+        assert game.chase_safe_potential == 0.0, 'fixture must start chase-unsafe'
+        finished, reward = game.step('forward')
+        assert not finished, 'the fixture move must be legal, or this tests a death'
+        assert game.chase_safe_potential == 1.0, 'the tail should have opened the pocket'
+        assert abs(reward - 0.1 * GAMMA) < 1e-12, reward
+    finally:
+        restore()
+
+
+def test_the_potential_going_down_costs_exactly_c():
+    """1 -> 0 costs -c, with no gamma on it, because gamma multiplies only the *new* potential.
+
+    The starting potential is set by hand here. Every legal move on this board leaves Phi at 0 (the
+    pocket's seal is mid-body and the vacated cell is in the main region), so a 1 -> 0 transition
+    cannot be produced from a restore alone — the snake opens space as it moves.
+    """
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, SEALED_POCKET, SEALED_FOOD, SEALED_FACING)
+        game.chase_safe_potential = 1.0
+        finished, reward = game.step('forward')
+        assert not finished
+        assert game.chase_safe_potential == 0.0
+        assert abs(reward - (-0.1)) < 1e-12, reward
+    finally:
+        restore()
+
+
+def test_a_held_potential_costs_exactly_c_times_gamma_minus_one():
+    """The discounting of a constant potential, and the test that gamma is wired at all: at gamma
+    = 1.0 this would be exactly 0.0 and the term would be a per-step bonus for being chase-safe."""
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game.chase_safe_potential == 1.0
+        finished, reward = game.step('forward')
+        assert not finished
+        assert game.chase_safe_potential == 1.0, 'the fixture must hold the potential'
+        assert abs(reward - 0.1 * (GAMMA - 1.0)) < 1e-12, reward
+    finally:
+        restore()
+
+
+def test_the_discount_is_threaded_and_not_defaulted():
+    """`SnakeEnvironment` owns the true gamma; a Game built without it would silently use 1.0."""
+    import snake_environment
+    importlib.reload(snake_environment)
+    env = snake_environment.SnakeEnvironment(discount=0.9975, display=False, policy_name='smoke')
+    assert env._game.shaping_discount == 0.9975
+
+
+# --------------------------------------------------------------- the ending, and the ablation
+
+def test_the_potential_is_zero_at_a_death_so_the_last_step_pays_minus_c():
+    """`Phi(terminal) = 0` is what the invariance requires, and the same branch keeps the potential
+    off an unusable grid — on a death the head is off the board. A starvation and a perfect game
+    take this identical branch, since both set `self.finished` before the term runs."""
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game.chase_safe_potential == 1.0
+        # One left turn from facing right points the head up, then straight on into the wall at
+        # y < 0. Six moves from (5,5); the loop is longer so the fixture is not one step from
+        # silently asserting nothing if the opening tile ever moves.
+        finished = False
+        for index in range(9):
+            finished, reward = game.step('left' if index == 0 else 'forward')
+            if finished:
+                break
+        assert finished, 'the walk must reach the wall'
+        assert game.chase_safe_potential == 0.0
+        # The death pays DEATH_REWARD plus -c times whatever the potential was, which on this board
+        # is 1.0 for every step up until the wall.
+        assert abs(reward - (-5.0 - 0.1)) < 1e-12, reward
+    finally:
+        restore()
+
+
+def test_a_starvation_also_ends_with_a_zero_potential():
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        # One step from starving: the budget is spent, so the next step ends the episode.
+        game.last_food_step = game.current_step - module.starve_budget(len(game.snake_group))
+        finished, reward = game.step('forward')
+        assert finished and game.starved, (finished, game.starved)
+        assert game.chase_safe_potential == 0.0
+        assert abs(reward - (-0.5 - 0.1)) < 1e-12, reward
+    finally:
+        restore()
+
+
+def test_turning_the_chase_safe_knob_off_changes_no_reward_and_no_food_position():
+    """The regression that protects every existing arm. `count_groups` draws no randomness, so
+    skipping the term cannot shift the food stream — this asserts that rather than assuming it."""
+    actions = ['forward', 'left', 'forward', 'right', 'forward'] * 4
+    for seed in (1, 5, 9):
+        off = play_chase(0.0, actions, seed=seed)
+        on_but_zero = play_chase(0.0, actions, seed=seed, gate=0)
+        assert off == on_but_zero, seed
+        shaped = play_chase(0.1, actions, seed=seed, gate=0)
+        assert [s['food'] for s in shaped] == [s['food'] for s in off], (
+            'the shaped run must see the same food stream, or nothing below is comparable')
+
+
+def play_chase(c, actions, seed=7, gate=0, discount=GAMMA):
+    """Plays a fixed action sequence from a fresh episode under the chase-safe knobs."""
+    module = build_chase_game(c, gate=gate)
+    try:
+        game = module.Game(display=False, discount=discount)
+        random.seed(seed)
+        game.reset()
+        steps = []
+        for action in actions:
+            finished, reward = game.step(action)
+            steps.append({'reward': round(reward, 12), 'finished': finished,
+                          'head': game.head.tile_pos,
+                          'food': (game.current_food.position
+                                   if game.current_food != 'no food' else None)})
+            if finished:
+                break
+        return steps
+    finally:
+        restore()
+
+
+def test_the_shaped_rewards_telescope_to_minus_c_times_the_opening_potential():
+    """The invariance property, end to end and on a real episode.
+
+    Differencing a shaped run against an unshaped one on the same food stream isolates `F` exactly,
+    and the discounted sum of `F` has to come out at `-c * Phi(s0)` — a constant that depends on the
+    opening board and *not* on the policy, which is the whole reason this form is safe. A sign
+    error, a missing gamma or a non-zero terminal potential each break it.
+    """
+    actions = ['forward', 'left', 'forward', 'right', 'forward'] * 6
+    for seed in (1, 5, 9):
+        plain = play_chase(0.0, actions, seed=seed)
+        shaped = play_chase(0.1, actions, seed=seed, gate=0)
+        assert len(plain) == len(shaped), 'the two runs must follow the same trajectory'
+        telescope = sum((GAMMA ** index) * (shaped[index]['reward'] - plain[index]['reward'])
+                        for index in range(len(shaped)))
+        # Phi(s0) on the opening board: the snake starts at length 5 in open space, so 1 unless the
+        # food happened to spawn sealed, which cannot happen on an opening board.
+        assert abs(telescope - (-0.1 * 1.0)) < 1e-9, (seed, telescope)
+
+
+# ------------------------------------------------------------------ the fork, and the snapshot
+
+def test_restoring_a_snapshot_rebuilds_the_potential_from_the_restored_board():
+    """`GameSnapshot` does not carry the potential, and `ForkingCollector` reuses a pool of envs, so
+    without this a branch computes its first F against the value left by the previous branch."""
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game.chase_safe_potential == 1.0
+        # Deliberately wrong before the restore, which is exactly the pooled-env situation.
+        game.chase_safe_potential = 1.0
+        snapshot = module.GameSnapshot(
+            body=SEALED_POCKET, head_move_dir=SEALED_FACING, tail_last_move_dir=SEALED_FACING,
+            food=SEALED_FOOD, current_score=0, current_step=0, last_food_step=0,
+            finished=False, starved=False, perfect_game=False)
+        game.restore_snapshot(snapshot)
+        assert game.chase_safe_potential == 0.0, 'the stale 1.0 survived the restore'
+    finally:
+        restore()
+
+
+def test_a_restored_branch_pays_the_same_shaped_reward_as_its_parent_would():
+    """The same gap, end to end on the path the collector takes: fork, then step, and the branch's
+    first shaped reward has to match the parent's."""
+    module = build_chase_game(0.1, gate=0)
+    try:
+        parent = restored(module, TAIL_UNSEALS, SEALED_FOOD, TAIL_UNSEALS_FACING)
+        snapshot = parent.snapshot()
+        _, parent_reward = parent.step('forward')
+
+        branch = module.Game(display=False, discount=GAMMA)
+        # A pooled env that has already played something else, so its potential is whatever that
+        # episode left behind.
+        random.seed(3)
+        branch.reset()
+        branch.step('forward')
+        branch.chase_safe_potential = 1.0
+        branch.restore_snapshot(snapshot)
+        _, branch_reward = branch.step('forward')
+        assert abs(branch_reward - parent_reward) < 1e-12, (parent_reward, branch_reward)
+    finally:
+        restore()
+
+
+def test_the_state_potential_agrees_with_the_observation_the_policy_reads():
+    """`chase_safe_state` on the post-move board must mean the same thing as `obs[15 + a]`, which is
+    what the policy actually sees. Asserted on a coiled fixture: on an open board the two agree
+    whatever the rule is, so this only says anything because the pocket is here.
+
+    Excludes nothing, because the fixture move neither eats nor follows the tail — the two
+    documented cases where `group_obs` deliberately answers a different question.
+    """
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, TAIL_UNSEALS, SEALED_FOOD, TAIL_UNSEALS_FACING)
+        observation = game.get_observation()
+        # 15-17 is the safe-to-chase block, ordered left, right, forward.
+        forward_flag = float(observation[15 + module.ACTIONS.index('forward')])
+        game.step('forward')
+        assert game.chase_safe_potential == forward_flag, (forward_flag,
+                                                           game.chase_safe_potential)
+        assert forward_flag == 1.0, 'the fixture must exercise a 1, or the equality is trivial'
+    finally:
+        restore()

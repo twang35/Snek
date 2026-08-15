@@ -112,6 +112,15 @@ def main(argv):
     if FOOD_DISTANCE_REWARD != DEFAULT_FOOD_DISTANCE_REWARD:
         print('hyperparameter override: FOOD_DISTANCE_REWARD = {0} (default {1})'.format(
             FOOD_DISTANCE_REWARD, DEFAULT_FOOD_DISTANCE_REWARD))
+    # Same reasoning for the chase-safe shaping knobs, and the gate is printed alongside `c`
+    # whenever the term is on at all — a gate is meaningless without knowing the coefficient, and
+    # this pair is exactly the kind of thing that would otherwise be reconstructed from memory when
+    # a batch is read back months later.
+    if CHASE_SAFE_SHAPING != DEFAULT_CHASE_SAFE_SHAPING:
+        print('hyperparameter override: CHASE_SAFE_SHAPING = {0} (default {1}), '
+              'CHASE_SAFE_GATE = {2} (default {3})'.format(
+                  CHASE_SAFE_SHAPING, DEFAULT_CHASE_SAFE_SHAPING,
+                  CHASE_SAFE_GATE, DEFAULT_CHASE_SAFE_GATE))
 
     # Fraction of *refinement-phase* episodes in which the epsilon coin's random move is drawn
     # from the non-fatal moves instead of all three. 0.0 reproduces batch 12 exactly. See
@@ -468,6 +477,12 @@ def main(argv):
         'DEATH_REWARD': DEATH_REWARD,
         'FOOD_REWARD': FOOD_REWARD,
         'FOOD_DISTANCE_REWARD': FOOD_DISTANCE_REWARD,
+        'CHASE_SAFE_SHAPING': ('off' if not CHASE_SAFE_SHAPING else
+                               'c={0}, potential-based on head/food/tail in one region, '
+                               '{1}'.format(CHASE_SAFE_SHAPING,
+                                            'ungated' if CHASE_SAFE_GATE <= 0 else
+                                            'gated to snake length >= {0}'.format(
+                                                CHASE_SAFE_GATE))),
         'eval_only': eval_only,
         'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }

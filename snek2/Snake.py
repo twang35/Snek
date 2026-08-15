@@ -163,10 +163,21 @@ class Food(pygame.sprite.Sprite):
 
 
 class Game:
-    def __init__(self, display=True, limit_fps=False, policy_name=''):
+    def __init__(self, display=True, limit_fps=False, policy_name='', discount=1.0):
         self.display = display
         self.limit_fps = limit_fps
         self.policy_name = policy_name
+        # The discount the *agent* trains with, threaded in from SnakeEnvironment rather than
+        # re-read from the environment here, because snek2.py holds its default (`tuned('DISCOUNT',
+        # 0.99)`) and a second copy of that number would drift silently. Only the potential-based
+        # shaping term uses it: with gamma = 1 the shaped rewards telescope in undiscounted terms
+        # while the agent discounts, which leaves a residual per-step bonus for being chase-safe —
+        # a different and unprincipled term. The 1.0 default is what the frozen diagnostics that
+        # build a Game directly get, and they all run with shaping off.
+        self.shaping_discount = discount
+        # Phi(s) for the board as it currently stands, cached between steps so the flood fill runs
+        # once per step rather than twice. reset() and restore_snapshot() both set it.
+        self.chase_safe_potential = 0.0
         # show screen
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
 
@@ -263,6 +274,28 @@ class Game:
         self.starved = False
         self.perfect_game = False
 
+        # After _rebuild_grid(), because the potential reads the grid. Below any sensible gate at
+        # the opening length of 5, so this is 0 for the gated form — which is what makes the
+        # episode's discounted shaping telescope to exactly 0.
+        self.chase_safe_potential = self._chase_safe_potential()
+
+    def _chase_safe_potential(self):
+        """Phi(s) for the current board: chase-safety, gated by snake length. 0.0 when shaping is off.
+
+        Gated because Phase 0 chose the length-gated variant — see CHASE_SAFE_GATE. The gate is
+        tested *before* the flood fill, so a below-gate board costs nothing but a comparison, which
+        is most of the episode.
+
+        Returns 0.0 whenever CHASE_SAFE_SHAPING is 0.0 so the ablation skips `count_groups`
+        entirely. That cannot change the food stream: `count_groups` draws no randomness.
+        """
+        if not CHASE_SAFE_SHAPING:
+            return 0.0
+        if len(self.snake_group) < CHASE_SAFE_GATE:
+            return 0.0
+        return float(chase_safe_state(self.grid, self.head.tile_pos, self.tail.tile_pos,
+                                      self.current_food))
+
     def get_observation(self):
         # Each segment lands on the cell its predecessor just left, so the tail's next cell is
         # wherever the segment ahead of it stands now. group_obs needs that as well as the
@@ -340,6 +373,18 @@ class Game:
         self.perfect_game = snapshot.perfect_game
 
         self._rebuild_grid()
+
+        # **The potential is per-episode state, and the snapshot does not carry it**, so a forked
+        # branch would otherwise compute its first F against the value left behind by whatever
+        # branch last used this pooled env — an arbitrary constant of up to +/-c in the branch's
+        # return, which breaks the telescope on exactly the transitions the term exists to improve.
+        # Live rather than hypothetical: the base config runs FORK_BRANCHES=4 with forks at length
+        # >= 85, and `ForkingCollector._fork` pops envs off a reused pool.
+        #
+        # Recomputed rather than added to GameSnapshot: Phi is a pure function of grid, head, tail
+        # and food, all of which are restored exactly above, so this is byte-identical to carrying
+        # the value and it leaves GameSnapshot, validate_snapshot and test_game_snapshot alone.
+        self.chase_safe_potential = self._chase_safe_potential()
 
     def _build_snake(self, body, head_move_dir, tail_last_move_dir):
         """Builds a snake of arbitrary shape from ordered body cells, head first.
@@ -526,6 +571,27 @@ class Game:
             moves_to_food = distance_to_food(self.head.tile_pos, self.current_food.position)
             if moves_to_food > old_moves_to_food:
                 reward -= FOOD_DISTANCE_REWARD
+
+        # Potential-based shaping (Ng, Harada and Russell 1999): F = c * (gamma * Phi(s') - Phi(s)).
+        # This form leaves the optimal policy unchanged for any bounded Phi, which is the reason to
+        # prefer it here — the marker it rests on is correlational, so a term that *could* move the
+        # optimum would be a real risk. It can only make learning faster or slower.
+        #
+        # Its position at the end of step() is load-bearing. By here _rebuild_grid() has run, so
+        # self.grid is the post-move board; every branch that can set self.finished has run; and on
+        # a step that ate, the replacement food is already placed, so Phi(s') is measured against
+        # the **new** food. That last point is what the per-action flag at obs[15 + a] cannot give.
+        #
+        # `Phi(terminal) = 0` is required by the theory, and the branch is also what keeps this off
+        # an unusable grid: on a death the head is off the board.
+        #
+        # A perfect game therefore pays -c at the winning step. Required, and negligible against
+        # PERFECT_GAME_REWARD = 100.
+        if CHASE_SAFE_SHAPING:
+            new_potential = 0.0 if self.finished else self._chase_safe_potential()
+            reward += CHASE_SAFE_SHAPING * (self.shaping_discount * new_potential
+                                            - self.chase_safe_potential)
+            self.chase_safe_potential = new_potential
 
         return self.finished, reward
 
