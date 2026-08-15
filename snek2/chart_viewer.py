@@ -126,22 +126,49 @@ def register_arm(policy_name):
         pass
 
 
-# How long a registered arm keeps its panel. Long enough that a wave (~6 h to a 2M cap) is never
-# cut short, short enough that tomorrow's wave under the same prefix does not inherit today's
-# arms as extra panels — the `runs/b20*.png` glob this file replaced grew to eight stale panels
-# plus four live ones exactly that way.
+# Backstop only: a line older than this is dropped whatever else is true, so the file cannot grow
+# without bound. **It is not what separates one wave from the next — liveness is** (see
+# `registered_arms`). A TTL alone cannot do that job, and shipping one that tried is why batch 30's
+# relaunch opened a window with **eight panels**: the arms it replaced were 71 minutes old, well
+# inside 12 h, so the registry offered all eight and the union took them.
 ARM_REGISTRY_TTL = 12 * 3600
+# Grace period in which a registered arm needs no live process to keep its panel. This is the whole
+# reason the registry exists: a trainer registers before `exec` is visible to `ps` and while Python
+# is still importing TensorFlow, so for the first seconds of a wave the process scan genuinely
+# cannot see arms that are starting. 120 s is ~20x the observed gap between registration and a
+# scan-visible process, and short enough that a dead arm from an earlier launch never reaches it.
+ARM_REGISTRY_GRACE = 120
 # Hard cap on panels, whatever the registry says. A window taller than the screen shows nothing.
 MAX_WAVE_PANELS = 8
 
 
-def registered_arms(prefix, now=None):
-    """Arms that registered under `prefix` within `ARM_REGISTRY_TTL`, oldest first, deduped.
+def registered_arms(prefix, now=None, alive=None):
+    """Arms `prefix`'s trainers registered that are **either just-registered or still running**.
+
+    Oldest first, deduped. Two admission rules, and the second is the one that separates a relaunch
+    from the wave it replaced:
+
+    - **age <= `ARM_REGISTRY_GRACE`** — a starting arm, which the process scan cannot see yet. This
+      is the registry's purpose and it needs no corroboration.
+    - **the policy has a live trainer** — an older entry that is still real. After the grace period
+      the process list is the authority on "running", so the registry stops asserting it alone.
+
+    **Age alone was not enough, and batch 30 proved it within an hour.** The original rule admitted
+    anything inside a 12 h TTL, so relaunching `b30` 71 minutes after killing its first wave offered
+    the four dead arms plus the four new ones and the window opened with eight panels — the exact
+    failure the registry was introduced to prevent, arriving by a different route.
+
+    **This does not weaken the sticky-panel property**, which is the reason the naive fix ("drop
+    anything not running") looks wrong: stickiness does not live here. `wave_files` accumulates into
+    its caller's `known` list and never prunes it, so an arm that finishes mid-wave was already
+    admitted and keeps its panel for the life of the viewer. What this rule drops is an arm that was
+    never in *this* viewer's `known` to begin with.
 
     Unreadable or malformed lines are skipped rather than raised on: this is a convenience index
     rebuilt by every launch, so a corrupt line costs one panel and never the window.
     """
     now = time.time() if now is None else now
+    alive = live_arms(prefix) if alive is None else alive
     found = []
     try:
         with open(arms_path(prefix)) as handle:
@@ -158,6 +185,8 @@ def registered_arms(prefix, now=None):
             continue
         if age > ARM_REGISTRY_TTL or age < -60:
             continue        # stale, or a clock that ran backwards further than a skew
+        if age > ARM_REGISTRY_GRACE and policy not in alive:
+            continue        # a previous wave's arm: registered long ago, not running now
         if batch_prefix(policy) == prefix and policy not in found:
             found.append(policy)
     return found
@@ -174,9 +203,15 @@ def wave_files(prefix, known):
     Sticky on purpose: `known` is mutated and never pruned, so an arm that reaches its step
     cap keeps its panel while its siblings run. That is the point of watching a wave — the
     finished curve is what the others get compared against — and it also means a transient
-    `ps` failure cannot blank the window.
+    `ps` failure cannot blank the window. It is also where *all* the stickiness lives, which is what
+    lets `registered_arms` require liveness of anything past its grace period.
+
+    One scan, passed to both readers. Two scans would be two chances to disagree — an arm appearing
+    between them would be admitted by the second and absent from the first, which is the class of
+    race this file has already been bitten by twice.
     """
-    for policy in registered_arms(prefix) + live_arms(prefix):
+    alive = live_arms(prefix)
+    for policy in registered_arms(prefix, alive=alive) + alive:
         if policy not in known:
             known.append(policy)
     del known[MAX_WAVE_PANELS:]

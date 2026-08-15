@@ -1044,6 +1044,102 @@ def test_wave_files_caps_the_panel_count():
     assert len(files) == chart_viewer.MAX_WAVE_PANELS
 
 
+def _write_registry(prefix, entries, now):
+    """Registry lines as `(age_seconds, policy)` pairs, so a fixture can place an entry either
+    side of the grace period without waiting."""
+    with open(chart_viewer.arms_path(prefix), 'a') as handle:
+        for age, policy in entries:
+            handle.write('{0:.0f}\t{1}\n'.format(now - age, policy))
+
+
+def test_registered_arms_drops_a_dead_arm_from_a_relaunch_the_same_hour():
+    """**The eight-panel bug, 2026-08-14.** b30 was killed and relaunched 71 minutes later; the TTL
+    was 12 h, so the registry still offered the four dead arms and the window opened on eight.
+
+    Age cannot decide this — 71 minutes is an ordinary gap both for "a wave that started slowly"
+    and for "the wave I replaced". Liveness can, and does."""
+    _clear_locks()
+    now = 1_800_000_000.0
+    _write_registry('b30', [(71 * 60, 'b30a-dead1'), (71 * 60, 'b30b-dead2'),
+                            (20, 'b30e-live1'), (20, 'b30f-live2')], now)
+    assert chart_viewer.registered_arms('b30', now=now, alive=['b30e-live1', 'b30f-live2']) == [
+        'b30e-live1', 'b30f-live2']
+
+
+def test_registered_arms_admits_a_starting_arm_no_scan_can_see_yet():
+    """The property the grace period exists for, and the one the liveness rule must not break:
+    for the first seconds of a wave the trainer has registered but `ps` cannot see it — it is
+    mid-`exec`, or still importing TensorFlow. That is the 3-of-4 bug, and `alive=[]` is exactly
+    what the scan returned when it happened."""
+    _clear_locks()
+    now = 1_800_000_000.0
+    _write_registry('b30', [(5, 'b30a-juststarted')], now)
+    assert chart_viewer.registered_arms('b30', now=now, alive=[]) == ['b30a-juststarted']
+
+
+def test_registered_arms_keeps_an_older_arm_that_is_still_running():
+    """A viewer restarted by hand three hours into a wave: every entry is far past the grace
+    period, and every arm is alive. All four keep their panels."""
+    _clear_locks()
+    now = 1_800_000_000.0
+    arms = ['b30e-live1', 'b30f-live2', 'b30g-live3', 'b30h-live4']
+    _write_registry('b30', [(3 * 3600, name) for name in arms], now)
+    assert chart_viewer.registered_arms('b30', now=now, alive=arms) == arms
+
+
+def test_registered_arms_still_honours_the_ttl_for_a_long_running_arm():
+    """The TTL is a backstop on file growth, not the wave rule, so it outranks liveness: an entry
+    older than 12 h is dropped even for a live arm. Harmless — a live arm is admitted by the scan
+    in the same breath (see `wave_files`), so this only stops the *file* from mattering forever."""
+    _clear_locks()
+    now = 1_800_000_000.0
+    _write_registry('b30', [(chart_viewer.ARM_REGISTRY_TTL + 60, 'b30a-ancient')], now)
+    assert chart_viewer.registered_arms('b30', now=now, alive=['b30a-ancient']) == []
+
+
+def test_wave_files_does_not_inherit_the_previous_wave_after_a_relaunch():
+    """End to end, the shape the user saw: registry holds both waves, `ps` shows only the new one,
+    and the window gets four panels rather than eight."""
+    _clear_locks()
+    dead = ['b30a-chase10seed1', 'b30b-chase10seed2', 'b30c-chase10seed3', 'b30d-chase10seed4']
+    _write_registry('b30', [(71 * 60, name) for name in dead], time.time())
+    live = ['b30e-chase10seed1', 'b30f-chase10seed2', 'b30g-chase10seed3', 'b30h-chase10seed4']
+    for name in live:
+        chart_viewer.register_arm(name)
+    saved = chart_viewer.subprocess.run
+    try:
+        chart_viewer.subprocess.run = _fake_ps(
+            [' {0} /opt/miniconda3/envs/snek/bin/python -u snek2.py {1}'.format(1000 + i, name)
+             for i, name in enumerate(live)])
+        files = chart_viewer.wave_files('b30', [])
+    finally:
+        chart_viewer.subprocess.run = saved
+    assert [chart_viewer.policy_from_png(f) for f in files] == live
+
+
+def test_wave_files_keeps_a_finished_arm_whose_registry_entry_no_longer_qualifies():
+    """**The reason liveness in `registered_arms` is safe.** Stickiness lives in `known`, not in the
+    registry: an arm admitted while running keeps its panel after it stops, even though its entry is
+    past the grace period and its process is gone. Without this the naive "drop what is not running"
+    fix would blank the finished curve the surviving arms are read against."""
+    _clear_locks()
+    now = time.time()
+    _write_registry('b30', [(chart_viewer.ARM_REGISTRY_GRACE + 60, 'b30e-finished'),
+                            (chart_viewer.ARM_REGISTRY_GRACE + 60, 'b30f-running')], now)
+    saved = chart_viewer.subprocess.run
+    known = []
+    try:
+        both = [' 1001 /opt/miniconda3/envs/snek/bin/python -u snek2.py b30e-finished',
+                ' 1002 /opt/miniconda3/envs/snek/bin/python -u snek2.py b30f-running']
+        chart_viewer.subprocess.run = _fake_ps(both)
+        assert len(chart_viewer.wave_files('b30', known)) == 2
+        chart_viewer.subprocess.run = _fake_ps(both[1:])     # b30e has reached its cap
+        files = chart_viewer.wave_files('b30', known)
+    finally:
+        chart_viewer.subprocess.run = saved
+    assert [chart_viewer.policy_from_png(f) for f in files] == ['b30e-finished', 'b30f-running']
+
+
 def test_register_arm_never_raises_when_the_registry_is_unwritable():
     """A registry write is never worth a training run."""
     saved = chart_viewer.LOCK_DIR
