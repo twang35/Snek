@@ -80,6 +80,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b25d-fc200x100x100noisseed4-r2` ‡‡‡ § | **fc 200,100,100**, IS off, td_error | 3.00M | 99.0% @2431k /100 | 98.3% | 85.92% /eq §§ | 94.3% | ‡‡‡ § HOF-500 best partial 96.4% @2431k (304 episodes, abandoned). Its peak arrives late — peak trailing 95.00 at 2426k |
 | `b25a-fc200x100x100noisseed1-r2` ‡‡‡ § | **fc 200,100,100**, IS off, td_error | 3.00M | 99.0% @802k /100 | 98.7% | 85.59% /eq §§ | 93.7% | ‡‡‡ § its 99%/100 @802k re-measured to **92.7%** before gate 98 abandoned it — the batch's clearest selection-inflation row |
 | `b25b-fc200x100x100noisseed2-r2` ‡‡‡ § | **fc 200,100,100**, IS off, td_error | 3.00M | 99.0% @890k /100 | 98.7% | 85.54% /eq §§ | **95.3%** | ‡‡‡ § **the batch's one plausible hall candidate**: @911k was still **97.2% at 392 episodes** when gate 98 stopped it. Gate 97 would have run it to 500; not promoted, since the auto chain's gate is 98 |
+| `b30e-chase10fc200x100x100seed1` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 99.0% @641k /100 | 99.0% | 83.75% /eq §§ | 93.7% | ‡‡‡ § shaped counterpart of `b25a`. 6 checkpoints ≥98%/100 re-measured at 500/gate 98: **0 held**, best 96.1% @651k (285 ep, ab.). No record |
+| `b30g-chase10fc200x100x100seed3` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 99.0% @738k /100 | 98.3% | 84.28% /eq §§ | 93.3% | ‡‡‡ § shaped counterpart of `b25c`. 3 checkpoints ≥98%/100 → **0 held**, best 95.3% @709k (233 ep, ab.). No record |
+| `b30f-chase10fc200x100x100seed2` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 98.0% @643k /100 | 97.0% | 84.32% /eq §§ | 92.3% | ‡‡‡ § shaped counterpart of `b25b`. 1 checkpoint ≥98%/100 → **0 held**, 90.9% @643k (132 ep, ab.). No record |
+| `b30h-chase10fc200x100x100seed4` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 97.0% @614k /100 | 96.3% | 81.00% /eq §§ | 92.3% | ‡‡‡ § shaped counterpart of `b25d`. **No ≥98%/100 checkpoint**, so the HOF-500 selected nothing. Lowest pooled of the four |
 | `b26b-fc100x100noisseed2` ‡‡‡ § | **fc 100,100** (2 layers, 0.62× the b24 net), IS off, td_error | 3.00M | 97.0% @1948k /100 | 96.7% | **83.83%** /eq §§ | 93.7% | ‡‡‡ § best of b26 on every column; `sef` 58.0%. **No ≥98%/100 checkpoint**, so the auto HOF-500 selected nothing |
 | `b26c-fc100x100noisseed3` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 97.0% @1969k /100 | 96.0% | 83.18% /eq §§ | 92.0% | ‡‡‡ § 2nd of b26; only 7 full-length rows cleared gate 95, against b25c's 64 — the shallow shape spends much less time in the measurable band |
 | `b26a-fc100x100noisseed1` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 95.0% @2904k /100 | 95.0% | 80.02% /eq §§ | 88.0% | ‡‡‡ § just 2 full-length rows, both at the gate exactly. Peak trailing 94.92 — the first b24-family arm not to reach 95.00 |
@@ -263,6 +267,43 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 30 — chase-safe shaping on `fc 200,100,100`, `c=0.10`: **null, and it completes the shaping×architecture 2×2**
+
+**b27's shaping term on b25's net.** Potential-based chase-safe shaping — `c·(γΦ(s′) − Φ(s))` with Φ = 1
+iff the head and tail share a free region that also holds the food and the snake is ≥85 long — on
+`fc 200,100,100`, IS off, `td_error`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no
+food-distance shaping, **2M cap**, seeds 1-4. The seed-matched control is **b25** (`-r2`). With b24
+(`fc 320` control) and b27 (`fc 320` shaped) it closes a **2×2 of shaping × architecture**, so the shaping
+result no longer rests on one net.
+
+**Trained and closed out on the laptop, after a killed-and-resumed close-out.** The first close-out pass was
+killed at ~80-100% screened; the relaunch with `EVAL_RESUME=1` reused ~75k banked episodes and finished the
+rest, then a HOF-500 re-measure ran on the three arms with a ≥98%/100 checkpoint (only the valid post-fix
+runs `b30e-h`; the first launches `b30a-d` trained under the perfect-counting bug and are discarded — see
+[`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)).
+
+**The result is a null, pointing the same way as b27.** Close-out pools **83.3** (eq-effort, gate 95),
+**−2.7 under the b25 control's 86.0** — the identical gap and direction as b27's 85.2 vs b24's 87.9. And on
+the metric that decides it, **0 of b30's 10 ≥98%/100 checkpoints held ≥98%/500**: every one deflated (best
+`b30e` @651k 96.1%), exactly as b25's four arms did (best 97.2%). So on `fc 200,100,100` shaped and control
+are a dead heat at zero records.
+
+| arm | peak trail | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|---|
+| `b30e` seed1 | 95.00 | 93.7% | 58.4% | 83.75 | 6 ckpts, best 96.1% (ab.) — **0 held** |
+| `b30g` seed3 | 95.00 | 93.3% | 58.3% | 84.28 | 3 ckpts, best 95.3% (ab.) — **0 held** |
+| `b30f` seed2 | 94.92 | 92.3% | 55.9% | 84.32 | 1 ckpt, 90.9% (ab.) — **0 held** |
+| `b30h` seed4 | 95.00 | 92.3% | 55.0% | 81.00 | no ≥98%/100 |
+| **mean** | | **92.9%** | **56.9%** | **83.3** | **0 of 10 held** |
+
+**The 2×2 verdict.** On `fc 320` the control (b24) produced two records and the shaped arm (b27) none; on
+`fc 200,100,100` neither reaches a record. Chase-safe shaping at `c=0.10` produces no record-tier checkpoint
+on either net and removes the control's records on the wider one — **null-to-negative, confirmed on two
+architectures**. Whether a larger dose changes that is what **b28** (`c=0.20`) is running to answer; the Φ
+calibration ([findings.md](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one))
+predicts it will not, since Φ carries ~0 at the lengths where a perfect game is decided. Full conclusion:
+[`findings.md`](findings.md#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
 
 ## Batch 26 — FC `100,100` under IS-off: **the shallow shape does not carry the lift**
 

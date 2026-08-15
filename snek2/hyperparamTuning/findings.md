@@ -75,6 +75,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ Free space in one piece at length 90-94 separates the records from a dud by 87 points** | **measured 2026-08-14** — one-piece share **92% / 77% / 5%** for `b24d` / `b18b` / `b20d`, per meal, identical food, exact (one flood fill, no search). The gap opens **ten meals before the end**, and all three reach those lengths equally often. Largest per-policy separation on record here |
 | **‡ The chase-safe potential self-attenuates: ~35 flips per episode for a dud, ~4.6 for a record** | **measured 2026-08-14**, 60 episodes × 3 checkpoints. Genuine flips per endgame meal are **2.5-3.6** for `b20d` against **0.21-0.63** for the records, which spend 10.8% of steps at length ≥85 against `b20d`'s 41.2%. Sets `c = 0.10`. **98-99 carries 0.00-0.04 — the last meals cannot be shaped by this quantity.** See below |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
+| **‡‡ Chase-safe reward shaping at `c=0.10` is null-to-negative — 0 records on two nets, −2.7 pooled on both** | **measured 2026-08-15**. b27 (`fc 320`) and b30 (`fc 200,100,100`) vs seed-matched IS-off controls: on `fc 320` shaped held **0 of 4** ≥98%/500 against the control's **2** (the records); on `fc 200,100,100` **0 vs 0**. Both healthy throughout, so not destabilizing — it buys nothing, and on the wider net it removed the control's records. **The dose is still open**: b28 (`c=0.20`) is running. See below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
 | **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
@@ -273,6 +274,46 @@ since nothing here argues for restoring it, and batch 17 onward runs with `FOOD_
 the pf30 crossing was flat (424k vs 429k) and the ceiling had not moved. Both facts were right and the
 conclusion was wrong — they are the two metrics this effect does *not* touch. **"Read crossings early,
 read levels late" cuts both ways: an early crossing read is trustworthy and says nothing about level.**
+
+
+## ‡‡ Chase-safe reward shaping is null-to-negative at `c=0.10` — two architectures agree
+
+**Potential-based chase-safe shaping adds `c·(γΦ(s′) − Φ(s))` to every step, with Φ = 1 iff the head and
+tail share a free region that also holds the food and the snake is ≥85 long** — potential-based, so the
+optimal policy is untouched and only the gradient on the way there changes ([the plan](../plans/chase-safe-reward-shaping.md);
+Φ calibration [below](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)).
+Two batches carry it at `c=0.10` against seed-matched IS-off controls, one per architecture:
+
+| net | shaped | control | shaped ≥98%/500 | control ≥98%/500 | pooled shaped (control) |
+|---|---|---|---|---|---|
+| `fc 320` | `b27e-h` | `b24a-d` | **0 of 4** | **2 of 4** (the records) | 85.2 (87.9), **−2.7** |
+| `fc 200,100,100` | `b30e-h` | `b25a-d` | **0 of 4** | **0 of 4** | 83.3 (86.0), **−2.7** |
+
+**On the decisive metric — a checkpoint that holds ≥98% over 500 fresh episodes — shaping produced none on
+either net.** On `fc 320` the control produced two (`b24b`, `b24d`, both 98.0%/500, the project record) and
+the shaped arm none; the best shaped checkpoint re-measured to 97.5% (`b27h` @1945k, 435 ep, abandoned). On
+`fc 200,100,100` neither shaped nor control reaches the gate — b30's ten ≥98%/100 close-out checkpoints all
+deflated at 500 (best `b30e` @651k **96.1%**), and b25's four arms did the same (best 97.2%). Every close-out
+`99%/100` and `98%/100` row is a selection high that shrinks at 500, the selection-inflation this project
+[already documents](#checkpoint-to-checkpoint-variance-is-large-and-it-is-not-sampling-noise).
+
+**Both waves are healthy throughout** — trailing 93.6-94.1 (b27), peak ~95 (b30), no dead or zero stretch —
+so the potential-based term is not destabilizing. It simply buys nothing, and on the wider net it removed the
+control's two records. The pooled gap is the same **−2.7** on both nets: a shade *below* the control, not
+above.
+
+**This is `c=0.10`, and the dose is not yet ruled out.** `b28` (`c=0.20` on `fc 320`) is running to separate
+*"chase-safe is the wrong idea"* from *"the dose was too small to see"*, with `b29` (gate 75) queued behind
+it. Until those land the established claim is the narrow one: **`c=0.10` chase-safe shaping does not help on
+either architecture, and hurts on `fc 320`.** The Φ calibration already shows why a larger `c` may not rescue
+it — [the potential carries 0.00-0.04 at lengths 98-99](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one),
+so the last few meals, where a perfect game is won or lost, cannot be shaped by this quantity at any dose.
+
+**A caveat on the runs themselves.** The first launches of both batches — `b27a-d` and `b30a-d` — trained
+under the [perfect-counting bug](#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)
+that pinned epsilon at 0.0125 and are discarded; the valid, unhandicapped runs are `b27e-h` and `b30e-h`,
+relaunched after the fix, and are the only ones read above.
+
 
 ## Forked endgame collection: null at 60% of the intended dose, and the premise it was built on is false
 
