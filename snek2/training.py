@@ -145,8 +145,9 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
         #
         # The forking collector is a drop-in for the driver that advances one of several branches
         # of the same game instead of only the main line, still one counted step per iteration —
-        # see forking_collector.py. `None` unless SNEK_FORK_BRANCHES is set above 1, so the default
-        # path is the PyDriver call it always was plus one `is None` test.
+        # see forking_collector.py. `None` only when SNEK_FORK_BRANCHES is 1, which since the
+        # 2026-08-14 default raise means someone asked for it explicitly; the PyDriver branch is
+        # kept because that is the plain single-line collect every arm before batch 17 ran.
         if forking_collector is None:
             time_step, _ = collect_driver.run(time_step)
         else:

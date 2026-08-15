@@ -22,8 +22,9 @@ budget. Confined to the endgame by the length gate, that works out to roughly 1.
 episodes per gradient step at a cap of 4. Read a forking arm at matched `global_step` against a
 matched control, and use the `main_steps` counter for the games-played axis.
 
-Nothing here is on by default: `SNEK_FORK_BRANCHES=1` means `validate_config` returns None and
-`training.py` keeps calling `PyDriver` exactly as before.
+**On by default since 2026-08-14** (4 branches) — every arm from batch 17 on passed
+`SNEK_FORK_BRANCHES=4` explicitly, so a default of 1 described no run that existed. `SNEK_FORK_BRANCHES=1`
+still turns it off: `validate_config` returns False and `training.py` calls `PyDriver` exactly as before.
 
 A resume starts with the main line only. Live branches are in memory and are not checkpointed, the
 same discontinuity the replay buffer's own trailing window has always had.

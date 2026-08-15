@@ -138,17 +138,23 @@ def main(argv):
             'SNEK_GUIDED_FRACTION={0} is not a probability. Use a value in [0.0, 1.0].'
             .format(guided_fraction))
 
-    # Forked endgame collection. Off at 1, which is "one branch — the main line", i.e. exactly
-    # today's collect loop. See forking_collector.py for what the branches are for; the short
-    # version is that the buffer holds the consequence of the action taken at an endgame decision
-    # point and never the consequence of the alternative, so `Q(s, a_good)` for the untaken safe
-    # action is trained on nothing and the argmax has no reason to flip.
+    # Forked endgame collection. 1 is off — "one branch, the main line", i.e. the plain collect
+    # loop. See forking_collector.py for what the branches are for; the short version is that the
+    # buffer holds the consequence of the action taken at an endgame decision point and never the
+    # consequence of the alternative, so `Q(s, a_good)` for the untaken safe action is trained on
+    # nothing and the argmax has no reason to flip.
+    #
+    # **Default raised 1 → 4 on 2026-08-14**, because 1 had stopped describing anything that runs:
+    # every arm from batch 17 on passes `SNEK_FORK_BRANCHES=4` explicitly, including the record
+    # holder `b24d` and its control `b22`. A default nobody uses is a trap rather than a
+    # conservative choice — an arm launched without the knob differed from the batch it was meant
+    # to join, silently and in the collector rather than anywhere a metric would show it.
     #
     # Read here rather than in snake_constants, unlike FOOD_DISTANCE_REWARD: these are consumed in
     # this process only — the collector, its environment pool and the training environment all live
     # in the parent — so there is no worker-process copy to go stale, and tuned() gets the
     # `hyperparameter override:` line and the run_config entry for free.
-    fork_branches = tuned('FORK_BRANCHES', 1, int)
+    fork_branches = tuned('FORK_BRANCHES', 4, int)
     fork_prob = tuned('FORK_PROB', 0.5)
     fork_min_length = tuned('FORK_MIN_LENGTH', 85, int)
     fork_max_steps = tuned('FORK_MAX_STEPS', 60, int)
