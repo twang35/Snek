@@ -1,7 +1,7 @@
 # Charts
 
-Progress graphs for the most recent batches — **23 through 27 plus 30**, a cap of six, newest first. Per-arm
-numbers live in
+Progress graphs for the most recent batches — **23 through 27 plus 30**, a cap of six, newest first, plus
+the **C51 pilot** as a temporary seventh while it runs. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
 
@@ -43,6 +43,52 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 diagnostic figures referenced from [`findings.md`](findings.md) and
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
+
+## C51 pilot — distributional RL, learning-rate screen — *four arms running on the laptop*
+
+**A seventh section on purpose, and temporary.** The cap of six counts numbered batches; this is a 600k
+screen that will either become a batch or be closed, and retiring `b23` for something that may not
+survive the day would cost the link repair twice. It goes back to six at the next batch close.
+
+The first C51 arms in this project, from
+[`../plans/distributional-c51.md`](../plans/distributional-c51.md): the scalar head is replaced by a
+distribution over the return on **51 atoms over `[-5, 120]`** trained by cross-entropy, with the PER
+priority as the KL. Everything else is **b25's config verbatim** — `fc 200,100,100`, IS off, target 1000,
+discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping — so `b25a-d` is the seed-matched control
+when this becomes a batch.
+
+**It is a learning-rate screen, not a result.** A cross-entropy loss starts at `ln 51 ≈ 3.93` where the
+Huber TD loss starts near 0, so b25's `1e-5` is not obviously the same step size for a categorical head.
+Two rates × two seeds, seed-matched across the rates.
+
+**Status at 15:20 on 2026-08-15 — the screen has already separated the two rates, and `5e-5` wins
+clearly:**
+
+| arm | step | first perfect game | best single episode | peak trailing | best-30 |
+|---|---|---|---|---|---|
+| `c51pilot-lr5e5seed1` | 41k | **15k** | **95/95** | 46.5 @38k | 0.7 @37k |
+| `c51pilot-lr5e5seed2` | 55k | **20k** | **95/95** | **63.3** @24k | **1.0** @29k |
+| `c51pilot-lr1e5seed1` | 83k | none yet | 60/95 | 16.2 @55k | 0.0 |
+| `c51pilot-lr1e5seed2` | 51k | none yet | 60/95 | 27.1 @37k | 0.0 |
+
+**Both `5e-5` arms won a game inside 20k steps**, against b25's ~9k — the same order, so a categorical
+agent learns this task at a comparable rate and the first question the pilot asks is answered *yes*. Both
+`1e-5` arms are still short of a win at 51-83k with a best episode of 60/95, which is the predicted
+under-stepping: the same rate that suits a Huber TD error is too small for a cross-entropy on 51 atoms.
+**Read none of the peak numbers as a comparison against b25** — these are 40-80k of a 600k screen, and
+`sef` is 0 for all four because no arm has an eval above 80% yet.
+
+![c51pilot-lr5e5seed1](charts/c51pilot-lr5e5seed1.png)
+**c51pilot-lr5e5seed1** — first perfect game at 15k
+
+![c51pilot-lr5e5seed2](charts/c51pilot-lr5e5seed2.png)
+**c51pilot-lr5e5seed2** — the fastest climb of the four, peak trailing 63.3 by 24k
+
+![c51pilot-lr1e5seed1](charts/c51pilot-lr1e5seed1.png)
+**c51pilot-lr1e5seed1** — b25's rate, and visibly slower
+
+![c51pilot-lr1e5seed2](charts/c51pilot-lr1e5seed2.png)
+**c51pilot-lr1e5seed2**
 
 ## Batch 28 — chase-safe shaping at **`c=0.20`**, gate 85 (b24 config) — *b28a-d running on the desktop*
 
@@ -104,13 +150,28 @@ training numbers, shaped first, b25-r2 control at the matched ≤2M horizon in p
 | `b30h-chase10fc200x100x100seed4` | 4 | 92.3 (`b25d` 91.7, +0.6) | 55.0 (54.2, +0.8) | 95.00 |
 | **mean** | | **92.9 (93.6, −0.7)** | **56.9 (58.6, −1.7)** | — |
 
-**Close-out running (resumed) on the laptop.** A first pass (4 parallel `top20`, gate 95) was killed
-~13:29 on 2026-08-15 with all four `complete=false` after screening ~80-100% of each arm; it was
-relaunched with `EVAL_RESUME=1`, which reused every banked measurement (~75k episodes across the four —
-18-22 full-length rows skipped, 551-631 partial screens topped up rather than re-measured) and is
-finishing the remaining ~140 checkpoints per arm. Until it lands b30 still has **no** pooled figure and
-no **≥98%/500 count**, the decisive metric for the shaping×architecture 2×2. Numbers land in
-`completedRuns.md` and the pooled/HOF line here once the four processes reach `complete=true`.
+**Close-out landed 15:05 on 2026-08-15 — all four `complete`, and it points the same way as the training
+numbers: below the control.** A first pass (4 parallel `top20`, gate 95) was killed ~13:29 with all four
+`complete=false`; the relaunch with `EVAL_RESUME=1` reused every banked measurement (~75k episodes across
+the four) and finished the remainder.
+
+| arm | pooled (equal-effort, gate 95) | full-length rows | ≥98%/100 | best full-length row |
+|---|---|---|---|---|
+| `b30f-chase10fc200x100x100seed2` | **84.32** | 22 | 1 | 98.0% @643k |
+| `b30g-chase10fc200x100x100seed3` | 84.28 | 39 | 3 | **99.0% @738k** |
+| `b30e-chase10fc200x100x100seed1` | 83.75 | 28 | **6** | **99.0% @641k** |
+| `b30h-chase10fc200x100x100seed4` | 81.00 | 10 | 0 | 97.0% @614k |
+| **mean** | **83.34** | | **10 total** | |
+
+**83.3 against b25-r2's ~86.1** on the same equal-effort figure — the shaped wave is ~2.8 behind its
+seed-matched control on `fc 200,100,100`, which is the *same direction and about the same size* as b27's
+85.2 vs 87.9 on `fc 320`. Two architectures, two nulls-or-worse.
+
+**The ≥98% column is at 100 episodes, not 500, and the two are not interchangeable** — b25's own
+`99.0%/100` rows re-measured to 92.7-96.4% under the 500-episode gate-98 pass, which is the
+selection-inflation this project already documented. **b30 still has no HOF-500 figure**: the laptop does
+not auto-chain that pass. Running it is what would settle the shaping×architecture 2×2 on the decisive
+metric, and it is a free slot's worth of work whenever one exists.
 
 ![b30e](charts/b30e-chase10fc200x100x100seed1.png)
 **b30e-chase10fc200x100x100seed1**

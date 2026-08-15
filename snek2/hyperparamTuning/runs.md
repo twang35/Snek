@@ -52,39 +52,51 @@ landed (full numbers and graphs in [`charts.md`](charts.md)):
   b24 control's ~87.9 (a shade *below*), and **0 of 4** seeds produced a ≥98%/500 checkpoint — best `b27h`
   **97.5%** — against the control's **two** 98.0%/500 records. `c=0.10` on `fc 320` did not reproduce the
   record, let alone beat it.
-- **b30e-h (laptop): done at 2M — the early edge washed out, and no close-out ran.** Matched at ≤2M the
-  shaped wave reads best-30 **92.9 vs 93.6 (−0.7)** and `sef` **56.9 vs 58.6 (−1.7)** against the b25-r2
-  control — a dead heat, reversing the +6.9 `sef` lead it showed at 0.95M. The laptop does not auto-chain
-  evals, so **b30 has no pooled / no ≥98%-500 figure**; finishing the shaping×architecture 2×2 needs a
-  close-out (rsync the four checkpoints to the desktop and queue, or run it on the now-idle laptop).
+- **b30e-h (laptop): done at 2M and closed out at 15:05 — also a null, and by the same margin as b27.**
+  Training was a dead heat (matched ≤2M best-30 **92.9 vs 93.6**, `sef` **56.9 vs 58.6** against the b25-r2
+  control), and the close-out agrees: pooled equal-effort **83.3 mean** (84.3 / 84.3 / 83.8 / 81.0) against
+  b25-r2's ~86.1, so **~2.8 behind its seed-matched control** — the same direction and size as b27's 85.2 vs
+  87.9 on `fc 320`. **Two architectures, two nulls-or-worse for `c=0.10`.** Ten checkpoints reached ≥98% at
+  *100* episodes (6 / 3 / 1 / 0), best 99.0% — but that is not the ≥98%/**500** gate, and b25's own 99.0%/100
+  rows fell to 92.7-96.4% under it. **b30 still has no HOF-500 pass**; that is what would settle the
+  shaping×architecture 2×2 on the decisive metric, and it needs a free slot.
 - **b28a-d (desktop): running, 262-275k of 2M (~13%), all four healthy** — epsilons off the ceiling
   (0.003-0.005), no zero stretch. The `c=0.20` dose rung, and a dead heat with the control this early
   (matched ≤275k best-30 **56.9 vs 57.4**). Since both `c=0.10` batches came back null, **b28 is the arm
   that decides "wrong idea" vs "dose too small to see."**
-- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: b30e-g's close-out is finishing (~60% of
-  its measurements at 14:53); the C51 pilot below is armed and launches when it exits.**
+- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: b30e-h's close-out finished at 15:05 —
+  all four `complete`, pooled equal-effort 83.8 / 84.3 / 84.3 / 81.0 — and the C51 pilot below launched at
+  15:06.**
 
 **Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
 + forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
 
-## C51 pilot — four arms, armed on the laptop (2026-08-15)
+## C51 pilot — four arms running on the laptop since 15:06 (2026-08-15)
 
-Distributional RL, implemented through phase 3 of
-[`../plans/distributional-c51.md`](../plans/distributional-c51.md). **The code is written and tested but
-uncommitted**, pending review; phase 4 — the real batch — is deliberately not started.
+Distributional RL, phase 3 of
+[`../plans/distributional-c51.md`](../plans/distributional-c51.md). The implementation is committed
+(`245cf914`); phase 4 — the real batch — is deliberately not started.
 
 | | |
 |---|---|
 | arms | `c51pilot-lr1e5seed{1,2}`, `c51pilot-lr5e5seed{1,2}` — seed-matched across the two rates |
 | config | b25's verbatim (`fc 200,100,100`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping) plus `ALGO=c51`, 51 atoms over `[-5, 120]` |
 | cap | **600k steps** — a screen, not a result |
-| launcher | `hyperparamTuning/launch_c51_pilot.sh`, waiting on `eval_checkpoints.py b30` so the pilot does not share 14 cores with a close-out |
+| launcher | `hyperparamTuning/launch_c51_pilot.sh`, which waited on `eval_checkpoints.py b30` so the pilot did not share 14 cores with a close-out |
 
 **What it is asking**, in order: does a categorical agent learn this task at all; how many steps to its
 first perfect game against b25's ~9k; is the loss scale sane at 1e-5 (a cross-entropy starts at
 `ln 51 ≈ 3.93`, where the Huber TD loss starts near 0, so the same learning rate is not obviously the same
 step size). **The gate to phase 4 is one learning rate**, and the stop rule is pre-registered: if neither
 rate reaches its first perfect game by ~300k while the control did, stop and report rather than sweep.
+
+**First readings, 15:20 — the screen has already separated the two rates.** Both `5e-5` arms won a game
+inside **15k and 20k steps** (best single episode 95/95, peak trailing 46.5 and 63.3); neither `1e-5` arm
+has a win at 51-83k, best episode 60/95. That is the predicted under-stepping — the rate that suits a
+Huber TD error is too small for a cross-entropy over 51 atoms — and it answers the pilot's first question
+*yes*: a categorical agent learns this task, at the same order as b25's ~9k first win. Graphs and the full
+table are in [`charts.md`](charts.md#c51-pilot--distributional-rl-learning-rate-screen--four-arms-running-on-the-laptop).
+**Nothing here is a comparison against b25** — 40-80k of a 600k screen, `sef` still 0 for all four.
 
 **`SNEK_CHART_VIEWER=0` on all four, one window opened by hand.** `chart_viewer.batch_prefix` groups only
 `b<n><letters>-` names, so four `c51pilot-*` arms would open four windows; the launcher uses the
