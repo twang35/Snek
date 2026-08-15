@@ -259,12 +259,25 @@ branch, swap `head_groups & tail_groups` for `head_groups` alone, and drop the `
 **The base rate is measured.** The table above is `behaviour_profile.py` output, and it already shows Φ
 is non-degenerate with a wide per-band range. Nothing needs re-running for it.
 
-**Only the flip rate is missing, and it is what sets `c`.** A ~20-line scratchpad script: 20 greedy
-episodes on **`b24d` @1342k** (the 98.0%/500 record, in `hallOfFame/`) and **`b20d` @3000k** (the
-mediocre reference the packing and entrapment findings both use), reporting Φ's 0↔1 transition count
-**per meal interval** by length band. Both checkpoints are already local and both diagnostics that use
-them run at `discount=0.9975`, so this is a copy of `behaviour_profile.py`'s harness with the
-per-action read replaced by `chase_safe_state`.
+**Only the flip rate is missing, and it is what sets `c`.** A ~20-line scratchpad script: a copy of
+`behaviour_profile.py`'s harness with the per-action read at `obs[15 + a]` replaced by a
+`chase_safe_state` call on the live grid.
+
+**‡ Weighted toward the near-endgame, revised 2026-08-14.** The original 20 episodes on two checkpoints
+gives only ~100 meal intervals in the top band, which is the band the batch is *for*. Instead:
+
+| | |
+|---|---|
+| checkpoints | **`b24d` @1342k**, **`b18b` @1588k**, **`b20d` @3000k** — the same trio the packing finding uses, so the numbers sit beside its table |
+| episodes | **60 each on identical food streams** (seeds 201/202), matching `endgame_packing.py`'s protocol |
+| bands | 50-84, **85-89, 90-94, 95-97, 98-99** — split at the top, where the old 85-94 / 95-99 pair is too coarse |
+| per band | Φ mean · **flips per meal** · **flips per 100 steps** · steps per meal · **share of the episode's steps** |
+
+**Three of those columns are load-bearing.** `flips per meal` is the calibration denominator, because a
+real 1.0 arrives once per meal. `flips per 100 steps` has to be reported beside it, or a weak policy's
+86-226 steps per meal at 95-99 inflates its per-meal count purely through meal *duration* rather than
+flip frequency. And **share of steps** is the number that decides the gate question below: it says how
+much of a global `c`'s dose lands where no help is wanted.
 
 ### ‡ Why the flip rate is the quantity that sets `c` — and not the base rate
 
@@ -320,6 +333,46 @@ way the batch lands.
 
 **Report the flip rates, the chosen `c` and both sanity checks before writing any arm launch**, so the
 value rests on a principle rather than a prior.
+
+### ‡ Variant B — a length-gated Φ, if the signal is wanted only in the near-endgame
+
+Added 2026-08-14, from the observation that early-game competence needs no help. **`c` is a single global
+scalar, so it cannot be aimed at a length band** — calibrating it on the endgame only makes the term
+louder *everywhere*, and if the endgame flip rate is the lower one that means over-dosing the mid-game to
+make the endgame audible. The way to aim the term is to change **Φ**, not `c`:
+
+```
+Phi(s) = 1 if snake_len >= GATE and head, food and tail share one region, else 0
+```
+
+**This is still potential-based and the guarantee is untouched** — the theorem holds for *any* bounded
+function of state, and a length gate is one. Two properties it gains:
+
+- **Total discounted shaping becomes exactly 0.** The telescope is `−c·Φ(s₀)`, and Φ(s₀) = 0 because the
+  snake starts at length 5. Nothing to offset at all.
+- **A larger `c` fits the same safety budget**, because the mid-game's flip traffic no longer competes for
+  it. That is what "focus `c` on the long tail" actually cashes out as.
+
+**One hard constraint on how deep the gate can usefully sit.** Φ is **structurally 0 at length 99** — one
+free cell cannot hold head, food and tail — and near-structurally 0 at 98, where indices 18-20 take over
+the job. So **the last two or three meals cannot be shaped by this potential at any `c`**. The shapeable
+near-endgame is roughly **85-94**, which is also exactly where the packing gap opens (92% / 77% / 5% at
+90-94, ten meals before the end). A gate at **85** is therefore the candidate; a gate at 95 would buy
+almost nothing.
+
+**`GATE = 85` also matches `FORK_MIN_LENGTH = 85`**, which this base config already runs at
+`FORK_BRANCHES=4` — so the shaped transitions are the same ones the collector already oversamples. That
+compounds the dose, which is the intent, and is a second reason to keep `c` conservative.
+
+**The risk that argues against gating, stated fairly.** The packing finding shows policies *arrive* at
+90-94 fragmented rather than arriving less often, so the behaviour that separates them happens **upstream
+of the band where it becomes visible**, and nobody has pinned how far upstream. If the causal horizon is
+length 70, a gate at 85 shapes only the symptom. Variant A (no gate) hedges that by shaping everywhere and
+accepting a mid-game dose; Variant B bets that 85+ is early enough.
+
+**Pick one, do not split the batch.** n=2 per variant resolves nothing. Phase 0's step-share and per-band
+flip columns are what decide it: if a large share of steps sits below 85 *and* the mid-game carries most of
+the flips, gate it; if flips are concentrated at 85+ anyway, the gate is redundant and A is simpler.
 
 **Cost.** Time 2,000 steps with the term on and off. Expect ~+15% on observation build — one more
 `count_groups` against the three `group_obs` already runs — and no measurable change in steps/second,
@@ -394,7 +447,8 @@ check in advance.
   confirms Φ ≈ 0 through 85-99, the follow-up is a **graded** potential: the share of open cells in the
   region the head and tail share, which `count_groups` already returns as a bitmask, so it costs one
   `bin(region).count('1')`. That is a different hypothesis — packing, not reachability — and it should
-  not be built alongside the binary version.
+  not be built alongside the binary version. **‡ The length-gated Variant B above is the cheaper first
+  response to this risk**, since it keeps the same Φ and only changes where it is non-zero.
 - **‡ The graded packing potential now has its own case, and it still must not be built alongside this.**
   The 2026-08-14 packing finding — one-piece share at length 90-94 of **92% / 77% / 5%** for `b24d` /
   `b18b` / `b20d` — is a larger separation than realised chase-safety's, and it is upstream: fragmenting
