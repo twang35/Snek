@@ -266,17 +266,60 @@ mediocre reference the packing and entrapment findings both use), reporting Φ's
 them run at `discount=0.9975`, so this is a copy of `behaviour_profile.py`'s harness with the
 per-action read replaced by `chase_safe_state`.
 
-**The rule that turns that number into `c`.** Target summed |shaping| between two meals at **≲ 25% of
-`FOOD_REWARD = 1.0`**, and a flip costs `c` while a held Φ costs only `c·(1−γ)` = 0.0025c per step at
-γ = 0.9975 — negligible, ~1/4 of the old distance penalty even summed over a 1,500-step episode. So
-flips dominate and
+### ‡ Why the flip rate is the quantity that sets `c` — and not the base rate
+
+**The whole point of the potential form is that the total return is fixed, so `c` cannot be read off the
+return.** The discounted sum telescopes *exactly*: `Σ γᵗ F_t = −c·Φ(s₀)`, a constant that depends on the
+opening board and not on the policy. That is the invariance. It also means the term's size is invisible in
+the return — a c of 0.01 and a c of 10 change the objective by the same constant.
+
+**What `c` actually scales is the per-transition reward, which is what a 1-step DQN learns from.** The
+real reward is 0 on all but ~95 of a ~1,500-step episode, so on a step where Φ flips, `±c` is the *entire*
+reward signal for that transition. So the calibration has to compare `c` against `FOOD_REWARD = 1.0` per
+**meal interval** — the natural denominator, since that is how often a real 1.0 arrives.
+
+**Three magnitudes, which is why only the flip rate matters:**
+
+| event | shaped reward | over an episode |
+|---|---|---|
+| Φ flips 0→1 | `+c·γ` | the dominant term |
+| Φ flips 1→0 | `−c` | the dominant term |
+| Φ **held** at 1 | `c·(γ−1)` = **−0.0025c**/step | −0.24c over 1,500 steps at γ=0.9975 |
+| Φ held at 0 | exactly 0 | nothing |
+
+So a held potential is nearly free and the base rate — the thing `behaviour_profile.py` already measured
+— tells us almost nothing about scale. **Flips are the entire budget**, hence:
 
 ```
-c = 0.25 / mean flips per meal interval,   clamped to [0.02, 0.10]
+c = 0.25 / (flips per meal interval, in the band where that rate is highest),  clamped to [0.02, 0.10]
 ```
 
-At 2-3 flips per meal that is c ≈ 0.10 (the old prior); at 5-6 it is c ≈ 0.05. **Report the number and
-the resulting `c` before writing any arm launch**, so the value is on a principle rather than a guess.
+At 2-3 flips per meal that is c ≈ 0.10 (the old prior); at 5-6, c ≈ 0.05. Use the **worst band** rather
+than the episode mean, so the term cannot dominate the food signal anywhere; then sanity-check the other
+direction, that at the *low* band the per-meal shaping is still ≥ ~2% of `FOOD_REWARD`, or the term is
+inert where it is supposed to act.
+
+**Why two checkpoints and not one.** `b24d` is the regime the batch is trying to reach and `b20d` is the
+one it starts from, so their flip rates bracket what a shaped arm will actually experience — early
+training resembles `b20d`, late training `b24d`. Calibrating on the higher rate bounds the dose; reporting
+both says how much the dose fades as the arm improves.
+
+**The measurement is circular, and benignly so.** Φ's flip rate is a property of the *policy*, and these
+two policies trained without the term — so a shaped arm's rate will differ. The direction is favourable:
+locally the term pays `+cγ` for entering chase-safety and `−c` for leaving it, so a policy that responds
+to it flips *less*, and the term self-attenuates as the arm gets better. Phase 0 therefore measures an
+upper bound on the dose, which is the safe side to be wrong on.
+
+**The interaction that may matter more than the reward scale: PER.** Priorities are `|TD error|^α` with
+α=0.6 and IS off in this base, so adding `±c` to the reward on flip steps raises those transitions'
+priority directly. If `c` is comparable to a typical endgame `|TD error|`, the term's largest effect could
+be *which transitions get replayed* rather than what the targets say. That is plausibly the mechanism
+rather than a side effect — and it is checkable after the fact with
+[`per_priorities.py`](../hyperparamTuning/perDiagnostics/per_priorities.py), which is worth doing whichever
+way the batch lands.
+
+**Report the flip rates, the chosen `c` and both sanity checks before writing any arm launch**, so the
+value rests on a principle rather than a prior.
 
 **Cost.** Time 2,000 steps with the term on and off. Expect ~+15% on observation build — one more
 `count_groups` against the three `group_obs` already runs — and no measurable change in steps/second,
@@ -364,9 +407,14 @@ check in advance.
   null means "no large effect on this base", not "no effect". That is the right trade — the base is the
   strongest on record and its controls are already paid for — but the interaction is untested and a
   positive result should be re-run on `50,100,50` before it is called a property of the term.
-- **`avg_reward` shifts slightly**, and the bootstrap epsilon phase thresholds on it. The term
-  telescopes, so the shift is bounded by about `c` per episode against ~95 food points, far smaller
-  than the distance term's documented shift. `avg_score` is a food count and is unaffected.
+- **`avg_reward` shifts slightly**, and the bootstrap epsilon phase thresholds on it. **‡ Corrected
+  2026-08-14 — the earlier "bounded by about `c` per episode" was wrong by ~5×**, because it applied the
+  telescope to the wrong sum. The *discounted* sum telescopes exactly to `−c·Φ(s₀)`; `avg_reward` is
+  **undiscounted**, where the residual is `−c·[(1−γ)(T−1) + 1]` — at γ=0.9975 that is −1.1c on a 50-step
+  episode and **−4.75c** on a 1,500-step one, so −0.47 at c=0.1 against an `avg_reward` of ~160. Still
+  negligible for the thresholds (which are 2 to 20, and reached while episodes are short and the residual
+  is ~−0.11), and far smaller than the distance term's documented shift. `avg_score` is a food count and
+  is unaffected.
 
 ## What this deliberately does not touch
 
