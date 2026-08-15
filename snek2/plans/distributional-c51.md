@@ -1,9 +1,16 @@
 # Distributional RL — C51 (categorical DQN)
 
-**Status:** proposed 2026-08-15, **awaiting review.** Nothing is implemented. A throwaway feasibility
-probe has already been run against this repo's own environment and specs, and its results are in
-[what the probe established](#what-the-probe-already-established) — they remove most of the
-implementation risk and change two design choices from what a naive port would have done.
+**Status:** proposed 2026-08-15. **Phase 0 is done** and picked the support — `v_min = -6`,
+`v_max = 110`, `num_atoms = 51` — while **falsifying the premise the support section rested on**
+([results](#phase-0-results--the-support-measured-2026-08-15)). The control moved from `b24` to `b25`
+on 2026-08-15 for the head-size reason [below](#the-phase-34-launch-line). **No code is written yet:
+phase 1 is held pending review of the phase-0 numbers.** Phases 3-4 are held until the desktop's
+shaping queue (b28, then b29) closes, so the shaping result lands first; nothing about phases 1-2
+depends on that.
+
+A throwaway feasibility probe was also run against this repo's own environment and specs, and its
+results are in [what the probe established](#what-the-probe-already-established) — they remove most of
+the implementation risk and change two design choices from what a naive port would have done.
 
 **One line:** replace the scalar `DdqnAgent` with a categorical (C51) agent that predicts a
 *distribution* over the return on a fixed atom grid and trains it by cross-entropy, behind a
@@ -118,29 +125,70 @@ Also measured: 200 `agent.train` steps at batch 128 in **1.33 s (150 train-steps
 `num_atoms=111` on `fc (50,100,50)`, so the loss step is not near the bottleneck (the desktop's arms
 run the *whole* loop at ~92 steps/s). Parameter count on that shape: **28,683 vs 11,853** for ddqn.
 
-## The one real design question: the support
+## Phase 0 results — the support, measured (2026-08-15)
 
-C51 needs a fixed `[v_min, v_max]` grid, and **this env's return range is awkward** — the reward
-quantum is `FOOD_REWARD=1`, `DEATH_REWARD=-5`, and a perfect game pays `PERFECT_GAME_REWARD=100` on
-its terminal step. So:
+C51 needs a fixed `[v_min, v_max]` grid and `project_distribution` clamps anything outside it, so the
+grid is a modelling choice made before training. Measured with
+[`perDiagnostics/return_distribution.py`](../hyperparamTuning/perDiagnostics/return_distribution.py)
+over **three checkpoints, 60 greedy episodes, 116,454 states**: the record `b24d` @1342k, and `b30e`
+(the control's `200,100,100` trunk) at its peak @681k and mid-climb @200k.
 
-- The state before the last food has a return of ~**101**, and with γ=0.99 the win bonus is still
-  worth 20+ for the last ~160 steps of a won game — the endgame this project cares about most.
-- Almost every other state's return sits in roughly **[-5, 25]**.
+| γ=0.9975 | min | p5 | p50 | p95 | p99.9 | max |
+|---|---|---|---|---|---|---|
+| `b24d` @1342k (98%/500) | -0.50 | 4.56 | 27.99 | 93.09 | 103.37 | **104.37** |
+| `b30e` @681k (peak) | -0.50 | 8.52 | 27.12 | 90.44 | 103.08 | **104.38** |
+| `b30e` @200k (mid-climb) | -0.50 | -0.34 | 11.47 | 40.77 | 100.01 | 102.23 |
 
-A grid that covers 101 therefore spends most of its atoms where nothing ever lands. Three ways out,
-and the recommendation is the first:
+**‡ This falsifies the premise the section it replaces was built on.** That version said "almost every
+other state's return sits in roughly [-5, 25]", so a grid covering the win would waste most of its
+atoms, and it offered a nonlinear support as the principled fix. Both are wrong, and the error was
+reasoning at **γ=0.99 when the config runs γ=0.9975**. An effective horizon of 400 steps rather than
+100 means the terminal +100 is visible from most of a won game, so the returns are spread broadly
+across the whole range instead of piling up near zero: **60% of a champion's states are above 25, 24%
+above 50, 12% above 75.** There is no crowding problem, the nonlinear support is closed unbuilt, and
+the atom count is a free choice rather than a constraint.
 
-| option | verdict |
-|---|---|
-| **cover the true range with enough atoms** — `[-6, 105]`, 111 atoms → spacing exactly 1.0 = one food | **recommended.** Atoms are cheap on this net, and `project_distribution` *interpolates* between neighbouring atoms, so the represented **mean is exact** even at coarse spacing — what coarse atoms cost is distributional detail, which is the thing C51 is supposed to buy |
-| rescale the rewards so the range is small | **rejected.** `runs.md`'s "explicitly not planned" keeps `FOOD_REWARD`/`DEATH_REWARD`/`STARVE_REWARD`/`PERFECT_GAME_REWARD` fixed *because* they rescale `avg_reward`, which is what `BOOTSTRAP_REWARD_THRESHOLDS` fires on — a rescale would silently move the epsilon schedule and confound the arm |
-| a nonlinear (signed-sqrt) support | not now. It is the principled answer to a 1-vs-100 dynamic range and it is ~10 lines, but it is nonstandard, and choosing it before measuring the return distribution would be guessing |
+**Two numbers the analytic reasoning got wrong, both in the direction that would have clipped:**
 
-**Phase 0 measures the distribution rather than arguing about it** (below). Two loud guards ship with
-the code either way: `v_max ≥ PERFECT_GAME_REWARD + FOOD_REWARD` and `v_min ≤ DEATH_REWARD +
-STARVE_REWARD`, both refusing to start unless `SNEK_C51_ALLOW_CLIPPING=1`. Silent clipping of the win
-value is exactly the class of failure `arch.json` exists to prevent.
+- **The max is 104.38, not ~101.** A state a few steps from the win still collects food on the way, so
+  the return is `100·γ^k` *plus* those meals. The guard originally written as
+  `v_max ≥ PERFECT_GAME_REWARD + FOOD_REWARD` (101) would have permitted a grid that clips the top of
+  the distribution — the exact failure it was added to prevent.
+- **The observed min is -0.50, not -5.** `STARVE_REWARD`, not `DEATH_REWARD`: there were **zero
+  collisions in all 60 greedy episodes** across all three checkpoints, which independently reproduces
+  the folder's finding that the modal failure is failing to reach reachable food. `-5` still has to be
+  covered, because exploration collides during training even though greedy play does not, and the
+  analytic minimum is exactly `DEATH_REWARD` (a one-step death; any earlier death is discounted toward
+  zero).
+
+**Chosen support: `v_min = -6`, `v_max = 110`, `num_atoms = 51`.** `-6` clears the analytic minimum;
+`110` gives 5.4% headroom over the measured max, which covers a faster policy fitting more meals
+inside the horizon; and 51 atoms — the published C51 and Rainbow value — gives spacing 2.32 and **38
+atoms across the p5-p95 bulk**, ample resolution. 111 atoms would give 84 across the bulk for 1.35×
+the head, which the measurement says is not needed. Note also that `project_distribution`
+*interpolates* between neighbouring atoms, so the represented **mean is exact** at any spacing; what
+atoms buy is distributional detail.
+
+**The bimodality argument is now measured, and it is stronger than claimed.** Within a *single* length
+band the return is either near zero or near 100, which is precisely what a scalar Q cannot represent:
+
+| checkpoint, band | p50 | p95 | p99.9 | max |
+|---|---|---|---|---|
+| `b30e` @200k, length 95-97 | **-0.21** | 2.15 | **101.74** | 102.23 |
+| `b30e` @200k, length 90-94 | 3.35 | 85.26 | 100.26 | 100.77 |
+| `b24d` @1342k, length 90-94 | 64.55 | 102.93 | 103.94 | 104.15 |
+
+A mean-only estimate at length 95-97 for the mid-climb policy regresses toward a value **no outcome
+ever pays**, and the spread it is hiding is the whole width of the grid.
+
+**Reward rescaling stays rejected**, and the measurement does not reopen it: `runs.md`'s "explicitly
+not planned" keeps `FOOD_REWARD`/`DEATH_REWARD`/`STARVE_REWARD`/`PERFECT_GAME_REWARD` fixed *because*
+they rescale `avg_reward`, which is what `BOOTSTRAP_REWARD_THRESHOLDS` fires on — a rescale would
+silently move the epsilon schedule and confound the arm.
+
+**Two loud guards still ship**, with the measured bounds rather than the analytic ones: `v_max ≥ 106`
+and `v_min ≤ -5`, both refusing to start unless `SNEK_C51_ALLOW_CLIPPING=1`. Silent clipping of the
+win value is exactly the class of failure `arch.json` exists to prevent.
 
 ## The priority signal: KL, not cross-entropy
 
@@ -173,8 +221,8 @@ choice can change which experience gets replayed, not just how hard.
 | knob | default | meaning |
 |---|---|---|
 | `SNEK_ALGO` | `ddqn` | `ddqn` or `c51`. Anything else exits at startup |
-| `SNEK_NUM_ATOMS` | 111 | size of the support grid. Ignored unless `ALGO=c51` |
-| `SNEK_V_MIN` / `SNEK_V_MAX` | -6.0 / 105.0 | support bounds, guarded as above |
+| `SNEK_NUM_ATOMS` | 51 | size of the support grid, [chosen from the measurement](#phase-0-results--the-support-measured-2026-08-15). Ignored unless `ALGO=c51` |
+| `SNEK_V_MIN` / `SNEK_V_MAX` | -6.0 / 110.0 | support bounds, guarded as above |
 | `SNEK_C51_DOUBLE` | 1 | 1 = action for the target atoms chosen by the **online** net (Rainbow-style double, matching today's `DdqnAgent`); 0 = upstream's target-net selection |
 | `SNEK_C51_ALLOW_CLIPPING` | 0 | escape hatch for the two support guards |
 | `SNEK_PRIORITY_SIGNAL` | `td_error` | gains `ce` as a third value, meaningful only for c51 |
@@ -223,7 +271,7 @@ test fails" rule.
 | **with a desynced target net**, the selected atoms are the online argmax's row | switching to target-net selection. **Must desync first** — see the probe finding, the mutant survives otherwise |
 | loss at init ≈ `ln(num_atoms)` | a support/atom-count mismatch between net and agent |
 | a `discount == 0` transition puts target mass at the reward, not spread over the support | anything that breaks the terminal-bootstrap contract `snake_environment.to_tensor_time_step` is built on |
-| `v_max` below `PERFECT_GAME_REWARD` raises unless the escape hatch is set | dropping the clipping guards |
+| `v_max` below **106** (the measured max is 104.38) or `v_min` above `DEATH_REWARD` raises unless the escape hatch is set | dropping the clipping guards, and the too-weak 101 bound the analytic version would have allowed |
 | the shield masks fatal exploration moves over a *categorical* greedy policy | a regression in `ShieldedEpsilonGreedyPolicy`'s `info_spec` contract |
 | arch: missing `algo` reads as `ddqn`; c51-vs-ddqn mismatch raises; atoms/support mismatch fails a resume; round trip keeps all four fields | every silent-restore path this repo has already been bitten by twice |
 
@@ -233,27 +281,43 @@ Then the full suite: **24 modules** (up from 23), ~610 tests, 0 failed.
 
 | phase | work | gate to the next |
 |---|---|---|
-| **0** | `perDiagnostics/return_distribution.py`: play greedy episodes with a `hallOfFame/` champion and a mid-skill checkpoint, compute per-state discounted returns at γ=0.99, report percentiles, max, and the share above 25. Minutes to run | picks `v_min`/`v_max`/`num_atoms` from data. Diagnostics-only, so it pushes without review |
+| **0** | **done 2026-08-15** — [`return_distribution.py`](../hyperparamTuning/perDiagnostics/return_distribution.py), 3 checkpoints × 60 episodes × 116,454 states. Support chosen, and the section's own premise falsified: [results](#phase-0-results--the-support-measured-2026-08-15) | `v_min = -6`, `v_max = 110`, `num_atoms = 51` |
 | **1** | the edits and tests above, plus mutation checks | full suite green; every mutant fails |
 | **2** | `snek2.py smoke` with `SNEK_ALGO=c51 SNEK_MIN_CHECKPOINT_SCORE=0 SNEK_MAX_STEPS=3000`: trains, writes `arch.json` with `algo=c51`, checkpoints, `watch.py smoke` loads it, and a one-checkpoint eval measures it. Record steps/s against a matched ddqn smoke | it runs end to end on both hosts' code path. **Note the eval displaces every `evals/` PNG** (CLAUDE.md) — check what is at the top level first and restore afterwards |
-| **3** | pilot: one wave of 4 arms, `{atoms 51, atoms 111} × {lr 1e-5, lr 5e-5}`, one seed each, `SNEK_MAX_STEPS=600000`. A **screen, not a result** — does it learn at all, how fast to the first perfect game, is the loss scale sane at 1e-5 | pick one config. If none reaches its first perfect game by ~300k while the control did, stop and report rather than sweeping |
-| **4** | the batch: 4 seeds of the chosen config, **matched to `b24`** so `b24a-d` is the seed-matched control and no control arms need running | the pre-registered criteria below |
+| **3** | pilot: one wave of 4 arms, `{lr 1e-5, lr 5e-5} × 2 seeds` at the chosen support, `SNEK_MAX_STEPS=600000`. A **screen, not a result** — does it learn at all, how fast to the first perfect game, is the loss scale sane at 1e-5 | pick one rate. If neither reaches its first perfect game by ~300k while the control did, stop and report rather than sweeping |
+| **4** | the batch: 4 seeds of the chosen config, **matched to `b25` (`FC_LAYERS=200,100,100`, IS-off)** so `b25a-d` is the seed-matched control and no control arms need running | the pre-registered criteria below |
 
 ### The phase 3/4 launch line
 
-`b24`'s config verbatim, plus the new knobs, one process per seed. The batch prefix is taken at launch
+`b25`'s config verbatim, plus the new knobs, one process per seed. The batch prefix is taken at launch
 (next free is **`b31`**, but `fc 512` and the four owed `320` seeds are ahead of this in the backlog,
 so do not reserve it):
 
 ```
 cd snek2
-SNEK_ALGO=c51 SNEK_NUM_ATOMS=<n> SNEK_V_MIN=<v> SNEK_V_MAX=<v> \
-  SNEK_FC_LAYERS=320 SNEK_IS_WEIGHTS=0 SNEK_TARGET_UPDATE_PERIOD=1000 \
+SNEK_ALGO=c51 SNEK_NUM_ATOMS=51 SNEK_V_MIN=-6 SNEK_V_MAX=110 \
+  SNEK_FC_LAYERS=200,100,100 SNEK_IS_WEIGHTS=0 SNEK_TARGET_UPDATE_PERIOD=1000 \
   SNEK_DISCOUNT=0.9975 SNEK_FOOD_DISTANCE_REWARD=0 SNEK_FORK_BRANCHES=4 \
   SNEK_MAX_STEPS=2000000 SNEK_SEED=<n> \
   PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -u snek2.py b31<x>-c51seed<n> \
   > /tmp/b31<x>.log 2>&1 &
 ```
+
+**The control is `b25`, not the record `b24`, and the reason is the head.** A C51 head is
+`last_layer_width × 3·num_atoms`, and `fc 320` is the one shape whose widest layer is also its *last*,
+so it pays for the head at 320 wide while `200,100,100` pays at 100:
+
+| fc | ddqn | c51 N=51 | c51 N=111 |
+|---|---|---|---|
+| `50,100,50` | 11,853 | 19,503 (1.65×) | 28,683 (2.42×) |
+| **`200,100,100`** | 36,703 | **51,853 (1.41×)** | 70,033 (1.91×) |
+| `320` | 10,883 | 59,033 (5.42×) | 116,813 (10.73×) |
+
+`200,100,100` also carries **+10.3 of b24's +12.2** on the IS-off lift, and that lift tracks the widest
+layer rather than the parameter count — so this control keeps nearly all of the record config's
+strength while cutting the confound from 5.42× to 1.41×. **The cost, stated plainly: `b25` has zero
+`≥98%/500` checkpoints** where b24 has two, so the decisive-artifact criterion below becomes one-sided
+— a c51 arm producing one is a clear win, producing none says nothing.
 
 `SNEK_FORK_BRANCHES=4` is not optional and nothing in the summary block reports it, so an omission
 differs from the control invisibly — the trap b27 nearly fell into. Confirm every arm with
@@ -267,17 +331,18 @@ b30's four close-out evals; the pilot waits for that to finish rather than shari
 ### Pre-registered criteria for phase 4
 
 **Primary is `best_perfect30` at a matched truncation of 2M**, not `strong_eval_fraction`. That is the
-2026-08-14 re-measurement talking: at b24's level `best_perfect30` has sd **0.67** against `sef`'s
+2026-08-14 re-measurement talking: at this level `best_perfect30` has sd **0.67** against `sef`'s
 **5.59**, so paired at n=4 it resolves ~**3.6 pp** where `sef` resolves ~21.3 pp, and it still has
-3.8 pp of headroom. `sef` is reported alongside for continuity. **Never on `peak_trailing`** — all
-four b24 arms sit exactly on its 95.00 cap; report the count of trailing-95.00 windows instead
-(control: 7 · 22 · 10 · 17).
+3.8 pp of headroom. The `b25` control reads **94.3** on it (`sef` 63.8, pooled 86.0), against b24's
+96.2. `sef` is reported alongside for continuity. **Never on `peak_trailing`** — b25 and b24 both sit
+on its 95.00 cap; report the count of trailing-95.00 windows instead.
 
 Secondary, and the one the mechanism actually predicts: **drawdown** — peak `pf30` minus the mean over
 the 500k that follows it.
 
-Decisive artifact: **the count of full-length ≥98%/500 rows** out of the close-out → HOF-500 chain.
-The control is `1 · 1 · 0 · 0` across b24b/d/c/a. On the desktop that chain is automatic; **on the
+Decisive artifact: **the count of full-length ≥98%/500 rows** out of the close-out → HOF-500 chain,
+where **the `b25` control is `0 · 0 · 0 · 0`** and b24 is `1 · 1 · 0 · 0`. On the desktop that chain is
+automatic; **on the
 laptop both passes are by hand**, as 4 parallel `eval_checkpoints.py` processes with `EVAL_WORKERS` ≥ 4.
 Note also that a strong arm can finish with an empty HOF job, since that chain gates at 98 — `b25b`'s
 plausible 97.2% was abandoned that way — so a gate-97 pass by hand is worth doing if the close-out
@@ -307,12 +372,14 @@ seed draw.
    time — with `alpha` as the named follow-up if the batch is ambiguous. Note the phase-4 control is
    `IS_WEIGHTS=0`, so the IS-weight path is not even exercised there; the fix matters for the default
    config and for not shipping a knob that silently does nothing.
-3. **Head-size confound.** C51 multiplies the head by `num_atoms` — on `fc 320` with 111 atoms that
-   is 116.8k parameters against ddqn's 10.9k. The licence to ignore it is batch 20's nine-shape sweep
-   ("architecture never raises the ceiling") and the b24/b25/b26 finding that the lift tracks the
-   *widest layer*, not the parameter count — but it is a confound, it should be stated in the write-up,
-   and it is a second reason to prefer fewer atoms if phase 0 permits.
-4. **Support mis-specification.** Covered by the two startup guards and by phase 0.
+3. **Head-size confound — now 1.41×, down from 10.73×.** C51 multiplies the head by `num_atoms`, and
+   choosing the `b25` trunk plus 51 atoms is what shrinks it: 51,853 parameters against the control's
+   36,703. The licence to treat that as harmless is batch 20's nine-shape sweep ("architecture never
+   raises the ceiling") and the b24/b25/b26 finding that the lift tracks the *widest layer*, not the
+   parameter count — b25 itself already runs at 3.09× b22's parameters. It still belongs in the
+   write-up as a stated confound.
+4. **Support mis-specification.** Closed by phase 0 and the two startup guards — and phase 0 found the
+   analytic bound would have been too low, so this risk was real.
 5. **A reward-derived quantity breaking silently.** This plan touches no reward, but it does touch the
    terminal bootstrap, and the last thing to touch that class cost eight arms 300k+ steps each: the
    perfect-game counter compared a final reward with `PERFECT_GAME_REWARD`, read 0%, and — because
@@ -328,8 +395,8 @@ seed draw.
 
 - **Not Rainbow.** No noisy nets, no duelling head, no multi-step. Those are separate arms and
   bundling them would make the result unattributable, which is the mistake batch 10 is still paying for.
-- **Not QR-DQN/IQN, yet.** Quantile regression needs no `[v_min, v_max]` at all, which fits this env's
-  1-vs-100 reward range better than any fixed grid — and if phase 0 says the support is the binding
-  constraint, it is the right follow-up. It is ~150 lines with no `tf_agents` support, against C51's
-  ~90 with most of the machinery already shipped, so C51 goes first.
+- **Not QR-DQN/IQN, and phase 0 removed the reason to want it.** Quantile regression needs no
+  `[v_min, v_max]`, which would have been the principled answer if the returns had piled up near zero
+  under a grid stretched to 104. They do not — the bulk spans most of the grid — so the fixed support
+  costs nothing here, and ~150 lines with no `tf_agents` support buys nothing over C51's ~90.
 - **Not a reward change.** The support is chosen to fit the existing rewards, never the reverse.

@@ -14,6 +14,16 @@
 | `plasticity.py` | `<out.json> <policy> [stride] [extra] [boards]` | the three published loss-of-plasticity signatures against step — dormant units, feature rank, weight norm — each against a fresh net of the same shape |
 | `plasticity_probe.py` | `<out.json> <policy> [stride] [extra] [boards]` | whether the checkpoint can still **fit a new target**, which is the question the signatures are only correlates of |
 | `plasticity_analysis.py` | `<payload_dir> [out.png\|-] [probe_dir]` | the tables and figure from both: control→peak→end, drawdown events, flat stretches, early-vs-late, and the paired probe trend |
+| `return_distribution.py` | `<out.json> <ckpt-or-policy> <episodes-per-seed> <seed[,seed...]>` | the distribution of the **discounted return from each visited state**, by outcome and by length band — the Phase 0 measurement that sizes C51's `[v_min, v_max]` grid and `num_atoms` |
+
+`return_distribution.py` needs two things read before its numbers are used. It sets
+**`SNEK_FOOD_DISTANCE_REWARD=0`, not the repo default of 0.001**, because every config since batch 17
+does — left at the default the measured returns would carry a shaping term the arm will not have, so
+every reward knob in effect is printed and stored in the payload. And it reports **several gammas from
+one episode set**, which is exact rather than an approximation: the discount reaches the return only
+through the recorded per-step `d`, and it changes neither the greedy action nor any reward. Its own
+Phase 0 run found the returns are *not* concentrated near zero at γ=0.9975 — 60% of a champion's states
+are above 25 — which falsified the premise the C51 plan's support section was built on.
 
 `point_of_no_return.py` shards across seeds like the `diagnostics/` scripts do; six processes take
 six cores and ~5 minutes for 360 episodes. It **checks its own simulator against the live game on
