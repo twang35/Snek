@@ -1,0 +1,19 @@
+{
+  "id": "b29d-chase10g75seed4",
+  "type": "train",
+  "policy": "b29d-chase10g75seed4",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "4",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75"
+  },
+  "max_steps": 2000000,
+  "priority": 30,
+  "notes": "c at the calibrated 0.10 but the gate ten lengths earlier, testing whether the causal horizon for endgame packing sits above 85. The packing finding shows policies arrive at length 90-94 already fragmented, so the separating behaviour is upstream of where it becomes visible and nobody has pinned how far."
+}

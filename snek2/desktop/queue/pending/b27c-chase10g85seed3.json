@@ -1,0 +1,19 @@
+{
+  "id": "b27c-chase10g85seed3",
+  "type": "train",
+  "policy": "b27c-chase10g85seed3",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "3",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "85"
+  },
+  "max_steps": 2000000,
+  "priority": 10,
+  "notes": "chase-safe potential shaping at the Phase 0 calibrated dose (c=0.10, gate 85). Everything else is b24's config exactly, so b24a-d at a matched 2M are the seed-matched control. Primary metric best_perfect30, seed by seed."
+}

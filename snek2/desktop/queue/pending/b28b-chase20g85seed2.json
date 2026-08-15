@@ -1,0 +1,19 @@
+{
+  "id": "b28b-chase20g85seed2",
+  "type": "train",
+  "policy": "b28b-chase20g85seed2",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.2",
+    "SNEK_CHASE_SAFE_GATE": "85"
+  },
+  "max_steps": 2000000,
+  "priority": 20,
+  "notes": "the same arm at double the calibrated dose, to separate 'wrong idea' from 'dose too small' if b27 is null. 0.20 is what the 25%-of-FOOD_REWARD budget still permits on b20d's measured flip rate, so it is the top of the calibrated range rather than an arbitrary step."
+}
