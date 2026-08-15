@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-14T21:18:18",
-  "ts": 1786767498.3127167,
+  "iso": "2026-08-14T21:18:51",
+  "ts": 1786767531.2535295,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,47 +18,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 0,
     "eval": 0
   },
-  "running": [
-    {
-      "id": "b27a-chase10g85seed1",
-      "type": "train",
-      "policy": "b27a-chase10g85seed1",
-      "pid": 705810,
-      "step": 408000,
-      "steps_per_sec": 92.3,
-      "elapsed_s": 4578
-    },
-    {
-      "id": "b27b-chase10g85seed2",
-      "type": "train",
-      "policy": "b27b-chase10g85seed2",
-      "pid": 705811,
-      "step": 441000,
-      "steps_per_sec": 123.0,
-      "elapsed_s": 4578
-    },
-    {
-      "id": "b27c-chase10g85seed3",
-      "type": "train",
-      "policy": "b27c-chase10g85seed3",
-      "pid": 705812,
-      "step": 424000,
-      "steps_per_sec": 92.3,
-      "elapsed_s": 4578
-    },
-    {
-      "id": "b27d-chase10g85seed4",
-      "type": "train",
-      "policy": "b27d-chase10g85seed4",
-      "pid": 705813,
-      "step": 431000,
-      "steps_per_sec": 123.0,
-      "elapsed_s": 4578
-    }
-  ],
+  "running": [],
   "ledger": {
     "smoke-1": "failed",
     "smoke-2": "failed",
@@ -179,18 +142,10 @@
     "b26b-fc100x100noisseed2-hof": "done",
     "b26c-fc100x100noisseed3-hof": "done",
     "b26d-fc100x100noisseed4-hof": "done",
-    "b27a-chase10g85seed1": "running",
-    "b27b-chase10g85seed2": "running",
-    "b27c-chase10g85seed3": "running",
-    "b27d-chase10g85seed4": "running",
-    "b27a-chase10g85seed1-closeout": "queued",
-    "b27b-chase10g85seed2-closeout": "queued",
-    "b27c-chase10g85seed3-closeout": "queued",
-    "b27d-chase10g85seed4-closeout": "queued",
-    "b27a-chase10g85seed1-hof": "queued",
-    "b27b-chase10g85seed2-hof": "queued",
-    "b27c-chase10g85seed3-hof": "queued",
-    "b27d-chase10g85seed4-hof": "queued",
+    "b27a-chase10g85seed1": "failed",
+    "b27b-chase10g85seed2": "failed",
+    "b27c-chase10g85seed3": "failed",
+    "b27d-chase10g85seed4": "failed",
     "b28a-chase20g85seed1": "queued",
     "b28b-chase20g85seed2": "queued",
     "b28c-chase20g85seed3": "queued",
@@ -218,8 +173,8 @@
   },
   "disk_free_gb": 140.0,
   "load_avg": [
-    12.103515625,
-    9.69873046875,
-    9.0419921875
+    10.14453125,
+    9.50732421875,
+    9.00146484375
   ]
 }
