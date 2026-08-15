@@ -15,3 +15,4 @@ the measurement design in it is what a later replication needs.
 | plan | status |
 |---|---|
 | [`chase-safe-reward-shaping.md`](chase-safe-reward-shaping.md) | approved 2026-08-11, **revised 2026-08-14 and ready to execute** — the hold expired (20-26 closed, both hosts idle), the control moved to batch 24, and the fork/snapshot gap is fixed in the design |
+| [`distributional-c51.md`](distributional-c51.md) | **proposed 2026-08-15, awaiting review** — a categorical (C51) value head behind `SNEK_ALGO=c51`. A feasibility probe against this repo's own specs is already done and is what fixes the two design choices a naive port would get wrong (IS weights are silently dropped by `tf_agents`' C51 loss; the PER priority has to be the KL, not the cross-entropy) |
