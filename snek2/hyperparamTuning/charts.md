@@ -69,10 +69,17 @@ fits the objective, the worse it plays.
 trained arm: **1.22 atoms per food against the control's 0.44**, the 2.8× as designed. So **atom spacing is
 not what limits C51 here.**
 
-**Why it fails, in one line.** A winning step *replaces* the food reward rather than adding to it, so the
-win pays exactly 10 and terminates — while the network's own `V` at length 95-97 reads **16.65**.
-**Greedy play declines the win**, by 67%. Measured with the new
-[`perDiagnostics/value_by_length.py`](perDiagnostics/value_by_length.py).
+**Why it fails, in one line.** Every meal of progress moves board-fill up a notch and moves `V` **down
+1.7-4.4 points** while the meal pays 1 — so `Q(don't eat) > Q(eat)` and the agent correctly avoids
+finishing. The control's `V` moves **+4.4 to +12.1** over the same bands. The threshold is
+`W > 1/(1 − γ^k)`, which at γ=0.9975 and 7-12 steps per meal is **34-58**: 100 clears it, 10 does not.
+
+**Two things this is *not*.** The board-fill input is **rank 1 of 30** by saliency in both arms, so it is
+not being ignored; and the endgame action gap is **19.8-24.3, larger than `V` itself**, so the actions are
+not near-tied. Measured with [`perDiagnostics/endgame_gradient.py`](perDiagnostics/endgame_gradient.py) —
+which also found that **indices 18-20, "this move wins", are constant zeros in 0.000-0.025% of states**,
+so neither arm learns to win from them. An earlier reading of this batch as a *calibration* failure was
+withdrawn the same day: against the optimal value the net is 9-16% optimistic, which is ordinary.
 
 **What that looks like on the board**, greedy, 60 episodes each:
 

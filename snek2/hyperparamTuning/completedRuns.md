@@ -333,20 +333,34 @@ declined over the next 1.4M steps: the better it fit the objective, the worse it
 **1.22 atoms per food against the control's 0.44**, the 2.8× as designed. So **atom spacing is not what
 limits C51 here**, and the hypothesis this batch existed to test is retired.
 
-### Why — the win became worth less than not winning
+### Why — every meal costs more value than it pays
 
-`Snake.py` *replaces* the food reward on a winning step rather than adding to it, so taking the win pays
-exactly `PERFECT_GAME_REWARD` and terminates. Measured on `b33a` @852k with the new
-[`perDiagnostics/value_by_length.py`](perDiagnostics/value_by_length.py): the network's own `V(s)` at
-length 95-97 is **16.65**, against **10.0** for taking the win. **Greedy play declines the win, by 67%**,
-and it is not wrong about its own values — it is right about a mis-specified objective.
+**Corrected the same day, and the correction is the finding.** The first diagnosis written here was that
+the network was badly miscalibrated in the endgame and that greedy play "declined the win". Both were
+wrong, and for one reason: `V` was compared against the **realised on-policy return**, which is not what
+Q-learning estimates. Against the *optimal* value — `Σ_{j<m} f^j + W·f^m` for `m` meals left and
+`f = γ^k` — the network is **9-16% optimistic**, which is ordinary. It is not the broken part.
 
-The belief is also miscalibrated in exactly the direction that stalls. Against realised returns
-(γ=0.9975), in the **85-89** band where both runs have plenty of states, the control reads `V` 56.18
-against `G` 56.22 — **0.04 out on a 100-point scale** — and the win-10 arm reads 19.59 against 4.64,
-**15 out on a 30-point scale**. Full table and the mechanism (at `W=100` the endgame is the highest-value
-region and therefore the loss's largest target; at `W=10` it is the lowest and its structure is swamped):
-[`findings.md`](findings.md#-falsified-2026-08-16-shrinking-the-win-reward-100--10-does-not-buy-c51-stability--it-teaches-the-agent-that-winning-is-a-mistake).
+**The defect is the sign of the value gradient.** Measured on 12,000 greedy states per arm with the new
+[`perDiagnostics/endgame_gradient.py`](perDiagnostics/endgame_gradient.py):
+
+| length band | `b33a` V | `b33a` dV | `b32a` V | `b32a` dV |
+|---|---|---|---|---|
+| 50-79 | 23.17 | **−4.38** | 37.85 | **+4.37** |
+| 80-89 | 20.23 | **−2.94** | 50.00 | **+12.14** |
+| 90-93 | 18.50 | **−1.73** | 60.92 | **+10.92** |
+| 94-96 | 14.20 | **−4.31** | 72.19 | **+11.27** |
+
+Eating moves board-fill up one notch and `V` **down 1.7-4.4** while the meal pays 1, so
+`Q(don't eat) > Q(eat)` and the agent is *right*. It is maximising faithfully. Nor are the actions
+near-tied: the endgame gap is **19.8-24.3, larger than `V` itself**, because the alternative to a safe
+move is death at −5 — it separates fatal from non-fatal perfectly and simply cannot prefer progress.
+
+**And the board-fill input is not being ignored** — it is **rank 1 of 30** by saliency in *both* arms
+(29.0% and 28.4% of endgame gradient mass, 2.5× the next input). The win-10 arm reads it correctly.
+Meanwhile **indices 18-20, "this move wins", are constant zeros** (nonzero in 0.000-0.025% of states), so
+neither arm learns to win from the one input that says so. Threshold rule, corollaries and the dead-input
+table: [`findings.md`](findings.md#-falsified-2026-08-16-shrinking-the-win-reward-100--10-does-not-buy-c51-stability--it-teaches-the-agent-that-winning-is-a-mistake).
 
 ### How it dies — geometry, not the clock
 
@@ -378,11 +392,16 @@ policy's own.
 
 ### Verdict
 
-**Do not revisit.** The knob is not a scale factor: a terminal reward has to stay above the value of
-continuing or optimal play is to refuse it. The transferable rule is to **check `V(pre-terminal state)`
-against the terminal payoff before changing either** — one `value_by_length.py` run, which would have
-killed this batch before it consumed 8.5 hours across four arms. What the batch does leave behind is a
-clean negative on atom spacing as C51's constraint, and the diagnostic that produced it.
+**Do not revisit at this discount.** The knob is not a scale factor. The transferable rule is arithmetic:
+one meal of progress is worth `f^{m−1}·[W(1−f) − 1]` with `f = γ^k`, so **progress only pays when
+`W > 1/(1 − γ^k)`** — at γ=0.9975 and the project's 7-12 steps per meal that is **34-58**. The shipped 100
+clears it by 2-3×; 10 misses it by 3-6×. **Three lines of algebra would have killed this batch before it
+consumed 8.5 hours across four arms**, and the corollary is that `W=10` is only viable alongside γ≈0.974.
+
+What the batch leaves behind is worth more than the arms cost: a clean negative on atom spacing as C51's
+constraint, the threshold rule above, the discovery that **indices 18-20 are dead inputs**, and two
+diagnostics ([`value_by_length.py`](perDiagnostics/value_by_length.py),
+[`endgame_gradient.py`](perDiagnostics/endgame_gradient.py)).
 
 ## Batch 30 — chase-safe shaping on `fc 200,100,100`, `c=0.10`: **null, and it completes the shaping×architecture 2×2**
 

@@ -31,7 +31,10 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
 | **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported so far**: b32 cuts churn 0.137 → 0.098 paired at 360k, monotone in dose, at no cost to best-30. See below |
-| **‡‡ Falsified: shrinking the win reward 100 → 10 does not buy C51 resolution-for-free** — the network's own `V` at length 95-97 is **16.65** against a win that pays **10.0**, so greedy play *declines the win* | **measured 2026-08-16**, b33 vs a paired b32 control. Best-30 **18.3-25.3 vs 77.0/63.0**; the 2.8× atom-per-food gain arrived and bought nothing, so **spacing is not the C51 constraint**. It stalls (32-42 steps/meal at length 95+ vs 2.0) and dies of geometry — **73-90% collisions, not starvation**, 44 of 48 losses still winnable a median 1 move from death. **Check `V(pre-terminal)` against the terminal payoff before changing either.** See below |
+| **‡‡ A terminal reward must clear `W > 1/(1 − γ^k)` (`k` = steps per meal) or progress lowers value** — at γ=0.9975 that is **34-58** at the realistic pace, so the shipped `PERFECT_GAME_REWARD=100` clears it 2-3× and **10 misses it 3-6×** | **derived and measured 2026-08-16** by b33. Every meal costs the win-10 arm **1.7-4.4** points of `V` while paying 1, so it correctly avoids finishing. **The win reward is the potential, not the prize** — its job is keeping `V` rising as the board fills. Shrinking `W` requires shrinking γ. See below |
+| **‡‡ Falsified: shrinking the win reward 100 → 10 does not buy C51 resolution-for-free** | **measured 2026-08-16**, b33 vs a paired b32 control. Best-30 **18.3-25.3 vs 77.0/63.0**; the 2.8× atom-per-food gain arrived and bought nothing, so **spacing is not the C51 constraint**. It stalls (32-42 steps/meal at length 95+ vs 2.0) and dies of geometry — **73-90% collisions, not starvation**, 44 of 48 losses still winnable a median 1 move from death. See below |
+| **‡ Corrected same day: the win-10 arm's value function is *not* miscalibrated** — it is within **9-16%** of the optimal value; the first diagnosis compared `V` against the realised on-policy return, which Q-learning is not estimating | **correction 2026-08-16**. The defect is the gradient's **sign**, not its level, and "greedy play declines the win" was withdrawn with it. Endgame action gap is **19.8-24.3, larger than `V`**, so actions are not near-tied either |
+| **‡‡ Indices 18-20 (`perfect_game_move`) are constant zeros — nonzero in 0.000-0.025% of states** | **measured 2026-08-16**, 12,000 greedy states per arm. A third instance of the `game_over` trap after index 29: `perfect_game_obs` only fires at `snake_len == PERFECT_SCORE − 1`. Forcing the flag moves `Q` by **+0.53** (`b33a`) and **−0.94** (`b32a`) — the wrong sign in the arm that wins 92%. **Neither arm learns to win from it.** Board-fill, by contrast, is **rank 1 of 30** by saliency in both |
 | **‡ A C51 learning-rate screen at n=2 could not separate `1e-5` from `1e-4`** — within-rate seed spread 57.6 pp against a 30.5 pp spread between rate means | **measured 2026-08-15**. `2.5e-4`+ is out (collapse); `5e-5` chosen for `b31` on consistency, not on being best. Time-to-first-win predicted nothing (ρ=0.05). See below |
 
 **Records and the horizon**
@@ -311,41 +314,82 @@ has measured, and all four seeds peaked at **150-353k** and then declined to a t
 3.7-8.7. **So atom spacing is not what limits C51 here**, which retires the hypothesis this batch existed
 to test.
 
-**The one number that explains it.** `Snake.py` *replaces* the food reward on a winning step rather than
-adding to it, so taking the win pays exactly `PERFECT_GAME_REWARD` and terminates. Measured with the new
-[`perDiagnostics/value_by_length.py`](perDiagnostics/value_by_length.py) on `b33a` @852k:
+**‡ Corrected 2026-08-16, same day: the first diagnosis here was wrong, and the correction is the
+finding.** The original claim was that the network was *badly miscalibrated* in the endgame — believing
+16.65 where the realised return was 0.02 — and that greedy play therefore "declined the win". Both halves
+were mistakes, and the same mistake: **`V` was compared against the realised on-policy return `G`, but
+Q-learning targets the value of the *optimal* policy, so `V` exceeding a suboptimal policy's own return is
+expected rather than a defect.** Against the optimal value the network is accurate. With `k` steps per meal,
+`m` meals remaining and `f = γ^k`, the optimal value is `Σ_{j<m} f^j + W·f^m`; at `k=7`, `γ=0.9975`, `W=10`
+that gives **15.9 at length 91** and **13.0 at length 95**, against measured **18.50** and **14.20** — 9-16%
+optimistic, which is ordinary. **The value function is not the broken part.**
 
-| what | value |
-|---|---|
-| the network's `V(s)` at length 95-97 | **16.65** |
-| what taking the win pays there | **10.0** |
+**What is actually wrong is the *sign of its gradient*.** Measured with the new
+[`perDiagnostics/endgame_gradient.py`](perDiagnostics/endgame_gradient.py), 12,000 greedy states per arm:
 
-**The agent's own value function ranks "keep playing" 67% above "win now".** A policy acting greedily on
-those values declines the win — and it is not wrong about its own numbers, it is right about a
-mis-specified objective. Nothing about the optimiser, the support or the network shape is involved.
-
-**And the belief is badly miscalibrated, in the direction that causes the stall.** `V` against the
-realised return `G` (γ=0.9975, `return_distribution.py`, same bands):
-
-| band | `b33a` V | `b33a` G | V−G | `b32a` V | `b32a` G | V−G |
+| length band | `b33a` V | `b33a` dV | `b33a` gap p50 | `b32a` V | `b32a` dV | `b32a` gap p50 |
 |---|---|---|---|---|---|---|
-| 10-49 | 28.02 | 20.14 | +7.9 | 33.44 | 24.31 | +9.1 |
-| 50-84 | 23.46 | 10.36 | +13.1 | 40.07 | 34.44 | +5.6 |
-| **85-89** | 19.59 | 4.64 | **+15.0** | 56.18 | 56.22 | **−0.04** |
-| 95-97 | 16.65 | 0.02 | +16.6 | 78.73 | 45.57 | +33.2 |
+| 20-49 | 27.55 | — | 0.22 | 33.48 | — | 0.17 |
+| 50-79 | 23.17 | **−4.38** | 8.87 | 37.85 | **+4.37** | 1.03 |
+| 80-89 | 20.23 | **−2.94** | 24.32 | 50.00 | **+12.14** | 51.12 |
+| 90-93 | 18.50 | **−1.73** | 23.16 | 60.92 | **+10.92** | 63.05 |
+| 94-96 | 14.20 | **−4.31** | 19.82 | 72.19 | **+11.27** | 74.76 |
 
-Read the **85-89** row, where both runs have plenty of states (251 and 310): the control is calibrated to
-0.04 on a 100-point scale, and the win-10 arm is off by 15 on a 30-point scale. The two outer bands are
-thin in the `V` probe and the realised return there is bimodal, so **the 95-97 and 98-99 rows are
-directional only** — quote 85-89 for the calibration claim and quote `V` vs the win's payoff for the
-behavioural one.
+**Every meal of progress costs the win-10 arm value.** Eating moves board-fill up one notch and `V` down
+1.7-4.4 points while the meal pays 1, so `Q(don't eat) > Q(eat)` — and the agent is *correct*, because
+that is what its objective says. It is not confused, not blind, and not miscalibrated. It is maximising
+faithfully. (The 97-99 band is dropped from the table: n=27-79 across runs and it flips sign between them.)
 
-**The mechanism, and why the miscalibration is one-sided.** At `W=100` the endgame is the *highest*-value
-region, so it is the largest, sharpest target in the return distribution and the loss is dominated by
-getting it right. At `W=10` the endgame is the *lowest*-value region and its true returns (~0-5) sit
-inside the span the early game already occupies (~20-30), so nothing in the loss forces the net to learn
-that the endgame is nearly worthless. **The win reward was not only an incentive — it was the training
-signal that made the endgame learnable at all.**
+**And it is not a case of near-tied actions either** — the endgame action gap is **19.8-24.3, larger than
+`V` itself** (gap/`V` 101-126%), because the alternative to a safe move is death at −5. The policy
+separates fatal from non-fatal perfectly. What it cannot do is prefer the move that makes *progress*.
+
+**The design rule, which is the transferable part.** From `V(m) = Σ_{j<m} f^j + W·f^m`, one meal of
+progress is worth `f^{m−1}·[W(1−f) − 1]`, so **progress is locally attractive only when**
+
+    W > 1 / (1 − γ^k)          k = steps per meal
+
+At γ=0.9975 that threshold is **34 at k=12, 58 at k=7, 100 at k=4**. The project's realistic endgame pace
+is 7-12 steps per meal, so the shipped `PERFECT_GAME_REWARD=100` clears the threshold by 2-3× and **10
+misses it by 3-6×** — which is the whole result, derivable in three lines before any GPU time. Two
+corollaries: the rule couples the win reward to the discount, so **shrinking `W` requires shrinking γ**
+(`W=10` needs `γ^k < 0.9`, i.e. γ≈0.974 at k=4); and at very small `k` the threshold rises above 100,
+which is why the very last band is not where the rule bites.
+
+**The win reward is not the prize, it is the potential.** Its real job is to keep `V` rising as the board
+fills; the 100 points at the end are almost incidental. That is the same mechanism as potential-based
+shaping, arrived at from the opposite direction.
+
+### The board-fill input is not being ignored — but three inputs are dead
+
+The obvious hypothesis, that the net stops reading how full the board is, is **false in both arms**.
+`endgame_gradient.py`'s saliency panel, mean `|dV/dobs_i|` at length ≥90:
+
+| | `b33a` | `b32a` |
+|---|---|---|
+| index 22 (board-fill) rank | **1 of 30** | **1 of 30** |
+| its share of total gradient | **29.0%** | **28.4%** |
+| next input (21, starve budget) | 11.9% | 7.3% |
+
+It is the most-read input in the vector, in both, by ~2.5×. The win-10 arm reads board-fill *correctly*;
+it is the value it maps it to that makes finishing unattractive.
+
+**Indices 18-20 (`perfect_game_move`, "this move wins") are effectively constant zeros — a third instance
+of the `game_over` trap.** `perfect_game_obs` returns `[0, 0, 0]` unless `snake_len == PERFECT_SCORE − 1`,
+which is the single step before a win, so occupancy over 12,000 greedy states is:
+
+| index | `b33a` nonzero | `b32a` nonzero |
+|---|---|---|
+| 18 / 19 / 20 | 0.000% / 0.008% / 0.000% | 0.008% / 0.008% / 0.025% |
+| 29 (food space, the documented near-constant) | 83.4% | 97.1% |
+
+**So the explicit "you can win right now" signal has untrained weights, and neither arm learns to win from
+it** — forcing it to 1 moves `Q` for that action by **+0.53** in `b33a` and **−0.94** in `b32a`, the wrong
+sign in the arm that wins 92% of its games. The record-holding configs win because the win reward carved a
+steep board-fill response, not because they read this flag. Index 29 is already flagged in CLAUDE.md as
+nearly constant at 99.95%; **18-20 are three more, and far more extreme.** Worth knowing before anyone
+tries to fix an endgame by adding a flag that only fires at the endgame's last step: an input that is on
+in 0.01% of states cannot be trained, however informative it looks.
 
 **What the failure looks like, measured greedy** with `behaviour_profile.py` and `point_of_no_return.py`,
 60 episodes per arm on one seed:

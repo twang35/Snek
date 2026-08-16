@@ -185,6 +185,27 @@ reads 1 at indices 26-28 (the flag only asks "is this the tail's cell" — combi
 index 29 sits at 1 in **99.95%** of states, so it is nearly a constant and **its weights are not
 meaningfully trained** — same shape as the `game_over` trap above.
 
+**Indices 18-20 (`perfect_game_move`) are worse: nonzero in 0.000-0.025% of states** (measured
+2026-08-16, 12,000 greedy states on two arms). `perfect_game_obs` returns `[0, 0, 0]` unless
+`snake_len == PERFECT_SCORE - 1`, so the "this move wins" flag only exists on the single step before a
+win. Forcing it to 1 moves `Q` for that action by **+0.53** on one arm and **−0.94** on another — the
+wrong sign on the arm that wins 92% of its games. **No policy in this project has ever learned to win
+from that input**; the ones that win do it through board-fill (index 22), which is **rank 1 of 30** by
+saliency in every arm measured. Two consequences: don't credit an endgame result to indices 18-20, and
+**don't try to fix an endgame by adding an input that only fires in the endgame's last step** — an input
+that is on in 0.01% of states cannot be trained however informative it looks. Measure occupancy with
+[`perDiagnostics/endgame_gradient.py`](snek2/hyperparamTuning/perDiagnostics/endgame_gradient.py) before
+adding a block.
+
+**A terminal reward is a potential, not a prize, and it has a threshold.** With `k` steps per meal and
+`f = γ^k`, one meal of progress is worth `f^(m-1)·[W(1-f) - 1]`, so progress only raises value when
+**`W > 1/(1 - γ^k)`** — at `DISCOUNT=0.9975` and this project's 7-12 steps per meal, **34-58**.
+`PERFECT_GAME_REWARD=100` clears that by 2-3×; batch 33 cut it to 10, missed by 3-6×, and the agents
+correctly learned to avoid finishing (see
+[`findings.md`](snek2/hyperparamTuning/findings.md#-falsified-2026-08-16-shrinking-the-win-reward-100--10-does-not-buy-c51-stability--it-teaches-the-agent-that-winning-is-a-mistake)).
+**So `PERFECT_GAME_REWARD` and `DISCOUNT` cannot be tuned independently** — lowering the win requires
+lowering γ to match.
+
 **`tests/test_observation_spec.py` is the guard.** It asserts `observation_spec()`'s length equals
 what `get_observations` builds across three hand-built boards, and pins each recent block to its
 index range by comparing against the producing function rather than a literal — an ordering bug
