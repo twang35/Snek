@@ -274,42 +274,68 @@ against 36 GB, and a swap-in rate of 244 pages per 20 s, so the cost is throughp
 **c51pilotB-lr25e4seed2** — lr 0.00025, best-30 2.3, first perfect 59k
 <!-- C51-PILOT-STATUS:END -->
 
-## Batch 28 — chase-safe shaping at **`c=0.20`**, gate 85 (b24 config) — *b28a-d running on the desktop*
+## Batches 28-29 — chase-safe **dose** (`c=0.20`) and **gate** (`75`) on `fc 320` — *done: the gate is the lever (desktop)*
 
-The dose rung above b27. Identical to it — `fc 320`, gate 85, IS off, `td_error`, target 1000, discount
-0.9975, `FORK_BRANCHES=4`, 2M cap, seeds 1-4, the same `b24a-d` control — with the shaping coefficient
-**doubled to `c=0.20`**. Its job is the one ambiguity a single dose cannot resolve: **b27 came back null**
-(below — pooled 85.2 vs the control's 87.9, and **0 of 4** record-tier checkpoints against the control's
-two), so b28 separates *"chase-safe is the wrong idea"* from *"`c=0.10` was too small to see."*
+Both extend b27's gate-85 null onto the two axes a single dose could not test. `b28` doubles the coefficient
+to **`c=0.20`** at gate 85; `b29` drops the **gate to 75** at `c=0.10`. Everything else is b24's config —
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, 2M cap, seeds 1-4, the same
+`b24a-d` control. All eight closed out and HOF-500'd on the desktop.
 
-**Status at 08:46 on 2026-08-15: 262-275k of 2M (~13%), all four healthy** — epsilons off the 0.0125
-ceiling (0.003-0.005), no dead or zero stretch, peak trailing ~93.7. **A dead heat with the control this
-early, exactly like b27 was**: at the matched ≤275k horizon mean best-30 **56.9 vs 57.4 (−0.5), 2 of 4
-seeds ahead**, `sef` ~3 for both (near zero this early). Nothing to read yet — best-30 at 13% of the cap
-measures *when* an arm started winning, not the endgame consolidation this batch is about. Shaped first,
-control in parentheses:
+**`b28` (`c=0.20`, gate 85) is a null — the dose is not the issue.** Pooled mean **85.4**, ~2.5 under the b24
+control's 87.9, and **0 of 4** seeds held ≥98%/500. With b27/b30 this rules out both the net and the dose at
+gate 85.
 
-| arm | step | best-30 (control) | `sef` (control) |
-|---|---|---|---|
-| `b28b-chase20g85seed2` | 275k | **65.3** (`b24b` 58.3, +7.0) | 5.4 (2.2) |
-| `b28d-chase20g85seed4` | 269k | 63.3 (`b24d` 73.7, −10.4) | 6.7 (13.8) |
-| `b28c-chase20g85seed3` | 274k | 53.3 (`b24c` 58.7, −5.4) | 0.0 (1.8) |
-| `b28a-chase20g85seed1` | 262k | 45.7 (`b24a` 39.0, +6.7) | 0.4 (0.0) |
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|
+| `b28d-chase20g85seed4` | 96.7 | 68.7 | 89.10 | best 96.8% @1061k (341 ep, ab.) — **0 held** |
+| `b28a-chase20g85seed1` | 96.0 | 54.0 | 89.72 | best 95.6% @1727k (275 ep, ab.) — **0 held** |
+| `b28c-chase20g85seed3` | 92.7 | 33.4 | 82.67 | none reached the gate — **0 held** |
+| `b28b-chase20g85seed2` | 90.7 | 47.9 | 80.15 | best 90.0% @1127k (120 ep, ab.) — **0 held** |
 
-**The verdict is the 2M close-out's ≥98%/500 count, read against b24's two records — not best-30 at 275k.**
-`b29` (gate 75) is queued behind these four.
+**`b29` (`c=0.10`, gate 75) produced a record region — the positive result of the whole investigation.**
+Pooled **87.8** (a dead heat with b24) but **21 checkpoints held ≥98%/500 across two of four seeds**, where
+the record-holding control produced only 2 isolated ones. `b29b` carries an **18-checkpoint band**
+(1446k-1529k) peaking at **99.0%/500 (495/500) @1447k** — a candidate new record (point estimate above b24's
+98.0%/500; lead inside the CI, but the *region* is not).
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 (≥98%/500) |
+|---|---|---|---|---|
+| `b29a-chase10g75seed1` | 97.7 | 60.3 | 89.76 | **3 held**, best 98.4% @1347k |
+| `b29c-chase10g75seed3` | 96.3 | 67.9 | 89.68 | 0 held (best 97.1%, 378 ep ab.) |
+| `b29b-chase10g75seed2` | 97.3 | 55.6 | 87.14 | **18 held** (1446k-1529k), best **99.0% @1447k** |
+| `b29d-chase10g75seed4` | 94.3 | 59.7 | 84.75 | 0 held (best 90.6%, 127 ep ab.) |
+
+**The gate is the lever, not the dose or the net.** Gate 85 is null on `fc 320` (b27), on `fc 200,100,100`
+(b30) and at doubled dose (b28); gate 75 matches the control's pooled *and* produces a record region it never
+did. The Φ calibration is why — the potential carries ~0 at lengths 98-99, so a gate-85 term grades the flat
+final approach while gate 75 turns it on ten meals earlier, in the packing decisions that decide whether the
+endgame is winnable. Full write-up:
+[`completedRuns.md`](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
+`b29b` @1447k is a `hallOfFame/` candidate pending the manual verified copy-and-play.
+
+![b29b](charts/b29b-chase10g75seed2.png)
+**b29b-chase10g75seed2 — 99.0%/500 @1447k, the record-region arm**
+
+![b29a](charts/b29a-chase10g75seed1.png)
+**b29a-chase10g75seed1 — 3 held ≥98%/500**
+
+![b29c](charts/b29c-chase10g75seed3.png)
+**b29c-chase10g75seed3**
+
+![b29d](charts/b29d-chase10g75seed4.png)
+**b29d-chase10g75seed4**
 
 ![b28a](charts/b28a-chase20g85seed1.png)
-**b28a-chase20g85seed1**
+**b28a-chase20g85seed1** (`c=0.20`, null)
 
 ![b28b](charts/b28b-chase20g85seed2.png)
-**b28b-chase20g85seed2**
+**b28b-chase20g85seed2** (`c=0.20`, null)
 
 ![b28c](charts/b28c-chase20g85seed3.png)
-**b28c-chase20g85seed3**
+**b28c-chase20g85seed3** (`c=0.20`, null)
 
 ![b28d](charts/b28d-chase20g85seed4.png)
-**b28d-chase20g85seed4**
+**b28d-chase20g85seed4** (`c=0.20`, null)
 
 ## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *done: close-out + HOF-500 null (laptop)*
 

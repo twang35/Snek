@@ -77,7 +77,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ Free space in one piece at length 90-94 separates the records from a dud by 87 points** | **measured 2026-08-14** — one-piece share **92% / 77% / 5%** for `b24d` / `b18b` / `b20d`, per meal, identical food, exact (one flood fill, no search). The gap opens **ten meals before the end**, and all three reach those lengths equally often. Largest per-policy separation on record here |
 | **‡ The chase-safe potential self-attenuates: ~35 flips per episode for a dud, ~4.6 for a record** | **measured 2026-08-14**, 60 episodes × 3 checkpoints. Genuine flips per endgame meal are **2.5-3.6** for `b20d` against **0.21-0.63** for the records, which spend 10.8% of steps at length ≥85 against `b20d`'s 41.2%. Sets `c = 0.10`. **98-99 carries 0.00-0.04 — the last meals cannot be shaped by this quantity.** See below |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
-| **‡‡ Chase-safe reward shaping at `c=0.10` is null-to-negative — 0 records on two nets, −2.7 pooled on both** | **measured 2026-08-15**. b27 (`fc 320`) and b30 (`fc 200,100,100`) vs seed-matched IS-off controls: on `fc 320` shaped held **0 of 4** ≥98%/500 against the control's **2** (the records); on `fc 200,100,100` **0 vs 0**. Both healthy throughout, so not destabilizing — it buys nothing, and on the wider net it removed the control's records. **The dose is still open**: b28 (`c=0.20`) is running. See below |
+| **‡‡ Chase-safe shaping: the gate is the lever — null at gate 85 at any dose/net, records at gate 75** | **measured 2026-08-16**, 4 batches. Gate 85 held **0 records** across b27 (`fc 320`), b30 (`fc 200,100,100`) and b28 (`c=0.20`) — dose and net ruled out. Gate 75 (b29) matched the control's pooled *and* produced **21 checkpoints ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500** — a record region where the control had isolated points. See below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
 | **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
@@ -103,7 +103,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A seed number is a stable unit of quality across configs | **falsified** — batch 11's best seed became batch 13's worst |
 | The same `SNEK_SEED` reproduces a run | **falsified** — same seed and config diverge in weights inside 1000 steps; `cpprb`'s sampling RNG is unseeded and unseedable |
 | The epsilon *ratchet* was a real defect | **standing**, on mechanism: no recovery from a collapse |
-| **‡‡ The best-30 lever order: IS off (+22) ≈ β→0.1 ≫ widen the net (+10) ≈ drop food-distance shaping (+13) ≫ forking (+3-9, one seed −33) ≫ chase-safe shaping (~0)** | **synthesised 2026-08-15**, seed-matched pairs across b16-b30. IS off is the whole story below the ceiling and **saturates at β→0.1**; above ~92 best-30 stops separating a record-holder from a null (b24 96.2 → 2 records, b25 94.2 / b30 92.9 → **0**). See below |
+| **‡‡ The best-30 lever order: IS off (+22) ≈ β→0.1 ≫ widen the net (+10) ≈ drop food-distance shaping (+13) ≫ forking (+3-9, one seed −33) ≫ chase-safe shaping at gate 85 (~0)** | **synthesised 2026-08-15**, seed-matched pairs across b16-b30. IS off is the whole story below the ceiling and **saturates at β→0.1**; above ~92 best-30 stops separating a record-holder from a null (b24 96.2 → 2 records, b25 94.2 / b30 92.9 → **0**). Gate 85 shaping is null at any dose; **gate 75 (b29) produces records** — see below |
 
 **Measurement**
 
@@ -328,8 +328,9 @@ gains far less ([the widest-layer finding](#-corrected-2026-08-14-the-is-off-arc
 **Forking helps the seeds that train normally and blows one up.** b17 (forking) vs b16 (identical, forking
 off): seeds 2-4 gained +7.7 / +9.3 / +2.7, seed 1 collapsed −33 (never reached ε ≤ 0.003). The mean is
 negative and the batch is [officially unmeasured](#forked-endgame-collection-null-at-60-of-the-intended-dose-and-the-premise-it-was-built-on-is-false),
-but the signal on the healthy seeds is a real +3 to +9. **Chase-safe shaping does nothing**, 0 of 4 seeds,
-matching [the records](#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
+but the signal on the healthy seeds is a real +3 to +9. **Chase-safe shaping at gate 85 does nothing** to
+best-30, 0 of 12 seeds producing a ≥98%/500 record; but [gate 75 does](#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever),
+so the gate, not the shaping term, is the lever.
 
 **Two caveats on the metric itself.** (1) It **compresses near the top and stops discriminating what you
 actually want**: above ~92 a 3.3 pp best-30 gap is the difference between b24's *two* records and b25/b30's
@@ -489,38 +490,49 @@ conclusion was wrong — they are the two metrics this effect does *not* touch. 
 read levels late" cuts both ways: an early crossing read is trustworthy and says nothing about level.**
 
 
-## ‡‡ Chase-safe reward shaping is null-to-negative at `c=0.10` — two architectures agree
+## ‡‡ Chase-safe reward shaping: null at gate 85 at any dose, records at gate 75 — the gate is the lever
 
 **Potential-based chase-safe shaping adds `c·(γΦ(s′) − Φ(s))` to every step, with Φ = 1 iff the head and
-tail share a free region that also holds the food and the snake is ≥85 long** — potential-based, so the
+tail share a free region that also holds the food and the snake is ≥ *gate* long** — potential-based, so the
 optimal policy is untouched and only the gradient on the way there changes ([the plan](../plans/chase-safe-reward-shaping.md);
 Φ calibration [below](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)).
-Two batches carry it at `c=0.10` against seed-matched IS-off controls, one per architecture:
+Four batches walk three axes — architecture, dose `c`, and the length **gate** — all against seed-matched
+IS-off controls:
 
-| net | shaped | control | shaped ≥98%/500 | control ≥98%/500 | pooled shaped (control) |
-|---|---|---|---|---|---|
-| `fc 320` | `b27e-h` | `b24a-d` | **0 of 4** | **2 of 4** (the records) | 85.2 (87.9), **−2.7** |
-| `fc 200,100,100` | `b30e-h` | `b25a-d` | **0 of 4** | **0 of 4** | 83.3 (86.0), **−2.7** |
+| shaped | net | `c` | gate | control | shaped ≥98%/500 | best HOF-500 |
+|---|---|---|---|---|---|---|
+| `b27e-h` | `fc 320` | 0.10 | 85 | `b24` (2 records) | **0 of 4** | 97.5 (`b27h`) |
+| `b30e-h` | `fc 200,100,100` | 0.10 | 85 | `b25` (0) | **0 of 4** | 96.1 (`b30e`) |
+| `b28a-d` | `fc 320` | **0.20** | 85 | `b24` (2 records) | **0 of 4** | 96.8 (`b28d`) |
+| `b29a-d` | `fc 320` | 0.10 | **75** | `b24` (2 records) | **21, in 2 seeds** | **99.0 (`b29b` @1447k)** |
 
-**On the decisive metric — a checkpoint that holds ≥98% over 500 fresh episodes — shaping produced none on
-either net.** On `fc 320` the control produced two (`b24b`, `b24d`, both 98.0%/500, the project record) and
-the shaped arm none; the best shaped checkpoint re-measured to 97.5% (`b27h` @1945k, 435 ep, abandoned). On
-`fc 200,100,100` neither shaped nor control reaches the gate — b30's ten ≥98%/100 close-out checkpoints all
-deflated at 500 (best `b30e` @651k **96.1%**), and b25's four arms did the same (best 97.2%). Every close-out
-`99%/100` and `98%/100` row is a selection high that shrinks at 500, the selection-inflation this project
-[already documents](#checkpoint-to-checkpoint-variance-is-large-and-it-is-not-sampling-noise).
+**Gate 85 is null on every axis it was pushed.** Two architectures agree (`b27`, `b30`), doubling the dose to
+`c=0.20` changes nothing (`b28`), and none of the twelve gate-85 arms produced a single checkpoint that holds
+≥98% over 500 fresh episodes — while the `fc 320` control produced two (`b24b`, `b24d`, both 98.0%/500). The Φ
+calibration says why, and it is not a dose problem: [the potential carries 0.00-0.04 at lengths 98-99](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one),
+so a gate that only switches the term on at 85 is grading the final approach, exactly where Φ is already flat.
+There is nothing there to shape, at any `c`.
 
-**Both waves are healthy throughout** — trailing 93.6-94.1 (b27), peak ~95 (b30), no dead or zero stretch —
-so the potential-based term is not destabilizing. It simply buys nothing, and on the wider net it removed the
-control's two records. The pooled gap is the same **−2.7** on both nets: a shade *below* the control, not
-above.
+**Gate 75 is where it pays — and this overturns the reading written earlier in this batch.** Dropping the gate
+ten meals earlier, into the packing decisions that decide whether the endgame is winnable at all, `b29`
+produced **21 checkpoints at ≥98%/500 across two of its four seeds**, including an unprecedented **18-checkpoint
+band in `b29b`** and a peak of **`b29b` @1447k = 99.0%/500 (495/500)** — a point estimate *above* the project
+record `b24d`/`b24b` at 98.0%/500. This is the design's own hypothesis — shape the *setup*, not the finish —
+and it is the first evidence for it. It corrects the mid-batch conclusion that "chase-safe is null on two
+architectures": that was true, but gate-85-specific; the lever is the **gate**, not the dose or the net.
 
-**This is `c=0.10`, and the dose is not yet ruled out.** `b28` (`c=0.20` on `fc 320`) is running to separate
-*"chase-safe is the wrong idea"* from *"the dose was too small to see"*, with `b29` (gate 75) queued behind
-it. Until those land the established claim is the narrow one: **`c=0.10` chase-safe shaping does not help on
-either architecture, and hurts on `fc 320`.** The Φ calibration already shows why a larger `c` may not rescue
-it — [the potential carries 0.00-0.04 at lengths 98-99](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one),
-so the last few meals, where a perfect game is won or lost, cannot be shaped by this quantity at any dose.
+**Read the lead honestly.** `b29b`'s 99.0% over `b24d`'s 98.0% is inside the 500-episode confidence intervals —
+a one-run point lead, not a resolved win. What is *outside* noise is the **region**: `b24` produced 2 isolated
+≥98%/500 checkpoints across 4 seeds, `b29` produced 21 across 2, an 18-wide contiguous band in one arm. A record
+this project has only ever hit as isolated points now appears as a plateau — that is the signal worth chasing,
+and it makes `b29b` @1447k a candidate for `hallOfFame/` (pending the manual verified copy-and-play; the
+checkpoint is on the desktop and needs an rsync first).
+
+**Every wave is healthy throughout** — trailing 93-94 (b27/b29), peak ~95 (b30), no dead or zero stretch — so
+the potential-based term never destabilizes; it simply grades the wrong decisions until the gate moves. Every
+close-out `99%/100` and `98%/100` row still deflates at 500, the selection-inflation this project
+[already documents](#checkpoint-to-checkpoint-variance-is-large-and-it-is-not-sampling-noise); the counts above
+are the survivors of the 500-episode re-measure, not close-out highs.
 
 **A caveat on the runs themselves.** The first launches of both batches — `b27a-d` and `b30a-d` — trained
 under the [perfect-counting bug](#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)

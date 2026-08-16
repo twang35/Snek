@@ -72,6 +72,8 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b29b-chase10g75seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **99.0%** @1447k /500 | 100% | 87.14% /eq §§ | 97.3% | ‡‡‡ § **candidate new record — highest /500 point estimate on record (99.0%, 495/500)**, and the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a *region*, where b24's records are isolated points. The 99.0 vs 98.0 lead over b24 is inside the 500-ep CI; the region is not. **Pending the manual verified HOF copy-and-play** (checkpoint is on the desktop). See [Batches 28-29](#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
+| `b29a-chase10g75seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **98.4%** @1347k /500 | 100% | 89.76% /eq §§ | 97.7% | ‡‡‡ § **3 checkpoints held ≥98%/500** (1339k/1347k/1414k), best 98.4% — record-tier, the second seed of the b29 gate-75 region. Not yet HOF-promoted |
 | `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **98.0%** @1342k /500 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § **THE NEW RECORD** — 98.0% over 500 fresh episodes (490/500, CI [96.4,98.9]), and it *rose* on re-measurement (97.0/100 → 98.0/500), the genuine-region signature. 3 of its 51 ≥97%/100 checkpoints held ≥97%/500 (early, 0.9-1.36M). In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **98.0%** @2860k /500 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § **new record (tied)** — 98.0%/500 (490/500, CI [96.4,98.9]); 3 of 59 ≥97%/100 checkpoints held ≥97%/500, all late (2.74-2.86M). In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b24c-fc320noisseed3` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 97.4% @2982k /500 | 99.3% | 87.68% /eq §§ | 96.0% | ‡‡‡ § 3 of 46 ≥97%/100 checkpoints held ≥97%/500 (best 97.4%, CI [95.6,98.5], late 2.95-2.98M); **both its 100%/100 highs shrank below 97%/500**. Not added to HOF (below the record) |
@@ -84,6 +86,12 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b30g-chase10fc200x100x100seed3` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 99.0% @738k /100 | 98.3% | 84.28% /eq §§ | 93.3% | ‡‡‡ § shaped counterpart of `b25c`. 3 checkpoints ≥98%/100 → **0 held**, best 95.3% @709k (233 ep, ab.). No record |
 | `b30f-chase10fc200x100x100seed2` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 98.0% @643k /100 | 97.0% | 84.32% /eq §§ | 92.3% | ‡‡‡ § shaped counterpart of `b25b`. 1 checkpoint ≥98%/100 → **0 held**, 90.9% @643k (132 ep, ab.). No record |
 | `b30h-chase10fc200x100x100seed4` ‡‡‡ § | **fc 200,100,100**, chase-safe shaping `c=0.10` (gate 85), IS off, td_error | 2.00M | 97.0% @614k /100 | 96.3% | 81.00% /eq §§ | 92.3% | ‡‡‡ § shaped counterpart of `b25d`. **No ≥98%/100 checkpoint**, so the HOF-500 selected nothing. Lowest pooled of the four |
+| `b29c-chase10g75seed3` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 75), IS off, td_error | 2.00M | 97.1% @1396k /378 *trunc* | 99.0% | 89.68% /eq §§ | 96.3% | ‡‡‡ § third b29 seed; **0 held** — best partial 97.1% abandoned at 378 ep under gate 98. Highest `sef` of b29 (67.9%). The two record seeds are `b29b`/`b29a` above |
+| `b29d-chase10g75seed4` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 75), IS off, td_error | 2.00M | 90.6% @1443k /127 *trunc* | 98.0% | 84.75% /eq §§ | 94.3% | ‡‡‡ § the weak b29 seed; **0 held**, best partial 90.6% (127 ep, ab.). The gate-75 region rests on 2 of 4 seeds |
+| `b28d-chase20g85seed4` ‡‡‡ § | **fc 320**, chase-safe shaping **`c=0.20`** (gate 85), IS off, td_error | 2.00M | 96.8% @1061k /341 *trunc* | 99.0% | 89.10% /eq §§ | 96.7% | ‡‡‡ § best of b28 (doubled dose, gate 85); **0 held** — best partial 96.8% ab. at 341 ep. Doubling `c` does not rescue gate 85 |
+| `b28a-chase20g85seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.20` (gate 85), IS off, td_error | 2.00M | 95.6% @1727k /275 *trunc* | 99.0% | 89.72% /eq §§ | 96.0% | ‡‡‡ § highest pooled of b28 (89.72); **0 held**, best partial 95.6% (275 ep, ab.) |
+| `b28c-chase20g85seed3` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.20` (gate 85), IS off, td_error | 2.00M | — *trunc* (0 full-length) | 97.0% | 82.67% /eq §§ | 92.7% | ‡‡‡ § no checkpoint reached the gate; **0 held**. `sef` 33.4% |
+| `b28b-chase20g85seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.20` (gate 85), IS off, td_error | 2.00M | 90.0% @1127k /120 *trunc* | 96.0% | 80.15% /eq §§ | 90.7% | ‡‡‡ § weakest of b28; **0 held**, best partial 90.0% (120 ep, ab.) |
 | `b26b-fc100x100noisseed2` ‡‡‡ § | **fc 100,100** (2 layers, 0.62× the b24 net), IS off, td_error | 3.00M | 97.0% @1948k /100 | 96.7% | **83.83%** /eq §§ | 93.7% | ‡‡‡ § best of b26 on every column; `sef` 58.0%. **No ≥98%/100 checkpoint**, so the auto HOF-500 selected nothing |
 | `b26c-fc100x100noisseed3` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 97.0% @1969k /100 | 96.0% | 83.18% /eq §§ | 92.0% | ‡‡‡ § 2nd of b26; only 7 full-length rows cleared gate 95, against b25c's 64 — the shallow shape spends much less time in the measurable band |
 | `b26a-fc100x100noisseed1` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 95.0% @2904k /100 | 95.0% | 80.02% /eq §§ | 88.0% | ‡‡‡ § just 2 full-length rows, both at the gate exactly. Peak trailing 94.92 — the first b24-family arm not to reach 95.00 |
@@ -297,13 +305,14 @@ are a dead heat at zero records.
 | `b30h` seed4 | 95.00 | 92.3% | 55.0% | 81.00 | no ≥98%/100 |
 | **mean** | | **92.9%** | **56.9%** | **83.3** | **0 of 10 held** |
 
-**The 2×2 verdict.** On `fc 320` the control (b24) produced two records and the shaped arm (b27) none; on
-`fc 200,100,100` neither reaches a record. Chase-safe shaping at `c=0.10` produces no record-tier checkpoint
-on either net and removes the control's records on the wider one — **null-to-negative, confirmed on two
-architectures**. Whether a larger dose changes that is what **b28** (`c=0.20`) is running to answer; the Φ
-calibration ([findings.md](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one))
-predicts it will not, since Φ carries ~0 at the lengths where a perfect game is decided. Full conclusion:
-[`findings.md`](findings.md#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
+**The 2×2 verdict, at gate 85.** On `fc 320` the control (b24) produced two records and the shaped arm (b27)
+none; on `fc 200,100,100` neither reaches a record. Chase-safe shaping at `c=0.10`, **gate 85**, produces no
+record-tier checkpoint on either net and removes the control's records on the wider one. **b28** (`c=0.20`,
+gate 85) later confirmed the dose is not the issue — also 0 records — as the Φ calibration
+([findings.md](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one))
+predicted, since Φ carries ~0 at the lengths a gate-85 term grades. **The lever turned out to be the gate, not
+the dose: `b29` (`c=0.10`, gate 75) produced a 21-checkpoint ≥98%/500 region** — see Batches 28-29 below.
+Full conclusion: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
 **How it was judged: the control at a matched 2M horizon, seed by seed.** b25/b24 ran to 3M, so their
 summaries were recomputed truncated at 2M (`run_report.build_summary`) for a like-for-like read against
@@ -321,6 +330,52 @@ b30's 2M cap:
 widest-layer ordering and `best_perfect30` being the sharper metric at this level. b30's best-30 (92.9)
 sits just under its b25 control (93.6), the −0.7 of the shaping null; `b25d` was the weak seed of that wave
 (91.7 / 54.2), so a b30 seed 4 that merely matched it would not have been a null.
+
+
+## Batches 28-29 — chase-safe dose and gate: **the gate is the lever, and gate 75 produces a record region**
+
+**Two arms extend the gate-85 nulls onto the two axes left untested — dose and gate.** Both are `fc 320`,
+IS off, `td_error`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance
+shaping, **2M cap**, seeds 1-4, seed-matched control **b24** (the record-holder). `b28` raises the dose to
+**`c=0.20`** at gate 85; `b29` drops the gate to **75** at `c=0.10`. Both trained, closed out and HOF-500
+re-measured on the desktop.
+
+**`b28` (`c=0.20`, gate 85) is a null — the dose is not the issue.** Same direction as b27/b30: pooled
+**85.4**, ~2.5 under the b24 control's 87.9, and **0 of 4 arms** produced a checkpoint holding ≥98%/500.
+
+| arm | peak trail | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|---|
+| `b28d` seed4 | 95.00 | 96.7% | 68.7% | 89.10 | best 96.8% @1061k (341 ep, ab.) — **0 held** |
+| `b28a` seed1 | 95.00 | 96.0% | 54.0% | 89.72 | best 95.6% @1727k (275 ep, ab.) — **0 held** |
+| `b28c` seed3 | 95.00 | 92.7% | 33.4% | 82.67 | none reached the gate — **0 held** |
+| `b28b` seed2 | 94.94 | 90.7% | 47.9% | 80.15 | best 90.0% @1127k (120 ep, ab.) — **0 held** |
+| **mean** | | **94.0%** | **51.0%** | **85.4** | **0 of 4 held** |
+
+**`b29` (`c=0.10`, gate 75) produces a record region — this is the positive result.** Pooled **87.8**, a dead
+heat with the b24 control (87.9), and best-30 **96.4** (the highest of any shaped batch) — but the tell is the
+HOF-500: **21 checkpoints held ≥98%/500 across two of the four seeds**, where the record-holding control b24
+only ever produced 2 isolated ones across all four. `b29b` alone carries an **18-checkpoint contiguous band**
+(1446k-1529k), peaking at **`b29b` @1447k = 99.0%/500 (495/500)** — a point estimate *above* the project
+record b24d/b24b at 98.0%/500.
+
+| arm | peak trail | best-30 | `sef` | pooled (eq) | HOF-500 (≥98%/500) |
+|---|---|---|---|---|---|
+| `b29a` seed1 | 95.00 | 97.7% | 60.3% | 89.76 | **3 held**, best 98.4% @1347k |
+| `b29c` seed3 | 95.00 | 96.3% | 67.9% | 89.68 | 0 held (best 97.1%, 378 ep ab.) |
+| `b29b` seed2 | 95.00 | 97.3% | 55.6% | 87.14 | **18 held** (1446k-1529k), best **99.0% @1447k** |
+| `b29d` seed4 | 95.00 | 94.3% | 59.7% | 84.75 | 0 held (best 90.6%, 127 ep ab.) |
+| **mean** | | **96.4%** | **60.9%** | **87.8** | **21 held, in 2 of 4 seeds** |
+
+**The verdict: the gate is the lever, not the dose or the net.** Gate 85 is null on `fc 320` (b27), on
+`fc 200,100,100` (b30) and at doubled dose (b28); gate 75 (b29) matches the control's pooled/best-30 *and*
+produces a record region the control never did. The Φ calibration is why — the potential carries ~0 at
+lengths 98-99, so a gate-85 term grades the flat final approach, while gate 75 turns the term on ten meals
+earlier, in the packing decisions that decide whether the endgame is winnable. **Read `b29b` @1447k as a
+candidate new record, not a settled one:** the 99.0 vs 98.0 lead is inside the 500-episode CIs, but the
+*region* — 21 held across 2 seeds, an 18-wide band — is the signal outside noise. It is a `hallOfFame/`
+candidate pending the manual verified copy-and-play (the checkpoint is on the desktop and needs an rsync
+first). Full conclusion:
+[`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
 ## Batch 26 — FC `100,100` under IS-off: **the shallow shape does not carry the lift**
 

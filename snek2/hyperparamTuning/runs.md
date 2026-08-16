@@ -43,10 +43,11 @@ you want them removed as well. The registry rule is now liveness-based
 ([the mechanism](../../CLAUDE.md#rendering-is-off-by-default--use-watchpy-to-see-a-game)); the desktop was
 checked and needs no change, since its daemon passes explicit PNG paths and reads no registry.
 
-**Progress update, 2026-08-15 08:46 — b27 and b30 are done; b28 is running; the fix held throughout.**
-All twelve fixed-counter arms trained with a real perfect rate and a descending epsilon — the two things
-b27a-d could not produce in 320k steps — so the counter fix is confirmed end to end. Where each batch
-landed (full numbers and graphs in [`charts.md`](charts.md)):
+**Progress update, 2026-08-16 — all four chase-safe shaping batches (b27-b30) are done, and the gate is the
+lever: gate 85 is null at any dose, gate 75 produced a record region.** All sixteen fixed-counter arms
+trained with a real perfect rate and a descending epsilon — the two things b27a-d could not produce in 320k
+steps — so the counter fix is confirmed end to end. Where each batch landed (full numbers and graphs in
+[`charts.md`](charts.md); write-ups in [`completedRuns.md`](completedRuns.md)):
 
 - **b27e-h (desktop): done at 2M, closed out — a null.** Pooled mean **85.2** (eq-effort, gate 95) vs the
   b24 control's ~87.9 (a shade *below*), and **0 of 4** seeds produced a ≥98%/500 checkpoint — best `b27h`
@@ -62,18 +63,21 @@ landed (full numbers and graphs in [`charts.md`](charts.md)):
   best partial `b30e` @651k **96.1% at 285 episodes**, then `b30g` 95.3% and `b30f` 90.9%. So the
   shaping×architecture 2×2 is complete and `c=0.10` produced **no record-tier checkpoint on either net** —
   the write-up is in [`completedRuns.md`](completedRuns.md) and
-  [`findings.md`](findings.md#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
-- **b28a-d (desktop): running, 262-275k of 2M (~13%), all four healthy** — epsilons off the ceiling
-  (0.003-0.005), no zero stretch. The `c=0.20` dose rung, and a dead heat with the control this early
-  (matched ≤275k best-30 **56.9 vs 57.4**). Since both `c=0.10` batches came back null, **b28 is the arm
-  that decides "wrong idea" vs "dose too small to see."**
-- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: `b31a-d` was stopped at 538-569k with no
-  close-out and the laptop now holds `b32a-d` (C51 + Adam `epsilon`, 1M).** The reason for both is the
-  same measurement — C51's churn is the learning rate, not C51
+  [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
+- **b28a-d (desktop, `c=0.20`, gate 85): done at 2M, closed out and HOF-500'd — a null, the dose is not the
+  issue.** Pooled mean **85.4** (~2.5 under the b24 control's 87.9) and **0 of 4** seeds held ≥98%/500.
+  Doubling the dose changed nothing, which — with b27/b30 — rules out both the net and the dose at gate 85.
+- **b29a-d (desktop, `c=0.10`, gate 75): done at 2M, closed out and HOF-500'd — the positive result.**
+  Pooled **87.8** (a dead heat with b24) but **21 checkpoints held ≥98%/500 across 2 of 4 seeds**, where the
+  record-holding control produced only 2 isolated ones. `b29b` @1447k = **99.0%/500 (495/500)**, the head of
+  an 18-checkpoint band — a *candidate new record* (see Record status below). **The gate, not the dose or the
+  net, is the lever.**
+- **Laptop: `b31a-d` was stopped at 538-569k with no close-out and the laptop now holds `b32a-d` (C51 + Adam
+  `epsilon`, 1M).** The reason for both is the same measurement — C51's churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
-+ forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
+**Timing.** The desktop is idle now that b29 has closed out. Check it with
+`git show origin/ops-status:status.json`.
 
 ## C51 pilot — closed at 600k, and it handed off to batch `b31` by itself (2026-08-15)
 
@@ -273,69 +277,29 @@ Reached 538-569k in 2h44m, all four healthy (no zero stretch), best-30 **21.0 / 
 **50.7 pp spread at one config**, which is the n=4 noise problem restated rather than a result. Graphs in
 [`charts.md`](charts.md); the arms are in [`completedRuns.md`](completedRuns.md) as void.
 
-## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b28 running, b29 queued — desktop)
+## Batches 27-30 are closed — chase-safe shaping, and the gate is the lever
 
-**The shaping shipped 2026-08-14; batch 27 is on its second launch** (`b27e-h` — a-d were void, see the
-banner above). `Snake.step` now adds
-`c·(γΦ(s′) − Φ(s))` where **Φ = 1 iff the head and the tail share a free region that also contains the
-food, and the snake is at least `SNEK_CHASE_SAFE_GATE` long** — the length gate is variant B of the plan.
-Potential-based, so by Ng/Harada/Russell the optimal policy is unchanged for any bounded Φ and any `c`;
-what changes is the gradient the agent sees on the way there, and the PER priorities of the transitions
-that flip Φ. Everything is in [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md).
+All sixteen chase-safe arms have stopped, so per the bookkeeping rule their descriptions moved to
+[`completedRuns.md`](completedRuns.md). The shaping adds `c·(γΦ(s′) − Φ(s))` with Φ = 1 iff the head and
+tail share a free region holding the food and the snake is ≥ gate long — potential-based, optimal policy
+unchanged ([plan](../plans/chase-safe-reward-shaping.md); Phase 0 Φ calibration in
+[`findings.md`](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)).
+All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29, `fc 200,100,100` for b30), so
+`b24a-d`/`b25a-d` are the seed-matched controls at zero extra compute. Cap 2M.
 
-All twelve arms are **b24's config plus the one knob** — `fc 320`, `IS_WEIGHTS=0`, `td_error`,
-`TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping, seeds 1-4 —
-so **`b24a-d` is the seed-matched control at zero extra compute**. The cap is **2M**, not b24's 3M: b24's
-best HOF-500 checkpoints land at 1.03-1.39M and 2.86M, and 2M buys three batches for the price of two.
+| batch | `c` | gate | net | verdict | write-up |
+|---|---|---|---|---|---|
+| **27** | 0.10 | 85 | `320` | **null** — pooled 85.2 vs b24 87.9, 0 of 4 ≥98%/500 | [Batch 30 2×2](completedRuns.md#batch-30--chase-safe-shaping-on-fc-200100100-c010-null-and-it-completes-the-shapingarchitecture-22) |
+| **30** | 0.10 | 85 | `200,100,100` | **null** — pooled 83.3 vs b25 86.0, 0 of 10 held | [Batch 30](completedRuns.md#batch-30--chase-safe-shaping-on-fc-200100100-c010-null-and-it-completes-the-shapingarchitecture-22) |
+| **28** | **0.20** | 85 | `320` | **null** — pooled 85.4, 0 of 4 held; the dose is not the issue | [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
+| **29** | 0.10 | **75** | `320` | **records** — pooled 87.8, **21 held ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500** | [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 
-| batch | `c` | gate | priority | what a lift here means |
-|---|---|---|---|---|
-| **b27** (done — null) | 0.10 | 85 | 10 | the calibrated dose — one quarter of a meal's reward spread over the ~2.5 genuine flips a struggling policy makes per endgame meal. **Result: pooled 85.2 vs control ~87.9, 0 of 4 ≥98%/500. No lift.** |
-| **b28** (running) | **0.20** | 85 | 20 | the dose ladder. b27 *was* null, so this separates "wrong idea" from "too small to see" — the one ambiguity a single-dose test cannot resolve |
-| **b29** (queued) | 0.10 | **75** | 30 | the gate ladder. 75 starts shaping ~10 meals earlier, where the packing decisions that *create* the endgame are made |
-
-**`c = 0.10` is measured, not assumed** ([Phase 0](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)):
-Φ flips **~35 times an episode for `b20d`** and **~4.6 for the records**, so the term self-attenuates as a
-policy improves — it is a scaffold that fades. At 0.10 the total shaping over an episode is ~0.25 of a
-single meal's reward for a struggling policy, and the discounted sum telescopes to exactly
-`−c·Φ(s₀)` = **0** here, since the opening board (length 5) is below any gate.
-
-**Two things Phase 0 established that the design had wrong.** Gating does *not* buy a larger `c` — flips
-are concentrated at length ≥85 for the binding policy, so gating **halves** the calibrated dose
-(0.203 → 0.097). And **Φ almost never *changes* at length 98-99** — 0.00-0.04 genuine flips per meal — so
-the last two or three meals get no gradient from this quantity at any `c`, which is exactly where
-[the starvation finding](findings.md) says the losses are. So b27 is a test of whether *reaching* length
-96-98 more reliably raises the perfect rate, not a fix for the final meals.
-
-**Corrected 2026-08-14: "no flips at 98-99" is not "Φ is 0 there", and reading it that way is what let the
-counter bug ship.** This section used to say Φ was *structurally 0* at length 99. Measured on a constructed
-full-tour board, **Φ(s) = 1** on the pre-win board: with one cell free the food occupies it, the head's only
-legal move is into it, and in the tail-chasing endgame the tail borders it too, so head, food and tail do
-share a region. What is 0 at length 99 is the **per-action flag** at `obs[15 + a]`, which is computed on the
-*post-move* board — after the winning move there is no food and no free cell
-([the Phase 0 note](findings.md#the-record-checkpoint-specifically) is about that flag). The consequence is
-concrete: the winning transition **is** shaped, paying exactly `−c`, which is the value that stopped every
-perfect-game counter from recognising a win.
-
-**Judge these on `best_perfect30` and the count of ≥98%/500 checkpoints, not on peak trailing.** Peak is
-capped at 95.00 and all four b24 arms already sit on the cap
-([why](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap)),
-so it cannot move even if a shaped arm plays perfectly. `sef` alongside, at the matched 2M horizon.
-
-**The implementation caught a live defect the design would have shipped.** The potential is per-episode
-state, and `Game.snapshot()` does not carry it — with `FORK_BRANCHES=4` forking at length ≥85, every
-endgame fork would have started its shaping from the *parent's* stale Φ. `restore_snapshot()` now
-recomputes it. 24 tests in `tests/test_reward_shaping.py` pin the behaviour, each verified to fail against
-a mutated implementation.
-
-Desktop status (2026-08-15): **b28a-d running** (4 trainers, the box's cap), **b29 queued** behind them,
-each with close-out and HOF-500 auto-chained. b27e-h finished and closed out; ~6 h per batch at ~92 steps/s.
-Check with `git show origin/ops-status:status.json`.
-
-**b30e-h is fully done** — finished at the 2M cap, then closed out (killed mid-run and resumed with
-`EVAL_RESUME=1`) and HOF-500 re-measured on the laptop on 2026-08-15, both null (0 of 10 checkpoints
-≥98%/500). The shaping×architecture 2×2 is complete; see the progress banner above and
-[`completedRuns.md`](completedRuns.md#batch-30--chase-safe-shaping-on-fc-200100100-c010-null-and-it-completes-the-shapingarchitecture-22).
+**The lever is the gate, not the dose or the net.** Gate 85 is null on `fc 320` (b27), on `fc 200,100,100`
+(b30) and at doubled dose (b28); gate 75 (b29) matches the control's pooled *and* produces a record region
+the control never did. The Φ calibration is why: the potential carries ~0 at lengths 98-99, so a gate-85
+term grades the flat final approach, while gate 75 turns it on ten meals earlier, in the packing decisions
+that decide whether the endgame is winnable. Full conclusion:
+[`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
 ## Batches 20-26 are closed — where their descriptions went
 
@@ -374,6 +338,15 @@ from a local minimum; all four seeds make the same level shift
 ([`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum)).
 
 ## Record status
+
+**CANDIDATE NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes**
+(495/500). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500, but the lead is inside
+the 500-episode CIs, so it is a *narrow* point lead. **What is outside noise is the region:** b29b carries an
+**18-checkpoint ≥98%/500 band** (1446k-1529k) and its sibling `b29a` holds 3 more, so the gate-75 arm
+produced **21 record-tier checkpoints across 2 seeds** where every prior record appeared only as isolated
+points. **Not yet promoted:** the manual verified copy-and-play still has to run, and the checkpoint lives on
+the desktop — it needs an rsync to the laptop first ([procedure](../hallOfFame/README.md)). Write-up:
+[Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
 
 **NEW RECORD, 2026-08-13: `b24d-fc320noisseed4` @1342000 — 98.0% over 500 fresh episodes** (490/500,
 CI **96.4-98.9**). It edges the prior record, `b18b-tgt1000seed2` @1588000 at 97.6%/700 (CI 96.1-98.5), on
@@ -434,11 +407,14 @@ reality.
 
 **Outstanding, highest-value, in order:**
 
-1. **`CHASE_SAFE_SHAPING`: b27 and b30 are closed and both null at `c=0.10` (0 records on either net); b28
-   (`c=0.20`) and b29 (gate 75) are the live question.** Design, Phase 0 measurement and implementation notes:
-   [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md); the batch description is
-   at the top of this file. The next decision point is b28's close-out against `b24a-d` — whether a doubled
-   dose does what `c=0.10` did not.
+1. **`CHASE_SAFE_SHAPING`: all four batches (b27-b30) closed. Gate 85 is null at any dose or net; `gate 75`
+   (b29) produced a 21-checkpoint ≥98%/500 region, the gate is the lever.** The two live follow-ups: **(a)
+   promote `b29b` @1447k** — rsync the checkpoint to the laptop and run the verified HOF copy-and-play
+   ([procedure](../hallOfFame/README.md)); and **(b) replicate gate 75**, since a record region on 2 of 4
+   seeds at n=4 is a strong signal but not a settled effect — a `gate 70`/`gate 75` follow-up against
+   `b24a-d` would firm it up and probe whether lowering the gate further keeps paying. Design and Phase 0:
+   [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md); full result in
+   [`completedRuns.md`](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
 2. **`fc 512` under the b24 config is now the strongest untested architecture arm.** b25/b26 turned the
    width result into an ordering on the *widest layer* — 320 → +12.2, 200 → +10.3, 100 → +3.5, 50 → 0 —
    with parameter count not even monotone
@@ -488,7 +464,7 @@ table.
 
 | change | targets | prior |
 |---|---|---|
-| ~~`CHASE_SAFE_SHAPING`~~ — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **shipped and running 2026-08-14** as **b27** (`c` 0.10, gate 85), **b28** (`c` 0.20) and **b29** (gate 75) — see the batch description at the top of this file and the [plan](../plans/chase-safe-reward-shaping.md) |
+| ~~`CHASE_SAFE_SHAPING`~~ — potential-based shaping on head/food/tail in one region | endgame food-finding, the modal failure since batch 16 | **closed 2026-08-16** across b27-b30: gate 85 null at any dose/net, **`gate 75` (b29) produced a record region** ([finding](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever)). The live follow-up is gate-75 replication + promoting `b29b` — see Outstanding #1 above |
 | **Free space in one piece** — as a graded potential and/or an observation | endgame packing, which is what decides whether the food lands somewhere edible | **new 2026-08-14**, and the largest per-policy separation on record: one-piece share at length 90-94 is **92% / 77% / 5%** for `b24d` / `b18b` / `b20d` ([findings](findings.md#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points)). `count_groups` already runs every step, so both forms are nearly free. **Correlational, n=3 checkpoints** |
 | **`SNEK_ALGO=c51`** — distributional RL, a categorical value head instead of a scalar Q | post-peak collapse, which has no established mechanism now that plasticity loss is ruled out | **proposed 2026-08-15, awaiting review** — [plan](../plans/distributional-c51.md). The first change to the *loss* rather than a reward, width or schedule, and the only backlog item that needs a code change before it can be launched by env var. A feasibility probe already ran: the shield, the buffer spec and the network all work unchanged, and `tf_agents`' own C51 loss **silently drops IS weights and returns no PER priority**, both of which the plan fixes. Honest prior: ~40% null on `best_perfect30` |
 | `LEARNING_RATE=1e-4` | training speed | high, but order it after a stability fix |
