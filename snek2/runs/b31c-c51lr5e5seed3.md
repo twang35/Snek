@@ -1,21 +1,19 @@
-# b36d-c51fc320seed4
+# b31c-c51lr5e5seed3
 
-![b36d-c51fc320seed4 progress](b36d-c51fc320seed4.png)
+![b31c-c51lr5e5seed3 progress](b31c-c51lr5e5seed3.png)
 
 Blue is average score (food eaten) on the left axis, red is perfect-game percentage on the right.
 
-Latest eval: step 167000, avg score 93.2, perfect games 60%.
+Latest eval: step 563000, avg score 79.5, perfect games 10%.
 
 ## Config
 
 | setting | value |
 |---|---|
-| policy_name | b36d-c51fc320seed4 |
-| seed | 4 |
+| policy_name | b31c-c51lr5e5seed3 |
+| seed | 3 |
 | zeroed_observations | none |
-| learning_rate | 0.0001 |
-| adam_epsilon | 0.00015 |
-| perfect_game_reward | 100.0 |
+| learning_rate | 5e-05 |
 | batch_size | 128 |
 | discount | 0.9975 |
 | target_update_period | 1000 |
@@ -28,13 +26,13 @@ Latest eval: step 167000, avg score 93.2, perfect games 60%.
 | guided_fraction | 0.8 |
 | forking | up to 4 live branches including the main line, fork p=0.5 at length >= 85, branch capped at 60 steps, one branch advanced per iteration |
 | exploration_shield | 80% of refinement-phase episodes draw the epsilon move from non-fatal actions; greedy moves never shielded |
-| fc_layer_params | (320,) |
+| fc_layer_params | (200, 100, 100) |
 | algo | c51 (distributional), 51 atoms over [-5.0, 120.0] at 2.500 spacing, cross-entropy loss, double (online argmax) target selection, standard init |
 | replay_buffer | cpprb prioritized, capacity 100000 |
 | priority_exponent (alpha) | 0.6 |
 | priority_signal | kl (SNEK_PRIORITY_SIGNAL=td_error; a distributional agent has no TD error) |
 | importance_sampling_beta | disabled |
-| max_steps | 3000000 |
+| max_steps | 2000000 |
 | initial_populate_steps | 1000 |
 | eval | 10 episodes every 1000 steps |
 | grid | 9x9, max possible score 95 |
@@ -44,27 +42,27 @@ Latest eval: step 167000, avg score 93.2, perfect games 60%.
 | CHASE_SAFE_SHAPING | off |
 | eval_only | False |
 | min_checkpoint_score | 40.0 |
-| c51_support_note | support [-5.0, 120.0] is below the derived maximum return 194.0, so a return above 120.0 would be clipped. 14% headroom over the measured 105.0; spacing 2.500. This is a judgement, not an error. |
+| c51_support_note | support [-5.0, 120.0] is below the derived maximum return 194.0, so a return above 120.0 would be clipped. Measured max is 105.0 (14% headroom); spacing 2.500. This is a judgement, not an error. |
 
 ## Evals
 
-168 evals so far. Full series in [`b36d-c51fc320seed4_evals.json`](b36d-c51fc320seed4_evals.json).
+564 evals so far. Full series in [`b31c-c51lr5e5seed3_evals.json`](b31c-c51lr5e5seed3_evals.json).
 
 | step | avg score | trailing avg | min score | max score | avg reward | perfect % | epsilon |
 |---|---|---|---|---|---|---|---|
 | 0 | 0.0 | 0.0 | 0 | 0/95 | -5.0 | 0 | 0.4 |
-| 1000 | 12.8 | 12.8 | 0 | 43/95 | 12.3 | 0 | 0.2 |
-| 2000 | 3.1 | 7.95 | 1 | 12/95 | 2.6 | 0 | 0.2 |
+| 1000 | 2.4 | 2.4 | 0 | 4/95 | 1.9 | 0 | 0.4 |
+| 2000 | 23.0 | 12.7 | 0 | 81/95 | 21.6 | 0 | 0.1 |
 | ... | | | | | | | |
-| 156000 | 85.1 | 84.22 | 78 | 92/95 | 84.15 | 0 | 0.0065 |
-| 157000 | 87.3 | 84.22 | 75 | 95/95 | 95.85 | 10 | 0.0068 |
-| 158000 | 77.1 | 82.18 | 2 | 95/95 | 106.45 | 30 | 0.0069 |
-| 159000 | 77.3 | 80.8 | 3 | 95/95 | 136.05 | 60 | 0.0068 |
-| 160000 | 49.6 | 75.28 | 2 | 95/95 | 98.85 | 50 | 0.0068 |
-| 161000 | 88.8 | 76.02 | 68 | 95/95 | 138.05 | 50 | 0.0067 |
-| 162000 | 80.8 | 74.72 | 4 | 95/95 | 139.55 | 60 | 0.0065 |
-| 163000 | 92.3 | 77.76 | 85 | 95/95 | 161.45 | 70 | 0.0062 |
-| 164000 | 89.8 | 80.26 | 75 | 95/95 | 128.65 | 40 | 0.0062 |
-| 165000 | 82.4 | 86.82 | 66 | 95/95 | 101.35 | 20 | 0.0063 |
-| 166000 | 89.7 | 87.0 | 78 | 95/95 | 148.45 | 60 | 0.0061 |
-| 167000 | 93.2 | 89.48 | 85 | 95/95 | 152.4 | 60 | 0.0058 |
+| 552000 | 77.9 | 46.18 | 26 | 93/95 | 76.05 | 0 | 0.0108 |
+| 553000 | 72.2 | 56.32 | 12 | 93/95 | 69.9 | 0 | 0.0109 |
+| 554000 | 42.6 | 57.7 | 1 | 90/95 | 39.85 | 0 | 0.0109 |
+| 555000 | 22.3 | 52.0 | 4 | 89/95 | 21.35 | 0 | 0.0109 |
+| 556000 | 14.1 | 45.82 | 1 | 55/95 | 12.25 | 0 | 0.0109 |
+| 557000 | 37.5 | 37.74 | 0 | 90/95 | 36.1 | 0 | 0.011 |
+| 558000 | 54.9 | 34.28 | 2 | 89/95 | 50.35 | 0 | 0.0111 |
+| 559000 | 72.2 | 40.2 | 3 | 93/95 | 70.35 | 0 | 0.0111 |
+| 560000 | 59.6 | 47.66 | 5 | 87/95 | 55.05 | 0 | 0.0114 |
+| 561000 | 75.0 | 59.84 | 5 | 95/95 | 92.15 | 20 | 0.0113 |
+| 562000 | 78.0 | 67.94 | 52 | 95/95 | 85.2 | 10 | 0.0113 |
+| 563000 | 79.5 | 72.86 | 42 | 95/95 | 86.7 | 10 | 0.0113 |
