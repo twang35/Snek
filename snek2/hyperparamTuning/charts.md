@@ -44,50 +44,79 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
 
-## Batch 33 — a filled board pays **10**, not 100 — *running on the laptop, 3M cap*
+## Batch 33 — a filled board pays **10**, not 100 — *stopped at 1.64-1.77M of 3M: the largest single-knob regression measured here*
 
 **`SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, otherwise batch 32's config at `eps 1.5e-4`, seeds
-1-4.** `b32a`/`b32b` are an exact paired control differing only in the win reward. Launched 01:32 on
-2026-08-16 alongside b32, 8 trainers, the user's explicit call. Rationale and the two failure predictions
-are in [`runs.md`](runs.md); launcher [`launch_win10.sh`](launch_win10.sh).
+1-4.** `b32a`/`b32b` are an exact paired control differing only in the win reward. Launched 01:32,
+stopped 10:04 on 2026-08-16 at the user's call, no close-out — the training curves settle it. Launcher
+[`launch_win10.sh`](launch_win10.sh); full write-up in [`completedRuns.md`](completedRuns.md), mechanism in
+[`findings.md`](findings.md#-falsified-2026-08-16-shrinking-the-win-reward-100--10-does-not-buy-c51-stability--it-teaches-the-agent-that-winning-is-a-mistake).
 
-**The motivation:** the win reward is what forces a 125-unit support, so at 51 atoms the spacing is 2.5
-while `FOOD_REWARD` is 1.0 — **a meal is 0.40 atoms**. At `v_max=40` spacing is 0.9 and a meal is 1.11
-atoms, a 2.8× resolution gain. **`v_max` is measured, not `120/10`:** the maximum return moves from "just
-before the win" (104.4 at `W=100`) to the *opening of an episode* at `W=10`, measured **32.46**, and 40
-gives the same 21% headroom the shipped 120 has.
+| arm | step | best-30 | at | trailing now | `sef` | final ε |
+|---|---|---|---|---|---|---|
+| `b33b` | 1640k | 25.3 | 238k | 73.6 | 0.0 | 0.0102 |
+| `b33c` | 1772k | 22.3 | 150k | 78.1 | 0.1 | 0.0115 |
+| `b33a` | 1732k | 20.3 | 179k | 76.4 | 0.1 | 0.0110 |
+| `b33d` | 1708k | 18.3 | 353k | 67.9 | 0.1 | 0.0104 |
+| **`b32a`** control | 1000k | **77.0** | 724k | 84.3 | 16.1 | 0.0035 |
+| **`b32b`** control | 1000k | **63.0** | 865k | 69.4 | 10.3 | 0.0035 |
 
-**Expected to underperform — the point is the shape of the failure**, and this table is the reason to
-expect it. Realised returns at `W=10`, γ=0.9975, on `b18b-ckpt1588000`:
+**Every arm peaks by 353k and declines for the next 1.4M steps.** That shape is the reading: the better it
+fits the objective, the worse it plays.
 
-| length band | median return | max |
-|---|---|---|
-| 10-49 | **19.42** | **30.79** |
-| 50-84 | 18.43 | 29.04 |
-| 90-94 | 15.47 | 18.18 |
-| 98-99 | **10.95** | 10.98 |
+**The motivation was resolution, it was delivered, and it bought nothing.** The win is what forces a
+125-unit support, so at 51 atoms a meal is **0.40 atoms**; at `v_max=40` it is **1.11**. Measured on the
+trained arm: **1.22 atoms per food against the control's 0.44**, the 2.8× as designed. So **atom spacing is
+not what limits C51 here.**
 
-**The value ordering over states inverts.** A length-20 state is worth ~19 and a length-98 state ~11,
-because 95 discounted meals beat four meals plus a 10-point win — where at `W=100` the endgame was the
-high-value region. So there is no value gradient pulling the agent toward finishing, and urgency drops
-10× on top of that (`W·(1−0.9975¹⁰⁰)` = 22 against 2.2). **Watch steps-per-meal at length 85+ and the
-starve/death split, not best-30.**
+**Why it fails, in one line.** A winning step *replaces* the food reward rather than adding to it, so the
+win pays exactly 10 and terminates — while the network's own `V` at length 95-97 reads **16.65**.
+**Greedy play declines the win**, by 67%. Measured with the new
+[`perDiagnostics/value_by_length.py`](perDiagnostics/value_by_length.py).
 
-No readings yet; charts are the first evals only.
+**What that looks like on the board**, greedy, 60 episodes each:
+
+| arm | outcomes | median steps/meal at 95+ | starve headroom | `chase_safe` |
+|---|---|---|---|---|
+| `b33a` @852k | 44 coll / 4 starve / **12 perfect** | **32.5** | 468 | 0.054 |
+| `b33b` @1640k | 54 / 4 / 2 | 33.5 | 466 | 0.044 |
+| `b33c` @1772k | 44 / 14 / 2 | 42.5 | 458 | 0.051 |
+| `b33d` @1708k | 53 / 3 / 4 | 36.0 | 464 | 0.052 |
+| **`b32a` @724k** control | **5 / 0 / 55** | **2.0** | 498 | 0.158 |
+
+It **stalls** two meals short and dies of **geometry, not the clock** — 44 of 48 lost episodes still
+winnable a median **1 move** before death at median length 96, with 458-468 steps of starve budget in
+hand. **The predicted urgency collapse is confirmed and larger than predicted (16-21×, not 10×); the
+predicted *symptom* — starvation — is wrong**, and that correction is the transferable part.
 
 ![b33a](charts/b33a-c51win10seed1.png)
-**b33a-c51win10seed1** — paired with `b32a`
+**b33a-c51win10seed1** — paired with `b32a`. Best-30 20.3 @179k, then 1.55M steps of decline
 
 ![b33b](charts/b33b-c51win10seed2.png)
-**b33b-c51win10seed2** — paired with `b32b`
+**b33b-c51win10seed2** — paired with `b32b`. The batch's best at 25.3, still a third of its control
 
 ![b33c](charts/b33c-c51win10seed3.png)
-**b33c-c51win10seed3**
+**b33c-c51win10seed3** — peaks earliest (150k) and starves most (14 of 60)
 
 ![b33d](charts/b33d-c51win10seed4.png)
-**b33d-c51win10seed4**
+**b33d-c51win10seed4** — the weakest, best-30 18.3
 
-## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *running on the laptop, 1M cap*
+## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *all four reached the 1M cap; churn re-measure at 1M still owed*
+
+**Final training numbers, 2026-08-16.** Both `1.5e-4` arms beat the `1e-7` control's ≤364k best-30 of 33.9,
+and three of four annealed epsilon to 0.0035 where the control stayed near the ceiling:
+
+| arm | `eps` | best-30 | at | `sef` | final ε |
+|---|---|---|---|---|---|
+| `b32a` | 1.5e-4 | **77.0** | 724k | **16.1** | 0.0035 |
+| `b32c` | 3.125e-4 | 73.3 | 353k | 9.0 | 0.0036 |
+| `b32b` | 1.5e-4 | 63.0 | 865k | 10.3 | 0.0035 |
+| `b32d` | 3.125e-4 | **10.0** | 326k | 0.0 | 0.0115 |
+
+Group means **70.0** at `1.5e-4` and **41.7** at `3.125e-4`, but `b32d` is the whole difference and n=2
+cannot resolve a 2× dose — that was stated before launch and still holds. **The primary readout is churn,
+and it has not been re-measured past 360k**; the table below is the 360k reading. Everything under it is
+unchanged and still the right way to read this batch.
 
 **Whether `epsilon` can separate C51's learning speed from its churn.** Adam steps by
 `lr·m/(√v + ε)`, so `ε` is the gradient magnitude below which the update stops being scale-invariant —

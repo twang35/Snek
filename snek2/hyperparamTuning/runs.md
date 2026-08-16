@@ -72,11 +72,19 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   record-holding control produced only 2 isolated ones. `b29b` @1447k = **99.0%/500 (495/500)**, the head of
   an 18-checkpoint band — **the new project record**, promoted to `hallOfFame/` (see Record status below).
   **The gate, not the dose or the net, is the lever.**
-- **Laptop: `b31a-d` was stopped at 538-569k with no close-out and the laptop now holds `b32a-d` (C51 + Adam
-  `epsilon`, 1M).** The reason for both is the same measurement — C51's churn is the learning rate, not C51
+- **Laptop: `b31a-d` was stopped at 538-569k with no close-out**, for the same measurement that started the
+  C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Timing.** The desktop is idle now that b29 has closed out. Check it with
+**Both hosts as of 2026-08-16 10:25.**
+
+| host | state | owed |
+|---|---|---|
+| **laptop** | **idle, 0 trainers.** `b32a-d` all reached their 1M cap; `b33a-d` stopped at 1.64-1.77M | b32's **churn re-measure at 1M** — the batch's primary readout, still only measured to 360k. A close-out is optional and b33 needs none |
+| **desktop** | **`b34a-d` running**, 174-181k of 2M at 92 steps/s, heartbeat 10:22, 0 evals | nothing — close-out and HOF-500 auto-chain |
+
+`b32a-d` is the only thing between here and a verdict on Adam's `epsilon`, and it is one
+`c51_stability.py --end 1000000` run, not a close-out. Check the desktop with
 `git show origin/ops-status:status.json`.
 
 ## C51 pilot — closed at 600k, and it handed off to batch `b31` by itself (2026-08-15)
@@ -160,46 +168,28 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
-## Batch 33 — a filled board pays **10**, not 100 — running on the laptop, 3M cap (2026-08-16)
+## Batch 33 — the win reward cut to 10 — stopped 2026-08-16, falsified
 
-**Four arms, `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, otherwise b32's config at `eps 1.5e-4`,
-seeds 1-4, 3M cap.** So **`b32a`/`b32b` are an exact paired control differing only in the win reward**,
-and seeds 3-4 add spread. Launched alongside b32, 8 trainers — over the standing 4-arm rule, the user's
-explicit call, the same suspension the C51 pilot ran under (~2.3 GB/arm against 36 GB, so the cost is
-throughput). Launcher and the full rationale:
-[`launch_win10.sh`](launch_win10.sh).
+**Four arms at `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, stopped at 1.64-1.77M of 3M.** Best-30
+**18.3-25.3 against the paired b32 control's 77.0 and 63.0** — the largest single-knob regression measured
+here. The cause is not the optimiser: the network's own `V` at length 95-97 is **16.65** against a win that
+pays **10.0**, so greedy play *declines the win* and stalls two meals short until it collides. The 2.8×
+atom-per-food gain the batch was run for arrived and bought nothing, so **atom spacing is not C51's
+constraint**. Design, predictions, and which of them survived:
+[`completedRuns.md`](completedRuns.md#batch-33--the-win-reward-cut-to-10-falsified-and-it-found-a-general-rule-about-terminal-rewards).
+**Do not revisit** — and check `V(pre-terminal)` against the terminal payoff before moving either.
 
-**The motivation is real** — the win reward is what forces a 125-unit support, and at 51 atoms that
-makes spacing 2.5 while `FOOD_REWARD` is 1.0, so **a meal is 0.40 atoms**. At `v_max=40` spacing is 0.9
-and a meal is **1.11 atoms**, a 2.8× resolution gain.
+## Batch 32 — Adam's `epsilon` on C51, `lr 1e-4`, two reference values — all four at the 1M cap, churn re-measure owed (2026-08-15)
 
-**`v_max=40` is measured, not `120/10`.** The return is `F + γ^(T−t)·W` and `F` (remaining food
-discounted to now) is largest at the *start* of an episode. At `W=100` the win dominates so the maximum
-sits just before winning (104.4); at `W=10` it does not, so the maximum moves to the opening —
-`return_distribution.py` on `b18b-ckpt1588000` with the reward changed measures **32.46**, and 40 gives
-21% headroom, the same proportion the shipped 120 has over 104.4. My own arithmetic said ~21 and was
-wrong, which is why this was measured.
+**Arms done, verdict not.** Final best-30 **77.0 / 63.0** at `1.5e-4` and **73.3 / 10.0** at `3.125e-4`
+against the `1e-7` control's 33.9 (≤364k), and three of four annealed epsilon to **0.0035** where the
+control stayed near the 0.0125 ceiling. But **best-30 is not this batch's readout** — churn is, and it has
+only been measured to 360k (0.147 → 0.110 → 0.081 at 200k, 0.137 → 0.110 → 0.098 at 360k, monotone in dose,
+7 of 8 paired). **Re-run `c51_stability.py --end 1000000` before concluding anything.** It stays in this
+file rather than moving to `completedRuns.md` because that measurement is live forward work. Per-arm
+numbers and the full table: [`charts.md`](charts.md).
 
-**Expected to underperform; the point is the *shape* of the failure.** Two predictions worth checking
-against, both from measurements already in [`findings.md`](findings.md):
-
-1. **The value ordering over states inverts.** At `W=10` a length-20 state is worth ~19 and a length-98
-   state ~11, because 95 discounted meals beat four meals plus a 10-point win. At `W=100` the endgame
-   was the high-value region. **So there is no value gradient pulling the agent toward finishing.**
-2. **Urgency to finish drops 10×** — delaying the win 100 steps costs `W·(1−0.9975¹⁰⁰)`, so 22 reward at
-   100 and 2.2 at 10.
-
-Since endgame hunting speed is the measured elite-vs-mediocre discriminator and starvation is the modal
-failure at median length 98, **watch steps-per-meal at length 85+ and the starve/death split**, not just
-best-30. `behaviour_profile.py` and `point_of_no_return.py` both read a c51 arm unchanged and are the
-scripts that say *how* it failed.
-
-**What made this safe to run at all:** perfect games are counted from **score**, so the counter that
-broke the last time a reward term moved is immune by construction. `arch.json` now records
-`perfect_game_reward` and a resume under a changed win is refused — without that, a win-10 checkpoint
-resumed at 100 restores cleanly and optimises something else.
-
-## Batch 32 — Adam's `epsilon` on C51, `lr 1e-4`, two reference values — running on the laptop (2026-08-15)
+The design below is unchanged and is how to read it.
 
 **Does `epsilon` separate C51's learning speed from its churn?** Four arms to **1M**, `lr 1e-4`
 throughout, everything else b25's config plus `ALGO=c51`:

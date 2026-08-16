@@ -18,6 +18,7 @@
 | `c51_stability.py` | `--policy <name> [--policy ...] [--states N] [--points K] [--stride S] [--end STEP]` | whether a chaotic eval curve is a **policy that keeps changing its mind** or a stable policy seen through a noisy 10-episode sample — greedy-action churn on a fixed state set, the action gap, how far the value function moves per `stride` steps, and (c51 only) boundary-atom mass and effective atom count |
 
 | `atom_resolution.py` | `<policy> [<policy> ...]` | whether the atom **spacing** is coarse relative to the decisions the policy makes — action-gap percentiles in reward units and in atoms, and the share of states under one atom, broken down by snake length |
+| `value_by_length.py` | `<out.json> <ckpt-or-policy> <states> <max-episodes>` | what the network **believes** a state is worth by length band, in `return_distribution.py`'s bands so the two give the calibration error `V − G` — and, compared against the win's own payoff, whether the agent's values rank winning below carrying on. The batch-33 verdict |
 
 `atom_resolution.py` is the range/resolution counterpart to the above: `c51_stability.py` shows the
 support's *range* is right (boundary mass ~0), this asks whether its *spacing* is. Two rules for reading it,

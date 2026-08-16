@@ -31,6 +31,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
 | **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported so far**: b32 cuts churn 0.137 → 0.098 paired at 360k, monotone in dose, at no cost to best-30. See below |
+| **‡‡ Falsified: shrinking the win reward 100 → 10 does not buy C51 resolution-for-free** — the network's own `V` at length 95-97 is **16.65** against a win that pays **10.0**, so greedy play *declines the win* | **measured 2026-08-16**, b33 vs a paired b32 control. Best-30 **18.3-25.3 vs 77.0/63.0**; the 2.8× atom-per-food gain arrived and bought nothing, so **spacing is not the C51 constraint**. It stalls (32-42 steps/meal at length 95+ vs 2.0) and dies of geometry — **73-90% collisions, not starvation**, 44 of 48 losses still winnable a median 1 move from death. **Check `V(pre-terminal)` against the terminal payoff before changing either.** See below |
 | **‡ A C51 learning-rate screen at n=2 could not separate `1e-5` from `1e-4`** — within-rate seed spread 57.6 pp against a 30.5 pp spread between rate means | **measured 2026-08-15**. `2.5e-4`+ is out (collapse); `5e-5` chosen for `b31` on consistency, not on being best. Time-to-first-win predicted nothing (ρ=0.05). See below |
 
 **Records and the horizon**
@@ -295,6 +296,93 @@ third, and more importantly **the ddqn reference (0.047) was measured at `lr 1e-
 runs at `lr 1e-4`** — the same rate-vs-algorithm confound this section opens by correcting, reintroduced.
 There is no ddqn-at-1e-4 measurement, so no floor is known for this rate. Quote only the paired same-rate
 same-seed comparison: **0.137 → 0.098 at 360k, 0.147 → 0.081 at 200k.**
+
+## ‡‡ Falsified 2026-08-16: shrinking the win reward 100 → 10 does not buy C51 stability — it teaches the agent that winning is a mistake
+
+Batch 33 ran `SNEK_PERFECT_GAME_REWARD=10` with a measured `v_max=40`, four seeds, against `b32a`/`b32b`
+as an exact paired control differing only in the win reward. **Stopped at 1.64-1.77M of 3M.** The
+motivation was resolution: the win is what forces a 125-unit support, so at 51 atoms a meal is 0.40
+atoms, against 1.11 at `v_max=40`.
+
+**The resolution gain arrived exactly as designed and bought nothing.** `return_distribution.py` on the
+trained arm confirms 1.22 atoms per food against the control's 0.44 — 2.8×, as predicted. Best-30 went
+**18.3-25.3 against the paired control's 77.0 and 63.0**, the largest single-knob regression this project
+has measured, and all four seeds peaked at **150-353k** and then declined to a trailing perfect rate of
+3.7-8.7. **So atom spacing is not what limits C51 here**, which retires the hypothesis this batch existed
+to test.
+
+**The one number that explains it.** `Snake.py` *replaces* the food reward on a winning step rather than
+adding to it, so taking the win pays exactly `PERFECT_GAME_REWARD` and terminates. Measured with the new
+[`perDiagnostics/value_by_length.py`](perDiagnostics/value_by_length.py) on `b33a` @852k:
+
+| what | value |
+|---|---|
+| the network's `V(s)` at length 95-97 | **16.65** |
+| what taking the win pays there | **10.0** |
+
+**The agent's own value function ranks "keep playing" 67% above "win now".** A policy acting greedily on
+those values declines the win — and it is not wrong about its own numbers, it is right about a
+mis-specified objective. Nothing about the optimiser, the support or the network shape is involved.
+
+**And the belief is badly miscalibrated, in the direction that causes the stall.** `V` against the
+realised return `G` (γ=0.9975, `return_distribution.py`, same bands):
+
+| band | `b33a` V | `b33a` G | V−G | `b32a` V | `b32a` G | V−G |
+|---|---|---|---|---|---|---|
+| 10-49 | 28.02 | 20.14 | +7.9 | 33.44 | 24.31 | +9.1 |
+| 50-84 | 23.46 | 10.36 | +13.1 | 40.07 | 34.44 | +5.6 |
+| **85-89** | 19.59 | 4.64 | **+15.0** | 56.18 | 56.22 | **−0.04** |
+| 95-97 | 16.65 | 0.02 | +16.6 | 78.73 | 45.57 | +33.2 |
+
+Read the **85-89** row, where both runs have plenty of states (251 and 310): the control is calibrated to
+0.04 on a 100-point scale, and the win-10 arm is off by 15 on a 30-point scale. The two outer bands are
+thin in the `V` probe and the realised return there is bimodal, so **the 95-97 and 98-99 rows are
+directional only** — quote 85-89 for the calibration claim and quote `V` vs the win's payoff for the
+behavioural one.
+
+**The mechanism, and why the miscalibration is one-sided.** At `W=100` the endgame is the *highest*-value
+region, so it is the largest, sharpest target in the return distribution and the loss is dominated by
+getting it right. At `W=10` the endgame is the *lowest*-value region and its true returns (~0-5) sit
+inside the span the early game already occupies (~20-30), so nothing in the loss forces the net to learn
+that the endgame is nearly worthless. **The win reward was not only an incentive — it was the training
+signal that made the endgame learnable at all.**
+
+**What the failure looks like, measured greedy** with `behaviour_profile.py` and `point_of_no_return.py`,
+60 episodes per arm on one seed:
+
+| arm | outcomes | median steps/meal, length 95+ | starve headroom | `chase_safe` |
+|---|---|---|---|---|
+| `b33a` @852k | 44 coll / 4 starve / 12 perfect | **32.5** | 468 | 0.054 |
+| `b33b` @1640k | 54 / 4 / 2 | 33.5 | 466 | 0.044 |
+| `b33c` @1772k | 44 / 14 / 2 | 42.5 | 458 | 0.051 |
+| `b33d` @1708k | 53 / 3 / 4 | 36.0 | 464 | 0.052 |
+| **`b32a` @724k** (control) | **5 / 0 / 55** | **2.0** | 498 | 0.158 |
+
+It stalls in the last band — 16-21× the control's steps per meal, and 3.5× as many steps spent there
+while winning 4.6× less often — and then dies of **geometry, not the clock**: `point_of_no_return.py`
+finds **44 of 48 lost episodes still winnable at the moment of death, a median of 1 move before it, at
+median length 96** — two meals short — with 458-468 steps of starve budget still in hand.
+
+**Predictions this confirms and one it falsifies.** The launcher recorded two before the batch ran.
+Prediction 1, that the value ordering over states inverts, is **confirmed and monotone** — `V` falls
+28.02 → 13.39 with length where the control rises 33.44 → 100.19. Prediction 2's *mechanism*, that
+urgency to finish collapses, is **confirmed and larger than predicted** (16-21×, not 10×). Prediction 2's
+*symptom* — "watch the starve/death split", on the standing finding that starvation is the modal endgame
+failure — is **wrong**: starvation is 6-23% of losses and collision is 73-90%, with starve headroom
+barely moved. **A collapse in urgency does not have to show up on the starve clock**; here dawdling on a
+96-full board runs out of space long before it runs out of time, and `chase_safe` at 0.044-0.054 against
+0.158 is where it shows instead.
+
+**An amplifier, not the cause.** The low perfect rate holds `training.epsilon_for` near its refinement
+ceiling — b33 ends at **0.0102-0.0115** where three of four b32 arms annealed to **0.0035** — so ~3× the
+random moves on a board where one wrong move kills. Same ratchet as the counter bug
+[below](#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter).
+It is not the cause here: every measurement above is from **greedy** play with no epsilon at all.
+
+**The general lesson, which is the part worth keeping.** A terminal reward's size is not a free scale
+factor even when the support is re-derived for it. It has to stay above the value of continuing, or
+optimal play is to refuse it — so **check `V(pre-terminal state)` against the terminal payoff before
+changing either.** `value_by_length.py` is one command and would have killed this batch before it ran.
 
 ## ‡‡ What moves best-30: turn IS off first, then widen — shaping and forking barely register
 

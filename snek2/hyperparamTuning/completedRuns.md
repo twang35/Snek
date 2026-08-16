@@ -266,6 +266,12 @@ Four things this ranking makes visible that per-batch reading did not:
   63.7 trailing before collapsing again. A ranking by endpoint hides that entirely — see
   [`findings.md`](findings.md).
 
+**Arms stopped without a close-out have no rows here, on purpose.** Every column except `best perfect-30`
+comes from `eval_checkpoints.py`, so an arm that was never closed out cannot be ranked against these rows
+without inventing a position for it. As of 2026-08-16 that is the **C51 pilot** (8 arms), **`b31a-d`** and
+**`b33a-d`** — all stopped deliberately, none measured. Their training numbers are in their own batch
+sections below and in [`charts.md`](charts.md); read them as within-batch comparisons only.
+
 **The top two rows were measured mid-run at ~2.6-2.9M steps**, not at the final steps shown, because
 both arms kept training after measurement and then declined. Those are their best figures, and their
 record checkpoints are preserved in [`../hallOfFame/`](../hallOfFame/README.md).
@@ -275,6 +281,108 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 33 — the win reward cut to **10**: **falsified, and it found a general rule about terminal rewards**
+
+**Four arms, `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, otherwise batch 32's config at
+`eps 1.5e-4`** (`ALGO=c51`, 51 atoms, `fc 200,100,100`, IS off, `TARGET_UPDATE_PERIOD=1000`,
+`DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping, `lr 1e-4`), seeds 1-4, 3M cap.
+Launched 01:32 and **stopped 10:04 on 2026-08-16 at 1.64-1.77M**, no close-out — the training curves and
+three greedy diagnostics settle it, and a close-out would only rank checkpoints of a policy that declines
+to win. Launcher [`launch_win10.sh`](launch_win10.sh).
+
+### The design
+
+**`b32a`/`b32b` are an exact paired control differing only in the win reward** — same `eps`, same `lr`,
+same seeds 1 and 2 — and seeds 3-4 add spread. Deliberately not a mirror of b32's 2+2 split: this batch
+varies one thing.
+
+**The motivation was atom resolution.** The win reward is what forces a 125-unit support, so at 51 atoms
+the spacing is 2.5 while `FOOD_REWARD` is 1.0 — **a meal is 0.40 atoms**, and C51 cannot represent a
+one-meal preference at finer grain than its grid. At `v_max=40` spacing is 0.9 and a meal is **1.11
+atoms**, a 2.8× gain.
+
+**`v_max=40` was measured, not `120/10`.** The return is `F + γ^(T−t)·W` and `F` — remaining food
+discounted to now — is largest at the *start* of an episode. At `W=100` the win dominates so the maximum
+sits just before winning (104.4); at `W=10` it does not, so the maximum moves to the opening, measured
+**32.46**, and 40 gives the same 21% headroom the shipped 120 has. Hand arithmetic said ~21 and was wrong,
+which is why it was measured.
+
+**Two failure predictions were recorded before launch**, and the batch was run knowing it would probably
+lose, to see the *shape*: (1) the value ordering over states inverts, so nothing pulls the agent toward
+finishing; (2) urgency to finish drops ~10×, so **watch steps-per-meal at length 85+ and the starve/death
+split**.
+
+### The result — vs the paired b32 control
+
+| arm | step | best-30 | at | trailing now | `sef` | final ε |
+|---|---|---|---|---|---|---|
+| `b33b` seed2 | 1640k | 25.3 | 238k | 73.6 | 0.0 | 0.0102 |
+| `b33c` seed3 | 1772k | 22.3 | 150k | 78.1 | 0.1 | 0.0115 |
+| `b33a` seed1 | 1732k | 20.3 | 179k | 76.4 | 0.1 | 0.0110 |
+| `b33d` seed4 | 1708k | 18.3 | 353k | 67.9 | 0.1 | 0.0104 |
+| **`b32a` control** | 1000k | **77.0** | 724k | 84.3 | 16.1 | 0.0035 |
+| **`b32b` control** | 1000k | **63.0** | 865k | 69.4 | 10.3 | 0.0035 |
+
+**The largest single-knob regression this project has measured**: group mean best-30 **21.6 against 70.0**,
+with the four treated seeds spanning 7 pp — far tighter than the 54.6 pp within-rate seed spread that makes
+most n=2 C51 comparisons unreadable. **At this effect size n=4 is plenty.** Every arm peaked by **353k** and
+declined over the next 1.4M steps: the better it fit the objective, the worse it played.
+
+**The resolution gain arrived and bought nothing.** `return_distribution.py` on the trained arm confirms
+**1.22 atoms per food against the control's 0.44**, the 2.8× as designed. So **atom spacing is not what
+limits C51 here**, and the hypothesis this batch existed to test is retired.
+
+### Why — the win became worth less than not winning
+
+`Snake.py` *replaces* the food reward on a winning step rather than adding to it, so taking the win pays
+exactly `PERFECT_GAME_REWARD` and terminates. Measured on `b33a` @852k with the new
+[`perDiagnostics/value_by_length.py`](perDiagnostics/value_by_length.py): the network's own `V(s)` at
+length 95-97 is **16.65**, against **10.0** for taking the win. **Greedy play declines the win, by 67%**,
+and it is not wrong about its own values — it is right about a mis-specified objective.
+
+The belief is also miscalibrated in exactly the direction that stalls. Against realised returns
+(γ=0.9975), in the **85-89** band where both runs have plenty of states, the control reads `V` 56.18
+against `G` 56.22 — **0.04 out on a 100-point scale** — and the win-10 arm reads 19.59 against 4.64,
+**15 out on a 30-point scale**. Full table and the mechanism (at `W=100` the endgame is the highest-value
+region and therefore the loss's largest target; at `W=10` it is the lowest and its structure is swamped):
+[`findings.md`](findings.md#-falsified-2026-08-16-shrinking-the-win-reward-100--10-does-not-buy-c51-stability--it-teaches-the-agent-that-winning-is-a-mistake).
+
+### How it dies — geometry, not the clock
+
+Greedy, 60 episodes per arm on one seed, `behaviour_profile.py` and `point_of_no_return.py`:
+
+| arm | outcomes | median steps/meal at 95+ | starve headroom | `chase_safe` |
+|---|---|---|---|---|
+| `b33a` @852k | 44 coll / 4 starve / **12 perfect** | **32.5** | 468 | 0.054 |
+| `b33b` @1640k | 54 / 4 / 2 | 33.5 | 466 | 0.044 |
+| `b33c` @1772k | 44 / 14 / 2 | 42.5 | 458 | 0.051 |
+| `b33d` @1708k | 53 / 3 / 4 | 36.0 | 464 | 0.052 |
+| **`b32a` @724k** control | **5 / 0 / 55** | **2.0** | 498 | 0.158 |
+
+It stalls two meals short — 16-21× the control's steps per meal in the last band, and 3.5× as many steps
+spent there while winning 4.6× less — then collides: **44 of 48 lost episodes were still winnable at the
+moment of death, a median of 1 move before it, at median length 96**, with 458-468 steps of starve budget
+in hand.
+
+**Prediction 1 confirmed and monotone** — `V` falls 28.02 → 13.39 with length where the control rises
+33.44 → 100.19. **Prediction 2's mechanism confirmed and larger than predicted** — 16-21×, not 10×.
+**Prediction 2's symptom falsified** — starvation is 6-23% of losses, collision 73-90%, and the starve
+headroom barely moves. A collapse in urgency does not have to appear on the starve clock; on a 96-full
+board it runs out of space first.
+
+**The epsilon ratchet is an amplifier, not the cause.** The low perfect rate holds `epsilon_for` near its
+refinement ceiling — b33 ends at 0.0102-0.0115 where three of four b32 arms annealed to 0.0035, so ~3× the
+random moves where one wrong move kills. Every measurement above is **greedy**, so the failure is the
+policy's own.
+
+### Verdict
+
+**Do not revisit.** The knob is not a scale factor: a terminal reward has to stay above the value of
+continuing or optimal play is to refuse it. The transferable rule is to **check `V(pre-terminal state)`
+against the terminal payoff before changing either** — one `value_by_length.py` run, which would have
+killed this batch before it consumed 8.5 hours across four arms. What the batch does leave behind is a
+clean negative on atom spacing as C51's constraint, and the diagnostic that produced it.
 
 ## Batch 30 — chase-safe shaping on `fc 200,100,100`, `c=0.10`: **null, and it completes the shaping×architecture 2×2**
 
