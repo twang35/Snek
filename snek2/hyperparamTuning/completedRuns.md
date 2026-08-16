@@ -305,6 +305,23 @@ calibration ([findings.md](findings.md#-measured-the-chase-safe-potential-is-nea
 predicts it will not, since Φ carries ~0 at the lengths where a perfect game is decided. Full conclusion:
 [`findings.md`](findings.md#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
 
+**How it was judged: the control at a matched 2M horizon, seed by seed.** b25/b24 ran to 3M, so their
+summaries were recomputed truncated at 2M (`run_report.build_summary`) for a like-for-like read against
+b30's 2M cap:
+
+| seed | b25 best-30 @2M | b25 `sef` @2M | b24 best-30 @2M | b24 `sef` @2M |
+|---|---|---|---|---|
+| 1 | 93.7 | 61.4 | 94.0 | 46.7 |
+| 2 | 95.3 | 57.9 | 96.7 | 65.1 |
+| 3 | 93.7 | 61.0 | 96.0 | 57.0 |
+| 4 | 91.7 | 54.2 | 96.7 | 64.1 |
+| **mean** | **93.6** | **58.6** | **95.8** | **58.2** |
+
+`320` leads `200,100,100` on best-30 at 2M (95.8 vs 93.6) while `sef` is a dead heat — consistent with the
+widest-layer ordering and `best_perfect30` being the sharper metric at this level. b30's best-30 (92.9)
+sits just under its b25 control (93.6), the −0.7 of the shaping null; `b25d` was the weak seed of that wave
+(91.7 / 54.2), so a b30 seed 4 that merely matched it would not have been a null.
+
 ## Batch 26 — FC `100,100` under IS-off: **the shallow shape does not carry the lift**
 
 Design, and what it isolates: b22's exact IS-off config (`SNEK_IS_WEIGHTS=0`, `td_error` priority,
