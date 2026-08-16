@@ -177,6 +177,18 @@ still learns — churn **0.117-0.245** against the ddqn control's 0.033-0.058, n
 reached best-30 66.3 still rising at 599k. At `2.5e-4` the arm is broken outright and a working fix could
 be invisible under whatever else is wrong.
 
+**The comparison is both halves against the control, not one half against the other.** That contrast is
+1500-3000×; the 2× between `1.5e-4` and `3.125e-4` is a bonus and **n=2 per side cannot resolve a 2× dose**,
+so this batch answers *"does `epsilon` help at all"* and not *"which value is better"*. Reading the two
+halves against each other would be the pilot's n=2 mistake repeated.
+
+**Two things deliberately not treated as risks.** The `sqrt(1 - beta_2)` transient makes `epsilon` bite
+~31× harder for the first ~1000 optimizer steps (= 1000 env steps at `collect_steps_per_iteration = 1`,
+so 0.1% of the cap): it decays smoothly, it points toward *less* movement in the phase where gradients are
+least informative, and **every arm in this project has it**, including the ddqn controls at `1e-7`, so it
+cannot bias the comparison. And the two values are both published working settings — if either works, the
+finding lands.
+
 **Judge it on churn and drawdown depth, not `best_perfect30`.** Within-rate seed spread at `1e-4` is
 **54.6 pp**, so at n=2 per side the score resolves nothing — the same trap the pilot's rate screen fell
 into. The readout is
@@ -184,14 +196,19 @@ into. The readout is
 `c51pilotB-lr1e4seed1/2`. What each outcome means:
 
 - **Churn drops toward the ddqn floor and drawdowns shrink, learning speed holds** → the mechanism is
-  confirmed and `epsilon` becomes a standing part of the c51 config. The follow-up is then re-running the
-  rate screen with it, since the pilot's whole rate ranking was measured at 1e-7.
+  confirmed and `epsilon` becomes a standing part of the c51 config. **The follow-up is then the rate
+  screen, not a third `epsilon`** — the pilot's whole rate ranking, `5e-5` included, was measured at `1e-7`,
+  so if the churn/speed trade-off moves then the best rate probably moves with it. Refining `epsilon`'s
+  second digit is worth much less than that.
 - **Churn drops but so does learning speed** → it is acting as a smaller learning rate in disguise, which
   the pilot already showed costs the peak. `tests/test_adam_epsilon.py` pins that it *should not* — a
   well-driven gradient keeps >98% of its step — so this outcome would mean the gradients here are far
   smaller than assumed, which is itself worth knowing.
-- **Nothing moves** → falsified in 4 arms, and the remaining candidates are the exploration-schedule
-  ratchet and n-step returns, in that order.
+- **Nothing moves** → *this* is where a third value earns its slots, and it should be one **big** step
+  (~`1e-3`), not another 2× nudge, to separate "wrong idea" from "dose too small to see". Same shape as
+  b27's `c=0.10` null leading to b28's `c=0.20` rather than to abandoning the shaping. If a big step is
+  also null, the remaining candidates are the exploration-schedule ratchet and n-step returns, in that
+  order.
 
 **Timing.** ~1.7 h to 1M at four arms. `1e-7` is still the default, so nothing else in the project
 changes; the knob is recorded per-arm in `runs/<policy>.md`.
