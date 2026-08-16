@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-15T18:31:30",
-  "ts": 1786843890.8978345,
+  "iso": "2026-08-15T18:32:57",
+  "ts": 1786843977.4406137,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -19,17 +19,44 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 4
   },
   "running": [
     {
-      "id": "b28d-chase20g85seed4-closeout",
+      "id": "b28a-chase20g85seed1-hof",
+      "type": "eval",
+      "policy": "b28a-chase20g85seed1",
+      "pid": 1825787,
+      "step": 2000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b28b-chase20g85seed2-hof",
+      "type": "eval",
+      "policy": "b28b-chase20g85seed2",
+      "pid": 1825788,
+      "step": 2000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b28c-chase20g85seed3-hof",
+      "type": "eval",
+      "policy": "b28c-chase20g85seed3",
+      "pid": 1825789,
+      "step": 2000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b28d-chase20g85seed4-hof",
       "type": "eval",
       "policy": "b28d-chase20g85seed4",
-      "pid": 1597714,
+      "pid": 1825790,
       "step": 2000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 16583
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -175,11 +202,11 @@
     "b28a-chase20g85seed1-closeout": "done",
     "b28b-chase20g85seed2-closeout": "done",
     "b28c-chase20g85seed3-closeout": "done",
-    "b28d-chase20g85seed4-closeout": "running",
-    "b28a-chase20g85seed1-hof": "queued",
-    "b28b-chase20g85seed2-hof": "queued",
-    "b28c-chase20g85seed3-hof": "queued",
-    "b28d-chase20g85seed4-hof": "queued",
+    "b28d-chase20g85seed4-closeout": "done",
+    "b28a-chase20g85seed1-hof": "running",
+    "b28b-chase20g85seed2-hof": "running",
+    "b28c-chase20g85seed3-hof": "running",
+    "b28d-chase20g85seed4-hof": "running",
     "b29a-chase10g75seed1": "queued",
     "b29b-chase10g75seed2": "queued",
     "b29c-chase10g75seed3": "queued",
@@ -195,8 +222,8 @@
   },
   "disk_free_gb": 136.7,
   "load_avg": [
-    4.171875,
-    4.28857421875,
-    5.09521484375
+    1.83740234375,
+    3.6337890625,
+    4.79638671875
   ]
 }
