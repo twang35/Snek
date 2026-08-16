@@ -1,0 +1,19 @@
+{
+  "id": "b34c-chase10g70seed3",
+  "type": "train",
+  "policy": "b34c-chase10g70seed3",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "3",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "70"
+  },
+  "max_steps": 2000000,
+  "priority": 30,
+  "notes": "Gate ladder continues below b29's 75. c stays at the calibrated 0.10; the gate drops to 70, shaping ~15 lengths before the endgame becomes visible. b29 (gate 75) produced a 21-checkpoint >=98%/500 record region across 2 of 4 seeds (best b29b @1447k 99.0%/500) where gate 85 was null at any dose or net; this arm tests whether lowering the gate further keeps paying or overshoots. Seed-matched control is b24a-d (same config, no shaping)."
+}
