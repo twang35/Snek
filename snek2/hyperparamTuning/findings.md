@@ -82,6 +82,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡ The chase-safe potential self-attenuates: ~35 flips per episode for a dud, ~4.6 for a record** | **measured 2026-08-14**, 60 episodes × 3 checkpoints. Genuine flips per endgame meal are **2.5-3.6** for `b20d` against **0.21-0.63** for the records, which spend 10.8% of steps at length ≥85 against `b20d`'s 41.2%. Sets `c = 0.10`. **98-99 carries 0.00-0.04 — the last meals cannot be shaped by this quantity.** See below |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
 | **‡‡ Chase-safe shaping: the gate is the lever — null at gate 85 at any dose/net, records at gate 75** | **measured 2026-08-16**, 4 batches. Gate 85 held **0 records** across b27 (`fc 320`), b30 (`fc 200,100,100`) and b28 (`c=0.20`) — dose and net ruled out. Gate 75 (b29) matched the control's pooled *and* produced **21 checkpoints ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500** — a record region where the control had isolated points. See below |
+| **‡‡ Why gate 75 wins, at the board level** — seed-matched greedy replay: gate 75 keeps the board healthier at **every** length (better packing, ~½ the isolated pockets, food reachable ~1.5× more), and gate 85's failures arrive at the gate already fragmented | **measured 2026-08-16**, 4×400 episodes. All losses are **starves, not walls**; the divergence opens *below* gate 85, so gate 85 grades decisions already made. Predicts gate 40 (b35) buys little → sweet-spot, not monotone. See below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
 | **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
@@ -671,6 +672,71 @@ are the survivors of the 500-episode re-measure, not close-out highs.
 under the [perfect-counting bug](#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)
 that pinned epsilon at 0.0125 and are discarded; the valid, unhandicapped runs are `b27e-h` and `b30e-h`,
 relaunched after the fix, and are the only ones read above.
+
+### ‡‡ Why gate 75 wins, at the board level: b29 keeps the board healthier at *every* length, and b27's failures arrive at the gate already broken
+
+The gate result above says gate 75 produces a region where gate 85 is null; it does not say *what the two
+policies do differently*. To answer that, [`gate_behavior.py`](../perDiagnostics/gate_behavior.py) replays the
+**seed-matched** checkpoint pairs — `b27e`/`b29a` (seed 1) and `b27f`/`b29b` (seed 2), only the gate differs —
+for **400 greedy episodes on one fixed seed**, so the two arms in a pair face the identical food sequence, and
+logs board-state metametrics at every step from length 40 up. There is no shaping at eval time, so every
+difference is what the arm *learned*. Figure: [`../charts/gate-behavior-b27-vs-b29.png`](../charts/gate-behavior-b27-vs-b29.png).
+
+**Seed-matched, gate 75 wins on both seeds, and every loss is a starve — never a wall.**
+
+| pair | gate 85 (b27) | gate 75 (b29) | b27 losses | b29 losses |
+|---|---|---|---|---|
+| seed 1 | 91.2% | **98.2%** | 33 starve, 2 collide | **7 starve, 0 collide** |
+| seed 2 | 94.5% | **97.2%** | 19 starve, 3 collide | **11 starve, 0 collide** |
+
+**The difference is not a switch at the gate — it is a continuously healthier board that widens with length.**
+The policy cannot see its own gate at eval time, so neither arm changes behaviour *at* 75 or 85; instead b29
+packs better at **every** length, and its lead is already open in the 65-84 window — below b27's gate of 85,
+the range b29 was shaped in and b27 was not. Pooled over all 800 episodes per arm-pair, at matched length:
+
+| length band | one-piece packing (b27→b29) | % steps head cut off from free space (b27→b29) | % steps food unreachable (b27→b29) |
+|---|---|---|---|
+| 65-74 | 0.83 → **0.90** | 56% → **35%** | 31% → **21%** |
+| 75-79 | 0.80 → **0.90** | 62% → **34%** | 40% → **23%** |
+| 80-84 | 0.78 → **0.88** | 63% → **38%** | 46% → **27%** |
+| 90-94 | 0.75 → **0.84** | 66% → **44%** | 58% → **40%** |
+
+Every metric moves the same way on both seeds (the figure shows the two b29 lines above the two b27 lines with
+almost no crossing). **Food-unreachability is the mechanism of the starve losses**: b27's head cannot path to
+the food ~1.5× as often, which forces detours that burn the starve clock. Starve *headroom* itself is nearly
+identical between arms until length 95+ — the clock only bites at the very end, but b27 arrives there having
+spent it on detours around fragmentation.
+
+**When b27 fails, the board was already broken at the gate — confirming the "already bad at the gate"
+hypothesis.** Board quality at the step length first reaches the arm's gate, split by outcome:
+
+| arm | perfect games at gate | failed games at gate |
+|---|---|---|
+| `b27e` s1 (gate 85) | packing 0.89, iso-pockets 33%, food-unreach 12% | packing **0.71**, iso-pockets **65%**, food-unreach 15% |
+| `b27f` s2 (gate 85) | packing 0.91, iso-pockets 28%, food-unreach 10% | packing **0.68**, iso-pockets **100%**, food-unreach **50%** |
+| `b29b` s2 (gate 75) | packing 0.95, iso-pockets 17%, food-unreach 6% | packing 0.80, iso-pockets 64%, food-unreach 9% |
+
+b27's failures cross their gate with the free space already fragmented (packing 0.68-0.71 vs 0.89-0.91 for the
+wins) — the game was lost before length 85, with only ten meals left to undo it. b27's *wins* also arrive at
+its gate more fragmented (0.89-0.91) than b29's wins arrive at their earlier gate (0.95): fragmentation
+accumulates with length, so the later the gate, the worse the board it grades. **This is the board-level reason
+gate 85 is null — by the time it activates in training, the packing that decides the game has already happened,
+which is exactly the Φ-is-flat-at-the-endgame [calibration finding](#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)
+seen from the behaviour side.**
+
+**Longer repair window: real but secondary.** Both arms constantly create and resolve isolated pockets — ~230
+of 400 episodes touch a "bad" board (iso>0 or φ=0) near the gate even among the winners, so transient
+fragmentation is normal snake play, not doom. What differs is recovery: b29 recovers-and-still-wins **97.8% /
+95.4%** of bad boards vs b27's **91.4% / 92.8%**. b29's edge here is both a longer window (a 75→95 board has 20
+meals to recover vs 10 from 85) and less-severe damage to begin with (fewer isolated cells), so the user's
+"more time to fix a bad board" is a contributing cause, but the dominant story is that b29 *reaches* trouble in
+better shape and less often.
+
+**Prediction for b35 (gate 40, queued).** The packing gap between arms is already near-saturated in the 40-64
+band (b29 only slightly ahead) and opens mostly from 75 up. If the divergence is set in the 75-95 window,
+gate 40 buys little over gate 75 — favouring a **sweet-spot** reading (there is a best gate, near 75) over a
+**monotone-earlier-is-better** one. b34 (gate 70) and b35 (gate 40) test exactly this; re-running
+`gate_behavior.py` on their checkpoints against these same curves is the direct check.
 
 
 ## Forked endgame collection: null at 60% of the intended dose, and the premise it was built on is false
