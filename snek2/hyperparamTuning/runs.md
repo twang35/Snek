@@ -76,12 +76,12 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-16 10:25.**
+**Both hosts as of 2026-08-16 10:42.**
 
 | host | state | owed |
 |---|---|---|
 | **laptop** | **idle, 0 trainers.** `b32a-d` all reached their 1M cap; `b33a-d` stopped at 1.64-1.77M | b32's **churn re-measure at 1M** — the batch's primary readout, still only measured to 360k. A close-out is optional and b33 needs none |
-| **desktop** | **`b34a-d` running**, 174-181k of 2M at 92 steps/s, heartbeat 10:22, 0 evals | nothing — close-out and HOF-500 auto-chain |
+| **desktop** | **`b34a-d` running** (gate 70), ~180k of 2M at 92 steps/s, heartbeat 10:41, 0 evals; **`b35a-d` (gate 40) queued** behind it | nothing — both waves close-out and HOF-500 auto-chain; b35 starts when b34 frees the four slots |
 
 `b32a-d` is the only thing between here and a verdict on Adam's `epsilon`, and it is one
 `c51_stability.py --end 1000000` run, not a close-out. Check the desktop with
@@ -267,7 +267,7 @@ Reached 538-569k in 2h44m, all four healthy (no zero stretch), best-30 **21.0 / 
 **50.7 pp spread at one config**, which is the n=4 noise problem restated rather than a result. Graphs in
 [`charts.md`](charts.md); the arms are in [`completedRuns.md`](completedRuns.md) as void.
 
-## Batch 34 — chase-safe `c=0.10`, **gate 70** — *queued on the desktop (2026-08-16)*
+## Batch 34 — chase-safe `c=0.10`, **gate 70** — *running on the desktop (2026-08-16)*
 
 The gate ladder's next rung below b29's 75. Four arms, **identical to b29** — `fc 320`, IS off, `td_error`,
 target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping, `c=0.10`, 2M cap, seeds 1-4, the
@@ -288,6 +288,29 @@ on its next poll, close-out and HOF-500 auto-chained as usual.
 **Judge it on the ≥98%/500 count and the width of any record band, not best-30 or peak** — peak is saturated
 at 95 and best-30 stops discriminating above ~92 (both true of every b24-family arm). Check the desktop with
 `git show origin/ops-status:status.json`.
+
+## Batch 35 — chase-safe `c=0.10`, **gate 40** — *queued on the desktop behind b34 (2026-08-16)*
+
+The ladder's deep rung, and a **one-variable step from b34**: identical config, only `SNEK_CHASE_SAFE_GATE`
+drops 70 → 40. `c` stays 0.10 by choice — the calibration clamp binds at 0.10 for any gate ≤ 85 (raw
+gate-40 value ~0.16), so this holds the **per-flip** dose constant and moves only the gate, at the cost of
+letting **total episode dose rise ~2.5× vs gate 85** (~93 Φ-flips/episode in the ≥40 region vs 37 at ≥85 for
+the binding policy). Queued at priority 30 behind b34, so it starts when b34 frees the box's four slots.
+
+**What it asks — does shaping the *mid-game* help, or just add noise?** Gate 40 reaches down into length
+40–70, *below* where the packing advantage that separates records from duds is established (measured at
+90–94), and into bands where the weak policy's Φ base rate is only 0.34. So it is the first arm to test
+chase-safety shaping outside the endgame proper. Read against b29 (gate 75) and b34 (gate 70):
+
+| outcome | reading |
+|---|---|
+| gate 40 ≥ gate 70/75 | the causal horizon reaches into the mid-game — chase-safety matters long before the endgame, and the effect is dose-driven (more shaped transitions → better) |
+| gate 40 ≈ gate 70/75 | the extra mid-game shaping is inert — the endgame gate (70–75) is what carries the effect, and the 2.5× dose neither helps nor hurts |
+| gate 40 < gate 70/75 (toward the gate-85 null) | too-early shaping **dilutes** the signal or the 2.5× dose adds gradient/PER noise that outweighs it — the useful window is a band, not "everything above 40" |
+
+**Same judging as b34** — ≥98%/500 count and record-band width, not best-30 or peak. This was queued at the
+user's request to change one variable at a time (b34 → b35 is gate-only); the total-dose confound is
+acknowledged and is itself part of what the three-way read above disentangles.
 
 ## Batches 27-30 are closed — chase-safe shaping, and the gate is the lever
 
@@ -423,10 +446,12 @@ reality.
 1. **`CHASE_SAFE_SHAPING`: all four batches (b27-b30) closed. Gate 85 is null at any dose or net; `gate 75`
    (b29) produced a 21-checkpoint ≥98%/500 region, the gate is the lever.** `b29b` @1447k (99.0%/500) is
    promoted to [`../hallOfFame/`](../hallOfFame/README.md) as the new record (2026-08-16, copy verified).
-   **The live follow-up is `b34a-d` — `gate 70` at `c=0.10`, queued on the desktop 2026-08-16** (identical to
-   b29 but the gate ten lengths earlier), asking whether lowering the gate further keeps paying or overshoots;
-   the seed-matched control is `b24a-d`. A gate-70 win over b29 would establish a monotone gate response;
-   a null or regression would place the useful gate at 75. Design and Phase 0:
+   **Two gate-ladder follow-ups on the desktop (both `c=0.10`, control `b24a-d`): `b34a-d` gate 70 running,
+   `b35a-d` gate 40 queued behind it** (2026-08-16). b34 is one rung below b29; b35 is a bigger step into the
+   mid-game to test whether chase-safety shaping helps outside the endgame at all. A monotone gate response
+   (40 ≥ 70 ≥ 75) would say the causal horizon reaches deep; a knee would locate the useful gate. Both are
+   `c=0.10` so per-flip dose is fixed and only the gate moves (total episode dose rises ~2.5× at gate 40).
+   Sections at the top of this file. Design and Phase 0:
    [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md); full b29 result in
    [`completedRuns.md`](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
 2. **`fc 512` under the b24 config is now the strongest untested architecture arm.** b25/b26 turned the
