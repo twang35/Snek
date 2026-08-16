@@ -295,8 +295,8 @@ gate 85.
 **`b29` (`c=0.10`, gate 75) produced a record region — the positive result of the whole investigation.**
 Pooled **87.8** (a dead heat with b24) but **21 checkpoints held ≥98%/500 across two of four seeds**, where
 the record-holding control produced only 2 isolated ones. `b29b` carries an **18-checkpoint band**
-(1446k-1529k) peaking at **99.0%/500 (495/500) @1447k** — a candidate new record (point estimate above b24's
-98.0%/500; lead inside the CI, but the *region* is not).
+(1446k-1529k) peaking at **99.0%/500 (495/500) @1447k** — **the new project record** (point estimate above
+b24's 98.0%/500; lead inside the CI, but the *region* is not).
 
 | arm | best-30 | `sef` | pooled (eq) | HOF-500 (≥98%/500) |
 |---|---|---|---|---|
@@ -311,7 +311,7 @@ did. The Φ calibration is why — the potential carries ~0 at lengths 98-99, so
 final approach while gate 75 turns it on ten meals earlier, in the packing decisions that decide whether the
 endgame is winnable. Full write-up:
 [`completedRuns.md`](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
-`b29b` @1447k is a `hallOfFame/` candidate pending the manual verified copy-and-play.
+`b29b` @1447k was promoted to `hallOfFame/` on 2026-08-16 (copy verified 98/100 on fresh laptop episodes).
 
 ![b29b](charts/b29b-chase10g75seed2.png)
 **b29b-chase10g75seed2 — 99.0%/500 @1447k, the record-region arm**

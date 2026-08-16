@@ -9,14 +9,20 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: **98.0% over 500 episodes**, `b24d-fc320noisseed4-ckpt1342000`
+## The current record: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000`
 
-Batches 11-24 train on the **30-value observation vector** — the current one (era `b09c616`), after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these eleven entries all load on
-`master` as it stands.** Each came from a batch close-out or, for batch 24, its 500-episode HOF
-re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the two batch-24 entries are the first
+Batches 11-29 train on the **30-value observation vector** — the current one (era `b09c616`), after the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these twelve entries all load on
+`master` as it stands.** Each came from a batch close-out or, for batches 24 and 29, its 500-episode HOF
+re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the batch-24 and batch-29 entries are the only
 non-default architecture here (`fc 320`)** and load because `arch.json` (copied in with each) rebuilds the
 recorded net — see [`../CLAUDE.md`](../CLAUDE.md) on the `arch.json` sidecar.
+
+**`b29b` @1447k edges `b24d` (98.0%/500) on the point estimate and their CIs overlap** — a narrow lead, taken
+as the record under this folder's 500-episode standard exactly as `b24d` was taken over `b18b`. What sets it
+apart from every prior record is that it is a **region**, not an isolated point: 18 checkpoints of the same
+arm hold ≥98%/500 across 1446k-1529k (its sibling `b29a` holds 3 more), where `b24d`/`b18b` were lone peaks.
+It is also the first record from **reward shaping** — chase-safe potential-based shaping at `c=0.10`, gate 75.
 
 **Every entry must clear a fresh ≥95-episode re-measurement before it is added** — the 500-episode HOF eval
 for batch 24, a close-out re-measure for the rest — because a selected /100 high is inflated ~5-6 pp by
@@ -25,7 +31,8 @@ selection and mostly does not survive (see the batch-24 note below: 199 ≥97%/1
 
 | checkpoint | measured | config |
 |---|---|---|
-| **`b24d-fc320noisseed4-ckpt1342000`** | **490/500 = 98.0%** (CI **96.4-98.9**) — **the record**; it *rose* from 97.0/100 on re-measurement, the genuine-region signature. First non-default-arch record (`fc 320`). Added 2026-08-13; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=4` |
+| **`b29b-chase10g75seed2-ckpt1447000`** | **495/500 = 99.0%** (CI **97.7-99.6**) — **the record**; it *rose* from 98.0/100 on re-measurement, the genuine-region signature, and is the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a region, not a point. First record from reward shaping (`c=0.10`, gate 75) and from `fc 320` chase-safe. 98/100 on the copy here. Added 2026-08-16; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, **`CHASE_SAFE_SHAPING=0.1`, gate 75**, `SNEK_SEED=2` |
+| **`b24d-fc320noisseed4-ckpt1342000`** | **490/500 = 98.0%** (CI **96.4-98.9**) — the prior record (2026-08-13), within CI of `b29b`; it *rose* from 97.0/100 on re-measurement, the genuine-region signature. First non-default-arch record (`fc 320`). See below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=4` |
 | `b24b-fc320noisseed2-ckpt2860000` | **490/500 = 98.0%** (CI 96.4-98.9) — ties the record from a second seed, a late checkpoint (2.86M). Added 2026-08-13 | same as above except `SNEK_SEED=2` |
 | **`b18b-tgt1000seed2-ckpt1588000`** | **683/700 = 97.6%** (CI **96.1-98.5**) — the prior record and deepest-measured strong checkpoint; the first selected high in this project to survive re-measurement; see below | `TARGET_UPDATE_PERIOD=1000`, forking on, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `td_loss`/no-IS, `SNEK_SEED=2` |
 | `b17b-forkseed2-ckpt1248000` | **483/500 = 96.6%** (CI 94.6-97.9) on fresh episodes — 2nd-highest measured here; a 99/100 close-out read re-measured at 500, and **95/100 on the copy in this folder** (CI 88.8-97.8), confirming it loads and plays. Not the record — below `b18b` @1588k and CIs overlap — but higher than `b17b` @1190k, so the better step of this arm. Added 2026-08-12 | forking on (`FORK_BRANCHES=4`), `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=2` |
@@ -58,7 +65,32 @@ the 97.6% record.
 > Nothing here needs changing: the entries are the right checkpoints to keep, and the ranking among
 > them is roughly preserved. It is the absolute percentages that are optimistic.
 
-### ‡ `b24d` @1342000 — the new record, and the first from a wide (`fc 320`) net
+### ‡ `b29b` @1447000 — the record, the first from reward shaping, and the first that is a *region*
+
+Added 2026-08-16. Promoted under the standing rule: **a checkpoint that beats the all-time best on
+re-measurement belongs here.** It came out of batch 29's auto HOF-500 (gate 98, early-abandon) — chase-safe
+potential-based shaping at `c=0.10`, **gate 75**, otherwise b24's config on `fc 320`.
+
+| measurement | result | why it exists |
+|---|---|---|
+| close-out, 100 episodes (desktop) | 98/100 = **98.0%** | the selected /100 read |
+| **HOF-500, 500 fresh episodes, gate 98 (desktop, auto)** | 495/500 = **99.0%** (97.7-99.6) | the record figure — it *rose* 1 pp rather than shrinking |
+| 100 fresh, **on the copy in this folder** (laptop) | 98/100 = **98.0%** (93.0-99.4), avg score 94.7 | confirms the copy loads via `arch.json` and plays like a champion |
+
+**It edges `b24d` @1342k (98.0%/500) on the point estimate; the intervals overlap** (97.7-99.6 vs 96.4-98.9),
+so it is a narrow lead taken as confirmed under this folder's 500-episode standard — the same call `b24d` got
+over `b18b`. The tell that it is real, not a lucky draw, is the same as every record here: it **rose** on
+re-measurement (98.0/100 → 99.0/500), the genuine-region signature.
+
+**What is new is that it really is a region.** Where `b24d` and `b18b` were lone peaks whose neighbours fell
+5-6 pp away, `b29b` holds **18 checkpoints at ≥98%/500 across 1446k-1529k**, and its seed-1 sibling `b29a`
+holds 3 more (best 98.4%/500 @1347k) — 21 record-tier checkpoints across two seeds, where the prior
+record-holder `b24` produced only 2 isolated ones across four. This is the first time the project's top tier
+appears as a plateau rather than a spike. It loads only because `arch.json` (era `b09c616`, `obs_len` 30)
+rebuilds the recorded 320-wide net. Full batch write-up:
+[`../hyperparamTuning/completedRuns.md`](../hyperparamTuning/completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
+
+### ‡ `b24d` @1342000 — the prior record, and the first from a wide (`fc 320`) net
 
 Added 2026-08-13. Promoted under the standing rule: **a checkpoint that beats the all-time best on
 re-measurement belongs here.** It came out of batch 24's 500-episode HOF eval (gate 97, early-abandon), which

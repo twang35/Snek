@@ -72,7 +72,7 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b29b-chase10g75seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **99.0%** @1447k /500 | 100% | 87.14% /eq §§ | 97.3% | ‡‡‡ § **candidate new record — highest /500 point estimate on record (99.0%, 495/500)**, and the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a *region*, where b24's records are isolated points. The 99.0 vs 98.0 lead over b24 is inside the 500-ep CI; the region is not. **Pending the manual verified HOF copy-and-play** (checkpoint is on the desktop). See [Batches 28-29](#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
+| `b29b-chase10g75seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **99.0%** @1447k /500 | 100% | 87.14% /eq §§ | 97.3% | ‡‡‡ § **THE RECORD — highest /500 point estimate on record (99.0%, 495/500, CI 97.7-99.6)**, and the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a *region*, where b24's records are isolated points. The 99.0 vs 98.0 lead over b24 is inside the 500-ep CI; the region is not. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) 2026-08-16**, copy verified 98/100. See [Batches 28-29](#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 | `b29a-chase10g75seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **98.4%** @1347k /500 | 100% | 89.76% /eq §§ | 97.7% | ‡‡‡ § **3 checkpoints held ≥98%/500** (1339k/1347k/1414k), best 98.4% — record-tier, the second seed of the b29 gate-75 region. Not yet HOF-promoted |
 | `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **98.0%** @1342k /500 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § **THE NEW RECORD** — 98.0% over 500 fresh episodes (490/500, CI [96.4,98.9]), and it *rose* on re-measurement (97.0/100 → 98.0/500), the genuine-region signature. 3 of its 51 ≥97%/100 checkpoints held ≥97%/500 (early, 0.9-1.36M). In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **98.0%** @2860k /500 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § **new record (tied)** — 98.0%/500 (490/500, CI [96.4,98.9]); 3 of 59 ≥97%/100 checkpoints held ≥97%/500, all late (2.74-2.86M). In [`../hallOfFame/`](../hallOfFame/README.md) |
@@ -370,11 +370,12 @@ record b24d/b24b at 98.0%/500.
 `fc 200,100,100` (b30) and at doubled dose (b28); gate 75 (b29) matches the control's pooled/best-30 *and*
 produces a record region the control never did. The Φ calibration is why — the potential carries ~0 at
 lengths 98-99, so a gate-85 term grades the flat final approach, while gate 75 turns the term on ten meals
-earlier, in the packing decisions that decide whether the endgame is winnable. **Read `b29b` @1447k as a
-candidate new record, not a settled one:** the 99.0 vs 98.0 lead is inside the 500-episode CIs, but the
-*region* — 21 held across 2 seeds, an 18-wide band — is the signal outside noise. It is a `hallOfFame/`
-candidate pending the manual verified copy-and-play (the checkpoint is on the desktop and needs an rsync
-first). Full conclusion:
+earlier, in the packing decisions that decide whether the endgame is winnable. **`b29b` @1447k is now the
+project record**, promoted to [`../hallOfFame/`](../hallOfFame/README.md) on 2026-08-16 (rsynced off the
+desktop, the copy re-measured 98/100 on fresh laptop episodes). The 99.0 vs 98.0 lead over `b24d` is inside
+the 500-episode CIs — a narrow point lead, taken as the record under the folder's 500-episode standard — but
+the *region* (21 held across 2 seeds, an 18-wide band) is the signal outside noise, and the first time the
+top tier appears as a plateau rather than a spike. Full conclusion:
 [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
 ## Batch 26 — FC `100,100` under IS-off: **the shallow shape does not carry the lift**

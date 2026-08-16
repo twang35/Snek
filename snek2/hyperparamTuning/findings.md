@@ -524,9 +524,10 @@ architectures": that was true, but gate-85-specific; the lever is the **gate**, 
 **Read the lead honestly.** `b29b`'s 99.0% over `b24d`'s 98.0% is inside the 500-episode confidence intervals —
 a one-run point lead, not a resolved win. What is *outside* noise is the **region**: `b24` produced 2 isolated
 ≥98%/500 checkpoints across 4 seeds, `b29` produced 21 across 2, an 18-wide contiguous band in one arm. A record
-this project has only ever hit as isolated points now appears as a plateau — that is the signal worth chasing,
-and it makes `b29b` @1447k a candidate for `hallOfFame/` (pending the manual verified copy-and-play; the
-checkpoint is on the desktop and needs an rsync first).
+this project has only ever hit as isolated points now appears as a plateau — that is the signal worth chasing.
+**`b29b` @1447k is now the folder record**, promoted to [`../hallOfFame/`](../hallOfFame/README.md) on
+2026-08-16 (rsynced off the desktop, the copy re-measured 98/100 on fresh laptop episodes); its 99.0%/500
+edges `b24d`'s 98.0%/500 within the CI, but it is the first record that is a genuine region rather than a point.
 
 **Every wave is healthy throughout** — trailing 93-94 (b27/b29), peak ~95 (b30), no dead or zero stretch — so
 the potential-based term never destabilizes; it simply grades the wrong decisions until the gate moves. Every

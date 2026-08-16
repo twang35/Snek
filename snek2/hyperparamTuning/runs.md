@@ -70,8 +70,8 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
 - **b29a-d (desktop, `c=0.10`, gate 75): done at 2M, closed out and HOF-500'd — the positive result.**
   Pooled **87.8** (a dead heat with b24) but **21 checkpoints held ≥98%/500 across 2 of 4 seeds**, where the
   record-holding control produced only 2 isolated ones. `b29b` @1447k = **99.0%/500 (495/500)**, the head of
-  an 18-checkpoint band — a *candidate new record* (see Record status below). **The gate, not the dose or the
-  net, is the lever.**
+  an 18-checkpoint band — **the new project record**, promoted to `hallOfFame/` (see Record status below).
+  **The gate, not the dose or the net, is the lever.**
 - **Laptop: `b31a-d` was stopped at 538-569k with no close-out and the laptop now holds `b32a-d` (C51 + Adam
   `epsilon`, 1M).** The reason for both is the same measurement — C51's churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
@@ -277,6 +277,28 @@ Reached 538-569k in 2h44m, all four healthy (no zero stretch), best-30 **21.0 / 
 **50.7 pp spread at one config**, which is the n=4 noise problem restated rather than a result. Graphs in
 [`charts.md`](charts.md); the arms are in [`completedRuns.md`](completedRuns.md) as void.
 
+## Batch 34 — chase-safe `c=0.10`, **gate 70** — *queued on the desktop (2026-08-16)*
+
+The gate ladder's next rung below b29's 75. Four arms, **identical to b29** — `fc 320`, IS off, `td_error`,
+target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping, `c=0.10`, 2M cap, seeds 1-4, the
+same `b24a-d` seed-matched control — with **`SNEK_CHASE_SAFE_GATE=70`** the only change. Queued to `ops` at
+priority 30; the desktop was idle at queue time (heartbeat 09:47, 0 trainers), so it should pick the wave up
+on its next poll, close-out and HOF-500 auto-chained as usual.
+
+**What it asks.** b29 (gate 75) turned a gate-85 null into a record region by shaping the packing decisions
+~10 meals before the endgame; b34 moves the gate 5 more lengths earlier. Reading the outcome against b29's
+21-checkpoint ≥98%/500 region and `b24a-d`:
+
+| outcome | reading |
+|---|---|
+| gate 70 ≥ gate 75 on the ≥98%/500 count | a **monotone** gate response — the causal horizon for packing sits at or below 70, and the ladder should keep descending |
+| gate 70 ≈ gate 75 | the effect **saturates** by 75 — gate 75 is the operating point, no reason to go lower |
+| gate 70 < gate 75 (toward the gate-85 null) | 75 is a **sweet spot**; too-early shaping dilutes the signal across lengths where Φ flips constantly (Phase 0: ~35 flips/episode for a weak policy), and the useful window is narrow |
+
+**Judge it on the ≥98%/500 count and the width of any record band, not best-30 or peak** — peak is saturated
+at 95 and best-30 stops discriminating above ~92 (both true of every b24-family arm). Check the desktop with
+`git show origin/ops-status:status.json`.
+
 ## Batches 27-30 are closed — chase-safe shaping, and the gate is the lever
 
 All sixteen chase-safe arms have stopped, so per the bookkeeping rule their descriptions moved to
@@ -339,14 +361,15 @@ from a local minimum; all four seeds make the same level shift
 
 ## Record status
 
-**CANDIDATE NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes**
-(495/500). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500, but the lead is inside
-the 500-episode CIs, so it is a *narrow* point lead. **What is outside noise is the region:** b29b carries an
+**NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI
+97.7-99.6). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500; the lead is inside the
+500-episode CIs, so it is a *narrow* point lead — taken as the record under the folder's 500-episode standard,
+exactly as `b24d` was taken over `b18b`. **What is outside noise is the region:** b29b carries an
 **18-checkpoint ≥98%/500 band** (1446k-1529k) and its sibling `b29a` holds 3 more, so the gate-75 arm
 produced **21 record-tier checkpoints across 2 seeds** where every prior record appeared only as isolated
-points. **Not yet promoted:** the manual verified copy-and-play still has to run, and the checkpoint lives on
-the desktop — it needs an rsync to the laptop first ([procedure](../hallOfFame/README.md)). Write-up:
-[Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
+points. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) on 2026-08-16** — the checkpoint was rsynced
+off the desktop and the copy re-measured 98/100 on fresh laptop episodes (loads and plays like a champion).
+Write-up: [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
 
 **NEW RECORD, 2026-08-13: `b24d-fc320noisseed4` @1342000 — 98.0% over 500 fresh episodes** (490/500,
 CI **96.4-98.9**). It edges the prior record, `b18b-tgt1000seed2` @1588000 at 97.6%/700 (CI 96.1-98.5), on
@@ -408,12 +431,13 @@ reality.
 **Outstanding, highest-value, in order:**
 
 1. **`CHASE_SAFE_SHAPING`: all four batches (b27-b30) closed. Gate 85 is null at any dose or net; `gate 75`
-   (b29) produced a 21-checkpoint ≥98%/500 region, the gate is the lever.** The two live follow-ups: **(a)
-   promote `b29b` @1447k** — rsync the checkpoint to the laptop and run the verified HOF copy-and-play
-   ([procedure](../hallOfFame/README.md)); and **(b) replicate gate 75**, since a record region on 2 of 4
-   seeds at n=4 is a strong signal but not a settled effect — a `gate 70`/`gate 75` follow-up against
-   `b24a-d` would firm it up and probe whether lowering the gate further keeps paying. Design and Phase 0:
-   [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md); full result in
+   (b29) produced a 21-checkpoint ≥98%/500 region, the gate is the lever.** `b29b` @1447k (99.0%/500) is
+   promoted to [`../hallOfFame/`](../hallOfFame/README.md) as the new record (2026-08-16, copy verified).
+   **The live follow-up is `b34a-d` — `gate 70` at `c=0.10`, queued on the desktop 2026-08-16** (identical to
+   b29 but the gate ten lengths earlier), asking whether lowering the gate further keeps paying or overshoots;
+   the seed-matched control is `b24a-d`. A gate-70 win over b29 would establish a monotone gate response;
+   a null or regression would place the useful gate at 75. Design and Phase 0:
+   [`../plans/chase-safe-reward-shaping.md`](../plans/chase-safe-reward-shaping.md); full b29 result in
    [`completedRuns.md`](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
 2. **`fc 512` under the b24 config is now the strongest untested architecture arm.** b25/b26 turned the
    width result into an ordering on the *widest layer* — 320 → +12.2, 200 → +10.3, 100 → +3.5, 50 → 0 —
