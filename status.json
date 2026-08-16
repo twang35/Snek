@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-16T15:18:11",
-  "ts": 1786918691.1634133,
+  "iso": "2026-08-16T15:19:22",
+  "ts": 1786918762.85374,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,7 +18,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
@@ -27,36 +27,27 @@
       "type": "train",
       "policy": "b34a-chase10g70seed1",
       "pid": 2550531,
-      "step": 1871000,
-      "steps_per_sec": 122.5,
-      "elapsed_s": 19557
+      "step": 1877000,
+      "steps_per_sec": 83.7,
+      "elapsed_s": 19629
     },
     {
       "id": "b34b-chase10g70seed2",
       "type": "train",
       "policy": "b34b-chase10g70seed2",
       "pid": 2550532,
-      "step": 1927000,
-      "steps_per_sec": 122.5,
-      "elapsed_s": 19557
-    },
-    {
-      "id": "b34c-chase10g70seed3",
-      "type": "train",
-      "policy": "b34c-chase10g70seed3",
-      "pid": 2550533,
-      "step": 1994000,
-      "steps_per_sec": 91.9,
-      "elapsed_s": 19557
+      "step": 1934000,
+      "steps_per_sec": 97.6,
+      "elapsed_s": 19629
     },
     {
       "id": "b34d-chase10g70seed4",
       "type": "train",
       "policy": "b34d-chase10g70seed4",
       "pid": 2550534,
-      "step": 1970000,
-      "steps_per_sec": 91.9,
-      "elapsed_s": 19557
+      "step": 1977000,
+      "steps_per_sec": 97.6,
+      "elapsed_s": 19629
     }
   ],
   "ledger": {
@@ -221,15 +212,15 @@
     "b29d-chase10g75seed4-hof": "done",
     "b34a-chase10g70seed1": "running",
     "b34b-chase10g70seed2": "running",
-    "b34c-chase10g70seed3": "running",
+    "b34c-chase10g70seed3": "done",
     "b34d-chase10g70seed4": "running",
+    "b34c-chase10g70seed3-closeout": "queued",
     "b34a-chase10g70seed1-closeout": "queued",
     "b34b-chase10g70seed2-closeout": "queued",
-    "b34c-chase10g70seed3-closeout": "queued",
     "b34d-chase10g70seed4-closeout": "queued",
+    "b34c-chase10g70seed3-hof": "queued",
     "b34a-chase10g70seed1-hof": "queued",
     "b34b-chase10g70seed2-hof": "queued",
-    "b34c-chase10g70seed3-hof": "queued",
     "b34d-chase10g70seed4-hof": "queued",
     "b35a-chase10g40seed1": "queued",
     "b35b-chase10g40seed2": "queued",
@@ -246,8 +237,8 @@
   },
   "disk_free_gb": 133.7,
   "load_avg": [
-    9.849609375,
-    8.70849609375,
-    8.7578125
+    10.701171875,
+    9.16943359375,
+    8.9130859375
   ]
 }
