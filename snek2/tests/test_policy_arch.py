@@ -34,8 +34,12 @@ def test_write_then_read_round_trips_the_fields():
     # An exact dict, not a field-by-field check: a new field that readers must handle should fail
     # here and be added deliberately. `algo` is always present, the categorical fields never are on a
     # scalar arm — a ddqn sidecar carrying three nulls would make "absent means scalar" ambiguous.
+    # `perfect_game_reward` *is* written for both algorithms, because it is not a shape or an
+    # observation and so nothing downstream would notice it disagreeing — see
+    # tests/test_perfect_game_reward_scale.py. This tripwire caught its addition, which is the point.
     assert arch == {'fc_layer_params': [100, 200, 100], 'num_actions': 3,
-                    'obs_len': 30, 'obs_era': 'b09c616', 'algo': 'ddqn'}
+                    'obs_len': 30, 'obs_era': 'b09c616', 'algo': 'ddqn',
+                    'perfect_game_reward': 100.0}
 
 
 def test_read_arch_is_none_when_absent():

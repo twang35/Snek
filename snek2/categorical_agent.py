@@ -64,11 +64,36 @@ PRIORITY_KL = 'kl'
 PRIORITY_CE = 'ce'
 PRIORITY_SIGNALS = (PRIORITY_KL, PRIORITY_CE)
 
-# The largest return the *measurement* found: 104.38, over 3 checkpoints and 60 greedy episodes
-# (perDiagnostics/return_distribution.py, 2026-08-15). Rounded up. A `v_max` below this clips returns
-# that real policies demonstrably reach, which is a mistake rather than a trade-off, so it is a hard
-# failure. Above it and below the derived bound is a judgement — see `check_support`.
-MEASURED_MAX_RETURN = 105.0
+# The largest return the *measurement* found, per reward scale. A `v_max` below the figure for the
+# scale in effect clips returns that real policies demonstrably reach, which is a mistake rather than a
+# trade-off, so it is a hard failure. Above it and below the derived bound is a judgement — see
+# `check_support`.
+#
+# **Keyed by `PERFECT_GAME_REWARD` because the number is only valid at the scale it was measured at,
+# and it does not scale linearly.** At a win of 100 the maximum return is just before the win (104.38
+# measured); at a win of 10 the win no longer dominates, so the maximum moves to the *opening* of an
+# episode where all 95 meals are still ahead, and it lands at **32.46** — not 10.4. A single constant
+# here silently assumed a win of 100, and `SNEK_PERFECT_GAME_REWARD` is exactly the knob that breaks
+# that assumption.
+#
+#   win 100 -> 104.38 over 3 checkpoints and 60 greedy episodes (2026-08-15)
+#   win  10 ->  32.46 over b18b-ckpt1588000, 16 episodes, seeds 301+302 (2026-08-16)
+#
+# Both from perDiagnostics/return_distribution.py at gamma 0.9975, rounded up.
+MEASURED_MAX_RETURN_BY_WIN = {100.0: 105.0, 10.0: 33.0}
+# Kept as a module attribute for the default scale, since tests and readers refer to it by name.
+MEASURED_MAX_RETURN = MEASURED_MAX_RETURN_BY_WIN[100.0]
+
+
+def measured_max_return():
+    """The measured maximum return for the reward scale currently in effect, or ``None`` if unmeasured.
+
+    ``None`` is the honest answer at an untested win value and downgrades the hard failure to a
+    warning: refusing to start on a bound measured under different rewards would be worse than
+    starting with the judgement recorded, and inventing a scaled figure would be worse still, since
+    the relationship is not linear.
+    """
+    return MEASURED_MAX_RETURN_BY_WIN.get(float(snake_constants.PERFECT_GAME_REWARD))
 
 
 def theoretical_max_return():
@@ -113,8 +138,9 @@ def check_support(v_min, v_max, num_atoms, allow_clipping=False):
     | condition | level |
     |---|---|
     | `v_min` above the reachable minimum | hard failure — costs nothing to satisfy, and a clipped death value is a wrong terminal target |
-    | `v_max` below `MEASURED_MAX_RETURN` | hard failure — clipping returns real policies reach is a mistake, not a trade |
+    | `v_max` below the measured max **for the reward scale in effect** | hard failure — clipping returns real policies reach is a mistake, not a trade |
     | `v_max` below `theoretical_max_return()` | **warning**, carried into `run_config` so `runs/<policy>.md` records the judgement |
+    | reward scale never measured | **warning** — see `measured_max_return` |
 
     `allow_clipping` overrides **only the two hard failures**. It deliberately does not suppress the
     warning: the warning is the record of a choice, and an escape hatch that erased it would leave no
@@ -132,24 +158,33 @@ def check_support(v_min, v_max, num_atoms, allow_clipping=False):
             'SNEK_V_MIN={0} is above the reachable minimum return {1} (DEATH_REWARD {2} minus '
             'CHASE_SAFE_SHAPING {3}), so a death would be clipped'.format(
                 v_min, floor, snake_constants.DEATH_REWARD, snake_constants.CHASE_SAFE_SHAPING))
-    if v_max < MEASURED_MAX_RETURN:
+    measured = measured_max_return()
+    if measured is not None and v_max < measured:
         problems.append(
-            'SNEK_V_MAX={0} is below the measured maximum return {1}, which real policies reach '
-            '(3 checkpoints, 60 episodes)'.format(v_max, MEASURED_MAX_RETURN))
+            'SNEK_V_MAX={0} is below the measured maximum return {1} at PERFECT_GAME_REWARD={2}, '
+            'which real policies reach'.format(v_max, measured,
+                                               snake_constants.PERFECT_GAME_REWARD))
     if problems and not allow_clipping:
         raise SystemExit(
             'refusing to start: {0}. Set SNEK_C51_ALLOW_CLIPPING=1 to override.'
             .format('; and '.join(problems)))
 
     warnings = []
+    if measured is None:
+        warnings.append(
+            'PERFECT_GAME_REWARD={0} has no measured maximum return, so the clipping check could not '
+            'run. Measure it with perDiagnostics/return_distribution.py and add it to '
+            'MEASURED_MAX_RETURN_BY_WIN before trusting this support.'
+            .format(snake_constants.PERFECT_GAME_REWARD))
     if v_max < ceiling:
         spacing = (v_max - v_min) / (num_atoms - 1)
+        headroom = ('{0:.0f}% headroom over the measured {1}'.format(
+            100.0 * (v_max - measured) / measured, measured) if measured is not None
+            else 'measured max unknown at this reward scale')
         warnings.append(
             'support [{0}, {1}] is below the derived maximum return {2}, so a return above {1} would '
-            'be clipped. Measured max is {3} ({4:.0f}% headroom); spacing {5:.3f}. This is a '
-            'judgement, not an error.'.format(v_min, v_max, ceiling, MEASURED_MAX_RETURN,
-                                              100.0 * (v_max - MEASURED_MAX_RETURN)
-                                              / MEASURED_MAX_RETURN, spacing))
+            'be clipped. {3}; spacing {4:.3f}. This is a judgement, not an error.'
+            .format(v_min, v_max, ceiling, headroom, spacing))
     return warnings
 
 

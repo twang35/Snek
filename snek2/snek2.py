@@ -127,6 +127,14 @@ def main(argv):
     # the env worker processes — see the comment on FOOD_DISTANCE_REWARD. Printed here anyway, once
     # from the parent, so that `grep 'hyperparameter override:'` on a log still shows every knob an
     # arm was given; that grep is how a misconfigured control arm was caught before.
+    # Same reason as the two below: paid inside Snake.step in the env worker processes, so it is read
+    # in snake_constants rather than here, and printed here so `grep 'hyperparameter override:'` on a
+    # log still shows every knob an arm was given. Changing it changes the *objective*, so it is one of
+    # the loudest things an arm can carry.
+    if PERFECT_GAME_REWARD != DEFAULT_PERFECT_GAME_REWARD:
+        print('hyperparameter override: PERFECT_GAME_REWARD = {0} (default {1}) — this changes the '
+              'objective, and for a c51 arm SNEK_V_MAX must be re-derived, not divided'
+              .format(PERFECT_GAME_REWARD, DEFAULT_PERFECT_GAME_REWARD))
     if FOOD_DISTANCE_REWARD != DEFAULT_FOOD_DISTANCE_REWARD:
         print('hyperparameter override: FOOD_DISTANCE_REWARD = {0} (default {1})'.format(
             FOOD_DISTANCE_REWARD, DEFAULT_FOOD_DISTANCE_REWARD))
@@ -513,11 +521,13 @@ def main(argv):
             fc_layer_params, num_actions, obs_len, OBS_ERA, algo=algo,
             num_atoms=num_atoms if is_categorical else None,
             v_min=v_min if is_categorical else None,
-            v_max=v_max if is_categorical else None))
+            v_max=v_max if is_categorical else None,
+            perfect_game_reward=PERFECT_GAME_REWARD))
     else:
         policy_arch.assert_restorable(policy_dir, num_actions, obs_len, OBS_ERA)
         policy_arch.assert_config_matches(policy_dir, fc_layer_params, algo=algo,
-                                          num_atoms=num_atoms, v_min=v_min, v_max=v_max)
+                                          num_atoms=num_atoms, v_min=v_min, v_max=v_max,
+                                          perfect_game_reward=PERFECT_GAME_REWARD)
 
     train_checkpointer.initialize_or_restore()
     global_step = tf.compat.v1.train.get_global_step()
@@ -536,6 +546,7 @@ def main(argv):
                                 if ZERO_OBS_INDICES else 'none'),
         'learning_rate': learning_rate,
         'adam_epsilon': adam_epsilon,
+        'perfect_game_reward': PERFECT_GAME_REWARD,
         'batch_size': batch_size,
         'discount': discount,
         'target_update_period': agent_target_update_period,

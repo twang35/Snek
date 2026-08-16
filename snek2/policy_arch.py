@@ -21,6 +21,8 @@ import os
 
 import numpy as np
 
+import snake_constants
+
 ARCH_FILENAME = 'arch.json'
 
 # Read for `algo` when the field is absent. Every policy directory written before C51 existed has no
@@ -45,7 +47,7 @@ def arch_path(policy_dir):
 
 
 def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo=DEFAULT_ALGO,
-               num_atoms=None, v_min=None, v_max=None):
+               num_atoms=None, v_min=None, v_max=None, perfect_game_reward=None):
     """The canonical dict.
 
     ``fc_layer_params`` is stored as a list — JSON has no tuples and every reader iterates it, so
@@ -60,6 +62,15 @@ def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo=DEFAULT_ALGO
     durably written. A categorical policy's greedy action is ``argmax_a sum_i z_i p_i(s, a)``, so
     restoring correct weights against the wrong support yields a **different policy** with no shape
     mismatch anywhere — the silent-failure class this file exists for, arriving through a new door.
+
+    ``perfect_game_reward`` is recorded for **both** algorithms and defaults to
+    ``snake_constants.DEFAULT_PERFECT_GAME_REWARD`` when omitted, which is what every arm before batch
+    33 trained with. It is not a weight shape and not an observation, so nothing about restoring
+    breaks when it disagrees — which is exactly why it is written down. An arm trained to value a win
+    at 10 and resumed at 100 restores cleanly and then optimises a different objective, and for a
+    categorical arm the atoms are calibrated to the old return range on top of that. Absent from a
+    pre-batch-33 sidecar, and ``reward_scale_of`` reads that absence as the default rather than as
+    unknown.
     """
     arch = {
         'fc_layer_params': [int(width) for width in fc_layer_params],
@@ -74,7 +85,19 @@ def build_arch(fc_layer_params, num_actions, obs_len, obs_era, algo=DEFAULT_ALGO
         arch['num_atoms'] = int(num_atoms)
         arch['v_min'] = float(v_min)
         arch['v_max'] = float(v_max)
+    arch['perfect_game_reward'] = float(
+        snake_constants.DEFAULT_PERFECT_GAME_REWARD if perfect_game_reward is None
+        else perfect_game_reward)
     return arch
+
+
+def reward_scale_of(arch):
+    """What a win paid for this checkpoint, defaulting to the pre-batch-33 value.
+
+    A missing field means the sidecar predates the knob, and every such arm trained at the default —
+    so this is a known value rather than an unknown one, and the guards can compare it.
+    """
+    return float(arch.get('perfect_game_reward', snake_constants.DEFAULT_PERFECT_GAME_REWARD))
 
 
 def algo_of(arch):
@@ -202,7 +225,7 @@ def assert_restorable(policy_dir, num_actions, obs_len, obs_era):
 
 
 def assert_config_matches(policy_dir, fc_layer_params, algo=DEFAULT_ALGO, num_atoms=None,
-                          v_min=None, v_max=None):
+                          v_min=None, v_max=None, perfect_game_reward=None):
     """On a training *resume*, the checkpoint's arch is authoritative and the env knobs are the thing
     that might be wrong.
 
@@ -231,6 +254,12 @@ def assert_config_matches(policy_dir, fc_layer_params, algo=DEFAULT_ALGO, num_at
             elif float(arch[field]) != float(wanted_value):
                 problems.append('recorded {0} {1} != {2} {3}'
                                 .format(field, arch[field], knob, wanted_value))
+    wanted_reward = (snake_constants.PERFECT_GAME_REWARD if perfect_game_reward is None
+                     else float(perfect_game_reward))
+    if reward_scale_of(arch) != float(wanted_reward):
+        problems.append('recorded perfect_game_reward {0} != SNEK_PERFECT_GAME_REWARD {1} — the '
+                        'checkpoint was trained for a different objective'
+                        .format(reward_scale_of(arch), wanted_reward))
     if problems:
         raise ArchMismatch(
             'resuming {0}: {1}. The checkpoint was trained with the recorded values; drop the '

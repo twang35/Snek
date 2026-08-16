@@ -67,7 +67,29 @@ CHASE_SAFE_GATE = int(os.environ.get('SNEK_CHASE_SAFE_GATE', DEFAULT_CHASE_SAFE_
 DEATH_REWARD = -5.0  # maybe avoid deaths more?
 STARVE_REWARD = -0.5
 global PERFECT_GAME_REWARD
-PERFECT_GAME_REWARD = 100
+# What a filled board pays. Read from the environment for the same reason FOOD_DISTANCE_REWARD is —
+# `Snake.step` pays it inside the parallel env worker processes, and `from snake_constants import *`
+# binds a copy at import, so an assignment in the parent would never reach a worker.
+#
+# **Changing it changes the objective, not just the scale, and it changes the shape of the return.**
+# At `gamma=0.9975` the discounted return from a state is `F + gamma^(T-t) * W`, where `F` is the
+# remaining food discounted to now. `F` is largest at the *start* of an episode (~20.8, all 95 meals
+# still to come) and smallest at the end (~3.6, four meals left). So at `W=100` the maximum return is
+# just before the win (~102.6, measured 104.4) while at `W=10` it moves to the *opening* (~20.8) —
+# `v_max` has to be re-derived rather than divided by 10, and this is why `SNEK_V_MAX` is not
+# adjusted automatically here.
+#
+# It also rescales the urgency to finish: delaying the win 100 steps costs `W*(1 - 0.9975^100)`,
+# so 22 reward at `W=100` and 2.2 at `W=10`. Endgame hunting speed is the measured elite-vs-mediocre
+# discriminator, so a smaller `W` is a real change of what the agent is asked to do. See
+# hyperparamTuning/findings.md.
+#
+# **Nothing identifies a perfect game by this value.** `state_helpers.is_perfect_score(score)` is the
+# single definition and `tests/test_perfect_game_counting.py` has an `ast` tripwire that fails if a
+# comparison against this constant reappears — which is what makes the knob safe to turn at all.
+DEFAULT_PERFECT_GAME_REWARD = 100
+PERFECT_GAME_REWARD = float(os.environ.get('SNEK_PERFECT_GAME_REWARD',
+                                           DEFAULT_PERFECT_GAME_REWARD))
 global PERFECT_GAME_WAIT_MS
 PERFECT_GAME_WAIT_MS = 500
 
