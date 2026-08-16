@@ -38,9 +38,9 @@ grep -ho 'charts/[a-zA-Z0-9-]*\.png' charts.md archive/batches1-11.md archive/ch
 comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 ```
 
-**Four PNGs in `charts/` are not arm charts and will always appear in that list** —
-`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities` and `plasticity-metrics` are
-diagnostic figures referenced from [`findings.md`](findings.md) and
+**Five PNGs in `charts/` are not arm charts and will always appear in that list** —
+`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities`, `plasticity-metrics` and
+`best30-drivers` are diagnostic figures referenced from [`findings.md`](findings.md) and
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
 

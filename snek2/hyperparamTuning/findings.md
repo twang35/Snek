@@ -132,6 +132,8 @@ knob, horizon-matched within each pair.** best-30 is the near-ceiling primary me
 variance up there) and a *leading indicator* of a record — it ranked batch 24's four HOF outcomes correctly
 — so what raises it is worth stating in one place.
 
+![what moves best-30 across batches — the IS/width ladder and the forking slopegraph](charts/best30-drivers.png)
+
 | lever | comparison | Δ best-30 | seeds better |
 |---|---|---|---|
 | **Turn IS off** (β→1.0 cancels PER; off restores it) | b22 vs b20 control (`50,100,50`) | **+22.2** | 4/4 |
