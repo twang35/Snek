@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-16T00:31:00",
-  "ts": 1786865460.3989062,
+  "iso": "2026-08-16T00:32:27",
+  "ts": 1786865547.0660849,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,36 +18,27 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b29a-chase10g75seed1",
-      "type": "train",
-      "policy": "b29a-chase10g75seed1",
-      "pid": 1844278,
-      "step": 1993000,
-      "steps_per_sec": 105.3,
-      "elapsed_s": 20213
-    },
     {
       "id": "b29b-chase10g75seed2",
       "type": "train",
       "policy": "b29b-chase10g75seed2",
       "pid": 1844279,
-      "step": 1966000,
-      "steps_per_sec": 126.4,
-      "elapsed_s": 20213
+      "step": 1976000,
+      "steps_per_sec": 115.4,
+      "elapsed_s": 20300
     },
     {
       "id": "b29d-chase10g75seed4",
       "type": "train",
       "policy": "b29d-chase10g75seed4",
       "pid": 1844281,
-      "step": 1938000,
-      "steps_per_sec": 105.3,
-      "elapsed_s": 20213
+      "step": 1946000,
+      "steps_per_sec": 92.3,
+      "elapsed_s": 20300
     }
   ],
   "ledger": {
@@ -198,23 +189,23 @@
     "b28b-chase20g85seed2-hof": "done",
     "b28c-chase20g85seed3-hof": "done",
     "b28d-chase20g85seed4-hof": "done",
-    "b29a-chase10g75seed1": "running",
+    "b29a-chase10g75seed1": "done",
     "b29b-chase10g75seed2": "running",
     "b29c-chase10g75seed3": "done",
     "b29d-chase10g75seed4": "running",
-    "b29c-chase10g75seed3-closeout": "queued",
     "b29a-chase10g75seed1-closeout": "queued",
+    "b29c-chase10g75seed3-closeout": "queued",
     "b29b-chase10g75seed2-closeout": "queued",
     "b29d-chase10g75seed4-closeout": "queued",
-    "b29c-chase10g75seed3-hof": "queued",
     "b29a-chase10g75seed1-hof": "queued",
+    "b29c-chase10g75seed3-hof": "queued",
     "b29b-chase10g75seed2-hof": "queued",
     "b29d-chase10g75seed4-hof": "queued"
   },
   "disk_free_gb": 135.2,
   "load_avg": [
-    6.35888671875,
-    7.5478515625,
-    8.18701171875
+    5.962890625,
+    7.22998046875,
+    8.0205078125
   ]
 }
