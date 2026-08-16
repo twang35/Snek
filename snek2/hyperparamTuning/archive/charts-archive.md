@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-15 | 25 | batch 32 (Adam `epsilon` on C51) landed; batch 25 became the seventh-newest |
 | 2026-08-15 | 24 | batch 31 (the first C51 batch) landed; batch 24 became the seventh-newest |
 | 2026-08-15 | 23 | batch 28 landed; batch 23 became the seventh-newest |
 | 2026-08-14 | 22 | batch 30 launched on the laptop; batch 22 became the seventh-newest |
@@ -24,6 +25,46 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 25 — FC `200,100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4
+
+b22's exact IS-off config with a 3-layer `200,100,100` net (36,804 params, **3.09×** the control) — the second
+shape in the width follow-up after b24's `320` result. It asks whether b24's consolidation lift is width
+itself or just more parameters, and whether it survives at a shape other than one wide layer. Seed-matched
+control is b22 (`50,100,50`, IS off). Trained on the desktop.
+
+**Fully evaluated — and the first auto-HOF chain ran end to end (training → close-out → HOF-500).** The
+close-out (gate 95) pools a mean **86.0** — **+10.3 over the b22 control's 75.7, within 1.9 of b24's
+87.9** — so the consolidation lift **replicates at a 3-layer `200,100,100` shape**. (This section first
+read that as "capacity rather than width"; **b26 falsified it** — `100,100` carries more parameters than
+b24's `320` and gets +3.5. The shapes order by widest layer, and `200,100,100` costs 3.09× the control's
+parameters to land *below* `320`'s 0.94×.) Peak is unmoved at 95.0. **But the HOF-500 (gate 98) held nothing: every
+arm's ≥98%/100 candidates were abandoned, none reaching 98% over 500** — the /100 highs inflated exactly as
+b24's did. The strongest was `b25b` @911k, still 97.2% when gate-98 stopped it at 392 episodes; that is a
+plausible ~97%/500 holder the folder's gate-97 standard would have run to completion, so it needs a hand
+re-measure before any hall claim. **No b25 checkpoint enters the folder on the auto run.** Sorted by
+close-out pooled.
+
+| arm | peak trail | best-30 | `sef` | close-out pooled | HOF-500 (gate 98) |
+|---|---|---|---|---|---|
+| `b25c` | 95.00 | 93.7% | **66.9%** | **87.2** | none ≥98% (best 95.3% @827k, ab.) |
+| `b25d` | 95.00 | 94.3% | 62.2% | 85.9 | none ≥98% (best 96.4% @2431k, ab.) |
+| `b25a` | 95.00 | 93.7% | 63.2% | 85.6 | none ≥98% (best 92.7% @802k, ab.) |
+| `b25b` | 95.00 | **95.3%** | 62.7% | 85.5 | none ≥98% (best **97.2%** @911k, ab.) |
+| **mean — b25 fc200,100,100 IS-off** | **95.00** | **94.3%** | **63.8%** | **86.0** | 0 of 4 held ≥98%/500 |
+| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 | — |
+
+![b25c](../charts/b25c-fc200x100x100noisseed3-r2.png)
+**b25c-fc200x100x100noisseed3-r2**
+
+![b25a](../charts/b25a-fc200x100x100noisseed1-r2.png)
+**b25a-fc200x100x100noisseed1-r2**
+
+![b25b](../charts/b25b-fc200x100x100noisseed2-r2.png)
+**b25b-fc200x100x100noisseed2-r2**
+
+![b25d](../charts/b25d-fc200x100x100noisseed4-r2.png)
+**b25d-fc200x100x100noisseed4-r2**
 
 ## Batch 24 — FC width `320` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4
 

@@ -1,7 +1,7 @@
 # Charts
 
-Progress graphs for the most recent batches — **23 through 27 plus 30**, a cap of six, newest first, plus
-the **C51 pilot** as a temporary seventh while it runs. Per-arm numbers live in
+Progress graphs for the most recent batches — **26, 27, 28, 30, 31 and 32**, a cap of six, newest first,
+plus the **C51 pilot** as a temporary seventh while its arms are still a live control. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
 
@@ -44,36 +44,63 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
 
-## Batch 31 — **C51** at `lr 5e-5`, `fc 200,100,100`, seeds 1-4 — *running on the laptop, 2M cap*
+## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *running on the laptop, 1M cap*
 
-**The first C51 batch.** Distributional RL: the scalar head is replaced by a distribution over the return
-on **51 atoms over `[-5, 120]`** trained by cross-entropy, with the PER priority as the KL. Design,
-measurements and pre-registered criteria:
-[`../plans/distributional-c51.md`](../plans/distributional-c51.md).
+**Whether `epsilon` can separate C51's learning speed from its churn.** Adam steps by
+`lr·m/(√v + ε)`, so `ε` is the gradient magnitude below which the update stops being scale-invariant —
+above it a parameter moves ~`lr` per step whatever its gradient, below it a small gradient buys a small
+step. We had been at Keras's default **1e-7**, where essentially everything is in the first regime, so a
+coordinate carrying nothing but batch noise takes a full-size step. That matters far more for a 3×51 = 153
+output categorical head than a 3-output scalar one, and the reference implementations do not use the
+framework default. Full argument and the measurements behind it:
+[`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it).
 
-Everything else is **b25's config verbatim** — `fc 200,100,100`, IS off, `td_error`, target 1000, discount
-0.9975, `FORK_BRANCHES=4`, no food-distance shaping, seeds 1-4 — so **`b25a-d`-r2 is the seed-matched
-control at zero extra compute**. Cap **2M**. The learning rate comes from the pilot below, chosen by
-[`pick_c51_lr.py`](pick_c51_lr.py) with nobody watching; `5e-5` won on *consistency* between its seeds
-rather than on being the highest-scoring rate, which the [finding](findings.md#-the-c51-learning-rate-screen-the-seed-spread-beat-the-rate-effect-and-time-to-first-win-predicted-nothing)
-spells out.
+| arms | `SNEK_ADAM_EPSILON` | source |
+|---|---|---|
+| `b32a`, `b32b` (seeds 1, 2) | **1.5e-4** | Dopamine's Rainbow config |
+| `b32c`, `b32d` (seeds 1, 2) | **3.125e-4** | Dopamine's C51 config |
+| *control, already on disk* | 1e-7 | `c51pilotB-lr1e4seed1/2`, same config, 600k |
 
-**Status at 21:22 on 2026-08-15: 245-280k of 2M (~13%), all four healthy** — epsilons 0.0074-0.0089, no
-zero stretch, peak trailing 85-90. **Behind the control at the matched horizon**, c51 first:
+`lr 1e-4` throughout, otherwise b25's config plus `ALGO=c51`. **The control is not in this wave** — the two
+pilot arms at `lr 1e-4` ran it at the default, so seeds 1 and 2 are reused deliberately and the comparison
+is paired at 600k with the extra 400k free. `lr 1e-4` rather than the pilot's chosen `5e-5` because that is
+where the defect is largest while the rate still learns: churn **0.117-0.245** against the ddqn control's
+0.033-0.058, never settling, yet seed 2 reached best-30 66.3 still rising at 599k.
 
-| arm | step | best-30 ≤260k (control) | peak trail |
-|---|---|---|---|
-| `b31d-c51lr5e5seed4` | 249k | **29.3** (`b25d` 28.3, +1.0) | 89.86 |
-| `b31a-c51lr5e5seed1` | 261k | 21.7 (`b25a` 44.3, −22.6) | 90.02 |
-| `b31c-c51lr5e5seed3` | 280k | 18.0 (`b25c` 44.7, −26.7) | 85.34 |
-| `b31b-c51lr5e5seed2` | 245k | 16.7 (`b25b` 28.0, −11.3) | 87.00 |
-| **mean** | | **21.4 (36.3, −14.9)** | — |
+**The readout is churn and drawdown depth, not `best_perfect30`** — within-rate seed spread at `1e-4` is
+54.6 pp, so at n=2 per side the score resolves nothing. Measured with
+[`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py) at `--end 600000`.
 
-**Read that as "slower to start", not "worse"** — the same caveat batch 28's section carries. best-30 at
-13% of the cap measures *when* an arm began winning, and the pilot's own arms show C51 arriving late and
-then climbing hard: its best arm was still rising at 600k. **The verdict is the 2M close-out's ≥98%/500
-count against b25's zero**, and on this batch the criterion is one-sided — b25 produced no record-tier
-checkpoint, so a c51 record would be a clear win and no c51 record says nothing.
+**Launched 23:14 on 2026-08-15**, ~1.7 h to 1M. No readings yet; charts are the first evals only.
+
+![b32a](charts/b32a-c51eps15e4seed1.png)
+**b32a-c51eps15e4seed1** — `eps 1.5e-4`, seed 1
+
+![b32b](charts/b32b-c51eps15e4seed2.png)
+**b32b-c51eps15e4seed2** — `eps 1.5e-4`, seed 2
+
+![b32c](charts/b32c-c51eps3125e4seed1.png)
+**b32c-c51eps3125e4seed1** — `eps 3.125e-4`, seed 1
+
+![b32d](charts/b32d-c51eps3125e4seed2.png)
+**b32d-c51eps3125e4seed2** — `eps 3.125e-4`, seed 2
+
+## Batch 31 — **C51** at `lr 5e-5`, 2M — *stopped at 538-569k, no close-out*
+
+**The first C51 batch, and void.** b25's config verbatim plus `ALGO=c51` (51 atoms over `[-5, 120]`, KL
+priority) at the rate [`pick_c51_lr.py`](pick_c51_lr.py) chose from the pilot, seeds 1-4, 2M cap. Killed at
+23:10 after `c51_stability.py` showed the chaos these curves show is the **learning rate, not C51** — which
+made 2M at a rate chosen under the old reading not worth four slots. **No close-out was run**, by decision.
+
+| arm | step | best-30 | `sef` | peak trail |
+|---|---|---|---|---|
+| `b31d-c51lr5e5seed4` | 569k | **71.7** | 16.5 | 92.86 |
+| `b31a-c51lr5e5seed1` | 555k | 66.7 | 9.5 | **94.86** |
+| `b31b-c51lr5e5seed2` | 538k | 53.3 | 1.7 | 92.26 |
+| `b31c-c51lr5e5seed3` | 562k | 21.0 | 0.0 | 89.76 |
+
+All four healthy at the kill (no zero stretch). The **50.7 pp best-30 spread at one config** is the n=4
+noise problem restated, not a result — which is the other reason not to spend a close-out on it.
 
 ![b31a](charts/b31a-c51lr5e5seed1.png)
 **b31a-c51lr5e5seed1**
@@ -89,9 +116,9 @@ checkpoint, so a c51 record would be a clear win and no c51 record says nothing.
 
 ## C51 pilot — distributional RL, learning-rate screen — *closed at 600k, chose `5e-5`*
 
-**A seventh section on purpose, and temporary.** The cap of six counts numbered batches; this screen
-became `b31` when it closed, and the section stays only while `b31` is young enough that the pilot's own
-curves are the reference for it.
+**A seventh section on purpose, and temporary.** The cap of six counts numbered batches. This screen
+became `b31`, which is now void — but its two `lr 1e-4` arms are **batch 32's control**, so the section
+stays until b32 closes rather than being retired with b31.
 
 **The table and the graphs below this paragraph are regenerated by
 [`pick_c51_lr.py`](pick_c51_lr.py)** between the `C51-PILOT-STATUS` markers, so they are current as of
@@ -372,43 +399,3 @@ Sorted by close-out pooled.
 
 ![b26d](charts/b26d-fc100x100noisseed4.png)
 **b26d-fc100x100noisseed4**
-
-## Batch 25 — FC `200,100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4
-
-b22's exact IS-off config with a 3-layer `200,100,100` net (36,804 params, **3.09×** the control) — the second
-shape in the width follow-up after b24's `320` result. It asks whether b24's consolidation lift is width
-itself or just more parameters, and whether it survives at a shape other than one wide layer. Seed-matched
-control is b22 (`50,100,50`, IS off). Trained on the desktop.
-
-**Fully evaluated — and the first auto-HOF chain ran end to end (training → close-out → HOF-500).** The
-close-out (gate 95) pools a mean **86.0** — **+10.3 over the b22 control's 75.7, within 1.9 of b24's
-87.9** — so the consolidation lift **replicates at a 3-layer `200,100,100` shape**. (This section first
-read that as "capacity rather than width"; **b26 falsified it** — `100,100` carries more parameters than
-b24's `320` and gets +3.5. The shapes order by widest layer, and `200,100,100` costs 3.09× the control's
-parameters to land *below* `320`'s 0.94×.) Peak is unmoved at 95.0. **But the HOF-500 (gate 98) held nothing: every
-arm's ≥98%/100 candidates were abandoned, none reaching 98% over 500** — the /100 highs inflated exactly as
-b24's did. The strongest was `b25b` @911k, still 97.2% when gate-98 stopped it at 392 episodes; that is a
-plausible ~97%/500 holder the folder's gate-97 standard would have run to completion, so it needs a hand
-re-measure before any hall claim. **No b25 checkpoint enters the folder on the auto run.** Sorted by
-close-out pooled.
-
-| arm | peak trail | best-30 | `sef` | close-out pooled | HOF-500 (gate 98) |
-|---|---|---|---|---|---|
-| `b25c` | 95.00 | 93.7% | **66.9%** | **87.2** | none ≥98% (best 95.3% @827k, ab.) |
-| `b25d` | 95.00 | 94.3% | 62.2% | 85.9 | none ≥98% (best 96.4% @2431k, ab.) |
-| `b25a` | 95.00 | 93.7% | 63.2% | 85.6 | none ≥98% (best 92.7% @802k, ab.) |
-| `b25b` | 95.00 | **95.3%** | 62.7% | 85.5 | none ≥98% (best **97.2%** @911k, ab.) |
-| **mean — b25 fc200,100,100 IS-off** | **95.00** | **94.3%** | **63.8%** | **86.0** | 0 of 4 held ≥98%/500 |
-| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 | — |
-
-![b25c](charts/b25c-fc200x100x100noisseed3-r2.png)
-**b25c-fc200x100x100noisseed3-r2**
-
-![b25a](charts/b25a-fc200x100x100noisseed1-r2.png)
-**b25a-fc200x100x100noisseed1-r2**
-
-![b25b](charts/b25b-fc200x100x100noisseed2-r2.png)
-**b25b-fc200x100x100noisseed2-r2**
-
-![b25d](charts/b25d-fc200x100x100noisseed4-r2.png)
-**b25d-fc200x100x100noisseed4-r2**

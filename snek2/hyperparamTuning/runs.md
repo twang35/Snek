@@ -67,9 +67,10 @@ landed (full numbers and graphs in [`charts.md`](charts.md)):
   (0.003-0.005), no zero stretch. The `c=0.20` dose rung, and a dead heat with the control this early
   (matched ≤275k best-30 **56.9 vs 57.4**). Since both `c=0.10` batches came back null, **b28 is the arm
   that decides "wrong idea" vs "dose too small to see."**
-- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: b30e-h closed out at 15:05, then the C51
-  pilot's eight arms ran to their 600k cap and handed off to batch `b31` at 20:09 — the laptop now holds
-  `b31a-d` (C51, 2M).**
+- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: `b31a-d` was stopped at 538-569k with no
+  close-out and the laptop now holds `b32a-d` (C51 + Adam `epsilon`, 1M).** The reason for both is the
+  same measurement — C51's churn is the learning rate, not C51
+  ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
 **Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
 + forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
@@ -155,27 +156,56 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
-## Batch 31 — C51 at `lr 5e-5`, `fc 200,100,100`, seeds 1-4 — running on the laptop (2026-08-15)
+## Batch 32 — Adam's `epsilon` on C51, `lr 1e-4`, two reference values — running on the laptop (2026-08-15)
 
-**The first C51 batch**, launched 20:09 by the pilot's own handoff. b25's config verbatim plus
-`ALGO=c51` (51 atoms over `[-5, 120]`, KL priority) at the pilot's chosen rate, **2M cap**, seeds 1-4 —
-so **`b25a-d`-r2 is the seed-matched control at zero extra compute**.
+**Does `epsilon` separate C51's learning speed from its churn?** Four arms to **1M**, `lr 1e-4`
+throughout, everything else b25's config plus `ALGO=c51`:
 
-**Status 21:22 — 245-280k of 2M (~13%), all four healthy** (epsilons 0.0074-0.0089, no zero stretch, peak
-trailing 85-90) and **behind the control at the matched horizon: mean best-30 21.4 vs 36.3 (−14.9), 1 of 4
-seeds ahead.** Graphs and the per-arm table are in [`charts.md`](charts.md).
+| arms | `SNEK_ADAM_EPSILON` | source of the value |
+|---|---|---|
+| `b32a`, `b32b` (seeds 1, 2) | **1.5e-4** | Dopamine's published Rainbow config |
+| `b32c`, `b32d` (seeds 1, 2) | **3.125e-4** | Dopamine's published C51 config |
+| *control — already on disk* | 1e-7 (Keras default) | `c51pilotB-lr1e4seed1/2`, same config, 600k |
 
-**That is "slower to start", not "worse", and the distinction is load-bearing here.** best-30 at 13% of
-the cap measures *when* an arm began winning, and the pilot showed C51 arriving late and then climbing
-hard — its best arm was still rising at the 600k cap. **The verdict is the 2M close-out's ≥98%/500 count.**
-On this control that criterion is **one-sided**: b25 produced *no* record-tier checkpoint, so a c51 record
-is a clear win while no c51 record says nothing. If it comes back flat, the honest next question is the
-horizon rather than another c51 knob — b24's records land at 1.03-1.39M and b25's arms never got there at
-all.
+**The control is not in this wave**, which is why four arms buy a three-way comparison. The two pilot
+arms at `lr 1e-4` ran this config at the framework default, so **seeds 1 and 2 are reused deliberately**
+and the comparison is paired at a 600k horizon with the extra 400k as free information. Paired matters:
+the seed decides which arm in a wave wins in 18 of 18 measured waves.
 
-**Timing.** ~3.4 h to 2M at four arms on the laptop, so it finishes around 23:30. Its close-out is **not**
-auto-chained (that is a desktop feature), so someone has to run one: 4 parallel `top20` processes at
-`EVAL_WORKERS=4`, per the standing instruction.
+**Why `lr 1e-4` and not the pilot's chosen `5e-5`.** It is where the defect is largest while the rate
+still learns — churn **0.117-0.245** against the ddqn control's 0.033-0.058, never settling, yet seed 2
+reached best-30 66.3 still rising at 599k. At `2.5e-4` the arm is broken outright and a working fix could
+be invisible under whatever else is wrong.
+
+**Judge it on churn and drawdown depth, not `best_perfect30`.** Within-rate seed spread at `1e-4` is
+**54.6 pp**, so at n=2 per side the score resolves nothing — the same trap the pilot's rate screen fell
+into. The readout is
+[`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py) at `--end 600000` against
+`c51pilotB-lr1e4seed1/2`. What each outcome means:
+
+- **Churn drops toward the ddqn floor and drawdowns shrink, learning speed holds** → the mechanism is
+  confirmed and `epsilon` becomes a standing part of the c51 config. The follow-up is then re-running the
+  rate screen with it, since the pilot's whole rate ranking was measured at 1e-7.
+- **Churn drops but so does learning speed** → it is acting as a smaller learning rate in disguise, which
+  the pilot already showed costs the peak. `tests/test_adam_epsilon.py` pins that it *should not* — a
+  well-driven gradient keeps >98% of its step — so this outcome would mean the gradients here are far
+  smaller than assumed, which is itself worth knowing.
+- **Nothing moves** → falsified in 4 arms, and the remaining candidates are the exploration-schedule
+  ratchet and n-step returns, in that order.
+
+**Timing.** ~1.7 h to 1M at four arms. `1e-7` is still the default, so nothing else in the project
+changes; the knob is recorded per-arm in `runs/<policy>.md`.
+
+## Batch 31 — C51 at `lr 5e-5`, 2M — **stopped at 538-569k, no close-out** (2026-08-15)
+
+Launched 20:09 by the pilot's handoff, **killed 23:10 at the user's call** after
+[`c51_stability.py`](perDiagnostics/c51_stability.py) showed the chaos was the learning rate rather than
+C51, which made a 2M run at a rate chosen under the old reading not worth the slots. **No close-out was
+run** — deliberately, not pending.
+
+Reached 538-569k in 2h44m, all four healthy (no zero stretch), best-30 **21.0 / 53.3 / 66.7 / 71.7** — a
+**50.7 pp spread at one config**, which is the n=4 noise problem restated rather than a result. Graphs in
+[`charts.md`](charts.md); the arms are in [`completedRuns.md`](completedRuns.md) as void.
 
 ## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b28 running, b29 queued — desktop)
 
