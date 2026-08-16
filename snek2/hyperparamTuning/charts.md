@@ -71,7 +71,30 @@ where the defect is largest while the rate still learns: churn **0.117-0.245** a
 54.6 pp, so at n=2 per side the score resolves nothing. Measured with
 [`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py) at `--end 600000`.
 
-**Launched 23:14 on 2026-08-15**, ~1.7 h to 1M. No readings yet; charts are the first evals only.
+**Launched 23:14 on 2026-08-15. Status at 01:06 on 2026-08-16 — 370-403k of 1M, all four alive, no zero
+stretch, and the readout is moving the right way.** Churn per 5k steps on a fixed 800-state set, paired
+against each arm's own seed at `eps 1e-7`:
+
+| `eps` | churn @200k | churn @360k | best-30 ≤364k | peak trailing |
+|---|---|---|---|---|
+| **1e-7** (control, `c51pilotB`) | 0.166 / 0.127 → **0.147** | 0.167 / 0.106 → **0.137** | 11.7 / 56.0 → 33.9 | 85.6 / 90.1 |
+| **1.5e-4** (`b32a`/`b32b`) | 0.115 / 0.104 → **0.110** | 0.101 / 0.119 → **0.110** | 66.3 / 61.3 → **63.8** | **93.0 / 92.3** |
+| **3.125e-4** (`b32c`/`b32d`) | 0.099 / 0.062 → **0.081** | 0.099 / 0.097 → **0.098** | 73.3 / **10.0** → 41.7 | 92.5 / 87.2 |
+| *ddqn floor, for scale* | 0.042 / 0.056 | 0.035 / 0.058 | — | — |
+
+**7 of 8 paired comparisons across two independent horizons churn less than their own control**, and the
+group means are monotone in dose at both. **It did not cost learning speed** — the failure mode where
+`epsilon` acts as a smaller learning rate in disguise — since both `1.5e-4` arms beat their controls on
+best-30 *and* peak trailing, and the treated groups hold the two highest peaks here.
+
+**The confound to keep in view is reverse causation:** churn falls as a policy converges, and these arms are
+also *better*, so "a better policy settles" would produce the same table. The evidence against it is
+`b32d` — **lowest churn of all six arms (0.062) and the worst best-30 (10.0)**, epsilon still near the
+exploration ceiling. Churn fell in an arm that did not learn better, which is what acting on the optimizer
+rather than on performance looks like. Not settled at n=2; the 600k pairing is the one to judge on.
+
+**Unchanged by this:** `aeff` is 28-33 of 51 atoms in every arm including the treated ones, so **the return
+distribution still is not sharpening** and the n-step candidate is untouched. Boundary mass stays ~0.
 
 ![b32a](charts/b32a-c51eps15e4seed1.png)
 **b32a-c51eps15e4seed1** — `eps 1.5e-4`, seed 1

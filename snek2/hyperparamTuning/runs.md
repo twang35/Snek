@@ -210,6 +210,14 @@ into. The readout is
   also null, the remaining candidates are the exploration-schedule ratchet and n-step returns, in that
   order.
 
+**Status 01:06 on 2026-08-16 — 370-403k of 1M, all four alive, and it is working so far.** Churn per 5k
+steps drops monotonically with the dose at both horizons measured — control **0.147 / 0.137**, `1.5e-4`
+**0.110 / 0.110**, `3.125e-4` **0.081 / 0.098** (ddqn floor ~0.045) — with **7 of 8 paired comparisons below
+their own seed's control**, and **no cost to learning speed**: both `1.5e-4` arms beat their controls on
+best-30 (66.3/61.3 vs 11.7/56.0) and on peak trailing (93.0/92.3 vs 85.6/90.1). The full table, the
+reverse-causation confound and the evidence against it are in [`charts.md`](charts.md). **Not settled at
+n=2** — judge on the 600k pairing.
+
 **Timing.** ~1.7 h to 1M at four arms. `1e-7` is still the default, so nothing else in the project
 changes; the knob is recorded per-arm in `runs/<policy>.md`.
 
