@@ -4,20 +4,24 @@ Batch 32 rests entirely on the claim that Adam's `epsilon` changes which coordin
 claim gets a fixture rather than a comment. Without one, the knob reads like a divide-by-zero guard
 and the obvious "simplification" is to delete it.
 
-The mechanism test is exact rather than empirical, and the exact form is worth having written down
-because the obvious guess about it is wrong. Keras applies `epsilon` *outside* the bias correction, so
-one step from rest moves
+**There are two crossovers, and the one that matters for training is the second.** Keras folds the bias
+correction into the step size and adds `epsilon` to the *raw* `sqrt(v)` accumulator, so the two regimes
+sit in different places depending on how far along `v` is:
 
-    lr * x / (x + eps),   x = sqrt(1 - beta_2) * |g| = 0.0316 * |g|
+- **From rest (t=1)**, `v` has only just started accumulating: the step is `lr * x/(x + eps)` with
+  `x = sqrt(1 - beta_2) * |g| = 0.0316 * |g|`, putting the half-step point at `|g| ~ 31.6 * eps`.
+- **In steady state**, `v` has converged to `mean(g^2)` and the bias correction cancels that factor
+  entirely: the step is `lr * mean(g)/(RMS(g) + eps)` and the half-step point is at `RMS(g) ~ eps`.
 
-which is `lr` when `x >> eps` and `lr * x/eps` when `x << eps`. **The crossover is therefore at
-`|g| ~ 31.6 * eps`, not at `|g| ~ eps`** — a factor of 31.6 that decides whether a given epsilon is
-doing anything at all. At Dopamine's `3.125e-4` the half-step point is `|g| ~ 1e-2`, so it damps a
-much wider band of gradients than the number suggests; a first version of this file assumed the
-crossover was at `eps` itself and picked test gradients that all landed on the wrong side of it.
+Measured at `lr=1e-4`, `eps=3.125e-4`: gradient `1e-2` moves 5.03e-5 at t=1 (half a step) but 9.70e-5
+at t=4000 (97% of a full step), while gradient `3.125e-4` moves 4.98e-5 at t=4000 — exactly half.
 
-One step is enough to pin the whole regime split, with no dependence on how many iterations a loop
-happened to run.
+Both are pinned below, because getting this wrong in either direction misprices the knob. A first
+version of this file assumed the crossover was at `eps` and chose test gradients that all landed on the
+wrong side of the t=1 form; the fix then over-corrected into treating `31.6 * eps` as *the* threshold,
+which would have suggested `3.125e-4` damps everything below `1e-2` when in training it damps below
+`~3e-4`. The 31.6 is a transient of the opening ~`1/(1 - beta_2)` = 1000 steps, so it makes `epsilon`
+temporarily more aggressive while a run starts and then stops mattering.
 """
 import ast
 import os
@@ -32,9 +36,11 @@ import snek2
 SNEK2_PATH = os.path.join(os.path.dirname(__file__), '..', 'snek2.py')
 DOPAMINE_C51_EPSILON = 3.125e-4      # Dopamine's published C51 config, with lr 2.5e-4
 RAINBOW_EPSILON = 1.5e-4             # Dopamine's published Rainbow config, with lr 6.25e-5
-# sqrt(1 - beta_2) at Keras's default beta_2=0.999. The gradient at which one step from rest is
-# exactly half of `lr` is CROSSOVER_SCALE**-1 * eps, i.e. ~31.6 * eps.
-CROSSOVER_SCALE = 0.001 ** 0.5
+# sqrt(1 - beta_2) at Keras's default beta_2=0.999. Scales the *t=1* crossover only: from rest the
+# half-step gradient is eps / FIRST_STEP_SCALE, i.e. ~31.6 * eps. In steady state it is eps itself.
+FIRST_STEP_SCALE = 0.001 ** 0.5
+# beta_2's own timescale, 1/(1 - beta_2): how long the transient above takes to decay.
+STEADY_STATE_STEPS = 4000
 
 
 def _source_default(knob):
@@ -123,6 +129,21 @@ def test_every_adam_built_in_snek2_passes_epsilon():
                     call.lineno, knob, ast.dump(value), expected))
 
 
+def _steady_step(epsilon, gradient, learning_rate=1e-4):
+    """Per-step movement after `v` has converged, which is where a run spends its life.
+
+    A constant gradient is used rather than a noisy one so the number is exact: `m` converges to `g`
+    and `v` to `g**2`, making the step `lr * g/(|g| + eps)` with no sampling error to average out.
+    """
+    variable = tf.Variable(0.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=epsilon)
+    for _ in range(STEADY_STATE_STEPS):
+        optimizer.apply_gradients([(tf.constant(gradient), variable)])
+    before = float(variable.numpy())
+    optimizer.apply_gradients([(tf.constant(gradient), variable)])
+    return abs(float(variable.numpy()) - before)
+
+
 def test_a_large_epsilon_barely_changes_a_well_driven_gradient():
     """Well above the crossover both settings take essentially the full `lr` step.
 
@@ -148,15 +169,16 @@ def test_a_large_epsilon_strongly_damps_a_noise_sized_gradient():
     assert default / dopamine > 100, (default, dopamine)
 
 
-def test_the_crossover_sits_at_31_times_epsilon_not_at_epsilon():
-    """Half a step at `|g| = eps / sqrt(1 - beta_2)`, which is the non-obvious part of the form.
+def test_the_first_step_crossover_sits_at_31_times_epsilon():
+    """From rest, half a step at `|g| = eps / sqrt(1 - beta_2)` — the opening transient.
 
-    Pins *where* the split happens, not just that it exists. That location is what makes 1.5e-4 and
-    3.125e-4 different treatments rather than two ways of spelling the same one, and it is what a
-    future reader needs in order to pick a third value on purpose.
+    Worth pinning because it is the regime a *fresh* run starts in: for roughly the first
+    1/(1 - beta_2) steps `epsilon` bites ~31x harder than its steady-state threshold, so an arm is
+    damped most while it is starting. It is emphatically **not** the training-relevant crossover, which
+    the next test covers.
     """
     for epsilon in (RAINBOW_EPSILON, DOPAMINE_C51_EPSILON):
-        half_step_gradient = epsilon / CROSSOVER_SCALE
+        half_step_gradient = epsilon / FIRST_STEP_SCALE
         at_crossover = _first_step(epsilon, half_step_gradient)
         assert abs(at_crossover - 1e-4 * 0.5) < 1e-4 * 0.02, (epsilon, at_crossover)
         # And one order of magnitude below it really is in the damped regime, so the crossover is a
@@ -164,13 +186,30 @@ def test_the_crossover_sits_at_31_times_epsilon_not_at_epsilon():
         assert _first_step(epsilon, half_step_gradient / 10) < 1e-4 * 0.15, epsilon
 
 
+def test_the_steady_state_crossover_sits_at_epsilon_itself():
+    """Once `v` has converged the half-step gradient is `eps`, with no sqrt(1 - beta_2) factor.
+
+    **This is the number to reason with when choosing a value**, and the one an intuition built on the
+    t=1 form gets wrong by 31x. Under `eps=3.125e-4` a gradient of 1e-2 keeps ~97% of its step here
+    while giving up half of it at t=1 — so the knob does not damp anything like the band the first-step
+    form suggests.
+    """
+    for epsilon in (RAINBOW_EPSILON, DOPAMINE_C51_EPSILON):
+        at_crossover = _steady_step(epsilon, epsilon)
+        assert abs(at_crossover - 1e-4 * 0.5) < 1e-4 * 0.05, (epsilon, at_crossover)
+        # An order of magnitude above eps is essentially undamped, an order below is essentially off.
+        assert _steady_step(epsilon, epsilon * 10) > 1e-4 * 0.85, epsilon
+        assert _steady_step(epsilon, epsilon / 10) < 1e-4 * 0.15, epsilon
+
+
 def test_the_two_batch_32_settings_are_meaningfully_different():
     """1.5e-4 and 3.125e-4 must separate on a real gradient, or b32's two halves test one thing.
 
-    Compared at the gradient sitting between their crossovers, where the difference is largest — a
-    check on the experiment's design, not on Keras.
+    Compared in steady state at the gradient between their thresholds, since that is where the arms
+    spend all but their first thousand steps. The separation is a factor of ~2 in threshold, not the
+    ~60x the t=1 form would imply — a check on the experiment's design, not on Keras.
     """
-    between = (RAINBOW_EPSILON + DOPAMINE_C51_EPSILON) / 2 / CROSSOVER_SCALE
-    rainbow = _first_step(RAINBOW_EPSILON, between)
-    dopamine = _first_step(DOPAMINE_C51_EPSILON, between)
+    between = (RAINBOW_EPSILON + DOPAMINE_C51_EPSILON) / 2
+    rainbow = _steady_step(RAINBOW_EPSILON, between)
+    dopamine = _steady_step(DOPAMINE_C51_EPSILON, between)
     assert rainbow / dopamine > 1.2, (rainbow, dopamine)
