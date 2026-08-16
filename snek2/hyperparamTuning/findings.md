@@ -30,7 +30,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
-| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading untested suspect is **Adam ε=1e-7** where Dopamine's C51 uses 3.125e-4. See below |
+| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported so far**: b32 cuts churn 0.137 → 0.098 paired at 360k, monotone in dose, at no cost to best-30. See below |
 | **‡ A C51 learning-rate screen at n=2 could not separate `1e-5` from `1e-4`** — within-rate seed spread 57.6 pp against a 30.5 pp spread between rate means | **measured 2026-08-15**. `2.5e-4`+ is out (collapse); `5e-5` chosen for `b31` on consistency, not on being best. Time-to-first-win predicted nothing (ρ=0.05). See below |
 
 **Records and the horizon**
@@ -233,11 +233,31 @@ Upward epsilon reversals: **b25 = 0, 0, 0, 0** against **C51 = 2, 3, 4, 7, 7, 8,
 `2.5e-4` arms at the exploration ceiling for 64-70% of the run. A ratchet that never lets the schedule
 regress once refinement is reached would decouple it, and that applies to every arm, not only C51's.
 
-**A third: `n_step_update=1`.** The effective atom count (`exp(entropy)`) sits at **29-40 of 51** all the
-way to the cap, so the predicted return distribution never sharpens — with γ=0.9975 and n=1 the value
-propagates ~400 steps one hop at a time. Rainbow uses n=3 for this. `SnekCategoricalDqnAgent` currently
-*raises* on `n_step_update>1`, so this is work rather than a knob, and it is third because part of that
-width is the genuine stochasticity of food placement.
+**~~A third: `n_step_update=1`.~~ Retracted 2026-08-16, before it cost anything.** The argument was that
+the effective atom count (`exp(entropy)`) sitting at **28-40 of 51** all the way to the cap meant the
+predicted distribution never sharpens, so n-step would cut the ~400 one-hop backups that γ=0.9975 implies.
+Both halves fail:
+
+- **A wide distribution is the *correct* answer here, and ours are already narrower than the truth.**
+  `return_distribution.py`'s existing payload measures realised discounted returns at γ=0.9975 over 32,750
+  champion states: pooled **sd 24.89** reward units, ~10 atoms at Δ=2.5. A Gaussian of sd σ discretised at
+  width Δ reads `exp(entropy) ≈ σ·4.13/Δ`, so a *calibrated* net should show **~41 effective atoms**. The
+  nets read 28-33. The returns genuinely spread that far — food placement is random and outcomes bifurcate
+  (length 90-94 piles mass at both −0.5 and +101) — so this was correctness mistaken for a defect.
+- **n-step is separately falsified in this project**, and for a reason C51 does not touch: batch 15's n=3
+  reached pf30 ≥ 40% **128k later** than its control, 3 of 4 seeds slower, evals null, and the diagnosis was
+  that credit propagation was never binding — **286 of 286 winnable positions won and 285 of 285 unwinnable
+  ones lost** at the final decision, so there is no terminal-value error for a faster backup to fix. See
+  [above](#re-opened-2026-08-02-n-step-returns-were-never-cleanly-tested).
+
+So the candidate list after `epsilon` is the **exploration-schedule ratchet**, and nothing else.
+
+**A related correction to how the `epsilon` result is quoted.** "Churn closed a third of the way to the ddqn
+floor" appeared in a progress report and should not be repeated: the arithmetic is 43-67% rather than a
+third, and more importantly **the ddqn reference (0.047) was measured at `lr 1e-5` while every C51 arm here
+runs at `lr 1e-4`** — the same rate-vs-algorithm confound this section opens by correcting, reintroduced.
+There is no ddqn-at-1e-4 measurement, so no floor is known for this rate. Quote only the paired same-rate
+same-seed comparison: **0.137 → 0.098 at 360k, 0.147 → 0.081 at 200k.**
 
 ## ‡‡ What moves best-30: turn IS off first, then widen — shaping and forking barely register
 

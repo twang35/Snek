@@ -207,8 +207,10 @@ into. The readout is
 - **Nothing moves** → *this* is where a third value earns its slots, and it should be one **big** step
   (~`1e-3`), not another 2× nudge, to separate "wrong idea" from "dose too small to see". Same shape as
   b27's `c=0.10` null leading to b28's `c=0.20` rather than to abandoning the shaping. If a big step is
-  also null, the remaining candidates are the exploration-schedule ratchet and n-step returns, in that
-  order.
+  also null, the remaining candidate is the **exploration-schedule ratchet** — n-step was retracted
+  2026-08-16 (already falsified on ddqn for a reason C51 does not touch, and the `aeff` observation behind
+  it turned out to be correctness rather than a defect; see
+  [`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
 **Status 01:06 on 2026-08-16 — 370-403k of 1M, all four alive, and it is working so far.** Churn per 5k
 steps drops monotonically with the dose at both horizons measured — control **0.147 / 0.137**, `1.5e-4`

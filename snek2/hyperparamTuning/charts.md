@@ -93,8 +93,10 @@ also *better*, so "a better policy settles" would produce the same table. The ev
 exploration ceiling. Churn fell in an arm that did not learn better, which is what acting on the optimizer
 rather than on performance looks like. Not settled at n=2; the 600k pairing is the one to judge on.
 
-**Unchanged by this:** `aeff` is 28-33 of 51 atoms in every arm including the treated ones, so **the return
-distribution still is not sharpening** and the n-step candidate is untouched. Boundary mass stays ~0.
+**Unchanged by this:** `aeff` is 28-33 of 51 atoms in every arm and boundary mass stays ~0. That is **not**
+a defect — realised returns at γ=0.9975 have pooled **sd 24.89**, implying a calibrated net should read ~41
+effective atoms, so ours are slightly *over*confident rather than never sharpening. The n-step candidate
+that reading supported is [retracted](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it).
 
 ![b32a](charts/b32a-c51eps15e4seed1.png)
 **b32a-c51eps15e4seed1** — `eps 1.5e-4`, seed 1
