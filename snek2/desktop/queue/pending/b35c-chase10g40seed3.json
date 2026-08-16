@@ -1,0 +1,19 @@
+{
+  "id": "b35c-chase10g40seed3",
+  "type": "train",
+  "policy": "b35c-chase10g40seed3",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "3",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "40"
+  },
+  "max_steps": 2000000,
+  "priority": 30,
+  "notes": "Gate ladder, one variable moved from b34: gate 70 -> 40, c held at 0.10. Deliberately holds the per-flip dose constant (calibration clamps c to 0.10 at any gate <=85) rather than total episode dose, which at gate 40 is ~2.5x gate-85 / ~1.8x gate-75 because ~93 Phi-flips/episode fall in the >=40 region vs 37 at >=85. Reaches into the mid-game (length 40-70), below where the packing advantage that separates records from duds is established (measured at 90-94), so it tests whether mid-game chase-safety shaping helps or just adds gradient/PER noise. Continues b29 (gate 75, record) and b34 (gate 70). Seed-matched control is b24a-d (same config, no shaping)."
+}
