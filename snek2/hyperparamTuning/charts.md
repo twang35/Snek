@@ -80,12 +80,17 @@ against each arm's own seed at `eps 1e-7`:
 | **1e-7** (control, `c51pilotB`) | 0.166 / 0.127 → **0.147** | 0.167 / 0.106 → **0.137** | 11.7 / 56.0 → 33.9 | 85.6 / 90.1 |
 | **1.5e-4** (`b32a`/`b32b`) | 0.115 / 0.104 → **0.110** | 0.101 / 0.119 → **0.110** | 66.3 / 61.3 → **63.8** | **93.0 / 92.3** |
 | **3.125e-4** (`b32c`/`b32d`) | 0.099 / 0.062 → **0.081** | 0.099 / 0.097 → **0.098** | 73.3 / **10.0** → 41.7 | 92.5 / 87.2 |
-| *ddqn floor, for scale* | 0.042 / 0.056 | 0.035 / 0.058 | — | — |
+| *ddqn `b30e`/`b30f` — **`lr 1e-5`, not comparable*** | 0.042 / 0.056 | 0.035 / 0.058 | — | — |
 
 **7 of 8 paired comparisons across two independent horizons churn less than their own control**, and the
 group means are monotone in dose at both. **It did not cost learning speed** — the failure mode where
 `epsilon` acts as a smaller learning rate in disguise — since both `1.5e-4` arms beat their controls on
 best-30 *and* peak trailing, and the treated groups hold the two highest peaks here.
+
+**Quote the paired figures only.** The ddqn row is there for scale and **is not a target**: it was measured
+at `lr 1e-5` against these arms' `lr 1e-4`, so treating the distance to it as "how much is left to fix"
+re-commits the rate-vs-algorithm confound this whole line of work started by correcting. No ddqn-at-`1e-4`
+measurement exists.
 
 **The confound to keep in view is reverse causation:** churn falls as a policy converges, and these arms are
 also *better*, so "a better policy settles" would produce the same table. The evidence against it is
