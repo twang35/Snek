@@ -1,6 +1,6 @@
 # Charts
 
-Progress graphs for the most recent batches — **26, 27, 28, 30, 31 and 32**, a cap of six, newest first,
+Progress graphs for the most recent batches — **27, 28, 30, 31, 32 and 33**, a cap of six, newest first,
 plus the **C51 pilot** as a temporary seventh while its arms are still a live control. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
@@ -43,6 +43,49 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 `best30-drivers` are diagnostic figures referenced from [`findings.md`](findings.md) and
 [`perDiagnostics/`](perDiagnostics/README.md), not training graphs. Anything *else* the check prints is a
 real gap.
+
+## Batch 33 — a filled board pays **10**, not 100 — *running on the laptop, 3M cap*
+
+**`SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, otherwise batch 32's config at `eps 1.5e-4`, seeds
+1-4.** `b32a`/`b32b` are an exact paired control differing only in the win reward. Launched 01:32 on
+2026-08-16 alongside b32, 8 trainers, the user's explicit call. Rationale and the two failure predictions
+are in [`runs.md`](runs.md); launcher [`launch_win10.sh`](launch_win10.sh).
+
+**The motivation:** the win reward is what forces a 125-unit support, so at 51 atoms the spacing is 2.5
+while `FOOD_REWARD` is 1.0 — **a meal is 0.40 atoms**. At `v_max=40` spacing is 0.9 and a meal is 1.11
+atoms, a 2.8× resolution gain. **`v_max` is measured, not `120/10`:** the maximum return moves from "just
+before the win" (104.4 at `W=100`) to the *opening of an episode* at `W=10`, measured **32.46**, and 40
+gives the same 21% headroom the shipped 120 has.
+
+**Expected to underperform — the point is the shape of the failure**, and this table is the reason to
+expect it. Realised returns at `W=10`, γ=0.9975, on `b18b-ckpt1588000`:
+
+| length band | median return | max |
+|---|---|---|
+| 10-49 | **19.42** | **30.79** |
+| 50-84 | 18.43 | 29.04 |
+| 90-94 | 15.47 | 18.18 |
+| 98-99 | **10.95** | 10.98 |
+
+**The value ordering over states inverts.** A length-20 state is worth ~19 and a length-98 state ~11,
+because 95 discounted meals beat four meals plus a 10-point win — where at `W=100` the endgame was the
+high-value region. So there is no value gradient pulling the agent toward finishing, and urgency drops
+10× on top of that (`W·(1−0.9975¹⁰⁰)` = 22 against 2.2). **Watch steps-per-meal at length 85+ and the
+starve/death split, not best-30.**
+
+No readings yet; charts are the first evals only.
+
+![b33a](charts/b33a-c51win10seed1.png)
+**b33a-c51win10seed1** — paired with `b32a`
+
+![b33b](charts/b33b-c51win10seed2.png)
+**b33b-c51win10seed2** — paired with `b32b`
+
+![b33c](charts/b33c-c51win10seed3.png)
+**b33c-c51win10seed3**
+
+![b33d](charts/b33d-c51win10seed4.png)
+**b33d-c51win10seed4**
 
 ## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *running on the laptop, 1M cap*
 
@@ -389,43 +432,3 @@ queued behind it.
 ![b27h](charts/b27h-chase10g85seed4.png)
 **b27h-chase10g85seed4** — first filled board at step 8k, and the first arm whose epsilon left the 0.0125
 ceiling.
-
-## Batch 26 — FC `100,100` under IS-off (`SNEK_IS_WEIGHTS=0`), `td_error`, seeds 1-4 — *closed, HOF-500 empty*
-
-The third shape in the width follow-up: a shallow **two-layer `100,100`** net, after b24 (`320`) and b25
-(`200,100,100`) both lifted consolidation. It asks whether a shallower shape still gets the gain, or whether
-it needs the depth/capacity those two had. Seed-matched control is b22 (`50,100,50`, IS off). Trained on the
-desktop.
-
-**All four trained to the 3M cap and closed out (gate 95).** The shallow shape **does not carry the lift**:
-close-out pooled mean **79.2** is only **+3.5 over the b22 control's 75.7** — against b24's +12.2 (`320`) and
-b25's +10.3 (`200,100,100`). Three seeds learned well (`sef` 44-58); `b26d` is a weak seed (`sef` 13.8,
-pooled 69.6) but never died. **No arm produced a ≥98%/100 checkpoint** — the best full-length reads are
-`b26b`/`b26c` at 97.0%/100 — so the auto-HOF-500 (gate 98, running now) selects nothing and lands empty; the
-record stays b24's. **‡ This is also the arm that separates width from size, and it retracts b25's reading.** `100,100`
-has **1.14× the control's parameters — more than b24's `320` at 0.94×** — and gets a quarter of the lift,
-so "the gain tracks capacity" is wrong. The ordering that holds is the **widest layer**: 320 → +12.2,
-200 → +10.3, 100 → +3.5, 50 → 0
-([finding](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)).
-Sorted by close-out pooled.
-
-| arm | peak trail | best-30 | `sef` (3M) | close-out pooled | best full-length |
-|---|---|---|---|---|---|
-| `b26b` | 95.00 | **93.7%** @1982k | **58.0%** | **83.8** | 97.0% @1948k |
-| `b26c` | 94.96 | 92.0% @2231k | 52.1% | 83.2 | 97.0% @1969k |
-| `b26a` | 94.92 | 88.0% @2349k | 44.6% | 80.0 | 95.0% @2904k |
-| `b26d` | 94.84 | 79.7% @1073k | 13.8% | 69.6 | none ≥95% (all ab.) |
-| **mean — b26 fc100,100 IS-off** | **94.93** | **88.4%** | **42.1%** | **79.2** | 0 of 4 held ≥98%/100 |
-| **mean — b22 fc50,100,50 IS-off (control)** | 94.88 | 86.2% | 30.5% | 75.7 | — |
-
-![b26b](charts/b26b-fc100x100noisseed2.png)
-**b26b-fc100x100noisseed2**
-
-![b26c](charts/b26c-fc100x100noisseed3.png)
-**b26c-fc100x100noisseed3**
-
-![b26a](charts/b26a-fc100x100noisseed1.png)
-**b26a-fc100x100noisseed1**
-
-![b26d](charts/b26d-fc100x100noisseed4.png)
-**b26d-fc100x100noisseed4**

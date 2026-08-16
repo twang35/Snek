@@ -156,6 +156,45 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
+## Batch 33 — a filled board pays **10**, not 100 — running on the laptop, 3M cap (2026-08-16)
+
+**Four arms, `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, otherwise b32's config at `eps 1.5e-4`,
+seeds 1-4, 3M cap.** So **`b32a`/`b32b` are an exact paired control differing only in the win reward**,
+and seeds 3-4 add spread. Launched alongside b32, 8 trainers — over the standing 4-arm rule, the user's
+explicit call, the same suspension the C51 pilot ran under (~2.3 GB/arm against 36 GB, so the cost is
+throughput). Launcher and the full rationale:
+[`launch_win10.sh`](launch_win10.sh).
+
+**The motivation is real** — the win reward is what forces a 125-unit support, and at 51 atoms that
+makes spacing 2.5 while `FOOD_REWARD` is 1.0, so **a meal is 0.40 atoms**. At `v_max=40` spacing is 0.9
+and a meal is **1.11 atoms**, a 2.8× resolution gain.
+
+**`v_max=40` is measured, not `120/10`.** The return is `F + γ^(T−t)·W` and `F` (remaining food
+discounted to now) is largest at the *start* of an episode. At `W=100` the win dominates so the maximum
+sits just before winning (104.4); at `W=10` it does not, so the maximum moves to the opening —
+`return_distribution.py` on `b18b-ckpt1588000` with the reward changed measures **32.46**, and 40 gives
+21% headroom, the same proportion the shipped 120 has over 104.4. My own arithmetic said ~21 and was
+wrong, which is why this was measured.
+
+**Expected to underperform; the point is the *shape* of the failure.** Two predictions worth checking
+against, both from measurements already in [`findings.md`](findings.md):
+
+1. **The value ordering over states inverts.** At `W=10` a length-20 state is worth ~19 and a length-98
+   state ~11, because 95 discounted meals beat four meals plus a 10-point win. At `W=100` the endgame
+   was the high-value region. **So there is no value gradient pulling the agent toward finishing.**
+2. **Urgency to finish drops 10×** — delaying the win 100 steps costs `W·(1−0.9975¹⁰⁰)`, so 22 reward at
+   100 and 2.2 at 10.
+
+Since endgame hunting speed is the measured elite-vs-mediocre discriminator and starvation is the modal
+failure at median length 98, **watch steps-per-meal at length 85+ and the starve/death split**, not just
+best-30. `behaviour_profile.py` and `point_of_no_return.py` both read a c51 arm unchanged and are the
+scripts that say *how* it failed.
+
+**What made this safe to run at all:** perfect games are counted from **score**, so the counter that
+broke the last time a reward term moved is immune by construction. `arch.json` now records
+`perfect_game_reward` and a resume under a changed win is refused — without that, a win-10 checkpoint
+resumed at 100 restores cleanly and optimises something else.
+
 ## Batch 32 — Adam's `epsilon` on C51, `lr 1e-4`, two reference values — running on the laptop (2026-08-15)
 
 **Does `epsilon` separate C51's learning speed from its churn?** Four arms to **1M**, `lr 1e-4`
