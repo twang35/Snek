@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-16T09:51:41",
-  "ts": 1786899101.4961321,
+  "iso": "2026-08-16T09:52:14",
+  "ts": 1786899134.2091367,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,10 +18,47 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 4,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b34a-chase10g70seed1",
+      "type": "train",
+      "policy": "b34a-chase10g70seed1",
+      "pid": 2550531,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b34b-chase10g70seed2",
+      "type": "train",
+      "policy": "b34b-chase10g70seed2",
+      "pid": 2550532,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b34c-chase10g70seed3",
+      "type": "train",
+      "policy": "b34c-chase10g70seed3",
+      "pid": 2550533,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b34d-chase10g70seed4",
+      "type": "train",
+      "policy": "b34d-chase10g70seed4",
+      "pid": 2550534,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
     "smoke-1": "failed",
     "smoke-2": "failed",
@@ -181,7 +218,19 @@
     "b29a-chase10g75seed1-hof": "done",
     "b29b-chase10g75seed2-hof": "done",
     "b29c-chase10g75seed3-hof": "done",
-    "b29d-chase10g75seed4-hof": "done"
+    "b29d-chase10g75seed4-hof": "done",
+    "b34a-chase10g70seed1": "running",
+    "b34b-chase10g70seed2": "running",
+    "b34c-chase10g70seed3": "running",
+    "b34d-chase10g70seed4": "running",
+    "b34a-chase10g70seed1-closeout": "queued",
+    "b34b-chase10g70seed2-closeout": "queued",
+    "b34c-chase10g70seed3-closeout": "queued",
+    "b34d-chase10g70seed4-closeout": "queued",
+    "b34a-chase10g70seed1-hof": "queued",
+    "b34b-chase10g70seed2-hof": "queued",
+    "b34c-chase10g70seed3-hof": "queued",
+    "b34d-chase10g70seed4-hof": "queued"
   },
   "disk_free_gb": 135.1,
   "load_avg": [
