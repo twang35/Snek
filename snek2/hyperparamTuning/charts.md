@@ -275,6 +275,18 @@ the wider one — **null-to-negative, confirmed on two architectures.**
 ![b30h](charts/b30h-chase10fc200x100x100seed4.png)
 **b30h-chase10fc200x100x100seed4**
 
+**`b30a-d` are the same config killed at 137-139k** and are captioned here only so the completeness check
+above stops reporting them. They ran while `perfect_percent` read 0 for every eval — the reward-identified
+perfect game, [`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)
+— so their curves are mismeasured *and* their epsilon was pinned at the 0.0125 ceiling, which makes them
+unusable as arms rather than merely short. `savedPolicies/b30[a-d]` is gone; `runs/b30a-d*` is kept
+deliberately, so `refresh_charts.sh` keeps copying these four PNGs. Nothing should be read off them.
+
+![b30a](charts/b30a-chase10fc200x100x100seed1.png)
+![b30b](charts/b30b-chase10fc200x100x100seed2.png)
+![b30c](charts/b30c-chase10fc200x100x100seed3.png)
+![b30d](charts/b30d-chase10fc200x100x100seed4.png)
+
 ## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *done, close-out null*
 
 The first arms to carry the new shaping term. `Snake.step` adds `c·(γΦ(s′) − Φ(s))` with **Φ = 1 iff the

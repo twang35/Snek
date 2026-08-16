@@ -30,6 +30,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
+| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading untested suspect is **Adam ε=1e-7** where Dopamine's C51 uses 3.125e-4. See below |
 | **‡ A C51 learning-rate screen at n=2 could not separate `1e-5` from `1e-4`** — within-rate seed spread 57.6 pp against a 30.5 pp spread between rate means | **measured 2026-08-15**. `2.5e-4`+ is out (collapse); `5e-5` chosen for `b31` on consistency, not on being best. Time-to-first-win predicted nothing (ρ=0.05). See below |
 
 **Records and the horizon**
@@ -164,6 +165,65 @@ which for `5e-5` was ~270k and for the slower rates is beyond 600k.
 **What is safe to take from it:** `2.5e-4` and above is out — that failure is consistent across seeds and
 one arm collapsed outright. Everything between `1e-5` and `1e-4` is unresolved, and `5e-5` is the
 defensible pick because it reaches its plateau ~2x sooner and does so from both seeds.
+
+## ‡‡ The C51 arms' chaos is the learning rate, not C51 — and the rate is high because C51 needs it
+
+The pilot's eval curves swing far more than their controls, which invited the reading that distributional
+RL is intrinsically less stable here. It is not. Measured 2026-08-15 with
+[`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py) — greedy-action flips on a **fixed**
+800-state set, which removes the 10-episode eval sampling that a curve cannot separate out — against
+`b30e-h`, the only local ddqn arms on the same `fc 200,100,100` and observation era.
+
+| arm | churn @200k | @400k | @600k | eval \|Δtrailing\| | max drawdown |
+|---|---|---|---|---|---|
+| c51 @ **1e-5** | 0.051 | 0.051 | 0.036 | 1.52 | 35.6 |
+| c51 @ `5e-5` | 0.112 | 0.059 | 0.057 | 2.43 | 60.7 |
+| c51 @ `1e-4` | — | — | — | 2.99 | 66.3 |
+| c51 @ **`2.5e-4`** | **0.207** | **0.197** | **0.225** | 2.38 | **67.8** |
+| **ddqn @ 1e-5** (`b30e`, `b30f`) | 0.042 / 0.056 | 0.035 / 0.058 | 0.033 / 0.056 | 0.66 | 13.4 |
+
+**1. Rate-matched, C51's *policy* is as stable as the scalar control.** `1e-5` is the repo default, so
+b25 and b30 ran there while the pilot swept to 25× it — the first version of this comparison pooled all
+eight pilot arms against a 1e-5 control and read "2.5× noisier", which was the rate, not the algorithm.
+At a matched rate the churn is 0.036-0.051 against 0.033-0.058, at every phase. Only `2.5e-4` is
+pathological, and it never settles.
+
+**2. The eval curve is still noisier at a matched rate** — `|Δtrailing|` 1.52 vs 0.66-0.92, drawdown 35.6
+vs 13.4-26.2 — but `1e-5` also has the *highest* trailing sd of any pilot group with the *shallowest*
+drawdown, which is the signature of an arm still climbing rather than one collapsing. **Drawdown depth is
+what scales monotonically with the rate** (35.6 → 60.7 → 66.3 → 67.8), and that is the quantity to watch.
+
+**3. So the trade-off is the finding, not the instability.** C51 at the control's rate is stable and too
+slow (peak 89.9 against 94.6-94.8 at 600k); buying speed with a larger rate buys churn in the same move.
+Anything that separates those two is the lever — **not** a smaller learning rate, which the screen already
+shows costs the peak.
+
+**Two hypotheses this closes cheaply.** The **support is not the problem**: mass on the outermost atoms is
+0.000-0.017, so `v_max=120` sitting above a ~104 maximum return is not clipping the projection. And the
+**actions are not near-tied**: the raw action gap is no *smaller* for C51 (5.5-12.9 against 5.9-8.4), so a
+flip is the value function moving, not a coin toss between equals.
+
+**The leading suspect is Adam's epsilon, on the argument rather than on a measurement.** `snek2.py` builds
+`Adam(learning_rate=learning_rate)` in both branches — Keras default `1e-7`. Dopamine's C51 uses
+**3.125e-4** and Rainbow 1.5e-4, ~3000× larger, deliberately. Adam steps by `lr·m̂/(√v̂ + ε)`, so where
+`√v̂ ≪ ε` the update stays proportional to the gradient instead of saturating at ±`lr`; a categorical head
+has 3×51 = 153 outputs against a scalar head's 3 and cross-entropy pushes mass at two atoms per sample, so
+far more coordinates are noise-dominated at any moment. That predicts exactly the observed shape — the
+signal needs a big step and the big step amplifies the noise — and a larger ε is what separates them.
+**Untested here**; the clean experiment is two seeds at `1e-4` with `ε=3.125e-4` against
+`c51pilotB-lr1e4seed1/2`, which are already a same-rate same-seed control.
+
+**A second, algorithm-independent amplifier is real and measured.** `training.epsilon_for` drives the
+refinement phase off the trailing perfect rate, so a dip re-injects exploration and deepens the dip.
+Upward epsilon reversals: **b25 = 0, 0, 0, 0** against **C51 = 2, 3, 4, 7, 7, 8, 10, 19**, with the
+`2.5e-4` arms at the exploration ceiling for 64-70% of the run. A ratchet that never lets the schedule
+regress once refinement is reached would decouple it, and that applies to every arm, not only C51's.
+
+**A third: `n_step_update=1`.** The effective atom count (`exp(entropy)`) sits at **29-40 of 51** all the
+way to the cap, so the predicted return distribution never sharpens — with γ=0.9975 and n=1 the value
+propagates ~400 steps one hop at a time. Rainbow uses n=3 for this. `SnekCategoricalDqnAgent` currently
+*raises* on `n_step_update>1`, so this is work rather than a knob, and it is third because part of that
+width is the genuine stochasticity of food placement.
 
 ## ‡‡ What moves best-30: turn IS off first, then widen — shaping and forking barely register
 
