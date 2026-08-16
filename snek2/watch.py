@@ -29,7 +29,7 @@ macOS has room to show some of that title. Both matter when several of these are
 which is the normal case with a batch of four arms running.
 
 Environment:
-    WATCH_FPS         frame rate cap (default 90; 0 for uncapped)
+    WATCH_FPS         frame rate cap (default 60; 0 for uncapped)
     WATCH_EPISODES    episodes to play, 0 for forever (default 0)
     WATCH_PERFECT_WAIT_MS  pause on a win (default 2000, long enough to see it)
     SNEK_TILE_PIXELS  pixels per tile, so 10x this is the window edge (default here 15)
@@ -87,7 +87,7 @@ def main(argv):
 
     policy_name = argv[1]
     pinned_step = int(argv[2]) if len(argv) > 2 else None
-    fps = int(os.environ.get('WATCH_FPS', 90))
+    fps = int(os.environ.get('WATCH_FPS', 60))
     max_episodes = int(os.environ.get('WATCH_EPISODES', 0))
     snake_constants.PERFECT_GAME_WAIT_MS = int(os.environ.get('WATCH_PERFECT_WAIT_MS', 2000))
 
