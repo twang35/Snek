@@ -236,10 +236,12 @@ Desktop status (2026-08-15): **b28a-d running** (4 trainers, the box's cap), **b
 each with close-out and HOF-500 auto-chained. b27e-h finished and closed out; ~6 h per batch at ~92 steps/s.
 Check with `git show origin/ops-status:status.json`.
 
-**The laptop is idle** — b30e-h finished at the 2M cap. Its close-out was never run (the laptop does not
-auto-chain evals), so b30 still owes a close-out before the shaping×architecture 2×2 is complete.
+**b30e-h is fully done** — finished at the 2M cap, then closed out (killed mid-run and resumed with
+`EVAL_RESUME=1`) and HOF-500 re-measured on the laptop on 2026-08-15, both null (0 of 10 checkpoints
+≥98%/500). The shaping×architecture 2×2 is complete; see the progress banner above and
+[`completedRuns.md`](completedRuns.md#batch-30--chase-safe-shaping-on-fc-200100100-c010-null-and-it-completes-the-shapingarchitecture-22).
 
-## Batch 30 — the same shaping on `fc 200,100,100` (b30e-h running on the laptop)
+## Batch 30 — the same shaping on `fc 200,100,100` (b30e-h done — close-out + HOF-500 null)
 
 Relaunched 2026-08-14 at 21:35 as **`b30e-h`** on the laptop, 4 arms, seeds 1-4 (a-d were void, see the
 banner above): **b27's config with the net changed to `200,100,100`** — `c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975,
@@ -250,8 +252,8 @@ one architecture.
 
 | | no shaping | `c=0.10`, gate 85 |
 |---|---|---|
-| **`fc 320`** | **b24** (closed — pooled 87.9, the record) | **b27** (running, desktop) |
-| **`fc 200,100,100`** | **b25** (closed — pooled 86.0, no ≥98%/500) | **b30** (running, laptop) |
+| **`fc 320`** | **b24** (closed — pooled 87.9, the record) | **b27** (done — null, 0/4 ≥98%/500) |
+| **`fc 200,100,100`** | **b25** (closed — pooled 86.0, no ≥98%/500) | **b30** (done — null, 0/10 ≥98%/500) |
 
 If shaping helps on both nets the effect is about the reward, not the architecture; if it helps only on
 `320`, the interesting quantity is the interaction, and that is a different experiment from either
