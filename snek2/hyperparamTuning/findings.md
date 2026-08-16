@@ -178,7 +178,7 @@ RL is intrinsically less stable here. It is not. Measured 2026-08-15 with
 |---|---|---|---|---|---|
 | c51 @ **1e-5** | 0.051 | 0.051 | 0.036 | 1.52 | 35.6 |
 | c51 @ `5e-5` | 0.112 | 0.059 | 0.057 | 2.43 | 60.7 |
-| c51 @ `1e-4` | — | — | — | 2.99 | 66.3 |
+| c51 @ `1e-4` seed 1 / seed 2 | 0.189 / 0.117 | 0.147 / 0.127 | **0.245** / 0.138 | 2.99 | 66.3 |
 | c51 @ **`2.5e-4`** | **0.207** | **0.197** | **0.225** | 2.38 | **67.8** |
 | **ddqn @ 1e-5** (`b30e`, `b30f`) | 0.042 / 0.056 | 0.035 / 0.058 | 0.033 / 0.056 | 0.66 | 13.4 |
 
@@ -211,7 +211,21 @@ has 3×51 = 153 outputs against a scalar head's 3 and cross-entropy pushes mass 
 far more coordinates are noise-dominated at any moment. That predicts exactly the observed shape — the
 signal needs a big step and the big step amplifies the noise — and a larger ε is what separates them.
 **Untested here**; the clean experiment is two seeds at `1e-4` with `ε=3.125e-4` against
-`c51pilotB-lr1e4seed1/2`, which are already a same-rate same-seed control.
+`c51pilotB-lr1e4seed1/2`, which are already a same-rate same-seed control, so it costs two arms rather
+than four.
+
+**`1e-4` is the rate to run that A/B at, and the churn table is why.** It churns **3-7× the control at
+every phase and never settles** — seed 1 goes 0.189 → 0.147 → **0.245**, worsening at the end, with its
+state set collected at mean snake length **9.8**, so it is dying almost immediately (this is the arm that
+finished at best-30 11.7). Yet seed 2 at the same rate reached 66.3 and was **still rising** at 599k. That
+combination is what makes the rate a good test bed: the defect is large and unambiguous while the rate can
+still learn, where at `2.5e-4` the arm is broken outright and a working fix could be invisible underneath
+whatever else has gone wrong.
+
+**Judge that A/B on churn and drawdown depth, not on `best_perfect30`.** The within-rate seed spread at
+`1e-4` is **54.6 pp**, so at n=2 the score cannot resolve anything — the same n=2 trap the screen above
+already fell into. Churn can: it is measured over 800 fixed states × 6 checkpoint pairs, and the effect
+being looked for is ~4× rather than a few pp.
 
 **A second, algorithm-independent amplifier is real and measured.** `training.epsilon_for` drives the
 refinement phase off the trailing perfect rate, so a dip re-injects exploration and deepens the dip.
