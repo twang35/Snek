@@ -676,11 +676,11 @@ relaunched after the fix, and are the only ones read above.
 ### ‡‡ Why gate 75 wins, at the board level: b29 keeps the board healthier at *every* length, and b27's failures arrive at the gate already broken
 
 The gate result above says gate 75 produces a region where gate 85 is null; it does not say *what the two
-policies do differently*. To answer that, [`gate_behavior.py`](../perDiagnostics/gate_behavior.py) replays the
+policies do differently*. To answer that, [`gate_behavior.py`](perDiagnostics/gate_behavior.py) replays the
 **seed-matched** checkpoint pairs — `b27e`/`b29a` (seed 1) and `b27f`/`b29b` (seed 2), only the gate differs —
 for **400 greedy episodes on one fixed seed**, so the two arms in a pair face the identical food sequence, and
 logs board-state metametrics at every step from length 40 up. There is no shaping at eval time, so every
-difference is what the arm *learned*. Figure: [`../charts/gate-behavior-b27-vs-b29.png`](../charts/gate-behavior-b27-vs-b29.png).
+difference is what the arm *learned*. Figure: [`charts/gate-behavior-b27-vs-b29.png`](charts/gate-behavior-b27-vs-b29.png).
 
 **Seed-matched, gate 75 wins on both seeds, and every loss is a starve — never a wall.**
 

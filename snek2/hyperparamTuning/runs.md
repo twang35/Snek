@@ -76,12 +76,12 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-16 10:42.**
+**Both hosts as of 2026-08-16 12:45.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **idle, 0 trainers.** `b32a-d` all reached their 1M cap; `b33a-d` stopped at 1.64-1.77M | b32's **churn re-measure at 1M** — the batch's primary readout, still only measured to 360k. A close-out is optional and b33 needs none |
-| **desktop** | **`b34a-d` running** (gate 70), ~180k of 2M at 92 steps/s, heartbeat 10:41, 0 evals; **`b35a-d` (gate 40) queued** behind it | nothing — both waves close-out and HOF-500 auto-chain; b35 starts when b34 frees the four slots |
+| **laptop** | **`b36a-d` running** (C51 on `fc 320`), launched 12:43, 3M cap, one window on `--arms b36` | b32's **churn re-measure at 1M** — its primary readout, still only measured to 360k. b36 will contend for cores with it; that is acceptable since the re-measure is minutes, not hours |
+| **desktop** | **`b34a-d` running** (gate 70), ~285k of 2M at 92 steps/s, heartbeat 10:41, 0 evals; **`b35a-d` (gate 40) queued** behind it | nothing — both waves close-out and HOF-500 auto-chain; b35 starts when b34 frees the four slots |
 
 `b32a-d` is the only thing between here and a verdict on Adam's `epsilon`, and it is one
 `c51_stability.py --end 1000000` run, not a close-out. Check the desktop with
@@ -167,6 +167,56 @@ cannot vote against its own rate.
 `b<n><letters>-` names, so four `c51pilot-*` arms would open four windows; the launcher uses the
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
+
+## Batch 36 — C51 on **`fc 320`**, one wide layer instead of three narrow — running on the laptop, 3M cap (2026-08-16)
+
+**Batch 32's config verbatim at `eps 1.5e-4`, with `SNEK_FC_LAYERS=320` the only change.** Four arms,
+seeds 1-4, **3M cap**, win reward back at its default 100, `lr 1e-4`, `ALGO=c51`, 51 atoms over
+`[-5, 120]`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no
+food-distance shaping. Launcher [`launch_c51_fc320.sh`](launch_c51_fc320.sh); graphs in
+[`charts.md`](charts.md).
+
+**Two controls, both already on disk, and they answer different questions.**
+
+| control | what it isolates | caveat |
+|---|---|---|
+| **`b32a`/`b32b`** — same `eps`, `lr`, seeds 1-2, `fc 200,100,100` | the **architecture**, one variable | only **1M** deep, so match at 1M before quoting anything |
+| **`b24a-d`** — `fc 320`, IS off, same seeds, 2M, closed out | **ddqn at this exact shape**: is C51 worth it at all | pooled 87.9 with **two ≥98%/500 records** — a high bar |
+
+**What the shape changes is *where* the parameters sit, not how many.** Obs 30 into 3×51 = 153 outputs:
+`fc 320` puts 48,960 of its ~58.9k parameters (**83%**) in the layer feeding the distribution, against
+15,453 of ~51.9k (**30%**) for `fc 200,100,100`. Total capacity rises only 13%, but two layers of gradient
+compounding disappear. **So churn is the reading, not level** — C51's defect here is instability.
+
+**3M is as much of the experiment as the shape.** No C51 arm has ever run past **1M**: the pilot stopped at
+600k, b31 at ~560k, b32 at its cap. b32's best-30 peaks landed at 353-865k and every b33 arm declined for
+1.4M steps after peaking, so **"does C51 hold or decay past 1M"** is open and expensive — if it decays,
+every future C51 batch can stop at ~1.2M for a third of the cost.
+
+### Pre-registered hypotheses, in order of what I expect
+
+1. **A null on the ceiling, a real drop in churn** — the base case. `findings.md` has nine shapes and
+   architecture never raising the ceiling, and shallower nets are better-conditioned. **Readout:** best-30
+   group mean within noise of b32's 70.0 at a matched 1M, churn at `--end 1000000` measurably below b32's
+   0.110. That outcome would say *depth was costing C51 stability and nothing else*, which is still useful
+   — it makes `fc 320` the default shape for C51 without claiming a better ceiling.
+2. **`fc 320` helps C51 more than it helped ddqn**, because 83% of the parameters now sit in the layer
+   feeding a 153-way categorical head, where for ddqn that layer produces 3 numbers. **Readout:** best-30
+   group mean clearly above 70 *and* the first C51 arm ever to hold a **≥98%/500** checkpoint. This is the
+   outcome worth the 3M.
+3. **Decay past ~1.2M**, the same shape b33 showed and b32 was capped too early to reveal. **Readout:**
+   peak best-30 before 1.2M followed by sustained decline. Note 1 and 3 are **not exclusive** — churn can
+   fall while the arm still decays, and that combination would point at the exploration-schedule ratchet
+   rather than the optimiser.
+
+**What would falsify the capacity story specifically** — and it is my own prior measurement, so it is the
+honest test: the deeper net's penultimate layer was **not** capacity-bound (effective rank **16-20 of 100**,
+head outputs 4-6 of 153). **If `fc 320`'s penultimate rank also comes out at 16-20, widening bought
+nothing** and any improvement is optimisation, not capacity. Cheap to check post-hoc with
+[`perDiagnostics/plasticity.py`](perDiagnostics/plasticity.py)'s feature-rank panel.
+
+**Judge in this order:** churn at a matched horizon, then best-30 against b32's 70.0 at 1M, then the
+≥98%/500 count at close-out against b24's two. **Not** `peak_trailing`, which is saturated at 95.
 
 ## Batch 33 — the win reward cut to 10 — stopped 2026-08-16, falsified
 

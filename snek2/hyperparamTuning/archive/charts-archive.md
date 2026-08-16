@@ -1307,3 +1307,49 @@ that would have lowered it requires finishing a game and 3.3% random actions nev
 that peaked at 81.4 trailing was never once measured completing the board.
 
 ---
+
+## Batch 27 — potential-based chase-safe shaping, `c=0.10`, gate 85 (b24 config) — *done, close-out null*
+
+The first arms to carry the new shaping term. `Snake.step` adds `c·(γΦ(s′) − Φ(s))` with **Φ = 1 iff the
+head and tail share a free region that also holds the food, and the snake is ≥85 long**; potential-based,
+so the optimal policy is untouched and only the gradient on the way there changes. Everything else is
+b24's config — `fc 320`, IS off, `td_error`, target period 1000, discount 0.9975, `FORK_BRANCHES=4`,
+seeds 1-4 — which makes **`b24a-d` the seed-matched control**. Cap **2M** (b24 ran 3M; its record
+checkpoints land at 1.03-1.39M). Design and the Phase 0 calibration of `c`:
+[the plan](../../plans/chase-safe-reward-shaping.md) and [`runs.md`](../runs.md).
+
+**Done at the 2M cap, closed out on the desktop — and it is a null.** The close-out pools **85.6 / 84.2 /
+83.2 / 88.0** (eq-effort, gate 95), **mean 85.2**, against the b24 control's **~87.9** — a shade *below*, not
+above. And on the metric that matters, **no b27 seed produced a ≥98%/500 checkpoint**: the auto-chained
+HOF-500 re-measure (gate 98, 500 episodes) found `b27e` empty, `b27f` a single 92.6% partial, `b27g` best
+96.6%, `b27h` best **97.5%** (435 ep) — all short of the bar the control cleared **twice** (`b24b`, `b24d`
+both 98.0%/500, the record). So `c=0.10` chase-safe shaping on `fc 320` did not reproduce the record, let
+alone beat it. All four healthy throughout (trailing 93.6-94.1, no dead or zero stretch), so the term is
+not destabilizing — it simply bought nothing. Close-out and HOF-500, shaped first, b24 control in
+parentheses:
+
+| arm | close-out pooled (control) | HOF-500 best (≥98% held) |
+|---|---|---|
+| `b27h-chase10g85seed4` | **88.0** (`b24d` 85.97) | 97.5% @1945k, 435 ep — **0 held** |
+| `b27e-chase10g85seed1` | 85.6 (`b24a` 89.03) | none reached the gate |
+| `b27f-chase10g85seed2` | 84.2 (`b24b` 88.84) | 92.6% @1431k (partial) — 0 held |
+| `b27g-chase10g85seed3` | 83.2 (`b24c` ~87.8) | 96.6% @1975k — 0 held |
+| **mean** | **85.2 (≈87.9)** | **0 of 4 ≥98%/500 (control: 2 of 4)** |
+
+Read together with b30 (same `c=0.10`, other net, also a dead-heat-to-slightly-behind after the early edge
+washed out), **both architectures agree that `c=0.10` chase-safe shaping does not help.** Whether that is
+the idea or the dose is exactly what **b28** (`c=0.20`, above) is running to answer; **b29** (gate 75) is
+queued behind it.
+
+![b27e](../charts/b27e-chase10g85seed1.png)
+**b27e-chase10g85seed1**
+
+![b27f](../charts/b27f-chase10g85seed2.png)
+**b27f-chase10g85seed2**
+
+![b27g](../charts/b27g-chase10g85seed3.png)
+**b27g-chase10g85seed3**
+
+![b27h](../charts/b27h-chase10g85seed4.png)
+**b27h-chase10g85seed4** — first filled board at step 8k, and the first arm whose epsilon left the 0.0125
+ceiling.
