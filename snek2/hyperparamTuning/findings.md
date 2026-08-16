@@ -198,10 +198,47 @@ slow (peak 89.9 against 94.6-94.8 at 600k); buying speed with a larger rate buys
 Anything that separates those two is the lever — **not** a smaller learning rate, which the screen already
 shows costs the peak.
 
-**Two hypotheses this closes cheaply.** The **support is not the problem**: mass on the outermost atoms is
-0.000-0.017, so `v_max=120` sitting above a ~104 maximum return is not clipping the projection. And the
-**actions are not near-tied**: the raw action gap is no *smaller* for C51 (5.5-12.9 against 5.9-8.4), so a
-flip is the value function moving, not a coin toss between equals.
+**One hypothesis this closes cheaply.** The **support's *range* is not the problem**: mass on the outermost
+atoms is 0.000-0.017, so `v_max=120` sitting above a ~104 maximum return is not clipping the projection.
+
+**~~And the actions are not near-tied~~ — corrected 2026-08-16. Most of them are; it just does not matter.**
+The original claim rested on the *mean* action gap being no smaller for C51 (5.5-12.9 against 5.9-8.4). That
+comparison is still valid, but the absolute reading was wrong, because the gap distribution is violently
+**bimodal** and the mean sits in neither mode. Measured over 3,000 states on `b32c` and `c51pilotB-lr1e4seed2`
+(spacing 2.5, `FOOD_REWARD` 1.0 = **0.40 atoms**):
+
+| percentile | gap, reward units | gap, atoms |
+|---|---|---|
+| 25% | 0.11 | 0.05 |
+| **50%** | **0.28** | **0.11** |
+| 75% | 42.7 | 17.1 |
+
+**59-67% of states have a gap under one atom.** But splitting by length shows where they are:
+
+| length | median gap | atoms | share < 1 atom |
+|---|---|---|---|
+| 1-49 | 0.27 | 0.11 | **79%** |
+| 50-84 | 1.01 | 0.40 | 57% |
+| **85-94** | **62.8** | **25.1** | **17.7%** |
+
+So the sub-atomic gaps are early-game open-board states where several moves genuinely are interchangeable —
+the grid correctly reporting that the choice does not matter — while the endgame this project has established
+decides games carries **25-atom** gaps. **Grid resolution is not binding where it counts**, and a flip in the
+lower mode is not a mistake.
+
+**That is also why shrinking `PERFECT_GAME_REWARD` to buy finer atoms is the wrong trade.** The win reward is
+correctly identified as what forces a 125-unit support and hence 2.5 spacing at 51 atoms — but the 62.8-unit
+endgame gap *is* the +100 being in or out of reach. At win=10 with support `[-5, 30]` (spacing 0.7) that gap
+becomes ~6.3 units ≈ **9 atoms**, so resolution on the decisions that matter gets ~2.8× *worse* in exchange
+for improving the ones that do not. Worse, at γ=0.9975 delaying the win 100 steps costs `100·(1−0.9975¹⁰⁰)`
+≈ **22** reward at win=100 and **2.2** at win=10, which cuts the pressure to finish fast 10× — and endgame
+hunting speed is [the elite-vs-mediocre discriminator](#-what-the-record-checkpoints-do-differently-they-find-food-in-the-endgame-and-that-is-nearly-all-of-it)
+(p90 steps/meal 5-13 for the records against 86-226), with starvation the modal failure at median length
+98 (glance table above).
+**The clean way to test resolution is `num_atoms` 51 → 201 at constant reward** (spacing 0.625, a meal = 1.6
+atoms): one variable, objective untouched, every existing comparison still valid, and nearly free in learning
+terms since the head's outputs already occupy only ~5 of 153 dimensions. Ranked **below** the
+exploration-schedule ratchet, because of the table above.
 
 **The leading suspect is Adam's epsilon, on the argument rather than on a measurement.** `snek2.py` builds
 `Adam(learning_rate=learning_rate)` in both branches — Keras default `1e-7`. Dopamine's C51 uses

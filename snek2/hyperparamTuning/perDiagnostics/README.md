@@ -17,6 +17,21 @@
 | `return_distribution.py` | `<out.json> <ckpt-or-policy> <episodes-per-seed> <seed[,seed...]>` | the distribution of the **discounted return from each visited state**, by outcome and by length band — the Phase 0 measurement that sizes C51's `[v_min, v_max]` grid and `num_atoms` |
 | `c51_stability.py` | `--policy <name> [--policy ...] [--states N] [--points K] [--stride S] [--end STEP]` | whether a chaotic eval curve is a **policy that keeps changing its mind** or a stable policy seen through a noisy 10-episode sample — greedy-action churn on a fixed state set, the action gap, how far the value function moves per `stride` steps, and (c51 only) boundary-atom mass and effective atom count |
 
+| `atom_resolution.py` | `<policy> [<policy> ...]` | whether the atom **spacing** is coarse relative to the decisions the policy makes — action-gap percentiles in reward units and in atoms, and the share of states under one atom, broken down by snake length |
+
+`atom_resolution.py` is the range/resolution counterpart to the above: `c51_stability.py` shows the
+support's *range* is right (boundary mass ~0), this asks whether its *spacing* is. Two rules for reading it,
+both learned the hard way:
+
+- **Never quote the mean.** The gap distribution is violently bimodal — median 0.28 reward units against a
+  75th percentile of 42.7 — so the mean sits in neither mode. A mean-based reading is exactly what produced
+  the retracted "the actions are not near-tied" claim in `findings.md`.
+- **The length breakdown settles it, the pooled share does not.** 59-73% of states have a sub-atom gap, which
+  sounds alarming until it is split by length: those states are early open-board play where several moves
+  genuinely are interchangeable, while length 85-94 carries **25-atom** gaps. Resolution is not binding where
+  games are decided, which is why shrinking `PERFECT_GAME_REWARD` to narrow the support is a bad trade — that
+  endgame gap *is* the +100 being in or out of reach.
+
 `c51_stability.py` is the script that separated C51's instability from C51 itself. It reads any arm of
 either algorithm — `build_eval_agent` dispatches on `arch.json` — so a categorical arm and a scalar one
 are measured by the identical code path, which is the whole point. Three things about reading it:
