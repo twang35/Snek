@@ -74,6 +74,23 @@ def main(argv):
     # reduced variance and a roughly repeatable run, not bit-identical replay — see seed_process.
     seed = tuned('SEED', None, int)
     learning_rate = tuned('LEARNING_RATE', 1e-5)
+    # Adam's `epsilon`, defaulted to Keras's own 1e-7 so every arm before batch 32 is reproduced
+    # exactly and a ddqn run is untouched unless this is set deliberately.
+    #
+    # It is not merely a divide-by-zero guard. Adam steps by `lr * m/(sqrt(v) + eps)`, so `eps` is the
+    # gradient magnitude below which the update stops being scale-invariant and goes back to being
+    # proportional: above it a parameter moves ~`lr` per step whatever its gradient, below it a small
+    # gradient buys a small step. At 1e-7 essentially every parameter is in the first regime, so a
+    # coordinate driven by nothing but batch noise still takes a full-size step in the noise's
+    # direction.
+    #
+    # That is a much bigger deal for a categorical head than a scalar one — 3*51 = 153 outputs against
+    # 3, and the projected target puts its mass on ~2 atoms per sample, so most atom-logits carry a
+    # small noisy gradient at any moment. The reference implementations do not use the framework
+    # default here: Dopamine's published C51 pairs lr 2.5e-4 with eps 3.125e-4, Rainbow 6.25e-5 with
+    # 1.5e-4. Batch 32 tests both against b31's measured churn. See
+    # hyperparamTuning/findings.md.
+    adam_epsilon = tuned('ADAM_EPSILON', 1e-7)
 
     # batch_size = 64
     batch_size = tuned('BATCH_SIZE', 128, int)
@@ -369,7 +386,8 @@ def main(argv):
             min_q_value=v_min,
             max_q_value=v_max,
             epsilon_greedy=epsilon,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate,
+                                               epsilon=adam_epsilon),
             target_update_period=agent_target_update_period,
             target_update_tau=target_update_tau,
             gradient_clipping=gradient_clipping or None,
@@ -384,7 +402,8 @@ def main(argv):
             train_env.action_spec(),
             q_network=q_net,
             epsilon_greedy=epsilon,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate,
+                                               epsilon=adam_epsilon),
             td_errors_loss_fn=common.element_wise_huber_loss,
             target_update_period=agent_target_update_period,
             target_update_tau=target_update_tau,
@@ -516,6 +535,7 @@ def main(argv):
         'zeroed_observations': (','.join(str(i) for i in sorted(ZERO_OBS_INDICES))
                                 if ZERO_OBS_INDICES else 'none'),
         'learning_rate': learning_rate,
+        'adam_epsilon': adam_epsilon,
         'batch_size': batch_size,
         'discount': discount,
         'target_update_period': agent_target_update_period,
