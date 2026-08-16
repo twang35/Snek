@@ -15,6 +15,21 @@
 | `plasticity_probe.py` | `<out.json> <policy> [stride] [extra] [boards]` | whether the checkpoint can still **fit a new target**, which is the question the signatures are only correlates of |
 | `plasticity_analysis.py` | `<payload_dir> [out.png\|-] [probe_dir]` | the tables and figure from both: control→peak→end, drawdown events, flat stretches, early-vs-late, and the paired probe trend |
 | `return_distribution.py` | `<out.json> <ckpt-or-policy> <episodes-per-seed> <seed[,seed...]>` | the distribution of the **discounted return from each visited state**, by outcome and by length band — the Phase 0 measurement that sizes C51's `[v_min, v_max]` grid and `num_atoms` |
+| `c51_stability.py` | `--policy <name> [--policy ...] [--states N] [--points K] [--stride S] [--end STEP]` | whether a chaotic eval curve is a **policy that keeps changing its mind** or a stable policy seen through a noisy 10-episode sample — greedy-action churn on a fixed state set, the action gap, how far the value function moves per `stride` steps, and (c51 only) boundary-atom mass and effective atom count |
+
+`c51_stability.py` is the script that separated C51's instability from C51 itself. It reads any arm of
+either algorithm — `build_eval_agent` dispatches on `arch.json` — so a categorical arm and a scalar one
+are measured by the identical code path, which is the whole point. Three things about reading it:
+
+- **Churn is per `--stride` steps, so two arms are only comparable at the same stride**, and it falls as
+  a policy converges, so `--end` exists to anchor both arms at the same *phase* rather than at the same
+  distance from their cap. A tail-only reading answers a different question from the one a mid-training
+  swing raises, and on this pilot the two readings disagreed.
+- **The state set is per arm**, collected from that arm's newest sampled checkpoint, so `len` (mean snake
+  length over the set) is printed to make a mismatch visible rather than silently averaged away.
+- **One arm is not a measurement.** The first run of this script compared a single C51 arm against a
+  single ddqn arm and read 0.077 against 0.035; adding a second seed of each put both algorithms at
+  0.033-0.058 at matched learning rate. The state collection is itself a sample.
 
 `return_distribution.py` needs two things read before its numbers are used. It sets
 **`SNEK_FOOD_DISTANCE_REWARD=0`, not the repo default of 0.001**, because every config since batch 17
