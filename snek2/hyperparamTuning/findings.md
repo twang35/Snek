@@ -101,6 +101,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A seed number is a stable unit of quality across configs | **falsified** — batch 11's best seed became batch 13's worst |
 | The same `SNEK_SEED` reproduces a run | **falsified** — same seed and config diverge in weights inside 1000 steps; `cpprb`'s sampling RNG is unseeded and unseedable |
 | The epsilon *ratchet* was a real defect | **standing**, on mechanism: no recovery from a collapse |
+| **‡‡ The best-30 lever order: IS off (+22) ≈ β→0.1 ≫ widen the net (+10) ≈ drop food-distance shaping (+13) ≫ forking (+3-9, one seed −33) ≫ chase-safe shaping (~0)** | **synthesised 2026-08-15**, seed-matched pairs across b16-b30. IS off is the whole story below the ceiling and **saturates at β→0.1**; above ~92 best-30 stops separating a record-holder from a null (b24 96.2 → 2 records, b25 94.2 / b30 92.9 → **0**). See below |
 
 **Measurement**
 
@@ -123,6 +124,45 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
 
 ---
+
+## ‡‡ What moves best-30: turn IS off first, then widen — shaping and forking barely register
+
+**Reading `best_perfect30` across the b16-b30 era, paired (seeds 1-4) wherever a batch pair changed one
+knob, horizon-matched within each pair.** best-30 is the near-ceiling primary metric (lowest between-seed
+variance up there) and a *leading indicator* of a record — it ranked batch 24's four HOF outcomes correctly
+— so what raises it is worth stating in one place.
+
+| lever | comparison | Δ best-30 | seeds better |
+|---|---|---|---|
+| **Turn IS off** (β→1.0 cancels PER; off restores it) | b22 vs b20 control (`50,100,50`) | **+22.2** | 4/4 |
+| β→0.1 (captures almost all of the IS gain) | b23 vs b20 control | +21.8 | 4/4 |
+| **Remove food-distance shaping** | b16 vs b14 (crosses the era) | +12.6 | 4/4 |
+| **Widen the widest layer**, IS-off | `50,100,50`→`320` (b22→b24) | +10.0 | monotone |
+| β→0.5 (partial IS) | b21 vs b20 control | +10.1 | 3/4 |
+| Forking | b17 vs b16 | +3 to +9 | 3/4 (one seed **−33**) |
+| **Chase-safe shaping** `c=0.10` | b30 vs b25 | −0.7 | **0/4** |
+
+**IS is the whole story below the ceiling, and it saturates.** Turning importance sampling off — restoring
+the prioritization that [β→1.0 silently cancels](#-measured-batches-19-20-compared-aggressive-per-against-uniform-replay)
+— is worth **+22 pp**, four times any other single knob. But nearly all of it is already bought at
+**β→0.1**: IS-off vs β→0.1 is +0.4, a dead heat. So the ladder is β→1.0 (64) → β→0.5 (74) → {β→0.1, IS-off}
+(~86), and it flattens there.
+
+**Above that, only width still moves it**, and it tracks the *widest layer*, not the parameter count:
+`50,100,50` 86 → `100,100` 88 → `200,100,100` 94 → `320` 96 — `100,100` has more parameters than `320` and
+gains far less ([the widest-layer finding](#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)).
+
+**Forking helps the seeds that train normally and blows one up.** b17 (forking) vs b16 (identical, forking
+off): seeds 2-4 gained +7.7 / +9.3 / +2.7, seed 1 collapsed −33 (never reached ε ≤ 0.003). The mean is
+negative and the batch is [officially unmeasured](#forked-endgame-collection-null-at-60-of-the-intended-dose-and-the-premise-it-was-built-on-is-false),
+but the signal on the healthy seeds is a real +3 to +9. **Chase-safe shaping does nothing**, 0 of 4 seeds,
+matching [the records](#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
+
+**Two caveats on the metric itself.** (1) It **compresses near the top and stops discriminating what you
+actually want**: above ~92 a 3.3 pp best-30 gap is the difference between b24's *two* records and b25/b30's
+*zero* — best-30 leads a record, it does not prove one, and ≥98%/500 still decides. (2) **Horizon inflates
+it** — it is the best window over the whole run, so a 3M arm reads higher than a 2M or 1.25M arm for
+nothing. The paired rows above control for both; raw cross-batch means do not.
 
 ## Network shape: the sweep is complete — nine shapes, and architecture never raises the ceiling
 
