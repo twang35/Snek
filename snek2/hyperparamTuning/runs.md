@@ -57,21 +57,24 @@ landed (full numbers and graphs in [`charts.md`](charts.md)):
   control), and the close-out agrees: pooled equal-effort **83.3 mean** (84.3 / 84.3 / 83.8 / 81.0) against
   b25-r2's ~86.1, so **~2.8 behind its seed-matched control** — the same direction and size as b27's 85.2 vs
   87.9 on `fc 320`. **Two architectures, two nulls-or-worse for `c=0.10`.** Ten checkpoints reached ≥98% at
-  *100* episodes (6 / 3 / 1 / 0), best 99.0% — but that is not the ≥98%/**500** gate, and b25's own 99.0%/100
-  rows fell to 92.7-96.4% under it. **b30 still has no HOF-500 pass**; that is what would settle the
-  shaping×architecture 2×2 on the decisive metric, and it needs a free slot.
+  *100* episodes (6 / 3 / 1 / 0), best 99.0% — but that is not the ≥98%/**500** gate. **The HOF-500 pass has
+  since run and is empty**: every one of its ten candidates was abandoned under gate 98 before 500 episodes,
+  best partial `b30e` @651k **96.1% at 285 episodes**, then `b30g` 95.3% and `b30f` 90.9%. So the
+  shaping×architecture 2×2 is complete and `c=0.10` produced **no record-tier checkpoint on either net** —
+  the write-up is in [`completedRuns.md`](completedRuns.md) and
+  [`findings.md`](findings.md#-chase-safe-reward-shaping-is-null-to-negative-at-c010--two-architectures-agree).
 - **b28a-d (desktop): running, 262-275k of 2M (~13%), all four healthy** — epsilons off the ceiling
   (0.003-0.005), no zero stretch. The `c=0.20` dose rung, and a dead heat with the control this early
   (matched ≤275k best-30 **56.9 vs 57.4**). Since both `c=0.10` batches came back null, **b28 is the arm
   that decides "wrong idea" vs "dose too small to see."**
-- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: b30e-h's close-out finished at 15:05 —
-  all four `complete`, pooled equal-effort 83.8 / 84.3 / 84.3 / 81.0 — and the C51 pilot below launched at
-  15:06.**
+- **b29 (gate 75): queued** behind b28 on the desktop. **Laptop: b30e-h closed out at 15:05, then the C51
+  pilot's eight arms ran to their 600k cap and handed off to batch `b31` at 20:09 — the laptop now holds
+  `b31a-d` (C51, 2M).**
 
 **Timing.** b28a-d reach 2M in ~5.5 h at ~92 steps/s. Desktop memory sits well inside the band (4 trainers
 + forked self-evals). Check the desktop with `git show origin/ops-status:status.json`.
 
-## C51 pilot — eight arms on the laptop, handing off to batch `b31` by itself (2026-08-15)
+## C51 pilot — closed at 600k, and it handed off to batch `b31` by itself (2026-08-15)
 
 Distributional RL, phase 3 of
 [`../plans/distributional-c51.md`](../plans/distributional-c51.md). The implementation is committed
@@ -96,10 +99,11 @@ step size). **The gate to phase 4 is one learning rate.**
 also the one place this project's "never more than 4 trainers" rule is knowingly suspended; it was the
 user's call, for this screen only.
 
-### The handoff to `b31` runs unattended
+### The handoff to `b31` ran unattended, and worked
 
-**`launch_c51_batch.sh b31` is detached and waiting.** When the last pilot arm stops it picks the rate,
-launches four seeds at 2M, regenerates the tables below, and commits. Written this way because cron jobs
+**`launch_c51_batch.sh b31` fired at 20:09**, ~3h20m after it was armed: all eight pilot arms reached the
+600k cap, it picked `5e-5`, launched `b31a-d` at 2M, regenerated the tables below and pushed the result as
+`c45e8a4f` — with nobody watching any of it. Written this way because cron jobs
 in this tool are session-only and fire only while the REPL is idle, so nothing scheduled can be relied on
 once the session closes — a detached `nohup` can.
 
@@ -150,6 +154,28 @@ cannot vote against its own rate.
 `b<n><letters>-` names, so four `c51pilot-*` arms would open four windows; the launcher uses the
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
+
+## Batch 31 — C51 at `lr 5e-5`, `fc 200,100,100`, seeds 1-4 — running on the laptop (2026-08-15)
+
+**The first C51 batch**, launched 20:09 by the pilot's own handoff. b25's config verbatim plus
+`ALGO=c51` (51 atoms over `[-5, 120]`, KL priority) at the pilot's chosen rate, **2M cap**, seeds 1-4 —
+so **`b25a-d`-r2 is the seed-matched control at zero extra compute**.
+
+**Status 21:22 — 245-280k of 2M (~13%), all four healthy** (epsilons 0.0074-0.0089, no zero stretch, peak
+trailing 85-90) and **behind the control at the matched horizon: mean best-30 21.4 vs 36.3 (−14.9), 1 of 4
+seeds ahead.** Graphs and the per-arm table are in [`charts.md`](charts.md).
+
+**That is "slower to start", not "worse", and the distinction is load-bearing here.** best-30 at 13% of
+the cap measures *when* an arm began winning, and the pilot showed C51 arriving late and then climbing
+hard — its best arm was still rising at the 600k cap. **The verdict is the 2M close-out's ≥98%/500 count.**
+On this control that criterion is **one-sided**: b25 produced *no* record-tier checkpoint, so a c51 record
+is a clear win while no c51 record says nothing. If it comes back flat, the honest next question is the
+horizon rather than another c51 knob — b24's records land at 1.03-1.39M and b25's arms never got there at
+all.
+
+**Timing.** ~3.4 h to 2M at four arms on the laptop, so it finishes around 23:30. Its close-out is **not**
+auto-chained (that is a desktop feature), so someone has to run one: 4 parallel `top20` processes at
+`EVAL_WORKERS=4`, per the standing instruction.
 
 ## Batch 27 / 28 / 29 — potential-based chase-safe shaping (b27e-h running on the desktop)
 

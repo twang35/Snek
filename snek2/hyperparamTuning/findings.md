@@ -30,6 +30,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
+| **‡ A C51 learning-rate screen at n=2 could not separate `1e-5` from `1e-4`** — within-rate seed spread 57.6 pp against a 30.5 pp spread between rate means | **measured 2026-08-15**. `2.5e-4`+ is out (collapse); `5e-5` chosen for `b31` on consistency, not on being best. Time-to-first-win predicted nothing (ρ=0.05). See below |
 
 **Records and the horizon**
 
@@ -124,6 +125,45 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
 
 ---
+
+## ‡ The C51 learning-rate screen: the seed spread beat the rate effect, and time-to-first-win predicted nothing
+
+Eight arms, four rates × two seeds, all to a 600k cap on b25's config plus `SNEK_ALGO=c51`
+(51 atoms over `[-5, 120]`). Run 2026-08-15 to pick one rate for batch `b31`; the picker's rule and the
+generated tables are in [`charts.md`](charts.md) and `runs/c51pilot_lr_choice.json`.
+
+| rate | mean best-30 | **spread between its two seeds** | mean `sef` | what it did |
+|---|---|---|---|---|
+| `5e-5` | **69.5** | **4.4** | **12.6** | the only rate whose seeds agreed. Both peaked early (256k, 269k) and plateaued |
+| `1e-5` | 56.5 | **57.6** | 3.6 | contains the **best single arm of the eight** — 85.3, and *still rising* at the cap |
+| `1e-4` | 39.0 | **54.6** | 5.3 | bimodal like `1e-5`: one arm 66.3 and still rising at 599k, one 11.7 |
+| `2.5e-4` | 4.0 | 3.4 | 0.0 | **broken.** Max single eval 30-40%, and seed 1 collapsed to `zero_since=599000` |
+
+**The two findings are about the method, not the rate.**
+
+**1. At n=2 the between-seed spread is twice the between-rate effect, so "5e-5 won" is weaker than it
+reads.** Within-rate spread reaches **57.6 pp**; the spread between the *means* of the three rates that
+work at all is **30.5 pp**. `5e-5` won the ranking mostly by being *consistent* — its two seeds differ by
+4.4 — not by being best, and the highest-scoring arm in the whole screen came from the rate that placed
+second. This is the ~10 pp / n=4 rule biting harder at n=2: the docs' own sd of 0.67 for `best_perfect30`
+was measured on same-config arms near the ceiling at 2-3M steps, and it does not transfer to 600k screens
+where arms are still climbing.
+
+**2. Time to the first perfect game carries no information about where an arm ends up — Spearman
+ρ = 0.05 over the eight arms.** The fastest starter (`1e-4` seed 1, first win at **8k**, faster than
+b25's ~9k) finished at best-30 **11.7**; the slowest (`1e-5` seed 1, first win at **141k**) finished at
+**85.3**, the best of the screen. That was the C51 plan's own second question, and it should not be used
+to select a rate again — a mid-screen reading of it called `1e-5` "under-stepping" and the same arms
+falsified that within four hours.
+
+**Three arms had not stopped improving at 600k** (`1e-5` seed 1 peaking at 579k, `1e-4` seed 2 at 599k),
+so for those two rates the **cap** rather than the rate may be what bounded them. A screen that ends
+while a third of its arms are still climbing cannot rank them; the horizon has to be past the plateau,
+which for `5e-5` was ~270k and for the slower rates is beyond 600k.
+
+**What is safe to take from it:** `2.5e-4` and above is out — that failure is consistent across seeds and
+one arm collapsed outright. Everything between `1e-5` and `1e-4` is unresolved, and `5e-5` is the
+defensible pick because it reaches its plateau ~2x sooner and does so from both seeds.
 
 ## ‡‡ What moves best-30: turn IS off first, then widen — shaping and forking barely register
 
