@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-17T08:45:02",
-  "ts": 1786981502.7337072,
+  "iso": "2026-08-17T08:45:37",
+  "ts": 1786981537.0530705,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,18 +18,45 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 4,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b35c-chase10g40seed3-hof",
-      "type": "eval",
-      "policy": "b35c-chase10g40seed3",
-      "pid": 3659325,
-      "step": 2000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2713
+      "id": "b37a-chase10g75seed5",
+      "type": "train",
+      "policy": "b37a-chase10g75seed5",
+      "pid": 3699879,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b37b-chase10g75seed6",
+      "type": "train",
+      "policy": "b37b-chase10g75seed6",
+      "pid": 3699880,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b37c-chase10g75seed7",
+      "type": "train",
+      "policy": "b37c-chase10g75seed7",
+      "pid": 3699881,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b37d-chase10g75seed8",
+      "type": "train",
+      "policy": "b37d-chase10g75seed8",
+      "pid": 3699882,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -214,12 +241,12 @@
     "b35d-chase10g40seed4-closeout": "done",
     "b35a-chase10g40seed1-hof": "done",
     "b35b-chase10g40seed2-hof": "done",
-    "b35c-chase10g40seed3-hof": "running",
+    "b35c-chase10g40seed3-hof": "done",
     "b35d-chase10g40seed4-hof": "done",
-    "b37a-chase10g75seed5": "queued",
-    "b37b-chase10g75seed6": "queued",
-    "b37c-chase10g75seed7": "queued",
-    "b37d-chase10g75seed8": "queued",
+    "b37a-chase10g75seed5": "running",
+    "b37b-chase10g75seed6": "running",
+    "b37c-chase10g75seed7": "running",
+    "b37d-chase10g75seed8": "running",
     "b37a-chase10g75seed5-closeout": "queued",
     "b37b-chase10g75seed6-closeout": "queued",
     "b37c-chase10g75seed7-closeout": "queued",
@@ -231,8 +258,8 @@
   },
   "disk_free_gb": 132.0,
   "load_avg": [
-    4.146484375,
-    4.24658203125,
-    5.31787109375
+    3.759765625,
+    4.16455078125,
+    5.2509765625
   ]
 }
