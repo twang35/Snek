@@ -81,7 +81,7 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
 | host | state | owed |
 |---|---|---|
 | **laptop** | **`b36a-d` running** (C51 on `fc 320`), ~1.8-1.96M of 3M, all four alive (trailing ~90, best-30 84-87, epsilon annealed to ~0.003-0.006) | b32's **churn re-measure at 1M** — its primary readout, still only measured to 360k. b36 is now past the 1M mark the C51-decay question needs, so read both when b36 closes |
-| **desktop** | **`b34a-d` done** (gate 70 — closed out + HOF-500, **null**, [below](#batch-34--chase-safe-c010-gate-70--done-on-the-desktop-null)); **`b35a-d` (gate 40) now running**, ~60-66k of 2M at ~61 steps/s, heartbeat 21:06 | nothing — b35 close-out and HOF-500 auto-chain |
+| **desktop** | **`b35a-d` (gate 40) running**, ~60-66k of 2M at ~61 steps/s, heartbeat 21:06; **`b34a-d` done** (gate 70 — **null**, [below](#batch-34--chase-safe-c010-gate-70--done-on-the-desktop-null)); **`b37a-d` (b29 replication, seeds 5-8) queued** at priority 30 behind b35 | nothing — every wave close-out and HOF-500 auto-chain; b37 starts when b35 frees the four slots |
 
 `b32a-d` is the only thing between here and a verdict on Adam's `epsilon`, and it is one
 `c51_stability.py --end 1000000` run, not a close-out. Check the desktop with
@@ -327,6 +327,30 @@ collapses the record region. All four healthy throughout (peak 95.00, no zero st
 **band around 75**, not a threshold: 85 null, 75 records, 70 null again. Full numbers and per-arm table in
 [`completedRuns.md`](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold);
 finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
+
+## Batch 37 — **b29 replication on fresh seeds 5-8** — *queued on the desktop behind b35 (2026-08-16)*
+
+**Exact b29 config, new seed draw — is the gate-75 record region reproducible, or were seeds 1-2 lucky?**
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping,
+chase-safe `c=0.10`, **gate 75**, 2M cap — every env var identical to b29, only `SNEK_SEED` changes (5, 6, 7,
+8 for `b37a-d`). Queued to `ops` at priority 30; starts when b35 frees the box's four slots, close-out and
+HOF-500 auto-chained.
+
+**Why it matters.** b29's whole result — the new project record — rests on a **21-checkpoint ≥98%/500 region
+that appears in only 2 of its 4 seeds** (`b29a` 3, `b29b` 18), while `b29c`/`b29d` held none. b34 (gate 70) then
+produced **0 across 4 seeds**, and its near-misses were on *different* seeds (3, 4) than b29's winners (1, 2).
+So the gate-75 effect could be a genuine narrow sweet spot **or** two lucky seeds; n=4 cannot tell them apart.
+A fresh draw of four seeds at the exact same config is the direct test.
+
+| outcome | reading |
+|---|---|
+| b37 produces a ≥98%/500 region comparable to b29's 21 | the config is **robust** — gate 75 reliably reaches the record tier, seeds 1-2 were not special |
+| b37 produces a few isolated ≥98%/500 checkpoints (like b24's 2) | gate 75 **helps but the record *region* was partly seed-luck** — real effect, inflated headline |
+| b37 produces 0, like b34 | b29's region was **lucky seeds**; the gate-75 result does not generalise and needs re-examining |
+
+**No seed-matched control** — no b24-family arm ran on seeds 5-8 — so judge b37 on its **aggregate ≥98%/500
+count and record-band width against b29's**, not seed-by-seed, and not on pooled/best-30 (which do not
+discriminate up here). Check the desktop with `git show origin/ops-status:status.json`.
 
 ## Batch 35 — chase-safe `c=0.10`, **gate 40** — *running on the desktop (2026-08-16)*
 
