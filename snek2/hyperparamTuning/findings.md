@@ -31,6 +31,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
 | **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported, at half the size first reported**: on a *shared* state set b32 cuts churn **0.119 → 0.088 (−26%)** paired at 600k, 4 of 4, flat to 1M — the 360k figures below were on per-arm sets and inflated ~2×. No dose effect. See below |
+| **‡‡ After four fixes C51 is still well behind `ddqn` at its own architecture — `b24`, not `b32`, is the control** | **corrected 2026-08-17**. `b24a-d` (`ddqn`, **same `fc 320`**): best-30 **95.3-96.7**, `sef` **60.5-73.2**, and **every seed has a ≥98% checkpoint inside 2M**. `b36a-d` (c51, `fc 320`): **84.0-86.7**, `sef` **17.4-24.7**, best 91.6-97.0, **no seed ≥98%**. `fc 320` is a real gain **over `b32`** (+9 to +24 pp, spread 14.0 → 2.7) and that much stands; the "four seeds finally agree" reading does not, since both `ddqn` batches sit at 1.4 pp. `sef` at 3× does not overlap |
+| **‡‡ A C51 head starts at the grid midpoint — 57.5, against a true value of ~34 — and it cost b36 nothing** | **measured 2026-08-17**. Five c51 arms *descend* to 32.4-36.0 and the `ddqn` control *ascends* to 33.96, so ~34 is the truth and the init is **1.7× optimistic**. Harmless because the offset is **common-mode**: `b36a`'s action gap is at full scale (14.91) at 8k while `V` is 21 too high, and it scores 45 at 8k / 92 at 127k regardless. **`SNEK_C51_ZERO_INIT=1` would be a mild pessimization** — 0 is *further* from 34 than 57.5 is, and its λ=0.162 ramp starts the head sharper (`aeff` 6.7) than any trained net here ever gets. Wash-out is `ln(0.5)/ln(γ)` per target refresh — **277k predicted, 233-335k measured** — so it is the discount's clock, not the algorithm's. See below |
 | **‡ Cross-arm churn requires `--states-from`; every per-arm figure comparing arms of different quality is inflated ~2×** | **corrected 2026-08-16**. `churn` depends on the action gap, which is ~0.2 early-game against 20-24 in the endgame, so a weak arm that dies early is scored on near-tied states that flip for free. b32's controls carried state-set mean lengths of **11.9 and 21.2** against the treated arms' 34.9-38.0. On a shared champion set the effect halves but survives, and **gap stops explaining churn** — the highest-gap arm of the six is now a control. Within-arm trends across phases are unaffected |
 | **‡‡ A terminal reward must clear `W > 1/(1 − γ^k)` (`k` = steps per meal) or progress lowers value** — at γ=0.9975 that is **34-58** at the realistic pace, so the shipped `PERFECT_GAME_REWARD=100` clears it 2-3× and **10 misses it 3-6×** | **derived and measured 2026-08-16** by b33. Every meal costs the win-10 arm **1.7-4.4** points of `V` while paying 1, so it correctly avoids finishing. **The win reward is the potential, not the prize** — its job is keeping `V` rising as the board fills. Shrinking `W` requires shrinking γ. See below |
 | **‡‡ Falsified: shrinking the win reward 100 → 10 does not buy C51 resolution-for-free** | **measured 2026-08-16**, b33 vs a paired b32 control. Best-30 **18.3-25.3 vs 77.0/63.0**; the 2.8× atom-per-food gain arrived and bought nothing, so **spacing is not the C51 constraint**. It stalls (32-42 steps/meal at length 95+ vs 2.0) and dies of geometry — **73-90% collisions, not starvation**, 44 of 48 losses still winnable a median 1 move from death. See below |
@@ -357,6 +359,138 @@ were an early-training transient is answered: the gap persists, it just was neve
 **Every churn number in this file measured before 2026-08-16 used per-arm state sets** and carries the same
 inflation whenever it is used to compare *arms of different quality*. Within-arm trends across phases are
 unaffected, since the set is fixed for that arm.
+
+## ‡‡ A C51 head starts at the grid midpoint, not at 0 — and it cost b36 nothing, because the `ddqn` control's init is *further* from the truth
+
+Every c51 arm in this project began believing an arbitrary state was worth **57.5**, because the atom
+logits start near-uniform and the expected value of a uniform distribution on `[-5, 120]` is its
+midpoint. A scalar `ddqn` head starts at Q ≈ 0 instead. `plans/distributional-c51.md` pre-registered
+this as "the one new confound the grid creates", shipped `SNEK_C51_ZERO_INIT` to remove it, defaulted it
+**off**, and deferred the decision to a phase-2 wash-out measurement. This is that measurement, from
+[`perDiagnostics/init_optimism.py`](perDiagnostics/init_optimism.py) — 1500 states from the `b29b`
+champion (mean length 46.5), 15 log-spaced checkpoints per arm, `V = mean_s max_a Q`:
+
+| arm | algo | V at first ckpt | V final | initial error | half-life of the error | washed out (±2) |
+|---|---|---|---|---|---|---|
+| fresh net, standard init | c51 | **58.52** | — | **+24.5** | — | — |
+| fresh net, `ZERO_INIT=1` | c51 | **0.07** | — | **−34.0** | — | — |
+| `b36a` | c51 | 56.66 @8k | 35.61 | +21.1 | **277k** | 918k |
+| `b36b` | c51 | 59.11 @15k | 33.21 | +25.9 | 335k | 1392k |
+| `b36c` | c51 | 57.57 @13k | 34.80 | +22.8 | 260k | 979k |
+| `b36d` | c51 | 57.59 @13k | 32.38 | +25.2 | 320k | 1313k |
+| `b32a` | c51 | 58.17 @8k | 35.96 | +22.2 | 233k | 708k |
+| **`b30e`** | **`ddqn`** | **0.39 @7k** | **33.96** | **−33.6** | **481k** | **2000000** |
+
+Half-life is a least-squares fit of `log|excess|` against step over the rungs with `|excess| > 3`, not a
+two-point ratio — `excess` is taken against the arm's own final checkpoint, so it is 0 there by
+construction and the last rungs are a noise floor that would otherwise set the slope.
+
+**Three independent lines put the true value at ~34, so the +24.5 is real.** Five c51 arms *descend* to
+32.4-36.0 and the scalar control *ascends* to 33.96 — two algorithms, opposite directions, same answer
+within ±2. Independently, `return_distribution.py`'s Phase 0 measurement put a champion's median
+discounted return at **27.99**, and this state set is length-46.5, above the median. The standard init is
+therefore optimistic by about **1.7×**.
+
+**But it did not cost b36 anything, and the control is why.** Three findings, in the order that matters:
+
+#### 1. Zero-init would have been *further* from the truth, not closer
+
+`|57.5 − 34| = 23.5` against `|0 − 34| = 34`. The knob was designed to match the `ddqn` control's init,
+on the reasoning that a matched init removes a confound — but the control's init is the *worse* of the
+two on this reward scale. **The measured evidence says the default was right and the knob as specified is
+a mild pessimization.** If a centered init is ever wanted, target the measured value scale (~30, λ≈0.022
+from `zero_init_lambda`'s bisection), not 0.
+
+#### 2. The offset is common-mode across actions, so the greedy policy is untouched
+
+This is the mechanism, and it is the whole answer to "was it detrimental". `argmax_a Q(s, a)` is
+invariant to anything added equally to all actions, and the action gap says the offset is exactly that:
+**`b36a`'s gap is 14.91 at 8,000 steps against 12.36 at 2M** — already at full scale while `V` is 21
+units too high. So the arm plays well long before its values are calibrated, and the eval curve proves
+it: **`avg_score` 45.0 at 8k and 92.3 at 127k, both carrying a +19 to +21 offset.** A miscalibrated
+level and a broken policy are different failures, and only the second one matters to the score.
+
+#### 3. The wash-out time is the discount, not the algorithm
+
+A uniform value offset contracts by γ per bootstrap, and the target refreshes every 1,000 steps, so the
+predicted half-life is `ln(0.5)/ln(0.9975) ≈ 277` refreshes ≈ **277k steps**. The five c51 arms measure
+**233-335k, mean 285k** — and `b36a` measures **277k** exactly.
+The prediction lands, which means **no amount of init tuning shortens this** — it is `SNEK_DISCOUNT` and
+`SNEK_TARGET_UPDATE_PERIOD` setting the clock. The control makes the point unarguable: `b30e` starts
+it needs **481k** per halving — 1.7× the c51 mean — and its full 2M steps to arrive. **The categorical
+arms corrected a 24-unit error faster than the scalar arm corrected a 34-unit one.**
+
+**A second thing the knob would break, which the plan did not anticipate.** A single linear bias ramp
+`bias_i = −λ(z_i − v_min)` sets the mean and the spread with **one** parameter, so it cannot move one
+without moving the other. Targeting E[Q]=0 needs λ=0.162, which puts **70% of the initial mass on the
+bottom 3 atoms** and an effective atom count of **6.7 of 51** — *sharper than any trained network in this
+project ever becomes* (b36 settles at `aeff` 20.9-24.6). So `ZERO_INIT=1` starts a distributional head
+more confident than its own converged state, and training would have to broaden it back out. The standard
+init instead starts at `aeff` **49.9**, i.e. maximum ignorance, and sharpens monotonically — which is the
+right direction of travel for a distribution. Targeting ~30 keeps both right (λ≈0.025 → `aeff` 36).
+
+**What this cannot establish.** No arm has run with the ramp, so this compares init *positions* against a
+measured truth, not two trained populations. The claim is not "zero-init would score worse" — it is that
+zero-init starts further from the answer, in the wrong entropy regime, and cannot beat a clock the
+discount sets. The `ddqn` control is also not an exact match (`fc 200,100,100`, `CHASE_SAFE` c=0.10), but
+potential-based shaping shifts `V` by `−c·Φ ≤ 0.10`, which is negligible against 34.
+
+**One incidental observation worth a follow-up, not a conclusion.** The categorical head reaches full
+action separation almost immediately — gap **14.91 at 8k** — while the scalar control climbs from **1.68
+at 7k** to 12.33 only by 2M. It is not yet clear that this is an advantage rather than an artifact of
+c51's inflated early value scale, and it has bought nothing so far: **`b30e`'s batch beats b36 on every
+metric** (see the note below). `fc 320` also *holds*
+the optimism longer than `fc 200,100,100` does (b36c/b36d rise to 58.7-58.9 by ~80-110k before
+descending, where `b32a` is down to 52 by 23k) — n=1 architecture, so noted only.
+
+## ‡‡ After four fixes, C51 is still well behind the scalar head **at its own architecture** — and `b24`, not `b32`, is the control
+
+**A correction to how the b36 result was first read.** b36's training numbers were compared against
+`b32a`/`b32b`, its paired c51 predecessors, which made `fc 320` look like the best thing in the project.
+The decisive control is **`b24a-d`: `ddqn` at `fc 320`, the identical architecture**, same observation era,
+same `discount 0.9975`, `target_update_period 1000`, `n_step 1`, `alpha 0.6`, `FOOD_DISTANCE_REWARD 0`, no
+chase-safe shaping, IS off. It is not close:
+
+| batch | algo | best-30 per seed | spread | `sef` | best ckpt ≤2M | pooled |
+|---|---|---|---|---|---|---|
+| **`b24a-d`** | **`ddqn` `fc 320`** | **95.3, 96.0, 96.7, 96.7** | 1.4 pp | **60.5-73.2** | **98.0, 99.0, 99.0, 100.0** | **85.97-89.03** (3M) |
+| `b36a-d` | c51 `fc 320` ε1.5e-4 | 84.0, 84.7, 86.0, 86.7 | 2.7 pp | 17.4-24.7 | 91.6, 94.0, 95.0, **97.0** | 74.77-80.19 (2M) |
+| `b38a-d` | c51 `fc 320` ε3.125e-4 | 80.0, 84.3, 87.3, 88.3 | 8.3 pp | 17.8-29.3 | *running* | *running* |
+| `b32a-b` | c51 `fc 200,100,100` | 77.0, 63.0 (≤1M) | 14.0 pp | 10.3-16.1 | never closed out | — |
+| `b30e-h` | `ddqn` `fc 200,100,100` | 92.3, 92.3, 93.3, 93.7 | 1.4 pp | 55.0-58.4 | 99.0 (e) | 83.75 (e, 2M) |
+
+**`sef` is the reading, and it is a factor of 3.** It is the metric with the lowest between-seed variance
+in this folder — chosen for exactly that — and **60.5-73.2 against 17.4-24.7** does not overlap at all.
+best-30 is +10 pp. **The best-checkpoint column is horizon-matched exactly** (`best_of` over rows at
+≤2M only), so it needs no caveat: every b24 seed produced a ≥98% checkpoint inside b36's horizon and no
+b36 seed did.
+
+**So the claim that survives is narrow.** `fc 320` is a real improvement *over `b32`* — +9 to +24 pp of
+best-30, seed spread 14.0 → 2.7 — and that stands as a result about the architecture *within C51*. But
+**the seed-agreement claim does not generalise**: both `ddqn` batches sit at **1.4 pp**, tighter still, so
+four seeds agreeing is not something C51 bought.
+
+**This is the standing state of the C51 investigation after four rounds of fixes** — the learning rate
+(the chaos was the rate, not C51), Adam ε (−26% churn), the win reward (falsified), and now `fc 320`. Each
+fixed something real, and C51 is still behind a scalar head at the same shape. **The init optimism above is
+now excluded as the remaining explanation**: it is common-mode, it costs the policy nothing, and the
+control's init starts *further* from the truth.
+
+**Three caveats, stated because two of them favour C51 and one does not.**
+
+- **The learning rate differs by 10× (`1e-5` vs `1e-4`) and this is not a confound to remove** — it is
+  itself a finding: C51 at the control's rate is *stable and too slow* (peak 89.9 vs 94.6). Both arms run
+  at their own best known rate, which is the decision-relevant comparison even though it is not
+  one-variable. Adam ε also differs (1e-7 vs 1.5e-4) for the same reason.
+- **The horizons differ, 3M against 2M, so the pooled column is not comparable** — a longer arm pools
+  more late checkpoints, and b24's late ones were strong (a record at 2.86M), so 3M pooled is if anything
+  *favourable to b24*. The pooled figures are listed for completeness; the ≤2M best-checkpoint column is
+  the one that carries the argument. **`sef` shares the horizon problem** (it is a fraction of each arm's
+  own evals): b24 at 3.00M against b36 at 1.87-2.02M, and **b38's row at 2.27-2.36M is not strictly
+  comparable to either**, which is why b38 is listed and not leaned on.
+- **b36 was stopped at 2M by choice, not by collapse** — trailing held 91-93 — so a 3M b36 could close
+  part of the pooled gap. It could not close the `sef` gap, which is already a factor of 3 over the
+  region where both were running.
 
 ## ‡‡ Falsified 2026-08-16: shrinking the win reward 100 → 10 does not buy C51 stability — it teaches the agent that winning is a mistake
 

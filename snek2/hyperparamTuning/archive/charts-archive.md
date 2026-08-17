@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-17 | 33 | batch 38 (Adam ε 3.125e-4 on `fc 320`) launched; batch 33 is closed and falsified, so it went ahead of the still-live b32 control and the contiguous gate ladder |
 | 2026-08-17 | 31 | batch 35's results (gate 40) landed; retired ahead of the strict-oldest 28-29 because 31 is a void arm with no close-out and the gate ladder is kept contiguous for the incoming b37 |
 | 2026-08-16 | 30 | batch 34's results (gate 70) landed; batch 30 retired to keep six + the C51 pilot |
 | 2026-08-16 | 26 | batch 33 (win reward 10) landed; batch 26 became the seventh-newest |
@@ -28,6 +29,70 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 33 — a filled board pays **10**, not 100 — *stopped at 1.64-1.77M of 3M: the largest single-knob regression measured here*
+
+**`SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, otherwise batch 32's config at `eps 1.5e-4`, seeds
+1-4.** `b32a`/`b32b` are an exact paired control differing only in the win reward. Launched 01:32,
+stopped 10:04 on 2026-08-16 at the user's call, no close-out — the training curves settle it. Launcher
+[`launch_win10.sh`](../launch_win10.sh); full write-up in [`completedRuns.md`](../completedRuns.md), mechanism in
+[`findings.md`](../findings.md#-falsified-2026-08-16-shrinking-the-win-reward-100--10-does-not-buy-c51-stability--it-teaches-the-agent-that-winning-is-a-mistake).
+
+| arm | step | best-30 | at | trailing now | `sef` | final ε |
+|---|---|---|---|---|---|---|
+| `b33b` | 1640k | 25.3 | 238k | 73.6 | 0.0 | 0.0102 |
+| `b33c` | 1772k | 22.3 | 150k | 78.1 | 0.1 | 0.0115 |
+| `b33a` | 1732k | 20.3 | 179k | 76.4 | 0.1 | 0.0110 |
+| `b33d` | 1708k | 18.3 | 353k | 67.9 | 0.1 | 0.0104 |
+| **`b32a`** control | 1000k | **77.0** | 724k | 84.3 | 16.1 | 0.0035 |
+| **`b32b`** control | 1000k | **63.0** | 865k | 69.4 | 10.3 | 0.0035 |
+
+**Every arm peaks by 353k and declines for the next 1.4M steps.** That shape is the reading: the better it
+fits the objective, the worse it plays.
+
+**The motivation was resolution, it was delivered, and it bought nothing.** The win is what forces a
+125-unit support, so at 51 atoms a meal is **0.40 atoms**; at `v_max=40` it is **1.11**. Measured on the
+trained arm: **1.22 atoms per food against the control's 0.44**, the 2.8× as designed. So **atom spacing is
+not what limits C51 here.**
+
+**Why it fails, in one line.** Every meal of progress moves board-fill up a notch and moves `V` **down
+1.7-4.4 points** while the meal pays 1 — so `Q(don't eat) > Q(eat)` and the agent correctly avoids
+finishing. The control's `V` moves **+4.4 to +12.1** over the same bands. The threshold is
+`W > 1/(1 − γ^k)`, which at γ=0.9975 and 7-12 steps per meal is **34-58**: 100 clears it, 10 does not.
+
+**Two things this is *not*.** The board-fill input is **rank 1 of 30** by saliency in both arms, so it is
+not being ignored; and the endgame action gap is **19.8-24.3, larger than `V` itself**, so the actions are
+not near-tied. Measured with [`perDiagnostics/endgame_gradient.py`](../perDiagnostics/endgame_gradient.py) —
+which also found that **indices 18-20, "this move wins", are constant zeros in 0.000-0.025% of states**,
+so neither arm learns to win from them. An earlier reading of this batch as a *calibration* failure was
+withdrawn the same day: against the optimal value the net is 9-16% optimistic, which is ordinary.
+
+**What that looks like on the board**, greedy, 60 episodes each:
+
+| arm | outcomes | median steps/meal at 95+ | starve headroom | `chase_safe` |
+|---|---|---|---|---|
+| `b33a` @852k | 44 coll / 4 starve / **12 perfect** | **32.5** | 468 | 0.054 |
+| `b33b` @1640k | 54 / 4 / 2 | 33.5 | 466 | 0.044 |
+| `b33c` @1772k | 44 / 14 / 2 | 42.5 | 458 | 0.051 |
+| `b33d` @1708k | 53 / 3 / 4 | 36.0 | 464 | 0.052 |
+| **`b32a` @724k** control | **5 / 0 / 55** | **2.0** | 498 | 0.158 |
+
+It **stalls** two meals short and dies of **geometry, not the clock** — 44 of 48 lost episodes still
+winnable a median **1 move** before death at median length 96, with 458-468 steps of starve budget in
+hand. **The predicted urgency collapse is confirmed and larger than predicted (16-21×, not 10×); the
+predicted *symptom* — starvation — is wrong**, and that correction is the transferable part.
+
+![b33a](../charts/b33a-c51win10seed1.png)
+**b33a-c51win10seed1** — paired with `b32a`. Best-30 20.3 @179k, then 1.55M steps of decline
+
+![b33b](../charts/b33b-c51win10seed2.png)
+**b33b-c51win10seed2** — paired with `b32b`. The batch's best at 25.3, still a third of its control
+
+![b33c](../charts/b33c-c51win10seed3.png)
+**b33c-c51win10seed3** — peaks earliest (150k) and starves most (14 of 60)
+
+![b33d](../charts/b33d-c51win10seed4.png)
+**b33d-c51win10seed4** — the weakest, best-30 18.3
 
 ## Batch 31 — **C51** at `lr 5e-5`, 2M — *stopped at 538-569k, no close-out*
 

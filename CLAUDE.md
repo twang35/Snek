@@ -300,9 +300,9 @@ comm -23 /tmp/have /tmp/doc   # anything listed is undocumented
 **Both details in that snippet are load-bearing.** `archive/charts-archive.md` has to be in the grep or
 every retired arm reads as undocumented, and the `sed` must be `s|.*charts/||` — archived captions link
 `../charts/x.png`, which the shorter `s|charts/||` leaves as `../x`. **A few PNGs will always be listed** —
-five as of 2026-08-15 (`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities`,
-`plasticity-metrics`, `best30-drivers`): they are diagnostic figures referenced from `findings.md`, not arm
-charts. **The authoritative list is the one in `charts.md`'s own completeness note**, which sits next to the
+six as of 2026-08-17 (`champion-vs-mediocre`, `drawdown-b23b-vs-b18`, `per-b18-vs-b20-priorities`,
+`plasticity-metrics`, `best30-drivers`, `gate-behavior-b27-vs-b29`): they are diagnostic figures referenced
+from `findings.md`, not arm charts. **The authoritative list is the one in `charts.md`'s own completeness note**, which sits next to the
 snippet and is updated when a figure is added; this count read "four" for a while because `best30-drivers`
 was added there and not here.
 

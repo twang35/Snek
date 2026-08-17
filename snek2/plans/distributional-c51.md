@@ -322,6 +322,26 @@ arm and its control**, which is exactly what this folder's protocol exists to pr
 Recommendation: **ship the knob, default it off, and decide from phase 2** — if the optimism visibly
 delays the first learning, the ramp becomes the default for phase 4 and the write-up says so.
 
+**‡ Decided 2026-08-17, and the answer is keep the default off — the knob is a mild pessimization.**
+Measured with [`perDiagnostics/init_optimism.py`](../hyperparamTuning/perDiagnostics/init_optimism.py)
+over five c51 arms and a `ddqn` control on one shared 1500-state set. Full account in
+[`findings.md`](../hyperparamTuning/findings.md); three things this section got wrong or could not know:
+
+- **The true value is ~34, so `0` is further from it than `57.5` is** (34.0 against 23.5). The knob was
+  specified to match the control's init; the control's init is the *worse* of the two on this reward
+  scale. Five c51 arms descend to 32.4-36.0 and `b30e` ascends to 33.96, which is what pins it.
+- **"Not obviously harmful" was right, and the reason is that the offset is common-mode.** `b36a` carries
+  a +21 offset at 8,000 steps with its action gap already at full scale (14.91 against 12.36 at 2M), and
+  scores 45.0 there — `argmax` is invariant to a constant added to every action.
+- **The ramp changes the spread as well as the mean, which this section did not consider.** One λ sets
+  both, so E[Q]=0 forces `aeff` **6.7 of 51** — sharper than any trained net in this project reaches
+  (b36 settles at 20.9-24.6). Standard init starts at 49.9 and sharpens monotonically, which is the right
+  direction for a distribution. **Target ~30 (λ≈0.025) if a centered init is ever wanted, not 0.**
+
+The wash-out the section asked for is **233-335k steps per halving**, matching `ln(0.5)/ln(γ)` per target
+refresh (277k) — so it is `SNEK_DISCOUNT` and `SNEK_TARGET_UPDATE_PERIOD` that set this clock, and no
+init choice shortens it.
+
 ## The priority signal: KL, not cross-entropy
 
 Upstream returns nothing, so this is a free choice. **Use `KL(target ‖ prediction) = CE − H(target)`,

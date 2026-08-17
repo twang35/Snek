@@ -16,7 +16,7 @@ following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **thes
 `master` as it stands.** Each came from a batch close-out or, for batches 24 and 29, its 500-episode HOF
 re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the batch-24 and batch-29 entries are the only
 non-default architecture here (`fc 320`)** and load because `arch.json` (copied in with each) rebuilds the
-recorded net — see [`../CLAUDE.md`](../CLAUDE.md) on the `arch.json` sidecar.
+recorded net — see [`CLAUDE.md`](../../CLAUDE.md) on the `arch.json` sidecar.
 
 **`b29b` @1447k edges `b24d` (98.0%/500) on the point estimate and their CIs overlap** — a narrow lead, taken
 as the record under this folder's 500-episode standard exactly as `b24d` was taken over `b18b`. What sets it

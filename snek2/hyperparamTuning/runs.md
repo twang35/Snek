@@ -172,7 +172,13 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
-## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — chained behind b36's close-out (2026-08-16)
+## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — **running, past 2.27M of 3M** (2026-08-17)
+
+**Reading so far: the null is holding and the spread is worse.** Best-30 **80.0 / 84.3 / 87.3 / 88.3**
+straddles b36's 84.0-86.7 with a mean within a point, but the **spread is 8.3 pp against b36's 2.7**, so the
+higher dose did not tighten anything. `sef` 17.8-29.3 is not yet comparable — these arms are at 2.27-2.36M
+against b36's 1.87-2.02M and `sef` is a fraction of each arm's own evals. Per-arm numbers and graphs in
+[`charts.md`](charts.md#batch-38--adam-ε-3125e-4-on-b36s-fc-320--running-past-227m-of-3m).
 
 **`launch_b38_eps3125.sh`, identical to b36 with `SNEK_ADAM_EPSILON=3.125e-4` the only change**, seeds 1-4,
 3M cap. `b36a-d` is therefore an exact seed-matched control and this is a clean one-variable dose comparison.
@@ -202,7 +208,16 @@ PYTHONPATH=. python hyperparamTuning/perDiagnostics/c51_stability.py \
 
 **b36 stopped at 2M, so match there** rather than at b38's 3M cap.
 
-## Batch 36 — C51 on **`fc 320`** — **stopped at 2M, close-out running** (2026-08-16)
+## Batch 36 — C51 on **`fc 320`** — **closed out: beats `b32`, loses to `b24` by a factor of 3 on `sef`** (2026-08-17)
+
+**Verdict, so this section can be read at a glance before the detail below.** Close-out complete at gate 95:
+pooled **74.77-80.19**, best checkpoints **91.6 / 94.0 / 95.0 / 97.0**, **no arm produced a ≥98% checkpoint**
+so there is no HOF-500 to run. Against `b32` this is a clear architecture win (best-30 84.0-86.7 vs 77.0/63.0,
+seed spread 14.0 → 2.7 pp). Against **`b24` — `ddqn` at the same `fc 320`** — it is not close: best-30
+**95.3-96.7**, `sef` **60.5-73.2 against 17.4-24.7**, and every b24 seed had a ≥98% checkpoint *inside 2M*.
+[Findings](findings.md#-after-four-fixes-c51-is-still-well-behind-the-scalar-head-at-its-own-architecture--and-b24-not-b32-is-the-control).
+**Init optimism is measured and excluded** as the remaining C51 suspect —
+[here](findings.md#-a-c51-head-starts-at-the-grid-midpoint-not-at-0--and-it-cost-b36-nothing-because-the-ddqn-controls-init-is-further-from-the-truth).
 
 **Batch 32's config verbatim at `eps 1.5e-4`, with `SNEK_FC_LAYERS=320` the only change.** Four arms,
 seeds 1-4, **3M cap**, win reward back at its default 100, `lr 1e-4`, `ALGO=c51`, 51 atoms over
@@ -215,7 +230,7 @@ food-distance shaping. Launcher [`launch_c51_fc320.sh`](launch_c51_fc320.sh); gr
 | control | what it isolates | caveat |
 |---|---|---|
 | **`b32a`/`b32b`** — same `eps`, `lr`, seeds 1-2, `fc 200,100,100` | the **architecture**, one variable | only **1M** deep, so match at 1M before quoting anything |
-| **`b24a-d`** — `fc 320`, IS off, same seeds, 2M, closed out | **ddqn at this exact shape**: is C51 worth it at all | pooled 87.9 with **two ≥98%/500 records** — a high bar |
+| **`b24a-d`** — `fc 320`, IS off, same seeds, **3M**, closed out | **ddqn at this exact shape**: is C51 worth it at all | pooled **85.97-89.03** with **two ≥98%/500 records** — a high bar, and b36 did not clear it |
 
 **What the shape changes is *where* the parameters sit, not how many.** Obs 30 into 3×51 = 153 outputs:
 `fc 320` puts 48,960 of its ~58.9k parameters (**83%**) in the layer feeding the distribution, against
@@ -274,12 +289,19 @@ nothing** and any improvement is optimisation, not capacity. Cheap to check post
 
 **Four arms at `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, stopped at 1.64-1.77M of 3M.** Best-30
 **18.3-25.3 against the paired b32 control's 77.0 and 63.0** — the largest single-knob regression measured
-here. The cause is not the optimiser: the network's own `V` at length 95-97 is **16.65** against a win that
-pays **10.0**, so greedy play *declines the win* and stalls two meals short until it collides. The 2.8×
-atom-per-food gain the batch was run for arrived and bought nothing, so **atom spacing is not C51's
-constraint**. Design, predictions, and which of them survived:
+here. The cause is not the optimiser: **every meal of progress lowers `V` by 1.7-4.4 while paying 1**, so
+`Q(don't eat) > Q(eat)` and the agent correctly avoids finishing. The general rule is
+**`W > 1/(1 − γ^k)`** — at γ=0.9975 and 7-12 steps per meal that is **34-58**, so 100 clears it and 10 does
+not. The 2.8× atom-per-food gain the batch was run for arrived and bought nothing, so **atom spacing is not
+C51's constraint**. Design, predictions, and which of them survived:
 [`completedRuns.md`](completedRuns.md#batch-33--the-win-reward-cut-to-10-falsified-and-it-found-a-general-rule-about-terminal-rewards).
-**Do not revisit** — and check `V(pre-terminal)` against the terminal payoff before moving either.
+**Do not revisit** — and check the threshold before moving either the win reward or γ.
+
+**‡ An earlier version of this pointer said "greedy play *declines the win*" and that `V` was miscalibrated.
+Both were withdrawn on 2026-08-16** and the retraction had not reached this file. `V` is within **9-16%** of
+the *optimal* value; the first diagnosis compared it against the realised on-policy return, which a
+Q-learning agent is not estimating. The defect is the value gradient's **sign**, not its level. **Its chart
+section was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when b38 launched.**
 
 ## Batch 32 — Adam's `epsilon` on C51 — **closed 2026-08-16: it works at −26% churn, the dose does not matter**
 
