@@ -1,0 +1,19 @@
+{
+  "id": "b37a-chase10g75seed5",
+  "type": "train",
+  "policy": "b37a-chase10g75seed5",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "5",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75"
+  },
+  "max_steps": 2000000,
+  "priority": 30,
+  "notes": "Exact replication of b29 (fc 320, IS off, td_error, target 1000, discount 0.9975, FORK_BRANCHES=4, chase-safe c=0.10, gate 75, 2M) on a fresh seed draw (5-8). b29 produced a 21-checkpoint >=98%/500 region across seeds 1-2 while gate 70 (b34) produced 0; this batch tests whether that record region reproduces on new seeds or was seed-luck. No seed-matched b24 control exists for seeds 5-8, so judge on the aggregate >=98%/500 count and record-band width against b29's, not seed-by-seed."
+}
