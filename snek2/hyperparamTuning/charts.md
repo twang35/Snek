@@ -1,16 +1,15 @@
 # Charts
 
-Progress graphs for the most recent batches — **28, 31, 32, 33, 34 and 36**, a cap of six, newest first,
+Progress graphs for the most recent batches — **28, 32, 33, 34, 35 and 36**, a cap of six, newest first,
 plus the **C51 pilot** as a temporary seventh while its arms are still a live control. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
-Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched, and
-**batch 30** followed when 34's results arrived.
+Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched, **batch 30**
+followed when 34's results arrived, and **batch 31** (a void, stopped C51 arm) when 35's arrived.
 
-**`b35` (gate 40) is a desktop batch still in training and has no section here yet** — its PNG lives on the
-box and arrives with its results, so it is entered when the results branch is copied in. That is a tracked
-gap, not a missed one; see [`runs.md`](runs.md) for its status. **`b34` (gate 70) closed and is entered
-below.**
+**`b35` (gate 40) closed and is entered below; `b34` (gate 70) is here too.** The gate-ladder batches
+(28-29, 34, 35) are kept contiguous for the incoming `b37` replication rather than retiring the strict-oldest
+of them — batch 31 went instead, being a void arm with no close-out.
 
 **Older sections are retired, not deleted.** Batches 1-11 are in
 [`archive/batches1-11.md`](archive/batches1-11.md) and anything retired since is in
@@ -110,6 +109,43 @@ churn reading against b32 are what decide it.
 
 ![b36d](charts/b36d-c51fc320seed4.png)
 **b36d-c51fc320seed4**
+
+## Batch 35 — chase-safe `c=0.10`, **gate 40** — *done on the desktop: null, and the sweet spot at 75 is isolated*
+
+**The gate ladder's deep rung: `b29`'s config with `SNEK_CHASE_SAFE_GATE=40`, everything else identical** —
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, `c=0.10`, 2M cap, seeds 1-4.
+Holds the per-flip dose at 0.10 (the calibration clamp) and moves only the gate, so the total episode dose
+rises ~2.5× vs gate 85.
+
+**Null on the record metric — yet the highest pooled of any shaped batch.** Pooled equal-effort **88.2**
+(88.6 / 85.9 / 90.7 / 87.6), above b29's 87.8, b34's 86.4 and the b24 control's 87.9, but **0 of the 3 measured
+seeds held any ≥98%/500 checkpoint** (best partials abandoned at 96-97% over 310-367 episodes; `b35c`'s HOF-500
+was still running at check time). So across four gates — 85, 75, 70, 40 — **only 75 records**; the sweet spot
+is a narrow, isolated band, and mid-game shaping (40) lifts the *average* board without buying the record-tier
+endgame. **Consolidation and the record tier are decoupled.** All four arms healthy throughout (peak 95.00, no
+zero stretch). Full read:
+[`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever);
+per-arm table in [`completedRuns.md`](completedRuns.md#batch-35--chase-safe-c010-gate-40-null--the-sweet-spot-at-75-is-isolated-not-a-plateau).
+`sef` is on a 2M horizon, comparable to the b28/b29/b34 waves.
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|
+| `b35c-chase10g40seed3` | 97.7 | 59.7 | **90.7** | HOF-500 running (best full 100% @1166k /100) |
+| `b35a-chase10g40seed1` | 96.0 | 47.4 | 88.6 | best 96.2% @1409k (319 ep, ab.) — **0 held** |
+| `b35d-chase10g40seed4` | 96.7 | 61.3 | 87.6 | best 97.0% @1480k (367 ep, ab.) — **0 held** |
+| `b35b-chase10g40seed2` | 94.7 | 62.8 | 85.9 | best 96.5% @1353k (310 ep, ab.) — **0 held** |
+
+![b35c](charts/b35c-chase10g40seed3.png)
+**b35c-chase10g40seed3** — highest pooled of any shaped batch; HOF-500 still running
+
+![b35a](charts/b35a-chase10g40seed1.png)
+**b35a-chase10g40seed1**
+
+![b35d](charts/b35d-chase10g40seed4.png)
+**b35d-chase10g40seed4**
+
+![b35b](charts/b35b-chase10g40seed2.png)
+**b35b-chase10g40seed2** — weakest seed
 
 ## Batch 34 — chase-safe `c=0.10`, **gate 70** — *done on the desktop: null, gate 75 is a narrow sweet spot*
 
@@ -311,35 +347,6 @@ that reading supported is [retracted](findings.md#-the-c51-arms-chaos-is-the-lea
 
 ![b32d](charts/b32d-c51eps3125e4seed2.png)
 **b32d-c51eps3125e4seed2** — `eps 3.125e-4`, seed 2
-
-## Batch 31 — **C51** at `lr 5e-5`, 2M — *stopped at 538-569k, no close-out*
-
-**The first C51 batch, and void.** b25's config verbatim plus `ALGO=c51` (51 atoms over `[-5, 120]`, KL
-priority) at the rate [`pick_c51_lr.py`](pick_c51_lr.py) chose from the pilot, seeds 1-4, 2M cap. Killed at
-23:10 after `c51_stability.py` showed the chaos these curves show is the **learning rate, not C51** — which
-made 2M at a rate chosen under the old reading not worth four slots. **No close-out was run**, by decision.
-
-| arm | step | best-30 | `sef` | peak trail |
-|---|---|---|---|---|
-| `b31d-c51lr5e5seed4` | 569k | **71.7** | 16.5 | 92.86 |
-| `b31a-c51lr5e5seed1` | 555k | 66.7 | 9.5 | **94.86** |
-| `b31b-c51lr5e5seed2` | 538k | 53.3 | 1.7 | 92.26 |
-| `b31c-c51lr5e5seed3` | 562k | 21.0 | 0.0 | 89.76 |
-
-All four healthy at the kill (no zero stretch). The **50.7 pp best-30 spread at one config** is the n=4
-noise problem restated, not a result — which is the other reason not to spend a close-out on it.
-
-![b31a](charts/b31a-c51lr5e5seed1.png)
-**b31a-c51lr5e5seed1**
-
-![b31b](charts/b31b-c51lr5e5seed2.png)
-**b31b-c51lr5e5seed2**
-
-![b31c](charts/b31c-c51lr5e5seed3.png)
-**b31c-c51lr5e5seed3**
-
-![b31d](charts/b31d-c51lr5e5seed4.png)
-**b31d-c51lr5e5seed4**
 
 ## C51 pilot — distributional RL, learning-rate screen — *closed at 600k, chose `5e-5`*
 

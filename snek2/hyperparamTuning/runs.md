@@ -81,7 +81,7 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
 | host | state | owed |
 |---|---|---|
 | **laptop** | **`b36a-d` stopped at 1.87-2.02M** (21:26) and its **close-out is running** — 4 parallel processes at `EVAL_WORKERS=4`. **`b38a-d` is chained behind it** and launches automatically when the last eval exits | nothing manual — watch `/tmp/chain-b38.log` for the handoff |
-| **desktop** | **`b35a-d` (gate 40) running**; **`b34a-d` done** (gate 70 — **null**, [below](#batch-34--chase-safe-c010-gate-70--done-on-the-desktop-null)); **`b37a-d` (b29 replication, seeds 5-8) queued** at priority 30 behind b35 | nothing — close-outs and HOF-500 auto-chain |
+| **desktop** | **`b35a-d` (gate 40) done** — **null** ([below](#batch-35--chase-safe-c010-gate-40--done-on-the-desktop-null)), close-out done, HOF-500 done for 3/4 (`b35c`-hof still running at 08:22); **`b34a-d` done** (gate 70, null); **`b37a-d` (b29 replication, seeds 5-8) next up** — still queued at the 08:22 poll but b35's four slots are now free, so it launches on the next dispatch | nothing — close-outs and HOF-500 auto-chain |
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
@@ -392,13 +392,13 @@ collapses the record region. All four healthy throughout (peak 95.00, no zero st
 [`completedRuns.md`](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold);
 finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
-## Batch 37 — **b29 replication on fresh seeds 5-8** — *queued on the desktop behind b35 (2026-08-16)*
+## Batch 37 — **b29 replication on fresh seeds 5-8** — *next up on the desktop (b35 done, launches on next dispatch)*
 
 **Exact b29 config, new seed draw — is the gate-75 record region reproducible, or were seeds 1-2 lucky?**
 `fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping,
 chase-safe `c=0.10`, **gate 75**, 2M cap — every env var identical to b29, only `SNEK_SEED` changes (5, 6, 7,
-8 for `b37a-d`). Queued to `ops` at priority 30; starts when b35 frees the box's four slots, close-out and
-HOF-500 auto-chained.
+8 for `b37a-d`). Queued to `ops` at priority 30; **b35 is now done, so its four slots are free — b37 launches
+on the next dispatch** (still `queued` at the 08:22 poll), close-out and HOF-500 auto-chained.
 
 **Why it matters.** b29's whole result — the new project record — rests on a **21-checkpoint ≥98%/500 region
 that appears in only 2 of its 4 seeds** (`b29a` 3, `b29b` 18), while `b29c`/`b29d` held none. b34 (gate 70) then
@@ -416,40 +416,30 @@ A fresh draw of four seeds at the exact same config is the direct test.
 count and record-band width against b29's**, not seed-by-seed, and not on pooled/best-30 (which do not
 discriminate up here). Check the desktop with `git show origin/ops-status:status.json`.
 
-## Batch 35 — chase-safe `c=0.10`, **gate 40** — *running on the desktop (2026-08-16)*
+## Batch 35 — chase-safe `c=0.10`, **gate 40** — *done on the desktop: null*
 
-The ladder's deep rung, and a **one-variable step from b34**: identical config, only `SNEK_CHASE_SAFE_GATE`
-drops 70 → 40. `c` stays 0.10 by choice — the calibration clamp binds at 0.10 for any gate ≤ 85 (raw
-gate-40 value ~0.16), so this holds the **per-flip** dose constant and moves only the gate, at the cost of
-letting **total episode dose rise ~2.5× vs gate 85** (~93 Φ-flips/episode in the ≥40 region vs 37 at ≥85 for
-the binding policy). **Now running** (~60-66k of 2M at ~61 steps/s, launched ~21:00 when b34 freed the four
-slots), close-out and HOF-500 auto-chained. With b34 (gate 70) confirmed null, the pre-registered "gate 40 <
-gate 70/75" reading — that 75 is a narrow sweet spot and mid-game shaping buys little — is the expected one.
+**Closed 2026-08-17, and the pre-registered "gate 40 < gate 70/75" outcome landed — mid-game shaping is a
+null on records.** The ladder's deep rung: `b29`'s config with only `SNEK_CHASE_SAFE_GATE=40` (per-flip dose
+held at the 0.10 clamp; total episode dose ~2.5× gate 85). **0 of the 3 measured seeds held any ≥98%/500
+checkpoint** (`b35c`'s HOF-500 was still running at check time), best partials abandoned at 96-97%. The twist:
+gate 40 posts the **highest pooled equal-effort of any shaped batch (88.2**, above b29's 87.8 and the b24
+control's 87.9) — so it grades the mid-game into a healthier *average* board without ever reaching the
+record-tier endgame. **Consolidation and the record tier are decoupled**, and across four gates (85, 75, 70, 40)
+**only 75 records** — the sweet spot is a narrow, isolated band. Full numbers and per-arm table:
+[`completedRuns.md`](completedRuns.md#batch-35--chase-safe-c010-gate-40-null--the-sweet-spot-at-75-is-isolated-not-a-plateau);
+finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
-**What it asks — does shaping the *mid-game* help, or just add noise?** Gate 40 reaches down into length
-40–70, *below* where the packing advantage that separates records from duds is established (measured at
-90–94), and into bands where the weak policy's Φ base rate is only 0.34. So it is the first arm to test
-chase-safety shaping outside the endgame proper. Read against b29 (gate 75) and b34 (gate 70):
+## The chase-safe gate ladder is complete (b27-30, 34, 35) — 75 is an isolated sweet spot
 
-| outcome | reading |
-|---|---|
-| gate 40 ≥ gate 70/75 | the causal horizon reaches into the mid-game — chase-safety matters long before the endgame, and the effect is dose-driven (more shaped transitions → better) |
-| gate 40 ≈ gate 70/75 | the extra mid-game shaping is inert — the endgame gate (70–75) is what carries the effect, and the 2.5× dose neither helps nor hurts |
-| gate 40 < gate 70/75 (toward the gate-85 null) | too-early shaping **dilutes** the signal or the 2.5× dose adds gradient/PER noise that outweighs it — the useful window is a band, not "everything above 40" |
-
-**Same judging as b34** — ≥98%/500 count and record-band width, not best-30 or peak. This was queued at the
-user's request to change one variable at a time (b34 → b35 is gate-only); the total-dose confound is
-acknowledged and is itself part of what the three-way read above disentangles.
-
-## Batches 27-30 are closed — chase-safe shaping, and the gate is the lever
-
-All sixteen chase-safe arms have stopped, so per the bookkeeping rule their descriptions moved to
-[`completedRuns.md`](completedRuns.md). The shaping adds `c·(γΦ(s′) − Φ(s))` with Φ = 1 iff the head and
-tail share a free region holding the food and the snake is ≥ gate long — potential-based, optimal policy
-unchanged ([plan](../plans/chase-safe-reward-shaping.md); Phase 0 Φ calibration in
+**Six batches walked the length gate from 85 down to 40, and only 75 records.** All are closed, so per the
+bookkeeping rule their descriptions moved to [`completedRuns.md`](completedRuns.md). The shaping adds
+`c·(γΦ(s′) − Φ(s))` with Φ = 1 iff the head and tail share a free region holding the food and the snake is
+≥ gate long — potential-based, optimal policy unchanged ([plan](../plans/chase-safe-reward-shaping.md);
+Phase 0 Φ calibration in
 [`findings.md`](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)).
-All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29, `fc 200,100,100` for b30), so
-`b24a-d`/`b25a-d` are the seed-matched controls at zero extra compute. Cap 2M.
+All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29/b34/b35, `fc 200,100,100` for b30),
+so `b24a-d`/`b25a-d` are the seed-matched controls at zero extra compute. Cap 2M. **`b37` (queued) re-runs the
+gate-75 winner on fresh seeds 5-8** to test whether the record region reproduces or was seed-luck.
 
 | batch | `c` | gate | net | verdict | write-up |
 |---|---|---|---|---|---|
@@ -458,9 +448,10 @@ All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29, `fc 2
 | **28** | **0.20** | 85 | `320` | **null** — pooled 85.4, 0 of 4 held; the dose is not the issue | [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 | **29** | 0.10 | **75** | `320` | **records** — pooled 87.8, **21 held ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500** | [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 | **34** | 0.10 | **70** | `320` | **null** — pooled 86.4, 0 of 4 held; a 5-length step off 75 loses it | [Batch 34](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold) |
+| **35** | 0.10 | **40** | `320` | **null** — 0 of 3 held (b35c pending), *highest pooled 88.2*; consolidation ≠ records | [Batch 35](completedRuns.md#batch-35--chase-safe-c010-gate-40-null--the-sweet-spot-at-75-is-isolated-not-a-plateau) |
 
-**The lever is the gate, and 75 is a narrow sweet spot.** Gate 85 is null on `fc 320` (b27), on
-`fc 200,100,100` (b30) and at doubled dose (b28); gate 70 (b34) is null too; only gate 75 (b29) matches the
+**The lever is the gate, and 75 is an isolated sweet spot.** Gate 85 is null on `fc 320` (b27), on
+`fc 200,100,100` (b30) and at doubled dose (b28); gate 70 (b34) and gate 40 (b35) are null too; only gate 75 (b29) matches the
 control's pooled *and* produces a record region the control never did. The Φ calibration is why: the potential carries ~0 at lengths 98-99, so a gate-85
 term grades the flat final approach, while gate 75 turns it on ten meals earlier, in the packing decisions
 that decide whether the endgame is winnable. Full conclusion:

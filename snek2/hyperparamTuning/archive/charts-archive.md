@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-17 | 31 | batch 35's results (gate 40) landed; retired ahead of the strict-oldest 28-29 because 31 is a void arm with no close-out and the gate ladder is kept contiguous for the incoming b37 |
 | 2026-08-16 | 30 | batch 34's results (gate 70) landed; batch 30 retired to keep six + the C51 pilot |
 | 2026-08-16 | 26 | batch 33 (win reward 10) landed; batch 26 became the seventh-newest |
 | 2026-08-15 | 25 | batch 32 (Adam `epsilon` on C51) landed; batch 25 became the seventh-newest |
@@ -27,6 +28,35 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 31 — **C51** at `lr 5e-5`, 2M — *stopped at 538-569k, no close-out*
+
+**The first C51 batch, and void.** b25's config verbatim plus `ALGO=c51` (51 atoms over `[-5, 120]`, KL
+priority) at the rate [`pick_c51_lr.py`](../pick_c51_lr.py) chose from the pilot, seeds 1-4, 2M cap. Killed at
+23:10 after `c51_stability.py` showed the chaos these curves show is the **learning rate, not C51** — which
+made 2M at a rate chosen under the old reading not worth four slots. **No close-out was run**, by decision.
+
+| arm | step | best-30 | `sef` | peak trail |
+|---|---|---|---|---|
+| `b31d-c51lr5e5seed4` | 569k | **71.7** | 16.5 | 92.86 |
+| `b31a-c51lr5e5seed1` | 555k | 66.7 | 9.5 | **94.86** |
+| `b31b-c51lr5e5seed2` | 538k | 53.3 | 1.7 | 92.26 |
+| `b31c-c51lr5e5seed3` | 562k | 21.0 | 0.0 | 89.76 |
+
+All four healthy at the kill (no zero stretch). The **50.7 pp best-30 spread at one config** is the n=4
+noise problem restated, not a result — which is the other reason not to spend a close-out on it.
+
+![b31a](../charts/b31a-c51lr5e5seed1.png)
+**b31a-c51lr5e5seed1**
+
+![b31b](../charts/b31b-c51lr5e5seed2.png)
+**b31b-c51lr5e5seed2**
+
+![b31c](../charts/b31c-c51lr5e5seed3.png)
+**b31c-c51lr5e5seed3**
+
+![b31d](../charts/b31d-c51lr5e5seed4.png)
+**b31d-c51lr5e5seed4**
 
 ## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *done: close-out + HOF-500 null (laptop)*
 

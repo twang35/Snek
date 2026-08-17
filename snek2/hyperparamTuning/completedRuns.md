@@ -96,6 +96,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b34c-chase10g70seed3` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 70), IS off, td_error | 2.00M | 96.0% @1532k /321 *trunc* | 100% | 89.4% /eq §§ | 97.0% | ‡‡‡ § 2nd of b34; **0 held**, best partial 96.0% (321 ep, ab.). Highest best-30 of b34 (97.0%) |
 | `b34a-chase10g70seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 70), IS off, td_error | 2.00M | 95.2% @1126k /248 *trunc* | 98.0% | 82.9% /eq §§ | 94.3% | ‡‡‡ § 3rd of b34; **0 held**, best partial 95.2% (248 ep, ab.) |
 | `b34b-chase10g70seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 70), IS off, td_error | 2.00M | 93.8% @1776k /193 *trunc* | 98.0% | 83.8% /eq §§ | 94.0% | ‡‡‡ § weakest of b34; **0 held**, best partial 93.8% (193 ep, ab.) |
+| `b35c-chase10g40seed3` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 40)**, IS off, td_error | 2.00M | 100% @1166k /100 | 100% | **90.7%** /eq §§ | 97.7% | ‡‡‡ § best of b35 (gate 40) — **highest pooled of any shaped batch**. HOF-500 still running at check time; the other three seeds held 0 |
+| `b35a-chase10g40seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 40), IS off, td_error | 2.00M | 96.2% @1409k /319 *trunc* | 99.0% | 88.6% /eq §§ | 96.0% | ‡‡‡ § 2nd of b35; **0 held**, best partial 96.2% (319 ep, ab.). Gate 40 is null — the sweet spot is isolated at 75 |
+| `b35d-chase10g40seed4` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 40), IS off, td_error | 2.00M | 97.0% @1480k /367 *trunc* | 99.0% | 87.6% /eq §§ | 96.7% | ‡‡‡ § 3rd of b35; **0 held**, best partial 97.0% (367 ep, ab.) |
+| `b35b-chase10g40seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` (gate 40), IS off, td_error | 2.00M | 96.5% @1353k /310 *trunc* | 98.0% | 85.9% /eq §§ | 94.7% | ‡‡‡ § weakest of b35; **0 held**, best partial 96.5% (310 ep, ab.) |
 | `b26b-fc100x100noisseed2` ‡‡‡ § | **fc 100,100** (2 layers, 0.62× the b24 net), IS off, td_error | 3.00M | 97.0% @1948k /100 | 96.7% | **83.83%** /eq §§ | 93.7% | ‡‡‡ § best of b26 on every column; `sef` 58.0%. **No ≥98%/100 checkpoint**, so the auto HOF-500 selected nothing |
 | `b26c-fc100x100noisseed3` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 97.0% @1969k /100 | 96.0% | 83.18% /eq §§ | 92.0% | ‡‡‡ § 2nd of b26; only 7 full-length rows cleared gate 95, against b25c's 64 — the shallow shape spends much less time in the measurable band |
 | `b26a-fc100x100noisseed1` ‡‡‡ § | **fc 100,100**, IS off, td_error | 3.00M | 95.0% @2904k /100 | 95.0% | 80.02% /eq §§ | 88.0% | ‡‡‡ § just 2 full-length rows, both at the gate exactly. Peak trailing 94.92 — the first b24-family arm not to reach 95.00 |
@@ -406,6 +410,36 @@ What the batch leaves behind is worth more than the arms cost: a clean negative 
 constraint, the threshold rule above, the discovery that **indices 18-20 are dead inputs**, and two
 diagnostics ([`value_by_length.py`](perDiagnostics/value_by_length.py),
 [`endgame_gradient.py`](perDiagnostics/endgame_gradient.py)).
+
+## Batch 35 — chase-safe `c=0.10`, **gate 40**: **null — the sweet spot at 75 is isolated, not a plateau**
+
+**The ladder's deep rung, one variable below b34.** `b29`'s config with `SNEK_CHASE_SAFE_GATE=40` — everything
+else identical (`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, `c=0.10`, 2M cap,
+seeds 1-4). `c` stays 0.10 (the calibration clamp binds there for any gate ≤ 85), so this holds the per-flip
+dose constant and moves only the gate, letting the total episode dose rise ~2.5× vs gate 85. Trained and closed
+out on the desktop; HOF-500 done for three of four seeds (`b35c`'s was still running at check time).
+
+**Gate 40 is a null on the record metric — but it posts the highest pooled of any shaped batch.** Pooled
+equal-effort **88.2** (88.6 / 85.9 / 90.7 / 87.6), *above* b29's 87.8, b34's 86.4 and even the b24 control's
+87.9 — yet **0 of the 3 measured seeds held any ≥98%/500 checkpoint**, best partials all abandoned at 96-97%
+over 310-367 episodes. So mid-game shaping produced a slightly healthier *average* board without ever reaching
+the record-tier endgame. **Consolidation and the record tier are decoupled**, which is the sharpest statement of
+why pooled/best-30 are the wrong readout up here.
+
+| arm | peak trail | best-30 | `sef` | pooled (eq) | HOF-500 (≥98%/500) |
+|---|---|---|---|---|---|
+| `b35c` seed3 | 95.00 | 97.7% | 59.7% | **90.7** | HOF-500 running (best full 100% @1166k /100) |
+| `b35a` seed1 | 95.00 | 96.0% | 47.4% | 88.6 | 0 held — best partial 96.2% @1409k (319 ep, ab.) |
+| `b35d` seed4 | 95.00 | 96.7% | 61.3% | 87.6 | 0 held — best partial 97.0% @1480k (367 ep, ab.) |
+| `b35b` seed2 | 95.00 | 94.7% | 62.8% | 85.9 | 0 held — best partial 96.5% @1353k (310 ep, ab.) |
+| **mean** | | **96.3%** | **57.8%** | **88.2** | **0 of 3 measured (b35c pending)** |
+
+**The verdict: gate 75 is an isolated sweet spot.** Across four gates — 85 (b27/b28/b30), 75 (b29), 70 (b34) and
+40 (b35) — **only 75 produces a ≥98%/500 region**; 85, 70 and 40 are all null. So the useful window is a narrow
+band around 75, not a monotone ladder and not "anything below 85". All four b35 arms were healthy throughout
+(peak 95.00, no dead or zero stretch), so the term never destabilizes; too-early shaping (40) just grades the
+mid-game, which lifts the average board without buying the endgame. Full conclusion:
+[`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
 ## Batch 34 — chase-safe `c=0.10`, **gate 70**: **null — gate 75 is a narrow sweet spot, not a threshold**
 
