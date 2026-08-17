@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-16T20:39:16",
-  "ts": 1786937956.1781838,
+  "iso": "2026-08-16T20:39:49",
+  "ts": 1786937989.2635775,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -28,8 +28,8 @@
       "policy": "b34a-chase10g70seed1",
       "pid": 3090813,
       "step": 2000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     },
     {
       "id": "b34b-chase10g70seed2-hof",
@@ -37,8 +37,8 @@
       "policy": "b34b-chase10g70seed2",
       "pid": 3090814,
       "step": 2000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     },
     {
       "id": "b34c-chase10g70seed3-hof",
@@ -46,8 +46,8 @@
       "policy": "b34c-chase10g70seed3",
       "pid": 3090815,
       "step": 2000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     },
     {
       "id": "b34d-chase10g70seed4-hof",
@@ -55,8 +55,8 @@
       "policy": "b34d-chase10g70seed4",
       "pid": 3090816,
       "step": 2000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     }
   ],
   "ledger": {
@@ -246,8 +246,8 @@
   },
   "disk_free_gb": 133.6,
   "load_avg": [
-    3.95263671875,
-    4.9658203125,
-    6.517578125
+    10.05126953125,
+    6.3291015625,
+    6.92138671875
   ]
 }
