@@ -81,8 +81,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ Free space in one piece at length 90-94 separates the records from a dud by 87 points** | **measured 2026-08-14** — one-piece share **92% / 77% / 5%** for `b24d` / `b18b` / `b20d`, per meal, identical food, exact (one flood fill, no search). The gap opens **ten meals before the end**, and all three reach those lengths equally often. Largest per-policy separation on record here |
 | **‡ The chase-safe potential self-attenuates: ~35 flips per episode for a dud, ~4.6 for a record** | **measured 2026-08-14**, 60 episodes × 3 checkpoints. Genuine flips per endgame meal are **2.5-3.6** for `b20d` against **0.21-0.63** for the records, which spend 10.8% of steps at length ≥85 against `b20d`'s 41.2%. Sets `c = 0.10`. **98-99 carries 0.00-0.04 — the last meals cannot be shaped by this quantity.** See below |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
-| **‡‡ Chase-safe shaping: the gate is the lever — null at gate 85 at any dose/net, records at gate 75** | **measured 2026-08-16**, 4 batches. Gate 85 held **0 records** across b27 (`fc 320`), b30 (`fc 200,100,100`) and b28 (`c=0.20`) — dose and net ruled out. Gate 75 (b29) matched the control's pooled *and* produced **21 checkpoints ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500** — a record region where the control had isolated points. See below |
-| **‡‡ Why gate 75 wins, at the board level** — seed-matched greedy replay: gate 75 keeps the board healthier at **every** length (better packing, ~½ the isolated pockets, food reachable ~1.5× more), and gate 85's failures arrive at the gate already fragmented | **measured 2026-08-16**, 4×400 episodes. All losses are **starves, not walls**; the divergence opens *below* gate 85, so gate 85 grades decisions already made. Predicts gate 40 (b35) buys little → sweet-spot, not monotone. See below |
+| **‡‡ Chase-safe shaping: the gate is the lever, and gate 75 is a narrow sweet spot — null at 85 *and* at 70, records only at 75** | **measured 2026-08-16**, 5 batches. Gate 85 held **0 records** across b27 (`fc 320`), b30 (`fc 200,100,100`) and b28 (`c=0.20`) — dose and net ruled out. Gate 75 (b29) produced **21 checkpoints ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500**. **Gate 70 (b34) drops back to null** — pooled 86.4, **0 of 4** held — so a 5-length move off 75 already loses it: the window is a band, not "everything below 85". See below |
+| **‡‡ Why gate 75 wins, at the board level** — seed-matched greedy replay: gate 75 keeps the board healthier at **every** length (better packing, ~½ the isolated pockets, food reachable ~1.5× more), and gate 85's failures arrive at the gate already fragmented | **measured 2026-08-16**, 4×400 episodes. All losses are **starves, not walls**; the divergence opens *below* gate 85, so gate 85 grades decisions already made. **Prediction confirmed:** it read "sweet-spot, not monotone" and gate 70 (b34) is null; gate 40 (b35) is the last rung, running. See below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
 | **‡‡ A drawdown is not how a policy escapes a local minimum** | **falsified 2026-08-11** on `b23b`'s 217-242k collapse plus four batch-18 windows. Endgame value structure, input rankings and churn are all unchanged through it, and the sibling with **no** drawdown gained **more** (+48.6 vs +40.9 pp). A drawdown is a *mid-game* failure: median death length **30** inside it, 96-97 either side |
@@ -638,6 +638,7 @@ IS-off controls:
 | `b30e-h` | `fc 200,100,100` | 0.10 | 85 | `b25` (0) | **0 of 4** | 96.1 (`b30e`) |
 | `b28a-d` | `fc 320` | **0.20** | 85 | `b24` (2 records) | **0 of 4** | 96.8 (`b28d`) |
 | `b29a-d` | `fc 320` | 0.10 | **75** | `b24` (2 records) | **21, in 2 seeds** | **99.0 (`b29b` @1447k)** |
+| `b34a-d` | `fc 320` | 0.10 | **70** | `b24` (2 records) | **0 of 4** | 97.2 (`b34d`, 392 ep ab.) |
 
 **Gate 85 is null on every axis it was pushed.** Two architectures agree (`b27`, `b30`), doubling the dose to
 `c=0.20` changes nothing (`b28`), and none of the twelve gate-85 arms produced a single checkpoint that holds
@@ -653,6 +654,17 @@ band in `b29b`** and a peak of **`b29b` @1447k = 99.0%/500 (495/500)** — a poi
 record `b24d`/`b24b` at 98.0%/500. This is the design's own hypothesis — shape the *setup*, not the finish —
 and it is the first evidence for it. It corrects the mid-batch conclusion that "chase-safe is null on two
 architectures": that was true, but gate-85-specific; the lever is the **gate**, not the dose or the net.
+
+**And the gate is a narrow sweet spot, not a threshold — gate 70 (`b34`) is back to null.** The obvious next
+question is whether lower is simply better, so `b34` drops the gate 5 lengths, 75 → 70, everything else `b29`'s
+config. It **loses the effect**: pooled equal-effort **86.4** (82.9 / 83.8 / 89.4 / 89.5, ~1.5 under the b24
+control's 87.9 and just under `b29`'s 87.8), best-30 group mean 95.3, and **0 of 4 seeds held any ≥98%/500
+checkpoint** — every HOF-500 candidate abandoned under gate 98 (best partials `b34d` 97.2% at 392 ep, `b34c`
+96.0% at 321, `b34a` 95.2% at 248, `b34b` 93.8% at 193). So a single 5-length step off 75 already collapses the
+record region to nothing. This confirms the [board-level prediction](#-why-gate-75-wins-at-the-board-level-b29-keeps-the-board-healthier-at-every-length-and-b27s-failures-arrive-at-the-gate-already-broken)
+that gate 75 is a sweet spot rather than a monotone ladder: the useful window is a **band** around 75, and
+shaping either too late (85) or too early (70) grades the wrong decisions. `b35` (gate 40) is the last rung and
+is running on the desktop; the reading above expects it to buy little.
 
 **Read the lead honestly.** `b29b`'s 99.0% over `b24d`'s 98.0% is inside the 500-episode confidence intervals —
 a one-run point lead, not a resolved win. What is *outside* noise is the **region**: `b24` produced 2 isolated

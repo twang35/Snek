@@ -76,12 +76,12 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-16 12:45.**
+**Both hosts as of 2026-08-16 21:06.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **`b36a-d` running** (C51 on `fc 320`), launched 12:43, 3M cap, one window on `--arms b36` | b32's **churn re-measure at 1M** — its primary readout, still only measured to 360k. b36 will contend for cores with it; that is acceptable since the re-measure is minutes, not hours |
-| **desktop** | **`b34a-d` running** (gate 70), ~285k of 2M at 92 steps/s, heartbeat 10:41, 0 evals; **`b35a-d` (gate 40) queued** behind it | nothing — both waves close-out and HOF-500 auto-chain; b35 starts when b34 frees the four slots |
+| **laptop** | **`b36a-d` running** (C51 on `fc 320`), ~1.8-1.96M of 3M, all four alive (trailing ~90, best-30 84-87, epsilon annealed to ~0.003-0.006) | b32's **churn re-measure at 1M** — its primary readout, still only measured to 360k. b36 is now past the 1M mark the C51-decay question needs, so read both when b36 closes |
+| **desktop** | **`b34a-d` done** (gate 70 — closed out + HOF-500, **null**, [below](#batch-34--chase-safe-c010-gate-70--done-on-the-desktop-null)); **`b35a-d` (gate 40) now running**, ~60-66k of 2M at ~61 steps/s, heartbeat 21:06 | nothing — b35 close-out and HOF-500 auto-chain |
 
 `b32a-d` is the only thing between here and a verdict on Adam's `epsilon`, and it is one
 `c51_stability.py --end 1000000` run, not a close-out. Check the desktop with
@@ -317,35 +317,26 @@ Reached 538-569k in 2h44m, all four healthy (no zero stretch), best-30 **21.0 / 
 **50.7 pp spread at one config**, which is the n=4 noise problem restated rather than a result. Graphs in
 [`charts.md`](charts.md); the arms are in [`completedRuns.md`](completedRuns.md) as void.
 
-## Batch 34 — chase-safe `c=0.10`, **gate 70** — *running on the desktop (2026-08-16)*
+## Batch 34 — chase-safe `c=0.10`, **gate 70** — *done on the desktop: null*
 
-The gate ladder's next rung below b29's 75. Four arms, **identical to b29** — `fc 320`, IS off, `td_error`,
-target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping, `c=0.10`, 2M cap, seeds 1-4, the
-same `b24a-d` seed-matched control — with **`SNEK_CHASE_SAFE_GATE=70`** the only change. Queued to `ops` at
-priority 30; the desktop was idle at queue time (heartbeat 09:47, 0 trainers), so it should pick the wave up
-on its next poll, close-out and HOF-500 auto-chained as usual.
+**Closed 2026-08-16 (training + close-out + HOF-500), and the pre-registered "gate 70 < gate 75" outcome
+landed: gate 75 is a narrow sweet spot.** Identical to b29 with `SNEK_CHASE_SAFE_GATE=70` the only change.
+Pooled equal-effort **86.4** (~1.5 under the b24 control and just under b29's 87.8) and **0 of 4 seeds held
+any ≥98%/500 checkpoint**, against b29's 21 across two seeds — so a single 5-length step off 75 already
+collapses the record region. All four healthy throughout (peak 95.00, no zero stretch). This makes the gate a
+**band around 75**, not a threshold: 85 null, 75 records, 70 null again. Full numbers and per-arm table in
+[`completedRuns.md`](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold);
+finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
-**What it asks.** b29 (gate 75) turned a gate-85 null into a record region by shaping the packing decisions
-~10 meals before the endgame; b34 moves the gate 5 more lengths earlier. Reading the outcome against b29's
-21-checkpoint ≥98%/500 region and `b24a-d`:
-
-| outcome | reading |
-|---|---|
-| gate 70 ≥ gate 75 on the ≥98%/500 count | a **monotone** gate response — the causal horizon for packing sits at or below 70, and the ladder should keep descending |
-| gate 70 ≈ gate 75 | the effect **saturates** by 75 — gate 75 is the operating point, no reason to go lower |
-| gate 70 < gate 75 (toward the gate-85 null) | 75 is a **sweet spot**; too-early shaping dilutes the signal across lengths where Φ flips constantly (Phase 0: ~35 flips/episode for a weak policy), and the useful window is narrow |
-
-**Judge it on the ≥98%/500 count and the width of any record band, not best-30 or peak** — peak is saturated
-at 95 and best-30 stops discriminating above ~92 (both true of every b24-family arm). Check the desktop with
-`git show origin/ops-status:status.json`.
-
-## Batch 35 — chase-safe `c=0.10`, **gate 40** — *queued on the desktop behind b34 (2026-08-16)*
+## Batch 35 — chase-safe `c=0.10`, **gate 40** — *running on the desktop (2026-08-16)*
 
 The ladder's deep rung, and a **one-variable step from b34**: identical config, only `SNEK_CHASE_SAFE_GATE`
 drops 70 → 40. `c` stays 0.10 by choice — the calibration clamp binds at 0.10 for any gate ≤ 85 (raw
 gate-40 value ~0.16), so this holds the **per-flip** dose constant and moves only the gate, at the cost of
 letting **total episode dose rise ~2.5× vs gate 85** (~93 Φ-flips/episode in the ≥40 region vs 37 at ≥85 for
-the binding policy). Queued at priority 30 behind b34, so it starts when b34 frees the box's four slots.
+the binding policy). **Now running** (~60-66k of 2M at ~61 steps/s, launched ~21:00 when b34 freed the four
+slots), close-out and HOF-500 auto-chained. With b34 (gate 70) confirmed null, the pre-registered "gate 40 <
+gate 70/75" reading — that 75 is a narrow sweet spot and mid-game shaping buys little — is the expected one.
 
 **What it asks — does shaping the *mid-game* help, or just add noise?** Gate 40 reaches down into length
 40–70, *below* where the packing advantage that separates records from duds is established (measured at
@@ -378,10 +369,11 @@ All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29, `fc 2
 | **30** | 0.10 | 85 | `200,100,100` | **null** — pooled 83.3 vs b25 86.0, 0 of 10 held | [Batch 30](completedRuns.md#batch-30--chase-safe-shaping-on-fc-200100100-c010-null-and-it-completes-the-shapingarchitecture-22) |
 | **28** | **0.20** | 85 | `320` | **null** — pooled 85.4, 0 of 4 held; the dose is not the issue | [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 | **29** | 0.10 | **75** | `320` | **records** — pooled 87.8, **21 held ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500** | [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
+| **34** | 0.10 | **70** | `320` | **null** — pooled 86.4, 0 of 4 held; a 5-length step off 75 loses it | [Batch 34](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold) |
 
-**The lever is the gate, not the dose or the net.** Gate 85 is null on `fc 320` (b27), on `fc 200,100,100`
-(b30) and at doubled dose (b28); gate 75 (b29) matches the control's pooled *and* produces a record region
-the control never did. The Φ calibration is why: the potential carries ~0 at lengths 98-99, so a gate-85
+**The lever is the gate, and 75 is a narrow sweet spot.** Gate 85 is null on `fc 320` (b27), on
+`fc 200,100,100` (b30) and at doubled dose (b28); gate 70 (b34) is null too; only gate 75 (b29) matches the
+control's pooled *and* produces a record region the control never did. The Φ calibration is why: the potential carries ~0 at lengths 98-99, so a gate-85
 term grades the flat final approach, while gate 75 turns it on ten meals earlier, in the packing decisions
 that decide whether the endgame is winnable. Full conclusion:
 [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).

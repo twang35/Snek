@@ -1,14 +1,16 @@
 # Charts
 
-Progress graphs for the most recent batches — **28, 30, 31, 32, 33 and 36**, a cap of six, newest first,
+Progress graphs for the most recent batches — **28, 31, 32, 33, 34 and 36**, a cap of six, newest first,
 plus the **C51 pilot** as a temporary seventh while its arms are still a live control. Per-arm numbers live in
 [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
 here **while it is still running**, with training-only numbers, not just once it has closed.
-Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched.
+Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched, and
+**batch 30** followed when 34's results arrived.
 
-**`b34` (gate 70) and `b35` (gate 40) are desktop batches and have no section here yet** — their PNGs live
-on the box and arrive with their results, so they are entered when the results branch is copied in. That is
-a tracked gap, not a missed one; see [`runs.md`](runs.md) for their status.
+**`b35` (gate 40) is a desktop batch still in training and has no section here yet** — its PNG lives on the
+box and arrives with its results, so it is entered when the results branch is copied in. That is a tracked
+gap, not a missed one; see [`runs.md`](runs.md) for its status. **`b34` (gate 70) closed and is entered
+below.**
 
 **Older sections are retired, not deleted.** Batches 1-11 are in
 [`archive/batches1-11.md`](archive/batches1-11.md) and anything retired since is in
@@ -95,6 +97,41 @@ First evals only, nothing to read yet.
 
 ![b36d](charts/b36d-c51fc320seed4.png)
 **b36d-c51fc320seed4**
+
+## Batch 34 — chase-safe `c=0.10`, **gate 70** — *done on the desktop: null, gate 75 is a narrow sweet spot*
+
+**One variable off the record region: `b29`'s config with the gate dropped 75 → 70.** Otherwise identical —
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, `c=0.10`, 2M cap, seeds 1-4,
+seed-matched control `b24`. Trained, closed out and HOF-500 re-measured on the desktop.
+
+**Gate 70 is a null — a 5-length step off 75 loses the effect.** Pooled equal-effort **86.4** (~1.5 under
+b24's 87.9, just under `b29`'s 87.8) and **0 of 4 seeds held any ≥98%/500 checkpoint**, against `b29`'s 21
+across two seeds. The close-out threw off two 100%/100 and two 98%/100 rows, but every one deflated below
+gate 98 at 500 episodes. All four arms healthy throughout (peak trailing 95.00, no zero stretch). This
+confirms gate 75 is a **band, not a threshold** — 85 is null, 75 records, 70 null again. Full read:
+[`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever);
+per-arm table in [`completedRuns.md`](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold).
+The `sef` numbers are on a 2M horizon and comparable to the b28/b29 waves below (also 2M), not to the 3M
+batches.
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|
+| `b34d-chase10g70seed4` | 95.7 | 68.9 | 89.5 | best 97.2% @1915k (392 ep, ab.) — **0 held** |
+| `b34c-chase10g70seed3` | 97.0 | 66.1 | 89.4 | best 96.0% @1532k (321 ep, ab.) — **0 held** |
+| `b34a-chase10g70seed1` | 94.3 | 46.7 | 82.9 | best 95.2% @1126k (248 ep, ab.) — **0 held** |
+| `b34b-chase10g70seed2` | 94.0 | 54.9 | 83.8 | best 93.8% @1776k (193 ep, ab.) — **0 held** |
+
+![b34d](charts/b34d-chase10g70seed4.png)
+**b34d-chase10g70seed4** — highest `sef`; best HOF-500 partial (97.2%, abandoned)
+
+![b34c](charts/b34c-chase10g70seed3.png)
+**b34c-chase10g70seed3** — highest best-30 of b34 (97.0)
+
+![b34a](charts/b34a-chase10g70seed1.png)
+**b34a-chase10g70seed1**
+
+![b34b](charts/b34b-chase10g70seed2.png)
+**b34b-chase10g70seed2** — weakest seed
 
 ## Batch 33 — a filled board pays **10**, not 100 — *stopped at 1.64-1.77M of 3M: the largest single-knob regression measured here*
 
@@ -424,79 +461,3 @@ endgame is winnable. Full write-up:
 
 ![b28d](charts/b28d-chase20g85seed4.png)
 **b28d-chase20g85seed4** (`c=0.20`, null)
-
-## Batch 30 — the same shaping on `fc 200,100,100`, `c=0.10`, gate 85 — *done: close-out + HOF-500 null (laptop)*
-
-b27's config with one change, the net: **`200,100,100`** instead of `320`. Everything else is identical —
-`c=0.10`, gate 85, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance
-shaping, **2M cap**, seeds 1-4. Together with b24/b25/b27 it makes a **2×2 of shaping × architecture**, so
-the shaping result stops depending on one net.
-
-**Done at the 2M cap on the laptop, all four — and the early edge washed out.** At ~0.95M this wave read
-`sef` **+6.9, 4 of 4 ahead** of its b25 control; **carried to the full 2M cap the lead is gone.** Matched
-at ≤2M, mean best-30 **92.9 vs 93.6 (−0.7)** and mean `sef` **56.9 vs 58.6 (−1.7)** — a dead heat, if
-anything a shade behind, and now pointing the *same* way as b27. The +6.9 was the ~10 pp `n=4` noise
-resolving as the control caught up, not a shaping effect. All four healthy throughout (peak trailing ~95,
-no dead or zero stretch), so the potential-based term is not destabilizing — it just is not helping. Final
-training numbers, shaped first, b25-r2 control at the matched ≤2M horizon in parentheses:
-
-| arm | seed | best-30 (control) | `sef` (control) | peak trail |
-|---|---|---|---|---|
-| `b30e-chase10fc200x100x100seed1` | 1 | 93.7 (`b25a` 93.7, +0.0) | 58.4 (61.4, −3.0) | 95.00 |
-| `b30g-chase10fc200x100x100seed3` | 3 | 93.3 (`b25c` 93.7, −0.4) | 58.3 (61.0, −2.7) | 95.00 |
-| `b30f-chase10fc200x100x100seed2` | 2 | 92.3 (`b25b` 95.3, −3.0) | 55.9 (57.9, −2.0) | 94.92 |
-| `b30h-chase10fc200x100x100seed4` | 4 | 92.3 (`b25d` 91.7, +0.6) | 55.0 (54.2, +0.8) | 95.00 |
-| **mean** | | **92.9 (93.6, −0.7)** | **56.9 (58.6, −1.7)** | — |
-
-**Close-out landed 15:05 on 2026-08-15 — all four `complete`, and it points the same way as the training
-numbers: below the control.** A first pass (4 parallel `top20`, gate 95) was killed ~13:29 with all four
-`complete=false`; the relaunch with `EVAL_RESUME=1` reused every banked measurement (~75k episodes across
-the four) and finished the remainder.
-
-| arm | pooled (equal-effort, gate 95) | full-length rows | ≥98%/100 | best full-length row |
-|---|---|---|---|---|
-| `b30f-chase10fc200x100x100seed2` | **84.32** | 22 | 1 | 98.0% @643k |
-| `b30g-chase10fc200x100x100seed3` | 84.28 | 39 | 3 | **99.0% @738k** |
-| `b30e-chase10fc200x100x100seed1` | 83.75 | 28 | **6** | **99.0% @641k** |
-| `b30h-chase10fc200x100x100seed4` | 81.00 | 10 | 0 | 97.0% @614k |
-| **mean** | **83.34** | | **10 total** | |
-
-**83.3 against b25-r2's ~86.1** on the same equal-effort figure — the shaped wave is ~2.8 behind its
-seed-matched control on `fc 200,100,100`, which is the *same direction and about the same size* as b27's
-85.2 vs 87.9 on `fc 320`. Two architectures, two nulls-or-worse.
-
-**HOF-500 re-measure (gate 98, flat, laptop, 15:33 on 2026-08-15): 0 of the 10 close-out checkpoints
-clear ≥98%/500.** Every `99%/100` and `98%/100` row deflated below the gate at 500 episodes — b30e best
-**96.1%** @651k, b30g **95.3%** @709k, b30f **90.9%** @643k, all abandoned — the selection-inflation this
-project documents (`100`-episode tops read high because they are the arm's best). Its seed-matched control
-**`b25`-r2 is also 0** (25 checkpoints, best 97.2%), so on `fc 200,100,100` shaped and unshaped are a
-**dead heat at zero records**.
-
-**That completes the shaping×architecture 2×2 on the decisive metric.** On `fc 320` the control (`b24`)
-held **two** records and the shaped arm (`b27`) **none**; on `fc 200,100,100` neither reaches one.
-Chase-safe shaping produces no record-tier checkpoint on either net and removes the control's records on
-the wider one — **null-to-negative, confirmed on two architectures.**
-
-![b30e](charts/b30e-chase10fc200x100x100seed1.png)
-**b30e-chase10fc200x100x100seed1**
-
-![b30f](charts/b30f-chase10fc200x100x100seed2.png)
-**b30f-chase10fc200x100x100seed2** — the first red mark of the relaunch, at step 6k.
-
-![b30g](charts/b30g-chase10fc200x100x100seed3.png)
-**b30g-chase10fc200x100x100seed3**
-
-![b30h](charts/b30h-chase10fc200x100x100seed4.png)
-**b30h-chase10fc200x100x100seed4**
-
-**`b30a-d` are the same config killed at 137-139k** and are captioned here only so the completeness check
-above stops reporting them. They ran while `perfect_percent` read 0 for every eval — the reward-identified
-perfect game, [`findings.md`](findings.md#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)
-— so their curves are mismeasured *and* their epsilon was pinned at the 0.0125 ceiling, which makes them
-unusable as arms rather than merely short. `savedPolicies/b30[a-d]` is gone; `runs/b30a-d*` is kept
-deliberately, so `refresh_charts.sh` keeps copying these four PNGs. Nothing should be read off them.
-
-![b30a](charts/b30a-chase10fc200x100x100seed1.png)
-![b30b](charts/b30b-chase10fc200x100x100seed2.png)
-![b30c](charts/b30c-chase10fc200x100x100seed3.png)
-![b30d](charts/b30d-chase10fc200x100x100seed4.png)
