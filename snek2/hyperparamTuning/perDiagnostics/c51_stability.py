@@ -181,8 +181,55 @@ def atom_stats(net, states, batch=512):
 ATOM_SUPPORT = None    # set per arm, so atom_stats' Q matches the arm's own support
 
 
-def measure(policy_name, states_wanted, points, stride, max_episodes, end=None):
-    """One arm: restores each sampled checkpoint against a fixed state set and returns its rows."""
+def collect_shared_states(policy_name, states_wanted, max_episodes):
+    """The fixed state set for a *cross-arm* comparison, drawn from one named policy.
+
+    Exists because the per-arm set makes `churn` incomparable between arms of different quality, and
+    the confound runs the wrong way. `churn` is the share of a state set where the argmax flips, so it
+    depends on the margin between the top two actions — and that margin is ~0.2 reward units in
+    early-game states against 20-24 in the endgame (see `endgame_gradient.py`). A weak arm dies early,
+    so *its* state set is dominated by near-tied early-game states that flip for free, and it scores
+    high churn for a reason that has nothing to do with the optimizer.
+
+    That is not hypothetical. The 2026-08-16 batch-32 reading had `churn`, `gap` and `len` rank-
+    correlated across all six arms: the two control arms carried mean lengths of **11.9 and 21.2**
+    against the treated arms' 34.9-38.0, and churn 0.185-0.207 against 0.095-0.118. With a per-arm set
+    there is no way to say which half of that is `epsilon`.
+
+    So pass `--states-from` a **neutral third policy** — a hall-of-fame champion is the natural choice —
+    and every arm is then asked the same question about the same states. Prefer neutral to
+    "one of the arms being compared", which tilts toward whichever arm supplied the set.
+    """
+    ckpt_dir = os.path.join(POLICIES_DIR, policy_name)
+    if not os.path.isdir(ckpt_dir):
+        ckpt_dir = policy_name          # allow hallOfFame/<name> or any path
+    steps = checkpoint_steps(ckpt_dir)
+    if not steps:
+        raise SystemExit('--states-from {0}: no checkpoints'.format(policy_name))
+    # Deliberately NOT filtered by --end. That flag anchors the *phase of the arms being compared*;
+    # the reference state set is a fixed yardstick and should be the source policy's best available
+    # checkpoint whatever phase is being read. Passing --end through here made a champion pinned at
+    # 1447k unusable for a 600k comparison, which is backwards.
+    pinned = max(steps)
+    spec_env = SnakeEnvironment(discount=0.99, display=False, policy_name='c51_stability_states')
+    tf_env = tf_py_environment.TFPyEnvironment(spec_env)
+    agent, checkpoint, _ = build_eval_agent(tf_env, spec_env, ckpt_dir)
+    support = policy_arch.support_from_arch(policy_arch.read_arch(ckpt_dir))
+    checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(pinned))).expect_partial()
+    states, mean_len = collect_states(spec_env, agent._q_network, support,
+                                      states_wanted, max_episodes)
+    print('shared state set: {0} states from {1} @{2}, mean length {3:.1f}'.format(
+        len(states), policy_name, pinned, mean_len))
+    return states, mean_len
+
+
+def measure(policy_name, states_wanted, points, stride, max_episodes, end=None, shared=None):
+    """One arm: restores each sampled checkpoint against a fixed state set and returns its rows.
+
+    `shared` is an optional `(states, mean_len)` from `collect_shared_states`. Pass it whenever the
+    rows will be compared *across* arms; leave it None to ask how much each arm changes its mind on
+    the states it visits itself, which is a different and also useful question.
+    """
     global ATOM_SUPPORT
     ckpt_dir = os.path.join(POLICIES_DIR, policy_name)
     steps = checkpoint_steps(ckpt_dir)
@@ -202,9 +249,12 @@ def measure(policy_name, states_wanted, points, stride, max_episodes, end=None):
     ATOM_SUPPORT = np.asarray(support, dtype=np.float32) if support is not None else None
     net = agent._q_network
 
-    # Newest first, so the state set comes from the arm's most developed policy.
-    checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(chosen[-1]))).expect_partial()
-    states, mean_len = collect_states(spec_env, net, support, states_wanted, max_episodes)
+    if shared is not None:
+        states, mean_len = shared
+    else:
+        # Newest first, so the state set comes from the arm's most developed policy.
+        checkpoint.restore(os.path.join(ckpt_dir, 'ckpt-{0}'.format(chosen[-1]))).expect_partial()
+        states, mean_len = collect_states(spec_env, net, support, states_wanted, max_episodes)
 
     rows = []
     previous_action = None
@@ -288,13 +338,26 @@ def main():
     parser.add_argument('--end', type=int, default=None,
                         help='anchor the newest sampled checkpoint at or below this step, so churn '
                              'can be read at a chosen phase rather than only at the cap')
+    parser.add_argument('--states-from', default=None,
+                        help='draw the fixed state set from this policy and use it for every --policy. '
+                             'Required for a legitimate cross-arm churn comparison: a per-arm set lets '
+                             'a weak arm be scored on near-tied early-game states, which flip for free. '
+                             'Prefer a neutral third policy, e.g. a hallOfFame champion.')
     args = parser.parse_args()
+
+    shared = None
+    if args.states_from:
+        shared = collect_shared_states(args.states_from, args.states, args.episodes)
+    elif len(args.policy) > 1:
+        print('NOTE: comparing {0} arms on per-arm state sets. `churn` is only comparable across arms '
+              'when the set is shared — check the `len` column, and prefer --states-from.'.format(
+                  len(args.policy)))
 
     rows = []
     for name in args.policy:
         print('measuring {0}'.format(name))
         rows.extend(measure(name, args.states, args.points, args.stride, args.episodes,
-                            args.end))
+                            args.end, shared))
         print()
     report(rows)
 

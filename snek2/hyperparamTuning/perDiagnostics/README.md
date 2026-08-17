@@ -16,7 +16,7 @@
 | `plasticity_probe.py` | `<out.json> <policy> [stride] [extra] [boards]` | whether the checkpoint can still **fit a new target**, which is the question the signatures are only correlates of |
 | `plasticity_analysis.py` | `<payload_dir> [out.png\|-] [probe_dir]` | the tables and figure from both: control→peak→end, drawdown events, flat stretches, early-vs-late, and the paired probe trend |
 | `return_distribution.py` | `<out.json> <ckpt-or-policy> <episodes-per-seed> <seed[,seed...]>` | the distribution of the **discounted return from each visited state**, by outcome and by length band — the Phase 0 measurement that sizes C51's `[v_min, v_max]` grid and `num_atoms` |
-| `c51_stability.py` | `--policy <name> [--policy ...] [--states N] [--points K] [--stride S] [--end STEP]` | whether a chaotic eval curve is a **policy that keeps changing its mind** or a stable policy seen through a noisy 10-episode sample — greedy-action churn on a fixed state set, the action gap, how far the value function moves per `stride` steps, and (c51 only) boundary-atom mass and effective atom count |
+| `c51_stability.py` | `--policy <name> [--policy ...] [--states N] [--points K] [--stride S] [--end STEP] [--states-from <policy>]` | whether a chaotic eval curve is a **policy that keeps changing its mind** or a stable policy seen through a noisy 10-episode sample — greedy-action churn on a fixed state set, the action gap, how far the value function moves per `stride` steps, and (c51 only) boundary-atom mass and effective atom count. **`--states-from` is mandatory for any cross-arm reading**; see below |
 
 | `atom_resolution.py` | `<policy> [<policy> ...]` | whether the atom **spacing** is coarse relative to the decisions the policy makes — action-gap percentiles in reward units and in atoms, and the share of states under one atom, broken down by snake length |
 | `value_by_length.py` | `<out.json> <ckpt-or-policy> <states> <max-episodes>` | what the network **believes** a state is worth by length band, in `return_distribution.py`'s bands. **`V − G` against realised return is the wrong comparison for a Q-learning agent** — it targets the optimal policy's value, not its own return; see the correction in the batch-33 finding. Use it for the *shape* of `V` against length |
@@ -43,8 +43,20 @@ are measured by the identical code path, which is the whole point. Three things 
   a policy converges, so `--end` exists to anchor both arms at the same *phase* rather than at the same
   distance from their cap. A tail-only reading answers a different question from the one a mid-training
   swing raises, and on this pilot the two readings disagreed.
-- **The state set is per arm**, collected from that arm's newest sampled checkpoint, so `len` (mean snake
-  length over the set) is printed to make a mismatch visible rather than silently averaged away.
+- **Comparing arms needs `--states-from`, and the default per-arm set inflated a real result ~2×** (found
+  2026-08-16). Churn is the share of a set where the argmax flips, so it depends on the margin between the
+  top two actions — and that margin is **~0.2 reward units early-game against 20-24 in the endgame**. A weak
+  arm dies early, so *its* set is dominated by near-tied states that flip for free. b32's `eps 1e-7` controls
+  carried set mean lengths of **11.9 and 21.2** against the treated arms' 34.9-38.0, and churn, gap and `len`
+  came out **rank-correlated across all six arms**. `--states-from` draws one set from a neutral third
+  policy — use `hallOfFame/b29b-chase10g75seed2-ckpt1447000`, which at 1500 states has mean length **50.5**
+  and spans whole games — and the effect halved from −47% to −26% but survived, 4 of 4. **The `len` column
+  printed the problem all along and was read past**, which is the actual lesson.
+- **`--end` does not filter the `--states-from` policy**, deliberately: it anchors the *phase of the arms
+  being compared*, while the reference set is a yardstick and should come from the source's best checkpoint
+  whatever phase is read. Passing it through made a champion pinned at 1447k unusable for a 600k comparison.
+- **The per-arm set is still the right default for a single arm** — "how much does this arm change its mind
+  on the states it actually visits" is a real question, and `len` is printed either way.
 - **One arm is not a measurement.** The first run of this script compared a single C51 arm against a
   single ddqn arm and read 0.077 against 0.035; adding a second seed of each put both algorithms at
   0.033-0.058 at matched learning rate. The state collection is itself a sample.

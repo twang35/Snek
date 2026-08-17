@@ -51,7 +51,7 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 36 — **C51 on `fc 320`**, one wide layer instead of three narrow — *running on the laptop, 3M cap*
+## Batch 36 — **C51 on `fc 320`**, one wide layer instead of three narrow — *stopped at 1.87-2.02M, close-out running*
 
 **Batch 32's config verbatim at `eps 1.5e-4` with `SNEK_FC_LAYERS=320` the only change**, seeds 1-4, win
 reward back at its default 100, `lr 1e-4`, 51 atoms over `[-5, 120]`. Launched 12:43 on 2026-08-16;
@@ -80,11 +80,24 @@ the one direct measurement says the deeper net's penultimate layer was *not* cap
 16-20 of 100, head outputs 4-6 of 153). **If that rank comes out at 16-20 of 320 here too, widening bought
 nothing** and any gain is optimisation rather than capacity.
 
-**3M is as much of the experiment as the shape.** No C51 arm has ever run past **1M** — the pilot stopped
-at 600k, b31 at ~560k, b32 at its cap — while b32's best-30 peaks landed at 353-865k and every b33 arm
-declined for 1.4M steps after peaking. If C51 decays past ~1.2M, every future C51 batch can stop there.
+**Stopped at 2M rather than 3M** (21:26 on 2026-08-16, the user's call), so **match at 2M**, and the
+close-out is running as 4 parallel processes at `EVAL_WORKERS=4`. Training numbers:
 
-First evals only, nothing to read yet.
+| arm | step | best-30 | at | `sef` | trailing |
+|---|---|---|---|---|---|
+| `b36d` | 1873k | **86.7** | 331k | 17.4 | 92.64 |
+| `b36b` | 1972k | 86.0 | 402k | **24.7** | 91.14 |
+| `b36c` | 2011k | 84.7 | 247k | 19.5 | **93.14** |
+| `b36a` | 2023k | 84.0 | 977k | 23.2 | 92.02 |
+| *`b32a`/`b32b` control, `fc 200,100,100`, ≤1M* | 1000k | *77.0 / 63.0* | | *16.1 / 10.3* | |
+
+**Hypothesis 2 is the one that survived so far, not the null.** Best-30 **84.0-86.7 against the control's
+77.0/63.0**, and — the more striking part — the **spread collapsed from 14 pp to 2.7 pp**. `sef` is
+17.4-24.7 against 10.3/16.1. So the wide-shallow shape did not just match the deep one; it made the seeds
+agree, which in a domain where "the seed decides which arm wins in 18 of 18 waves" is the more valuable
+half. **The 3M question went unanswered** — every arm peaked best-30 by 402k except `b36a` (977k) while
+trailing stayed 91-93 to 2M, so it neither collapsed like b33 nor kept climbing. Close-out and a shared-set
+churn reading against b32 are what decide it.
 
 ![b36a](charts/b36a-c51fc320seed1.png)
 **b36a-c51fc320seed1** — paired with `b32a`
@@ -197,7 +210,7 @@ predicted *symptom* — starvation — is wrong**, and that correction is the tr
 ![b33d](charts/b33d-c51win10seed4.png)
 **b33d-c51win10seed4** — the weakest, best-30 18.3
 
-## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *all four reached the 1M cap; churn re-measure at 1M still owed*
+## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *closed: `epsilon` works at −26% churn, the dose does not matter*
 
 **Final training numbers, 2026-08-16.** Both `1.5e-4` arms beat the `1e-7` control's ≤364k best-30 of 33.9,
 and three of four annealed epsilon to 0.0035 where the control stayed near the ceiling:
@@ -239,26 +252,42 @@ where the defect is largest while the rate still learns: churn **0.117-0.245** a
 54.6 pp, so at n=2 per side the score resolves nothing. Measured with
 [`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py) at `--end 600000`.
 
-**Launched 23:14 on 2026-08-15. Status at 01:06 on 2026-08-16 — 370-403k of 1M, all four alive, no zero
-stretch, and the readout is moving the right way.** Churn per 5k steps on a fixed 800-state set, paired
-against each arm's own seed at `eps 1e-7`:
+**Verdict, 2026-08-16: `epsilon` works, at about half the size first reported, and the dose does not
+matter.** The re-measure to 600k also found a defect in how churn was being compared, so the numbers below
+supersede the 200k/360k table this section used to carry.
 
-| `eps` | churn @200k | churn @360k | best-30 ≤364k | peak trailing |
-|---|---|---|---|---|
-| **1e-7** (control, `c51pilotB`) | 0.166 / 0.127 → **0.147** | 0.167 / 0.106 → **0.137** | 11.7 / 56.0 → 33.9 | 85.6 / 90.1 |
-| **1.5e-4** (`b32a`/`b32b`) | 0.115 / 0.104 → **0.110** | 0.101 / 0.119 → **0.110** | 66.3 / 61.3 → **63.8** | **93.0 / 92.3** |
-| **3.125e-4** (`b32c`/`b32d`) | 0.099 / 0.062 → **0.081** | 0.099 / 0.097 → **0.098** | 73.3 / **10.0** → 41.7 | 92.5 / 87.2 |
-| *ddqn `b30e`/`b30f` — **`lr 1e-5`, not comparable*** | 0.042 / 0.056 | 0.035 / 0.058 | — | — |
+**Churn per 5k steps on a *shared* 1500-state set** — drawn from `hallOfFame/b29b…ckpt1447000`, mean length
+**50.5**, identical for all six arms, paired against each arm's own seed at `eps 1e-7`:
 
-**7 of 8 paired comparisons across two independent horizons churn less than their own control**, and the
-group means are monotone in dose at both. **It did not cost learning speed** — the failure mode where
-`epsilon` acts as a smaller learning rate in disguise — since both `1.5e-4` arms beat their controls on
-best-30 *and* peak trailing, and the treated groups hold the two highest peaks here.
+| `eps` | seed 1 | seed 2 | group | best-30 @1M | change vs own control |
+|---|---|---|---|---|---|
+| **1e-7** (control, `c51pilotB`) | 0.134 | 0.103 | **0.119** | 33.9 (≤364k) | — |
+| **1.5e-4** (`b32a`/`b32b`) | **0.085** | **0.088** | **0.0865** | **77.0 / 63.0** | **−37% / −15%** |
+| **3.125e-4** (`b32c`/`b32d`) | **0.092** | **0.087** | **0.0895** | 73.3 / **10.0** | **−31% / −16%** |
 
-**Quote the paired figures only.** The ddqn row is there for scale and **is not a target**: it was measured
-at `lr 1e-5` against these arms' `lr 1e-4`, so treating the distance to it as "how much is left to fix"
-re-commits the rate-vs-algorithm confound this whole line of work started by correcting. No ddqn-at-`1e-4`
-measurement exists.
+**4 of 4 paired comparisons favour `epsilon`, group effect −26%, and it is flat from 600k to 1M** (b32's
+shared-set mean 0.0875 → 0.086), so it is not an early-training transient. **The dose is a dead heat**
+(0.0865 vs 0.0895), exactly as pre-registered for n=2 a side.
+
+**Why these numbers are lower than the ones this section used to show.** The old table used **per-arm** state
+sets, and churn depends on the action gap — ~0.2 reward units early-game against 20-24 in the endgame. The
+`eps 1e-7` controls die early, so their sets had mean lengths of **11.9 and 21.2** against the treated arms'
+34.9-38.0, and they were scored on near-tied states that flip for free. Churn, gap and `len` came out
+rank-correlated across all six arms. On the shared set the effect fell from −47% to −26%.
+[`c51_stability.py --states-from`](perDiagnostics/c51_stability.py) is the fix and is now required for any
+cross-arm reading; full account in
+[`findings.md`](findings.md#-corrected-2026-08-16-every-per-arm-churn-figure-above-is-inflated-2x-and-the-fix-is-a-shared-state-set).
+
+**Two things the shared set settles.** **Gap no longer explains churn** — `c51pilotB` seed 2 now has the
+*largest* action gap of the six (16.0 against 11.3-13.9) and still churns more than every treated arm, where
+on per-arm sets the controls had the two smallest gaps. And **it is the optimizer, not policy quality**:
+`b32d` has best-30 **10.0**, worst of the six by a wide margin, yet churn **0.087**, indistinguishable from
+the three good arms and well below both controls. Churn tracked the `epsilon` value, not the score.
+
+**What is still not established.** Four paired comparisons rest on **2 independent seeds**, and the per-seed
+effect spans **−15% to −37%** — a 2.5× range in the effect itself; a sign test on 2 seeds is p=0.25.
+**Direction consistent 4 of 4, magnitude ~26%, not significant.** `eps 1.5e-4` is a reasonable default on
+this evidence and not a demonstrated one, which is what `b36`+`b37` (4 seeds a side) is for.
 
 **The confound to keep in view is reverse causation:** churn falls as a policy converges, and these arms are
 also *better*, so "a better policy settles" would produce the same table. The evidence against it is

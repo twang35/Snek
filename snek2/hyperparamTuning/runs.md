@@ -76,16 +76,20 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-16 21:06.**
+**Both hosts as of 2026-08-16 21:32.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **`b36a-d` running** (C51 on `fc 320`), ~1.8-1.96M of 3M, all four alive (trailing ~90, best-30 84-87, epsilon annealed to ~0.003-0.006) | b32's **churn re-measure at 1M** — its primary readout, still only measured to 360k. b36 is now past the 1M mark the C51-decay question needs, so read both when b36 closes |
-| **desktop** | **`b35a-d` (gate 40) running**, ~60-66k of 2M at ~61 steps/s, heartbeat 21:06; **`b34a-d` done** (gate 70 — **null**, [below](#batch-34--chase-safe-c010-gate-70--done-on-the-desktop-null)); **`b37a-d` (b29 replication, seeds 5-8) queued** at priority 30 behind b35 | nothing — every wave close-out and HOF-500 auto-chain; b37 starts when b35 frees the four slots |
+| **laptop** | **`b36a-d` stopped at 1.87-2.02M** (21:26) and its **close-out is running** — 4 parallel processes at `EVAL_WORKERS=4`. **`b38a-d` is chained behind it** and launches automatically when the last eval exits | nothing manual — watch `/tmp/chain-b38.log` for the handoff |
+| **desktop** | **`b35a-d` (gate 40) running**; **`b34a-d` done** (gate 70 — **null**, [below](#batch-34--chase-safe-c010-gate-70--done-on-the-desktop-null)); **`b37a-d` (b29 replication, seeds 5-8) queued** at priority 30 behind b35 | nothing — close-outs and HOF-500 auto-chain |
 
-`b32a-d` is the only thing between here and a verdict on Adam's `epsilon`, and it is one
-`c51_stability.py --end 1000000` run, not a close-out. Check the desktop with
-`git show origin/ops-status:status.json`.
+**Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
+paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
+churn figure was inflated ~2×; both are written up under [batch 32](#batch-32--adams-epsilon-on-c51--closed-2026-08-16-it-works-at-26-churn-the-dose-does-not-matter).
+
+**Batch numbering: `b37` is the desktop's b29 replication, so the laptop's dose arm is `b38`.** Worth stating
+because both were queued within minutes of each other from different hosts, and `b37` was very nearly used
+twice.
 
 ## C51 pilot — closed at 600k, and it handed off to batch `b31` by itself (2026-08-15)
 
@@ -168,7 +172,37 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
-## Batch 36 — C51 on **`fc 320`**, one wide layer instead of three narrow — running on the laptop, 3M cap (2026-08-16)
+## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — chained behind b36's close-out (2026-08-16)
+
+**`launch_b38_eps3125.sh`, identical to b36 with `SNEK_ADAM_EPSILON=3.125e-4` the only change**, seeds 1-4,
+3M cap. `b36a-d` is therefore an exact seed-matched control and this is a clean one-variable dose comparison.
+**Launched automatically** by `chain_after_evals.sh`, which polls for `eval_checkpoints.py` to drain and then
+runs the launcher — log at `/tmp/chain-b38.log`.
+
+**This is the dose question b32 could not answer, retried at 4 seeds a side instead of 2.** b32's shared-set
+churn put `1.5e-4` at **0.0865** and `3.125e-4` at **0.0895** — nothing, on n=2, exactly as pre-registered.
+b36 + b38 is **the first configuration in this project with 4 seeds per side on one architecture**, so it is
+the first that can say anything about the dose at all.
+
+**Read churn first, and only with `--states-from`** — the same reference every C51 reading now uses, so the
+numbers stay comparable across batches:
+
+```
+PYTHONPATH=. python hyperparamTuning/perDiagnostics/c51_stability.py \
+  --policy b36a-c51fc320seed1 --policy b38a-c51fc320eps3125seed1 ... \
+  --states 1500 --stride 5000 --points 10 --end 2000000 \
+  --states-from hallOfFame/b29b-chase10g75seed2-ckpt1447000
+```
+
+| outcome | reading |
+|---|---|
+| lower churn at `3.125e-4`, best-30 held | the higher dose becomes the C51 default, and the response is still climbing — worth one more rung |
+| lower churn, **worse** best-30 | `epsilon` acting as a smaller learning rate in disguise, the known failure mode. This is why best-30 is read *alongside*, not after |
+| dead heat at n=4 a side | the dose question closes for good; `1.5e-4` stays the default as the lower-variance reference config |
+
+**b36 stopped at 2M, so match there** rather than at b38's 3M cap.
+
+## Batch 36 — C51 on **`fc 320`** — **stopped at 2M, close-out running** (2026-08-16)
 
 **Batch 32's config verbatim at `eps 1.5e-4`, with `SNEK_FC_LAYERS=320` the only change.** Four arms,
 seeds 1-4, **3M cap**, win reward back at its default 100, `lr 1e-4`, `ALGO=c51`, 51 atoms over
@@ -192,6 +226,24 @@ compounding disappear. **So churn is the reading, not level** — C51's defect h
 600k, b31 at ~560k, b32 at its cap. b32's best-30 peaks landed at 353-865k and every b33 arm declined for
 1.4M steps after peaking, so **"does C51 hold or decay past 1M"** is open and expensive — if it decays,
 every future C51 batch can stop at ~1.2M for a third of the cost.
+
+**Stopped at 1.87-2.02M rather than 3M** (21:26, the user's call) and closed out as 4 parallel processes at
+`EVAL_WORKERS=4`. **Match at 2M, not at the caps.**
+
+| arm | step | best-30 | at | `sef` | trailing |
+|---|---|---|---|---|---|
+| `b36d` | 1873k | **86.7** | 331k | 17.4 | 92.64 |
+| `b36b` | 1972k | 86.0 | 402k | **24.7** | 91.14 |
+| `b36c` | 2011k | 84.7 | 247k | 19.5 | **93.14** |
+| `b36a` | 2023k | 84.0 | 977k | 23.2 | 92.02 |
+| *`b32a`/`b32b`, `fc 200,100,100`, ≤1M* | 1000k | *77.0 / 63.0* | | *16.1 / 10.3* | |
+
+**Hypothesis 2 is ahead of the null so far, and the seed spread is the striking part.** Best-30 **84.0-86.7**
+against the control's 77.0/63.0, with the spread down from **14 pp to 2.7 pp**, and `sef` 17.4-24.7 against
+10.3/16.1. In a project where "the seed decides which arm wins in 18 of 18 waves", making four seeds agree is
+worth more than the level. **The 3M question is unanswered** — every arm peaked best-30 by 402k except `b36a`
+(977k) while trailing held 91-93 out to 2M, so it neither collapsed like b33 nor kept climbing. The close-out
+and a shared-set churn reading against b32 decide it.
 
 ### Pre-registered hypotheses, in order of what I expect
 
@@ -229,15 +281,27 @@ constraint**. Design, predictions, and which of them survived:
 [`completedRuns.md`](completedRuns.md#batch-33--the-win-reward-cut-to-10-falsified-and-it-found-a-general-rule-about-terminal-rewards).
 **Do not revisit** — and check `V(pre-terminal)` against the terminal payoff before moving either.
 
-## Batch 32 — Adam's `epsilon` on C51, `lr 1e-4`, two reference values — all four at the 1M cap, churn re-measure owed (2026-08-15)
+## Batch 32 — Adam's `epsilon` on C51 — **closed 2026-08-16: it works at −26% churn, the dose does not matter**
 
-**Arms done, verdict not.** Final best-30 **77.0 / 63.0** at `1.5e-4` and **73.3 / 10.0** at `3.125e-4`
-against the `1e-7` control's 33.9 (≤364k), and three of four annealed epsilon to **0.0035** where the
-control stayed near the 0.0125 ceiling. But **best-30 is not this batch's readout** — churn is, and it has
-only been measured to 360k (0.147 → 0.110 → 0.081 at 200k, 0.137 → 0.110 → 0.098 at 360k, monotone in dose,
-7 of 8 paired). **Re-run `c51_stability.py --end 1000000` before concluding anything.** It stays in this
-file rather than moving to `completedRuns.md` because that measurement is live forward work. Per-arm
-numbers and the full table: [`charts.md`](charts.md).
+**Closed.** Churn on a **shared** 1500-state set from `hallOfFame/b29b…ckpt1447000` (mean length 50.5,
+identical for all six arms), paired against each arm's own `eps 1e-7` seed at 600k:
+
+| `eps` | seed 1 | seed 2 | group | vs own control |
+|---|---|---|---|---|
+| 1e-7 control | 0.134 | 0.103 | 0.119 | — |
+| **1.5e-4** | 0.085 | 0.088 | **0.0865** | −37% / −15% |
+| **3.125e-4** | 0.092 | 0.087 | **0.0895** | −31% / −16% |
+
+**4 of 4 paired, group −26%, flat 600k → 1M (0.0875 → 0.086), dose a dead heat.** Best-30 at 1M was
+77.0/63.0 at `1.5e-4` against the control's 33.9, so it cost no learning speed. **Not significant**: 4
+comparisons rest on 2 independent seeds and the per-seed effect spans −15% to −37%, sign test p=0.25 — which
+is what `b36`+`b38` (4 seeds a side on `fc 320`) is built to fix.
+
+**The re-measure also found the measurement was wrong**, and that is the more portable result. The published
+200k/360k figures used **per-arm** state sets, inflating the effect ~2× because a weak arm dies early and is
+then scored on near-tied early-game states that flip for free. `--states-from` is now required for any
+cross-arm churn reading:
+[`findings.md`](findings.md#-corrected-2026-08-16-every-per-arm-churn-figure-above-is-inflated-2x-and-the-fix-is-a-shared-state-set).
 
 The design below is unchanged and is how to read it.
 

@@ -30,7 +30,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
-| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported so far**: b32 cuts churn 0.137 → 0.098 paired at 360k, monotone in dose, at no cost to best-30. See below |
+| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported, at half the size first reported**: on a *shared* state set b32 cuts churn **0.119 → 0.088 (−26%)** paired at 600k, 4 of 4, flat to 1M — the 360k figures below were on per-arm sets and inflated ~2×. No dose effect. See below |
+| **‡ Cross-arm churn requires `--states-from`; every per-arm figure comparing arms of different quality is inflated ~2×** | **corrected 2026-08-16**. `churn` depends on the action gap, which is ~0.2 early-game against 20-24 in the endgame, so a weak arm that dies early is scored on near-tied states that flip for free. b32's controls carried state-set mean lengths of **11.9 and 21.2** against the treated arms' 34.9-38.0. On a shared champion set the effect halves but survives, and **gap stops explaining churn** — the highest-gap arm of the six is now a control. Within-arm trends across phases are unaffected |
 | **‡‡ A terminal reward must clear `W > 1/(1 − γ^k)` (`k` = steps per meal) or progress lowers value** — at γ=0.9975 that is **34-58** at the realistic pace, so the shipped `PERFECT_GAME_REWARD=100` clears it 2-3× and **10 misses it 3-6×** | **derived and measured 2026-08-16** by b33. Every meal costs the win-10 arm **1.7-4.4** points of `V` while paying 1, so it correctly avoids finishing. **The win reward is the potential, not the prize** — its job is keeping `V` rising as the board fills. Shrinking `W` requires shrinking γ. See below |
 | **‡‡ Falsified: shrinking the win reward 100 → 10 does not buy C51 resolution-for-free** | **measured 2026-08-16**, b33 vs a paired b32 control. Best-30 **18.3-25.3 vs 77.0/63.0**; the 2.8× atom-per-food gain arrived and bought nothing, so **spacing is not the C51 constraint**. It stalls (32-42 steps/meal at length 95+ vs 2.0) and dies of geometry — **73-90% collisions, not starvation**, 44 of 48 losses still winnable a median 1 move from death. See below |
 | **‡ Corrected same day: the win-10 arm's value function is *not* miscalibrated** — it is within **9-16%** of the optimal value; the first diagnosis compared `V` against the realised on-policy return, which Q-learning is not estimating | **correction 2026-08-16**. The defect is the gradient's **sign**, not its level, and "greedy play declines the win" was withdrawn with it. Endgame action gap is **19.8-24.3, larger than `V`**, so actions are not near-tied either |
@@ -298,8 +299,64 @@ So the candidate list after `epsilon` is the **exploration-schedule ratchet**, a
 floor" appeared in a progress report and should not be repeated: the arithmetic is 43-67% rather than a
 third, and more importantly **the ddqn reference (0.047) was measured at `lr 1e-5` while every C51 arm here
 runs at `lr 1e-4`** — the same rate-vs-algorithm confound this section opens by correcting, reintroduced.
-There is no ddqn-at-1e-4 measurement, so no floor is known for this rate. Quote only the paired same-rate
-same-seed comparison: **0.137 → 0.098 at 360k, 0.147 → 0.081 at 200k.**
+There is no ddqn-at-1e-4 measurement, so no floor is known for this rate.
+
+### ‡ Corrected 2026-08-16: every per-arm churn figure above is inflated ~2x, and the fix is a shared state set
+
+**The `epsilon` result survives, at about half the size.** Deepening the measurement from 360k to 600k
+exposed a confound in `c51_stability.py`'s design, not in the arms. The script collected the fixed state
+set **per arm, from that arm's own newest checkpoint** — and `churn` is the share of states where the argmax
+flips, which depends on the margin between the top two actions. That margin is **~0.2 reward units in
+early-game states against 20-24 in the endgame** ([measured](#the-board-fill-input-is-not-being-ignored--but-three-inputs-are-dead)).
+A weak arm dies early, so *its* state set is dominated by near-tied early-game states that flip for free.
+
+The `len` column was printing the mismatch all along and it was read past:
+
+| arm | `eps` | per-arm `len` | per-arm churn | **shared-set churn** |
+|---|---|---|---|---|
+| `b32a` seed1 | 1.5e-4 | 36.4 | 0.095 | **0.085** |
+| `b32b` seed2 | 1.5e-4 | 36.9 | 0.107 | **0.088** |
+| `b32c` seed1 | 3.125e-4 | 38.0 | 0.097 | **0.092** |
+| `b32d` seed2 | 3.125e-4 | 34.9 | 0.118 | **0.087** |
+| `c51pilotB` seed1 | 1e-7 | **11.9** | **0.207** | **0.134** |
+| `c51pilotB` seed2 | 1e-7 | **21.2** | **0.185** | **0.103** |
+
+Churn, gap and `len` were **rank-correlated across all six arms** in exactly the direction that inflates the
+effect. On a shared set the group gap falls from **0.196 vs 0.104 (−47%)** to **0.119 vs 0.088 (−26%)**.
+
+**`--states-from` is the fix**, and it is now the required form for any cross-arm churn reading: it draws
+one state set from a **neutral third policy** — `hallOfFame/b29b-chase10g75seed2-ckpt1447000`, 1500 states,
+mean length **50.5**, spanning whole games — and scores every arm on it. Prefer neutral to "one of the arms
+being compared", which tilts toward whichever arm supplied the set. **`--end` deliberately does not filter
+the reference policy**: it anchors the phase of the arms under comparison, while the yardstick should be the
+source's best checkpoint whatever phase is read.
+
+**Two things the shared set establishes that the per-arm reading could not.**
+
+1. **Gap no longer explains churn.** On the shared set `c51pilotB` seed 2 has the **largest** action gap of
+   all six arms (16.0 against the treated arms' 11.3-13.9) and still churns more than every one of them. On
+   per-arm sets the two controls had the two *smallest* gaps, so the artifact was indistinguishable from the
+   effect.
+2. **It is the optimizer, not policy quality.** The strongest remaining reverse-causation story was "a better
+   policy is simply more settled". `b32d` refutes it: best-30 **10.0**, the worst of the six by far, yet
+   churn **0.087** — indistinguishable from the three good arms and well below both controls. Churn tracked
+   the `epsilon` value, not the score.
+
+**What it still does not establish.** Only **2 independent seeds** sit behind 4 paired comparisons, and the
+per-seed effect ranges from **−15%** (seed 2) to **−37%** (seed 1) — a 2.5x spread in the effect itself. A
+sign test on 2 independent seeds is p=0.25. **Direction consistent 4 of 4, magnitude ~26%, not significant** —
+so `eps 1.5e-4` is a reasonable default for C51 on the evidence, and is not a demonstrated one.
+
+**The dose question is closed, as pre-registered:** `1.5e-4` 0.0865 against `3.125e-4` 0.0895 is nothing, and
+n=2 per side was never going to resolve a 2x dose.
+
+**Churn does not fall further between 600k and 1M** — b32's shared-set mean is **0.0875 at 600k and 0.086 at
+1M**, flat. So it is neither converging away nor degrading, and the earlier worry that the 200k/360k readings
+were an early-training transient is answered: the gap persists, it just was never as wide as it looked.
+
+**Every churn number in this file measured before 2026-08-16 used per-arm state sets** and carries the same
+inflation whenever it is used to compare *arms of different quality*. Within-arm trends across phases are
+unaffected, since the set is fixed for that arm.
 
 ## ‡‡ Falsified 2026-08-16: shrinking the win reward 100 → 10 does not buy C51 stability — it teaches the agent that winning is a mistake
 
