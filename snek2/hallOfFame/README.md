@@ -11,12 +11,12 @@ rotation and are not deleted by anything.
 
 ## The current record: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000`
 
-Batches 11-29 train on the **30-value observation vector** — the current one (era `b09c616`), after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these twelve entries all load on
-`master` as it stands.** Each came from a batch close-out or, for batches 24 and 29, its 500-episode HOF
-re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the batch-24 and batch-29 entries are the only
-non-default architecture here (`fc 320`)** and load because `arch.json` (copied in with each) rebuilds the
-recorded net — see [`CLAUDE.md`](../../CLAUDE.md) on the `arch.json` sidecar.
+Batches 11-40 train on the **30-value observation vector** — the current one (era `b09c616`), after the
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these thirteen entries all load on
+`master` as it stands.** Each came from a batch close-out or, for batches 24, 29 and 40, its 500-episode HOF
+re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the batch-24, batch-29 and batch-40 entries are
+the only non-default architecture here (`fc 320`)** and load because `arch.json` (copied in with each) rebuilds
+the recorded net — see [`CLAUDE.md`](../../CLAUDE.md) on the `arch.json` sidecar.
 
 **`b29b` @1447k edges `b24d` (98.0%/500) on the point estimate and their CIs overlap** — a narrow lead, taken
 as the record under this folder's 500-episode standard exactly as `b24d` was taken over `b18b`. What sets it
@@ -32,6 +32,7 @@ selection and mostly does not survive (see the batch-24 note below: 199 ≥97%/1
 | checkpoint | measured | config |
 |---|---|---|
 | **`b29b-chase10g75seed2-ckpt1447000`** | **495/500 = 99.0%** (CI **97.7-99.6**) — **the record**; it *rose* from 98.0/100 on re-measurement, the genuine-region signature, and is the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a region, not a point. First record from reward shaping (`c=0.10`, gate 75) and from `fc 320` chase-safe. 98/100 on the copy here. Added 2026-08-16; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, **`CHASE_SAFE_SHAPING=0.1`, gate 75**, `SNEK_SEED=2` |
+| **`b40b-chasefree10g75seed2-ckpt1513000`** | **491/500 = 98.2%** (CI **96.6-99.1**) — third-best /500 measured here, behind `b29b` (99.0) and ahead of `b24b`/`b24d` (98.0); it *rose* from 98.0/100, the genuine-region signature. **The only one of b40's 90 ≥98%/100 candidates that held at 500** — and its batch is a **null**, which is why it is here on its own number and not as evidence for its config. 97/100 on the copy here. Added 2026-08-18; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, **`CHASE_SAFE_SHAPING=0.1`, gate 75, plus `FREE_SPACE_SHAPING`**, `SNEK_SEED=2` |
 | **`b24d-fc320noisseed4-ckpt1342000`** | **490/500 = 98.0%** (CI **96.4-98.9**) — the prior record (2026-08-13), within CI of `b29b`; it *rose* from 97.0/100 on re-measurement, the genuine-region signature. First non-default-arch record (`fc 320`). See below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=4` |
 | `b24b-fc320noisseed2-ckpt2860000` | **490/500 = 98.0%** (CI 96.4-98.9) — ties the record from a second seed, a late checkpoint (2.86M). Added 2026-08-13 | same as above except `SNEK_SEED=2` |
 | **`b18b-tgt1000seed2-ckpt1588000`** | **683/700 = 97.6%** (CI **96.1-98.5**) — the prior record and deepest-measured strong checkpoint; the first selected high in this project to survive re-measurement; see below | `TARGET_UPDATE_PERIOD=1000`, forking on, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `td_loss`/no-IS, `SNEK_SEED=2` |
@@ -64,6 +65,35 @@ the 97.6% record.
 > [`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md#-and-the-corollary-most-of-a-selected-high-is-selection).
 > Nothing here needs changing: the entries are the right checkpoints to keep, and the ranking among
 > them is roughly preserved. It is the absolute percentages that are optimistic.
+
+### ‡ `b40b` @1513000 — third-best measured, and the one entry whose batch is a null
+
+Added 2026-08-18. Its batch, `b40`, added a global free-space potential
+(`Φ = 1 / open regions`) on top of b29's chase-safe shaping and **came back null** — pooled 88.15 against b29's
+87.83, the ≥98%/100 tier unchanged. **This checkpoint is here on its own re-measured number, not as evidence
+for that config**, which is exactly the distinction this folder's admission rule is for.
+
+| measurement | result | why it exists |
+|---|---|---|
+| close-out, 100 episodes (desktop) | 98/100 = **98.0%** | the selected /100 read |
+| **HOF-500, 500 fresh episodes, gate 98 (desktop, auto)** | 491/500 = **98.2%** (96.6-99.1) | the admitting figure — it *rose* rather than shrinking |
+| 100 fresh, **on the copy in this folder** (laptop) | 97/100 = **97.0%** (91.5-99.0), avg score 94.39, min 64 | confirms the copy loads via `arch.json` and plays like a champion |
+
+**It sits third on the folder's 500-episode standard** — 98.2% against `b29b`'s 99.0% and ahead of
+`b24b`/`b24d` at 98.0% — with all three intervals overlapping, so the ordering among them is a point ordering,
+not a resolved one.
+
+**Its neighbourhood is a near-band, and gate 98 hides that.** Three checkpoints within 32k steps read
+**97.5-97.8%** before being abandoned under the auto pass's gate 98 (`@1545k` 482/493, `@1520k` 471/482,
+`@1509k` 436/447) — all above this folder's own gate of 97, so `b40b` carries a small ≥97%/500 cluster around
+1509k-1545k. Worth knowing when reading the entry against `b29b`'s 18-checkpoint ≥98%/500 band: the difference
+between them is partly where the gate was set.
+
+**Why it does not vindicate the free-space term.** `b40` produced **90** checkpoints at ≥98%/100 and exactly
+**one** held 500 episodes; `b37` — b29's config on fresh seeds — produced 59 and held **none**. That ~1-in-60
+attrition is what made the project retract "gate 75 produces a record region" (see
+[`../hyperparamTuning/findings.md`](../hyperparamTuning/findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading)).
+A folder entry is a preserved *policy*; a finding needs the batch.
 
 ### ‡ `b29b` @1447000 — the record, the first from reward shaping, and the first that is a *region*
 

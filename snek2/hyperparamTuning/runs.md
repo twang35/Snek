@@ -451,10 +451,12 @@ byte-identical on seeds 5-8, held **0 of 4**, and `b40` held 1, on comparable �
 off the desktop and the copy re-measured 98/100 on fresh laptop episodes (loads and plays like a champion).
 Write-up: [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
 
-**Promotion candidate, 2026-08-18: `b40b-chasefree10g75seed2` @1513000 — 98.2%/500.** Third-best /500 on record,
-behind `b29b` (99.0) and `b29a` (98.4) and ahead of `b24b`/`b24d` (98.0). It is the only checkpoint of `b40`'s 90
-≥98%/100 candidates that held. **Not promoted** — that is the manual, verified process, and its checkpoint is
-still on the desktop only.
+**Promoted 2026-08-18: `b40b-chasefree10g75seed2` @1513000 — 491/500 = 98.2%** (CI 96.6-99.1), now in
+[`../hallOfFame/`](../hallOfFame/README.md#-b40b-1513000--third-best-measured-and-the-one-entry-whose-batch-is-a-null).
+Third-best /500 in the folder, behind `b29b` (99.0) and ahead of `b24b`/`b24d` (98.0); it *rose* from 98.0/100.
+Checkpoint rsynced off the desktop and **the copy re-measured 97/100 on fresh laptop episodes** (avg score
+94.39, min 64). **Its batch is a null** — it is preserved on its own number, not as evidence for the free-space
+term. It also carries a ≥97%/500 cluster at 1509k-1545k that the auto pass's gate 98 abandoned.
 
 **NEW RECORD, 2026-08-13: `b24d-fc320noisseed4` @1342000 — 98.0% over 500 fresh episodes** (490/500,
 CI **96.4-98.9**). It edges the prior record, `b18b-tgt1000seed2` @1588000 at 97.6%/700 (CI 96.1-98.5), on
