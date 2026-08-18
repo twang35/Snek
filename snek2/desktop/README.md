@@ -275,6 +275,45 @@ remote-tracking ref, so without a fetch you get an old snapshot whose embedded
 `iso` timestamp then reads as a dead daemon. A stale-looking heartbeat is your own
 ref until you have fetched and re-read it.
 
+## ‡ A `done` in the ledger does not mean the results were published
+
+**`publish_results` has no retry, and this box's DNS for `github.com` flaps.** The job finishes, its artifacts
+are written to `~/Snek/snek2/runs/`, the ledger records **`done`**, the push fails once with
+`ssh: Could not resolve hostname github.com: Temporary failure in name resolution` — and nothing tries again.
+Measured 2026-08-18: **14 `publish_results` failures since 2026-08-17** (plus 122 for `publish_status`, which
+*does* retry every poll and so recovers on its own).
+
+**Nothing is lost, because a failed push leaves the commit local and the next successful results push carries
+the backlog with it.** That is why `b35`'s and three of `b37`'s close-outs eventually appeared while all four of
+`b40`'s HOF-500 files and `b40b`'s entire close-out did not: no results job completed after 07:27, and the queue
+then went empty, so nothing came along to carry them.
+
+**The trap is that absence looks like a result.** Most HOF jobs legitimately publish nothing — an arm with no
+≥98% checkpoint exits `done` with nothing measured — so *no file* and *an empty measurement* are the same
+absence over the git bus. `b40` looked like four empty HOF passes; it was in fact one held ≥98%/500 checkpoint
+at 98.2%, sitting unpublished on the box. **So before concluding a HOF pass found nothing, check the branch
+against the box:**
+
+```bash
+git fetch origin results
+git ls-tree --name-only origin/results:results | grep <policy>     # what was published
+ssh the-claw-den 'ls ~/Snek/snek2/runs/<policy>*'                  # what exists
+```
+
+**Recovery is a direct copy** — the git bus is for job control, not for large files, and rsync does not care
+about DNS on the box:
+
+```bash
+rsync -a "the-claw-den:Snek/snek2/runs/<policy>_checkpoint_evals*.json" snek2/runs/
+```
+
+Note the quoted **relative** path: `~/…` inside the quotes is not expanded by either shell and rsync fails with
+`change_dir … failed`.
+
+**The proper fix is in the daemon and has not been made** — either retry `publish_results` on the next poll, or
+reconcile at idle by pushing whenever the local `results` worktree is ahead of `origin/results`. Either one is a
+code change. Until then, treat a `done` HOF or close-out whose file never arrived as **unpublished, not empty**.
+
 ## Getting a finished job into the analysis workflow
 
 `git checkout results -- results/<job-id>` lands artifacts at

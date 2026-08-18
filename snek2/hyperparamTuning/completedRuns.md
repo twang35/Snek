@@ -74,6 +74,7 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 |---|---|---|---|---|---|---|---|
 | `b29b-chase10g75seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **99.0%** @1447k /500 | 100% | 87.14% /eq §§ | 97.3% | ‡‡‡ § **THE RECORD — highest /500 point estimate on record (99.0%, 495/500, CI 97.7-99.6)**, and the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a *region*, where b24's records are isolated points. The 99.0 vs 98.0 lead over b24 is inside the 500-ep CI; the region is not. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) 2026-08-16**, copy verified 98/100. See [Batches 28-29](#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 | `b29a-chase10g75seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **98.4%** @1347k /500 | 100% | 89.76% /eq §§ | 97.7% | ‡‡‡ § **3 checkpoints held ≥98%/500** (1339k/1347k/1414k), best 98.4% — record-tier, the second seed of the b29 gate-75 region. Not yet HOF-promoted |
+| `b40b-chasefree10g75seed2` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75) **+ free-space Φ = 1/(open regions)**, IS off, td_error | 2.00M | **98.2%** @1513k /500 | 100% | 89.52% /eq §§ | 97.7% | ‡‡‡ § **the only ≥98%/500 checkpoint in b40, and the third-best /500 on record** behind `b29b` (99.0) and `b29a` (98.4). 63 candidates at ≥98%/100 including a flawless **100.0%/100 @1424k**; one held. **HOF-promotion candidate, not yet promoted.** Its batch is a null — see [Batch 40](#batch-40--chase-safe-plus-a-free-space-term-null-and-the-b29-record-region-does-not-replicate) |
 | `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **98.0%** @1342k /500 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § **THE NEW RECORD** — 98.0% over 500 fresh episodes (490/500, CI [96.4,98.9]), and it *rose* on re-measurement (97.0/100 → 98.0/500), the genuine-region signature. 3 of its 51 ≥97%/100 checkpoints held ≥97%/500 (early, 0.9-1.36M). In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b24b-fc320noisseed2` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | **98.0%** @2860k /500 | 99.0% | 88.84% /eq §§ | **96.7%** | ‡‡‡ § **new record (tied)** — 98.0%/500 (490/500, CI [96.4,98.9]); 3 of 59 ≥97%/100 checkpoints held ≥97%/500, all late (2.74-2.86M). In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b24c-fc320noisseed3` ‡‡‡ § | **fc 320**, IS off, td_error | 3.00M | 97.4% @2982k /500 | 99.3% | 87.68% /eq §§ | 96.0% | ‡‡‡ § 3 of 46 ≥97%/100 checkpoints held ≥97%/500 (best 97.4%, CI [95.6,98.5], late 2.95-2.98M); **both its 100%/100 highs shrank below 97%/500**. Not added to HOF (below the record) |
@@ -112,6 +113,17 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 | `b38b-c51fc320eps3125seed2` ‡‡‡ § | **c51** `fc 320`, 51 atoms, **Adam ε 3.125e-4**, `lr 1e-4`, IS off, kl priority | 3.00M | 95.0% @284k /100 | 94.2% | 71.79% /eq §§ | **88.3%** | ‡‡‡ § highest best-30 of either batch on the **lowest** pooled — the clearest single case that best-30 and pooled measure different things. Trailing fell 81.2→74.6 over its last 700k steps |
 | `b38c-c51fc320eps3125seed3` ‡‡‡ § | **c51** `fc 320`, 51 atoms, **Adam ε 3.125e-4**, `lr 1e-4`, IS off, kl priority | 3.00M | 95.0% @290k /100 | 93.6% | 72.53% /eq §§ | 80.0% | ‡‡‡ § lowest best-30 of either batch (80.0) yet the highest trailing at cap (94.1). `sef` 18.6% |
 | `b38d-c51fc320eps3125seed4` ‡‡‡ § | **c51** `fc 320`, 51 atoms, **Adam ε 3.125e-4**, `lr 1e-4`, IS off, kl priority | 3.00M | 93.4% @557k /91 *trunc* | 92.5% | 72.66% /eq §§ | 87.3% | ‡‡‡ § no full-length row survived the gate at all; `sef` 22.2%. Pooled fell 74.55→72.66 past 2M |
+| `b40a-chasefree10g75seed1` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75) **+ free-space Φ = 1/(open regions)**, IS off, td_error | 2.00M | **100.0%** @1562k /100 | 100% | 88.28% /eq §§ | 96.3% | ‡‡‡ § **a flawless 100/100 close-out row** — but 0 of its 16 ≥98%/100 candidates held at 500 (best 96.3% at 294 ep, ab.), which is the attrition this file now expects. `sef` 45.0% |
+| `b40c-chasefree10g75seed3` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75) **+ free-space Φ = 1/(open regions)**, IS off, td_error | 2.00M | 99.0% @1538k /100 | 99.0% | 89.11% /eq §§ | 95.3% | ‡‡‡ § 9 candidates, 0 held (best 95.6% at 251 ep, ab.). `sef` 61.5% |
+| `b40d-chasefree10g75seed4` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75) **+ free-space Φ = 1/(open regions)**, IS off, td_error | 2.00M | 99.0% @1957k /100 | 99.0% | 85.68% /eq §§ | 94.0% | ‡‡‡ § the weak seed of b40, as every batch of this family has one. 2 candidates, 0 held. `sef` 56.8% |
+| `b37b-chase10g75seed6` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **b29's config, seeds 5-8** | 2.00M | 99.0% @1343k /100 | 99.0% | **90.50%** /eq §§ | 97.7% | ‡‡‡ § **highest pooled equal-effort of the whole chase-safe family (90.50)** — and **0 of its 43 ≥98%/100 candidates held at 500** (best 97.0% at 361 ep, ab.). The single clearest case that pooled and the record tier are different metrics |
+| `b37c-chase10g75seed7` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **b29's config, seeds 5-8** | 2.00M | 99.0% @879k /100 | 99.0% | 87.88% /eq §§ | 97.0% | ‡‡‡ § highest `sef` of b37 (58.6%); 16 candidates, 0 held (best 96.9% at 357 ep, ab.). Its best checkpoint is early, 879k |
+| `b37a-chase10g75seed5` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **b29's config, seeds 5-8** | 2.00M | 97.0% @1495k /100 | 97.0% | 82.19% /eq §§ | 91.3% | ‡‡‡ § **no ≥98%/100 checkpoint at all** — one of the two b37 seeds that contributed nothing, mirroring b29's own 2-of-4 split |
+| `b37d-chase10g75seed8` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **b29's config, seeds 5-8** | 2.00M | 93.4% @1393k /91 *trunc* | 93.4% | 80.72% /eq §§ | 90.0% | ‡‡‡ § weakest arm of the family on pooled (80.72); no full-length row survived the gate. `sef` 40.8% |
+| `b39d-c51zeroinitseed4` ‡‡ § | **c51** `fc 320`, 51 atoms over `[-5,120]`, **`C51_ZERO_INIT=1`** (E[Q]=0 at init), Adam ε 1.5e-4, `lr 1e-4`, IS off, kl priority | 3.00M | 90.9% @2913k /77 *trunc* | 90.9% | 70.57% /eq §§ | 80.7% | ‡‡ § top of b39, and **b39 has no full-length row in any arm** — all 650 close-out rows were abandoned under the 95% gate. Its best-30 peak is at 2924k, so the 3M horizon flatters it against b36's 2M and it still loses by 6 pp |
+| `b39c-c51zeroinitseed3` ‡‡ § | **c51** `fc 320`, 51 atoms over `[-5,120]`, **`C51_ZERO_INIT=1`** (E[Q]=0 at init), Adam ε 1.5e-4, `lr 1e-4`, IS off, kl priority | 3.00M | 91.9% @234k /86 *trunc* | 91.9% | 70.60% /eq §§ | 77.7% | ‡‡ § highest pooled of b39 by 0.03 pp — the batch's four seeds span **0.83 pp**, against b36's 5.4, which is what a capacity ceiling looks like rather than seed noise |
+| `b39a-c51zeroinitseed1` ‡‡ § | **c51** `fc 320`, 51 atoms over `[-5,120]`, **`C51_ZERO_INIT=1`** (E[Q]=0 at init), Adam ε 1.5e-4, `lr 1e-4`, IS off, kl priority | 3.00M | 89.4% @482k /66 *trunc* | 89.4% | 69.78% /eq §§ | 75.7% | ‡‡ § the mechanism arm: action gap **1.72 at 10k** against `b36a`'s **12.18**, reaching 8.90 only by ~600k, while its value level converged *faster* (half-life 202k vs 304k). `aeff` 7.0 → 26.7 @601k → 21.1 |
+| `b39b-c51zeroinitseed2` ‡‡ § | **c51** `fc 320`, 51 atoms over `[-5,120]`, **`C51_ZERO_INIT=1`** (E[Q]=0 at init), Adam ε 1.5e-4, `lr 1e-4`, IS off, kl priority | 3.00M | 91.5% @758k /71 *trunc* | 91.5% | 69.77% /eq §§ | 75.7% | ‡‡ § second mechanism arm, same shape — gap 1.69 → 9.17, `aeff` 7.0 → 27.3 @631k → 20.9, half-life 163k. Lowest pooled of the batch |
 | `b18b-tgt1000seed2` ‡‡‡ § | **target period 1000**, forking on | 2.40M | **97.6%** @1588k /700 | **97.0%** | 78.52% /eq §§ | 86.0% | ‡‡‡ § **THE PROJECT RECORD** — 97.6% over 700 fresh episodes (CI 96.1-98.5), beating `b17b` by +3.33 pp, p=0.0002. **The first selected high here that did not shrink** (98/100 -> 97.4%/500). A narrow peak: @1578k reads 91.6%. In [`../hallOfFame/`](../hallOfFame/README.md) |
 | `b18a-tgt1000seed1` ‡‡‡ § | **target period 1000**, forking on | 2.61M | 96% @1289k /100 | 95.3% | **81.87%** /eq §§ | 88.0% | ‡‡‡ § 2nd-highest eq-effort on record; `sef` **41.4%** at 2.61M |
 | `b18d-tgt1000seed4` ‡‡‡ § | **target period 1000**, forking on | 2.60M | 96% @1105k /100 | 96.0% | 80.22% /eq §§ | **91.0%** | ‡‡‡ § **highest `sef` ever recorded, 47.9%** (inflated by run length); best-30 91.0%, and the batch's smallest drawdown |
@@ -299,6 +311,188 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 40 — chase-safe **plus a free-space term**: null, and the b29 record region does not replicate
+
+**A second potential-based shaping term added on top of `b29`'s exact record config**, testing the
+mechanism the record rests on directly: the records keep their free space in one connected piece, so
+`b40` rewards that with `Φ = 1 / (number of open regions)`, the tail cell freed before the count. It is
+*added to* chase-safe, not a replacement — PBRS terms sum, so `b40` is `b29`'s shaping plus a global
+fragmentation signal and stays policy-invariant.
+
+| | |
+|---|---|
+| arms | `b40a-d-chasefree10g75seed{1..4}`, seeds 1-4, **2M**, priority 30 |
+| config | `b29` verbatim — `fc 320`, IS off, `TARGET_UPDATE_PERIOD 1000`, `DISCOUNT 0.9975`, `FORK_BRANCHES 4`, no food-distance, chase-safe `c=0.10` gate 75 — **plus** `SNEK_FREE_SPACE_SHAPING=0.10`, `SNEK_FREE_SPACE_GATE=75` |
+| control | **`b29a-d`** (seeds 1-4, on disk) — one-variable, the free-space term is the only change. `b37` (seeds 5-8) firms up the same baseline in parallel |
+| code | needs desktop `master ≥ 6bdbe7c3` (`FREE_SPACE_SHAPING`), **deployed 2026-08-17** — without it the env vars are ignored and `b40` is a silent `b29` dup |
+
+**Why `1/count` and not `largest/total`.** In a perfect game every open cell must be filled, so a single
+stranded cell loses — the *number* of pieces is the fatal quantity. `largest/total` reads 0.95 for a 19+1
+split and barely reacts to the first break; `1/count` cliffs to 0.5 the moment the board stops being one
+piece. **The tail is freed before counting** (the `update_grid` tail-as-door correction), so a region
+reachable only past the vacating tail is not miscounted as sealed — the artefact was wrong on 40% of steps
+past score 80, exactly this term's endgame.
+
+**What each outcome means.** `b40 > b29` on the ≥98%/500 count or the record-region width → the explicit
+packing signal adds on top of chase-safe, a new record; judge by that count against **b29's 21 checkpoints**,
+not `sef`/best-30, since b29 already dead-heats b24 on the pooled mean. `b40 ≈ b29` → the global term is
+redundant with chase-safe in practice, and the follow-up is the *replace* arm (free-space alone). Watch the
+training curves for added variance — a count-based term flickers more per step than chase-safe, though the
+tail-freeing and the gate 75 confine it.
+
+### Result
+
+| arm | best-30 | `sef` | pooled/eq | ≥98%/100 | held ≥98%/500 |
+|---|---|---|---|---|---|
+| `b40b` | **97.7** | **62.7** | 89.52 | **63** | **1 — 98.2% @1513k** |
+| `b40c` | 95.3 | 61.5 | 89.11 | 9 | 0 |
+| `b40a` | 96.3 | 45.0 | 88.28 | 16 | 0 |
+| `b40d` | 94.0 | 56.8 | 85.68 | 2 | 0 |
+| **group** | | | **88.15** | **90, 4 of 4 seeds** | **1** |
+
+**Null on both metrics that matter.** Pooled ties the family (b29 87.83, b34 86.43, b35 88.20), and the ≥98%/100
+distribution **16 / 63 / 9 / 2** is close to b29's own **59 / 64 / 9 / 1**. Two arms produced a flawless
+**100.0%/100** row (`b40a` @1562k, `b40b` @1424k) and one checkpoint held 500 episodes — `b40b` @1513k at
+**98.2%/500**, third-best /500 on record and a HOF-promotion candidate.
+
+**The hypothesis is answered, and answered against.** The term was aimed at the
+[one-piece-free-space gap](findings.md#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points)
+that separates records from duds by 87 points, which is the strongest per-policy separation this project has
+measured — and shaping it changed nothing. **Knowing which quantity distinguishes good policies did not make
+shaping that quantity work.** Fourth PBRS term to come back null.
+
+**Its wider consequence is about `b29`, not about free space.** With `b37` (b29's config on fresh seeds) holding
+**0 of 4**, three batches with indistinguishable /100 tiers produced held counts of **21, 1 and 0** — so that
+count is seed noise, and b29's 18-checkpoint band was a seed. The correction is in
+[`findings.md`](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading).
+
+
+## Batch 39 — **C51 initialised at expected Q = 0**: it loses, and through the head's capacity rather than its calibration
+
+**`launch_b39_zeroinit.sh`: b36's config with `SNEK_C51_ZERO_INIT=1` as the only change** — the two
+launchers' environment blocks were diffed and differ in exactly that line, so `b36a-d` is an exact
+seed-matched control. Same `eps 1.5e-4`, `lr 1e-4`, `fc 320`, seeds 1-4, 3M cap. **First arm ever to run
+with the ramp** (dead code since 2026-08-15); a 2,500-step smoke run verified the wiring first and all four
+reports read `zero-expected-Q init`.
+
+**Run in the knowledge that the measurement predicts it loses.** True value is **~34**, so standard init's
+57.5 is 23.5 high and **zero is 34.0 low** — the ramp moves the init *further* from the truth. The purpose
+is the mechanism: *why* it fails is transferable, *that* it fails is not.
+
+**Pre-registered before launch**, and the priors were nudged when the epsilon was set to b36's 1.5e-4
+rather than 1e-4, because the ramp unwinds through parameters whose Adam step is divided by `eps`:
+
+| | outcome | tell |
+|---|---|---|
+| **H1 ~50%** | null on best-30 and `sef`, with a measurably slower first 100-200k steps | time-to-first-80%-eval up, endpoint unchanged |
+| **H2 ~35%** | 5-10 pp regression, from top-atom suppression delaying the **endgame** value signal | `value_by_length.py` flat across bands 85-97 early; endgame gap below b36's 19.8-24.3 |
+| **H3 ~15%** | improvement, via less early over-optimistic bootstrapping → less churn | `c51_stability.py --states-from` below 0.0865 at matched `--end` |
+
+**‡ Result at 1.26M: H2 confirmed, H1 falsified — but through the wrong channel.** Matched and
+seed-paired, b39 is **−10.4 pp** on best-30 and on `sef`, **4 of 4 seeds down** (−7.0, −10.3, −12.0, −12.3),
+which lands at the top of H2's 5-10 pp band. The `aeff` signature appeared as pre-registered (**7.0 → ~27
+@600-630k → 21**, against b36's monotone 49.6 → 21.6). **The mechanism is not H2's endgame-suppression
+story.** Zero-init's value level converged *faster* — half-life **163-202k** against b36a's **304k**, from a
+*larger* initial error — so calibration is not the channel. The channel is **action separation**: b36a has a
+12.18 action gap by **8k steps**, b39 sits at **1.72** and needs ~600k to reach 8.90. Numbers, the death-atom
+mass, and the general rule are in
+[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m)
+and [`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
+**`SNEK_C51_ZERO_INIT` stays off**; the arms run to their 3M cap so the close-out measures the full curve.
+
+**The decisive measurement is `aeff` against step**, and it is a signature no other arm can produce:
+standard init falls 49.9 → 21-24 monotonically, so a **6.7 → ~36 → 21-24** climb is direct evidence the head
+spent training broadening before it could sharpen. Mechanism, the ramp's three effects, and the smoke
+confirmation are all in the launcher header and
+[`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
+
+### Result
+
+| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta | b39 pooled | b36 pooled |
+|---|---|---|---|---|---|
+| 1 | 75.7 / 10.7 | 84.0 / 24.3 | **−8.3** / −13.6 | 69.78 | 75.36 |
+| 2 | 75.7 / 15.8 | 86.0 / 25.3 | **−10.3** / −9.5 | 69.77 | 76.70 |
+| 3 | 77.7 / 20.0 | 84.7 / 18.9 | **−7.0** / +1.1 | 70.60 | 74.77 |
+| 4 | 74.7 / 11.0 | 86.7 / 17.5 | **−12.0** / −6.5 | 70.57 | 80.19 |
+| **group** | **76.0 / 14.4** | **85.4 / 21.5** | **−9.4 / −7.1** | **70.18** | **76.76** |
+
+*best-30 and `sef` matched at ≤1.87M, b36's shortest horizon; pooled over each arm's whole close-out.*
+
+**H2 confirmed, H1 falsified**, 4 of 4 seeds on both metrics. **All 650 close-out rows were abandoned under the
+95% gate** — no measurable checkpoint anywhere in the batch, against 4 full-length rows in b36 and 5 in b38 — and
+the pooled spread across seeds is **0.83 pp** (b36: 5.4), which reads as a ceiling rather than luck.
+
+**The pre-registered mechanism was wrong.** Zero-init's value level converged **faster** (half-life 163-202k vs
+b36a's 304k, wash-out 601-631k vs 864k) from a **larger** initial error, so calibration is not the channel. The
+channel is **action separation**: b36a reaches a 12.18 action gap by 8k steps, b39 sits at 1.72 and needs ~600k
+to reach 8.90, and `argmax` depends only on differences. The `aeff` path was non-monotonic exactly as
+pre-registered (7.0 → ~27 @600-630k → 21 vs b36's monotone 49.6 → 21.6). Full account in
+[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m).
+
+
+## Batch 37 — **`b29` replicated on fresh seeds 5-8**: the /100 band replicates, the /500 record does not
+
+**Retrieved into `runs/` on 2026-08-18 and confirmed — the provisional figures read off the `results` branch
+were correct.** All four arms completed training, close-out **and** HOF-500 at 2M. **Verdict and the correction
+it forces** are in
+[`findings.md`](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading);
+per-arm rows in [`completedRuns.md`](completedRuns.md), charts in [`charts.md`](charts.md#batch-37--b29-replicated-on-fresh-seeds-5-8--done-on-the-desktop-the-100-band-replicates-the-500-record-does-not).
+
+| arm | pooled /eq | best ckpt /100 | ≥98%/100 | **held ≥98%/500** | best-30 | `sef` |
+|---|---|---|---|---|---|---|
+| `b37b` seed6 | **90.50** | **99.0% @1343k** | **43** | **0** — best 97.0% @1347k (361 ep) | 97.7 | 56.0 |
+| `b37c` seed7 | 87.88 | **99.0% @879k** | **16** | **0** — best 96.9% @931k (357 ep) | 97.0 | 58.6 |
+| `b37a` seed5 | 82.19 | 97.0% @1495k | 0 | — (no candidates) | 91.3 | 49.8 |
+| `b37d` seed8 | 80.72 | 93.4% @1393k *[91 ep]* | 0 | — (no candidates) | 90.0 | 40.8 |
+| *`b29a-d` original* | *87.8 mean* | *99.0% / 98.4%* | | ***21 held across 2 of 4*** | | |
+
+**The provisional reading, which needs proper analysis before it is trusted: the *band* replicates and the
+*record* does not.** The same **2-of-4** pattern appears — two seeds with large ≥98%/100 bands (43 and 16
+checkpoints), two with none — and `b37b`'s pooled **90.50 is the highest of the whole gate-75 family**. But
+**0 of those candidates survived re-measurement at 500 episodes**, where b29 produced 21, and the two best
+were abandoned under gate 98 at ~360 episodes (97.0%, 96.9%). That is this project's documented
+selection-inflation signature, and it bears directly on whether "gate 75 is the lever" describes the gate or
+describes seeds 1-2 — so **do not resolve it from this table.**
+
+**Exact b29 config, new seed draw — is the gate-75 record region reproducible, or were seeds 1-2 lucky?**
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping,
+chase-safe `c=0.10`, **gate 75**, 2M cap — every env var identical to b29, only `SNEK_SEED` changes (5, 6, 7,
+8 for `b37a-d`). Queued to `ops` at priority 30; **b35 is now done, so its four slots are free — b37 launches
+on the next dispatch** (still `queued` at the 08:22 poll), close-out and HOF-500 auto-chained.
+
+**Why it matters.** b29's whole result — the new project record — rests on a **21-checkpoint ≥98%/500 region
+that appears in only 2 of its 4 seeds** (`b29a` 3, `b29b` 18), while `b29c`/`b29d` held none. b34 (gate 70) then
+produced **0 across 4 seeds**, and its near-misses were on *different* seeds (3, 4) than b29's winners (1, 2).
+So the gate-75 effect could be a genuine narrow sweet spot **or** two lucky seeds; n=4 cannot tell them apart.
+A fresh draw of four seeds at the exact same config is the direct test.
+
+| outcome | reading |
+|---|---|
+| b37 produces a ≥98%/500 region comparable to b29's 21 | the config is **robust** — gate 75 reliably reaches the record tier, seeds 1-2 were not special |
+| b37 produces a few isolated ≥98%/500 checkpoints (like b24's 2) | gate 75 **helps but the record *region* was partly seed-luck** — real effect, inflated headline |
+| b37 produces 0, like b34 | b29's region was **lucky seeds**; the gate-75 result does not generalise and needs re-examining |
+
+**No seed-matched control** — no b24-family arm ran on seeds 5-8 — so judge b37 on its **aggregate ≥98%/500
+count and record-band width against b29's**, not seed-by-seed, and not on pooled/best-30 (which do not
+discriminate up here). Check the desktop with `git fetch origin ops-status && git show
+origin/ops-status:status.json` — **the fetch is required**, see [CLAUDE.md](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
+
+### Result
+
+| arm | best-30 | `sef` | pooled/eq | ≥98%/100 | held ≥98%/500 |
+|---|---|---|---|---|---|
+| `b37b` seed6 | **97.7** | 56.0 | **90.50** | **43** | 0 — best 97.0%, ab. at 361 ep |
+| `b37c` seed7 | 97.0 | **58.6** | 87.88 | 16 | 0 — best 96.9%, ab. at 357 ep |
+| `b37a` seed5 | 91.3 | 49.8 | 82.19 | 0 | 0 |
+| `b37d` seed8 | 90.0 | 40.8 | 80.72 | 0 | 0 |
+| **group** | | | **85.32** | **59, 2 of 4 seeds** | **0 of 4** |
+
+**Outcome 3 of the three pre-registered readings: "b29's region was lucky seeds".** The 2-of-4 split reproduces
+exactly, and `b37b` posts the family's best pooled arm while holding nothing at 500 — the sharpest single
+illustration that pooled and the record tier measure different things. Retrieved into `runs/` 2026-08-18; the
+provisional figures read off the `results` branch the day before were correct.
+
 
 ## Batch 36 — C51 on `fc 320`: **the better C51 shape, and still far behind `ddqn`**
 

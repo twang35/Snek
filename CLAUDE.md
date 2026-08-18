@@ -397,6 +397,16 @@ verified process**. Most arms have no ≥98% checkpoint, so the HOF job exits `d
 measured; that is normal, not a failure. Turn it off with `auto_hof: false`. Full mechanism:
 [`snek2/desktop/README.md`](snek2/desktop/README.md#the-eval-chain-training--closeout--hof-re-measure).
 
+**‡ But "nothing measured" and "never published" look identical, and `publish_results` has no retry.** The
+box's DNS for `github.com` flaps; a failed push leaves the commit local, the ledger still says `done`, and only
+the *next* successful results push carries the backlog. On 2026-08-18 all four of `b40`'s HOF-500 files plus
+`b40b`'s whole close-out sat unpublished for hours — one of them a **98.2%/500** checkpoint — while
+`status.json` read `done` and the branch showed nothing. **So before concluding a HOF pass was empty, compare
+the branch with the box** (`git ls-tree --name-only origin/results:results | grep <policy>` against
+`ssh the-claw-den 'ls ~/Snek/snek2/runs/<policy>*'`) and recover with
+`rsync -a "the-claw-den:Snek/snek2/runs/<policy>_checkpoint_evals*.json" snek2/runs/`. Full account:
+[`snek2/desktop/README.md`](snek2/desktop/README.md#-a-done-in-the-ledger-does-not-mean-the-results-were-published).
+
 **Pushing to `ops` starts real work on another machine**, so it falls under the git rule above: queue a
 job only when the user has approved *that* job.
 

@@ -33,7 +33,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported, at half the size first reported**: on a *shared* state set b32 cuts churn **0.119 → 0.088 (−26%)** paired at 600k, 4 of 4, flat to 1M — the 360k figures below were on per-arm sets and inflated ~2×. **The dose is closed for good** — b36 vs b38 at 4 seeds a side, matched ≤2M, pools 76.77 vs 74.73, 3 of 4 favouring `1.5e-4`, p=0.625. Two 2× steps in the knob, nothing twice. See below |
 | **‡ C51 gains nothing past ~2M** — 3 of b38's 4 arms pool *worse* over their full 3M than over their first 2M | **measured 2026-08-17**. `b38a` is the lone exception and holds the batch's best checkpoint at 2355k. With b33's four arms declining for 1.4M steps after peaking, **future C51 batches can stop at ~2M** and cost a third less. Method: `pooled_equal_effort` is exactly recomputable at any cutoff from each row's `episode_perfect` flags |
 | **‡‡ After four fixes C51 is still well behind `ddqn` at its own architecture — `b24`, not `b32`, is the control** | **corrected 2026-08-17**. `b24a-d` (`ddqn`, **same `fc 320`**): best-30 **95.3-96.7**, `sef` **60.5-73.2**, and **every seed has a ≥98% checkpoint inside 2M**. `b36a-d` (c51, `fc 320`): **84.0-86.7**, `sef` **17.4-24.7**, best 91.6-97.0, **no seed ≥98%**. `fc 320` is a real gain **over `b32`** (+9 to +24 pp, spread 14.0 → 2.7) and that much stands; the "four seeds finally agree" reading does not, since both `ddqn` batches sit at 1.4 pp. `sef` at 3× does not overlap |
-| **‡‡ Zero-init on C51 loses −10.4 pp, 4 of 4 seeds — and via **action separation**, not calibration** | **measured 2026-08-17/18**, b39 vs b36 at ≤1.26M, one-variable. Zero-init converges its value *level* **faster** (half-life 163-202k vs 304k) from a *larger* error and still plays worse. The gap is the channel: b36 reaches full action separation (12.2) by **8k steps**, b39 sits at **1.7** and needs ~600k. λ=0.16219 leaves `aeff` **7.0 of 51** and 15-18% of greedy mass on the death atom. **Keep `SNEK_C51_ZERO_INIT` off.** See below |
+| **‡‡ Zero-init on C51 loses −9.4 pp best-30 / −6.6 pp pooled, 4 of 4 seeds — via **action separation**, not calibration** | **measured 2026-08-18**, b39 vs b36, one-variable, b39 closed at 3M. **650 of 650 close-out rows abandoned under the 95% gate — no measurable checkpoint in the whole batch.** Zero-init converges its value *level* **faster** (half-life 163-202k vs 304k) from a *larger* error and still plays worse. The channel is the gap: b36 reaches full separation (12.2) by **8k steps**, b39 sits at **1.7** and needs ~600k. λ=0.16219 leaves `aeff` **7.0 of 51**. Pooled spread of 0.83 pp across seeds says ceiling, not luck. **Keep `SNEK_C51_ZERO_INIT` off.** See below |
 | **‡‡ A C51 head starts at the grid midpoint — 57.5, against a true value of ~34 — and it cost b36 nothing** | **measured 2026-08-17**. Five c51 arms *descend* to 32.4-36.0 and the `ddqn` control *ascends* to 33.96, so ~34 is the truth and the init is **1.7× optimistic**. Harmless because the offset is **common-mode**: `b36a`'s action gap is at full scale (14.91) at 8k while `V` is 21 too high, and it scores 45 at 8k / 92 at 127k regardless. **`SNEK_C51_ZERO_INIT=1` would be a mild pessimization** — 0 is *further* from 34 than 57.5 is, and its λ=0.162 ramp starts the head sharper (`aeff` 6.7) than any trained net here ever gets. Wash-out is `ln(0.5)/ln(γ)` per target refresh — **277k predicted, 233-335k measured** — so it is the discount's clock, not the algorithm's. See below |
 | **‡ Cross-arm churn requires `--states-from`; every per-arm figure comparing arms of different quality is inflated ~2×** | **corrected 2026-08-16**. `churn` depends on the action gap, which is ~0.2 early-game against 20-24 in the endgame, so a weak arm that dies early is scored on near-tied states that flip for free. b32's controls carried state-set mean lengths of **11.9 and 21.2** against the treated arms' 34.9-38.0. On a shared champion set the effect halves but survives, and **gap stops explaining churn** — the highest-gap arm of the six is now a control. Within-arm trends across phases are unaffected |
 | **‡‡ A terminal reward must clear `W > 1/(1 − γ^k)` (`k` = steps per meal) or progress lowers value** — at γ=0.9975 that is **34-58** at the realistic pace, so the shipped `PERFECT_GAME_REWARD=100` clears it 2-3× and **10 misses it 3-6×** | **derived and measured 2026-08-16** by b33. Every meal costs the win-10 arm **1.7-4.4** points of `V` while paying 1, so it correctly avoids finishing. **The win reward is the potential, not the prize** — its job is keeping `V` rising as the board fills. Shrinking `W` requires shrinking γ. See below |
@@ -86,7 +86,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ Free space in one piece at length 90-94 separates the records from a dud by 87 points** | **measured 2026-08-14** — one-piece share **92% / 77% / 5%** for `b24d` / `b18b` / `b20d`, per meal, identical food, exact (one flood fill, no search). The gap opens **ten meals before the end**, and all three reach those lengths equally often. Largest per-policy separation on record here |
 | **‡ The chase-safe potential self-attenuates: ~35 flips per episode for a dud, ~4.6 for a record** | **measured 2026-08-14**, 60 episodes × 3 checkpoints. Genuine flips per endgame meal are **2.5-3.6** for `b20d` against **0.21-0.63** for the records, which spend 10.8% of steps at length ≥85 against `b20d`'s 41.2%. Sets `c = 0.10`. **98-99 carries 0.00-0.04 — the last meals cannot be shaped by this quantity.** See below |
 | **‡‡ Realised chase-safety is the only marker that still separates the top seven** | **best available lead**, n=7, ~18 tests — pearson **+0.860** (85-94) and **+0.822** (95-99). The *behaviour*, not the Q-sensitivity to obs 15-17 that this file demotes below |
-| **‡‡ Chase-safe shaping: the gate is the lever, and gate 75 is an isolated sweet spot — null at 85, 70 *and* 40, records only at 75** | **measured 2026-08-16/17**, 6 batches. Gate 85 held **0 records** across b27 (`fc 320`), b30 (`fc 200,100,100`) and b28 (`c=0.20`); **gate 70 (b34) 0 of 4**; **gate 40 (b35) 0 of 4** (b35c HOF-500 pending) *despite the highest pooled of any shaped batch, 88.2*. Only gate 75 (b29) produced records — **21 checkpoints ≥98%/500 in 2 seeds**, best `b29b` @1447k **99.0%/500**. The window is a **narrow band around 75**, not "everything below 85", and consolidation (pooled) is decoupled from the record tier. See below |
+| **‡‡‡ Corrected 2026-08-18: the ≥98%/500 record tier is **seed noise**, not a property of gate 75 — three indistinguishable batches gave 21, 1 and 0** | **measured 2026-08-18**, b37 (b29 replicated on seeds 5-8) held **0 of 4**; b40 (b29 + free-space term) held **1**; b29 held **21**. Their ≥98%/**100** tiers agree closely (b29 59/64/9/1, b40 16/63/9/2, b37 0/43/16/0) and pooled ties across the family (**87.83 / 88.15 / 85.32**, b34 86.43, b35 88.20). So gate 75 is still where the /100 tier is richest, but **"gate 75 produces a record region" does not survive replication** — 90 ≥98%/100 checkpoints in b40 yielded one that held 500 episodes. Judge this family on pooled, never on held counts. See below |
 | **‡‡ Why gate 75 wins, at the board level** — seed-matched greedy replay: gate 75 keeps the board healthier at **every** length (better packing, ~½ the isolated pockets, food reachable ~1.5× more), and gate 85's failures arrive at the gate already fragmented | **measured 2026-08-16**, 4×400 episodes. All losses are **starves, not walls**; the divergence opens *below* gate 85, so gate 85 grades decisions already made. **Prediction confirmed both ways:** it read "sweet-spot, not monotone" and gate 70 (b34) *and* gate 40 (b35) are both null. See below |
 | **‡‡ An arm's best checkpoint is set by its median (r=+0.971) — there is no lucky checkpoint** | **established** on 3,712 full-depth rows. `b10b` measured **624** and never cleared 90%; `b18b` measured 9 and all 9 cleared it. **Screening more checkpoints is not a route to a better policy** |
 | **‡ Checkpoints under 20k steps apart are indistinguishable at 100 episodes** | **measured** — mean \|Δperfect\| **5.90 pp** against a **6.48 pp** noise floor. Selecting the max of 20-50 such reads inflates by **5-6 pp**, which fully accounts for the project's documented −5.05 to −5.2 pp shrinkage |
@@ -459,21 +459,29 @@ metric** (see the note below). `fc 320` also *holds*
 the optimism longer than `fc 200,100,100` does (b36c/b36d rise to 58.7-58.9 by ~80-110k before
 descending, where `b32a` is down to 52 by 23k) — n=1 architecture, so noted only.
 
-## ‡‡ Zero-init loses, and the channel is **action separation, not calibration** — b39 at 1.26M
+## ‡‡ Zero-init loses, and the channel is **action separation, not calibration** — b39, closed at 3M
 
-`b39a-d` is b36's config with `SNEK_C51_ZERO_INIT=1` as the only change (env blocks diffed; one line).
-**H2 confirmed at the top of its pre-registered range.** Matched at ≤1.26M, seed-paired:
+`b39a-d` is b36's config with `SNEK_C51_ZERO_INIT=1` as the only change (env blocks diffed; one line). All
+four ran to the 3M cap and closed out at gate 95. **H2 confirmed, H1 (the 50% favourite) falsified.** Matched
+at ≤1.87M — b36's shortest horizon — and seed-paired:
 
-| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta |
-|---|---|---|---|
-| 1 | 71.7 / 9.6 | 84.0 / 29.9 | **−12.3** / −20.3 |
-| 2 | 75.7 / 17.8 | 86.0 / 29.1 | **−10.3** / −11.3 |
-| 3 | 77.7 / 22.4 | 84.7 / 19.8 | **−7.0** / +2.6 |
-| 4 | 74.7 / 10.2 | 86.7 / 22.9 | **−12.0** / −12.7 |
-| **group** | **74.9 / 15.0** | **85.3 / 25.4** | **−10.4 / −10.4** |
+| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta | b39 pooled | b36 pooled |
+|---|---|---|---|---|---|
+| 1 | 75.7 / 10.7 | 84.0 / 24.3 | **−8.3** / −13.6 | 69.78 | 75.36 |
+| 2 | 75.7 / 15.8 | 86.0 / 25.3 | **−10.3** / −9.5 | 69.77 | 76.70 |
+| 3 | 77.7 / 20.0 | 84.7 / 18.9 | **−7.0** / +1.1 | 70.60 | 74.77 |
+| 4 | 74.7 / 11.0 | 86.7 / 17.5 | **−12.0** / −6.5 | 70.57 | 80.19 |
+| **group** | **76.0 / 14.4** | **85.4 / 21.5** | **−9.4 / −7.1** | **70.18** | **76.76** |
 
-**4 of 4 seeds down on best-30. H1 (null, the 50% favourite) is falsified** — this is not a slow start that
-converges.
+**4 of 4 seeds down on best-30 and on pooled** (−5.58, −6.93, −4.17, −9.62) — not a slow start that converges.
+
+**‡ The single cleanest number: b39 produced no measurable checkpoint at all.** All **650 close-out rows across
+the four arms were abandoned** under the 95% gate — zero full-length rows, against 4 in b36 and 5 in b38 — and
+its best truncated rows are **89.4-91.9%** where b36's full-length best are **94.0-97.0%**. Nothing in the
+batch could still reach 95% once its failures were counted.
+
+**Its seed spread says ceiling, not luck: pooled 69.77-70.60, a spread of 0.83 pp**, against b36's 5.4 and
+b38's 6.7. Seed noise does not pin four seeds to the same worse level; a capacity constraint does.
 
 **‡ But the predicted *reason* was wrong, and the correction is the useful part.** Both the launcher and the
 earlier finding argued the damage would come through *calibration*: the ramp starts 34 from the truth
@@ -891,6 +899,8 @@ IS-off controls:
 | `b29a-d` | `fc 320` | 0.10 | **75** | `b24` (2 records) | **21, in 2 seeds** | **99.0 (`b29b` @1447k)** |
 | `b34a-d` | `fc 320` | 0.10 | **70** | `b24` (2 records) | **0 of 4** | 97.2 (`b34d`, 392 ep ab.) |
 | `b35a-d` | `fc 320` | 0.10 | **40** | — (none on seeds 1-4) | **0 of 4** (b35c pending) | 97.0 (`b35d`, 367 ep ab.) |
+| `b37a-d` | `fc 320` | 0.10 | **75**, seeds **5-8** | `b29` itself | **0 of 4** | 97.0 (`b37b`, 361 ep ab.) |
+| `b40a-d` | `fc 320` | 0.10 | **75** + free-space Φ | `b29` itself | **1** | **98.2 (`b40b` @1513k)** |
 
 **Gate 85 is null on every axis it was pushed.** Two architectures agree (`b27`, `b30`), doubling the dose to
 `c=0.20` changes nothing (`b28`), and none of the twelve gate-85 arms produced a single checkpoint that holds
@@ -927,11 +937,14 @@ and even the b24 control's 87.9), yet reaches no record tier — so **consolidat
 decoupled**, and a batch can grade the mid-game into a slightly healthier average board without ever producing
 the record-tier endgame that only gate 75 found. So across four gates — 85, 75, 70, 40 — only 75 records: the
 sweet spot is a **narrow, isolated band**, not a monotone ladder or a broad "anything below 85" region.
+**Qualified 2026-08-18** — the band is real on the ≥98%/**100** tier, but the /500 record count that framed it
+turned out to be seed noise; read the correction below before quoting the 21.
 
 **Read the lead honestly.** `b29b`'s 99.0% over `b24d`'s 98.0% is inside the 500-episode confidence intervals —
 a one-run point lead, not a resolved win. What is *outside* noise is the **region**: `b24` produced 2 isolated
 ≥98%/500 checkpoints across 4 seeds, `b29` produced 21 across 2, an 18-wide contiguous band in one arm. A record
-this project has only ever hit as isolated points now appears as a plateau — that is the signal worth chasing.
+this project has only ever hit as isolated points now appears as a plateau — **but see the
+[2026-08-18 correction below](#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading): the region did not replicate on fresh seeds, and the count is seed noise.**
 **`b29b` @1447k is now the folder record**, promoted to [`../hallOfFame/`](../hallOfFame/README.md) on
 2026-08-16 (rsynced off the desktop, the copy re-measured 98/100 on fresh laptop episodes); its 99.0%/500
 edges `b24d`'s 98.0%/500 within the CI, but it is the first record that is a genuine region rather than a point.
@@ -946,6 +959,41 @@ are the survivors of the 500-episode re-measure, not close-out highs.
 under the [perfect-counting bug](#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter)
 that pinned epsilon at 0.0125 and are discarded; the valid, unhandicapped runs are `b27e-h` and `b30e-h`,
 relaunched after the fix, and are the only ones read above.
+
+### ‡‡‡ Corrected 2026-08-18: the record *region* does not replicate — the ≥98%/500 count is seed noise, and pooled is the only metric of this family worth reading
+
+Everything above about gate 75 rests on `b29`'s **21 held checkpoints**. Two batches now test that number
+directly, and neither reproduces it.
+
+| batch | what it changes vs `b29` | pooled/eq (mean) | ≥98%/**100** | held ≥98%/**500** |
+|---|---|---|---|---|
+| `b29a-d` | — (the original) | **87.83** | 59 / 64 / 9 / 1 = **133** | **21**, best 99.0% |
+| `b37a-d` | **seeds only** (5-8) | 85.32 | 0 / 43 / 16 / 0 = **59** | **0** |
+| `b40a-d` | **+ free-space Φ** | **88.15** | 16 / 63 / 9 / 2 = **90** | **1**, best 98.2% |
+
+**The /100 tier replicates and pooled ties; only the /500 count moves, and it moves by 21×.** b40's per-seed
+≥98%/100 counts (16/63/9/2) are close to b29's own (59/64/9/1) — same 4-of-4 shape, same one-dominant-seed
+profile — and the three pooled means sit inside the family's spread (b34 86.43, b35 88.20). b37, which changes
+*nothing but the seed*, holds **zero**.
+
+**So "gate 75 produces a record region" does not survive replication.** What survives is narrower: gate 75 is
+where the ≥98%/**100** tier is richest, and `b29b`'s 18-wide band was a **seed**, not a config. 90 candidate
+checkpoints in b40 yielded **one** that held 98% over 500 fresh episodes; 59 in b37 yielded none. **That
+attrition rate is the finding** — a ≥98%/100 checkpoint has roughly a 1-in-60 chance of holding at 500 — and it
+is why held counts of 0, 1 and 21 are all consistent with the same underlying config.
+
+**Two rules follow.** Judge this family on **pooled equal-effort**, which is stable across seeds to ~±2 pp, and
+**never treat a single batch's held count as a property of its config** — this file did exactly that for two
+days. The gate-85/70/40 nulls are unaffected: those batches are null on pooled *and* on the /100 tier, which is
+a different and much stronger kind of null than "held 0 at 500".
+
+**And `b40`'s own hypothesis is answered: the free-space term is a null.** An explicit
+`Φ = 1 / (open regions)` on top of chase-safe moved pooled by +0.3 pp (88.15 vs 87.83, well inside seed noise)
+and the /100 tier not at all, despite being aimed exactly at the [one-piece-free-space
+gap](#-the-packing-property-the-records-keep-their-free-space-in-one-piece-and-it-separates-them-by-87-points) that separates
+records from duds by 87 points. **Knowing which quantity distinguishes good policies did not make shaping that
+quantity work** — the fourth PBRS term in this project to come back null, and the clearest sign yet that the
+remaining gap is not reachable by adding potentials.
 
 ### ‡‡ Why gate 75 wins, at the board level: b29 keeps the board healthier at *every* length, and b27's failures arrive at the gate already broken
 

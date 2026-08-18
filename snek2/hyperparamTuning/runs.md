@@ -76,12 +76,12 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-18 00:30.**
+**Both hosts as of 2026-08-18 09:40. Both are idle — nothing is training or evaluating on either box.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **`b39a-d` (C51 zero-init) running at 1.26-1.34M** of a 3M cap, launched 18:43 on 2026-08-17. **The result is already decided against it** — −10.4 pp on best-30 at a matched horizon, 4 of 4 seeds — but they run to the cap so the close-out measures the full curve. **`b36a-d` and `b38a-d` are both closed out**, neither produced a ≥98% checkpoint, so **no HOF-500 is owed for either** | nothing manual: `chain_closeout_after_training.sh b39` is waiting on the trainers and launches the close-out itself (4 processes × 4 workers, log `/tmp/b39_closeout_chain.log`) |
-| **desktop** | **`b40a-d` (free-space term) training** at **1.69-1.79M** of a 2M cap (heartbeat `2026-08-18T00:27:04`, fetched), close-outs and HOF-500s queued behind them. **`b35a-d` (gate 40) and `b37a-d` (b29 replication, seeds 5-8) are both fully done** — training, close-out *and* HOF-500 for all four arms of each. **`b37`'s results are on the `results` branch and have not been copied into `snek2/runs/` or written up yet** | **b37 needs its retrieval + write-up** ([procedure](../desktop/README.md#getting-a-finished-job-into-the-analysis-workflow)); b40 auto-chains |
+| **laptop** | **idle.** `b39a-d` reached its 3M cap at 08:00, and `chain_closeout_after_training.sh` ran the whole close-out unattended (4 processes × 4 workers, done 08:50). **Zero-init loses on every metric** — see below. `b36`, `b38`, `b39` all closed, none with a ≥98% checkpoint, so **no HOF-500 is owed** | **a batch decision — 4 free slots** |
+| **desktop** | **idle, queue empty, load 0.00** (heartbeat `2026-08-18T09:24:48`, fetched). **`b40a-d` is fully done** — training, close-out and HOF-500 — and `b35`, `b37`, `b40` are all retrieved into `runs/`. **`b40` is a null and it retires the b29 record region** (see below) | **a batch decision — 4 free slots**; the [publish gap](#-the-desktop-marked-14-publishes-done-that-never-reached-the-results-branch-2026-08-18) is recovered but the defect stands |
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
@@ -94,34 +94,41 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batch 40 — the free-space term stacked on the record — **running on the desktop**, 27-32k at 19:33 (2026-08-17)
+## Batch 40 — the free-space term stacked on the record — **closed 2026-08-18: null, and it retires b29's record region**
 
-**A second potential-based shaping term added on top of `b29`'s exact record config**, testing the
-mechanism the record rests on directly: the records keep their free space in one connected piece, so
-`b40` rewards that with `Φ = 1 / (number of open regions)`, the tail cell freed before the count. It is
-*added to* chase-safe, not a replacement — PBRS terms sum, so `b40` is `b29`'s shaping plus a global
-fragmentation signal and stays policy-invariant.
+**Result.** Pooled equal-effort **85.68 / 88.28 / 89.11 / 89.52** (mean **88.15**, a dead heat with b29's 87.83
+and b35's 88.20). **Two arms produced a flawless 100.0%/100 checkpoint** (`b40a` @1562k, `b40b` @1424k) and all
+four reached the ≥98%/100 tier — 16 / 63 / 9 / 2 = **90 candidates**, close to b29's own 59/64/9/1. **One held
+≥98% over 500 episodes**: `b40b` @1513k at **98.2%/500**, third-best /500 on record.
 
-| | |
-|---|---|
-| arms | `b40a-d-chasefree10g75seed{1..4}`, seeds 1-4, **2M**, priority 30 |
-| config | `b29` verbatim — `fc 320`, IS off, `TARGET_UPDATE_PERIOD 1000`, `DISCOUNT 0.9975`, `FORK_BRANCHES 4`, no food-distance, chase-safe `c=0.10` gate 75 — **plus** `SNEK_FREE_SPACE_SHAPING=0.10`, `SNEK_FREE_SPACE_GATE=75` |
-| control | **`b29a-d`** (seeds 1-4, on disk) — one-variable, the free-space term is the only change. `b37` (seeds 5-8) firms up the same baseline in parallel |
-| code | needs desktop `master ≥ 6bdbe7c3` (`FREE_SPACE_SHAPING`), **deployed 2026-08-17** — without it the env vars are ignored and `b40` is a silent `b29` dup |
+**Verdict: the free-space term is a null**, and read with `b37` (b29's config on fresh seeds, **0 of 4** held) it
+also retires the claim that gate 75 produces a *record region* — three batches with indistinguishable /100 tiers
+produced 21, 1 and 0 held checkpoints, so that count is seed noise. Full account in
+[`findings.md`](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading);
+rationale, per-arm rows and charts in [`completedRuns.md`](completedRuns.md) and
+[`charts.md`](charts.md#batch-40--chase-safe-plus-a-global-free-space-term--done-on-the-desktop-null-and-it-makes-b29s-record-region-look-like-seed-luck).
 
-**Why `1/count` and not `largest/total`.** In a perfect game every open cell must be filled, so a single
-stranded cell loses — the *number* of pieces is the fatal quantity. `largest/total` reads 0.95 for a 19+1
-split and barely reacts to the first break; `1/count` cliffs to 0.5 the moment the board stops being one
-piece. **The tail is freed before counting** (the `update_grid` tail-as-door correction), so a region
-reachable only past the vacating tail is not miscounted as sealed — the artefact was wrong on 40% of steps
-past score 80, exactly this term's endgame.
+**`b40b` @1513k is a HOF-promotion candidate** — 98.2%/500 sits behind `b29b` (99.0) and `b29a` (98.4) and ahead
+of `b24b`/`b24d` (98.0). Promotion is still the manual, verified process; it has not been done.
 
-**What each outcome means.** `b40 > b29` on the ≥98%/500 count or the record-region width → the explicit
-packing signal adds on top of chase-safe, a new record; judge by that count against **b29's 21 checkpoints**,
-not `sef`/best-30, since b29 already dead-heats b24 on the pooled mean. `b40 ≈ b29` → the global term is
-redundant with chase-safe in practice, and the follow-up is the *replace* arm (free-space alone). Watch the
-training curves for added variance — a count-based term flickers more per step than chase-safe, though the
-tail-freeing and the gate 75 confine it.
+## ‡ The desktop marked 14 publishes `done` that never reached the `results` branch (2026-08-18)
+
+**Its DNS resolution for `github.com` is flapping**, and `publish_results` has **no retry**: the artifacts are
+written, the ledger records `done`, the push fails once, and nothing tries again. 122 `publish_status` failures
+and **14 `publish_results` failures** since 2026-08-17, the last at 07:27 — all four `b40` HOF-500 files plus
+`b40b`'s whole close-out were sitting on the box unpublished while `status.json` said `done`.
+
+**Nothing was lost, and the recovery is cheap.** A failed push leaves the commit local, so **the next successful
+results push carries the backlog with it** — which is why b35's and three of b37's close-outs eventually appeared
+and b40's did not: no results job has completed since 07:27, and the queue is now empty. Retrieved by hand with
+`rsync the-claw-den:Snek/snek2/runs/<file> runs/`.
+
+**Two things to internalise.** A `done` in the ledger means "the job finished", **not** "the results are
+published" — check `git ls-tree --name-only origin/results:results | grep <policy>` before concluding a HOF pass
+found nothing, because *no file* and *an empty file* are the same absence over the git bus, and this batch looked
+like four empty HOF passes. And **the fix belongs in the daemon**: either retry `publish_results` on the next
+poll, or reconcile at idle by pushing whenever the local `results` worktree is ahead of `origin/results`. That is
+a code change and has not been made.
 
 ## C51 pilot — closed at 600k, and it handed off to batch `b31` by itself (2026-08-15)
 
@@ -204,44 +211,21 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
-## Batch 39 — **C51 initialised at expected Q = 0** — running, launched 18:43 on 2026-08-17
+## Batch 39 — **C51 initialised at expected Q = 0** — **closed 2026-08-18 at the 3M cap: it loses on every metric**
 
-**`launch_b39_zeroinit.sh`: b36's config with `SNEK_C51_ZERO_INIT=1` as the only change** — the two
-launchers' environment blocks were diffed and differ in exactly that line, so `b36a-d` is an exact
-seed-matched control. Same `eps 1.5e-4`, `lr 1e-4`, `fc 320`, seeds 1-4, 3M cap. **First arm ever to run
-with the ramp** (dead code since 2026-08-15); a 2,500-step smoke run verified the wiring first and all four
-reports read `zero-expected-Q init`.
+**Result.** Matched at ≤1.87M and seed-paired against `b36`, **−9.4 pp** best-30 and **−7.1 pp** `sef`, 4 of 4
+seeds down; pooled **70.18 vs 76.76**, also 4 of 4. **All 650 close-out rows were abandoned under the 95% gate**
+— the batch produced no measurable checkpoint at all, where b36 produced 4 and b38 5. Pre-registered **H2
+confirmed, H1 falsified**.
 
-**Run in the knowledge that the measurement predicts it loses.** True value is **~34**, so standard init's
-57.5 is 23.5 high and **zero is 34.0 low** — the ramp moves the init *further* from the truth. The purpose
-is the mechanism: *why* it fails is transferable, *that* it fails is not.
-
-**Pre-registered before launch**, and the priors were nudged when the epsilon was set to b36's 1.5e-4
-rather than 1e-4, because the ramp unwinds through parameters whose Adam step is divided by `eps`:
-
-| | outcome | tell |
-|---|---|---|
-| **H1 ~50%** | null on best-30 and `sef`, with a measurably slower first 100-200k steps | time-to-first-80%-eval up, endpoint unchanged |
-| **H2 ~35%** | 5-10 pp regression, from top-atom suppression delaying the **endgame** value signal | `value_by_length.py` flat across bands 85-97 early; endgame gap below b36's 19.8-24.3 |
-| **H3 ~15%** | improvement, via less early over-optimistic bootstrapping → less churn | `c51_stability.py --states-from` below 0.0865 at matched `--end` |
-
-**‡ Result at 1.26M: H2 confirmed, H1 falsified — but through the wrong channel.** Matched and
-seed-paired, b39 is **−10.4 pp** on best-30 and on `sef`, **4 of 4 seeds down** (−7.0, −10.3, −12.0, −12.3),
-which lands at the top of H2's 5-10 pp band. The `aeff` signature appeared as pre-registered (**7.0 → ~27
-@600-630k → 21**, against b36's monotone 49.6 → 21.6). **The mechanism is not H2's endgame-suppression
-story.** Zero-init's value level converged *faster* — half-life **163-202k** against b36a's **304k**, from a
-*larger* initial error — so calibration is not the channel. The channel is **action separation**: b36a has a
-12.18 action gap by **8k steps**, b39 sits at **1.72** and needs ~600k to reach 8.90. Numbers, the death-atom
-mass, and the general rule are in
-[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-at-126m)
-and [`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--running-launched-1843-on-2026-08-17).
-**`SNEK_C51_ZERO_INIT` stays off**; the arms run to their 3M cap so the close-out measures the full curve.
-
-**The decisive measurement is `aeff` against step**, and it is a signature no other arm can produce:
-standard init falls 49.9 → 21-24 monotonically, so a **6.7 → ~36 → 21-24** climb is direct evidence the head
-spent training broadening before it could sharpen. Mechanism, the ramp's three effects, and the smoke
-confirmation are all in the launcher header and
-[`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--running-launched-1843-on-2026-08-17).
+**But the predicted mechanism was wrong**, and that is the transferable part: zero-init converged its value
+*level* **faster** (half-life 163-202k vs b36a's 304k) from a *larger* initial error, so calibration is not the
+channel. The channel is **action separation** — b36a reaches a 12.18 action gap by **8k steps**, b39 sits at
+**1.72** and needs ~600k to reach 8.90. **Judge a categorical init by the spread it leaves available, not by how
+close its mean is to the truth.** `SNEK_C51_ZERO_INIT` stays off, now on measured grounds. Full account in
+[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m);
+pre-registration, per-arm rows and charts in [`completedRuns.md`](completedRuns.md) and
+[`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
 
 ## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — **closed 2026-08-17: dead heat, the dose question is settled**
 
@@ -332,50 +316,19 @@ collapses the record region. All four healthy throughout (peak 95.00, no zero st
 [`completedRuns.md`](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold);
 finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
-## Batch 37 — **b29 replication on fresh seeds 5-8** — **done on the desktop; results not yet retrieved** (2026-08-17)
+## Batch 37 — **b29 replication on fresh seeds 5-8** — **closed 2026-08-18: the /100 band replicates, the /500 record does not**
 
-**⚠ First numbers, read off the `results` branch without copying it in — so treat these as provisional and
-do the [retrieval](../desktop/README.md#getting-a-finished-job-into-the-analysis-workflow) before any
-write-up.** All four arms completed training, close-out **and** HOF-500 at 2M.
+**Result.** Pooled equal-effort **80.72 / 82.19 / 87.88 / 90.50** (mean **85.32**; `b37b`'s 90.50 is the highest
+single arm of the chase-safe family). The ≥98%/100 tier reproduces b29's **2-of-4** shape — 43 and 16 candidates
+in two seeds, none in the other two — and **0 of 4 seeds held ≥98% over 500 episodes**, where b29 held 21; the
+two best were abandoned under gate 98 at ~360 episodes (97.0%, 96.9%).
 
-| arm | pooled /eq | best ckpt /100 | ≥98%/100 | **held ≥98%/500** | best-30 | `sef` |
-|---|---|---|---|---|---|---|
-| `b37b` seed6 | **90.50** | **99.0% @1343k** | **43** | **0** — best 97.0% @1347k (361 ep) | 97.7 | 56.0 |
-| `b37c` seed7 | 87.88 | **99.0% @879k** | **16** | **0** — best 96.9% @931k (357 ep) | 97.0 | 58.6 |
-| `b37a` seed5 | 82.19 | 97.0% @1495k | 0 | — (no candidates) | 91.3 | 49.8 |
-| `b37d` seed8 | 80.72 | 93.4% @1393k *[91 ep]* | 0 | — (no candidates) | 90.0 | 40.8 |
-| *`b29a-d` original* | *87.8 mean* | *99.0% / 98.4%* | | ***21 held across 2 of 4*** | | |
-
-**The provisional reading, which needs proper analysis before it is trusted: the *band* replicates and the
-*record* does not.** The same **2-of-4** pattern appears — two seeds with large ≥98%/100 bands (43 and 16
-checkpoints), two with none — and `b37b`'s pooled **90.50 is the highest of the whole gate-75 family**. But
-**0 of those candidates survived re-measurement at 500 episodes**, where b29 produced 21, and the two best
-were abandoned under gate 98 at ~360 episodes (97.0%, 96.9%). That is this project's documented
-selection-inflation signature, and it bears directly on whether "gate 75 is the lever" describes the gate or
-describes seeds 1-2 — so **do not resolve it from this table.**
-
-**Exact b29 config, new seed draw — is the gate-75 record region reproducible, or were seeds 1-2 lucky?**
-`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping,
-chase-safe `c=0.10`, **gate 75**, 2M cap — every env var identical to b29, only `SNEK_SEED` changes (5, 6, 7,
-8 for `b37a-d`). Queued to `ops` at priority 30; **b35 is now done, so its four slots are free — b37 launches
-on the next dispatch** (still `queued` at the 08:22 poll), close-out and HOF-500 auto-chained.
-
-**Why it matters.** b29's whole result — the new project record — rests on a **21-checkpoint ≥98%/500 region
-that appears in only 2 of its 4 seeds** (`b29a` 3, `b29b` 18), while `b29c`/`b29d` held none. b34 (gate 70) then
-produced **0 across 4 seeds**, and its near-misses were on *different* seeds (3, 4) than b29's winners (1, 2).
-So the gate-75 effect could be a genuine narrow sweet spot **or** two lucky seeds; n=4 cannot tell them apart.
-A fresh draw of four seeds at the exact same config is the direct test.
-
-| outcome | reading |
-|---|---|
-| b37 produces a ≥98%/500 region comparable to b29's 21 | the config is **robust** — gate 75 reliably reaches the record tier, seeds 1-2 were not special |
-| b37 produces a few isolated ≥98%/500 checkpoints (like b24's 2) | gate 75 **helps but the record *region* was partly seed-luck** — real effect, inflated headline |
-| b37 produces 0, like b34 | b29's region was **lucky seeds**; the gate-75 result does not generalise and needs re-examining |
-
-**No seed-matched control** — no b24-family arm ran on seeds 5-8 — so judge b37 on its **aggregate ≥98%/500
-count and record-band width against b29's**, not seed-by-seed, and not on pooled/best-30 (which do not
-discriminate up here). Check the desktop with `git fetch origin ops-status && git show
-origin/ops-status:status.json` — **the fetch is required**, see [CLAUDE.md](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
+**Verdict: the outcome the pre-registration called "b29's region was lucky seeds".** Read with `b40`, three
+batches with indistinguishable /100 tiers produced held counts of 21, 1 and 0, so **the ≥98%/500 count is seed
+noise** and this family must be judged on pooled. The correction is in
+[`findings.md`](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading);
+rationale, per-arm rows and charts in [`completedRuns.md`](completedRuns.md) and
+[`charts.md`](charts.md#batch-37--b29-replicated-on-fresh-seeds-5-8--done-on-the-desktop-the-100-band-replicates-the-500-record-does-not).
 
 ## Batch 35 — chase-safe `c=0.10`, **gate 40** — *done on the desktop: null*
 
@@ -390,7 +343,7 @@ record-tier endgame. **Consolidation and the record tier are decoupled**, and ac
 [`completedRuns.md`](completedRuns.md#batch-35--chase-safe-c010-gate-40-null--the-sweet-spot-at-75-is-isolated-not-a-plateau);
 finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
-## The chase-safe gate ladder is complete (b27-30, 34, 35) — 75 is an isolated sweet spot
+## The chase-safe gate ladder is complete (b27-30, 34, 35, 37, 40) — 75 leads on the /100 tier, and its /500 "region" was seed noise
 
 **Six batches walked the length gate from 85 down to 40, and only 75 records.** All are closed, so per the
 bookkeeping rule their descriptions moved to [`completedRuns.md`](completedRuns.md). The shaping adds
@@ -398,9 +351,15 @@ bookkeeping rule their descriptions moved to [`completedRuns.md`](completedRuns.
 ≥ gate long — potential-based, optimal policy unchanged ([plan](../plans/chase-safe-reward-shaping.md);
 Phase 0 Φ calibration in
 [`findings.md`](findings.md#-measured-the-chase-safe-potential-is-nearly-static-for-a-record-policy-and-busy-for-a-bad-one)).
-All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29/b34/b35, `fc 200,100,100` for b30),
-so `b24a-d`/`b25a-d` are the seed-matched controls at zero extra compute. Cap 2M. **`b37` (queued) re-runs the
-gate-75 winner on fresh seeds 5-8** to test whether the record region reproduces or was seed-luck.
+All arms are **b24's config plus the one knob** (`fc 320` for b27/b28/b29/b34/b35/b37/b40, `fc 200,100,100` for
+b30), so `b24a-d`/`b25a-d` are the seed-matched controls at zero extra compute. Cap 2M.
+
+**‡‡‡ Closed 2026-08-18, and the headline is qualified.** `b37` re-ran gate 75 on fresh seeds 5-8 and held
+**0 of 4** at ≥98%/500; `b40` added a free-space term and held **1**; b29 held **21** — on
+indistinguishable ≥98%/**100** tiers and tied pooled. So **the /500 count is seed noise**, gate 75's lead lives
+on the /100 tier and on pooled, and the ladder's nulls at 85/70/40 stand (they are null on *both* tiers). Read the
+[correction](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading)
+before quoting the 21.
 
 | batch | `c` | gate | net | verdict | write-up |
 |---|---|---|---|---|---|
@@ -459,12 +418,18 @@ from a local minimum; all four seeds make the same level shift
 **NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI
 97.7-99.6). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500; the lead is inside the
 500-episode CIs, so it is a *narrow* point lead — taken as the record under the folder's 500-episode standard,
-exactly as `b24d` was taken over `b18b`. **What is outside noise is the region:** b29b carries an
-**18-checkpoint ≥98%/500 band** (1446k-1529k) and its sibling `b29a` holds 3 more, so the gate-75 arm
-produced **21 record-tier checkpoints across 2 seeds** where every prior record appeared only as isolated
-points. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) on 2026-08-16** — the checkpoint was rsynced
+exactly as `b24d` was taken over `b18b`. b29b carries an
+**18-checkpoint ≥98%/500 band** (1446k-1529k) and its sibling `b29a` holds 3 more — 21 record-tier checkpoints
+across 2 seeds. **‡‡‡ Corrected 2026-08-18: that region was read as the config's property and it is not.** `b37`,
+byte-identical on seeds 5-8, held **0 of 4**, and `b40` held 1, on comparable ≥98%/100 tiers — so the 21 is a
+**seed**, and the record stands as a *point* lead like every one before it. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) on 2026-08-16** — the checkpoint was rsynced
 off the desktop and the copy re-measured 98/100 on fresh laptop episodes (loads and plays like a champion).
 Write-up: [Batches 28-29](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
+
+**Promotion candidate, 2026-08-18: `b40b-chasefree10g75seed2` @1513000 — 98.2%/500.** Third-best /500 on record,
+behind `b29b` (99.0) and `b29a` (98.4) and ahead of `b24b`/`b24d` (98.0). It is the only checkpoint of `b40`'s 90
+≥98%/100 candidates that held. **Not promoted** — that is the manual, verified process, and its checkpoint is
+still on the desktop only.
 
 **NEW RECORD, 2026-08-13: `b24d-fc320noisseed4` @1342000 — 98.0% over 500 fresh episodes** (490/500,
 CI **96.4-98.9**). It edges the prior record, `b18b-tgt1000seed2` @1588000 at 97.6%/700 (CI 96.1-98.5), on

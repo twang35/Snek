@@ -31,6 +31,78 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 ---
 
+## Batch 35 — chase-safe `c=0.10`, **gate 40** — *done on the desktop: null, and the sweet spot at 75 is isolated*
+
+**The gate ladder's deep rung: `b29`'s config with `SNEK_CHASE_SAFE_GATE=40`, everything else identical** —
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, `c=0.10`, 2M cap, seeds 1-4.
+Holds the per-flip dose at 0.10 (the calibration clamp) and moves only the gate, so the total episode dose
+rises ~2.5× vs gate 85.
+
+**Null on the record metric — yet the highest pooled of any shaped batch.** Pooled equal-effort **88.2**
+(88.6 / 85.9 / 90.7 / 87.6), above b29's 87.8, b34's 86.4 and the b24 control's 87.9, but **0 of the 3 measured
+seeds held any ≥98%/500 checkpoint** (best partials abandoned at 96-97% over 310-367 episodes; `b35c`'s HOF-500
+was still running at check time). So across four gates — 85, 75, 70, 40 — **only 75 records**; the sweet spot
+is a narrow, isolated band, and mid-game shaping (40) lifts the *average* board without buying the record-tier
+endgame. **Consolidation and the record tier are decoupled.** All four arms healthy throughout (peak 95.00, no
+zero stretch). Full read:
+[`findings.md`](../findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever);
+per-arm table in [`completedRuns.md`](../completedRuns.md#batch-35--chase-safe-c010-gate-40-null--the-sweet-spot-at-75-is-isolated-not-a-plateau).
+`sef` is on a 2M horizon, comparable to the b28/b29/b34 waves.
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|
+| `b35c-chase10g40seed3` | 97.7 | 59.7 | **90.7** | HOF-500 running (best full 100% @1166k /100) |
+| `b35a-chase10g40seed1` | 96.0 | 47.4 | 88.6 | best 96.2% @1409k (319 ep, ab.) — **0 held** |
+| `b35d-chase10g40seed4` | 96.7 | 61.3 | 87.6 | best 97.0% @1480k (367 ep, ab.) — **0 held** |
+| `b35b-chase10g40seed2` | 94.7 | 62.8 | 85.9 | best 96.5% @1353k (310 ep, ab.) — **0 held** |
+
+![b35c](../charts/b35c-chase10g40seed3.png)
+**b35c-chase10g40seed3** — highest pooled of any shaped batch; HOF-500 still running
+
+![b35a](../charts/b35a-chase10g40seed1.png)
+**b35a-chase10g40seed1**
+
+![b35d](../charts/b35d-chase10g40seed4.png)
+**b35d-chase10g40seed4**
+
+![b35b](../charts/b35b-chase10g40seed2.png)
+**b35b-chase10g40seed2** — weakest seed
+
+## Batch 34 — chase-safe `c=0.10`, **gate 70** — *done on the desktop: null, gate 75 is a narrow sweet spot*
+
+**One variable off the record region: `b29`'s config with the gate dropped 75 → 70.** Otherwise identical —
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, `c=0.10`, 2M cap, seeds 1-4,
+seed-matched control `b24`. Trained, closed out and HOF-500 re-measured on the desktop.
+
+**Gate 70 is a null — a 5-length step off 75 loses the effect.** Pooled equal-effort **86.4** (~1.5 under
+b24's 87.9, just under `b29`'s 87.8) and **0 of 4 seeds held any ≥98%/500 checkpoint**, against `b29`'s 21
+across two seeds. The close-out threw off two 100%/100 and two 98%/100 rows, but every one deflated below
+gate 98 at 500 episodes. All four arms healthy throughout (peak trailing 95.00, no zero stretch). This
+confirms gate 75 is a **band, not a threshold** — 85 is null, 75 records, 70 null again. Full read:
+[`findings.md`](../findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever);
+per-arm table in [`completedRuns.md`](../completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold).
+The `sef` numbers are on a 2M horizon and comparable to the b28/b29 waves below (also 2M), not to the 3M
+batches.
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|
+| `b34d-chase10g70seed4` | 95.7 | 68.9 | 89.5 | best 97.2% @1915k (392 ep, ab.) — **0 held** |
+| `b34c-chase10g70seed3` | 97.0 | 66.1 | 89.4 | best 96.0% @1532k (321 ep, ab.) — **0 held** |
+| `b34a-chase10g70seed1` | 94.3 | 46.7 | 82.9 | best 95.2% @1126k (248 ep, ab.) — **0 held** |
+| `b34b-chase10g70seed2` | 94.0 | 54.9 | 83.8 | best 93.8% @1776k (193 ep, ab.) — **0 held** |
+
+![b34d](../charts/b34d-chase10g70seed4.png)
+**b34d-chase10g70seed4** — highest `sef`; best HOF-500 partial (97.2%, abandoned)
+
+![b34c](../charts/b34c-chase10g70seed3.png)
+**b34c-chase10g70seed3** — highest best-30 of b34 (97.0)
+
+![b34a](../charts/b34a-chase10g70seed1.png)
+**b34a-chase10g70seed1**
+
+![b34b](../charts/b34b-chase10g70seed2.png)
+**b34b-chase10g70seed2** — weakest seed
+
 ## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *closed: `epsilon` works at −26% churn, the dose does not matter*
 
 **Final training numbers, 2026-08-16.** Both `1.5e-4` arms beat the `1e-7` control's ≤364k best-30 of 33.9,
