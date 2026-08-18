@@ -429,6 +429,36 @@ def test_the_potential_is_zero_when_the_snake_is_coiled_around_the_food():
         restore()
 
 
+def test_the_chase_safe_observation_is_zero_on_the_eating_move_of_the_coil():
+    """The policy-facing counterpart of the test above, on the same coil: obs[15-17] is the "safe to
+    chase the food" per-action block, and the move that eats must read 0 even though it is legal.
+
+    The eating action here — `left`, which turns the head down onto the food at (1,1) — is a legal
+    move (obs[6] = 1, the head can take it) and it eats. But `group_obs`' eating branch sets the flag
+    to whether the tail is still reachable *after* the meal, and it is not: the head lands walled in
+    by its own body, so `can reach tail` (obs[9]) is 0 and the safe-to-chase flag follows it to 0.
+    The policy is told "this meal traps you", not "go eat". The other two moves read 0 as well — one
+    is a wall, the other follows the vacating tail and cannot reach the food — and index 29 confirms
+    the food is sealed with no open neighbour.
+
+    The obs[6] = 1 assertion is what makes this bite: the 0 is not the trivial 0 of an unreachable
+    food, it is the flag correctly calling a reachable meal a trap.
+    """
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, COILED_AROUND_FOOD, COILED_AROUND_FOOD_FOOD,
+                        COILED_AROUND_FOOD_FACING)
+        obs = game.get_observation()
+        eat = module.ACTIONS.index('left')   # 'left' from a left-facing head turns down onto (1,1)
+        assert float(obs[6 + eat]) == 1.0, 'the eating move must be legal, or the 0 below is trivial'
+        assert float(obs[9 + 2 * eat]) == 0.0, 'after eating, the head cannot reach its own tail'
+        assert float(obs[15 + eat]) == 0.0, 'so chasing this food is not safe'
+        assert [float(obs[15 + i]) for i in range(3)] == [0.0, 0.0, 0.0], 'no move here is a safe chase'
+        assert float(obs[29]) == 0.0, 'the food is sealed in, with no open neighbour'
+    finally:
+        restore()
+
+
 def test_the_gate_zeroes_the_potential_below_the_length_threshold():
     """Below the gate the potential is 0 whatever the board says, which is what confines the term
     to the endgame. Above it, the same board reads its true chase-safety."""
