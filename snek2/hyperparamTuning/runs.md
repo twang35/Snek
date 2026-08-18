@@ -89,7 +89,37 @@ churn figure was inflated ~2×; both are written up under [batch 32](#batch-32--
 
 **Batch numbering: `b37` is the desktop's b29 replication, so the laptop's dose arm is `b38`.** Worth stating
 because both were queued within minutes of each other from different hosts, and `b37` was very nearly used
-twice.
+twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
+`b40`.**
+
+## Batch 40 — the free-space term stacked on the record — **queued on the desktop** (2026-08-17)
+
+**A second potential-based shaping term added on top of `b29`'s exact record config**, testing the
+mechanism the record rests on directly: the records keep their free space in one connected piece, so
+`b40` rewards that with `Φ = 1 / (number of open regions)`, the tail cell freed before the count. It is
+*added to* chase-safe, not a replacement — PBRS terms sum, so `b40` is `b29`'s shaping plus a global
+fragmentation signal and stays policy-invariant.
+
+| | |
+|---|---|
+| arms | `b40a-d-chasefree10g75seed{1..4}`, seeds 1-4, **2M**, priority 30 |
+| config | `b29` verbatim — `fc 320`, IS off, `TARGET_UPDATE_PERIOD 1000`, `DISCOUNT 0.9975`, `FORK_BRANCHES 4`, no food-distance, chase-safe `c=0.10` gate 75 — **plus** `SNEK_FREE_SPACE_SHAPING=0.10`, `SNEK_FREE_SPACE_GATE=75` |
+| control | **`b29a-d`** (seeds 1-4, on disk) — one-variable, the free-space term is the only change. `b37` (seeds 5-8) firms up the same baseline in parallel |
+| code | needs desktop `master ≥ 6bdbe7c3` (`FREE_SPACE_SHAPING`), **deployed 2026-08-17** — without it the env vars are ignored and `b40` is a silent `b29` dup |
+
+**Why `1/count` and not `largest/total`.** In a perfect game every open cell must be filled, so a single
+stranded cell loses — the *number* of pieces is the fatal quantity. `largest/total` reads 0.95 for a 19+1
+split and barely reacts to the first break; `1/count` cliffs to 0.5 the moment the board stops being one
+piece. **The tail is freed before counting** (the `update_grid` tail-as-door correction), so a region
+reachable only past the vacating tail is not miscounted as sealed — the artefact was wrong on 40% of steps
+past score 80, exactly this term's endgame.
+
+**What each outcome means.** `b40 > b29` on the ≥98%/500 count or the record-region width → the explicit
+packing signal adds on top of chase-safe, a new record; judge by that count against **b29's 21 checkpoints**,
+not `sef`/best-30, since b29 already dead-heats b24 on the pooled mean. `b40 ≈ b29` → the global term is
+redundant with chase-safe in practice, and the follow-up is the *replace* arm (free-space alone). Watch the
+training curves for added variance — a count-based term flickers more per step than chase-safe, though the
+tail-freeing and the gate 75 confine it.
 
 ## C51 pilot — closed at 600k, and it handed off to batch `b31` by itself (2026-08-15)
 
