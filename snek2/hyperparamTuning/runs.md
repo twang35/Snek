@@ -111,6 +111,31 @@ rationale, per-arm rows and charts in [`completedRuns.md`](completedRuns.md) and
 **`b40b` @1513k is a HOF-promotion candidate** — 98.2%/500 sits behind `b29b` (99.0) and `b29a` (98.4) and ahead
 of `b24b`/`b24d` (98.0). Promotion is still the manual, verified process; it has not been done.
 
+## Batch 41 — b29 re-run on the **same seeds** — **queued on the desktop** (2026-08-18)
+
+**Sharpens the b37 finding by removing the seed as a variable.** b37 showed b29's /500 "region" does not
+replicate on *fresh* seeds; b41 re-runs b29's exact config on the **same** seeds 1-4 to ask whether it
+replicates even then. The training is not bit-reproducible — `ParallelPyEnvironment` worker ordering and TF's
+threaded FP reductions diverge and compound in the RL loop — so a same-seed re-run is *expected* to diverge,
+and the gap `b41x` vs `b29x` measures the **process-noise floor** every seed-matched comparison in this folder
+sits on top of, a number nobody has pinned.
+
+| | |
+|---|---|
+| arms | `b41a-d-b29repro-seed{1..4}`, seeds 1-4, **2M**, priority 30, desktop (same host as b29) |
+| config | `b29` verbatim, no free-space term (behaviourally identical under current code, which defaults it off) |
+| reads | per-seed vs `b29a-d`: pooled / best-30 / `sef`, the >=98%/500 count, and how far each curve tracks its twin before separating |
+
+**What each outcome means.** Curves that track a long time then separate, pooled within a point or two -> the
+floor is small and n=4 seed-matched verdicts here are trustworthy. Wide divergence from step ~0 -> the floor
+is large, and *every* n=4 verdict in this folder (the b40 null included) carries that much irreducible noise.
+Either way, if `b29b`'s 99.0%/500 does not reappear on its own seed, that is the strongest confirmation yet
+that the /500 record was noise rather than a property of the seed **or** the config.
+
+**Caveat:** current desktop code (`>=6bdbe7c3`) is not byte-identical to what b29 first ran — the free-space
+addition is off/no-op, but intervening commits make this "current code, same seed", not a binary replay. The
+FP/threading floor above dominates any such drift.
+
 ## ‡ The desktop marked 14 publishes `done` that never reached the `results` branch (2026-08-18)
 
 **Its DNS resolution for `github.com` is flapping**, and `publish_results` has **no retry**: the artifacts are
