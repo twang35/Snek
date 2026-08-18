@@ -410,6 +410,14 @@ the branch with the box** (`git ls-tree --name-only origin/results:results | gre
 **Pushing to `ops` starts real work on another machine**, so it falls under the git rule above: queue a
 job only when the user has approved *that* job.
 
+**Every training spec carries a `label`** — a short, human one-liner naming the batch and its key knobs
+(e.g. `"b40: free space + chase-safe shaping, gate=75, c=0.10"`). It is what `status.json`'s `at_a_glance`
+block shows for the batch, so the box reads at a glance. All arms of a batch share one label and the
+auto-spawned closeout/HOF evals inherit it; it defaults to `""`, so a batch queued without one shows only
+its id. **Copying an existing spec is how a batch ends up label-less** — the field post-dates most specs on
+`ops` — so set it deliberately. Spec format and the `at_a_glance`/ledger layout:
+[`snek2/desktop/README.md`](snek2/desktop/README.md#job-spec).
+
 **A reboot mid-job recovers by itself, and `interrupted` is the state that says so.** The daemon
 compares each running record's boot id against `/proc/sys/kernel/random/boot_id`: a mismatch means
 the machine rebooted, so the job is marked **`interrupted`** — non-terminal, therefore relaunched on
