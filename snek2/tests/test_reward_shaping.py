@@ -284,6 +284,24 @@ HEAD_ONLY_TRAP_FOOD = (5, 0)      # in the sealed top row: reachable by the head
 HEAD_ONLY_TRAP_SAFE_FOOD = (5, 5)  # in the lower region, which both head and tail touch
 HEAD_ONLY_TRAP_FACING = 'left'
 
+# A snake coiled clockwise all the way around a single food cell, head and tail meeting at the corner.
+# Every neighbour of the food is body, so the food is a sealed one-cell region the head sits *directly*
+# on: the head can eat it, but doing so walls the head in with its own body and it dies the next step
+# (this is not the winning move — the board is far from full). The tail is enclosed in the corner too,
+# so it neighbours no open region: `tail_groups` is empty and the head/tail intersection is empty, and
+# Phi = 0. Picture, y increasing downward, each arrow pointing at the next body segment toward the head:
+#
+#     T H <
+#     D F U
+#     > > U
+#
+# Head (1,0), tail (0,0), food (1,1). The head is adjacent to both the food and the tail (the tail is
+# only diagonal to the food), so it is the "everything is touching yet eating is fatal" case. Testing
+# the food against the head's regions alone returns 1 here, so it also pins the intersection rule.
+COILED_AROUND_FOOD = ((1, 0), (2, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1), (0, 0))
+COILED_AROUND_FOOD_FOOD = (1, 1)
+COILED_AROUND_FOOD_FACING = 'left'  # the neck (2,0) is right of the head, so it entered moving left
+
 
 def build_chase_game(c, gate=0, distance_shaping=0.0):
     """A fresh `Snake` module whose chase-safe knobs are `c` and `gate`.
@@ -387,6 +405,26 @@ def test_the_potential_tests_the_food_against_the_intersection_not_the_head_alon
         # intersection and not about the fixture being unreachable in general.
         game = restored(module, HEAD_ONLY_TRAP, HEAD_ONLY_TRAP_SAFE_FOOD, HEAD_ONLY_TRAP_FACING)
         assert game._chase_safe_potential() == 1.0
+    finally:
+        restore()
+
+
+def test_the_potential_is_zero_when_the_snake_is_coiled_around_the_food():
+    """A snake wrapped all the way around the food: the head sits right on it and *can* eat, but the
+    food is a sealed one-cell region and eating walls the head in — a death, not a meal — so Phi = 0.
+
+    Distinct from the fixtures above, and worth its own. The head neighbours the food's region
+    *directly* (in `HEAD_ONLY_TRAP` it neighbours a larger sealed region; in `SEALED_POCKET` it
+    neighbours neither), and the intersection is empty because the corner-enclosed tail borders no
+    open region at all — the `if not escape` path, which the other fixtures never take, since there
+    both ends border something and the food simply sits outside the shared region. `head_groups`
+    alone would call this 1, because the head is on the food, so the 0 pins the intersection.
+    """
+    module = build_chase_game(0.1, gate=0)
+    try:
+        game = restored(module, COILED_AROUND_FOOD, COILED_AROUND_FOOD_FOOD,
+                        COILED_AROUND_FOOD_FACING)
+        assert game._chase_safe_potential() == 0.0, 'eating a food the coil has sealed is not safe'
     finally:
         restore()
 
