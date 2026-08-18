@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T05:05:52",
-  "ts": 1787054752.7796931,
+  "iso": "2026-08-18T05:06:25",
+  "ts": 1787054785.6042433,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -29,7 +29,7 @@
       "pid": 346986,
       "step": 2000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 13915
+      "elapsed_s": 13948
     },
     {
       "id": "b40b-chasefree10g75seed2-closeout",
@@ -38,7 +38,7 @@
       "pid": 346987,
       "step": 2000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 13915
+      "elapsed_s": 13948
     },
     {
       "id": "b40c-chasefree10g75seed3-closeout",
@@ -47,7 +47,7 @@
       "pid": 346988,
       "step": 2000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 13915
+      "elapsed_s": 13948
     }
   ],
   "ledger": {
@@ -261,8 +261,8 @@
   },
   "disk_free_gb": 128.9,
   "load_avg": [
-    11.66552734375,
-    14.7626953125,
-    16.78173828125
+    11.6220703125,
+    14.408203125,
+    16.5869140625
   ]
 }
