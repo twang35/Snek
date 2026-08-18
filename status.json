@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-17T18:01:00",
-  "ts": 1787014860.3860872,
+  "iso": "2026-08-17T18:02:09",
+  "ts": 1787014929.059952,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -29,7 +29,7 @@
       "pid": 3998175,
       "step": 2000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 12208
+      "elapsed_s": 12276
     },
     {
       "id": "b37c-chase10g75seed7-closeout",
@@ -38,7 +38,7 @@
       "pid": 3998176,
       "step": 2000000,
       "steps_per_sec": 0.0,
-      "elapsed_s": 12208
+      "elapsed_s": 12276
     }
   ],
   "ledger": {
@@ -236,12 +236,24 @@
     "b37a-chase10g75seed5-hof": "queued",
     "b37d-chase10g75seed8-hof": "queued",
     "b37b-chase10g75seed6-hof": "queued",
-    "b37c-chase10g75seed7-hof": "queued"
+    "b37c-chase10g75seed7-hof": "queued",
+    "b40a-chasefree10g75seed1": "queued",
+    "b40b-chasefree10g75seed2": "queued",
+    "b40c-chasefree10g75seed3": "queued",
+    "b40d-chasefree10g75seed4": "queued",
+    "b40a-chasefree10g75seed1-closeout": "queued",
+    "b40b-chasefree10g75seed2-closeout": "queued",
+    "b40c-chasefree10g75seed3-closeout": "queued",
+    "b40d-chasefree10g75seed4-closeout": "queued",
+    "b40a-chasefree10g75seed1-hof": "queued",
+    "b40b-chasefree10g75seed2-hof": "queued",
+    "b40c-chasefree10g75seed3-hof": "queued",
+    "b40d-chasefree10g75seed4-hof": "queued"
   },
   "disk_free_gb": 130.4,
   "load_avg": [
-    7.041015625,
-    7.3408203125,
-    7.77734375
+    7.43359375,
+    7.40283203125,
+    7.76806640625
   ]
 }
