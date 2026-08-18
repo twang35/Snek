@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T15:23:10",
-  "ts": 1787091790.7385356,
+  "iso": "2026-08-18T15:23:43",
+  "ts": 1787091823.377936,
   "at_a_glance": {
     "running": [
       "b41 -- training (2 arms)"
@@ -36,20 +36,20 @@
       "type": "train",
       "policy": "b41a-b29repro-seed1",
       "pid": 743017,
-      "step": 1843000,
+      "step": 1847000,
       "max_steps": null,
-      "steps_per_sec": 92.6,
-      "elapsed_s": 20133
+      "steps_per_sec": 122.6,
+      "elapsed_s": 20166
     },
     {
       "id": "b41b-b29repro-seed2",
       "type": "train",
       "policy": "b41b-b29repro-seed2",
       "pid": 743018,
-      "step": 1995000,
+      "step": 1999000,
       "max_steps": null,
-      "steps_per_sec": 123.5,
-      "elapsed_s": 20133
+      "steps_per_sec": 122.6,
+      "elapsed_s": 20166
     }
   ],
   "ledger": {
@@ -275,8 +275,8 @@
   },
   "disk_free_gb": 127.4,
   "load_avg": [
-    4.029296875,
-    6.4033203125,
-    7.87060546875
+    4.46875,
+    6.2490234375,
+    7.7646484375
   ]
 }
