@@ -337,19 +337,38 @@ by git: you commit a job spec, it runs it, it pushes results back. Full docs in
 | | laptop | desktop `the-claw-den` |
 |---|---|---|
 | limit | **4 trainers** | `max_trainers` ≤ 4, `max_evals` ≤ 4 |
-| check | `pgrep -fl "python -u snek2.py"` | `git show origin/ops-status:status.json` |
+| check | `pgrep -fl "python -u snek2.py"` | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
 | queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch |
+
+**`git fetch` is not optional in that command, and leaving it out is the single most repeated mistake
+in this project's history with the desktop.** `git show origin/ops-status:…` reads a **local
+remote-tracking ref**, which changes only when you fetch. Without the fetch you are shown an
+arbitrarily old snapshot *with no indication that it is old* — and because the payload contains a
+timestamp, the natural misreading is "the daemon stopped at 08:33" when the truth is "my ref is from
+08:33". This has now produced three false alarms: **2026-08-12** (17 hours stale, four finished evals
+reported as still running), and **2026-08-17** twice in one session — a session that reported a
+10-hour-dead daemon and a batch that had failed to dispatch, while the box was in fact healthy, had
+already finished that batch *and* its close-outs, and had moved on to the next one.
+
+**So a stale-looking `iso` is your own ref until you have fetched and re-read it.** Never report the
+desktop as down, drained, stuck or off-LAN from an unfetched read. The ladder, in order:
+
+1. **`git fetch origin ops-status`**, then re-read. This resolves it almost every time.
+2. **Try `ssh the-claw-den` — actually run it**, with `-o ConnectTimeout=8 -o BatchMode=yes` so a
+   genuine failure returns in seconds instead of hanging. One command settles reachability.
+3. Only after 1 and 2 both fail is the box worth calling unreachable.
 
 **Neither check sees the other host.** The `pgrep` rule above is laptop-local, and desktop jobs never
 appear in it — so **"N arms running" is meaningless without naming the box**, and a progress report
-has to check both. The desktop's `running` and `counts` fields in `status.json` are the only authority
-for its side; its heartbeat `iso` tells you whether the daemon is alive at all.
+has to check both. The desktop's `running` and `counts` fields in a **freshly fetched** `status.json`
+are the only authority for its side.
 
-**The git bus works from anywhere, but `ssh the-claw-den` is home-LAN only** — Tailscale was removed
+**The git bus works from anywhere, and `ssh the-claw-den` is home-LAN only** — Tailscale was removed
 on 2026-08-13, so the name resolves by mDNS. Queueing, retuning, `status.json` and `results` are
-unaffected; deploying code, `journalctl` and `free -m` have to wait until you are home. A box that
-seems unreachable is usually just off-LAN, so **read the `iso` heartbeat before calling it broken**.
-Alias, no-config fallback and key recovery:
+unaffected; deploying code, `journalctl` and `free -m` need you to be home. **But "probably off-LAN"
+is a conclusion, not a starting assumption** — it was wrong on 2026-08-17, when `ssh` answered
+immediately and the earlier guidance to infer liveness from the heartbeat instead of just trying the
+connection is what produced the wrong call. Alias, no-config fallback and key recovery:
 [`snek2/desktop/SETUP.md`](snek2/desktop/SETUP.md#laptop-side-ssh-access-and-how-to-rebuild-it).
 
 **Memory is the desktop's binding constraint, not cores** — **15,030 MB** as `free -m` reports it

@@ -263,11 +263,17 @@ Treat the two as separate pools:
 | host | limit | how to check |
 |---|---|---|
 | laptop | 4 trainers | `pgrep -fl "python -u snek2.py"` |
-| desktop | `max_trainers` (≤ `HARD_MAX_TRAINERS=4`), `max_evals` (≤ `HARD_MAX_EVALS=4`) | `git show origin/ops-status:status.json` |
+| desktop | `max_trainers` (≤ `HARD_MAX_TRAINERS=4`), `max_evals` (≤ `HARD_MAX_EVALS=4`) | **`git fetch origin ops-status &&`** `git show origin/ops-status:status.json` |
 
 **Neither check covers the other host**, so a status report that says "4 arms
 running" must say *which box*. The desktop's `counts` and `running` fields in
 `status.json` are the only authority for its side.
+
+**The `git fetch` is load-bearing and omitting it has caused three false alarms**
+(2026-08-12, twice on 2026-08-17). `git show origin/ops-status:…` reads a *local*
+remote-tracking ref, so without a fetch you get an old snapshot whose embedded
+`iso` timestamp then reads as a dead daemon. A stale-looking heartbeat is your own
+ref until you have fetched and re-read it.
 
 ## Getting a finished job into the analysis workflow
 

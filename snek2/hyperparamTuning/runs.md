@@ -81,7 +81,7 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
 | host | state | owed |
 |---|---|---|
 | **laptop** | **`b39a-d` (C51 zero-init) running**, launched 18:43 on 2026-08-17 to a 3M cap, one chart window on `--arms b39`. **`b36a-d` and `b38a-d` are both closed out** — b38 ran itself to its 3M cap, its close-out finished 18:41, and neither batch produced a ≥98% checkpoint so **no HOF-500 is owed for either** | nothing manual until b39 reaches 3M and self-terminates |
-| **desktop** | **`b35a-d` (gate 40) done** — **null** ([below](#batch-35--chase-safe-c010-gate-40--done-on-the-desktop-null)), close-out done, HOF-500 done for 3/4 (`b35c`-hof still running at 08:22); **`b34a-d` done** (gate 70, null); **`b37a-d` (b29 replication, seeds 5-8) next up** — still queued at the 08:22 poll but b35's four slots are now free, so it launches on the next dispatch | nothing — close-outs and HOF-500 auto-chain |
+| **desktop** | **`b40a-d` (free-space term) training** at 27-32k, close-outs and HOF-500s queued behind them. **`b35a-d` (gate 40) and `b37a-d` (b29 replication, seeds 5-8) are both fully done** — training, close-out *and* HOF-500 for all four arms of each. **`b37`'s results are on the `results` branch and have not been copied into `snek2/runs/` or written up yet** | **b37 needs its retrieval + write-up** ([procedure](../desktop/README.md#getting-a-finished-job-into-the-analysis-workflow)); b40 auto-chains |
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
@@ -94,7 +94,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batch 40 — the free-space term stacked on the record — **queued on the desktop** (2026-08-17)
+## Batch 40 — the free-space term stacked on the record — **running on the desktop**, 27-32k at 19:33 (2026-08-17)
 
 **A second potential-based shaping term added on top of `b29`'s exact record config**, testing the
 mechanism the record rests on directly: the records keep their free space in one connected piece, so
@@ -320,7 +320,27 @@ collapses the record region. All four healthy throughout (peak 95.00, no zero st
 [`completedRuns.md`](completedRuns.md#batch-34--chase-safe-c010-gate-70-null--gate-75-is-a-narrow-sweet-spot-not-a-threshold);
 finding: [`findings.md`](findings.md#-chase-safe-reward-shaping-null-at-gate-85-at-any-dose-records-at-gate-75--the-gate-is-the-lever).
 
-## Batch 37 — **b29 replication on fresh seeds 5-8** — *next up on the desktop (b35 done, launches on next dispatch)*
+## Batch 37 — **b29 replication on fresh seeds 5-8** — **done on the desktop; results not yet retrieved** (2026-08-17)
+
+**⚠ First numbers, read off the `results` branch without copying it in — so treat these as provisional and
+do the [retrieval](../desktop/README.md#getting-a-finished-job-into-the-analysis-workflow) before any
+write-up.** All four arms completed training, close-out **and** HOF-500 at 2M.
+
+| arm | pooled /eq | best ckpt /100 | ≥98%/100 | **held ≥98%/500** | best-30 | `sef` |
+|---|---|---|---|---|---|---|
+| `b37b` seed6 | **90.50** | **99.0% @1343k** | **43** | **0** — best 97.0% @1347k (361 ep) | 97.7 | 56.0 |
+| `b37c` seed7 | 87.88 | **99.0% @879k** | **16** | **0** — best 96.9% @931k (357 ep) | 97.0 | 58.6 |
+| `b37a` seed5 | 82.19 | 97.0% @1495k | 0 | — (no candidates) | 91.3 | 49.8 |
+| `b37d` seed8 | 80.72 | 93.4% @1393k *[91 ep]* | 0 | — (no candidates) | 90.0 | 40.8 |
+| *`b29a-d` original* | *87.8 mean* | *99.0% / 98.4%* | | ***21 held across 2 of 4*** | | |
+
+**The provisional reading, which needs proper analysis before it is trusted: the *band* replicates and the
+*record* does not.** The same **2-of-4** pattern appears — two seeds with large ≥98%/100 bands (43 and 16
+checkpoints), two with none — and `b37b`'s pooled **90.50 is the highest of the whole gate-75 family**. But
+**0 of those candidates survived re-measurement at 500 episodes**, where b29 produced 21, and the two best
+were abandoned under gate 98 at ~360 episodes (97.0%, 96.9%). That is this project's documented
+selection-inflation signature, and it bears directly on whether "gate 75 is the lever" describes the gate or
+describes seeds 1-2 — so **do not resolve it from this table.**
 
 **Exact b29 config, new seed draw — is the gate-75 record region reproducible, or were seeds 1-2 lucky?**
 `fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping,
@@ -342,7 +362,8 @@ A fresh draw of four seeds at the exact same config is the direct test.
 
 **No seed-matched control** — no b24-family arm ran on seeds 5-8 — so judge b37 on its **aggregate ≥98%/500
 count and record-band width against b29's**, not seed-by-seed, and not on pooled/best-30 (which do not
-discriminate up here). Check the desktop with `git show origin/ops-status:status.json`.
+discriminate up here). Check the desktop with `git fetch origin ops-status && git show
+origin/ops-status:status.json` — **the fetch is required**, see [CLAUDE.md](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
 
 ## Batch 35 — chase-safe `c=0.10`, **gate 40** — *done on the desktop: null*
 
@@ -651,9 +672,18 @@ without naming the box:
 | host | check |
 |---|---|
 | laptop (4 trainers max) | `pgrep -fl "python -u snek2.py"` |
-| desktop `the-claw-den` | `git show origin/ops-status:status.json` — read `counts`, `running`, and the `iso` heartbeat |
+| desktop `the-claw-den` | **`git fetch origin ops-status &&`** `git show origin/ops-status:status.json` — read `counts`, `running`, and the `iso` heartbeat |
 
 Not `grep "[s]nek2.py"` on the laptop — git telemetry `curl` processes carry `snek2/snek2.py` in their
-payload and inflate the count. And `git fetch` first: `git show origin/ops-status:...` serves whatever
-was last fetched, which on 2026-08-12 was **17 hours stale** and showed four finished evals as still
-running.
+payload and inflate the count.
+
+**And `git fetch` first — this is the most-repeated mistake in this project's dealings with the desktop.**
+`git show origin/ops-status:…` reads a *local* remote-tracking ref, so with no fetch you get an old
+snapshot **and no sign that it is old**; because the payload carries a timestamp, it reads as a dead
+daemon. Three false alarms so far: 2026-08-12 (**17 hours stale**, four finished evals reported as still
+running) and twice on 2026-08-17, the second of which reported a 10-hour-dead daemon and a batch that had
+"failed to dispatch" while the box was healthy, had finished that batch *and* its close-outs *and* its
+HOF-500s, and had moved on to the next wave. **A stale-looking `iso` is your own ref until you have
+fetched and re-read it**, and `ssh the-claw-den -o ConnectTimeout=8` settles reachability in one command
+rather than by inference. Ladder and rationale:
+[CLAUDE.md](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
