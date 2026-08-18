@@ -33,6 +33,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported, at half the size first reported**: on a *shared* state set b32 cuts churn **0.119 → 0.088 (−26%)** paired at 600k, 4 of 4, flat to 1M — the 360k figures below were on per-arm sets and inflated ~2×. **The dose is closed for good** — b36 vs b38 at 4 seeds a side, matched ≤2M, pools 76.77 vs 74.73, 3 of 4 favouring `1.5e-4`, p=0.625. Two 2× steps in the knob, nothing twice. See below |
 | **‡ C51 gains nothing past ~2M** — 3 of b38's 4 arms pool *worse* over their full 3M than over their first 2M | **measured 2026-08-17**. `b38a` is the lone exception and holds the batch's best checkpoint at 2355k. With b33's four arms declining for 1.4M steps after peaking, **future C51 batches can stop at ~2M** and cost a third less. Method: `pooled_equal_effort` is exactly recomputable at any cutoff from each row's `episode_perfect` flags |
 | **‡‡ After four fixes C51 is still well behind `ddqn` at its own architecture — `b24`, not `b32`, is the control** | **corrected 2026-08-17**. `b24a-d` (`ddqn`, **same `fc 320`**): best-30 **95.3-96.7**, `sef` **60.5-73.2**, and **every seed has a ≥98% checkpoint inside 2M**. `b36a-d` (c51, `fc 320`): **84.0-86.7**, `sef` **17.4-24.7**, best 91.6-97.0, **no seed ≥98%**. `fc 320` is a real gain **over `b32`** (+9 to +24 pp, spread 14.0 → 2.7) and that much stands; the "four seeds finally agree" reading does not, since both `ddqn` batches sit at 1.4 pp. `sef` at 3× does not overlap |
+| **‡‡ Zero-init on C51 loses −10.4 pp, 4 of 4 seeds — and via **action separation**, not calibration** | **measured 2026-08-17/18**, b39 vs b36 at ≤1.26M, one-variable. Zero-init converges its value *level* **faster** (half-life 163-202k vs 304k) from a *larger* error and still plays worse. The gap is the channel: b36 reaches full action separation (12.2) by **8k steps**, b39 sits at **1.7** and needs ~600k. λ=0.16219 leaves `aeff` **7.0 of 51** and 15-18% of greedy mass on the death atom. **Keep `SNEK_C51_ZERO_INIT` off.** See below |
 | **‡‡ A C51 head starts at the grid midpoint — 57.5, against a true value of ~34 — and it cost b36 nothing** | **measured 2026-08-17**. Five c51 arms *descend* to 32.4-36.0 and the `ddqn` control *ascends* to 33.96, so ~34 is the truth and the init is **1.7× optimistic**. Harmless because the offset is **common-mode**: `b36a`'s action gap is at full scale (14.91) at 8k while `V` is 21 too high, and it scores 45 at 8k / 92 at 127k regardless. **`SNEK_C51_ZERO_INIT=1` would be a mild pessimization** — 0 is *further* from 34 than 57.5 is, and its λ=0.162 ramp starts the head sharper (`aeff` 6.7) than any trained net here ever gets. Wash-out is `ln(0.5)/ln(γ)` per target refresh — **277k predicted, 233-335k measured** — so it is the discount's clock, not the algorithm's. See below |
 | **‡ Cross-arm churn requires `--states-from`; every per-arm figure comparing arms of different quality is inflated ~2×** | **corrected 2026-08-16**. `churn` depends on the action gap, which is ~0.2 early-game against 20-24 in the endgame, so a weak arm that dies early is scored on near-tied states that flip for free. b32's controls carried state-set mean lengths of **11.9 and 21.2** against the treated arms' 34.9-38.0. On a shared champion set the effect halves but survives, and **gap stops explaining churn** — the highest-gap arm of the six is now a control. Within-arm trends across phases are unaffected |
 | **‡‡ A terminal reward must clear `W > 1/(1 − γ^k)` (`k` = steps per meal) or progress lowers value** — at γ=0.9975 that is **34-58** at the realistic pace, so the shipped `PERFECT_GAME_REWARD=100` clears it 2-3× and **10 misses it 3-6×** | **derived and measured 2026-08-16** by b33. Every meal costs the win-10 arm **1.7-4.4** points of `V` while paying 1, so it correctly avoids finishing. **The win reward is the potential, not the prize** — its job is keeping `V` rising as the board fills. Shrinking `W` requires shrinking γ. See below |
@@ -457,6 +458,50 @@ c51's inflated early value scale, and it has bought nothing so far: **`b30e`'s b
 metric** (see the note below). `fc 320` also *holds*
 the optimism longer than `fc 200,100,100` does (b36c/b36d rise to 58.7-58.9 by ~80-110k before
 descending, where `b32a` is down to 52 by 23k) — n=1 architecture, so noted only.
+
+## ‡‡ Zero-init loses, and the channel is **action separation, not calibration** — b39 at 1.26M
+
+`b39a-d` is b36's config with `SNEK_C51_ZERO_INIT=1` as the only change (env blocks diffed; one line).
+**H2 confirmed at the top of its pre-registered range.** Matched at ≤1.26M, seed-paired:
+
+| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta |
+|---|---|---|---|
+| 1 | 71.7 / 9.6 | 84.0 / 29.9 | **−12.3** / −20.3 |
+| 2 | 75.7 / 17.8 | 86.0 / 29.1 | **−10.3** / −11.3 |
+| 3 | 77.7 / 22.4 | 84.7 / 19.8 | **−7.0** / +2.6 |
+| 4 | 74.7 / 10.2 | 86.7 / 22.9 | **−12.0** / −12.7 |
+| **group** | **74.9 / 15.0** | **85.3 / 25.4** | **−10.4 / −10.4** |
+
+**4 of 4 seeds down on best-30. H1 (null, the 50% favourite) is falsified** — this is not a slow start that
+converges.
+
+**‡ But the predicted *reason* was wrong, and the correction is the useful part.** Both the launcher and the
+earlier finding argued the damage would come through *calibration*: the ramp starts 34 from the truth
+against standard init's 23.5, so the value level should take longer to arrive. **It arrives sooner.**
+
+| arm | init error | half-life | washed out | `aeff` path | action gap: 10k → max → final |
+|---|---|---|---|---|---|
+| `b39a` | **−29.7** | **202k** | **601k** | 7.0 → 26.7 @601k → 21.1 | **1.72** → 8.90 → 8.84 |
+| `b39b` | −30.2 | **163k** | 631k | 7.0 → 27.3 @631k → 20.9 | **1.69** → 9.17 → 9.17 |
+| `b36a` | +23.7 | 304k | 864k | 49.6 → monotone → 21.6 | **12.18** → 15.71 → 9.75 |
+
+So zero-init **converged its value level ~1.7× faster from a larger error** and still played worse.
+**Calibration speed is not the channel.** What separates them is the **action gap**: b36 has full-scale
+separation (12.2) by **8,000 steps**, while b39 sits at **1.7** and needs ~600k to reach 8.9 — its entire
+first 600k runs at a gap 3-7× smaller. `argmax` is invariant to the *level* and entirely dependent on the
+*differences*, so the level was never the thing to measure.
+
+**The mechanism, stated generally: a linear bias ramp costs a distributional head its usable atoms, and
+usable atoms are what express action differences.** At λ=0.16219 the head starts with `aeff` **7.0 of 51**
+and 15-18% of its greedy mass parked on the `−5` death atom (b36: 0.3%) — roughly 7 degrees of freedom to
+tell three actions apart instead of ~50. The **`aeff` path is non-monotonic exactly as pre-registered**
+(7 → ~27 → 21 against b36's monotone 49.6 → 21.6), so the head does spend training broadening before it can
+sharpen; the prediction was right about the path and wrong about why it hurts.
+
+**Two things to carry forward.** For a categorical head, judge an init by the **spread it leaves available**,
+not by how close its mean is to the true value — and **`SNEK_C51_ZERO_INIT` should stay off permanently**,
+now on measured grounds rather than inference. If a centred init is ever wanted, it needs a parameterisation
+that moves the mean without collapsing the entropy; one λ cannot.
 
 ## ‡‡ After four fixes, C51 is still well behind the scalar head **at its own architecture** — and `b24`, not `b32`, is the control
 

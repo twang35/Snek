@@ -76,12 +76,12 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-17 18:45.**
+**Both hosts as of 2026-08-18 00:30.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **`b39a-d` (C51 zero-init) running**, launched 18:43 on 2026-08-17 to a 3M cap, one chart window on `--arms b39`. **`b36a-d` and `b38a-d` are both closed out** — b38 ran itself to its 3M cap, its close-out finished 18:41, and neither batch produced a ≥98% checkpoint so **no HOF-500 is owed for either** | nothing manual until b39 reaches 3M and self-terminates |
-| **desktop** | **`b40a-d` (free-space term) training** at 27-32k, close-outs and HOF-500s queued behind them. **`b35a-d` (gate 40) and `b37a-d` (b29 replication, seeds 5-8) are both fully done** — training, close-out *and* HOF-500 for all four arms of each. **`b37`'s results are on the `results` branch and have not been copied into `snek2/runs/` or written up yet** | **b37 needs its retrieval + write-up** ([procedure](../desktop/README.md#getting-a-finished-job-into-the-analysis-workflow)); b40 auto-chains |
+| **laptop** | **`b39a-d` (C51 zero-init) running at 1.26-1.34M** of a 3M cap, launched 18:43 on 2026-08-17. **The result is already decided against it** — −10.4 pp on best-30 at a matched horizon, 4 of 4 seeds — but they run to the cap so the close-out measures the full curve. **`b36a-d` and `b38a-d` are both closed out**, neither produced a ≥98% checkpoint, so **no HOF-500 is owed for either** | nothing manual: `chain_closeout_after_training.sh b39` is waiting on the trainers and launches the close-out itself (4 processes × 4 workers, log `/tmp/b39_closeout_chain.log`) |
+| **desktop** | **`b40a-d` (free-space term) training** at **1.69-1.79M** of a 2M cap (heartbeat `2026-08-18T00:27:04`, fetched), close-outs and HOF-500s queued behind them. **`b35a-d` (gate 40) and `b37a-d` (b29 replication, seeds 5-8) are both fully done** — training, close-out *and* HOF-500 for all four arms of each. **`b37`'s results are on the `results` branch and have not been copied into `snek2/runs/` or written up yet** | **b37 needs its retrieval + write-up** ([procedure](../desktop/README.md#getting-a-finished-job-into-the-analysis-workflow)); b40 auto-chains |
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
@@ -224,6 +224,18 @@ rather than 1e-4, because the ramp unwinds through parameters whose Adam step is
 | **H1 ~50%** | null on best-30 and `sef`, with a measurably slower first 100-200k steps | time-to-first-80%-eval up, endpoint unchanged |
 | **H2 ~35%** | 5-10 pp regression, from top-atom suppression delaying the **endgame** value signal | `value_by_length.py` flat across bands 85-97 early; endgame gap below b36's 19.8-24.3 |
 | **H3 ~15%** | improvement, via less early over-optimistic bootstrapping → less churn | `c51_stability.py --states-from` below 0.0865 at matched `--end` |
+
+**‡ Result at 1.26M: H2 confirmed, H1 falsified — but through the wrong channel.** Matched and
+seed-paired, b39 is **−10.4 pp** on best-30 and on `sef`, **4 of 4 seeds down** (−7.0, −10.3, −12.0, −12.3),
+which lands at the top of H2's 5-10 pp band. The `aeff` signature appeared as pre-registered (**7.0 → ~27
+@600-630k → 21**, against b36's monotone 49.6 → 21.6). **The mechanism is not H2's endgame-suppression
+story.** Zero-init's value level converged *faster* — half-life **163-202k** against b36a's **304k**, from a
+*larger* initial error — so calibration is not the channel. The channel is **action separation**: b36a has a
+12.18 action gap by **8k steps**, b39 sits at **1.72** and needs ~600k to reach 8.90. Numbers, the death-atom
+mass, and the general rule are in
+[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-at-126m)
+and [`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--running-launched-1843-on-2026-08-17).
+**`SNEK_C51_ZERO_INIT` stays off**; the arms run to their 3M cap so the close-out measures the full curve.
 
 **The decisive measurement is `aeff` against step**, and it is a signature no other arm can produce:
 standard init falls 49.9 → 21-24 monotonically, so a **6.7 → ~36 → 21-24** climb is direct evidence the head

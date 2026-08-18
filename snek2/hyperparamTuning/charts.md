@@ -81,21 +81,41 @@ three decimals, all drift (max 0.0150) sitting in the bottom atoms. So recovery 
 kernel and cannot begin until the agent experiences high returns — **valuation lags discovery**, which
 predicts damage in the endgame value signal rather than in whether the arm learns to play.
 
-**Watch `aeff` against step.** Standard init falls 49.9 → 21-24 monotonically; if b39 climbs
-6.7 → ~36 → 21-24, that non-monotonic path is direct evidence of training spent broadening.
+**‡ Result at 1.26M, matched and seed-paired: H2 confirmed at the top of its range, H1 falsified.**
+b39 is **−10.4 pp** on best-30 and **−10.4 pp** on `sef`, **4 of 4 seeds down**. This is not a slow start.
 
-**First reading at 31-38k steps, which is 1% of the run and settles nothing.** Trailing avg score
-**69.1-82.1**; `b39a` reads **82.1 @38k** against `b36a`'s **85.9 @39k**, so there is no dramatic early
-slowdown of the kind H1 predicts — but a 3.8-point gap on one seed at 1% depth is noise, and best-30 is
-still 2.0-11.0 for every arm. **Do not read these panels as evidence either way yet.** The comparison that
-matters is `aeff` against step, and the first useful point for it is ~100k.
+| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta |
+|---|---|---|---|
+| 1 | 71.7 / 9.6 | 84.0 / 29.9 | **−12.3** / −20.3 |
+| 2 | 75.7 / 17.8 | 86.0 / 29.1 | **−10.3** / −11.3 |
+| 3 | 77.7 / 22.4 | 84.7 / 19.8 | **−7.0** / +2.6 |
+| 4 | 74.7 / 10.2 | 86.7 / 22.9 | **−12.0** / −12.7 |
+| **group** | **74.9 / 15.0** | **85.3 / 25.4** | **−10.4 / −10.4** |
 
-| arm | step | trailing | best-30 | ε |
-|---|---|---|---|---|
-| `b39a` | 38k | **82.1** | 11.0 | 0.010 |
-| `b39d` | 31k | 79.5 | 6.3 | 0.011 |
-| `b39b` | 35k | 75.5 | 2.0 | 0.012 |
-| `b39c` | 35k | 69.1 | 3.3 | 0.012 |
+**The `aeff` path is non-monotonic exactly as pre-registered** — b39a 7.0 → **26.7 @601k** → 21.1, b39b
+7.0 → **27.3 @631k** → 20.9, against b36a's monotone 49.6 → 21.6. The head does spend training broadening
+before it can sharpen.
+
+**But the predicted *reason* was wrong, and the correction is the point.** The damage was expected to run
+through calibration — zero-init starts 34 from the truth against standard init's 23.5, so it should take
+longer to arrive. **It arrives sooner:** half-life on `|excess|` is **202k / 163k** for b39a/b39b against
+b36a's **304k**, wash-out 601k/631k against 864k, from a *larger* initial error (−30 vs +24). Faster
+calibration, worse play.
+
+**What actually separates them is the action gap.** b36a has full-scale separation (**12.18**) by 8,000
+steps; b39 sits at **1.72** and needs ~600k to reach 8.90, so its whole first 600k runs at a gap 3-7×
+smaller. `argmax` ignores the level and depends entirely on the differences — the level was never the
+thing to measure. b39 also parks **15-18%** of its greedy mass on the `−5` death atom early, against
+b36's 0.3%. **The transferable rule: judge a categorical init by the spread it leaves available, not by
+how close its mean is to the truth.** Full account in
+[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-at-126m).
+
+| arm | step | trailing | best-30 | `sef` | ε |
+|---|---|---|---|---|---|
+| `b39c` | 1309k | 88.2 | **77.7** | 22.7 | 0.0030 |
+| `b39b` | 1343k | 91.3 | 75.7 | 17.7 | 0.0034 |
+| `b39d` | 1259k | 90.4 | 74.7 | 10.0 | 0.0044 |
+| `b39a` | 1290k | 85.9 | 71.7 | 9.5 | 0.0046 |
 
 ![b39a](charts/b39a-c51zeroinitseed1.png)
 **b39a-c51zeroinitseed1** — paired with `b36a` (best-30 84.0, pooled 75.36)
