@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T09:46:49",
-  "ts": 1787071609.540591,
+  "iso": "2026-08-18T09:47:37",
+  "ts": 1787071657.2831616,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,10 +18,47 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 4,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b41a-b29repro-seed1",
+      "type": "train",
+      "policy": "b41a-b29repro-seed1",
+      "pid": 743017,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b41b-b29repro-seed2",
+      "type": "train",
+      "policy": "b41b-b29repro-seed2",
+      "pid": 743018,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b41c-b29repro-seed3",
+      "type": "train",
+      "policy": "b41c-b29repro-seed3",
+      "pid": 743019,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b41d-b29repro-seed4",
+      "type": "train",
+      "policy": "b41d-b29repro-seed4",
+      "pid": 743020,
+      "step": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
     "smoke-1": "failed",
     "smoke-2": "failed",
@@ -229,12 +266,24 @@
     "b40a-chasefree10g75seed1-hof": "done",
     "b40b-chasefree10g75seed2-hof": "done",
     "b40c-chasefree10g75seed3-hof": "done",
-    "b40d-chasefree10g75seed4-hof": "done"
+    "b40d-chasefree10g75seed4-hof": "done",
+    "b41a-b29repro-seed1": "running",
+    "b41b-b29repro-seed2": "running",
+    "b41c-b29repro-seed3": "running",
+    "b41d-b29repro-seed4": "running",
+    "b41a-b29repro-seed1-closeout": "queued",
+    "b41b-b29repro-seed2-closeout": "queued",
+    "b41c-b29repro-seed3-closeout": "queued",
+    "b41d-b29repro-seed4-closeout": "queued",
+    "b41a-b29repro-seed1-hof": "queued",
+    "b41b-b29repro-seed2-hof": "queued",
+    "b41c-b29repro-seed3-hof": "queued",
+    "b41d-b29repro-seed4-hof": "queued"
   },
   "disk_free_gb": 128.9,
   "load_avg": [
-    0.07275390625,
-    0.0361328125,
-    0.00390625
+    0.1103515625,
+    0.044921875,
+    0.00537109375
   ]
 }
