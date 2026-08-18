@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T06:21:46",
-  "ts": 1787059306.5052545,
+  "iso": "2026-08-18T06:23:16",
+  "ts": 1787059396.738363,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -19,17 +19,44 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 4
   },
   "running": [
     {
-      "id": "b40b-chasefree10g75seed2-closeout",
+      "id": "b40a-chasefree10g75seed1-hof",
+      "type": "eval",
+      "policy": "b40a-chasefree10g75seed1",
+      "pid": 603469,
+      "step": 2000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b40b-chasefree10g75seed2-hof",
       "type": "eval",
       "policy": "b40b-chasefree10g75seed2",
-      "pid": 346987,
+      "pid": 603470,
       "step": 2000000,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 18469
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b40c-chasefree10g75seed3-hof",
+      "type": "eval",
+      "policy": "b40c-chasefree10g75seed3",
+      "pid": 603471,
+      "step": 2000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b40d-chasefree10g75seed4-hof",
+      "type": "eval",
+      "policy": "b40d-chasefree10g75seed4",
+      "pid": 603472,
+      "step": 2000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
@@ -233,18 +260,18 @@
     "b40c-chasefree10g75seed3": "done",
     "b40d-chasefree10g75seed4": "done",
     "b40a-chasefree10g75seed1-closeout": "done",
-    "b40b-chasefree10g75seed2-closeout": "running",
+    "b40b-chasefree10g75seed2-closeout": "done",
     "b40c-chasefree10g75seed3-closeout": "done",
     "b40d-chasefree10g75seed4-closeout": "done",
-    "b40a-chasefree10g75seed1-hof": "queued",
-    "b40c-chasefree10g75seed3-hof": "queued",
-    "b40d-chasefree10g75seed4-hof": "queued",
-    "b40b-chasefree10g75seed2-hof": "queued"
+    "b40a-chasefree10g75seed1-hof": "running",
+    "b40b-chasefree10g75seed2-hof": "running",
+    "b40c-chasefree10g75seed3-hof": "running",
+    "b40d-chasefree10g75seed4-hof": "running"
   },
   "disk_free_gb": 128.9,
   "load_avg": [
-    4.3701171875,
-    4.1953125,
-    4.7255859375
+    3.21337890625,
+    3.99365234375,
+    4.61279296875
   ]
 }
