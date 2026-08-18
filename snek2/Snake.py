@@ -178,6 +178,9 @@ class Game:
         # Phi(s) for the board as it currently stands, cached between steps so the flood fill runs
         # once per step rather than twice. reset() and restore_snapshot() both set it.
         self.chase_safe_potential = 0.0
+        # The free-space potential's own cache, same lifecycle. A separate flood fill from the one
+        # above: chase-safety keeps the tail occupied, this one frees it, so they cannot share.
+        self.free_space_potential = 0.0
         # show screen
         self.screen = pygame.display.set_mode(SCREENSIZE, 0, 0, SCREEN_TO_DISPLAY, 0)
 
@@ -278,6 +281,7 @@ class Game:
         # the opening length of 5, so this is 0 for the gated form — which is what makes the
         # episode's discounted shaping telescope to exactly 0.
         self.chase_safe_potential = self._chase_safe_potential()
+        self.free_space_potential = self._free_space_potential()
 
     def _chase_safe_potential(self):
         """Phi(s) for the current board: chase-safety, gated by snake length. 0.0 when shaping is off.
@@ -295,6 +299,21 @@ class Game:
             return 0.0
         return float(chase_safe_state(self.grid, self.head.tile_pos, self.tail.tile_pos,
                                       self.current_food))
+
+    def _free_space_potential(self):
+        """Phi(s) for the current board: `1 / open-region count`, gated by snake length. 0.0 off.
+
+        Mirrors `_chase_safe_potential` exactly — same gate-before-flood-fill order (so a below-gate
+        board costs one comparison, which is most of the episode), same 0.0-when-off so the ablation
+        skips `count_groups` entirely, same reason skipping it cannot shift the food stream
+        (`count_groups` draws no randomness). The function it calls frees the tail cell first; see
+        `free_space_pieces`.
+        """
+        if not FREE_SPACE_SHAPING:
+            return 0.0
+        if len(self.snake_group) < FREE_SPACE_GATE:
+            return 0.0
+        return free_space_pieces(self.grid, self.tail.tile_pos)
 
     def get_observation(self):
         # Each segment lands on the cell its predecessor just left, so the tail's next cell is
@@ -385,6 +404,7 @@ class Game:
         # and food, all of which are restored exactly above, so this is byte-identical to carrying
         # the value and it leaves GameSnapshot, validate_snapshot and test_game_snapshot alone.
         self.chase_safe_potential = self._chase_safe_potential()
+        self.free_space_potential = self._free_space_potential()
 
     def _build_snake(self, body, head_move_dir, tail_last_move_dir):
         """Builds a snake of arbitrary shape from ordered body cells, head first.
@@ -592,6 +612,16 @@ class Game:
             reward += CHASE_SAFE_SHAPING * (self.shaping_discount * new_potential
                                             - self.chase_safe_potential)
             self.chase_safe_potential = new_potential
+
+        # A second, independent PBRS term on the same principle - see the block above for why the
+        # position and the `Phi(terminal) = 0` branch are load-bearing. Independent because the two
+        # potentials measure different things (local eat-safety vs global fragmentation), and PBRS
+        # terms add: running both is shaping with Phi = c1*Phi_cs + c2*Phi_fs, still policy-invariant.
+        if FREE_SPACE_SHAPING:
+            new_free_space = 0.0 if self.finished else self._free_space_potential()
+            reward += FREE_SPACE_SHAPING * (self.shaping_discount * new_free_space
+                                            - self.free_space_potential)
+            self.free_space_potential = new_free_space
 
         return self.finished, reward
 

@@ -147,6 +147,11 @@ def main(argv):
               'CHASE_SAFE_GATE = {2} (default {3})'.format(
                   CHASE_SAFE_SHAPING, DEFAULT_CHASE_SAFE_SHAPING,
                   CHASE_SAFE_GATE, DEFAULT_CHASE_SAFE_GATE))
+    if FREE_SPACE_SHAPING != DEFAULT_FREE_SPACE_SHAPING:
+        print('hyperparameter override: FREE_SPACE_SHAPING = {0} (default {1}), '
+              'FREE_SPACE_GATE = {2} (default {3})'.format(
+                  FREE_SPACE_SHAPING, DEFAULT_FREE_SPACE_SHAPING,
+                  FREE_SPACE_GATE, DEFAULT_FREE_SPACE_GATE))
 
     # Fraction of *refinement-phase* episodes in which the epsilon coin's random move is drawn
     # from the non-fatal moves instead of all three. 0.0 reproduces batch 12 exactly. See
@@ -598,6 +603,12 @@ def main(argv):
                                             'ungated' if CHASE_SAFE_GATE <= 0 else
                                             'gated to snake length >= {0}'.format(
                                                 CHASE_SAFE_GATE))),
+        'FREE_SPACE_SHAPING': ('off' if not FREE_SPACE_SHAPING else
+                               'c={0}, potential-based on 1/open-region-count, '
+                               '{1}'.format(FREE_SPACE_SHAPING,
+                                            'ungated' if FREE_SPACE_GATE <= 0 else
+                                            'gated to snake length >= {0}'.format(
+                                                FREE_SPACE_GATE))),
         'eval_only': eval_only,
         'min_checkpoint_score': snake_constants.MIN_CHECKPOINT_SCORE,
     }

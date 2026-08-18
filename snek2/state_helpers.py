@@ -516,6 +516,35 @@ def chase_safe_state(grid, head_pos, tail_pos, current_food):
     return 1 if any(regions[index] & food_bit for index in escape) else 0
 
 
+def free_space_pieces(grid, tail_pos):
+    """`1 / (number of connected open regions of grid)`, with the tail's cell freed first.
+
+    The state form of the "keep the free space in one piece" potential behind `FREE_SPACE_SHAPING`.
+    One region -> 1.0, two -> 0.5, k -> 1/k, so the value cliffs the moment the board stops being a
+    single piece, whatever the *sizes* of the pieces. That is deliberate: in a perfect game every
+    open cell must eventually be filled, so a single stranded cell loses the game, and a size-weighted
+    measure (`largest / total`) reads 0.95 for a 19+1 split and misses it.
+
+    The tail cell is freed before the count, for the reason `update_grid` documents: the tail vacates
+    on the next ordinary move, so a region reachable only through it is not really sealed. Counting
+    the tail as a wall made the region count wrong on 12.1% of steps overall and 40% of steps past
+    score 80 for the 92% policy — exactly the endgame this potential is gated to — always in the
+    pessimistic direction. Freeing one cell is the state analogue of that per-action fix.
+
+    Unlike `chase_safe_state` this is a *global* board measure, so it needs no head or food: it asks
+    only how fragmented the open space is, not whether a particular meal is reachable. The two are
+    meant to be read together, not one instead of the other.
+
+    `.copy()` because `count_groups` reads the grid and the caller's board must not be mutated.
+    Returns a float in (0, 1]; a board with no open cell cannot occur before the terminal step, where
+    the caller returns 0.0 without calling this, but the `count` guard keeps the function total.
+    """
+    grid = grid.copy()
+    set_number(grid, tail_pos, 0)
+    _, count = count_groups(grid)
+    return 1.0 / count if count else 0.0
+
+
 def is_perfect_score(score):
     """True when `score` is a filled board. The one definition of "this episode was perfect".
 

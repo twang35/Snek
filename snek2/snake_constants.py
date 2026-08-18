@@ -64,6 +64,34 @@ CHASE_SAFE_SHAPING = float(os.environ.get('SNEK_CHASE_SAFE_SHAPING',
 # CHASE_SAFE_SHAPING is 0.0, since the whole term is skipped.
 DEFAULT_CHASE_SAFE_GATE = 85
 CHASE_SAFE_GATE = int(os.environ.get('SNEK_CHASE_SAFE_GATE', DEFAULT_CHASE_SAFE_GATE))
+# Potential-based shaping on "is the free space a single connected piece" — the coefficient `c` in
+# `F = c * (gamma * Phi(s') - Phi(s))`, with Phi = 1 / (number of open regions), the tail cell freed
+# first. Read from the environment for the same reason CHASE_SAFE_SHAPING is: it is consumed inside
+# `Snake.step`, which runs in the parallel env workers, where a parent assignment never reaches a
+# `from snake_constants import *` copy.
+#
+# **Why 1/count and not a size-weighted measure.** In a perfect game every open cell must eventually
+# be filled, so a *single* permanently stranded cell loses the game — the number of pieces is the
+# fatal quantity, not how the space is divided. `largest / total` reads 0.95 for a 19+1 split and so
+# barely reacts to the first break; `1 / count` cliffs to 0.5 the moment the board stops being one
+# piece, which is the intent.
+#
+# Complements CHASE_SAFE_SHAPING rather than replacing it. Chase-safety is a *local, binary* "can I
+# eat this food and still reach my tail"; this is a *global* "has the board fragmented at all". They
+# disagree on the cases that matter — a board can be one eat-trap from death while 98% of its free
+# space is in one piece, and vice versa — so an arm may run both, and their PBRS terms simply add.
+#
+# **0.0 is off and is a clean ablation**, on the same argument as CHASE_SAFE_SHAPING: the block is
+# skipped and `count_groups` draws no randomness, so the food stream is untouched. Default 0.0, so
+# every existing arm and historical number is unaffected.
+DEFAULT_FREE_SPACE_SHAPING = 0.0
+FREE_SPACE_SHAPING = float(os.environ.get('SNEK_FREE_SPACE_SHAPING', DEFAULT_FREE_SPACE_SHAPING))
+# Snake length below which this potential is identically 0, matching CHASE_SAFE_GATE's default of 85.
+# Gated for the same reason and with the same invariance argument: a length gate is a bounded function
+# of state, so the shaping stays policy-invariant, and a length-5 opening board sits below it, so
+# Phi(s0) = 0 and the episode's discounted shaping telescopes to 0. `SNEK_FREE_SPACE_GATE=0` ungates.
+DEFAULT_FREE_SPACE_GATE = 85
+FREE_SPACE_GATE = int(os.environ.get('SNEK_FREE_SPACE_GATE', DEFAULT_FREE_SPACE_GATE))
 DEATH_REWARD = -5.0  # maybe avoid deaths more?
 STARVE_REWARD = -0.5
 global PERFECT_GAME_REWARD

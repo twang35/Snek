@@ -303,7 +303,7 @@ COILED_AROUND_FOOD_FOOD = (1, 1)
 COILED_AROUND_FOOD_FACING = 'left'  # the neck (2,0) is right of the head, so it entered moving left
 
 
-def build_chase_game(c, gate=0, distance_shaping=0.0):
+def build_chase_game(c, gate=0, distance_shaping=0.0, free_space=0.0, free_space_gate=0):
     """A fresh `Snake` module whose chase-safe knobs are `c` and `gate`.
 
     Reloaded rather than assigned, for the reason `build_game` documents: `Snake.py` does
@@ -313,12 +313,19 @@ def build_chase_game(c, gate=0, distance_shaping=0.0):
     The distance shaping is forced to 0.0 as well, so a reward is the chase-safe term alone. That
     matches every arm from batch 17 on, and leaving it at its 0.001 default would put an unrelated
     penalty on some of the moves these tests assert exact values for.
+
+    `free_space` / `free_space_gate` drive the second PBRS term (`FREE_SPACE_SHAPING`), both 0/off by
+    default so existing callers are unchanged and a reward stays the chase-safe term alone unless a
+    test asks otherwise.
     """
     previous = {name: os.environ.get(name) for name in
-                ('SNEK_CHASE_SAFE_SHAPING', 'SNEK_CHASE_SAFE_GATE', 'SNEK_FOOD_DISTANCE_REWARD')}
+                ('SNEK_CHASE_SAFE_SHAPING', 'SNEK_CHASE_SAFE_GATE', 'SNEK_FOOD_DISTANCE_REWARD',
+                 'SNEK_FREE_SPACE_SHAPING', 'SNEK_FREE_SPACE_GATE')}
     os.environ['SNEK_CHASE_SAFE_SHAPING'] = repr(c)
     os.environ['SNEK_CHASE_SAFE_GATE'] = str(gate)
     os.environ['SNEK_FOOD_DISTANCE_REWARD'] = repr(distance_shaping)
+    os.environ['SNEK_FREE_SPACE_SHAPING'] = repr(free_space)
+    os.environ['SNEK_FREE_SPACE_GATE'] = str(free_space_gate)
     try:
         import snake_constants
         import state_helpers
@@ -328,6 +335,8 @@ def build_chase_game(c, gate=0, distance_shaping=0.0):
         importlib.reload(Snake)
         assert Snake.CHASE_SAFE_SHAPING == c, Snake.CHASE_SAFE_SHAPING
         assert Snake.CHASE_SAFE_GATE == gate, Snake.CHASE_SAFE_GATE
+        assert Snake.FREE_SPACE_SHAPING == free_space, Snake.FREE_SPACE_SHAPING
+        assert Snake.FREE_SPACE_GATE == free_space_gate, Snake.FREE_SPACE_GATE
         return Snake
     finally:
         for name, value in previous.items():
@@ -702,5 +711,105 @@ def test_the_state_potential_agrees_with_the_observation_the_policy_reads():
         assert game.chase_safe_potential == forward_flag, (forward_flag,
                                                            game.chase_safe_potential)
         assert forward_flag == 1.0, 'the fixture must exercise a 1, or the equality is trivial'
+    finally:
+        restore()
+
+
+# ------------------------------------------------- the free-space potential (1 / open-region count)
+
+def test_free_space_shaping_defaults_to_off():
+    """0.0, so every existing arm and historical number is unaffected, and the gate default matches
+    CHASE_SAFE_GATE so turning the term on with no gate override lands on the same endgame."""
+    import snake_constants
+    importlib.reload(snake_constants)
+    assert snake_constants.FREE_SPACE_SHAPING == 0.0
+    assert snake_constants.DEFAULT_FREE_SPACE_SHAPING == 0.0
+    assert snake_constants.FREE_SPACE_GATE == 85
+
+
+def test_the_free_space_potential_is_one_over_the_number_of_pieces():
+    """1 on a single open piece, 1/3 on the coil (a sealed food pocket, the freed corner cell and
+    the main board), so the value cliffs on fragmentation rather than tracking the stranded *size*."""
+    module = build_chase_game(0.0, gate=0, free_space=0.1, free_space_gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game._free_space_potential() == 1.0, 'one open region must read 1.0'
+        game = restored(module, COILED_AROUND_FOOD, COILED_AROUND_FOOD_FOOD, COILED_AROUND_FOOD_FACING)
+        assert abs(game._free_space_potential() - 1.0 / 3.0) < 1e-12, 'three regions must read 1/3'
+    finally:
+        restore()
+
+
+def test_the_free_space_potential_frees_the_tail_before_counting():
+    """The tail-aware decision, and the one a mutant is most likely to drop. On `TAIL_UNSEALS` the
+    tail (9,8) is the only wall between the sealed food and the main region, so freeing it merges
+    them and the board is one piece -> 1.0. Counting the tail as a wall would read 2 regions -> 0.5.
+
+    Contrast with `SEALED_POCKET`, where the seal is mid-body and freeing the tail cannot help: it
+    stays 2 regions -> 0.5. So the 1.0 above is specifically the freed tail, not the fixture.
+    """
+    module = build_chase_game(0.0, gate=0, free_space=0.1, free_space_gate=0)
+    try:
+        game = restored(module, TAIL_UNSEALS, SEALED_FOOD, TAIL_UNSEALS_FACING)
+        assert game._free_space_potential() == 1.0, 'freeing the tail must merge the pocket'
+        game = restored(module, SEALED_POCKET, SEALED_FOOD, SEALED_FACING)
+        assert game._free_space_potential() == 0.5, 'a mid-body seal the tail cannot open stays split'
+    finally:
+        restore()
+
+
+def test_the_free_space_gate_zeroes_the_potential_below_the_length_threshold():
+    """Below the gate the potential is 0 whatever the board says; at the gate the board decides."""
+    module = build_chase_game(0.0, gate=0, free_space=0.1, free_space_gate=len(OPEN_BOARD) + 1)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game._free_space_potential() == 0.0, 'a snake shorter than the gate must read 0'
+    finally:
+        restore()
+    module = build_chase_game(0.0, gate=0, free_space=0.1, free_space_gate=len(OPEN_BOARD))
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game._free_space_potential() == 1.0, 'at the gate the board decides'
+    finally:
+        restore()
+
+
+def test_the_free_space_potential_is_zero_whenever_the_term_is_off():
+    """So `c = 0` skips the flood fill entirely rather than computing a value nobody adds."""
+    module = build_chase_game(0.0, gate=0, free_space=0.0, free_space_gate=0)
+    try:
+        game = restored(module, COILED_AROUND_FOOD, COILED_AROUND_FOOD_FOOD, COILED_AROUND_FOOD_FACING)
+        assert game._free_space_potential() == 0.0
+    finally:
+        restore()
+
+
+def test_a_held_free_space_potential_costs_exactly_c_times_gamma_minus_one():
+    """Chase-safe off, free-space on: a forward move on the open board keeps the board one piece, so
+    the only reward is the free-space term at a held potential, c*(gamma - 1). Pins that the term is
+    wired into the reward at all, and — with chase-safe off — that it is wired *independently*."""
+    module = build_chase_game(0.0, gate=0, free_space=0.1, free_space_gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game.free_space_potential == 1.0
+        finished, reward = game.step('forward')
+        assert not finished
+        assert game.free_space_potential == 1.0, 'the fixture must hold the potential'
+        assert abs(reward - 0.1 * (GAMMA - 1.0)) < 1e-12, reward
+    finally:
+        restore()
+
+
+def test_the_two_shaping_terms_add():
+    """The whole basis of running both at once: PBRS terms sum, so with both on and each held at
+    1.0 across a move the reward is the sum, 2 * c * (gamma - 1). A mutant that dropped either term,
+    or shared one potential cache between them, fails this."""
+    module = build_chase_game(0.1, gate=0, free_space=0.1, free_space_gate=0)
+    try:
+        game = restored(module, OPEN_BOARD, OPEN_FOOD, OPEN_FACING)
+        assert game.chase_safe_potential == 1.0 and game.free_space_potential == 1.0
+        finished, reward = game.step('forward')
+        assert not finished
+        assert abs(reward - 2 * 0.1 * (GAMMA - 1.0)) < 1e-12, reward
     finally:
         restore()
