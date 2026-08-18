@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T13:24:46",
-  "ts": 1787084686.708812,
+  "iso": "2026-08-18T13:25:19",
+  "ts": 1787084719.380922,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -27,36 +27,36 @@
       "type": "train",
       "policy": "b41a-b29repro-seed1",
       "pid": 743017,
-      "step": 1169000,
-      "steps_per_sec": 60.9,
-      "elapsed_s": 13029
+      "step": 1172000,
+      "steps_per_sec": 91.8,
+      "elapsed_s": 13062
     },
     {
       "id": "b41b-b29repro-seed2",
       "type": "train",
       "policy": "b41b-b29repro-seed2",
       "pid": 743018,
-      "step": 1304000,
-      "steps_per_sec": 121.9,
-      "elapsed_s": 13029
+      "step": 1307000,
+      "steps_per_sec": 91.8,
+      "elapsed_s": 13062
     },
     {
       "id": "b41c-b29repro-seed3",
       "type": "train",
       "policy": "b41c-b29repro-seed3",
       "pid": 743019,
-      "step": 1265000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 13029
+      "step": 1269000,
+      "steps_per_sec": 122.4,
+      "elapsed_s": 13062
     },
     {
       "id": "b41d-b29repro-seed4",
       "type": "train",
       "policy": "b41d-b29repro-seed4",
       "pid": 743020,
-      "step": 1279000,
-      "steps_per_sec": 91.4,
-      "elapsed_s": 13029
+      "step": 1283000,
+      "steps_per_sec": 122.4,
+      "elapsed_s": 13062
     }
   ],
   "ledger": {
@@ -282,8 +282,8 @@
   },
   "disk_free_gb": 127.9,
   "load_avg": [
-    7.89599609375,
-    8.90185546875,
-    8.7373046875
+    7.9091796875,
+    8.80224609375,
+    8.70849609375
   ]
 }
