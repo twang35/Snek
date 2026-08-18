@@ -556,11 +556,16 @@ def test_publish_status_folds_the_queue_into_the_ledger_in_order():
     ])
     r._queued = r._scan_pending()
     r._publish()
-    ledger = json.loads(captured['text'])['ledger']
-    # run history first, then queued jobs (state 'queued') at the end in launch order
-    assert list(ledger.keys()) == ['done-arm', 'a', 'b'], list(ledger.keys())
+    published = json.loads(captured['text'])
+    ledger = published['ledger']
+    # newest/active on top: queued jobs (launch order, a@10 before b@30), then finished history
+    assert list(ledger.keys()) == ['a', 'b', 'done-arm'], list(ledger.keys())
     assert ledger['a'] == 'queued' and ledger['b'] == 'queued'
     assert ledger['done-arm'] == 'done'
+    # the at-a-glance summary rides at the top of status.json, listing the queued batches
+    assert list(published)[2] == 'at_a_glance', list(published)[:3]
+    assert published['at_a_glance']['running'] == []
+    assert any(line.split()[0] == 'a' for line in published['at_a_glance']['queued'])
 
 
 AUTO = runnermod.AUTO_CLOSEOUT_PRIORITY
@@ -645,13 +650,13 @@ def test_ledger_view_anticipates_closeouts_for_a_queued_training():
         def __init__(self, jid, pri):
             self.id, self.policy, self.priority, self.type = jid, jid, pri, 'train'
     r._queued = [_J('t1', 200), _J('t2', 200)]
-    view = r._ledger_view()
+    view = r._ledger_view(r._anticipated_order())
     assert list(view.keys()) == ['t1', 't2', 't1-closeout', 't2-closeout',
                                  't1-hof', 't2-hof'], list(view.keys())
     assert all(view[k] == 'queued' for k in view)
 
 
-def test_ledger_view_places_queued_after_history_and_running():
+def test_ledger_view_places_queued_first_then_running_then_finished():
     r = _runner(auto_closeout=False)
     r.ledger['hist'] = {'state': 'done'}
     r.ledger['run1'] = {'state': 'running', 'type': 'train'}
@@ -660,8 +665,9 @@ def test_ledger_view_places_queued_after_history_and_running():
         def __init__(self, jid):
             self.id, self.policy, self.priority, self.type = jid, jid, 200, 'train'
     r._queued = [_J('q1')]
-    view = r._ledger_view()
-    assert list(view.keys()) == ['hist', 'run1', 'q1'], list(view.keys())
+    view = r._ledger_view(r._anticipated_order())
+    # newest/active on top: queued, then running, then the finished history
+    assert list(view.keys()) == ['q1', 'run1', 'hist'], list(view.keys())
     assert view['q1'] == 'queued' and view['run1'] == 'running' and view['hist'] == 'done'
 
 
@@ -673,7 +679,7 @@ def test_ledger_view_lets_a_real_state_win_over_queued_on_overlap():
     class _J:  # minimal stand-in for a queued Job
         id, policy, priority, type = 'x', 'x', 100, 'train'
     r._queued = [_J()]
-    assert r._ledger_view()['x'] == 'running'
+    assert r._ledger_view(r._anticipated_order())['x'] == 'running'
 
 
 # ------------------------------------------------- boot id: reboot vs daemon restart
@@ -904,3 +910,73 @@ if __name__ == '__main__':
             fails += 1
     print(len(tests), 'tests,', fails, 'failed')
     sys.exit(1 if fails else 0)
+
+
+# ------------------------------------------------- batch/phase parsing + at-a-glance summary
+
+def test_batch_of_reads_the_leading_b_number():
+    assert runnermod.batch_of('b41a-b29repro-seed1') == 'b41'
+    assert runnermod.batch_of('b41a-b29repro-seed1-closeout') == 'b41'
+    assert runnermod.batch_of('b40d-chasefree10g75seed4-hof') == 'b40'
+    assert runnermod.batch_of('smoke-1') == 'smoke'   # non-b id falls back to the head
+
+
+def test_phase_of_reads_the_suffix_then_the_type():
+    assert runnermod.phase_of('b41a-x-closeout', 'eval') == 'closeout eval'
+    assert runnermod.phase_of('b41a-x-hof', 'eval') == 'hof'
+    assert runnermod.phase_of('b41a-x', 'train') == 'training'
+    assert runnermod.phase_of('b41a-x', 'eval') == 'eval'   # a hand-queued eval, no suffix
+
+
+def test_at_a_glance_running_line_averages_percent_across_a_batch():
+    running = [
+        {'id': 'b41a-x-seed1', 'type': 'train', 'policy': 'p1', 'step': 500000, 'max_steps': 2000000},
+        {'id': 'b41b-x-seed2', 'type': 'train', 'policy': 'p2', 'step': 1500000, 'max_steps': 2000000},
+    ]
+    g = runnermod.build_at_a_glance(running, [], {'b41': 'b29 re-run (same seeds), gate=75 c=0.10'})
+    assert g['queued'] == []
+    assert len(g['running']) == 1, g['running']            # both arms fold into one batch line
+    line = g['running'][0]
+    assert line.startswith('b41 -- b29 re-run (same seeds), gate=75 c=0.10 -- training'), line
+    assert '50%' in line and '(2 arms)' in line, line      # mean of 25% and 75%
+
+
+def test_at_a_glance_running_line_without_steps_shows_no_percent():
+    running = [{'id': 'b40a-x-seed1-closeout', 'type': 'eval', 'policy': 'p'}]
+    g = runnermod.build_at_a_glance(running, [], {})
+    assert g['running'] == ['b40 -- closeout eval (1 arm)'], g['running']
+
+
+def test_at_a_glance_queued_lists_one_line_per_batch_phase():
+    order = [
+        {'id': 'b41a-x-seed1', 'type': 'train', 'policy': 'p1'},
+        {'id': 'b41b-x-seed2', 'type': 'train', 'policy': 'p2'},
+        {'id': 'b41a-x-seed1-closeout', 'type': 'eval', 'policy': 'p1'},
+        {'id': 'b41b-x-seed2-closeout', 'type': 'eval', 'policy': 'p2'},
+        {'id': 'b41a-x-seed1-hof', 'type': 'eval', 'policy': 'p1'},
+    ]
+    g = runnermod.build_at_a_glance([], order, {'b41': 'demo'})
+    assert g['running'] == []
+    assert g['queued'] == [
+        'b41 training -- demo -- queued (2 arms)',
+        'b41 closeout eval -- demo -- queued (2 arms)',
+        'b41 hof -- demo -- queued (1 arm)',
+    ], g['queued']
+
+
+def test_parse_job_reads_an_optional_label():
+    j = jobmod.parse_job(json.dumps(
+        {'id': 'b41a', 'type': 'train', 'policy': 'b41a', 'label': 'b41: b29 re-run'}))
+    assert j.label == 'b41: b29 re-run'
+    j2 = jobmod.parse_job(json.dumps({'id': 'b41a', 'type': 'train', 'policy': 'b41a'}))
+    assert j2.label == ''                                  # optional, defaults empty
+
+
+def test_ledger_view_orders_finished_most_recent_first():
+    r = _runner(auto_closeout=False)
+    r.ledger['old'] = {'state': 'done', 'finished': 100.0}
+    r.ledger['new'] = {'state': 'done', 'finished': 300.0}
+    r.ledger['mid'] = {'state': 'failed', 'finished': 200.0}
+    r._queued = []
+    keys = list(r._ledger_view(r._anticipated_order()).keys())
+    assert keys == ['new', 'mid', 'old'], keys

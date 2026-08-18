@@ -444,12 +444,30 @@ the merge — do not trust piped output.
   "eval_args": ["top20"],       // eval only: extra argv for eval_checkpoints.py
   "eval_workers": 10,           // eval only: overrides runtime eval_workers
   "priority": 10,               // lower runs first; default 100
+  "label": "b40: free space + chase-safe shaping, gate=75, c=0.10",  // short, human; for at-a-glance
   "notes": "..."
 }
 ```
 
 `smoke`/`benchmark` force `SNEK_MIN_CHECKPOINT_SCORE=0` and default the policy to
 `smoke` / `bench-<id>` so they stay throwaway.
+
+**Always give a training batch a `label`.** It is a short, human one-liner naming the batch and its
+key knobs (e.g. `"b40: free space + chase-safe shaping, gate=75, c=0.10"`), and it is what the
+`at_a_glance` block at the top of `status.json` shows for that batch — so the box reads at a glance
+without parsing the ledger. All arms of a batch share one label; the auto-spawned closeout and HOF
+evals inherit it by batch. It is optional and defaults to `""`, but a batch queued without one shows
+only its id in the summary.
+
+### Reading `status.json` at a glance
+
+`status.json` opens with an `at_a_glance` block — `{"running": [...], "queued": [...]}`, one line per
+batch-phase, each running line carrying the mean percent done across that batch's arms
+(`"b41 -- b29 re-run (same seeds), gate=75 c=0.10 -- training 50% (2 arms)"`). Below it, the `ledger`
+is ordered **newest/active first**: the pending queue on top (in launch order, so the next job to run
+is highest), then the running jobs, then the finished history most-recent-first. This is the reverse of
+the on-disk `ledger.json`, whose insertion order is oldest-first — only the published view is reordered,
+so the authoritative ledger and every restart path are untouched.
 
 ## Files
 

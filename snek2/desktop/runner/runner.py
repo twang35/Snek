@@ -17,6 +17,7 @@ mismatch) marks them `interrupted` so they relaunch and resume -- see `_reattach
 """
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -82,6 +83,8 @@ class _StubJob:
         self.id = jid
         self.type = rec.get('type', 'train')
         self.policy = rec.get('policy')
+        self.max_steps = rec.get('max_steps')
+        self.label = rec.get('label', '')
 
     @property
     def category(self):
@@ -389,6 +392,9 @@ class Runner:
         self.running[job.id] = rj
         self.ledger[job.id] = {'state': 'running', 'type': job.type, 'policy': rj.policy,
                                'pid': rj.pid, 'log': rj.log_path, 'started': rj.started,
+                               # Carried so status.json's at-a-glance can show a % and a
+                               # label for a job re-adopted after a restart, spec not in hand.
+                               'max_steps': job.max_steps, 'label': job.label,
                                # The boot this pid belongs to. Without it a pid outliving a
                                # reboot reads as a live job -- see _reattach.
                                'boot': boot_id(),
@@ -431,18 +437,10 @@ class Runner:
         except Exception as e:  # best-effort, but say so in the journal, not silently
             sys.stderr.write('publish_results({0}) failed: {1}\n'.format(rj.job.id, e))
 
-    def _ledger_view(self):
-        """The id->state map published in status.json, with the pending queue folded in as
-        `queued` entries **at the end** -- after the run history and the running jobs -- in the
-        order the wave-barrier scheduler will actually launch them, including the closeout evals
-        each queued training will spawn -- and the HOF re-measure each of *those* spawns -- which
-        run before the next training batch (see `anticipated_queue`). So a glance at the tail of
-        the ledger shows the whole expected run order, not only the specs that exist as files today.
-
-        A launched job moves into `running` and drops out of `_queued` the same poll; a real
-        ledger state wins over the synthetic `queued` on the rare id overlap (a job re-queued
-        while its prior run is still settling) -- `setdefault` keeps the real state and its
-        position, appending only ids the history does not already carry."""
+    def _anticipated_order(self):
+        """The pending queue folded forward through the wave scheduler -- each queued training's
+        closeout, and each closeout's HOF, slotted where they will actually run (see
+        `anticipated_queue`). Shared by the ledger view and the at-a-glance summary so both agree."""
         limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
         auto = self.runtime.get('auto_closeout', True)
         auto_hof = self.runtime.get('auto_hof', True)
@@ -451,25 +449,67 @@ class Runner:
         running = [{'id': jid, 'type': rj.job.type, 'policy': rj.policy}
                    for jid, rj in self.running.items()]
         existing = set(self.ledger) | set(self.running) | {j['id'] for j in queued}
-        order = anticipated_queue(queued, running, limits, auto, existing, auto_hof)
-        view = {k: v.get('state') for k, v in self.ledger.items()}
-        for job in order:                              # queued at the end, in run order
-            view.setdefault(job['id'], 'queued')
+        return anticipated_queue(queued, running, limits, auto, existing, auto_hof)
+
+    def _batch_labels(self):
+        """Map batch id -> human label, from queued specs, running jobs and the ledger. A batch's
+        arms share a label, so the first non-empty one found wins."""
+        labels = {}
+        def add(jid, label):
+            if label:
+                labels.setdefault(batch_of(jid), label)
+        for j in self._queued:
+            add(j.id, getattr(j, 'label', ''))
+        for jid, rj in self.running.items():
+            add(jid, getattr(rj.job, 'label', ''))
+        for jid, rec in self.ledger.items():
+            add(jid, rec.get('label', ''))
+        return labels
+
+    def _ledger_view(self, order):
+        """The id->state map published in status.json, ordered newest/active first: the pending
+        queue at the top (in the order the wave scheduler will launch it, so the next job to run
+        sits highest), then the running jobs, then the finished history most-recent-first by its
+        `finished` timestamp. This is the reverse of the on-disk `ledger.json`, whose insertion
+        order is oldest-first; only the *published* view is reordered, so the authoritative ledger
+        and every restart path are untouched. A real ledger state always wins over the synthetic
+        `queued` on an id overlap (a job re-queued while its prior run is still settling)."""
+        queued_ids = [job['id'] for job in order
+                      if job['id'] not in self.ledger and job['id'] not in self.running]
+        running_ids = [jid for jid, rec in self.ledger.items()
+                       if rec.get('state') == 'running']
+        for jid in self.running:                       # a live job the ledger somehow missed
+            if jid not in running_ids and jid not in queued_ids:
+                running_ids.append(jid)
+        finished_ids = sorted(
+            (jid for jid, rec in self.ledger.items() if rec.get('state') != 'running'),
+            key=lambda jid: self.ledger[jid].get('finished') or 0, reverse=True)
+        view = {}
+        for jid in queued_ids:
+            view[jid] = 'queued'
+        for jid in running_ids + finished_ids:
+            view[jid] = self.ledger.get(jid, {}).get('state')
         return view
 
     def _publish(self):
+        order = self._anticipated_order()
+        running = [{'id': rj.job.id, 'type': rj.job.type, 'policy': rj.policy,
+                    'pid': rj.pid, 'step': rj.current_step,
+                    'max_steps': getattr(rj.job, 'max_steps', None),
+                    'steps_per_sec': rj.steps_per_sec,
+                    'elapsed_s': round(time.time() - rj.started)}
+                   for rj in self.running.values()]
         status = {
             'iso': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'ts': time.time(),
+            # A human summary at the top: one line per running batch (with % done) and one per
+            # queued batch-phase, so the box's state reads at a glance without parsing the ledger.
+            'at_a_glance': build_at_a_glance(running, order, self._batch_labels()),
             'runtime': self.runtime,
             'config_notes': self.config_notes,
             'counts': self._counts(),
-            'running': [{'id': rj.job.id, 'type': rj.job.type, 'policy': rj.policy,
-                         'pid': rj.pid, 'step': rj.current_step,
-                         'steps_per_sec': rj.steps_per_sec,
-                         'elapsed_s': round(time.time() - rj.started)}
-                        for rj in self.running.values()],
-            'ledger': self._ledger_view(),
+            'running': running,
+            'ledger': self._ledger_view(order),
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
             'load_avg': list(os.getloadavg()),
         }
@@ -477,6 +517,70 @@ class Runner:
             gitbus.publish_status(self.host, json.dumps(status, indent=2))
         except Exception as e:
             sys.stderr.write('publish_status failed: {0}\n'.format(e))
+
+
+_BATCH_RE = re.compile(r'^(b\d+)')
+
+
+def batch_of(job_id):
+    """The batch a job id belongs to: the leading b<number> ('b41a-...-seed1' -> 'b41'), or the id
+    up to the first '-' for anything that is not a b-numbered arm (so 'smoke-1' -> 'smoke')."""
+    jid = job_id or ''
+    m = _BATCH_RE.match(jid)
+    return m.group(1) if m else (jid.split('-')[0] or jid)
+
+
+def phase_of(job_id, job_type):
+    """The phase of a job, read off the id suffix the daemon mints (-closeout, -hof) with the job
+    type as the fallback: 'hof' | 'closeout eval' | 'training' | 'eval' | 'smoke' | 'benchmark'."""
+    jid = job_id or ''
+    if jid.endswith('-hof'):
+        return 'hof'
+    if jid.endswith('-closeout'):
+        return 'closeout eval'
+    return {'train': 'training'}.get(job_type, job_type or 'job')
+
+
+def build_at_a_glance(running, queued_order, labels):
+    """The `at_a_glance` block for status.json: {'running': [str], 'queued': [str]}, one line per
+    (batch, phase) group in first-seen order. `running` and `queued_order` are lists of job dicts;
+    a running trainer dict carries `step`/`max_steps`, from which each running line shows the mean
+    percent done across that batch's arms. `labels` maps a batch id to its human description.
+
+    Kept a pure function of plain dicts so it is testable without a live box."""
+    def group(jobs):
+        groups, index = [], {}
+        for j in jobs:
+            key = (batch_of(j['id']), phase_of(j['id'], j.get('type')))
+            if key not in index:
+                index[key] = len(groups)
+                groups.append((key[0], key[1], []))
+            groups[index[key]][2].append(j)
+        return groups
+
+    def described(batch):
+        lab = labels.get(batch)
+        if not lab:
+            return ''
+        return ' -- ' + (lab if len(lab) <= 80 else lab[:77] + '...')
+
+    def arms(n):
+        return '{0} arm{1}'.format(n, '' if n == 1 else 's')
+
+    running_lines = []
+    for batch, phase, jobs in group(running):
+        pcts = [100.0 * j['step'] / j['max_steps']
+                for j in jobs if j.get('step') and j.get('max_steps')]
+        pct = ' {0}%'.format(int(round(sum(pcts) / len(pcts)))) if pcts else ''
+        running_lines.append('{0}{1} -- {2}{3} ({4})'.format(
+            batch, described(batch), phase, pct, arms(len(jobs))))
+
+    queued_lines = []
+    for batch, phase, jobs in group(queued_order):
+        queued_lines.append('{0} {1}{2} -- queued ({3})'.format(
+            batch, phase, described(batch), arms(len(jobs))))
+
+    return {'running': running_lines, 'queued': queued_lines}
 
 
 def anticipated_queue(queued, running, limits, auto_closeout, existing_ids, auto_hof=True):

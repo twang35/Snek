@@ -15,7 +15,7 @@ class JobError(Exception):
 
 class Job:
     def __init__(self, id, type, policy=None, env=None, max_steps=None,
-                 eval_workers=None, eval_args=None, priority=100, notes=''):
+                 eval_workers=None, eval_args=None, priority=100, notes='', label=''):
         self.id = id
         self.type = type
         self.policy = policy
@@ -25,6 +25,9 @@ class Job:
         self.eval_args = eval_args or []
         self.priority = priority
         self.notes = notes
+        # A short human description for status.json's at-a-glance summary, e.g.
+        # 'b40: free space + chase-safe shaping, gate=75, c=0.10'. Optional; unset -> ''.
+        self.label = label
 
     @property
     def category(self):
@@ -80,4 +83,4 @@ def parse_job(text, source='<job>'):
 
     return Job(id=jid, type=jtype, policy=policy, env=env, max_steps=max_steps,
                eval_workers=eval_workers, eval_args=eval_args, priority=priority,
-               notes=str(raw.get('notes', '')))
+               notes=str(raw.get('notes', '')), label=str(raw.get('label', '')))
