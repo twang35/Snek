@@ -1,0 +1,21 @@
+{
+  "id": "b40b-chasefree10g75seed2",
+  "type": "train",
+  "policy": "b40b-chasefree10g75seed2",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FREE_SPACE_SHAPING": "0.1",
+    "SNEK_FREE_SPACE_GATE": "75"
+  },
+  "max_steps": 2000000,
+  "priority": 30,
+  "notes": "b29's record config (fc320, chase-safe c=0.10 gate 75) plus a second PBRS term, SNEK_FREE_SPACE_SHAPING=0.10 gate 75: Phi = 1/(number of connected open regions), tail freed before counting. Tests the mechanism the record rests on directly \u2014 the records keep free space in one piece, and 1/count cliffs the moment the board fragments where largest/total (0.95 for a 19+1 split) would miss it. PBRS terms add, so this is b29's shaping plus the global fragmentation signal, still policy-invariant. Seed-matched control is b29a-d (seeds 1-4); b37 (seeds 5-8) firms up the b29 baseline in parallel. Read the >=98%/500 count and the record-region width against b29's 21 checkpoints, not just sef/best-30."
+}
