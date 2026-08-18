@@ -30,7 +30,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
-| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported, at half the size first reported**: on a *shared* state set b32 cuts churn **0.119 → 0.088 (−26%)** paired at 600k, 4 of 4, flat to 1M — the 360k figures below were on per-arm sets and inflated ~2×. No dose effect. See below |
+| **‡‡ The C51 arms' chaos is the learning rate, not C51** — rate-matched at `1e-5`, greedy-action churn on a fixed state set is **0.036-0.051 against the ddqn control's 0.033-0.058**, at every phase | **measured 2026-08-15**. Only `2.5e-4` churns (0.20-0.23) and it never settles. The support is **not** clipping (outer-atom mass 0.000-0.017) and actions are **not** near-tied (gap no smaller than the control's). The trade-off is the finding: C51 at the control's rate is stable and too slow (peak 89.9 vs 94.6). Leading suspect **Adam ε=1e-7** (Dopamine's C51 uses 3.125e-4) is **supported, at half the size first reported**: on a *shared* state set b32 cuts churn **0.119 → 0.088 (−26%)** paired at 600k, 4 of 4, flat to 1M — the 360k figures below were on per-arm sets and inflated ~2×. **The dose is closed for good** — b36 vs b38 at 4 seeds a side, matched ≤2M, pools 76.77 vs 74.73, 3 of 4 favouring `1.5e-4`, p=0.625. Two 2× steps in the knob, nothing twice. See below |
+| **‡ C51 gains nothing past ~2M** — 3 of b38's 4 arms pool *worse* over their full 3M than over their first 2M | **measured 2026-08-17**. `b38a` is the lone exception and holds the batch's best checkpoint at 2355k. With b33's four arms declining for 1.4M steps after peaking, **future C51 batches can stop at ~2M** and cost a third less. Method: `pooled_equal_effort` is exactly recomputable at any cutoff from each row's `episode_perfect` flags |
 | **‡‡ After four fixes C51 is still well behind `ddqn` at its own architecture — `b24`, not `b32`, is the control** | **corrected 2026-08-17**. `b24a-d` (`ddqn`, **same `fc 320`**): best-30 **95.3-96.7**, `sef` **60.5-73.2**, and **every seed has a ≥98% checkpoint inside 2M**. `b36a-d` (c51, `fc 320`): **84.0-86.7**, `sef` **17.4-24.7**, best 91.6-97.0, **no seed ≥98%**. `fc 320` is a real gain **over `b32`** (+9 to +24 pp, spread 14.0 → 2.7) and that much stands; the "four seeds finally agree" reading does not, since both `ddqn` batches sit at 1.4 pp. `sef` at 3× does not overlap |
 | **‡‡ A C51 head starts at the grid midpoint — 57.5, against a true value of ~34 — and it cost b36 nothing** | **measured 2026-08-17**. Five c51 arms *descend* to 32.4-36.0 and the `ddqn` control *ascends* to 33.96, so ~34 is the truth and the init is **1.7× optimistic**. Harmless because the offset is **common-mode**: `b36a`'s action gap is at full scale (14.91) at 8k while `V` is 21 too high, and it scores 45 at 8k / 92 at 127k regardless. **`SNEK_C51_ZERO_INIT=1` would be a mild pessimization** — 0 is *further* from 34 than 57.5 is, and its λ=0.162 ramp starts the head sharper (`aeff` 6.7) than any trained net here ever gets. Wash-out is `ln(0.5)/ln(γ)` per target refresh — **277k predicted, 233-335k measured** — so it is the discount's clock, not the algorithm's. See below |
 | **‡ Cross-arm churn requires `--states-from`; every per-arm figure comparing arms of different quality is inflated ~2×** | **corrected 2026-08-16**. `churn` depends on the action gap, which is ~0.2 early-game against 20-24 in the endgame, so a weak arm that dies early is scored on near-tied states that flip for free. b32's controls carried state-set mean lengths of **11.9 and 21.2** against the treated arms' 34.9-38.0. On a shared champion set the effect halves but survives, and **gap stops explaining churn** — the highest-gap arm of the six is now a control. Within-arm trends across phases are unaffected |
@@ -352,6 +353,20 @@ so `eps 1.5e-4` is a reasonable default for C51 on the evidence, and is not a de
 **The dose question is closed, as pre-registered:** `1.5e-4` 0.0865 against `3.125e-4` 0.0895 is nothing, and
 n=2 per side was never going to resolve a 2x dose.
 
+**‡ Closed for good 2026-08-17 at n=4 a side.** b36 (ε `1.5e-4`) and b38 (ε `3.125e-4`) are the same
+`fc 320` config on the same four seeds, both closed out at gate 95. At a **matched ≤2M** horizon they pool
+**76.77 against 74.73** — 3 of 4 seeds favour the lower dose, mean **−2.04 pp**, sign test **p=0.625**.
+Best-30 (84.0-86.7 vs 80.0-88.3) and best checkpoint (91.6-97.0 vs 93.4-96.0) agree, and **neither batch
+produced a ≥98% checkpoint**. So `1.5e-4` stays the default on lower seed variance (spread 2.7 pp against
+8.3), and **there is nothing here to find at any n this project can afford.** Two 2x steps in the knob have
+now produced nothing twice.
+
+**A by-product worth more than the dose answer: C51 gains nothing past ~2M.** Pooling all of b38's rows
+against ≤2M only, **3 of 4 arms got worse** past 2M — `b38b` 73.01→71.79, `b38c` 73.37→72.53, `b38d`
+74.55→72.66; `b38a` is the lone exception (77.99→78.51) and holds the batch's best checkpoint at **2355k**. Combined with b33's four arms declining
+for 1.4M steps after peaking, **future C51 batches can stop at ~2M** and cost a third less. That is the
+horizon question b36's launcher raised, answered.
+
 **Churn does not fall further between 600k and 1M** — b32's shared-set mean is **0.0875 at 600k and 0.086 at
 1M**, flat. So it is neither converging away nor degrading, and the earlier worry that the 200k/360k readings
 were an early-training transient is answered: the gap persists, it just was never as wide as it looked.
@@ -455,7 +470,7 @@ chase-safe shaping, IS off. It is not close:
 |---|---|---|---|---|---|---|
 | **`b24a-d`** | **`ddqn` `fc 320`** | **95.3, 96.0, 96.7, 96.7** | 1.4 pp | **60.5-73.2** | **98.0, 99.0, 99.0, 100.0** | **85.97-89.03** (3M) |
 | `b36a-d` | c51 `fc 320` ε1.5e-4 | 84.0, 84.7, 86.0, 86.7 | 2.7 pp | 17.4-24.7 | 91.6, 94.0, 95.0, **97.0** | 74.77-80.19 (2M) |
-| `b38a-d` | c51 `fc 320` ε3.125e-4 | 80.0, 84.3, 87.3, 88.3 | 8.3 pp | 17.8-29.3 | *running* | *running* |
+| `b38a-d` | c51 `fc 320` ε3.125e-4 | 80.0, 84.3, 87.3, 88.3 | 8.3 pp | 15.5-31.0 | 93.4, 95.0, 95.0, 96.0 (**none**) | 71.79-78.51 (3M) |
 | `b32a-b` | c51 `fc 200,100,100` | 77.0, 63.0 (≤1M) | 14.0 pp | 10.3-16.1 | never closed out | — |
 | `b30e-h` | `ddqn` `fc 200,100,100` | 92.3, 92.3, 93.3, 93.7 | 1.4 pp | 55.0-58.4 | 99.0 (e) | 83.75 (e, 2M) |
 
@@ -482,12 +497,12 @@ control's init starts *further* from the truth.
   itself a finding: C51 at the control's rate is *stable and too slow* (peak 89.9 vs 94.6). Both arms run
   at their own best known rate, which is the decision-relevant comparison even though it is not
   one-variable. Adam ε also differs (1e-7 vs 1.5e-4) for the same reason.
-- **The horizons differ, 3M against 2M, so the pooled column is not comparable** — a longer arm pools
-  more late checkpoints, and b24's late ones were strong (a record at 2.86M), so 3M pooled is if anything
-  *favourable to b24*. The pooled figures are listed for completeness; the ≤2M best-checkpoint column is
-  the one that carries the argument. **`sef` shares the horizon problem** (it is a fraction of each arm's
-  own evals): b24 at 3.00M against b36 at 1.87-2.02M, and **b38's row at 2.27-2.36M is not strictly
-  comparable to either**, which is why b38 is listed and not leaned on.
+- **The horizons differ, 3M against 2M, and the pooled column is now comparable anyway** — `pooled_equal
+  _effort` turns out to be **exactly recomputable at any cutoff** from each row's stored `episode_perfect`
+  flags truncated to the screen depth (verified by reproducing all 8 b36/b38 published figures to the
+  decimal). At a matched **≤2M** cutoff: **b36 76.77, b38 74.73**, against b24's 85.97-89.03 over 3M. So
+  the horizon caveat that used to sit here is a method problem, not a data problem, and it is solved.
+  **`sef` still has it** (it is a fraction of each arm's own evals), so `sef` is only read b24-vs-b36.
 - **b36 was stopped at 2M by choice, not by collapse** — trailing held 91-93 — so a 3M b36 could close
   part of the pooled gap. It could not close the `sef` gap, which is already a factor of 3 over the
   region where both were running.

@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-17 | 32 | batch 39 (zero-init) launched; b32's question — the Adam epsilon dose — closed for good the same day when b36+b38 resolved it at 4 seeds a side. Retired ahead of the strict-oldest 28-29, which are held for the pending b37 replication |
 | 2026-08-17 | 33 | batch 38 (Adam ε 3.125e-4 on `fc 320`) launched; batch 33 is closed and falsified, so it went ahead of the still-live b32 control and the contiguous gate ladder |
 | 2026-08-17 | 31 | batch 35's results (gate 40) landed; retired ahead of the strict-oldest 28-29 because 31 is a void arm with no close-out and the gate ladder is kept contiguous for the incoming b37 |
 | 2026-08-16 | 30 | batch 34's results (gate 70) landed; batch 30 retired to keep six + the C51 pilot |
@@ -29,6 +30,108 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 32 — **Adam's `epsilon`** on C51, `lr 1e-4`, two reference values — *closed: `epsilon` works at −26% churn, the dose does not matter*
+
+**Final training numbers, 2026-08-16.** Both `1.5e-4` arms beat the `1e-7` control's ≤364k best-30 of 33.9,
+and three of four annealed epsilon to 0.0035 where the control stayed near the ceiling:
+
+| arm | `eps` | best-30 | at | `sef` | final ε |
+|---|---|---|---|---|---|
+| `b32a` | 1.5e-4 | **77.0** | 724k | **16.1** | 0.0035 |
+| `b32c` | 3.125e-4 | 73.3 | 353k | 9.0 | 0.0036 |
+| `b32b` | 1.5e-4 | 63.0 | 865k | 10.3 | 0.0035 |
+| `b32d` | 3.125e-4 | **10.0** | 326k | 0.0 | 0.0115 |
+
+Group means **70.0** at `1.5e-4` and **41.7** at `3.125e-4`, but `b32d` is the whole difference and n=2
+cannot resolve a 2× dose — that was stated before launch and still holds. **The primary readout is churn,
+and it has not been re-measured past 360k**; the table below is the 360k reading. Everything under it is
+unchanged and still the right way to read this batch.
+
+**Whether `epsilon` can separate C51's learning speed from its churn.** Adam steps by
+`lr·m/(√v + ε)`, so `ε` is the gradient magnitude below which the update stops being scale-invariant —
+above it a parameter moves ~`lr` per step whatever its gradient, below it a small gradient buys a small
+step. We had been at Keras's default **1e-7**, where essentially everything is in the first regime, so a
+coordinate carrying nothing but batch noise takes a full-size step. That matters far more for a 3×51 = 153
+output categorical head than a 3-output scalar one, and the reference implementations do not use the
+framework default. Full argument and the measurements behind it:
+[`findings.md`](../findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it).
+
+| arms | `SNEK_ADAM_EPSILON` | source |
+|---|---|---|
+| `b32a`, `b32b` (seeds 1, 2) | **1.5e-4** | Dopamine's Rainbow config |
+| `b32c`, `b32d` (seeds 1, 2) | **3.125e-4** | Dopamine's C51 config |
+| *control, already on disk* | 1e-7 | `c51pilotB-lr1e4seed1/2`, same config, 600k |
+
+`lr 1e-4` throughout, otherwise b25's config plus `ALGO=c51`. **The control is not in this wave** — the two
+pilot arms at `lr 1e-4` ran it at the default, so seeds 1 and 2 are reused deliberately and the comparison
+is paired at 600k with the extra 400k free. `lr 1e-4` rather than the pilot's chosen `5e-5` because that is
+where the defect is largest while the rate still learns: churn **0.117-0.245** against the ddqn control's
+0.033-0.058, never settling, yet seed 2 reached best-30 66.3 still rising at 599k.
+
+**The readout is churn and drawdown depth, not `best_perfect30`** — within-rate seed spread at `1e-4` is
+54.6 pp, so at n=2 per side the score resolves nothing. Measured with
+[`perDiagnostics/c51_stability.py`](../perDiagnostics/c51_stability.py) at `--end 600000`.
+
+**Verdict, 2026-08-16: `epsilon` works, at about half the size first reported, and the dose does not
+matter.** The re-measure to 600k also found a defect in how churn was being compared, so the numbers below
+supersede the 200k/360k table this section used to carry.
+
+**Churn per 5k steps on a *shared* 1500-state set** — drawn from `hallOfFame/b29b…ckpt1447000`, mean length
+**50.5**, identical for all six arms, paired against each arm's own seed at `eps 1e-7`:
+
+| `eps` | seed 1 | seed 2 | group | best-30 @1M | change vs own control |
+|---|---|---|---|---|---|
+| **1e-7** (control, `c51pilotB`) | 0.134 | 0.103 | **0.119** | 33.9 (≤364k) | — |
+| **1.5e-4** (`b32a`/`b32b`) | **0.085** | **0.088** | **0.0865** | **77.0 / 63.0** | **−37% / −15%** |
+| **3.125e-4** (`b32c`/`b32d`) | **0.092** | **0.087** | **0.0895** | 73.3 / **10.0** | **−31% / −16%** |
+
+**4 of 4 paired comparisons favour `epsilon`, group effect −26%, and it is flat from 600k to 1M** (b32's
+shared-set mean 0.0875 → 0.086), so it is not an early-training transient. **The dose is a dead heat**
+(0.0865 vs 0.0895), exactly as pre-registered for n=2 a side.
+
+**Why these numbers are lower than the ones this section used to show.** The old table used **per-arm** state
+sets, and churn depends on the action gap — ~0.2 reward units early-game against 20-24 in the endgame. The
+`eps 1e-7` controls die early, so their sets had mean lengths of **11.9 and 21.2** against the treated arms'
+34.9-38.0, and they were scored on near-tied states that flip for free. Churn, gap and `len` came out
+rank-correlated across all six arms. On the shared set the effect fell from −47% to −26%.
+[`c51_stability.py --states-from`](../perDiagnostics/c51_stability.py) is the fix and is now required for any
+cross-arm reading; full account in
+[`findings.md`](../findings.md#-corrected-2026-08-16-every-per-arm-churn-figure-above-is-inflated-2x-and-the-fix-is-a-shared-state-set).
+
+**Two things the shared set settles.** **Gap no longer explains churn** — `c51pilotB` seed 2 now has the
+*largest* action gap of the six (16.0 against 11.3-13.9) and still churns more than every treated arm, where
+on per-arm sets the controls had the two smallest gaps. And **it is the optimizer, not policy quality**:
+`b32d` has best-30 **10.0**, worst of the six by a wide margin, yet churn **0.087**, indistinguishable from
+the three good arms and well below both controls. Churn tracked the `epsilon` value, not the score.
+
+**What is still not established.** Four paired comparisons rest on **2 independent seeds**, and the per-seed
+effect spans **−15% to −37%** — a 2.5× range in the effect itself; a sign test on 2 seeds is p=0.25.
+**Direction consistent 4 of 4, magnitude ~26%, not significant.** `eps 1.5e-4` is a reasonable default on
+this evidence and not a demonstrated one, which is what `b36`+`b37` (4 seeds a side) is for.
+
+**The confound to keep in view is reverse causation:** churn falls as a policy converges, and these arms are
+also *better*, so "a better policy settles" would produce the same table. The evidence against it is
+`b32d` — **lowest churn of all six arms (0.062) and the worst best-30 (10.0)**, epsilon still near the
+exploration ceiling. Churn fell in an arm that did not learn better, which is what acting on the optimizer
+rather than on performance looks like. Not settled at n=2; the 600k pairing is the one to judge on.
+
+**Unchanged by this:** `aeff` is 28-33 of 51 atoms in every arm and boundary mass stays ~0. That is **not**
+a defect — realised returns at γ=0.9975 have pooled **sd 24.89**, implying a calibrated net should read ~41
+effective atoms, so ours are slightly *over*confident rather than never sharpening. The n-step candidate
+that reading supported is [retracted](../findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it).
+
+![b32a](../charts/b32a-c51eps15e4seed1.png)
+**b32a-c51eps15e4seed1** — `eps 1.5e-4`, seed 1
+
+![b32b](../charts/b32b-c51eps15e4seed2.png)
+**b32b-c51eps15e4seed2** — `eps 1.5e-4`, seed 2
+
+![b32c](../charts/b32c-c51eps3125e4seed1.png)
+**b32c-c51eps3125e4seed1** — `eps 3.125e-4`, seed 1
+
+![b32d](../charts/b32d-c51eps3125e4seed2.png)
+**b32d-c51eps3125e4seed2** — `eps 3.125e-4`, seed 2
 
 ## Batch 33 — a filled board pays **10**, not 100 — *stopped at 1.64-1.77M of 3M: the largest single-knob regression measured here*
 

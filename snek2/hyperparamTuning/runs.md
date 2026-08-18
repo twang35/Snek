@@ -76,16 +76,18 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-16 21:32.**
+**Both hosts as of 2026-08-17 18:45.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **`b36a-d` stopped at 1.87-2.02M** (21:26) and its **close-out is running** — 4 parallel processes at `EVAL_WORKERS=4`. **`b38a-d` is chained behind it** and launches automatically when the last eval exits | nothing manual — watch `/tmp/chain-b38.log` for the handoff |
+| **laptop** | **`b39a-d` (C51 zero-init) running**, launched 18:43 on 2026-08-17 to a 3M cap, one chart window on `--arms b39`. **`b36a-d` and `b38a-d` are both closed out** — b38 ran itself to its 3M cap, its close-out finished 18:41, and neither batch produced a ≥98% checkpoint so **no HOF-500 is owed for either** | nothing manual until b39 reaches 3M and self-terminates |
 | **desktop** | **`b35a-d` (gate 40) done** — **null** ([below](#batch-35--chase-safe-c010-gate-40--done-on-the-desktop-null)), close-out done, HOF-500 done for 3/4 (`b35c`-hof still running at 08:22); **`b34a-d` done** (gate 70, null); **`b37a-d` (b29 replication, seeds 5-8) next up** — still queued at the 08:22 poll but b35's four slots are now free, so it launches on the next dispatch | nothing — close-outs and HOF-500 auto-chain |
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
-churn figure was inflated ~2×; both are written up under [batch 32](#batch-32--adams-epsilon-on-c51--closed-2026-08-16-it-works-at-26-churn-the-dose-does-not-matter).
+churn figure was inflated ~2×; both are written up under [batch 32](completedRuns.md#batch-32--adams-epsilon-on-c51-it-works-at-26-churn-and-the-dose-does-not).
+**The dose is now closed for good** — b36 vs b38 retried it at 4 seeds a side and pooled 76.77 vs 74.73 at a
+matched ≤2M horizon, 3 of 4 favouring `1.5e-4`, p=0.625. `1.5e-4` stays the default on lower seed variance.
 
 **Batch numbering: `b37` is the desktop's b29 replication, so the laptop's dose arm is `b38`.** Worth stating
 because both were queued within minutes of each other from different hosts, and `b37` was very nearly used
@@ -202,13 +204,53 @@ cannot vote against its own rate.
 `--glob`/`--watch` form an eval wave already uses. The pilot deliberately does **not** claim `b31` — `fc 512`
 and the four owed `320` seeds are ahead of C51 in the backlog below.
 
-## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — **running, past 2.27M of 3M** (2026-08-17)
+## Batch 39 — **C51 initialised at expected Q = 0** — running, launched 18:43 on 2026-08-17
 
-**Reading so far: the null is holding and the spread is worse.** Best-30 **80.0 / 84.3 / 87.3 / 88.3**
-straddles b36's 84.0-86.7 with a mean within a point, but the **spread is 8.3 pp against b36's 2.7**, so the
-higher dose did not tighten anything. `sef` 17.8-29.3 is not yet comparable — these arms are at 2.27-2.36M
-against b36's 1.87-2.02M and `sef` is a fraction of each arm's own evals. Per-arm numbers and graphs in
-[`charts.md`](charts.md#batch-38--adam-ε-3125e-4-on-b36s-fc-320--running-past-227m-of-3m).
+**`launch_b39_zeroinit.sh`: b36's config with `SNEK_C51_ZERO_INIT=1` as the only change** — the two
+launchers' environment blocks were diffed and differ in exactly that line, so `b36a-d` is an exact
+seed-matched control. Same `eps 1.5e-4`, `lr 1e-4`, `fc 320`, seeds 1-4, 3M cap. **First arm ever to run
+with the ramp** (dead code since 2026-08-15); a 2,500-step smoke run verified the wiring first and all four
+reports read `zero-expected-Q init`.
+
+**Run in the knowledge that the measurement predicts it loses.** True value is **~34**, so standard init's
+57.5 is 23.5 high and **zero is 34.0 low** — the ramp moves the init *further* from the truth. The purpose
+is the mechanism: *why* it fails is transferable, *that* it fails is not.
+
+**Pre-registered before launch**, and the priors were nudged when the epsilon was set to b36's 1.5e-4
+rather than 1e-4, because the ramp unwinds through parameters whose Adam step is divided by `eps`:
+
+| | outcome | tell |
+|---|---|---|
+| **H1 ~50%** | null on best-30 and `sef`, with a measurably slower first 100-200k steps | time-to-first-80%-eval up, endpoint unchanged |
+| **H2 ~35%** | 5-10 pp regression, from top-atom suppression delaying the **endgame** value signal | `value_by_length.py` flat across bands 85-97 early; endgame gap below b36's 19.8-24.3 |
+| **H3 ~15%** | improvement, via less early over-optimistic bootstrapping → less churn | `c51_stability.py --states-from` below 0.0865 at matched `--end` |
+
+**The decisive measurement is `aeff` against step**, and it is a signature no other arm can produce:
+standard init falls 49.9 → 21-24 monotonically, so a **6.7 → ~36 → 21-24** climb is direct evidence the head
+spent training broadening before it could sharpen. Mechanism, the ramp's three effects, and the smoke
+confirmation are all in the launcher header and
+[`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--running-launched-1843-on-2026-08-17).
+
+## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — **closed 2026-08-17: dead heat, the dose question is settled**
+
+**All four hit the 3M cap and self-terminated**, then closed out at gate 95. At a **matched ≤2M horizon**
+b38 pools **74.73 against b36's 76.77** — 3 of 4 seeds favour `1.5e-4`, mean **−2.04 pp**, sign test
+**p=0.625**. Best-30 80.0-88.3 vs 84.0-86.7 and best checkpoint 93.4-96.0 vs 91.6-97.0 agree. **No arm
+≥98%, so no HOF-500.** So `1.5e-4` stays the default as the lower-variance reference and **the dose is
+closed for good** — b32 could not separate the two at n=2, and n=4 says there is nothing to separate.
+
+**Two by-products worth more than the dose answer itself.**
+
+1. **C51 does not benefit from running past ~2M.** Pooling all rows against ≤2M only, **3 of 4 arms got
+   worse** past 2M; `b38a` is the exception and holds the batch's best checkpoint at **2355k**. So future
+   C51 batches can stop at ~2M — the horizon question b36's launcher raised, answered.
+2. **`pooled_equal_effort` is exactly recomputable at any horizon** from each row's stored
+   `episode_perfect` flags truncated to the screen depth. Verified by reproducing all 8 published figures
+   to the decimal. That removes the horizon caveat that made the first b38-vs-b36 reading unquotable, and
+   it is the method to use whenever two arms stopped at different steps.
+
+Per-arm table in
+[`charts.md`](charts.md#batch-38--adam-ε-3125e-4-on-b36s-fc-320--closed-the-dose-is-a-dead-heat-at-n4-as-pre-registered).
 
 **`launch_b38_eps3125.sh`, identical to b36 with `SNEK_ADAM_EPSILON=3.125e-4` the only change**, seeds 1-4,
 3M cap. `b36a-d` is therefore an exact seed-matched control and this is a clean one-variable dose comparison.
@@ -238,189 +280,23 @@ PYTHONPATH=. python hyperparamTuning/perDiagnostics/c51_stability.py \
 
 **b36 stopped at 2M, so match there** rather than at b38's 3M cap.
 
-## Batch 36 — C51 on **`fc 320`** — **closed out: beats `b32`, loses to `b24` by a factor of 3 on `sef`** (2026-08-17)
+## Batch 36 (C51 on `fc 320`) and Batch 38 (its Adam-ε dose) — **both closed 2026-08-17**
 
-**Verdict, so this section can be read at a glance before the detail below.** Close-out complete at gate 95:
-pooled **74.77-80.19**, best checkpoints **91.6 / 94.0 / 95.0 / 97.0**, **no arm produced a ≥98% checkpoint**
-so there is no HOF-500 to run. Against `b32` this is a clear architecture win (best-30 84.0-86.7 vs 77.0/63.0,
-seed spread 14.0 → 2.7 pp). Against **`b24` — `ddqn` at the same `fc 320`** — it is not close: best-30
-**95.3-96.7**, `sef` **60.5-73.2 against 17.4-24.7**, and every b24 seed had a ≥98% checkpoint *inside 2M*.
-[Findings](findings.md#-after-four-fixes-c51-is-still-well-behind-the-scalar-head-at-its-own-architecture--and-b24-not-b32-is-the-control).
-**Init optimism is measured and excluded** as the remaining C51 suspect —
-[here](findings.md#-a-c51-head-starts-at-the-grid-midpoint-not-at-0--and-it-cost-b36-nothing-because-the-ddqn-controls-init-is-further-from-the-truth).
+**Full narratives moved to [`completedRuns.md`](completedRuns.md#batch-36--c51-on-fc-320-the-better-c51-shape-and-still-far-behind-ddqn), per the runs.md/completedRuns.md split.** The verdicts:
 
-**Batch 32's config verbatim at `eps 1.5e-4`, with `SNEK_FC_LAYERS=320` the only change.** Four arms,
-seeds 1-4, **3M cap**, win reward back at its default 100, `lr 1e-4`, `ALGO=c51`, 51 atoms over
-`[-5, 120]`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no
-food-distance shaping. Launcher [`launch_c51_fc320.sh`](launch_c51_fc320.sh); graphs in
-[`charts.md`](charts.md).
+- **`fc 320` is the better C51 shape** — best-30 84.0-86.7 against `b32`'s 77.0/63.0, seed spread 14.0 → 2.7 pp.
+- **C51 is still far behind `ddqn` at the identical shape.** `b24a-d` pools 85.97-89.03 with a ≥98% checkpoint
+  in every seed; b36 pools 74.77-80.19 and b38 71.79-78.51, **neither batch reaching ≥98% once**.
+- **The Adam-ε dose is closed for good** at 4 seeds a side: matched ≤2M, 76.77 vs 74.73, p=0.625.
+- **C51 gains nothing past ~2M**, so future C51 batches can stop there.
+- **Init optimism is excluded** as the remaining suspect, which is what `b39` now tests directly.
 
-**Two controls, both already on disk, and they answer different questions.**
+## Batch 32 — Adam's `epsilon` on C51 — **closed 2026-08-16**
 
-| control | what it isolates | caveat |
-|---|---|---|
-| **`b32a`/`b32b`** — same `eps`, `lr`, seeds 1-2, `fc 200,100,100` | the **architecture**, one variable | only **1M** deep, so match at 1M before quoting anything |
-| **`b24a-d`** — `fc 320`, IS off, same seeds, **3M**, closed out | **ddqn at this exact shape**: is C51 worth it at all | pooled **85.97-89.03** with **two ≥98%/500 records** — a high bar, and b36 did not clear it |
-
-**What the shape changes is *where* the parameters sit, not how many.** Obs 30 into 3×51 = 153 outputs:
-`fc 320` puts 48,960 of its ~58.9k parameters (**83%**) in the layer feeding the distribution, against
-15,453 of ~51.9k (**30%**) for `fc 200,100,100`. Total capacity rises only 13%, but two layers of gradient
-compounding disappear. **So churn is the reading, not level** — C51's defect here is instability.
-
-**3M is as much of the experiment as the shape.** No C51 arm has ever run past **1M**: the pilot stopped at
-600k, b31 at ~560k, b32 at its cap. b32's best-30 peaks landed at 353-865k and every b33 arm declined for
-1.4M steps after peaking, so **"does C51 hold or decay past 1M"** is open and expensive — if it decays,
-every future C51 batch can stop at ~1.2M for a third of the cost.
-
-**Stopped at 1.87-2.02M rather than 3M** (21:26, the user's call) and closed out as 4 parallel processes at
-`EVAL_WORKERS=4`. **Match at 2M, not at the caps.**
-
-| arm | step | best-30 | at | `sef` | trailing |
-|---|---|---|---|---|---|
-| `b36d` | 1873k | **86.7** | 331k | 17.4 | 92.64 |
-| `b36b` | 1972k | 86.0 | 402k | **24.7** | 91.14 |
-| `b36c` | 2011k | 84.7 | 247k | 19.5 | **93.14** |
-| `b36a` | 2023k | 84.0 | 977k | 23.2 | 92.02 |
-| *`b32a`/`b32b`, `fc 200,100,100`, ≤1M* | 1000k | *77.0 / 63.0* | | *16.1 / 10.3* | |
-
-**Hypothesis 2 is ahead of the null so far, and the seed spread is the striking part.** Best-30 **84.0-86.7**
-against the control's 77.0/63.0, with the spread down from **14 pp to 2.7 pp**, and `sef` 17.4-24.7 against
-10.3/16.1. In a project where "the seed decides which arm wins in 18 of 18 waves", making four seeds agree is
-worth more than the level. **The 3M question is unanswered** — every arm peaked best-30 by 402k except `b36a`
-(977k) while trailing held 91-93 out to 2M, so it neither collapsed like b33 nor kept climbing. The close-out
-and a shared-set churn reading against b32 decide it.
-
-### Pre-registered hypotheses, in order of what I expect
-
-1. **A null on the ceiling, a real drop in churn** — the base case. `findings.md` has nine shapes and
-   architecture never raising the ceiling, and shallower nets are better-conditioned. **Readout:** best-30
-   group mean within noise of b32's 70.0 at a matched 1M, churn at `--end 1000000` measurably below b32's
-   0.110. That outcome would say *depth was costing C51 stability and nothing else*, which is still useful
-   — it makes `fc 320` the default shape for C51 without claiming a better ceiling.
-2. **`fc 320` helps C51 more than it helped ddqn**, because 83% of the parameters now sit in the layer
-   feeding a 153-way categorical head, where for ddqn that layer produces 3 numbers. **Readout:** best-30
-   group mean clearly above 70 *and* the first C51 arm ever to hold a **≥98%/500** checkpoint. This is the
-   outcome worth the 3M.
-3. **Decay past ~1.2M**, the same shape b33 showed and b32 was capped too early to reveal. **Readout:**
-   peak best-30 before 1.2M followed by sustained decline. Note 1 and 3 are **not exclusive** — churn can
-   fall while the arm still decays, and that combination would point at the exploration-schedule ratchet
-   rather than the optimiser.
-
-**What would falsify the capacity story specifically** — and it is my own prior measurement, so it is the
-honest test: the deeper net's penultimate layer was **not** capacity-bound (effective rank **16-20 of 100**,
-head outputs 4-6 of 153). **If `fc 320`'s penultimate rank also comes out at 16-20, widening bought
-nothing** and any improvement is optimisation, not capacity. Cheap to check post-hoc with
-[`perDiagnostics/plasticity.py`](perDiagnostics/plasticity.py)'s feature-rank panel.
-
-**Judge in this order:** churn at a matched horizon, then best-30 against b32's 70.0 at 1M, then the
-≥98%/500 count at close-out against b24's two. **Not** `peak_trailing`, which is saturated at 95.
-
-## Batch 33 — the win reward cut to 10 — stopped 2026-08-16, falsified
-
-**Four arms at `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, stopped at 1.64-1.77M of 3M.** Best-30
-**18.3-25.3 against the paired b32 control's 77.0 and 63.0** — the largest single-knob regression measured
-here. The cause is not the optimiser: **every meal of progress lowers `V` by 1.7-4.4 while paying 1**, so
-`Q(don't eat) > Q(eat)` and the agent correctly avoids finishing. The general rule is
-**`W > 1/(1 − γ^k)`** — at γ=0.9975 and 7-12 steps per meal that is **34-58**, so 100 clears it and 10 does
-not. The 2.8× atom-per-food gain the batch was run for arrived and bought nothing, so **atom spacing is not
-C51's constraint**. Design, predictions, and which of them survived:
-[`completedRuns.md`](completedRuns.md#batch-33--the-win-reward-cut-to-10-falsified-and-it-found-a-general-rule-about-terminal-rewards).
-**Do not revisit** — and check the threshold before moving either the win reward or γ.
-
-**‡ An earlier version of this pointer said "greedy play *declines the win*" and that `V` was miscalibrated.
-Both were withdrawn on 2026-08-16** and the retraction had not reached this file. `V` is within **9-16%** of
-the *optimal* value; the first diagnosis compared it against the realised on-policy return, which a
-Q-learning agent is not estimating. The defect is the value gradient's **sign**, not its level. **Its chart
-section was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when b38 launched.**
-
-## Batch 32 — Adam's `epsilon` on C51 — **closed 2026-08-16: it works at −26% churn, the dose does not matter**
-
-**Closed.** Churn on a **shared** 1500-state set from `hallOfFame/b29b…ckpt1447000` (mean length 50.5,
-identical for all six arms), paired against each arm's own `eps 1e-7` seed at 600k:
-
-| `eps` | seed 1 | seed 2 | group | vs own control |
-|---|---|---|---|---|
-| 1e-7 control | 0.134 | 0.103 | 0.119 | — |
-| **1.5e-4** | 0.085 | 0.088 | **0.0865** | −37% / −15% |
-| **3.125e-4** | 0.092 | 0.087 | **0.0895** | −31% / −16% |
-
-**4 of 4 paired, group −26%, flat 600k → 1M (0.0875 → 0.086), dose a dead heat.** Best-30 at 1M was
-77.0/63.0 at `1.5e-4` against the control's 33.9, so it cost no learning speed. **Not significant**: 4
-comparisons rest on 2 independent seeds and the per-seed effect spans −15% to −37%, sign test p=0.25 — which
-is what `b36`+`b38` (4 seeds a side on `fc 320`) is built to fix.
-
-**The re-measure also found the measurement was wrong**, and that is the more portable result. The published
-200k/360k figures used **per-arm** state sets, inflating the effect ~2× because a weak arm dies early and is
-then scored on near-tied early-game states that flip for free. `--states-from` is now required for any
-cross-arm churn reading:
-[`findings.md`](findings.md#-corrected-2026-08-16-every-per-arm-churn-figure-above-is-inflated-2x-and-the-fix-is-a-shared-state-set).
-
-The design below is unchanged and is how to read it.
-
-**Does `epsilon` separate C51's learning speed from its churn?** Four arms to **1M**, `lr 1e-4`
-throughout, everything else b25's config plus `ALGO=c51`:
-
-| arms | `SNEK_ADAM_EPSILON` | source of the value |
-|---|---|---|
-| `b32a`, `b32b` (seeds 1, 2) | **1.5e-4** | Dopamine's published Rainbow config |
-| `b32c`, `b32d` (seeds 1, 2) | **3.125e-4** | Dopamine's published C51 config |
-| *control — already on disk* | 1e-7 (Keras default) | `c51pilotB-lr1e4seed1/2`, same config, 600k |
-
-**The control is not in this wave**, which is why four arms buy a three-way comparison. The two pilot
-arms at `lr 1e-4` ran this config at the framework default, so **seeds 1 and 2 are reused deliberately**
-and the comparison is paired at a 600k horizon with the extra 400k as free information. Paired matters:
-the seed decides which arm in a wave wins in 18 of 18 measured waves.
-
-**Why `lr 1e-4` and not the pilot's chosen `5e-5`.** It is where the defect is largest while the rate
-still learns — churn **0.117-0.245** against the ddqn control's 0.033-0.058, never settling, yet seed 2
-reached best-30 66.3 still rising at 599k. At `2.5e-4` the arm is broken outright and a working fix could
-be invisible under whatever else is wrong.
-
-**The comparison is both halves against the control, not one half against the other.** That contrast is
-1500-3000×; the 2× between `1.5e-4` and `3.125e-4` is a bonus and **n=2 per side cannot resolve a 2× dose**,
-so this batch answers *"does `epsilon` help at all"* and not *"which value is better"*. Reading the two
-halves against each other would be the pilot's n=2 mistake repeated.
-
-**Two things deliberately not treated as risks.** The `sqrt(1 - beta_2)` transient makes `epsilon` bite
-~31× harder for the first ~1000 optimizer steps (= 1000 env steps at `collect_steps_per_iteration = 1`,
-so 0.1% of the cap): it decays smoothly, it points toward *less* movement in the phase where gradients are
-least informative, and **every arm in this project has it**, including the ddqn controls at `1e-7`, so it
-cannot bias the comparison. And the two values are both published working settings — if either works, the
-finding lands.
-
-**Judge it on churn and drawdown depth, not `best_perfect30`.** Within-rate seed spread at `1e-4` is
-**54.6 pp**, so at n=2 per side the score resolves nothing — the same trap the pilot's rate screen fell
-into. The readout is
-[`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py) at `--end 600000` against
-`c51pilotB-lr1e4seed1/2`. What each outcome means:
-
-- **Churn drops toward the ddqn floor and drawdowns shrink, learning speed holds** → the mechanism is
-  confirmed and `epsilon` becomes a standing part of the c51 config. **The follow-up is then the rate
-  screen, not a third `epsilon`** — the pilot's whole rate ranking, `5e-5` included, was measured at `1e-7`,
-  so if the churn/speed trade-off moves then the best rate probably moves with it. Refining `epsilon`'s
-  second digit is worth much less than that.
-- **Churn drops but so does learning speed** → it is acting as a smaller learning rate in disguise, which
-  the pilot already showed costs the peak. `tests/test_adam_epsilon.py` pins that it *should not* — a
-  well-driven gradient keeps >98% of its step — so this outcome would mean the gradients here are far
-  smaller than assumed, which is itself worth knowing.
-- **Nothing moves** → *this* is where a third value earns its slots, and it should be one **big** step
-  (~`1e-3`), not another 2× nudge, to separate "wrong idea" from "dose too small to see". Same shape as
-  b27's `c=0.10` null leading to b28's `c=0.20` rather than to abandoning the shaping. If a big step is
-  also null, the remaining candidate is the **exploration-schedule ratchet** — n-step was retracted
-  2026-08-16 (already falsified on ddqn for a reason C51 does not touch, and the `aeff` observation behind
-  it turned out to be correctness rather than a defect; see
-  [`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
-
-**Status 01:06 on 2026-08-16 — 370-403k of 1M, all four alive, and it is working so far.** Churn per 5k
-steps drops monotonically with the dose at both horizons measured — control **0.147 / 0.137**, `1.5e-4`
-**0.110 / 0.110**, `3.125e-4` **0.081 / 0.098** (ddqn floor ~0.045) — with **7 of 8 paired comparisons below
-their own seed's control**, and **no cost to learning speed**: both `1.5e-4` arms beat their controls on
-best-30 (66.3/61.3 vs 11.7/56.0) and on peak trailing (93.0/92.3 vs 85.6/90.1). The full table, the
-reverse-causation confound and the evidence against it are in [`charts.md`](charts.md). **Not settled at
-n=2** — judge on the 600k pairing.
-
-**Timing.** ~1.7 h to 1M at four arms. `1e-7` is still the default, so nothing else in the project
-changes; the knob is recorded per-arm in `runs/<policy>.md`.
+**Full narrative moved to [`completedRuns.md`](completedRuns.md#batch-32--adams-epsilon-on-c51-it-works-at-26-churn-and-the-dose-does-not).** Shared-state-set churn **0.119 → 0.088 (−26%)**, 4 of 4 paired, flat 600k→1M, dose a dead heat — and the dose
+stayed a dead heat when b36+b38 retried it at 4 seeds a side. Its chart section is in
+[`archive/charts-archive.md`](archive/charts-archive.md); **b32a-d were never closed out**, so they have no rows
+in the canonical table.
 
 ## Batch 31 — C51 at `lr 5e-5`, 2M — **stopped at 538-569k, no close-out** (2026-08-15)
 
