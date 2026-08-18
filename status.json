@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-18T15:17:41",
-  "ts": 1787091461.4578316,
+  "iso": "2026-08-18T15:18:16",
+  "ts": 1787091496.0385654,
   "at_a_glance": {
     "running": [
-      "b41 -- training (4 arms)"
+      "b41 -- training (3 arms)"
     ],
     "queued": [
       "b41 closeout eval -- queued (4 arms)",
@@ -27,7 +27,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
@@ -36,55 +36,45 @@
       "type": "train",
       "policy": "b41a-b29repro-seed1",
       "pid": 743017,
-      "step": 1809000,
+      "step": 1813000,
       "max_steps": null,
-      "steps_per_sec": 61.2,
-      "elapsed_s": 19804
+      "steps_per_sec": 115.7,
+      "elapsed_s": 19839
     },
     {
       "id": "b41b-b29repro-seed2",
       "type": "train",
       "policy": "b41b-b29repro-seed2",
       "pid": 743018,
-      "step": 1956000,
+      "step": 1960000,
       "max_steps": null,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 19804
-    },
-    {
-      "id": "b41c-b29repro-seed3",
-      "type": "train",
-      "policy": "b41c-b29repro-seed3",
-      "pid": 743019,
-      "step": 1998000,
-      "max_steps": null,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 19804
+      "steps_per_sec": 115.7,
+      "elapsed_s": 19839
     },
     {
       "id": "b41d-b29repro-seed4",
       "type": "train",
       "policy": "b41d-b29repro-seed4",
       "pid": 743020,
-      "step": 1973000,
+      "step": 1977000,
       "max_steps": null,
-      "steps_per_sec": 91.8,
-      "elapsed_s": 19804
+      "steps_per_sec": 115.7,
+      "elapsed_s": 19839
     }
   ],
   "ledger": {
+    "b41c-b29repro-seed3-closeout": "queued",
     "b41a-b29repro-seed1-closeout": "queued",
     "b41b-b29repro-seed2-closeout": "queued",
-    "b41c-b29repro-seed3-closeout": "queued",
     "b41d-b29repro-seed4-closeout": "queued",
+    "b41c-b29repro-seed3-hof": "queued",
     "b41a-b29repro-seed1-hof": "queued",
     "b41b-b29repro-seed2-hof": "queued",
-    "b41c-b29repro-seed3-hof": "queued",
     "b41d-b29repro-seed4-hof": "queued",
     "b41a-b29repro-seed1": "running",
     "b41b-b29repro-seed2": "running",
-    "b41c-b29repro-seed3": "running",
     "b41d-b29repro-seed4": "running",
+    "b41c-b29repro-seed3": "done",
     "b40b-chasefree10g75seed2-hof": "done",
     "b40a-chasefree10g75seed1-hof": "done",
     "b40c-chasefree10g75seed3-hof": "done",
@@ -295,8 +285,8 @@
   },
   "disk_free_gb": 127.4,
   "load_avg": [
-    8.111328125,
-    8.935546875,
-    8.95556640625
+    7.31201171875,
+    8.6689453125,
+    8.86572265625
   ]
 }
