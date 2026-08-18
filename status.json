@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T01:02:45",
-  "ts": 1787040165.615536,
+  "iso": "2026-08-18T01:03:19",
+  "ts": 1787040199.8875735,
   "runtime": {
     "max_trainers": 4,
     "max_evals": 4,
@@ -18,7 +18,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
@@ -27,18 +27,9 @@
       "type": "train",
       "policy": "b40a-chasefree10g75seed1",
       "pid": 51307,
-      "step": 1916000,
-      "steps_per_sec": 115.3,
-      "elapsed_s": 19999
-    },
-    {
-      "id": "b40d-chasefree10g75seed4",
-      "type": "train",
-      "policy": "b40d-chasefree10g75seed4",
-      "pid": 51310,
-      "step": 1998000,
-      "steps_per_sec": 115.3,
-      "elapsed_s": 19999
+      "step": 1921000,
+      "steps_per_sec": 145.9,
+      "elapsed_s": 20034
     }
   ],
   "ledger": {
@@ -240,20 +231,20 @@
     "b40a-chasefree10g75seed1": "running",
     "b40b-chasefree10g75seed2": "done",
     "b40c-chasefree10g75seed3": "done",
-    "b40d-chasefree10g75seed4": "running",
+    "b40d-chasefree10g75seed4": "done",
     "b40b-chasefree10g75seed2-closeout": "queued",
     "b40c-chasefree10g75seed3-closeout": "queued",
-    "b40a-chasefree10g75seed1-closeout": "queued",
     "b40d-chasefree10g75seed4-closeout": "queued",
+    "b40a-chasefree10g75seed1-closeout": "queued",
     "b40b-chasefree10g75seed2-hof": "queued",
     "b40c-chasefree10g75seed3-hof": "queued",
-    "b40a-chasefree10g75seed1-hof": "queued",
-    "b40d-chasefree10g75seed4-hof": "queued"
+    "b40d-chasefree10g75seed4-hof": "queued",
+    "b40a-chasefree10g75seed1-hof": "queued"
   },
   "disk_free_gb": 128.9,
   "load_avg": [
-    5.021484375,
-    7.25439453125,
-    8.41015625
+    3.771484375,
+    6.70166015625,
+    8.181640625
   ]
 }
