@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T15:46:18",
-  "ts": 1787093178.4408922,
+  "iso": "2026-08-18T15:46:51",
+  "ts": 1787093211.016007,
   "at_a_glance": {
     "running": [
       "b41 -- closeout eval (4 arms)"
@@ -37,8 +37,8 @@
       "pid": 1052122,
       "step": 2000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     },
     {
       "id": "b41b-b29repro-seed2-closeout",
@@ -47,8 +47,8 @@
       "pid": 1052123,
       "step": 2000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     },
     {
       "id": "b41c-b29repro-seed3-closeout",
@@ -57,8 +57,8 @@
       "pid": 1052124,
       "step": 2000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     },
     {
       "id": "b41d-b29repro-seed4-closeout",
@@ -67,8 +67,8 @@
       "pid": 1052125,
       "step": 2000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     }
   ],
   "ledger": {
@@ -294,8 +294,8 @@
   },
   "disk_free_gb": 127.4,
   "load_avg": [
-    1.919921875,
-    2.3427734375,
-    3.51513671875
+    8.80517578125,
+    3.9697265625,
+    4.01953125
   ]
 }
