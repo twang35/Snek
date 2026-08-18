@@ -1,0 +1,19 @@
+{
+  "id": "b41d-b29repro-seed4",
+  "type": "train",
+  "policy": "b41d-b29repro-seed4",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "4",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75"
+  },
+  "max_steps": 2000000,
+  "priority": 30,
+  "notes": "Determinism / process-noise probe: b29's record config re-run verbatim on the SAME seeds 1-4 (fc320, IS off, target_update 1000, discount 0.9975, food-distance 0, fork_branches 4, chase-safe c=0.10 gate 75, 2M), on the same host b29 ran on. No SNEK_FREE_SPACE_SHAPING, so behaviourally identical to b29 under current code (the free-space term defaults off). Asks how closely a same-seed re-run matches the original: the training is not expected to be bit-reproducible (ParallelPyEnvironment worker ordering + TF threaded FP reductions diverge and compound in the RL loop), so the gap b41x-vs-b29x measures is the process-noise floor that every seed-matched comparison in this project sits on top of. Compare per-seed against b29a-d: best-30, sef, the >=98%/500 count, and how far the training curves track before separating."
+}
