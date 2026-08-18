@@ -160,6 +160,15 @@ fast a finished batch can be turned into a verdict, and a close-out that finishe
 instead of 90 gets the next batch launched sooner. Training is resumable and loses nothing but wall
 clock; an un-analysed batch blocks everything behind it.
 
+**Nobody has to wait up for the launch.** [`chain_closeout_after_training.sh <prefix>`](chain_closeout_after_training.sh)
+polls until that batch's trainers exit — at their `SNEK_MAX_STEPS` cap, so unattended — then starts one
+`eval_checkpoints.py` per arm at once, `EVAL_WORKERS=4`, logs in `/tmp/<policy>_closeout.log`. It is the mirror of
+[`chain_after_evals.sh`](chain_after_evals.sh), which queues a *wave* behind a close-out. First used on `b39`:
+trainers drained 08:00, close-out done 08:50, no intervention. Both scripts count processes rather than tracking
+pids, because `kill -0` succeeds on a zombie, and both filter `pgrep` output — a bare `pgrep -f snek2.py` matches
+git pathspecs and the telemetry `curl`, and a bare `pgrep -f eval_checkpoints.py` matches the `chart_viewer` that
+outlives the evals by design and would hold the wait open forever.
+
 What that means in practice:
 
 | setting | value | why |
