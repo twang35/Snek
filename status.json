@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-19T05:18:41",
-  "ts": 1787141921.3363104,
+  "iso": "2026-08-19T05:19:15",
+  "ts": 1787141955.3948119,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 96% (4 arms)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 95% (3 arms)"
     ],
     "queued": [
       "b44 closeout eval -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
@@ -27,7 +27,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
@@ -36,55 +36,45 @@
       "type": "train",
       "policy": "b44a-lowlr7-b29b",
       "pid": 1579340,
-      "step": 2900000,
+      "step": 2904000,
       "max_steps": 3000000,
-      "steps_per_sec": 92.2,
-      "elapsed_s": 12726
+      "steps_per_sec": 117.4,
+      "elapsed_s": 12760
     },
     {
       "id": "b44b-lowlr7-b29a",
       "type": "train",
       "policy": "b44b-lowlr7-b29a",
       "pid": 1579341,
-      "step": 2802000,
+      "step": 2806000,
       "max_steps": 3000000,
-      "steps_per_sec": 122.9,
-      "elapsed_s": 12726
-    },
-    {
-      "id": "b44c-lowlr7-b40b",
-      "type": "train",
-      "policy": "b44c-lowlr7-b40b",
-      "pid": 1579342,
-      "step": 2997000,
-      "max_steps": 3000000,
-      "steps_per_sec": 122.9,
-      "elapsed_s": 12726
+      "steps_per_sec": 117.4,
+      "elapsed_s": 12760
     },
     {
       "id": "b44d-lowlr7-b29c",
       "type": "train",
       "policy": "b44d-lowlr7-b29c",
       "pid": 1579343,
-      "step": 2828000,
+      "step": 2832000,
       "max_steps": 3000000,
-      "steps_per_sec": 122.9,
-      "elapsed_s": 12726
+      "steps_per_sec": 117.4,
+      "elapsed_s": 12760
     }
   ],
   "ledger": {
+    "b44c-lowlr7-b40b-closeout": "queued",
     "b44a-lowlr7-b29b-closeout": "queued",
     "b44b-lowlr7-b29a-closeout": "queued",
-    "b44c-lowlr7-b40b-closeout": "queued",
     "b44d-lowlr7-b29c-closeout": "queued",
+    "b44c-lowlr7-b40b-hof": "queued",
     "b44a-lowlr7-b29b-hof": "queued",
     "b44b-lowlr7-b29a-hof": "queued",
-    "b44c-lowlr7-b40b-hof": "queued",
     "b44d-lowlr7-b29c-hof": "queued",
     "b44a-lowlr7-b29b": "running",
     "b44b-lowlr7-b29a": "running",
-    "b44c-lowlr7-b40b": "running",
     "b44d-lowlr7-b29c": "running",
+    "b44c-lowlr7-b40b": "done",
     "b42d-cont3m-b29c-hof": "done",
     "b42b-cont3m-b29a-hof": "done",
     "b42a-cont3m-b29b-hof": "done",
@@ -319,8 +309,8 @@
   },
   "disk_free_gb": 125.6,
   "load_avg": [
-    9.31640625,
-    8.99609375,
-    8.47119140625
+    9.130859375,
+    8.99365234375,
+    8.4873046875
   ]
 }
