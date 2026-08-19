@@ -1,0 +1,20 @@
+{
+  "id": "b42b-cont3m-b29a",
+  "type": "train",
+  "policy": "b42b-cont3m-b29a",
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_SEED": "1",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75"
+  },
+  "max_steps": 3000000,
+  "priority": 30,
+  "label": "b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control)",
+  "notes": "Continues b29a-chase10g75seed1 from its own best checkpoint, ckpt-1347000 (98.4% over 500 episodes, rank 2 of 8), to an absolute 3M-step cap under b29's config: fc320, chase-safe c=0.10 gate 75, IS off, target_update 1000, discount 0.9975, food-distance 0, fork_branches 4, and NO free-space shaping. Asks the question nobody has asked in this project: every record so far is a checkpoint a 2M-step arm passed through on its way to a worse endpoint, so does a champion that keeps training keep improving, hold, or decay? The policy dir was pre-seeded by hand rather than resumed in place -- it holds arch.json, that one ckpt pair, and a copy of the source arm's replay_buffer, and its 'checkpoint' state file names only ckpt-1347000. Three reasons: initialize_or_restore() would otherwise take the source's LAST step (2M) rather than its best; resuming in place would append this continuation's checkpoints and graph history over the very arm the selection was made from; and a dir with exactly one pre-existing checkpoint means every later ckpt-* in it belongs to this run, so the close-out cannot mix two arms' weights at the same step. The replay buffer is carried deliberately -- a fresh dir has only the 1000 random transitions random_play() writes and training samples a batch from those on step 1, which measurably wrecks a 98% policy: a 5k-step smoke test fell from 80% to 50% perfect without the buffer and held 90-100% with it. Seed matches the source arm. The seed-matched treatment arm is b43 on the laptop, identical but SNEK_LEARNING_RATE=1e-6; that comparison needs training.enforce_learning_rate (2026-08-18) because Adam's learning_rate is a checkpointed Variable, so before that fix a resume silently restored the saved 1e-5 and SNEK_LEARNING_RATE was a no-op on every resume in this project's history."
+}
