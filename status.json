@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T09:29:29",
-  "ts": 1787156969.9896965,
+  "iso": "2026-08-19T09:30:03",
+  "ts": 1787157003.125009,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (4 arms)"
@@ -40,8 +40,8 @@
       "pid": 1785347,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 13552
+      "steps_per_sec": 0.0,
+      "elapsed_s": 13585
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -50,8 +50,8 @@
       "pid": 1785348,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 13552
+      "steps_per_sec": 0.0,
+      "elapsed_s": 13585
     },
     {
       "id": "b44c-lowlr7-b40b-closeout",
@@ -60,8 +60,8 @@
       "pid": 1785349,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 13552
+      "steps_per_sec": 0.0,
+      "elapsed_s": 13585
     },
     {
       "id": "b44d-lowlr7-b29c-closeout",
@@ -70,8 +70,8 @@
       "pid": 1785350,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 13552
+      "steps_per_sec": 0.0,
+      "elapsed_s": 13585
     }
   ],
   "ledger": {
@@ -333,8 +333,8 @@
   },
   "disk_free_gb": 125.6,
   "load_avg": [
-    18.3740234375,
-    18.5693359375,
-    18.68310546875
+    17.94189453125,
+    18.4365234375,
+    18.6337890625
   ]
 }
