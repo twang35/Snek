@@ -242,6 +242,71 @@ def stage_summary(runs):
     return out
 
 
+def whole_rounds(episodes, workers):
+    """`episodes` rounded up to a whole number of rounds, the way the planner counts them.
+
+    `evaluate` runs one episode per worker per round and cannot stop part-way through one, so a
+    100-episode request on 12 workers really runs 108. Mirrors `eval_checkpoints.plan_stages`'
+    local function of the same name; an estimate that skipped it would read 7% low on a worker
+    count that does not divide the request.
+    """
+    if not workers or workers <= 0:
+        return episodes
+    return -(-episodes // workers) * workers
+
+
+def remaining_episodes(runs):
+    """Episodes still to run, counted off the stage plan. None when no run says enough to tell.
+
+    **Not `episodes_planned - episodes_done`, which is what this replaced and which reads high by
+    exactly the work the abandonment gate declined to run.** `episodes_planned` is the plan as it
+    stood before any measurement — every full-tier row at the full length, every screen at the screen
+    length — while `episodes_done` is what was actually run, and a row the gate abandoned at 44 of 100
+    contributes 100 to the first and 44 to the second. The 56 it never ran then sits in the difference
+    as though it were still ahead. `eval_checkpoints` names the same identity when it reports savings:
+    the planned work for a session is `session_episodes + episodes_saved`.
+
+    On `b43c-lowlr-b40b`, mid-confirm, this was a factor of 3.3: planned 101,700 against 77,883 done
+    reads as 23,817 episodes remaining and **3h16m**, when the actual remainder was 89 confirmations
+    of 80 episodes = 7,120 and **59m**. 16,697 of the gap was `episodes_saved`.
+
+    Counting the plan forward instead of the shortfall backward is immune to that, and to two other
+    things. It needs no savings bookkeeping, so it is right on a **resumed** run, where `progress`
+    starts fresh and `episodes_saved` covers only the current session while `episodes_planned` covers
+    the resumed rows too. And each stage is priced at *its own* length, so the estimate does not
+    assume the remaining work looks like the average of what has run.
+
+    Two known biases, both small and both upward, which is the right direction for an ETA: the
+    in-flight checkpoint's episodes so far are not deducted (at most one checkpoint's worth), and
+    nothing here predicts future abandonment, which can only make the real figure smaller.
+    """
+    total, known = 0, False
+    for run in runs:
+        target = run.get('episodes_per_checkpoint')
+        if not target:
+            continue
+        workers = run.get('num_workers')
+        stages, screen = run.get('stages'), run.get('screen_episodes')
+        if stages and screen:
+            # A confirmation tops a screen up to full length, so it costs the difference, not the
+            # whole thing -- the same split `plan_stages` uses to build `episodes_planned`.
+            for name, episodes in (('full', target), ('screen', screen),
+                                   ('confirm', target - screen)):
+                entry = stages.get(name) or {}
+                left = max(0, (entry.get('planned') or 0) - (entry.get('done') or 0))
+                total += left * whole_rounds(episodes, workers)
+            known = True
+            continue
+        # The flat one-pass protocol has no stages, and every measurement is full length. Both
+        # counts include resumed rows, so the difference is right for a resumed run too.
+        planned, done = run.get('measurements_planned'), run.get('measurements_done')
+        if planned is None or done is None:
+            continue
+        total += max(0, planned - done) * whole_rounds(target, workers)
+        known = True
+    return total if known else None
+
+
 def stage_lines(stages):
     """The stage block for the text summary: one line per stage, detail only where it is useful.
 
@@ -258,7 +323,7 @@ def stage_lines(stages):
     for name in stages['order']:
         planned, done = stages[name]['planned'], stages[name]['done']
         if planned == 0:
-            lines.append('    {0:<8} {1:>4}       none for this arm'.format(name, '-'))
+            lines.append('    {0:<7} {1:>4}       none for this arm'.format(name, '-'))
             continue
         counts = '{0}/{1}'.format(done, planned)
         if done >= planned:
@@ -266,15 +331,21 @@ def stage_lines(stages):
             if name == 'screen':
                 promoted = stages['confirm']['planned']
                 cut = planned - promoted
-                detail = 'done — {0} promoted, {1} ({2:.0f}%) left at screen length'.format(
-                    promoted, cut, 100.0 * cut / planned)
+                # The cut share, not the cut count: '385 (74%) left at screen length' made this the
+                # widest line the left column could produce -- 78 characters, which overlapped the
+                # right column even at the old 8.5pt. 385 is `planned - promoted` and both are on
+                # the line already, so only the percentage is not derivable.
+                detail = 'done — {0} promoted, {1:.0f}% cut'.format(
+                    promoted, 100.0 * cut / planned)
         elif done == 0 and name != current:
             detail = 'pending'
         else:
             filled = int(20 * done / planned)
             detail = '{0:>3.0f}%  {1}{2}'.format(100.0 * done / planned,
                                                  '#' * filled, '.' * (20 - filled))
-        lines.append('    {0:<8} {1:>9}  {2}'.format(name, counts, detail))
+        # `<7`, not `<8`: 'confirm' is exactly seven characters, so the wider field spent one on
+        # nothing, and this block holds the left column's widest lines.
+        lines.append('    {0:<7} {1:>9}  {2}'.format(name, counts, detail))
     return lines
 
 
@@ -339,10 +410,17 @@ def summarize(runs, stale_after=180):
         seconds_per_episode = None
         mean_seconds = (sum(times) / len(times)) if times else None
 
+    ahead = remaining_episodes(runs)
     planned_episodes = sum(r.get('episodes_planned') or 0 for r in runs)
-    if planned_episodes and seconds_per_episode:
-        remaining_episodes = max(0, planned_episodes - total_episodes)
-        eta_seconds = remaining_episodes * seconds_per_episode / processes
+    if ahead is not None and seconds_per_episode:
+        eta_seconds = ahead * seconds_per_episode / processes
+    elif planned_episodes and seconds_per_episode:
+        # Files predating `episodes_per_checkpoint` / `stages`. `episodes_saved` is subtracted for
+        # the reason in `remaining_episodes`' docstring — it is planned work that will not be run —
+        # and is simply absent, hence 0, on the oldest files.
+        saved = sum(r.get('episodes_saved') or 0 for r in runs)
+        eta_seconds = max(0, planned_episodes - total_episodes - saved) * \
+            seconds_per_episode / processes
     else:
         remaining = max(0, requested - len(completed))
         eta_seconds = (remaining * mean_seconds / processes) if mean_seconds else None
@@ -399,6 +477,10 @@ def summarize(runs, stale_after=180):
         # number is actually useful in.
         'seconds_per_episode': seconds_per_episode,
         'episodes_saved': sum(r.get('episodes_saved') or 0 for r in runs),
+        # What the ETA is priced on, published so the text block can show it. Without it the ETA is
+        # unfalsifiable on the face of the chart, and the obvious check -- remaining checkpoints
+        # times `pace` -- disagrees with it whenever the remaining work is not average work.
+        'episodes_ahead': ahead,
         'eta_seconds': eta_seconds,
         'rates': rates,
     }
@@ -621,12 +703,13 @@ def progress_lines(policy_name, state):
     """Name, the progress bar and the stage block -- where the run is, not what it found."""
     lines = []
     done, requested = state['done'], state['requested']
-    # 20, not 28: the bar is decoration and the line it sits on is the widest in the left column, so
-    # those characters were worth more as column clearance at 10pt.
-    bar_width = 20
+    # 16, not the original 28: the bar is decoration and the line it sits on is the widest in the
+    # left column, so those characters are worth more as column clearance at 10pt. Sized for the
+    # worst case of five-digit counts on both sides of the slash, which is 51 characters.
+    bar_width = 16
     filled = int(bar_width * state['percent_done'] / 100.0)
     lines.append('{0}'.format(policy_name))
-    lines.append('  [{0}{1}] {2}/{3} {4}  ({5:.0f}%)'.format(
+    lines.append('  [{0}{1}] {2}/{3} {4} ({5:.0f}%)'.format(
         '#' * filled, '.' * (bar_width - filled), done, requested, state['unit'],
         state['percent_done']))
 
@@ -647,8 +730,14 @@ def ranking_lines(state):
         lines.append('  best {0:.1f}% @{1}   pooled {2:.1f}%{3}'.format(
             state['best']['perfect_percent'], state['best']['step'],
             state['pooled'], pooled_note))
-        lines.append('  pace {0}/checkpoint   ETA {1}'.format(
-            format_duration(state['mean_seconds']), format_duration(state['eta_seconds'])))
+        # The episode count is shown because `pace` is a blended per-measurement average and the
+        # ETA is not priced on it: at the end of a screening close-out every remaining measurement is
+        # an 80-episode confirmation, so `remaining x pace` reads ~30% low against a correct ETA and
+        # looks like the ETA is wrong. The two numbers reconcile through this one.
+        ahead = state.get('episodes_ahead')
+        lines.append('  pace {0}/checkpoint   ETA {1}{2}'.format(
+            format_duration(state['mean_seconds']), format_duration(state['eta_seconds']),
+            ' ({0:,} ep left)'.format(ahead) if ahead else ''))
         # Ranked over the deeply-measured rows only, the same rule best_of() applies. Without it
         # the list contradicted the `best` line directly above it: across a few hundred 20-episode
         # screens several land on 20/20, so an unfiltered top 5 was five lucky screens at 100.0%

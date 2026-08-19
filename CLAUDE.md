@@ -520,7 +520,7 @@ for name in mods:
 print(len(mods), 'modules,', total, 'tests,', fails, 'failed')"
 ```
 
-As of 2026-08-19 that reads **29 modules, 725 tests, 0 failed**. A module count below 29 means the glob
+As of 2026-08-19 that reads **29 modules, 732 tests, 0 failed**. A module count below 29 means the glob
 did not run from `snek2/`.
 
 **A passing suite is not coverage of the change you just made.** `group_obs` took a third signature

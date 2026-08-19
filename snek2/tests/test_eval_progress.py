@@ -236,11 +236,15 @@ def test_stage_lines_hide_the_percentage_once_a_stage_is_finished():
 
 
 def test_stage_lines_report_how_much_the_screen_cut():
-    # Answers "what percentage was screened out": 181 screened, 100 promoted, 81 left at 20.
+    # Answers "what percentage was screened out": 181 screened, 100 promoted, 45% left at 20. The
+    # cut *count* came off the line on 2026-08-19 -- at 78 characters this was the widest line the
+    # left column produced and it overlapped the right one, and 81 is `181 - 100`, both of which are
+    # still on the line.
     lines = eval_progress.stage_lines(
         eval_progress.stage_summary([staged(full=(48, 48), screen=(181, 181), confirm=(100, 5))]))
     screen_line = [l for l in lines if l.strip().startswith('screen')][0]
-    assert '100 promoted' in screen_line and '81 (45%)' in screen_line, screen_line
+    assert '100 promoted' in screen_line and '45% cut' in screen_line, screen_line
+    assert len(screen_line) <= 54, 'too wide for the left column: {0}'.format(len(screen_line))
 
 
 def test_stage_lines_mark_a_future_stage_pending_not_zero_percent():
@@ -1094,23 +1098,30 @@ def render_text_extents(state, policy='b43a-lowlr-b29b'):
     return boxes[0], boxes[1], inches
 
 
-def busy_state():
-    """A state with the widest lines both columns can produce: a four-line stage block, a full top
-    five at eight-digit steps, and every band populated."""
+def busy_state(stage='full'):
+    """A state with the widest lines both columns can produce.
+
+    Eight-digit steps, five-digit measurement counts, a full top five and every band populated. The
+    `stage` argument matters: at `'confirm'` the screen line carries its `done — N promoted, X% cut`
+    detail, which was the widest line in the whole block and is invisible while screening is still
+    running -- so a fixture that only ever tested stage 1 missed it, and it overlapped the right
+    column at 8.5pt and 10pt alike.
+    """
     rows = ([dict(result(10000000 - 1000 * i, episodes=100, perfect=100), min_score=95.0)
              for i in range(5)]
             + [dict(result(9000000 - 1000 * i, episodes=100, perfect=99 - i % 3), min_score=0.0)
                for i in range(20)]
             + [dict(result(8000000 - 1000 * i, episodes=44, perfect=42), abandoned=True)
                for i in range(10)])
+    stages = {'order': ['full', 'screen', 'confirm'], 'current': stage,
+              'full': {'planned': 12791, 'done': 12791 if stage != 'full' else 12000},
+              'screen': {'planned': 10506, 'done': 10506 if stage == 'confirm' else 0},
+              'confirm': {'planned': 2137, 'done': 48 if stage == 'confirm' else 0}}
     return eval_progress.summarize([run(
         rows, complete=False, num_workers=4, episodes_per_checkpoint=100, min_achievable=97.0,
         screen_episodes=20, confirm_count=100, episodes_saved=14330,
         session_measurements=35, session_episodes=3000, session_seconds=1500.0,
-        measurements_planned=1397, measurements_done=725,
-        stages={'order': ['full', 'screen', 'confirm'], 'current': 'full',
-                'full': {'planned': 791, 'done': 725}, 'screen': {'planned': 506, 'done': 0},
-                'confirm': {'planned': 100, 'done': 0}})])
+        measurements_planned=25434, measurements_done=12048, stages=stages)])
 
 
 def test_the_left_column_keeps_clear_of_the_right_one():
@@ -1120,15 +1131,17 @@ def test_the_left_column_keeps_clear_of_the_right_one():
     progress bar shortened to fit. A couple of characters of clearance is the margin: enough for a
     step number that grows a digit, not enough for a new line wider than the ones already there.
     """
-    left, right, _ = render_text_extents(busy_state())
-    assert left.x1 <= eval_progress.RIGHT_COLUMN_X - 0.02, (
-        'left column reaches {0:.3f}, right starts at {1}'.format(
-            left.x1, eval_progress.RIGHT_COLUMN_X))
-    assert right.x1 <= 1.0, 'right column runs off the panel at {0:.3f}'.format(right.x1)
+    for stage in ('full', 'screen', 'confirm'):
+        left, right, _ = render_text_extents(busy_state(stage))
+        assert left.x1 <= eval_progress.RIGHT_COLUMN_X - 0.02, (
+            'at stage {0} the left column reaches {1:.3f}, right starts at {2}'.format(
+                stage, left.x1, eval_progress.RIGHT_COLUMN_X))
+        assert right.x1 <= 1.0, 'at stage {0} the right column runs off at {1:.3f}'.format(
+            stage, right.x1)
 
 
 def test_both_columns_fit_inside_the_text_panel():
-    left, right, _ = render_text_extents(busy_state())
+    left, right, _ = render_text_extents(busy_state('confirm'))
     assert left.y0 >= 0.0, 'left column overflows the panel: y0 {0:.3f}'.format(left.y0)
     assert right.y0 >= 0.0, 'right column overflows the panel: y0 {0:.3f}'.format(right.y0)
 
@@ -1148,3 +1161,111 @@ def test_the_summary_font_is_larger_than_the_axis_labels():
     # Raised from 8.5 on request. The chart titles are 10pt, so this is now the same size as them
     # and clearly above the 7-8pt tick and axis labels.
     assert eval_progress.SUMMARY_FONTSIZE >= 10.0
+
+
+# ------------------------------- the ETA prices the plan ahead, not the shortfall (2026-08-19)
+
+def b43c_state(**overrides):
+    """`b43c-lowlr-b40b`'s real numbers mid-confirm, the run that surfaced the 3.3x ETA error.
+
+    803 full rows and 522 screens done, 52 of 137 confirmations done; 101,700 episodes planned,
+    77,883 run, 16,697 saved by the abandonment gate; 38,466s of session time.
+    """
+    payload = dict(
+        complete=False, num_workers=4, episodes_per_checkpoint=100, screen_episodes=20,
+        confirm_count=100, min_achievable=96.0, abandoned=525, episodes_saved=16697,
+        measurements_planned=1462, measurements_done=1377,
+        episodes_planned=101700, episodes_done=77883,
+        session_measurements=1377, session_episodes=77883, session_seconds=38466.1,
+        stages={'order': ['full', 'screen', 'confirm'], 'current': 'confirm',
+                'full': {'planned': 803, 'done': 803},
+                'screen': {'planned': 522, 'done': 522},
+                'confirm': {'planned': 137, 'done': 52}})
+    payload.update(overrides)
+    rows = [result(1000 * (i + 1), episodes=100, perfect=95) for i in range(20)]
+    return eval_progress.summarize([run(rows, **payload)])
+
+
+def test_the_eta_counts_the_work_ahead_not_the_planned_minus_done_gap():
+    """The 3.3x error: `episodes_planned - episodes_done` counts the gate's savings as work to come.
+
+    b43c read **3h16m** with 85 confirmations left. Each is an 80-episode top-up, so the real
+    remainder was 85 x 80 = 6,800 episodes at 0.494s = **56m**. The 16,697-episode difference is
+    exactly `episodes_saved` -- rows the gate abandoned early, whose unrun episodes sat in
+    `planned - done` as though they were still ahead.
+    """
+    state = b43c_state()
+    assert state['episodes_ahead'] == 6800
+    assert 3300 < state['eta_seconds'] < 3500, state['eta_seconds']
+    # What the old arithmetic would have said, for the record.
+    assert (101700 - 77883) * state['seconds_per_episode'] > 11000
+
+
+def test_abandonment_does_not_inflate_the_eta():
+    """Same work ahead, wildly different amounts of work the gate declined to run: same ETA.
+
+    This is the property the old formula lacked. Holding the stage plan fixed, an arm the gate cut
+    hard and an arm it never touched have the same amount left to do.
+    """
+    cut = b43c_state()
+    untouched = b43c_state(abandoned=0, episodes_saved=0, episodes_done=94580,
+                           session_episodes=94580, session_seconds=46718.0)
+    assert cut['episodes_ahead'] == untouched['episodes_ahead']
+    assert abs(cut['eta_seconds'] - untouched['eta_seconds']) < 60, (
+        cut['eta_seconds'], untouched['eta_seconds'])
+
+
+def test_the_eta_prices_a_confirmation_as_a_top_up_not_a_full_pass():
+    # A confirmation adds the difference between the full length and the screen it already has, the
+    # same split plan_stages uses. Pricing it at 100 would read 25% high.
+    state = b43c_state(stages={'order': ['full', 'screen', 'confirm'], 'current': 'confirm',
+                               'full': {'planned': 1, 'done': 1},
+                               'screen': {'planned': 1, 'done': 1},
+                               'confirm': {'planned': 10, 'done': 0}})
+    assert state['episodes_ahead'] == 10 * 80
+
+
+def test_the_eta_rounds_each_item_up_to_whole_rounds():
+    # 12 workers cannot run 100 episodes; it runs 108, and 20 becomes 24. An estimate that ignored
+    # the rounding reads ~7% low.
+    assert eval_progress.whole_rounds(100, 12) == 108
+    assert eval_progress.whole_rounds(20, 12) == 24
+    assert eval_progress.whole_rounds(100, 4) == 100
+    assert eval_progress.whole_rounds(100, None) == 100
+    state = b43c_state(num_workers=12,
+                       stages={'order': ['full', 'screen', 'confirm'], 'current': 'full',
+                               'full': {'planned': 10, 'done': 0},
+                               'screen': {'planned': 10, 'done': 0},
+                               'confirm': {'planned': 0, 'done': 0}})
+    assert state['episodes_ahead'] == 10 * 108 + 10 * 24
+
+
+def test_the_flat_protocol_eta_counts_whole_measurements():
+    # No stages and no screen: every measurement is a full pass, so the remaining count times the
+    # full length is exact -- and both counts include resumed rows, so a resume is handled too.
+    state = b43c_state(screen_episodes=None, stages=None,
+                       measurements_planned=30, measurements_done=20)
+    assert state['episodes_ahead'] == 10 * 100
+
+
+def test_the_eta_falls_back_when_the_file_predates_the_plan_fields():
+    # Files with episodes_planned but no episodes_per_checkpoint keep the old estimate, minus the
+    # gate's savings.
+    state = b43c_state(episodes_per_checkpoint=None, stages=None, screen_episodes=None,
+                       episodes_planned=100000, episodes_saved=10000)
+    assert state['episodes_ahead'] is None
+    # `state['episodes']` is the row sum, which is what the fallback measures against -- the payload's
+    # `episodes_done` is the same number on a real file, but this fixture's rows are synthetic.
+    expected = (100000 - state['episodes'] - 10000) * state['seconds_per_episode']
+    assert abs(state['eta_seconds'] - expected) < 1.0, (state['eta_seconds'], expected)
+
+
+def test_the_eta_line_shows_the_episode_count_it_is_priced_on():
+    """`remaining x pace` disagrees with the ETA whenever the remaining work is not average work.
+
+    At the end of a screening close-out every remaining measurement is an 80-episode confirmation
+    while `pace` is blended over 20-episode screens too, so the obvious check reads ~30% low and the
+    ETA looks broken. The episode count is what reconciles them.
+    """
+    text = '\n'.join(eval_progress.ranking_lines(b43c_state()))
+    assert '6,800 ep left' in text, text
