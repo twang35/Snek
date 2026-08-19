@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-18T20:35:47",
-  "ts": 1787110547.529709,
+  "iso": "2026-08-18T20:36:21",
+  "ts": 1787110581.4807012,
   "at_a_glance": {
     "running": [
-      "b41 -- hof (3 arms)"
+      "b41 -- hof (2 arms)"
     ],
     "queued": []
   },
@@ -25,19 +25,9 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 3
+    "eval": 2
   },
   "running": [
-    {
-      "id": "b41a-b29repro-seed1-hof",
-      "type": "eval",
-      "policy": "b41a-b29repro-seed1",
-      "pid": 1303259,
-      "step": 2000000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 34
-    },
     {
       "id": "b41c-b29repro-seed3-hof",
       "type": "eval",
@@ -46,7 +36,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 34
+      "elapsed_s": 68
     },
     {
       "id": "b41d-b29repro-seed4-hof",
@@ -56,13 +46,13 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 34
+      "elapsed_s": 68
     }
   ],
   "ledger": {
-    "b41a-b29repro-seed1-hof": "running",
     "b41c-b29repro-seed3-hof": "running",
     "b41d-b29repro-seed4-hof": "running",
+    "b41a-b29repro-seed1-hof": "done",
     "b41b-b29repro-seed2-hof": "done",
     "b41c-b29repro-seed3-closeout": "done",
     "b41d-b29repro-seed4-closeout": "done",
@@ -282,8 +272,8 @@
   },
   "disk_free_gb": 127.3,
   "load_avg": [
-    7.21533203125,
-    4.953125,
-    4.439453125
+    8.234375,
+    5.48974609375,
+    4.64111328125
   ]
 }
