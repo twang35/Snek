@@ -1,12 +1,11 @@
 {
-  "iso": "2026-08-19T01:46:02",
-  "ts": 1787129162.8271248,
+  "iso": "2026-08-19T01:46:35",
+  "ts": 1787129195.7487276,
   "at_a_glance": {
     "running": [
-      "b42 -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- hof (1 arm)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training (4 arms)"
     ],
     "queued": [
-      "b44 training -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b44 closeout eval -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)"
     ]
@@ -28,26 +27,52 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 4,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b42d-cont3m-b29c-hof",
-      "type": "eval",
-      "policy": "b42d-cont3m-b29c",
-      "pid": 1526576,
-      "step": 1806000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 3477
+      "id": "b44a-lowlr7-b29b",
+      "type": "train",
+      "policy": "b44a-lowlr7-b29b",
+      "pid": 1579340,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b44b-lowlr7-b29a",
+      "type": "train",
+      "policy": "b44b-lowlr7-b29a",
+      "pid": 1579341,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b44c-lowlr7-b40b",
+      "type": "train",
+      "policy": "b44c-lowlr7-b40b",
+      "pid": 1579342,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b44d-lowlr7-b29c",
+      "type": "train",
+      "policy": "b44d-lowlr7-b29c",
+      "pid": 1579343,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "b44a-lowlr7-b29b": "queued",
-    "b44b-lowlr7-b29a": "queued",
-    "b44c-lowlr7-b40b": "queued",
-    "b44d-lowlr7-b29c": "queued",
     "b44a-lowlr7-b29b-closeout": "queued",
     "b44b-lowlr7-b29a-closeout": "queued",
     "b44c-lowlr7-b40b-closeout": "queued",
@@ -56,7 +81,11 @@
     "b44b-lowlr7-b29a-hof": "queued",
     "b44c-lowlr7-b40b-hof": "queued",
     "b44d-lowlr7-b29c-hof": "queued",
-    "b42d-cont3m-b29c-hof": "running",
+    "b44a-lowlr7-b29b": "running",
+    "b44b-lowlr7-b29a": "running",
+    "b44c-lowlr7-b40b": "running",
+    "b44d-lowlr7-b29c": "running",
+    "b42d-cont3m-b29c-hof": "done",
     "b42b-cont3m-b29a-hof": "done",
     "b42a-cont3m-b29b-hof": "done",
     "b42c-cont3m-b40b-hof": "done",
@@ -290,8 +319,8 @@
   },
   "disk_free_gb": 126.6,
   "load_avg": [
-    4.04443359375,
-    4.33984375,
-    6.02490234375
+    2.96533203125,
+    4.05859375,
+    5.86865234375
   ]
 }
