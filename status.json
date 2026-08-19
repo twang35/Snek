@@ -1,12 +1,11 @@
 {
-  "iso": "2026-08-19T05:42:07",
-  "ts": 1787143327.9445553,
+  "iso": "2026-08-19T05:43:38",
+  "ts": 1787143418.1689773,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 100% (1 arm)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (4 arms)"
     ],
     "queued": [
-      "b44 closeout eval -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)"
     ]
   },
@@ -27,31 +26,61 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 4
   },
   "running": [
     {
-      "id": "b44b-lowlr7-b29a",
-      "type": "train",
+      "id": "b44a-lowlr7-b29b-closeout",
+      "type": "eval",
+      "policy": "b44a-lowlr7-b29b",
+      "pid": 1785347,
+      "step": 3000000,
+      "max_steps": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b44b-lowlr7-b29a-closeout",
+      "type": "eval",
       "policy": "b44b-lowlr7-b29a",
-      "pid": 1579341,
-      "step": 2994000,
-      "max_steps": 3000000,
-      "steps_per_sec": 156.8,
-      "elapsed_s": 14132
+      "pid": 1785348,
+      "step": 3000000,
+      "max_steps": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b44c-lowlr7-b40b-closeout",
+      "type": "eval",
+      "policy": "b44c-lowlr7-b40b",
+      "pid": 1785349,
+      "step": 3000000,
+      "max_steps": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b44d-lowlr7-b29c-closeout",
+      "type": "eval",
+      "policy": "b44d-lowlr7-b29c",
+      "pid": 1785350,
+      "step": 3000000,
+      "max_steps": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "b44a-lowlr7-b29b-closeout": "queued",
-    "b44c-lowlr7-b40b-closeout": "queued",
-    "b44d-lowlr7-b29c-closeout": "queued",
-    "b44b-lowlr7-b29a-closeout": "queued",
     "b44a-lowlr7-b29b-hof": "queued",
+    "b44b-lowlr7-b29a-hof": "queued",
     "b44c-lowlr7-b40b-hof": "queued",
     "b44d-lowlr7-b29c-hof": "queued",
-    "b44b-lowlr7-b29a-hof": "queued",
-    "b44b-lowlr7-b29a": "running",
+    "b44a-lowlr7-b29b-closeout": "running",
+    "b44b-lowlr7-b29a-closeout": "running",
+    "b44c-lowlr7-b40b-closeout": "running",
+    "b44d-lowlr7-b29c-closeout": "running",
+    "b44b-lowlr7-b29a": "done",
     "b44d-lowlr7-b29c": "done",
     "b44a-lowlr7-b29b": "done",
     "b44c-lowlr7-b40b": "done",
@@ -289,8 +318,8 @@
   },
   "disk_free_gb": 125.5,
   "load_avg": [
-    2.4521484375,
-    4.04736328125,
-    5.69775390625
+    1.095703125,
+    3.2578125,
+    5.267578125
   ]
 }
