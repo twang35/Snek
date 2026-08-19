@@ -1,11 +1,15 @@
 {
-  "iso": "2026-08-18T20:51:26",
-  "ts": 1787111486.7734175,
+  "iso": "2026-08-18T20:52:19",
+  "ts": 1787111539.5559435,
   "at_a_glance": {
     "running": [
-      "b41 -- hof (2 arms)"
+      "b41 -- hof (1 arm)"
     ],
-    "queued": []
+    "queued": [
+      "b42 training -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- queued (4 arms)",
+      "b42 closeout eval -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- queued (4 arms)",
+      "b42 hof -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- queued (4 arms)"
+    ]
   },
   "runtime": {
     "max_trainers": 4,
@@ -25,7 +29,7 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 2
+    "eval": 1
   },
   "running": [
     {
@@ -36,22 +40,24 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 973
-    },
-    {
-      "id": "b41d-b29repro-seed4-hof",
-      "type": "eval",
-      "policy": "b41d-b29repro-seed4",
-      "pid": 1303262,
-      "step": 2000000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 973
+      "elapsed_s": 1026
     }
   ],
   "ledger": {
+    "b42a-cont3m-b29b": "queued",
+    "b42b-cont3m-b29a": "queued",
+    "b42c-cont3m-b40b": "queued",
+    "b42d-cont3m-b29c": "queued",
+    "b42a-cont3m-b29b-closeout": "queued",
+    "b42b-cont3m-b29a-closeout": "queued",
+    "b42c-cont3m-b40b-closeout": "queued",
+    "b42d-cont3m-b29c-closeout": "queued",
+    "b42a-cont3m-b29b-hof": "queued",
+    "b42b-cont3m-b29a-hof": "queued",
+    "b42c-cont3m-b40b-hof": "queued",
+    "b42d-cont3m-b29c-hof": "queued",
     "b41c-b29repro-seed3-hof": "running",
-    "b41d-b29repro-seed4-hof": "running",
+    "b41d-b29repro-seed4-hof": "done",
     "b41a-b29repro-seed1-hof": "done",
     "b41b-b29repro-seed2-hof": "done",
     "b41c-b29repro-seed3-closeout": "done",
@@ -272,8 +278,8 @@
   },
   "disk_free_gb": 127.3,
   "load_avg": [
-    8.07177734375,
-    8.111328125,
-    6.93017578125
+    6.59228515625,
+    7.7421875,
+    6.8681640625
   ]
 }
