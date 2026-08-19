@@ -1,18 +1,27 @@
 # Charts
 
-Progress graphs for the most recent batches — **28, 36, 37, 38, 39 and 40**, a cap of six, newest first,
-plus the **C51 pilot** as a temporary seventh while its arms are still a live control. Per-arm numbers live in
-[`completedRuns.md`](completedRuns.md); this file is images plus a short reading of each. A batch appears
-here **while it is still running**, with training-only numbers, not just once it has closed.
-Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched, **batch 30**
-followed when 34's results arrived, **batch 31** (a void, stopped C51 arm) when 35's arrived, **batch 33**
-when 38 launched, **batch 32** when 39 did, and **batches 34 and 35** when 37's and 40's results landed.
+Progress graphs for the most recent batches — **28, 36, 37, 39, 40 and 43**, a cap of six, newest first.
+Per-arm numbers live in [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of
+each. A batch appears here **while it is still running**, with training-only numbers, not just once it has
+closed. Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched,
+**batch 30** followed when 34's results arrived, **batch 31** (a void, stopped C51 arm) when 35's arrived,
+**batch 33** when 38 launched, **batch 32** when 39 did, **batches 34 and 35** when 37's and 40's results
+landed, and **the C51 pilot plus batch 38** when 42/43 launched.
 
-**Everything here is now closed.** `b39` reached its 3M cap and closed out on the laptop; `b37` and `b40` are
-done on the desktop, training, close-out *and* HOF-500. The gate ladder's two null rungs (34, 70 and 35, 40)
-were retired to make room, since the ladder's conclusion is now carried by 28-29, 37 and 40 — the batches that
-bear on whether gate 75's record region was real.**`b37` and `b39` are not a numbering slip:** `b37` was queued from the desktop the same evening `b38` was
-launched from the laptop, so the two hosts took adjacent numbers out of order.
+**Everything here except 43 is closed.** `b39` reached its 3M cap and closed out on the laptop; `b37` and
+`b40` are done on the desktop, training, close-out *and* HOF-500. **`b43` is training now**, and **`b42` — its
+seed-matched control on the desktop — is queued behind a wave barrier and has no chart yet**; its section goes
+in as soon as its arms produce one. The gate ladder's two null rungs (34, 70 and 35, 40) were retired earlier,
+since the ladder's conclusion is now carried by 28-29, 37 and 40 — the batches that bear on whether gate 75's
+record region was real.
+
+**`b37` and `b39` are not a numbering slip:** `b37` was queued from the desktop the same evening `b38` was
+launched from the laptop, so the two hosts took adjacent numbers out of order. **`b41` has no section here
+either** — it is the b29 same-seed determinism probe, still closing out on the desktop.
+
+**Batch 42 and 43 arms do not start at step 0**, so their curves begin mid-chart at the step of the checkpoint
+each one continues. There is no resume line at the left edge because the graph history was deliberately not
+carried over: these are fresh policy dirs seeded from one checkpoint, not resumes of the source arm.
 
 **Older sections are retired, not deleted.** Batches 1-11 are in
 [`archive/batches1-11.md`](archive/batches1-11.md) and anything retired since is in
@@ -31,7 +40,7 @@ was unreadable against left-axis ticks.
 
 The images are **copies** from `snek2/runs/`, not links. The live graphs there are rewritten every
 eval and would be lost if that directory were cleaned out, silently blanking this file. Refresh with
-`refresh_charts.sh`, which re-copies every `runs/*.png` into `charts/` and prints each one's step.
+`scripts/refresh_charts.sh`, which re-copies every `runs/*.png` into `charts/` and prints each one's step.
 
 **The script does not touch this file** — it copies images only, so a new arm gets a PNG and no
 entry unless one is written by hand. That drifted once, to 12 undocumented arms across batches 5-7,
@@ -52,6 +61,77 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 `best30-drivers` and `gate-behavior-b27-vs-b29` are diagnostic figures referenced from
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
+
+## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *training on the laptop, launched 2026-08-18 20:52*
+
+**The question:** every record in this project is a checkpoint some arm *passed through* on its way to a worse
+endpoint. No arm has ever been continued from its own best checkpoint. `b43` continues the top four of eight
+across b29 and b40 — ranked by their best **500-episode** perfect rate — to a 3M absolute cap under b29's
+config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
+change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
+Rationale, the pre-registered outcome readings and the selection-bias warning are in
+[`runs.md`](runs.md#batches-42-and-43--what-happens-if-you-keep-training-a-champion--running-launched-2026-08-18-2052);
+launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
+[`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
+
+| arm | continues | from | its 500-ep rate there | training-self-eval so far |
+|---|---|---|---|---|
+| `b43a` | `b29b-chase10g75seed2` | @1447k | **99.0%** (the project record) | best-30 **97.7**, `sef` 98.6 |
+| `b43b` | `b29a-chase10g75seed1` | @1347k | 98.4% | best-30 **98.7**, `sef` 100.0 |
+| `b43c` | `b40b-chasefree10g75seed2` | @1513k | 98.2% | best-30 96.0, `sef` 100.0 |
+| `b43d` | `b29c-chase10g75seed3` | @1396k | 97.1% (378 ep, gate-abandoned) | best-30 95.7, `sef` 97.2 |
+
+**Reading, ~70 evals in (≈70k steps each): all four are holding, none has improved on its start.** Every arm
+sits at `sef` **97-100** with `max_single_eval` 100 and `zero_since` null — so nothing is degrading, which is
+itself the first result, since a champion dropped into a fresh replay buffer at a retuned rate could easily
+have fallen apart. It has not: **the same four checkpoints fell 80% → 50% perfect in 5k steps when the replay
+buffer was *not* carried over**, and holding 95-98% here is what the buffer copy bought.
+
+**Do not read these best-30 numbers against the 500-episode column beside them.** A 10-episode self-eval
+averaged over 30 evals and a flat 500-episode measurement are different instruments, and the 500-ep column is
+additionally **the maximum of a noisy statistic over 8 arms and hundreds of checkpoints** — biased upward. The
+comparison that means something is `b43` against `b42`, which starts from byte-identical weights. Everything
+here is training self-eval; the close-outs will be the real numbers.
+
+**`sef` is not comparable with any other batch in this file.** It is the share of an arm's *own* evals above
+80% perfect, and these arms started at ~98% instead of 0 — so 100.0 says "it never dropped", not "it learned
+fast". Only `b42`'s `sef` is a fair reference.
+
+### b43b-lowlr-b29a — continues `b29a` @1347k, 98.4%/500
+
+Best-30 **98.7** at 1381k, `sef` **100.0**, recent-30 95.7, `max_single_eval` 100. The steadiest of the four
+so far and the only one whose best-30 window sits above its own starting 500-ep figure — on 10-episode evals,
+so not yet a result.
+
+![b43b](charts/b43b-lowlr-b29a.png)
+
+### b43a-lowlr-b29b — continues `b29b` @1447k, **99.0%/500, the project record**
+
+Best-30 **97.7** at 1516k, `sef` **98.6**, recent-30 97.7. The arm that matters most: it starts from the head
+of b29b's 18-checkpoint band, and [that band is now known to be a
+seed rather than a config](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
+so whether the region can be *extended by training inside it* is the open question `b42`/`b43` exist to answer.
+
+![b43a](charts/b43a-lowlr-b29b.png)
+
+### b43c-lowlr-b40b — continues `b40b` @1513k, 98.2%/500
+
+Best-30 96.0 at 1542k, `sef` **100.0**, recent-30 95.0. **The one arm with a confound worth stating:** `b40b`
+was trained *with* the free-space PBRS term and is being continued *without* it, because the batch pins b29's
+config for all four. PBRS leaves the optimal policy unchanged but the value function absorbs the potential, so
+this arm's restored `Q` is mis-calibrated against its new reward in a way the other three are not. It is the
+same change on the `b42` side, so the host comparison stays clean — but do not read `b43c` against `b43a/b/d`
+as though only the seed differed.
+
+![b43c](charts/b43c-lowlr-b40b.png)
+
+### b43d-lowlr-b29c — continues `b29c` @1396k, 97.1% over 378 episodes
+
+Best-30 95.7 at 1461k, `sef` 97.2, recent-30 95.0. The weakest starting point of the four and currently the
+weakest arm, which is the expected ordering. Its starting figure is **not** a 500-episode number — the row was
+abandoned by the 98% gate at 378 episodes — so it is not strictly comparable with the three above it.
+
+![b43d](charts/b43d-lowlr-b29c.png)
 
 ## Batch 40 — chase-safe **plus a global free-space term** — *done on the desktop: null, and it makes b29's record region look like seed luck*
 
@@ -101,7 +181,7 @@ a HOF-promotion candidate — third-best /500 on record behind `b29b`'s 99.0 and
 **b36's config with `SNEK_C51_ZERO_INIT=1` as the only change** — verified by diffing the two launchers'
 environment blocks, which differ in exactly that one line. Same `eps 1.5e-4`, `lr 1e-4`, `fc 320`, seeds
 1-4, 3M cap, so `b36a-d` is an exact seed-matched control. Launcher
-[`launch_b39_zeroinit.sh`](launch_b39_zeroinit.sh); pre-registered hypotheses in [`runs.md`](runs.md).
+[`launch_b39_zeroinit.sh`](scripts/launch_b39_zeroinit.sh); pre-registered hypotheses in [`runs.md`](runs.md).
 
 **The first arm in this project to run with the ramp** — the knob shipped 2026-08-15 and was dead code
 until now, so the launch was preceded by a smoke run. All four reports confirm `zero-expected-Q init`.
@@ -188,67 +268,6 @@ how close its mean is to the truth.** Full account in
 ![b39d](charts/b39d-c51zeroinitseed4.png)
 **b39d-c51zeroinitseed4** — paired with `b36d` (86.7, **80.19** — the control's strongest arm)
 
-## Batch 38 — **Adam ε `3.125e-4`** on b36's `fc 320` — *closed: the dose is a dead heat at n=4, as pre-registered*
-
-**b36's config verbatim with `SNEK_ADAM_EPSILON=3.125e-4` the only change**, seeds 1-4, 3M steps. Launcher
-[`launch_b38_eps3125.sh`](launch_b38_eps3125.sh); chained behind b36's close-out by
-[`chain_after_evals.sh`](chain_after_evals.sh). **The numbering skips 37 deliberately** — `b37` is the
-desktop's b29 replication (seeds 5-8), queued the same evening from the other host. Rationale in
-[`runs.md`](runs.md).
-
-**What it is for.** b32 showed Adam ε cuts greedy-action churn **−26%** on a shared state set but could not
-separate `1.5e-4` from `3.125e-4` at n=2 a side. b36 + b38 is **4 seeds per side on one architecture** —
-the first configuration here that can resolve the dose at all. Pre-registered expectation: **a null on the
-dose**, since b32's two values came out 0.0865 against 0.0895.
-
-**All four ran to the 3M cap and self-terminated**, then closed out at gate 95 as 4 parallel processes at
-`EVAL_WORKERS=4`. Paired against b36 by seed:
-
-| arm | best-30 | `sef` | trailing @3M | pooled /eq | pooled **≤2M** | b36's ≤2M | best ckpt |
-|---|---|---|---|---|---|---|---|
-| `b38a` | 84.3 | **31.0** | 87.8 | **78.51** | **77.99** | 75.36 | **96.0 @2355k** |
-| `b38b` | **88.3** | 15.5 | **74.6** ↓ | 71.79 | 73.01 | 76.70 | 95.0 @284k |
-| `b38c` | 80.0 | 18.6 | **94.1** | 72.53 | 73.37 | 74.82 | 95.0 @290k |
-| `b38d` | 87.3 | 22.2 | 92.1 | 72.66 | 74.55 | 80.19 | 93.4 @557k *[91 ep]* |
-| **group** | 80.0-88.3 | 15.5-31.0 | | **73.87** | **74.73** | **76.77** | **no arm ≥98%** |
-
-**The dose question closes as a dead heat, exactly as pre-registered.** At a matched ≤2M horizon b38 pools
-**74.73 against b36's 76.77** — 3 of 4 seeds favour `1.5e-4`, mean **−2.04 pp**, sign test **p=0.625**. So
-`1.5e-4` stays the default as the lower-variance reference, and **the dose is closed for good**: b32 could
-not separate the two at n=2 and n=4 now says there is nothing to separate. Best-30 (80.0-88.3 vs
-84.0-86.7) and best checkpoint (93.4-96.0 vs 91.6-97.0) agree.
-
-**The ≤2M column is exact, not estimated.** `pooled_equal_effort` was recomputed from each row's stored
-`episode_perfect` flags truncated to the 20-episode screen depth, reproducing all 8 published figures to
-the decimal before being applied at the cutoff — so the horizon mismatch that made the first b38 reading
-unquotable is removed rather than caveated.
-
-**And the extra million steps was worth nothing or less.** Pooling over all rows against ≤2M only: **3 of 4
-arms got *worse* past 2M** (b38b 73.01→71.79, b38c 73.37→72.53, b38d 74.55→72.66). `b38a` is the exception
-and it is a real one — it improved (77.99→78.51) and holds the batch's best checkpoint at **2355k**, past
-b36's horizon entirely. So C51 past 2M is mildly negative on average with one seed still gaining, which
-**answers the horizon question b36's launcher raised**: there is no case for running C51 past ~2M, and a
-future C51 batch can stop there.
-
-**No arm produced a ≥98% checkpoint, so there is no HOF-500 to run** — the same outcome as b36. Against
-`b24` (`ddqn`, same `fc 320`, pooled 85.97-89.03, ≥98% in all four seeds) both C51 batches remain far
-behind.
-
-**The seed spread got worse, and that half of the earlier reading survives.** best-30 spread **8.3 pp
-against b36's 2.7**, so the higher dose did not tighten anything.
-
-![b38a](charts/b38a-c51fc320eps3125seed1.png)
-**b38a-c51fc320eps3125seed1** — highest `sef` of the four (29.3), peaks latest (1129k)
-
-![b38b](charts/b38b-c51fc320eps3125seed2.png)
-**b38b-c51fc320eps3125seed2** — the batch's best-30 (88.3) and its lowest trailing (81.2)
-
-![b38c](charts/b38c-c51fc320eps3125seed3.png)
-**b38c-c51fc320eps3125seed3** — the weak seed, best-30 80.0, yet the highest trailing (93.2)
-
-![b38d](charts/b38d-c51fc320eps3125seed4.png)
-**b38d-c51fc320eps3125seed4** — only arm to reach peak trailing 95.0
-
 ## Batch 37 — **`b29` replicated on fresh seeds 5-8** — *done on the desktop: the /100 band replicates, the /500 record does not*
 
 **Byte-identical to `b29` except `SNEK_SEED`** — `fc 320`, chase-safe `c=0.10`, **gate 75**, IS off,
@@ -290,7 +309,7 @@ single arm.
 
 **Batch 32's config verbatim at `eps 1.5e-4` with `SNEK_FC_LAYERS=320` the only change**, seeds 1-4, win
 reward back at its default 100, `lr 1e-4`, 51 atoms over `[-5, 120]`. Launched 12:43 on 2026-08-16;
-launcher [`launch_c51_fc320.sh`](launch_c51_fc320.sh), rationale and pre-registered hypotheses in
+launcher [`launch_c51_fc320.sh`](scripts/launch_c51_fc320.sh), rationale and pre-registered hypotheses in
 [`runs.md`](runs.md).
 
 **Two controls, both on disk, answering different questions.** `b32a`/`b32b` — same `eps`, `lr` and seeds
@@ -361,93 +380,6 @@ scale by 8k), it costs the policy nothing, and the `ddqn` control's init at 0 is
 
 ![b36d](charts/b36d-c51fc320seed4.png)
 **b36d-c51fc320seed4**
-
-## C51 pilot — distributional RL, learning-rate screen — *closed at 600k, chose `5e-5`*
-
-**A seventh section on purpose, and temporary.** The cap of six counts numbered batches. This screen
-became `b31`, which is now void — but its two `lr 1e-4` arms are **batch 32's control**, so the section
-stays until b32 closes rather than being retired with b31.
-
-**The table and the graphs below this paragraph are regenerated by
-[`pick_c51_lr.py`](pick_c51_lr.py)** between the `C51-PILOT-STATUS` markers, so they are current as of
-whenever it last ran, and the prose outside them is hand-written. **Editing inside the markers is
-pointless** — the next run overwrites it.
-
-The first C51 arms in this project, from
-[`../plans/distributional-c51.md`](../plans/distributional-c51.md): the scalar head is replaced by a
-distribution over the return on **51 atoms over `[-5, 120]`** trained by cross-entropy, with the PER
-priority as the KL. Everything else is **b25's config verbatim** — `fc 200,100,100`, IS off, target 1000,
-discount 0.9975, `FORK_BRANCHES=4`, no food-distance shaping — so `b25a-d` is the seed-matched control
-when this becomes a batch.
-
-**Closed 2026-08-15 at 20:09, and `5e-5` was chosen for `b31` on consistency rather than on being
-best.** The two readings worth carrying: at n=2 the **between-seed spread (up to 57.6 pp) is twice the
-spread between the rate means (30.5 pp)**, so the ranking is thin; and **time to the first perfect game
-predicted nothing** about where an arm finished (Spearman ρ = 0.05 — the 8k starter finished at 11.7, the
-141k starter at 85.3). `2.5e-4` is the one clear failure, with one arm collapsing to zero at 599k. Three
-arms had not stopped improving at the cap, so for `1e-5` and `1e-4` the **600k horizon** may be what bound
-them rather than the rate. Full account:
-[`findings.md`](findings.md#-the-c51-learning-rate-screen-the-seed-spread-beat-the-rate-effect-and-time-to-first-win-predicted-nothing).
-
-**It is a learning-rate screen, not a result.** A cross-entropy loss starts at `ln 51 ≈ 3.93` where the
-Huber TD loss starts near 0, so b25's `1e-5` is not obviously the same step size for a categorical head.
-**Four rates × two seeds, seed-matched across the rates**, launched as two waves an hour and a half apart:
-`1e-5` and `5e-5` at 15:06 (`c51pilot-`), then `1e-4` and `2.5e-4` at 16:41 (`c51pilotB-`) — so wave B is
-several hundred thousand steps behind and the horizon line in the generated block is what makes the
-comparison fair. Eight trainers on a 14-core laptop is deliberate and was measured first: ~2.3 GB per arm
-against 36 GB, and a swap-in rate of 244 pages per 20 s, so the cost is throughput and not paging.
-
-<!-- C51-PILOT-STATUS:BEGIN -->
-*Generated by `pick_c51_lr.py` at 2026-08-15 20:09, when the last pilot arm stopped — the numbers below are read straight off the eval series, and the prose around this block is hand-written.*
-
-**Compared at a common horizon of 600k steps**, the lowest final step any arm reached, because both metrics accumulate over an arm's own evals and a longer arm would otherwise win on horizon alone.
-
-| lr | seeds | mean best-30 | mean `sef` | mean peak trail |
-|---|---|---|---|---|
-| 5e-05 **← chosen** | 2 | 69.5 | 12.6 | 92.42 |
-| 1e-05 | 2 | 56.5 | 3.6 | 89.89 |
-| 0.0001 | 2 | 39.0 | 5.3 | 88.19 |
-| 0.00025 | 2 | 4.0 | 0.0 | 68.79 |
-
-| arm | lr | seed | step | best-30 | `sef` | peak trail | first perfect |
-|---|---|---|---|---|---|---|---|
-| `c51pilot-lr1e5seed1` | 1e-05 | 1 | 600k | 85.3 | 7.3 | 93.56 | 141k |
-| `c51pilot-lr5e5seed2` | 5e-05 | 2 | 600k | 71.7 | 13.0 | 93.30 | 20k |
-| `c51pilot-lr5e5seed1` | 5e-05 | 1 | 600k | 67.3 | 12.1 | 91.54 | 15k |
-| `c51pilotB-lr1e4seed2` | 0.0001 | 2 | 600k | 66.3 | 10.6 | 90.80 | 46k |
-| `c51pilot-lr1e5seed2` | 1e-05 | 2 | 600k | 27.7 | 0.0 | 86.22 | 92k |
-| `c51pilotB-lr1e4seed1` | 0.0001 | 1 | 600k | 11.7 | 0.0 | 85.58 | 8k |
-| `c51pilotB-lr25e4seed1` | 0.00025 | 1 | 600k | 5.7 | 0.0 | 70.82 | 49k |
-| `c51pilotB-lr25e4seed2` | 0.00025 | 2 | 600k | 2.3 | 0.0 | 66.76 | 59k |
-
-**Chosen: `5e-05`** — best_perfect30 69.5 against 56.5 for the next rate (1e-05).
-
-**Batch `b31` launched at 2026-08-15 20:09** on this rate, 4 seeds, 2M cap, `fc 200,100,100`, otherwise b25's config — so `b25a-d` is the seed-matched control.
-
-![c51pilot-lr1e5seed1](charts/c51pilot-lr1e5seed1.png)
-**c51pilot-lr1e5seed1** — lr 1e-05, best-30 85.3, first perfect 141k
-
-![c51pilot-lr5e5seed2](charts/c51pilot-lr5e5seed2.png)
-**c51pilot-lr5e5seed2** — lr 5e-05, best-30 71.7, first perfect 20k
-
-![c51pilot-lr5e5seed1](charts/c51pilot-lr5e5seed1.png)
-**c51pilot-lr5e5seed1** — lr 5e-05, best-30 67.3, first perfect 15k
-
-![c51pilotB-lr1e4seed2](charts/c51pilotB-lr1e4seed2.png)
-**c51pilotB-lr1e4seed2** — lr 0.0001, best-30 66.3, first perfect 46k
-
-![c51pilot-lr1e5seed2](charts/c51pilot-lr1e5seed2.png)
-**c51pilot-lr1e5seed2** — lr 1e-05, best-30 27.7, first perfect 92k
-
-![c51pilotB-lr1e4seed1](charts/c51pilotB-lr1e4seed1.png)
-**c51pilotB-lr1e4seed1** — lr 0.0001, best-30 11.7, first perfect 8k
-
-![c51pilotB-lr25e4seed1](charts/c51pilotB-lr25e4seed1.png)
-**c51pilotB-lr25e4seed1** — lr 0.00025, best-30 5.7, first perfect 49k
-
-![c51pilotB-lr25e4seed2](charts/c51pilotB-lr25e4seed2.png)
-**c51pilotB-lr25e4seed2** — lr 0.00025, best-30 2.3, first perfect 59k
-<!-- C51-PILOT-STATUS:END -->
 
 ## Batches 28-29 — chase-safe **dose** (`c=0.20`) and **gate** (`75`) on `fc 320` — *done: the gate is the lever (desktop)*
 

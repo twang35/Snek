@@ -76,12 +76,13 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-18 09:40. Both are idle — nothing is training or evaluating on either box.**
+**Both hosts as of 2026-08-18 20:58 (fetched). Both are busy — `b42` and `b43` are the same experiment,
+one per box.**
 
 | host | state | owed |
 |---|---|---|
-| **laptop** | **idle.** `b39a-d` reached its 3M cap at 08:00, and `chain_closeout_after_training.sh` ran the whole close-out unattended (4 processes × 4 workers, done 08:50). **Zero-init loses on every metric** — see below. `b36`, `b38`, `b39` all closed, none with a ≥98% checkpoint, so **no HOF-500 is owed** | **a batch decision — 4 free slots** |
-| **desktop** | **idle, queue empty, load 0.00** (heartbeat `2026-08-18T09:24:48`, fetched). **`b40a-d` is fully done** — training, close-out and HOF-500 — and `b35`, `b37`, `b40` are all retrieved into `runs/`. **`b40` is a null and it retires the b29 record region** (see below) | **a batch decision — 4 free slots**; the [publish gap](#-the-desktop-marked-14-publishes-done-that-never-reached-the-results-branch-2026-08-18) is recovered but the defect stands |
+| **laptop** | **4 arms training: `b43a-d`, launched 20:52.** All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate (`learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` in every log). One chart window on `--arms b43`. Earlier: `b36`, `b38`, `b39` all closed, none with a ≥98% checkpoint, so **no HOF-500 is owed** | close-out at the 3M cap; no HOF-500 unless an arm clears 98% |
+| **desktop** | **`b42a-d` queued, waiting on the wave barrier.** `b41c-b29repro-seed3-hof` was still running at the 20:58 heartbeat (elapsed 1383 s), and `_dispatch` returns early while anything runs, so b42 forms the next wave on its own. Close-outs and HOF-500s are already projected in the ledger — they are **synthesized from a `closeout: pending` marker set only when a training finishes**, so they cannot run ahead of it | nothing manual; the chain is automatic |
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm
@@ -93,6 +94,95 @@ matched ≤2M horizon, 3 of 4 favouring `1.5e-4`, p=0.625. `1.5e-4` stays the de
 because both were queued within minutes of each other from different hosts, and `b37` was very nearly used
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
+
+## Batches 42 and 43 — what happens if you keep training a champion — **running, launched 2026-08-18 20:52**
+
+**The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
+*passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
+checkpoint**. So: does a champion that keeps training improve, hold, or decay?
+
+**One experiment, two hosts, one variable between them.**
+
+| | desktop `b42` | laptop `b43` |
+|---|---|---|
+| learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** |
+| everything else | b29's config verbatim | b29's config verbatim |
+| cap | 3M, absolute | 3M, absolute |
+
+Config is b29's, byte-checked against `b29b`'s own spec with only `SNEK_SEED` substituted: `fc 320`,
+chase-safe `c=0.10` gate 75, IS off, target-update 1000, discount 0.9975, food-distance 0, fork-branches 4,
+and **no free-space shaping**. `b42` is therefore the seed-matched control for `b43`, and because `b42`'s
+configured rate equals the rate its checkpoints carry, the LR fix below is a provable no-op there — the two
+batches differ in the learning rate and nothing else.
+
+**The four arms are the top 4 of 8 across b29 and b40 by their best 500-episode perfect rate.**
+
+| arm | continues | from | 500-ep rate at that checkpoint | steps it will add |
+|---|---|---|---|---|
+| `b42a` / `b43a` | `b29b-chase10g75seed2` | @1447000 | **99.0%** (495/500) — the project record | 1.553M |
+| `b42b` / `b43b` | `b29a-chase10g75seed1` | @1347000 | **98.4%** | 1.653M |
+| `b42c` / `b43c` | `b40b-chasefree10g75seed2` | @1513000 | **98.2%** | 1.487M |
+| `b42d` / `b43d` | `b29c-chase10g75seed3` | @1396000 | 97.1% — but over **378** episodes, not 500 | 1.604M |
+
+Three of the four are b29 arms; that is where the measured checkpoints are, not a design choice. `b42d`'s row
+was **abandoned by the 98% gate**, so its 97.1% is not strictly comparable with the three full-length rows
+above it — it is the rank-4 arm on either reading, since rank 5 (`b40a` @1816k, 96.3%/294) sits behind it with
+a heavily overlapping CI.
+
+### ⚠ Read the result against selection bias, not against the numbers in that table
+
+The four starting rates are **the maximum of a noisy statistic over 8 arms and hundreds of checkpoints**, so
+they are biased upward — the winner's curse. This file already established the size of the effect:
+[a ≥98%/100 checkpoint has roughly a 1-in-60 chance of holding at
+500](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
+and `b29b`'s 18-wide band was **a seed, not a config**. So:
+
+- **An arm that continues and later measures ~96-97% has not necessarily decayed.** Regression to the mean
+  predicts exactly that, with no contribution from the extra training.
+- **The clean comparison is `b42` against `b43`, not either against its own starting rate.** Both start from
+  byte-identical checkpoints, so the selection bias is common-mode and cancels.
+- **The unbiased per-arm baseline is cheap and has not been run**: re-measure each *starting* checkpoint at
+  500 fresh episodes. The close-outs may supply it for free — the seeded dir still contains the start
+  checkpoint and it has a graph point, so `top20` can select it — but that is not guaranteed, and it is worth
+  one 2000-episode job if the headline reads as a decline.
+
+### What each outcome would mean
+
+| reading | meaning |
+|---|---|
+| `b42` holds ~99% and extends the band | the record region is reachable by *training longer from inside it*, and every previous arm was stopped early. The most valuable outcome |
+| `b42` decays, `b43` holds | the 1e-5 steps are too large to sit still at a champion — the endgame is a narrow basin and the default rate walks out of it. Would make **low-LR fine-tuning the way to bank a record**, which is a new tool |
+| both decay together | the decay is not the step size. Points at the objective or the replay distribution, and says a champion checkpoint is a transient the optimizer does not want to stay in |
+| both hold, neither improves | ~99% is the ceiling of this config and the remaining 1% is not a learning problem — consistent with the four null PBRS terms |
+| `b43` decays and `b42` does not | would be surprising and is the one reading that suggests a bug; check the reset line is in all four logs first |
+
+### How these arms were started — it is not an ordinary resume
+
+Each policy dir was **pre-seeded by hand**: `arch.json`, exactly one `ckpt-*` pair, a copy of the source
+arm's `replay_buffer/buffer.npz`, and a `checkpoint` state file naming only that step. Three reasons, all
+load-bearing:
+
+1. `initialize_or_restore()` takes whatever the `checkpoint` file names, which in the source dir is its
+   **last** step (2M), not its best. Resuming the source arm in place would have continued the wrong weights.
+2. It would also **append this continuation's checkpoints and graph history over the very arm the selection
+   was made from** — destroying the evidence.
+3. One pre-existing checkpoint means **every later `ckpt-*` in the dir belongs to the new run**, so a
+   close-out cannot mix two arms' weights at the same step.
+
+**Carrying the replay buffer is not optional, and it was measured.** A fresh dir holds only the 1000 random
+transitions `random_play()` writes, and training samples a batch from those on step 1. A 5k-step smoke test
+from `b29b` @1447000: **80% → 50% perfect without the buffer, 90-100% with it.** The seeding script is
+[`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
+
+### ⚠ This batch only measures anything because of a bug found while setting it up
+
+`SNEK_LEARNING_RATE` was a **no-op on every resume**. Adam's `learning_rate` is a checkpointed `tf.Variable`,
+so `initialize_or_restore()` silently restored the saved 1e-5 over the configured 1e-6 — `b43` would have run
+four arms identical to `b42` and reported otherwise. Fixed by `training.enforce_learning_rate`; each arm now
+prints its reset line at startup, **and that line is the batch's tripwire** — an arm missing it is training at
+1e-5. Nothing already measured is invalidated (every prior resume re-used its original rate). Mechanism,
+measurement and the two general lessons:
+[`findings.md`](findings.md#-snek_learning_rate-was-silently-discarded-by-every-resume--adams-rate-rides-in-the-checkpoint).
 
 ## Batch 40 — the free-space term stacked on the record — **closed 2026-08-18: null, and it retires b29's record region**
 
@@ -271,7 +361,8 @@ closed for good** — b32 could not separate the two at n=2, and n=4 says there 
    it is the method to use whenever two arms stopped at different steps.
 
 Per-arm table in
-[`charts.md`](charts.md#batch-38--adam-ε-3125e-4-on-b36s-fc-320--closed-the-dose-is-a-dead-heat-at-n4-as-pre-registered).
+[`archive/charts-archive.md`](archive/charts-archive.md#batch-38--adam-ε-3125e-4-on-b36s-fc-320--closed-the-dose-is-a-dead-heat-at-n4-as-pre-registered)
+— batch 38's chart section was retired there on 2026-08-18 to make room for 42/43.
 
 **`launch_b38_eps3125.sh`, identical to b36 with `SNEK_ADAM_EPSILON=3.125e-4` the only change**, seeds 1-4,
 3M cap. `b36a-d` is therefore an exact seed-matched control and this is a clean one-variable dose comparison.

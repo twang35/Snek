@@ -271,7 +271,10 @@ def replace_region(path, block):
 
 
 def refresh_charts():
-    subprocess.run(['zsh', os.path.join(HERE, 'refresh_charts.sh')], cwd=HERE,
+    # The script resolves `runs/` and `charts/` from its own location, so `cwd` is not load-bearing —
+    # it is passed only so a relative path in any future edit lands in the tuning directory rather
+    # than in whatever directory the caller happened to be in.
+    subprocess.run(['zsh', os.path.join(HERE, 'scripts', 'refresh_charts.sh')], cwd=HERE,
                    stdout=subprocess.DEVNULL, check=False)
 
 

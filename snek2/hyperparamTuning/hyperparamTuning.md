@@ -17,7 +17,8 @@ than any single run.
 | [`findings.md`](findings.md) | what is established, what has been falsified | when something is learned |
 | [`failureModes.md`](failureModes.md) | the four ways a policy degrades, and how to tell them apart | rarely |
 | [`charts.md`](charts.md) | progress graph for every arm, with captions | every progress update / docs change, finished or not |
-| `charts/` | snapshot copies of the graphs | via `refresh_charts.sh` |
+| `charts/` | snapshot copies of the graphs | via `scripts/refresh_charts.sh` |
+| [`scripts/`](scripts/README.md) | the launchers, the chaining scripts and `refresh_charts.sh` | one row per script in its README |
 
 **Start with [`runs.md`](runs.md)** if you are picking this up mid-flight — it says
 what is in progress and what to do next. Read this file for how the machinery works,
@@ -160,10 +161,10 @@ fast a finished batch can be turned into a verdict, and a close-out that finishe
 instead of 90 gets the next batch launched sooner. Training is resumable and loses nothing but wall
 clock; an un-analysed batch blocks everything behind it.
 
-**Nobody has to wait up for the launch.** [`chain_closeout_after_training.sh <prefix>`](chain_closeout_after_training.sh)
+**Nobody has to wait up for the launch.** [`chain_closeout_after_training.sh <prefix>`](scripts/chain_closeout_after_training.sh)
 polls until that batch's trainers exit — at their `SNEK_MAX_STEPS` cap, so unattended — then starts one
 `eval_checkpoints.py` per arm at once, `EVAL_WORKERS=4`, logs in `/tmp/<policy>_closeout.log`. It is the mirror of
-[`chain_after_evals.sh`](chain_after_evals.sh), which queues a *wave* behind a close-out. First used on `b39`:
+[`chain_after_evals.sh`](scripts/chain_after_evals.sh), which queues a *wave* behind a close-out. First used on `b39`:
 trainers drained 08:00, close-out done 08:50, no intervention. Both scripts count processes rather than tracking
 pids, because `kill -0` succeeds on a zombie, and both filter `pgrep` output — a bare `pgrep -f snek2.py` matches
 git pathspecs and the telemetry `curl`, and a bare `pgrep -f eval_checkpoints.py` matches the `chart_viewer` that
@@ -596,7 +597,7 @@ never edits `charts.md`.
 
 Do these in order, the moment the arms are killed:
 
-1. **`zsh hyperparamTuning/refresh_charts.sh`** — copies every `runs/*.png` into
+1. **`zsh hyperparamTuning/scripts/refresh_charts.sh`** — copies every `runs/*.png` into
    `hyperparamTuning/charts/` and prints the step each one reached, which is what the captions quote.
 2. **Add or finalize the batch's section at the top of [`charts.md`](charts.md)** (it is usually
    already there from progress updates — see above), newest first: a batch-level table, then one
@@ -929,7 +930,7 @@ link to them directly: if `runs/` is ever cleaned out, every chart in `charts.md
 would silently vanish. Instead `charts/` holds snapshot **copies**, refreshed with:
 
 ```
-snek2/hyperparamTuning/refresh_charts.sh
+snek2/hyperparamTuning/scripts/refresh_charts.sh
 ```
 
 which re-copies each graph and prints the step it is at, so captions in

@@ -27,6 +27,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | **‡‡ A perfect game was identified by its final reward, so the chase-safe shaping made every counter read 0%** | **found and fixed 2026-08-14**. b27 and b30 trained blind for 300k+ steps *and* had their epsilon pinned at 0.0125, because the schedule's skill signal is the perfect rate. Counting is off the **score** now. See below |
 | The vector is **30 values**; only batch 11+ checkpoints load on `master` (`450e66e` = 26, `e4514a8` = 20) | **breaking** |
 | A same-width observation change loads silently and plays like a beginner — 90.3% → scoring 0 | **standing hazard** |
+| **‡‡ `SNEK_LEARNING_RATE` was a no-op on every resume** — Adam's `learning_rate` is a checkpointed `tf.Variable`, so `initialize_or_restore()` silently restored the saved rate over the configured one | **found and fixed 2026-08-18**. Measured: an optimizer built at 1e-6 reads **1e-5** back after restoring a 1e-5 checkpoint. `training.enforce_learning_rate` puts it back and prints when it did. No past batch is invalidated — every resume in this project re-used its original rate — but **b43 would have been a silent null**. See below |
 | Index 29 (food-space) reads 1 in **99.95%** of states, so its weights are barely trained | **hazard**, don't repurpose it |
 | ~~Nothing in the vector distinguishes snake lengths 50 to 99~~ | **fixed 2026-08-02** — index 22 is linear board-fill, so 50 and 99 differ |
 | The 2026-08-03 observations gave +4 to +5 pp on three metrics, none significant | **open**, n=4, p 0.14-0.24 |
@@ -1225,6 +1226,54 @@ binomial expectation. An earlier warning here, built on `b4c` @869000 reading 51
 three runs, should be read as "one checkpoint once behaved strangely" rather than a property of
 the instrument. Pooling over many checkpoints is still what shrinks the interval (±1.3 at 6300
 episodes).
+
+## ‡‡ `SNEK_LEARNING_RATE` was silently discarded by every resume — Adam's rate rides in the checkpoint
+
+Found 2026-08-18 while setting up `b43`, which retunes the learning rate **on a resume** and is the first
+experiment in this project to do so. It would have produced four arms identical to their controls and a
+write-up claiming otherwise.
+
+**The mechanism.** Keras builds Adam's `learning_rate` as a `tf.Variable`, not a plain attribute. The
+variable is therefore tracked by `tf.train.Checkpoint`, so `common.Checkpointer` saves it alongside the
+`m`/`v` moments and `initialize_or_restore()` writes it back over whatever the constructor was given.
+Measured directly on tf 2.15.1 / keras 2.15.0:
+
+| optimizer built at | checkpoint written at | reads back as |
+|---|---|---|
+| 1e-6 | 1e-5 | **1e-5** |
+| 1e-4 | 1e-6 | **1e-6** |
+
+`adam_epsilon` is **not** affected — `epsilon` is a plain Python float on the optimizer, so nothing restores
+it, and `SNEK_ADAM_EPSILON` works on a resume. Only the rate has a Variable.
+
+**What it does and does not invalidate.** Nothing already measured. Every resume in this project's history —
+`b20e-h`'s 3M extension, `b25`'s `-r2` arms, every desktop `interrupted` relaunch — re-used the same rate it
+was originally launched with, so restoring the saved value and applying the configured value were the same
+operation. The bug only bites the case that had never come up: **changing the rate on a resume.** That is
+exactly `b43`, and it is why the fix and the batch land together.
+
+**The fix.** `training.enforce_learning_rate(optimizer, configured_lr)`, called from `snek2.main` immediately
+after `initialize_or_restore()`. It re-assigns the configured rate and returns the displaced value so the
+run prints
+
+```
+learning rate: checkpoint restored 1e-05, reset to the configured 1e-06
+```
+
+**That line is the batch's own tripwire** — an arm intended to run at a retuned rate and missing it is
+training at the checkpoint's rate. It puts back the *hyperparameter* only: `iterations` and the `m`/`v`
+moments are genuine training state and are deliberately left alone, which a fixture pins.
+
+Two general lessons, both the same shape as the [perfect-game counter
+bug](#-a-perfect-game-was-identified-by-its-final-reward-and-the-shaping-term-silenced-every-counter) below.
+**A framework's "hyperparameters" and its "state" are not separated by anything you can see from the call
+site** — the constructor takes `learning_rate` and `epsilon` side by side and one of them is durable state.
+And **a knob that is read, printed and recorded is not thereby applied**: `hyperparameter override:
+LEARNING_RATE = 1e-06` appeared in the log, went into `run_config`, and reached `runs/<policy>.md`, all
+while the optimizer stepped at 1e-5. `tests/test_adam_epsilon.py` already guarded that `learning_rate`
+reaches the *constructor*; the gap was everything after it. Guard fixtures live in
+[`tests/test_learning_rate_restore.py`](../tests/test_learning_rate_restore.py), including one that pins the
+underlying TF behaviour so the fix cannot quietly become dead code if a future version stops restoring it.
 
 ## ‡‡ A perfect game was identified by its final reward, and the shaping term silenced every counter
 

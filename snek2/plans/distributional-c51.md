@@ -17,7 +17,7 @@ deliberately not started** — the real batch is to be shaped with the user.
   **within ~10% of ddqn** (9000 steps: c51 146/151 s, ddqn 165/166 s — c51 *faster*, which is inside the
   noise of episode-length variation with a close-out competing for cores, so read it as "no meaningful
   slowdown" rather than as a speedup).
-- **Phase 3** is armed but waiting: `hyperparamTuning/launch_c51_pilot.sh` launches the four pilot arms
+- **Phase 3** is armed but waiting: `hyperparamTuning/scripts/launch_c51_pilot.sh` launches the four pilot arms
   when b30's close-out exits, per this file's own host note.
 
 A throwaway feasibility probe was also run against this repo's own environment and specs, and its

@@ -508,7 +508,7 @@ seed spread 14.0 → 2.7 pp). Against **`b24` — `ddqn` at the same `fc 320`** 
 **Batch 32's config verbatim at `eps 1.5e-4`, with `SNEK_FC_LAYERS=320` the only change.** Four arms,
 seeds 1-4, **3M cap**, win reward back at its default 100, `lr 1e-4`, `ALGO=c51`, 51 atoms over
 `[-5, 120]`, `IS_WEIGHTS=0`, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no
-food-distance shaping. Launcher [`launch_c51_fc320.sh`](launch_c51_fc320.sh); graphs in
+food-distance shaping. Launcher [`launch_c51_fc320.sh`](scripts/launch_c51_fc320.sh); graphs in
 [`charts.md`](charts.md).
 
 **Two controls, both already on disk, and they answer different questions.**
@@ -685,7 +685,7 @@ changes; the knob is recorded per-arm in `runs/<policy>.md`.
 `DISCOUNT=0.9975`, `FORK_BRANCHES=4`, no food-distance shaping, `lr 1e-4`), seeds 1-4, 3M cap.
 Launched 01:32 and **stopped 10:04 on 2026-08-16 at 1.64-1.77M**, no close-out — the training curves and
 three greedy diagnostics settle it, and a close-out would only rank checkpoints of a policy that declines
-to win. Launcher [`launch_win10.sh`](launch_win10.sh).
+to win. Launcher [`launch_win10.sh`](scripts/launch_win10.sh).
 
 ### The design
 
