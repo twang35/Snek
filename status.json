@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T01:22:48",
-  "ts": 1787127768.651356,
+  "iso": "2026-08-19T01:23:21",
+  "ts": 1787127801.101869,
   "at_a_glance": {
     "running": [
       "b42 -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- hof (2 arms)"
@@ -40,7 +40,7 @@
       "step": 1768000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2083
+      "elapsed_s": 2115
     },
     {
       "id": "b42d-cont3m-b29c-hof",
@@ -50,7 +50,7 @@
       "step": 1806000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2083
+      "elapsed_s": 2115
     }
   ],
   "ledger": {
@@ -300,8 +300,8 @@
   },
   "disk_free_gb": 126.7,
   "load_avg": [
-    8.38330078125,
-    10.38525390625,
-    11.8564453125
+    8.0185546875,
+    10.10693359375,
+    11.71630859375
   ]
 }
