@@ -390,9 +390,196 @@ def summarize(runs, stale_after=180):
         'pooled_is_equal_effort': any(r.get('pooled_equal_effort') is not None for r in runs),
         'episodes': total_episodes,
         'mean_seconds': mean_seconds,
+        # Per-episode cost and the gate's savings, for the metrics block. `episodes_saved` is the
+        # writer's own count of episodes the abandonment gate never ran; multiplied by the measured
+        # seconds-per-episode it becomes the wall clock the gate bought, which is the form the
+        # number is actually useful in.
+        'seconds_per_episode': seconds_per_episode,
+        'episodes_saved': sum(r.get('episodes_saved') or 0 for r in runs),
         'eta_seconds': eta_seconds,
         'rates': rates,
     }
+
+
+def full_length_rows(state):
+    """(rows measured to the run's own target depth, that target).
+
+    The same rule the chart's solid/hollow split uses -- `target_episodes` from the payload, falling
+    back to the deepest row for files predating the field -- so the text block and the picture cannot
+    disagree about which rows are comparable. Anything short of the target is a 20-episode screen or
+    a row the abandonment gate stopped, and neither is a measurement of the same thing.
+    """
+    rows = state['completed']
+    if not rows:
+        return [], 0
+    deepest = max(r['episodes'] for r in rows)
+    target = state.get('target_episodes') or deepest
+    return [r for r in rows if r['episodes'] >= target], target
+
+
+# 98 is the hall-of-fame selection gate (`desktop/runner/runner.py::HOF_THRESHOLD`, and the laptop
+# chain copies it), so these are the bands promotion is decided in: never lost a game, lost about
+# one in a hundred, lost about two, not a candidate.
+HOF_BAND = 98.0
+PERFECT_BANDS = (('= 100%', 100.0, None),
+                 ('99-100%', 99.0, 100.0),
+                 ('98-99%', HOF_BAND, 99.0),
+                 ('below 98%', None, HOF_BAND))
+
+
+def band_counts(rows):
+    """Rows per promotion band, as [(label, count), ...], highest band first.
+
+    Half-open ranges rather than exact integers because the depth is not fixed. At 100 episodes
+    "99-100%" can only ever be 99/100, but the HOF re-measure runs 500 episodes and 498/500 = 99.6%
+    has to land in the same band; a set of `== 99` tests would drop it silently.
+    """
+    counted = []
+    for label, low, high in PERFECT_BANDS:
+        count = 0
+        for row in rows:
+            percent = row['perfect_percent']
+            if low is not None and percent < low:
+                continue
+            if high is not None and percent >= high:
+                continue
+            count += 1
+        counted.append((label, count))
+    return counted
+
+
+def longest_band_run(rows, target, threshold=HOF_BAND):
+    """The longest consecutive stretch of decisive checkpoints all at or above `threshold`.
+
+    Returns (length, first_step, last_step), or (0, None, None).
+
+    This is the plateau test, and it is the difference between a champion and a lucky checkpoint: a
+    98% row inside a stretch of twenty is a policy that holds, a lone one between two abandoned
+    neighbours is a coin flip that landed. Consecutive means consecutive *among the rows that settle
+    the question*, in step order rather than file order -- the close-out measures stage 1 before
+    stage 2, so the file is not sorted.
+
+    Three kinds of row, and only two of them are decisive:
+
+    - measured to `target` -- counts if it clears `threshold`, breaks the stretch if it does not;
+    - **abandoned** -- always breaks it. Abandonment is a proof of being below the close-out gate,
+      hence below this one, and an abandoned row is short, so a depth test alone would skip it and
+      let it silently bridge two separate stretches;
+    - a screen short of `target` and not abandoned -- **skipped entirely**. 19/20 is equally
+      consistent with a 98% policy and a 90% one, so counting it would invent a plateau and
+      breaking on it would erase a real one.
+
+    Unselected steps are not gaps either: nobody looked at them.
+    """
+    best, best_span = 0, (None, None)
+    current, start = 0, None
+    for row in sorted(rows, key=lambda r: r['step']):
+        if not row.get('abandoned') and row['episodes'] < target:
+            continue
+        if row['perfect_percent'] >= threshold and not row.get('abandoned'):
+            current += 1
+            if start is None:
+                start = row['step']
+            if current > best:
+                best, best_span = current, (start, row['step'])
+        else:
+            current, start = 0, None
+    return (best,) + best_span
+
+
+def half_split_pooled(rows):
+    """(first-half rate, second-half rate) over the measured *step* range, or (None, None).
+
+    Split by step rather than by row index, and pooled by episodes so a deep row counts for more
+    than a screen. This is the whole question for a continuation arm -- b42-b45 exist to find out
+    whether a low learning rate holds a champion or slowly decays it -- and reading it off the
+    scatter by eye is exactly the judgement call that produced a retracted conclusion once already.
+    """
+    if len(rows) < 4:
+        return None, None
+    steps = sorted(r['step'] for r in rows)
+    midpoint = steps[len(steps) // 2]
+    halves = []
+    for keep in (lambda s: s < midpoint, lambda s: s >= midpoint):
+        chosen = [r for r in rows if keep(r['step'])]
+        episodes = sum(r['episodes'] for r in chosen)
+        if not episodes:
+            return None, None
+        halves.append(100.0 * sum(r['perfect_games'] for r in chosen) / episodes)
+    return halves[0], halves[1]
+
+
+def metrics_lines(state):
+    """The right-hand column: the distribution and the derived numbers, not the ranking.
+
+    Deliberately none of it duplicates the left column or the two charts above -- the in-flight
+    lines came out of the text block entirely on 2026-08-19 because the top panel already draws
+    them, per-round, which is strictly more than the text said.
+    """
+    rows = state['completed']
+    if not rows:
+        return ['  nothing measured yet']
+    full, target = full_length_rows(state)
+    pool, note = full, ''
+    if not pool:
+        # Every row stopped short of the target, which at a 97 gate is the normal case for a weak
+        # arm. Rank what there is and label the depth, rather than printing four zeroes.
+        pool = deep_rows(rows)
+        note = ' (deepest {0} ep, none full)'.format(max(r['episodes'] for r in rows))
+    lines = ['  perfect % of {0} {1} rows{2}'.format(
+        len(pool), 'full-length ({0} ep)'.format(target) if not note else 'deep', note)]
+    for label, count in band_counts(pool):
+        lines.append('    {0:<10} {1:>5}   {2:>4.0f}%'.format(
+            label, count, 100.0 * count / len(pool)))
+
+    candidates = [r for r in pool if r['perfect_percent'] >= HOF_BAND]
+    if candidates:
+        lines.append('  >= 98%: {0} rows over {1}-{2}'.format(
+            len(candidates), format_step_k(min(r['step'] for r in candidates)),
+            format_step_k(max(r['step'] for r in candidates))))
+        length, first, last = longest_band_run(rows, target)
+        if length:
+            lines.append('    longest run {0} in a row ({1}-{2})'.format(
+                length, format_step_k(first), format_step_k(last)))
+    else:
+        lines.append('  >= 98%: none -- no hall-of-fame candidate')
+
+    early, late = half_split_pooled(rows)
+    if early is not None:
+        # Zeroed under half a tenth, because '{:+.1f}' renders a delta of -0.02 as '-0.0' — a minus
+        # sign on a number that is not negative, which is exactly the direction this line exists to
+        # report.
+        delta = late - early
+        lines.append('  drift {0:.1f}% -> {1:.1f}%  ({2:+.1f} pp, first/last half)'.format(
+            early, late, delta if abs(delta) >= 0.05 else 0.0))
+
+    # `.get` on both: an older file may carry neither, and the whole line is optional rather than
+    # worth a KeyError on a chart that is a run's only live status display.
+    avg_scores = [r['avg_score'] for r in pool if r.get('avg_score') is not None]
+    worst = [r['min_score'] for r in pool if r.get('min_score') is not None]
+    if avg_scores:
+        lines.append('  score  mean {0:.1f}{1}'.format(
+            sum(avg_scores) / len(avg_scores),
+            '   worst episode {0:.0f}'.format(min(worst)) if worst else ''))
+
+    # How well the training self-eval predicted the real measurement. The graph point is what
+    # selects a checkpoint in the first place, so this is the selection protocol grading itself:
+    # a low hit rate means the close-out is spending its full-length budget on noise.
+    graph_perfect = [r for r in rows if (r.get('graph_single_eval') or 0) >= 100]
+    if graph_perfect:
+        hits = sum(1 for r in graph_perfect if r['perfect_percent'] >= HOF_BAND)
+        lines.append('  graph 100% -> >= 98%: {0} of {1} ({2:.0f}%)'.format(
+            hits, len(graph_perfect), 100.0 * hits / len(graph_perfect)))
+
+    abandoned = sum(1 for r in rows if r.get('abandoned'))
+    saved = state.get('episodes_saved') or 0
+    if abandoned or saved:
+        per_episode = state.get('seconds_per_episode')
+        clock = ' ~{0}'.format(format_duration(saved * per_episode)) if per_episode else ''
+        lines.append('  gate cut {0} rows, saved {1:,} ep{2}'.format(abandoned, saved, clock))
+    lines.append('  {0} rows measured = {1} full + {2} partial'.format(
+        len(rows), len(full), len(rows) - len(full)))
+    return lines
 
 
 def format_duration(seconds):
@@ -427,7 +614,8 @@ def in_flight_title(active):
         count, '' if count == 1 else 'es')
 
 
-def text_summary(policy_name, state):
+def progress_lines(policy_name, state):
+    """Name, the progress bar and the stage block -- where the run is, not what it found."""
     lines = []
     done, requested = state['done'], state['requested']
     bar_width = 28
@@ -438,7 +626,12 @@ def text_summary(policy_name, state):
         state['percent_done']))
 
     lines.extend(stage_lines(state.get('stages')))
+    return lines
 
+
+def ranking_lines(state):
+    """The headline number and the top 5: which checkpoints this arm produced."""
+    lines = []
     if state['completed']:
         pooled_note = (' (equal effort)' if state.get('pooled_is_equal_effort')
                        else ' over {0} episodes'.format(state['episodes']))
@@ -482,7 +675,18 @@ def text_summary(policy_name, state):
                 row['perfect_ci95'][0], row['perfect_ci95'][1], row['avg_score']))
     else:
         lines.append('  no checkpoint finished yet')
+    return lines
 
+
+def flight_lines(state):
+    """In-flight progress as text.
+
+    **Not drawn on the chart** since 2026-08-19 -- the top panel plots the same checkpoints' running
+    rate per round, which is the same information at higher resolution, so the text block was
+    spending five of its lines restating the panel above it. Kept for `report`, which prints to a
+    terminal and has no panel.
+    """
+    lines = []
     if state['active']:
         lines.append('  in flight:')
         for run, flight in sorted(state['active'], key=lambda p: p[1]['step']):
@@ -494,13 +698,41 @@ def text_summary(policy_name, state):
                              run['suffix'], flight['step'], flight['round'], flight['rounds_total'],
                              flight_workers(run, flight), flight['running_percent'],
                              format_duration(max(0, time.time() - flight['started_at']))))
-    elif done < requested:
+    elif state['done'] < state['requested']:
         lines.append('  nothing in flight')
 
-    for run, age in state['stale']:
-        lines.append('  STALE: {0} last wrote {1} ago and is incomplete — process likely died'.format(
-            run['suffix'], format_duration(age)))
-    return '\n'.join(lines)
+    return lines
+
+
+def stale_lines(state):
+    """One line per process that stopped writing while incomplete."""
+    return ['  STALE: {0} silent {1}, incomplete — likely dead'.format(
+        run['suffix'], format_duration(age)) for run, age in state['stale']]
+
+
+def text_summary(policy_name, state):
+    """The whole summary as one block, for `report`'s terminal output."""
+    return '\n'.join(progress_lines(policy_name, state)
+                     + ranking_lines(state)
+                     + metrics_lines(state)
+                     + flight_lines(state)
+                     + stale_lines(state))
+
+
+def summary_columns(policy_name, state):
+    """(left, right) text blocks for the chart's bottom panel.
+
+    Two columns rather than one because the charts above lost 20% of their height on 2026-08-19 and
+    the freed space is all width, not depth -- a single column would have been the same ~15 lines
+    with more air under them. The split is by kind, not by length: **left is where this arm got to
+    and what its best checkpoints are, right is the distribution and what follows from it**, so a
+    glance at one column answers one question.
+
+    In-flight lines are deliberately absent; the top panel draws them.
+    """
+    left = progress_lines(policy_name, state) + ranking_lines(state)
+    right = metrics_lines(state) + stale_lines(state)
+    return '\n'.join(left), '\n'.join(right)
 
 
 def draw_threshold(axis, state):
@@ -522,6 +754,32 @@ def draw_threshold(axis, state):
                  zorder=1, label='gate {0:.0f}%'.format(threshold))
 
 
+# Both perfect-% panels ran 0-100 until 2026-08-19. That spent half the panel on a range nothing
+# worth reading has been in for a year: the live question is whether a run sits at 93 or at 98, and
+# 5 pp of difference was 5% of the axis. 50 doubles the resolution of the half that is used.
+PERFECT_AXIS_FLOOR = 50.0
+
+
+def note_clipped(axis, values, unit):
+    """Writes how many points fall below the axis floor, in the panel, if any do.
+
+    The floor is **fixed**, not adaptive, for the same reason the figure size is: an axis that
+    rescales when one bad screen lands is an axis the eye has to re-read on every frame, and the
+    panels are side by side precisely so two runs can be compared by height. A floor that gave way
+    to the lowest point would be set by the worst 20-episode screen in the file.
+
+    Fixed means points *are* hidden, though -- an early screen at 0%, a collapsed arm, a first round
+    that misses -- and silently dropping data is the failure this project keeps paying for. So the
+    count is written where the data would have been. An empty panel with "138 rows below 50%" in the
+    corner says something; an empty panel says nothing.
+    """
+    count = sum(1 for value in values if value is not None and value < PERFECT_AXIS_FLOOR)
+    if not count:
+        return
+    axis.text(0.008, 0.04, '{0} {1} below {2:.0f}%'.format(count, unit, PERFECT_AXIS_FLOOR),
+              transform=axis.transAxes, ha='left', va='bottom', fontsize=7, color='#b0504a')
+
+
 def render(policy_name, state, out_path):
     # ‡ The layout is deliberately CONSTANT: three panels at a fixed figure size, whether or not
     # anything is in flight. It used to drop to two panels and shrink from 9.0in to 6.6in as soon as
@@ -531,9 +789,26 @@ def render(policy_name, state, out_path):
     #
     # The empty in-flight panel is the cost, and it is the right trade: dead space in a known place
     # beats live content in a moving one.
+    #
+    # Sizes as of 2026-08-19, in inches of drawn panel: the two charts gave up 20% of their height
+    # (2.10 -> ~1.68 each) and the text panel gained a fifth (2.00 -> ~2.39). The figure came down
+    # from 9.0in to 8.05 and hspace from 0.42 to 0.35 to absorb the difference, because **the figure
+    # shrank on account of the text getting shorter, not despite it** -- two columns roughly halve
+    # the line count, so a panel sized for the old single column left a visible empty strip under
+    # the last line, which is worse than the whitespace the columns were meant to fill.
+    #
+    # ~2.39in is ~17 monospace lines at 8.5pt. That is the capacity to keep: the left column runs to
+    # 13 (name, bar, a four-line stage block, best, pace, and a top-5 with its header) and the right
+    # to 12 plus one line per stale process, so a four-process run with every process dead is the
+    # worst case and it still fits.
+    #
+    # None of this touches the constant-size property above: every frame is 9.5x8.05in whatever the
+    # state. matplotlib takes hspace as a fraction of the *mean* panel height, so the panel inches
+    # here are figure_height * (1 - top_margin - bottom_margin) / (1 + 2 * hspace / 3), split by the
+    # ratios -- change one of the four numbers and the others move.
     has_flight = any((flight.get('per_round_perfect') or []) for _, flight in state['active'])
-    grid = gridspec.GridSpec(3, 1, height_ratios=[2.1, 2.1, 2.0], hspace=0.42)
-    figure = plt.figure(figsize=(9.5, 9.0))
+    grid = gridspec.GridSpec(3, 1, height_ratios=[1.68, 1.68, 2.40], hspace=0.35)
+    figure = plt.figure(figsize=(9.5, 8.05))
     next_row = 0
 
     # --- 1. in-flight convergence: running perfect rate vs round -------------------------
@@ -607,7 +882,22 @@ def render(policy_name, state, out_path):
         top.set_xlim(0.5, 11.5)
         top.text(0.5, 0.5, 'no checkpoint in flight', transform=top.transAxes,
                  ha='center', va='center', fontsize=10, color='#999999')
-    top.set_ylim(0, 100)
+    # Every running rate drawn in the panel, so a checkpoint running below the floor still appears.
+    # The idle panel passes nothing and lands on the plain floor, which keeps the two identical --
+    # the eye must not have to re-read the axis when work resumes.
+    running_rates = []
+    for run, flight in state['active']:
+        per_round = flight.get('per_round_perfect') or []
+        if not per_round:
+            continue
+        workers = flight_workers(run, flight)
+        won = seen = 0
+        for count in per_round:
+            won += count
+            seen += workers
+            running_rates.append(100.0 * won / seen)
+    note_clipped(top, running_rates, 'round' if len(running_rates) == 1 else 'rounds')
+    top.set_ylim(PERFECT_AXIS_FLOOR, 100)
     top.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
     top.tick_params(labelsize=7)
 
@@ -674,14 +964,22 @@ def render(policy_name, state, out_path):
     middle.set_title(title, fontsize=10)
     middle.set_xlabel('checkpoint step (thousands)', fontsize=8)
     middle.set_ylabel('measured perfect %', fontsize=8)
-    middle.set_ylim(0, 100)
+    note_clipped(middle, [r['perfect_percent'] for r in state['completed']],
+                 'row' if len(state['completed']) == 1 else 'rows')
+    middle.set_ylim(PERFECT_AXIS_FLOOR, 100)
     middle.grid(alpha=0.25, linestyle=(0, (4, 3)), linewidth=0.5)
     middle.tick_params(labelsize=7)
 
     # --- 3. the same numbers as text, so the image is self-contained ---------------------
     bottom = figure.add_subplot(grid[next_row])
     bottom.axis('off')
-    bottom.text(0.0, 1.0, text_summary(policy_name, state), fontsize=8.5, family='monospace',
+    # Two independent text artists rather than one string with padding: a monospace column is only
+    # aligned if nothing before it on the line can change width, and the left column's step numbers
+    # and percentages do change width between frames. Separate artists at fixed x cannot drift.
+    left_text, right_text = summary_columns(policy_name, state)
+    bottom.text(0.0, 1.0, left_text, fontsize=8.5, family='monospace',
+                va='top', ha='left', transform=bottom.transAxes)
+    bottom.text(0.52, 1.0, right_text, fontsize=8.5, family='monospace',
                 va='top', ha='left', transform=bottom.transAxes)
 
     figure.suptitle('{0} — eval progress {1}'.format(
@@ -690,7 +988,7 @@ def render(policy_name, state, out_path):
     # ‡ No bbox_inches='tight' here, deliberately. Tight crops to the drawn content, so the PNG's
     # pixel dimensions changed whenever a label, legend or the text block changed width — and the
     # live window sizes itself from the image, so it kept resizing even at a fixed figsize. Fixed
-    # margins instead: every frame is exactly 9.5x9.0in, so the window holds still and each panel
+    # margins instead: every frame is exactly 9.5x8.05in, so the window holds still and each panel
     # stays where it was in the previous frame.
     # top=0.925 (was 0.945) leaves room between the suptitle and the top panel's own title — at
     # 0.945 the "In flight: ..." title crowded right up against the "— eval progress" suptitle.
@@ -717,7 +1015,7 @@ def live_frame(policy_name, out_path=None, include_all=False, suffixes=None):
     Reads the PNG back instead of pulling the figure canvas, so the window and the saved chart are
     guaranteed to be the same image.
 
-    render() writes a **fixed-size** frame — three panels at 9.5x9.0in and 110dpi with explicit
+    render() writes a **fixed-size** frame — three panels at 9.5x8.05in and 110dpi with explicit
     margins, no bbox_inches='tight' — so every frame has identical pixel dimensions and the window
     does not resize between refreshes. That matters more than the trimmed whitespace tight used to
     save: the panel count used to drop from three to two between checkpoints, and the window jumped

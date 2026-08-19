@@ -7,6 +7,7 @@ new fields do.
 import os
 import shutil
 import tempfile
+import time
 
 import eval_progress
 
@@ -275,7 +276,11 @@ def test_top_five_excludes_lucky_screens_like_the_best_line_does():
     rows = ([result(1000 + i, episodes=20, perfect=20) for i in range(8)]
             + [result(9000, episodes=100, perfect=95)])
     state = eval_progress.summarize([run(rows, checkpoints_requested=9)])
-    text = eval_progress.text_summary('arm', state)
+    # Scoped to the ranking block since 2026-08-19, not the whole summary: the metrics column
+    # legitimately prints '100.0%' -- the drift line pools the eight screens and the early half of
+    # this fixture really is 20/20. Asserting over the whole block made this test fail for a
+    # sentence that was correct, which is a test that has stopped describing its own subject.
+    text = '\n'.join(eval_progress.ranking_lines(state))
     assert state['best']['step'] == 9000
     assert '100.0%' not in text, text
     assert 'full-length rows only' in text
@@ -594,7 +599,12 @@ def test_the_idle_panel_keeps_the_same_y_scale_so_the_eye_does_not_have_to_readj
                     os.remove(leftover)
         limits[label] = captured['figure'].axes[0].get_ylim()
         plt.close(captured['figure'])
-    assert limits['flight'] == limits['idle'] == (0, 100), limits
+    # 50, not 0, since 2026-08-19: the panel's whole job is telling 93% from 98%, and at 0-100 that
+    # difference was 5% of the axis. The floor is fixed rather than data-driven precisely so these
+    # two are equal -- an adaptive floor would move the moment a checkpoint ran badly.
+    # The literal 50 on purpose: written as `eval_progress.PERFECT_AXIS_FLOOR` this asserted the
+    # constant equals itself and passed with the floor put back to 0.
+    assert limits['flight'] == limits['idle'] == (50, 100), limits
 
 
 # ------------------------------------------------- solid means full length, nothing less
@@ -824,3 +834,223 @@ def test_render_dpi_defaults_to_110_and_follows_the_env_knob():
         else:
             os.environ['SNEK_EVAL_CHART_DPI'] = saved
         shutil.rmtree(directory, ignore_errors=True)
+
+
+# ------------------------------------- the bands, the plateau and the drift (2026-08-19)
+
+def test_the_bands_are_half_open_ranges_not_exact_integers():
+    # At 100 episodes "99-100%" can only be 99/100, which is why exact tests survived review the
+    # first time. The HOF re-measure runs 500 episodes: 498/500 is 99.6% and belongs in the same
+    # band, and 500/500 is the only thing that may count as 100%.
+    rows = [result(1, episodes=500, perfect=500), result(2, episodes=500, perfect=498),
+            result(3, episodes=500, perfect=492), result(4, episodes=500, perfect=400)]
+    assert eval_progress.band_counts(rows) == [
+        ('= 100%', 1), ('99-100%', 1), ('98-99%', 1), ('below 98%', 1)]
+
+
+def test_the_bands_partition_the_rows():
+    rows = [result(i, perfect=p) for i, p in enumerate([100, 100, 99, 98, 97, 40])]
+    assert sum(count for _, count in eval_progress.band_counts(rows)) == len(rows)
+
+
+def test_the_longest_run_is_broken_by_an_abandoned_row():
+    # The point of the metric: five 98s in a row is a policy that holds, and the same five with an
+    # abandoned checkpoint in the middle is two short stretches. Abandonment *is* evidence -- the
+    # gate only stops a row it has proved cannot reach the close-out threshold.
+    rows = [result(step, perfect=99) for step in (1000, 2000, 3000, 4000, 5000)]
+    assert eval_progress.longest_band_run(rows, 100) == (5, 1000, 5000)
+    # Abandoned *and* short, which is what an abandoned row always is -- so a depth test on its own
+    # would skip it and bridge the two stretches it separates.
+    rows[2] = dict(rows[2], episodes=44, perfect_games=43, perfect_percent=97.7, abandoned=True)
+    assert eval_progress.longest_band_run(rows, 100)[0] == 2
+
+
+def test_the_longest_run_breaks_on_an_abandoned_row_that_reads_above_the_band():
+    # An abandoned row's rate is always strictly below the gate it was abandoned under, so at this
+    # project's gates (<= 98) the percentage test alone would already catch it and the abandonment
+    # test looks redundant. It is not: the HOF path takes EVAL_MIN_ACHIEVABLE as an argument, and at
+    # a gate of 99 a 500-episode row cut at 464/470 reads 98.7% -- above the band, and still a proof
+    # that the checkpoint is not a 99% one.
+    rows = [result(1000, episodes=500, perfect=500),
+            dict(result(2000, episodes=470, perfect=464), abandoned=True),
+            result(3000, episodes=500, perfect=500)]
+    assert eval_progress.longest_band_run(rows, 500)[0] == 1
+
+
+def test_the_longest_run_ignores_the_order_rows_were_measured_in():
+    # The close-out measures stage 1 before stage 2, so the file is not in step order.
+    rows = [result(3000, perfect=99), result(1000, perfect=99), result(2000, perfect=99)]
+    assert eval_progress.longest_band_run(rows, 100) == (3, 1000, 3000)
+
+
+def test_the_longest_run_counts_only_consecutive_measured_rows():
+    # Unselected steps are not gaps in the policy -- nobody looked at them. A stretch of measured
+    # rows at 1000 and 9000 with nothing measured between is still a stretch of two.
+    rows = [result(1000, perfect=99), result(9000, perfect=99)]
+    assert eval_progress.longest_band_run(rows, 100) == (2, 1000, 9000)
+
+
+def test_the_longest_run_neither_counts_nor_breaks_on_a_screen():
+    # A 20-episode screen is not evidence: 19/20 fits a 98% policy and a 90% one equally. Counting
+    # it would invent a plateau out of one lucky screen; breaking on it would erase a real one.
+    lucky = [result(1000, perfect=99), result(2000, episodes=20, perfect=20),
+             result(3000, perfect=99)]
+    assert eval_progress.longest_band_run(lucky, 100) == (2, 1000, 3000)
+    unlucky = [result(1000, perfect=99), result(2000, episodes=20, perfect=17),
+               result(3000, perfect=99)]
+    assert eval_progress.longest_band_run(unlucky, 100) == (2, 1000, 3000)
+
+
+def test_the_drift_split_weights_a_deep_row_over_a_screen():
+    # A 20-episode screen at 100% in the late half must not outweigh 100 episodes at 90%: pooling
+    # is by episode, not by row, or one lucky screen reverses the sign of the trend.
+    rows = [result(1000, episodes=100, perfect=95), result(2000, episodes=100, perfect=95),
+            result(3000, episodes=100, perfect=90), result(4000, episodes=20, perfect=20)]
+    early, late = eval_progress.half_split_pooled(rows)
+    assert early == 95.0
+    assert round(late, 1) == round(100.0 * 110 / 120, 1)
+    assert late < early, 'the deep row has to dominate the screen'
+
+
+def test_the_drift_split_declines_on_too_few_rows():
+    assert eval_progress.half_split_pooled([result(1), result(2)]) == (None, None)
+
+
+def test_the_metrics_block_counts_the_bands_over_full_length_rows_only():
+    # A 20-episode screen going 20/20 is not a 100% checkpoint, and the bands are what a promotion
+    # decision reads. Same rule as `best_of`, applied to the distribution.
+    rows = [result(1000, episodes=100, perfect=98), result(2000, episodes=20, perfect=20)]
+    state = eval_progress.summarize([run(rows, episodes_per_checkpoint=100)])
+    text = '\n'.join(eval_progress.metrics_lines(state))
+    assert 'full-length (100 ep)' in text
+    assert '= 100%         0' in text, text
+    assert '98-99%         1' in text, text
+
+
+def test_the_metrics_block_says_so_when_no_row_reached_full_length():
+    # At a 97 gate a weak arm has no full-length row at all. Four zeroes would be a lie about the
+    # arm; the fallback ranks the deep rows and labels the depth.
+    rows = [dict(result(1000, episodes=40, perfect=30), abandoned=True),
+            dict(result(2000, episodes=40, perfect=28), abandoned=True)]
+    state = eval_progress.summarize([run(rows, episodes_per_checkpoint=100)])
+    text = '\n'.join(eval_progress.metrics_lines(state))
+    assert 'deepest 40 ep, none full' in text, text
+    assert '2 rows measured = 0 full + 2 partial' in text, text
+
+
+def test_the_metrics_block_reports_no_hof_candidate_rather_than_an_empty_range():
+    state = eval_progress.summarize([run([result(1000, perfect=70)], episodes_per_checkpoint=100)])
+    text = '\n'.join(eval_progress.metrics_lines(state))
+    assert 'no hall-of-fame candidate' in text, text
+
+
+def test_the_gate_savings_line_prices_the_skipped_episodes_in_wall_clock():
+    # 4000 episodes never run at the measured 0.5s each is a little over half an hour, and that is
+    # the form the number is useful in -- "episodes_saved: 4000" is not a decision.
+    rows = [dict(result(1000, episodes=40, perfect=30, seconds=20.0), abandoned=True)]
+    state = eval_progress.summarize([run(rows, episodes_per_checkpoint=100,
+                                         episodes_saved=4000,
+                                         session_measurements=1, session_episodes=40,
+                                         session_seconds=20.0)])
+    text = '\n'.join(eval_progress.metrics_lines(state))
+    assert 'gate cut 1 rows, saved 4,000 ep ~33m' in text, text
+
+
+def test_the_drift_line_does_not_print_a_negative_zero():
+    rows = [result(1000, episodes=1000, perfect=940), result(2000, episodes=1000, perfect=940),
+            result(3000, episodes=1000, perfect=940), result(4000, episodes=1000, perfect=939)]
+    text = '\n'.join(eval_progress.metrics_lines(
+        eval_progress.summarize([run(rows, episodes_per_checkpoint=1000)])))
+    assert '-0.0 pp' not in text, text
+
+
+# ------------------------------------- two columns, and no in-flight text (2026-08-19)
+
+def test_the_chart_text_is_two_columns_split_by_kind():
+    state = eval_progress.summarize([run([result(1000, perfect=98)],
+                                         episodes_per_checkpoint=100,
+                                         measurements_planned=1, measurements_done=1)])
+    left, right = eval_progress.summary_columns('arm', state)
+    assert 'top 5' in left and 'best' in left
+    assert 'perfect % of' in right and '= 100%' in right
+    assert 'top 5' not in right and 'perfect % of' not in left
+
+
+def test_the_chart_text_drops_the_in_flight_block_the_top_panel_already_draws():
+    live = run([result(1000, perfect=90)], complete=False, num_workers=4,
+               in_flight=flight(round_index=3, per_round_perfect=[4, 3, 2], rounds_total=10),
+               measurements_planned=20, measurements_done=1)
+    state = eval_progress.summarize([live])
+    left, right = eval_progress.summary_columns('arm', state)
+    assert 'in flight' not in left + right, (left, right)
+    # ...and `report`, which has no panel, still prints it.
+    assert 'in flight' in eval_progress.text_summary('arm', state)
+
+
+def test_a_stale_process_is_still_reported_on_the_chart():
+    # Staleness is measured against the wall clock, so the fixture has to use it -- the far-future
+    # `updated_at` the other fixtures pass is what makes a run read as fresh.
+    stale = run([result(1000, perfect=90)], complete=False, updated_at=time.time() - 600)
+    state = eval_progress.summarize([stale], stale_after=180)
+    _, right = eval_progress.summary_columns('arm', state)
+    assert 'STALE' in right, right
+
+
+def test_the_terminal_summary_carries_the_metrics_too():
+    state = eval_progress.summarize([run([result(1000, perfect=98)],
+                                         episodes_per_checkpoint=100)])
+    assert 'perfect % of' in eval_progress.text_summary('arm', state)
+
+
+def test_points_below_the_axis_floor_are_counted_in_the_panel():
+    """The floor hides data, so the count is drawn where the data would have been."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    figure = plt.figure()
+    axis = figure.add_subplot(1, 1, 1)
+    eval_progress.note_clipped(axis, [99.0, 40.0, 12.0, None], 'rows')
+    assert [t.get_text() for t in axis.texts] == ['2 rows below 50%']
+    plt.close(figure)
+
+    figure = plt.figure()
+    axis = figure.add_subplot(1, 1, 1)
+    eval_progress.note_clipped(axis, [99.0, 51.0], 'rows')
+    assert list(axis.texts) == [], 'nothing to say when nothing is hidden'
+    plt.close(figure)
+
+
+def test_the_two_charts_are_a_fifth_shorter_than_the_text_panel_is_tall():
+    """Pins the requested proportions: equal charts, 20% off each, the text panel taking the space."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    live = run([result(1000, perfect=90)], complete=True, num_workers=4,
+               measurements_planned=1, measurements_done=1)
+    state = eval_progress.summarize([live])
+    captured = {}
+    real_figure = plt.figure
+
+    def capture(*args, **kwargs):
+        fig = real_figure(*args, **kwargs)
+        captured['figure'] = fig
+        return fig
+
+    directory = tempfile.mkdtemp()
+    plt.figure = capture
+    try:
+        eval_progress.render('arm', state, os.path.join(directory, 'c.png'))
+    finally:
+        plt.figure = real_figure
+        shutil.rmtree(directory, ignore_errors=True)
+    figure = captured['figure']
+    heights = [axis.get_position().height * figure.get_size_inches()[1]
+               for axis in figure.axes]
+    plt.close(figure)
+    assert round(heights[0], 2) == round(heights[1], 2), heights
+    # 2.10in each before 2026-08-19.
+    assert abs(heights[0] - 0.8 * 2.10) < 0.03, heights
+    # ...and the text panel is the one that grew, not the figure.
+    assert heights[2] > 1.15 * 2.00, heights
