@@ -200,18 +200,56 @@ that was considered first.
 | `eval_wave.py` **(new)** | the controller: arg parsing, `--arms <prefix>`, arch grouping, lanes, greedy dispatch, per-policy writing and charts, `--chain` |
 | `eval_workers.py` | `load(step, ckpt_dir=None)` plus the worker-side arch compare; `('load', step, ckpt_dir)` on the command queue |
 
-### Desktop runner
+### Desktop runner (phase 5, in full)
+
+**`--chain` deletes the daemon's chain rather than changing it.** Stage B runs inside the wave
+process, so the box's job graph becomes `training wave -> one eval wave job`:
+
+| retires | why |
+|---|---|
+| `_auto_hof_jobs()` | the wave job runs the HOF stage itself |
+| `wants_hof`, `AUTO_HOF_PRIORITY`, `HOF_EVAL_ENV`, `HOF_EVAL_ARGS`, `HOF_THRESHOLD` | recipe and gate move to `eval_plan.py`, imported by both hosts |
+| the `hof: pending` marker and its `_reap` branch | no marker to set |
+| `hof_for()` in `anticipated_queue` | nothing to forecast separately |
+| `auto_hof` runtime flag | becomes `chain_hof`, passed as `--chain` |
+
+What changes:
 
 | file | change |
 |---|---|
-| `job.py` | `policies: [...]`, with `policy` kept as single-policy sugar |
-| `runner.py` | `_auto_closeout_jobs` / `_auto_hof_jobs` group the pending markers into **one** wave job instead of N; gate constants imported from `eval_plan` |
-| `launch.py` | eval argv becomes `eval_wave.py [--chain] <selector> <policies...>`; `EVAL_LANES` from runtime |
-| `runner.py` | `_publish_results` unions the artifact globs over `policies` |
-| `config.py` | `max_evals` stops being a job count — it clamps `EVAL_LANES` inside the wave |
+| `job.py` | `policies: [...]` with `policy` kept as sugar (`policies or [policy]`); `parse_job` validates it the same way. **`_StubJob` needs the same fallback** — it re-adopts a running job from a ledger record after a daemon restart, with no spec in hand, which is what breaks on deploy if missed |
+| `runner.py` | `_auto_closeout_jobs` groups the pending markers into **one** job carrying all their policies. Safe because the wave barrier returns early while anything runs, so the marker set is closed before any dispatch |
+| `launch.py` | `argv = [py, '-u', 'eval_wave.py', '--chain', selector] + policies`, plus `EVAL_LANES` beside today's `EVAL_WORKERS` |
+| `runner.py` | `_publish_results` unions the globs over `policies` but **publishes per policy with per-policy error capture** — see the risk below |
+| `runner.py` | `anticipated_queue` loses its HOF hop; `build_at_a_glance` gets simpler, since it already groups by `(batch, phase)` and four rows collapsing to one is that grouping finally being real. Optional: `phase_of` can read `stage` from the policies' result files so a wave shows `closeout eval` then `hof` as it moves |
+| `config.py` | `max_evals` stops meaning "concurrent eval jobs" (it would read 1); `eval_lanes` joins `RUNTIME_DEFAULTS`, clamped to 4, with `lanes * workers <= 32`. `viewer_png_paths` / `sticky_wave_pngs` expand `policies` |
 
-A migration guard is needed: an existing `<policy>-closeout` record in state `done` must satisfy that
-policy, so a wave job is not synthesized for work already finished under the old per-policy ids.
+**The job id is the one genuinely fiddly decision.** `<policy>-closeout` is idempotent by
+construction today, and the guard `if prior.get('state') in TERMINAL or eval_id in self.running`
+keys on it. `<batch>-closeout` is not enough: **b20 ran 36 arms under one prefix, in nine waves of
+four.** Recommended: `<batch>-closeout`, with a `-w<k>` suffix where `k` counts that batch's already
+terminal closeout wave records — a pure function of the ledger that does not churn while a wave is
+pending. **The hazard to pin with a fixture is id churn before dispatch**: `_scan_pending` runs every
+poll, so an id that shifted as more markers appeared would let a partly-finished wave relaunch under
+a new id and redo the work. Grouping only at dispatch, where the barrier guarantees the marker set is
+closed, is what prevents it.
+
+**Per-policy outcomes live in one record.** An arm can fail alone, so the record carries per-policy
+state, and the authority for "did this arm's close-out finish" is the flag the bash script already
+checks by hand: `complete: true` in `runs/<policy>_checkpoint_evals.json`. With `--chain` that check
+moves *inside* the controller, where it gates stage B per arm.
+
+`interrupted` recovery is unchanged and still per policy: relaunch with `EVAL_RESUME=1`, stage A
+finds everything measured and exits in seconds, stage B resumes under its own suffix via
+`resume_suffixes`. A reboot during stage B must not redo stage A — fixture.
+
+**Test impact is the reason this phase is last.** `desktop/tests/test_runner.py` has **83 tests** and
+roughly 30 are touched: all six `test_auto_closeout_*`, the seven `test_auto_hof_*` plus the two reap
+ones, five `anticipated_queue` HOF tests, both `test_build_eval_command_*`, the two
+`viewer_png_paths` ones, and `test_publish_status_folds_the_queue_into_the_ledger_in_order`. About
+ten of those are deletions. New fixtures: id stability across polls, one wave job publishing four
+policies with one of them failing, per-policy `complete` gating stage B, and `_StubJob` re-adoption
+from an old-style record.
 
 ### Laptop
 
@@ -308,6 +346,7 @@ total lane-busy time, not a speedup claim from one arm.
 | worker count creep past the memory band | refuse `EVAL_LANES * EVAL_WORKERS > 32`; spawned workers are ~230 MB each and ~40 hit the OOM killer |
 | the controller becomes a second place that knows the protocol | it does not define constants or thresholds — `eval_plan.py` is the only definition, imported by the controller, `eval_checkpoints.py` and `runner.py` alike |
 | ledger shape change orphans in-flight desktop work | ship phase 5 while the box is idle between batches, and add the `done`-record migration guard above |
+| one failed push now withholds four arms, not one | `publish_results` has no retry and the box's DNS for github.com flaps — b40 sat unpublished for hours with a 98.2%/500 checkpoint in it. So publish per policy in a loop with per-policy error capture, and a partial publish still lands the other three |
 | one wave job hides per-arm failure in `status.json` | the wave job reports per-policy state in its ledger record, and `at_a_glance` shows the batch label it already groups by |
 
 **What would falsify the premise:** if a lane switching arms turns out to cost a pool rebuild in
