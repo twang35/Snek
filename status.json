@@ -1,12 +1,15 @@
 {
-  "iso": "2026-08-19T08:42:07",
-  "ts": 1787154127.3846447,
+  "iso": "2026-08-19T08:42:40",
+  "ts": 1787154160.3728929,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (4 arms)"
     ],
     "queued": [
-      "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)"
+      "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
+      "b45 training -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
+      "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
+      "b45 hof -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)"
     ]
   },
   "runtime": {
@@ -38,7 +41,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 10709
+      "elapsed_s": 10742
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -48,7 +51,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 10709
+      "elapsed_s": 10742
     },
     {
       "id": "b44c-lowlr7-b40b-closeout",
@@ -58,7 +61,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 10709
+      "elapsed_s": 10742
     },
     {
       "id": "b44d-lowlr7-b29c-closeout",
@@ -68,7 +71,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 10709
+      "elapsed_s": 10742
     }
   ],
   "ledger": {
@@ -76,6 +79,18 @@
     "b44b-lowlr7-b29a-hof": "queued",
     "b44c-lowlr7-b40b-hof": "queued",
     "b44d-lowlr7-b29c-hof": "queued",
+    "b45a-lowlr8-b29b": "queued",
+    "b45b-lowlr8-b29a": "queued",
+    "b45c-lowlr8-b40b": "queued",
+    "b45d-lowlr8-b29c": "queued",
+    "b45a-lowlr8-b29b-closeout": "queued",
+    "b45b-lowlr8-b29a-closeout": "queued",
+    "b45c-lowlr8-b40b-closeout": "queued",
+    "b45d-lowlr8-b29c-closeout": "queued",
+    "b45a-lowlr8-b29b-hof": "queued",
+    "b45b-lowlr8-b29a-hof": "queued",
+    "b45c-lowlr8-b40b-hof": "queued",
+    "b45d-lowlr8-b29c-hof": "queued",
     "b44a-lowlr7-b29b-closeout": "running",
     "b44b-lowlr7-b29a-closeout": "running",
     "b44c-lowlr7-b40b-closeout": "running",
@@ -318,8 +333,8 @@
   },
   "disk_free_gb": 125.6,
   "load_avg": [
-    18.72509765625,
-    19.044921875,
-    19.03564453125
+    19.29638671875,
+    19.1513671875,
+    19.07177734375
   ]
 }
