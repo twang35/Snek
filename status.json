@@ -1,11 +1,12 @@
 {
-  "iso": "2026-08-19T16:43:46",
-  "ts": 1787183026.9148536,
+  "iso": "2026-08-19T16:43:59",
+  "ts": 1787183039.0063422,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (4 arms)"
     ],
     "queued": [
+      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
       "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b45 training -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
       "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
@@ -40,8 +41,8 @@
       "pid": 1785347,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 39609
+      "steps_per_sec": null,
+      "elapsed_s": 39621
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -50,8 +51,8 @@
       "pid": 1785348,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 39609
+      "steps_per_sec": null,
+      "elapsed_s": 39621
     },
     {
       "id": "b44c-lowlr7-b40b-closeout",
@@ -60,8 +61,8 @@
       "pid": 1785349,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 39609
+      "steps_per_sec": null,
+      "elapsed_s": 39621
     },
     {
       "id": "b44d-lowlr7-b29c-closeout",
@@ -70,8 +71,8 @@
       "pid": 1785350,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 39609
+      "steps_per_sec": null,
+      "elapsed_s": 39621
     }
   ],
   "ledger": {
@@ -333,8 +334,8 @@
   },
   "disk_free_gb": 125.6,
   "load_avg": [
-    19.51025390625,
-    18.78271484375,
-    18.61669921875
+    19.42529296875,
+    18.78955078125,
+    18.62109375
   ]
 }
