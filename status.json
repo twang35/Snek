@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T00:34:38",
-  "ts": 1787124878.313033,
+  "iso": "2026-08-19T00:35:10",
+  "ts": 1787124910.931411,
   "at_a_glance": {
     "running": [
       "b42 -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- closeout eval (2 arms)"
@@ -41,7 +41,7 @@
       "step": 1768000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 8388
+      "elapsed_s": 8421
     },
     {
       "id": "b42d-cont3m-b29c-closeout",
@@ -51,7 +51,7 @@
       "step": 1806000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 8388
+      "elapsed_s": 8421
     }
   ],
   "ledger": {
@@ -301,8 +301,8 @@
   },
   "disk_free_gb": 126.9,
   "load_avg": [
-    8.15966796875,
-    8.2021484375,
-    9.9541015625
+    8.1689453125,
+    8.19873046875,
+    9.8955078125
   ]
 }
