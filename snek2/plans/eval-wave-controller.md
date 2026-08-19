@@ -243,6 +243,16 @@ moves *inside* the controller, where it gates stage B per arm.
 finds everything measured and exits in seconds, stage B resumes under its own suffix via
 `resume_suffixes`. A reboot during stage B must not redo stage A — fixture.
 
+**‡ Pre-flight: no outstanding `hof: pending` marker may be left in the ledger.** Deleting
+`_auto_hof_jobs` deletes the only thing that reads that marker, so any pending HOF work becomes
+invisible — no error, no queued row, just a re-measure that never happens. **This is live as of
+2026-08-19:** the queue was paused mid-b44 to build this, so b44's four close-outs will reap and set
+exactly those four markers. The resume is therefore *not* flipping `paused` back — it is queueing one
+explicit `above:98` wave job for b44 first, which is also the new controller's first real exercise
+(b44's HOF is the imbalanced shape the whole plan is aimed at). Check with
+`git show origin/ops-status:status.json | grep -c '"hof": "pending"'` before deploying, after a
+fetch.
+
 **Test impact is the reason this phase is last.** `desktop/tests/test_runner.py` has **83 tests** and
 roughly 30 are touched: all six `test_auto_closeout_*`, the seven `test_auto_hof_*` plus the two reap
 ones, five `anticipated_queue` HOF tests, both `test_build_eval_command_*`, the two
