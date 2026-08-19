@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-19T00:06:26",
-  "ts": 1787123186.3901188,
+  "iso": "2026-08-19T00:07:01",
+  "ts": 1787123221.18165,
   "at_a_glance": {
     "running": [
-      "b42 -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- closeout eval (4 arms)"
+      "b42 -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- closeout eval (3 arms)"
     ],
     "queued": [
       "b42 hof -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- queued (4 arms)",
@@ -30,7 +30,7 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 4
+    "eval": 3
   },
   "running": [
     {
@@ -41,7 +41,7 @@
       "step": 1832000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 6697
+      "elapsed_s": 6731
     },
     {
       "id": "b42b-cont3m-b29a-closeout",
@@ -51,17 +51,7 @@
       "step": 1768000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 6697
-    },
-    {
-      "id": "b42c-cont3m-b40b-closeout",
-      "type": "eval",
-      "policy": "b42c-cont3m-b40b",
-      "pid": 1393627,
-      "step": 1911000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 6697
+      "elapsed_s": 6731
     },
     {
       "id": "b42d-cont3m-b29c-closeout",
@@ -71,13 +61,13 @@
       "step": 1806000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 6697
+      "elapsed_s": 6731
     }
   ],
   "ledger": {
+    "b42c-cont3m-b40b-hof": "queued",
     "b42a-cont3m-b29b-hof": "queued",
     "b42b-cont3m-b29a-hof": "queued",
-    "b42c-cont3m-b40b-hof": "queued",
     "b42d-cont3m-b29c-hof": "queued",
     "b44a-lowlr7-b29b": "queued",
     "b44b-lowlr7-b29a": "queued",
@@ -93,8 +83,8 @@
     "b44d-lowlr7-b29c-hof": "queued",
     "b42a-cont3m-b29b-closeout": "running",
     "b42b-cont3m-b29a-closeout": "running",
-    "b42c-cont3m-b40b-closeout": "running",
     "b42d-cont3m-b29c-closeout": "running",
+    "b42c-cont3m-b40b-closeout": "done",
     "b42d-cont3m-b29c": "failed",
     "b42c-cont3m-b40b": "failed",
     "b42b-cont3m-b29a": "failed",
@@ -321,8 +311,8 @@
   },
   "disk_free_gb": 126.9,
   "load_avg": [
-    18.1318359375,
-    18.37939453125,
-    18.5029296875
+    15.666015625,
+    17.74853515625,
+    18.28662109375
   ]
 }
