@@ -1,0 +1,15 @@
+{
+  "id": "b42b-cont3m-b29a-closeout",
+  "type": "eval",
+  "policy": "b42b-cont3m-b29a",
+  "eval_args": ["top20"],
+  "eval_workers": 4,
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_SEED": "1",
+    "EVAL_MIN_ACHIEVABLE": "96"
+  },
+  "priority": 10,
+  "label": "b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control)",
+  "notes": "Queued BY HAND because b42 was stopped early at ~1.6M of 3M rather than reaching its cap. A kill -9 sets popen.returncode to -9, so the daemon's reap computes ok=False, marks the training 'failed', and therefore neither sets the 'closeout: pending' marker nor publishes results -- auto-closeout would have been skipped silently. This spec supplies what the marker would have. EVAL_MIN_ACHIEVABLE=96 reproduces runner.py's CLOSEOUT_EVAL_ENV, which the auto path would have applied and a hand-written spec does not inherit; it must stay below the HOF gate of 98 because the HOF pass selects above:98 from this file and only rows reaching the gate are measured full length. The id ends in -closeout on purpose: wants_hof() keys on that suffix, so the HOF-500 re-measure still chains automatically off this job. Publishing is also recovered here -- _publish_results globs runs/<policy>*, so this job carries the training's own .md/.png/_evals.json up with it. Reason for stopping early: lr 1e-6 (b43, laptop) leads this arm by +1.9 pp mean perfect rate at a matched 80k-step horizon, 3 of 4 seeds, and b42 is drifting down (94.6 -> 93.7 as the window extends) where b43 is flat -- so the four slots were wanted for the 1e-7 rung (b44). Cost accepted knowingly: the paired b42-vs-b43 comparison now ends at ~1.6M instead of 3M."
+}
