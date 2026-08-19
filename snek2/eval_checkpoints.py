@@ -14,44 +14,48 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
 
     # the normal close-out
-    EVAL_WORKERS=10 PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top20
+    EVAL_WORKERS=10 PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top50
 
     # flat one-pass protocol (every arm before batch 10 was measured this way)
-    EVAL_SCREEN_EPISODES=0 ... top20
+    EVAL_SCREEN_EPISODES=0 ... top50
 
     # continue an interrupted close-out
-    EVAL_RESUME=1 ... top20
+    EVAL_RESUME=1 ... top50
 
-Selection (`top20`, `top`, `top:20`) ranks on the single 10-episode graph eval, breaking ties
+Selection (`top50`, `top`, `top:50`) ranks on the single graph eval, breaking ties
 on the surrounding rate. Selection (`above:98`, `above`) instead reads a *prior close-out's*
 100-episode measurement and takes every checkpoint whose `perfect_percent` is at or above the
 threshold — the HOF re-measure path, which reconfirms already-excellent checkpoints rather than
 re-discovering them from the noisy graph (see select_checkpoints_above):
 
-- every checkpoint at **>=90%** is measured, even past N
-- remaining slots go to the best of the rest down to **>=60%**
-- nothing below 60% is measured
+- every checkpoint at **>=95%** is measured, even past N
+- remaining slots go to the best of the rest down to **>=90%**
+- nothing below 90% is measured
 
-N is a target, not a quota — a weak arm may run 1 or 0. Because a graph point is 10 episodes,
-the mandatory tier is exactly {90, 100} and the fill band is {60, 70, 80}. Adjacent steps are
+N is a target, not a quota — a weak arm may run 1 or 0, and a *strong* arm blows past N, which is
+what makes a continuation close-out expensive. Because a graph point is **20 episodes** (since
+2026-08-19; it was 10 before, and the thresholds were 90/60 to match), the mandatory tier is
+exactly {95, 100} and the fill band is exactly {90}. Adjacent steps are
 allowed through on purpose: 1000 train steps can change the perfect rate by tens of points, so
 neighbours are separate policies rather than repeat samples.
 
 Three stages when screening is on (the default):
 
-1. every checkpoint whose graph point is **100%**, plus any explicitly named step, gets the
-   full EVAL_EPISODES immediately. Uncapped.
+1. every checkpoint whose graph point is **>=95%** (19/20 or 20/20 of a 20-episode graph eval),
+   plus any explicitly named step, gets the full EVAL_EPISODES immediately. Uncapped — but bounded
+   by EVAL_MIN_ACHIEVABLE, which abandons a row once the gate is unreachable, and that is what
+   makes an uncapped tier affordable. See ALWAYS_FULL_SINGLE.
 2. everything else selected gets EVAL_SCREEN_EPISODES (20)
 3. the best EVAL_CONFIRM_COUNT **of those screened** get the remaining 80
 
 A promoted checkpoint ends with exactly EVAL_EPISODES, so its number is comparable with arms
 measured flat. The 100% tier is excluded from confirmation slots — it already has the
-measurement a slot would buy. **That tier is coverage, not a shortlist of champions**; the
-larger 90% tier holds more of the actual best checkpoints, and finding them is stage 3's job.
+measurement a slot would buy. Since 2026-08-19 the full tier *is* the mandatory tier, so stage 2
+holds only the fill band (>=90% and <95%) and stage 3 ranks within it.
 
-Early abandonment (EVAL_MIN_ACHIEVABLE, default 95) stops a checkpoint once its ceiling — its
-rate if every remaining episode were perfect — falls below the gate. At 100 episodes and a 95%
-gate that is "stop once more than 5 have failed". The rule is arithmetic, not predictive, which
+Early abandonment (EVAL_MIN_ACHIEVABLE, default 97) stops a checkpoint once its ceiling — its
+rate if every remaining episode were perfect — falls below the gate. At 100 episodes and a 97%
+gate that is "stop once more than 3 have failed". The rule is arithmetic, not predictive, which
 is what makes it safe: a checkpoint that would reach the gate is never stopped, and an abandoned
 row's own rate is always below the gate, so it can never outrank a kept one.
 
@@ -81,7 +85,7 @@ Environment:
     EVAL_OUT_SUFFIX   appended to the output filename
     EVAL_SCREEN_EPISODES  screen depth before promotion (default 20; 0 turns screening off)
     EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 100)
-    EVAL_MIN_ACHIEVABLE   abandon once this rate is unreachable (default 95; 0 disables)
+    EVAL_MIN_ACHIEVABLE   abandon once this rate is unreachable (default 97; 0 disables)
     EVAL_ABANDON_FLOOR    never abandon before this many episodes (default 20, raised to
                       EVAL_SCREEN_EPISODES if larger)
     EVAL_RESUME       1 to skip checkpoints already measured at full length, or a
@@ -434,9 +438,11 @@ def held_from_row(row):
 def skips_screening(meta, threshold=None):
     """True when a checkpoint goes straight to a full-length measurement, no screen first.
 
-    Two cases qualify. A **graph point at `threshold`** (100% — ten perfect games out of ten) is
-    the strongest selector this project has, and measuring every one of them completely is a
-    coverage guarantee: the strongest tier is never represented by a 20-episode row. An
+    Two cases qualify. A **graph point at `threshold`** — `ALWAYS_FULL_SINGLE`, 95% since
+    2026-08-19, so 19/20 or 20/20 of a 20-episode graph eval — is the strongest selector this
+    project has, and measuring every one of them completely is a coverage guarantee: the strongest
+    tier is never represented by a 20-episode row. It used to be 100% only, which left several
+    hundred 19/20 checkpoints per continuation arm able to finish on a screen. An
     **explicitly named step** qualifies too, because naming one is a request to measure it — the
     docs already say explicit steps bypass the selection thresholds, and screening one to 20
     episodes and possibly leaving it there would quietly break that.
@@ -734,12 +740,16 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None, should_ab
     return scores, perfect_flags, rewards, elapsed, abandoned
 
 
-# Selection thresholds, in single-eval (10-episode) percentage points. A graph point is 10
-# episodes, so these are coarser than they look: the mandatory tier is {90, 100} and the fill
-# band is exactly {60, 70, 80}.
-ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, even past `count`
-MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
-DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
+# Selection thresholds, in single-eval percentage points. **A graph point is `training.
+# num_eval_episodes` episodes — 20 since 2026-08-19, 10 before it — so these are coarser than they
+# look and the granularity is load-bearing.** At 20 episodes the reportable values are multiples of
+# 5, so the mandatory tier is {95, 100} and the fill band is exactly {90}. At the old 10 they were
+# multiples of 10, which is why the thresholds used to be 90/60: a 95 tier would have collapsed to
+# {100} and been indistinguishable from ALWAYS_FULL_SINGLE. **If num_eval_episodes changes again,
+# re-derive these** rather than assuming the bands survive.
+ALWAYS_EVAL_SINGLE = 95.0   # every checkpoint at or above this is measured, even past `count`
+MIN_EVAL_SINGLE = 90.0      # below this, a checkpoint is not worth 100 episodes
+DEFAULT_COUNT = 50          # target total; the mandatory tier may exceed it
 
 # `above:N` with no N given. A HOF re-measure of the checkpoints a close-out already found
 # excellent; the desktop's auto-HOF passes `above:98` explicitly. This is a *measured* rate on
@@ -754,26 +764,43 @@ DEFAULT_SCREEN_EPISODES = 20
 # Abandon a checkpoint once it can no longer reach this perfect rate even if every remaining
 # episode is perfect. `EVAL_MIN_ACHIEVABLE=0` turns it off.
 #
-# 95 because that is the bar a checkpoint has to clear to be interesting at all; anything lower is
-# not a hall-of-fame candidate and does not need 100 episodes to be ruled out. At 100 episodes this
-# stops a run once more than 5 have failed, which is most of them.
+# 97 (raised from 95 on 2026-08-19) because that is the bar a checkpoint has to clear to be
+# interesting at all; anything lower is not a hall-of-fame candidate and does not need 100 episodes
+# to be ruled out. At 100 episodes this stops a run once more than 3 have failed, which is most of
+# them — and it must stay strictly BELOW the HOF selection gate of 98, since the HOF pass reads
+# `above:98` out of the close-out's own file and only rows reaching the close-out gate are measured
+# full length. Both the desktop runner and the laptop chain script assert that invariant.
 #
 # The cost is that **most arms will have no full-length row**, since few checkpoints clear 95%.
 # best_full_length_row handles that by relaxing to half-depth rows; pooled_equal_effort is
 # unaffected at any gate. Cross-batch best-checkpoint stays valid for the question that matters
-# here — "did this arm produce a >=95% checkpoint" — because any checkpoint at or above the gate is
+# here — "did this arm produce a >=97% checkpoint" — because any checkpoint at or above the gate is
 # measured full length under it.
-DEFAULT_MIN_ACHIEVABLE = 95.0
+DEFAULT_MIN_ACHIEVABLE = 97.0
 
 # Never abandon before this many episodes, so an abandoned row is always long enough to count in
 # equal_effort_pooled. Raised to the screen depth at startup — see make_abandon_test.
 DEFAULT_ABANDON_FLOOR = 20
 
 # Graph single-eval at or above which a checkpoint skips the screen and goes straight to full
-# length. 100% is ten perfect games out of ten, and the tier is uncapped — see skips_screening.
-# It is a coverage guarantee, not a champion shortlist: the larger 90% tier holds more of the
-# actual best checkpoints. Finding those is EVAL_CONFIRM_COUNT's job.
-ALWAYS_FULL_SINGLE = 100.0
+# length. **Equal to ALWAYS_EVAL_SINGLE since 2026-08-19, so the mandatory tier *is* the
+# full-length tier** — at 20 episodes that is 19/20 and 20/20. The collapse is deliberate.
+#
+# It looks like it should be expensive, since the tier is uncapped and full-length work is the
+# dominant cost of a close-out. It is not, and the reason is `DEFAULT_MIN_ACHIEVABLE`: a 19/20
+# checkpoint sent straight to full length is abandoned as soon as 97% becomes unreachable — after
+# 4 failures, often at the 20-episode floor — so a mediocre one costs about what a screen would
+# have cost, and one that survives deserved the full measurement anyway. Simulated on b43/b44's own
+# curves at 20-episode graph evals: moving this from 100 to 95 changed total close-out episodes by
+# **-1%**, every arm within ±3%. **That result depends on the gate.** At a loose gate (or
+# EVAL_MIN_ACHIEVABLE=0) this threshold becomes the whole bill again, so do not lower the gate and
+# leave this at 95.
+#
+# What it buys is coverage. Under the old 100 the tier below it was screened to 20 episodes and only
+# `EVAL_CONFIRM_COUNT` of them promoted, so on b43/b44 **427-575 checkpoints per arm** sat at 19/20
+# on the graph and could finish with a 20-episode row. Now every one of them gets a real
+# full-length attempt, bounded by the gate rather than by a quota.
+ALWAYS_FULL_SINGLE = 95.0
 
 # How many screened checkpoints get promoted to full length. 100 is the knee of the recall curve:
 # at 30 the arm's true best checkpoint made the cut only 57% of the time, at 100 it is 97%, for
@@ -786,7 +813,7 @@ CHART_MIN_INTERVAL = 2.0
 
 
 def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=10):
-    """Every checkpoint at >=90% single eval, then the best of >=60% up to `count` total.
+    """Every checkpoint at >=`ALWAYS_EVAL_SINGLE`, then the best of >=`MIN_EVAL_SINGLE` to `count`.
 
     1. Everything at `ALWAYS_EVAL_SINGLE` or better is measured, even past `count`.
     2. Remaining slots go to the highest single evals down to `MIN_EVAL_SINGLE`, ordered by
@@ -833,7 +860,7 @@ def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=1
     excluded = len(candidates) - len(mandatory) - len(fill_pool)
 
     for entry in mandatory:
-        entry['selected_by'] = 'threshold90'
+        entry['selected_by'] = 'threshold{0:g}'.format(ALWAYS_EVAL_SINGLE)
     fill = fill_pool[:max(0, count - len(mandatory))]
     for entry in fill:
         entry['selected_by'] = 'outlier'
@@ -846,10 +873,12 @@ def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=1
             '{2:.0f}% at step {3}), so there is nothing worth measuring for this arm'.format(
                 path, MIN_EVAL_SINGLE, best['single'], best['step']))
 
+    # The band is printed half-open (`>=lo, <hi`) rather than as `lo-(hi-10)`: the old form
+    # hardcoded a 10-episode graph point, and the granularity is now 20 episodes.
     print('selected {0} of {1} available checkpoints: {2} at >={3:.0f}% (all measured), '
-          '{4} filled from the {5:.0f}-{6:.0f}% band, {7} skipped below {5:.0f}%'.format(
+          '{4} filled from the >={5:.0f}% and <{6:.0f}% band, {7} skipped below {5:.0f}%'.format(
               len(chosen), len(candidates), len(mandatory), ALWAYS_EVAL_SINGLE,
-              len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE - 10, excluded))
+              len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE, excluded))
     if len(chosen) < count:
         print('    only {0} of {1} slots filled — everything else was below {2:.0f}%, '
               'which is not worth 100 episodes'.format(
@@ -858,8 +887,8 @@ def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=1
         print('    {0} checkpoints at >={1:.0f}% exceeds the {2}-slot target on purpose'.format(
             len(mandatory), ALWAYS_EVAL_SINGLE, count))
     if len(fill_pool) > len(fill):
-        print('    {0} more in the {1:.0f}-{2:.0f}% band were not measured (cap is {3})'.format(
-            len(fill_pool) - len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE - 10, count))
+        print('    {0} more in the >={1:.0f}% and <{2:.0f}% band were not measured (cap is {3})'.format(
+            len(fill_pool) - len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE, count))
     for entry in sorted(chosen, key=lambda c: c['step']):
         print('    {0:>8}  single eval {1:>5.1f}%   surrounding {2:>5.1f}%   {3}'.format(
             entry['step'], entry['single'], entry['smoothed'], entry['selected_by']))

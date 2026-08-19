@@ -60,12 +60,13 @@ HOF_EVAL_ENV = {
     'EVAL_OUT_SUFFIX': '_hof500',
 }
 
-# The closeout's own abandonment gate. It used to inherit the training env and fall to
-# eval_checkpoints' default of 95; pinned here so every closeout uses the same gate whatever
-# the arm trained under. Must stay BELOW HOF_THRESHOLD: HOF selects `above:98` from the
-# closeout file, and only rows that reach the gate are full length, so a gate above 98 would
-# abandon the very checkpoints HOF needs to read and starve the re-measure.
-CLOSEOUT_THRESHOLD = 96
+# The closeout's own abandonment gate, 97 since 2026-08-19 (was 96). Pinned here so every
+# closeout uses the same gate whatever the arm trained under. Must stay BELOW HOF_THRESHOLD:
+# HOF selects `above:98` from the closeout file, and only rows that reach the gate are full
+# length, so a gate at or above 98 would abandon the very checkpoints HOF needs to read and
+# starve the re-measure. 97 leaves exactly one point of headroom, so this assert matters more
+# than it did at 96 — do not raise either constant without re-reading the other.
+CLOSEOUT_THRESHOLD = 97
 assert CLOSEOUT_THRESHOLD < HOF_THRESHOLD, 'closeout gate must stay below the HOF selection gate'
 CLOSEOUT_EVAL_ENV = {'EVAL_MIN_ACHIEVABLE': str(CLOSEOUT_THRESHOLD)}
 
@@ -80,7 +81,7 @@ def wants_closeout(job_type, ok, auto_closeout_enabled):
 def wants_hof(job_id, job_type, ok, hof_enabled):
     """Whether a just-finished job should get an automatic HOF re-measure. Only a *successful
     closeout eval* qualifies, identified by the `<policy>-closeout` id the runner synthesizes --
-    so a manual top20 eval does not trigger one, and the HOF job's own `<policy>-hof` id never
+    so a manual top50 eval does not trigger one, and the HOF job's own `<policy>-hof` id never
     does (no HOF-of-a-HOF). A failed closeout has no trustworthy result file to select from."""
     return bool(hof_enabled) and ok and job_type == 'eval' and str(job_id).endswith('-closeout')
 
@@ -305,7 +306,7 @@ class Runner:
                 env['EVAL_RESUME'] = '1'           # a reboot cut the last attempt short: keep its
                                                    # full-length rows, redo only the partial one
             jobs.append(Job(id=eval_id, type='eval', policy=rec['policy'],
-                            env=env, eval_args=['top20'],
+                            env=env, eval_args=['top50'],
                             priority=AUTO_CLOSEOUT_PRIORITY))
         return jobs
 

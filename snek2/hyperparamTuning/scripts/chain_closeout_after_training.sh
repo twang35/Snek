@@ -36,7 +36,7 @@ cd "$(dirname "$0")/../.." || exit 1   # scripts/ -> hyperparamTuning/ -> snek2/
 PREFIX=${1:?usage: chain_closeout_after_training.sh <batch-prefix> [poll-seconds]}
 POLL=${2:-120}
 WORKERS=${EVAL_WORKERS:-4}
-COUNT=${CLOSEOUT_TOP:-top20}
+COUNT=${CLOSEOUT_TOP:-top50}
 LOGDIR=${CLOSEOUT_LOGDIR:-/tmp}
 PY=${SNEK_PYTHON:-/opt/miniconda3/envs/snek/bin/python}
 
@@ -45,7 +45,7 @@ PY=${SNEK_PYTHON:-/opt/miniconda3/envs/snek/bin/python}
 # `eval_checkpoints` defaults to 95, so a laptop close-out and a desktop close-out of the same batch
 # were being written under *different* gates — and CLAUDE.md is explicit that a file's gate lives in
 # its payload as `min_achievable` and must be checked before anything is pooled across files.
-CLOSEOUT_GATE=${CLOSEOUT_GATE:-96}
+CLOSEOUT_GATE=${CLOSEOUT_GATE:-97}
 HOF_GATE=${HOF_GATE:-98}
 CHAIN_HOF=${CHAIN_HOF:-1}
 

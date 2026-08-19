@@ -9,7 +9,7 @@ files beside the tuning docs and they crowded out the files a session actually h
 | `refresh_charts.sh` | — | re-copies every `runs/*.png` into `../charts/` and prints the step each arm reached, so `charts.md` captions can be written to match. **Copies images only — it never edits `charts.md`** | reusable tool |
 | `seed_from_checkpoint.sh` | `<src-policy> <step> <dst-policy> [savedPolicies-root]` | builds a **fresh** policy dir that resumes from **one chosen checkpoint** of an existing arm — `arch.json`, that one `ckpt-*` pair, a copy of the source's `replay_buffer/`, and a `checkpoint` state file naming only that step. Refuses to clobber an existing dir, and refuses if the step or `arch.json` is missing | reusable tool |
 | `chain_after_evals.sh` | `<launcher-script> [poll-seconds]` | polls until every `eval_checkpoints.py` has drained, then `exec`s a launcher — queues a *wave* behind a close-out with nobody on the terminal | reusable tool |
-| `chain_closeout_after_training.sh` | `<batch-prefix> [poll-seconds]` | the mirror: polls until that batch's trainers drain (they self-terminate at `SNEK_MAX_STEPS`), then runs the close-out as one `eval_checkpoints.py` per arm at `EVAL_WORKERS=4`, **then the HOF-500 re-measure on any arm with a ≥98% close-out checkpoint**. The whole `training → closeout → HOF` chain, unattended | reusable tool |
+| `chain_closeout_after_training.sh` | `<batch-prefix> [poll-seconds]` | the mirror: polls until that batch's trainers drain (they self-terminate at `SNEK_MAX_STEPS`), then runs the close-out as one `eval_checkpoints.py` per arm at `EVAL_WORKERS=4`, **then the HOF-500 re-measure on any arm with a ≥98% close-out checkpoint**. The whole `training → closeout → HOF` chain, unattended. Selector `top50` and close-out gate `97` since 2026-08-19, matching the desktop | reusable tool |
 | `launch_c51_wave.sh` | `<prefix> <lr>:<seed> [...]` | the generic C51 launcher — one arm per `<lr>:<seed>` on b25's config plus the c51 knobs, 600k cap, `SNEK_CHART_VIEWER=0` plus one hand-started viewer for the wave | reusable tool |
 | `launch_b43_lowlr.sh` | — | batch 43: continues the four best b29/b40 checkpoints to 3M with `SNEK_LEARNING_RATE=1e-6` the only change from b29's config. Expects the policy dirs pre-seeded by `seed_from_checkpoint.sh`; the desktop's control is `b42` on the `ops` queue | record — do not edit |
 | `launch_c51_batch.sh` | `[batch-prefix]` (default `b31`) | the pilot→batch handoff, run unattended: waits out the pilot, waits for a free trainer slot, calls `pick_c51_lr.py` to choose the rate, launches 4 seeds at 2M, then regenerates and **commits** the pilot's doc regions | record of b31's launch |
@@ -72,9 +72,9 @@ added on 2026-08-18 copies `desktop/runner/runner.py`'s `HOF_EVAL_ENV` and `HOF_
 selecting `above:98`. **If the daemon's recipe changes, change this too**; there is no shared
 definition, and a silent divergence would make the two hosts' `_hof500` files non-comparable.
 
-**It also pins the close-out gate at 96**, which it did not before. The script inherited
-`eval_checkpoints`' default of 95 while the desktop pinned 96, so the two hosts wrote close-outs under
-different gates — and a file's gate lives in its payload as `min_achievable`, which CLAUDE.md requires
+**It also pins the close-out gate at 97** (96 until 2026-08-19), which it did not pin at all before.
+The script inherited `eval_checkpoints`' default of 95 while the desktop pinned 96, so the two hosts
+wrote close-outs under different gates — and a file's gate lives in its payload as `min_achievable`, which CLAUDE.md requires
 checking before anything is pooled across files. `CLOSEOUT_GATE` and `HOF_GATE` override, and the
 script **refuses to start** if the close-out gate is not strictly below the HOF gate: HOF selects from
 the close-out's own file, only rows reaching the close-out gate are measured full length, so a gate at

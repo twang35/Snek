@@ -11,7 +11,20 @@ import pyformulas as pf
 
 trailing_avg_window = 5
 log_interval = 200
-num_eval_episodes = 10
+# 20, raised from 10 on 2026-08-19. This is the graph eval, and its episode count sets the
+# *granularity* of every downstream selection threshold: a 10-episode eval can only report
+# multiples of 10, so `eval_checkpoints.ALWAYS_FULL_SINGLE = 100` meant "10 perfect games out of
+# 10" and admitted ~66% of a champion arm's checkpoints to the uncapped full-length tier, which is
+# what made a continuation close-out cost ~15 h. At 20 episodes the same 100% means 20/20 and
+# admits ~44%, and a 95% tier becomes expressible at all ({95, 100} rather than collapsing to
+# {100}). Measured on b43/b44's own curves: close-out episodes -25%, against +15,500 self-eval
+# episodes per arm here — roughly a 2:1 trade in the close-out's favour.
+#
+# Two consequences to remember. `perfect_percent` feeds `epsilon_for`'s refinement phase, so this
+# changes the exploration schedule as well as the report; and `best_perfect30` / `sef` are computed
+# from these evals, so **an arm measured at 20 episodes is not strictly comparable with the
+# batches 1-44 measured at 10** — the estimator is less noisy, which moves the tails most.
+num_eval_episodes = 20
 eval_interval = 1000
 display_progress_interval = eval_interval
 buffer_save_interval = 10 * eval_interval

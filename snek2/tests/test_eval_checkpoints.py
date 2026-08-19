@@ -683,25 +683,32 @@ def test_the_gate_scales_with_a_shorter_target():
     assert test(13, 20) is True
 
 
-def test_the_default_gate_is_95_and_stops_a_100_episode_run_after_6_failures():
+def test_the_default_gate_is_97_and_stops_a_100_episode_run_after_4_failures():
     # The gate is the bar a checkpoint has to clear to be worth keeping at all. Pinned as
     # arithmetic rather than as a bare constant, because what matters downstream is where the rule
     # fires, not the number itself.
-    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 95.0
+    #
+    # Raised 95 -> 97 on 2026-08-19, with the selection tiers and the 20-episode graph eval. The
+    # old form of this test read "after 6 failures"; at 97 it is 4, which is the point of the
+    # change — a tighter gate abandons sooner and is most of the close-out saving on arms whose
+    # checkpoints sit just under the bar.
+    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 97.0
     test = eval_checkpoints.make_abandon_test(eval_checkpoints.DEFAULT_MIN_ACHIEVABLE, 100,
-                                              eval_checkpoints.DEFAULT_ABANDON_FLOOR)
-    # 5 failures still allow exactly 95%, so the run continues; the 6th makes 95% unreachable.
-    assert eval_checkpoints.achievable_percent(45, 50, 100) == 95.0
-    assert test(45, 50) is False
-    assert test(44, 50) is True
-    # A 90% gate tolerates 10 failures and would keep both of those going, so a revert to any
-    # looser gate cannot pass silently.
-    for looser in (90.0, 85.0):
-        assert eval_checkpoints.make_abandon_test(looser, 100, 20)(44, 50) is False
+                                             eval_checkpoints.DEFAULT_ABANDON_FLOOR)
+    # 3 failures still allow exactly 97%, so the run continues; the 4th makes 97% unreachable.
+    assert eval_checkpoints.achievable_percent(47, 50, 100) == 97.0
+    assert test(47, 50) is False
+    assert test(46, 50) is True
+    # Every looser gate tolerates more failures and would keep that going, so a revert to any of
+    # them cannot pass silently. 95 is included because that is the value this replaced.
+    for looser in (95.0, 90.0, 85.0):
+        assert eval_checkpoints.make_abandon_test(looser, 100, 20)(46, 50) is False
+    # And the gate must stay strictly below the HOF selection gate, or the re-measure starves.
+    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE < eval_checkpoints.DEFAULT_ABOVE_THRESHOLD
 
-    # The floor still binds first: 95% of 100 is unreachable after 6 failures, which can happen
+    # The floor still binds first: 97% of 100 is unreachable after 4 failures, which can happen
     # inside the first 20 episodes, so the floor is what keeps a row long enough for
-    # equal_effort_pooled. This is the gate at which the floor stops being slack.
+    # equal_effort_pooled. The tighter gate makes the floor bind more often, not less.
     assert test(4, 10) is False, 'the floor must suppress a check below 20 episodes'
     assert test(4, 20) is True
 

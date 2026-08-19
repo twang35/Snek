@@ -103,16 +103,16 @@ does, reload its checkpoint and evaluate it over hundreds of episodes:
 
 ```
 cd snek2
-EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
-  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top20
+EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top50 \
+  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top50
 ```
 
 **Screening is on by default** and is **3.6x cheaper than measuring every selected checkpoint at
 100 episodes, for the same answer** — see "Screening" below. `EVAL_SCREEN_EPISODES=0` gets the flat
 one-pass protocol every arm before batch 10 was measured under.
 
-**Early abandonment is on by default at `EVAL_MIN_ACHIEVABLE=95`**: a checkpoint stops being measured
-the moment it cannot reach the gate even if every remaining episode is perfect. It cannot change any
+**Early abandonment is on by default at `EVAL_MIN_ACHIEVABLE=97`** (95 before 2026-08-19): a checkpoint
+stops being measured the moment it cannot reach the gate even if every remaining episode is perfect. It cannot change any
 ranking among rows that reach the gate — the test is arithmetic, so a checkpoint that would have
 reached it is never stopped, and an abandoned row's own rate is always below it.
 `pooled_equal_effort` truncates to the screen depth, so it is exact at any gate.
@@ -124,7 +124,12 @@ Simulated on batch 13's 505 full-length rows, full-length work as a share of a f
 |---|---|---|
 | 85 | 71% | 16 failures |
 | 90 | 52% | 11 failures |
-| **95** | **31%** | **6 failures** |
+| 95 | 31% | 6 failures |
+| **97** (default since 2026-08-19) | **not simulated** | **4 failures** |
+
+**The 97 row is deliberately blank.** The percentages above come from replaying batch 13's 505
+full-length rows; nobody has replayed them at 97, so quoting a number here would be inventing one. It
+is necessarily below 31%, and the saving still tracks arm quality inversely — see the ‡ note below.
 
 **‡ Those are batch 13's distribution and they over-predict the saving on a strong arm.** The realised
 total saving under the 90% gate was **34.8% of planned episodes on batch 14 and 28.1% on batch 15**,
@@ -249,20 +254,27 @@ project record. A weak arm produces none. So the extra measurements land on the 
 hiding something, and the stage plan is raised when they appear (an over-quota confirm cannot be
 predicted before the screens run, so a plan printed at launch reads slightly low).
 
-`top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
-10-episode eval** from the graph, using the surrounding perfect rate to order within an
-equal-eval tier, and applies two thresholds:
+`top50` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single graph
+eval**, using the surrounding perfect rate to order within an equal-eval tier, and applies two
+thresholds:
 
 | rule | threshold | effect |
 |---|---|---|
-| always measure | single eval **>=90%** | every such checkpoint runs, even past N |
-| fill remaining slots | **>=60%**, best first | at 10-episode granularity this is {60, 70, 80} |
-| never measure | below **60%** | skipped entirely, however few slots are filled |
+| always measure | single eval **>=95%** | every such checkpoint runs, even past N |
+| fill remaining slots | **>=90%**, best first | at 20-episode granularity this is exactly {90} |
+| never measure | below **90%** | skipped entirely, however few slots are filled |
 
-**N is a target, not a quota.** A graph point is 10 episodes, so `perfect_percent` only takes
-values 0, 10, … 100 — which makes those thresholds coarser than they look. `>=90%` is the set
-{90, 100} and the fill band is exactly {60, 70, 80}. `b8f-disc9975seed2` has 32 checkpoints at
->=90% and runs all 32; `b8e-clipseed2` has one point above the floor in 1165 evals and runs one.
+**N is a target, not a quota**, and the *granularity is load-bearing.* A graph point is
+`training.num_eval_episodes` episodes — **20 since 2026-08-19**, 10 before — so `perfect_percent`
+only takes values on a grid of `100/n`, which makes these thresholds coarser than they look. At 20
+the mandatory tier `>=95%` is the set {95, 100} and the fill band is exactly {90}. **At the old 10
+the thresholds had to be 90/60**, because `>=95%` would have collapsed to {100} and merged the
+mandatory tier into the uncapped full-length tier — which is why the two changes shipped together
+and why `tests/test_selection_tiers.py` fails if either moves alone.
+
+`b8f-disc9975seed2` has 32 checkpoints in the old `>=90%` tier and runs all 32; `b8e-clipseed2` has
+one point above the floor in 1165 evals and runs one. A *continuation* arm is the opposite extreme —
+`b43`'s arms selected 791-1196 each, because a champion never drops below the mandatory threshold.
 
 Explicit steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is
 the question, and they bypass both thresholds.
@@ -271,16 +283,29 @@ the question, and they bypass both thresholds.
 
 Three stages instead of one:
 
-1. every checkpoint whose **graph point is 100%** (ten perfect games out of ten) gets the full
-   **100 episodes** immediately. Uncapped, and large on a strong arm — 47/142/7/146 across batch
-   10's four arms. Explicitly named steps join this tier, since naming one is a request to measure it.
-2. everything else selected gets **20 episodes**
+1. every checkpoint whose **graph point is >=95%** (`ALWAYS_FULL_SINGLE`; at 20-episode graph evals
+   that is **19/20 or 20/20**) gets the full **100 episodes** immediately. Uncapped, and large on a
+   strong arm — 47/142/7/146 across batch 10's four arms *under the old 100% threshold*, and
+   790-1400 per arm on a continuation batch. Explicitly named steps join this tier, since naming one
+   is a request to measure it.
+2. everything else selected gets **20 episodes** — since 2026-08-19 that is only the fill band
+   (>=90% and <95%), because stage 1's threshold now equals the mandatory tier's
 3. the best **100** (`EVAL_CONFIRM_COUNT`) **of those screened** get **80 more**, reaching 100
 
 A promoted checkpoint ends with exactly 100 episodes — the screen counts toward the total — so its
 number is directly comparable with every arm measured under the flat protocol. Checkpoints that
 miss the cut keep their 20-episode row, whose much wider Wilson interval says how little it is worth.
-Confirmation slots exclude the 100% tier, which already has the measurement a slot would buy.
+Confirmation slots exclude stage 1's tier, which already has the measurement a slot would buy.
+
+**‡ Stage 1's threshold was 100% until 2026-08-19, and lowering it to 95% is almost free *because of
+the gate*.** An uncapped tier that admits every 19/20 checkpoint sounds ruinous; simulated on b43/b44's
+own curves it changed total close-out episodes by **-1%**, every arm within ±3%, because
+`EVAL_MIN_ACHIEVABLE=97` abandons such a checkpoint after 4 failures — often at the 20-episode floor,
+for what the screen would have cost. **The saving is conditional on the gate staying stricter than the
+tier**, so the two move together or not at all. What it buys is coverage: 427-575 checkpoints per arm
+previously sat at 19/20, were screened, and were capped by `EVAL_CONFIRM_COUNT`, so an arm's best
+checkpoint could end on a 20-episode row — which is exactly the failure the batch-10 evidence below
+warned about.
 
 **Cost on a batch-10-shaped arm**, against measuring all 660 selected checkpoints at 100:
 

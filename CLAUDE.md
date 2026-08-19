@@ -399,7 +399,7 @@ Still measure with `free -m` before pushing `max_evals`/`eval_workers` past thos
 copy before any tuning tool can see it. The exact commands are in
 [`snek2/desktop/README.md`](snek2/desktop/README.md#getting-a-finished-job-into-the-analysis-workflow).
 
-**The desktop chains two evals off every training: `training → closeout (top20) → HOF re-measure`.**
+**The desktop chains two evals off every training: `training → closeout (top50) → HOF re-measure`.**
 When a closeout finishes, `auto_hof` (default on) queues a `<policy>-hof` job that re-runs the
 closeout's **≥98%** checkpoints at **500 episodes, flat, `EVAL_MIN_ACHIEVABLE=98`**, writing
 `_hof500`. It only produces the re-measurement — **promotion into `hallOfFame/` is still the manual,
@@ -520,7 +520,7 @@ for name in mods:
 print(len(mods), 'modules,', total, 'tests,', fails, 'failed')"
 ```
 
-As of 2026-08-14 that reads **23 modules, 596 tests, 0 failed**. A module count below 23 means the glob
+As of 2026-08-19 that reads **29 modules, 698 tests, 0 failed**. A module count below 29 means the glob
 did not run from `snek2/`.
 
 **A passing suite is not coverage of the change you just made.** `group_obs` took a third signature
@@ -795,42 +795,85 @@ selected gets 20, and the best `EVAL_CONFIRM_COUNT` *of those screened* get 80 m
 episodes on a large arm — but the saving collapses to 1.0x when the screened pool is smaller than
 the confirm count, which happened on `b11c`.
 
-**`top20` is not a budget — "N is a target, not a quota", and a *good* arm blows through it.**
-`select_top_checkpoints` measures **every checkpoint whose 10-episode graph eval reached ≥90%**, past N;
-only the fill band down to 60% is limited by the count. A normal arm climbs from 0, so few checkpoints
-qualify and `top20` really does measure ~20-40. **An arm continued from an already-excellent checkpoint
-spends its entire run above the mandatory threshold**, so nearly every checkpoint qualifies: `b43`'s four
-continuation arms selected **791, 1196, 803 and 826** checkpoints, and that close-out ran **~15 hours**.
-`b42` is the contrast from the other side — the same selector, but it *decayed*, so only 261-373 qualified
-and it finished overnight.
+**`top50` is not a budget — "N is a target, not a quota", and a *good* arm blows through it.**
+`select_top_checkpoints` measures **every checkpoint whose graph eval reached `ALWAYS_EVAL_SINGLE`**, past
+N; only the fill band down to `MIN_EVAL_SINGLE` is limited by the count. A normal arm climbs from 0, so few
+checkpoints qualify and `top50` really does measure a few dozen. **An arm continued from an
+already-excellent checkpoint spends its entire run above the mandatory threshold**, so nearly every
+checkpoint qualifies: `b43`'s four continuation arms selected **791, 1196, 803 and 826** checkpoints, and
+that close-out ran **~15 hours**. `b42` is the contrast from the other side — the same selector, but it
+*decayed*, so only 261-373 qualified and it finished overnight.
 
-So **budget a continuation batch's close-out at 8-15 h per wave, and never read one still running after
-7 hours as hung.** The lever if it needs to be cheaper is the **selector, not the worker count** —
+**The dominant cost is the uncapped full-length tier, not the selection count.** A checkpoint at
+`ALWAYS_FULL_SINGLE` skips the screen and takes the whole `EVAL_EPISODES`; on `b43`/`b44` that tier was
+**791-1300 checkpoints per arm**, i.e. essentially the entire bill. Raising `num_eval_episodes` to 20 is
+what cut it: the threshold is a *rate*, so 95% now means 19 or 20 perfect games out of 20 rather than
+collapsing onto 10 of 10.
+
+**‡ `ALWAYS_FULL_SINGLE` is 95, equal to `ALWAYS_EVAL_SINGLE` — the mandatory tier *is* the full-length
+tier, and that is affordable only because of the gate.** The obvious fear is that an uncapped
+full-length tier admitting every 19/20 checkpoint would multiply the bill. It does not: simulated on
+b43/b44's own curves at 20-episode graph evals, moving this threshold from 100 to 95 changed total
+close-out episodes by **-1%**, every arm within ±3%. The reason is `EVAL_MIN_ACHIEVABLE=97` — a 19/20
+checkpoint whose true rate is under the gate is abandoned after 4 failures, often at the 20-episode
+floor, so it costs about what a screen would have; one that survives deserved the measurement. **The
+result is conditional on the gate being stricter than the tier**, so never loosen the gate and leave
+this at 95. `tests/test_selection_tiers.py` fails if that ordering breaks.
+
+What it buys is coverage: under the old 100 threshold, **427-575 checkpoints per arm** sat at 19/20 on
+the graph, were screened to 20 episodes, and were capped by `EVAL_CONFIRM_COUNT` — so an arm's best
+checkpoint could finish on a 20-episode row. Now every one gets a full-length attempt bounded by the
+gate rather than by a quota.
+
+Measured on `b43`/`b44`'s own curves, the retune (20-episode graph, tiers 95/90, `top50`, gate 97) cuts
+close-out episodes by **~25%**, against **+15,500 self-eval episodes per arm** on the training side —
+roughly a 2:1 trade in the close-out's favour, and the training half is *not* negligible.
+
+So **still budget a continuation batch's close-out in hours, not minutes, and never read one still running
+after 7 hours as hung.** The remaining lever is the **selector, not the worker count** —
 `above:<threshold>` reads a prior close-out's 100-episode measurements instead of the noisy graph, which
 is what the HOF pass already does. Raising `EVAL_WORKERS` does not help much here, because the cost is
 checkpoint *count* times per-checkpoint restore, not episodes per checkpoint.
 
-**`EVAL_MIN_ACHIEVABLE=95` abandons a checkpoint mid-measurement** once it cannot reach 95% even if
-every remaining episode is perfect — at 100 episodes, once more than 5 have failed. Full-length work
-drops to **31%** of a flat pass (52% at a 90% gate, 71% at 85%), and **no ranking among rows that
-reach the gate can change**, because the test is arithmetic rather than predictive. Abandoned rows
-carry `abandoned: true`, are shorter, and are **not comparable with full-length rows**.
+**`EVAL_MIN_ACHIEVABLE=97` abandons a checkpoint mid-measurement** once it cannot reach 97% even if
+every remaining episode is perfect — at 100 episodes, once more than 3 have failed (it was 95, and "more
+than 5", until 2026-08-19). Full-length work drops further than the **31%** of a flat pass measured at the
+95 gate (52% at 90, 71% at 85); the 97 figure has not been measured yet, so do not quote one. **No ranking
+among rows that reach the gate can change**, because the test is arithmetic rather than predictive.
+Abandoned rows carry `abandoned: true`, are shorter, and are **not comparable with full-length rows**.
 `pooled_equal_effort` is exact at any gate. `EVAL_MIN_ACHIEVABLE=0` turns it off.
 
-**At 95 most arms will have no full-length row**, since few checkpoints clear 95%.
+**97 leaves exactly one point of headroom under the HOF selection gate of 98**, and that invariant is
+load-bearing: HOF reads `above:98` out of the close-out's own file, and only rows reaching the close-out
+gate are measured full length, so a close-out gate at or above 98 would abandon precisely the rows the
+re-measure needs and starve it silently. `runner.py` asserts it, the laptop chain script refuses to start
+without it, and `tests/test_selection_tiers.py` pins it. **Do not raise either number without re-reading
+the other.**
+
+**At 97 most arms will have no full-length row**, since few checkpoints clear 97%.
 `best_full_length_row` then relaxes to **half-depth** rows and prints `[truncated]`. It must never
 relax to *all* rows — that hands the title to a 20-episode screen on a lucky 20/20.
 
 **A file's gate is in its payload as `min_achievable`; check it before pooling anything.** Batches 11
-and 13 have no gate, batch 14 has 90, batch 15 onward 95. Cross-batch best-checkpoint stays valid for
-"did this arm produce a ≥95% checkpoint", since anything at or above a gate is measured full length
-under it — but the graph-100% tier is censored by any gate and must not be compared across them.
+and 13 have no gate, batch 14 has 90, batches 15-44 have 95 (96 where the desktop or the chain script
+pinned it), and **batch 45 onward has 97**. Cross-batch best-checkpoint stays valid for "did this arm
+produce a ≥`gate`% checkpoint", since anything at or above a gate is measured full length under it — but
+the graph-100% tier is censored by any gate and must not be compared across them.
+
+**‡ 2026-08-19 is also a *graph* boundary, not only a gate one, and it biases one metric.**
+`training.num_eval_episodes` went 10 → 20, so batches 1-44 report `perfect_percent` in multiples of 10 and
+batch 45 onward in multiples of 5. **Banded mean perfect rate stays comparable** — a 20-episode estimate of
+the same true rate has the same expectation. **`best_perfect30` and `max_single_eval` do not**: they are
+maxima over a noisy statistic, and halving the noise lowers them systematically, so a 20-episode arm looks
+slightly *worse* on those than a 10-episode arm of identical quality. Compare those two metrics only within
+an era, and prefer banded means or the close-out across the boundary.
 
 Two consequences for reading the output file: rows have **different episode counts**, so pooling
 them over-weights the winners and reads high — use the equal-effort figure the run prints, or the
 graph-100% tier if the run predates that field — and best-checkpoint must come from full-length rows
 only, which `eval_progress.best_of()` enforces.
 
-**The 100% tier is a coverage guarantee, not a shortlist of champions.** 6 of the 8 arms measured
-across batches 10-11 found their best checkpoint in the graph-90% tier, which is ~4x larger.
-Finding the best checkpoint is `EVAL_CONFIRM_COUNT`'s job.
+**The full-length tier is a coverage guarantee, not a shortlist of champions.** 6 of the 8 arms
+measured across batches 10-11 found their best checkpoint *below* the graph-100% tier — which is
+exactly why `ALWAYS_FULL_SINGLE` came down to 95, so those checkpoints are measured properly instead of
+competing for `EVAL_CONFIRM_COUNT` slots. Below 95 that job is still the confirm count's.
