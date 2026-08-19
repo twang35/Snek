@@ -183,7 +183,10 @@ def best_of(rows):
 
 
 STAGE_LABELS = {
-    'full': 'measuring every 100% graph point at full length',
+    # Shortened from 'measuring every 100% graph point at full length' when the text went to 10pt:
+    # at 65 characters that line alone ran into the right column, and it is the widest line either
+    # column produces.
+    'full': 'every 100% graph point, full length',
     'screen': 'screening the rest',
     'confirm': 'confirming the best of the screened',
     'done': 'complete',
@@ -618,7 +621,9 @@ def progress_lines(policy_name, state):
     """Name, the progress bar and the stage block -- where the run is, not what it found."""
     lines = []
     done, requested = state['done'], state['requested']
-    bar_width = 28
+    # 20, not 28: the bar is decoration and the line it sits on is the widest in the left column, so
+    # those characters were worth more as column clearance at 10pt.
+    bar_width = 20
     filled = int(bar_width * state['percent_done'] / 100.0)
     lines.append('{0}'.format(policy_name))
     lines.append('  [{0}{1}] {2}/{3} {4}  ({5:.0f}%)'.format(
@@ -633,8 +638,12 @@ def ranking_lines(state):
     """The headline number and the top 5: which checkpoints this arm produced."""
     lines = []
     if state['completed']:
+        # 'ep', not 'episodes': with an eight-digit step and a six-digit episode total this is the
+        # widest line the left column can produce, and at 10pt the long form ran into the right
+        # column. `tests/test_eval_progress.py::test_the_left_column_keeps_clear_of_the_right_one`
+        # measures it on exactly that worst case.
         pooled_note = (' (equal effort)' if state.get('pooled_is_equal_effort')
-                       else ' over {0} episodes'.format(state['episodes']))
+                       else ' over {0} ep'.format(state['episodes']))
         lines.append('  best {0:.1f}% @{1}   pooled {2:.1f}%{3}'.format(
             state['best']['perfect_percent'], state['best']['step'],
             state['pooled'], pooled_note))
@@ -759,6 +768,19 @@ def draw_threshold(axis, state):
 # 5 pp of difference was 5% of the axis. 50 doubles the resolution of the half that is used.
 PERFECT_AXIS_FLOOR = 50.0
 
+# Point size of the two text columns, raised from 8.5 on 2026-08-19 (chart titles are 10pt, so this
+# now matches them). **It is bounded by width, not by height**: the columns are monospace blocks at
+# fixed x, so the widest line in the left column has to stay clear of where the right one starts, and
+# a font bump is a proportional widening of every line. Raising it needed the stage label and the
+# progress bar shortened to fit; `tests/test_eval_progress.py` measures the rendered extents and
+# fails if the columns would touch, which is the only reliable check -- character-width arithmetic on
+# a font metric is a guess.
+SUMMARY_FONTSIZE = 10.0
+# Where the right column starts, in axes fraction. The left column gets everything before it, and
+# the measured clearance at 10pt is ~4 characters on the left and ~2 on the right -- enough for a
+# step number that grows to eight digits, not enough to absorb a new line wider than the ones there.
+RIGHT_COLUMN_X = 0.52
+
 
 def note_clipped(axis, values, unit):
     """Writes how many points fall below the axis floor, in the panel, if any do.
@@ -791,24 +813,22 @@ def render(policy_name, state, out_path):
     # beats live content in a moving one.
     #
     # Sizes as of 2026-08-19, in inches of drawn panel: the two charts gave up 20% of their height
-    # (2.10 -> ~1.68 each) and the text panel gained a fifth (2.00 -> ~2.39). The figure came down
-    # from 9.0in to 8.05 and hspace from 0.42 to 0.35 to absorb the difference, because **the figure
-    # shrank on account of the text getting shorter, not despite it** -- two columns roughly halve
-    # the line count, so a panel sized for the old single column left a visible empty strip under
-    # the last line, which is worse than the whitespace the columns were meant to fill.
+    # (2.10 -> ~1.68 each) and the text panel gained 37% (2.00 -> ~2.75), with hspace down from 0.42
+    # to 0.35. The figure is 8.56in rather than 9.0, so it is still shorter than it was even after
+    # the text panel took two rises -- the first because two columns roughly halve the line count,
+    # the second when the text went from 8.5pt to 10pt.
     #
-    # ~2.39in is ~17 monospace lines at 8.5pt. That is the capacity to keep: the left column runs to
-    # 13 (name, bar, a four-line stage block, best, pace, and a top-5 with its header) and the right
-    # to 12 plus one line per stale process, so a four-process run with every process dead is the
-    # worst case and it still fits.
+    # ~2.75in is ~16 monospace lines at 10pt, plus the 0.39in bottom margin under it. That is the
+    # capacity to keep: the left column runs to 13 (name, bar, a four-line stage block, best, pace,
+    # and a top-5 with its header) and the right to 12 plus one line per stale process.
     #
-    # None of this touches the constant-size property above: every frame is 9.5x8.05in whatever the
+    # None of this touches the constant-size property above: every frame is 9.5x8.56in whatever the
     # state. matplotlib takes hspace as a fraction of the *mean* panel height, so the panel inches
     # here are figure_height * (1 - top_margin - bottom_margin) / (1 + 2 * hspace / 3), split by the
     # ratios -- change one of the four numbers and the others move.
     has_flight = any((flight.get('per_round_perfect') or []) for _, flight in state['active'])
-    grid = gridspec.GridSpec(3, 1, height_ratios=[1.68, 1.68, 2.40], hspace=0.35)
-    figure = plt.figure(figsize=(9.5, 8.05))
+    grid = gridspec.GridSpec(3, 1, height_ratios=[1.68, 1.68, 2.75], hspace=0.35)
+    figure = plt.figure(figsize=(9.5, 8.56))
     next_row = 0
 
     # --- 1. in-flight convergence: running perfect rate vs round -------------------------
@@ -977,9 +997,9 @@ def render(policy_name, state, out_path):
     # aligned if nothing before it on the line can change width, and the left column's step numbers
     # and percentages do change width between frames. Separate artists at fixed x cannot drift.
     left_text, right_text = summary_columns(policy_name, state)
-    bottom.text(0.0, 1.0, left_text, fontsize=8.5, family='monospace',
+    bottom.text(0.0, 1.0, left_text, fontsize=SUMMARY_FONTSIZE, family='monospace',
                 va='top', ha='left', transform=bottom.transAxes)
-    bottom.text(0.52, 1.0, right_text, fontsize=8.5, family='monospace',
+    bottom.text(RIGHT_COLUMN_X, 1.0, right_text, fontsize=SUMMARY_FONTSIZE, family='monospace',
                 va='top', ha='left', transform=bottom.transAxes)
 
     figure.suptitle('{0} — eval progress {1}'.format(
@@ -988,7 +1008,7 @@ def render(policy_name, state, out_path):
     # ‡ No bbox_inches='tight' here, deliberately. Tight crops to the drawn content, so the PNG's
     # pixel dimensions changed whenever a label, legend or the text block changed width — and the
     # live window sizes itself from the image, so it kept resizing even at a fixed figsize. Fixed
-    # margins instead: every frame is exactly 9.5x8.05in, so the window holds still and each panel
+    # margins instead: every frame is exactly 9.5x8.56in, so the window holds still and each panel
     # stays where it was in the previous frame.
     # top=0.925 (was 0.945) leaves room between the suptitle and the top panel's own title — at
     # 0.945 the "In flight: ..." title crowded right up against the "— eval progress" suptitle.
@@ -1000,6 +1020,12 @@ def render(policy_name, state, out_path):
     # window size (chart_viewer's window is fixed by figure_dims, not by the source px). The dpi is
     # still one constant per process, so a standalone window is the same size on every frame — only
     # larger. The 1x desktop display keeps the 110 default (smaller PNGs, no memory cost).
+    # The text panel has no y axis, so the 0.07 left margin the two charts need is 0.66in of dead
+    # width it can spend on the columns instead. Set *after* subplots_adjust, which would otherwise
+    # overwrite it, and to constants rather than anything state-dependent so the block stays put.
+    text_box = bottom.get_position()
+    bottom.set_position([0.02, text_box.y0, 0.985 - 0.02, text_box.height])
+
     dpi = int(os.environ.get('SNEK_EVAL_CHART_DPI', '110'))
     figure.savefig(partial, dpi=dpi)
     plt.close(figure)
@@ -1015,7 +1041,7 @@ def live_frame(policy_name, out_path=None, include_all=False, suffixes=None):
     Reads the PNG back instead of pulling the figure canvas, so the window and the saved chart are
     guaranteed to be the same image.
 
-    render() writes a **fixed-size** frame — three panels at 9.5x8.05in and 110dpi with explicit
+    render() writes a **fixed-size** frame — three panels at 9.5x8.56in and 110dpi with explicit
     margins, no bbox_inches='tight' — so every frame has identical pixel dimensions and the window
     does not resize between refreshes. That matters more than the trimmed whitespace tight used to
     save: the panel count used to drop from three to two between checkpoints, and the window jumped

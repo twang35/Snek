@@ -1054,3 +1054,97 @@ def test_the_two_charts_are_a_fifth_shorter_than_the_text_panel_is_tall():
     assert abs(heights[0] - 0.8 * 2.10) < 0.03, heights
     # ...and the text panel is the one that grew, not the figure.
     assert heights[2] > 1.15 * 2.00, heights
+
+
+# ------------------------------------- the text columns must not collide (2026-08-19)
+
+def render_text_extents(state, policy='b43a-lowlr-b29b'):
+    """(left bbox, right bbox, bottom-panel height in inches), bboxes in axes fraction.
+
+    Measured off the real renderer rather than computed from character counts: the columns are
+    positioned in axes fraction and sized by font metrics, so the only honest test of "do these two
+    blocks touch" is to draw them and ask.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    captured = {}
+    real_figure = plt.figure
+
+    def capture(*args, **kwargs):
+        fig = real_figure(*args, **kwargs)
+        captured['figure'] = fig
+        return fig
+
+    directory = tempfile.mkdtemp()
+    plt.figure = capture
+    try:
+        eval_progress.render(policy, state, os.path.join(directory, 'c.png'))
+    finally:
+        plt.figure = real_figure
+        shutil.rmtree(directory, ignore_errors=True)
+    figure = captured['figure']
+    bottom = figure.axes[2]
+    renderer = figure.canvas.get_renderer()
+    boxes = [t.get_window_extent(renderer=renderer).transformed(bottom.transAxes.inverted())
+             for t in bottom.texts]
+    inches = bottom.get_position().height * figure.get_size_inches()[1]
+    plt.close(figure)
+    return boxes[0], boxes[1], inches
+
+
+def busy_state():
+    """A state with the widest lines both columns can produce: a four-line stage block, a full top
+    five at eight-digit steps, and every band populated."""
+    rows = ([dict(result(10000000 - 1000 * i, episodes=100, perfect=100), min_score=95.0)
+             for i in range(5)]
+            + [dict(result(9000000 - 1000 * i, episodes=100, perfect=99 - i % 3), min_score=0.0)
+               for i in range(20)]
+            + [dict(result(8000000 - 1000 * i, episodes=44, perfect=42), abandoned=True)
+               for i in range(10)])
+    return eval_progress.summarize([run(
+        rows, complete=False, num_workers=4, episodes_per_checkpoint=100, min_achievable=97.0,
+        screen_episodes=20, confirm_count=100, episodes_saved=14330,
+        session_measurements=35, session_episodes=3000, session_seconds=1500.0,
+        measurements_planned=1397, measurements_done=725,
+        stages={'order': ['full', 'screen', 'confirm'], 'current': 'full',
+                'full': {'planned': 791, 'done': 725}, 'screen': {'planned': 506, 'done': 0},
+                'confirm': {'planned': 100, 'done': 0}})])
+
+
+def test_the_left_column_keeps_clear_of_the_right_one():
+    """The font size is bounded by width, not height, and this is the bound.
+
+    Raising it from 8.5 to 10pt widened every line by 18% and needed the stage label and the
+    progress bar shortened to fit. A couple of characters of clearance is the margin: enough for a
+    step number that grows a digit, not enough for a new line wider than the ones already there.
+    """
+    left, right, _ = render_text_extents(busy_state())
+    assert left.x1 <= eval_progress.RIGHT_COLUMN_X - 0.02, (
+        'left column reaches {0:.3f}, right starts at {1}'.format(
+            left.x1, eval_progress.RIGHT_COLUMN_X))
+    assert right.x1 <= 1.0, 'right column runs off the panel at {0:.3f}'.format(right.x1)
+
+
+def test_both_columns_fit_inside_the_text_panel():
+    left, right, _ = render_text_extents(busy_state())
+    assert left.y0 >= 0.0, 'left column overflows the panel: y0 {0:.3f}'.format(left.y0)
+    assert right.y0 >= 0.0, 'right column overflows the panel: y0 {0:.3f}'.format(right.y0)
+
+
+def test_the_text_panel_holds_sixteen_lines_at_the_chosen_size():
+    """Capacity, in the two numbers that set it -- panel inches and point size.
+
+    16 lines is the documented worst case (a 13-line left column, and a right column of 12 plus one
+    line per stale process). matplotlib's default line spacing is 1.2x the point size.
+    """
+    _, _, inches = render_text_extents(busy_state())
+    needed = 16 * eval_progress.SUMMARY_FONTSIZE * 1.2 / 72.0
+    assert inches >= needed, '{0:.2f}in of panel for {1:.2f}in of text'.format(inches, needed)
+
+
+def test_the_summary_font_is_larger_than_the_axis_labels():
+    # Raised from 8.5 on request. The chart titles are 10pt, so this is now the same size as them
+    # and clearly above the 7-8pt tick and axis labels.
+    assert eval_progress.SUMMARY_FONTSIZE >= 10.0

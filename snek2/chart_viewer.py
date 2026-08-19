@@ -232,26 +232,41 @@ def policy_from_png(path):
 
 
 def panel_title(label, live, readable):
-    """The title for one panel — the fix for a panel that read `(completed) (waiting…)` at once.
+    """The title for one panel — the status tag, and the policy name only when nothing else shows it.
 
     `live` is the set of running-policy tokens, or None when the process list could not be read
-    this refresh. `readable` is whether the panel's PNG loaded. The two status tags are mutually
-    exclusive by construction here, which they were not when the caller appended `(completed)` and
-    then the draw-failure path appended `(waiting…)` on top:
+    this refresh. `readable` is whether the panel's PNG loaded.
+
+    **The name is dropped whenever the chart itself is on screen** (2026-08-19). Every chart this
+    viewer shows carries its own title inside the image — an eval PNG says `<policy> — eval progress
+    <time>` and a training PNG names itself too — so the panel title was printing the same policy
+    name a second time, directly above the first.
+
+    It comes back the moment the image is *not* showing, and that is the whole subtlety: an empty
+    panel labelled only `(waiting…)` in a four-panel window does not say which arm is waiting, and
+    the image that would have said it is the thing that is missing. So the name is the fallback
+    identifier, not the title.
+
+    The status tags are unchanged, and remain mutually exclusive by construction — they were not,
+    when the caller appended `(completed)` and the draw-failure path appended `(waiting…)` on top:
 
     - a finished arm (name absent from `live`) reads **`(completed)`**, whether or not its chart
       still loads — an eval that started later may have archived the PNG, and a missing chart on a
       done arm is not the same as one still being written;
     - a live arm with no chart yet reads **`(waiting…)`**;
-    - `live is None` (unknown) or a healthy chart on a live arm gets no tag — a false `(completed)`
-      on a running arm is worse than none.
+    - `live is None` (unknown) or a healthy chart on a live arm gets no tag at all — a false
+      `(completed)` on a running arm is worse than none, and now no tag means no title.
     """
     done = live is not None and bool(label) and label not in live
     if done:
-        return label + ' (completed)'
-    if not readable and live is not None:
-        return label + ' (waiting…)'
-    return label
+        tag = '(completed)'
+    elif not readable and live is not None:
+        tag = '(waiting…)'
+    else:
+        tag = ''
+    if readable:
+        return tag
+    return '{0} {1}'.format(label, tag).rstrip()
 
 
 def running_policies():

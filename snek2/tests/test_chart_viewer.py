@@ -952,14 +952,30 @@ def test_panel_title_never_shows_completed_and_waiting_together():
     pt = chart_viewer.panel_title
     # finished arm, chart archived/missing -> completed only, NOT "(completed) (waiting…)"
     assert pt('b21a-beta05seed1', live, False) == 'b21a-beta05seed1 (completed)'
-    # finished arm, chart present -> completed
-    assert pt('b21a-beta05seed1', live, True) == 'b21a-beta05seed1 (completed)'
+    # finished arm, chart present -> the tag, without the name the chart already carries
+    assert pt('b21a-beta05seed1', live, True) == '(completed)'
     # live arm, chart not written yet -> waiting
     assert pt('b20ah-fc100x200x100seed4', live, False) == 'b20ah-fc100x200x100seed4 (waiting…)'
-    # live arm, chart present -> no tag
-    assert pt('b20ah-fc100x200x100seed4', live, True) == 'b20ah-fc100x200x100seed4'
+    # live arm, chart present -> no title at all
+    assert pt('b20ah-fc100x200x100seed4', live, True) == ''
     # process list unreadable (None): never tag, even with a missing chart
     assert pt('b21a-beta05seed1', None, False) == 'b21a-beta05seed1'
+
+
+def test_panel_title_drops_the_name_the_chart_already_prints():
+    """Every chart names itself inside the image, so a panel title repeated it directly above."""
+    live = {'b43a-lowlr-b29b'}
+    assert chart_viewer.panel_title('b43a-lowlr-b29b', live, True) == ''
+    assert chart_viewer.panel_title('b43a-lowlr-b29b', None, True) == ''
+
+
+def test_panel_title_keeps_the_name_when_there_is_no_image_to_name_it():
+    """The fallback that makes dropping the name safe: an empty panel tagged only `(waiting…)`
+    in a four-arm window does not say *which* arm is waiting, and the chart that would have
+    said it is exactly what is missing."""
+    live = {'b43a-lowlr-b29b', 'b43b-lowlr-b29a'}
+    assert chart_viewer.panel_title('b43a-lowlr-b29b', live, False) == 'b43a-lowlr-b29b (waiting…)'
+    assert chart_viewer.panel_title('b43b-lowlr-b29a', live, False) == 'b43b-lowlr-b29a (waiting…)'
 
 
 def test_clamp_dims_shrinks_uniformly_and_never_grows():
