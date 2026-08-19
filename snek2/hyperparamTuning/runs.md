@@ -76,13 +76,31 @@ steps — so the counter fix is confirmed end to end. Where each batch landed (f
   C51 `epsilon` line — the churn is the learning rate, not C51
   ([`findings.md`](findings.md#-the-c51-arms-chaos-is-the-learning-rate-not-c51--and-the-rate-is-high-because-c51-needs-it)).
 
-**Both hosts as of 2026-08-18 20:58 (fetched). Both are busy — `b42` and `b43` are the same experiment,
-one per box.**
+**Both hosts as of 2026-08-18 21:24 (fetched). Both are training `b42`/`b43` — the same four
+checkpoints, one learning rate each, and both chains are armed. Nothing is owed by hand.**
 
-| host | state | owed |
+| host | state | measurement chain |
 |---|---|---|
-| **laptop** | **4 arms training: `b43a-d`, launched 20:52.** All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate (`learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` in every log). One chart window on `--arms b43`. Earlier: `b36`, `b38`, `b39` all closed, none with a ≥98% checkpoint, so **no HOF-500 is owed** | close-out at the 3M cap; no HOF-500 unless an arm clears 98% |
-| **desktop** | **`b42a-d` queued, waiting on the wave barrier.** `b41c-b29repro-seed3-hof` was still running at the 20:58 heartbeat (elapsed 1383 s), and `_dispatch` returns early while anything runs, so b42 forms the next wave on its own. Close-outs and HOF-500s are already projected in the ledger — they are **synthesized from a `closeout: pending` marker set only when a training finishes**, so they cannot run ahead of it | nothing manual; the chain is automatic |
+| **laptop** | **4 arms training: `b43a-d`, launched 20:52, ~5.8-6.1k steps/min, at 1.53-1.70M of 3M.** All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **ETA 3.6-4.3 h from 21:24**, so the chain fires ~01:00-01:40 |
+| **desktop** | **4 arms training: `b42a-d`, dispatched ~21:10** once `b41c-b29repro-seed3-hof` cleared the wave barrier. Each is writing checkpoints from exactly its seed step (1447k / 1347k / 1513k / 1396k), which confirms the hand-seeded dirs restored correctly | **automatic.** `auto_closeout` + `auto_hof` chain close-out → HOF-500 off every training. Both are projected in the ledger already but are **synthesized from a `closeout: pending` marker set only when a training finishes**, so neither can run ahead of it |
+
+**The two hosts now run the same chain, which they did not before 2026-08-18.** The desktop daemon has
+chained `training → closeout → HOF` since 2026-08-15; the laptop's `chain_closeout_after_training.sh`
+stopped after the close-out, so a laptop batch produced *less* than the same batch on the desktop and the
+missing half was the one that decides whether a checkpoint is hall-of-fame material. The script now carries
+the HOF stage, copied from the daemon's own `HOF_EVAL_ENV`/`HOF_EVAL_ARGS`. **It also pins the close-out
+gate at 96** — it used to inherit `eval_checkpoints`' default of 95 while the desktop pinned 96, so the two
+hosts were writing close-outs under different gates. That matters because a file's gate lives in its
+payload as `min_achievable` and has to be checked before anything is pooled across files, and because the
+HOF pass selects `above:98` *from the close-out file* — a gate at or above 98 would abandon the very rows
+it needs. Verified against four finished close-outs: the selector reproduces the desktop's own HOF row
+counts exactly (b40b 63, b29b 64, b40d 2, b39a 0).
+
+**`b42`'s arms started ~5 minutes before the learning-rate fix was deployed, and it does not matter.** A
+running job keeps the code it launched with, so b42 is on the pre-fix `snek2.py` — but its configured rate
+*is* the rate its checkpoints carry (1e-5), so `enforce_learning_rate` would compare equal and assign
+nothing. The two batches still differ only in the learning rate. Any *future* desktop batch that retunes
+the rate on a resume gets the fix, which is live there from `b8d817fd7`.
 
 **Adam's `epsilon` is settled and b32 is closed** — shared-state-set churn **0.119 → 0.088, −26%, 4 of 4
 paired, flat to 1M, no dose effect**. The same measurement found that every previously published per-arm

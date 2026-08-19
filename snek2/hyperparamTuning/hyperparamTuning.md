@@ -165,7 +165,18 @@ clock; an un-analysed batch blocks everything behind it.
 polls until that batch's trainers exit — at their `SNEK_MAX_STEPS` cap, so unattended — then starts one
 `eval_checkpoints.py` per arm at once, `EVAL_WORKERS=4`, logs in `/tmp/<policy>_closeout.log`. It is the mirror of
 [`chain_after_evals.sh`](scripts/chain_after_evals.sh), which queues a *wave* behind a close-out. First used on `b39`:
-trainers drained 08:00, close-out done 08:50, no intervention. Both scripts count processes rather than tracking
+trainers drained 08:00, close-out done 08:50, no intervention.
+
+**Since 2026-08-18 it runs the HOF-500 re-measure too, so the laptop chain matches the desktop's**
+(`training → closeout → HOF`, which the daemon has done since 2026-08-15). It pins the close-out gate at
+**96** — it used to inherit `eval_checkpoints`' default of 95 while the desktop pinned 96, so the same batch
+was written under different gates on the two hosts — and then re-measures every arm holding a **≥98%**
+close-out checkpoint at 500 flat episodes under `EVAL_OUT_SUFFIX=_hof500`. Most arms have none, which exits 0
+with "no HOF pass owed" and is the normal outcome. `CHAIN_HOF=0` restores the close-out-only behaviour;
+`CLOSEOUT_GATE`/`HOF_GATE` override the gates, and the script refuses to start unless the close-out gate is
+strictly below the HOF gate, since HOF selects from the close-out's own file. Details and the reason the
+recipe is duplicated rather than shared:
+[`scripts/README.md`](scripts/README.md#the-hof-stage-exists-to-match-the-desktop-not-to-add-a-feature). Both scripts count processes rather than tracking
 pids, because `kill -0` succeeds on a zombie, and both filter `pgrep` output — a bare `pgrep -f snek2.py` matches
 git pathspecs and the telemetry `curl`, and a bare `pgrep -f eval_checkpoints.py` matches the `chart_viewer` that
 outlives the evals by design and would hold the wait open forever.
