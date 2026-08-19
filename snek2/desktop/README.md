@@ -59,8 +59,14 @@ The daemon synthesizes two follow-on evals, each off a ledger marker, never as s
 
 | link | trigger | synthesized job | what it runs |
 |---|---|---|---|
-| **closeout** | a training finishes OK (`auto_closeout`) | `<policy>-closeout`, priority 10 | `eval_checkpoints.py <policy> top20` |
+| **closeout** | a training finishes OK (`auto_closeout`) | `<policy>-closeout`, priority 10 | `eval_checkpoints.py <policy> top20` at `EVAL_MIN_ACHIEVABLE=97` |
 | **HOF re-measure** | a closeout finishes OK (`auto_hof`) | `<policy>-hof`, priority 11 | `eval_checkpoints.py <policy> above:98` at 500 episodes, flat |
+
+The closeout pins its abandonment gate at **`EVAL_MIN_ACHIEVABLE=97`** (`CLOSEOUT_EVAL_ENV`),
+overriding whatever the training env carried rather than falling to `eval_checkpoints`' default of
+95. It stays **below** the HOF gate of 98 on purpose: HOF's `above:98` selects only rows the
+closeout measured at full length, and a gate above 98 would abandon exactly those checkpoints and
+starve the re-measure.
 
 The HOF re-measure reconfirms the checkpoints a closeout already found excellent. `above:98` reads
 the closeout's own `runs/<policy>_checkpoint_evals.json` and takes every checkpoint measured there

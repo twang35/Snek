@@ -308,9 +308,22 @@ def test_auto_closeout_synthesizes_eval_inheriting_env():
     assert j.id == 'b20a-fc25seed1-closeout' and j.type == 'eval'
     assert j.policy == 'b20a-fc25seed1'
     assert j.env.get('SNEK_FC_LAYERS') == '25,50,25'   # the FC trap: width must carry over
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == '97'        # closeout gate pinned, not inherited
     assert j.eval_args == ['top20']
     assert j.priority == runnermod.AUTO_CLOSEOUT_PRIORITY
     assert j.priority < 100                             # beats a default-priority training
+
+
+def test_closeout_gate_overrides_an_inherited_min_achievable():
+    # A training env that set its own gate must not leak into the closeout -- the closeout
+    # recipe wins, exactly like the HOF recipe does one hop later.
+    r = _runner()
+    r.ledger['b40a'] = {'state': 'done', 'type': 'train', 'policy': 'b40a',
+                        'closeout': 'pending',
+                        'env': {'SNEK_FC_LAYERS': '320', 'EVAL_MIN_ACHIEVABLE': '80'}}
+    j = r._auto_closeout_jobs()[0]
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == '97'
+    assert runnermod.CLOSEOUT_THRESHOLD < runnermod.HOF_THRESHOLD  # HOF above:98 stays readable
 
 
 def test_auto_closeout_skips_when_eval_done_running_or_unmarked():

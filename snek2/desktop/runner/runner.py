@@ -60,6 +60,15 @@ HOF_EVAL_ENV = {
     'EVAL_OUT_SUFFIX': '_hof500',
 }
 
+# The closeout's own abandonment gate. It used to inherit the training env and fall to
+# eval_checkpoints' default of 95; pinned here so every closeout uses the same gate whatever
+# the arm trained under. Must stay BELOW HOF_THRESHOLD: HOF selects `above:98` from the
+# closeout file, and only rows that reach the gate are full length, so a gate above 98 would
+# abandon the very checkpoints HOF needs to read and starve the re-measure.
+CLOSEOUT_THRESHOLD = 97
+assert CLOSEOUT_THRESHOLD < HOF_THRESHOLD, 'closeout gate must stay below the HOF selection gate'
+CLOSEOUT_EVAL_ENV = {'EVAL_MIN_ACHIEVABLE': str(CLOSEOUT_THRESHOLD)}
+
 
 def wants_closeout(job_type, ok, auto_closeout_enabled):
     """Whether a just-finished job should get an automatic closeout eval. Only a *training*
@@ -289,8 +298,10 @@ class Runner:
             eval_id = rec['policy'] + '-closeout'
             if self.ledger.get(eval_id, {}).get('state') in TERMINAL or eval_id in self.running:
                 continue
+            env = dict(rec.get('env') or {})
+            env.update(CLOSEOUT_EVAL_ENV)          # the closeout gate wins over the inherited env
             jobs.append(Job(id=eval_id, type='eval', policy=rec['policy'],
-                            env=dict(rec.get('env') or {}), eval_args=['top20'],
+                            env=env, eval_args=['top20'],
                             priority=AUTO_CLOSEOUT_PRIORITY))
         return jobs
 
