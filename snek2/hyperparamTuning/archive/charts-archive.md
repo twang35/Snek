@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-19 | 36 | batch 44 (`lr 1e-7`, the third rung of the continuation ladder) got its section, making seven. **36 was being held only as the named control for 39**, and 39 was itself retired the evening before, so the reason expired. Retired ahead of the strict-oldest 28-29, which remains the source of three of the four checkpoints 42/43/44 continue. Its conclusion — C51 on `fc 320` is still well behind the scalar head at its own architecture — is carried by [`../findings.md`](../findings.md) |
 | 2026-08-18 | 39 | batch 42 got its section (the `lr 1e-5` control for 43), making seven. Retired ahead of the strict-oldest 28-29, which is the source of three of the four checkpoints 42/43/44 continue and the batch they are read against; 39 bears on none of the continuation work and its conclusion — zero-init loses through action separation, not calibration — is carried in full by [`../findings.md`](../findings.md) |
 | 2026-08-18 | C51 pilot | batches 42 and 43 (continuing the four best checkpoints) landed. The pilot was explicitly a *temporary seventh* while its arms were a live control; every C51 arm is now closed, so it went first |
 | 2026-08-18 | 38 | retired with the pilot in the same pass — two sections had to go to hold six. **38 rather than the strict-oldest 28-29, and rather than 36**: 28-29 is the direct source of b42/b43's four checkpoints and is what they are read against, and 36 is still the named control for 39. Nothing kept here cites 38, and its conclusion — the Adam-ε dose is a dead heat at n=4 — is carried in full by [`findings.md`](../findings.md) |
@@ -33,6 +34,82 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 36 — **C51 on `fc 320`**, one wide layer instead of three narrow — *stopped at 1.87-2.02M, closed out*
+
+**Batch 32's config verbatim at `eps 1.5e-4` with `SNEK_FC_LAYERS=320` the only change**, seeds 1-4, win
+reward back at its default 100, `lr 1e-4`, 51 atoms over `[-5, 120]`. Launched 12:43 on 2026-08-16;
+launcher [`launch_c51_fc320.sh`](../scripts/launch_c51_fc320.sh), rationale and pre-registered hypotheses in
+[`runs.md`](../runs.md).
+
+**Two controls, both on disk, answering different questions.** `b32a`/`b32b` — same `eps`, `lr` and seeds
+at `fc 200,100,100` — is the clean one-variable *architecture* pair, but only 1M deep, so **match at 1M
+before quoting anything**. `b24a-d` is **ddqn** at this exact shape, **3M** and closed out at pooled
+**85.97-89.03** with two ≥98%/500 records, which is the "is C51 worth it at all" comparison — **and b36
+did not clear it**, see the reading below.
+
+**What the shape changes for a categorical head is *where* the parameters sit, not how many.** Obs 30 to
+3×51 = 153 outputs:
+
+| shape | first layers | final layer | total | share in the final layer |
+|---|---|---|---|---|
+| **`fc 320`** | 9,920 | **48,960** | ~58.9k | **83%** |
+| `fc 200,100,100` | 36,400 | 15,453 | ~51.9k | 30% |
+
+Only +13% capacity, but the budget moves into the layer feeding the 153-way distribution, and two layers
+of gradient compounding disappear. **That second half is why churn is the reading, not level** — C51's
+defect here is instability.
+
+**The pre-registered expectation is a null on the ceiling**, because nine shapes have never raised it and
+the one direct measurement says the deeper net's penultimate layer was *not* capacity-bound (effective rank
+16-20 of 100, head outputs 4-6 of 153). **If that rank comes out at 16-20 of 320 here too, widening bought
+nothing** and any gain is optimisation rather than capacity.
+
+**Stopped at 2M rather than 3M** (21:26 on 2026-08-16, the user's call), so **match at 2M**. Close-out
+complete at gate 95, 4 parallel processes at `EVAL_WORKERS=4`:
+
+| arm | step | best-30 | at | `sef` | trailing | pooled /eq | best ckpt |
+|---|---|---|---|---|---|---|---|
+| `b36d` | 1873k | **86.7** | 331k | 17.4 | 92.64 | **80.19** | 95.0 @356k |
+| `b36b` | 1972k | 86.0 | 402k | **24.7** | 91.14 | 76.70 | 94.0 @305k |
+| `b36c` | 2011k | 84.7 | 247k | 19.5 | **93.14** | 74.77 | 91.6 @471k *[83 ep]* |
+| `b36a` | 2023k | 84.0 | 977k | 23.2 | 92.02 | 75.36 | **97.0 @550k** |
+| *`b32a`/`b32b` control, `fc 200,100,100`, ≤1M* | 1000k | *77.0 / 63.0* | | *16.1 / 10.3* | | *never closed out* | |
+| **`b24a-d` control, `ddqn` at this same `fc 320`, 3M** | 3000k | **95.3-96.7** | | **60.5-73.2** | | **85.97-89.03** | **98.0-100.0** *(≤2M rows)* |
+
+**Hypothesis 2 beat the null against `b32`, and the batch still loses badly to `b24`.** Both readings are
+real and they answer different questions:
+
+- **Against `b32` (the C51 architecture question): a clear gain.** Best-30 **84.0-86.7 against 77.0/63.0**,
+  `sef` 17.4-24.7 against 10.3/16.1, and the **seed spread collapsed from 14 pp to 2.7 pp**. Wide-shallow
+  is the better C51 shape.
+- **Against `b24` (the "is C51 worth it" question): no.** Same `fc 320`, same observation era, `ddqn`:
+  best-30 **95.3-96.7**, `sef` **60.5-73.2** — a factor of 3, and `sef` is the low-variance metric — and
+  **every b24 seed produced a ≥98% checkpoint inside 2M** where no b36 seed did. The seed-agreement gain
+  also does not generalise: `b24`'s spread is **1.4 pp**, tighter than b36's. Full comparison and its
+  caveats in [`findings.md`](../findings.md#-after-four-fixes-c51-is-still-well-behind-the-scalar-head-at-its-own-architecture--and-b24-not-b32-is-the-control).
+
+**The 3M question went unanswered** — every arm peaked best-30 by 402k except `b36a` (977k) while trailing
+stayed 91-93 to 2M, so it neither collapsed like b33 nor kept climbing. **`b36c`'s best row is 83 episodes,
+not 100** — abandoned under `EVAL_MIN_ACHIEVABLE=95`, so `best_of` relaxed to half-depth and it is not
+comparable with the full-length rows.
+
+**Init optimism is now measured and excluded as a C51 explanation.** Every arm started at `V ≈ 57.5`, the
+grid midpoint, against a true value of **~34** — but the offset is common-mode (the action gap is at full
+scale by 8k), it costs the policy nothing, and the `ddqn` control's init at 0 is *further* from the truth.
+[The finding](../findings.md#-a-c51-head-starts-at-the-grid-midpoint-not-at-0--and-it-cost-b36-nothing-because-the-ddqn-controls-init-is-further-from-the-truth).
+
+![b36a](../charts/b36a-c51fc320seed1.png)
+**b36a-c51fc320seed1** — paired with `b32a`
+
+![b36b](../charts/b36b-c51fc320seed2.png)
+**b36b-c51fc320seed2** — paired with `b32b`
+
+![b36c](../charts/b36c-c51fc320seed3.png)
+**b36c-c51fc320seed3**
+
+![b36d](../charts/b36d-c51fc320seed4.png)
+**b36d-c51fc320seed4**
 
 ## Batch 39 — **C51 initialised at expected Q = 0** instead of the grid midpoint — *closed at the 3M cap: it loses on every metric, through the head's capacity rather than its calibration*
 

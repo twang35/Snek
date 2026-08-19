@@ -268,6 +268,16 @@ update docs, report. **Do not kill, stop or restart any arm** — not even one t
 is past its cap, or is clearly failing. Deciding a run is done is the user's call. If a run looks
 finished and no slot is needed, say so as a recommendation.
 
+**Refresh the charts first — before the analysis, not after it** (standing instruction, 2026-08-19).
+The order is: pull any finished desktop results into `snek2/runs/`, run `refresh_charts.sh`, run the
+completeness check, *then* analyse and write. Two reasons it has to be first. The user reads the chart
+window and `charts.md` while the reply is still being written, so stale images are the one artifact that
+is visibly wrong for the whole update; and the refresh is what reveals **which** arms have new data —
+including arms whose results landed on the `results` branch, or never landed and need the rsync recovery.
+Doing it last has repeatedly meant discovering a finished batch after the analysis was already written.
+`refresh_charts.sh` is **zsh**, not bash (`${0:a:h}`), so `bash scripts/refresh_charts.sh` dies with
+`a: unbound variable`.
+
 Stop an arm only when asked, or when the user asks for something that plainly needs a free slot —
 and then say which ones are stopping and why.
 
@@ -764,6 +774,21 @@ whose graph point was 100% gets the full 100 episodes immediately (uncapped), ev
 selected gets 20, and the best `EVAL_CONFIRM_COUNT` *of those screened* get 80 more. ~2.4x fewer
 episodes on a large arm — but the saving collapses to 1.0x when the screened pool is smaller than
 the confirm count, which happened on `b11c`.
+
+**`top20` is not a budget — "N is a target, not a quota", and a *good* arm blows through it.**
+`select_top_checkpoints` measures **every checkpoint whose 10-episode graph eval reached ≥90%**, past N;
+only the fill band down to 60% is limited by the count. A normal arm climbs from 0, so few checkpoints
+qualify and `top20` really does measure ~20-40. **An arm continued from an already-excellent checkpoint
+spends its entire run above the mandatory threshold**, so nearly every checkpoint qualifies: `b43`'s four
+continuation arms selected **791, 1196, 803 and 826** checkpoints, and that close-out ran **~15 hours**.
+`b42` is the contrast from the other side — the same selector, but it *decayed*, so only 261-373 qualified
+and it finished overnight.
+
+So **budget a continuation batch's close-out at 8-15 h per wave, and never read one still running after
+7 hours as hung.** The lever if it needs to be cheaper is the **selector, not the worker count** —
+`above:<threshold>` reads a prior close-out's 100-episode measurements instead of the noisy graph, which
+is what the HOF pass already does. Raising `EVAL_WORKERS` does not help much here, because the cost is
+checkpoint *count* times per-checkpoint restore, not episodes per checkpoint.
 
 **`EVAL_MIN_ACHIEVABLE=95` abandons a checkpoint mid-measurement** once it cannot reach 95% even if
 every remaining episode is perfect — at 100 episodes, once more than 5 have failed. Full-length work

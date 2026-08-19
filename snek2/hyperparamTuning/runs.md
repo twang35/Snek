@@ -81,8 +81,8 @@ checkpoints, one learning rate each, and both chains are armed. Nothing is owed 
 
 | host | state | measurement chain |
 |---|---|---|
-| **laptop** | **4 arms training: `b43a-d`, launched 20:52, ~5.8-6.1k steps/min, at 1.91-2.07M of 3M** (+541-562k past their seed checkpoints). All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **ETA ~2.6-2.9 h from 22:25**, so the chain fires ~01:00-01:20 |
-| **desktop** | **`b42a-d` stopped by hand at 22:15**, at +385-421k past seed (1.77-1.91M of a 3M cap), because the comparison with `b43` had resolved on 4 of 4 seeds and the arms were spending compute going downhill. **Its close-out is running now** — four `eval_checkpoints.py … top20`, one per arm. **`b44a-d` (`lr 1e-7`) is queued** behind that eval chain | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
+| **laptop** | **`b43a-d` finished training at the 3M cap** (drained 01:07, +1487-1653k past their seed checkpoints). **Its close-out is running** — launched 01:07:50 by the chain script, 4 arms x 4 workers, gate 96. All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **fired on time at 01:07.** The close-out is at 542-709 of 791-1196 checkpoints per arm after 7.3 h — `b43b` is the long pole at ~8 h remaining, so HOF-500 starts this evening. See the close-out cost warning below: this is expected, not stuck |
+| **desktop** | **`b42a-d` stopped by hand at 22:15** at +385-421k past seed; **its close-out and HOF-500 are both done**. **`b44a-d` then trained to the 3M cap overnight and its close-out is running** since 05:43, HOF-500 queued behind it. Nothing is training on either host | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
 
 **The two hosts now run the same chain, which they did not before 2026-08-18.** The desktop daemon has
 chained `training → closeout → HOF` since 2026-08-15; the laptop's `chain_closeout_after_training.sh`
@@ -119,7 +119,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42, 43 and 44 — what happens if you keep training a champion — **`b42` answered it and was stopped; `b43` running; `b44` queued**
+## Batches 42, 43 and 44 — what happens if you keep training a champion — **the answer is yes, at a low enough rate; `b42` closed, `b43`/`b44` in close-out**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
@@ -132,11 +132,18 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute |
-| state | **stopped at +385-421k — it decays** | running, +541-562k — it holds, and one seed improved | queued behind `b42`'s eval chain |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out running on the laptop since 01:07 | **done at 3M**, close-out running on the desktop since 05:43 |
+| result | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 |
 
-`b44` exists because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
-into a hold. It asks where that stops — see [the estimate and the three
-readings](#b44-at-1e-7--what-it-should-do-and-the-one-outcome-that-would-be-interesting) below.
+`b44` existed because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
+into a hold. It asked where that stops, and **the answer is "not yet at 1e-7"** — see [what actually
+happened](#-b44-at-1e-7-beat-1e-6-on-4-of-4-seeds--the-pre-registered-null-was-wrong) below.
+
+**Where this leaves the ladder.** Banded mean self-eval perfect rate is monotone in the rate across all three
+rungs, and the step sizes tell you where the plateau is: `1e-5` → `1e-6` bought **+4.9 pp**, `1e-6` → `1e-7`
+bought **+2.0 pp**. Decelerating but not flat, so **`1e-8` is the obvious next rung** and the one thing that
+would settle whether this is a plateau or a slope. The close-outs now running are what decide it on the
+500-episode instrument; everything above is 10-episode self-eval.
 
 Config is b29's, byte-checked against `b29b`'s own spec with only `SNEK_SEED` substituted: `fc 320`,
 chase-safe `c=0.10` gate 75, IS off, target-update 1000, discount 0.9975, food-distance 0, fork-branches 4,
@@ -215,22 +222,59 @@ one. That saturation was first read as "no arm ever beat its starting checkpoint
 retracted. Use `perfect_percent`, `best_perfect30` or `sef`. The general lesson is the `game_over`/`sef` one
 again: **a metric at its ceiling looks like a measurement and carries no information.**
 
-### b44 at 1e-7 — what it should do, and the one outcome that would be interesting
+### ‡ b44 at 1e-7 beat 1e-6 on 4 of 4 seeds — the pre-registered null was wrong
 
-Queued on the desktop, same four seeded checkpoints, `SNEK_LEARNING_RATE=1e-7` the only change from `b42`.
-Pre-registered before launch, in the specs' own `notes`:
+Done at the 3M cap. Same four seeded checkpoints, `SNEK_LEARNING_RATE=1e-7` the only change from `b42`.
+**The estimate written into the specs before launch put ~65% on a null and ~25% on a win; the 25% branch is
+what happened, on every seed.** The readings as pre-registered, with the outcome marked:
 
 | reading | probability | what it would mean |
 |---|---|---|
-| **null against `b43`** | ~65% | the expected outcome. If 1e-6 is already doing nothing but failing to damage the policy, 1e-7 cannot do better than the same nothing. Bounds the useful range and says the preservation effect **saturates by 1e-6** |
-| better than `b43` | ~25% | decay at 1e-6 is still nonzero and the optimum is below it — extend the ladder to 1e-8 |
-| **worse than `b43`** | ~10% | the informative one. It would mean `b43` is not merely holding but **actively repairing** — most plausibly adapting to the transplanted replay buffer, which comes from the source arm's *final* step and is therefore slightly off-policy for the restored weights — and that 1e-6 is roughly the rate at which repair keeps pace with drift |
+| ~~null against `b43`~~ | ~65% | **did not happen.** The reasoning — that 1e-6 is already doing nothing but failing to damage the policy — was simply wrong: at 1e-7 these arms are still *moving*, and their best-30 peaks arrive 300-1100k steps past seed rather than at it |
+| **✅ better than `b43`** | ~25% | **this is what happened, 4 of 4 seeds.** Decay at 1e-6 is still nonzero and the optimum is below it — extend the ladder to **1e-8** |
+| ~~worse than `b43`~~ | ~10% | did not happen. The "1e-6 is actively repairing and 1e-7 cannot keep pace" mechanism is not what is going on — **both** rates improve, and the slower one improves further |
 
-**The likely failure mode at a low rate is stasis, not collapse**, so "no improvement" is not a broken arm —
-read it against `b43`, which is the control for exactly that. Adam's step is `lr · m/(√v + ε)`, so lowering the
-rate scales every step's magnitude near-uniformly without changing the relative dynamics; 1e-7 should look like
-1e-6 at roughly a tenth the movement. Note `b43b`'s gain is the main reason the "worse" branch is not smaller:
-if some of what 1e-6 buys is *motion* rather than *stillness*, 1e-7 gives that up.
+**Why the null prediction failed, and it is worth keeping.** The reasoning was that Adam's step is
+`lr · m/(√v + ε)`, so lowering the rate scales every step near-uniformly without changing the relative dynamics
+— hence 1e-7 should look like 1e-6 at a tenth the movement, and if 1e-6 is already only *preserving*, a tenth of
+preserving is still preserving. The scaling argument is fine; **the premise that 1e-6 was only preserving was
+not.** It was improving, slowly, and 1e-7 improves *further* because it improves *more slowly and for longer*.
+The tell was available before launch and was misread: `b43b`'s 100.0 best-30 window arrived 320k steps past its
+seed, which is motion, not stillness. **The general lesson: "this knob has saturated" needs evidence that the
+quantity has stopped changing, not that it is changing slowly** — and a peak arriving late in the run is
+evidence against saturation.
+
+| band past seed | `b43` 1e-6 | `b44` 1e-7 | diff | seeds `1e-7` ahead |
+|---|---|---|---|---|
+| 0-250k | 95.9 | 96.3 | +0.4 | 3 of 4 |
+| 250-500k | 95.4 | 96.5 | +1.1 | **4 of 4** |
+| 500-750k | 92.2 | **96.6** | **+4.4** | **4 of 4** |
+| 750-1000k | 93.4 | 97.0 | **+3.6** | **4 of 4** |
+| 1000-1250k | 94.8 | 96.6 | +1.8 | 3 of 4 |
+| 1250-1487k | 94.5 | 95.2 | +0.7 | 2 of 4 |
+
+Per seed over the whole +1487k common window: **+4.6, +1.0, +1.6, +0.8** — mean **+2.0 pp**, against **+4.9 pp**
+for the 1e-5 → 1e-6 step. The gap is widest at 500-1000k because that is where `b43` dips to 92.2 and `b44` does
+not: **1e-6 still wanders on a half-million-step timescale, 1e-7 largely does not.** `b44`'s best-30 peaks land
+at 1814k / 2190k / 2230k / 2460k, i.e. 300-1100k past seed, against *at the seed step* for `b42`.
+
+**Next rung: `1e-8`.** The ladder is monotone and decelerating (+4.9 then +2.0), which is what approaching a
+plateau looks like without having arrived, and nothing yet distinguishes "plateau" from "slope". Not queued —
+the box is busy with `b44`'s close-out and HOF.
+
+### ⚠ A continuation batch's close-out costs 10-20x a normal one's — budget for it
+
+`top20` measured **791, 1196, 803 and 826** checkpoints on `b43`'s four arms, not 20, and `b43`'s close-out has
+been running since 01:07. This is documented behaviour rather than a bug: **"N is a target, not a quota"** —
+`select_top_checkpoints` measures every checkpoint whose 10-episode graph eval reached **≥90%**, past N. A normal
+arm climbs from 0 so few checkpoints qualify; **an arm continued from a 98% checkpoint spends its whole run above
+the mandatory threshold, so nearly every checkpoint qualifies.** `b42` is the contrast from the other side — it
+decayed, so only 261-373 of its checkpoints qualified and its close-out finished overnight.
+
+**So do not read a continuation close-out still running after 7 hours as hung**, and expect **8-15 h per wave**.
+If a future continuation batch needs a cheaper close-out, the lever is the *selector*, not the worker count —
+`above:<threshold>` reads a prior close-out's 100-episode numbers instead of the graph, which is what the HOF
+pass already uses.
 
 ### How these arms were started — it is not an ordinary resume
 
