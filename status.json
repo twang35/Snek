@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T20:42:06",
-  "ts": 1787110926.181163,
+  "iso": "2026-08-18T20:43:12",
+  "ts": 1787110992.2894216,
   "at_a_glance": {
     "running": [
       "b41 -- hof (2 arms)"
@@ -36,7 +36,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 413
+      "elapsed_s": 479
     },
     {
       "id": "b41d-b29repro-seed4-hof",
@@ -46,7 +46,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 413
+      "elapsed_s": 479
     }
   ],
   "ledger": {
@@ -272,8 +272,8 @@
   },
   "disk_free_gb": 127.3,
   "load_avg": [
-    8.216796875,
-    7.4091796875,
-    5.78857421875
+    8.3349609375,
+    7.578125,
+    5.9580078125
   ]
 }
