@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-19T05:39:31",
-  "ts": 1787143171.099605,
+  "iso": "2026-08-19T05:40:57",
+  "ts": 1787143257.7992508,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 99% (2 arms)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 99% (1 arm)"
     ],
     "queued": [
       "b44 closeout eval -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
@@ -27,7 +27,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
@@ -36,33 +36,23 @@
       "type": "train",
       "policy": "b44b-lowlr7-b29a",
       "pid": 1579341,
-      "step": 2970000,
+      "step": 2983000,
       "max_steps": 3000000,
-      "steps_per_sec": 148.4,
-      "elapsed_s": 13975
-    },
-    {
-      "id": "b44d-lowlr7-b29c",
-      "type": "train",
-      "policy": "b44d-lowlr7-b29c",
-      "pid": 1579343,
-      "step": 2994000,
-      "max_steps": 3000000,
-      "steps_per_sec": 148.4,
-      "elapsed_s": 13975
+      "steps_per_sec": 149.9,
+      "elapsed_s": 14062
     }
   ],
   "ledger": {
     "b44a-lowlr7-b29b-closeout": "queued",
     "b44c-lowlr7-b40b-closeout": "queued",
-    "b44b-lowlr7-b29a-closeout": "queued",
     "b44d-lowlr7-b29c-closeout": "queued",
+    "b44b-lowlr7-b29a-closeout": "queued",
     "b44a-lowlr7-b29b-hof": "queued",
     "b44c-lowlr7-b40b-hof": "queued",
-    "b44b-lowlr7-b29a-hof": "queued",
     "b44d-lowlr7-b29c-hof": "queued",
+    "b44b-lowlr7-b29a-hof": "queued",
     "b44b-lowlr7-b29a": "running",
-    "b44d-lowlr7-b29c": "running",
+    "b44d-lowlr7-b29c": "done",
     "b44a-lowlr7-b29b": "done",
     "b44c-lowlr7-b40b": "done",
     "b42d-cont3m-b29c-hof": "done",
@@ -299,8 +289,8 @@
   },
   "disk_free_gb": 125.5,
   "load_avg": [
-    4.75927734375,
-    4.9990234375,
-    6.24951171875
+    2.89111328125,
+    4.44140625,
+    5.94189453125
   ]
 }
