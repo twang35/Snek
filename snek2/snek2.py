@@ -388,6 +388,14 @@ def main(argv):
     # The c51 branch swaps the head and the loss and nothing else: same trunk widths, same
     # initializers (CategoricalQNetwork's encoding network defaults to the same VarianceScaling
     # dense_layer() passes), same optimizer, same target-update schedule, same PER buffer.
+    #
+    # Built once and shared by both branches rather than constructed inline in each, because the
+    # restore below has to reach this exact object: Adam's `learning_rate` is a Variable the
+    # checkpointer saves, so a resume overwrites it and `training.enforce_learning_rate` has to put
+    # the configured value back. The alternative is reaching in through `agent._optimizer`, a private
+    # attribute of a library class — a local costs nothing and cannot be renamed out from under us.
+    # Only one branch ever runs, so this constructs exactly as many optimizers as before.
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=adam_epsilon)
     if is_categorical:
         q_net = build_categorical_q_net(
             train_env.observation_spec(), action_tensor_spec, fc_layer_params, num_atoms,
@@ -399,8 +407,7 @@ def main(argv):
             min_q_value=v_min,
             max_q_value=v_max,
             epsilon_greedy=epsilon,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate,
-                                               epsilon=adam_epsilon),
+            optimizer=optimizer,
             target_update_period=agent_target_update_period,
             target_update_tau=target_update_tau,
             gradient_clipping=gradient_clipping or None,
@@ -415,8 +422,7 @@ def main(argv):
             train_env.action_spec(),
             q_network=q_net,
             epsilon_greedy=epsilon,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate,
-                                               epsilon=adam_epsilon),
+            optimizer=optimizer,
             td_errors_loss_fn=common.element_wise_huber_loss,
             target_update_period=agent_target_update_period,
             target_update_tau=target_update_tau,
@@ -535,6 +541,12 @@ def main(argv):
                                           perfect_game_reward=PERFECT_GAME_REWARD)
 
     train_checkpointer.initialize_or_restore()
+    # Adam's learning rate rides along in the checkpoint, so the restore just overwrote the
+    # configured one. Put it back — see training.enforce_learning_rate for the measurement.
+    overridden_lr = enforce_learning_rate(optimizer, learning_rate)
+    if overridden_lr is not None:
+        print('learning rate: checkpoint restored {0:g}, reset to the configured {1:g}'.format(
+            overridden_lr, learning_rate))
     global_step = tf.compat.v1.train.get_global_step()
     if replay_buffer.restore(replay_buffer_dir):
         print('restored replay buffer:', replay_buffer.size, 'transitions')

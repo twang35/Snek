@@ -549,6 +549,39 @@ def maybe_update_guided_fraction(avg_reward, initial_epsilon, configured_fractio
                 'ON' if target > 0.0 else 'OFF', target), flush=True)
 
 
+def enforce_learning_rate(optimizer, configured_lr):
+    """Re-asserts the configured learning rate over whatever the checkpoint restored.
+
+    Adam's `learning_rate` is a `tf.Variable`, not a plain attribute, so `common.Checkpointer`
+    saves it alongside the moment estimates and `initialize_or_restore()` silently overwrites the
+    value the constructor was given. Measured on tf 2.15.1 / keras 2.15.0: an optimizer built at
+    1e-6 reads 1e-5 back after restoring a checkpoint written at 1e-5. That makes
+    `SNEK_LEARNING_RATE` a **no-op on every resume** — the knob works on a fresh arm and is
+    discarded by exactly the runs that most want it, which is the same silent-config-override shape
+    as the `v_max` and observation-era traps `policy_arch.py` exists to catch, and it is quieter
+    because nothing about the run looks wrong afterwards.
+
+    `epsilon` needs no equivalent: it is a plain Python float on the optimizer, so nothing restores
+    it. `iterations` and the `m`/`v` moments are genuine training state and are deliberately left
+    alone — this puts back the hyperparameter, not the history.
+
+    Comparison is on the float32 round-trip because that is what the Variable holds: a configured
+    1e-5 reads back as 9.999999747e-06, so comparing the raw floats would call every resume an
+    override. `round(x, 6)` — the idiom `maybe_update_epsilon` uses — does separate 1e-5 from 1e-6,
+    but it floors anything at or below 5e-7 to 0.0, so it would call 1e-7 and 1e-8 equal and
+    silently drop a retune in that range. float32 equality needs no threshold and is what the
+    Variable can actually represent.
+
+    Returns the restored value when it differed from the configured one and was replaced, else
+    None, so a caller can report the override.
+    """
+    restored = float(optimizer.learning_rate.numpy())
+    if np.float32(restored) == np.float32(configured_lr):
+        return None
+    optimizer.learning_rate.assign(configured_lr)
+    return restored
+
+
 def maybe_update_epsilon(avg_reward, perfect_rate, epsilon, initial_epsilon, min_epsilon):
     """Assigns the scheduled epsilon, if it differs from what the Variable already holds.
 

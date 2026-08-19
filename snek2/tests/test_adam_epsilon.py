@@ -102,15 +102,21 @@ def test_it_reaches_the_optimizer():
 def test_every_adam_built_in_snek2_passes_epsilon():
     """The tripwire: a new agent branch that forgets `epsilon` would silently train at 1e-7.
 
-    There are two `Adam(...)` sites, one per algorithm, and they are 16 lines apart — exactly the
-    shape of edit where one gets updated and the other does not. Walks the AST rather than grepping
-    so a reformatted call cannot slip through on whitespace.
+    Walks the AST rather than grepping so a reformatted call cannot slip through on whitespace, and
+    asserts the property over *every* `Adam(...)` site rather than a fixed count of them. It was
+    written as `== 2` when there was one call per algorithm branch, and it failed — correctly, as a
+    tripwire — the moment those were hoisted into a single shared optimizer so
+    `training.enforce_learning_rate` could reach the object the checkpointer restores into. A count
+    is the wrong assertion here: it fires on a refactor that cannot break the knob and would still
+    have to be edited by hand by whoever adds a third branch, which is the person most likely to
+    just bump the number. `>= 1` plus "all of them pass both knobs" catches the real failure — a new
+    branch building its own bare `Adam()` — and is indifferent to how many sites exist.
     """
     tree = ast.parse(open(SNEK2_PATH).read())
     calls = [node for node in ast.walk(tree)
              if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
              and node.func.attr == 'Adam']
-    assert len(calls) == 2, 'expected one Adam per algorithm branch, found {0}'.format(len(calls))
+    assert calls, 'snek2.py builds no Adam at all'
     for call in calls:
         keywords = {kw.arg: kw.value for kw in call.keywords}
         assert 'epsilon' in keywords, (
