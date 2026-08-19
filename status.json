@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T18:24:14",
-  "ts": 1787102654.8244424,
+  "iso": "2026-08-18T18:24:47",
+  "ts": 1787102687.4448338,
   "at_a_glance": {
     "running": [
       "b41 -- closeout eval (3 arms)"
@@ -38,7 +38,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 9476
+      "elapsed_s": 9509
     },
     {
       "id": "b41c-b29repro-seed3-closeout",
@@ -48,7 +48,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 9476
+      "elapsed_s": 9509
     },
     {
       "id": "b41d-b29repro-seed4-closeout",
@@ -58,7 +58,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 9476
+      "elapsed_s": 9509
     }
   ],
   "ledger": {
@@ -282,10 +282,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 127.4,
+  "disk_free_gb": 127.3,
   "load_avg": [
-    11.6455078125,
-    11.640625,
-    13.083984375
+    11.42724609375,
+    11.59423828125,
+    13.02197265625
   ]
 }
