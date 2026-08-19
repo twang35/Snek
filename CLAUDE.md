@@ -590,6 +590,26 @@ the `pgrep` check before any had spawned, all four saw nothing, and all four ope
 holds the **viewer's** pid, not the trainer's — pointed at the trainer it would keep the claim alive
 after the window was killed and drop it when the trainer merely finished — and a failed spawn releases
 it. A stale lock naming a dead pid is taken over, so nothing suppresses the window permanently.
+
+**‡ The claim lock still lets two windows through, and a laptop close-out opened two on 2026-08-19.**
+`b43`'s four evals spawned **two** viewers in the same second (pids 89235/89236, byte-identical
+`--glob evals/b43*_eval_progress.png` argv, both appending to the one `*-eval.log`). The hole is that
+**`claim_viewer_slot` writes the pid as a second step after the `O_EXCL` create**, and
+`hold_viewer_slot` later rewrites the lock with `open(lock, 'w')`, which truncates before writing —
+so there are two windows in which the lock file **exists but is empty**. An empty lock parses as
+`int('' or 0)` → `holder = 0`, and `if holder and pid_alive(holder)` is then False, so the second
+claimant reads a *young* lock as a **stale** one and takes it over. That is the only path in that
+function where two claimants both win. Not yet fixed; the mechanism is from reading the code, not a
+reproduction.
+
+Two things this implies. **`O_EXCL` alone is not atomic enough when the payload is written
+separately** — the claim is only as atomic as its slowest write, so an empty-but-present lock has to
+count as *held*, not stale (a create-time mtime check, or writing the pid inside the same `os.open`
+via a temp-and-`rename`, would close it). And **a duplicate viewer is safe to retire by explicit pid
+with plain `kill`** — SIGTERM reaches `exit_now()`, so it costs no crash report; verified 0 before and
+0 after. **Never retire one with `pkill -f chart_viewer`**, which kills every window including the
+survivor, and prefer the pid the lock names as the one to keep, so the claim stays consistent. Expect
+the killed one to sit in `ZN` until the eval that spawned it exits.
 **Sequential calls in one process cannot test this**; race it with several live processes that hold the
 claim, the way a trainer does. It refreshes every 1s at 2x size, watches `snek2.py <prefix>` and exits
 on its own once the batch stops. `SNEK_CHART_VIEWER=0` turns it off; smoke runs and `eval_only` never

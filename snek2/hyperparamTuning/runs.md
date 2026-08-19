@@ -82,7 +82,7 @@ checkpoints, one learning rate each, and both chains are armed. Nothing is owed 
 | host | state | measurement chain |
 |---|---|---|
 | **laptop** | **`b43a-d` finished training at the 3M cap** (drained 01:07, +1487-1653k past their seed checkpoints). **Its close-out is running** — launched 01:07:50 by the chain script, 4 arms x 4 workers, gate 96. All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **fired on time at 01:07.** The close-out is at 542-709 of 791-1196 checkpoints per arm after 7.3 h — `b43b` is the long pole at ~8 h remaining, so HOF-500 starts this evening. See the close-out cost warning below: this is expected, not stuck |
-| **desktop** | **`b42a-d` stopped by hand at 22:15** at +385-421k past seed; **its close-out and HOF-500 are both done**. **`b44a-d` then trained to the 3M cap overnight and its close-out is running** since 05:43, HOF-500 queued behind it. Nothing is training on either host | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
+| **desktop** | **`b42a-d` stopped by hand at 22:15** at +385-421k past seed; **its close-out and HOF-500 are both done**. **`b44a-d` then trained to the 3M cap overnight and its close-out is running** since 05:43, HOF-500 queued behind it. **`b45a-d` (`lr 1e-8`, 5M cap) is queued** behind that chain, dirs already seeded. Nothing is training on either host | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
 
 **The two hosts now run the same chain, which they did not before 2026-08-18.** The desktop daemon has
 chained `training → closeout → HOF` since 2026-08-15; the laptop's `chain_closeout_after_training.sh`
@@ -119,7 +119,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42, 43 and 44 — what happens if you keep training a champion — **the answer is yes, at a low enough rate; `b42` closed, `b43`/`b44` in close-out**
+## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, at a low enough rate; `b42` closed, `b43`/`b44` in close-out, `b45` queued**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
@@ -127,13 +127,13 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 
 **One experiment, now a three-rung learning-rate ladder on one set of checkpoints.**
 
-| | desktop `b42` | laptop `b43` | desktop `b44` |
-|---|---|---|---|
-| learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** |
-| everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim |
-| cap | 3M, absolute | 3M, absolute | 3M, absolute |
+| | desktop `b42` | laptop `b43` | desktop `b44` | desktop `b45` |
+|---|---|---|---|---|
+| learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
+| everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
+| cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
 | state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out running on the laptop since 01:07 | **done at 3M**, close-out running on the desktop since 05:43 |
-| result | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 |
+| result | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | — |
 
 `b44` existed because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
 into a hold. It asked where that stops, and **the answer is "not yet at 1e-7"** — see [what actually
@@ -258,9 +258,32 @@ for the 1e-5 → 1e-6 step. The gap is widest at 500-1000k because that is where
 not: **1e-6 still wanders on a half-million-step timescale, 1e-7 largely does not.** `b44`'s best-30 peaks land
 at 1814k / 2190k / 2230k / 2460k, i.e. 300-1100k past seed, against *at the seed step* for `b42`.
 
-**Next rung: `1e-8`.** The ladder is monotone and decelerating (+4.9 then +2.0), which is what approaching a
-plateau looks like without having arrived, and nothing yet distinguishes "plateau" from "slope". Not queued —
-the box is busy with `b44`'s close-out and HOF.
+### Batch 45 — `1e-8`, and the first rung with a longer cap
+
+**Queued on the desktop 2026-08-19**, behind `b44`'s close-out and HOF. The ladder is monotone and decelerating
+(+4.9 then +2.0), which is what approaching a plateau looks like without having arrived; nothing yet
+distinguishes "plateau" from "slope", and this rung is the measurement that does.
+
+**The cap is 5M rather than 3M, and it is the one deliberate difference from the other three rungs.** The
+`best_perfect30` peak arrives later at every rung — **at** the seed step for `b42`, 1527k-2803k for `b43`,
+1814k/2190k/2230k/2460k for `b44` (300-1100k past seed). If that timescale keeps stretching with the rate, a 3M
+cap would stop these arms *before* their peak and the batch would report truncation as a null — which is exactly
+the "it will just freeze" error that was already wrong once, at 1e-7. 5M gives each arm ~3.5-3.65M steps past
+seed against `b44`'s ~1.49-1.65M, for roughly 20 h of wall clock.
+
+**This introduces no confound.** A cap cannot change a trajectory, only where it stops, so every cross-rung
+comparison is still made over the matched +1487k window and is unaffected; the extra steps are strictly
+additional data.
+
+| reading | probability | what it would mean |
+|---|---|---|
+| `b45` beats `b44` by a further **+0.5 to +1.5 pp**, 3-4 of 4 seeds | ~45% | the ladder is a slope, not a plateau, and the useful rate is lower still |
+| **null against `b44`**, inside ±0.5 pp | ~40% | the plateau is real and sits between 1e-7 and 1e-8. **The outcome to plan around** — it makes 1e-7 the operating point and closes the ladder |
+| `b45` is **worse** than `b44` | ~15% | two mechanisms, and **the peak's timing separates them**: still climbing at the 5M cap means merely too slow (raise the cap again); flat from early on means the step has fallen below the scale that changes the greedy action, and the arm is genuinely frozen — the real floor this ladder has been looking for |
+
+**Read the peak's timing, not only its height.** `best_perfect30`'s *step* is the discriminator between "frozen"
+and "still improving", and it is what made `b44`'s result legible. Given the last rung's pre-registration was
+wrong in exactly the direction of assuming saturation, the null branch above is the one to hold most loosely.
 
 ### ⚠ A continuation batch's close-out costs 10-20x a normal one's — budget for it
 

@@ -167,7 +167,7 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-43-and-44--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-at-a-low-enough-rate-b42-closed-b43b44-in-close-out);
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-at-a-low-enough-rate-b42-closed-b43b44-in-close-out-b45-queued);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 
