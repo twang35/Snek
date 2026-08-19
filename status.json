@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T01:03:13",
-  "ts": 1787126593.1932793,
+  "iso": "2026-08-19T01:03:45",
+  "ts": 1787126625.673353,
   "at_a_glance": {
     "running": [
       "b42 -- b42: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-5 (control) -- hof (3 arms)"
@@ -40,7 +40,7 @@
       "step": 1832000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 908
+      "elapsed_s": 940
     },
     {
       "id": "b42b-cont3m-b29a-hof",
@@ -50,7 +50,7 @@
       "step": 1768000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 908
+      "elapsed_s": 940
     },
     {
       "id": "b42d-cont3m-b29c-hof",
@@ -60,7 +60,7 @@
       "step": 1806000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 908
+      "elapsed_s": 940
     }
   ],
   "ledger": {
@@ -310,8 +310,8 @@
   },
   "disk_free_gb": 126.7,
   "load_avg": [
-    12.96435546875,
-    13.9951171875,
-    12.9111328125
+    12.869140625,
+    13.86865234375,
+    12.90380859375
   ]
 }
