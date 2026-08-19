@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-18T19:20:27",
-  "ts": 1787106027.7895985,
+  "iso": "2026-08-18T19:21:00",
+  "ts": 1787106060.867989,
   "at_a_glance": {
     "running": [
       "b41 -- closeout eval (2 arms)"
@@ -38,7 +38,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 12849
+      "elapsed_s": 12882
     },
     {
       "id": "b41d-b29repro-seed4-closeout",
@@ -48,7 +48,7 @@
       "step": 2000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 12849
+      "elapsed_s": 12882
     }
   ],
   "ledger": {
@@ -274,8 +274,8 @@
   },
   "disk_free_gb": 127.3,
   "load_avg": [
-    8.20068359375,
-    8.13134765625,
-    8.69189453125
+    8.0341796875,
+    8.099609375,
+    8.66015625
   ]
 }
