@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-19T03:04:20",
-  "ts": 1787133860.880653,
+  "iso": "2026-08-19T03:05:27",
+  "ts": 1787133927.0746667,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 65% (4 arms)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 66% (4 arms)"
     ],
     "queued": [
       "b44 closeout eval -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
@@ -36,40 +36,40 @@
       "type": "train",
       "policy": "b44a-lowlr7-b29b",
       "pid": 1579340,
-      "step": 1976000,
+      "step": 1984000,
       "max_steps": 3000000,
-      "steps_per_sec": 120.3,
-      "elapsed_s": 4665
+      "steps_per_sec": 120.9,
+      "elapsed_s": 4731
     },
     {
       "id": "b44b-lowlr7-b29a",
       "type": "train",
       "policy": "b44b-lowlr7-b29a",
       "pid": 1579341,
-      "step": 1877000,
+      "step": 1885000,
       "max_steps": 3000000,
-      "steps_per_sec": 105.2,
-      "elapsed_s": 4665
+      "steps_per_sec": 120.9,
+      "elapsed_s": 4731
     },
     {
       "id": "b44c-lowlr7-b40b",
       "type": "train",
       "policy": "b44c-lowlr7-b40b",
       "pid": 1579342,
-      "step": 2058000,
+      "step": 2066000,
       "max_steps": 3000000,
-      "steps_per_sec": 120.3,
-      "elapsed_s": 4665
+      "steps_per_sec": 120.9,
+      "elapsed_s": 4731
     },
     {
       "id": "b44d-lowlr7-b29c",
       "type": "train",
       "policy": "b44d-lowlr7-b29c",
       "pid": 1579343,
-      "step": 1919000,
+      "step": 1927000,
       "max_steps": 3000000,
-      "steps_per_sec": 120.3,
-      "elapsed_s": 4665
+      "steps_per_sec": 120.9,
+      "elapsed_s": 4731
     }
   ],
   "ledger": {
@@ -317,10 +317,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 126.3,
+  "disk_free_gb": 126.2,
   "load_avg": [
-    7.15771484375,
-    8.32861328125,
-    8.5654296875
+    7.31298828125,
+    8.22265625,
+    8.517578125
   ]
 }
