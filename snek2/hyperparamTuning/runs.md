@@ -821,6 +821,7 @@ table.
 | **`FC_LAYERS=512`** under the b24 config | consolidation — how far the widest-layer ordering goes | **new 2026-08-14, and the top architecture item.** b24/b25/b26 order the lift by widest layer (320 → +12.2, 200 → +10.3, 100 → +3.5) with parameter count non-monotone ([finding](findings.md#-corrected-2026-08-14-the-is-off-architecture-lift-tracks-the-widest-layer-not-the-parameter-count)). `b24a-d` is already the seed-matched control, so the arm costs four trainings and nothing else |
 | ~~epsilon ladder *shape*~~ | exploration schedule | **done 2026-08-04** — rewritten, needs measuring |
 | `REPLAY_BUFFER_MAX_LENGTH=1000000` | experience diversity | low — the 500k result was ambiguous |
+| **`eval_wave.py`** — one controller owns a wave of evals, on both hosts | eval wall clock, and the laptop/desktop asymmetry. **Infrastructure, not a training change** | **proposed 2026-08-19, scope approved** — [plan](../plans/eval-wave-controller.md). Whole-checkpoint units handed to shared lanes, so a wave stops idling on its stragglers: measured **1.7-2.8x on a HOF wave** (b40 16/63/9/2 candidates), 1.0-1.2x on a recent close-out and up to 3.0x on the uneven ones (b19, b17). Also deletes `chain_closeout_after_training.sh` and the gate constants duplicated between it and `runner.py` |
 
 **`LEARNING_RATE=1e-4` — only after a stability fix.** 1e-5 is very conservative and
 the in-code comment already suggests 1e-4. With a stable target it may train several
