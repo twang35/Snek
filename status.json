@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-19T05:31:27",
-  "ts": 1787142687.3585694,
+  "iso": "2026-08-19T05:33:00",
+  "ts": 1787142780.0926669,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 98% (3 arms)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 98% (2 arms)"
     ],
     "queued": [
       "b44 closeout eval -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
@@ -27,53 +27,43 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b44a-lowlr7-b29b",
-      "type": "train",
-      "policy": "b44a-lowlr7-b29b",
-      "pid": 1579340,
-      "step": 2999000,
-      "max_steps": 3000000,
-      "steps_per_sec": 126.3,
-      "elapsed_s": 13492
-    },
     {
       "id": "b44b-lowlr7-b29a",
       "type": "train",
       "policy": "b44b-lowlr7-b29a",
       "pid": 1579341,
-      "step": 2901000,
+      "step": 2915000,
       "max_steps": 3000000,
-      "steps_per_sec": 126.3,
-      "elapsed_s": 13492
+      "steps_per_sec": 151.0,
+      "elapsed_s": 13584
     },
     {
       "id": "b44d-lowlr7-b29c",
       "type": "train",
       "policy": "b44d-lowlr7-b29c",
       "pid": 1579343,
-      "step": 2925000,
+      "step": 2938000,
       "max_steps": 3000000,
-      "steps_per_sec": 147.4,
-      "elapsed_s": 13492
+      "steps_per_sec": 140.2,
+      "elapsed_s": 13584
     }
   ],
   "ledger": {
-    "b44c-lowlr7-b40b-closeout": "queued",
     "b44a-lowlr7-b29b-closeout": "queued",
+    "b44c-lowlr7-b40b-closeout": "queued",
     "b44b-lowlr7-b29a-closeout": "queued",
     "b44d-lowlr7-b29c-closeout": "queued",
-    "b44c-lowlr7-b40b-hof": "queued",
     "b44a-lowlr7-b29b-hof": "queued",
+    "b44c-lowlr7-b40b-hof": "queued",
     "b44b-lowlr7-b29a-hof": "queued",
     "b44d-lowlr7-b29c-hof": "queued",
-    "b44a-lowlr7-b29b": "running",
     "b44b-lowlr7-b29a": "running",
     "b44d-lowlr7-b29c": "running",
+    "b44a-lowlr7-b29b": "done",
     "b44c-lowlr7-b40b": "done",
     "b42d-cont3m-b29c-hof": "done",
     "b42b-cont3m-b29a-hof": "done",
@@ -309,8 +299,8 @@
   },
   "disk_free_gb": 125.5,
   "load_avg": [
-    5.87451171875,
-    6.5439453125,
-    7.4140625
+    4.53271484375,
+    5.96240234375,
+    7.1298828125
   ]
 }
