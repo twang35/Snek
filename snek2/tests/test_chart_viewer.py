@@ -44,6 +44,12 @@ def _with_env(**kv):
     return restore
 
 
+# Every fake `subprocess.run` result in this file carries a `returncode` as well as `stdout`, and it
+# follows pgrep's real semantics: **0 when there is output, 1 when there is none**. That is not
+# decoration. `_matching_commands` reads the status to tell "no match" (1) from "the check failed"
+# (>= 2), because both produce empty stdout and treating the second as the first is what closed a
+# watch window over a running eval on 2026-08-19. A stub without a status cannot exercise that.
+
 def test_batch_prefix_groups_a_wave():
     """All four arms of a wave must map to one prefix, or they get one window each."""
     for arm in ('b20a-fc50seed1', 'b20b-fc50seed2', 'b20c-fc50seed3', 'b20d-fc50seed4'):
@@ -125,6 +131,7 @@ def test_spawn_skipped_when_disabled_and_for_smoke():
 
     class _Res:
         stdout = b''      # no viewer running, so only the gate can stop a launch
+        returncode = 1
 
     class _Proc:
         pid = 999
@@ -162,6 +169,7 @@ def test_dedupe_matches_on_the_glob_not_the_script_name():
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def fake_run(args, **_kw):
         if args[0] == 'pgrep':
@@ -195,6 +203,7 @@ def test_dedupe_allows_the_first_launch():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
     try:
@@ -212,6 +221,7 @@ def test_spawn_command_is_detached_and_watches_its_own_batch():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     class _Proc:
         pid = 999
@@ -247,6 +257,7 @@ def test_spawn_failure_is_swallowed():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
 
@@ -293,6 +304,7 @@ def test_eval_spawn_skipped_when_disabled_and_for_verification():
 
     class _Res:
         stdout = b''       # no viewer running, so only the gate can stop a launch
+        returncode = 1
 
     class _Proc:
         pid = 999
@@ -328,6 +340,7 @@ def test_eval_spawn_is_gated_off_the_desktop():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     chart_viewer.subprocess.run = lambda *_a, **_kw: _Res()
     chart_viewer.subprocess.Popen = lambda argv, **_kw: calls.append(argv)
@@ -351,6 +364,7 @@ def test_eval_spawn_globs_evals_and_watches_the_eval_processes():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     class _Proc:
         pid = 999
@@ -389,6 +403,7 @@ def test_eval_spawn_dedupes_on_the_eval_glob():
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def fake_run(args, **_kw):
         if args[0] == 'pgrep':
@@ -420,6 +435,7 @@ def _fake_ps(lines):
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def run(args, **_kw):
         if args[0] == 'pgrep':
@@ -578,6 +594,7 @@ def _fake_ps_by_pattern(lines):
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def run(args, **_kw):
         if args[0] == 'pgrep':
@@ -653,6 +670,7 @@ def test_auto_launch_scopes_the_window_to_the_running_arms():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     class _Proc:
         pid = 1
@@ -693,6 +711,7 @@ def test_the_lock_ends_up_pointing_at_the_viewer_not_the_trainer():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     class _Proc:
         pid = 4242
@@ -719,6 +738,7 @@ def test_a_failed_spawn_releases_the_claim():
 
     class _Res:
         stdout = b''
+        returncode = 1
 
     def boom(*_a, **_kw):
         raise OSError('exec failed')
@@ -790,6 +810,7 @@ def test_dedupe_keys_on_the_arms_flag_so_two_batches_get_two_windows():
         class _Res:
             def __init__(self, out):
                 self.stdout = out
+                self.returncode = 0 if out else 1
 
         def run(args, **_kw):
             if args[0] == 'pgrep':
@@ -1329,6 +1350,7 @@ def test_spawn_registers_the_arm_even_when_another_viewer_owns_the_window():
         class _Res:
             def __init__(self, out):
                 self.stdout = out
+                self.returncode = 0 if out else 1
         if args[0] == 'ps' and 'stat=' in args:
             return _Res(b'S')
         return _Res(b'')
@@ -1376,6 +1398,7 @@ def _fake_ps_stat(state):
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def run(args, **_kw):
         if args[0] == 'ps' and 'stat=' in args:
@@ -1467,6 +1490,7 @@ def test_dedupe_ignores_a_zombie_viewer():
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def zombie_viewer(args, **_kw):
         if args[0] == 'pgrep':
@@ -1488,6 +1512,7 @@ def test_dedupe_still_sees_a_live_viewer():
     class _Res:
         def __init__(self, out):
             self.stdout = out
+            self.returncode = 0 if out else 1
 
     def live_viewer(args, **_kw):
         if args[0] == 'pgrep':
@@ -1500,3 +1525,86 @@ def test_dedupe_still_sees_a_live_viewer():
         assert chart_viewer.viewer_running_for('--arms b30') is True
     finally:
         chart_viewer.subprocess.run = saved
+
+
+# ------------------------- a failed pgrep is not an answer (2026-08-19)
+
+def _stub_pgrep(monkey_returncode, stdout=b''):
+    """Replaces subprocess.run for the duration of a call, returning a fixed pgrep result."""
+    class _Result(object):
+        def __init__(self):
+            self.returncode = monkey_returncode
+            self.stdout = stdout
+
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return _Result()
+
+    return fake_run, calls
+
+
+def test_a_failed_pgrep_raises_instead_of_reading_as_nothing_running():
+    """`pgrep` exits 1 for "no match" and >= 2 for an error, and both give empty stdout.
+
+    Reading only stdout turned a failed check into the strongest possible answer -- "nothing is
+    running" -- which is what closes a watch window. Verified on this machine: 1 for no match, 2 for
+    a bad flag and for a bad regex.
+    """
+    import subprocess
+
+    real_run = subprocess.run
+    fake, _ = _stub_pgrep(2)
+    subprocess.run = fake
+    try:
+        raised = False
+        try:
+            chart_viewer._matching_commands('eval_checkpoints.py b43')
+        except RuntimeError:
+            raised = True
+        assert raised, 'a pgrep that failed with status 2 must not read as "no matches"'
+    finally:
+        subprocess.run = real_run
+
+
+def test_no_match_is_still_no_match():
+    """Status 1 is a real answer and must stay one, or nothing would ever be able to finish."""
+    import subprocess
+
+    real_run = subprocess.run
+    fake, _ = _stub_pgrep(1)
+    subprocess.run = fake
+    try:
+        assert chart_viewer._matching_commands('eval_checkpoints.py b99') == []
+    finally:
+        subprocess.run = real_run
+
+
+def test_the_watch_keeps_the_window_open_when_the_check_cannot_be_answered():
+    """The contract each caller wants: unanswerable means "keep showing", never "exit"."""
+    import subprocess
+
+    real_run = subprocess.run
+    fake, _ = _stub_pgrep(2)
+    subprocess.run = fake
+    try:
+        assert chart_viewer._training_alive('eval_checkpoints.py b43') is True
+        # ...and the panel-set callers degrade the other way: nothing new, nothing marked completed.
+        assert chart_viewer.running_policies() is None
+        assert chart_viewer.live_arms('b43') == []
+    finally:
+        subprocess.run = real_run
+
+
+def test_the_watch_still_exits_when_the_process_list_really_is_empty():
+    """The fix must not make a window immortal: a clean "no match" still ends the wait."""
+    import subprocess
+
+    real_run = subprocess.run
+    fake, _ = _stub_pgrep(1)
+    subprocess.run = fake
+    try:
+        assert chart_viewer._training_alive('eval_checkpoints.py b43') is False
+    finally:
+        subprocess.run = real_run

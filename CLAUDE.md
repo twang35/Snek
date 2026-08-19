@@ -520,7 +520,7 @@ for name in mods:
 print(len(mods), 'modules,', total, 'tests,', fails, 'failed')"
 ```
 
-As of 2026-08-19 that reads **29 modules, 732 tests, 0 failed**. A module count below 29 means the glob
+As of 2026-08-19 that reads **29 modules, 736 tests, 0 failed**. A module count below 29 means the glob
 did not run from `snek2/`.
 
 **A passing suite is not coverage of the change you just made.** `group_obs` took a third signature
@@ -672,6 +672,25 @@ its still-intact `--arms b30` argv, so **killing a window locked the batch out o
 the exact opposite of the "nothing suppresses the window permanently" property above. `pid_state()` /
 `zombie()` fix both sites. When restarting a window by hand, expect the old pid to linger in `pgrep`
 output; that is the zombie, not a second viewer, and `ps -o stat=` tells them apart.
+
+**‡ But `pgrep -f` does *not* always show the zombie, and the two tools disagree** (2026-08-19). A
+zombie's argv is no longer readable, so `pgrep -f chart_viewer` returned **nothing** while
+`ps -o stat= -p 89236` read `ZN` for the same pid — the b43 eval viewer, unreaped because the eval
+that spawned it never `wait()`s. So a process scan can under-report as easily as over-report, and
+**"pgrep found nothing" is not proof a pid is gone**; read `ps -o pid=,stat= -p <pid>` before
+concluding it. The claim lock survives this because it checks `zombie()` on the pid it names rather
+than scanning, which is what let the batch reopen instead of staying locked out.
+
+**‡ A failed `pgrep` used to read as "nothing is running", and it closed a live window**
+(2026-08-19). `pgrep` exits 0 for a match, **1** for no match and **>= 2** for an error, and all of
+those produce empty stdout — so `chart_viewer._matching_commands`, which read only stdout, turned a
+check that *failed* into the strongest possible answer. `_training_alive` then returns False, and six
+of those in a row close the window: the `b43` window exited at 13:59 while `b43b-lowlr-b29a` still had
+five hours to run. It now raises on `>= 2`, which is what its docstring always claimed. **The cause of
+that particular exit was never reproduced** — the check passed on the same pattern minutes later, and
+the obvious suspect (a sibling pid dying between the `pgrep` and the `ps`) was tested and falsified, so
+treat the fix as closing a real hole rather than as a diagnosis. `ps` is deliberately left alone: it
+exits 1 both when every listed pid is gone and on a bad pid, so there is nothing to tell apart.
 
 **A `kill` that seems not to work may have worked.** `kill -0 <pid>` succeeds on a zombie, so a
 wait-for-exit loop written on it never finishes. Read `ps -o stat=` instead.

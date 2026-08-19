@@ -42,9 +42,36 @@ def _matching_commands(pattern):
     itself. Uses `ps` for the cmdline text so it works on macOS (no /proc) as well as Linux.
     Raises on failure; callers decide what an unanswerable check means, which differs
     between "is training alive" (keep showing) and "which arms are live" (show none new).
+
+    **That last paragraph was a lie until 2026-08-19, and it is the whole point of the
+    returncode check below.** `pgrep` exits 0 for a match, **1** for no match and **>= 2** for an
+    error — bad usage, an unparseable pattern, or a failure to enumerate processes (verified on this
+    machine: 1 for no match, 2 for both a bad flag and a bad regex). Every one of those produces
+    empty stdout, and `subprocess.run` without `check=True` does not raise, so a pgrep that *failed*
+    read as **"nothing is running"** — the strongest possible answer — from the weakest possible
+    evidence.
+
+    What that costs: `_training_alive` returns False, and six consecutive False readings close the
+    window. The `b43` eval window did exit at 13:59 on 2026-08-19 while `b43b-lowlr-b29a` was still
+    running, in the same minute a sibling arm and its four spawned workers were tearing down. **That
+    is a plausible cause, not a proven one** — the check passes on the same pattern afterwards, so it
+    was never reproduced, and the more obvious suspect (a sibling pid dying between the `pgrep` and
+    the `ps`) was tested and *falsified*: a recently dead pid still returns the live ones. The bug
+    below is real regardless of whether it is that bug.
+
+    `running_policies` and `live_arms` share the blind spot, and there it means a live arm reading as
+    `(completed)` or a panel never appearing — the same shape as the historical 3-of-4 window bugs.
+
+    The `ps` call is deliberately *not* given the same treatment: it exits 1 both when every listed
+    pid is gone (a real answer, and the common one during a teardown) and on a bad pid, so there is
+    nothing to distinguish. Its empty output is trusted, which is safe because a pid list that came
+    from a successful pgrep and then emptied really does mean the processes ended.
     """
     res = subprocess.run(['pgrep', '-f', pattern],
                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if res.returncode > 1:
+        raise RuntimeError('pgrep -f {0!r} failed with status {1}'.format(
+            pattern, res.returncode))
     mine = str(os.getpid())
     pids = [p for p in res.stdout.decode().split() if p and p != mine]
     if not pids:
