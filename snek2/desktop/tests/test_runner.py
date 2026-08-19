@@ -308,8 +308,11 @@ def test_auto_closeout_synthesizes_eval_inheriting_env():
     assert j.id == 'b20a-fc25seed1-closeout' and j.type == 'eval'
     assert j.policy == 'b20a-fc25seed1'
     assert j.env.get('SNEK_FC_LAYERS') == '25,50,25'   # the FC trap: width must carry over
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == '96'        # closeout gate pinned, not inherited
-    assert j.eval_args == ['top20']
+    # Read from the constant, not a literal: this pair drifted silently when the gate moved
+    # 96 -> 97 on 2026-08-19 and the selector top20 -> top50, and a tripwire asserting a stale
+    # constant is worse than no tripwire.
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == str(runnermod.CLOSEOUT_THRESHOLD)
+    assert j.eval_args == ['top50']
     assert j.priority == runnermod.AUTO_CLOSEOUT_PRIORITY
     assert j.priority < 100                             # beats a default-priority training
 
@@ -322,7 +325,7 @@ def test_closeout_gate_overrides_an_inherited_min_achievable():
                         'closeout': 'pending',
                         'env': {'SNEK_FC_LAYERS': '320', 'EVAL_MIN_ACHIEVABLE': '80'}}
     j = r._auto_closeout_jobs()[0]
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == '96'
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == str(runnermod.CLOSEOUT_THRESHOLD)
     assert runnermod.CLOSEOUT_THRESHOLD < runnermod.HOF_THRESHOLD  # HOF above:98 stays readable
 
 
@@ -981,6 +984,45 @@ def test_at_a_glance_running_line_without_steps_shows_no_percent():
     running = [{'id': 'b40a-x-seed1-closeout', 'type': 'eval', 'policy': 'p'}]
     g = runnermod.build_at_a_glance(running, [], {})
     assert g['running'] == ['b40 -- closeout eval (1 arm)'], g['running']
+
+
+def test_hold_notice_is_none_when_nothing_holds_the_queue():
+    assert runnermod.hold_notice(()) is None
+    assert runnermod.hold_notice(['viewer']) is None   # not a hold flag
+
+
+def test_hold_notice_names_only_the_flag_that_is_set():
+    paused = runnermod.hold_notice(['paused'])
+    assert '"paused": false' in paused and 'drain' not in paused, paused
+    assert 'runtime.json on ops' in paused, paused
+    drained = runnermod.hold_notice(['drain'])
+    assert '"drain": false' in drained and 'paused' not in drained, drained
+    assert 'draining' in drained, drained
+
+
+def test_hold_notice_names_both_flags_and_is_order_stable():
+    both = runnermod.hold_notice(['drain', 'paused'])       # caller order reversed
+    assert '"paused": false' in both and '"drain": false' in both, both
+    assert both == runnermod.hold_notice(['paused', 'drain']), both
+
+
+def test_at_a_glance_puts_the_hold_notice_before_the_batch_lines():
+    order = [{'id': 'b45a-x-seed1', 'type': 'train', 'policy': 'p1'}]
+    g = runnermod.build_at_a_glance([], order, {'b45': 'demo'}, ['paused'])
+    assert len(g['queued']) == 2, g['queued']
+    assert g['queued'][0] == runnermod.hold_notice(['paused']), g['queued']
+    assert g['queued'][1].startswith('b45 training'), g['queued']
+
+
+def test_at_a_glance_shows_the_hold_notice_with_an_empty_queue():
+    g = runnermod.build_at_a_glance([], [], {}, ['paused'])
+    assert g['queued'] == [runnermod.hold_notice(['paused'])], g['queued']
+
+
+def test_at_a_glance_has_no_notice_when_not_held():
+    order = [{'id': 'b45a-x-seed1', 'type': 'train', 'policy': 'p1'}]
+    g = runnermod.build_at_a_glance([], order, {'b45': 'demo'})
+    assert len(g['queued']) == 1 and g['queued'][0].startswith('b45 training'), g['queued']
 
 
 def test_at_a_glance_queued_lists_one_line_per_batch_phase():

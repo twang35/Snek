@@ -523,7 +523,9 @@ class Runner:
             'ts': time.time(),
             # A human summary at the top: one line per running batch (with % done) and one per
             # queued batch-phase, so the box's state reads at a glance without parsing the ledger.
-            'at_a_glance': build_at_a_glance(running, order, self._batch_labels()),
+            'at_a_glance': build_at_a_glance(
+                running, order, self._batch_labels(),
+                [f for f in HOLD_FLAGS if self.runtime.get(f)]),
             'runtime': self.runtime,
             'config_notes': self.config_notes,
             'counts': self._counts(),
@@ -560,11 +562,38 @@ def phase_of(job_id, job_type):
     return {'train': 'training'}.get(job_type, job_type or 'job')
 
 
-def build_at_a_glance(running, queued_order, labels):
+# Shown first in `at_a_glance.queued` while the queue is held, so a queue that is not moving says
+# why and how to release it -- the previous behaviour was an unchanged list of queued batches, which
+# reads exactly like a queue that is about to run. Both flags skip `_dispatch` identically (see
+# `poll_once`), so the notice names whichever ones are actually set: telling someone to clear
+# `paused` while `drain` is the flag that is set would send them to the wrong field.
+HOLD_FLAGS = ('paused', 'drain')
+_HOLD_WORDS = {'paused': 'paused', 'drain': 'draining'}
+
+
+def hold_notice(held_by):
+    """The `at_a_glance.queued` line for a held queue, or None when nothing holds it.
+
+    `held_by` is whichever of `HOLD_FLAGS` are set. Split out from `build_at_a_glance` so the
+    wording is testable on its own, and ordered by `HOLD_FLAGS` rather than by the caller so the
+    line is stable across polls."""
+    held = [flag for flag in HOLD_FLAGS if flag in held_by]
+    if not held:
+        return None
+    return '** queue {0}: nothing new will start. Set {1} in runtime.json on ops to resume'.format(
+        ' and '.join(_HOLD_WORDS[f] for f in held),
+        ' and '.join('"{0}": false'.format(f) for f in held))
+
+
+def build_at_a_glance(running, queued_order, labels, held_by=()):
     """The `at_a_glance` block for status.json: {'running': [str], 'queued': [str]}, one line per
     (batch, phase) group in first-seen order. `running` and `queued_order` are lists of job dicts;
     a running trainer dict carries `step`/`max_steps`, from which each running line shows the mean
     percent done across that batch's arms. `labels` maps a batch id to its human description.
+
+    `held_by` is whichever of `HOLD_FLAGS` are set; when any are, `hold_notice` goes **first** in
+    `queued`, ahead of the batch lines. Unconditional on the queue being non-empty, because an
+    empty `queued` list under a hold is the case most in need of the explanation.
 
     Kept a pure function of plain dicts so it is testable without a live box."""
     def group(jobs):
@@ -595,6 +624,9 @@ def build_at_a_glance(running, queued_order, labels):
             batch, described(batch), phase, pct, arms(len(jobs))))
 
     queued_lines = []
+    notice = hold_notice(held_by)
+    if notice:
+        queued_lines.append(notice)
     for batch, phase, jobs in group(queued_order):
         queued_lines.append('{0} {1}{2} -- queued ({3})'.format(
             batch, phase, described(batch), arms(len(jobs))))
