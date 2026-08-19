@@ -249,9 +249,10 @@ invisible — no error, no queued row, just a re-measure that never happens. **T
 2026-08-19:** the queue was paused mid-b44 to build this, so b44's four close-outs will reap and set
 exactly those four markers. The resume is therefore *not* flipping `paused` back — it is queueing one
 explicit `above:98` wave job for b44 first, which is also the new controller's first real exercise
-(b44's HOF is the imbalanced shape the whole plan is aimed at). Check with
-`git show origin/ops-status:status.json | grep -c '"hof": "pending"'` before deploying, after a
-fetch.
+(b44's HOF is the imbalanced shape the whole plan is aimed at). **The marker is not visible in `status.json`** — that payload flattens each ledger record to a
+bare state string, so the `hof` field never reaches it. Check either from the box
+(`ssh the-claw-den 'grep -c "\"hof\": \"pending\"" <LEDGER_PATH>'`) or, conservatively and from
+anywhere, by looking for any `-hof` row in a freshly fetched `at_a_glance.queued` / ledger view.
 
 **Test impact is the reason this phase is last.** `desktop/tests/test_runner.py` has **83 tests** and
 roughly 30 are touched: all six `test_auto_closeout_*`, the seven `test_auto_hof_*` plus the two reap
