@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T04:46:16",
-  "ts": 1787139976.3896132,
+  "iso": "2026-08-19T04:46:49",
+  "ts": 1787140009.0164196,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- training 89% (4 arms)"
@@ -36,40 +36,40 @@
       "type": "train",
       "policy": "b44a-lowlr7-b29b",
       "pid": 1579340,
-      "step": 2672000,
+      "step": 2675000,
       "max_steps": 3000000,
-      "steps_per_sec": 123.5,
-      "elapsed_s": 10781
+      "steps_per_sec": 92.0,
+      "elapsed_s": 10813
     },
     {
       "id": "b44b-lowlr7-b29a",
       "type": "train",
       "policy": "b44b-lowlr7-b29a",
       "pid": 1579341,
-      "step": 2583000,
+      "step": 2587000,
       "max_steps": 3000000,
-      "steps_per_sec": 123.5,
-      "elapsed_s": 10781
+      "steps_per_sec": 122.6,
+      "elapsed_s": 10813
     },
     {
       "id": "b44c-lowlr7-b40b",
       "type": "train",
       "policy": "b44c-lowlr7-b40b",
       "pid": 1579342,
-      "step": 2769000,
+      "step": 2772000,
       "max_steps": 3000000,
-      "steps_per_sec": 123.5,
-      "elapsed_s": 10781
+      "steps_per_sec": 92.0,
+      "elapsed_s": 10813
     },
     {
       "id": "b44d-lowlr7-b29c",
       "type": "train",
       "policy": "b44d-lowlr7-b29c",
       "pid": 1579343,
-      "step": 2609000,
+      "step": 2612000,
       "max_steps": 3000000,
-      "steps_per_sec": 123.5,
-      "elapsed_s": 10781
+      "steps_per_sec": 91.9,
+      "elapsed_s": 10813
     }
   ],
   "ledger": {
@@ -319,8 +319,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    7.9306640625,
-    7.70166015625,
-    8.0830078125
+    7.94287109375,
+    7.716796875,
+    8.07568359375
   ]
 }
