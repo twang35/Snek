@@ -1,17 +1,18 @@
 # Charts
 
-Progress graphs for the most recent batches — **28, 36, 37, 39, 40 and 43**, a cap of six, newest first.
+Progress graphs for the most recent batches — **28, 36, 37, 40, 42 and 43**, a cap of six, newest first.
 Per-arm numbers live in [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of
 each. A batch appears here **while it is still running**, with training-only numbers, not just once it has
 closed. Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched,
 **batch 30** followed when 34's results arrived, **batch 31** (a void, stopped C51 arm) when 35's arrived,
 **batch 33** when 38 launched, **batch 32** when 39 did, **batches 34 and 35** when 37's and 40's results
-landed, and **the C51 pilot plus batch 38** when 42/43 launched.
+landed, and **the C51 pilot plus batch 38** when 42/43 launched, and **batch 39** when 42 got its section. 39 went ahead of the strict-oldest 28-29 for the same reason 28-29 has been held four times now: it is the source of three of the four checkpoints 42/43/44 continue, and it is what they are read against. 39 bears on none of that.
 
-**Everything here except 43 is closed.** `b39` reached its 3M cap and closed out on the laptop; `b37` and
-`b40` are done on the desktop, training, close-out *and* HOF-500. **`b43` is training now**, and **`b42` — its
-seed-matched control on the desktop — is queued behind a wave barrier and has no chart yet**; its section goes
-in as soon as its arms produce one. The gate ladder's two null rungs (34, 70 and 35, 40) were retired earlier,
+**Everything here except 43 is closed.** `b37` and `b40` are done on the desktop, training,
+close-out *and* HOF-500. **`b43` is training on the laptop**, at +541-562k past its seed checkpoints, with a
+close-out and HOF-500 chained behind it. **`b42` was stopped early** at +385-421k — its answer had resolved on
+4 of 4 seeds — and its close-out is running on the desktop now, HOF-500 queued behind it. **`b44` — the same
+four checkpoints at `lr 1e-7`** — is queued on the desktop behind that eval chain and has no chart yet. The gate ladder's two null rungs (34, 70 and 35, 40) were retired earlier,
 since the ladder's conclusion is now carried by 28-29, 37 and 40 — the batches that bear on whether gate 75's
 record region was real.
 
@@ -62,7 +63,7 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *training on the laptop, launched 2026-08-18 20:52*
+## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *training on the laptop, +541-562k past seed: it holds where `1e-5` decays, 4 of 4 seeds*
 
 **The question:** every record in this project is a checkpoint some arm *passed through* on its way to a worse
 endpoint. No arm has ever been continued from its own best checkpoint. `b43` continues the top four of eight
@@ -70,22 +71,30 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-and-43--what-happens-if-you-keep-training-a-champion--running-launched-2026-08-18-2052);
+[`runs.md`](runs.md#batches-42-43-and-44--what-happens-if-you-keep-training-a-champion--b42-answered-it-and-was-stopped-b43-running-b44-queued);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 
-| arm | continues | from | its 500-ep rate there | training-self-eval so far |
-|---|---|---|---|---|
-| `b43a` | `b29b-chase10g75seed2` | @1447k | **99.0%** (the project record) | best-30 **97.7**, `sef` 98.6 |
-| `b43b` | `b29a-chase10g75seed1` | @1347k | 98.4% | best-30 **98.7**, `sef` 100.0 |
-| `b43c` | `b40b-chasefree10g75seed2` | @1513k | 98.2% | best-30 96.0, `sef` 100.0 |
-| `b43d` | `b29c-chase10g75seed3` | @1396k | 97.1% (378 ep, gate-abandoned) | best-30 95.7, `sef` 97.2 |
+| arm | continues | from | its 500-ep rate there | training-self-eval so far | `b42` best-30 / `sef` |
+|---|---|---|---|---|---|
+| `b43b` | `b29a-chase10g75seed1` | @1347k | 98.4% | best-30 **100.0** @1667k, `sef` 99.6, recent-30 95.0 | its `b42` twin: 97.3 / 97.9 |
+| `b43a` | `b29b-chase10g75seed2` | @1447k | **99.0%** (the project record) | best-30 98.7 @1527k, `sef` 99.6, recent-30 91.7 | 97.3 / **87.0** |
+| `b43c` | `b40b-chasefree10g75seed2` | @1513k | 98.2% | best-30 98.3 @1701k, `sef` **99.8**, recent-30 95.3 | **93.3** / 91.2 |
+| `b43d` | `b29c-chase10g75seed3` | @1396k | 97.1% (378 ep, gate-abandoned) | best-30 98.3 @1539k, `sef` 97.9, recent-30 94.7 | 97.7 / 95.9 |
 
-**Reading, ~70 evals in (≈70k steps each): all four are holding, none has improved on its start.** Every arm
-sits at `sef` **97-100** with `max_single_eval` 100 and `zero_since` null — so nothing is degrading, which is
-itself the first result, since a champion dropped into a fresh replay buffer at a retuned rate could easily
-have fallen apart. It has not: **the same four checkpoints fell 80% → 50% perfect in 5k steps when the replay
-buffer was *not* carried over**, and holding 95-98% here is what the buffer copy bought.
+**Reading at +541-562k: all four hold, and one has improved on its start.** Every arm sits at `sef`
+**97.9-99.8** with `max_single_eval` 100 and `zero_since` null, and **`b43b` reached a `best_perfect30` of
+100.0 at 1667k — 320k steps past its own seed checkpoint**, a 30-eval window with no imperfect game in it. So
+`1e-6` is not merely preservation. That nothing fell apart is itself a result: **the same four checkpoints fell
+80% → 50% perfect in 5k steps when the replay buffer was *not* carried over**, and holding 95-100% here is what
+the buffer copy bought.
+
+**Against `b42`, the seed-matched `1e-5` control, `b43` leads on 4 of 4 seeds on every metric** — `best_perfect30`
+98.3-100.0 against 93.3-97.7, `sef` 97.9-99.8 against 87.0-97.9, and banded perfect rate +4.7/+7.1/+6.1 pp over
+the 100-200k, 200-300k and 300-385k bands past seed. The full banded table is in
+[batch 42's section below](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-on-the-desktop-at-177-191m-it-decays-and-that-is-the-answer),
+which is where the pair's result lives since `b42` is the arm that moved. **`b44`** now extends the ladder to
+**`1e-7`** on the same four checkpoints, queued on the desktop.
 
 **Do not read these best-30 numbers against the 500-episode column beside them.** A 10-episode self-eval
 averaged over 30 evals and a flat 500-episode measurement are different instruments, and the 500-ep column is
@@ -94,20 +103,25 @@ comparison that means something is `b43` against `b42`, which starts from byte-i
 here is training self-eval; the close-outs will be the real numbers.
 
 **`sef` is not comparable with any other batch in this file.** It is the share of an arm's *own* evals above
-80% perfect, and these arms started at ~98% instead of 0 — so 100.0 says "it never dropped", not "it learned
-fast". Only `b42`'s `sef` is a fair reference.
+80% perfect, and these arms started at ~98% instead of 0 — so 99.8 says "it never dropped", not "it learned
+fast". Only `b42`'s `sef` is a fair reference, and it is in the last column of the table above; `b44`'s will be
+the other one. **`b42` and `b43` are also not at a common step horizon** (`b42` was stopped at +385-421k,
+`b43` is past +541k) and `sef` is a fraction of each arm's own evals, so the banded comparison — not this
+column — is the rigorous one.
 
 ### b43b-lowlr-b29a — continues `b29a` @1347k, 98.4%/500
 
-Best-30 **98.7** at 1381k, `sef` **100.0**, recent-30 95.7, `max_single_eval` 100. The steadiest of the four
-so far and the only one whose best-30 window sits above its own starting 500-ep figure — on 10-episode evals,
-so not yet a result.
+Best-30 **100.0** at 1667k, `sef` **99.6**, recent-30 95.0, `max_single_eval` 100. **The strongest evidence in
+the pair that `1e-6` improves rather than merely holds** — a 30-eval window with no imperfect game, 320k steps
+past its seed, against 97.3 for its byte-identical `b42` twin. On 10-episode evals, so the close-out is what
+decides it; but a clean 30-window is not something the starting checkpoint produced.
 
 ![b43b](charts/b43b-lowlr-b29a.png)
 
 ### b43a-lowlr-b29b — continues `b29b` @1447k, **99.0%/500, the project record**
 
-Best-30 **97.7** at 1516k, `sef` **98.6**, recent-30 97.7. The arm that matters most: it starts from the head
+Best-30 **98.7** at 1527k, `sef` **99.6**, recent-30 91.7 — against 97.3 / **87.0** for `b42a` from
+byte-identical weights, the widest `sef` gap of the four. The arm that matters most: it starts from the head
 of b29b's 18-checkpoint band, and [that band is now known to be a
 seed rather than a config](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
 so whether the region can be *extended by training inside it* is the open question `b42`/`b43` exist to answer.
@@ -116,7 +130,8 @@ so whether the region can be *extended by training inside it* is the open questi
 
 ### b43c-lowlr-b40b — continues `b40b` @1513k, 98.2%/500
 
-Best-30 96.0 at 1542k, `sef` **100.0**, recent-30 95.0. **The one arm with a confound worth stating:** `b40b`
+Best-30 **98.3** at 1701k, `sef` **99.8**, recent-30 95.3 — its `b42` twin is the weakest arm of the eight at
+best-30 **93.3**. **The one arm with a confound worth stating:** `b40b`
 was trained *with* the free-space PBRS term and is being continued *without* it, because the batch pins b29's
 config for all four. PBRS leaves the optimal policy unchanged but the value function absorbs the potential, so
 this arm's restored `Q` is mis-calibrated against its new reward in a way the other three are not. It is the
@@ -127,11 +142,83 @@ as though only the seed differed.
 
 ### b43d-lowlr-b29c — continues `b29c` @1396k, 97.1% over 378 episodes
 
-Best-30 95.7 at 1461k, `sef` 97.2, recent-30 95.0. The weakest starting point of the four and currently the
-weakest arm, which is the expected ordering. Its starting figure is **not** a 500-episode number — the row was
+Best-30 **98.3** at 1539k, `sef` 97.9, recent-30 94.7. The weakest starting point of the four and still the
+weakest arm of the `b43` four, which is the expected ordering — though it has closed most of the gap, and its
+`b42` twin is the *best* of the `b42` four, making this the narrowest pair (+1.7 pp over the matched window). Its starting figure is **not** a 500-episode number — the row was
 abandoned by the 98% gate at 378 episodes — so it is not strictly comparable with the three above it.
 
 ![b43d](charts/b43d-lowlr-b29c.png)
+
+## Batch 42 — the **same four checkpoints at the default `lr 1e-5`** — *stopped early on the desktop at 1.77-1.91M: it decays, and that is the answer*
+
+`b43`'s seed-matched control, and the reason the pair exists. Identical in every respect — same four seeded
+policy dirs, same source checkpoints, same seeds, byte-identical env on all nine of b29's knobs — except the
+learning rate is left at the default **`1e-5`**, the rate these checkpoints were originally trained at.
+**Stopped by hand after ~400k steps past resume** rather than run to its 3M cap, because by then the
+comparison had resolved 4 of 4 and the arms were spending compute going downhill. Close-out and HOF-500 were
+queued explicitly so stopping cost no measurement.
+
+| arm | continues | from | `best_perfect30` | `sef` | recent-30 | steps past seed |
+|---|---|---|---|---|---|---|
+| `b42d` | `b29c` | @1396k | 97.7 | 95.9 | 90.0 | +410k |
+| `b42a` | `b29b` | @1447k | 97.3 | **87.0** | 87.0 | +385k |
+| `b42b` | `b29a` | @1347k | 97.3 | 97.9 | 92.7 | +421k |
+| `b42c` | `b40b` | @1513k | **93.3** | 91.2 | 86.0 | +398k |
+
+**The result: at `1e-5` a champion loses about 5 pp of perfect rate and settles at a lower plateau.** Banded
+mean perfect rate over the **+385k window matched across all eight `b42`/`b43` arms** — the largest window
+where every arm has data:
+
+| band past seed | `b42` (1e-5) | `b43` (1e-6) | diff | seeds favouring 1e-6 |
+|---|---|---|---|---|
+| 0-100k | 93.6 | 95.4 | +1.8 | 3 of 4 |
+| 100-200k | 91.6 | 96.3 | **+4.7** | **4 of 4** |
+| 200-300k | 89.1 | 96.2 | **+7.1** | **4 of 4** |
+| 300-385k | 89.5 | 95.6 | **+6.1** | **4 of 4** |
+
+It is a **one-time drop to a lower level, not an ongoing collapse** — the last two bands are flat at ~89, so
+the arm re-equilibrates rather than unravelling. `best_perfect30` and `sef` agree on all four seeds
+(93.3-97.7 against 98.3-100.0, and 87.0-97.9 against 97.9-99.8). Read against
+[the record region being seed noise](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
+the reading is that the default rate is simply too large to *sit still* in a narrow high-performing basin: the
+step size that found the basin is bigger than the basin.
+
+**⚠ Do not judge these arms with `peak_trailing`.** It is trailing average *score*, which maxes at 95/95, and
+**all eight `b42`/`b43` arms read exactly 95.0 with the peak timestamped at their own seed step** — the metric
+is saturated from the first eval, because a policy restored from a 98% checkpoint already fills the board. An
+earlier pass here misread that as "no arm ever beat its starting checkpoint", which is false: `b43b` reached a
+**100.0** best-30 window 320k steps past its seed. Use `perfect_percent`, `best_perfect30` or `sef`.
+
+### b42a-cont3m-b29b — continues the project record, `b29b` @1447k (99.0%/500)
+
+`sef` **87.0**, the worst of the eight arms in this pair of batches, against **99.6** for `b43a` from
+byte-identical weights. The arm that starts highest falls furthest — which is what a basin-too-narrow reading
+predicts, since the record checkpoint sits at the head of b29b's 18-checkpoint band.
+
+![b42a](charts/b42a-cont3m-b29b.png)
+
+### b42c-cont3m-b40b — continues `b40b` @1513k (98.2%/500)
+
+`best_perfect30` **93.3**, the lowest of the four. Carries the same free-space confound as `b43c` — trained
+*with* the global free-space term and continued *without* it — so its restored value function is
+mis-calibrated against its new reward. The confound is identical on the `b43` side, so the pairwise comparison
+holds.
+
+![b42c](charts/b42c-cont3m-b40b.png)
+
+### b42b-cont3m-b29a — continues `b29a` @1347k (98.4%/500)
+
+`sef` 97.9, the best-holding of the four and the smallest gap to its `b43` twin (+1.7 pp over the whole matched
+window). Went furthest past its seed, +421k.
+
+![b42b](charts/b42b-cont3m-b29a.png)
+
+### b42d-cont3m-b29c — continues `b29c` @1396k (97.1%, 378 ep)
+
+`best_perfect30` **97.7**, the highest of the four, from the weakest starting checkpoint — its start is a
+gate-abandoned 378-episode row, not a 500-episode number, so it is not strictly comparable with the others.
+
+![b42d](charts/b42d-cont3m-b29c.png)
 
 ## Batch 40 — chase-safe **plus a global free-space term** — *done on the desktop: null, and it makes b29's record region look like seed luck*
 
@@ -175,98 +262,6 @@ a HOF-promotion candidate — third-best /500 on record behind `b29b`'s 99.0 and
 
 ![b40d](charts/b40d-chasefree10g75seed4.png)
 **b40d-chasefree10g75seed4** — the weak seed, as in every batch of this family
-
-## Batch 39 — **C51 initialised at expected Q = 0** instead of the grid midpoint — *closed at the 3M cap: it loses on every metric, through the head's capacity rather than its calibration*
-
-**b36's config with `SNEK_C51_ZERO_INIT=1` as the only change** — verified by diffing the two launchers'
-environment blocks, which differ in exactly that one line. Same `eps 1.5e-4`, `lr 1e-4`, `fc 320`, seeds
-1-4, 3M cap, so `b36a-d` is an exact seed-matched control. Launcher
-[`launch_b39_zeroinit.sh`](scripts/launch_b39_zeroinit.sh); pre-registered hypotheses in [`runs.md`](runs.md).
-
-**The first arm in this project to run with the ramp** — the knob shipped 2026-08-15 and was dead code
-until now, so the launch was preceded by a smoke run. All four reports confirm `zero-expected-Q init`.
-
-**It is being run knowing the measurement says it should lose.** The [init-optimism
-finding](findings.md#-a-c51-head-starts-at-the-grid-midpoint-not-at-0--and-it-cost-b36-nothing-because-the-ddqn-controls-init-is-further-from-the-truth) put the
-true value at **~34**, so the standard init's 57.5 is 23.5 too high and **zero is 34.0 too low** — the
-ramp moves the init *further* from the truth. The point is the mechanism, not the verdict.
-
-| | E[Q] | `aeff` | bottom-3 mass | action spread |
-|---|---|---|---|---|
-| standard init | 58.52 | 49.87 of 51 | 0.018 | 0.73 |
-| **zero init** (λ=0.16219) | 0.07 | **6.66 of 51** | **0.290** | **0.09** |
-
-**One λ sets the mean and the spread**, so the head starts *sharper than any trained net here ever
-becomes* (b36 settles at `aeff` 20.9-24.6) and must **broaden before it can sharpen**. The ramp is also a
-**−20.3 logit handicap on the top atom** and **−17.0 at `z=100`**, where a near-win must put its mass;
-`e^−17 ≈ 4e−8`. **Confirmed on the smoke run:** after 2,000 steps the top-atom biases had not moved to
-three decimals, all drift (max 0.0150) sitting in the bottom atoms. So recovery must come through the
-kernel and cannot begin until the agent experiences high returns — **valuation lags discovery**, which
-predicts damage in the endgame value signal rather than in whether the arm learns to play.
-
-**‡ Closed: all four arms self-terminated at the 3M cap and closed out at gate 95. H2 confirmed, H1
-falsified, and the margin held from 1.26M to the end.** Matched at ≤1.87M (b36's shortest horizon) and
-seed-paired, b39 is **−9.4 pp** on best-30 and **−7.1 pp** on `sef`, **4 of 4 seeds down**. This is not a
-slow start.
-
-| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta | b39 pooled | b36 pooled |
-|---|---|---|---|---|---|
-| 1 | 75.7 / 10.7 | 84.0 / 24.3 | **−8.3** / −13.6 | 69.78 | 75.36 |
-| 2 | 75.7 / 15.8 | 86.0 / 25.3 | **−10.3** / −9.5 | 69.77 | 76.70 |
-| 3 | 77.7 / 20.0 | 84.7 / 18.9 | **−7.0** / +1.1 | 70.60 | 74.77 |
-| 4 | 74.7 / 11.0 | 86.7 / 17.5 | **−12.0** / −6.5 | 70.57 | 80.19 |
-| **group** | **76.0 / 14.4** | **85.4 / 21.5** | **−9.4 / −7.1** | **70.18** | **76.76** |
-
-*best-30 and `sef` matched at ≤1.87M; pooled equal-effort over each arm's whole close-out.*
-
-**‡ The cleanest single number is that b39 produced no measurable checkpoint at all.** Across **650 rows in
-four arms, every one was abandoned under the 95% gate** — not one checkpoint could still reach 95% once its
-failures were counted, so the batch has **zero full-length rows**. b36 produced 4 and b38 5. b39's best rows
-are truncated at **89.4-91.9%** against b36's **94.0-97.0%**. Pooled is **−6.58 pp**, 4 of 4 seeds
-(−5.58, −6.93, −4.17, −9.62).
-
-**Its seed spread is the tell that this is a ceiling, not luck: pooled 69.77-70.60, a spread of 0.83 pp**,
-against b36's 5.4 and b38's 6.7. Every seed is pinned at the same worse level, which is what a capacity
-constraint looks like and not what seed noise looks like.
-
-**The `aeff` path is non-monotonic exactly as pre-registered** — b39a 7.0 → **26.7 @601k** → 21.1, b39b
-7.0 → **27.3 @631k** → 20.9, against b36a's monotone 49.6 → 21.6. The head does spend training broadening
-before it can sharpen.
-
-**But the predicted *reason* was wrong, and the correction is the point.** The damage was expected to run
-through calibration — zero-init starts 34 from the truth against standard init's 23.5, so it should take
-longer to arrive. **It arrives sooner:** half-life on `|excess|` is **202k / 163k** for b39a/b39b against
-b36a's **304k**, wash-out 601k/631k against 864k, from a *larger* initial error (−30 vs +24). Faster
-calibration, worse play.
-
-**What actually separates them is the action gap.** b36a has full-scale separation (**12.18**) by 8,000
-steps; b39 sits at **1.72** and needs ~600k to reach 8.90, so its whole first 600k runs at a gap 3-7×
-smaller. `argmax` ignores the level and depends entirely on the differences — the level was never the
-thing to measure. b39 also parks **15-18%** of its greedy mass on the `−5` death atom early, against
-b36's 0.3%. **The transferable rule: judge a categorical init by the spread it leaves available, not by
-how close its mean is to the truth.** Full account in
-[`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m).
-
-| arm | step | trailing | best-30 (own peak) | `sef` | pooled | best row |
-|---|---|---|---|---|---|---|
-| `b39d` | 3000k | 92.1 | **80.7** @2924k | 15.7 | 70.57 | 90.9% (77 ep, ab.) |
-| `b39c` | 3000k | 90.8 | 77.7 @886k | 17.6 | 70.60 | 91.9% (86 ep, ab.) |
-| `b39a` | 3000k | 91.4 | 75.7 @1795k | 12.8 | 69.78 | 89.4% (66 ep, ab.) |
-| `b39b` | 3000k | 88.8 | 75.7 @769k | 13.6 | 69.77 | 91.5% (71 ep, ab.) |
-
-*Own-peak best-30 is over the full 3M, so it flatters b39 against b36's 2M — and it still loses by 5-11 pp.*
-
-![b39a](charts/b39a-c51zeroinitseed1.png)
-**b39a-c51zeroinitseed1** — paired with `b36a` (best-30 84.0, pooled 75.36)
-
-![b39b](charts/b39b-c51zeroinitseed2.png)
-**b39b-c51zeroinitseed2** — paired with `b36b` (86.0, 76.70)
-
-![b39c](charts/b39c-c51zeroinitseed3.png)
-**b39c-c51zeroinitseed3** — paired with `b36c` (84.7, 74.77)
-
-![b39d](charts/b39d-c51zeroinitseed4.png)
-**b39d-c51zeroinitseed4** — paired with `b36d` (86.7, **80.19** — the control's strongest arm)
 
 ## Batch 37 — **`b29` replicated on fresh seeds 5-8** — *done on the desktop: the /100 band replicates, the /500 record does not*
 

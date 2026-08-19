@@ -398,14 +398,14 @@ story.** Zero-init's value level converged *faster* — half-life **163-202k** a
 12.18 action gap by **8k steps**, b39 sits at **1.72** and needs ~600k to reach 8.90. Numbers, the death-atom
 mass, and the general rule are in
 [`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m)
-and [`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
+and [`charts.md`](archive/charts-archive.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
 **`SNEK_C51_ZERO_INIT` stays off**; the arms run to their 3M cap so the close-out measures the full curve.
 
 **The decisive measurement is `aeff` against step**, and it is a signature no other arm can produce:
 standard init falls 49.9 → 21-24 monotonically, so a **6.7 → ~36 → 21-24** climb is direct evidence the head
 spent training broadening before it could sharpen. Mechanism, the ramp's three effects, and the smoke
 confirmation are all in the launcher header and
-[`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
+[`charts.md`](archive/charts-archive.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
 
 ### Result
 

@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-18 | 39 | batch 42 got its section (the `lr 1e-5` control for 43), making seven. Retired ahead of the strict-oldest 28-29, which is the source of three of the four checkpoints 42/43/44 continue and the batch they are read against; 39 bears on none of the continuation work and its conclusion — zero-init loses through action separation, not calibration — is carried in full by [`../findings.md`](../findings.md) |
 | 2026-08-18 | C51 pilot | batches 42 and 43 (continuing the four best checkpoints) landed. The pilot was explicitly a *temporary seventh* while its arms were a live control; every C51 arm is now closed, so it went first |
 | 2026-08-18 | 38 | retired with the pilot in the same pass — two sections had to go to hold six. **38 rather than the strict-oldest 28-29, and rather than 36**: 28-29 is the direct source of b42/b43's four checkpoints and is what they are read against, and 36 is still the named control for 39. Nothing kept here cites 38, and its conclusion — the Adam-ε dose is a dead heat at n=4 — is carried in full by [`findings.md`](../findings.md) |
 | 2026-08-17 | 32 | batch 39 (zero-init) launched; b32's question — the Adam epsilon dose — closed for good the same day when b36+b38 resolved it at 4 seeds a side. Retired ahead of the strict-oldest 28-29, which are held for the pending b37 replication |
@@ -32,6 +33,98 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 39 — **C51 initialised at expected Q = 0** instead of the grid midpoint — *closed at the 3M cap: it loses on every metric, through the head's capacity rather than its calibration*
+
+**b36's config with `SNEK_C51_ZERO_INIT=1` as the only change** — verified by diffing the two launchers'
+environment blocks, which differ in exactly that one line. Same `eps 1.5e-4`, `lr 1e-4`, `fc 320`, seeds
+1-4, 3M cap, so `b36a-d` is an exact seed-matched control. Launcher
+[`launch_b39_zeroinit.sh`](../scripts/launch_b39_zeroinit.sh); pre-registered hypotheses in [`runs.md`](../runs.md).
+
+**The first arm in this project to run with the ramp** — the knob shipped 2026-08-15 and was dead code
+until now, so the launch was preceded by a smoke run. All four reports confirm `zero-expected-Q init`.
+
+**It is being run knowing the measurement says it should lose.** The [init-optimism
+finding](../findings.md#-a-c51-head-starts-at-the-grid-midpoint-not-at-0--and-it-cost-b36-nothing-because-the-ddqn-controls-init-is-further-from-the-truth) put the
+true value at **~34**, so the standard init's 57.5 is 23.5 too high and **zero is 34.0 too low** — the
+ramp moves the init *further* from the truth. The point is the mechanism, not the verdict.
+
+| | E[Q] | `aeff` | bottom-3 mass | action spread |
+|---|---|---|---|---|
+| standard init | 58.52 | 49.87 of 51 | 0.018 | 0.73 |
+| **zero init** (λ=0.16219) | 0.07 | **6.66 of 51** | **0.290** | **0.09** |
+
+**One λ sets the mean and the spread**, so the head starts *sharper than any trained net here ever
+becomes* (b36 settles at `aeff` 20.9-24.6) and must **broaden before it can sharpen**. The ramp is also a
+**−20.3 logit handicap on the top atom** and **−17.0 at `z=100`**, where a near-win must put its mass;
+`e^−17 ≈ 4e−8`. **Confirmed on the smoke run:** after 2,000 steps the top-atom biases had not moved to
+three decimals, all drift (max 0.0150) sitting in the bottom atoms. So recovery must come through the
+kernel and cannot begin until the agent experiences high returns — **valuation lags discovery**, which
+predicts damage in the endgame value signal rather than in whether the arm learns to play.
+
+**‡ Closed: all four arms self-terminated at the 3M cap and closed out at gate 95. H2 confirmed, H1
+falsified, and the margin held from 1.26M to the end.** Matched at ≤1.87M (b36's shortest horizon) and
+seed-paired, b39 is **−9.4 pp** on best-30 and **−7.1 pp** on `sef`, **4 of 4 seeds down**. This is not a
+slow start.
+
+| seed | b39 best-30 / `sef` | b36 best-30 / `sef` | delta | b39 pooled | b36 pooled |
+|---|---|---|---|---|---|
+| 1 | 75.7 / 10.7 | 84.0 / 24.3 | **−8.3** / −13.6 | 69.78 | 75.36 |
+| 2 | 75.7 / 15.8 | 86.0 / 25.3 | **−10.3** / −9.5 | 69.77 | 76.70 |
+| 3 | 77.7 / 20.0 | 84.7 / 18.9 | **−7.0** / +1.1 | 70.60 | 74.77 |
+| 4 | 74.7 / 11.0 | 86.7 / 17.5 | **−12.0** / −6.5 | 70.57 | 80.19 |
+| **group** | **76.0 / 14.4** | **85.4 / 21.5** | **−9.4 / −7.1** | **70.18** | **76.76** |
+
+*best-30 and `sef` matched at ≤1.87M; pooled equal-effort over each arm's whole close-out.*
+
+**‡ The cleanest single number is that b39 produced no measurable checkpoint at all.** Across **650 rows in
+four arms, every one was abandoned under the 95% gate** — not one checkpoint could still reach 95% once its
+failures were counted, so the batch has **zero full-length rows**. b36 produced 4 and b38 5. b39's best rows
+are truncated at **89.4-91.9%** against b36's **94.0-97.0%**. Pooled is **−6.58 pp**, 4 of 4 seeds
+(−5.58, −6.93, −4.17, −9.62).
+
+**Its seed spread is the tell that this is a ceiling, not luck: pooled 69.77-70.60, a spread of 0.83 pp**,
+against b36's 5.4 and b38's 6.7. Every seed is pinned at the same worse level, which is what a capacity
+constraint looks like and not what seed noise looks like.
+
+**The `aeff` path is non-monotonic exactly as pre-registered** — b39a 7.0 → **26.7 @601k** → 21.1, b39b
+7.0 → **27.3 @631k** → 20.9, against b36a's monotone 49.6 → 21.6. The head does spend training broadening
+before it can sharpen.
+
+**But the predicted *reason* was wrong, and the correction is the point.** The damage was expected to run
+through calibration — zero-init starts 34 from the truth against standard init's 23.5, so it should take
+longer to arrive. **It arrives sooner:** half-life on `|excess|` is **202k / 163k** for b39a/b39b against
+b36a's **304k**, wash-out 601k/631k against 864k, from a *larger* initial error (−30 vs +24). Faster
+calibration, worse play.
+
+**What actually separates them is the action gap.** b36a has full-scale separation (**12.18**) by 8,000
+steps; b39 sits at **1.72** and needs ~600k to reach 8.90, so its whole first 600k runs at a gap 3-7×
+smaller. `argmax` ignores the level and depends entirely on the differences — the level was never the
+thing to measure. b39 also parks **15-18%** of its greedy mass on the `−5` death atom early, against
+b36's 0.3%. **The transferable rule: judge a categorical init by the spread it leaves available, not by
+how close its mean is to the truth.** Full account in
+[`findings.md`](../findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m).
+
+| arm | step | trailing | best-30 (own peak) | `sef` | pooled | best row |
+|---|---|---|---|---|---|---|
+| `b39d` | 3000k | 92.1 | **80.7** @2924k | 15.7 | 70.57 | 90.9% (77 ep, ab.) |
+| `b39c` | 3000k | 90.8 | 77.7 @886k | 17.6 | 70.60 | 91.9% (86 ep, ab.) |
+| `b39a` | 3000k | 91.4 | 75.7 @1795k | 12.8 | 69.78 | 89.4% (66 ep, ab.) |
+| `b39b` | 3000k | 88.8 | 75.7 @769k | 13.6 | 69.77 | 91.5% (71 ep, ab.) |
+
+*Own-peak best-30 is over the full 3M, so it flatters b39 against b36's 2M — and it still loses by 5-11 pp.*
+
+![b39a](../charts/b39a-c51zeroinitseed1.png)
+**b39a-c51zeroinitseed1** — paired with `b36a` (best-30 84.0, pooled 75.36)
+
+![b39b](../charts/b39b-c51zeroinitseed2.png)
+**b39b-c51zeroinitseed2** — paired with `b36b` (86.0, 76.70)
+
+![b39c](../charts/b39c-c51zeroinitseed3.png)
+**b39c-c51zeroinitseed3** — paired with `b36c` (84.7, 74.77)
+
+![b39d](../charts/b39d-c51zeroinitseed4.png)
+**b39d-c51zeroinitseed4** — paired with `b36d` (86.7, **80.19** — the control's strongest arm)
 
 ## C51 pilot — distributional RL, learning-rate screen — *closed at 600k, chose `5e-5`*
 

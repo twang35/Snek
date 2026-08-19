@@ -81,8 +81,8 @@ checkpoints, one learning rate each, and both chains are armed. Nothing is owed 
 
 | host | state | measurement chain |
 |---|---|---|
-| **laptop** | **4 arms training: `b43a-d`, launched 20:52, ~5.8-6.1k steps/min, at 1.53-1.70M of 3M.** All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **ETA 3.6-4.3 h from 21:24**, so the chain fires ~01:00-01:40 |
-| **desktop** | **4 arms training: `b42a-d`, dispatched ~21:10** once `b41c-b29repro-seed3-hof` cleared the wave barrier. Each is writing checkpoints from exactly its seed step (1447k / 1347k / 1513k / 1396k), which confirms the hand-seeded dirs restored correctly | **automatic.** `auto_closeout` + `auto_hof` chain close-out → HOF-500 off every training. Both are projected in the ledger already but are **synthesized from a `closeout: pending` marker set only when a training finishes**, so neither can run ahead of it |
+| **laptop** | **4 arms training: `b43a-d`, launched 20:52, ~5.8-6.1k steps/min, at 1.91-2.07M of 3M** (+541-562k past their seed checkpoints). All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **ETA ~2.6-2.9 h from 22:25**, so the chain fires ~01:00-01:20 |
+| **desktop** | **`b42a-d` stopped by hand at 22:15**, at +385-421k past seed (1.77-1.91M of a 3M cap), because the comparison with `b43` had resolved on 4 of 4 seeds and the arms were spending compute going downhill. **Its close-out is running now** — four `eval_checkpoints.py … top20`, one per arm. **`b44a-d` (`lr 1e-7`) is queued** behind that eval chain | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
 
 **The two hosts now run the same chain, which they did not before 2026-08-18.** The desktop daemon has
 chained `training → closeout → HOF` since 2026-08-15; the laptop's `chain_closeout_after_training.sh`
@@ -108,24 +108,35 @@ churn figure was inflated ~2×; both are written up under [batch 32](completedRu
 **The dose is now closed for good** — b36 vs b38 retried it at 4 seeds a side and pooled 76.77 vs 74.73 at a
 matched ≤2M horizon, 3 of 4 favouring `1.5e-4`, p=0.625. `1.5e-4` stays the default on lower seed variance.
 
+**A `failed` training does not publish.** `_publish_results` is gated on the same `ok` flag as
+`auto_closeout`, so `b42`'s training artifacts were never going to reach the `results` branch. They were
+rsynced across by hand (`rsync -a "the-claw-den:Snek/snek2/runs/b42*" snek2/runs/`) and are what the banded
+comparison below is computed from. Re-rsync when the close-out finishes to pick up
+`_checkpoint_evals.json`.
+
 **Batch numbering: `b37` is the desktop's b29 replication, so the laptop's dose arm is `b38`.** Worth stating
 because both were queued within minutes of each other from different hosts, and `b37` was very nearly used
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42 and 43 — what happens if you keep training a champion — **running, launched 2026-08-18 20:52**
+## Batches 42, 43 and 44 — what happens if you keep training a champion — **`b42` answered it and was stopped; `b43` running; `b44` queued**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
 checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 
-**One experiment, two hosts, one variable between them.**
+**One experiment, now a three-rung learning-rate ladder on one set of checkpoints.**
 
-| | desktop `b42` | laptop `b43` |
-|---|---|---|
-| learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** |
-| everything else | b29's config verbatim | b29's config verbatim |
-| cap | 3M, absolute | 3M, absolute |
+| | desktop `b42` | laptop `b43` | desktop `b44` |
+|---|---|---|---|
+| learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** |
+| everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim |
+| cap | 3M, absolute | 3M, absolute | 3M, absolute |
+| state | **stopped at +385-421k — it decays** | running, +541-562k — it holds, and one seed improved | queued behind `b42`'s eval chain |
+
+`b44` exists because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
+into a hold. It asks where that stops — see [the estimate and the three
+readings](#b44-at-1e-7--what-it-should-do-and-the-one-outcome-that-would-be-interesting) below.
 
 Config is b29's, byte-checked against `b29b`'s own spec with only `SNEK_SEED` substituted: `fc 320`,
 chase-safe `c=0.10` gate 75, IS off, target-update 1000, discount 0.9975, food-distance 0, fork-branches 4,
@@ -169,10 +180,57 @@ and `b29b`'s 18-wide band was **a seed, not a config**. So:
 | reading | meaning |
 |---|---|
 | `b42` holds ~99% and extends the band | the record region is reachable by *training longer from inside it*, and every previous arm was stopped early. The most valuable outcome |
-| `b42` decays, `b43` holds | the 1e-5 steps are too large to sit still at a champion — the endgame is a narrow basin and the default rate walks out of it. Would make **low-LR fine-tuning the way to bank a record**, which is a new tool |
+| **✅ `b42` decays, `b43` holds — this is what happened, 4 of 4 seeds** | the 1e-5 steps are too large to sit still at a champion — the endgame is a narrow basin and the default rate walks out of it. Makes **low-LR fine-tuning the way to bank a record**, which is a new tool |
 | both decay together | the decay is not the step size. Points at the objective or the replay distribution, and says a champion checkpoint is a transient the optimizer does not want to stay in |
 | both hold, neither improves | ~99% is the ceiling of this config and the remaining 1% is not a learning problem — consistent with the four null PBRS terms |
 | `b43` decays and `b42` does not | would be surprising and is the one reading that suggests a bug; check the reset line is in all four logs first |
+
+### ✅ What happened — `b42` decays, `b43` holds, on 4 of 4 seeds
+
+Banded mean self-eval perfect rate over the **+385k window matched across all eight arms** (the largest window
+where every arm has data — `b42` was stopped at +385-421k, `b43` is past +541k, and `sef` is a fraction of each
+arm's *own* evals, so bands are the only fair comparison):
+
+| band past seed | `b42` (1e-5) | `b43` (1e-6) | diff | seeds favouring 1e-6 |
+|---|---|---|---|---|
+| 0-100k | 93.6 | 95.4 | +1.8 | 3 of 4 |
+| 100-200k | 91.6 | 96.3 | **+4.7** | **4 of 4** |
+| 200-300k | 89.1 | 96.2 | **+7.1** | **4 of 4** |
+| 300-385k | 89.5 | 95.6 | **+6.1** | **4 of 4** |
+
+`best_perfect30` and `strong_eval_fraction` agree on all four seeds: **93.3-97.7 / 87.0-97.9** at 1e-5 against
+**98.3-100.0 / 97.9-99.8** at 1e-6.
+
+Two refinements on the headline. **The decay is a one-time drop to a lower plateau, not an ongoing collapse** —
+1e-5's last two bands are flat at ~89, so the arm re-equilibrates about 5 pp down rather than unravelling.
+And **1e-6 is not pure preservation: `b43b` reached a `best_perfect30` of 100.0 at 1667k, 320k steps past its
+own seed**, a 30-eval window with no imperfect game, against 97.3 for its byte-identical `b42` twin. So on at
+least one seed, continuing a champion at a low rate *improved* it. These are 10-episode self-evals; the
+close-outs and HOF-500s decide it.
+
+**⚠ `peak_trailing` cannot judge this family of arms, and it briefly fooled this investigation.** It is
+trailing average *score*, which maxes at 95/95 — **all eight `b42`/`b43` arms read exactly 95.0 with the peak
+timestamped at their own seed step**, because a policy restored from a 98% checkpoint fills the board on eval
+one. That saturation was first read as "no arm ever beat its starting checkpoint", which is false and is
+retracted. Use `perfect_percent`, `best_perfect30` or `sef`. The general lesson is the `game_over`/`sef` one
+again: **a metric at its ceiling looks like a measurement and carries no information.**
+
+### b44 at 1e-7 — what it should do, and the one outcome that would be interesting
+
+Queued on the desktop, same four seeded checkpoints, `SNEK_LEARNING_RATE=1e-7` the only change from `b42`.
+Pre-registered before launch, in the specs' own `notes`:
+
+| reading | probability | what it would mean |
+|---|---|---|
+| **null against `b43`** | ~65% | the expected outcome. If 1e-6 is already doing nothing but failing to damage the policy, 1e-7 cannot do better than the same nothing. Bounds the useful range and says the preservation effect **saturates by 1e-6** |
+| better than `b43` | ~25% | decay at 1e-6 is still nonzero and the optimum is below it — extend the ladder to 1e-8 |
+| **worse than `b43`** | ~10% | the informative one. It would mean `b43` is not merely holding but **actively repairing** — most plausibly adapting to the transplanted replay buffer, which comes from the source arm's *final* step and is therefore slightly off-policy for the restored weights — and that 1e-6 is roughly the rate at which repair keeps pace with drift |
+
+**The likely failure mode at a low rate is stasis, not collapse**, so "no improvement" is not a broken arm —
+read it against `b43`, which is the control for exactly that. Adam's step is `lr · m/(√v + ε)`, so lowering the
+rate scales every step's magnitude near-uniformly without changing the relative dynamics; 1e-7 should look like
+1e-6 at roughly a tenth the movement. Note `b43b`'s gain is the main reason the "worse" branch is not smaller:
+if some of what 1e-6 buys is *motion* rather than *stillness*, 1e-7 gives that up.
 
 ### How these arms were started — it is not an ordinary resume
 
@@ -358,7 +416,7 @@ channel. The channel is **action separation** — b36a reaches a 12.18 action ga
 close its mean is to the truth.** `SNEK_C51_ZERO_INIT` stays off, now on measured grounds. Full account in
 [`findings.md`](findings.md#-zero-init-loses-and-the-channel-is-action-separation-not-calibration--b39-closed-at-3m);
 pre-registration, per-arm rows and charts in [`completedRuns.md`](completedRuns.md) and
-[`charts.md`](charts.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
+[`charts.md`](archive/charts-archive.md#batch-39--c51-initialised-at-expected-q--0-instead-of-the-grid-midpoint--closed-at-the-3m-cap-it-loses-on-every-metric-through-the-heads-capacity-rather-than-its-calibration).
 
 ## Batch 38 — b36's config at the **other** Adam epsilon (`3.125e-4`) — **closed 2026-08-17: dead heat, the dose question is settled**
 
