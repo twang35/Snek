@@ -65,7 +65,7 @@ HOF_EVAL_ENV = {
 # the arm trained under. Must stay BELOW HOF_THRESHOLD: HOF selects `above:98` from the
 # closeout file, and only rows that reach the gate are full length, so a gate above 98 would
 # abandon the very checkpoints HOF needs to read and starve the re-measure.
-CLOSEOUT_THRESHOLD = 97
+CLOSEOUT_THRESHOLD = 96
 assert CLOSEOUT_THRESHOLD < HOF_THRESHOLD, 'closeout gate must stay below the HOF selection gate'
 CLOSEOUT_EVAL_ENV = {'EVAL_MIN_ACHIEVABLE': str(CLOSEOUT_THRESHOLD)}
 
@@ -296,10 +296,14 @@ class Runner:
             if rec.get('closeout') != 'pending' or not rec.get('policy'):
                 continue
             eval_id = rec['policy'] + '-closeout'
-            if self.ledger.get(eval_id, {}).get('state') in TERMINAL or eval_id in self.running:
+            prior = self.ledger.get(eval_id, {})
+            if prior.get('state') in TERMINAL or eval_id in self.running:
                 continue
             env = dict(rec.get('env') or {})
             env.update(CLOSEOUT_EVAL_ENV)          # the closeout gate wins over the inherited env
+            if prior.get('state') == 'interrupted':
+                env['EVAL_RESUME'] = '1'           # a reboot cut the last attempt short: keep its
+                                                   # full-length rows, redo only the partial one
             jobs.append(Job(id=eval_id, type='eval', policy=rec['policy'],
                             env=env, eval_args=['top20'],
                             priority=AUTO_CLOSEOUT_PRIORITY))
@@ -323,10 +327,13 @@ class Runner:
             if rec.get('hof') != 'pending' or not rec.get('policy'):
                 continue
             hof_id = rec['policy'] + '-hof'
-            if self.ledger.get(hof_id, {}).get('state') in TERMINAL or hof_id in self.running:
+            prior = self.ledger.get(hof_id, {})
+            if prior.get('state') in TERMINAL or hof_id in self.running:
                 continue
             env = dict(rec.get('env') or {})
             env.update(HOF_EVAL_ENV)               # the HOF recipe wins over the inherited env
+            if prior.get('state') == 'interrupted':
+                env['EVAL_RESUME'] = '1'           # resume the 500-ep re-measure, do not redo it
             jobs.append(Job(id=hof_id, type='eval', policy=rec['policy'],
                             env=env, eval_args=list(HOF_EVAL_ARGS),
                             priority=AUTO_HOF_PRIORITY))

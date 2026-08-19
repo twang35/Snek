@@ -308,7 +308,7 @@ def test_auto_closeout_synthesizes_eval_inheriting_env():
     assert j.id == 'b20a-fc25seed1-closeout' and j.type == 'eval'
     assert j.policy == 'b20a-fc25seed1'
     assert j.env.get('SNEK_FC_LAYERS') == '25,50,25'   # the FC trap: width must carry over
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == '97'        # closeout gate pinned, not inherited
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == '96'        # closeout gate pinned, not inherited
     assert j.eval_args == ['top20']
     assert j.priority == runnermod.AUTO_CLOSEOUT_PRIORITY
     assert j.priority < 100                             # beats a default-priority training
@@ -322,8 +322,20 @@ def test_closeout_gate_overrides_an_inherited_min_achievable():
                         'closeout': 'pending',
                         'env': {'SNEK_FC_LAYERS': '320', 'EVAL_MIN_ACHIEVABLE': '80'}}
     j = r._auto_closeout_jobs()[0]
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == '97'
+    assert j.env['EVAL_MIN_ACHIEVABLE'] == '96'
     assert runnermod.CLOSEOUT_THRESHOLD < runnermod.HOF_THRESHOLD  # HOF above:98 stays readable
+
+
+def test_interrupted_closeout_resumes_a_fresh_one_does_not():
+    # A reboot marks the running closeout 'interrupted' (non-terminal), so it is re-synthesized.
+    # That relaunch must carry EVAL_RESUME=1 to keep the full-length rows already on disk;
+    # a first-time closeout (no prior record) must not, or it would read a stale file.
+    r = _runner()
+    r.ledger['b41a'] = {'state': 'done', 'type': 'train', 'policy': 'b41a',
+                        'closeout': 'pending', 'env': {'SNEK_FC_LAYERS': '320'}}
+    assert 'EVAL_RESUME' not in r._auto_closeout_jobs()[0].env   # fresh: measure from scratch
+    r.ledger['b41a-closeout'] = {'state': 'interrupted', 'type': 'eval', 'policy': 'b41a'}
+    assert r._auto_closeout_jobs()[0].env['EVAL_RESUME'] == '1'  # relaunch: resume
 
 
 def test_auto_closeout_skips_when_eval_done_running_or_unmarked():
@@ -389,8 +401,19 @@ def test_auto_hof_synthesizes_a_500ep_flat_eval_inheriting_env():
     assert j.env['EVAL_INDEPENDENT'] == '1'
     assert j.env['EVAL_MIN_ACHIEVABLE'] == '98'
     assert j.env['EVAL_OUT_SUFFIX'] == '_hof500'       # a distinct file, never clobbers the closeout
+    assert 'EVAL_RESUME' not in j.env                   # fresh HOF: measure from scratch
     assert j.priority == runnermod.AUTO_HOF_PRIORITY
     assert runnermod.AUTO_CLOSEOUT_PRIORITY < j.priority < 100  # after the closeout, before a training
+
+
+def test_interrupted_hof_resumes_the_500ep_remeasure():
+    # The expensive one to redo: a reboot mid-HOF must resume its _hof500 file, not restart it.
+    r = _runner()
+    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending',
+                              'env': {'SNEK_FC_LAYERS': '320'}}
+    assert 'EVAL_RESUME' not in r._auto_hof_jobs()[0].env
+    r.ledger['p-hof'] = {'state': 'interrupted', 'type': 'eval', 'policy': 'p'}
+    assert r._auto_hof_jobs()[0].env['EVAL_RESUME'] == '1'
 
 
 def test_auto_hof_recipe_wins_over_an_inherited_eval_env():

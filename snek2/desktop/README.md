@@ -59,14 +59,22 @@ The daemon synthesizes two follow-on evals, each off a ledger marker, never as s
 
 | link | trigger | synthesized job | what it runs |
 |---|---|---|---|
-| **closeout** | a training finishes OK (`auto_closeout`) | `<policy>-closeout`, priority 10 | `eval_checkpoints.py <policy> top20` at `EVAL_MIN_ACHIEVABLE=97` |
+| **closeout** | a training finishes OK (`auto_closeout`) | `<policy>-closeout`, priority 10 | `eval_checkpoints.py <policy> top20` at `EVAL_MIN_ACHIEVABLE=96` |
 | **HOF re-measure** | a closeout finishes OK (`auto_hof`) | `<policy>-hof`, priority 11 | `eval_checkpoints.py <policy> above:98` at 500 episodes, flat |
 
-The closeout pins its abandonment gate at **`EVAL_MIN_ACHIEVABLE=97`** (`CLOSEOUT_EVAL_ENV`),
+The closeout pins its abandonment gate at **`EVAL_MIN_ACHIEVABLE=96`** (`CLOSEOUT_EVAL_ENV`),
 overriding whatever the training env carried rather than falling to `eval_checkpoints`' default of
 95. It stays **below** the HOF gate of 98 on purpose: HOF's `above:98` selects only rows the
 closeout measured at full length, and a gate above 98 would abandon exactly those checkpoints and
 starve the re-measure.
+
+**A reboot mid-eval resumes rather than restarts.** When `_reattach` marks a running closeout or
+HOF `interrupted` (boot-id mismatch) and the job is re-synthesized on the next dispatch, its env
+carries **`EVAL_RESUME=1`** — so the relaunch keeps the full-length rows already on disk and
+re-measures only the checkpoint that was in flight when the power was lost, instead of redoing the
+whole pass. A first-time eval (no prior ledger record) never gets the flag, so it always measures
+from scratch. The flag is only set on the `interrupted` path, so a `done`/`failed` eval is never
+resumed from a stale file.
 
 The HOF re-measure reconfirms the checkpoints a closeout already found excellent. `above:98` reads
 the closeout's own `runs/<policy>_checkpoint_evals.json` and takes every checkpoint measured there
