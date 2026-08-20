@@ -672,10 +672,17 @@ def install_signal_exit(plt):
 # 1040px. A built-in panel is smaller than that, so there the screen fit clamps it down to ~88% of
 # the panel height instead. A single panel is under the budgets, so its size comes from the scale.
 MAX_FIG_W_IN = 18.2
-MAX_FIG_H_IN = 10.4
+MAX_FIG_H_IN = 13.0
 
 # These budgets and the default scale below were raised 30% on request (from 14.0/8.0 and 2.0); an
 # earlier 8.0in was itself a fix for a 9.0in that still clipped a built-in panel.
+#
+# The height went 10.4 -> 13.0 on 2026-08-19, when the panel box started matching the image's aspect
+# (`figure_dims`). A near-square eval chart at the old cap made the *height* the binding constraint
+# on a 2x2 grid, so the window came out narrower than the screen with the charts no larger -- the
+# whitespace was gone but none of it had been given back. 13.0 hands the decision to
+# `fit_figure_to_screen`, which reads the real display and only ever shrinks, so this is a ceiling
+# for the case where that probe fails rather than a size anyone sees.
 
 
 def clamp_dims(w, h, max_w, max_h):
@@ -693,13 +700,62 @@ def grid_shape(n):
     return rows, cols
 
 
-def figure_dims(rows, cols, scale):
+# Fallback panel aspect (width / height) for a grid built before any image has been read. 1.4 was
+# the only aspect until 2026-08-19, hardcoded as 4.2 x 3.0 inches per panel.
+DEFAULT_PANEL_ASPECT = 1.4
+
+
+def image_aspect(images, default=DEFAULT_PANEL_ASPECT):
+    """Width / height of the first readable image, or `default` when there is none.
+
+    One aspect for the whole grid rather than one per panel: the panels are the same kind of chart
+    written by the same code, and a per-axes aspect would need a `GridSpec` with unequal rows for no
+    real gain.
+    """
+    for image in images or ():
+        if image is None:
+            continue
+        try:
+            height, width = image.shape[0], image.shape[1]
+        except (AttributeError, IndexError):
+            continue
+        if height and width:
+            return float(width) / float(height)
+    return default
+
+
+def figure_dims(rows, cols, scale, aspect=DEFAULT_PANEL_ASPECT):
     """Panel-grid size in inches, shrunk uniformly (aspect preserved) to the laptop-safe budget.
 
     Uniform, not per-axis: clamping width and height independently would distort the charts.
     The shrink is 1.0 whenever the requested size already fits, so single panels and the
-    desktop's own --scale are unchanged unless they would overflow."""
-    return clamp_dims(cols * 4.2 * scale, rows * 3.0 * scale, MAX_FIG_W_IN, MAX_FIG_H_IN)
+    desktop's own --scale are unchanged unless they would overflow.
+
+    **`aspect` is the panel's, and it has to come from the image** (2026-08-19). Each panel was a
+    fixed 4.2 x 3.0 inches, aspect 1.4, while `imshow` preserves the image's own aspect inside that
+    box -- so every panel was letterboxed by whatever the two disagreed about, and a 2x2 grid showed
+    the difference twice with the slack piling up between the rows. The eval chart is 1.11 and the
+    training chart 1.62, so both were wrong, in opposite directions. Matching the box to the image
+    means the chart fills its panel and the window's whole area is chart, which is what makes the
+    text inside it bigger.
+    """
+    aspect = aspect or DEFAULT_PANEL_ASPECT
+    panel_w = 4.2 * scale
+    return clamp_dims(cols * panel_w, rows * panel_w / aspect, MAX_FIG_W_IN, MAX_FIG_H_IN)
+
+
+def apply_tight_grid(fig, gap=0.01):
+    """Push the panels out to the figure edges with a hairline between them.
+
+    Replaces `tight_layout`, which reserves room for the titles, labels and ticks a panel of bare
+    `imshow` axes does not have -- roughly 8% of the height on a 2x2 grid, all of it visible as a
+    band between the rows. `gap` is in axes-height/width units, so 0.01 is a seam rather than a
+    margin.
+    """
+    try:
+        fig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0, wspace=gap, hspace=gap)
+    except Exception:
+        pass
 
 
 def fit_figure_to_screen(fig, w_in, h_in):
@@ -741,12 +797,13 @@ def viewer_dpi(platform, override=None):
     return VIEWER_HIDPI_DPI if platform == 'darwin' else 100
 
 
-def make_figure(plt, rows, cols, scale, title, dpi=None):
+def make_figure(plt, rows, cols, scale, title, dpi=None,
+                aspect=DEFAULT_PANEL_ASPECT):
     """Build the chart grid, then (re)install the signal handler — one operation, in that
     order, because separating them silently breaks the clean exit. See
     `install_signal_exit`: Tk overwrites the OS-level handler while creating this window,
     so any install that does not follow a `subplots()` call is dead code."""
-    dims = figure_dims(rows, cols, scale)
+    dims = figure_dims(rows, cols, scale, aspect)
     fig, grid = plt.subplots(rows, cols, squeeze=False, figsize=dims,
                              dpi=viewer_dpi(sys.platform, dpi))
     fit_figure_to_screen(fig, *dims)
@@ -791,6 +848,7 @@ def main():
     axes = []
     wave_arms = []
     rendered_files = None
+    rendered_aspect = None
     absent_checks = 0
     # Startup grace: training (and its first PNG) may not exist for a few refreshes,
     # so require the watch pattern to be absent on several consecutive checks first.
@@ -812,25 +870,36 @@ def main():
             sys.stderr.flush()
         n = max(1, len(files))
         rows, cols = grid_shape(n)
+        # Decoded *before* the figure, because the panel box is sized to the image's own aspect --
+        # a grid built first would have to be thrown away and rebuilt on the first refresh.
+        images = []
+        for path in files:
+            try:
+                images.append(mpimg.imread(path))
+            except Exception:
+                images.append(None)   # a half-written PNG: blank panel, the next refresh has it
+        aspect = image_aspect(images)
         # Rebuild when the panel *set* changes, not only when the axis count does: a late arm can
         # arrive without changing rows*cols (3 -> 4 both want a 2x2), and rebuilding on the set
-        # guarantees the new arm gets a panel rather than relying on positional reuse.
-        if fig is None or len(axes) != rows * cols or files != rendered_files:
+        # guarantees the new arm gets a panel rather than relying on positional reuse. The aspect
+        # joins that test because the first refresh with a readable image is usually the one that
+        # learns it, and a stale box would letterbox every panel until the set next changed.
+        if (fig is None or len(axes) != rows * cols or files != rendered_files
+                or aspect != rendered_aspect):
             if fig is not None:
                 plt.close(fig)
-            fig, axes = make_figure(plt, rows, cols, args.scale, args.title, args.dpi)
+            fig, axes = make_figure(plt, rows, cols, args.scale, args.title, args.dpi,
+                                    aspect=aspect)
             fignum = fig.number
-        rendered_files = files
+        rendered_files, rendered_aspect = files, aspect
         for ax in axes:
             ax.clear()
             ax.axis('off')
-        for i, path in enumerate(files):
-            try:
-                axes[i].imshow(mpimg.imread(path))
-            except Exception:
-                pass          # a half-written PNG: leave the panel blank, the next refresh has it
+        for i, image in enumerate(images):
+            if image is not None:
+                axes[i].imshow(image)
         try:
-            fig.tight_layout()
+            apply_tight_grid(fig)
             fig.canvas.draw_idle()
         except Exception as error:
             # A draw failure never matters to anything but this window.

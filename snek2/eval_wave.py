@@ -190,6 +190,22 @@ class Arm:
 
         rows, resumed_steps, source_screens, partial = load_finished_results(
             policy_name, resume_suffixes(resume_spec, suffix), num_episodes)
+        # A row the gate already settled is a **final** measurement, not a partial one, so it joins
+        # the resumed set rather than the work list. `load_finished_results` cannot make that call --
+        # it knows nothing about gates -- and without it a resumed run re-planned every abandoned
+        # checkpoint: b43's HOF resume made 30 units that each cost a checkpoint restore and a round
+        # of worker setup (~3 s) to re-derive an answer the controller already held, and the progress
+        # bar counted work that would never be done. Applied with this run's own threshold, so a
+        # resume under a *lower* gate correctly re-opens what the stricter one gave up on.
+        self.settled = {}
+        gate = make_abandon_test(min_achievable, num_episodes, abandon_floor)
+        if gate:
+            for step in sorted(partial):
+                held = partial[step]
+                have = len(held.get('scores') or ())
+                if have and gate(int(sum(held.get('perfect') or ())), have):
+                    self.settled[step] = partial.pop(step)
+                    resumed_steps.add(step)
         self.resumed_by_step = {row['step']: row for row in rows}
         self.resumed_steps = resumed_steps
         self.source_screens = source_screens
@@ -251,6 +267,10 @@ class Arm:
         self.partial = {step: held for step, held in self.partial.items()
                         if step in set(self.requested_steps)}
         self.samples = {step: dict(held) for step, held in self.partial.items()}
+        # Settled rows are not work, but they are still results: `rows()` unions the samples with the
+        # resumed rows, and `load_finished_results` returned these as partials rather than rows, so
+        # dropping them here would delete them from the file on the next write.
+        self.samples.update({step: dict(held) for step, held in self.settled.items()})
         self.all_steps = sorted(set(self.resumed_steps) | set(self.requested_steps))
         self.plan = plan_stages(self.requested_steps, selected_by, self.screen_episodes,
                                 self.confirm_count, self.num_episodes, self.num_workers,
@@ -279,11 +299,27 @@ class Arm:
         The top-up is not an optimisation: a checkpoint the gate stopped at 60 of 100, or one a kill
         interrupted, would otherwise be restarted and throw away real episodes. Same rule the
         single-policy path applies in all three of its stages.
+
+        **A checkpoint the gate has already settled is not a unit at all.** The stopping rule is
+        arithmetic on (perfect, episodes, target, threshold) -- `make_abandon_test` -- so the
+        controller can evaluate it against the stored samples without a worker. Before this, a
+        resumed run made a *unit* out of every abandoned checkpoint, and the lane paid a checkpoint
+        restore and a round of setup to be told what the controller already knew: b43's HOF resumed
+        30 abandoned checkpoints at ~3 s each. It is small here, and it is not small on the 607-arm.
+        The answer cannot change by running more episodes, which is exactly what makes the row final.
+
+        Evaluated fresh rather than read off the row's `abandoned` flag, so a run resumed under a
+        *lower* gate correctly re-opens a checkpoint the old gate had given up on.
         """
+        settled = make_abandon_test(self.min_achievable, target, self.abandon_floor)
         units = []
         for step in steps:
-            have = len(self.samples.get(step, {}).get('scores') or ())
+            sample = self.samples.get(step) or {}
+            scores = sample.get('scores') or ()
+            have = len(scores)
             if have >= target:
+                continue
+            if settled and have and settled(int(sum(sample.get('perfect') or ())), have):
                 continue
             units.append(Unit(self, step, target - have, stage))
         return units
@@ -829,6 +865,45 @@ class Wave:
 
     # ---------------------------------------------------------------- output
 
+    def wave_eta_seconds(self):
+        """Seconds until the **whole wave** finishes, or None before there is a pace to price with.
+
+        A per-arm ETA is meaningless in a wave and reads badly wrong in both directions. Lanes are
+        shared, so an arm's remaining work divided by "1 process" is its remaining *lane*-time, not
+        wall clock -- and the arm that finishes last inherits every lane as its siblings drop out. On
+        b43's HOF that put `b43b-lowlr-b29a` at **37.9 h** on a wave with about 13 h left in it, while
+        the three small arms each read low.
+
+        So every panel gets the same number, the one the question is actually about. Remaining
+        lane-seconds is summed across the arms -- each priced at its own stage lengths by
+        `remaining_episodes` and deflated by its own observed abandonment rate -- then divided by the
+        lane count. Each arm's own share of the work is already on its chart as a percentage.
+
+        Priced on the wave's pooled seconds-per-episode rather than per arm, because the arms differ
+        only in how much work they have, not in what an episode costs; pooling is the larger sample.
+        """
+        import eval_progress
+        try:
+            per_episode = [(arm.progress['session_seconds'], arm.progress['session_episodes'])
+                           for arm in self.arms]
+            seconds = sum(s for s, _ in per_episode)
+            episodes = sum(e for _, e in per_episode)
+            if not seconds or not episodes:
+                return None
+            ahead = 0
+            for arm in self.arms:
+                if arm.spec is None:
+                    continue
+                run = arm.payload(complete=False)
+                left = eval_progress.remaining_episodes([run])
+                if left is None:
+                    return None
+                ahead += left * eval_progress.expected_run_fraction([run])
+            lanes = max(1, len(self.lanes))
+            return ahead * (seconds / float(episodes)) / lanes
+        except Exception:
+            return None      # an ETA is never worth losing a measurement over
+
     def write(self, arm):
         """`runs/<policy>_checkpoint_evals<suffix>.json`, rewritten in full after every round.
 
@@ -837,6 +912,13 @@ class Wave:
         `write_payload` does the `.partial` + `os.replace`, so a reader never sees a half-written
         file.
         """
+        eta = self.wave_eta_seconds()
+        for other in self.arms:
+            # Stamped on every arm, not only the one being written: the charts are refreshed as a set
+            # and a stale ETA on three of four panels is exactly the inconsistency this replaces.
+            other.progress['wave_eta_seconds'] = eta
+            other.progress['wave_lanes'] = len(self.lanes)
+            other.progress['wave_arms'] = len(self.arms)
         write_payload(arm.out_path, arm.payload(complete=False))
         self.refresh_charts()
 
@@ -970,8 +1052,10 @@ def build_arms(policies, kind, value, settings):
                 policy_name, len(skipped)))
             continue
         if skipped:
-            print('{0}: resuming, {1} already measured at >={2} episodes, {3} left'.format(
-                policy_name, len(skipped), settings['num_episodes'], len(arm.requested_steps)))
+            note = ('' if not arm.settled else
+                    ' ({0} of them settled below the gate)'.format(len(arm.settled)))
+            print('{0}: resuming, {1} already measured{2}, {3} left'.format(
+                policy_name, len(skipped), note, len(arm.requested_steps)))
         if arm.partial:
             carried = sum(len(held['scores']) for held in arm.partial.values())
             print('    {0}: reusing {1} partial sample{2} ({3} episodes) rather than '

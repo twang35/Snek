@@ -94,6 +94,67 @@ def test_summarize_prices_the_eta_in_episodes_not_checkpoints():
     assert abs(state['eta_seconds'] - 400.0) < 0.001
 
 
+def test_the_eta_is_deflated_by_the_gates_observed_savings():
+    """`remaining_episodes` prices the plan ahead at full length and said so, calling the missing
+    prediction of future abandonment a small upward bias. On a HOF pass at gate 98 it is the dominant
+    term: `b43d-lowlr-b29c` had abandoned 23 of 23 at a mean of 262 of 500 episodes, so the chart read
+    4h25m against a real ~2h."""
+    rows = [result(step, episodes=250, perfect=200, seconds=125.0) for step in range(1, 5)]
+    payload = run(rows, complete=False, episodes_per_checkpoint=500,
+                  measurements_planned=8, measurements_done=4,
+                  session_measurements=4, session_episodes=1000, session_seconds=500.0)
+    state = eval_progress.summarize([payload])
+    # 4 rows x 250 of a 500 target => half of every planned episode is actually run.
+    assert abs(eval_progress.expected_run_fraction([payload]) - 0.5) < 1e-9
+    # 4 ahead x 500 planned = 2000 episodes, deflated to 1000, at 0.5 s/episode => 500 s.
+    assert abs(state['eta_seconds'] - 500.0) < 0.001
+    assert abs(state['run_fraction'] - 0.5) < 1e-9
+
+
+def test_the_deflator_ignores_the_session_counters_a_resume_breaks():
+    """The tempting source is `session_episodes + episodes_saved`, the identity `eval_checkpoints`
+    prints. It is wrong across a resume: a resumed row the gate re-abandons from its stored samples
+    runs ~0 new episodes while still reporting the whole shortfall as saved. On b43a mid-resume that
+    read **0.025**, which would have turned a 4-hour estimate into six minutes."""
+    rows = [result(step, episodes=250, perfect=200, seconds=125.0) for step in range(1, 5)]
+    payload = run(rows, complete=False, episodes_per_checkpoint=500,
+                  measurements_planned=8, measurements_done=4,
+                  session_measurements=2, session_episodes=40, session_seconds=20.0,
+                  episodes_saved=1560)
+    assert abs(eval_progress.expected_run_fraction([payload]) - 0.5) < 1e-9
+
+
+def test_the_deflator_stands_down_without_evidence_and_on_a_staged_run():
+    one = run([result(1, episodes=250, perfect=200)], complete=False,
+              episodes_per_checkpoint=500, measurements_planned=4, measurements_done=1)
+    assert eval_progress.expected_run_fraction([one]) == 1.0     # too few rows to trust
+    staged = run([result(step, episodes=20, perfect=19) for step in range(1, 6)], complete=False,
+                 episodes_per_checkpoint=100, screen_episodes=20,
+                 stages={'full': {'planned': 0, 'done': 0},
+                         'screen': {'planned': 5, 'done': 5},
+                         'confirm': {'planned': 2, 'done': 0}})
+    # A screen and a full-length row are different targets and the payload does not say which a row
+    # was, so there is no honest per-row target: 1.0, which is conservative.
+    assert eval_progress.expected_run_fraction([staged]) == 1.0
+
+
+def test_a_waves_eta_replaces_the_per_arm_one():
+    """An arm of a wave shares lanes, so its own remaining work over "one process" is remaining
+    lane-time, and the last arm standing inherits every lane: b43b read 37.9 h on a wave with ~13 h
+    left. `eval_wave` computes one number for the whole wave and stamps it on every arm."""
+    rows = [result(step, episodes=250, perfect=200, seconds=125.0) for step in range(1, 5)]
+    payload = run(rows, complete=False, episodes_per_checkpoint=500,
+                  measurements_planned=8, measurements_done=4,
+                  session_measurements=4, session_episodes=1000, session_seconds=500.0,
+                  wave_eta_seconds=1234.0, wave_lanes=4, wave_arms=4)
+    state = eval_progress.summarize([payload])
+    assert state['eta_seconds'] == 1234.0
+    assert state['wave_eta'] is True and state['wave_arms'] == 4
+    # ...and a single-policy run is untouched: no key, no override.
+    del payload['wave_eta_seconds']
+    assert eval_progress.summarize([payload])['wave_eta'] is False
+
+
 def test_summarize_falls_back_to_per_checkpoint_eta_for_older_files():
     # Files written before episodes_planned existed must still get an ETA.
     state = eval_progress.summarize([run(

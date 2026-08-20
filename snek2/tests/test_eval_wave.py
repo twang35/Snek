@@ -110,6 +110,27 @@ class Bench:
             open(os.path.join(path, 'ckpt-{0}.index'.format(step)), 'w').close()
         return name
 
+    def results(self, name, suffix, rows):
+        """A prior result file for `name`, in the shape `load_finished_results` reads.
+
+        `rows` are dicts of step/episodes/perfect; the per-episode arrays `held_from_row` needs are
+        filled in, since a row without them is deliberately un-resumable.
+        """
+        payload = {'policy_name': name, 'complete': True, 'results': []}
+        for row in rows:
+            episodes, perfect = row['episodes'], row['perfect']
+            payload['results'].append({
+                'step': row['step'], 'episodes': episodes, 'perfect_games': perfect,
+                'perfect_percent': round(100.0 * perfect / episodes, 1),
+                'perfect_ci95': [0.0, 100.0], 'avg_score': 90.0, 'seconds': 10.0,
+                'episode_scores': [95] * episodes,
+                'episode_perfect': [1] * perfect + [0] * (episodes - perfect),
+                'episode_rewards': [0.0] * episodes})
+        path = os.path.join(self.runs, '{0}_checkpoint_evals{1}.json'.format(name, suffix))
+        with open(path, 'w') as handle:
+            json.dump(payload, handle)
+        return path
+
     def arm(self, name, requested, selected_by=None, num_episodes=100, screen_episodes=20,
             confirm_count=2, num_workers=4, min_achievable=0.0):
         arm = eval_wave.Arm(name, '', num_episodes, num_workers, screen_episodes, confirm_count,
@@ -231,6 +252,66 @@ def test_the_queue_hands_out_full_length_work_before_screens():
                 break
             taken.append((unit.stage, unit.step))
         assert taken == [('full', 3000), ('screen', 1000), ('screen', 2000)], taken
+
+
+def test_a_resume_does_not_re_verify_a_checkpoint_the_gate_has_settled():
+    """The stopping rule is arithmetic on the stored samples, so the controller can apply it without
+    a worker. A resumed run used to make a unit out of every abandoned checkpoint and pay a restore
+    plus a round of setup -- ~3 s each, 30 of them on b43's HOF resume -- to be told what it already
+    knew."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000], num_episodes=100, screen_episodes=0,
+                        min_achievable=98.0)
+        # 1000 ran 60 of 100 with 50 perfect: 90 is the ceiling now, under the 98% gate, settled.
+        arm.samples[1000] = {'scores': [95] * 60, 'perfect': [1] * 50 + [0] * 10,
+                             'rewards': [0.0] * 60}
+        # 2000 ran 60 of 100 with 59 perfect: it can still finish at 99%, so it owes 40 episodes.
+        arm.samples[2000] = {'scores': [95] * 60, 'perfect': [1] * 59 + [0],
+                             'rewards': [0.0] * 60}
+        units = arm._units_for([1000, 2000], 100, 'flat')
+        assert [(u.step, u.episodes) for u in units] == [(2000, 40)], units
+
+
+def test_a_settled_row_is_resumed_work_not_planned_work():
+    """Promoted to the resumed set at load time, so the plan does not count work that will never be
+    done -- and still written out, because `load_finished_results` handed it over as a *partial* and
+    `rows()` would otherwise drop it from the file on the next write."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        # step 1000 abandoned at 60/100 with 50 perfect (ceiling 90, under the 98 gate); step 2000 is
+        # full length; step 3000 has nothing yet.
+        bench.results('b44a-x', '', [
+            dict(step=1000, episodes=60, perfect=50),
+            dict(step=2000, episodes=100, perfect=99),
+        ])
+        arm = eval_wave.Arm('b44a-x', '', 100, 4, 0, 2, 98.0, 20, '1', None)
+        assert sorted(arm.settled) == [1000], arm.settled
+        assert arm.resumed_steps == {1000, 2000}, arm.resumed_steps
+        skipped = arm.finalise_plan([1000, 2000, 3000], {
+            step: graph_meta(step, 99.0) for step in (1000, 2000, 3000)})
+        assert sorted(skipped) == [1000, 2000], skipped
+        assert arm.requested_steps == [3000], arm.requested_steps
+        assert arm.progress['measurements'] == 2, arm.progress
+        # the settled row survives into the payload rather than vanishing
+        assert [row['step'] for row in arm.rows()] == [1000, 2000], arm.rows()
+        assert arm._units_for([3000], 100, 'flat')[0].episodes == 100
+
+
+def test_a_lower_gate_reopens_a_checkpoint_the_old_gate_gave_up_on():
+    """Evaluated fresh rather than read off the row's `abandoned` flag, so re-running at a looser
+    threshold measures what the stricter one abandoned instead of inheriting its verdict."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        held = {'scores': [95] * 60, 'perfect': [1] * 50 + [0] * 10, 'rewards': [0.0] * 60}
+        strict = bench.arm('b44a-x', [1000], num_episodes=100, screen_episodes=0,
+                           min_achievable=98.0)
+        strict.samples[1000] = dict(held)
+        assert strict._units_for([1000], 100, 'flat') == []
+        loose = bench.arm('b44a-x', [1000], num_episodes=100, screen_episodes=0,
+                          min_achievable=85.0)
+        loose.samples[1000] = dict(held)
+        assert [(u.step, u.episodes) for u in loose._units_for([1000], 100, 'flat')] == [(1000, 40)]
 
 
 def test_the_queue_rotates_over_the_arms_within_a_stage():

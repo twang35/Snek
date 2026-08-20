@@ -606,6 +606,48 @@ def _fake_ps_by_pattern(lines):
     return run
 
 
+def test_the_panel_box_matches_the_image_aspect():
+    """Each panel was a fixed 4.2 x 3.0 inches (aspect 1.4) whatever it was showing, while `imshow`
+    keeps the image's own aspect inside that box -- so every panel was letterboxed by the difference
+    and a 2x2 grid stacked the slack between its rows. The eval chart is 1.11 and the training chart
+    1.62, so the fixed box was wrong for both, in opposite directions."""
+    for aspect in (1.11, 1.4, 1.62):
+        for rows, cols in ((1, 1), (2, 2), (3, 2)):
+            w, h = chart_viewer.figure_dims(rows, cols, 0.4, aspect)   # small scale: no clamping
+            assert abs((w / h) - (float(cols) / rows) * aspect) < 1e-9, (rows, cols, aspect, w, h)
+
+
+def test_the_default_aspect_is_the_old_fixed_one():
+    """A caller that says nothing gets exactly the pre-2026-08-19 geometry."""
+    assert chart_viewer.figure_dims(2, 2, 0.4) == chart_viewer.figure_dims(2, 2, 0.4, 1.4)
+
+
+def test_image_aspect_reads_the_first_readable_image():
+    class _Img(object):
+        def __init__(self, h, w):
+            self.shape = (h, w, 4)
+
+    assert abs(chart_viewer.image_aspect([None, _Img(1883, 2090)]) - 2090 / 1883.0) < 1e-9
+    # nothing readable, and a shapeless object, both fall back rather than raising
+    assert chart_viewer.image_aspect([]) == chart_viewer.DEFAULT_PANEL_ASPECT
+    assert chart_viewer.image_aspect([None, None]) == chart_viewer.DEFAULT_PANEL_ASPECT
+    assert chart_viewer.image_aspect([object()]) == chart_viewer.DEFAULT_PANEL_ASPECT
+    assert chart_viewer.image_aspect([_Img(0, 10), _Img(2, 4)]) == 2.0
+
+
+def test_the_grid_is_pushed_out_to_the_figure_edges():
+    """`tight_layout` reserves room for the titles, labels and ticks that bare `imshow` panels do not
+    have -- about 8% of a 2x2 grid's height, all of it a band between the rows."""
+    from matplotlib.figure import Figure
+
+    fig = Figure()
+    fig.subplots(2, 2)
+    chart_viewer.apply_tight_grid(fig)
+    pars = fig.subplotpars
+    assert (pars.left, pars.bottom, pars.right, pars.top) == (0.0, 0.0, 1.0, 1.0)
+    assert pars.wspace <= 0.01 and pars.hspace <= 0.01, (pars.wspace, pars.hspace)
+
+
 def test_no_panel_carries_a_matplotlib_title():
     """A tripwire, not a behaviour test: **panels must have no title at all.**
 
@@ -937,9 +979,13 @@ def test_figure_dims_clamps_a_multirow_wave_to_the_screen():
 
 def test_figure_dims_leaves_a_fitting_grid_untouched():
     """Single panels and any grid already inside the budget must not be shrunk, so the
-    clamp never makes a window that already fit smaller than asked."""
-    assert chart_viewer.figure_dims(1, 1, 2.0) == (8.4, 6.0)   # under budget, unchanged
-    assert chart_viewer.figure_dims(2, 2, 1.0) == (8.4, 6.0)   # 2x2 at scale 1 also fits
+    clamp never makes a window that already fit smaller than asked.
+
+    Rounded because the panel height is now `width / aspect` rather than a second literal, so the
+    default 1.4 lands on 5.999999999999999 rather than 6.0."""
+    dims = lambda *a: tuple(round(x, 6) for x in chart_viewer.figure_dims(*a))
+    assert dims(1, 1, 2.0) == (8.4, 6.0)   # under budget, unchanged
+    assert dims(2, 2, 1.0) == (8.4, 6.0)   # 2x2 at scale 1 also fits
 
 
 def test_clamp_dims_shrinks_uniformly_and_never_grows():

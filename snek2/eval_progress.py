@@ -255,6 +255,50 @@ def whole_rounds(episodes, workers):
     return -(-episodes // workers) * workers
 
 
+def expected_run_fraction(runs, min_measurements=3):
+    """The share of the episodes still *planned* that will actually be run, from this run's own
+    abandonment rate. `1.0` when there is not enough evidence, or when nothing is being abandoned.
+
+    `remaining_episodes` prices the plan ahead at full length and says so: "nothing here predicts
+    future abandonment, which can only make the real figure smaller". That was written when the gate
+    was a trim -- and on a close-out it is. **On a HOF pass at gate 98 it is the dominant term**, and
+    calling it a small bias was wrong: `b43d-lowlr-b29c` had abandoned **23 of 23** measurements at a
+    mean of 262 of 500 episodes, so the 60 checkpoints ahead were priced at 30,000 episodes when they
+    will cost about 15,700 -- the chart read **4h25m** against a real ~2h.
+
+    **Measured off the rows, not off the session counters, and that is the whole subtlety.** The
+    obvious source is the identity `session_episodes + episodes_saved` = the planned work for this
+    session, which `eval_checkpoints` itself prints. It is wrong across a **resume**: a resumed row
+    that the gate re-abandons from its stored samples runs ~0 new episodes while still reporting the
+    whole shortfall as saved, so the ratio collapses. On b43a mid-resume it read **0.025**, which
+    would have turned a 4-hour estimate into six minutes. A row's own `episodes` against the target
+    every row shares is immune -- resumed and fresh rows are priced the same way.
+
+    Only for the **flat** protocol, where every measurement's target is `episodes_per_checkpoint`. A
+    three-stage close-out mixes 20-episode screens with full-length rows and the payload does not say
+    which a given row was, so there is no honest per-row target and this returns 1.0 -- today's
+    behaviour, and conservative, which is the right direction for an ETA. `remaining_episodes`
+    already handles the larger stage-mix error there by pricing each stage at its own length.
+
+    `min_measurements` holds it at 1.0 until a few rows exist, so one unlucky first checkpoint cannot
+    halve the ETA.
+    """
+    measured, actual, target_total = 0, 0, 0
+    for run in runs:
+        if run.get('stages'):
+            return 1.0
+        target = run.get('episodes_per_checkpoint')
+        rows = [r for r in (run.get('results') or []) if r.get('episodes')]
+        if not target or not rows:
+            continue
+        measured += len(rows)
+        actual += sum(r['episodes'] for r in rows)
+        target_total += target * len(rows)
+    if measured < min_measurements or not actual or not target_total:
+        return 1.0
+    return min(1.0, float(actual) / target_total)
+
+
 def remaining_episodes(runs):
     """Episodes still to run, counted off the stage plan. None when no run says enough to tell.
 
@@ -411,19 +455,34 @@ def summarize(runs, stale_after=180):
         mean_seconds = (sum(times) / len(times)) if times else None
 
     ahead = remaining_episodes(runs)
+    # Deflated by the gate's observed savings: `ahead` is the plan at full length, and on a gated
+    # pass most of it is never run. See `expected_run_fraction` -- b43d's chart read 4h25m against
+    # a real ~2h without this.
+    run_fraction = expected_run_fraction(runs)
     planned_episodes = sum(r.get('episodes_planned') or 0 for r in runs)
     if ahead is not None and seconds_per_episode:
-        eta_seconds = ahead * seconds_per_episode / processes
+        eta_seconds = ahead * run_fraction * seconds_per_episode / processes
     elif planned_episodes and seconds_per_episode:
         # Files predating `episodes_per_checkpoint` / `stages`. `episodes_saved` is subtracted for
         # the reason in `remaining_episodes`' docstring — it is planned work that will not be run —
         # and is simply absent, hence 0, on the oldest files.
         saved = sum(r.get('episodes_saved') or 0 for r in runs)
         eta_seconds = max(0, planned_episodes - total_episodes - saved) * \
-            seconds_per_episode / processes
+            run_fraction * seconds_per_episode / processes
     else:
         remaining = max(0, requested - len(completed))
         eta_seconds = (remaining * mean_seconds / processes) if mean_seconds else None
+
+    # A wave overrides all of the above, because none of it can be right from one arm's file. Its
+    # arms share lanes, so what the arithmetic above produces is this arm's remaining *lane*-time,
+    # and the arm that finishes last inherits every lane its siblings give up: on b43's HOF that read
+    # 37.9 h for `b43b-lowlr-b29a` on a wave with ~13 h left in it. `eval_wave` computes one number
+    # across every arm and stamps it on all of them, so the panels agree and answer the question
+    # actually being asked. Absent from a single-policy run, which is the common case.
+    wave_eta = next((r.get('wave_eta_seconds') for r in runs
+                     if r.get('wave_eta_seconds') is not None), None)
+    if wave_eta is not None:
+        eta_seconds = wave_eta
 
     # Progress in measurements, which counts a confirmation pass separately from the screen that
     # earned it. Without it a screening run reads 100% done the moment stage 1 ends.
@@ -482,6 +541,13 @@ def summarize(runs, stale_after=180):
         # times `pace` -- disagrees with it whenever the remaining work is not average work.
         'episodes_ahead': ahead,
         'eta_seconds': eta_seconds,
+        # The gate's observed run fraction, published for the same reason as `episodes_ahead`: it is
+        # the difference between the episodes the plan names and the episodes the ETA prices.
+        'run_fraction': run_fraction,
+        # Set when the ETA is the whole wave's rather than this arm's, so the text block can say so
+        # instead of implying the arm alone takes that long.
+        'wave_eta': wave_eta is not None,
+        'wave_arms': next((r.get('wave_arms') for r in runs if r.get('wave_arms')), None),
         'rates': rates,
     }
 
@@ -733,10 +799,14 @@ def ranking_lines(state):
         # The episode count is shown because `pace` is a blended per-measurement average and the
         # ETA is not priced on it: at the end of a screening close-out every remaining measurement is
         # an 80-episode confirmation, so `remaining x pace` reads ~30% low against a correct ETA and
-        # looks like the ETA is wrong. The two numbers reconcile through this one.
+        # looks like the ETA is wrong. The two numbers reconcile through this one. On a *flat* gated
+        # pass the two now agree by construction, since `expected_run_fraction` is exactly the ratio
+        # that turns the planned episodes ahead into the mean measurement's actual cost.
         ahead = state.get('episodes_ahead')
-        lines.append('  pace {0}/checkpoint   ETA {1}{2}'.format(
-            format_duration(state['mean_seconds']), format_duration(state['eta_seconds']),
+        eta_label = 'wave ETA' if state.get('wave_eta') else 'ETA'
+        lines.append('  pace {0}/checkpoint   {1} {2}{3}'.format(
+            format_duration(state['mean_seconds']), eta_label,
+            format_duration(state['eta_seconds']),
             ' ({0:,} ep left)'.format(ahead) if ahead else ''))
         # Ranked over the deeply-measured rows only, the same rule best_of() applies. Without it
         # the list contradicted the `best` line directly above it: across a few hundred 20-episode
