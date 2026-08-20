@@ -1,20 +1,21 @@
 {
-  "iso": "2026-08-19T18:45:10",
-  "ts": 1787190310.7606475,
+  "iso": "2026-08-19T18:46:19",
+  "ts": 1787190379.7198873,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (2 arms)"
     ],
     "queued": [
       "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
+      "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b45 training -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
       "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)"
     ]
   },
   "runtime": {
     "max_trainers": 4,
-    "max_evals": 4,
-    "eval_workers": 2,
+    "max_evals": 1,
+    "eval_workers": 4,
     "eval_lanes": 4,
     "poll_seconds": 30,
     "tf_intraop_threads": 0,
@@ -27,9 +28,7 @@
     "auto_closeout": true,
     "auto_hof": true
   },
-  "config_notes": [
-    "max_evals 4 x eval_lanes 4 x eval_workers 4 = 64 spawned workers exceeds 32; reduced to 4 lanes x 2 workers"
-  ],
+  "config_notes": [],
   "counts": {
     "trainer": 0,
     "eval": 2
@@ -46,7 +45,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 46893
+      "elapsed_s": 46962
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -59,10 +58,11 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 46893
+      "elapsed_s": 46962
     }
   ],
   "ledger": {
+    "b44-hof": "queued",
     "b45a-lowlr8-b29b": "queued",
     "b45b-lowlr8-b29a": "queued",
     "b45c-lowlr8-b40b": "queued",
@@ -310,8 +310,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    7.7275390625,
-    7.90625,
-    8.3603515625
+    7.7919921875,
+    7.8701171875,
+    8.3125
   ]
 }
