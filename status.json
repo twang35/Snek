@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T21:37:19",
-  "ts": 1787200639.838743,
+  "iso": "2026-08-19T21:38:22",
+  "ts": 1787200702.6846604,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- hof (4 arms)"
@@ -45,8 +45,8 @@
       "pid": 2560417,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 3717
+      "steps_per_sec": null,
+      "elapsed_s": 3780
     }
   ],
   "ledger": {
@@ -298,8 +298,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    18.68505859375,
-    19.1640625,
-    19.06884765625
+    19.099609375,
+    19.18115234375,
+    19.08154296875
   ]
 }
