@@ -27,6 +27,7 @@ that changed no behaviour: the suite read 29 modules / 736 tests / 0 failed befo
 compatibility surface, and `tests/test_eval_checkpoints.py` and `tests/test_selection_tiers.py`
 both reach through it.
 """
+import collections
 import glob
 import json
 import os
@@ -485,6 +486,102 @@ def make_abandon_test(min_achievable, target_episodes, floor_episodes):
     return should_abandon
 
 
+# The immutable half of a result file: everything decided before the first checkpoint is measured.
+# Split from `progress` (which mutates every round) so `build_payload` cannot accidentally depend on
+# a value that changed under it, and so the two callers — `eval_checkpoints.main` and
+# `eval_wave.py` — provably pass the same thing.
+PayloadSpec = collections.namedtuple('PayloadSpec', [
+    'policy_name', 'num_episodes', 'all_steps', 'num_workers', 'screen_episodes',
+    'confirm_count', 'min_achievable', 'abandon_floor', 'measurements_planned',
+    'episodes_planned', 'full_planned', 'screen_planned', 'confirm_planned'])
+
+
+def build_payload(spec, progress, samples, results, complete, in_flight=None):
+    """The result-file payload, and the **only** definition of it.
+
+    Both the single-policy CLI and the wave controller write
+    `runs/<policy>_checkpoint_evals<suffix>.json`, and everything downstream — `eval_progress`,
+    `select_checkpoints_above`, `run_report`, the desktop's publish globs — reads it by key. Two
+    builders that drift is the failure this project has already paid for twice in a different guise
+    (two `build_eval_agent`-shaped constructions, where `expect_partial()` hid the mismatch), so
+    there is one.
+
+    `complete` distinguishes a finished run from a partial one, so a later reader does not quietly
+    treat 6 checkpoints as the arm's full measurement — and `select_checkpoints_above` refuses to
+    select from a file that is not complete.
+    """
+    return {'policy_name': spec.policy_name,
+            'episodes_per_checkpoint': spec.num_episodes,
+            'checkpoints_requested': len(spec.all_steps),
+            # Recorded rather than inferred from episodes/rounds, which is wrong for any
+            # checkpoint being topped up — the episode count includes the screen already on
+            # file while the round count does not.
+            'num_workers': spec.num_workers,
+            'complete': complete,
+            'requested_steps': spec.all_steps,
+            # Screening protocol, or None for the flat one-pass measurement. Recorded
+            # because a pooled rate only compares across arms when the selection rule
+            # matches, and this is part of the rule.
+            'screen_episodes': spec.screen_episodes or None,
+            'confirm_count': spec.confirm_count if spec.screen_episodes else None,
+            # Also part of the selection rule, so also recorded: a file measured with the
+            # gate on holds shorter rows below the threshold than one measured without it,
+            # and pooling the two sets of raw rows would compare different protocols.
+            'min_achievable': spec.min_achievable or None,
+            'abandon_floor': spec.abandon_floor if spec.min_achievable else None,
+            'abandoned': progress.get('abandoned', 0),
+            'episodes_saved': progress.get('episodes_saved', 0),
+            # Progress in measurements and in episodes. Both are needed once checkpoints
+            # can be measured twice at different lengths: the first tracks the stage plan,
+            # the second is what an ETA can actually be built from.
+            'measurements_planned': spec.measurements_planned,
+            'measurements_done': progress['measurements'],
+            # This process's own throughput, for the ETA. See `eval_checkpoints.main`'s `progress`
+            # for why the pace cannot be averaged over resumed rows.
+            'session_measurements': progress['session_measurements'],
+            'session_episodes': progress['session_episodes'],
+            'session_seconds': round(progress['session_seconds'], 1),
+            # Which pass is running and how far through each one is, so the chart can show
+            # the shape of a three-stage close-out rather than one bar that stalls.
+            'stage': progress['stage'],
+            # The arm-level rate: every checkpoint truncated to its first `screen_episodes`,
+            # because pooling rows of different depths weights the full-length ones — the
+            # arm's best by construction — 5x. None for a flat run, already equal effort.
+            'pooled_equal_effort': (
+                (lambda t: round(100.0 * t[0] / t[1], 2) if t[1] else None)(
+                    equal_effort_pooled(samples, spec.screen_episodes))
+                if spec.screen_episodes else None),
+            'stages': {
+                'full': {'planned': spec.full_planned, 'done': progress['full_done']},
+                'screen': {'planned': spec.screen_planned, 'done': progress['screen_done']},
+                'confirm': {'planned': spec.confirm_planned, 'done': progress['confirm_done']},
+            } if spec.screen_episodes else None,
+            'episodes_planned': spec.episodes_planned,
+            'episodes_done': sum(r['episodes'] for r in results),
+            # The checkpoint being measured right now, updated every round, or None
+            # between checkpoints. eval_progress.py renders this; without it a
+            # ~5-minute checkpoint is invisible until it lands.
+            'in_flight': in_flight,
+            'updated_at': time.time(),
+            # Step order, not measurement order: a resumed run appends new checkpoints
+            # after the rows it loaded, which would otherwise interleave arbitrarily.
+            'results': sorted(results, key=lambda r: r['step'])}
+
+
+def write_payload(out_path, payload):
+    """Writes a result payload atomically: `.partial` then `os.replace`.
+
+    Part of the protocol rather than a detail. A long run rewrites the whole file after every
+    checkpoint — writing only at the end means an interruption throws all of it away — and a reader
+    polling the file (`eval_progress.live_frame`, the desktop's publish) must never see a
+    half-written one.
+    """
+    partial_path = out_path + '.partial'
+    with open(partial_path, 'w') as handle:
+        json.dump(payload, handle, indent=2)
+    os.replace(partial_path, out_path)
+
+
 def best_full_length_row(results, num_episodes):
     """The best checkpoint, ranked over rows deep enough for a maximum to mean anything.
 
@@ -579,6 +676,45 @@ DEFAULT_CONFIRM_COUNT = 100
 # Seconds between live-chart refreshes. A frame is ~0.1s and a round ~4s, so this only bites
 # early in a run when episodes are short and rounds finish fast.
 CHART_MIN_INTERVAL = 2.0
+
+# ---------------------------------------------------------------- the HOF re-measure
+
+# 500 episodes, flat, gate 98, into its own file. Selected `above:98` from the close-out's own
+# result file, so it re-measures exactly the checkpoints the close-out already found excellent.
+#
+# A distinct suffix is not cosmetic: it keeps this off the close-out's file so neither clobbers the
+# other, and so the close-out's 100-episode rows can never be mistaken for finished HOF work.
+HOF_EPISODES = 500
+HOF_SUFFIX = '_hof500'
+HOF_GATE = DEFAULT_ABOVE_THRESHOLD
+
+# **The one place this ordering is asserted.** It was previously asserted in two — `runner.py` and
+# the laptop's chain script — which is how two copies of a recipe start to drift. The invariant: the
+# HOF pass reads `above:HOF_GATE` out of the close-out's own file, and only rows that *reach* the
+# close-out gate are measured full length, so a close-out gate at or above the HOF gate would
+# abandon precisely the rows the re-measure needs and starve it silently. At 97 against 98 there is
+# exactly one point of headroom, so this matters more than it did at 96.
+assert DEFAULT_MIN_ACHIEVABLE < HOF_GATE, (
+    'the close-out gate ({0}) must stay strictly below the HOF selection gate ({1})'.format(
+        DEFAULT_MIN_ACHIEVABLE, HOF_GATE))
+
+
+def hof_settings(closeout_settings):
+    """The stage-B settings, derived from stage A's — the single definition of the recipe.
+
+    Takes the close-out's settings rather than being a constant dict so the parts that are *not* the
+    recipe (worker count, `EVAL_RESUME`) carry over from however the wave was launched, while
+    everything the recipe fixes is overridden here. `source_suffix` is what `select_checkpoints_above`
+    reads the candidates out of, which is stage A's file, not stage B's.
+    """
+    return dict(closeout_settings,
+                suffix=closeout_settings['suffix'] + HOF_SUFFIX,
+                source_suffix=closeout_settings['suffix'],
+                num_episodes=HOF_EPISODES,
+                screen_episodes=0,
+                screen_requested='0',
+                min_achievable=HOF_GATE,
+                abandon_floor=DEFAULT_ABANDON_FLOOR)
 
 
 def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=10):

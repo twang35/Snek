@@ -40,35 +40,30 @@ TERMINAL = ('done', 'failed')
 # is the whole point of auto-closeout: never train the next thing before evaluating the last.
 AUTO_CLOSEOUT_PRIORITY = 10
 
-# A HOF re-measure runs after its closeout (11 < a training's 100, so it still beats the next
-# training batch, and 11 > 10 so a closeout that is *also* pending in the same eval wave slots
-# first). It never races its own closeout: the `hof: pending` marker is only set once the
-# closeout has reaped, so its result file is complete before the HOF job can be synthesized.
-AUTO_HOF_PRIORITY = 11
+# **This daemon carries no eval-protocol numbers, and that is deliberate.** It used to hold five
+# of them -- the closeout gate, the HOF gate, 500 episodes, the flat-screen flag, the `_hof500`
+# suffix -- as a second copy of what `eval_plan.py` defines, plus its own copy of the
+# `closeout gate < HOF gate` assert. Both copies are gone, and the daemon cannot simply import the
+# originals either: it runs on **base** miniconda python with `desktop/` as its working directory
+# (see systemd/snek-runner.service), because it has to be able to start before the `snek` conda env
+# exists, and `eval_plan` needs numpy.
+#
+# So the rule is inverted instead: the daemon *removes* the protocol keys from the env it inherits
+# and lets the tool's own defaults decide. One definition, no import, and nothing here to drift.
+# The HOF stage is `eval_wave.py --chain`, which owns the whole recipe (eval_plan.hof_settings).
+EVAL_PROTOCOL_KEYS = ('EVAL_EPISODES', 'EVAL_SCREEN_EPISODES', 'EVAL_MIN_ACHIEVABLE',
+                      'EVAL_ABANDON_FLOOR', 'EVAL_CONFIRM_COUNT', 'EVAL_OUT_SUFFIX')
 
-# The HOF re-measure: 500 episodes, flat (no screening), abandoning anything that cannot reach
-# 98%. `above:98` reads the closeout's own result file and takes every checkpoint measured at
-# >=98% there. A distinct EVAL_OUT_SUFFIX keeps this off the closeout's file so neither clobbers
-# the other and the closeout's 100-episode rows are never mistaken for finished HOF work.
-HOF_THRESHOLD = 98
-HOF_EVAL_ARGS = ['above:{0}'.format(HOF_THRESHOLD)]
-HOF_EVAL_ENV = {
-    'EVAL_EPISODES': '500',
-    'EVAL_SCREEN_EPISODES': '0',
-    'EVAL_INDEPENDENT': '1',
-    'EVAL_MIN_ACHIEVABLE': str(HOF_THRESHOLD),
-    'EVAL_OUT_SUFFIX': '_hof500',
-}
 
-# The closeout's own abandonment gate, 97 since 2026-08-19 (was 96). Pinned here so every
-# closeout uses the same gate whatever the arm trained under. Must stay BELOW HOF_THRESHOLD:
-# HOF selects `above:98` from the closeout file, and only rows that reach the gate are full
-# length, so a gate at or above 98 would abandon the very checkpoints HOF needs to read and
-# starve the re-measure. 97 leaves exactly one point of headroom, so this assert matters more
-# than it did at 96 — do not raise either constant without re-reading the other.
-CLOSEOUT_THRESHOLD = 97
-assert CLOSEOUT_THRESHOLD < HOF_THRESHOLD, 'closeout gate must stay below the HOF selection gate'
-CLOSEOUT_EVAL_ENV = {'EVAL_MIN_ACHIEVABLE': str(CLOSEOUT_THRESHOLD)}
+def inherited_eval_env(env):
+    """A training's env, stripped of anything that would override the eval protocol.
+
+    A training arm's env is inherited so the arm's own `SNEK_*` reach its close-out -- historically
+    this was about `SNEK_FC_LAYERS` (the FC trap), now handled by `arch.json`, but the shaping and
+    reward knobs still matter because they change what `avg_reward` means. What must *not* come
+    along is an `EVAL_*` knob: those belong to the measurement, not to the arm.
+    """
+    return {k: v for k, v in (env or {}).items() if k not in EVAL_PROTOCOL_KEYS}
 
 
 def wants_closeout(job_type, ok, auto_closeout_enabled):
@@ -78,14 +73,6 @@ def wants_closeout(job_type, ok, auto_closeout_enabled):
     return bool(auto_closeout_enabled) and ok and job_type == 'train'
 
 
-def wants_hof(job_id, job_type, ok, hof_enabled):
-    """Whether a just-finished job should get an automatic HOF re-measure. Only a *successful
-    closeout eval* qualifies, identified by the `<policy>-closeout` id the runner synthesizes --
-    so a manual top50 eval does not trigger one, and the HOF job's own `<policy>-hof` id never
-    does (no HOF-of-a-HOF). A failed closeout has no trustworthy result file to select from."""
-    return bool(hof_enabled) and ok and job_type == 'eval' and str(job_id).endswith('-closeout')
-
-
 class _StubJob:
     """Stands in for a Job re-adopted from the ledger after a restart, where the
     original spec is not in hand -- only what the ledger recorded."""
@@ -93,8 +80,13 @@ class _StubJob:
         self.id = jid
         self.type = rec.get('type', 'train')
         self.policy = rec.get('policy')
+        # The same `policies or [policy]` fallback `Job` does, and it is load-bearing rather than
+        # tidy: this is the path that re-adopts a *running* wave after a daemon restart, with no
+        # spec in hand, so a missing `policies` here would publish one arm of four.
+        self.policies = [p for p in (rec.get('policies') or [self.policy]) if p]
         self.max_steps = rec.get('max_steps')
         self.label = rec.get('label', '')
+        self.chain = bool(rec.get('chain'))
 
     @property
     def category(self):
@@ -178,12 +170,11 @@ class Runner:
                 # Same boot, dead pid: the job ran to its own end while the daemon was down.
                 # Exit code is unknown across reparenting, so success is assumed; on that same
                 # assumption the arm still earns its closeout, so auto-closeout does not
-                # silently skip a restart-straddling arm. A closeout that finished the same way
-                # earns its HOF re-measure by the identical argument.
+                # silently skip a restart-straddling arm. There is no HOF branch any more: the
+                # re-measure is a stage inside the closeout's own process (`--chain`), so a
+                # closeout that straddled a restart already ran it or already failed to.
                 if wants_closeout(rec.get('type'), True, self.runtime.get('auto_closeout', True)):
                     rec['closeout'] = 'pending'
-                elif wants_hof(jid, rec.get('type'), True, self.runtime.get('auto_hof', True)):
-                    rec['hof'] = 'pending'
         self._save_ledger()
 
     # -------------------------------------------------------------------- loop
@@ -225,7 +216,8 @@ class Runner:
             self._wave_pngs, self._wave_category = [], None
             return
         try:
-            running_jobs = [(rj.job.category, rj.policy) for rj in self.running.values()]
+            running_jobs = [(rj.job.category, rj.job.policies or [rj.policy])
+                            for rj in self.running.values()]
             current = viewer_png_paths(running_jobs, self.host['SNEK_DIR'])
             if not current:
                 return
@@ -259,7 +251,8 @@ class Runner:
                 if self.host.get('XAUTHORITY'):
                     env.setdefault('XAUTHORITY', self.host['XAUTHORITY'])
             argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
-                   ['--watch', 'snek2.py|eval_checkpoints.py', '--interval', '1',
+                   ['--watch', 'snek2.py|eval_wave.py|eval_checkpoints.py',
+                    '--interval', '1',
                     '--scale', viewer_scale(category), '--title', 'snek desktop']
             subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=env,
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)
@@ -281,64 +274,95 @@ class Runner:
         return c
 
     def _auto_closeout_jobs(self):
-        """Closeout evals to run for trainings that finished under auto-closeout and have not
-        been evaluated yet -- synthesized fresh each dispatch, never persisted as specs.
+        """Closeout waves to run for trainings that finished under auto-closeout and have not been
+        evaluated yet -- synthesized fresh each dispatch, never persisted as specs.
 
-        Driven entirely off the ledger, so it survives a daemon restart: the `closeout:
-        pending` marker and the training's stored `env` both persist. Idempotent because the
-        synthesized job's id is `<policy>-closeout`; once that eval is running or terminal the
-        guard below skips it, so the still-'pending' marker cannot launch a second one. It
-        inherits the training's whole env, which carries SNEK_FC_LAYERS -- without it the
-        restore silently mismatches the architecture (the FC trap) and the arm scores ~0."""
+        **One job per batch, not one per arm.** A batch's arms are grouped into a single
+        `eval_wave.py` job carrying every one of their policies, so its lanes move to whichever arm
+        still has checkpoints instead of a finished arm's share of the box going idle. Grouping is
+        safe here because of the wave barrier: `_dispatch` returns early while anything is running,
+        so by the time this is read the set of `closeout: pending` markers is closed. That is also
+        why the grouping happens at dispatch rather than in `_scan_pending` -- an id that shifted as
+        more markers appeared would let a partly-finished wave relaunch under a new id and redo the
+        work.
+
+        Driven entirely off the ledger, so it survives a daemon restart: the `closeout: pending`
+        markers and each training's stored `env` both persist.
+
+        **Arms are grouped by their inherited env as well as by batch**, because a wave is one
+        process with one environment: the shaping and reward knobs change what `avg_reward` means, so
+        two arms that disagree about them must not be measured under a single setting. Normally a
+        batch's arms share an env exactly and there is one group.
+        """
         if not self.runtime.get('auto_closeout', True):
             return []
-        jobs = []
-        for rec in self.ledger.values():
+        groups = {}
+        for rec in sorted(self.ledger.values(), key=lambda r: str(r.get('policy'))):
             if rec.get('closeout') != 'pending' or not rec.get('policy'):
                 continue
-            eval_id = rec['policy'] + '-closeout'
-            prior = self.ledger.get(eval_id, {})
-            if prior.get('state') in TERMINAL or eval_id in self.running:
+            env = inherited_eval_env(rec.get('env'))
+            key = (batch_of(rec['policy']), tuple(sorted(env.items())))
+            groups.setdefault(key, {'policies': [], 'env': env, 'resume': False})
+            groups[key]['policies'].append(rec['policy'])
+        jobs, taken = [], set()
+        for (batch, _), group in sorted(groups.items(), key=lambda kv: kv[1]['policies'][0]):
+            eval_id = self._closeout_id(batch, group['policies'], taken)
+            if eval_id is None:
                 continue
-            env = dict(rec.get('env') or {})
-            env.update(CLOSEOUT_EVAL_ENV)          # the closeout gate wins over the inherited env
+            taken.add(eval_id)
+            prior = self.ledger.get(eval_id, {})
+            env = dict(group['env'])
             if prior.get('state') == 'interrupted':
                 env['EVAL_RESUME'] = '1'           # a reboot cut the last attempt short: keep its
                                                    # full-length rows, redo only the partial one
-            jobs.append(Job(id=eval_id, type='eval', policy=rec['policy'],
+            jobs.append(Job(id=eval_id, type='eval', policies=group['policies'],
                             env=env, eval_args=['top50'],
+                            # `--chain` is the HOF re-measure, run as stage B inside this same
+                            # process. There is no `hof: pending` marker any more and nothing to
+                            # forecast separately: an arm with no >=98% checkpoint contributes no
+                            # work to stage B, which is the normal outcome.
+                            chain=self.runtime.get('auto_hof', True),
                             priority=AUTO_CLOSEOUT_PRIORITY))
         return jobs
 
-    def _auto_hof_jobs(self):
-        """HOF re-measures to run for closeouts that finished under auto-hof and have not been
-        re-measured yet -- the exact mirror of `_auto_closeout_jobs`, one link further down the
-        chain (training -> closeout -> hof).
+    def _closeout_id(self, batch, policies, taken=()):
+        """`<batch>-closeout`, or `<batch>-closeout-w<k>` for a later wave of the same batch, or
+        None when this exact wave is already running or terminal.
 
-        The `hof: pending` marker is set on the *closeout's* ledger record (id `<policy>-closeout`),
-        so `rec['env']` here is the env the closeout ran under, which itself inherited the
-        training's -- the FC trap survives both hops. The synthesized job's id is `<policy>-hof`;
-        once it is running or terminal the guard skips it, so a still-'pending' marker cannot launch
-        a second one. Its env forces the 500-episode flat recipe over the inherited one, and its
-        `above:98` arg selects from the closeout result file (see select_checkpoints_above)."""
-        if not self.runtime.get('auto_hof', True):
-            return []
-        jobs = []
-        for rec in self.ledger.values():
-            if rec.get('hof') != 'pending' or not rec.get('policy'):
+        `<batch>-closeout` alone is not enough, and the case is real: **b20 ran 36 arms under one
+        prefix, in nine waves of four.** Under a single id the second wave would be skipped as
+        already-terminal and never measured. `k` counts up from 2 to the first free id, which does
+        not churn between polls because ledger records are never deleted -- and the grouping that
+        feeds it only happens at dispatch, when the marker set is closed.
+
+        Returns None when the id whose *policy set* matches this one is already accounted for, so a
+        still-'pending' marker cannot launch a second copy of the same wave.
+
+        `taken` is the ids already claimed **in this same pass**, which the ledger cannot know about
+        yet. It matters whenever one batch splits into two waves for disagreeing envs: without it
+        both groups are handed `<batch>-closeout` and the second silently replaces the first.
+        """
+        wanted = set(policies)
+        base = '{0}-closeout'.format(batch)
+        for index in range(1, 100):
+            eval_id = base if index == 1 else '{0}-w{1}'.format(base, index)
+            if eval_id in taken:
                 continue
-            hof_id = rec['policy'] + '-hof'
-            prior = self.ledger.get(hof_id, {})
-            if prior.get('state') in TERMINAL or hof_id in self.running:
+            if eval_id in self.running:
+                # In flight under this id. Whether or not its arm set matches, there is nothing to
+                # launch: a wave already occupies the box and the barrier means nothing else starts.
+                return None
+            prior = self.ledger.get(eval_id)
+            if prior is None:
+                return eval_id
+            if prior.get('state') in TERMINAL:
+                # Taken by a finished wave. If it measured these same arms the work is done;
+                # otherwise this is a later wave of the batch and needs the next id.
+                if set(prior.get('policies') or [prior.get('policy')]) == wanted:
+                    return None
                 continue
-            env = dict(rec.get('env') or {})
-            env.update(HOF_EVAL_ENV)               # the HOF recipe wins over the inherited env
-            if prior.get('state') == 'interrupted':
-                env['EVAL_RESUME'] = '1'           # resume the 500-ep re-measure, do not redo it
-            jobs.append(Job(id=hof_id, type='eval', policy=rec['policy'],
-                            env=env, eval_args=list(HOF_EVAL_ARGS),
-                            priority=AUTO_HOF_PRIORITY))
-        return jobs
+            return eval_id      # non-terminal (pending / interrupted): relaunch under this id
+        return None
 
     def _scan_pending(self):
         """The launchable jobs waiting for the next wave, sorted by priority -- the order
@@ -365,8 +389,6 @@ class Runner:
             desired.append(job)
         seen = {job.id for job in desired}
         desired += [j for j in self._auto_closeout_jobs() if j.id not in seen]
-        seen = {job.id for job in desired}
-        desired += [j for j in self._auto_hof_jobs() if j.id not in seen]
         desired.sort(key=lambda j: j.priority)
         if marked:
             self._save_ledger()
@@ -410,6 +432,10 @@ class Runner:
         prior = self.ledger.get(job.id) or {}
         self.running[job.id] = rj
         self.ledger[job.id] = {'state': 'running', 'type': job.type, 'policy': rj.policy,
+                               # Every arm this job owns. An eval wave has several; a training has
+                               # one and records it both ways, so a reader never has to know which.
+                               'policies': list(job.policies),
+                               'chain': bool(getattr(job, 'chain', False)),
                                'pid': rj.pid, 'log': rj.log_path, 'started': rj.started,
                                # Carried so status.json's at-a-glance can show a % and a
                                # label for a job re-adopted after a restart, spec not in hand.
@@ -437,35 +463,44 @@ class Runner:
                         'policy': rj.policy, 'finished': time.time(), 'returncode': rc})
             if wants_closeout(rj.job.type, ok, self.runtime.get('auto_closeout', True)):
                 rec['closeout'] = 'pending'   # picked up by _auto_closeout_jobs next dispatch
-            elif wants_hof(jid, rj.job.type, ok, self.runtime.get('auto_hof', True)):
-                rec['hof'] = 'pending'        # picked up by _auto_hof_jobs next dispatch
             del self.running[jid]
             if ok:
                 self._publish_results(rj)
         self._save_ledger()
 
     def _publish_results(self, rj):
-        snek, pol = self.host['SNEK_DIR'], str(rj.policy)
-        arts, runs = [], os.path.join(self.host['SNEK_DIR'], 'runs')
-        if os.path.isdir(runs):
-            for f in os.listdir(runs):
-                if f == pol + '.md' or f.startswith(pol + '.') or f.startswith(pol + '_'):
-                    arts.append(os.path.join(runs, f))
-        try:
-            gitbus.publish_results(self.host, rj.job, arts)
-        except Exception as e:  # best-effort, but say so in the journal, not silently
-            sys.stderr.write('publish_results({0}) failed: {1}\n'.format(rj.job.id, e))
+        """Publishes every arm this job owned, **one push per arm**.
+
+        Per arm rather than one push for the whole wave, and the reason is a failure this project has
+        already paid for: the box's DNS for github.com flaps, `publish_results` has no retry, and a
+        failed push leaves the commit local while the ledger still says `done`. On 2026-08-18 that
+        hid four HOF-500 files and a whole close-out for hours -- one of them a 98.2%/500 checkpoint.
+        A wave makes that worse by concentrating four arms behind one push, so the error is caught
+        per arm and the remaining arms are still attempted.
+        """
+        runs = os.path.join(self.host['SNEK_DIR'], 'runs')
+        names = sorted(os.listdir(runs)) if os.path.isdir(runs) else []
+        for pol in [str(p) for p in (rj.job.policies or [rj.policy]) if p]:
+            arts = [os.path.join(runs, f) for f in names
+                    if f == pol + '.md' or f.startswith(pol + '.') or f.startswith(pol + '_')]
+            try:
+                gitbus.publish_results(self.host, rj.job, arts)
+            except Exception as e:  # best-effort, but say so in the journal, not silently
+                sys.stderr.write('publish_results({0}, {1}) failed: {2}\n'.format(
+                    rj.job.id, pol, e))
 
     def _anticipated_order(self):
-        """The pending queue folded forward through the wave scheduler -- each queued training's
-        closeout, and each closeout's HOF, slotted where they will actually run (see
-        `anticipated_queue`). Shared by the ledger view and the at-a-glance summary so both agree."""
+        """The pending queue folded forward through the wave scheduler -- each queued batch's
+        closeout wave slotted where it will actually run (see `anticipated_queue`). Shared by the
+        ledger view and the at-a-glance summary so both agree."""
         limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
         auto = self.runtime.get('auto_closeout', True)
         auto_hof = self.runtime.get('auto_hof', True)
-        queued = [{'id': j.id, 'type': j.type, 'policy': j.policy, 'priority': j.priority}
+        queued = [{'id': j.id, 'type': j.type, 'policy': j.policy,
+                   'policies': list(j.policies), 'priority': j.priority}
                   for j in self._queued if j.id not in self.running]
-        running = [{'id': jid, 'type': rj.job.type, 'policy': rj.policy}
+        running = [{'id': jid, 'type': rj.job.type, 'policy': rj.policy,
+                    'policies': list(rj.job.policies)}
                    for jid, rj in self.running.items()]
         existing = set(self.ledger) | set(self.running) | {j['id'] for j in queued}
         return anticipated_queue(queued, running, limits, auto, existing, auto_hof)
@@ -513,6 +548,7 @@ class Runner:
     def _publish(self):
         order = self._anticipated_order()
         running = [{'id': rj.job.id, 'type': rj.job.type, 'policy': rj.policy,
+                    'policies': list(rj.job.policies),
                     'pid': rj.pid, 'step': rj.current_step,
                     'max_steps': getattr(rj.job, 'max_steps', None),
                     'steps_per_sec': rj.steps_per_sec,
@@ -551,14 +587,26 @@ def batch_of(job_id):
     return m.group(1) if m else (jid.split('-')[0] or jid)
 
 
+_CLOSEOUT_ID_RE = re.compile(r'-closeout(-w\d+)?$')
+
+
 def phase_of(job_id, job_type):
-    """The phase of a job, read off the id suffix the daemon mints (-closeout, -hof) with the job
-    type as the fallback: 'hof' | 'closeout eval' | 'training' | 'eval' | 'smoke' | 'benchmark'."""
+    """The phase of a job, read off the id suffix the daemon mints with the job type as the
+    fallback: 'closeout eval' | 'hof' | 'training' | 'eval' | 'smoke' | 'benchmark'.
+
+    The `-w<k>` tail has to be part of the pattern: a batch's second closeout wave is
+    `b20-closeout-w2`, and a plain `endswith('-closeout')` would call that an 'eval' and split the
+    at-a-glance grouping in two.
+
+    `-hof` is kept for **old ledger records only**. The daemon no longer mints that id -- the
+    re-measure is stage B inside the closeout's own process -- but the ledger is append-only and
+    status.json still renders records from before the change.
+    """
     jid = job_id or ''
+    if _CLOSEOUT_ID_RE.search(jid):
+        return 'closeout eval'
     if jid.endswith('-hof'):
         return 'hof'
-    if jid.endswith('-closeout'):
-        return 'closeout eval'
     return {'train': 'training'}.get(job_type, job_type or 'job')
 
 
@@ -612,7 +660,12 @@ def build_at_a_glance(running, queued_order, labels, held_by=()):
             return ''
         return ' -- ' + (lab if len(lab) <= 80 else lab[:77] + '...')
 
-    def arms(n):
+    def arms(jobs):
+        """"N arms", counted in **policies**, not in jobs.
+
+        One eval job is a wave of four arms, so counting jobs would report a batch's whole close-out
+        as "1 arm" -- the number a reader uses to check that nothing was dropped."""
+        n = sum(len(job.get('policies') or [job.get('policy')] or []) or 1 for job in jobs)
         return '{0} arm{1}'.format(n, '' if n == 1 else 's')
 
     running_lines = []
@@ -621,7 +674,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=()):
                 for j in jobs if j.get('step') and j.get('max_steps')]
         pct = ' {0}%'.format(int(round(sum(pcts) / len(pcts)))) if pcts else ''
         running_lines.append('{0}{1} -- {2}{3} ({4})'.format(
-            batch, described(batch), phase, pct, arms(len(jobs))))
+            batch, described(batch), phase, pct, arms(jobs)))
 
     queued_lines = []
     notice = hold_notice(held_by)
@@ -629,65 +682,68 @@ def build_at_a_glance(running, queued_order, labels, held_by=()):
         queued_lines.append(notice)
     for batch, phase, jobs in group(queued_order):
         queued_lines.append('{0} {1}{2} -- queued ({3})'.format(
-            batch, phase, described(batch), arms(len(jobs))))
+            batch, phase, described(batch), arms(jobs)))
 
     return {'running': running_lines, 'queued': queued_lines}
 
 
 def anticipated_queue(queued, running, limits, auto_closeout, existing_ids, auto_hof=True):
     """Simulate the wave-barrier scheduler forward over the pending queue and return the jobs
-    in the order they are expected to launch -- with each queued training's closeout eval, and
-    each closeout's HOF re-measure, inserted where they will actually run.
+    in the order they are expected to launch -- with each queued batch's closeout **wave**
+    inserted where it will actually run.
 
     Modelled straight from `_dispatch`: repeatedly form a wave from the highest-priority job's
-    category, up to that category's limit, drain it, and let every training in it spawn a
-    closeout (priority `AUTO_CLOSEOUT_PRIORITY` = 10) and every closeout spawn a HOF re-measure
-    (priority `AUTO_HOF_PRIORITY` = 11) that compete in the next wave. Both outrank a queued
-    training (100), so a batch's closeouts, then its HOFs, always slot in ahead of the following
-    batch -- the exact interleaving the box will run. The HOF trails its closeout because it is
-    only spawned once that closeout has been placed in a wave, never in the same one.
+    category, up to that category's limit, drain it, and let the trainings in it spawn **one**
+    closeout per batch (priority `AUTO_CLOSEOUT_PRIORITY` = 10) that competes in the next wave. A
+    closeout outranks a queued training (100), so a batch's closeout always slots in ahead of the
+    following batch -- the exact interleaving the box will run.
 
-    `queued` and `running` are lists of dicts with id/type/policy (queued also has priority);
-    `queued` is the real pending set (already includes closeouts synthesized for *finished*
-    trainings, and HOFs for *finished* closeouts), `running` seeds anticipated closeouts for
-    trainings on the box now and HOFs for closeouts on the box now. `existing_ids` is every id
-    already known (ledger, running, queued), so a job that already exists somewhere is never
-    invented twice. Returns the ordered list of queued/anticipated job dicts."""
+    **There is no HOF hop any more.** The re-measure is stage B inside the closeout's own process
+    (`eval_wave.py --chain`), so it is not a job, has nothing to forecast, and cannot be a wave of
+    its own. `auto_hof` is kept in the signature and reported as part of the closeout line rather
+    than dropped, because the runtime flag still exists and still decides whether stage B runs.
+
+    A batch's four trainings collapsing into one closeout row is the *reason* this is grouped: the
+    old forecast showed four closeout jobs and then four HOF jobs, which is eight rows for what is
+    now one process.
+
+    `queued` and `running` are lists of dicts with id/type/policy (queued also has priority, and a
+    wave carries `policies`); `queued` is the real pending set (already includes closeouts
+    synthesized for *finished* trainings), `running` seeds anticipated closeouts for trainings on the
+    box now. `existing_ids` is every id already known (ledger, running, queued), so a job that
+    already exists somewhere is never invented twice. Returns the ordered list of queued/anticipated
+    job dicts."""
     def category(job_type):
         return 'eval' if job_type == 'eval' else 'trainer'
 
     seen = set(existing_ids)
 
-    def closeout_for(policy):
-        """A fresh closeout dict for `policy`, or None if one already exists or is not wanted."""
-        cid = (policy or '') + '-closeout'
-        if not policy or cid in seen:
-            return None
-        seen.add(cid)
-        return {'id': cid, 'type': 'eval', 'policy': policy, 'priority': AUTO_CLOSEOUT_PRIORITY}
+    def closeout_for(jobs):
+        """One closeout wave dict for a set of just-placed trainings, or None.
 
-    def hof_for(policy):
-        """A fresh HOF dict for `policy`, or None if one already exists or is not wanted."""
-        hid = (policy or '') + '-hof'
-        if not policy or hid in seen:
-            return None
-        seen.add(hid)
-        return {'id': hid, 'type': 'eval', 'policy': policy, 'priority': AUTO_HOF_PRIORITY}
-
-    def spawned_by(job):
-        """The follow-on a just-placed job triggers: a training -> its closeout, a closeout ->
-        its HOF. None otherwise. Keeps the running-seed and wave-drain paths in step."""
-        if wants_closeout(job.get('type'), True, auto_closeout):
-            return closeout_for(job.get('policy'))
-        if wants_hof(job.get('id'), job.get('type'), True, auto_hof):
-            return hof_for(job.get('policy'))
-        return None
+        Grouped by batch, exactly as `_auto_closeout_jobs` groups the real markers. Not grouped by
+        env here: a forecast has no env to read, and getting the *count of rows* right is what this
+        function is for.
+        """
+        out = []
+        by_batch = {}
+        for job in jobs:
+            policy = job.get('policy')
+            if not policy or not wants_closeout(job.get('type'), True, auto_closeout):
+                continue
+            by_batch.setdefault(batch_of(policy), []).append(policy)
+        for batch, policies in sorted(by_batch.items()):
+            cid = '{0}-closeout'.format(batch)
+            if cid in seen:
+                continue
+            seen.add(cid)
+            out.append({'id': cid, 'type': 'eval', 'policy': policies[0],
+                        'policies': sorted(policies), 'chain': bool(auto_hof),
+                        'priority': AUTO_CLOSEOUT_PRIORITY})
+        return out
 
     pool = [dict(j) for j in queued]
-    for r in running:                                  # follow-ons for jobs on the box now
-        nxt = spawned_by(r)
-        if nxt:
-            pool.append(nxt)
+    pool += closeout_for(running)                      # follow-ons for jobs on the box now
 
     order = []
     while pool:
@@ -700,10 +756,7 @@ def anticipated_queue(queued, running, limits, auto_closeout, existing_ids, auto
         wave_ids = {job['id'] for job in wave}
         order.extend(wave)
         pool = [job for job in pool if job['id'] not in wave_ids]
-        for job in wave:                               # each job in the wave spawns its follow-on
-            nxt = spawned_by(job)
-            if nxt:
-                pool.append(nxt)
+        pool += closeout_for(wave)         # the wave's trainings spawn their batches' closeouts
     return order
 
 
@@ -712,17 +765,24 @@ def viewer_png_paths(running_jobs, snek_dir):
 
     Each job's chart lives at a category-specific path: an eval writes
     evals/<policy>_eval_progress.png, a trainer writes runs/<policy>.png. `running_jobs`
-    is an iterable of (category, policy) pairs; policies that are falsy are skipped.
+    is an iterable of `(category, policies)` pairs -- **plural**, because one eval job is now a
+    wave of four arms and each arm still writes its own chart. A bare string is accepted as a
+    one-element list, so a caller with a single policy in hand needs no change. Falsy policies are
+    skipped.
+
     Sorted so the result is comparable across polls -- the set changes when a wave flips
     train->eval, which is exactly when the viewer's fixed arg list has gone stale."""
     pngs = []
-    for category, policy in running_jobs:
-        if not policy:
-            continue
-        if category == 'eval':
-            pngs.append(os.path.join(snek_dir, 'evals', policy + '_eval_progress.png'))
-        else:
-            pngs.append(os.path.join(snek_dir, 'runs', policy + '.png'))
+    for category, policies in running_jobs:
+        if isinstance(policies, str) or policies is None:
+            policies = [policies]
+        for policy in policies:
+            if not policy:
+                continue
+            if category == 'eval':
+                pngs.append(os.path.join(snek_dir, 'evals', policy + '_eval_progress.png'))
+            else:
+                pngs.append(os.path.join(snek_dir, 'runs', policy + '.png'))
     return sorted(pngs)
 
 

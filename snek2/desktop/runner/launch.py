@@ -39,8 +39,16 @@ def build_command(job, host, runtime):
             env.setdefault('XAUTHORITY', host['XAUTHORITY'])
 
     if job.type == 'eval':
-        argv = [py, '-u', 'eval_checkpoints.py', job.policy] + list(job.eval_args)
-        env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 10))
+        # `eval_wave.py`, not `eval_checkpoints.py`: one process owns the whole wave, so its lanes
+        # move to whichever arm still has work instead of a finished arm's share of the box sitting
+        # idle. `--chain` leads the argv because the selector has to follow it, and the policies
+        # trail the selector — the same spelling an agent types on the laptop, which is the point.
+        argv = [py, '-u', 'eval_wave.py']
+        if job.chain:
+            argv.append('--chain')
+        argv += list(job.eval_args) + list(job.policies)
+        env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 4))
+        env['EVAL_LANES'] = str(job.eval_lanes or runtime.get('eval_lanes', 4))
         return argv, env, 'eval-{0}.log'.format(job.id), job.policy
 
     # train / smoke / benchmark all invoke the trainer.
@@ -114,7 +122,11 @@ def spawn(job, host, runtime):
 
 def update_throughput(rj, host):
     """Refreshes rj.current_step and rj.steps_per_sec from the policy's evals.json
-    summary. Cheap and best-effort -- a missing or half-written file is ignored."""
+    summary. Cheap and best-effort -- a missing or half-written file is ignored.
+
+    Reads `rj.policy`, which for an eval wave is the first of its arms. That is right rather than
+    approximate: the field exists to show a *training's* progress, and a wave has no single step to
+    report."""
     path = os.path.join(host['SNEK_DIR'], 'runs', str(rj.policy) + '_evals.json')
     try:
         with open(path) as fh:

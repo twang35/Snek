@@ -16,7 +16,12 @@ import json
 RUNTIME_DEFAULTS = {
     'max_trainers': 2,        # concurrent train/smoke/benchmark jobs
     'max_evals': 1,           # concurrent eval jobs
-    'eval_workers': 10,       # EVAL_WORKERS per eval job
+    'eval_workers': 4,        # EVAL_WORKERS per eval lane
+    # EVAL_LANES per eval job. An eval job is now a *wave*: one `eval_wave.py` process owning
+    # every arm of a batch, with `eval_lanes` worker pools taking whichever checkpoint is next
+    # regardless of which arm it belongs to. So `max_evals` normally reads 1 and this is the knob
+    # that fills the box. 4 x 4 is the measured throughput point (~12.7 of 14 cores busy).
+    'eval_lanes': 4,
     'poll_seconds': 30,
     'tf_intraop_threads': 0,  # 0 = leave TensorFlow's default
     'omp_num_threads': 0,     # 0 = leave oneDNN's default
@@ -26,10 +31,15 @@ RUNTIME_DEFAULTS = {
     'drain': False,           # alias of paused, kept separate for intent
     'viewer': True,           # keep a decoupled chart viewer up while trainers run
     'auto_closeout': True,    # a finished training auto-queues its closeout eval (runs next)
-    'auto_hof': True,         # a finished closeout auto-queues a 500-episode HOF re-measure of its >=98% checkpoints
+    # A closeout wave also runs the 500-episode HOF re-measure of its >=98% checkpoints, in the same
+    # process, via `eval_wave.py --chain`. Deliberately still spelled `auto_hof` although the
+    # mechanism is now a chained stage rather than a queued job: `parse_runtime_config` rejects the
+    # whole file on an unknown key and keeps the last-known-good config, so renaming it would make a
+    # deploy that landed before the `ops` edit reject every config until someone noticed.
+    'auto_hof': True,
 }
 
-_INT_KEYS = ('max_trainers', 'max_evals', 'eval_workers', 'poll_seconds',
+_INT_KEYS = ('max_trainers', 'max_evals', 'eval_workers', 'eval_lanes', 'poll_seconds',
              'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
 _BOOL_KEYS = ('paused', 'drain', 'viewer', 'auto_closeout', 'auto_hof')
 
@@ -37,6 +47,11 @@ _REQUIRED_HOST = ('REPO_PATH', 'SNEK_DIR', 'PYTHON_BIN', 'GIT_REMOTE',
                   'OPS_BRANCH', 'STATUS_BRANCH', 'RESULTS_BRANCH',
                   'STATUS_WORKTREE', 'RESULTS_WORKTREE', 'LEDGER_PATH', 'LOG_DIR',
                   'HARD_MAX_TRAINERS', 'HARD_MAX_EVALS', 'MIN_POLL_SECONDS')
+
+
+# The most spawned eval workers this box may hold at once, across every lane of every eval job.
+# See the clamp in `clamp_runtime` for the memory arithmetic behind the number.
+MAX_EVAL_WORKERS = 32
 
 
 class ConfigError(Exception):
@@ -83,12 +98,46 @@ def clamp_runtime(cfg, host):
     clamp('max_trainers', 0, host['HARD_MAX_TRAINERS'])
     clamp('max_evals', 0, host['HARD_MAX_EVALS'])
     clamp('eval_workers', 1, 64)
+    clamp('eval_lanes', 1, host['HARD_MAX_EVALS'])
     clamp('poll_seconds', host['MIN_POLL_SECONDS'], 3600)
     clamp('tf_intraop_threads', 0, 64)
     clamp('omp_num_threads', 0, 64)
     clamp('nice', 0, 19)
     clamp('disk_min_gb', 0, 100000)
+    notes += clamp_eval_workers(cfg)
     return notes
+
+
+def clamp_eval_workers(cfg):
+    """Holds `max_evals x eval_lanes x eval_workers` at or under `MAX_EVAL_WORKERS`.
+
+    **All three multiply, and forgetting `max_evals` is how this box gets OOM-killed.** An eval job
+    used to be one policy with `eval_workers` behind it; it is now a *wave* with `eval_lanes` pools
+    of `eval_workers` each, so a `max_evals` of 4 that used to mean 16 spawned workers means 64.
+    Memory, not cores, is the binding constraint: a spawned worker carries its own TensorFlow arena
+    at ~230 MB, and 15,030 MB total puts the OOM ceiling near 40 -- so 32 is the operating band,
+    chosen to keep >=3 GB of headroom.
+
+    `eval_workers` gives way first and `eval_lanes` only if that is not enough, because a lane that
+    does not exist cannot pick up another arm's work -- which is the entire point of a wave -- while
+    a lane with fewer workers merely measures more slowly. `max_evals` is never touched: it is a
+    scheduling decision, and quietly running fewer waves than asked would be a surprising way to
+    honour a memory limit.
+    """
+    def total(lanes, workers):
+        return max(1, cfg['max_evals']) * lanes * workers
+
+    lanes, workers = cfg['eval_lanes'], cfg['eval_workers']
+    if total(lanes, workers) <= MAX_EVAL_WORKERS:
+        return []
+    per_job = max(1, MAX_EVAL_WORKERS // max(1, cfg['max_evals']))
+    cfg['eval_workers'] = max(1, per_job // lanes)
+    if total(lanes, cfg['eval_workers']) > MAX_EVAL_WORKERS:
+        cfg['eval_lanes'] = max(1, per_job // cfg['eval_workers'])
+    return ['max_evals {0} x eval_lanes {1} x eval_workers {2} = {3} spawned workers exceeds {4}; '
+            'reduced to {5} lanes x {6} workers'.format(
+                cfg['max_evals'], lanes, workers, total(lanes, workers), MAX_EVAL_WORKERS,
+                cfg['eval_lanes'], cfg['eval_workers'])]
 
 
 def parse_runtime_config(text, host):

@@ -173,27 +173,31 @@ def test_build_benchmark_defaults_steps_and_policy():
     assert env['SNEK_MIN_CHECKPOINT_SCORE'] == '0'
 
 
-def test_build_eval_command_uses_worker_count():
-    j = jobmod.parse_job('{"id": "e1", "type": "eval", "policy": "b19a", "eval_args": ["top20"]}')
-    r = _runtime(); r['eval_workers'] = 10
+def test_build_eval_command_runs_the_wave_and_sets_both_knobs():
+    j = jobmod.parse_job('{"id": "e1", "type": "eval", "policy": "b19a", "eval_args": ["top50"]}')
+    r = _runtime(); r['eval_workers'] = 4; r['eval_lanes'] = 4
     argv, env, log, policy = launch.build_command(j, _host(), r)
-    assert argv == ['/py', '-u', 'eval_checkpoints.py', 'b19a', 'top20']
-    assert env['EVAL_WORKERS'] == '10'
+    assert argv == ['/py', '-u', 'eval_wave.py', 'top50', 'b19a']
+    assert env['EVAL_WORKERS'] == '4' and env['EVAL_LANES'] == '4'
 
 
-def test_build_eval_command_passes_hof_env_and_args_through():
-    # The synthesized HOF job's argv and its 500-episode env must reach the process untouched,
-    # while EVAL_WORKERS still comes from the runtime (the "4 parallel" of a regular eval).
+def test_build_eval_command_puts_chain_before_the_selector():
+    # Order is not cosmetic: `eval_wave.parse_options` reads leading `--chain` tokens and everything
+    # after the selector is a policy name, so `top50 --chain` would be rejected as a policy.
     j = jobmod.parse_job(json.dumps({
-        'id': 'p-hof', 'type': 'eval', 'policy': 'p', 'eval_args': ['above:98'],
-        'env': {'EVAL_EPISODES': '500', 'EVAL_SCREEN_EPISODES': '0',
-                'EVAL_MIN_ACHIEVABLE': '98', 'EVAL_OUT_SUFFIX': '_hof500'}}))
-    r = _runtime(); r['eval_workers'] = 4
-    argv, env, log, policy = launch.build_command(j, _host(), r)
-    assert argv == ['/py', '-u', 'eval_checkpoints.py', 'p', 'above:98']
-    assert env['EVAL_EPISODES'] == '500' and env['EVAL_SCREEN_EPISODES'] == '0'
-    assert env['EVAL_MIN_ACHIEVABLE'] == '98' and env['EVAL_OUT_SUFFIX'] == '_hof500'
-    assert env['EVAL_WORKERS'] == '4'
+        'id': 'b45-closeout', 'type': 'eval', 'policies': ['b45a', 'b45b'],
+        'eval_args': ['top50'], 'chain': True}))
+    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    assert argv == ['/py', '-u', 'eval_wave.py', '--chain', 'top50', 'b45a', 'b45b']
+    assert policy == 'b45a'                      # the throughput field: the wave's first arm
+
+
+def test_build_eval_command_lets_a_spec_override_the_lane_count():
+    j = jobmod.parse_job(json.dumps({'id': 'e', 'type': 'eval', 'policy': 'p',
+                                     'eval_args': ['top50'], 'eval_lanes': 2,
+                                     'eval_workers': 8}))
+    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    assert env['EVAL_LANES'] == '2' and env['EVAL_WORKERS'] == '8'
 
 
 def test_build_threads_injected():
@@ -297,36 +301,78 @@ def test_wants_closeout_only_for_successful_training():
     assert runnermod.wants_closeout('train', True, False) is False    # feature disabled
 
 
-def test_auto_closeout_synthesizes_eval_inheriting_env():
+def test_auto_closeout_groups_a_batch_into_one_wave():
     r = _runner()
-    r.ledger['b20a-fc25seed1'] = {'state': 'done', 'type': 'train',
-                                  'policy': 'b20a-fc25seed1', 'closeout': 'pending',
-                                  'env': {'SNEK_FC_LAYERS': '25,50,25', 'SNEK_SEED': '1'}}
+    for arm in ('b20a-fc25seed1', 'b20b-fc25seed2', 'b20c-fc25seed3'):
+        r.ledger[arm] = {'state': 'done', 'type': 'train', 'policy': arm,
+                         'closeout': 'pending',
+                         'env': {'SNEK_FC_LAYERS': '25,50,25', 'SNEK_SEED': '1'}}
     jobs = r._auto_closeout_jobs()
-    assert len(jobs) == 1
+    assert len(jobs) == 1, [j.id for j in jobs]      # one job, not three
     j = jobs[0]
-    assert j.id == 'b20a-fc25seed1-closeout' and j.type == 'eval'
-    assert j.policy == 'b20a-fc25seed1'
-    assert j.env.get('SNEK_FC_LAYERS') == '25,50,25'   # the FC trap: width must carry over
-    # Read from the constant, not a literal: this pair drifted silently when the gate moved
-    # 96 -> 97 on 2026-08-19 and the selector top20 -> top50, and a tripwire asserting a stale
-    # constant is worse than no tripwire.
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == str(runnermod.CLOSEOUT_THRESHOLD)
+    assert j.id == 'b20-closeout' and j.type == 'eval'
+    assert j.policies == ['b20a-fc25seed1', 'b20b-fc25seed2', 'b20c-fc25seed3']
+    assert j.policy == 'b20a-fc25seed1'              # sugar: the first arm
+    assert j.env.get('SNEK_FC_LAYERS') == '25,50,25'  # the arm's own knobs still carry over
     assert j.eval_args == ['top50']
     assert j.priority == runnermod.AUTO_CLOSEOUT_PRIORITY
-    assert j.priority < 100                             # beats a default-priority training
+    assert j.priority < 100                          # beats a default-priority training
 
 
-def test_closeout_gate_overrides_an_inherited_min_achievable():
-    # A training env that set its own gate must not leak into the closeout -- the closeout
-    # recipe wins, exactly like the HOF recipe does one hop later.
+def test_the_closeout_carries_no_eval_protocol_env_at_all():
+    # The daemon used to pin the gate here, as a second copy of `eval_plan.DEFAULT_MIN_ACHIEVABLE`.
+    # It now *strips* the protocol keys instead and lets the tool's own default decide, so there is
+    # one definition and nothing here to drift. A stale knob in the training's env must not survive.
     r = _runner()
     r.ledger['b40a'] = {'state': 'done', 'type': 'train', 'policy': 'b40a',
                         'closeout': 'pending',
-                        'env': {'SNEK_FC_LAYERS': '320', 'EVAL_MIN_ACHIEVABLE': '80'}}
+                        'env': {'SNEK_FREE_SPACE_SHAPING': '0.1', 'EVAL_MIN_ACHIEVABLE': '80',
+                                'EVAL_EPISODES': '10', 'EVAL_OUT_SUFFIX': '_stale'}}
     j = r._auto_closeout_jobs()[0]
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == str(runnermod.CLOSEOUT_THRESHOLD)
-    assert runnermod.CLOSEOUT_THRESHOLD < runnermod.HOF_THRESHOLD  # HOF above:98 stays readable
+    assert j.env == {'SNEK_FREE_SPACE_SHAPING': '0.1'}, j.env
+    for key in runnermod.EVAL_PROTOCOL_KEYS:
+        assert key not in j.env, key
+
+
+def test_arms_that_disagree_about_shaping_get_separate_waves():
+    # One wave is one process with one environment, and the shaping knobs change what `avg_reward`
+    # means. Two arms that disagree must not be measured under a single setting.
+    r = _runner()
+    r.ledger['b41a'] = {'state': 'done', 'type': 'train', 'policy': 'b41a',
+                        'closeout': 'pending', 'env': {'SNEK_CHASE_SAFE_SHAPING': '0.10'}}
+    r.ledger['b41b'] = {'state': 'done', 'type': 'train', 'policy': 'b41b',
+                        'closeout': 'pending', 'env': {}}
+    jobs = r._auto_closeout_jobs()
+    assert len(jobs) == 2, [(j.id, j.policies) for j in jobs]
+    assert sorted(p for j in jobs for p in j.policies) == ['b41a', 'b41b']
+    assert len({j.id for j in jobs}) == 2            # and the two ids do not collide
+
+
+def test_a_second_wave_of_the_same_batch_gets_its_own_id():
+    # b20 ran 36 arms under one prefix, in nine waves of four. Under a single `b20-closeout` the
+    # later waves would be skipped as already-terminal and never measured at all.
+    r = _runner()
+    r.ledger['b20-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'b20a',
+                                'policies': ['b20a', 'b20b']}
+    r.ledger['b20e'] = {'state': 'done', 'type': 'train', 'policy': 'b20e',
+                        'closeout': 'pending', 'env': {}}
+    r.ledger['b20f'] = {'state': 'done', 'type': 'train', 'policy': 'b20f',
+                        'closeout': 'pending', 'env': {}}
+    jobs = r._auto_closeout_jobs()
+    assert [j.id for j in jobs] == ['b20-closeout-w2'], [j.id for j in jobs]
+    assert jobs[0].policies == ['b20e', 'b20f']
+
+
+def test_the_same_wave_is_never_measured_twice():
+    # Idempotence, and it has to be by arm *set* rather than by id alone now that the id is the
+    # batch: a still-'pending' marker must not launch a second copy of a finished wave.
+    r = _runner()
+    r.ledger['b20-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'b20a',
+                                'policies': ['b20a', 'b20b']}
+    for arm in ('b20a', 'b20b'):
+        r.ledger[arm] = {'state': 'done', 'type': 'train', 'policy': arm,
+                         'closeout': 'pending', 'env': {}}
+    assert r._auto_closeout_jobs() == []
 
 
 def test_interrupted_closeout_resumes_a_fresh_one_does_not():
@@ -335,10 +381,10 @@ def test_interrupted_closeout_resumes_a_fresh_one_does_not():
     # a first-time closeout (no prior record) must not, or it would read a stale file.
     r = _runner()
     r.ledger['b41a'] = {'state': 'done', 'type': 'train', 'policy': 'b41a',
-                        'closeout': 'pending', 'env': {'SNEK_FC_LAYERS': '320'}}
+                        'closeout': 'pending', 'env': {'SNEK_SEED': '1'}}
     assert 'EVAL_RESUME' not in r._auto_closeout_jobs()[0].env   # fresh: measure from scratch
-    r.ledger['b41a-closeout'] = {'state': 'interrupted', 'type': 'eval', 'policy': 'b41a'}
-    assert r._auto_closeout_jobs()[0].env['EVAL_RESUME'] == '1'  # relaunch: resume
+    r.ledger['b41-closeout'] = {'state': 'interrupted', 'type': 'eval', 'policy': 'b41a'}
+    assert r._auto_closeout_jobs()[0].env['EVAL_RESUME'] == '1'
 
 
 def test_auto_closeout_skips_when_eval_done_running_or_unmarked():
@@ -346,9 +392,10 @@ def test_auto_closeout_skips_when_eval_done_running_or_unmarked():
     # unmarked done training -> nothing (no retroactive closeouts for pre-feature arms)
     r.ledger['old'] = {'state': 'done', 'type': 'train', 'policy': 'old-arm'}
     assert r._auto_closeout_jobs() == []
-    # marked, but its closeout already ran -> skip (idempotent, no second eval)
+    # marked, but its closeout already ran over the same arm -> skip (idempotent, no second eval)
     r.ledger['p1'] = {'state': 'done', 'type': 'train', 'policy': 'p1', 'closeout': 'pending'}
-    r.ledger['p1-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p1'}
+    r.ledger['p1-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p1',
+                               'policies': ['p1']}
     # marked, but its closeout is currently running -> skip
     r.ledger['p2'] = {'state': 'done', 'type': 'train', 'policy': 'p2', 'closeout': 'pending'}
     r.running['p2-closeout'] = object()
@@ -362,11 +409,12 @@ def test_auto_closeout_disabled_yields_nothing():
     assert r._auto_closeout_jobs() == []
 
 
-# ----------------------------------------------- auto-HOF: the link after the closeout
+# ----------------------------------------------- the HOF stage, now inside the closeout process
 class _FakeRJ:
     """The bit of launch.RunningJob that _reap touches, with no subprocess behind it."""
-    def __init__(self, jid, jtype, policy, alive=False, rc=0):
-        self.job = jobmod.Job(id=jid, type=jtype, policy=policy, env={}, priority=10)
+    def __init__(self, jid, jtype, policy, alive=False, rc=0, policies=None):
+        self.job = jobmod.Job(id=jid, type=jtype, policy=policy, policies=policies,
+                              env={}, priority=10)
         self.policy = policy
         self.log_path = '/nonexistent.log'
         self._alive, self._rc = alive, rc
@@ -378,153 +426,109 @@ class _FakeRJ:
         return self._rc
 
 
-def test_wants_hof_only_for_a_successful_closeout_eval():
-    assert runnermod.wants_hof('p-closeout', 'eval', True, True) is True
-    assert runnermod.wants_hof('p-closeout', 'eval', False, True) is False  # failed: no result file
-    assert runnermod.wants_hof('p-hof', 'eval', True, True) is False         # no HOF-of-a-HOF
-    assert runnermod.wants_hof('manual-top20', 'eval', True, True) is False  # a hand-queued eval
-    assert runnermod.wants_hof('p', 'train', True, True) is False            # a training gets a closeout
-    assert runnermod.wants_hof('p-closeout', 'eval', True, False) is False   # feature disabled
+def test_the_daemon_no_longer_mints_a_hof_job_at_all():
+    # The re-measure is stage B of the closeout's own process (`eval_wave.py --chain`), so there is
+    # no `wants_hof`, no `_auto_hof_jobs`, and no `hof: pending` marker to lose results down. Named
+    # explicitly rather than left as an absence, because "the function is gone" is the behaviour
+    # change -- a reintroduced second copy of the recipe is what this guards against.
+    assert not hasattr(runnermod, 'wants_hof')
+    assert not hasattr(runnermod, '_auto_hof_jobs')
+    assert not hasattr(runnermod.Runner, '_auto_hof_jobs')
+    for gone in ('HOF_THRESHOLD', 'HOF_EVAL_ENV', 'HOF_EVAL_ARGS', 'AUTO_HOF_PRIORITY',
+                 'CLOSEOUT_THRESHOLD', 'CLOSEOUT_EVAL_ENV'):
+        assert not hasattr(runnermod, gone), gone
 
 
-def test_auto_hof_synthesizes_a_500ep_flat_eval_inheriting_env():
+def test_a_closeout_wave_carries_chain_when_auto_hof_is_on():
     r = _runner()
-    r.ledger['b25a-fc320seed1-closeout'] = {
-        'state': 'done', 'type': 'eval', 'policy': 'b25a-fc320seed1', 'hof': 'pending',
-        'env': {'SNEK_FC_LAYERS': '320', 'SNEK_SEED': '1'}}
-    jobs = r._auto_hof_jobs()
-    assert len(jobs) == 1
-    j = jobs[0]
-    assert j.id == 'b25a-fc320seed1-hof' and j.type == 'eval'
-    assert j.policy == 'b25a-fc320seed1'
-    assert j.eval_args == ['above:98']                 # selects the closeout's >=98% checkpoints
-    assert j.env['SNEK_FC_LAYERS'] == '320'            # FC trap survives both hops (train->closeout->hof)
-    assert j.env['EVAL_EPISODES'] == '500'
-    assert j.env['EVAL_SCREEN_EPISODES'] == '0'        # flat, no screening
-    assert j.env['EVAL_INDEPENDENT'] == '1'
-    assert j.env['EVAL_MIN_ACHIEVABLE'] == '98'
-    assert j.env['EVAL_OUT_SUFFIX'] == '_hof500'       # a distinct file, never clobbers the closeout
-    assert 'EVAL_RESUME' not in j.env                   # fresh HOF: measure from scratch
-    assert j.priority == runnermod.AUTO_HOF_PRIORITY
-    assert runnermod.AUTO_CLOSEOUT_PRIORITY < j.priority < 100  # after the closeout, before a training
-
-
-def test_interrupted_hof_resumes_the_500ep_remeasure():
-    # The expensive one to redo: a reboot mid-HOF must resume its _hof500 file, not restart it.
-    r = _runner()
-    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending',
-                              'env': {'SNEK_FC_LAYERS': '320'}}
-    assert 'EVAL_RESUME' not in r._auto_hof_jobs()[0].env
-    r.ledger['p-hof'] = {'state': 'interrupted', 'type': 'eval', 'policy': 'p'}
-    assert r._auto_hof_jobs()[0].env['EVAL_RESUME'] == '1'
-
-
-def test_auto_hof_recipe_wins_over_an_inherited_eval_env():
-    # The training env could carry stale EVAL_* knobs; the 500-episode recipe must override them.
-    r = _runner()
-    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending',
-                              'env': {'EVAL_EPISODES': '100', 'EVAL_OUT_SUFFIX': '_stale'}}
-    j = r._auto_hof_jobs()[0]
-    assert j.env['EVAL_EPISODES'] == '500'
-    assert j.env['EVAL_OUT_SUFFIX'] == '_hof500'
-
-
-def test_auto_hof_skips_when_done_running_or_unmarked():
-    r = _runner()
-    # a finished closeout with no hof marker (a pre-feature arm) -> nothing retroactive
-    r.ledger['old-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'old'}
-    assert r._auto_hof_jobs() == []
-    # marked, but its hof already ran -> skip (idempotent)
-    r.ledger['p1-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p1', 'hof': 'pending'}
-    r.ledger['p1-hof'] = {'state': 'done', 'type': 'eval', 'policy': 'p1'}
-    # marked, but its hof is running -> skip
-    r.ledger['p2-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p2', 'hof': 'pending'}
-    r.running['p2-hof'] = object()
-    assert [j.id for j in r._auto_hof_jobs()] == []
-
-
-def test_auto_hof_disabled_yields_nothing():
-    r = _runner()
+    r.ledger['b25a-x'] = {'state': 'done', 'type': 'train', 'policy': 'b25a-x',
+                          'closeout': 'pending', 'env': {'SNEK_SEED': '1'}}
+    assert r._auto_closeout_jobs()[0].chain is True
     r.runtime['auto_hof'] = False
-    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending'}
-    assert r._auto_hof_jobs() == []
+    assert r._auto_closeout_jobs()[0].chain is False
 
 
-def test_reap_marks_a_finished_closeout_for_its_hof():
+def test_reap_does_not_mark_a_finished_closeout_for_anything():
+    # The marker is what `_auto_hof_jobs` used to read, and deleting that function would have made
+    # a leftover marker silently invisible. Nothing sets one now.
     r = _runner()
     r._publish_results = lambda rj: None               # no git behind this test
     r.running['p-closeout'] = _FakeRJ('p-closeout', 'eval', 'p', alive=False, rc=0)
     r._reap()
     assert r.ledger['p-closeout']['state'] == 'done'
-    assert r.ledger['p-closeout'].get('hof') == 'pending'   # .get so a missing marker asserts, not KeyErrors
-    assert [j.id for j in r._auto_hof_jobs()] == ['p-hof']
+    assert 'hof' not in r.ledger['p-closeout']
 
 
-def test_reap_does_not_hof_a_plain_eval_or_a_failed_closeout():
-    r = _runner()
-    r._publish_results = lambda rj: None
-    r.running['manual-top20'] = _FakeRJ('manual-top20', 'eval', 'x', alive=False, rc=0)
-    r.running['q-closeout'] = _FakeRJ('q-closeout', 'eval', 'q', alive=False, rc=1)  # failed
-    r._reap()
-    assert 'hof' not in r.ledger['manual-top20']       # a hand-queued eval never triggers one
-    assert r.ledger['q-closeout']['state'] == 'failed'
-    assert 'hof' not in r.ledger['q-closeout']          # a failed closeout has no result to select from
-
-
-def test_scan_pending_includes_auto_hofs_in_priority_order():
-    r = _runner()
-    r.ledger['p-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'p', 'hof': 'pending'}
-    _stub_pending([('t.json', {'id': 't', 'type': 'train', 'policy': 't', 'priority': 100})])
-    got = [j.id for j in r._scan_pending()]
-    assert got == ['p-hof', 't'], got                  # the hof (priority 11) sorts ahead of the training
-
-
-def test_scan_pending_queues_a_closeout_and_a_hof_together():
-    r = _runner()
-    r.ledger['a'] = {'state': 'done', 'type': 'train', 'policy': 'a', 'closeout': 'pending'}
-    r.ledger['b-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'b', 'hof': 'pending'}
-    _stub_pending([])
-    got = [j.id for j in r._scan_pending()]
-    assert got == ['a-closeout', 'b-hof'], got         # closeout (10) before hof (11)
-
-
-def test_a_dead_closeout_across_a_daemon_restart_queues_its_hof():
-    # Same boot, dead pid: the detached closeout ran to its end while the daemon was down, so it
-    # earns its HOF re-measure the same way a straddling training earns its closeout.
+def test_a_dead_closeout_across_a_daemon_restart_marks_nothing_further():
+    # Same boot, dead pid: the detached closeout ran to its end while the daemon was down. Under the
+    # old chain that earned it a HOF job; now stage B either already ran inside it or already failed
+    # inside it, so there is nothing for the daemon to add.
     real_boot, real_alive = runnermod.boot_id, launch.pid_alive
     runnermod.boot_id = lambda: 'BOOT-A'
     launch.pid_alive = lambda _pid: False
     try:
         r = _runner()
-        r.ledger['p-closeout'] = {'state': 'running', 'type': 'eval', 'policy': 'p',
-                                  'pid': 4242, 'boot': 'BOOT-A', 'env': {'SNEK_FC_LAYERS': '320'}}
+        r.ledger['b30-closeout'] = {'state': 'running', 'type': 'eval', 'policy': 'b30a',
+                                    'policies': ['b30a', 'b30b'],
+                                    'pid': 4242, 'boot': 'BOOT-A', 'env': {'SNEK_SEED': '1'}}
         r._reattach()
     finally:
         runnermod.boot_id, launch.pid_alive = real_boot, real_alive
-    got = r.ledger['p-closeout']
-    assert got['state'] == 'done' and got['hof'] == 'pending', got
-    jobs = r._auto_hof_jobs()
-    assert [j.id for j in jobs] == ['p-hof']
-    assert jobs[0].env['SNEK_FC_LAYERS'] == '320'      # the FC trap survives the restart
+    got = r.ledger['b30-closeout']
+    assert got['state'] == 'done' and 'hof' not in got, got
 
 
-def test_a_reboot_withholds_a_closeouts_hof_until_it_actually_finishes():
-    # A closeout the machine killed is not done, so it must not spend its (partial) result on a
-    # HOF re-measure -- it re-runs, and only the finished re-run earns the hof.
+def test_a_restart_readopts_a_running_wave_with_all_of_its_arms():
+    # `_StubJob` rebuilds a Job from the ledger record with no spec in hand. A missing `policies`
+    # fallback here would publish one arm of four when the wave finished.
     real_boot, real_alive = runnermod.boot_id, launch.pid_alive
-    runnermod.boot_id = lambda: 'BOOT-B'
-    launch.pid_alive = lambda _pid: False
+    runnermod.boot_id = lambda: 'BOOT-A'
+    launch.pid_alive = lambda _pid: True
     try:
         r = _runner()
-        r.ledger['p-closeout'] = {'state': 'running', 'type': 'eval', 'policy': 'p',
-                                  'pid': 4242, 'boot': 'BOOT-A'}
+        r.ledger['b30-closeout'] = {'state': 'running', 'type': 'eval', 'policy': 'b30a',
+                                    'policies': ['b30a', 'b30b', 'b30c', 'b30d'],
+                                    'chain': True, 'pid': 4242, 'boot': 'BOOT-A'}
         r._reattach()
     finally:
         runnermod.boot_id, launch.pid_alive = real_boot, real_alive
-    got = r.ledger['p-closeout']
-    assert got['state'] == 'interrupted', got
-    assert 'hof' not in got, got
-    assert r._auto_hof_jobs() == []
+    job = r.running['b30-closeout'].job
+    assert job.policies == ['b30a', 'b30b', 'b30c', 'b30d']
+    assert job.chain is True
+    # And a record written before `policies` existed still yields one policy, not none.
+    r2 = _runner()
+    assert runnermod._StubJob('t', {'type': 'train', 'policy': 'p'}).policies == ['p']
+
+
+def test_publish_results_pushes_each_arm_separately():
+    # One push per arm, because `publish_results` has no retry and the box's DNS for github.com
+    # flaps: a wave concentrating four arms behind one push would lose all four to one failure.
+    r = _runner()
+    pushed = []
+    seen = []
+
+    def fake_publish(host, job, arts):
+        pushed.append(sorted(os.path.basename(a) for a in arts))
+        if len(pushed) == 1:
+            raise RuntimeError('DNS flap')
+        seen.append(job.id)
+
+    real = runnermod.gitbus.publish_results
+    runnermod.gitbus.publish_results = fake_publish
+    runs = os.path.join(_host()['SNEK_DIR'], 'runs')
+    real_isdir, real_listdir = os.path.isdir, os.listdir
+    os.path.isdir = lambda p: True if p == runs else real_isdir(p)
+    os.listdir = lambda p: (['a1.md', 'a1_evals.json', 'a2.md', 'other.md']
+                            if p == runs else real_listdir(p))
+    try:
+        r._publish_results(_FakeRJ('b30-closeout', 'eval', 'a1', policies=['a1', 'a2']))
+    finally:
+        runnermod.gitbus.publish_results = real
+        os.path.isdir, os.listdir = real_isdir, real_listdir
+    assert len(pushed) == 2, pushed                 # the failure did not stop the second arm
+    assert pushed[0] == ['a1.md', 'a1_evals.json']
+    assert pushed[1] == ['a2.md']
+    assert seen == ['b30-closeout']
 
 
 def test_viewer_scale_is_larger_for_eval_waves():
@@ -610,29 +614,29 @@ def test_publish_status_folds_the_queue_into_the_ledger_in_order():
 AUTO = runnermod.AUTO_CLOSEOUT_PRIORITY
 
 
-def test_anticipated_queue_interleaves_a_closeout_batch_between_training_batches():
-    # Two training batches queued; each batch's closeouts, then its HOF re-measures, run before
-    # the next batch's training -- a closeout (priority 10) and a HOF (11) both outrank a queued
-    # training (200), and the HOF trails its own closeout because it is only spawned once the
-    # closeout has been placed in a wave.
+def test_anticipated_queue_interleaves_a_closeout_wave_between_training_batches():
+    # Two training batches queued; each batch's closeout **wave** runs before the next batch's
+    # training, because a closeout (priority 10) outranks a queued training (200). One row per
+    # batch, not one per arm and then one per HOF -- eight rows collapse to two.
     queued = [{'id': p, 'type': 'train', 'policy': p, 'priority': 200}
-              for p in ('a1', 'a2', 'b1', 'b2')]
+              for p in ('b1a', 'b1b', 'b2a', 'b2b')]
     order = runnermod.anticipated_queue(
-        queued, [], {'trainer': 2, 'eval': 2}, True, {'a1', 'a2', 'b1', 'b2'})
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'b1a', 'b1b', 'b2a', 'b2b'})
     assert [j['id'] for j in order] == [
-        'a1', 'a2', 'a1-closeout', 'a2-closeout', 'a1-hof', 'a2-hof',
-        'b1', 'b2', 'b1-closeout', 'b2-closeout', 'b1-hof', 'b2-hof'], [j['id'] for j in order]
+        'b1a', 'b1b', 'b1-closeout', 'b2a', 'b2b', 'b2-closeout'], [j['id'] for j in order]
+    wave = [j for j in order if j['id'] == 'b1-closeout'][0]
+    assert wave['policies'] == ['b1a', 'b1b']
+    assert wave['chain'] is True
 
 
-def test_anticipated_queue_seeds_closeouts_for_trainings_running_now():
-    # A training on the box now will spawn a closeout, which in turn spawns a HOF, all before
-    # the queued batch.
-    queued = [{'id': 'b1', 'type': 'train', 'policy': 'b1', 'priority': 200}]
-    running = [{'id': 'r1', 'type': 'train', 'policy': 'r1'}]
+def test_anticipated_queue_seeds_a_closeout_wave_for_trainings_running_now():
+    queued = [{'id': 'b2a', 'type': 'train', 'policy': 'b2a', 'priority': 200}]
+    running = [{'id': 'b1a', 'type': 'train', 'policy': 'b1a'},
+               {'id': 'b1b', 'type': 'train', 'policy': 'b1b'}]
     order = runnermod.anticipated_queue(
-        queued, running, {'trainer': 2, 'eval': 2}, True, {'b1', 'r1'})
+        queued, running, {'trainer': 2, 'eval': 2}, True, {'b2a', 'b1a', 'b1b'})
     assert [j['id'] for j in order] == [
-        'r1-closeout', 'r1-hof', 'b1', 'b1-closeout', 'b1-hof'], [j['id'] for j in order]
+        'b1-closeout', 'b2a', 'b2-closeout'], [j['id'] for j in order]
 
 
 def test_anticipated_queue_omits_closeouts_when_auto_closeout_off():
@@ -643,41 +647,43 @@ def test_anticipated_queue_omits_closeouts_when_auto_closeout_off():
 
 def test_anticipated_queue_never_invents_an_existing_closeout_twice():
     # The real closeout for a finished training already sits in the queue; do not duplicate it.
-    queued = [{'id': 'p', 'type': 'train', 'policy': 'p', 'priority': 200},
-              {'id': 'p-closeout', 'type': 'eval', 'policy': 'p', 'priority': AUTO}]
+    queued = [{'id': 'b9a', 'type': 'train', 'policy': 'b9a', 'priority': 200},
+              {'id': 'b9-closeout', 'type': 'eval', 'policy': 'b9a', 'priority': AUTO}]
     order = runnermod.anticipated_queue(
-        queued, [], {'trainer': 2, 'eval': 2}, True, {'p', 'p-closeout'})
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'b9a', 'b9-closeout'})
     ids = [j['id'] for j in order]
-    assert ids.count('p-closeout') == 1, ids
+    assert ids.count('b9-closeout') == 1, ids
 
 
-def test_anticipated_queue_chains_a_hof_after_each_closeout():
-    queued = [{'id': 't', 'type': 'train', 'policy': 't', 'priority': 200}]
-    order = runnermod.anticipated_queue(queued, [], {'trainer': 2, 'eval': 2}, True, {'t'})
-    assert [j['id'] for j in order] == ['t', 't-closeout', 't-hof'], [j['id'] for j in order]
+def test_anticipated_queue_forecasts_no_hof_hop_at_all():
+    # The re-measure is stage B inside the closeout's own process, so it is not a job and there is
+    # nothing to place in a later wave. Under the old chain this same input produced three rows.
+    queued = [{'id': 'b7a', 'type': 'train', 'policy': 'b7a', 'priority': 200}]
+    order = runnermod.anticipated_queue(queued, [], {'trainer': 2, 'eval': 2}, True, {'b7a'})
+    assert [j['id'] for j in order] == ['b7a', 'b7-closeout'], [j['id'] for j in order]
+    assert not any('hof' in j['id'] for j in order)
 
 
-def test_anticipated_queue_seeds_a_hof_for_a_closeout_running_now():
-    running = [{'id': 'r-closeout', 'type': 'eval', 'policy': 'r'}]
+def test_anticipated_queue_marks_the_closeout_unchained_when_auto_hof_is_off():
+    # `auto_hof` no longer adds or removes a row; it decides whether the one closeout row runs its
+    # stage B. Reported on the row so the forecast still says what the box will do.
+    queued = [{'id': 'b7a', 'type': 'train', 'policy': 'b7a', 'priority': 200}]
     order = runnermod.anticipated_queue(
-        [], running, {'trainer': 2, 'eval': 2}, True, {'r-closeout'})
-    assert [j['id'] for j in order] == ['r-hof'], [j['id'] for j in order]
+        queued, [], {'trainer': 2, 'eval': 2}, True, {'b7a'}, auto_hof=False)
+    assert [j['id'] for j in order] == ['b7a', 'b7-closeout']
+    assert [j for j in order if j['id'] == 'b7-closeout'][0]['chain'] is False
 
 
-def test_anticipated_queue_omits_hofs_when_auto_hof_off():
-    queued = [{'id': 't', 'type': 'train', 'policy': 't', 'priority': 200}]
+def test_anticipated_queue_puts_a_whole_batch_in_one_closeout_row():
+    # Four arms, `max_evals` of 1: the old forecast needed four eval waves for the closeouts and
+    # four more for the HOFs. One row now, which is also what the box actually runs.
+    queued = [{'id': 'b8{0}'.format(c), 'type': 'train', 'policy': 'b8{0}'.format(c),
+               'priority': 200} for c in 'abcd']
     order = runnermod.anticipated_queue(
-        queued, [], {'trainer': 2, 'eval': 2}, True, {'t'}, auto_hof=False)
-    assert [j['id'] for j in order] == ['t', 't-closeout'], [j['id'] for j in order]
-
-
-def test_anticipated_queue_never_invents_an_existing_hof_twice():
-    queued = [{'id': 'p-closeout', 'type': 'eval', 'policy': 'p', 'priority': AUTO},
-              {'id': 'p-hof', 'type': 'eval', 'policy': 'p', 'priority': runnermod.AUTO_HOF_PRIORITY}]
-    order = runnermod.anticipated_queue(
-        queued, [], {'trainer': 2, 'eval': 2}, True, {'p-closeout', 'p-hof'})
-    ids = [j['id'] for j in order]
-    assert ids.count('p-hof') == 1, ids
+        queued, [], {'trainer': 4, 'eval': 1}, True, {j['id'] for j in queued})
+    assert [j['id'] for j in order] == ['b8a', 'b8b', 'b8c', 'b8d', 'b8-closeout']
+    assert [j for j in order if j['id'] == 'b8-closeout'][0]['policies'] == \
+        ['b8a', 'b8b', 'b8c', 'b8d']
 
 
 def test_ledger_view_anticipates_closeouts_for_a_queued_training():
@@ -688,10 +694,11 @@ def test_ledger_view_anticipates_closeouts_for_a_queued_training():
     class _J:
         def __init__(self, jid, pri):
             self.id, self.policy, self.priority, self.type = jid, jid, pri, 'train'
-    r._queued = [_J('t1', 200), _J('t2', 200)]
+            self.policies = [jid]
+    r._queued = [_J('b6a', 200), _J('b6b', 200)]
     view = r._ledger_view(r._anticipated_order())
-    assert list(view.keys()) == ['t1', 't2', 't1-closeout', 't2-closeout',
-                                 't1-hof', 't2-hof'], list(view.keys())
+    # One closeout row for the batch, and no HOF hop -- four rows became three.
+    assert list(view.keys()) == ['b6a', 'b6b', 'b6-closeout'], list(view.keys())
     assert all(view[k] == 'queued' for k in view)
 
 
@@ -703,6 +710,7 @@ def test_ledger_view_places_queued_first_then_running_then_finished():
     class _J:
         def __init__(self, jid):
             self.id, self.policy, self.priority, self.type = jid, jid, 200, 'train'
+            self.policies = [jid]
     r._queued = [_J('q1')]
     view = r._ledger_view(r._anticipated_order())
     # newest/active on top: queued, then running, then the finished history
@@ -717,6 +725,7 @@ def test_ledger_view_lets_a_real_state_win_over_queued_on_overlap():
     r.ledger['x'] = {'state': 'running', 'type': 'train'}
     class _J:  # minimal stand-in for a queued Job
         id, policy, priority, type = 'x', 'x', 100, 'train'
+        policies = ['x']
     r._queued = [_J()]
     assert r._ledger_view(r._anticipated_order())['x'] == 'running'
 
@@ -1058,3 +1067,183 @@ def test_ledger_view_orders_finished_most_recent_first():
     r._queued = []
     keys = list(r._ledger_view(r._anticipated_order()).keys())
     assert keys == ['new', 'mid', 'old'], keys
+
+
+# ------------------------------------------------- the wave: specs, argv, status, capacity
+
+def test_parse_job_accepts_a_policies_wave_and_fills_in_policy():
+    j = jobmod.parse_job(json.dumps({'id': 'b45-closeout', 'type': 'eval',
+                                     'policies': ['b45a', 'b45b'], 'eval_args': ['top50']}))
+    assert j.policies == ['b45a', 'b45b']
+    assert j.policy == 'b45a'          # sugar, so a caller that only knows `policy` still works
+
+
+def test_parse_job_fills_in_policies_from_a_single_policy():
+    # The other direction, and it is the common one: every training spec and every hand-written
+    # eval spec names one policy, and everything downstream now reads `policies`.
+    j = jobmod.parse_job('{"id": "t", "type": "train", "policy": "p"}')
+    assert j.policies == ['p'] and j.policy == 'p'
+
+
+def test_parse_job_rejects_a_bad_policies_field():
+    for bad in ({'policies': []}, {'policies': 'b45a'}, {'policies': ['b45a', '']},
+                {'policies': [1]}):
+        spec = dict({'id': 'e', 'type': 'eval'}, **bad)
+        try:
+            jobmod.parse_job(json.dumps(spec))
+        except jobmod.JobError:
+            continue
+        raise AssertionError('accepted {0}'.format(bad))
+
+
+def test_only_an_eval_takes_policies_or_chain():
+    # A training is one arm by construction, so a `policies` list there is a spec mistake worth
+    # naming rather than silently training the first of them.
+    for spec in ({'id': 't', 'type': 'train', 'policies': ['a', 'b']},
+                 {'id': 't', 'type': 'train', 'policy': 'a', 'chain': True}):
+        try:
+            jobmod.parse_job(json.dumps(spec))
+        except jobmod.JobError:
+            continue
+        raise AssertionError('accepted {0}'.format(spec))
+
+
+def test_chain_defaults_off_and_must_be_a_bool():
+    assert jobmod.parse_job('{"id": "e", "type": "eval", "policy": "p"}').chain is False
+    try:
+        jobmod.parse_job('{"id": "e", "type": "eval", "policy": "p", "chain": "yes"}')
+    except jobmod.JobError:
+        return
+    raise AssertionError('accepted a string chain')
+
+
+def test_inherited_eval_env_keeps_the_arm_and_drops_the_protocol():
+    got = runnermod.inherited_eval_env({
+        'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_FC_LAYERS': '320',
+        'EVAL_EPISODES': '10', 'EVAL_MIN_ACHIEVABLE': '80', 'EVAL_OUT_SUFFIX': '_x',
+        'EVAL_SCREEN_EPISODES': '0', 'EVAL_ABANDON_FLOOR': '5', 'EVAL_CONFIRM_COUNT': '3'})
+    assert got == {'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_FC_LAYERS': '320'}, got
+    assert runnermod.inherited_eval_env(None) == {}
+
+
+def test_phase_of_reads_a_later_closeout_wave_as_a_closeout():
+    # `b20-closeout-w2` does not end in '-closeout', and calling it a plain 'eval' would split the
+    # at-a-glance grouping in two for what is one phase of one batch.
+    assert runnermod.phase_of('b20-closeout', 'eval') == 'closeout eval'
+    assert runnermod.phase_of('b20-closeout-w2', 'eval') == 'closeout eval'
+    assert runnermod.phase_of('b20-closeout-w11', 'eval') == 'closeout eval'
+    assert runnermod.phase_of('manual-top50', 'eval') == 'eval'
+    # Old ledger records only: the daemon no longer mints this id.
+    assert runnermod.phase_of('p-hof', 'eval') == 'hof'
+
+
+def test_at_a_glance_counts_arms_in_policies_not_in_jobs():
+    # A batch's whole close-out is one job. Counting jobs would report "1 arm", which is the
+    # number a reader uses to check that nothing was dropped.
+    glance = runnermod.build_at_a_glance(
+        [], [{'id': 'b45-closeout', 'type': 'eval',
+              'policies': ['b45a', 'b45b', 'b45c', 'b45d']}], {})
+    assert glance['queued'] == ['b45 closeout eval -- queued (4 arms)'], glance['queued']
+
+
+def test_at_a_glance_still_counts_a_single_policy_job_as_one_arm():
+    glance = runnermod.build_at_a_glance([], [{'id': 'b45a', 'type': 'train',
+                                               'policy': 'b45a'}], {})
+    assert glance['queued'] == ['b45 training -- queued (1 arm)'], glance['queued']
+
+
+def test_viewer_png_paths_expands_a_wave_into_one_chart_per_arm():
+    got = runnermod.viewer_png_paths([('eval', ['b45a', 'b45b'])], '/s')
+    assert got == ['/s/evals/b45a_eval_progress.png', '/s/evals/b45b_eval_progress.png'], got
+
+
+def test_viewer_png_paths_still_takes_a_bare_policy_string():
+    # A caller with one policy in hand needs no change, and a None must not become 'None.png'.
+    assert runnermod.viewer_png_paths([('trainer', 'b45a')], '/s') == ['/s/runs/b45a.png']
+    assert runnermod.viewer_png_paths([('eval', None)], '/s') == []
+
+
+def test_eval_lanes_defaults_to_four_and_clamps_to_the_host_ceiling():
+    host = _host(); host['HARD_MAX_EVALS'] = 4
+    out, notes = cfg.parse_runtime_config('{}', host)
+    assert out['eval_lanes'] == 4
+    out, notes = cfg.parse_runtime_config('{"eval_lanes": 99, "eval_workers": 1}', host)
+    assert out['eval_lanes'] == 4
+    assert any('eval_lanes' in n for n in notes), notes
+
+
+def test_lanes_times_workers_is_capped_and_the_workers_give_way():
+    # Memory is this box's binding constraint: a spawned worker carries its own ~230 MB TensorFlow
+    # arena. The lanes are kept because a lane that does not exist cannot pick up another arm's
+    # work, which is the whole point of a wave; a lane with fewer workers only measures slower.
+    host = _host(); host['HARD_MAX_EVALS'] = 4
+    out, notes = cfg.parse_runtime_config('{"eval_lanes": 4, "eval_workers": 10}', host)
+    assert out['eval_lanes'] == 4
+    assert out['eval_lanes'] * out['eval_workers'] <= cfg.MAX_EVAL_WORKERS
+    assert out['eval_workers'] == 8, out['eval_workers']
+    assert any('exceeds' in n for n in notes), notes
+    # Inside the band nothing is touched.
+    out, notes = cfg.parse_runtime_config('{"eval_lanes": 4, "eval_workers": 4}', host)
+    assert (out['eval_lanes'], out['eval_workers']) == (4, 4)
+    assert not [n for n in notes if 'exceeds' in n]
+
+
+def test_a_fresh_launch_records_every_arm_of_the_wave():
+    # The record is the only thing `_StubJob` has after a daemon restart, and it is what
+    # `_publish_results` iterates. A record that kept one policy of four would publish one arm of
+    # four -- with the ledger still reading `done`, which is exactly the class of silence that hid
+    # b40's HOF results for hours.
+    r = _runner()
+    real_spawn = launch.spawn
+    launch.spawn = lambda job, host, runtime: launch.RunningJob(job, job.policy, 999, '/l')
+    try:
+        r._launch(jobmod.Job(id='b45-closeout', type='eval',
+                             policies=['b45a', 'b45b', 'b45c', 'b45d'],
+                             eval_args=['top50'], chain=True, env={}, priority=10))
+    finally:
+        launch.spawn = real_spawn
+    rec = r.ledger['b45-closeout']
+    assert rec['policies'] == ['b45a', 'b45b', 'b45c', 'b45d'], rec['policies']
+    assert rec['policy'] == 'b45a' and rec['chain'] is True
+    # And the round trip a restart actually takes.
+    assert runnermod._StubJob('b45-closeout', rec).policies == ['b45a', 'b45b', 'b45c', 'b45d']
+
+
+def test_max_evals_multiplies_into_the_worker_cap():
+    # The way this box gets OOM-killed. `max_evals` used to mean 4 x eval_workers = 16 spawned
+    # workers; with a wave behind each job it means 4 x eval_lanes x eval_workers = 64, and 40 is
+    # roughly where the OOM-killer sits.
+    host = _host(); host['HARD_MAX_EVALS'] = 4
+    out, notes = cfg.parse_runtime_config(
+        '{"max_evals": 4, "eval_lanes": 4, "eval_workers": 4}', host)
+    assert out['max_evals'] == 4                 # a scheduling decision, never overridden here
+    assert out['eval_lanes'] == 4                # lanes are what a wave is for
+    assert out['eval_workers'] == 2
+    assert out['max_evals'] * out['eval_lanes'] * out['eval_workers'] <= cfg.MAX_EVAL_WORKERS
+    assert any('max_evals' in n and 'exceeds' in n for n in notes), notes
+
+
+def test_lanes_give_way_only_when_workers_cannot_go_lower():
+    host = _host(); host['HARD_MAX_EVALS'] = 4
+    out, _ = cfg.parse_runtime_config(
+        '{"max_evals": 4, "eval_lanes": 4, "eval_workers": 1}', host)
+    # 4 x 4 x 1 = 16, already inside the band: nothing moves.
+    assert (out['eval_lanes'], out['eval_workers']) == (4, 1)
+    # A ceiling low enough that even one worker per lane does not fit forces the lanes down.
+    real = cfg.MAX_EVAL_WORKERS
+    cfg.MAX_EVAL_WORKERS = 8
+    try:
+        out, notes = cfg.parse_runtime_config(
+            '{"max_evals": 4, "eval_lanes": 4, "eval_workers": 4}', host)
+    finally:
+        cfg.MAX_EVAL_WORKERS = real
+    assert out['eval_workers'] == 1 and out['eval_lanes'] == 2, (out['eval_lanes'],
+                                                                out['eval_workers'])
+    assert out['max_evals'] * out['eval_lanes'] * out['eval_workers'] <= 8
+
+
+def test_a_zero_max_evals_does_not_divide_by_zero():
+    # `max_evals: 0` is a legal way to say "run no evals", and the cap must not explode on it.
+    host = _host(); host['HARD_MAX_EVALS'] = 4
+    out, notes = cfg.parse_runtime_config('{"max_evals": 0, "eval_workers": 40}', host)
+    assert out['max_evals'] == 0 and out['eval_workers'] >= 1

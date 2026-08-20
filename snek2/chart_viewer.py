@@ -560,7 +560,7 @@ def is_verification_policy(policy_name):
             or policy_name.startswith('bench'))
 
 
-def spawn_for_eval(policy_name):
+def spawn_for_eval(policy_name, watch='eval_checkpoints.py {prefix}'):
     """Best-effort live chart window for an eval (close-out / HOF) launch. Returns the Popen or None.
 
     The training counterpart is `spawn_for_policy`; this differs only in what it points the viewer
@@ -569,6 +569,13 @@ def spawn_for_eval(policy_name):
     viewer is launched with `--glob evals/<prefix>*_eval_progress.png` and
     `--watch eval_checkpoints.py <prefix>`, which shows every arm of the wave and exits when the last
     eval process stops. Verification evals (smoke / champion_* / bench-*) get no window.
+
+    `watch` is a `pgrep -f` pattern with `{prefix}` in it, and it has to be the caller's to choose:
+    the pattern is matched against a whole command line, so it depends on where the policy names sit
+    in that line. `eval_checkpoints.py b44a-x` puts one right after the script, while
+    `eval_wave.py top50 b44a-x b44b-y` puts the selector in between — hence `eval_wave.py .*{prefix}`
+    from the wave controller. A pattern that cannot match reads as "the eval stopped" and the window
+    closes within six checks.
 
     Darwin-only via `viewer_enabled()` — the same gate as training — so this never fires on the
     desktop, where the runner daemon owns the viewer (it injects the graphical session's
@@ -584,6 +591,7 @@ def spawn_for_eval(policy_name):
     glob_arg = os.path.join('evals', '{0}*_eval_progress.png'.format(prefix))
     # pgrep catches a viewer opened by an earlier arm of the same wave whose lock has aged out of
     # tmp; the O_EXCL claim closes the race four arms starting in one second would otherwise lose.
+    watch_pattern = watch.format(prefix=prefix)
     if viewer_running_for('--glob {0}'.format(glob_arg)) or not claim_viewer_slot(slot):
         return None
     try:
@@ -593,7 +601,7 @@ def spawn_for_eval(policy_name):
         log = open(log_path, 'ab')
         argv = [sys.executable, '-u', os.path.join(here, 'chart_viewer.py'),
                 '--glob', glob_arg,
-                '--watch', 'eval_checkpoints.py {0}'.format(prefix),
+                '--watch', watch_pattern,
                 '--title', 'snek {0} eval — live'.format(prefix)]
         proc = subprocess.Popen(argv, cwd=here, stdout=log, stderr=log,
                                 start_new_session=True, close_fds=True)

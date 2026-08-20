@@ -179,14 +179,20 @@ from eval_plan import (  # noqa: F401 - re-exported for callers and tests
     DEFAULT_COUNT,
     DEFAULT_MIN_ACHIEVABLE,
     DEFAULT_SCREEN_EPISODES,
+    HOF_EPISODES,
+    HOF_GATE,
+    HOF_SUFFIX,
     MIN_EVAL_SINGLE,
+    PayloadSpec,
     achievable_percent,
     archive_existing_eval_pngs,
     backup_previous_results,
     best_full_length_row,
+    build_payload,
     build_row,
     equal_effort_pooled,
     held_from_row,
+    hof_settings,
     load_finished_results,
     make_abandon_test,
     merge_checkpoint_evals,
@@ -199,6 +205,7 @@ from eval_plan import (  # noqa: F401 - re-exported for callers and tests
     select_top_checkpoints,
     skips_screening,
     wilson_interval,
+    write_payload,
 )
 
 
@@ -551,6 +558,16 @@ def main(argv):
                 'stage': 'full' if screen_episodes else 'flat',
                 'full_done': 0, 'screen_done': 0, 'confirm_done': 0}
 
+    # Everything the payload needs that does not change once measuring starts. Paired with
+    # `progress` above, which is the half that does.
+    payload_spec = PayloadSpec(
+        policy_name=policy_name, num_episodes=num_episodes, all_steps=all_steps,
+        num_workers=num_workers, screen_episodes=screen_episodes, confirm_count=confirm_count,
+        min_achievable=min_achievable, abandon_floor=abandon_floor,
+        measurements_planned=measurements_planned, episodes_planned=episodes_planned,
+        full_planned=len(full_steps), screen_planned=len(screen_steps),
+        confirm_planned=plan['confirmed'])
+
     def write_results(results, complete, in_flight=None):
         """Rewrites the whole file after every checkpoint, and after every round.
 
@@ -559,72 +576,13 @@ def main(argv):
         throws all of it away. The numbers would still be in the log, but nothing
         machine-readable would survive. Rewriting is cheap next to a checkpoint's runtime.
 
-        `complete` distinguishes a finished run from a partial one, so a later reader does
-        not quietly treat 6 checkpoints as the arm's full measurement. The write goes via
-        .partial + os.replace, so a reader never sees a half-written file even if the
-        process dies mid-write.
+        The payload itself is built by `eval_plan.build_payload`, which is the single definition
+        shared with `eval_wave.py` — two builders that drift is a failure class this project has
+        already paid for. `write_payload` does the `.partial` + `os.replace` so a reader never sees
+        a half-written file even if the process dies mid-write.
         """
-        payload = {'policy_name': policy_name,
-                   'episodes_per_checkpoint': num_episodes,
-                   'checkpoints_requested': len(all_steps),
-                   # Recorded rather than inferred from episodes/rounds, which is wrong for any
-                   # checkpoint being topped up — the episode count includes the screen already on
-                   # file while the round count does not.
-                   'num_workers': num_workers,
-                   'complete': complete,
-                   'requested_steps': all_steps,
-                   # Screening protocol, or None for the flat one-pass measurement. Recorded
-                   # because a pooled rate only compares across arms when the selection rule
-                   # matches, and this is part of the rule.
-                   'screen_episodes': screen_episodes or None,
-                   'confirm_count': confirm_count if screen_episodes else None,
-                   # Also part of the selection rule, so also recorded: a file measured with the
-                   # gate on holds shorter rows below the threshold than one measured without it,
-                   # and pooling the two sets of raw rows would compare different protocols.
-                   'min_achievable': min_achievable or None,
-                   'abandon_floor': abandon_floor if min_achievable else None,
-                   'abandoned': progress.get('abandoned', 0),
-                   'episodes_saved': progress.get('episodes_saved', 0),
-                   # Progress in measurements and in episodes. Both are needed once checkpoints
-                   # can be measured twice at different lengths: the first tracks the stage plan,
-                   # the second is what an ETA can actually be built from.
-                   'measurements_planned': measurements_planned,
-                   'measurements_done': progress['measurements'],
-                   # This process's own throughput, for the ETA. See `progress` above for why
-                   # the pace cannot be averaged over resumed rows.
-                   'session_measurements': progress['session_measurements'],
-                   'session_episodes': progress['session_episodes'],
-                   'session_seconds': round(progress['session_seconds'], 1),
-                   # Which pass is running and how far through each one is, so the chart can show
-                   # the shape of a three-stage close-out rather than one bar that stalls.
-                   'stage': progress['stage'],
-                   # The arm-level rate: every checkpoint truncated to its first `screen_episodes`,
-                   # because pooling rows of different depths weights the full-length ones — the
-                   # arm's best by construction — 5x. None for a flat run, already equal effort.
-                   'pooled_equal_effort': (
-                       (lambda t: round(100.0 * t[0] / t[1], 2) if t[1] else None)(
-                           equal_effort_pooled(samples, screen_episodes))
-                       if screen_episodes else None),
-                   'stages': {
-                       'full': {'planned': len(full_steps), 'done': progress['full_done']},
-                       'screen': {'planned': len(screen_steps), 'done': progress['screen_done']},
-                       'confirm': {'planned': plan['confirmed'],
-                                   'done': progress['confirm_done']},
-                   } if screen_episodes else None,
-                   'episodes_planned': episodes_planned,
-                   'episodes_done': sum(r['episodes'] for r in results),
-                   # The checkpoint being measured right now, updated every round, or None
-                   # between checkpoints. eval_progress.py renders this; without it a
-                   # ~5-minute checkpoint is invisible until it lands.
-                   'in_flight': in_flight,
-                   'updated_at': time.time(),
-                   # Step order, not measurement order: a resumed run appends new checkpoints
-                   # after the rows it loaded, which would otherwise interleave arbitrarily.
-                   'results': sorted(results, key=lambda r: r['step'])}
-        partial_path = out_path + '.partial'
-        with open(partial_path, 'w') as handle:
-            json.dump(payload, handle, indent=2)
-        os.replace(partial_path, out_path)
+        write_payload(out_path, build_payload(
+            payload_spec, progress, samples, results, complete, in_flight))
         update_chart()
 
     # Live progress window, same mechanism as training's graph. Refreshed from write_results()
