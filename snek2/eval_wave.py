@@ -61,6 +61,7 @@ along with the `training -> closeout -> hof` job graph. An arm whose close-out d
 
 Design and phases: [`plans/eval-wave-controller.md`](plans/eval-wave-controller.md).
 """
+import collections
 import json
 import os
 import queue as queuemod
@@ -111,6 +112,15 @@ from snake_constants import EVALS_DIR, POLICY_DIR, RUNS_DIR
 # have all landed (see Wave.issue_confirms). `flat` is the whole plan when screening is off, so it
 # sits where the screens would.
 STAGES = ('full', 'screen', 'flat', 'confirm')
+
+# How many finished measurements a per-arm ETA is priced on. **Wall clock between completions**, not
+# lane-seconds per measurement, and that is the whole point: an arm holding one of four lanes
+# completes a measurement every unit-time, and the same arm holding all four completes one every
+# quarter of that. So the ratio the old arithmetic had to guess -- how much of the box is this arm
+# actually getting -- is measured rather than assumed, and it re-prices itself as siblings finish and
+# hand their lanes over. Ten is long enough to average out one slow checkpoint and short enough to
+# follow a lane handover within a few minutes of it happening.
+ETA_WINDOW = 10
 
 
 def parse_selector(tokens):
@@ -218,6 +228,10 @@ class Arm:
         self.num_workers = num_workers
         self.samples = {}
         self.in_flight = {}
+        # Wall-clock stamps of this session's finished measurements, newest last, `ETA_WINDOW`
+        # intervals' worth. Session-only on purpose: a resumed row's original timestamp says nothing
+        # about the pace of the run that is now going.
+        self.completions = collections.deque(maxlen=ETA_WINDOW + 1)
         self.progress = {'measurements': len(resumed_steps),
                          'session_measurements': 0, 'session_episodes': 0,
                          'session_seconds': 0.0, 'stage': 'full' if screen_episodes else 'flat',
@@ -826,6 +840,7 @@ class Wave:
         arm.progress['session_measurements'] += 1
         arm.progress['session_episodes'] += len(scores)
         arm.progress['session_seconds'] += elapsed
+        arm.completions.append(time.time())
         self.done += 1
 
         row = build_row(unit.step, held, arm.selected_by.get(unit.step))
@@ -865,22 +880,48 @@ class Wave:
 
     # ---------------------------------------------------------------- output
 
+    def arm_eta_seconds(self, arm):
+        """Seconds until **this arm** finishes, from its own last `ETA_WINDOW` completions.
+
+        The measured quantity is wall clock between finished measurements, so an arm's share of the
+        lanes is observed rather than assumed -- see `ETA_WINDOW`. That is what the episode-priced
+        arithmetic could not do: it divides an arm's remaining lane-seconds by a process count, which
+        in a wave is neither 1 nor the lane count but whatever the rotation is currently giving it, so
+        `b43b-lowlr-b29a` read **37.9 h** on a wave with ~13 h left while its three siblings each read
+        low. Here the same handover shows up as the intervals getting shorter, within a window.
+
+        `None` until two measurements have landed this session, which is when there is an interval to
+        average. The caller leaves whatever the file already carried in that case rather than
+        publishing a number with no evidence behind it.
+
+        Counts *measurements*, not episodes, because the interval already prices what a measurement
+        costs -- including the abandonment gate cutting most of them short, which the episode path has
+        to model with a separate deflator. The remaining count includes the in-flight unit, so an arm
+        never reads 0 while a lane is still working on it.
+        """
+        stamps = list(arm.completions)
+        if len(stamps) < 2 or arm.spec is None:
+            return None
+        left = max(0, arm.spec.measurements_planned - arm.progress['measurements'])
+        if not left:
+            return 0.0
+        return left * (stamps[-1] - stamps[0]) / (len(stamps) - 1)
+
     def wave_eta_seconds(self):
         """Seconds until the **whole wave** finishes, or None before there is a pace to price with.
 
-        A per-arm ETA is meaningless in a wave and reads badly wrong in both directions. Lanes are
-        shared, so an arm's remaining work divided by "1 process" is its remaining *lane*-time, not
-        wall clock -- and the arm that finishes last inherits every lane as its siblings drop out. On
-        b43's HOF that put `b43b-lowlr-b29a` at **37.9 h** on a wave with about 13 h left in it, while
-        the three small arms each read low.
-
-        So every panel gets the same number, the one the question is actually about. Remaining
-        lane-seconds is summed across the arms -- each priced at its own stage lengths by
-        `remaining_episodes` and deflated by its own observed abandonment rate -- then divided by the
-        lane count. Each arm's own share of the work is already on its chart as a percentage.
+        Not a substitute for the per-arm number, which is on every panel -- this is the answer to a
+        different question, "when is the box free", and it is the one that cannot be read off any
+        single arm's file. Remaining lane-seconds is summed across the arms -- each priced at its own
+        stage lengths by `remaining_episodes` and deflated by its own observed abandonment rate --
+        then divided by the lane count.
 
         Priced on the wave's pooled seconds-per-episode rather than per arm, because the arms differ
         only in how much work they have, not in what an episode costs; pooling is the larger sample.
+
+        Episode-priced rather than window-priced, unlike `arm_eta_seconds`: the whole wave keeps every
+        lane busy until the tail, so there is no lane-share to discover, and the episode plan is the
+        more direct measure of what is left.
         """
         import eval_progress
         try:
@@ -915,10 +956,17 @@ class Wave:
         eta = self.wave_eta_seconds()
         for other in self.arms:
             # Stamped on every arm, not only the one being written: the charts are refreshed as a set
-            # and a stale ETA on three of four panels is exactly the inconsistency this replaces.
+            # and a stale wave total on three of four panels reads as four disagreeing answers.
             other.progress['wave_eta_seconds'] = eta
             other.progress['wave_lanes'] = len(self.lanes)
             other.progress['wave_arms'] = len(self.arms)
+            # The arm's own ETA, on the other hand, is per arm by definition. Left alone when there is
+            # not yet an interval to average, so the previous frame's number stands rather than the
+            # line disappearing and coming back.
+            own = self.arm_eta_seconds(other)
+            if own is not None:
+                other.progress['arm_eta_seconds'] = own
+                other.progress['arm_eta_window'] = min(ETA_WINDOW, len(other.completions) - 1)
         write_payload(arm.out_path, arm.payload(complete=False))
         self.refresh_charts()
 

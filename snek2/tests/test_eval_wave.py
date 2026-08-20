@@ -436,6 +436,137 @@ def test_a_sample_already_at_full_length_produces_no_unit():
         assert arm.initial_units() == []
 
 
+# ---------------------------------------------------------------- the per-arm ETA
+
+def eta_wave(bench, arm, lanes=4):
+    """A `Wave` with no lanes running, for driving the ETA arithmetic directly."""
+    wave = eval_wave.Wave([arm], lanes, 4)
+    wave.lanes = [None] * lanes                 # only the count is read
+    wave.chart['off'] = True
+    return wave
+
+
+def test_an_arms_eta_is_the_wall_clock_between_its_own_completions():
+    """Not lane-seconds per measurement, which is what the episode arithmetic prices: an arm holding
+    one of four lanes spends four times as long per measurement as the same arm holding all four, and
+    only the wall clock between its completions can see the difference."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000])
+        wave = eta_wave(bench, arm)
+        arm.spec = arm.spec._replace(measurements_planned=10)
+        arm.progress['measurements'] = 4
+        now = time.time()
+        arm.completions.extend([now - 90, now - 60, now - 30, now])
+        # 6 left at 30s between completions -- and the in-flight unit is one of the 6, so a lane still
+        # working is never counted as finished.
+        assert abs(wave.arm_eta_seconds(arm) - 180.0) < 1e-6
+        # A finished arm is 0, not None: None means "no estimate", which reads as unknown.
+        arm.progress['measurements'] = 10
+        assert wave.arm_eta_seconds(arm) == 0.0
+
+
+def test_an_arms_eta_reprices_itself_when_it_inherits_the_lanes():
+    """The property the window exists for. Nothing about the plan changes -- the same arm, the same
+    remaining count -- but its completions arrive 4x faster once its siblings finish and hand their
+    lanes over, and the ETA follows within a window instead of needing the share modelled."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000])
+        wave = eta_wave(bench, arm)
+        arm.spec = arm.spec._replace(measurements_planned=110)
+        arm.progress['measurements'] = 10
+        now = time.time()
+        arm.completions.extend([now - 400 + 40 * i for i in range(11)])   # one lane of four
+        crowded = wave.arm_eta_seconds(arm)
+        arm.completions.clear()
+        arm.completions.extend([now - 100 + 10 * i for i in range(11)])   # all four lanes
+        alone = wave.arm_eta_seconds(arm)
+        assert abs(crowded - 100 * 40.0) < 1e-6, crowded
+        assert abs(alone - 100 * 10.0) < 1e-6, alone
+
+
+def test_the_window_holds_ten_intervals_and_forgets_the_rest():
+    """Ten, so one slow checkpoint is averaged out and a lane handover is still visible within
+    minutes. A window over the whole session would keep pricing the crowded phase for hours."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000])
+        wave = eta_wave(bench, arm)
+        arm.spec = arm.spec._replace(measurements_planned=100)
+        arm.progress['measurements'] = 50
+        now = time.time()
+        # 40 slow completions, then 10 fast ones. Only the fast ones may survive.
+        stamps = [now - 100000 + 1000 * i for i in range(40)]
+        stamps += [stamps[-1] + 5 * (i + 1) for i in range(10)]
+        for stamp in stamps:
+            arm.completions.append(stamp)
+        assert len(arm.completions) == eval_wave.ETA_WINDOW + 1
+        assert abs(wave.arm_eta_seconds(arm) - 50 * 5.0) < 1e-6, wave.arm_eta_seconds(arm)
+
+
+def test_an_eta_with_no_interval_leaves_the_last_one_standing():
+    """One completion is not a pace. The stamp is left alone rather than cleared, so the line holds
+    its previous number instead of blinking out and back on the next measurement."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000])
+        wave = eta_wave(bench, arm)
+        assert wave.arm_eta_seconds(arm) is None
+        arm.progress['arm_eta_seconds'] = 4242.0
+        wave.write(arm)
+        assert json.load(open(arm.out_path))['arm_eta_seconds'] == 4242.0
+        # ...and once there is an interval, the stamp is this wave's own number.
+        now = time.time()
+        arm.completions.extend([now - 20, now])
+        arm.progress['measurements'] = 1
+        wave.write(arm)
+        payload = json.load(open(arm.out_path))
+        assert payload['arm_eta_seconds'] == 20.0 * (arm.spec.measurements_planned - 1)
+        assert payload['arm_eta_window'] == 1, 'the window reports what it averaged, not its cap'
+
+
+def test_every_arm_is_stamped_with_its_own_eta_and_the_shared_wave_total():
+    """The wave total has to be identical on every panel -- four disagreeing totals is the bug the
+    stamp replaced -- while the arm ETAs are the arms' own and must not be equalised."""
+    with Bench() as bench:
+        arms = []
+        for name in ('b44a-x', 'b44b-y'):
+            bench.policy(name)
+            arms.append(bench.arm(name, [1000, 2000, 3000]))
+        wave = eval_wave.Wave(arms, 2, 4)
+        wave.lanes = [None, None]
+        wave.chart['off'] = True
+        now = time.time()
+        arms[0].completions.extend([now - 20, now])
+        arms[1].completions.extend([now - 200, now])
+        for arm in arms:
+            arm.progress['measurements'] = 1
+        # One write, both arms stamped: the charts are refreshed as a set, so an arm that is not the
+        # one being written still has to carry a current number.
+        wave.write(arms[0])
+        etas = [arm.progress.get('arm_eta_seconds') for arm in arms]
+        assert etas[0] and etas[1], etas
+        assert etas[1] == 10 * etas[0], etas
+        assert (arms[0].progress['wave_eta_seconds']
+                == arms[1].progress['wave_eta_seconds'])
+        assert json.load(open(arms[0].out_path))['wave_arms'] == 2
+
+
+def test_a_real_run_records_a_completion_for_every_measurement():
+    """The wiring, not the arithmetic: the ETA is only as live as `on_done` remembering to stamp the
+    clock, and every fixture above hands the window its timestamps directly."""
+    with Bench() as bench:
+        bench.policy('b44a-x', steps=(1000, 2000, 3000))
+        arm = bench.arm('b44a-x', [1000, 2000, 3000], screen_episodes=0)
+        wave = run_wave(bench, [arm], lanes=1)
+        assert not wave.failures
+        assert len(arm.completions) == 3, list(arm.completions)
+        assert arm.completions[0] <= arm.completions[-1]
+        # A finished arm prices at 0 rather than dropping the field.
+        assert json.load(open(arm.out_path))['arm_eta_seconds'] == 0.0
+
+
 # ---------------------------------------------------------------- the wave, end to end
 
 def run_wave(bench, arms, lanes=2, pools=None):

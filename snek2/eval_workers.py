@@ -79,6 +79,7 @@ quota is designed to avoid, so `collect_results` keeps draining until every work
 import collections
 import multiprocessing
 import os
+import threading
 import time
 
 # Message tags on the results queue. One queue, many writers, so every message carries its rank.
@@ -89,6 +90,50 @@ TAG_DONE = 'done'
 TAG_ERROR = 'error'
 
 Episode = collections.namedtuple('Episode', ['rank', 'score', 'perfect', 'reward', 'steps'])
+
+
+# How often a worker checks that its controller is still there. Two seconds is well under the cost of
+# the memory being held (16 workers ~= 3.7 GB) and far above any scheduling jitter.
+PARENT_POLL_SECONDS = 2.0
+
+
+def watch_parent(parent_pid, poll_seconds=PARENT_POLL_SECONDS, on_orphan=None):
+    """Blocks while this process is still `parent_pid`'s child, then exits it.
+
+    Run in a daemon thread by `install_parent_watchdog`. `on_orphan` is for tests; in production it
+    is `os._exit(0)`, deliberately: a worker holds no durable state -- every result travels back over
+    the queue as it is produced -- so there is nothing to flush, and an orphaned worker running
+    interpreter finalisation from a thread is the `chart_viewer` Tk crash in a different costume.
+    Exit code 0 because being orphaned is not this process's failure.
+    """
+    while os.getppid() == parent_pid:
+        time.sleep(poll_seconds)
+    (on_orphan or (lambda: os._exit(0)))()
+
+
+def install_parent_watchdog(poll_seconds=PARENT_POLL_SECONDS):
+    """Makes this worker die with its controller. Returns the thread, for tests.
+
+    `daemon=True` on the `Process` only covers a *clean* parent exit -- it is implemented as an
+    atexit hook in the parent -- so it does nothing for `kill -9`, and nothing for a default SIGTERM
+    either. This project's house style for stopping a run is `kill -9` (a trainer ignores SIGTERM
+    outright), so the uncovered case is the normal case: killing an `eval_wave` controller on
+    2026-08-19 left **16** spawned workers holding ~3.7 GB, reparented to launchd and invisible to
+    `pgrep -f eval_wave` because their argv reads `python -c from multiprocessing.spawn import ...`.
+
+    Polling `getppid()` rather than a pipe or `PR_SET_PDEATHSIG`: the pipe wants a plumbing change at
+    every call site, and `prctl` does not exist on darwin, where half of this project's evals run.
+    The recorded pid is compared for *change*, not against 1, because a reparented process lands on
+    whatever the platform's reaper is -- launchd's pid is 1, but a user session's reaper need not be.
+
+    Installed before the TensorFlow import, since that import is ~8 s of the worker's life and an
+    orphan made during it would otherwise wait for the load command that is never coming.
+    """
+    parent = os.getppid()
+    thread = threading.Thread(target=watch_parent, args=(parent, poll_seconds),
+                              daemon=True, name='parent-watchdog')
+    thread.start()
+    return thread
 
 
 def split_quota(episodes, num_workers):
@@ -203,6 +248,7 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
     for tracing.
     """
     try:
+        install_parent_watchdog()
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
         os.environ['SDL_AUDIODRIVER'] = 'dummy'
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'

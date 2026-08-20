@@ -12,7 +12,12 @@ quota design replaces the barrier, and the dangerous moment is abandonment — i
 stopped draining the moment the stop flag went up, it would discard exactly the long episodes still
 in flight and inflate the perfect rate. Several tests below exist only to hold that line.
 """
+import ast
 import collections
+import inspect
+import multiprocessing
+import os
+import time
 
 import eval_workers
 from eval_workers import Episode, collect_results, split_quota
@@ -268,3 +273,81 @@ def test_collection_does_not_depend_on_episode_duration():
     fast_scores, fast_perfect, _, _, _ = collect_results(fast, 2, FakeFlag())
     assert slow_perfect == fast_perfect == [True, False]
     assert len(slow_scores) == len(fast_scores) == 2
+
+
+# ---------------------------------------------------------- dying with the controller
+
+def _orphan_probe(poll_seconds, flag):
+    """Runs the watchdog against a parent pid this process does not have, in a child process."""
+    eval_workers.watch_parent(-1, poll_seconds, on_orphan=lambda: flag.set())
+
+
+def test_the_watchdog_returns_as_soon_as_the_parent_is_no_longer_the_parent():
+    """The predicate, run for real in another process: `watch_parent` blocks only while `getppid()`
+    still reads the pid it was given. Compared for *change* rather than against 1, because a
+    reparented process lands on whatever the platform's reaper is."""
+    ctx = multiprocessing.get_context('spawn')
+    flag = ctx.Event()
+    proc = ctx.Process(target=_orphan_probe, args=(0.01, flag), daemon=True)
+    proc.start()
+    proc.join(timeout=20)
+    assert not proc.is_alive(), 'the watchdog never returned'
+    assert flag.is_set(), 'it returned without reporting the orphaning'
+
+
+def test_the_watchdog_waits_while_the_parent_is_still_there():
+    fired = []
+    started = time.time()
+    # Its own real parent pid, so the loop's condition holds -- and a fake sleep that breaks out
+    # after a few turns, since the honest version of this test would never end.
+    turns = []
+
+    def sleep(_seconds):
+        turns.append(1)
+        if len(turns) >= 3:
+            raise KeyboardInterrupt      # stands in for "the process was still alive at exit"
+
+    real_sleep, time.sleep = time.sleep, sleep
+    try:
+        eval_workers.watch_parent(os.getppid(), 0.01, on_orphan=lambda: fired.append(1))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        time.sleep = real_sleep
+    assert len(turns) == 3 and not fired, (turns, fired)
+    assert time.time() - started < 5
+
+
+def test_a_worker_installs_the_watchdog_before_it_imports_tensorflow():
+    """A tripwire, not a behaviour test: the ~8 s TensorFlow import is time a worker can be orphaned
+    in, and an orphan made during it would otherwise sit waiting for a load command that is never
+    coming. `daemon=True` on the Process does not cover this -- it is an atexit hook in the parent, so
+    `kill -9` (this project's way of stopping a run) leaves the workers behind: 16 of them holding
+    ~3.7 GB on 2026-08-19."""
+    tree = ast.parse(inspect.getsource(eval_workers._worker_main))
+    body = tree.body[0].body
+    assert isinstance(body[-1], ast.Try), 'expected the worker body to be one try block'
+    calls = [node for node in ast.walk(body[-1])
+             if isinstance(node, ast.Call) and getattr(node.func, 'id', None)
+             == 'install_parent_watchdog']
+    assert len(calls) == 1, 'the worker must install the parent watchdog exactly once'
+    first = body[-1].body[0]
+    assert isinstance(first, ast.Expr) and getattr(first.value.func, 'id', None) == \
+        'install_parent_watchdog', 'it has to come first, before the TensorFlow import'
+    imports = [node.lineno for node in ast.walk(body[-1])
+               if isinstance(node, ast.Import) and any(a.name == 'tensorflow' for a in node.names)]
+    assert imports and min(imports) > calls[0].lineno
+
+
+def test_the_watchdog_thread_is_a_daemon():
+    """A non-daemon watchdog would hold the worker open at exit forever, since its loop only returns
+    when the parent dies -- the process would hang on the way out instead of hanging on the way in."""
+    thread = eval_workers.install_parent_watchdog(poll_seconds=3600)
+    assert thread.daemon is True and thread.is_alive()
+
+
+def test_the_pool_still_marks_its_workers_daemonic():
+    """Belt and braces: the watchdog covers `kill -9`, `daemon=True` covers a clean parent exit
+    without waiting for a poll. Removing either leaves a real case uncovered."""
+    source = inspect.getsource(eval_workers.IndependentWorkerPool.__init__)
+    assert 'daemon=True' in source

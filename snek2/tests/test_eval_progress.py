@@ -204,21 +204,51 @@ def test_the_deflator_stands_down_without_evidence_and_on_a_staged_run():
     assert eval_progress.expected_run_fraction([staged]) == 1.0
 
 
-def test_a_waves_eta_replaces_the_per_arm_one():
+def test_the_controllers_own_eta_beats_this_files_arithmetic():
     """An arm of a wave shares lanes, so its own remaining work over "one process" is remaining
-    lane-time, and the last arm standing inherits every lane: b43b read 37.9 h on a wave with ~13 h
-    left. `eval_wave` computes one number for the whole wave and stamps it on every arm."""
+    lane-time and nothing in its file says what share of the box it is getting: b43b read 37.9 h on a
+    wave with ~13 h left. `eval_wave` measures the share as wall clock between completions and stamps
+    the result, so the stamp wins wherever it exists."""
     rows = [result(step, episodes=250, perfect=200, seconds=125.0) for step in range(1, 5)]
     payload = run(rows, complete=False, episodes_per_checkpoint=500,
                   measurements_planned=8, measurements_done=4,
                   session_measurements=4, session_episodes=1000, session_seconds=500.0,
+                  arm_eta_seconds=600.0, arm_eta_window=10,
                   wave_eta_seconds=1234.0, wave_lanes=4, wave_arms=4)
     state = eval_progress.summarize([payload])
-    assert state['eta_seconds'] == 1234.0
-    assert state['wave_eta'] is True and state['wave_arms'] == 4
-    # ...and a single-policy run is untouched: no key, no override.
+    assert state['eta_seconds'] == 600.0, 'the arm ETA is the arm\'s own, not the wave\'s'
+    assert state['eta_window'] == 10
+    # The wave total is carried alongside rather than in place of it -- a different question, "when
+    # is the box free", and the only one an arm's file cannot answer for itself.
+    assert state['wave_eta_seconds'] == 1234.0 and state['wave_arms'] == 4
+    # Before the second completion there is no interval to average, and the episode arithmetic that
+    # the stamp exists to replace is still better than no ETA at all.
+    del payload['arm_eta_seconds']
+    fallback = eval_progress.summarize([payload])
+    assert fallback['eta_seconds'] not in (None, 1234.0) and fallback['eta_window'] is None
+    # ...and a single-policy run carries neither field.
     del payload['wave_eta_seconds']
-    assert eval_progress.summarize([payload])['wave_eta'] is False
+    assert eval_progress.summarize([payload])['wave_eta_seconds'] is None
+
+
+def test_the_wave_total_is_named_on_the_chart_and_the_arm_eta_is_not_relabelled():
+    """The label read `wave ETA` while the wave's number was replacing the arm's. Now the left
+    column's ETA is always this arm's, and the wave's total is a line in the right column -- so
+    neither number can be read as the other."""
+    rows = [result(step, episodes=250, perfect=200, seconds=125.0) for step in range(1, 5)]
+    payload = run(rows, complete=False, episodes_per_checkpoint=500,
+                  measurements_planned=8, measurements_done=4,
+                  session_measurements=4, session_episodes=1000, session_seconds=500.0,
+                  arm_eta_seconds=600.0, arm_eta_window=10,
+                  wave_eta_seconds=36000.0, wave_lanes=4, wave_arms=4)
+    left, right = eval_progress.summary_columns('b43b-lowlr-b29a',
+                                                eval_progress.summarize([payload]))
+    assert 'ETA 10m' in left and 'wave ETA' not in left, left
+    assert 'wave of 4: all done in 10h00m' in right, right
+    # No wave, no line: a single-policy close-out says nothing about waves.
+    del payload['wave_eta_seconds']
+    _, alone = eval_progress.summary_columns('arm', eval_progress.summarize([payload]))
+    assert 'wave of' not in alone, alone
 
 
 def test_summarize_falls_back_to_per_checkpoint_eta_for_older_files():

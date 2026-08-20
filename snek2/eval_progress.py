@@ -473,16 +473,22 @@ def summarize(runs, stale_after=180):
         remaining = max(0, requested - len(completed))
         eta_seconds = (remaining * mean_seconds / processes) if mean_seconds else None
 
-    # A wave overrides all of the above, because none of it can be right from one arm's file. Its
-    # arms share lanes, so what the arithmetic above produces is this arm's remaining *lane*-time,
-    # and the arm that finishes last inherits every lane its siblings give up: on b43's HOF that read
-    # 37.9 h for `b43b-lowlr-b29a` on a wave with ~13 h left in it. `eval_wave` computes one number
-    # across every arm and stamps it on all of them, so the panels agree and answer the question
-    # actually being asked. Absent from a single-policy run, which is the common case.
+    # In a wave the controller's own figure wins, because none of the arithmetic above can be right
+    # from one arm's file: its arms share lanes, so what that produces is this arm's remaining
+    # *lane*-time over a process count that is not the arm's actual share of the box. `eval_wave`
+    # measures the share instead -- wall clock between this arm's last ~10 completions -- which also
+    # re-prices itself when a sibling finishes and hands its lane over. Both fields are absent from a
+    # single-policy run, which is the common case, and `arm_eta_seconds` is absent for the first two
+    # measurements of a wave, where the episode arithmetic above is the fallback.
+    arm_eta = next((r.get('arm_eta_seconds') for r in runs
+                    if r.get('arm_eta_seconds') is not None), None)
+    if arm_eta is not None:
+        eta_seconds = arm_eta
+    # The whole wave's finish time is a different question -- when is the box free -- so it is shown
+    # next to the arm's rather than instead of it. It was *replacing* it for a day, which made the
+    # four panels agree at the cost of the number each one was being read for.
     wave_eta = next((r.get('wave_eta_seconds') for r in runs
                      if r.get('wave_eta_seconds') is not None), None)
-    if wave_eta is not None:
-        eta_seconds = wave_eta
 
     # Progress in measurements, which counts a confirmation pass separately from the screen that
     # earned it. Without it a screening run reads 100% done the moment stage 1 ends.
@@ -544,9 +550,14 @@ def summarize(runs, stale_after=180):
         # The gate's observed run fraction, published for the same reason as `episodes_ahead`: it is
         # the difference between the episodes the plan names and the episodes the ETA prices.
         'run_fraction': run_fraction,
-        # Set when the ETA is the whole wave's rather than this arm's, so the text block can say so
-        # instead of implying the arm alone takes that long.
-        'wave_eta': wave_eta is not None,
+        # The wave's own total, shown beside the arm's ETA when the file is a wave's. Not a flag: the
+        # arm ETA is always the arm's now, so what the text block needs is the other number itself.
+        'wave_eta_seconds': wave_eta,
+        # How many completions the arm's ETA was averaged over, or None when it came from the episode
+        # arithmetic instead. Published so a suspicious ETA can be traced to its evidence -- and tied
+        # to `arm_eta` rather than read on its own, so it can never describe an ETA it did not price.
+        'eta_window': (next((r.get('arm_eta_window') for r in runs if r.get('arm_eta_window')), None)
+                       if arm_eta is not None else None),
         'wave_arms': next((r.get('wave_arms') for r in runs if r.get('wave_arms')), None),
         'rates': rates,
     }
@@ -730,6 +741,12 @@ def metrics_lines(state):
         lines.append('  gate cut {0} rows, saved {1:,} ep{2}'.format(abandoned, saved, clock))
     lines.append('  {0} rows measured = {1} full + {2} partial'.format(
         len(rows), len(full), len(rows) - len(full)))
+    # The wave's own total, in the right column because it is context rather than this arm's result --
+    # and on the chart at all because the ETA on the left is now the arm's, so without this nothing
+    # says when the box comes free. Absent for a single-policy run.
+    if state.get('wave_eta_seconds') is not None:
+        lines.append('  wave of {0}: all done in {1}'.format(
+            state.get('wave_arms') or '?', format_duration(state['wave_eta_seconds'])))
     return lines
 
 
@@ -803,9 +820,8 @@ def ranking_lines(state):
         # pass the two now agree by construction, since `expected_run_fraction` is exactly the ratio
         # that turns the planned episodes ahead into the mean measurement's actual cost.
         ahead = state.get('episodes_ahead')
-        eta_label = 'wave ETA' if state.get('wave_eta') else 'ETA'
-        lines.append('  pace {0}/checkpoint   {1} {2}{3}'.format(
-            format_duration(state['mean_seconds']), eta_label,
+        lines.append('  pace {0}/checkpoint   ETA {1}{2}'.format(
+            format_duration(state['mean_seconds']),
             format_duration(state['eta_seconds']),
             ' ({0:,} ep left)'.format(ahead) if ahead else ''))
         # Ranked over the deeply-measured rows only, the same rule best_of() applies. Without it

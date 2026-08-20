@@ -541,10 +541,13 @@ def build_payload(spec, progress, samples, results, complete, in_flight=None):
             'session_measurements': progress['session_measurements'],
             'session_episodes': progress['session_episodes'],
             'session_seconds': round(progress['session_seconds'], 1),
-            # Wave-level, and absent from a single-policy run, which is why these are `.get`. A
-            # wave's arms share lanes, so an arm's own remaining work over "one process" is its
-            # remaining lane-time rather than wall clock -- and the last arm standing inherits every
-            # lane. `eval_progress` prefers `wave_eta_seconds` when it is here.
+            # Wave-level, and absent from a single-policy run, which is why these are `.get`.
+            # `arm_eta_seconds` is this arm's own finish time measured as wall clock between its last
+            # few completions -- the only way to price an arm whose share of the lanes changes as its
+            # siblings finish -- and `eval_progress` prefers it over its own episode arithmetic.
+            # `wave_eta_seconds` is the whole wave's, which no single arm's file could carry.
+            'arm_eta_seconds': progress.get('arm_eta_seconds'),
+            'arm_eta_window': progress.get('arm_eta_window'),
             'wave_eta_seconds': progress.get('wave_eta_seconds'),
             'wave_lanes': progress.get('wave_lanes'),
             'wave_arms': progress.get('wave_arms'),
