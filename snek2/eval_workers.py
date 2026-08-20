@@ -225,6 +225,7 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
         from tf_agents.environments import tf_py_environment
         from tf_agents.utils import common
 
+        import policy_arch
         from eval_agent import build_eval_agent
         from snake_environment import SnakeEnvironment
         from state_helpers import is_perfect_score
@@ -233,6 +234,12 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
         tf_env = tf_py_environment.TFPyEnvironment(py_env)
         agent, checkpoint, global_step = build_eval_agent(tf_env, py_env, ckpt_dir)
         policy_action = common.function(agent.policy.action)
+        # The arch this network was built for. A `load` naming a different directory is checked
+        # against it before anything is restored -- see policy_arch.assert_same_network for why a
+        # matching tensor shape is not enough. Cached per directory because a wave alternates
+        # between the same few arms and re-reading the sidecar per unit is pointless.
+        built_arch = policy_arch.require_arch(ckpt_dir)
+        checked_dirs = {ckpt_dir: built_arch}
 
         def one_episode():
             steps = 0
@@ -259,9 +266,18 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
             if command[0] == 'exit':
                 return
             if command[0] == 'load':
+                # ('load', step) restores from this worker's own policy; ('load', step, dir) from
+                # another one's, which is what lets a lane take work from a sibling arm without the
+                # ~8s of TensorFlow import and graph build a new pool would cost. The network is
+                # untouched either way -- a restore writes into the same variables, which is already
+                # what happens between checkpoints of one arm.
                 step = command[1]
+                target_dir = command[2] if len(command) > 2 and command[2] else ckpt_dir
+                if target_dir not in checked_dirs:
+                    checked_dirs[target_dir] = policy_arch.assert_same_network(
+                        built_arch, policy_arch.require_arch(target_dir), ckpt_dir, target_dir)
                 checkpoint.restore(
-                    os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))).expect_partial()
+                    os.path.join(target_dir, 'ckpt-{0}'.format(step))).expect_partial()
                 results.put((TAG_LOADED, rank, int(global_step.numpy())))
                 continue
             if command[0] == 'run':
@@ -323,10 +339,17 @@ class IndependentWorkerPool:
                 values.append(message)
         return values
 
-    def load(self, step):
-        """Restores one checkpoint in every worker. Returns the global_step they read back."""
+    def load(self, step, ckpt_dir=None):
+        """Restores one checkpoint in every worker. Returns the global_step they read back.
+
+        `ckpt_dir` defaults to the pool's own policy. Passing another policy's directory is how a
+        wave lane switches arms: the workers check its `arch.json` against the network they built
+        (`policy_arch.assert_same_network`) and then restore, so the switch costs one restore rather
+        than a new pool. A mismatch raises `ArchMismatch` out of `_await` instead of restoring
+        weights whose values no longer mean what the network thinks they mean.
+        """
         for queue in self._commands:
-            queue.put(('load', step))
+            queue.put(('load', step, ckpt_dir or self._ckpt_dir))
         acks = self._await(TAG_LOADED, self._num_workers)
         restored = {ack[2] for ack in acks}
         if len(restored) != 1:

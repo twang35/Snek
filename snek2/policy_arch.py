@@ -224,6 +224,67 @@ def assert_restorable(policy_dir, num_actions, obs_len, obs_era):
     return arch
 
 
+# What has to match for a checkpoint to be restorable into an *already built* network — the
+# question `assert_restorable` never had to ask, because until `eval_wave.py` every process built
+# its network for exactly one policy and never pointed it at another one.
+#
+# `perfect_game_reward` is deliberately **not** here. It is the objective the arm trained toward,
+# not a property of the weights: restoring across a mismatch is safe, the greedy action is an argmax
+# over one checkpoint's own Q values, and it legitimately differs between arms a wave measures side
+# by side (batch 33 trained at 10, everything else at 100). Including it would refuse lanes that are
+# perfectly safe to share. Everything else that `build_arch` records *is* here, `v_min`/`v_max`
+# included, because a categorical policy's action is ``argmax_a sum_i z_i p_i(s, a)`` — correct
+# weights against the wrong support is a different policy with no shape mismatch anywhere.
+RESTORE_FIELDS = ('fc_layer_params', 'num_actions', 'obs_len', 'obs_era', 'algo') + CATEGORICAL_FIELDS
+
+
+def restore_signature(arch):
+    """The fields of `arch` that decide whether weights can be restored into a built network.
+
+    A hashable value, so a caller can group policies into lanes with a dict rather than comparing
+    pairwise. `fc_layer_params` round-trips through JSON as a list, so it is normalised to a tuple
+    here — otherwise two identical arches would hash differently depending on which one came from
+    disk.
+    """
+    signature = []
+    for field in RESTORE_FIELDS:
+        # Through the accessor, not `.get`, for exactly the fields that have one. The sidecars are
+        # **not** uniform: `algo` and `perfect_game_reward` were added later, so arms of one batch
+        # can disagree about whether `algo` is present at all — measured on b43, where a/b/d have no
+        # `algo` key and c records `"ddqn"`. A raw `.get` reads those as None vs 'ddqn' and refuses
+        # to share a lane between two arms of the same batch, which is the false negative this
+        # whole function exists to avoid.
+        value = algo_of(arch) if field == 'algo' else arch.get(field)
+        signature.append((field, tuple(value) if isinstance(value, list) else value))
+    return tuple(signature)
+
+
+def assert_same_network(built_arch, target_arch, built_dir='<built>', target_dir='<target>'):
+    """Raise `ArchMismatch` unless `target_arch`'s weights can be restored into `built_arch`'s network.
+
+    This is the guard on a lane switching arms mid-wave. It exists because **a checkpoint restores
+    whenever the tensors are the same shape, and nothing else checks that the values still mean what
+    they meant** — the failure that took every hall-of-fame checkpoint from 90.3% to scoring 0, 0, 1
+    on 2026-08-02, when an observation index was repurposed at constant length. Crossing between two
+    policies' directories is a new door onto exactly that room, so it is closed here rather than
+    trusted to the two dirs happening to agree.
+
+    Returns the target arch, so the caller can use it as the lane's new current arch.
+    """
+    if restore_signature(built_arch) == restore_signature(target_arch):
+        return target_arch
+    built_by_field = dict(restore_signature(built_arch))
+    target_by_field = dict(restore_signature(target_arch))
+    problems = ['{0} {1!r} != built {2!r}'.format(field, target_by_field[field],
+                                                  built_by_field[field])
+                for field in RESTORE_FIELDS
+                if built_by_field[field] != target_by_field[field]]
+    raise ArchMismatch(
+        'cannot restore {0} into a network built for {1}: {2}. A lane may only take work from '
+        'policies whose {3} agrees.'.format(target_dir, built_dir, '; '.join(problems),
+                                            ARCH_FILENAME))
+
+
 def assert_config_matches(policy_dir, fc_layer_params, algo=DEFAULT_ALGO, num_atoms=None,
                           v_min=None, v_max=None, perfect_game_reward=None):
     """On a training *resume*, the checkpoint's arch is authoritative and the env knobs are the thing

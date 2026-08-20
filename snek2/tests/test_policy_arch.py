@@ -270,3 +270,80 @@ def test_refuse_categorical_raises_for_a_c51_policy():
 def test_refuse_categorical_returns_the_arch_for_a_ddqn_policy():
     arch = policy_arch.refuse_categorical(_dir_with_arch(), 'plasticity.py')
     assert arch['fc_layer_params'] == [50, 100, 50]
+
+
+# ---------------------------------------------------------------- cross-arm restore (eval_wave)
+
+def _arch(**over):
+    a = policy_arch.build_arch([100, 100], 4, 30, 'b09c616')
+    a.update(over)
+    return a
+
+
+def test_restore_signature_is_hashable_and_ignores_the_json_round_trip():
+    # fc_layer_params comes back from JSON as a list and is built as a tuple by some callers; two
+    # identical arches must not hash differently depending on which side of disk they came from.
+    a = _arch(fc_layer_params=[100, 100])
+    b = _arch(fc_layer_params=(100, 100))
+    assert policy_arch.restore_signature(a) == policy_arch.restore_signature(b)
+    assert len({policy_arch.restore_signature(a), policy_arch.restore_signature(b)}) == 1
+
+
+def test_same_network_accepts_two_arms_of_one_batch():
+    # The normal case a wave depends on: same shape, same observation, different policy.
+    assert policy_arch.assert_same_network(_arch(), _arch()) is not None
+
+
+def test_same_network_ignores_the_win_reward():
+    # A batch-33 arm (win = 10) and a normal one (100) share a network exactly. Refusing this would
+    # refuse a lane that is perfectly safe, and the reward is not a property of the weights.
+    built = _arch(perfect_game_reward=100.0)
+    target = _arch(perfect_game_reward=10.0)
+    assert policy_arch.assert_same_network(built, target) is target
+
+
+def test_same_network_accepts_an_older_sidecar_missing_algo():
+    # Measured on b43: a/b/d were written before `algo` and `perfect_game_reward` existed and have
+    # neither key; c has both. A raw `.get('algo')` reads None vs 'ddqn' and refuses to share a lane
+    # between two arms of the *same batch* -- the false negative this normalisation exists for.
+    old_style = {'fc_layer_params': [320], 'num_actions': 3, 'obs_len': 30, 'obs_era': 'b09c616'}
+    new_style = policy_arch.build_arch([320], 3, 30, 'b09c616')
+    assert policy_arch.restore_signature(old_style) == policy_arch.restore_signature(new_style)
+    assert policy_arch.assert_same_network(old_style, new_style) is new_style
+    assert policy_arch.assert_same_network(new_style, old_style) is old_style
+
+
+def test_same_network_refuses_a_different_width_or_observation():
+    for field, value in (('fc_layer_params', [320]), ('num_actions', 3),
+                         ('obs_len', 26), ('obs_era', 'e4514a8'), ('algo', 'c51')):
+        try:
+            policy_arch.assert_same_network(_arch(), _arch(**{field: value}))
+        except policy_arch.ArchMismatch as error:
+            assert field in str(error), (field, str(error))
+        else:
+            raise AssertionError('a differing {0} was accepted'.format(field))
+
+
+def test_same_network_refuses_a_moved_categorical_support():
+    # The silent one: correct weights against the wrong support is a *different policy* with no
+    # shape mismatch anywhere, because the action is argmax_a sum_i z_i p_i(s, a).
+    built = policy_arch.build_arch([320], 4, 30, 'b09c616', algo='c51',
+                                   num_atoms=51, v_min=-5.0, v_max=120.0)
+    moved = policy_arch.build_arch([320], 4, 30, 'b09c616', algo='c51',
+                                   num_atoms=51, v_min=-5.0, v_max=60.0)
+    try:
+        policy_arch.assert_same_network(built, moved)
+    except policy_arch.ArchMismatch as error:
+        assert 'v_max' in str(error), str(error)
+    else:
+        raise AssertionError('a moved support was accepted')
+
+
+def test_same_network_names_both_directories_in_the_error():
+    try:
+        policy_arch.assert_same_network(_arch(), _arch(obs_len=26), 'dirs/built', 'dirs/target')
+    except policy_arch.ArchMismatch as error:
+        assert 'dirs/built' in str(error) and 'dirs/target' in str(error), str(error)
+    else:
+        raise AssertionError('accepted')
+
