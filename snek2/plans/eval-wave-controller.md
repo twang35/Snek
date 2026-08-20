@@ -152,6 +152,30 @@ trained toward, not a property of the weights, the greedy action is an argmax ov
 own Q values, and it legitimately differs between arms measured side by side (batch 33 trained at
 10). With that, all four b43 arms group into one lane pool.
 
+**‡ Amendment 2026-08-19: lane eligibility is `(restore_signature, eval-relevant env)`, not the
+signature alone.** A worker builds **one** `SnakeEnvironment` from its process's `SNEK_*` at startup.
+Today each policy's eval is its own process and the desktop passes that policy's own training env
+(`rec['env']`); a wave is one process and can carry only one. Of the knobs the env reads:
+
+| knob | reaches a measurement? | wave rule |
+|---|---|---|
+| `SNEK_ZERO_OBS` | **yes** — zeroes observation indices, so the policy sees something else and behaves differently | **hard-fail** a wave that mixes disagreeing arms |
+| `SNEK_CHASE_SAFE_SHAPING`/`_GATE`, `SNEK_FREE_SPACE_SHAPING`/`_GATE`, `SNEK_FOOD_DISTANCE_REWARD`, `SNEK_PERFECT_GAME_REWARD` | reward only. `perfect_percent` is immune (a perfect game is identified by **score**), but a row's `avg_reward` would be computed under the lane's config rather than the arm's | **partition lanes** — cheap, since arms of one batch always agree |
+| `SNEK_TILE_PIXELS` | no — cosmetic, verified by a fixed-seed observation hash | ignore |
+| `SNEK_V_MAX` | no — the support comes from `arch.json` (`support_from_arch`), not the env | ignore |
+
+This only bites on a hand-assembled cross-batch wave; a batch launched by one script agrees by
+construction. Enforcing it is better than remembering it.
+
+**Sidecar vintage is *not* part of this.** `b43a/b/d` carry no `algo` and no `perfect_game_reward`
+while `b43c` carries both, because each arm's sidecar came from the checkpoint it was seeded from
+(b43c from b40, the others from b29). It is notational: `DEFAULT_PERFECT_GAME_REWARD = 100`, so
+b43c's recorded `100.0` *is* a/b/d's absent value. Verified live — a pool built on b43a's old-style
+sidecar loaded b43c and played filled boards, 0.014 s cold and 0.004 s once the per-directory check
+is cached. **Do not "fix" this with `backfill_arch.py`**: writing those fields into an old sidecar
+asserts a fact about how that arm trained, where absence is already read correctly by `algo_of` and
+`reward_scale_of`.
+
 **The guard is the important half.** The worker compares the target directory's `arch.json` against
 its built arch and raises `ArchMismatch` rather than restoring — the same discipline
 `policy_arch.assert_restorable` already enforces at build time, extended to the switch. CLAUDE.md's
