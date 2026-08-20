@@ -684,12 +684,19 @@ def metrics_lines(state):
     full, target = full_length_rows(state)
     pool, note = full, ''
     if not pool:
-        # Every row stopped short of the target, which at a 97 gate is the normal case for a weak
+        # Every row stopped short of the target, which at a 98 gate is the normal case for a weak
         # arm. Rank what there is and label the depth, rather than printing four zeroes.
         pool = deep_rows(rows)
-        note = ' (deepest {0} ep, none full)'.format(max(r['episodes'] for r in rows))
-    lines = ['  perfect % of {0} {1} rows{2}'.format(
-        len(pool), 'full-length ({0} ep)'.format(target) if not note else 'deep', note)]
+        # Its own line, not a suffix. As a suffix this ran to 53 characters and was **clipped by the
+        # right edge of the frame** on `b43d`'s live chart -- the caveat that no row reached full
+        # length is the one thing on the line that must not be the part that gets cut. The column's
+        # width is what it is (see SUMMARY_FONTSIZE), so a second line is the only fix that scales.
+        note = '    deepest {0} of {1} ep, none full length'.format(
+            max(r['episodes'] for r in rows), target)
+    lines = ['  perfect % of {0} {1} rows'.format(
+        len(pool), 'full-length ({0} ep)'.format(target) if not note else 'deep')]
+    if note:
+        lines.append(note)
     for label, count in band_counts(pool):
         lines.append('    {0:<10} {1:>5}   {2:>4.0f}%'.format(
             label, count, 100.0 * count / len(pool)))
@@ -846,7 +853,11 @@ def ranking_lines(state):
         deepest = max(row['episodes'] for row in state['completed'])
         target = state.get('target_episodes') or deepest
         if deepest < target:
-            note = '  (best depth {0} of {1} episodes — none full length)'.format(deepest, target)
+            # 'ep' and no em dash: at 10pt the long form ran **57 characters** and crossed into the
+            # right column on `b43d`'s live chart, printing `none full length)below 98%` as one word.
+            # The left column's budget is `RIGHT_COLUMN_X` minus two characters of clearance, and
+            # this branch -- every row abandoned short of the target -- is the widest thing it draws.
+            note = '  (deepest {0}/{1} ep, none full)'.format(deepest, target)
         elif len(deep) != len(state['completed']):
             note = '  (full-length rows only)'
         else:

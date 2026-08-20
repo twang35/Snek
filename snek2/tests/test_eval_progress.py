@@ -466,8 +466,10 @@ def test_top_five_does_not_claim_full_length_when_the_gate_abandoned_every_row()
     state = eval_progress.summarize(
         [run(rows, checkpoints_requested=9, episodes_per_checkpoint=100)])
     text = eval_progress.text_summary('arm', state)
-    assert 'none full length' in text and 'full-length rows only' not in text, text
-    assert '58 of 100 episodes' in text, text
+    assert 'none full' in text and 'full-length rows only' not in text, text
+    # Wording shortened 2026-08-19 -- the long form crossed into the right column on the chart -- so
+    # the depth is asserted as the pair it now prints rather than as prose.
+    assert 'deepest 58/100 ep' in text, text
 
 
 def test_top_five_flags_shallow_rows_even_when_none_were_filtered_out():
@@ -482,8 +484,8 @@ def test_top_five_flags_shallow_rows_even_when_none_were_filtered_out():
         [run(rows, checkpoints_requested=9, episodes_per_checkpoint=100)])
     text = eval_progress.text_summary('arm', state)
     assert len(eval_progress.deep_rows(rows)) == len(rows), 'fixture must filter nothing'
-    assert 'none full length' in text, text
-    assert '36 of 100 episodes' in text, text
+    assert 'none full' in text, text
+    assert 'deepest 36/100 ep' in text, text
 
 
 def test_top_five_still_says_full_length_when_the_deep_rows_reached_the_target():
@@ -1095,7 +1097,7 @@ def test_the_metrics_block_says_so_when_no_row_reached_full_length():
             dict(result(2000, episodes=40, perfect=28), abandoned=True)]
     state = eval_progress.summarize([run(rows, episodes_per_checkpoint=100)])
     text = '\n'.join(eval_progress.metrics_lines(state))
-    assert 'deepest 40 ep, none full' in text, text
+    assert 'deep rows' in text and 'deepest 40 of 100 ep, none full length' in text, text
     assert '2 rows measured = 0 full + 2 partial' in text, text
 
 
@@ -1314,6 +1316,24 @@ def test_the_left_column_keeps_clear_of_the_right_one():
                 stage, left.x1, eval_progress.RIGHT_COLUMN_X))
         assert right.x1 <= 1.0, 'at stage {0} the right column runs off at {1:.3f}'.format(
             stage, right.x1)
+
+
+def test_the_right_column_fits_when_no_row_reached_full_length():
+    """The wording that was clipped. `b43d`'s live chart drew `perfect % of 23 deep rows (deepest 488
+    ep, none full)` -- 53 characters -- and the frame cut it after `none full`, losing exactly the
+    caveat the line exists to carry. Every fixture above has full-length rows, so the branch that
+    produces this wording was never measured; this is the one that measures it."""
+    shallow = busy_state('confirm')
+    # Every row abandoned short of the target, which at a 98 gate is the normal case for a weak arm.
+    for row in shallow['completed']:
+        row['episodes'] = 488
+        row['abandoned'] = True
+    shallow['target_episodes'] = 500
+    _, right = eval_progress.summary_columns('b43d-lowlr-b29c', shallow)
+    assert 'none full length' in right, right
+    left_box, right_box, _ = render_text_extents(shallow, policy='b43d-lowlr-b29c')
+    assert right_box.x1 <= 1.0, 'the right column runs off the frame at {0:.3f}'.format(right_box.x1)
+    assert left_box.x1 <= eval_progress.RIGHT_COLUMN_X - 0.02, left_box.x1
 
 
 def test_both_columns_fit_inside_the_text_panel():
