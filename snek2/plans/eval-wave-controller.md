@@ -1,10 +1,11 @@
 # One wave, one controller: `eval_wave.py`
 
 **Status:** proposed 2026-08-19. Scope and the `--chain` decision approved in conversation the same
-day. **Phases 0 and 1 are written and uncommitted pending review** — `eval_plan.py` extracted (29
-definitions moved byte-identically; suite 30 modules / 747 tests / 0 failed) and the cross-arm
-`load` guard landed. **Phase 1's premise is confirmed by measurement: a lane switches arms in
-0.00 s.** Phases 2-6 not started.
+day. **Phases 0-2 are written; phase 3's code is written and its gate is outstanding.** Phases 0 and
+1 are committed (`eval_plan.py` extracted, 29 definitions moved byte-identically; the cross-arm
+`load` guard landed, and its premise is confirmed by measurement — **a lane switches arms in
+0.00 s**). `eval_wave.py` and its 25 fixtures are **uncommitted pending review**; suite **31 modules
+/ 772 tests / 0 failed**, and 12 of 12 mutants killed. Phases 4-6 not started.
 
 **One line:** replace the four independent `eval_checkpoints.py` processes — and the *two* separate
 things that orchestrate them, a bash script on the laptop and the runner daemon on the desktop —
@@ -333,8 +334,9 @@ PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45
 |---|---|---|
 | **0 done** | extract `eval_plan.py`, re-export from `eval_checkpoints` | **met**: the 29 moved and 3 kept definitions all byte-identical to HEAD (`ast.get_source_segment` diff); suite **30 modules / 740 tests / 0 failed**; 4 dead imports trimmed |
 | **1 done** | `load(step, ckpt_dir)` + arch compare | **met**: live swap on one pool costs 0.00 s and plays filled boards; 7 new `policy_arch` fixtures, cross-arch and moved-support swaps raise; suite **747 tests / 0 failed** |
-| 2 | `eval_wave.py`, one policy, one lane | file structurally identical to `eval_checkpoints.py`'s on the same explicit step list |
-| 3 | multi-policy, multi-lane, greedy dispatch, `wave` block | measured makespan against a recorded 4-process baseline |
+| **2 done** | `eval_wave.py`, one policy, one lane | **met**: on `b43a` steps 1447000-1449000 at 4 episodes, the wave's file and `eval_checkpoints.py`'s have identical key order, identical row-key order and identical values for all 20 protocol fields (only the stochastic rates differ) |
+| 3 code written, **gate outstanding** | multi-policy, multi-lane, greedy dispatch, `wave` block | measured makespan against a recorded 4-process baseline — needs a real wave, so it waits for b44's close-outs to clear the desktop |
+| 3a | the `wave` block in the payload | not written yet: the per-arm payload is byte-compatible today, and the wave-level ETA is an addition to it |
 | 4 | `--chain` | gate assert in one place; a no-candidate arm exits clean |
 | 5 | runner deltas + `desktop/tests/test_runner.py` | a queued b46 close-out dispatches as one job and publishes four policies |
 | 6 | delete the bash script; update `CLAUDE.md`, `hyperparamTuning.md`, `desktop/README.md` | — |
@@ -343,6 +345,39 @@ PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45
 
 New fixtures in `tests/test_eval_wave.py`, plus additions to `tests/test_eval_workers.py` and
 `desktop/tests/test_runner.py`.
+
+### ‡ The screened protocol cannot be tested against real checkpoints, and that is why the fixtures exist
+
+The flat path is verified against `eval_checkpoints.py`'s own output — the phase-2 gate above — and
+that comparison is the real check on the arithmetic. **The three-stage screened path has no such
+check available**, because every policy in `savedPolicies/` with a current observation era is a
+*continuation* arm: `select_top_checkpoints('b43a-lowlr-b29b', …, 6)` returns **791 checkpoints, all
+791 in the mandatory full-length tier and 0 screened**, whatever count is asked for. So no live
+`top<N>` run on this machine's data produces a screen to confirm, and the screened path, the confirm
+barrier, the plan correction and the error handling are pinned by fixtures driven by a fake pool
+instead.
+
+25 fixtures, and each of the 12 mutants below fails at least one of them:
+
+| mutant | killed by |
+|---|---|
+| `on_error` does not advance the barrier | the arm waits forever for a screen that will never arrive |
+| confirm on the first screen instead of the last | `pick_finalists` ranks against a partial field |
+| `lane_key` compares the raw sidecar dict | b43's non-uniform `algo` splits one batch into two lane groups |
+| no top-up: always ask for the whole target | a checkpoint stopped at 60 of 100 is restarted |
+| the payload leaks the controller's own bookkeeping | `queued` / `_already` reach `in_flight` |
+| no overshoot correction | `measurements_done` exceeds `measurements_planned` |
+| `lane_split` may starve a group | its work becomes unrunnable and the wave hangs |
+| `take` ignores eligibility | an arm is measured by a lane built for a different observation |
+| `add` does not dedupe | a re-issued unit is measured twice |
+| `finish` always marks complete | a HOF pass selects out of a truncated close-out |
+| `batch_of` keeps the whole head | `b4` and `b44` become the same batch |
+| the queue is not stage-major | screens run before the full tier |
+
+**One of those fixtures was worthless on its first draft** and is worth recording, because it is the
+failure mode CLAUDE.md warns about. The stage-order test used steps 1000 (full), 2000 and 3000
+(screened) — ordered by step alone that is *also* full-then-screen, so it passed with the stage
+ordering deleted entirely. The fix is that the full-tier step is now the **highest** one.
 
 - **Dispatch is exhaustive and disjoint.** Every planned unit is measured exactly once across lanes,
   for a plan with uneven per-policy counts (1, 2, 9, 64 — b29's real shape).
