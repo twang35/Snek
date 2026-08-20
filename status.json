@@ -1,12 +1,11 @@
 {
-  "iso": "2026-08-19T18:47:11",
-  "ts": 1787190431.3052406,
+  "iso": "2026-08-19T18:48:09",
+  "ts": 1787190489.3474724,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (2 arms)"
     ],
     "queued": [
-      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
       "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b45 training -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
       "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)"
@@ -22,7 +21,7 @@
     "omp_num_threads": 0,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": true,
+    "paused": false,
     "drain": false,
     "viewer": true,
     "auto_closeout": true,
@@ -45,7 +44,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 47013
+      "elapsed_s": 47071
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -58,7 +57,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 47013
+      "elapsed_s": 47071
     }
   ],
   "ledger": {
@@ -310,8 +309,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    8.12890625,
-    7.95361328125,
-    8.31494140625
+    8.37060546875,
+    8.02734375,
+    8.318359375
   ]
 }
