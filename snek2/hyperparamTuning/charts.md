@@ -333,6 +333,8 @@ abandoned by the 98% gate at 378 episodes — so it is not strictly comparable w
 
 ## Batch 42 — the **same four checkpoints at the default `lr 1e-5`** — *stopped early at 1.77-1.91M, closed out and HOF-500'd: it decays, and its surviving ≥98% checkpoints are its own starting weights*
 
+**Finished on all three instruments; canonical write-up in [`completedRuns.md`](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays).** This section keeps the graphs.
+
 `b43`'s seed-matched control, and the reason the pair exists. Identical in every respect — same four seeded
 policy dirs, same source checkpoints, same seeds, byte-identical env on all nine of b29's knobs — except the
 learning rate is left at the default **`1e-5`**, the rate these checkpoints were originally trained at.

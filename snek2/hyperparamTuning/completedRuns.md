@@ -394,6 +394,34 @@ also what exposed the O(rows)x O(episodes) progress-write defect in the eval con
 per measurement against 46 s of measuring — fixed in `adbec2904`. Both write paths carry the fix now; the
 diagnostic is two `grep -c`s and it is documented in [`CLAUDE.md`](../../CLAUDE.md).
 
+## Batch 42 — the same four checkpoints at the default `lr 1e-5`: **stopped early, it decays**
+
+The seed-matched control for [`b43`](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) — the identical four `b29`/`b40` checkpoints, the same
+replay-buffer copy, continued at the rate they were originally trained at. Stopped by hand at **+385-421k past
+seed** (1.77-1.91M of a 3M cap) once the direction was unambiguous. Closed out and HOF-500'd in full.
+
+| arm | continues | best-30 | `sef` | pooled/eq | ≥98%/100 | ≥98%/500 |
+|---|---|---|---|---|---|---|
+| `b42b` | `b29a` @1347k | 97.3 | 97.9 | **93.77** | 27 | 0 |
+| `b42d` | `b29c` @1396k | **97.7** | 95.9 | 93.54 | **48** | **3** |
+| `b42a` | `b29b` @1447k | 97.3 | **87.0** | 90.75 | 17 | 1 |
+| `b42c` | `b40b` @1513k | **93.3** | 91.2 | 90.29 | 6 | 0 |
+| **group** | | | | **92.09** | **98** | **4** |
+
+**It decays, and the little that survives is what it started with.** All four ≥98%/500 rows sit **+3k to +74k**
+from their own seed checkpoint — `b42a` @1453k (98.4%) from @1447k, `b42d` @1399k / @1457k / @1470000 from
+@1396k — so the batch held nothing it learned, only what it was handed. `b43` at `1e-6` produced **187** rows
+from byte-identical weights and `b44` at `1e-7` is past 350 with half its pass to go.
+
+**Its one win is worth keeping.** On the `b29c` seed `b42d` held **3** where `b43d` held **0**, and tied it on
+pooled equal-effort (93.54 against 93.50) — the only per-seed inversion anywhere in the ladder, on the weakest
+starting checkpoint of the four. It is why the ladder's result is stated as 3 of 4 seeds on the deep instruments
+rather than 4 of 4.
+
+**Verdict: the control worked.** It establishes that continuing a champion at its original rate is not merely
+neutral but actively lossy, which is what makes `b43`/`b44` a result rather than a curiosity. Per-seed table and
+the full ladder: [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue).
+
 ## Batch 40 — chase-safe **plus a free-space term**: null, and the b29 record region does not replicate
 
 **A second potential-based shaping term added on top of `b29`'s exact record config**, testing the
@@ -653,24 +681,6 @@ nothing** and any improvement is optimisation, not capacity. Cheap to check post
 **Judge in this order:** churn at a matched horizon, then best-30 against b32's 70.0 at 1M, then the
 ≥98%/500 count at close-out against b24's two. **Not** `peak_trailing`, which is saturated at 95.
 
-## Batch 33 — the win reward cut to 10 — stopped 2026-08-16, falsified
-
-**Four arms at `SNEK_PERFECT_GAME_REWARD=10`, `SNEK_V_MAX=40`, stopped at 1.64-1.77M of 3M.** Best-30
-**18.3-25.3 against the paired b32 control's 77.0 and 63.0** — the largest single-knob regression measured
-here. The cause is not the optimiser: **every meal of progress lowers `V` by 1.7-4.4 while paying 1**, so
-`Q(don't eat) > Q(eat)` and the agent correctly avoids finishing. The general rule is
-**`W > 1/(1 − γ^k)`** — at γ=0.9975 and 7-12 steps per meal that is **34-58**, so 100 clears it and 10 does
-not. The 2.8× atom-per-food gain the batch was run for arrived and bought nothing, so **atom spacing is not
-C51's constraint**. Design, predictions, and which of them survived:
-[`completedRuns.md`](completedRuns.md#batch-33--the-win-reward-cut-to-10-falsified-and-it-found-a-general-rule-about-terminal-rewards).
-**Do not revisit** — and check the threshold before moving either the win reward or γ.
-
-**‡ An earlier version of this pointer said "greedy play *declines the win*" and that `V` was miscalibrated.
-Both were withdrawn on 2026-08-16** and the retraction had not reached this file. `V` is within **9-16%** of
-the *optimal* value; the first diagnosis compared it against the realised on-policy return, which a
-Q-learning agent is not estimating. The defect is the value gradient's **sign**, not its level. **Its chart
-section was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when b38 launched.**
-
 ## Batch 32 — Adam's `epsilon` on C51: **it works at −26% churn, and the dose does not**
 
 **Closed.** Churn on a **shared** 1500-state set from `hallOfFame/b29b…ckpt1447000` (mean length 50.5,
@@ -880,6 +890,10 @@ What the batch leaves behind is worth more than the arms cost: a clean negative 
 constraint, the threshold rule above, the discovery that **indices 18-20 are dead inputs**, and two
 diagnostics ([`value_by_length.py`](perDiagnostics/value_by_length.py),
 [`endgame_gradient.py`](perDiagnostics/endgame_gradient.py)).
+
+**Its chart section was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when b38 launched**,
+and this file carried a duplicate `## Batch 33` summary block above [Batch 32](#batch-32--adams-epsilon-on-c51-it-works-at-26-churn-and-the-dose-does-not)
+until 2026-08-20 — every figure in it is above, so it was removed rather than merged.
 
 ## Batch 35 — chase-safe `c=0.10`, **gate 40**: **null — the sweet spot at 75 is isolated, not a plateau**
 
