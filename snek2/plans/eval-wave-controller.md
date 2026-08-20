@@ -4,9 +4,10 @@
 day. **Phases 0-4 are written and their gates met.** Phases 0 and 1 are committed (`eval_plan.py` extracted, 29 definitions moved byte-identically; the cross-arm
 `load` guard landed, and its premise is confirmed by measurement — **a lane switches arms in
 0.00 s**). `eval_wave.py`, `--chain` and their 33 fixtures are **uncommitted pending review**; suite
-**31 modules / 780 tests / 0 failed** plus the desktop's 89, and **18 of 18 mutants killed**. Phase 5
-(the runner deltas) is **in progress and uncommitted**; it needs an idle box to deploy, and b44's
-close-outs were still running as of 17:57. Phase 6 not started.
+**31 modules / 780 tests / 0 failed** and the desktop's **100 / 0 failed**, with **18 of 18** and
+**19 of 19** mutants killed respectively. Phase 5's code is written and uncommitted; its gate needs an
+idle box, and b44's close-outs were still running as of 17:57. Phase 6 not started, and its docs
+should land with the deploy rather than ahead of it.
 
 **Read the ‡ correction below before quoting this plan's speedup.** The measured makespan gain is
 1.29x, not the 1.7-2.8x derived from lane-idle time.
@@ -390,16 +391,45 @@ from an old-style record.
 `chain_closeout_after_training.sh` is **deleted**, along with its duplicated constants, its heredoc
 completeness check and its three `pgrep` traps. Its one irreducible feature — waiting for a batch's
 trainers to drain so an overnight batch measures itself — becomes `--wait-for-trainers <prefix>`, a
-bounded poll inside the job. Arm discovery (`ls -d savedPolicies/<prefix>[a-z]-*`) becomes
-`--arms <prefix>` in the controller: one tested implementation instead of a shell glob.
+bounded poll inside the job.
+
+**Arm discovery is a positional batch id, not `--arms <prefix>`** (as built): a trailing token that
+is not a policy directory is expanded through `arms_for_prefix`, so `eval_wave.py top50 b45` and
+`eval_wave.py top50 b45a-… b45b-…` mean the same thing. One argument form instead of two, and the
+same spelling works on both hosts — which is the property the whole plan is for. It matches on the
+batch id rather than `startswith`, because `'b44a-x'.startswith('b4')` is true.
 
 ```
 # what an agent runs on the laptop
-PYTHONPATH=. python -u eval_wave.py --chain --arms b45 top50
+PYTHONPATH=. python -u eval_wave.py --chain top50 b45
 
 # what the daemon runs on the desktop
 PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45d-…
 ```
+
+### ‡ Three deviations in phase 5, and why
+
+**1. The daemon carries no protocol numbers, and does not import them either.** The table above says
+"the runner imports those constants rather than defining its own". It cannot: the daemon runs on
+**base** miniconda python with `desktop/` as its working directory, deliberately, so that it can
+start before the `snek` conda env exists — and `eval_plan` needs numpy. The rule is inverted
+instead. `inherited_eval_env` *strips* `EVAL_EPISODES`, `EVAL_SCREEN_EPISODES`,
+`EVAL_MIN_ACHIEVABLE`, `EVAL_ABANDON_FLOOR`, `EVAL_CONFIRM_COUNT` and `EVAL_OUT_SUFFIX` from the env
+a close-out inherits, and lets the tool's own defaults decide. That removes **five** numbers and one
+duplicated assert from `runner.py` rather than the two the plan counted, with no import at all.
+
+**2. The runtime flag stays spelled `auto_hof`, not `chain_hof`.** `parse_runtime_config` rejects the
+whole file on an unknown key and keeps the last-known-good config, so a deploy that landed before the
+`ops` edit would reject every config until someone noticed — and after a daemon restart
+"last-known-good" is the built-in defaults. The rename buys accuracy and costs a deploy hazard on a
+box with no SSH backstop. The comment on the key says what the mechanism now is.
+
+**3. The job id is `<batch>-closeout`, with `-w<k>` from the second wave on**, resolved as the first
+free `k`. Two cases collapse into that one rule: b20's nine waves under one prefix, and a single
+dispatch that splits a batch in two because its arms disagree about their eval-relevant env. The
+second case is why `_closeout_id` also takes the ids claimed **in this same pass** — the ledger
+cannot know about them yet, and without it both groups are handed `<batch>-closeout` and the second
+silently replaces the first. That mutant is killed by a fixture.
 
 ## Phases
 
@@ -411,7 +441,7 @@ PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45
 | **3 done** | multi-policy, multi-lane, greedy dispatch | **met, and it revises the headline claim**: measured makespan **98 s -> 76 s (1.29x)** on an 8/4/2/1 imbalance, 15 units at 4 lanes x 4 workers, lanes running 3/4/4/4 with 7 arm switches. Episode-normalised the gain is **1.12x**, and the reason it is not the 1.7-2.8x this plan predicted is below |
 | 3a | the `wave` block in the payload | not written yet: the per-arm payload is byte-compatible today, and the wave-level ETA is an addition to it |
 | **4 done** (laptop half) | `--chain` | **met**: the recipe and the gate are one definition, `eval_plan.hof_settings` + the module-scope `assert DEFAULT_MIN_ACHIEVABLE < HOF_GATE`; a no-candidate arm returns 0 with no arms built. `runner.py` still carries its own copies — deleting them is phase 5, because the daemon needs `snek2/` on its import path and a deploy |
-| 5 | runner deltas + `desktop/tests/test_runner.py` | a queued b46 close-out dispatches as one job and publishes four policies |
+| 5 **code written, deploy outstanding** | runner deltas + `desktop/tests/test_runner.py` | a queued b46 close-out dispatches as one job and publishes four policies. Code and 100 desktop fixtures are done (19 of 19 mutants killed); the gate needs an **idle box**, and b44's close-outs were still running. Three deviations from the table above, all recorded below |
 | 6 | delete the bash script; update `CLAUDE.md`, `hyperparamTuning.md`, `desktop/README.md` | — |
 
 ## Tests
