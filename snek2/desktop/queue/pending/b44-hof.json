@@ -1,0 +1,29 @@
+{
+  "id": "b44-hof",
+  "type": "eval",
+  "policies": [
+    "b44a-lowlr7-b29b",
+    "b44b-lowlr7-b29a",
+    "b44c-lowlr7-b40b",
+    "b44d-lowlr7-b29c"
+  ],
+  "eval_args": ["above:98"],
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "EVAL_EPISODES": "500",
+    "EVAL_SCREEN_EPISODES": "0",
+    "EVAL_INDEPENDENT": "1",
+    "EVAL_MIN_ACHIEVABLE": "98",
+    "EVAL_OUT_SUFFIX": "_hof500"
+  },
+  "priority": 10,
+  "label": "b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7",
+  "notes": "ONE-TIME MIGRATION SPEC, and the first live run of eval_wave.py. b44's HOF re-measure used to be minted by the daemon from a `hof: pending` marker on each finished closeout record; `_auto_hof_jobs` and that whole marker chain were deleted on 2026-08-19 when the re-measure became stage B of the closeout's own process (`eval_wave.py --chain`). b44 straddles the change -- b44c and b44d carry markers nothing reads any more, and the two closeouts running through the deploy set none at all -- so its re-measure is queued by hand. From b45 on there is nothing to queue: the closeout wave chains into it.\n\nWHY HOF-ONLY AND NOT --chain. Stage A would re-derive the selection, and b44's closeouts ran under `top20` while an auto-closeout now passes `top50`. On continuation arms nearly every checkpoint sits in the mandatory full-length tier whatever N is, so the two selections are probably identical -- but 'probably' here is worth hours of re-measurement, and the chain gets its real first test on b45, which is queued right behind this. So this spec is the old `HOF_EVAL_ARGS`/`HOF_EVAL_ENV` recipe verbatim: `above:98` read out of each arm's own closeout file, 500 episodes, flat, gate 98, into `_hof500`.\n\nWHAT IT STILL EXERCISES. Everything that matters about the wave: four arms in one process, whole-checkpoint units handed to 4 lanes x 4 workers, a lane crossing to another arm's checkpoints under the arch.json guard, and one controller writing every results file and chart. b44's arms will have very unequal amounts of >=98% work -- b42's HOF found almost none -- which is exactly the shape the controller exists for.\n\nInherited env is b44's training env minus SNEK_SEED and SNEK_LEARNING_RATE, which are training-only. The shaping and reward knobs are kept because they change what a reward means, and the wave measures all four arms under one environment."
+}
