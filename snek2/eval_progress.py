@@ -887,6 +887,36 @@ def text_summary(policy_name, state):
                      + stale_lines(state))
 
 
+def fit_summary_panel(boxes, needed_in, figure_height_in):
+    """Re-lay the three panels so the summary block is `needed_in` tall, keeping everything else.
+
+    `boxes` is `[(y0, height), ...]` bottom-up -- summary, lower chart, upper chart -- in figure
+    fraction. Returns the same shape.
+
+    The frame stays **exactly** 9.5 x 8.56 in; only the split moves. That is the property the ‡ note
+    on `savefig` protects (a PNG whose pixel size changes makes the viewer's window resize every
+    frame, and now also makes it rebuild its figure, since the panel box is sized from the image
+    aspect). So the height the summary block gives up goes to the two charts, evenly, and the gaps
+    and margins are preserved: the top of the upper chart lands exactly where it was.
+
+    Never grows the block past what the gridspec gave it -- the capacity is the worst case and the
+    charts should keep anything the text does not need.
+    """
+    (t0, th), (c2_0, c2h), (c1_0, c1h) = boxes
+    if figure_height_in <= 0 or th <= 0:
+        return list(boxes)
+    shrink = th - (needed_in / figure_height_in)
+    if shrink <= 0:
+        return list(boxes)
+    gap_lower = c2_0 - (t0 + th)
+    gap_upper = c1_0 - (c2_0 + c2h)
+    share = shrink / 2.0
+    new_t = (t0, th - shrink)
+    new_c2 = (new_t[0] + new_t[1] + gap_lower, c2h + share)
+    new_c1 = (new_c2[0] + new_c2[1] + gap_upper, c1h + share)
+    return [new_t, new_c2, new_c1]
+
+
 def summary_columns(policy_name, state):
     """(left, right) text blocks for the chart's bottom panel.
 
@@ -935,6 +965,26 @@ PERFECT_AXIS_FLOOR = 50.0
 # fails if the columns would touch, which is the only reliable check -- character-width arithmetic on
 # a font metric is a guess.
 SUMMARY_FONTSIZE = 10.0
+
+# matplotlib's default line spacing for a multi-line `text` artist is 1.2 x fontsize, so one text
+# line of the summary block is this many inches tall. Used to size the block to its content.
+SUMMARY_LINE_IN = SUMMARY_FONTSIZE * 1.2 / 72.0
+
+# Blank lines left under the last line of the summary block. The block's *capacity* is the worst
+# case -- 16 lines, sized for a screened close-out with a four-line stage block and stale processes --
+# and a flat HOF pass uses about 10, so the leftover was rendering as **324 px, 17% of the frame's
+# height**, at the bottom of every chart. In `chart_viewer`'s 2x2 that lands between the rows and
+# reads as a broken layout.
+#
+# One line, not three, because the gap a reader sees is the sum of four things and only two of them
+# are here: this slack, the figure's bottom margin, the last line's own descender space (~1 line
+# tall, since the text box is taller than its ink), and the next panel's top margin. Three slack
+# lines measured out as ~7 rendered lines between the rows.
+SUMMARY_SLACK_LINES = 1
+
+# The frame is a fixed size on every render, whatever the state -- see the ‡ note on `savefig`.
+FIGURE_WIDTH_IN = 9.5
+FIGURE_HEIGHT_IN = 8.56
 # Where the right column starts, in axes fraction. The left column gets everything before it, and
 # the measured clearance at 10pt is ~4 characters on the left and ~2 on the right -- enough for a
 # step number that grows to eight digits, not enough to absorb a new line wider than the ones there.
@@ -987,7 +1037,7 @@ def render(policy_name, state, out_path):
     # ratios -- change one of the four numbers and the others move.
     has_flight = any((flight.get('per_round_perfect') or []) for _, flight in state['active'])
     grid = gridspec.GridSpec(3, 1, height_ratios=[1.68, 1.68, 2.75], hspace=0.35)
-    figure = plt.figure(figsize=(9.5, 8.56))
+    figure = plt.figure(figsize=(FIGURE_WIDTH_IN, FIGURE_HEIGHT_IN))
     next_row = 0
 
     # --- 1. in-flight convergence: running perfect rate vs round -------------------------
@@ -1171,7 +1221,11 @@ def render(policy_name, state, out_path):
     # stays where it was in the previous frame.
     # top=0.925 (was 0.945) leaves room between the suptitle and the top panel's own title — at
     # 0.945 the "In flight: ..." title crowded right up against the "— eval progress" suptitle.
-    figure.subplots_adjust(left=0.07, right=0.985, top=0.925, bottom=0.045)
+    # bottom=0.02 (was 0.045): nothing is drawn below the summary block -- it is a bare text axes --
+    # so this margin is pure gap in `chart_viewer`'s grid. What is left is the cushion for the one
+    # state `fit_summary_panel` cannot help, a block whose content exceeds the gridspec's 16-line
+    # capacity and overflows downward; 0.02 of 8.56in is about one line of it.
+    figure.subplots_adjust(left=0.07, right=0.985, top=0.925, bottom=0.02)
     # SNEK_EVAL_CHART_DPI (default 110) is the render resolution. chart_viewer.py only *magnifies*
     # this PNG, so on a HiDPI (Retina) panel 110 dpi is blown up ~2x and looks soft — the training
     # chart is crisp on the same laptop because under_the_hood renders it at 200 dpi. eval_checkpoints
@@ -1182,6 +1236,20 @@ def render(policy_name, state, out_path):
     # The text panel has no y axis, so the 0.07 left margin the two charts need is 0.66in of dead
     # width it can spend on the columns instead. Set *after* subplots_adjust, which would otherwise
     # overwrite it, and to constants rather than anything state-dependent so the block stays put.
+    #
+    # Its *height* is fitted to the text it actually holds, and hands the difference to the two
+    # charts. The gridspec ratio is the worst case (16 lines: a four-line stage block, a top-5, and a
+    # line per stale process), a flat HOF pass writes about 10, and the leftover was rendering as
+    # 324 px of blank -- 17% of the frame -- under the last line. In a 2x2 viewer window that is the
+    # band between the rows. `fit_summary_panel` keeps the frame size, the gaps and the top of the
+    # upper chart fixed, so nothing about the constant-size property changes.
+    lines = max(left_text.count('\n'), right_text.count('\n')) + 1 + SUMMARY_SLACK_LINES
+    boxes = [(box.y0, box.height) for box in (bottom.get_position(), middle.get_position(),
+                                              top.get_position())]
+    fitted = fit_summary_panel(boxes, lines * SUMMARY_LINE_IN, FIGURE_HEIGHT_IN)
+    for axes, (y0, height) in zip((bottom, middle, top), fitted):
+        box = axes.get_position()
+        axes.set_position([box.x0, y0, box.width, height])
     text_box = bottom.get_position()
     bottom.set_position([0.02, text_box.y0, 0.985 - 0.02, text_box.height])
 

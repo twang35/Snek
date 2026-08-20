@@ -27,6 +27,72 @@ def run(results, complete=True, **extra):
     return {k: v for k, v in payload.items() if not (k == 'episodes_per_checkpoint' and v is None)}
 
 
+# ------------------------------------------------------------------- summary panel geometry
+
+def test_fit_summary_panel_gives_the_slack_to_the_charts():
+    """The summary block's height is the worst case (16 lines); a flat HOF pass writes about 10, and
+    the leftover rendered as 324 px of blank -- 17% of the frame -- under the last line of text. In
+    `chart_viewer`'s 2x2 that is the band between the rows."""
+    # bottom-up: summary at 2.75in, two charts at 1.68in, 0.71in gaps, 8.56in frame
+    h = 8.56
+    boxes = [(0.02, 2.75 / h), (0.02 + (2.75 + 0.71) / h, 1.68 / h),
+             (0.02 + (2.75 + 0.71 + 1.68 + 0.71) / h, 1.68 / h)]
+    fitted = eval_progress.fit_summary_panel(boxes, 1.75, h)
+    (t0, th), (c2_0, c2h), (c1_0, c1h) = fitted
+    assert abs(th * h - 1.75) < 1e-9                       # the block is exactly what it needs
+    assert t0 == boxes[0][0]                               # anchored at the bottom margin
+    freed = 2.75 - 1.75
+    assert abs(c2h * h - (1.68 + freed / 2)) < 1e-9         # split evenly between the charts
+    assert abs(c1h * h - (1.68 + freed / 2)) < 1e-9
+    # the gaps and the top of the upper chart are exactly where they were
+    assert abs((c2_0 - (t0 + th)) * h - 0.71) < 1e-9
+    assert abs((c1_0 - (c2_0 + c2h)) * h - 0.71) < 1e-9
+    assert abs((c1_0 + c1h) - (boxes[2][0] + boxes[2][1])) < 1e-12
+
+
+def test_fit_summary_panel_never_grows_the_block():
+    """The gridspec height is the capacity, and a block that wants more than that overflows into the
+    bottom margin rather than stealing from the charts -- which is what the margin is left for."""
+    h = 8.56
+    boxes = [(0.02, 2.75 / h), (0.4, 1.68 / h), (0.7, 1.68 / h)]
+    assert eval_progress.fit_summary_panel(boxes, 3.5, h) == list(boxes)
+    assert eval_progress.fit_summary_panel(boxes, 2.75, h) == list(boxes)
+    # degenerate inputs are returned untouched rather than raising
+    assert eval_progress.fit_summary_panel(boxes, 1.0, 0) == list(boxes)
+    assert eval_progress.fit_summary_panel([(0.0, 0.0), (0.4, 0.1), (0.7, 0.1)], 1.0, h) == \
+        [(0.0, 0.0), (0.4, 0.1), (0.7, 0.1)]
+
+
+def test_the_rendered_frame_has_almost_no_trailing_blank():
+    """The property, measured on a real render rather than inferred from the geometry: the blank
+    below the last line of text is what lands between the rows of the viewer's grid. It was 324 of
+    1883 px (17%); at three slack lines it was still 233, because the gap a reader sees also includes
+    the figure's bottom margin, the last line's own descender space and the next panel's top margin.
+    """
+    import numpy as np
+    import matplotlib.image as mpimg
+
+    state = eval_progress.summarize([run(
+        [result(step, episodes=500, perfect=490, seconds=250.0) for step in (1000, 2000, 3000)],
+        complete=False, episodes_per_checkpoint=500, measurements_planned=10,
+        measurements_done=3, session_measurements=3, session_episodes=1500,
+        session_seconds=750.0)])
+    out = os.path.join(tempfile.mkdtemp(prefix='chartfit-'), 'frame.png')
+    try:
+        eval_progress.render('b43a-lowlr-b29b', state, out)
+        image = mpimg.imread(out)[:, :, :3]
+        height = image.shape[0]
+        background = image[2, 2]
+        ink = np.where(np.abs(image - background).max(axis=(1, 2)) > 0.02)[0]
+        blank = height - 1 - int(ink.max())
+        # 6%: the fit renders 47 of 941 px (5.0%) at the default 110 dpi, and the figure's own
+        # bottom margin is the other half of this gap -- 0.045 instead of 0.02 puts it at ~70 px, so
+        # a looser bar here would let the margin drift back without failing anything.
+        assert blank < 0.06 * height, '{0} of {1} px blank below the last line'.format(blank, height)
+    finally:
+        shutil.rmtree(os.path.dirname(out), ignore_errors=True)
+
+
 # ------------------------------------------------------------------- best_of
 
 def test_best_of_is_plain_max_when_every_row_has_the_same_length():
@@ -1086,15 +1152,12 @@ def test_points_below_the_axis_floor_are_counted_in_the_panel():
     plt.close(figure)
 
 
-def test_the_two_charts_are_a_fifth_shorter_than_the_text_panel_is_tall():
-    """Pins the requested proportions: equal charts, 20% off each, the text panel taking the space."""
+def render_panel_heights(state, policy='arm'):
+    """The three panels' heights in inches, top-down, off a real render."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    live = run([result(1000, perfect=90)], complete=True, num_workers=4,
-               measurements_planned=1, measurements_done=1)
-    state = eval_progress.summarize([live])
     captured = {}
     real_figure = plt.figure
 
@@ -1106,19 +1169,41 @@ def test_the_two_charts_are_a_fifth_shorter_than_the_text_panel_is_tall():
     directory = tempfile.mkdtemp()
     plt.figure = capture
     try:
-        eval_progress.render('arm', state, os.path.join(directory, 'c.png'))
+        eval_progress.render(policy, state, os.path.join(directory, 'c.png'))
     finally:
         plt.figure = real_figure
         shutil.rmtree(directory, ignore_errors=True)
     figure = captured['figure']
-    heights = [axis.get_position().height * figure.get_size_inches()[1]
-               for axis in figure.axes]
+    size = figure.get_size_inches()
+    heights = [axis.get_position().height * size[1] for axis in figure.axes]
     plt.close(figure)
+    return heights, (round(float(size[0]), 3), round(float(size[1]), 3))
+
+
+def test_the_charts_take_back_whatever_the_summary_block_does_not_need():
+    """Was `the two charts are a fifth shorter than the text panel is tall`, which pinned the
+    gridspec's 1.68/1.68/2.75 as the *final* layout. Those ratios are now the **capacity**: the
+    summary block is fitted to its own text and hands the difference back to the two charts, so a
+    flat run renders charts taller than their share and a text panel shorter than its own. What still
+    has to hold is that the charts stay equal, that they only ever grow, and that the frame does not
+    move -- the constant-size property the viewer's window depends on.
+    """
+    flat = eval_progress.summarize([run([result(1000, perfect=90)], complete=True, num_workers=4,
+                                        measurements_planned=1, measurements_done=1)])
+    heights, size = render_panel_heights(flat)
+    assert size == (9.5, 8.56), size
     assert round(heights[0], 2) == round(heights[1], 2), heights
-    # 2.10in each before 2026-08-19.
-    assert abs(heights[0] - 0.8 * 2.10) < 0.03, heights
-    # ...and the text panel is the one that grew, not the figure.
-    assert heights[2] > 1.15 * 2.00, heights
+    # 2.10in each before the 20% cut of 2026-08-19, 1.73in as the gridspec now hands them out.
+    share = 1.73
+    assert heights[0] > share, 'the charts did not take the block\'s slack: {0}'.format(heights)
+    # The block is fitted to its lines, so a flat run's is well under the worst-case capacity.
+    lines = 8
+    assert heights[2] < lines * eval_progress.SUMMARY_LINE_IN + 0.2, heights
+
+    # ...and the busier the block, the more of it comes back off the charts.
+    busy, _ = render_panel_heights(busy_state('confirm'))
+    assert busy[2] > heights[2] + 0.5, (busy, heights)
+    assert busy[0] < heights[0] - 0.2 and busy[0] >= share - 0.02, (busy, heights)
 
 
 # ------------------------------------- the text columns must not collide (2026-08-19)
@@ -1207,15 +1292,28 @@ def test_both_columns_fit_inside_the_text_panel():
     assert right.y0 >= 0.0, 'right column overflows the panel: y0 {0:.3f}'.format(right.y0)
 
 
-def test_the_text_panel_holds_sixteen_lines_at_the_chosen_size():
-    """Capacity, in the two numbers that set it -- panel inches and point size.
+def test_the_text_panel_is_no_taller_than_the_block_it_draws():
+    """Was `holds sixteen lines at the chosen size`, which pinned the panel's *capacity*: the box was
+    a fixed gridspec ratio sized for the documented worst case, so the only question was whether the
+    worst case fit. Since `fit_summary_panel` (2026-08-19) the panel is sized **to** the block it
+    actually draws, and the failure mode flipped -- a panel taller than its text is the 324 px of
+    blank the fit exists to remove. `test_both_columns_fit_inside_the_text_panel` is the other side;
+    this is the one that would regress if the fit were reverted or bypassed.
 
-    16 lines is the documented worst case (a 13-line left column, and a right column of 12 plus one
-    line per stale process). matplotlib's default line spacing is 1.2x the point size.
+    Measured against the drawn extents rather than a line count, because a literal 16 would now pin
+    how many lines `busy_state` happens to produce instead of the layout rule.
     """
-    _, _, inches = render_text_extents(busy_state())
-    needed = 16 * eval_progress.SUMMARY_FONTSIZE * 1.2 / 72.0
-    assert inches >= needed, '{0:.2f}in of panel for {1:.2f}in of text'.format(inches, needed)
+    left, right, inches = render_text_extents(busy_state())
+    line = eval_progress.SUMMARY_FONTSIZE * 1.2 / 72.0
+    drawn = max(left.height, right.height) * inches   # axes fraction of the panel -> inches
+    slack = inches - drawn
+    assert slack >= 0, 'the block overflows its panel by {0:.2f}in'.format(-slack)
+    # 2.5 lines, as a literal: one is the slack the layout means to leave, and the rest is the
+    # difference between a text artist's ink box and its line box. Reading SUMMARY_SLACK_LINES here
+    # instead would move the bar with the setting, so raising the slack could not fail this.
+    allowed = 2.5 * line
+    assert slack <= allowed, '{0:.2f}in of blank under a {1:.2f}in block (allowed {2:.2f}in)'.format(
+        slack, drawn, allowed)
 
 
 def test_the_summary_font_is_larger_than_the_axis_labels():
