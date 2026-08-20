@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T19:53:01",
-  "ts": 1787194381.5304213,
+  "iso": "2026-08-19T19:53:34",
+  "ts": 1787194414.2799578,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (2 arms)"
@@ -44,7 +44,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 50963
+      "elapsed_s": 50996
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -57,7 +57,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 50963
+      "elapsed_s": 50996
     }
   ],
   "ledger": {
@@ -309,8 +309,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    8.62158203125,
-    8.53369140625,
-    8.30419921875
+    7.8447265625,
+    8.35986328125,
+    8.25390625
   ]
 }
