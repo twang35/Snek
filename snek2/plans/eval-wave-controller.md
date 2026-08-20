@@ -1,11 +1,13 @@
 # One wave, one controller: `eval_wave.py`
 
 **Status:** proposed 2026-08-19. Scope and the `--chain` decision approved in conversation the same
-day. **Phases 0-2 are written; phase 3's code is written and its gate is outstanding.** Phases 0 and
-1 are committed (`eval_plan.py` extracted, 29 definitions moved byte-identically; the cross-arm
+day. **Phases 0-2 and 4 are written; phase 3's code is written and its gate is outstanding.** Phases
+0 and 1 are committed (`eval_plan.py` extracted, 29 definitions moved byte-identically; the cross-arm
 `load` guard landed, and its premise is confirmed by measurement — **a lane switches arms in
-0.00 s**). `eval_wave.py` and its 25 fixtures are **uncommitted pending review**; suite **31 modules
-/ 772 tests / 0 failed**, and 12 of 12 mutants killed. Phases 4-6 not started.
+0.00 s**). `eval_wave.py`, `--chain` and their 33 fixtures are **uncommitted pending review**; suite
+**31 modules / 780 tests / 0 failed** plus the desktop's 89, and **18 of 18 mutants killed**. Phase 5
+(the runner deltas, which is where `runner.py`'s duplicate gate constants actually go away) and
+phase 6 not started, and phase 5 needs an idle box.
 
 **One line:** replace the four independent `eval_checkpoints.py` processes — and the *two* separate
 things that orchestrate them, a bash script on the laptop and the runner daemon on the desktop —
@@ -231,6 +233,24 @@ came out `complete`, selects `above:98` from that file and runs 500 episodes fla
 than defining its own — which is what removes both copies. A policy with no qualifying checkpoint
 contributes no units and is not an error; that is the normal outcome for most arms.
 
+**As built** (2026-08-19), three details are worth having written down:
+
+- **The recipe is a function of stage A's settings, not a constant dict.** `eval_plan.hof_settings`
+  overrides what the recipe fixes — 500 episodes, flat, gate 98, `_hof500` — and *carries over* what
+  it does not: the worker count and `EVAL_RESUME`, which belong to how the wave was launched rather
+  than to the protocol. `runner.py`'s `HOF_EVAL_ENV` is a constant dict and therefore silently
+  discards both.
+- **The two suffixes compose rather than replace**, and `source_suffix` is a separate field from
+  `suffix`. Stage B reads `<suffix>` and writes `<suffix>_hof500`, so a verification wave launched
+  with `EVAL_OUT_SUFFIX=_check` cannot land on the real `_hof500` file. A mutant that spells stage
+  B's source as its own output survived one fixture and was only killed by a second one written with
+  a non-empty suffix — the empty string is also `select_checkpoints_above`'s default, so the obvious
+  test cannot tell the two apart.
+- **Stage B's arm list comes from the *files*, not from stage A's arms in memory.** An arm the wave
+  skipped because everything was already measured is finished, not failed, and is owed its
+  re-measure all the same; an arm whose file is missing, unparseable or `complete: false` is skipped,
+  which is the same flag `select_checkpoints_above` refuses to read from.
+
 ### Resume
 
 `EVAL_RESUME` and `load_finished_results` work unchanged, per policy, because the file format and the
@@ -337,7 +357,7 @@ PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45
 | **2 done** | `eval_wave.py`, one policy, one lane | **met**: on `b43a` steps 1447000-1449000 at 4 episodes, the wave's file and `eval_checkpoints.py`'s have identical key order, identical row-key order and identical values for all 20 protocol fields (only the stochastic rates differ) |
 | 3 code written, **gate outstanding** | multi-policy, multi-lane, greedy dispatch, `wave` block | measured makespan against a recorded 4-process baseline — needs a real wave, so it waits for b44's close-outs to clear the desktop |
 | 3a | the `wave` block in the payload | not written yet: the per-arm payload is byte-compatible today, and the wave-level ETA is an addition to it |
-| 4 | `--chain` | gate assert in one place; a no-candidate arm exits clean |
+| **4 done** (laptop half) | `--chain` | **met**: the recipe and the gate are one definition, `eval_plan.hof_settings` + the module-scope `assert DEFAULT_MIN_ACHIEVABLE < HOF_GATE`; a no-candidate arm returns 0 with no arms built. `runner.py` still carries its own copies — deleting them is phase 5, because the daemon needs `snek2/` on its import path and a deploy |
 | 5 | runner deltas + `desktop/tests/test_runner.py` | a queued b46 close-out dispatches as one job and publishes four policies |
 | 6 | delete the bash script; update `CLAUDE.md`, `hyperparamTuning.md`, `desktop/README.md` | — |
 
