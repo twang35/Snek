@@ -289,6 +289,11 @@ class Runner:
         Driven entirely off the ledger, so it survives a daemon restart: the `closeout: pending`
         markers and each training's stored `env` both persist.
 
+        **What stops a re-measure is `_measured_policies`, not the job id.** A training's
+        `closeout: pending` marker is never cleared, so the marker set says "this arm was trained",
+        not "this arm still needs measuring"; the id was doing that job by accident, and a
+        batch-level id broke it -- see `_measured_policies`.
+
         **Arms are grouped by their inherited env as well as by batch**, because a wave is one
         process with one environment: the shaping and reward knobs change what `avg_reward` means, so
         two arms that disagree about them must not be measured under a single setting. Normally a
@@ -296,9 +301,12 @@ class Runner:
         """
         if not self.runtime.get('auto_closeout', True):
             return []
+        measured = self._measured_policies()
         groups = {}
         for rec in sorted(self.ledger.values(), key=lambda r: str(r.get('policy'))):
             if rec.get('closeout') != 'pending' or not rec.get('policy'):
+                continue
+            if rec['policy'] in measured:
                 continue
             env = inherited_eval_env(rec.get('env'))
             key = (batch_of(rec['policy']), tuple(sorted(env.items())))
@@ -306,7 +314,7 @@ class Runner:
             groups[key]['policies'].append(rec['policy'])
         jobs, taken = [], set()
         for (batch, _), group in sorted(groups.items(), key=lambda kv: kv[1]['policies'][0]):
-            eval_id = self._closeout_id(batch, group['policies'], taken)
+            eval_id = self._closeout_id(batch, taken)
             if eval_id is None:
                 continue
             taken.add(eval_id)
@@ -325,43 +333,66 @@ class Runner:
                             priority=AUTO_CLOSEOUT_PRIORITY))
         return jobs
 
-    def _closeout_id(self, batch, policies, taken=()):
-        """`<batch>-closeout`, or `<batch>-closeout-w<k>` for a later wave of the same batch, or
-        None when this exact wave is already running or terminal.
+    def _measured_policies(self):
+        """Every policy a closeout wave has already measured, or is measuring right now.
+
+        Read off the closeout *records*, never off the trainings' markers. A training's
+        `closeout: pending` marker is set when it finishes and is never cleared, so the marker set
+        is a list of everything ever trained under auto-closeout -- 64 arms on this box. What used
+        to stop a re-measure was incidental: the id `<policy>-closeout` was already taken, and a
+        taken terminal id read as "done". Grouping a batch into one wave changes the id to
+        `<batch>-closeout`, which had never been used for b20-b44, so on the first restart after the
+        wave controller shipped the daemon forecast **thirteen** closeout waves it had already run,
+        b20's at 12 arms.
+
+        Covering by *policy* rather than by id fixes three things at once: the legacy per-arm ids,
+        an arm mid-migration (b44's two running per-arm close-outs), and a batch measured in several
+        waves -- b20's nine waves of four all wrote `<policy>-closeout` records, and without this a
+        later wave's group would re-measure every earlier wave's arms under `-w<k>`.
+
+        `failed` counts as measured, matching the id-based rule it replaces: a wave that failed is
+        not retried automatically, because the reason is usually not transient. `interrupted` does
+        not, so a reboot's half-finished wave is regrouped and relaunched with `EVAL_RESUME`.
+        """
+        covered = set()
+
+        def add(job_id, policies):
+            if _CLOSEOUT_ID_RE.search(str(job_id)):
+                covered.update(str(p) for p in policies if p)
+
+        for job_id, rj in self.running.items():
+            add(job_id, rj.job.policies or [rj.policy])
+        for job_id, rec in self.ledger.items():
+            if rec.get('state') in TERMINAL:
+                add(job_id, rec.get('policies') or [rec.get('policy')])
+        return covered
+
+    def _closeout_id(self, batch, taken=()):
+        """`<batch>-closeout`, or `<batch>-closeout-w<k>` for a later wave of the same batch.
 
         `<batch>-closeout` alone is not enough, and the case is real: **b20 ran 36 arms under one
-        prefix, in nine waves of four.** Under a single id the second wave would be skipped as
-        already-terminal and never measured. `k` counts up from 2 to the first free id, which does
-        not churn between polls because ledger records are never deleted -- and the grouping that
-        feeds it only happens at dispatch, when the marker set is closed.
+        prefix, in nine waves of four.** Each wave needs its own id or the second one collides with
+        the first. `k` counts up from 2 to the first id that is free, which does not churn between
+        polls because ledger records are never deleted.
 
-        Returns None when the id whose *policy set* matches this one is already accounted for, so a
-        still-'pending' marker cannot launch a second copy of the same wave.
+        Free means: not claimed in this same pass, not running, and either absent from the ledger or
+        **non-terminal** -- an `interrupted` wave is deliberately relaunched under its own id so its
+        completed rows are still there to resume from. Deciding *whether* there is anything to
+        measure is `_measured_policies`' job, not this one's; by the time a group reaches here its
+        arms are known to be unmeasured.
 
         `taken` is the ids already claimed **in this same pass**, which the ledger cannot know about
         yet. It matters whenever one batch splits into two waves for disagreeing envs: without it
         both groups are handed `<batch>-closeout` and the second silently replaces the first.
         """
-        wanted = set(policies)
         base = '{0}-closeout'.format(batch)
         for index in range(1, 100):
             eval_id = base if index == 1 else '{0}-w{1}'.format(base, index)
-            if eval_id in taken:
+            if eval_id in taken or eval_id in self.running:
                 continue
-            if eval_id in self.running:
-                # In flight under this id. Whether or not its arm set matches, there is nothing to
-                # launch: a wave already occupies the box and the barrier means nothing else starts.
-                return None
-            prior = self.ledger.get(eval_id)
-            if prior is None:
-                return eval_id
-            if prior.get('state') in TERMINAL:
-                # Taken by a finished wave. If it measured these same arms the work is done;
-                # otherwise this is a later wave of the batch and needs the next id.
-                if set(prior.get('policies') or [prior.get('policy')]) == wanted:
-                    return None
+            if self.ledger.get(eval_id, {}).get('state') in TERMINAL:
                 continue
-            return eval_id      # non-terminal (pending / interrupted): relaunch under this id
+            return eval_id
         return None
 
     def _scan_pending(self):

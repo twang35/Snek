@@ -398,9 +398,48 @@ def test_auto_closeout_skips_when_eval_done_running_or_unmarked():
                                'policies': ['p1']}
     # marked, but its closeout is currently running -> skip
     r.ledger['p2'] = {'state': 'done', 'type': 'train', 'policy': 'p2', 'closeout': 'pending'}
-    r.running['p2-closeout'] = object()
+    r.running['p2-closeout'] = _FakeRJ('p2-closeout', 'eval', 'p2', alive=True, policies=['p2'])
     ids = [j.id for j in r._auto_closeout_jobs()]
     assert ids == [], ids
+
+
+def test_a_legacy_per_arm_closeout_still_counts_as_measured():
+    # The marker on a finished training is never cleared, so what stops a re-measure has to be the
+    # closeout records. Before 2026-08-19 it was the *id*: `<policy>-closeout` was taken, so the
+    # work read as done. Grouping the batch changed the id to `<batch>-closeout`, which no b20-b44
+    # arm had ever used -- and 64 finished trainings on the desktop instantly read as unmeasured,
+    # b20's forecast wave alone carrying 12 arms it had already measured one at a time.
+    r = _runner()
+    for arm in ('b20a-x', 'b20b-x', 'b20c-x', 'b20d-x'):
+        r.ledger[arm] = {'state': 'done', 'type': 'train', 'policy': arm, 'closeout': 'pending'}
+        r.ledger[arm + '-closeout'] = {'state': 'done', 'type': 'eval', 'policy': arm}
+    assert r._auto_closeout_jobs() == []
+
+
+def test_only_the_unmeasured_arms_of_a_part_measured_batch_form_the_wave():
+    # b44's shape at the migration: two arms closed out under the old per-arm ids, two still to go.
+    r = _runner()
+    for arm in ('b44a-x', 'b44b-x', 'b44c-x', 'b44d-x'):
+        r.ledger[arm] = {'state': 'done', 'type': 'train', 'policy': arm, 'closeout': 'pending'}
+    r.ledger['b44a-x-closeout'] = {'state': 'done', 'type': 'eval', 'policy': 'b44a-x'}
+    r.running['b44b-x-closeout'] = _FakeRJ('b44b-x-closeout', 'eval', 'b44b-x', alive=True)
+    jobs = r._auto_closeout_jobs()
+    assert [j.id for j in jobs] == ['b44-closeout'], [j.id for j in jobs]
+    assert jobs[0].policies == ['b44c-x', 'b44d-x'], jobs[0].policies
+
+
+def test_a_failed_closeout_is_not_retried_but_an_interrupted_one_is():
+    # Same split the id-based rule had: a failure is usually not transient, while `interrupted`
+    # means a reboot cut the wave short and its finished rows are still on disk to resume from.
+    r = _runner()
+    r.ledger['b50a-x'] = {'state': 'done', 'type': 'train', 'policy': 'b50a-x',
+                          'closeout': 'pending'}
+    r.ledger['b50-closeout'] = {'state': 'failed', 'type': 'eval', 'policies': ['b50a-x']}
+    assert r._auto_closeout_jobs() == []
+    r.ledger['b50-closeout']['state'] = 'interrupted'
+    jobs = r._auto_closeout_jobs()
+    assert [j.id for j in jobs] == ['b50-closeout'], [j.id for j in jobs]
+    assert jobs[0].env.get('EVAL_RESUME') == '1', jobs[0].env
 
 
 def test_auto_closeout_disabled_yields_nothing():
