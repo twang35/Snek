@@ -854,6 +854,38 @@ after 7 hours as hung.** The remaining lever is the **selector, not the worker c
 is what the HOF pass already does. Raising `EVAL_WORKERS` does not help much here, because the cost is
 checkpoint *count* times per-checkpoint restore, not episodes per checkpoint.
 
+**‡ But part of those hours was never measurement, and the diagnostic is two `grep -c`s** (fixed
+2026-08-20, `adbec2904`). A wave's *lane* prints `N episodes in Xs` when it finishes a measurement; the
+*controller* prints the `[ n/N ]` row when it folds one. **Those counts should track each other. When
+lane completions run ahead, the controller is the bottleneck, not the box:**
+
+```
+grep -c "episodes in" <log>          # measurements the lanes have finished
+grep -cE "^\[ *[0-9]+/[0-9]+" <log>  # measurements the controller has folded
+```
+
+The gap was real on both hosts. `on_round` fired once per `EVAL_WORKERS` episodes — 125 times for a
+500-episode measurement — and each call rebuilt every banked row and re-serialised the whole result file,
+five payloads deep in a wave because `wave_eta_seconds` prices the wave off *all* the arms. Cost is
+O(rows) per write and O(episodes) writes, so the two multiply: **58 s of single-threaded bookkeeping per
+measurement at 552 rows, against the 46 s four lanes need to produce one.** So the controller overtakes
+its own lanes partway through a long arm, and once the queue drains it is the only thing running —
+b43's HOF pass finished all 767 measurements and then folded alone for 90 minutes with 16 workers idle
+and the machine 95% free. b44's, at 2,235 measurements, was heading for ~30 h of which half was
+bookkeeping.
+
+`eval_plan.WriteGate` now bounds progress writes by wall clock and `eval_plan.RowCache` memoises
+`build_row` per step, taking a write from 468 ms to 43 ms and the per-measurement cost from 58 s to 1 s.
+Both write paths use them, so this applies to `eval_checkpoints.py` too. Three things to carry:
+
+- **A running eval that looks slow is not necessarily slow.** Check the two counts before adding workers.
+- **All 16 workers idle at 0% while the controller burns a core is the signature.** `ps -o time` deltas
+  and `sample`/`top` on a worker settle it in a minute; a worker parked in `read` is waiting for a
+  command that its lane is too busy to send.
+- **A killed wave loses only what has not been folded**, because a finished measurement forces its
+  write — the unfolded ones live in the controller's outbox and nowhere else. Read the gap before
+  killing: it is exactly what a resume will have to re-measure.
+
 **`EVAL_MIN_ACHIEVABLE=97` abandons a checkpoint mid-measurement** once it cannot reach 97% even if
 every remaining episode is perfect — at 100 episodes, once more than 3 have failed (it was 95, and "more
 than 5", until 2026-08-19). Full-length work drops further than the **31%** of a flat pass measured at the
