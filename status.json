@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T17:39:25",
-  "ts": 1787186365.406989,
+  "iso": "2026-08-19T17:39:58",
+  "ts": 1787186398.4149685,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (3 arms)"
@@ -42,7 +42,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 42947
+      "elapsed_s": 42980
     },
     {
       "id": "b44b-lowlr7-b29a-closeout",
@@ -52,7 +52,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 42947
+      "elapsed_s": 42980
     },
     {
       "id": "b44c-lowlr7-b40b-closeout",
@@ -62,7 +62,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 42947
+      "elapsed_s": 42980
     }
   ],
   "ledger": {
@@ -324,8 +324,8 @@
   },
   "disk_free_gb": 125.6,
   "load_avg": [
-    13.11767578125,
-    12.9541015625,
-    13.400390625
+    12.86572265625,
+    12.88427734375,
+    13.361328125
   ]
 }
