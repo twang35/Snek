@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-19T21:10:47",
-  "ts": 1787199047.8248985,
+  "iso": "2026-08-19T21:10:52",
+  "ts": 1787199052.1435926,
   "at_a_glance": {
     "running": [
       "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- hof (4 arms)"
@@ -45,8 +45,8 @@
       "pid": 2560417,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2125
+      "steps_per_sec": null,
+      "elapsed_s": 2130
     }
   ],
   "ledger": {
