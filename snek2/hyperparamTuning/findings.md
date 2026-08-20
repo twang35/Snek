@@ -47,6 +47,9 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
+| **‡‡ The record is a 500/500** — `b44b-lowlr7-b29a` @1886k, a *continuation* of `b29a` @1347k at `lr 1e-7` | **measured 2026-08-20**, gate 98, flat. First flawless 500-episode pass in the project, against `b29b` @1447k's 495/500. Its batch's HOF pass was ~53% done, and it is **not promoted** — see below |
+| **‡‡ Continuing a champion at a lower rate works: 1e-5 → 1e-6 → 1e-7 gave 4 → 187 → 293+ rows ≥98%/500** | **established for b43 2026-08-20**, `b44` mid-pass. Byte-identical starting weights, 4 of 4 seeds on ≥98%/100. `b45` at 1e-8 tests monotonicity. See below |
+| **‡‡ Among *statistically tied* checkpoints, nothing predicts which continues better** — the 99.0% record's continuation lost to the 98.4% one's, 16 rows to 170 | **two independent rungs agree**, 2026-08-20. /500 rate ranks the four at ρ=0.80 and pooled eq at 0.20, but /500 swaps exactly the top two — where the 10x gap is. **Continue several candidates**, don't rank tied ones. See below |
 | **The record is 97.6%** — `b18b-tgt1000seed2` @1588k, **683/700 fresh episodes** (CI 96.1-98.5) | **measured 2026-08-09**. Beats `b17b`'s 94.24%/5120 by **+3.33 pp, p=0.0002**, intervals **non-overlapping** — the first move in the ceiling that is a different class, not a better sample |
 | **A selected high can survive re-measurement** — @1588k was selected at 98/100 and re-measures at 97.4%/500, a **0.6 pp** change | **first instance**, 2026-08-09. Every prior one shrank (99→94.2, 97→93.0, 96→93.5, 96→~94); across nine batch-18 checkpoints >95% the mean shrinkage was **−5.2 pp**, so this is an outlier, not a new norm |
 | The record is a **narrow peak, not a region** — @1578k is 10k steps away and reads **91.6%/500** | **standing caveat** — a position-chosen grid is still the only way to claim a region |
@@ -137,6 +140,81 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
 
 ---
+
+## ‡‡ Continuing a champion works and lower is better — but the best checkpoint was the wrong one to continue (b42/b43/b44, 2026-08-20)
+
+**Settled for `b43`, corroborated mid-pass by `b44`.** Nothing in this project had ever been continued from its
+own best checkpoint. Three batches now have, from the same four `b29`/`b40` checkpoints on the same seeds, with
+learning rate the only difference:
+
+| rung | rate | rows ≥98%/500 | best /500 |
+|---|---|---|---|
+| `b42` | 1e-5 — the rate they were trained at | **4** | 98.4% |
+| `b43` | **1e-6** | **187** | 99.6% (`b43b` @1661k, 498/500) |
+| `b44` | **1e-7** | **293 at ~53% of its pass** | **100.0%** (`b44b` @1886k, **500/500**) |
+
+**A champion that keeps training at a low enough rate improves; at its original rate it decays.** 4 → 187 held
+checkpoints from byte-identical starting weights is not a marginal effect, and `b43` beat `b42` on ≥98%/100 on
+4 of 4 seeds. The replay buffer was carried over with the weights — the same four checkpoints fell 80% → 50%
+perfect in 5k steps when it was *not*, so the buffer copy is load-bearing, not incidental.
+
+**That lower is monotonically better down to 1e-7 rests on one incomplete pass.** `b45` at `1e-8` is the rung
+that says whether the ladder is monotone or has an optimum, and it is queued.
+
+### The best starting checkpoint was not the best one to continue — on two rungs independently
+
+| continues | its own /500 rate | `b43` held ≥98%/500 | `b44` held (mid-pass) |
+|---|---|---|---|
+| `b29b` @1447k | **99.0%** — the project record | 16 | 105 |
+| `b29a` @1347k | 98.4% — second of the four | **170** | **155** |
+| `b40b` @1513k | 98.2% | 1 | 33 |
+| `b29c` @1396k | 97.1% | 0 | 0 |
+
+**The record checkpoint's continuation lost to the second-best checkpoint's — by 10x on `b43`, by 1.5x on
+`b44`'s half-finished pass.** So **a checkpoint's measured /500 rate does not predict how well it continues**,
+and the ranking used to choose these four arms was the wrong ranking for the question. Two rungs is not proof,
+but they are independent draws that agree at both ends: the same seed wins twice and the same seed holds nothing
+twice.
+
+This is the third independent result against treating b29's record region as a property of the *config*. It did
+not replicate on fresh seeds (`b37`, 0 of 4), did not survive an added shaping term (`b40`, 1 of 4), and does
+not reproduce as the best *continuation* among its own siblings. See [the 2026-08-18
+correction](#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading).
+
+**Read these counts per seed, never pooled.** One seed carries **91%** of `b43`'s 187 and 53% of `b44`'s so far,
+and the weakest seed held nothing on any rung. The rate multiplies what a seed already had; it does not create
+it. On `b43` that seed even **inverted the batch** — `b42d` held 3 where `b43d` held 0, and `b43d` tied `b42d`
+on pooled equal-effort (93.50 against 93.54) — so the headline direction has a per-seed exception on the metric
+with the fewest rows behind it.
+
+### The failure is at the *top* of the ranking, not across it — and no available metric fixes it
+
+Both rungs produced the **same** ordering of the four sources, so continuation quality is a stable property of
+the starting checkpoint. The question is which pre-selection metric sees it:
+
+| source | /500 rate (rank) | pooled eq (rank) | `b43` held (rank) | `b44` held (rank) |
+|---|---|---|---|---|
+| `b29a` @1347k | 98.4% (2) | **89.76 (1)** | **170 (1)** | **155 (1)** |
+| `b29b` @1447k | **99.0% (1)** | 87.14 (4) | 16 (2) | 105 (2) |
+| `b40b` @1513k | 98.2% (3) | 89.52 (3) | 1 (3) | 33 (3) |
+| `b29c` @1396k | 97.1% (4) | 89.68 (2) | 0 (4) | 0 (4) |
+
+**Spearman against held count: /500 rate 0.80, pooled equal-effort 0.20** — identical on both rungs. So the
+/500 maximum is *not* a bad ordering; it places the bottom two exactly right and swaps only the top two. But
+**that swap is the entire result**, because #1 and #2 differ by a factor of 10 in outcome. The metric fails
+precisely where the decision is made.
+
+**Pooled equal-effort is worse here, so do not substitute it.** It ranks `b29c` — which held nothing on any
+rung — second, and demotes the record checkpoint to fourth. Earlier drafts of this note recommended it; that
+was wrong.
+
+**The practical rule, then, is not a better metric.** The top two candidates were **99.0% and 98.4% over 500
+episodes — statistically tied**, CIs overlapping — and their continuations differed 10x. Nothing measurable
+before the fact separated them. So **continue more than one candidate**, and treat the choice among
+statistically tied checkpoints as a coin flip rather than a ranking. Both `b43` and `b44` happened to include
+the winner only because they took the top four rather than the top one.
+
+Batch write-up: [`completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue).
 
 ## ‡ The C51 learning-rate screen: the seed spread beat the rate effect, and time-to-first-win predicted nothing
 

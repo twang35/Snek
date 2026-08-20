@@ -205,10 +205,10 @@ launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 
 | arm | continues | from | its 500-ep rate there | training-self-eval so far | `b42` best-30 / `sef` |
 |---|---|---|---|---|---|
-| `b43b` | `b29a-chase10g75seed1` | @1347k | 98.4% | best-30 **100.0** @1667k, `sef` 99.6, recent-30 95.0 | its `b42` twin: 97.3 / 97.9 |
-| `b43a` | `b29b-chase10g75seed2` | @1447k | **99.0%** (the project record) | best-30 98.7 @1527k, `sef` 99.6, recent-30 91.7 | 97.3 / **87.0** |
-| `b43c` | `b40b-chasefree10g75seed2` | @1513k | 98.2% | best-30 98.3 @1701k, `sef` **99.8**, recent-30 95.3 | **93.3** / 91.2 |
-| `b43d` | `b29c-chase10g75seed3` | @1396k | 97.1% (378 ep, gate-abandoned) | best-30 98.3 @1539k, `sef` 97.9, recent-30 94.7 | 97.7 / 95.9 |
+| `b43b` | `b29a-chase10g75seed1` | @1347k | 98.4% | best-30 **100.0** @1667k, `sef` **99.5**, recent-30 96.3 | its `b42` twin: 97.3 / 97.9 |
+| `b43a` | `b29b-chase10g75seed2` | @1447k | **99.0%** (the record at the time) | best-30 98.7 @1527k, `sef` 96.5, recent-30 94.0 | 97.3 / **87.0** |
+| `b43c` | `b40b-chasefree10g75seed2` | @1513k | 98.2% | best-30 98.7 @**2803k**, `sef` 98.5, recent-30 88.0 | **93.3** / 91.2 |
+| `b43d` | `b29c-chase10g75seed3` | @1396k | 97.1% (378 ep, gate-abandoned) | best-30 98.3 @1539k, `sef` 96.6, recent-30 90.3 | 97.7 / 95.9 |
 
 **All four reached the 3M cap** (+1487-1653k past seed) and the close-out launched at 01:07, still running.
 Final training numbers: `best_perfect30` **98.3-100.0**, `sef` **96.5-99.5**, `max_single_eval` 100,
@@ -220,11 +220,17 @@ seed checkpoint**, a 30-eval window with no imperfect game in it. So `1e-6` is n
 80% → 50% perfect in 5k steps when the replay buffer was *not* carried over**, and holding 95-100% here is what
 the buffer copy bought.
 
-**Against `b42`, the seed-matched `1e-5` control, `b43` leads on 4 of 4 seeds on every metric** — `best_perfect30`
-98.3-100.0 against 93.3-97.7, `sef` 97.9-99.8 against 87.0-97.9, and banded perfect rate +4.7/+7.1/+6.1 pp over
+**Against `b42`, the seed-matched `1e-5` control, `b43` leads on 4 of 4 seeds on every *training* metric** —
+`best_perfect30` 98.3-100.0 against 93.3-97.7, `sef` 96.5-99.5 against 87.0-97.9, and banded perfect rate +4.7/+7.1/+6.1 pp over
 the 100-200k, 200-300k and 300-385k bands past seed. The full banded table is in
 [batch 42's section below](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-at-177-191m-closed-out-and-hof-500d-it-decays-and-its-surviving-98-checkpoints-are-its-own-starting-weights),
 which is where the pair's result lives since `b42` is the arm that moved. **`b44`** extended the ladder to **`1e-7`** and won on 4 of 4 seeds.
+
+**On the deeper instruments the lead is 4 of 4 but the margin is not uniform, and one seed inverts.** `b43`
+takes ≥98%/100 on all four seeds (607/166/133/83 against 27/17/6/48), but pooled equal-effort is **3 of 4 plus a
+dead heat** — `b43d` 93.50 against `b42d` 93.54 — and ≥98%/**500** is 3 of 4 with the `b29c` seed *reversed*,
+`b42d` holding 3 where `b43d` held 0. Per-seed table in
+[`completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue).
 
 **Do not read these best-30 numbers against the 500-episode column beside them.** A 10-episode self-eval
 averaged over 30 evals and a flat 500-episode measurement are different instruments, and the 500-ep column is
@@ -233,7 +239,7 @@ comparison that means something is `b43` against `b42`, which starts from byte-i
 here is training self-eval; the close-outs will be the real numbers.
 
 **`sef` is not comparable with any other batch in this file.** It is the share of an arm's *own* evals above
-80% perfect, and these arms started at ~98% instead of 0 — so 99.8 says "it never dropped", not "it learned
+80% perfect, and these arms started at ~98% instead of 0 — so 99.5 says "it never dropped", not "it learned
 fast". Only `b42`'s `sef` is a fair reference, and it is in the last column of the table above; `b44`'s will be
 the other one. **`b42` and `b43` are also not at a common step horizon** (`b42` was stopped at +385-421k,
 `b43` is past +541k) and `sef` is a fraction of each arm's own evals, so the banded comparison — not this
@@ -268,9 +274,14 @@ carrying the candidate record at ~25% of the pass; it finished at 99.4% and was 
 was the count and not the maximum, and that is exactly how it turned out — see
 [`runs.md`](runs.md#-b43s-hof-500-is-done-and-b44s-half-finished-one-already-holds-a-500500).
 
+**`b43` is finished on all three instruments, and its canonical write-up is now in
+[`completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue)** — the per-seed `b42` comparison, the pooled equal-effort figures
+and the cost breakdown live there. This section keeps the graphs and the batch's rationale because the ladder
+it belongs to is still running (`b44`'s HOF-500, then `b45`).
+
 ### b43b-lowlr-b29a — continues `b29a` @1347k, 98.4%/500 — **the batch's best arm on every instrument**
 
-Best-30 **100.0** at 1667k, `sef` **99.6**, recent-30 95.0, `max_single_eval` 100. **The strongest evidence in
+Best-30 **100.0** at 1667k, `sef` **99.5**, recent-30 96.3, `max_single_eval` 100. **The strongest evidence in
 the pair that `1e-6` improves rather than merely holds** — a 30-eval window with no imperfect game, 320k steps
 past its seed, against 97.3 for its byte-identical `b42` twin. The close-out and HOF-500 then agreed on all
 three counts: **607 ≥98%/100, 170 ≥98%/500, 17 ≥99%/500, best 99.6% @1661k** (498/500), and a pooled 97.3%.
@@ -284,8 +295,8 @@ which is one more reason not to treat the b29 record region as a property of the
 
 ### b43a-lowlr-b29b — continues `b29b` @1447k, **99.0%/500, the record at the time**
 
-Best-30 **98.7** at 1527k, `sef` **99.6**, recent-30 91.7 — against 97.3 / **87.0** for `b42a` from
-byte-identical weights, the widest `sef` gap of the four. The arm that matters most: it starts from the head
+Best-30 **98.7** at 1527k, `sef` 96.5, recent-30 94.0 — against 97.3 / **87.0** for `b42a` from
+byte-identical weights, the widest `sef` gap of the four (+9.5 pp). The arm that matters most: it starts from the head
 of b29b's 18-checkpoint band, and [that band is now known to be a
 seed rather than a config](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
 so whether the region can be *extended by training inside it* is the open question `b42`/`b43` exist to answer.
@@ -300,8 +311,9 @@ form of the seed-not-config result and worth remembering the next time a champio
 
 ### b43c-lowlr-b40b — continues `b40b` @1513k, 98.2%/500
 
-Best-30 **98.3** at 1701k, `sef` **99.8**, recent-30 95.3 — its `b42` twin is the weakest arm of the eight at
-best-30 **93.3**. **The one arm with a confound worth stating:** `b40b`
+Best-30 **98.7** at **2803k**, `sef` 98.5, recent-30 88.0 — its `b42` twin is the weakest arm of the eight at
+best-30 **93.3**. **Its best-30 peaked 1.1M steps later than any sibling's**, so `1e-6` was still finding
+gains at 2.8M — the clearest single sign that the cap, not the rate, ended this arm. **The one arm with a confound worth stating:** `b40b`
 was trained *with* the free-space PBRS term and is being continued *without* it, because the batch pins b29's
 config for all four. PBRS leaves the optimal policy unchanged but the value function absorbs the potential, so
 this arm's restored `Q` is mis-calibrated against its new reward in a way the other three are not. It is the
@@ -312,7 +324,7 @@ as though only the seed differed.
 
 ### b43d-lowlr-b29c — continues `b29c` @1396k, 97.1% over 378 episodes
 
-Best-30 **98.3** at 1539k, `sef` 97.9, recent-30 94.7. The weakest starting point of the four and still the
+Best-30 **98.3** at 1539k, `sef` 96.6, recent-30 90.3. The weakest starting point of the four and still the
 weakest arm of the `b43` four, which is the expected ordering — though it has closed most of the gap, and its
 `b42` twin is the *best* of the `b42` four, making this the narrowest pair (+1.7 pp over the matched window). Its starting figure is **not** a 500-episode number — the row was
 abandoned by the 98% gate at 378 episodes — so it is not strictly comparable with the three above it.

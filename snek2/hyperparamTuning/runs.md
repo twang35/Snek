@@ -132,7 +132,7 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
-| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out (15 h) and HOF-500 both **complete** | **done at 3M**, close-out done (11.2-14.9 h), **HOF-500 ~53% done** on the desktop | queued behind `b44`'s HOF |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **done at 3M**, close-out done (11.2-14.9 h), **HOF-500 ~53% done** on the desktop | queued behind `b44`'s HOF |
 | self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | — |
 | close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | — |
 | HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **187 rows ≥98%**, best 99.6% (`b43b` @1661k) — pass complete | **293 rows ≥98% at ~53%** of the pass, and a **500/500** (`b44b` @1886k) | — |
@@ -334,6 +334,12 @@ far, while the `b29c` seed (`b43d`/`b44d`) produced zero on every rung. The rate
 had; it does not create it. That is consistent with [the retired b29 record
 region](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading)
 and it means **`b45` at `1e-8` should be read on the same four seeds separately**, never pooled into one number.
+
+**`b43` is now closed out of this file.** Its canonical write-up — the per-seed `b42` comparison, pooled
+equal-effort figures, the cost breakdown and the two readings that would be wrong — is in
+[`completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue), and the selection result it produced is in
+[`findings.md`](findings.md#-continuing-a-champion-works-and-lower-is-better--but-the-best-checkpoint-was-the-wrong-one-to-continue-b42b43b44-2026-08-20).
+The ladder's forward plan stays here until `b45` finishes.
 
 ### Batch 45 — `1e-8`, and the first rung with a longer cap
 

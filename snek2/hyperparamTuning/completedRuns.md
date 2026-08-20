@@ -72,7 +72,11 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
-| `b29b-chase10g75seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **99.0%** @1447k /500 | 100% | 87.14% /eq §§ | 97.3% | ‡‡‡ § **THE RECORD — highest /500 point estimate on record (99.0%, 495/500, CI 97.7-99.6)**, and the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a *region*, where b24's records are isolated points. The 99.0 vs 98.0 lead over b24 is inside the 500-ep CI; the region is not. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) 2026-08-16**, copy verified 98/100. See [Batches 28-29](#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
+| `b43b-lowlr-b29a` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b29a` @1347k) | 3.00M | **99.6%** @1661k /500 | 100% | **96.82%** /eq §§ | **100.0%** | ‡‡‡ § **The widest record region ever measured here — 170 checkpoints ≥98%/500, 17 of them ≥99%**, against 18 for `b29b` and 1 for `b40b`. Two rows at 99.6% (@1661k, @1708k), the highest /500 of any *completed* batch; `b44b`'s 500/500 is higher and its pass is still running. **It continues the second-best seed checkpoint (98.4%), not the record, and beat the arm that continued the record 170 to 16** — see [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
+| `b43a-lowlr-b29b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b29b` @1447k) | 3.00M | **99.4%** @1618k /500 | 100% | 93.68% /eq §§ | 98.7% | ‡‡‡ § continues the old 99.0%/500 record and **extended it — 99.4% at 1618k, 171k steps past the checkpoint it started from**, with 16 rows ≥98%/500 against `b42a`'s 1 from identical weights. Beaten by its own sibling `b43b` on every column. See [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
+| `b43c-lowlr-b40b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b40b` @1513k) | 3.00M | **98.0%** @1760k /500 | 100% | 94.12% /eq §§ | 98.7% | ‡‡‡ § one held checkpoint, and **its best-30 peaked at 2803k** — the latest peak of the batch by 1.1M steps, so `1e-6` was still finding gains very late. Carries a confound: trained *with* the free-space term, continued *without* it. See [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
+| `b43d-lowlr-b29c` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b29c` @1396k) | 3.00M | 100.0% @1539k /100 | 100% | 93.50% /eq §§ | 98.3% | ‡‡‡ § **the batch's only arm with nothing held at 500** (best 97.7% @1426k over 488, gate-abandoned) — and the one seed where the `1e-5` control won, `b42d` holding 3. Weakest starting checkpoint of the four. See [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
+| `b29b-chase10g75seed2` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **99.0%** @1447k /500 | 100% | 87.14% /eq §§ | 97.3% | ‡‡‡ § **the record until 2026-08-20** (99.0%, 495/500, CI 97.7-99.6) — passed by `b43b` @1661k (99.6%) and `b44b` @1886k (500/500), both of which are *continuations* of these same weights at a lower rate. Head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a *region*, where b24's records are isolated points. The 99.0 vs 98.0 lead over b24 is inside the 500-ep CI; the region is not. **Promoted to [`../hallOfFame/`](../hallOfFame/README.md) 2026-08-16**, copy verified 98/100. See [Batches 28-29](#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region) |
 | `b29a-chase10g75seed1` ‡‡‡ § | **fc 320**, chase-safe shaping `c=0.10` **(gate 75)**, IS off, td_error | 2.00M | **98.4%** @1347k /500 | 100% | 89.76% /eq §§ | 97.7% | ‡‡‡ § **3 checkpoints held ≥98%/500** (1339k/1347k/1414k), best 98.4% — record-tier, the second seed of the b29 gate-75 region. Not yet HOF-promoted |
 | `b40b-chasefree10g75seed2` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75) **+ free-space Φ = 1/(open regions)**, IS off, td_error | 2.00M | **98.2%** @1513k /500 | 100% | 89.52% /eq §§ | 97.7% | ‡‡‡ § **the only ≥98%/500 checkpoint in b40, and the third-best /500 on record** behind `b29b` (99.0) and `b29a` (98.4). 63 candidates at ≥98%/100 including a flawless **100.0%/100 @1424k**; one held. **HOF-promotion candidate, not yet promoted.** Its batch is a null — see [Batch 40](#batch-40--chase-safe-plus-a-free-space-term-null-and-the-b29-record-region-does-not-replicate) |
 | `b24d-fc320noisseed4` ‡‡‡ § | **fc 320**, IS off (`SNEK_IS_WEIGHTS=0`), td_error | 3.00M | **98.0%** @1342k /500 | 99.0% | 85.97% /eq §§ | 96.7% | ‡‡‡ § **THE NEW RECORD** — 98.0% over 500 fresh episodes (490/500, CI [96.4,98.9]), and it *rose* on re-measurement (97.0/100 → 98.0/500), the genuine-region signature. 3 of its 51 ≥97%/100 checkpoints held ≥97%/500 (early, 0.9-1.36M). In [`../hallOfFame/`](../hallOfFame/README.md) |
@@ -311,6 +315,84 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 43 — continuing the four best checkpoints at `lr 1e-6`: **a record region 10x wider than anything before it, and the best checkpoint was the wrong one to continue**
+
+**The question nobody here had asked.** Every record in this project was a checkpoint some 2M-step arm
+*passed through* on its way to a worse endpoint; no arm had ever been continued **from its own best
+checkpoint**. `b43` continues the top four of the eight `b29`/`b40` checkpoints — ranked by their best
+**500-episode** rate — under b29's config with `SNEK_LEARNING_RATE=1e-6` as the only change. The desktop's
+**`b42`** ran the identical four at the default `1e-5` as the seed-matched control, and **`b44`** later added
+the `1e-7` rung.
+
+| | |
+|---|---|
+| arms | `b43a-d-lowlr-*`, **3M absolute cap** (+1487-1653k past their seed checkpoints), laptop |
+| config | `b29` verbatim — `fc 320`, IS off, `TARGET_UPDATE_PERIOD 1000`, `DISCOUNT 0.9975`, `FORK_BRANCHES 4`, chase-safe `c=0.10` gate 75 — with **`SNEK_LEARNING_RATE=1e-6`** the only change |
+| control | **`b42a-d`** at `1e-5`, byte-identical starting weights, the same four seeds |
+| start | not an ordinary resume — checkpoint, **100k-transition replay buffer** and rate all restored; `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is the tripwire in every log |
+| measurement | close-out 100 ep at gate 96 (15 h), HOF-500 `above:98` at gate 98 (12.3 h) — **both complete** |
+
+### Result
+
+| arm | continues | best-30 | `sef` | pooled/eq | ≥98%/100 | ≥98%/500 | best /500 |
+|---|---|---|---|---|---|---|---|
+| `b43b` | `b29a` @1347k (98.4%) | **100.0** @1667k | **99.5** | **96.82** | **607** | **170** | **99.6% @1661k** (498/500) |
+| `b43a` | `b29b` @1447k (**99.0%**) | 98.7 @1527k | 96.5 | 93.68 | 166 | 16 | 99.4% @1618k (497/500) |
+| `b43c` | `b40b` @1513k (98.2%) | 98.7 @**2803k** | 98.5 | 94.12 | 133 | 1 | 98.0% @1760k (490/500) |
+| `b43d` | `b29c` @1396k (97.1%) | 98.3 @1539k | 96.6 | 93.50 | 83 | 0 | — |
+| **group** | | | | **94.53** | **989** | **187** | |
+
+**`1e-6` beats `1e-5`, and the margin grows with instrument depth.**
+
+| seed | `b42` eq (1e-5) | `b43` eq (1e-6) | `b42` ≥98%/100 | `b43` ≥98%/100 | `b42` ≥98%/500 | `b43` ≥98%/500 |
+|---|---|---|---|---|---|---|
+| `b29a` | 93.77 | **96.82** | 27 | **607** | 0 | **170** |
+| `b29b` | 90.75 | **93.68** | 17 | **166** | 1 | **16** |
+| `b40b` | 90.29 | **94.12** | 6 | **133** | 0 | **1** |
+| `b29c` | 93.54 | 93.50 | 48 | **83** | **3** | 0 |
+| total | | | 98 | **989** | **4** | **187** |
+
+**4 of 4 seeds on ≥98%/100, 3 of 4 on pooled equal-effort and on ≥98%/500.** The `b29c` seed is the exception
+on both: a dead heat on pooled (93.50 against 93.54 — 0.04 pp, noise) and an *inversion* at /500, where `b42d`
+held 3 and `b43d` held 0. It produced the weakest starting checkpoint and `b42`'s *best* arm, so it inverts the
+batch on the one metric with the fewest rows behind it. **Do not read the group totals as though the effect
+were uniform across seeds.**
+
+### ‡ The best starting checkpoint was not the best one to continue
+
+`b43a` continues the **99.0%/500** checkpoint that was the project record and finished with **16** rows
+≥98%/500. `b43b` continues a checkpoint measured **98.4%** — second of the four — and finished with **170**,
+plus the higher pooled figure, the higher best-30, the higher `sef` and the higher best /500. **A checkpoint's
+own /500 rate did not predict how well it continues**, and the gap is a factor of 10, not a tie.
+
+That matters because ranking by /500 rate is exactly how this batch chose its four arms. It is also the third
+independent result pointing the same way: b29's 18-checkpoint band did not replicate on fresh seeds (`b37`,
+0 of 4) or under an added shaping term (`b40`, 1 of 4), and now it did not reproduce as the *best continuation*
+among its own siblings either. See
+[`findings.md`](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading).
+
+**One seed carries 91% of the batch's held checkpoints** (`b43b`, 170 of 187) — the same concentration `b29`
+showed. So the headline count is a seed effect *amplified* by the rate rather than created by it: what `1e-6`
+bought was 1.6M further steps in which the good seed did not decay.
+
+### Two readings that would be wrong
+
+**`peak_trailing` is useless for this family.** All four arms report exactly **95.0**, at 1347k / 1396k /
+1448k / 1513k — within a few thousand steps of their own seed checkpoints. The metric is saturated here; it
+describes where the arm started, not what it did.
+
+**`sef` is not comparable with any other batch in this file.** These arms began at ~98% instead of 0, so
+96.5-99.5 says "it never dropped", not "it learned fast". Only `b42`'s column is a fair reference.
+
+### Cost
+
+The close-out ran **15 h** and the HOF-500 **12.3 h** (767 measurements, 4 lanes, 80% utilisation) — 10-20x a
+normal batch's, because a continuation arm sits above `ALWAYS_EVAL_SINGLE` for its whole run, so the selector
+took 791-1196 checkpoints per arm instead of a few dozen; `b43b`'s HOF pass alone measured 607. That pass is
+also what exposed the O(rows)x O(episodes) progress-write defect in the eval controller — 58 s of bookkeeping
+per measurement against 46 s of measuring — fixed in `adbec2904`. Both write paths carry the fix now; the
+diagnostic is two `grep -c`s and it is documented in [`CLAUDE.md`](../../CLAUDE.md).
 
 ## Batch 40 — chase-safe **plus a free-space term**: null, and the b29 record region does not replicate
 
