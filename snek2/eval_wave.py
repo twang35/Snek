@@ -104,10 +104,12 @@ from eval_plan import (
 )
 from snake_constants import EVALS_DIR, POLICY_DIR, RUNS_DIR
 
-# Stage order, and the reason it is stage-major rather than policy-major: each policy's result file
-# then fills in the same order it does under the single-policy CLI, so a live chart reads the same.
-# `confirm` units do not exist until that policy's screens have all landed (see Wave.issue_confirms).
-# `flat` is the whole plan when screening is off, so it sits where the screens would.
+# Stage order, and it is the *only* thing that orders the queue: a `confirm` ranks the screens it
+# follows, so the stages cannot interleave. Within one stage the arms rotate instead — see
+# `interleave_by_arm`, and note that this is a change from the single-policy CLI, where a lone arm's
+# rows necessarily arrive in step order. `confirm` units do not exist until that policy's screens
+# have all landed (see Wave.issue_confirms). `flat` is the whole plan when screening is off, so it
+# sits where the screens would.
 STAGES = ('full', 'screen', 'flat', 'confirm')
 
 
@@ -429,8 +431,45 @@ class Unit:
                                            self.episodes)
 
 
+def interleave_by_arm(units):
+    """`units` ordered stage-major, then one unit per arm in rotation.
+
+    Stage order is the part that is not negotiable: a confirmation depends on the screens it ranks,
+    so `STAGES.index` leads the key. **Within a stage the order is free**, and rotating over the arms
+    is strictly better than taking one arm at a time.
+
+    Two reasons, and the second is the one that made this a bug rather than a preference.
+
+    A wave's arms have very unequal amounts of work -- b43's HOF selected 166 / 607 / 133 / 83
+    checkpoints -- so arm-major order spends its first hours entirely inside the first arm. The
+    window then shows **one chart filling and three saying "nothing measured yet"**, for hours, which
+    reads as three broken arms. It is also the wrong thing to have on disk: stop the run early and
+    arm-major leaves one arm complete and three unmeasured, where rotation leaves four comparable
+    partial measurements. Comparing the arms is the entire point of the batch.
+
+    It costs nothing. A lane crossing to another arm's checkpoint is one `checkpoint.restore` into
+    the same network, the same call a lane already makes between two checkpoints of one arm -- the
+    `arch.json` check is cached per directory in the worker, so a switch measures 0.00s. Rotation
+    does not change how many units exist or how long each takes; it changes only which order they
+    come back in.
+
+    Ranking is done over a *deterministically sorted* copy rather than over insertion order, so the
+    result does not depend on the order `Wave` happened to build its arms in, and re-ranking a queue
+    that has already had units taken from it stays stable.
+    """
+    ordered = sorted(units, key=lambda u: (STAGES.index(u.stage), u.arm.policy_name, u.step))
+    rank, ranked = {}, []
+    for unit in ordered:
+        group = (unit.stage, unit.arm.policy_name)
+        position = rank.get(group, 0)
+        rank[group] = position + 1
+        ranked.append(((STAGES.index(unit.stage), position, unit.arm.policy_name, unit.step), unit))
+    ranked.sort(key=lambda row: row[0])
+    return [unit for _, unit in ranked]
+
+
 class WaveQueue:
-    """The units waiting to be measured, handed out in stage-major order.
+    """The units waiting to be measured, handed out stage-major and then **round-robin over arms**.
 
     One lock, held only while a list is inspected — a lane spends ~35-90 s per unit, so contention
     is not a consideration and a simple structure is worth more than a clever one.
@@ -454,7 +493,7 @@ class WaveQueue:
                     continue
                 self._issued.add(key)
                 self._pending.append(unit)
-            self._pending.sort(key=lambda u: (STAGES.index(u.stage), u.arm.policy_name, u.step))
+            self._pending = interleave_by_arm(self._pending)
 
     def take(self, key):
         """The next unit this lane may run, or None. `key` is the lane's eligibility key."""

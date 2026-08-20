@@ -34,6 +34,35 @@ import tempfile
 import time
 
 
+def _scan_all_commands(pattern, mine):
+    """Command lines matching `pattern` read from a full `ps -Ao pid=,command=` scan.
+
+    The second opinion `_matching_commands` asks before it reports nothing running. `ps -A` lists
+    every process with the same argv text `ps -p` gives, so it answers the same question without
+    going through pgrep at all; the pattern is applied with Python's `re`, which is why an
+    unparseable one raises here rather than reading as "nothing found".
+
+    A non-zero exit is unanswerable, not empty. Same filters as the caller: our own pid, and any
+    other viewer, since the watched pattern is an argument on a viewer's own command line.
+    """
+    ps = subprocess.run(['ps', '-Ao', 'pid=,command='],
+                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if ps.returncode != 0:
+        raise RuntimeError('ps -A failed with status {0}'.format(ps.returncode))
+    try:
+        matcher = re.compile(pattern)
+    except re.error as error:
+        raise RuntimeError('pattern {0!r} is not a usable regex: {1}'.format(pattern, error))
+    found = []
+    for line in ps.stdout.decode('utf-8', 'replace').splitlines():
+        fields = line.split()
+        if not fields or fields[0] == mine or 'chart_viewer.py' in line:
+            continue
+        if matcher.search(line):
+            found.append(line)
+    return found
+
+
 def _matching_commands(pattern):
     """Command lines of processes matching `pattern` (pgrep -f), excluding viewers.
 
@@ -59,13 +88,28 @@ def _matching_commands(pattern):
     the `ps`) was tested and *falsified*: a recently dead pid still returns the live ones. The bug
     below is real regardless of whether it is that bug.
 
-    `running_policies` and `live_arms` share the blind spot, and there it means a live arm reading as
-    `(completed)` or a panel never appearing — the same shape as the historical 3-of-4 window bugs.
+    `live_arms` shares the blind spot, and there it means a panel never appearing — the same shape as
+    the historical 3-of-4 window bugs. `running_policies` shared it too, until the panel status tag
+    it fed was deleted for being wrong about `eval_wave.py`.
 
     The `ps` call is deliberately *not* given the same treatment: it exits 1 both when every listed
     pid is gone (a real answer, and the common one during a teardown) and on a bad pid, so there is
     nothing to distinguish. Its empty output is trusted, which is safe because a pid list that came
     from a successful pgrep and then emptied really does mean the processes ended.
+
+    **‡ The returncode check was not enough, and a no-match is now corroborated (2026-08-19).** Three
+    `eval_wave.py` waves in a row opened a window that exited within ~10 s -- `0 panels`, then
+    `watched training gone`, while the wave it was watching ran for hours afterwards. The mechanism
+    was never found: `pgrep -f 'eval_wave.py .*b43'` matches that process every time it is run by
+    hand, 80/80 probes, including from a process whose own argv contains the pattern. So the fix
+    stops trying to explain pgrep and stops *trusting* it in one direction: a **match** is taken at
+    face value, an **absence** is re-checked against a full `ps -Ao pid=,command=` scan with Python's
+    own `re`. Only when both agree is the answer empty.
+
+    That asymmetry is the whole idea, and it is cheap -- the corroboration runs only on the answer
+    that closes windows, never on the common one. It also removes any dependence on pgrep's regex
+    dialect for the negative case. What it cannot do is invent evidence: a genuinely finished wave
+    is absent from `ps` too, so a window still exits when it should.
     """
     res = subprocess.run(['pgrep', '-f', pattern],
                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -75,7 +119,7 @@ def _matching_commands(pattern):
     mine = str(os.getpid())
     pids = [p for p in res.stdout.decode().split() if p and p != mine]
     if not pids:
-        return []
+        return _scan_all_commands(pattern, mine)
     args = ['ps', '-o', 'pid=,command=']
     for p in pids:
         args += ['-p', p]
@@ -258,66 +302,23 @@ def policy_from_png(path):
     return base
 
 
-def panel_title(label, live, readable):
-    """The title for one panel — the status tag, and the policy name only when nothing else shows it.
-
-    `live` is the set of running-policy tokens, or None when the process list could not be read
-    this refresh. `readable` is whether the panel's PNG loaded.
-
-    **The name is dropped whenever the chart itself is on screen** (2026-08-19). Every chart this
-    viewer shows carries its own title inside the image — an eval PNG says `<policy> — eval progress
-    <time>` and a training PNG names itself too — so the panel title was printing the same policy
-    name a second time, directly above the first.
-
-    It comes back the moment the image is *not* showing, and that is the whole subtlety: an empty
-    panel labelled only `(waiting…)` in a four-panel window does not say which arm is waiting, and
-    the image that would have said it is the thing that is missing. So the name is the fallback
-    identifier, not the title.
-
-    The status tags are unchanged, and remain mutually exclusive by construction — they were not,
-    when the caller appended `(completed)` and the draw-failure path appended `(waiting…)` on top:
-
-    - a finished arm (name absent from `live`) reads **`(completed)`**, whether or not its chart
-      still loads — an eval that started later may have archived the PNG, and a missing chart on a
-      done arm is not the same as one still being written;
-    - a live arm with no chart yet reads **`(waiting…)`**;
-    - `live is None` (unknown) or a healthy chart on a live arm gets no tag at all — a false
-      `(completed)` on a running arm is worse than none, and now no tag means no title.
-    """
-    done = live is not None and bool(label) and label not in live
-    if done:
-        tag = '(completed)'
-    elif not readable and live is not None:
-        tag = '(waiting…)'
-    else:
-        tag = ''
-    if readable:
-        return tag
-    return '{0} {1}'.format(label, tag).rstrip()
-
-
-def running_policies():
-    """Policy names that currently have a live trainer OR eval process, or None if unknown.
-
-    This is what lets a panel be tagged `(completed)`: the viewer keeps a wave's finished
-    charts on screen (sticky `wave_files`, and the desktop runner unions the set too), so it
-    needs a live signal for which of those arms are still going. A policy counts as running
-    when its name appears as a whitespace token on the command line of a `snek2.py` (trainer)
-    or `eval_checkpoints.py` (eval) process -- both put the policy right after the script.
-
-    Token match, never substring, so `...seed1` is not read as running because `...seed11`
-    is; policy names here are long and unique enough that a token collision does not occur.
-    Returns None if the process list cannot be read, and the caller then marks nothing
-    completed -- a false `(completed)` on a live arm is worse than a missing one on a dead
-    arm, which the panel's frozen curve already shows."""
-    tokens = set()
-    for pattern in ('snek2.py', 'eval_checkpoints.py'):
-        try:
-            for line in _matching_commands(pattern):
-                tokens.update(line.split())
-        except Exception:
-            return None
-    return tokens
+# There is no per-panel title, and that is deliberate (2026-08-19). Every chart this viewer shows
+# already carries its own title *inside the image* — an eval PNG says `<policy> — eval progress
+# <time>`, a training PNG names itself — so a matplotlib title printed the policy name a second time
+# directly above the first, and a four-panel window spent two lines of every panel's height on it.
+# `tight_layout` pays for that by shrinking the images, which is the visible symptom: smaller charts
+# and a smaller font in exactly the window whose whole job is to be readable across the room.
+#
+# It also carried a status tag, and the tag is the reason this is a hard rule rather than a
+# preference. `(completed)` was decided by asking whether the arm's name appeared on a running
+# `snek2.py` or `eval_checkpoints.py` command line — so the moment a wave began running under
+# `eval_wave.py` instead, **every panel of a live four-arm eval read `(completed)`**. A status
+# derived from a process scan is wrong whenever the launcher changes, and it is wrong silently.
+# The image itself already shows liveness: a live arm's curve moves every refresh and a finished
+# one's is frozen.
+#
+# So panels get no title. If a chart is genuinely missing the panel is blank, which is honest — and
+# `--glob`/`--arms` only ever names files that exist or arms that launched.
 
 
 def _training_alive(pattern):
@@ -823,15 +824,11 @@ def main():
         for ax in axes:
             ax.clear()
             ax.axis('off')
-        live = running_policies()
         for i, path in enumerate(files):
-            label = policy_from_png(path)
             try:
                 axes[i].imshow(mpimg.imread(path))
-                readable = True
             except Exception:
-                readable = False
-            axes[i].set_title(panel_title(label, live, readable), fontsize=8)
+                pass          # a half-written PNG: leave the panel blank, the next refresh has it
         try:
             fig.tight_layout()
             fig.canvas.draw_idle()

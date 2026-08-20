@@ -5,6 +5,7 @@ The drawing loop is not covered here — it needs a display. What is covered is 
 `snek2.main()` relies on before it spawns anything, because a wrong answer there either
 opens four windows for one wave or opens none at all.
 """
+import ast
 import os
 import signal
 import sys
@@ -586,9 +587,8 @@ def test_policy_from_png_strips_both_chart_layouts():
 def _fake_ps_by_pattern(lines):
     """Stub subprocess.run so `pgrep -f PAT` matches only lines containing PAT, the way the
     real pgrep does. `_fake_ps` ignores the pattern and returns every line, which cannot tell
-    a scan of one process kind from a scan of both -- so running_policies would look correct
-    even if it dropped a pattern. Here each pid maps to one line, pgrep returns the pids whose
-    line contains the pattern, and ps returns exactly those pids' lines."""
+    a scan of one process kind from a scan of both. Here each pid maps to one line, pgrep returns
+    the pids whose line contains the pattern, and ps returns exactly those pids' lines."""
     numbered = {1000 + i: line for i, line in enumerate(lines)}
 
     class _Res:
@@ -606,48 +606,25 @@ def _fake_ps_by_pattern(lines):
     return run
 
 
-def test_running_policies_collects_trainers_and_evals():
-    """The completed tag needs to know an arm is *gone*, and an arm is present as either a
-    trainer (snek2.py) or an eval (eval_checkpoints.py). Both patterns must be scanned, so a
-    panel is not called completed while its eval is still measuring it. The pattern-aware fake
-    is what makes this bite: were the eval scan dropped, seed2's eval-only line would vanish."""
-    saved = chart_viewer.subprocess.run
-    lines = [' 1001 python -u snek2.py b20q-fc25seed1',
-             ' 1002 python -u eval_checkpoints.py b20r-fc25seed2 top20']
-    chart_viewer.subprocess.run = _fake_ps_by_pattern(lines)
-    try:
-        live = chart_viewer.running_policies()
-        assert 'b20q-fc25seed1' in live
-        assert 'b20r-fc25seed2' in live
-    finally:
-        chart_viewer.subprocess.run = saved
+def test_no_panel_carries_a_matplotlib_title():
+    """A tripwire, not a behaviour test: **panels must have no title at all.**
 
+    It keeps coming back, and each time for a plausible-looking reason -- name the arm, tag the
+    finished ones -- so the rule is pinned in the source rather than in a rendered figure nobody can
+    assert on. Two costs paid for it. Every chart already prints its own title inside the image, so a
+    panel title repeated the policy name directly above itself and `tight_layout` shrank all four
+    images to make room. And the status tag was **wrong**: `(completed)` was decided by looking for
+    the arm on a running `snek2.py` or `eval_checkpoints.py` command line, so the first four-arm
+    `eval_wave.py` eval rendered every live panel as `(completed)`.
 
-def test_running_policies_is_token_exact_not_substring():
-    """`seed1` must not read as running because `seed11` is — a token match, not `in`. A wave
-    with both would otherwise leave the finished seed1 falsely un-tagged."""
-    saved = chart_viewer.subprocess.run
-    chart_viewer.subprocess.run = _fake_ps([' 1001 python -u snek2.py b20q-fc25seed11'])
-    try:
-        live = chart_viewer.running_policies()
-        assert 'b20q-fc25seed11' in live
-        assert 'b20q-fc25seed1' not in live      # the finished sibling stays taggable
-    finally:
-        chart_viewer.subprocess.run = saved
-
-
-def test_running_policies_is_none_when_it_cannot_look():
-    """Unreadable process list -> None, so the caller tags nothing. A false (completed) on a
-    live arm is worse than a missing one, whose frozen curve already shows it stopped."""
-    saved = chart_viewer.subprocess.run
-
-    def boom(*_a, **_kw):
-        raise OSError('no ps here')
-    chart_viewer.subprocess.run = boom
-    try:
-        assert chart_viewer.running_policies() is None
-    finally:
-        chart_viewer.subprocess.run = saved
+    `set_window_title` on the canvas manager is a different call and stays -- that is the OS window's
+    name, not a panel's.
+    """
+    tree = ast.parse(open(chart_viewer.__file__).read())
+    titled = [node.func.attr for node in ast.walk(tree)
+              if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+              and node.func.attr in ('set_title', 'suptitle')]
+    assert titled == [], titled
 
 
 def test_wave_files_never_shows_a_finished_arm_from_an_earlier_wave():
@@ -963,40 +940,6 @@ def test_figure_dims_leaves_a_fitting_grid_untouched():
     clamp never makes a window that already fit smaller than asked."""
     assert chart_viewer.figure_dims(1, 1, 2.0) == (8.4, 6.0)   # under budget, unchanged
     assert chart_viewer.figure_dims(2, 2, 1.0) == (8.4, 6.0)   # 2x2 at scale 1 also fits
-
-
-def test_panel_title_never_shows_completed_and_waiting_together():
-    """The desktop bug: a finished arm whose eval PNG a later wave had archived read
-    `(completed) (waiting…)` at once. A done arm is `(completed)` whether or not its chart
-    loads; `(waiting…)` is only a live arm with no chart yet; and the two never coincide."""
-    live = {'b20ah-fc100x200x100seed4'}  # only this arm still running
-    pt = chart_viewer.panel_title
-    # finished arm, chart archived/missing -> completed only, NOT "(completed) (waiting…)"
-    assert pt('b21a-beta05seed1', live, False) == 'b21a-beta05seed1 (completed)'
-    # finished arm, chart present -> the tag, without the name the chart already carries
-    assert pt('b21a-beta05seed1', live, True) == '(completed)'
-    # live arm, chart not written yet -> waiting
-    assert pt('b20ah-fc100x200x100seed4', live, False) == 'b20ah-fc100x200x100seed4 (waiting…)'
-    # live arm, chart present -> no title at all
-    assert pt('b20ah-fc100x200x100seed4', live, True) == ''
-    # process list unreadable (None): never tag, even with a missing chart
-    assert pt('b21a-beta05seed1', None, False) == 'b21a-beta05seed1'
-
-
-def test_panel_title_drops_the_name_the_chart_already_prints():
-    """Every chart names itself inside the image, so a panel title repeated it directly above."""
-    live = {'b43a-lowlr-b29b'}
-    assert chart_viewer.panel_title('b43a-lowlr-b29b', live, True) == ''
-    assert chart_viewer.panel_title('b43a-lowlr-b29b', None, True) == ''
-
-
-def test_panel_title_keeps_the_name_when_there_is_no_image_to_name_it():
-    """The fallback that makes dropping the name safe: an empty panel tagged only `(waiting…)`
-    in a four-arm window does not say *which* arm is waiting, and the chart that would have
-    said it is exactly what is missing."""
-    live = {'b43a-lowlr-b29b', 'b43b-lowlr-b29a'}
-    assert chart_viewer.panel_title('b43a-lowlr-b29b', live, False) == 'b43a-lowlr-b29b (waiting…)'
-    assert chart_viewer.panel_title('b43b-lowlr-b29a', live, False) == 'b43b-lowlr-b29a (waiting…)'
 
 
 def test_clamp_dims_shrinks_uniformly_and_never_grows():
@@ -1529,20 +1472,97 @@ def test_dedupe_still_sees_a_live_viewer():
 
 # ------------------------- a failed pgrep is not an answer (2026-08-19)
 
-def _stub_pgrep(monkey_returncode, stdout=b''):
-    """Replaces subprocess.run for the duration of a call, returning a fixed pgrep result."""
+def _stub_pgrep(monkey_returncode, stdout=b'', ps_all=b''):
+    """Replaces subprocess.run for the duration of a call, returning a fixed pgrep result.
+
+    `ps -Ao` is answered separately, because a pgrep that reports **no match** is now corroborated
+    against a full process scan before `_matching_commands` will call the answer empty. `ps_all` is
+    that scan's output, empty by default -- so a stub that means "really nothing is running" needs
+    no change, while one that means "pgrep lied" sets it.
+    """
     class _Result(object):
-        def __init__(self):
-            self.returncode = monkey_returncode
-            self.stdout = stdout
+        def __init__(self, returncode, out):
+            self.returncode = returncode
+            self.stdout = out
 
     calls = []
 
     def fake_run(args, **kwargs):
         calls.append(args)
-        return _Result()
+        if args[:2] == ['ps', '-Ao']:
+            return _Result(0, ps_all)
+        return _Result(monkey_returncode, stdout)
 
     return fake_run, calls
+
+
+def test_a_no_match_is_corroborated_against_a_full_process_scan():
+    """The window-closing answer is the one that gets a second opinion.
+
+    Three `eval_wave.py` waves in a row opened a window that exited within ~10 s while the wave ran
+    on for hours: `pgrep` reported no match for a process that `ps` lists and that the same pgrep
+    matches every time it is run by hand. The mechanism was never reproduced, so the fix does not
+    depend on knowing it -- an absence is re-checked against `ps -Ao pid=,command=`, and only a
+    double negative closes a window.
+    """
+    import subprocess
+
+    real_run = subprocess.run
+    wave = ' 4242 /opt/miniconda3/envs/snek/bin/python -u eval_wave.py above:98 b43a-lowlr-b29b'
+    # The scan is a whole `ps -A`, so most of what it reads has nothing to do with the pattern --
+    # without the regex applied to each line the answer would be the entire process table.
+    noise = [' 1 /sbin/launchd', ' 4200 /opt/homebrew/bin/tmux']
+    fake, calls = _stub_pgrep(1, ps_all=('\n'.join(noise + [wave]) + '\n').encode())
+    subprocess.run = fake
+    try:
+        assert chart_viewer._matching_commands('eval_wave.py .*b43') == [wave]
+        assert chart_viewer._training_alive('eval_wave.py .*b43') is True
+        assert ['ps', '-Ao'] in [args[:2] for args in calls], calls
+    finally:
+        subprocess.run = real_run
+
+
+def test_the_corroborating_scan_drops_viewers_and_our_own_pid():
+    """Same two exclusions as the pgrep path: the watched pattern sits on a viewer's own argv."""
+    import subprocess
+    import os as osmod
+
+    real_run = subprocess.run
+    lines = [' {0} python -u chart_viewer.py --watch eval_wave.py .*b43'.format(osmod.getpid()),
+             ' 4243 python -u chart_viewer.py --watch eval_wave.py .*b43',
+             ' 4244 python -u eval_wave.py above:98 b43a-x']
+    fake, _ = _stub_pgrep(1, ps_all=('\n'.join(lines) + '\n').encode())
+    subprocess.run = fake
+    try:
+        found = chart_viewer._matching_commands('eval_wave.py .*b43')
+        assert found == [lines[2]], found
+    finally:
+        subprocess.run = real_run
+
+
+def test_an_unreadable_process_table_is_unanswerable_not_empty():
+    """`ps -A` failing means "cannot tell", which keeps the window open."""
+    import subprocess
+
+    real_run = subprocess.run
+
+    class _Bad(object):
+        returncode = 1
+        stdout = b''
+
+    def fake_run(args, **_kw):
+        return _Bad()
+    subprocess.run = fake_run
+    try:
+        raised = False
+        try:
+            chart_viewer._matching_commands('eval_wave.py .*b43')
+        except RuntimeError:
+            raised = True
+        assert raised
+        assert chart_viewer._training_alive('eval_wave.py .*b43') is True
+    finally:
+        subprocess.run = real_run
 
 
 def test_a_failed_pgrep_raises_instead_of_reading_as_nothing_running():
@@ -1590,8 +1610,7 @@ def test_the_watch_keeps_the_window_open_when_the_check_cannot_be_answered():
     subprocess.run = fake
     try:
         assert chart_viewer._training_alive('eval_checkpoints.py b43') is True
-        # ...and the panel-set callers degrade the other way: nothing new, nothing marked completed.
-        assert chart_viewer.running_policies() is None
+        # ...and the panel-set caller degrades the other way: an unanswerable scan adds no arm.
         assert chart_viewer.live_arms('b43') == []
     finally:
         subprocess.run = real_run

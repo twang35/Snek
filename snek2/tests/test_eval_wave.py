@@ -233,6 +233,84 @@ def test_the_queue_hands_out_full_length_work_before_screens():
         assert taken == [('full', 3000), ('screen', 1000), ('screen', 2000)], taken
 
 
+def test_the_queue_rotates_over_the_arms_within_a_stage():
+    # b43's HOF selected 166 / 607 / 133 / 83 checkpoints. Arm-major order spends its first hours
+    # inside one arm, so three of four panels read "nothing measured yet" for hours and an early stop
+    # leaves three arms unmeasured -- when comparing the arms is the whole point of the batch.
+    with Bench() as bench:
+        arms = []
+        for name in ('b44a-x', 'b44b-y', 'b44c-z'):
+            bench.policy(name)
+            arms.append(bench.arm(name, [1000, 2000, 3000]))
+        queue = eval_wave.WaveQueue()
+        for arm in arms:
+            queue.add(arm.initial_units())
+        taken = []
+        while True:
+            unit = queue.take(eval_wave.lane_key(arms[0]))
+            if unit is None:
+                break
+            taken.append((unit.arm.policy_name, unit.step))
+        assert [name for name, _ in taken] == ['b44a-x', 'b44b-y', 'b44c-z'] * 3, taken
+        assert [step for _, step in taken[:3]] == [1000, 1000, 1000], taken
+
+
+def test_rotation_never_reorders_the_stages():
+    # The one ordering that is not free: a confirmation ranks the screens it follows.
+    with Bench() as bench:
+        for name in ('b44a-x', 'b44b-y'):
+            bench.policy(name)
+        a = bench.arm('b44a-x', [1000, 3000], selected_by={
+            1000: graph_meta(1000, 90.0), 3000: graph_meta(3000, 100.0)})
+        b = bench.arm('b44b-y', [1000, 3000], selected_by={
+            1000: graph_meta(1000, 90.0), 3000: graph_meta(3000, 100.0)})
+        queue = eval_wave.WaveQueue()
+        queue.add(a.initial_units())
+        queue.add(b.initial_units())
+        stages = []
+        while True:
+            unit = queue.take(eval_wave.lane_key(a))
+            if unit is None:
+                break
+            stages.append(unit.stage)
+        assert stages == ['full', 'full', 'screen', 'screen'], stages
+
+
+def test_rotation_does_not_depend_on_the_order_the_arms_were_added():
+    with Bench() as bench:
+        for name in ('b44a-x', 'b44b-y', 'b44c-z'):
+            bench.policy(name)
+        made = [bench.arm(n, [1000, 2000]) for n in ('b44a-x', 'b44b-y', 'b44c-z')]
+
+        def drain(order):
+            queue = eval_wave.WaveQueue()
+            for arm in order:
+                queue.add(arm.initial_units())
+            out = []
+            while True:
+                unit = queue.take(eval_wave.lane_key(made[0]))
+                if unit is None:
+                    return out
+                out.append((unit.arm.policy_name, unit.step))
+
+        assert drain(made) == drain(list(reversed(made)))
+
+
+def test_interleave_is_stable_however_the_units_arrive():
+    # The ranking runs over a sorted copy, not over insertion order. With the current callers the
+    # two agree -- `add` is handed each arm's units in step order -- so this tests the function's
+    # contract directly rather than through the queue, where the difference is invisible until a
+    # caller changes.
+    with Bench() as bench:
+        for name in ('b44a-x', 'b44b-y', 'b44c-z'):
+            bench.policy(name)
+        arms = [bench.arm(n, [1000, 2000, 3000]) for n in ('b44a-x', 'b44b-y', 'b44c-z')]
+        units = [u for arm in arms for u in arm.initial_units()]
+        shape = lambda seq: [(u.arm.policy_name, u.step) for u in eval_wave.interleave_by_arm(seq)]
+        assert shape(list(reversed(units))) == shape(units)
+        assert [step for _, step in shape(list(reversed(units)))[:3]] == [1000, 1000, 1000]
+
+
 def test_the_queue_never_hands_out_the_same_unit_twice():
     with Bench() as bench:
         bench.policy('b44a-x')
