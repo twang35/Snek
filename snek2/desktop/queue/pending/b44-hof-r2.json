@@ -1,0 +1,32 @@
+{
+  "id": "b44-hof-r2",
+  "type": "eval",
+  "policies": [
+    "b44a-lowlr7-b29b",
+    "b44b-lowlr7-b29a",
+    "b44c-lowlr7-b40b",
+    "b44d-lowlr7-b29c"
+  ],
+  "eval_args": [
+    "above:98"
+  ],
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "EVAL_EPISODES": "500",
+    "EVAL_SCREEN_EPISODES": "0",
+    "EVAL_INDEPENDENT": "1",
+    "EVAL_MIN_ACHIEVABLE": "98",
+    "EVAL_OUT_SUFFIX": "_hof500",
+    "EVAL_RESUME": "1"
+  },
+  "priority": 9,
+  "label": "b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7",
+  "notes": "Continues b44-hof, which was killed at 1135 of 2235 measurements so it could be relaunched on adbec2904. Identical recipe -- same policies, same `above:98`, 500 episodes flat at gate 98 into `_hof500` -- plus EVAL_RESUME=1, and a NEW id because a killed job's ledger record goes terminal and poll_once drops anything terminal.\n\nWHY IT WAS KILLED, which is the part worth keeping. b44-hof was measuring fine and folding too slowly. `Wave.on_round` fired once per 4 episodes -- ~83 times per measurement -- and each call rebuilt every banked row and re-serialised the whole file, five payloads deep because `wave_eta_seconds` prices the wave off all four arms. Measured on the live job: the lanes completed a measurement every 45.3 s while the controller folded one every 60.3 s, so the backlog grew ~20/h and stood at 72 when it was killed. The write is O(rows) and b44a/b grow from 345 rows to 853/867, so the fold cost would have roughly 2.5x'd by the end -- ~13 h of lane work against ~30 h of bookkeeping, ending in a many-hour single-threaded tail with 16 workers idle and the box at ~5%. adbec2904 puts the fold at ~1-2 s per measurement, so the job becomes lane-bound at ~13 h. This spec pays ~55 min of re-measurement -- the 72 unfolded results lived only in the controller's outbox -- to save ~15 h.\n\nRESUME IS EXACT, not approximate. `load_finished_results` keeps every row already at 500 episodes, and `Arm.__init__`'s settled pass keeps the gate-abandoned ones too, which is most of this arm set: it re-applies make_abandon_test(98, 500, 20) to the stored per-episode samples rather than re-measuring what the gate has already decided arithmetically. So the plan covers only the 72 lost measurements and the ~1028 never started.\n\nPRIORITY 9, one below b44-hof's 10 and well below b45's 30, so this wins the wave when the box goes idle. Dispatch is wave-barriered -- nothing new starts while anything runs -- so b45's training arms begin when this finishes. That is the intended order and it needs no drain.\n\nb44d is already complete at 100/100 and contributes no work; a/b/c stood at 345 each."
+}
