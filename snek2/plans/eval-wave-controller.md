@@ -1,7 +1,10 @@
 # One wave, one controller: `eval_wave.py`
 
 **Status:** proposed 2026-08-19. Scope and the `--chain` decision approved in conversation the same
-day. **Not built.**
+day. **Phases 0 and 1 are written and uncommitted pending review** — `eval_plan.py` extracted (29
+definitions moved byte-identically; suite 30 modules / 747 tests / 0 failed) and the cross-arm
+`load` guard landed. **Phase 1's premise is confirmed by measurement: a lane switches arms in
+0.00 s.** Phases 2-6 not started.
 
 **One line:** replace the four independent `eval_checkpoints.py` processes — and the *two* separate
 things that orchestrate them, a bash script on the laptop and the runner daemon on the desktop —
@@ -100,6 +103,12 @@ today's 20** and ~0.9 GB of duplicate TF arena in the four parents goes away. An
 `if __name__ == '__main__'` guard is correct, since `IndependentWorkerPool` uses its own
 `get_context('spawn')`.
 
+**‡ That guard is mandatory rather than stylistic, and omitting it does not fail cleanly.**
+`spawn` re-imports `__main__` in every worker, so an unguarded module-level pool construction starts
+building pools *inside* the workers: measured 2026-08-19 as a **2-minute hang leaving 8 orphaned
+`spawn_main` helpers**, with the `RuntimeError` about bootstrapping arriving only from the children.
+So `eval_wave.py` builds nothing at module scope.
+
 ### The unit and the dispatch rule
 
 A unit is `(policy, step, episodes, stage)` — one checkpoint, one stage, measured start to finish by
@@ -126,6 +135,22 @@ provided the target's `arch.json` matches what it built. The controller reads ev
 `obs_len`, `obs_era`, plus the categorical fields). Lanes belong to an arch group and only take units
 from it; when arms differ, lanes are allocated across groups in proportion to estimated work. Within
 a batch the arms always share an arch, so in practice every lane can take anything.
+
+**Measured 2026-08-19, and the premise holds.** A real 2-worker pool built for
+`b43a-lowlr-b29b`, loading its own checkpoint and then `b43b-lowlr-b29a`'s through the same workers:
+**own 0.01 s, sibling 0.00 s, back 0.00 s, against 3.2 s to build the pool** — and both arms played
+`[95, 95]`, i.e. filled boards, so the weights genuinely work in a network built for the sibling.
+Cross-arm work is free, so the affinity heuristic this section hedged about is unnecessary and the
+controller's scheduler can be plain greedy.
+
+**‡ But the sidecars are not uniform, and a naive signature refuses arms of the same batch.**
+`b43a/b/d` predate the `algo` and `perfect_game_reward` fields and carry neither key; `b43c` records
+both. A raw `arch.get('algo')` therefore reads `None` against `'ddqn'` and splits one batch into two
+lane groups. So `restore_signature` goes through `algo_of`, which already reads an absent `algo` as
+the default — and `perfect_game_reward` is deliberately **excluded**: it is the objective the arm
+trained toward, not a property of the weights, the greedy action is an argmax over one checkpoint's
+own Q values, and it legitimately differs between arms measured side by side (batch 33 trained at
+10). With that, all four b43 arms group into one lane pool.
 
 **The guard is the important half.** The worker compares the target directory's `arch.json` against
 its built arch and raises `ArchMismatch` rather than restoring — the same discipline
@@ -282,8 +307,8 @@ PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45
 
 | phase | content | gate to the next |
 |---|---|---|
-| 0 | extract `eval_plan.py`, re-export from `eval_checkpoints` | suite reads **29 modules, 736 tests, 0 failed** and no behaviour changed |
-| 1 | `load(step, ckpt_dir)` + arch compare | two arms sharing an arch swap on one pool; a cross-arch swap raises |
+| **0 done** | extract `eval_plan.py`, re-export from `eval_checkpoints` | **met**: the 29 moved and 3 kept definitions all byte-identical to HEAD (`ast.get_source_segment` diff); suite **30 modules / 740 tests / 0 failed**; 4 dead imports trimmed |
+| **1 done** | `load(step, ckpt_dir)` + arch compare | **met**: live swap on one pool costs 0.00 s and plays filled boards; 7 new `policy_arch` fixtures, cross-arch and moved-support swaps raise; suite **747 tests / 0 failed** |
 | 2 | `eval_wave.py`, one policy, one lane | file structurally identical to `eval_checkpoints.py`'s on the same explicit step list |
 | 3 | multi-policy, multi-lane, greedy dispatch, `wave` block | measured makespan against a recorded 4-process baseline |
 | 4 | `--chain` | gate assert in one place; a no-candidate arm exits clean |
