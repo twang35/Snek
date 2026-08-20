@@ -119,7 +119,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, at a low enough rate; `b42` closed, `b43`/`b44` in close-out, `b45` queued**
+## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, at a low enough rate; `b42`-`b44` closed out, both HOF-500s running, `b45` queued behind them**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
@@ -132,8 +132,10 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
-| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out running on the laptop since 01:07 | **done at 3M**, close-out running on the desktop since 05:43 |
-| result | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | — |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out done (15 h), HOF-500 running on the laptop | **done at 3M**, close-out done (11.2-14.9 h), HOF-500 running on the desktop | queued behind `b44`'s HOF |
+| self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | — |
+| close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | — |
+| HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **22 so far and a 99.4% candidate record**, pass ~25% done | 14 in the first 128 measurements, pass ~6% done | — |
 
 `b44` existed because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
 into a hold. It asked where that stops, and **the answer is "not yet at 1e-7"** — see [what actually
@@ -258,6 +260,63 @@ for the 1e-5 → 1e-6 step. The gap is widest at 500-1000k because that is where
 not: **1e-6 still wanders on a half-million-step timescale, 1e-7 largely does not.** `b44`'s best-30 peaks land
 at 1814k / 2190k / 2230k / 2460k, i.e. 300-1100k past seed, against *at the seed step* for `b42`.
 
+### ✅ The 100-episode close-outs agree with the self-evals, and the effect is much larger than the self-evals suggested
+
+All three rungs are closed out (2026-08-19). The comparison below is **the share of a batch's measured
+checkpoints that reached ≥98% over 100 episodes** — not the best row, which is a maximum over a noisy statistic
+and reads high by construction on whichever arm was measured most.
+
+| starting checkpoint | `b42` 1e-5 | `b43` 1e-6 | `b44` 1e-7 |
+|---|---|---|---|
+| `b29b` @1447k (the record) | 6.5% (17/261) | 12.8% (166/1297) | **56.3% (853/1516)** |
+| `b29a` @1347k | 7.2% (27/373) | 38.7% (607/1568) | **53.7% (867/1616)** |
+| `b40b` @1513k | 2.2% (6/279) | 10.0% (133/1325) | **30.1% (415/1377)** |
+| `b29c` @1396k | **14.1% (48/340)** | 6.0% (83/1378) | 6.9% (100/1450) |
+
+**Monotone in the rate on 3 of 4 seeds, and the steps are large** — on the record seed the ≥98%/100 share goes
+6.5 → 12.8 → **56.3**, i.e. `1e-7` puts more than half of its checkpoints in the record tier where the default
+rate puts one in fifteen. The ≥99%/100 shares tell the same story (2.7 → 6.0 → 32.8 on that seed).
+
+**The exception is `b29c`, and it is the weakest of the four starts** (its seed row was 97.1% over 378 episodes,
+abandoned by the gate rather than a full-length 500). On that seed the ladder is flat from 1e-6 down and `b42`
+is nominally ahead. Consistent with the rest of this file's experience: the rate matters most where there is a
+narrow good basin to sit still in, and that seed may not have been in one.
+
+**Two reasons this understates rather than overstates the effect.** The close-out selector measures every
+checkpoint whose graph eval cleared the mandatory tier, so the denominators are near-censuses of different
+sizes: **65-93% of `b42`'s checkpoints and 84-98% of `b43`/`b44`'s**. `b42`'s pool is therefore the *more*
+selected one — its weak checkpoints are missing from the denominator — and it still comes last. And `b44`'s
+pool is the least selected of the three (98% of all its checkpoints on two arms), so it carries the most dead
+weight and still wins.
+
+**A caveat that applies to the whole table**: these close-outs ran at a gate of 96, so a row below 96% was
+abandoned early and is not full length. Every share above counts full-length rows only, which is exactly the
+set the gate guarantees, so the comparison is sound — but the *pooled* rate over all rows is not comparable
+across arms with different abandonment counts and is deliberately not quoted here.
+
+### ‡ The HOF-500 passes are running, and `b43a` is carrying a candidate record
+
+Both re-measures (`above:98` at 500 episodes, flat) are in flight as of 2026-08-19 21:50, and they are the
+instrument that decides the ladder: everything above is 100 episodes.
+
+| arm | ≥98%/500 rows so far | best /500 so far | pass |
+|---|---|---|---|
+| `b43a` (1e-6, from the record) | 9 | **99.4% @1618000** (497/500) | ~25% done |
+| `b43b` | 12 | 99.0% @1371000 | ~25% |
+| `b43c` | 1 | 98.0% @1760000 | ~25% |
+| `b43d` | 0 | — | ~25% |
+| `b44a` (1e-7, from the record) | 5 | 98.4% @1518000 | ~6% |
+| `b44b` | 6 | 98.6% @1355000 | ~6% |
+| `b44c` | 3 | 98.6% @1531000 | ~6% |
+| `b44d` | 0 | — | ~6% |
+
+**`b43a` @1618000 at 99.4%/500 would be the highest /500 on record**, above `b29b` @1447k's 99.0% — and it is
+171k steps *past* that checkpoint on the same weights, which is the ladder's whole claim in one row. Hold it
+loosely for now: 497/500 against 495/500 is well inside the CI, the pass is a quarter done, and it is the
+maximum of a noisy statistic over 59 measured checkpoints, which is the winner's curse this file has already
+been caught by twice. **The number worth watching is the count, not the maximum** — `b43` has 22 rows ≥98%/500
+against `b42`'s 4 in a completed pass, and `b44` has 14 in its first 128 measurements.
+
 ### Batch 45 — `1e-8`, and the first rung with a longer cap
 
 **Queued on the desktop 2026-08-19**, behind `b44`'s close-out and HOF. The ladder is monotone and decelerating
@@ -294,10 +353,39 @@ arm climbs from 0 so few checkpoints qualify; **an arm continued from a 98% chec
 the mandatory threshold, so nearly every checkpoint qualifies.** `b42` is the contrast from the other side — it
 decayed, so only 261-373 of its checkpoints qualified and its close-out finished overnight.
 
-**So do not read a continuation close-out still running after 7 hours as hung**, and expect **8-15 h per wave**.
+**So do not read a continuation close-out still running after 7 hours as hung.** Measured now that all three are
+finished: **`b43` 15 h on the laptop, `b44` 11.2-14.9 h on the desktop, `b42` 2.5 h** — the last one because it
+decayed, so its pool was a fifth the size.
+
+**The HOF-500 passes are the same shape one instrument deeper**, and they are the larger bill: `above:98` selects
+**166 / 607 / 133 / 83** checkpoints on `b43` and **853 / 867 / 415 / 100** on `b44`, each at 500 episodes. `b43`'s
+pass prices at ~10 h and `b44`'s at ~18 h; `b42`'s was 0.2-1.0 h per arm, on 4 qualifying rows. **So a rung of
+this ladder costs roughly 4 h of training and 25-30 h of measurement**, and the measurement is on the critical
+path for the next rung — see the note on `b45` below.
+
 If a future continuation batch needs a cheaper close-out, the lever is the *selector*, not the worker count —
 `above:<threshold>` reads a prior close-out's 100-episode numbers instead of the graph, which is what the HOF
 pass already uses.
+
+### ⚠ `b45` is blocked behind `b44`'s HOF-500 for ~18 h, and that is the wave barrier working as designed
+
+As of 21:50 the desktop is running **one** job — `b44-hof` — and holding `b45`'s four trainings plus their
+close-out queued behind it, because nothing new starts while anything is running. `b44-hof` is ~6% done at
+128 of 2235 measurements, so on its own pace that is **~18 h of a 4-trainer box running one eval**.
+
+**Nothing is broken and nothing needs doing tonight**, but it is a choice worth making deliberately rather than
+by default, and it is the user's call:
+
+| option | cost |
+|---|---|
+| **let it run** (default) | `b45` starts ~16:00 tomorrow; the ladder's decisive instrument for `b44` lands first |
+| **kill `b44-hof` and let `b45` train** | frees the box now; `b44`'s /500 tier is lost until it is requeued, and its 100-episode result already stands |
+| **requeue `b44-hof` with a stricter selector** | `above:99` is 1238 of the 2235 (~10 h — the 98-99 band is only the cheaper half); `above:99.5`, i.e. the 100%/100 rows alone, is **374 (~3 h)** |
+
+The third is the one to pick if the box is wanted back quickly, but only at `above:99.5`: a hall-of-fame
+promotion needs ≥98%/500, while the *record* question lives entirely in the top band, and `b44` has **160 and
+160** checkpoints at 100%/100 on its two best arms — far more than a record needs. `above:99` barely saves
+anything, because the 98-99 band is where the rows are cheapest to abandon.
 
 ### How these arms were started — it is not an ordinary resume
 
@@ -673,6 +761,13 @@ from a local minimum; all four seeds make the same level shift
 ([`findings.md`](findings.md#-falsified-a-drawdown-is-not-how-a-policy-escapes-a-local-minimum)).
 
 ## Record status
+
+**‡ Candidate, 2026-08-19, pass still running: `b43a-lowlr-b29b` @1618000 — 99.4%/500 (497/500).** It is
+`b29b`'s record checkpoint continued at `lr 1e-6` for another 171k steps, so if it holds it is both a new record
+and the ladder's headline. **Not claimed yet**: its HOF-500 pass is ~25% done, 497/500 against the standing
+495/500 is well inside the CI, and it is the maximum over 59 measured checkpoints — the winner's curse that has
+already been corrected twice in this file. See
+[the HOF-500 note](#-the-hof-500-passes-are-running-and-b43a-is-carrying-a-candidate-record).
 
 **NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI
 97.7-99.6). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500; the lead is inside the

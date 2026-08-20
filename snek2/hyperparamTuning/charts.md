@@ -8,9 +8,10 @@ closed. Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-arc
 **batch 33** when 38 launched, **batch 32** when 39 did, **batches 34 and 35** when 37's and 40's results
 landed, and **the C51 pilot plus batch 38** when 42/43 launched, and **batch 39** when 42 got its section, and **batch 36** when 44 got its. 36 was being held only as the named control for 39, and 39 is now archived itself. 39 went ahead of the strict-oldest 28-29 for the same reason 28-29 has been held four times now: it is the source of three of the four checkpoints 42/43/44 continue, and it is what they are read against. 39 bears on none of that.
 
-**`b37`, `b40` and `b42` are fully closed** — training, close-out *and* HOF-500. **`b43` and `b44` finished
-training at the 3M cap and their close-outs are running**, `b43` on the laptop since 01:07 and `b44` on the
-desktop since 05:43, with HOF-500 chained behind each. Those close-outs are **slow by nature, not stuck** — see
+**`b37`, `b40` and `b42` are fully closed** — training, close-out *and* HOF-500. **`b43` and `b44` are through
+their close-outs** (2026-08-19: 15 h on the laptop, 11.2-14.9 h on the desktop) **and their HOF-500 re-measures
+are running** — `b43`'s on the laptop at ~25%, `b44`'s on the desktop at ~6%, the latter ~18 h of work. Both
+passes are **slow by nature, not stuck** — see
 [the cost warning](#-a-continuation-batchs-close-out-costs-10-20x-a-normal-ones) in batch 44's section. **`b42`
 was stopped early** at +385-421k, once its answer had resolved on 4 of 4 seeds. The gate ladder's two null rungs (34, 70 and 35, 40) were retired earlier,
 since the ladder's conclusion is now carried by 28-29, 37 and 40 — the batches that bear on whether gate 75's
@@ -63,7 +64,7 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *done training at the 3M cap: it beats `1e-6` on 4 of 4 seeds, so the ladder is still monotone*
+## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *closed out (11-15 h): it beats `1e-6` on 3 of 4 seeds on the 100-episode instrument too, and by a lot; HOF-500 running*
 
 The third rung, and **the rung that falsified its own pre-registration.** `b44` was queued expecting a null
 against `b43` (~65% by the estimate written into its specs) on the reasoning that if `1e-6` is already doing
@@ -109,8 +110,24 @@ steps past seed — against 1527k-2803k for `b43` and *at the seed step* for `b4
 preserve; it improves more slowly and for longer. That is why the "it will just freeze" prediction failed: at
 `1e-7` these arms are still moving, just not far enough per step to fall out of the basin.
 
-**Close-out and HOF-500 are running** and are what decide this — everything above is 10-episode self-eval. See
-the ⚠ note in [batch 42's section](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-on-the-desktop-at-177-191m-it-decays-and-that-is-the-answer)
+### ✅ Close-out (100 episodes) — the self-eval result survives the deeper instrument, larger
+
+| arm | checkpoints measured | ≥98%/100 | ≥99%/100 | =100%/100 | `b43` twin's ≥98%/100 |
+|---|---|---|---|---|---|
+| `b44a` | 1516 | **853 (56.3%)** | 497 | 160 | 166 (12.8%) |
+| `b44b` | 1616 | **867 (53.7%)** | 514 | 160 | 607 (38.7%) |
+| `b44c` | 1377 | **415 (30.1%)** | 200 | 50 | 133 (10.0%) |
+| `b44d` | 1450 | 100 (6.9%) | 27 | 4 | 83 (6.0%) |
+
+**More than half of `b44a`'s and `b44b`'s checkpoints are in the ≥98%/100 tier**, against one in eight and two in
+five for their `1e-6` twins and one in fifteen for `1e-5`. `b44d` is the flat seed on every rung. Note that
+`b44`'s pool is the *least* selected of the three batches — 98% of all its checkpoints on two arms — so it
+carries the most dead weight in the denominator and still wins; the full comparison, with the caveats, is in
+[`runs.md`](runs.md#-the-100-episode-close-outs-agree-with-the-self-evals-and-the-effect-is-much-larger-than-the-self-evals-suggested).
+
+**The HOF-500 is running** (`above:98`, 2235 measurements, ~18 h) and is what decides the ladder against `b43`:
+14 rows ≥98%/500 in the first 128 measurements, best 98.6% so far. See
+the ⚠ note in [batch 42's section](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-at-177-191m-closed-out-and-hof-500d-it-decays-and-its-surviving-98-checkpoints-are-its-own-starting-weights)
 on why `peak_trailing` is useless for this family, and the [close-out cost
 warning](#-a-continuation-batchs-close-out-costs-10-20x-a-normal-ones) below.
 
@@ -159,7 +176,7 @@ behaviour, not a bug: **"N is a target, not a quota"** — every checkpoint whos
 Practical consequence: budget a continuation batch's close-out at **8-15 hours per wave**, not one, and do not
 read a close-out still running after 7 hours as hung. `b43`'s was launched 01:07 and is still going.
 
-## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *done training at the 3M cap; close-out running: it holds where `1e-5` decays, but `1e-7` beats it*
+## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *closed out (15 h); HOF-500 running and carrying a 99.4%/500 candidate record*
 
 **The question:** every record in this project is a checkpoint some arm *passed through* on its way to a worse
 endpoint. No arm has ever been continued from its own best checkpoint. `b43` continues the top four of eight
@@ -167,7 +184,7 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-at-a-low-enough-rate-b42-closed-b43b44-in-close-out-b45-queued);
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-at-a-low-enough-rate-b42-b44-closed-out-both-hof-500s-running-b45-queued-behind-them);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 
@@ -184,14 +201,14 @@ Final training numbers: `best_perfect30` **98.3-100.0**, `sef` **96.5-99.5**, `m
 seed checkpoint**, a 30-eval window with no imperfect game in it. So `1e-6` is not merely preservation.
 
 **`b44` at `1e-7` then beat it on 4 of 4 seeds** (+2.0 pp mean over the full common window), so `b43` is the
-*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--done-training-at-the-3m-cap-it-beats-1e-6-on-4-of-4-seeds-so-the-ladder-is-still-monotone). That nothing fell apart is itself a result: **the same four checkpoints fell
+*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--closed-out-11-15-h-it-beats-1e-6-on-3-of-4-seeds-on-the-100-episode-instrument-too-and-by-a-lot-hof-500-running). That nothing fell apart is itself a result: **the same four checkpoints fell
 80% → 50% perfect in 5k steps when the replay buffer was *not* carried over**, and holding 95-100% here is what
 the buffer copy bought.
 
 **Against `b42`, the seed-matched `1e-5` control, `b43` leads on 4 of 4 seeds on every metric** — `best_perfect30`
 98.3-100.0 against 93.3-97.7, `sef` 97.9-99.8 against 87.0-97.9, and banded perfect rate +4.7/+7.1/+6.1 pp over
 the 100-200k, 200-300k and 300-385k bands past seed. The full banded table is in
-[batch 42's section below](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-on-the-desktop-at-177-191m-it-decays-and-that-is-the-answer),
+[batch 42's section below](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-at-177-191m-closed-out-and-hof-500d-it-decays-and-its-surviving-98-checkpoints-are-its-own-starting-weights),
 which is where the pair's result lives since `b42` is the arm that moved. **`b44`** extended the ladder to **`1e-7`** and won on 4 of 4 seeds.
 
 **Do not read these best-30 numbers against the 500-episode column beside them.** A 10-episode self-eval
@@ -206,6 +223,21 @@ fast". Only `b42`'s `sef` is a fair reference, and it is in the last column of t
 the other one. **`b42` and `b43` are also not at a common step horizon** (`b42` was stopped at +385-421k,
 `b43` is past +541k) and `sef` is a fraction of each arm's own evals, so the banded comparison — not this
 column — is the rigorous one.
+
+### ✅ Close-out (100 episodes) and HOF-500 so far
+
+| arm | checkpoints measured | ≥98%/100 | ≥99%/100 | best /100 | ≥98%/500 so far | best /500 so far |
+|---|---|---|---|---|---|---|
+| `b43a` | 1297 | 166 (12.8%) | 78 | 100% @1502k | **9** | **99.4% @1618k** |
+| `b43b` | 1568 | **607 (38.7%)** | 311 | 100% @1356k | **12** | 99.0% @1371k |
+| `b43c` | 1325 | 133 (10.0%) | 47 | 100% @1516k | 1 | 98.0% @1760k |
+| `b43d` | 1378 | 83 (6.0%) | 27 | 100% @1539k | 0 | — |
+
+Against `b42`'s 17 / 27 / 6 / 48 ≥98%/100 rows on the same four seeds, and `b44`'s 853 / 867 / 415 / 100 — so
+`b43` sits where the ladder says it should on 3 of 4 seeds and loses to `b42` on `b29c`. The /500 column is
+**~25% of the way through** its pass; `b43a` @1618000 at 99.4% (497/500) is a candidate record and is 171k steps
+past the record checkpoint it continues. Held loosely — see
+[`runs.md`](runs.md#-the-hof-500-passes-are-running-and-b43a-is-carrying-a-candidate-record).
 
 ### b43b-lowlr-b29a — continues `b29a` @1347k, 98.4%/500
 
