@@ -1,12 +1,11 @@
 {
-  "iso": "2026-08-19T20:34:12",
-  "ts": 1787196852.0971143,
+  "iso": "2026-08-19T20:35:22",
+  "ts": 1787196922.364623,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (1 arm)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- hof (4 arms)"
     ],
     "queued": [
-      "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
       "b45 training -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)",
       "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)"
     ]
@@ -34,27 +33,30 @@
   },
   "running": [
     {
-      "id": "b44b-lowlr7-b29a-closeout",
+      "id": "b44-hof",
       "type": "eval",
-      "policy": "b44b-lowlr7-b29a",
+      "policy": "b44a-lowlr7-b29b",
       "policies": [
-        "b44b-lowlr7-b29a"
+        "b44a-lowlr7-b29b",
+        "b44b-lowlr7-b29a",
+        "b44c-lowlr7-b40b",
+        "b44d-lowlr7-b29c"
       ],
-      "pid": 1785348,
+      "pid": 2560417,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 53434
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "b44-hof": "queued",
     "b45a-lowlr8-b29b": "queued",
     "b45b-lowlr8-b29a": "queued",
     "b45c-lowlr8-b40b": "queued",
     "b45d-lowlr8-b29c": "queued",
     "b45-closeout": "queued",
-    "b44b-lowlr7-b29a-closeout": "running",
+    "b44-hof": "running",
+    "b44b-lowlr7-b29a-closeout": "done",
     "b44a-lowlr7-b29b-closeout": "done",
     "b44c-lowlr7-b40b-closeout": "done",
     "b44d-lowlr7-b29c-closeout": "done",
@@ -296,8 +298,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    3.85009765625,
-    4.10693359375,
-    4.69287109375
+    3.759765625,
+    4.04638671875,
+    4.6259765625
   ]
 }
