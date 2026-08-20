@@ -1,13 +1,19 @@
 # One wave, one controller: `eval_wave.py`
 
 **Status:** proposed 2026-08-19. Scope and the `--chain` decision approved in conversation the same
-day. **Phases 0-2 and 4 are written; phase 3's code is written and its gate is outstanding.** Phases
-0 and 1 are committed (`eval_plan.py` extracted, 29 definitions moved byte-identically; the cross-arm
+day. **Phases 0-4 are written and their gates met.** Phases 0 and 1 are committed (`eval_plan.py` extracted, 29 definitions moved byte-identically; the cross-arm
 `load` guard landed, and its premise is confirmed by measurement — **a lane switches arms in
 0.00 s**). `eval_wave.py`, `--chain` and their 33 fixtures are **uncommitted pending review**; suite
 **31 modules / 780 tests / 0 failed** plus the desktop's 89, and **18 of 18 mutants killed**. Phase 5
-(the runner deltas, which is where `runner.py`'s duplicate gate constants actually go away) and
-phase 6 not started, and phase 5 needs an idle box.
+(the runner deltas) is **in progress and uncommitted**; it needs an idle box to deploy, and b44's
+close-outs were still running as of 17:57. Phase 6 not started.
+
+**Read the ‡ correction below before quoting this plan's speedup.** The measured makespan gain is
+1.29x, not the 1.7-2.8x derived from lane-idle time.
+
+**Headline claim corrected 2026-08-19 — see the ‡ note below:** the measured makespan gain is
+**1.29x** (1.12x episode-normalised), not the 1.7-2.8x derived from lane-idle time. The case for
+building it stands on the other grounds.
 
 **One line:** replace the four independent `eval_checkpoints.py` processes — and the *two* separate
 things that orchestrate them, a bash script on the laptop and the runner daemon on the desktop —
@@ -18,6 +24,53 @@ Two problems, one shape. The wave has no representation in code today: on the de
 ledger rows, on the laptop a bash loop. Everything below follows from giving it one.
 
 ## Why
+
+### ‡ Correction (2026-08-19): the idle is real, but recovering it is worth ~1.1-1.3x, not 1.7-2.8x
+
+The table below measures **lane-idle time** — how much of a wave's lane-seconds a four-process
+close-out leaves unused — and reads it as the speedup a wave would recover. That step is wrong, and
+a head-to-head benchmark says so.
+
+Four b43 arms, one 8-checkpoint step list, seeded so 8 / 4 / 2 / 1 checkpoints were left to measure
+(the shape a HOF wave really has, produced the way it really arises — some arms already measured).
+40 episodes flat, gate 97, 4 workers per process or per lane, so both sides held 16 spawned workers:
+
+| | wall clock | episodes | throughput |
+|---|---|---|---|
+| 4 x `eval_checkpoints.py` | **98 s** | 516 | 5.27 ep/s |
+| 1 x `eval_wave.py`, 4 lanes | **76 s** | 448 | 5.89 ep/s |
+
+**1.29x on the clock, 1.12x once normalised for the episodes each side happened to run** (the two
+differ because abandonment is stochastic per checkpoint). The lanes came out 3/4/4/4 with 7 arm
+switches, so the balancing itself worked exactly as designed.
+
+**What the lane-idle arithmetic misses is that the baseline is not a fixed partition — the straggler
+inherits the whole box.** The 8-checkpoint arm's per-unit time in the four-process run:
+
+```
+22.0s  14.3s   7.4s  11.3s  10.2s   7.6s   8.6s   6.5s      <- alone from about here
+```
+
+It runs **~2.9x faster** once its three siblings have finished, because 16 spawned workers on a
+10-core laptop are heavily oversubscribed and the freed cores go straight to the one arm left. The
+wave, by contrast, holds every unit at 12-22 s from start to finish — it is *always* saturated,
+which is the point, but it means the comparison is 16-workers-shared against a baseline that ends up
+running 4-workers-exclusive. The box recovers most of the theoretical loss on its own.
+
+Modelled forward onto the worst real shape in the record — b40's HOF wave, 63/16/9/2 candidates —
+with the two measured rates (18.6 s per unit at four processes, 6.5 s alone, interpolated as
+`6.5 x n^0.76`), the baseline finishes in ~523 s against the wave's ~419 s: **~1.25x**. That is a
+model, not a measurement, and it is offered only to say that the extreme shape does not restore the
+old number either.
+
+**Is it still worth building? Yes, and the reasons are mostly not speed.** ~1.25x on a 15-hour
+continuation close-out is still three hours, and the rest of the case is unchanged and does not
+depend on the ratio: one job where the desktop dispatched four plus four HOF follow-ons, no
+`hof: pending` marker chain to lose results down, one definition of the eval protocol instead of
+three, the 200-line bash reimplementation deleted, and lane utilisation reported for the first time
+(a four-process wave cannot report it, because none of the four can see the others' idle time).
+**But the plan should not have claimed a speedup it had derived rather than measured**, and the
+sections below are left as written with this correction standing in front of them.
 
 ### The idle is measured, not assumed
 
@@ -355,7 +408,7 @@ PYTHONPATH=. python -u eval_wave.py --chain top50 b45a-… b45b-… b45c-… b45
 | **0 done** | extract `eval_plan.py`, re-export from `eval_checkpoints` | **met**: the 29 moved and 3 kept definitions all byte-identical to HEAD (`ast.get_source_segment` diff); suite **30 modules / 740 tests / 0 failed**; 4 dead imports trimmed |
 | **1 done** | `load(step, ckpt_dir)` + arch compare | **met**: live swap on one pool costs 0.00 s and plays filled boards; 7 new `policy_arch` fixtures, cross-arch and moved-support swaps raise; suite **747 tests / 0 failed** |
 | **2 done** | `eval_wave.py`, one policy, one lane | **met**: on `b43a` steps 1447000-1449000 at 4 episodes, the wave's file and `eval_checkpoints.py`'s have identical key order, identical row-key order and identical values for all 20 protocol fields (only the stochastic rates differ) |
-| 3 code written, **gate outstanding** | multi-policy, multi-lane, greedy dispatch, `wave` block | measured makespan against a recorded 4-process baseline — needs a real wave, so it waits for b44's close-outs to clear the desktop |
+| **3 done** | multi-policy, multi-lane, greedy dispatch | **met, and it revises the headline claim**: measured makespan **98 s -> 76 s (1.29x)** on an 8/4/2/1 imbalance, 15 units at 4 lanes x 4 workers, lanes running 3/4/4/4 with 7 arm switches. Episode-normalised the gain is **1.12x**, and the reason it is not the 1.7-2.8x this plan predicted is below |
 | 3a | the `wave` block in the payload | not written yet: the per-arm payload is byte-compatible today, and the wave-level ETA is an addition to it |
 | **4 done** (laptop half) | `--chain` | **met**: the recipe and the gate are one definition, `eval_plan.hof_settings` + the module-scope `assert DEFAULT_MIN_ACHIEVABLE < HOF_GATE`; a no-candidate arm returns 0 with no arms built. `runner.py` still carries its own copies — deleting them is phase 5, because the daemon needs `snek2/` on its import path and a deploy |
 | 5 | runner deltas + `desktop/tests/test_runner.py` | a queued b46 close-out dispatches as one job and publishes four policies |
