@@ -81,8 +81,8 @@ checkpoints, one learning rate each, and both chains are armed. Nothing is owed 
 
 | host | state | measurement chain |
 |---|---|---|
-| **laptop** | **`b43a-d` finished training at the 3M cap** (drained 01:07, +1487-1653k past their seed checkpoints). **Its close-out is running** — launched 01:07:50 by the chain script, 4 arms x 4 workers, gate 96. All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. One chart window on `--arms b43` | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **fired on time at 01:07.** The close-out is at 542-709 of 791-1196 checkpoints per arm after 7.3 h — `b43b` is the long pole at ~8 h remaining, so HOF-500 starts this evening. See the close-out cost warning below: this is expected, not stuck |
-| **desktop** | **`b42a-d` stopped by hand at 22:15** at +385-421k past seed; **its close-out and HOF-500 are both done**. **`b44a-d` then trained to the 3M cap overnight and its close-out is running** since 05:43, HOF-500 queued behind it. **`b45a-d` (`lr 1e-8`, 5M cap) is queued** behind that chain, dirs already seeded. Nothing is training on either host | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
+| **laptop** | **`b43a-d` are finished — training, close-out and HOF-500 all complete.** Trained to the 3M cap (drained 01:07, +1487-1653k past their seed checkpoints), closed out in 15 h, and the HOF-500 landed **09:55 on 2026-08-20** (767 measurements, 12.3 h, 80% lane utilisation). All four restored their seed checkpoint, their 100k-transition replay buffer and the retuned rate — `learning rate: checkpoint restored 1e-05, reset to the configured 1e-06` is in every log, which is the batch's tripwire. **Nothing is running on the laptop now** | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **fired on time at 01:07.** The close-out is at 542-709 of 791-1196 checkpoints per arm after 7.3 h — `b43b` is the long pole at ~8 h remaining, so HOF-500 starts this evening. See the close-out cost warning below: this is expected, not stuck |
+| **desktop** | **`b42a-d` stopped by hand at 22:15** at +385-421k past seed; **its close-out and HOF-500 are both done**. **`b44a-d` trained to the 3M cap overnight and its close-out is done (11.2-14.9 h); its HOF-500 is running** as `b44-hof-r2` — resumed 09:47 on 2026-08-20 after the write-throttle fix was deployed, keeping 1157 of its 2235 rows, and at 1176 as of 10:05. **`b45a-d` (`lr 1e-8`, 5M cap) is queued** behind it at priority 30, dirs already seeded | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
 
 **The two hosts now run the same chain, which they did not before 2026-08-18.** The desktop daemon has
 chained `training → closeout → HOF` since 2026-08-15; the laptop's `chain_closeout_after_training.sh`
@@ -119,7 +119,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, at a low enough rate; `b42`-`b44` closed out, both HOF-500s running, `b45` queued behind them**
+## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, and lower is better; `b43`'s HOF-500 is done, `b44`'s is half done and already holds a 500/500**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
@@ -132,10 +132,10 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
-| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out done (15 h), HOF-500 running on the laptop | **done at 3M**, close-out done (11.2-14.9 h), HOF-500 running on the desktop | queued behind `b44`'s HOF |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd | **done at 3M**, close-out (15 h) and HOF-500 both **complete** | **done at 3M**, close-out done (11.2-14.9 h), **HOF-500 ~53% done** on the desktop | queued behind `b44`'s HOF |
 | self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | — |
 | close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | — |
-| HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **22 so far and a 99.4% candidate record**, pass ~25% done | 14 in the first 128 measurements, pass ~6% done | — |
+| HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **187 rows ≥98%**, best 99.6% (`b43b` @1661k) — pass complete | **293 rows ≥98% at ~53%** of the pass, and a **500/500** (`b44b` @1886k) | — |
 
 `b44` existed because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
 into a hold. It asked where that stops, and **the answer is "not yet at 1e-7"** — see [what actually
@@ -294,28 +294,46 @@ abandoned early and is not full length. Every share above counts full-length row
 set the gate guarantees, so the comparison is sound — but the *pooled* rate over all rows is not comparable
 across arms with different abandonment counts and is deliberately not quoted here.
 
-### ‡ The HOF-500 passes are running, and `b43a` is carrying a candidate record
+### ✅ `b43`'s HOF-500 is done, and `b44`'s half-finished one already holds a 500/500
 
-Both re-measures (`above:98` at 500 episodes, flat) are in flight as of 2026-08-19 21:50, and they are the
-instrument that decides the ladder: everything above is 100 episodes.
+Both re-measures are `above:98` at 500 episodes, flat, and they are the instrument that decides the ladder —
+everything above is 100 episodes. `b43`'s finished on the laptop at 09:55 on 2026-08-20 (767 measurements,
+12.3 h wall clock, 80% lane utilisation); `b44`'s is at 1176 of 2235 on the desktop, read 10:05.
 
-| arm | ≥98%/500 rows so far | best /500 so far | pass |
-|---|---|---|---|
-| `b43a` (1e-6, from the record) | 9 | **99.4% @1618000** (497/500) | ~25% done |
-| `b43b` | 12 | 99.0% @1371000 | ~25% |
-| `b43c` | 1 | 98.0% @1760000 | ~25% |
-| `b43d` | 0 | — | ~25% |
-| `b44a` (1e-7, from the record) | 5 | 98.4% @1518000 | ~6% |
-| `b44b` | 6 | 98.6% @1355000 | ~6% |
-| `b44c` | 3 | 98.6% @1531000 | ~6% |
-| `b44d` | 0 | — | ~6% |
+| arm | ≥98%/500 | ≥99%/500 | best /500 | pass |
+|---|---|---|---|---|
+| `b43a` (1e-6, from the record) | 16 | 2 | 99.4% @1618000 (497/500) | **done** |
+| `b43b` | **170** | **17** | **99.6% @1661000** (498/500), also @1708000 | **done** |
+| `b43c` | 1 | 0 | 98.0% @1760000 | **done** |
+| `b43d` | 0 | 0 | — (97.7% @1426k over 488, gate-abandoned) | **done** |
+| `b44a` (1e-7, from the record) | 105 | — | 99.6% @2207000 | ~53% |
+| `b44b` | **155** | — | **100.0% @1886000 — 500/500** | ~53% |
+| `b44c` | 33 | — | 98.8% @2301000 | ~53% |
+| `b44d` | 0 | — | — | ~53% |
 
-**`b43a` @1618000 at 99.4%/500 would be the highest /500 on record**, above `b29b` @1447k's 99.0% — and it is
-171k steps *past* that checkpoint on the same weights, which is the ladder's whole claim in one row. Hold it
-loosely for now: 497/500 against 495/500 is well inside the CI, the pass is a quarter done, and it is the
-maximum of a noisy statistic over 59 measured checkpoints, which is the winner's curse this file has already
-been caught by twice. **The number worth watching is the count, not the maximum** — `b43` has 22 rows ≥98%/500
-against `b42`'s 4 in a completed pass, and `b44` has 14 in its first 128 measurements.
+**Totals: `b42` 4 rows ≥98%/500 in a completed pass, `b43` 187 in a completed pass, `b44` 293 with roughly half
+its pass to go.** The ladder's ordering holds on the deepest instrument available, and the gap is not marginal —
+it is 4 → 187 → 293+ from byte-identical starting weights, with learning rate the only difference.
+
+**`b44b` @1886000 scored 500/500** — the first flawless 500-episode measurement in the project, against a
+previous best of 495/500. Being at the ceiling makes it a different kind of claim from the near-misses below it:
+it cannot be beaten, only matched or found not to replicate. **It is not in `hallOfFame/` and should not be
+treated as promoted** — that is the manual verified process, and it needs an independent measurement of the
+*copied* checkpoint before the number means anything about a file on disk.
+
+**Two things this pass corrects in the note it replaces.** First, the candidate record was attributed to the
+wrong arm: `b43a` was leading at ~25% of the pass with 99.4%, and `b43b` — a *worse* starting checkpoint, 98.4%
+against 99.0% — finished with 99.6% and **170 of `b43`'s 187** ≥98% rows against `b43a`'s 16. **So a checkpoint's
+own /500 rate does not predict how well it continues**, and continuing the best checkpoint was not the best move.
+Second, the note's own advice — *watch the count, not the maximum* — was right, and it is what makes the ladder
+readable: the maxima (99.4 / 99.6 / 100.0) are three noisy draws separated by 2-3 episodes, while the counts are
+separated by factors of 40 and up.
+
+**The counts are still one seed's story.** `b43b` alone carries 91% of `b43`'s total and `b44b` 53% of `b44`'s so
+far, while the `b29c` seed (`b43d`/`b44d`) produced zero on every rung. The rate multiplies whatever the seed
+had; it does not create it. That is consistent with [the retired b29 record
+region](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading)
+and it means **`b45` at `1e-8` should be read on the same four seeds separately**, never pooled into one number.
 
 ### Batch 45 — `1e-8`, and the first rung with a longer cap
 
@@ -367,7 +385,7 @@ If a future continuation batch needs a cheaper close-out, the lever is the *sele
 `above:<threshold>` reads a prior close-out's 100-episode numbers instead of the graph, which is what the HOF
 pass already uses.
 
-### ⚠ `b45` is blocked behind `b44`'s HOF-500 for ~18 h, and that is the wave barrier working as designed
+### ⚠ `b45` is blocked behind `b44`'s HOF-500 (~13 h left as of 2026-08-20 10:05), and that is the wave barrier working as designed
 
 As of 21:50 the desktop is running **one** job — `b44-hof` — and holding `b45`'s four trainings plus their
 close-out queued behind it, because nothing new starts while anything is running. `b44-hof` is ~6% done at
@@ -767,7 +785,7 @@ from a local minimum; all four seeds make the same level shift
 and the ladder's headline. **Not claimed yet**: its HOF-500 pass is ~25% done, 497/500 against the standing
 495/500 is well inside the CI, and it is the maximum over 59 measured checkpoints — the winner's curse that has
 already been corrected twice in this file. See
-[the HOF-500 note](#-the-hof-500-passes-are-running-and-b43a-is-carrying-a-candidate-record).
+[the HOF-500 note](#-b43s-hof-500-is-done-and-b44s-half-finished-one-already-holds-a-500500).
 
 **NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI
 97.7-99.6). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500; the lead is inside the

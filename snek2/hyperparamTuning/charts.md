@@ -64,7 +64,7 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *closed out (11-15 h): it beats `1e-6` on 3 of 4 seeds on the 100-episode instrument too, and by a lot; HOF-500 running*
+## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *closed out (11-15 h): it beats `1e-6` on the 100-episode instrument too, and its half-finished HOF-500 holds the project's first **500/500***
 
 The third rung, and **the rung that falsified its own pre-registration.** `b44` was queued expecting a null
 against `b43` (~65% by the estimate written into its specs) on the reasoning that if `1e-6` is already doing
@@ -125,8 +125,23 @@ five for their `1e-6` twins and one in fifteen for `1e-5`. `b44d` is the flat se
 carries the most dead weight in the denominator and still wins; the full comparison, with the caveats, is in
 [`runs.md`](runs.md#-the-100-episode-close-outs-agree-with-the-self-evals-and-the-effect-is-much-larger-than-the-self-evals-suggested).
 
-**The HOF-500 is running** (`above:98`, 2235 measurements, ~18 h) and is what decides the ladder against `b43`:
-14 rows ≥98%/500 in the first 128 measurements, best 98.6% so far. See
+**The HOF-500 is what decides the ladder against `b43`, and it has already produced the project's first
+flawless 500-episode measurement:** `b44b` @1886000 scored **500/500**, against a previous record of 495/500
+(`b29b` @1447k, 99.0%). At **~53% of the pass** (1176 of 2235 measurements, read 2026-08-20 10:05) `b44` has
+**293 rows ≥98%/500** — more than `b43`'s **187 in a completed pass**, on a *less* selected pool:
+
+| arm | rows so far | ≥98%/500 | best /500 | `b43` twin's final ≥98%/500 |
+|---|---|---|---|---|
+| `b44a` | 360 | 105 | 99.6% @2207k | 16 |
+| `b44b` | 358 | **155** | **100.0% @1886k** (500/500) | 170 |
+| `b44c` | 358 | 33 | 98.8% @2301k | 1 |
+| `b44d` | 100 | 0 | — | 0 |
+
+**Hold the 500/500 as a measurement, not yet as a champion.** It is the maximum over 358 measured checkpoints
+on the arm that was always going to win, so the winner's curse applies as it did to `b43a`'s 99.4% — but unlike
+that one it is at the ceiling, so it cannot be beaten, only matched or failed to replicate. **It has not been
+promoted into `hallOfFame/`**; that is the manual verified process, and it needs a fresh independent
+measurement of the *copied* checkpoint first. See
 the ⚠ note in [batch 42's section](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-at-177-191m-closed-out-and-hof-500d-it-decays-and-its-surviving-98-checkpoints-are-its-own-starting-weights)
 on why `peak_trailing` is useless for this family, and the [close-out cost
 warning](#-a-continuation-batchs-close-out-costs-10-20x-a-normal-ones) below.
@@ -176,7 +191,7 @@ behaviour, not a bug: **"N is a target, not a quota"** — every checkpoint whos
 Practical consequence: budget a continuation batch's close-out at **8-15 hours per wave**, not one, and do not
 read a close-out still running after 7 hours as hung. `b43`'s was launched 01:07 and is still going.
 
-## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *closed out (15 h); HOF-500 running and carrying a 99.4%/500 candidate record*
+## Batch 43 — **continuing the four best checkpoints at `lr 1e-6`** — *closed out (15 h) and HOF-500'd: **187** checkpoints at ≥98%/500 against `b42`'s 4, topping out at 99.6% — which `b44` then beat*
 
 **The question:** every record in this project is a checkpoint some arm *passed through* on its way to a worse
 endpoint. No arm has ever been continued from its own best checkpoint. `b43` continues the top four of eight
@@ -184,7 +199,7 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-at-a-low-enough-rate-b42-b44-closed-out-both-hof-500s-running-b45-queued-behind-them);
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-b43s-hof-500-is-done-b44s-is-half-done-and-already-holds-a-500500);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 
@@ -201,7 +216,7 @@ Final training numbers: `best_perfect30` **98.3-100.0**, `sef` **96.5-99.5**, `m
 seed checkpoint**, a 30-eval window with no imperfect game in it. So `1e-6` is not merely preservation.
 
 **`b44` at `1e-7` then beat it on 4 of 4 seeds** (+2.0 pp mean over the full common window), so `b43` is the
-*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--closed-out-11-15-h-it-beats-1e-6-on-3-of-4-seeds-on-the-100-episode-instrument-too-and-by-a-lot-hof-500-running). That nothing fell apart is itself a result: **the same four checkpoints fell
+*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--closed-out-11-15-h-it-beats-1e-6-on-the-100-episode-instrument-too-and-its-half-finished-hof-500-holds-the-projects-first-500500). That nothing fell apart is itself a result: **the same four checkpoints fell
 80% → 50% perfect in 5k steps when the replay buffer was *not* carried over**, and holding 95-100% here is what
 the buffer copy bought.
 
@@ -224,37 +239,62 @@ the other one. **`b42` and `b43` are also not at a common step horizon** (`b42` 
 `b43` is past +541k) and `sef` is a fraction of each arm's own evals, so the banded comparison — not this
 column — is the rigorous one.
 
-### ✅ Close-out (100 episodes) and HOF-500 so far
+### ✅ Close-out (100 episodes) and HOF-500 — both complete
 
-| arm | checkpoints measured | ≥98%/100 | ≥99%/100 | best /100 | ≥98%/500 so far | best /500 so far |
-|---|---|---|---|---|---|---|
-| `b43a` | 1297 | 166 (12.8%) | 78 | 100% @1502k | **9** | **99.4% @1618k** |
-| `b43b` | 1568 | **607 (38.7%)** | 311 | 100% @1356k | **12** | 99.0% @1371k |
-| `b43c` | 1325 | 133 (10.0%) | 47 | 100% @1516k | 1 | 98.0% @1760k |
-| `b43d` | 1378 | 83 (6.0%) | 27 | 100% @1539k | 0 | — |
+| arm | checkpoints measured | ≥98%/100 | ≥99%/100 | best /100 | ≥98%/500 | ≥99%/500 | best /500 |
+|---|---|---|---|---|---|---|---|
+| `b43a` | 1297 | 166 (12.8%) | 78 | 100% @1502k | 16 | 2 | 99.4% @1618k |
+| `b43b` | 1568 | **607 (38.7%)** | 311 | 100% @1356k | **170** | **17** | **99.6% @1661k** (also @1708k) |
+| `b43c` | 1325 | 133 (10.0%) | 47 | 100% @1516k | 1 | 0 | 98.0% @1760k |
+| `b43d` | 1378 | 83 (6.0%) | 27 | 100% @1539k | 0 | 0 | — |
 
 Against `b42`'s 17 / 27 / 6 / 48 ≥98%/100 rows on the same four seeds, and `b44`'s 853 / 867 / 415 / 100 — so
-`b43` sits where the ladder says it should on 3 of 4 seeds and loses to `b42` on `b29c`. The /500 column is
-**~25% of the way through** its pass; `b43a` @1618000 at 99.4% (497/500) is a candidate record and is 171k steps
-past the record checkpoint it continues. Held loosely — see
-[`runs.md`](runs.md#-the-hof-500-passes-are-running-and-b43a-is-carrying-a-candidate-record).
+`b43` sits where the ladder says it should on 3 of 4 seeds and loses to `b42` on `b29c`.
 
-### b43b-lowlr-b29a — continues `b29a` @1347k, 98.4%/500
+**187 checkpoints at ≥98%/500 against `b42`'s 4** is the headline, and it is a 47× gap from byte-identical
+starting weights. But **one seed carries 170 of the 187**, and `b43c`/`b43d` contribute 1 and 0 — so the count
+is a **seed effect amplified by the rate**, not a config effect. That is the same shape as [the retired b29
+record region](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
+and the reason to read the pooled figures rather than the counts.
+
+Pooled rate over each arm's own measured checkpoints: `b43b` **97.3%** (228404/234625, 607 checkpoints),
+`b43a` 96.6% (166), `b43c` 95.9% (133), `b43d` 95.0% (83) — the same ordering as every other instrument here.
+**These pool rows of unequal length and so read high**: the 98% gate abandons the weak rows early, which makes
+them short, so the winners carry more of the denominator than they should. Compare the ordering, not the level.
+
+**The prediction written here yesterday was wrong in its subject and right in its substance.** `b43a` was
+carrying the candidate record at ~25% of the pass; it finished at 99.4% and was passed by its sibling `b43b` at
+**99.6%** (498/500), and both were then beaten by `b44b`'s **500/500**. The note said the number worth watching
+was the count and not the maximum, and that is exactly how it turned out — see
+[`runs.md`](runs.md#-b43s-hof-500-is-done-and-b44s-half-finished-one-already-holds-a-500500).
+
+### b43b-lowlr-b29a — continues `b29a` @1347k, 98.4%/500 — **the batch's best arm on every instrument**
 
 Best-30 **100.0** at 1667k, `sef` **99.6**, recent-30 95.0, `max_single_eval` 100. **The strongest evidence in
 the pair that `1e-6` improves rather than merely holds** — a 30-eval window with no imperfect game, 320k steps
-past its seed, against 97.3 for its byte-identical `b42` twin. On 10-episode evals, so the close-out is what
-decides it; but a clean 30-window is not something the starting checkpoint produced.
+past its seed, against 97.3 for its byte-identical `b42` twin. The close-out and HOF-500 then agreed on all
+three counts: **607 ≥98%/100, 170 ≥98%/500, 17 ≥99%/500, best 99.6% @1661k** (498/500), and a pooled 97.3%.
+
+**Note which seed this is.** `b43b` continues `b29a`, whose 500-episode rate at its seed checkpoint was 98.4% —
+*second* of the four, not the 99.0% record. The arm continued *from* the record, `b43a`, finished with 16
+≥98%/500 rows against this arm's 170. **So a checkpoint's own /500 rate did not predict how well it continues**,
+which is one more reason not to treat the b29 record region as a property of the weights.
 
 ![b43b](charts/b43b-lowlr-b29a.png)
 
-### b43a-lowlr-b29b — continues `b29b` @1447k, **99.0%/500, the project record**
+### b43a-lowlr-b29b — continues `b29b` @1447k, **99.0%/500, the record at the time**
 
 Best-30 **98.7** at 1527k, `sef` **99.6**, recent-30 91.7 — against 97.3 / **87.0** for `b42a` from
 byte-identical weights, the widest `sef` gap of the four. The arm that matters most: it starts from the head
 of b29b's 18-checkpoint band, and [that band is now known to be a
 seed rather than a config](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading),
 so whether the region can be *extended by training inside it* is the open question `b42`/`b43` exist to answer.
+
+**The answer, from its own HOF-500: yes, but this was not the arm that showed it.** `b43a` produced **16**
+≥98%/500 rows and a best of **99.4% @1618k** — 171k steps past the record checkpoint it continues, so the region
+*was* extended, and by more than `b42a`'s 1 row from the same weights. But its sibling `b43b`, starting from a
+*worse* checkpoint, produced 170. **Continuing the best checkpoint was not the best move**, which is the sharpest
+form of the seed-not-config result and worth remembering the next time a champion is picked by its /500 rate.
 
 ![b43a](charts/b43a-lowlr-b29b.png)
 
