@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-19T20:02:49",
-  "ts": 1787194969.2022507,
+  "iso": "2026-08-19T20:03:24",
+  "ts": 1787195004.1383035,
   "at_a_glance": {
     "running": [
-      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (2 arms)"
+      "b44 -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- closeout eval (1 arm)"
     ],
     "queued": [
       "b44 hof -- b44: continue the 4 best b29/b40 checkpoints to 3M, lr 1e-7 -- queued (4 arms)",
@@ -30,22 +30,9 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 2
+    "eval": 1
   },
   "running": [
-    {
-      "id": "b44a-lowlr7-b29b-closeout",
-      "type": "eval",
-      "policy": "b44a-lowlr7-b29b",
-      "policies": [
-        "b44a-lowlr7-b29b"
-      ],
-      "pid": 1785347,
-      "step": 3000000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 51551
-    },
     {
       "id": "b44b-lowlr7-b29a-closeout",
       "type": "eval",
@@ -57,7 +44,7 @@
       "step": 3000000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 51551
+      "elapsed_s": 51586
     }
   ],
   "ledger": {
@@ -67,8 +54,8 @@
     "b45c-lowlr8-b40b": "queued",
     "b45d-lowlr8-b29c": "queued",
     "b45-closeout": "queued",
-    "b44a-lowlr7-b29b-closeout": "running",
     "b44b-lowlr7-b29a-closeout": "running",
+    "b44a-lowlr7-b29b-closeout": "done",
     "b44c-lowlr7-b40b-closeout": "done",
     "b44d-lowlr7-b29c-closeout": "done",
     "b44b-lowlr7-b29a": "done",
@@ -309,8 +296,8 @@
   },
   "disk_free_gb": 125.7,
   "load_avg": [
-    8.19140625,
-    8.169921875,
-    8.19580078125
+    7.65966796875,
+    8.0654296875,
+    8.16015625
   ]
 }
