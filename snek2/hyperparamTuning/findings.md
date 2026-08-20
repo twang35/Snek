@@ -47,7 +47,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 | finding | status |
 |---|---|
-| **‡‡ The record is a 500/500** — `b44b-lowlr7-b29a` @1886k, a *continuation* of `b29a` @1347k at `lr 1e-7` | **measured 2026-08-20**, gate 98, flat. First flawless 500-episode pass in the project, against `b29b` @1447k's 495/500. Its batch's HOF pass was ~53% done, and it is **not promoted** — see below |
+| ~~**The record is a 500/500** — `b44b-lowlr7-b29a` @1886k~~ | **retracted the same day.** Re-measured on **1000 fresh episodes: 982/1000 = 98.2%** (97.2-98.9). The flawless pass was a selected outlier — 1 in 8,800 at that true rate. **No checkpoint in this project has a verified rate above ~99%**; the best fresh estimate is `b44b` @2297000 at 99.0% and the four best pool to **98.40%**. See below |
 | **‡‡ Continuing a champion at a lower rate works: 1e-5 → 1e-6 → 1e-7 gave 4 → 187 → 293+ rows ≥98%/500** | **established for b43 2026-08-20**, `b44` mid-pass. Byte-identical starting weights, 4 of 4 seeds on ≥98%/100. `b45` at 1e-8 tests monotonicity. See below |
 | **‡‡ Among *statistically tied* checkpoints, nothing predicts which continues better** — the 99.0% record's continuation lost to the 98.4% one's, 16 rows to 170 | **two independent rungs agree**, 2026-08-20. /500 rate ranks the four at ρ=0.80 and pooled eq at 0.20, but /500 swaps exactly the top two — where the 10x gap is. **Continue several candidates**, don't rank tied ones. See below |
 | **The record is 97.6%** — `b18b-tgt1000seed2` @1588k, **683/700 fresh episodes** (CI 96.1-98.5) | **measured 2026-08-09**. Beats `b17b`'s 94.24%/5120 by **+3.33 pp, p=0.0002**, intervals **non-overlapping** — the first move in the ceiling that is a different class, not a better sample |
@@ -141,6 +141,59 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 
 ---
 
+## ‡‡ The winner's curse, measured: four selected champions all fell, and the 500/500 did not reproduce (2026-08-20)
+
+**The four best checkpoints in the project, re-measured on 1000 fresh episodes each, flat, gate off. All four
+came in below their selected figure**, mean **−1.35 pp**:
+
+| checkpoint | selected /500 | fresh /1000 | fresh 95% CI | drop | p |
+|---|---|---|---|---|---|
+| `b44b` @1886000 | **500/500 = 100.0%** | 982/1000 = **98.2%** | 97.2-98.9 | **−1.80** | 0.0025 |
+| `b44b` @2297000 | 499/500 = 99.8% | 990/1000 = **99.0%** | 98.2-99.5 | −0.80 | 0.087 |
+| `b44a` @2451000 | 498/500 = 99.6% | 983/1000 = **98.3%** | 97.3-98.9 | −1.30 | 0.034 |
+| `b43b` @1708000 | 498/500 = 99.6% | 981/1000 = **98.1%** | 97.1-98.8 | −1.50 | 0.020 |
+
+**Three of the four drops are significant on their own**, and the flawless pass did not reproduce.
+`P(500/500 | true rate 0.982)` is **1 in 8,800** — so that row was a genuine outlier, *selected for being one*
+out of ~400 measurements on that arm. That is the whole mechanism, and this is the first time this project has
+measured its size: **expect a selected /500 maximum to be ~1.4 pp optimistic.**
+
+**Never pool a selected measurement with its re-measurement.** The 500-episode row is what caused the
+checkpoint to be picked, so folding it back in re-imports the bias the re-measure exists to remove. The fresh
+1000 alone is the unbiased estimate. (A note written earlier the same day suggested pooling to 1500 episodes;
+that was wrong.)
+
+**The ranking inverted, and it still is not resolvable.** The 100% checkpoint is now **third of four**, and the
+best is `b44b` @2297000 at 99.0% — but **no pair among the four differs significantly** (p = 0.09 to 0.18). So
+1000 episodes tightened every interval and still cannot order these four. The defensible figure for "how good
+is the best policy here" is the pooled fresh estimate: **3936/4000 = 98.40% (97.96-98.74)**.
+
+### What the failures look like
+
+About half of every arm's failures sit at score 90-94 — the endgame, within five food of a win — but three of
+the four also died catastrophically early at least once:
+
+| checkpoint | failures | <50 | 50-79 | 80-89 | 90-94 | worst |
+|---|---|---|---|---|---|---|
+| `b44b` @1886000 | 18 | 2 | 4 | 4 | 8 | **4** |
+| `b44b` @2297000 | 10 | 2 | 0 | 0 | 8 | **4** |
+| `b44a` @2451000 | 17 | 3 | 2 | 3 | 9 | 20 |
+| `b43b` @1708000 | 19 | 0 | 6 | 5 | 8 | 59 |
+
+A score of **4** is dying almost immediately, and two arms did it once each in 1000 games. That is a different
+failure mode from losing the endgame and a 500-episode pass will often miss it entirely. Note also that
+`b43b` @1708000 — the `1e-6` rung — is the only one with **no** early death while carrying the *most* failures
+overall, so "fewest failures" and "no catastrophic failure" are not the same ranking.
+
+**Method.** `EVAL_EPISODES=1000 EVAL_SCREEN_EPISODES=0 EVAL_MIN_ACHIEVABLE=0`, four processes × 4 workers,
+~8 min wall clock; one policy dir per checkpoint under `savedPolicies/k1000*`, results in
+`runs/k1000*_checkpoint_evals_k1000.json`. **Gate off is load-bearing** — the default abandons a checkpoint once
+it cannot reach 97%, which would truncate exactly these rows. The three desktop checkpoints were copied with
+their `arch.json` and **verified to play before measuring** (20/20 perfect, score 95.0). The desktop's HOF pass
+sets `SNEK_CHASE_SAFE_SHAPING`/`GATE` and this run did not: checked and irrelevant, because `get_observations`
+reads no shaping constant and both terms enter only through `reward +=`, which cannot change an argmax over a
+restored `Q`.
+
 ## ‡‡ Continuing a champion works and lower is better — but the best checkpoint was the wrong one to continue (b42/b43/b44, 2026-08-20)
 
 **Settled for `b43`, corroborated mid-pass by `b44`.** Nothing in this project had ever been continued from its
@@ -151,7 +204,7 @@ learning rate the only difference:
 |---|---|---|---|
 | `b42` | 1e-5 — the rate they were trained at | **4** | 98.4% |
 | `b43` | **1e-6** | **187** | 99.6% (`b43b` @1661k, 498/500) |
-| `b44` | **1e-7** | **293 at ~53% of its pass** | **100.0%** (`b44b` @1886k, **500/500**) |
+| `b44` | **1e-7** | **293 at ~53% of its pass** | 99.8% (`b44b` @2297k) — the 500/500 at @1886k [did not reproduce](#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) |
 
 **A champion that keeps training at a low enough rate improves; at its original rate it decays.** 4 → 187 held
 checkpoints from byte-identical starting weights is not a marginal effect, and `b43` beat `b42` on ≥98%/100 on

@@ -64,7 +64,7 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *closed out (11-15 h): it beats `1e-6` on the 100-episode instrument too, and its half-finished HOF-500 holds the project's first **500/500***
+## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *closed out (11-15 h): it beats `1e-6` on the 100-episode instrument too; its HOF-500's flawless row **did not survive re-measurement***
 
 The third rung, and **the rung that falsified its own pre-registration.** `b44` was queued expecting a null
 against `b43` (~65% by the estimate written into its specs) on the reasoning that if `1e-6` is already doing
@@ -133,15 +133,17 @@ flawless 500-episode measurement:** `b44b` @1886000 scored **500/500**, against 
 | arm | rows so far | ≥98%/500 | best /500 | `b43` twin's final ≥98%/500 |
 |---|---|---|---|---|
 | `b44a` | 360 | 105 | 99.6% @2207k | 16 |
-| `b44b` | 358 | **155** | **100.0% @1886k** (500/500) | 170 |
+| `b44b` | 358 | **155** | 100.0% @1886k (500/500) — **re-measures 98.2%/1000** | 170 |
 | `b44c` | 358 | 33 | 98.8% @2301k | 1 |
 | `b44d` | 100 | 0 | — | 0 |
 
-**Hold the 500/500 as a measurement, not yet as a champion.** It is the maximum over 358 measured checkpoints
-on the arm that was always going to win, so the winner's curse applies as it did to `b43a`'s 99.4% — but unlike
-that one it is at the ceiling, so it cannot be beaten, only matched or failed to replicate. **It has not been
-promoted into `hallOfFame/`**; that is the manual verified process, and it needs a fresh independent
-measurement of the *copied* checkpoint first. See
+**‡ It failed to replicate, and that caution was the right one.** The 500/500 was re-measured the same day on
+**1000 fresh episodes and scored 982/1000 = 98.2%** (97.2-98.9) — a **−1.8 pp** drop, p=0.0025. All four of the
+project's best checkpoints were re-measured together and **all four fell**, mean −1.35 pp, which puts a number
+on the winner's curse for the first time: [full result in
+`findings.md`](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20). Nothing was promoted into `hallOfFame/`, and on
+these numbers nothing should be until a candidate is chosen on a fresh measurement rather than a selected one.
+See
 the ⚠ note in [batch 42's section](#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5--stopped-early-at-177-191m-closed-out-and-hof-500d-it-decays-and-its-surviving-98-checkpoints-are-its-own-starting-weights)
 on why `peak_trailing` is useless for this family, and the [close-out cost
 warning](#-a-continuation-batchs-close-out-costs-10-20x-a-normal-ones) below.
@@ -199,7 +201,7 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-b43s-hof-500-is-done-b44s-is-half-done-and-already-holds-a-500500);
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-b43s-hof-500-is-done-and-b44s-is-half-done-but-its-500500-re-measured-at-982);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 
@@ -216,7 +218,7 @@ Final training numbers: `best_perfect30` **98.3-100.0**, `sef` **96.5-99.5**, `m
 seed checkpoint**, a 30-eval window with no imperfect game in it. So `1e-6` is not merely preservation.
 
 **`b44` at `1e-7` then beat it on 4 of 4 seeds** (+2.0 pp mean over the full common window), so `b43` is the
-*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--closed-out-11-15-h-it-beats-1e-6-on-the-100-episode-instrument-too-and-its-half-finished-hof-500-holds-the-projects-first-500500). That nothing fell apart is itself a result: **the same four checkpoints fell
+*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--closed-out-11-15-h-it-beats-1e-6-on-the-100-episode-instrument-too-its-hof-500s-flawless-row-did-not-survive-re-measurement). That nothing fell apart is itself a result: **the same four checkpoints fell
 80% → 50% perfect in 5k steps when the replay buffer was *not* carried over**, and holding 95-100% here is what
 the buffer copy bought.
 
@@ -270,9 +272,11 @@ them short, so the winners carry more of the denominator than they should. Compa
 
 **The prediction written here yesterday was wrong in its subject and right in its substance.** `b43a` was
 carrying the candidate record at ~25% of the pass; it finished at 99.4% and was passed by its sibling `b43b` at
-**99.6%** (498/500), and both were then beaten by `b44b`'s **500/500**. The note said the number worth watching
+**99.6%** (498/500), and both were then beaten by `b44b`'s **500/500** — which itself
+[fell to 98.2% on 1000 fresh episodes](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20), as did `b43b` @1708000
+(98.1%). The note said the number worth watching
 was the count and not the maximum, and that is exactly how it turned out — see
-[`runs.md`](runs.md#-b43s-hof-500-is-done-and-b44s-half-finished-one-already-holds-a-500500).
+[`runs.md`](runs.md#-b43s-hof-500-is-done-b44s-is-half-done--and-its-500500-did-not-survive-re-measurement).
 
 **`b43` is finished on all three instruments, and its canonical write-up is now in
 [`completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue)** — the per-seed `b42` comparison, the pooled equal-effort figures

@@ -119,7 +119,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, and lower is better; `b43`'s HOF-500 is done, `b44`'s is half done and already holds a 500/500**
+## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, and lower is better; `b43`'s HOF-500 is done and `b44`'s is half done, but its 500/500 re-measured at 98.2%**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
@@ -294,7 +294,7 @@ abandoned early and is not full length. Every share above counts full-length row
 set the gate guarantees, so the comparison is sound — but the *pooled* rate over all rows is not comparable
 across arms with different abandonment counts and is deliberately not quoted here.
 
-### ✅ `b43`'s HOF-500 is done, and `b44`'s half-finished one already holds a 500/500
+### ✅ `b43`'s HOF-500 is done, `b44`'s is half done — and its 500/500 did not survive re-measurement
 
 Both re-measures are `above:98` at 500 episodes, flat, and they are the instrument that decides the ladder —
 everything above is 100 episodes. `b43`'s finished on the laptop at 09:55 on 2026-08-20 (767 measurements,
@@ -307,7 +307,7 @@ everything above is 100 episodes. `b43`'s finished on the laptop at 09:55 on 202
 | `b43c` | 1 | 0 | 98.0% @1760000 | **done** |
 | `b43d` | 0 | 0 | — (97.7% @1426k over 488, gate-abandoned) | **done** |
 | `b44a` (1e-7, from the record) | 105 | — | 99.6% @2207000 | ~53% |
-| `b44b` | **155** | — | **100.0% @1886000 — 500/500** | ~53% |
+| `b44b` | **155** | — | 100.0% @1886000 (500/500) — **re-measures 98.2%/1000** | ~53% |
 | `b44c` | 33 | — | 98.8% @2301000 | ~53% |
 | `b44d` | 0 | — | — | ~53% |
 
@@ -315,11 +315,11 @@ everything above is 100 episodes. `b43`'s finished on the laptop at 09:55 on 202
 its pass to go.** The ladder's ordering holds on the deepest instrument available, and the gap is not marginal —
 it is 4 → 187 → 293+ from byte-identical starting weights, with learning rate the only difference.
 
-**`b44b` @1886000 scored 500/500** — the first flawless 500-episode measurement in the project, against a
-previous best of 495/500. Being at the ceiling makes it a different kind of claim from the near-misses below it:
-it cannot be beaten, only matched or found not to replicate. **It is not in `hallOfFame/` and should not be
-treated as promoted** — that is the manual verified process, and it needs an independent measurement of the
-*copied* checkpoint before the number means anything about a file on disk.
+**`b44b` @1886000 scored 500/500, and then failed to replicate.** Re-measured the same day on **1000 fresh
+episodes: 982/1000 = 98.2%** (97.2-98.9), a −1.8 pp drop at p=0.0025. The four best checkpoints in the project
+were re-measured together and **all four fell**, mean −1.35 pp — so a selected /500 maximum should be treated as
+roughly **1.4 pp optimistic**, and the pooled fresh figure for the four is **98.40%**. Nothing is in
+`hallOfFame/`, and the re-measurement is why: [full result in `findings.md`](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20).
 
 **Two things this pass corrects in the note it replaces.** First, the candidate record was attributed to the
 wrong arm: `b43a` was leading at ~25% of the pass with 99.4%, and `b43b` — a *worse* starting checkpoint, 98.4%
@@ -791,7 +791,7 @@ from a local minimum; all four seeds make the same level shift
 and the ladder's headline. **Not claimed yet**: its HOF-500 pass is ~25% done, 497/500 against the standing
 495/500 is well inside the CI, and it is the maximum over 59 measured checkpoints — the winner's curse that has
 already been corrected twice in this file. See
-[the HOF-500 note](#-b43s-hof-500-is-done-and-b44s-half-finished-one-already-holds-a-500500).
+[the HOF-500 note](#-b43s-hof-500-is-done-b44s-is-half-done--and-its-500500-did-not-survive-re-measurement).
 
 **NEW RECORD, 2026-08-16: `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI
 97.7-99.6). It is the highest /500 point estimate on record, above `b24d`'s 98.0%/500; the lead is inside the
