@@ -12,6 +12,7 @@ import json
 import os
 
 import eval_checkpoints
+import eval_plan
 from snake_constants import RUNS_DIR
 
 
@@ -286,6 +287,91 @@ def test_build_row_ci_widens_as_the_sample_shrinks():
     assert wide['perfect_percent'] == narrow['perfect_percent'] == 70.0
     assert (wide['perfect_ci95'][1] - wide['perfect_ci95'][0]) > \
            (narrow['perfect_ci95'][1] - narrow['perfect_ci95'][0])
+
+
+# ------------------------------------------------------------ RowCache / WriteGate
+
+def test_a_cached_row_is_not_rebuilt_on_the_next_pass():
+    """The point of the cache. Both writers assemble the whole row list on every write, so a rebuild
+    per pass is a rebuild per round — 97 ms x 125 on a 513-row arm."""
+    cache = eval_checkpoints.RowCache()
+    samples = {1000: held([True] * 7 + [False] * 3)}
+    builds = []
+    # Patched in `eval_plan`, not in `eval_checkpoints`: `RowCache.rows` resolves `build_row` in the
+    # namespace it is defined in, and the re-export is a separate binding to the same function.
+    real = eval_plan.build_row
+
+    def counting(step, sample, meta=None):
+        builds.append(step)
+        return real(step, sample, meta)
+
+    eval_plan.build_row = counting
+    try:
+        first = cache.rows(samples, {}, lambda step: None)
+        second = cache.rows(samples, {}, lambda step: None)
+    finally:
+        eval_plan.build_row = real
+    assert builds == [1000], builds
+    # By reference, which is what makes the second pass free. Safe only because build_row copies the
+    # episode_* lists out of the sample.
+    assert second[0] is first[0]
+
+
+def test_a_topped_up_sample_needs_a_put_or_its_row_freezes():
+    """The invariant, stated as the failure it prevents: a screened row topped up to full length
+    keeps reporting its screen depth if the mutator forgets to `put`."""
+    cache = eval_checkpoints.RowCache()
+    sample = held([True] * 15 + [False] * 5)
+    samples = {1000: sample}
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 20
+    # A top-up, the way `measure` and `Wave.on_done` both do it: extend in place, then re-put.
+    sample['perfect'].extend([True] * 80)
+    sample['scores'].extend(range(80))
+    sample['rewards'].extend([1.0] * 80)
+    cache.put(1000, eval_checkpoints.build_row(1000, sample))
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 100
+
+
+def test_clear_drops_rows_cached_against_a_replaced_samples_dict():
+    cache = eval_checkpoints.RowCache()
+    samples = {1000: held([True] * 4)}
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 4
+    cache.clear()
+    samples[1000] = held([True] * 9)
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 9
+
+
+def test_a_step_still_being_measured_has_no_row_yet():
+    """An empty sample is the checkpoint in flight; its state travels in `in_flight`, not as a row
+    with no episodes in it."""
+    cache = eval_checkpoints.RowCache()
+    samples = {1000: held([True] * 4), 2000: held([])}
+    assert [r['step'] for r in cache.rows(samples, {}, lambda step: None)] == [1000]
+
+
+def test_rows_come_out_in_step_order_whatever_the_dict_order():
+    cache = eval_checkpoints.RowCache()
+    samples = {3000: held([True]), 1000: held([True]), 2000: held([True])}
+    resumed = {500: {'step': 500, 'episodes': 100}}
+    assert [r['step'] for r in cache.rows(samples, resumed, lambda step: None)] == \
+        [500, 1000, 2000, 3000]
+
+
+def test_the_write_gate_admits_one_write_per_interval():
+    gate = eval_checkpoints.WriteGate(interval=2.0)
+    gate.record(now=100.0)
+    assert not gate.due(now=101.9)
+    assert gate.due(now=102.0)
+    # Pure: asking does not consume the slot, so a caller that asks twice and writes once is honest.
+    assert gate.due(now=102.0)
+    gate.record(now=102.0)
+    assert not gate.due(now=103.0)
+
+
+def test_the_write_gate_defaults_to_the_shared_constant():
+    # Read late rather than as a default argument, so the constant is patchable and so the class can
+    # be defined above it in the file.
+    assert eval_checkpoints.WriteGate().interval == eval_checkpoints.WRITE_MIN_INTERVAL
 
 
 # --------------------------------------------------------------- skips_screening

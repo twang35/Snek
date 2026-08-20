@@ -84,6 +84,8 @@ from eval_plan import (
     HOF_EPISODES,
     HOF_GATE,
     PayloadSpec,
+    RowCache,
+    WriteGate,
     archive_existing_eval_pngs,
     backup_previous_results,
     best_full_length_row,
@@ -121,6 +123,14 @@ STAGES = ('full', 'screen', 'flat', 'confirm')
 # hand their lanes over. Ten is long enough to average out one slow checkpoint and short enough to
 # follow a lane handover within a few minutes of it happening.
 ETA_WINDOW = 10
+
+# Seconds between recomputations of the **wave** ETA. Far coarser than `WRITE_MIN_INTERVAL` because
+# this is the one number in the payload whose inputs are the *plans* rather than the samples: it
+# answers "when is the box free" in hours, and a value 30 s old is indistinguishable from a fresh
+# one. It was also the expensive half of a write -- `wave_eta_seconds` builds **all four** arms'
+# payloads to price the wave, so it paid four row-rebuild passes on top of the one `write_payload`
+# needs, and it paid them once per round.
+ETA_MIN_INTERVAL = 30.0
 
 
 def parse_selector(tokens):
@@ -228,6 +238,13 @@ class Arm:
         self.num_workers = num_workers
         self.samples = {}
         self.in_flight = {}
+        # Almost every entry here is placed by `Wave.on_done` from the row it has already built for
+        # the log line, so a completed measurement costs no rebuild at all; the lazy path in
+        # `RowCache.rows` covers only the partial samples `finalise_plan` seeds from a resumed file.
+        self.row_cache = RowCache()
+        # Per arm rather than per wave, so a busy arm's rounds cannot starve a quiet sibling's file
+        # of updates.
+        self.write_gate = WriteGate()
         # Wall-clock stamps of this session's finished measurements, newest last, `ETA_WINDOW`
         # intervals' worth. Session-only on purpose: a resumed row's original timestamp says nothing
         # about the pace of the run that is now going.
@@ -285,6 +302,11 @@ class Arm:
         # resumed rows, and `load_finished_results` returned these as partials rather than rows, so
         # dropping them here would delete them from the file on the next write.
         self.samples.update({step: dict(held) for step, held in self.settled.items()})
+        # `samples` was just replaced wholesale, so nothing cached against the old one is valid.
+        # Empty in practice — no write has happened yet — but the cache's invariant is that it is
+        # cleared wherever `samples` is rebound and updated wherever a sample is mutated, and half an
+        # invariant is how a cache goes quietly stale.
+        self.row_cache.clear()
         self.all_steps = sorted(set(self.resumed_steps) | set(self.requested_steps))
         self.plan = plan_stages(self.requested_steps, selected_by, self.screen_episodes,
                                 self.confirm_count, self.num_episodes, self.num_workers,
@@ -382,12 +404,13 @@ class Arm:
 
     def rows(self):
         """Every checkpoint with episodes banked. One in flight is skipped until its episodes
-        land — its running state travels in the payload's `in_flight` block instead."""
-        rows = dict(self.resumed_by_step)
-        for step, held in self.samples.items():
-            if held['scores']:
-                rows[step] = build_row(step, held, self.selected_by.get(step))
-        return [rows[step] for step in sorted(rows)]
+        land — its running state travels in the payload's `in_flight` block instead.
+
+        Memoised per step, so **`self.samples[step]` may be mutated only by `Wave.on_done`**, which
+        pairs the mutation with a `row_cache.put`. See `eval_plan.RowCache` for why a cache here is
+        worth the invariant, and what it looks like when the invariant is broken.
+        """
+        return self.row_cache.rows(self.samples, self.resumed_by_step, self.selected_by.get)
 
     def payload(self, complete):
         # One in-flight block, because that is what the format holds: a policy worked by two lanes
@@ -691,6 +714,10 @@ class Wave:
         self.lanes_wanted = lanes_wanted
         self.workers_per_lane = workers_per_lane
         self.chart = {'last': 0.0, 'off': False}
+        # The wave ETA, recomputed on `ETA_MIN_INTERVAL` rather than once per write. `None` is both
+        # the initial value and what `wave_eta_seconds` returns before there is a pace to price
+        # with, so a not-yet-computed value and an unknowable one are already the same thing here.
+        self.eta = {'last': 0.0, 'value': None}
         self.issued = 0
         self.done = 0
         self.failures = []
@@ -746,8 +773,9 @@ class Wave:
         for arm in self.arms:
             self.add_units(arm.initial_units())
             # A file exists from the first moment, so a wave killed in its first minute still says
-            # what it was going to do rather than leaving no trace at all.
-            self.write(arm)
+            # what it was going to do rather than leaving no trace at all. Forced, because that
+            # guarantee is exactly the kind a throttle would quietly withdraw.
+            self.write(arm, force=True)
             if arm.screen_episodes and not arm.screens_expected:
                 # Every screen came in from a resumed file, so the barrier is already satisfied and
                 # nothing will arrive to trip it.
@@ -844,12 +872,16 @@ class Wave:
         self.done += 1
 
         row = build_row(unit.step, held, arm.selected_by.get(unit.step))
+        # Built from the sample this method just extended, so it *is* what `rows()` would produce for
+        # this step, and this is the `put` that `Arm.rows`'s invariant requires: `on_done` is the only
+        # place a sample is mutated, so it is the only place the cache can go stale.
+        arm.row_cache.put(unit.step, row)
         print('[{0:>4}/{1:<4}] {2:<26} {3:>8}  {4:<11} {5:>5.1f}%  {6:>4} eps  {7:>4.0f}s{8}'.format(
             self.done, self.issued, arm.policy_name, unit.step, unit.label,
             row['perfect_percent'], row['episodes'], elapsed,
             '  ABANDONED' if abandoned else ''))
         self.note_stage_done(unit)
-        self.write(arm)
+        self.write(arm, force=True)
 
     def on_error(self, unit, lane_index, traceback_text):
         self.failures.append((unit, traceback_text))
@@ -945,15 +977,33 @@ class Wave:
         except Exception:
             return None      # an ETA is never worth losing a measurement over
 
-    def write(self, arm):
-        """`runs/<policy>_checkpoint_evals<suffix>.json`, rewritten in full after every round.
+    def wave_eta_cached(self):
+        """`wave_eta_seconds` behind a wall-clock gate. See `ETA_MIN_INTERVAL` for why it needs one."""
+        now = time.time()
+        if now - self.eta['last'] >= ETA_MIN_INTERVAL:
+            self.eta['last'] = now
+            self.eta['value'] = self.wave_eta_seconds()
+        return self.eta['value']
+
+    def write(self, arm, force=False):
+        """`runs/<policy>_checkpoint_evals<suffix>.json`, rewritten in full.
 
         Rewriting is cheap next to a checkpoint's runtime and it is what makes a killed wave
         resumable: a 15-hour close-out that wrote only at the end would throw all of it away.
         `write_payload` does the `.partial` + `os.replace`, so a reader never sees a half-written
         file.
+
+        **Rewriting it once per round is not cheap**, which is what `WRITE_MIN_INTERVAL` is for: a
+        progress call from `on_round` is dropped when this arm was written less than that ago, while
+        `force=True` — every completed measurement, and the plan's first write — always goes through.
+        So the in-flight block advances on wall clock instead of on episode count, and **no durable
+        result ever waits on the gate**, which is the property that makes the throttle safe: a
+        dropped write would otherwise be a dropped measurement on a killed wave.
         """
-        eta = self.wave_eta_seconds()
+        if not (force or arm.write_gate.due()):
+            return
+        arm.write_gate.record()
+        eta = self.wave_eta_cached()
         for other in self.arms:
             # Stamped on every arm, not only the one being written: the charts are refreshed as a set
             # and a stale wave total on three of four panels reads as four disagreeing answers.

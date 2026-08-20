@@ -305,6 +305,79 @@ def held_from_row(row):
             'abandoned': bool(row.get('abandoned'))}
 
 
+class RowCache:
+    """`build_row` output per step, so assembling a result list costs a lookup per row, not a build.
+
+    Both writers assemble the whole list on **every** write — `eval_wave.Arm.rows` and
+    `eval_checkpoints`'s `current_results` — while at most one step's sample can have changed since
+    the last one. Measured on `b43b-lowlr-b29a` at 513 rows: **97 ms** a pass, run five times per
+    write in the wave and once per write in the single-policy path, against writes arriving 125 times
+    per 500-episode measurement.
+
+    **The invariant is the whole of it: whoever mutates a sample must `put` the rebuilt row.** A
+    cache that is merely never invalidated does not look broken — it looks like a checkpoint whose
+    row froze at its screening depth while the file kept being rewritten around it. Both call sites
+    mutate a sample in exactly one place and both already build the row there for their own log line,
+    so `put` costs nothing and is the natural pairing; `clear` is for the one place a samples dict is
+    rebound wholesale (`eval_wave.Arm.finalise_plan`).
+
+    Rows are handed out by reference. That is safe because `build_row` copies the three `episode_*`
+    lists out of the sample rather than aliasing them, and every consumer downstream — the payload's
+    sort, the summaries, `eval_progress` — only reads.
+    """
+
+    def __init__(self):
+        self._rows = {}
+
+    def put(self, step, row):
+        self._rows[step] = row
+
+    def clear(self):
+        self._rows.clear()
+
+    def rows(self, samples, resumed_by_step, meta_for):
+        """Result rows for every step with episodes banked, in step order.
+
+        A step whose sample is still empty is skipped — that is the checkpoint in flight, whose
+        running state travels in the payload's `in_flight` block instead. `meta_for(step)` supplies
+        the selection metadata, which is fixed for the run and so never invalidates a row.
+        """
+        rows = dict(resumed_by_step)
+        for step, held in samples.items():
+            if not held['scores']:
+                continue
+            row = self._rows.get(step)
+            if row is None:
+                row = build_row(step, held, meta_for(step))
+                self._rows[step] = row
+            rows[step] = row
+        return [rows[step] for step in sorted(rows)]
+
+
+class WriteGate:
+    """A wall-clock gate on *progress* writes. See `WRITE_MIN_INTERVAL` for the cost it bounds.
+
+    Split into a pure `due()` and an explicit `record()` so the two call sites read the way they
+    actually behave: the wave asks whether a round's write is due, while the single-policy path's
+    `write_results` records every write it makes — including the unconditional per-checkpoint one,
+    which has to reset the gate or the next round would write again immediately.
+
+    `now` is injectable so the fixtures need no sleeps.
+    """
+
+    def __init__(self, interval=None):
+        # Looked up here rather than as a default argument: `WRITE_MIN_INTERVAL` lives with the other
+        # protocol constants further down the file, so a default would be evaluated before it exists.
+        # A late read is also what lets a fixture patch the constant and have it take effect.
+        self.interval = WRITE_MIN_INTERVAL if interval is None else interval
+        self.last = 0.0
+
+    def due(self, now=None):
+        return (time.time() if now is None else now) - self.last >= self.interval
+
+    def record(self, now=None):
+        self.last = time.time() if now is None else now
+
 
 def skips_screening(meta, threshold=None):
     """True when a checkpoint goes straight to a full-length measurement, no screen first.
@@ -686,6 +759,23 @@ DEFAULT_CONFIRM_COUNT = 100
 # Seconds between live-chart refreshes. A frame is ~0.1s and a round ~4s, so this only bites
 # early in a run when episodes are short and rounds finish fast.
 CHART_MIN_INTERVAL = 2.0
+
+# Seconds between full rewrites of a result file *while a measurement is in flight*. A completed
+# measurement always writes immediately, so this bounds only the progress refresh.
+#
+# ‡ It exists because the write is O(banked rows) and the round cadence is O(episodes), so the two
+# multiply. `on_round` fires once per `num_workers` episodes -- **125 times** for a 500-episode
+# measurement -- and each call rebuilt every banked row and re-serialised the whole file. Measured on
+# `b43b-lowlr-b29a` at 513 rows: 97 ms to rebuild the rows, 0.52 s for one of `eval_wave`'s writes
+# (which built five payloads), **65 s of single-threaded bookkeeping per measurement** against the
+# 46 s of wall clock four lanes needed to produce one. So the controller thread overtook the lanes
+# partway through the arm and then became the only thing running: b43's HOF pass finished all 767
+# measurements at ~07:29 and spent the next 90 minutes folding a backlog out of its own outbox at
+# 45 s a row, with 4 lanes and 16 workers idle and the machine 95% free.
+#
+# A wall-clock gate makes the cost independent of episode count, which is the property that was
+# missing. It does not make the write cheap -- see `eval_wave.Arm.rows` for that half.
+WRITE_MIN_INTERVAL = 2.0
 
 # ---------------------------------------------------------------- the HOF re-measure
 

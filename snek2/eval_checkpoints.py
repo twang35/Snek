@@ -184,6 +184,9 @@ from eval_plan import (  # noqa: F401 - re-exported for callers and tests
     HOF_SUFFIX,
     MIN_EVAL_SINGLE,
     PayloadSpec,
+    RowCache,
+    WRITE_MIN_INTERVAL,
+    WriteGate,
     achievable_percent,
     archive_existing_eval_pngs,
     backup_previous_results,
@@ -568,8 +571,12 @@ def main(argv):
         full_planned=len(full_steps), screen_planned=len(screen_steps),
         confirm_planned=plan['confirmed'])
 
+    # The `WRITE_MIN_INTERVAL` gate on `on_round`'s progress writes. Recorded by every write,
+    # including the unconditional per-checkpoint one, or the round after it would write again at once.
+    write_gate = WriteGate()
+
     def write_results(results, complete, in_flight=None):
-        """Rewrites the whole file after every checkpoint, and after every round.
+        """Rewrites the whole file after every checkpoint, and on a wall-clock tick within one.
 
         A long run is expensive — 20 checkpoints x 100 episodes is well over an hour, and a
         63-checkpoint run took four — so writing only at the end means any interruption
@@ -581,6 +588,7 @@ def main(argv):
         already paid for. `write_payload` does the `.partial` + `os.replace` so a reader never sees
         a half-written file even if the process dies mid-write.
         """
+        write_gate.record()
         write_payload(out_path, build_payload(
             payload_spec, progress, samples, results, complete, in_flight))
         update_chart()
@@ -644,6 +652,11 @@ def main(argv):
     # median and extremes are recomputed from the pooled raw episodes rather than approximated.
     samples = {step: dict(held) for step, held in resumed_partial.items()}
     resumed_by_step = {row['step']: row for row in resumed_rows}
+    # Rows are memoised per step, so **`samples[step]` may be mutated only by `measure`**, which
+    # pairs the mutation with a `row_cache.put`. See `eval_plan.RowCache` for the cost this bounds
+    # (a 1,300-checkpoint close-out rebuilt every row 125 times per measurement) and for what a
+    # broken invariant looks like.
+    row_cache = RowCache()
 
     def current_results():
         """Result rows for every checkpoint with episodes banked.
@@ -653,11 +666,7 @@ def main(argv):
         is no rate to report. Its running state travels in the payload's `in_flight` block
         instead, which is what eval_progress.py draws it from.
         """
-        rows = dict(resumed_by_step)
-        for step, held in samples.items():
-            if held['scores']:
-                rows[step] = build_row(step, held, selected_by.get(step))
-        return [rows[step] for step in sorted(rows)]
+        return row_cache.rows(samples, resumed_by_step, selected_by.get)
 
     def measure(step, episodes, label, stage=None):
         """Restores one checkpoint and adds `episodes` more episodes to its sample."""
@@ -680,6 +689,11 @@ def main(argv):
         started_at = time.time()
 
         def on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round):
+            # One progress write per `WRITE_MIN_INTERVAL`, not one per round: the write is O(banked
+            # rows) and rounds arrive O(episodes), so the two multiplied. Nothing durable is at stake
+            # here — this block is progress only, and the measurement's own write is unconditional.
+            if not write_gate.due():
+                return
             # Report the checkpoint's whole sample, screening episodes included, so a topped-up
             # finalist shows its true running rate rather than restarting from zero.
             total_perfect = sum(held['perfect']) + perfect_so_far
@@ -730,6 +744,10 @@ def main(argv):
         progress['session_seconds'] += elapsed
 
         row = build_row(step, held, selected_by.get(step))
+        # Built from the sample just extended above, so it is exactly what `current_results` would
+        # produce for this step. This is the `put` the cache's invariant requires: `measure` is the
+        # only place a sample is mutated, so it is the only place the cache can go stale.
+        row_cache.put(step, row)
         write_results(current_results(), complete=False)
         print('    perfect {0}/{1} = {2}%  (95% CI {3}-{4}%)'.format(
             row['perfect_games'], row['episodes'], row['perfect_percent'],

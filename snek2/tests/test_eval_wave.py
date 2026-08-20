@@ -514,13 +514,15 @@ def test_an_eta_with_no_interval_leaves_the_last_one_standing():
         wave = eta_wave(bench, arm)
         assert wave.arm_eta_seconds(arm) is None
         arm.progress['arm_eta_seconds'] = 4242.0
-        wave.write(arm)
+        # Forced, both of them: this fixture is about what a write *stamps*, and two unforced writes
+        # inside `WRITE_MIN_INTERVAL` are one write by design (see the write-gate fixtures below).
+        wave.write(arm, force=True)
         assert json.load(open(arm.out_path))['arm_eta_seconds'] == 4242.0
         # ...and once there is an interval, the stamp is this wave's own number.
         now = time.time()
         arm.completions.extend([now - 20, now])
         arm.progress['measurements'] = 1
-        wave.write(arm)
+        wave.write(arm, force=True)
         payload = json.load(open(arm.out_path))
         assert payload['arm_eta_seconds'] == 20.0 * (arm.spec.measurements_planned - 1)
         assert payload['arm_eta_window'] == 1, 'the window reports what it averaged, not its cap'
@@ -724,6 +726,9 @@ def test_the_in_flight_block_carries_exactly_the_keys_eval_progress_reads():
         wave = eval_wave.Wave([arm], 1, 4)
         wave.chart['off'] = True
         wave.enqueue_initial()
+        # A real round lands seconds after the plan's opening write, not in the same instant, so the
+        # gate is wound back to where it would be — otherwise this measures the throttle, not the keys.
+        arm.write_gate.record(now=time.time() - eval_plan.WRITE_MIN_INTERVAL - 1)
         wave.on_round(eval_wave.Unit(arm, 1000, 100, 'flat'), 3, 25, 2, 12, [1, 1, 0])
         block = json.load(open(arm.out_path))['in_flight']
         assert set(block) == IN_FLIGHT_KEYS, sorted(set(block) ^ IN_FLIGHT_KEYS)
@@ -909,3 +914,165 @@ def test_stage_b_reads_a_non_default_close_out_suffix():
         arms = eval_wave.build_arms(['b44a-x'], 'above', eval_plan.HOF_GATE, hof)
         assert [arm.requested_steps for arm in arms] == [[1000]]
         assert arms[0].out_path.endswith('b44a-x_checkpoint_evals_check_hof500.json')
+
+
+# ------------------------------------------------- the write gate and the row cache
+
+def test_a_progress_write_is_throttled_and_the_round_it_drops_is_not_lost():
+    """`on_round` fires once per `num_workers` episodes — 125 times for a 500-episode measurement —
+    and the write behind it is O(banked rows), so the two multiplied until the controller thread
+    overtook its own lanes. The gate bounds it by wall clock; the state a dropped write held back is
+    still in memory and goes out with the next one."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000], screen_episodes=0)
+        wave = eval_wave.Wave([arm], 1, 4)
+        wave.lanes = [None]
+        wave.chart['off'] = True
+        wave.enqueue_initial()                          # the plan's first write, forced
+        first = json.load(open(arm.out_path))
+        assert first['in_flight'] is None
+
+        unit = eval_wave.Unit(arm, 1000, 100, 'flat')
+        wave.on_round(unit, 3, 25, 9, 12, [3, 3, 3])
+        # Dropped: the gate was stamped a moment ago by the forced write above.
+        assert json.load(open(arm.out_path))['updated_at'] == first['updated_at']
+
+        # Wind the gate back and the next round publishes — carrying round 4, not replaying round 3.
+        arm.write_gate.record(now=time.time() - eval_plan.WRITE_MIN_INTERVAL - 1)
+        wave.on_round(unit, 4, 25, 12, 16, [3, 3, 3, 3])
+        payload = json.load(open(arm.out_path))
+        assert payload['updated_at'] > first['updated_at']
+        assert payload['in_flight']['round'] == 4
+        assert payload['in_flight']['episodes_so_far'] == 16
+
+
+def test_the_gate_is_per_arm_so_a_busy_arm_cannot_starve_a_quiet_one():
+    """One shared gate would hand every slot to whichever arm produces rounds fastest, and the
+    other three panels would go stale — which is the same class of bug as the four disagreeing wave
+    totals the ETA stamp fixed."""
+    with Bench() as bench:
+        arms = []
+        for name in ('b44a-x', 'b44b-y'):
+            bench.policy(name)
+            arms.append(bench.arm(name, [1000, 2000, 3000], screen_episodes=0))
+        wave = eval_wave.Wave(arms, 2, 4)
+        wave.lanes = [None, None]
+        wave.chart['off'] = True
+        wave.write(arms[0], force=True)
+        assert not arms[0].write_gate.due()
+        assert arms[1].write_gate.due(), 'one arm being written must not gate its sibling'
+
+
+def test_every_measurement_lands_in_the_file_even_with_progress_writes_gated_off():
+    """The property that makes the throttle safe: a *finished* measurement forces its write, so no
+    gate can cost a result on a wave that is later killed. Read before `finish()` deliberately —
+    that writes unconditionally and would mask the difference."""
+    with Bench() as bench:
+        bench.policy('b44a-x', steps=(1000, 2000, 3000))
+        arm = bench.arm('b44a-x', [1000, 2000, 3000], screen_episodes=0)
+        wave = eval_wave.Wave([arm], 1, 4)
+        wave.lanes.append(eval_wave.Lane(0, FakePool(), 'b44a-x', wave.queue,
+                                         eval_wave.lane_key(arm), wave.outbox))
+        wave.chart['off'] = True
+        # Wide enough that nothing but a forced write can get through.
+        arm.write_gate.interval = 1e9
+        wave.enqueue_initial()
+        wave.run()
+        payload = json.load(open(arm.out_path))
+        assert [row['step'] for row in payload['results']] == [1000, 2000, 3000]
+
+
+def test_the_wave_eta_is_priced_on_its_own_clock_not_on_every_write():
+    """`wave_eta_seconds` builds *every* arm's payload to price the wave, so it was four row passes
+    on top of the one the write needs — and it answers a question measured in hours."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000], screen_episodes=0)
+        wave = eval_wave.Wave([arm], 1, 4)
+        wave.lanes = [None]
+        wave.chart['off'] = True
+        calls = []
+
+        def priced():
+            calls.append(1)
+            return 1234.0
+
+        wave.wave_eta_seconds = priced
+        for _ in range(5):
+            wave.write(arm, force=True)
+        assert len(calls) == 1, calls
+        assert arm.progress['wave_eta_seconds'] == 1234.0
+        # It does re-price, on its own interval rather than the write's.
+        wave.eta['last'] -= eval_wave.ETA_MIN_INTERVAL + 1
+        wave.write(arm, force=True)
+        assert len(calls) == 2, calls
+
+
+def test_on_done_seeds_the_row_cache_so_the_write_that_follows_rebuilds_nothing():
+    """`on_done` already builds the row for its log line, so handing it to the cache makes a
+    completed measurement cost zero rebuilds — the write it triggers, the wave ETA's four payloads
+    and every later write all read it back."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000], screen_episodes=0)
+        wave = eval_wave.Wave([arm], 1, 4)
+        wave.lanes = [None]
+        wave.chart['off'] = True
+        unit = eval_wave.Unit(arm, 1000, 4, 'flat')
+
+        builds = []
+        # Both bindings: `eval_wave` imported `build_row` by name, so `eval_plan.build_row` alone
+        # would miss `on_done`'s own call and `eval_wave.build_row` alone would miss the cache's.
+        real = eval_plan.build_row
+
+        def counting(step, held, meta=None):
+            builds.append(step)
+            return real(step, held, meta)
+
+        eval_plan.build_row = counting
+        eval_wave.build_row = counting
+        try:
+            wave.on_done(unit, [95] * 4, [1, 1, 1, 0], [1.0] * 4, 2.0, False, 0, 0)
+            rows = arm.rows()
+        finally:
+            eval_plan.build_row = real
+            eval_wave.build_row = real
+        assert builds == [1000], builds
+        assert [row['step'] for row in rows] == [1000]
+        assert rows[0]['episodes'] == 4 and rows[0]['perfect_percent'] == 75.0
+
+
+def test_finalise_plan_leaves_no_row_cached_against_the_samples_it_replaced():
+    """`finalise_plan` rebinds `samples` wholesale — out of the partials a resumed file supplied —
+    so anything cached against the old dict describes a sample that is no longer there. The arm needs
+    a resumed partial for this to bite at all: with `samples` empty, `rows()` never consults the
+    cache and the assertion would pass against any implementation."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        # A 60-of-100 row, which `load_finished_results` returns as a partial to be topped up.
+        bench.results('b44a-x', '', [{'step': 1000, 'episodes': 60, 'perfect': 45}])
+        arm = eval_wave.Arm('b44a-x', '', 100, 4, 0, 2, 0.0, 20, '1', None)
+        arm.row_cache.put(1000, dict(step=1000, episodes=999, perfect_percent=0.1))
+        arm.finalise_plan([1000], {1000: graph_meta(1000, 90.0)})
+        rows = arm.rows()
+        assert [row['episodes'] for row in rows] == [60], rows
+
+
+def test_a_finished_measurement_never_leaves_a_stale_in_flight_block():
+    """The one way the gate could publish a lie: drop a checkpoint's last round, so the block the
+    file carries is older than the row that lands beside it. `on_done` pops the block before it
+    writes, so the two always agree — a file can never name a step it has already reported."""
+    with Bench() as bench:
+        bench.policy('b44a-x')
+        arm = bench.arm('b44a-x', [1000, 2000, 3000], screen_episodes=0)
+        wave = eval_wave.Wave([arm], 1, 4)
+        wave.lanes = [None]
+        wave.chart['off'] = True
+        wave.enqueue_initial()
+        unit = eval_wave.Unit(arm, 1000, 4, 'flat')
+        wave.on_round(unit, 1, 1, 4, 4, [4])            # dropped by the gate
+        wave.on_done(unit, [95] * 4, [1, 1, 1, 1], [1.0] * 4, 1.0, False, 0, 0)
+        payload = json.load(open(arm.out_path))
+        assert payload['in_flight'] is None
+        assert [row['step'] for row in payload['results']] == [1000]
