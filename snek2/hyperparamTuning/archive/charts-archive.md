@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-20 | 28-29 | batch 45 (`lr 1e-8`, the fourth rung) got its section, making seven. **Strict oldest.** It is the source of three of the four checkpoints 42-45 continue, so it was held back once already; its conclusion — the gate is the lever, and gate 75 produced what looked like a record region — is now carried by [`../findings.md`](../findings.md), and that region has since been [shown to be seed noise](../findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading) and its record checkpoint [re-measured 1.5 pp lower](../findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) |
 | 2026-08-19 | 36 | batch 44 (`lr 1e-7`, the third rung of the continuation ladder) got its section, making seven. **36 was being held only as the named control for 39**, and 39 was itself retired the evening before, so the reason expired. Retired ahead of the strict-oldest 28-29, which remains the source of three of the four checkpoints 42/43/44 continue. Its conclusion — C51 on `fc 320` is still well behind the scalar head at its own architecture — is carried by [`../findings.md`](../findings.md) |
 | 2026-08-18 | 39 | batch 42 got its section (the `lr 1e-5` control for 43), making seven. Retired ahead of the strict-oldest 28-29, which is the source of three of the four checkpoints 42/43/44 continue and the batch they are read against; 39 bears on none of the continuation work and its conclusion — zero-init loses through action separation, not calibration — is carried in full by [`../findings.md`](../findings.md) |
 | 2026-08-18 | C51 pilot | batches 42 and 43 (continuing the four best checkpoints) landed. The pilot was explicitly a *temporary seventh* while its arms were a live control; every C51 arm is now closed, so it went first |
@@ -2020,3 +2021,66 @@ queued behind it.
 ![b27h](../charts/b27h-chase10g85seed4.png)
 **b27h-chase10g85seed4** — first filled board at step 8k, and the first arm whose epsilon left the 0.0125
 ceiling.
+
+## Batches 28-29 — chase-safe **dose** (`c=0.20`) and **gate** (`75`) on `fc 320` — *done: the gate is the lever (desktop)*
+
+Both extend b27's gate-85 null onto the two axes a single dose could not test. `b28` doubles the coefficient
+to **`c=0.20`** at gate 85; `b29` drops the **gate to 75** at `c=0.10`. Everything else is b24's config —
+`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, 2M cap, seeds 1-4, the same
+`b24a-d` control. All eight closed out and HOF-500'd on the desktop.
+
+**`b28` (`c=0.20`, gate 85) is a null — the dose is not the issue.** Pooled mean **85.4**, ~2.5 under the b24
+control's 87.9, and **0 of 4** seeds held ≥98%/500. With b27/b30 this rules out both the net and the dose at
+gate 85.
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
+|---|---|---|---|---|
+| `b28d-chase20g85seed4` | 96.7 | 68.7 | 89.10 | best 96.8% @1061k (341 ep, ab.) — **0 held** |
+| `b28a-chase20g85seed1` | 96.0 | 54.0 | 89.72 | best 95.6% @1727k (275 ep, ab.) — **0 held** |
+| `b28c-chase20g85seed3` | 92.7 | 33.4 | 82.67 | none reached the gate — **0 held** |
+| `b28b-chase20g85seed2` | 90.7 | 47.9 | 80.15 | best 90.0% @1127k (120 ep, ab.) — **0 held** |
+
+**`b29` (`c=0.10`, gate 75) produced a record region — the positive result of the whole investigation.**
+Pooled **87.8** (a dead heat with b24) but **21 checkpoints held ≥98%/500 across two of four seeds**, where
+the record-holding control produced only 2 isolated ones. `b29b` carries an **18-checkpoint band**
+(1446k-1529k) peaking at **99.0%/500 (495/500) @1447k** — **the new project record** (point estimate above
+b24's 98.0%/500; lead inside the CI, but the *region* is not).
+
+| arm | best-30 | `sef` | pooled (eq) | HOF-500 (≥98%/500) |
+|---|---|---|---|---|
+| `b29a-chase10g75seed1` | 97.7 | 60.3 | 89.76 | **3 held**, best 98.4% @1347k |
+| `b29c-chase10g75seed3` | 96.3 | 67.9 | 89.68 | 0 held (best 97.1%, 378 ep ab.) |
+| `b29b-chase10g75seed2` | 97.3 | 55.6 | 87.14 | **18 held** (1446k-1529k), best **99.0% @1447k** |
+| `b29d-chase10g75seed4` | 94.3 | 59.7 | 84.75 | 0 held (best 90.6%, 127 ep ab.) |
+
+**The gate is the lever, not the dose or the net.** Gate 85 is null on `fc 320` (b27), on `fc 200,100,100`
+(b30) and at doubled dose (b28); gate 75 matches the control's pooled *and* produces a record region it never
+did. The Φ calibration is why — the potential carries ~0 at lengths 98-99, so a gate-85 term grades the flat
+final approach while gate 75 turns it on ten meals earlier, in the packing decisions that decide whether the
+endgame is winnable. Full write-up:
+[`completedRuns.md`](../completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
+`b29b` @1447k was promoted to `hallOfFame/` on 2026-08-16 (copy verified 98/100 on fresh laptop episodes).
+
+![b29b](../charts/b29b-chase10g75seed2.png)
+**b29b-chase10g75seed2 — 99.0%/500 @1447k, the record-region arm**
+
+![b29a](../charts/b29a-chase10g75seed1.png)
+**b29a-chase10g75seed1 — 3 held ≥98%/500**
+
+![b29c](../charts/b29c-chase10g75seed3.png)
+**b29c-chase10g75seed3**
+
+![b29d](../charts/b29d-chase10g75seed4.png)
+**b29d-chase10g75seed4**
+
+![b28a](../charts/b28a-chase20g85seed1.png)
+**b28a-chase20g85seed1** (`c=0.20`, null)
+
+![b28b](../charts/b28b-chase20g85seed2.png)
+**b28b-chase20g85seed2** (`c=0.20`, null)
+
+![b28c](../charts/b28c-chase20g85seed3.png)
+**b28c-chase20g85seed3** (`c=0.20`, null)
+
+![b28d](../charts/b28d-chase20g85seed4.png)
+**b28d-chase20g85seed4** (`c=0.20`, null)

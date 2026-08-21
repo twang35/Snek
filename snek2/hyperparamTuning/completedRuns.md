@@ -72,6 +72,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b44a-lowlr7-b29b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b29b` @1447k) | 3.00M | **100.0%** @2798k /500 | 100% | **97.69%** /eq §§ | 99.7% | ‡‡‡ § **429 checkpoints ≥98%/500 and 48 at ≥99% — the widest record region in the project by 2.5x**, against 170 for `b43b` and 18 for `b29b`. Its 500/500 @2798k is one of only two flawless rows ever measured here and **is a selection artefact** — its sibling's was re-measured at 98.2%/1000, and with 90 rows ≥99% two such rows is what chance produces. Read the count. See [Batch 44](#batch-44--the-same-four-checkpoints-at-lr-1e-7-the-best-rung-of-the-ladder--874-checkpoints-at-98500-and-it-falsified-its-own-pre-registration) |
+| `b44b-lowlr7-b29a` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b29a` @1347k) | 3.00M | **100.0%** @1886k /500 — **re-measures 98.2%/1000** | 100% | **97.69%** /eq §§ | **100.0%** | ‡‡‡ § 403 rows ≥98%/500, 41 at ≥99%, and **the only checkpoint in the project re-measured on 1000 fresh episodes: 982/1000 = 98.2%** (97.2-98.9), −1.8 pp on its selected figure. Also a best-30 of 100.0 at 2460k. The clearest single demonstration of the winner's curse here — see [the re-measurement](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) |
+| `b44c-lowlr7-b40b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b40b` @1513k) | 3.00M | **99.0%** @2600k /500 | 100% | 96.14% /eq §§ | 99.0% | ‡‡‡ § 42 rows ≥98%/500 against its `b43` twin's 1 — a 42x gain on the seed that responded *least* to `1e-6`. Carries the free-space confound: trained with that term, continued without it. See [Batch 44](#batch-44--the-same-four-checkpoints-at-lr-1e-7-the-best-rung-of-the-ladder--874-checkpoints-at-98500-and-it-falsified-its-own-pre-registration) |
+| `b44d-lowlr7-b29c` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b29c` @1396k) | 3.00M | 98.0% @2230k /100 | 100% | 94.43% /eq §§ | 98.0% | ‡‡‡ § **nothing held at 500: all 100 candidates gate-abandoned.** The `b29c` seed has now produced no ≥98%/500 checkpoint at 1e-5, 1e-6 or 1e-7 — four rungs, one flat seed. See [Batch 44](#batch-44--the-same-four-checkpoints-at-lr-1e-7-the-best-rung-of-the-ladder--874-checkpoints-at-98500-and-it-falsified-its-own-pre-registration) |
 | `b43b-lowlr-b29a` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b29a` @1347k) | 3.00M | **99.6%** @1661k /500 | 100% | **96.82%** /eq §§ | **100.0%** | ‡‡‡ § **The widest record region ever measured here — 170 checkpoints ≥98%/500, 17 of them ≥99%**, against 18 for `b29b` and 1 for `b40b`. Two rows at 99.6% (@1661k, @1708k), the highest /500 of any *completed* batch. **@1708k re-measures 98.1% on 1000 fresh episodes** — see [the winner's-curse result](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20). **It continues the second-best seed checkpoint (98.4%), not the record, and beat the arm that continued the record 170 to 16** — see [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
 | `b43a-lowlr-b29b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b29b` @1447k) | 3.00M | **99.4%** @1618k /500 | 100% | 93.68% /eq §§ | 98.7% | ‡‡‡ § continues the old 99.0%/500 record and **extended it — 99.4% at 1618k, 171k steps past the checkpoint it started from**, with 16 rows ≥98%/500 against `b42a`'s 1 from identical weights. Beaten by its own sibling `b43b` on every column. See [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
 | `b43c-lowlr-b40b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-6`** (`b40b` @1513k) | 3.00M | **98.0%** @1760k /500 | 100% | 94.12% /eq §§ | 98.7% | ‡‡‡ § one held checkpoint, and **its best-30 peaked at 2803k** — the latest peak of the batch by 1.1M steps, so `1e-6` was still finding gains very late. Carries a confound: trained *with* the free-space term, continued *without* it. See [Batch 43](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) |
@@ -315,6 +319,66 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 44 — the same four checkpoints at `lr 1e-7`: **the best rung of the ladder — 874 checkpoints at ≥98%/500, and it falsified its own pre-registration**
+
+The third rung, and **the one that broke the prediction written into its own specs.** `b44` was queued expecting
+a null against [`b43`](#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) — roughly 65% likely by the
+estimate in the job spec — on the reasoning that if `1e-6` were already doing nothing but failing to damage the
+policy, `1e-7` could not do better than the same nothing. That was wrong on every seed.
+
+| | |
+|---|---|
+| arms | `b44a-d-lowlr7-*`, **3M absolute cap**, desktop |
+| config | `b29` verbatim — `fc 320`, IS off, `TARGET_UPDATE_PERIOD 1000`, `DISCOUNT 0.9975`, `FORK_BRANCHES 4`, chase-safe `c=0.10` gate 75 — with **`SNEK_LEARNING_RATE=1e-7`** the only change |
+| control | `b42` at `1e-5` and `b43` at `1e-6`, byte-identical starting weights, the same four seeds |
+| measurement | close-out 100 ep (11.2-14.9 h), HOF-500 `above:98` at gate 98 — **2235 measurements, complete 2026-08-20** |
+
+### Result
+
+| arm | continues | best-30 | `sef` | pooled/eq | ≥98%/100 | ≥98%/500 | ≥99%/500 | best /500 |
+|---|---|---|---|---|---|---|---|---|
+| `b44a` | `b29b` @1447k | 99.7 @2190k | **99.9** | **97.69** | **853** | **429** | **48** | **100.0% @2798k** |
+| `b44b` | `b29a` @1347k | **100.0** @2460k | **99.9** | **97.69** | **867** | 403 | 41 | **100.0% @1886k** |
+| `b44c` | `b40b` @1513k | 99.0 @1814k | 98.7 | 96.14 | 415 | 42 | 1 | 99.0% @2600k |
+| `b44d` | `b29c` @1396k | 98.0 @2230k | 98.7 | 94.43 | 100 | 0 | 0 | — |
+| **group** | | | | **96.49** | **2235** | **874** | **90** | |
+
+**The ladder is monotone across three rungs, and the gaps are large.**
+
+| rung | rate | pooled/eq | ≥98%/100 | ≥98%/500 |
+|---|---|---|---|---|
+| `b42` | 1e-5 | 92.09 | 98 | **4** |
+| `b43` | 1e-6 | 94.53 | 989 | **187** |
+| `b44` | **1e-7** | **96.49** | **2235** | **874** |
+
+**4 → 187 → 874 held checkpoints from byte-identical starting weights**, with learning rate the only difference,
+and `b44` wins on **4 of 4 seeds** at every level of the instrument — including the `b29c` seed that inverted
+between `b42` and `b43`. It is also the *least* selected pool of the three: 98% of all checkpoints on two arms
+qualified for the close-out, so it carries the most dead weight in its denominator and still wins.
+
+### ‡ Two 500/500 rows, and both are selection artefacts
+
+`b44a` @2798000 and `b44b` @1886000 each returned **500 perfect games out of 500** — the only flawless
+500-episode rows in the project. **Neither is a perfect policy.** @1886000 was re-measured on 1000 fresh
+episodes and scored **982/1000 = 98.2%** (97.2-98.9); @2798000 has not been re-measured and there is no reason
+to expect it to differ. With **90 checkpoints at ≥99%/500**, two flawless rows is roughly what chance produces —
+a checkpoint whose true rate is 99% returns 500/500 about **0.7%** of the time.
+
+So **read the count, not the maximum.** The count is what separates this rung from `b43` (874 against 187); the
+maxima are three noisy draws a couple of episodes apart. Full re-measurement result, including the finding that
+`hallOfFame/` entries fall just as far: [`findings.md`](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20).
+
+**`b44d`'s zero is real.** All **100** of its candidates were measured and every one was gate-abandoned —
+arithmetically unable to reach 98% — so the `b29c` seed has now produced no ≥98%/500 checkpoint at any rate.
+(Its result file carries `complete: false` only because no row survived to full length.)
+
+### Verdict
+
+**The best configuration this project has found, and the rung to build on** — but its own numbers should be read
+~1.4 pp optimistic, like every selected figure here. `b45` at **`1e-8`** tests whether the ladder is monotone or
+has an optimum, and it is the first rung given a **5M** cap, because `b44`'s best rows sit at 2.2-2.9M and 3M was
+plausibly the binding constraint rather than the arms' limit.
 
 ## Batch 43 — continuing the four best checkpoints at `lr 1e-6`: **a record region 10x wider than anything before it, and the best checkpoint was the wrong one to continue**
 

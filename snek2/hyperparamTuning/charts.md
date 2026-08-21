@@ -64,7 +64,53 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *closed out (11-15 h): it beats `1e-6` on the 100-episode instrument too; its HOF-500's flawless row **did not survive re-measurement***
+## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *training on the desktop, ~31% of a 5M cap: holding on all four, and `b45c` has the strongest curve of the whole ladder so far*
+
+The fourth and lowest rung. `b42`-`b44` walked the rate down 1e-5 → 1e-6 → 1e-7 and each step beat the last, so
+`b45` asks whether that is monotone or whether there is an optimum. **It is the first rung with a longer cap —
+5M rather than 3M** — because `b43c` did not peak until 2803k and `b44`'s best rows sit at 2.2-2.9M, so 3M was
+starting to look like the binding constraint rather than the arms' own limit.
+
+| arm | continues | step | past seed | best-30 | `sef` | recent-30 | `max_single` |
+|---|---|---|---|---|---|---|---|
+| `b45c` | `b40b` @1513k | 1655k | +142k | **99.2** @1621k | **100.0** | 97.2 | 100 |
+| `b45a` | `b29b` @1447k | 1585k | +138k | 98.3 @1510k | **100.0** | 97.0 | 100 |
+| `b45b` | `b29a` @1347k | 1480k | +133k | 98.2 @1391k | **100.0** | 97.2 | 100 |
+| `b45d` | `b29c` @1396k | 1533k | +137k | 95.2 @1485k | 99.3 | 93.7 | 100 |
+
+**`zero_since` is null on all four**, and three arms have not produced a single eval below 80% perfect.
+**`b45c`'s best-30 of 99.2 is the highest any arm in this ladder has reached on the training instrument** — and
+it comes from the `b40b` seed, which was the *weakest* at `1e-6` (`b43c` held 1 checkpoint) and mid-pack at
+`1e-7` (`b44c` held 42). Worth watching rather than believing: these are 10-episode evals and the arms are only
+~135-142k past their seeds.
+
+**`b45d` is the flat seed again**, 95.2 against its siblings' 98.2-99.2 — the same `b29c` seed that held 0 at
+both `1e-6` and `1e-7`. Four rungs in, that seed has never produced a ≥98%/500 checkpoint under continuation.
+
+**Do not read `sef` here against other batches.** These arms started at ~98%, so 100.0 says "it never dropped",
+not "it learned fast"; the only fair references are the other rungs, in
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-4--187--874-rows-98500-across-1e-51e-61e-7-b45-at-1e-8-is-training).
+The close-out and HOF-500 are queued behind the training and will be the real numbers — and on
+[today's re-measurement result](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) they should be read as ~1.4 pp
+optimistic when they land.
+
+### b45c-lowlr8-b40b — continues `b40b` @1513k
+
+![b45c](charts/b45c-lowlr8-b40b.png)
+
+### b45a-lowlr8-b29b — continues `b29b` @1447k
+
+![b45a](charts/b45a-lowlr8-b29b.png)
+
+### b45b-lowlr8-b29a — continues `b29a` @1347k
+
+![b45b](charts/b45b-lowlr8-b29a.png)
+
+### b45d-lowlr8-b29c — continues `b29c` @1396k, the flat seed on every rung
+
+![b45d](charts/b45d-lowlr8-b29c.png)
+
+## Batch 44 — the **same four checkpoints at `lr 1e-7`** — *done: **874** checkpoints at ≥98%/500, 4.7x `b43`'s 187 — and both of its two 500/500 rows are selection artefacts*
 
 The third rung, and **the rung that falsified its own pre-registration.** `b44` was queued expecting a null
 against `b43` (~65% by the estimate written into its specs) on the reasoning that if `1e-6` is already doing
@@ -125,17 +171,27 @@ five for their `1e-6` twins and one in fifteen for `1e-5`. `b44d` is the flat se
 carries the most dead weight in the denominator and still wins; the full comparison, with the caveats, is in
 [`runs.md`](runs.md#-the-100-episode-close-outs-agree-with-the-self-evals-and-the-effect-is-much-larger-than-the-self-evals-suggested).
 
-**The HOF-500 is what decides the ladder against `b43`, and it has already produced the project's first
-flawless 500-episode measurement:** `b44b` @1886000 scored **500/500**, against a previous record of 495/500
-(`b29b` @1447k, 99.0%). At **~53% of the pass** (1176 of 2235 measurements, read 2026-08-20 10:05) `b44` has
-**293 rows ≥98%/500** — more than `b43`'s **187 in a completed pass**, on a *less* selected pool:
+**The HOF-500 finished 2026-08-20 — all 2235 measurements — and it decides the ladder against `b43`
+emphatically: 874 rows ≥98%/500 against `b43`'s 187**, a 4.7x gap on a *less* selected pool, and 90 rows at
+≥99% against 19.
 
-| arm | rows so far | ≥98%/500 | best /500 | `b43` twin's final ≥98%/500 |
-|---|---|---|---|---|
-| `b44a` | 360 | 105 | 99.6% @2207k | 16 |
-| `b44b` | 358 | **155** | 100.0% @1886k (500/500) — **re-measures 98.2%/1000** | 170 |
-| `b44c` | 358 | 33 | 98.8% @2301k | 1 |
-| `b44d` | 100 | 0 | — | 0 |
+| arm | rows | ≥98%/500 | ≥99%/500 | best /500 | `b43` twin's ≥98%/500 |
+|---|---|---|---|---|---|
+| `b44a` | 853 | **429** | **48** | **100.0% @2798k** (500/500) | 16 |
+| `b44b` | 867 | 403 | 41 | **100.0% @1886k** (500/500) — re-measures **98.2%/1000** | 170 |
+| `b44c` | 415 | 42 | 1 | 99.0% @2600k | 1 |
+| `b44d` | 100 | 0 | 0 | — (all 100 gate-abandoned) | 0 |
+| **total** | 2235 | **874** | **90** | | **187** |
+
+**Two 500/500 rows, one per good seed — and both are selection artefacts, not perfect policies.** @1886000 was
+re-measured on 1000 fresh episodes and scored **982/1000 = 98.2%**; @2798000 has not been re-measured but there
+is no reason to expect it to behave differently. With **90 checkpoints at ≥99%/500**, two flawless rows is
+roughly what chance produces — a checkpoint whose true rate is 99% returns 500/500 about 0.7% of the time. So
+read the *count*, not the maximum: that is what separates this rung from `b43`.
+
+**`b44d` finished too**, and its zero is real: all **100** of its candidates were measured and every one was
+gate-abandoned, i.e. arithmetically unable to reach 98%. (Its file carries `complete: false` only because no row
+survived to full length.)
 
 **‡ It failed to replicate, and that caution was the right one.** The 500/500 was re-measured the same day on
 **1000 fresh episodes and scored 982/1000 = 98.2%** (97.2-98.9) — a **−1.8 pp** drop, p=0.0025. All four of the
@@ -201,7 +257,7 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-b43s-hof-500-is-done-and-b44s-is-half-done-but-its-500500-re-measured-at-982);
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-4--187--874-rows-98500-across-1e-51e-61e-7-b45-at-1e-8-is-training);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 
@@ -218,7 +274,7 @@ Final training numbers: `best_perfect30` **98.3-100.0**, `sef` **96.5-99.5**, `m
 seed checkpoint**, a 30-eval window with no imperfect game in it. So `1e-6` is not merely preservation.
 
 **`b44` at `1e-7` then beat it on 4 of 4 seeds** (+2.0 pp mean over the full common window), so `b43` is the
-*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--closed-out-11-15-h-it-beats-1e-6-on-the-100-episode-instrument-too-its-hof-500s-flawless-row-did-not-survive-re-measurement). That nothing fell apart is itself a result: **the same four checkpoints fell
+*middle* rung, not the answer — see [batch 44 above](#batch-44--the-same-four-checkpoints-at-lr-1e-7--done-874-checkpoints-at-98500-47x-b43s-187--and-both-of-its-two-500500-rows-are-selection-artefacts). That nothing fell apart is itself a result: **the same four checkpoints fell
 80% → 50% perfect in 5k steps when the replay buffer was *not* carried over**, and holding 95-100% here is what
 the buffer copy bought.
 
@@ -495,66 +551,3 @@ single arm.
 
 ![b37d](charts/b37d-chase10g75seed8.png)
 **b37d-chase10g75seed8** — the weak seed
-
-## Batches 28-29 — chase-safe **dose** (`c=0.20`) and **gate** (`75`) on `fc 320` — *done: the gate is the lever (desktop)*
-
-Both extend b27's gate-85 null onto the two axes a single dose could not test. `b28` doubles the coefficient
-to **`c=0.20`** at gate 85; `b29` drops the **gate to 75** at `c=0.10`. Everything else is b24's config —
-`fc 320`, IS off, `td_error`, target 1000, discount 0.9975, `FORK_BRANCHES=4`, 2M cap, seeds 1-4, the same
-`b24a-d` control. All eight closed out and HOF-500'd on the desktop.
-
-**`b28` (`c=0.20`, gate 85) is a null — the dose is not the issue.** Pooled mean **85.4**, ~2.5 under the b24
-control's 87.9, and **0 of 4** seeds held ≥98%/500. With b27/b30 this rules out both the net and the dose at
-gate 85.
-
-| arm | best-30 | `sef` | pooled (eq) | HOF-500 |
-|---|---|---|---|---|
-| `b28d-chase20g85seed4` | 96.7 | 68.7 | 89.10 | best 96.8% @1061k (341 ep, ab.) — **0 held** |
-| `b28a-chase20g85seed1` | 96.0 | 54.0 | 89.72 | best 95.6% @1727k (275 ep, ab.) — **0 held** |
-| `b28c-chase20g85seed3` | 92.7 | 33.4 | 82.67 | none reached the gate — **0 held** |
-| `b28b-chase20g85seed2` | 90.7 | 47.9 | 80.15 | best 90.0% @1127k (120 ep, ab.) — **0 held** |
-
-**`b29` (`c=0.10`, gate 75) produced a record region — the positive result of the whole investigation.**
-Pooled **87.8** (a dead heat with b24) but **21 checkpoints held ≥98%/500 across two of four seeds**, where
-the record-holding control produced only 2 isolated ones. `b29b` carries an **18-checkpoint band**
-(1446k-1529k) peaking at **99.0%/500 (495/500) @1447k** — **the new project record** (point estimate above
-b24's 98.0%/500; lead inside the CI, but the *region* is not).
-
-| arm | best-30 | `sef` | pooled (eq) | HOF-500 (≥98%/500) |
-|---|---|---|---|---|
-| `b29a-chase10g75seed1` | 97.7 | 60.3 | 89.76 | **3 held**, best 98.4% @1347k |
-| `b29c-chase10g75seed3` | 96.3 | 67.9 | 89.68 | 0 held (best 97.1%, 378 ep ab.) |
-| `b29b-chase10g75seed2` | 97.3 | 55.6 | 87.14 | **18 held** (1446k-1529k), best **99.0% @1447k** |
-| `b29d-chase10g75seed4` | 94.3 | 59.7 | 84.75 | 0 held (best 90.6%, 127 ep ab.) |
-
-**The gate is the lever, not the dose or the net.** Gate 85 is null on `fc 320` (b27), on `fc 200,100,100`
-(b30) and at doubled dose (b28); gate 75 matches the control's pooled *and* produces a record region it never
-did. The Φ calibration is why — the potential carries ~0 at lengths 98-99, so a gate-85 term grades the flat
-final approach while gate 75 turns it on ten meals earlier, in the packing decisions that decide whether the
-endgame is winnable. Full write-up:
-[`completedRuns.md`](completedRuns.md#batches-28-29--chase-safe-dose-and-gate-the-gate-is-the-lever-and-gate-75-produces-a-record-region).
-`b29b` @1447k was promoted to `hallOfFame/` on 2026-08-16 (copy verified 98/100 on fresh laptop episodes).
-
-![b29b](charts/b29b-chase10g75seed2.png)
-**b29b-chase10g75seed2 — 99.0%/500 @1447k, the record-region arm**
-
-![b29a](charts/b29a-chase10g75seed1.png)
-**b29a-chase10g75seed1 — 3 held ≥98%/500**
-
-![b29c](charts/b29c-chase10g75seed3.png)
-**b29c-chase10g75seed3**
-
-![b29d](charts/b29d-chase10g75seed4.png)
-**b29d-chase10g75seed4**
-
-![b28a](charts/b28a-chase20g85seed1.png)
-**b28a-chase20g85seed1** (`c=0.20`, null)
-
-![b28b](charts/b28b-chase20g85seed2.png)
-**b28b-chase20g85seed2** (`c=0.20`, null)
-
-![b28c](charts/b28c-chase20g85seed3.png)
-**b28c-chase20g85seed3** (`c=0.20`, null)
-
-![b28d](charts/b28d-chase20g85seed4.png)
-**b28d-chase20g85seed4** (`c=0.20`, null)
