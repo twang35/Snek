@@ -5,6 +5,7 @@ real box and is not exercised here.
 Run directly:  PYTHONPATH=.. python test_runner.py    (from snek2/desktop/tests)
 or import and call the test_* functions like the snek2/tests suite.
 """
+import ast
 import json
 import os
 import shutil
@@ -280,6 +281,84 @@ def test_sticky_wave_resets_on_a_new_same_category_wave():
     assert all('b21' not in p for p in got)
 
 
+def test_eval_batch_pngs_keeps_a_batchs_finished_arms():
+    # b45's closeout ran as three waves ({a,c}, {b}, {d}). While wave 2 measures b45b alone, the
+    # window must still show a's and c's finished charts -- they are on disk, and they belong to
+    # the batch being measured.
+    names = ['b45a-lowlr8_eval_progress.png', 'b45b-lowlr8_eval_progress.png',
+             'b45c-lowlr8_eval_progress.png']
+    got = runnermod.eval_batch_pngs([('eval', ['b45b-lowlr8'])], '/snek', names)
+    assert got == ['/snek/evals/b45a-lowlr8_eval_progress.png',
+                   '/snek/evals/b45b-lowlr8_eval_progress.png',
+                   '/snek/evals/b45c-lowlr8_eval_progress.png'], got
+    # The old rule -- the running job's own policies -- is what showed one panel.
+    assert len(runnermod.viewer_png_paths([('eval', ['b45b-lowlr8'])], '/snek')) == 1
+
+
+def test_eval_batch_pngs_ignores_other_batches_and_non_charts():
+    names = ['b45a-x_eval_progress.png', 'b44a-x_eval_progress.png', 'notes.txt',
+             'b45b-x.png', 'champion_7_eval_progress.png']
+    got = runnermod.eval_batch_pngs([('eval', ['b45a-x'])], '/snek', names)
+    assert got == ['/snek/evals/b45a-x_eval_progress.png'], got
+
+
+def test_eval_batch_pngs_membership_is_the_chart_on_disk_not_the_arm_list():
+    # The bound that replaces a TTL: only arms whose chart is in evals/ right now can get a panel,
+    # so a wide batch measured over many waves cannot grow the window without limit, and an arm
+    # that has not started yet never becomes an unlabelled blank box.
+    got = runnermod.eval_batch_pngs([('eval', ['b45a-x', 'b45d-x'])], '/snek',
+                                    ['b45a-x_eval_progress.png'])
+    assert got == ['/snek/evals/b45a-x_eval_progress.png'], got
+
+
+def test_eval_batch_pngs_is_capped():
+    names = ['b20%s-x_eval_progress.png' % c for c in 'abcdefghijkl']
+    got = runnermod.eval_batch_pngs([('eval', ['b20a-x'])], '/snek', names)
+    assert len(got) == runnermod.MAX_VIEWER_PANELS, len(got)
+
+
+def test_eval_batch_pngs_only_ever_names_eval_charts():
+    # It is used for eval waves only -- a training wave keeps the sticky set, which cannot
+    # over-report. So this must never emit a runs/ path whatever it is handed.
+    got = runnermod.eval_batch_pngs([('trainer', ['b45a-x'])], '/snek',
+                                    ['b45a-x_eval_progress.png'])
+    assert all('/evals/' in path for path in got), got
+
+
+def test_agreed_env_keeps_only_what_every_arm_shares():
+    envs = [{'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_SEED': '1'},
+            {'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_SEED': '2'},
+            {'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_SEED': '3', 'SNEK_EXTRA': 'x'}]
+    assert runnermod.agreed_env(envs) == {'SNEK_CHASE_SAFE_SHAPING': '0.1'}
+    assert runnermod.agreed_env([]) == {}
+    assert runnermod.agreed_env([{'A': '1'}]) == {'A': '1'}
+
+
+def test_closeout_group_env_ignores_everything_a_measurement_cannot_see():
+    env = {'SNEK_SEED': '2', 'SNEK_LEARNING_RATE': '1e-8', 'SNEK_DISCOUNT': '0.9975',
+           'SNEK_FC_LAYERS': '320', 'SNEK_TARGET_UPDATE_PERIOD': '1000',
+           'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_CHASE_SAFE_GATE': '75'}
+    assert runnermod.closeout_group_env(env) == {'SNEK_CHASE_SAFE_SHAPING': '0.1',
+                                                'SNEK_CHASE_SAFE_GATE': '75'}
+
+
+def test_eval_relevant_env_matches_eval_wave():
+    """Tripwire: the runner cannot import eval_wave (TensorFlow), so it carries a copy of
+    EVAL_RELEVANT_ENV. Read the real tuple out of the source and fail if the two have drifted --
+    a knob added to the eval's list and not to this one would silently stop splitting waves that
+    must be split."""
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       '..', '..', 'eval_wave.py')
+    tree = ast.parse(open(os.path.normpath(src)).read())
+    found = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+                getattr(t, 'id', None) == 'EVAL_RELEVANT_ENV' for t in node.targets):
+            found = tuple(el.value for el in node.value.elts)
+    assert found is not None, 'EVAL_RELEVANT_ENV not found in eval_wave.py'
+    assert found == runnermod.EVAL_RELEVANT_ENV, (found, runnermod.EVAL_RELEVANT_ENV)
+
+
 def _runner(auto_closeout=True):
     """A Runner with a throwaway ledger and no box behind it -- enough to exercise the pure
     ledger-driven logic (_auto_closeout_jobs) without git or spawn."""
@@ -317,6 +396,39 @@ def test_auto_closeout_groups_a_batch_into_one_wave():
     assert j.eval_args == ['top50']
     assert j.priority == runnermod.AUTO_CLOSEOUT_PRIORITY
     assert j.priority < 100                          # beats a default-priority training
+
+
+def test_auto_closeout_groups_arms_that_differ_only_in_seed_into_one_wave():
+    # The b45 regression. Its four arms are one experiment differing only in SNEK_SEED, which
+    # cannot reach a measurement of an already-trained checkpoint -- but the group key was the
+    # whole inherited env, so the closeout split into three waves ({a,c} seed 2, {b} seed 1,
+    # {d} seed 3) and ran at a quarter of the intended 4 lanes.
+    r = _runner()
+    seeds = {'b45a-lowlr8-b29b': '2', 'b45b-lowlr8-b29a': '1',
+             'b45c-lowlr8-b40b': '2', 'b45d-lowlr8-b29c': '3'}
+    for arm, seed in seeds.items():
+        r.ledger[arm] = {'state': 'done', 'type': 'train', 'policy': arm, 'closeout': 'pending',
+                         'env': {'SNEK_SEED': seed, 'SNEK_LEARNING_RATE': '1e-8',
+                                 'SNEK_CHASE_SAFE_SHAPING': '0.1', 'SNEK_CHASE_SAFE_GATE': '75'}}
+    jobs = r._auto_closeout_jobs()
+    assert len(jobs) == 1, [(j.id, j.policies) for j in jobs]
+    assert jobs[0].policies == sorted(seeds), jobs[0].policies
+    # The wave's env carries what the arms agree on and not one arm's seed.
+    assert jobs[0].env.get('SNEK_CHASE_SAFE_SHAPING') == '0.1'
+    assert 'SNEK_SEED' not in jobs[0].env, jobs[0].env
+
+
+def test_auto_closeout_still_splits_arms_that_disagree_about_shaping():
+    # The property the loose key must not lose: shaping and reward knobs change what avg_reward
+    # means, so those arms cannot share one process.
+    r = _runner()
+    r.ledger['b46a-x'] = {'state': 'done', 'type': 'train', 'policy': 'b46a-x',
+                          'closeout': 'pending', 'env': {'SNEK_FREE_SPACE_SHAPING': '0.1'}}
+    r.ledger['b46b-x'] = {'state': 'done', 'type': 'train', 'policy': 'b46b-x',
+                          'closeout': 'pending', 'env': {'SNEK_FREE_SPACE_SHAPING': '0'}}
+    jobs = r._auto_closeout_jobs()
+    assert len(jobs) == 2, [(j.id, j.policies) for j in jobs]
+    assert {j.env.get('SNEK_FREE_SPACE_SHAPING') for j in jobs} == {'0.1', '0'}
 
 
 def test_the_closeout_carries_no_eval_protocol_env_at_all():

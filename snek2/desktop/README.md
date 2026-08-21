@@ -83,6 +83,26 @@ EVAL_MIN_ACHIEVABLE=98`** and writes **`EVAL_OUT_SUFFIX=_hof500`** — a separat
 clobbers the closeout's result and the closeout's 100-episode rows are never mistaken for finished
 HOF work. Worker count is the runtime's `eval_workers` (the usual 4), like any eval.
 
+**‡ A batch closes out as *one* wave, and what defines "one" is the measurement-relevant env**
+(2026-08-21). `_auto_closeout_jobs` groups the pending markers by `(batch, closeout_group_env(env))`,
+where `closeout_group_env` keeps only `EVAL_RELEVANT_ENV` — the shaping and reward knobs an eval can
+actually see. It used to key on the *whole* inherited training env, so `b45`, whose four arms differ
+only in `SNEK_SEED`, split into three waves: `b45-closeout` `{a,c}`, `b45-closeout-w2` `{b}`,
+`b45-closeout-w3` `{d}`. Two costs, and the second is the real one:
+
+- The chart window showed 2 panels, then 1, then 1 — a finished arm's chart was gone before anyone
+  came back to read it (see `eval_batch_pngs` and the `keep_batches` exemption in
+  `eval_plan.archive_existing_eval_pngs`).
+- **Three sequential waves of 2/1/1 arms measure a batch at a quarter of the intended 4 lanes.** For a
+  continuation batch, whose close-out is already priced in hours, that is the difference between one
+  pass and three.
+
+The wave runs under `agreed_env(...)` — every key the group's arms agree on — so a looser group key
+never attributes one arm's seed or learning rate to its siblings. `runner.EVAL_RELEVANT_ENV` is a
+**copy** of `eval_wave.EVAL_RELEVANT_ENV` (the runner cannot import that module: TensorFlow), and
+`tests/test_runner.py::test_eval_relevant_env_matches_eval_wave` parses the real tuple out of
+`eval_wave.py` and fails if the two drift.
+
 Three properties that matter:
 
 - **The HOF never races its own closeout.** The `hof: pending` marker is set only when the closeout

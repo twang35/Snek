@@ -192,7 +192,7 @@ def protocol_from_sources(source_screens):
     return None, 0
 
 
-def archive_existing_eval_pngs():
+def archive_existing_eval_pngs(keep_batches=()):
     """Moves whatever is currently in EVALS_DIR into a timestamped EVALS_ARCHIVE_DIR
     subfolder, so a new eval or batch starts from an empty folder and evals/ always shows
     only the most recently completed work.
@@ -202,9 +202,26 @@ def archive_existing_eval_pngs():
     here first archives the previous batch's leftovers and the rest find nothing left to
     move. A FileNotFoundError from a sibling winning that race is swallowed rather than
     raised.
+
+    `keep_batches` names batch prefixes whose charts stay where they are, and the caller passes
+    the batches it is *about to measure*. Without it a batch measured in two waves erased its own
+    first wave: `b45`'s closeout ran as three waves, and wave 2 archived `b45a`'s and `b45c`'s
+    finished charts on startup, so the window they had just filled went blank and nothing ever
+    rewrote them. Keeping them is safe because each arm rewrites its own file by name -- a re-run
+    overwrites, and an arm the re-run leaves out keeps the chart it had, which is the point.
+    Anything from an *earlier* batch is archived exactly as before.
     """
     os.makedirs(EVALS_DIR, exist_ok=True)
     pngs = [name for name in os.listdir(EVALS_DIR) if name.endswith('.png')]
+    keep = set(keep_batches or ())
+    if keep and pngs:
+        # Imported here rather than at module scope: `chart_viewer` owns both the batch regex and
+        # the `<policy>_eval_progress.png` naming, and this keeps eval_plan's import surface --
+        # which every eval process pays for -- exactly as it was. It is stdlib-only at module
+        # level, so this costs nothing and cannot cycle.
+        import chart_viewer
+        pngs = [name for name in pngs
+                if chart_viewer.batch_prefix(chart_viewer.policy_from_png(name)) not in keep]
     if not pngs:
         return
     dest = os.path.join(EVALS_ARCHIVE_DIR, time.strftime('%Y%m%d-%H%M%S'))

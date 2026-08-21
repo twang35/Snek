@@ -136,6 +136,16 @@ Two consequences worth internalising:
   because it rewrites its own chart every round regardless of what is there; only finished arms
   need the copy back.
 
+**‡ One exemption exists now: an eval no longer archives charts of the batch it is measuring**
+(2026-08-21). `archive_existing_eval_pngs(keep_batches=...)` — both call sites pass the batch
+prefixes of the policies they are about to measure. It closes a hole that only opened when a
+batch's close-out arrived as *several* waves: `b45`'s ran as three, and wave 2's startup archived
+`b45a`'s and `b45c`'s finished charts, so panels the window had just filled went blank and nothing
+rewrote them. Keeping them is safe because every arm rewrites its own file by name — a re-run
+overwrites, and an arm a re-run leaves out keeps the chart it had, which is the point. **Everything
+above still holds for any *other* batch**, so a verification eval named `smoke` or `champion_*`
+still displaces a real close-out's charts, and the restore recipe is unchanged.
+
 **`<policy>_checkpoint_evals<suffix>.json.previous` is a safety net.** Written before overwriting
 an existing *complete* result, because the first write of a new run destroys whatever was at that
 path. Check it isn't the only copy of something real before removing it.
@@ -426,6 +436,26 @@ closeout's **≥98%** checkpoints at **500 episodes, flat, `EVAL_MIN_ACHIEVABLE=
 verified process**. Most arms have no ≥98% checkpoint, so the HOF job exits `done` with nothing
 measured; that is normal, not a failure. Turn it off with `auto_hof: false`. Full mechanism:
 [`snek2/desktop/README.md`](snek2/desktop/README.md#the-eval-chain-training--closeout--hof-re-measure).
+
+**‡ A batch's close-out is one wave per *measurement-relevant* env, and it used to be one per env**
+(fixed 2026-08-21). `_auto_closeout_jobs` keyed its groups on the whole inherited training env, so
+`b45` — four arms differing only in `SNEK_SEED` — split into **three** waves, `{a,c}`, `{b}`, `{d}`.
+The cost was throughput, not just a short window: three sequential waves of 2/1/1 arms measure a
+batch at a quarter of the intended 4 lanes, against the standing "4 processes × ≥4 workers" rule. The
+key is now `runner.EVAL_RELEVANT_ENV`, a copy of `eval_wave.EVAL_RELEVANT_ENV` with a test that fails
+if the two drift, and the wave runs under `agreed_env` — every setting its arms share, so no arm's
+seed is attributed to the others. **A seed, a learning rate, a target-update period cannot reach a
+measurement of an already-trained checkpoint**; shaping and reward knobs can, and those still split.
+
+**‡ The desktop viewer's panel set is the batch's charts for an eval wave, the running arms for a
+training one** (2026-08-21). Stickiness within a wave (`sticky_wave_pngs`) covers a training wave,
+whose arms are dispatched together, and cannot cover a batch measured in several waves — which is how
+`b45` showed 2 panels, then 1, then 1. `eval_batch_pngs` widens an eval wave to **every chart in
+`evals/` whose batch this wave is measuring**. Membership is *the file existing on disk*, the same
+rule as the laptop's `--glob`, and that is load-bearing twice over: `chart_viewer` deliberately has
+no per-panel title, so a path for an un-started arm would be an unlabelled empty box; and it bounds
+the set without a TTL, so a 36-arm batch like `b20` cannot open a window taller than the screen. A
+*training* wave is deliberately **not** widened — it is the one case that could over-report.
 
 **‡ But "nothing measured" and "never published" look identical, and `publish_results` has no retry.** The
 box's DNS for `github.com` flaps; a failed push leaves the commit local, the ledger still says `done`, and only

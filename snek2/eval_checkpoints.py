@@ -317,8 +317,12 @@ def main(argv):
     if len(argv) < 3:
         print(__doc__)
         return 1
-    archive_existing_eval_pngs()
     policy_name = argv[1]
+    # Exempts this policy's own batch, so a batch measured as four separate processes -- or in two
+    # passes -- does not archive the siblings' finished charts out from under the window. See
+    # `eval_plan.archive_existing_eval_pngs`.
+    import chart_viewer as _cv
+    archive_existing_eval_pngs(keep_batches={_cv.batch_prefix(policy_name)})
     # Live chart window on the laptop only. `viewer_enabled()` is darwin-gated, so this is a no-op
     # on the desktop, where the runner daemon owns the viewer (`desktop/runner/runner.py`) — two
     # owners would open two windows per wave. It runs after archive_existing_eval_pngs() so the

@@ -54,6 +54,24 @@ AUTO_CLOSEOUT_PRIORITY = 10
 EVAL_PROTOCOL_KEYS = ('EVAL_EPISODES', 'EVAL_SCREEN_EPISODES', 'EVAL_MIN_ACHIEVABLE',
                       'EVAL_ABANDON_FLOOR', 'EVAL_CONFIRM_COUNT', 'EVAL_OUT_SUFFIX')
 
+# The `SNEK_*` a *measurement* actually depends on, and therefore the only env a batch's arms have
+# to agree about to share one closeout wave. **A copy of `eval_wave.EVAL_RELEVANT_ENV`**, which is
+# the source of truth -- the runner cannot import it, because that module pulls in TensorFlow, so
+# `tests/test_runner.py` reads the tuple out of `eval_wave.py` and fails if the two drift.
+#
+# Grouping on the *whole* inherited env instead is what split `b45`'s closeout into **three** waves
+# -- `{a,c}`, `{b}`, `{d}` -- because its arms differ in `SNEK_SEED`, which cannot reach a
+# measurement of an already-trained checkpoint. The cost was not only cosmetic: three sequential
+# waves of 2/1/1 arms run a close-out at a quarter of the intended 4 lanes, against a standing
+# instruction to measure a batch as 4 parallel arms. `SNEK_LEARNING_RATE`, `SNEK_DISCOUNT`,
+# `SNEK_TARGET_UPDATE_PERIOD`, `SNEK_IS_WEIGHTS` and `SNEK_FORK_BRANCHES` are the same class: they
+# shaped the weights, and the weights are in the checkpoint. `SNEK_FC_LAYERS` is excluded for a
+# different reason -- `arch.json` governs the network at eval time and `eval_wave` already gives a
+# differing architecture its own lane through `restore_signature`.
+EVAL_RELEVANT_ENV = ('SNEK_ZERO_OBS', 'SNEK_CHASE_SAFE_SHAPING', 'SNEK_CHASE_SAFE_GATE',
+                     'SNEK_FREE_SPACE_SHAPING', 'SNEK_FREE_SPACE_GATE',
+                     'SNEK_FOOD_DISTANCE_REWARD', 'SNEK_PERFECT_GAME_REWARD')
+
 
 def inherited_eval_env(env):
     """A training's env, stripped of anything that would override the eval protocol.
@@ -64,6 +82,34 @@ def inherited_eval_env(env):
     along is an `EVAL_*` knob: those belong to the measurement, not to the arm.
     """
     return {k: v for k, v in (env or {}).items() if k not in EVAL_PROTOCOL_KEYS}
+
+
+def closeout_group_env(env):
+    """The measurement-relevant slice of a training's env -- the group key for a closeout wave.
+
+    Two arms of a batch belong in one wave unless they disagree about something a measurement can
+    see. See `EVAL_RELEVANT_ENV` for why that is a short list and what it cost to key on the long
+    one."""
+    return {k: v for k, v in (env or {}).items() if k in EVAL_RELEVANT_ENV}
+
+
+def agreed_env(envs):
+    """The env to run a group's wave under: every key the group's arms agree on, value included.
+
+    A group is now allowed to hold arms whose envs differ in measurement-irrelevant ways, so there
+    is no longer one arm's env to hand the wave. Taking the agreed subset is the honest answer --
+    every setting the wave inherits is one all of its arms were trained with -- and it drops exactly
+    the keys the looser group key stopped caring about (`SNEK_SEED`, the rates). Handing the first
+    arm's env to the whole wave instead would quietly attribute one arm's seed to all four."""
+    envs = [e or {} for e in envs]
+    if not envs:
+        return {}
+    shared = dict(envs[0])
+    for env in envs[1:]:
+        for key in list(shared):
+            if env.get(key) != shared[key]:
+                del shared[key]
+    return shared
 
 
 def wants_closeout(job_type, ok, auto_closeout_enabled):
@@ -205,11 +251,13 @@ class Runner:
         track the set the live viewer was launched with and relaunch whenever it no longer
         matches what the running jobs need.
 
-        The panel set is *sticky within a wave*: an arm that reaches its cap and exits keeps
-        its panel until the whole wave drains, so a wave of four never collapses to the two
-        still training. The viewer tags the finished ones `(completed)`. `sticky_wave_pngs`
-        only unions -- it never drops -- so a finished arm does not trigger a relaunch; the
-        set resets when the wave flips category (train->eval) or the box goes idle."""
+        The panel set is *sticky within a wave*: an arm that reaches its cap and exits keeps its
+        panel until the whole wave drains, so a wave of four never collapses to the two still
+        training. `sticky_wave_pngs` only unions -- it never drops -- so a finished arm does not
+        trigger a relaunch; the set resets when the wave flips category (train->eval) or the box
+        goes idle. An **eval** wave widens further, to every chart of the batch it is measuring
+        (`eval_batch_pngs`), because a batch's measurement can arrive as several waves and
+        stickiness only spans one."""
         if not self.runtime.get('viewer', True) or not self.running:
             # Idle between waves: forget the wave so the next one starts from its own arms,
             # not unioned onto the previous batch's (a trainer->trainer flip keeps category).
@@ -218,12 +266,25 @@ class Runner:
         try:
             running_jobs = [(rj.job.category, rj.job.policies or [rj.policy])
                             for rj in self.running.values()]
-            current = viewer_png_paths(running_jobs, self.host['SNEK_DIR'])
-            if not current:
-                return
             # Wave-barrier scheduling runs one category at a time, so the wave's category is
             # simply that of whatever is running; sorted+joined stays deterministic regardless.
             category = ','.join(sorted({c for c, _ in running_jobs}))
+            # An eval wave widens from its running arms to every chart of the batches it is
+            # measuring, so a batch sliced into several waves still shows all four panels. Only
+            # eval: a *training* wave never splits (its arms are dispatched together and run
+            # concurrently), so the sticky set below already keeps a finished trainer's panel, and
+            # widening it would be the one change that could over-report. The `or` covers the first
+            # seconds of a fresh wave, when no chart exists yet -- fall back to the running arms'
+            # paths, exactly as before, so the window still opens promptly.
+            current = viewer_png_paths(running_jobs, self.host['SNEK_DIR'])
+            if category == 'eval':
+                try:
+                    names = os.listdir(os.path.join(self.host['SNEK_DIR'], 'evals'))
+                except OSError:
+                    names = []
+                current = eval_batch_pngs(running_jobs, self.host['SNEK_DIR'], names) or current
+            if not current:
+                return
             desired = sticky_wave_pngs(self._wave_pngs, self._wave_category, category, current)
             self._wave_pngs, self._wave_category = desired, category
             viewer_running = subprocess.run(
@@ -294,10 +355,14 @@ class Runner:
         not "this arm still needs measuring"; the id was doing that job by accident, and a
         batch-level id broke it -- see `_measured_policies`.
 
-        **Arms are grouped by their inherited env as well as by batch**, because a wave is one
-        process with one environment: the shaping and reward knobs change what `avg_reward` means, so
-        two arms that disagree about them must not be measured under a single setting. Normally a
-        batch's arms share an env exactly and there is one group.
+        **Arms are grouped by batch and by the *measurement-relevant* half of their inherited env**,
+        because a wave is one process with one environment: the shaping and reward knobs change what
+        `avg_reward` means, so two arms that disagree about them must not be measured under a single
+        setting. Everything else about a training -- its seed, its learning rate, its target-update
+        period -- is already baked into the checkpoint and cannot reach the measurement, so it must
+        *not* split the wave. Keying on the whole env did, and `b45` paid three waves of 2/1/1 arms
+        for it; see `EVAL_RELEVANT_ENV`. Normally a batch's arms agree on the relevant half exactly
+        and there is one group.
         """
         if not self.runtime.get('auto_closeout', True):
             return []
@@ -309,9 +374,11 @@ class Runner:
             if rec['policy'] in measured:
                 continue
             env = inherited_eval_env(rec.get('env'))
-            key = (batch_of(rec['policy']), tuple(sorted(env.items())))
-            groups.setdefault(key, {'policies': [], 'env': env, 'resume': False})
+            key = (batch_of(rec['policy']),
+                   tuple(sorted(closeout_group_env(env).items())))
+            groups.setdefault(key, {'policies': [], 'envs': [], 'resume': False})
             groups[key]['policies'].append(rec['policy'])
+            groups[key]['envs'].append(env)
         jobs, taken = [], set()
         for (batch, _), group in sorted(groups.items(), key=lambda kv: kv[1]['policies'][0]):
             eval_id = self._closeout_id(batch, taken)
@@ -319,7 +386,7 @@ class Runner:
                 continue
             taken.add(eval_id)
             prior = self.ledger.get(eval_id, {})
-            env = dict(group['env'])
+            env = agreed_env(group['envs'])
             if prior.get('state') == 'interrupted':
                 env['EVAL_RESUME'] = '1'           # a reboot cut the last attempt short: keep its
                                                    # full-length rows, redo only the partial one
@@ -815,6 +882,49 @@ def viewer_png_paths(running_jobs, snek_dir):
             else:
                 pngs.append(os.path.join(snek_dir, 'runs', policy + '.png'))
     return sorted(pngs)
+
+
+MAX_VIEWER_PANELS = 8
+
+
+def eval_batch_pngs(running_jobs, snek_dir, eval_dir_names):
+    """Panel paths for an eval wave: **every chart in `evals/` belonging to a batch this wave is
+    measuring**, not only the arms measuring right now.
+
+    The set used to be the running jobs' own policies, made sticky within a wave. That covers a
+    wave that drains and is not enough, because a batch's measurement does not arrive as one wave:
+    `b45`'s closeout ran as three (`{a,c}`, `{b}`, `{d}`), so the window showed 2 panels, then 1,
+    then 1, and a finished arm's chart was gone by the time anyone came back to look. Reading the
+    set off the batch makes the slicing invisible -- the same four charts from the first slice to
+    the last.
+
+    **Membership is decided by the chart existing on disk**, which is the same rule the laptop's
+    `--glob evals/<prefix>*_eval_progress.png` uses, and it is what keeps two hard-won properties
+    intact. A panel is never blank-by-construction: `chart_viewer` deliberately has no per-panel
+    title, so a path for an arm that has not started yet would be an unlabelled empty box (see the
+    note above `_training_alive` in `chart_viewer.py`). And the set stays bounded without a TTL --
+    only arms whose charts are in `evals/` right now can appear, so a historically wide batch like
+    `b20` (36 arms over several waves) cannot open a window taller than the screen, which is the
+    failure the laptop's arm registry had to solve a different way.
+
+    It relies on the batch's earlier waves *keeping* their charts, which they now do:
+    `eval_plan.archive_existing_eval_pngs` exempts the batches a wave is about to measure. Before
+    that, wave 2 archived wave 1's charts on startup and there was nothing on disk to find."""
+    batches = set()
+    for _category, policies in running_jobs:
+        if isinstance(policies, str) or policies is None:
+            policies = [policies]
+        for policy in policies:
+            if policy:
+                batches.add(batch_of(policy))
+    suffix = '_eval_progress.png'
+    pngs = []
+    for name in eval_dir_names or []:
+        if not name.endswith(suffix):
+            continue
+        if batch_of(name[:-len(suffix)]) in batches:
+            pngs.append(os.path.join(snek_dir, 'evals', name))
+    return sorted(pngs)[:MAX_VIEWER_PANELS]
 
 
 def viewer_scale(category):
