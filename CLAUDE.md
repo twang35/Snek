@@ -332,6 +332,26 @@ every `](file.md#anchor)` in the tuning docs against the real headings.
   `curl` processes whose JSON payload contains `snek2/snek2.py`, which read 6 trainers when 4 were
   running. The same class of trap caught `pgrep -fl watch` matching `watchdogd` and `watchman`.
   **That `pgrep` is laptop-local and cannot see the desktop** — see below.
+- **‡ A `pgrep` pattern matches the shell that runs it, and this is the default outcome, not an
+  edge case** (2026-08-20). `pgrep -f <pat>` scans full command lines, and the invoking shell's own
+  command line contains `<pat>` verbatim — so the check counts itself. It cost two immortal
+  processes: wait-loops written as `until [ "$(pgrep -cf 'eval_checkpoints.py k1000')" = "0" ]; do
+  sleep 10; done` never saw zero, because the loop's own argv holds that string. They spun on
+  `sleep` for six hours until killed by pid.
+
+  Three things follow. **Bracket every pattern in the command, not just one** — a compound check
+  that brackets `eval_check[p]oints` and then greps a bare `chart_viewer` on the next line still
+  self-matches on the second pattern. **Prefer `ps -Ao pid=,command= | grep <bracketed>`** over
+  `pgrep -f`, or hold the pattern in a variable the argv never spells out. And **a self-matching
+  count is 1, not 0**, so it reads as "still running" — which fails safe for a liveness check and
+  fails *open* for a wait-loop, where it means "never finish". Never write a wait-loop whose
+  condition greps for a string its own command line contains.
+
+  Note this is the *inverse* failure from
+  [`_matching_commands`](snek2/chart_viewer.py), where a `pgrep` that errored read as "nothing is
+  running" and closed a live window. Both directions are real: **a process scan can over-report and
+  under-report, so never treat its output as authority without checking the pattern against the
+  scanner itself.**
 - **This domain is very noisy** — the same config has produced 62.5 and 18.0. Never conclude from a
   single run; repeat promising configs 2-3 times. **n=4 cannot resolve an effect below ~10 pp.**
 
