@@ -9,7 +9,36 @@ checkpoint**. That has already cost real evidence — `b5c-schlongIS`'s 17.0% pe
 permanently unmeasurable once the arm passed 1.28M steps. Copies here are outside that
 rotation and are not deleted by anything.
 
-## The current record: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000`
+## ‡‡ 2026-08-20: the top four entries were re-measured on 1000 fresh episodes, and all four fell
+
+**Read this before quoting any number in this file.** The four best entries here were re-measured flat, gate
+off, 1000 episodes each, on the laptop:
+
+| entry | admitted at | **fresh /1000** | 95% CI | drop |
+|---|---|---|---|---|
+| `b29b-chase10g75seed2-ckpt1447000` | 495/500 = 99.0% | **975/1000 = 97.5%** | 96.3-98.3 | −1.50 |
+| `b40b-chasefree10g75seed2-ckpt1513000` | 491/500 = 98.2% | **959/1000 = 95.9%** | 94.5-97.0 | **−2.30** |
+| `b24d-fc320noisseed4-ckpt1342000` | 490/500 = 98.0% | **974/1000 = 97.4%** | 96.2-98.2 | −0.60 |
+| `b24b-fc320noisseed2-ckpt2860000` | 490/500 = 98.0% | **966/1000 = 96.6%** | 95.3-97.6 | −1.40 |
+
+**Mean −1.45 pp.** The admission rule below — enter on a re-measured number, never a close-out /100 — removes
+the /100 inflation and then **re-creates a smaller version of the same bias at /500**, because the second stage
+still keeps the *best* of the re-measurements. A singly-selected group measured the same day fell −1.35 pp, so
+being twice-measured bought nothing. **Treat every figure in the table below as roughly 1.4 pp optimistic.**
+
+**The ordering inverted.** `b40b` fell from second to **last** and is now significantly below `b29b` (p=0.045);
+`b24d` barely moved and is statistically **tied** with the record (p=0.887). `b40b` was also the most extreme
+survivor of the four — the only one of b40's 90 ≥98%/100 candidates to hold at 500 — and it fell furthest, which
+is the selection mechanism showing through.
+
+**Four checkpoints not in this folder beat all four of these**, pooling 98.40% against 96.85%
+(z=4.55, p=5×10⁻⁶): `b44b` @2297000, `b44b` @1886000, `b44a` @2451000 and `b43b` @1708000, all continuations of
+`b29a`/`b29b`/`b40b` at a lower learning rate. **Nothing has been promoted** — that stays deliberate and manual —
+but the candidate list should be drawn from fresh measurements, and on that basis the strongest checkpoint the
+project has is **`b44b` @2297000 at 99.0%/1000**. Full result, method and failure breakdown:
+[`findings.md`](../hyperparamTuning/findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20).
+
+## The record as admitted: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000` — **re-measures 97.5%/1000**
 
 Batches 11-40 train on the **30-value observation vector** — the current one (era `b09c616`), after the
 following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these thirteen entries all load on

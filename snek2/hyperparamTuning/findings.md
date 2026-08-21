@@ -168,6 +168,60 @@ best is `b44b` @2297000 at 99.0% — but **no pair among the four differs signif
 1000 episodes tightened every interval and still cannot order these four. The defensible figure for "how good
 is the best policy here" is the pooled fresh estimate: **3936/4000 = 98.40% (97.96-98.74)**.
 
+### ‡ Surviving one re-measurement does not inoculate — the four `hallOfFame/` entries fell just as far
+
+The obvious objection to the table above is that those four checkpoints were selected on a *single* 500-episode
+maximum. `hallOfFame/` admits nothing that way: [its rule](../hallOfFame/README.md) is that an entry enters on a
+**re-measured** number, never its close-out /100, precisely because a selected /100 is inflated 5-6 pp. So the
+four best entries in that folder are twice-measured, and three of them *rose* on the second pass — the
+"genuine-region signature" the README describes. **They were re-measured on 1000 fresh episodes anyway:**
+
+| entry | admitted at | fresh /1000 | 95% CI | drop | p |
+|---|---|---|---|---|---|
+| `b29b` @1447k — *the record* | 495/500 = 99.0% | 975/1000 = **97.5%** | 96.3-98.3 | −1.50 | 0.050 |
+| `b40b` @1513k | 491/500 = 98.2% | 959/1000 = **95.9%** | 94.5-97.0 | **−2.30** | 0.019 |
+| `b24d` @1342k | 490/500 = 98.0% | 974/1000 = **97.4%** | 96.2-98.2 | −0.60 | 0.474 |
+| `b24b` @2860k | 490/500 = 98.0% | 966/1000 = **96.6%** | 95.3-97.6 | −1.40 | 0.130 |
+
+**Mean drop −1.45 pp, against −1.35 pp for the singly-selected group. There is no inoculation effect at all.**
+A checkpoint that has already survived one independent re-measurement is *not* a safer estimate than one that
+has not — because the second stage introduces its own selection: you keep the best of the re-measurements.
+**So the folder's two-stage admission rule removes the /100 inflation and then re-creates a smaller version of
+the same bias at /500.** Any "record" figure in this project should be read as ~1.4 pp optimistic regardless of
+how many times it has been measured, unless the measurement that *produced* the number was not the one used to
+choose it.
+
+**Selection pressure tracks the size of the drop, which is the mechanism showing through.** `b40b` fell
+furthest (−2.30) and was the most extreme survivor of the four — [the only one of b40's **90**
+≥98%/100 candidates that held at 500](completedRuns.md#batch-40--chase-safe-plus-a-free-space-term-null-and-the-b29-record-region-does-not-replicate).
+`b24d` fell least (−0.60, not significant) and was 1 of **9** survivors from 199 candidates. n=4, so this is a
+consistent direction rather than a measured slope, but it is the sign the theory predicts.
+
+**The hall-of-fame ordering inverted.** `b40b` went from second to **last** and is now significantly below
+`b29b` (p=0.045), while `b24d` — which barely moved — is statistically **tied** with the record (975 vs 974,
+p=0.887). `b29b` @1447k keeps the top spot on the point estimate only.
+
+### ‡‡ On a common unbiased instrument, the b43/b44 continuations beat the entire existing hall of fame
+
+Eight checkpoints, 1000 fresh episodes each, same knobs, same host — the first apples-to-apples comparison this
+project has of its continuation policies against its historical best:
+
+| group | pooled fresh | range |
+|---|---|---|
+| `b43`/`b44` continuations | **3936/4000 = 98.40%** | 98.1-99.0 |
+| `hallOfFame/` top four | 3874/4000 = 96.85% | 95.9-97.5 |
+
+**+1.55 pp, z=4.55, p=5.3×10⁻⁶.** Every one of the four continuations scored above every one of the four
+hall-of-fame entries. **But no single pairwise comparison is significant** — the worst continuation (981) against
+the best entry (975) gives p=0.36 — so the claim is about the two *groups*, not about any one checkpoint beating
+any other. That is the correct strength to quote: the continuation approach is clearly ahead, and picking an
+individual champion out of it still needs a measurement that was not used to do the picking.
+
+**Consequence for `hallOfFame/`.** On these numbers the folder's top four are all beaten by four checkpoints that
+are not in it, and its headline record (99.0%) is really ~97.5%. Promotion is deliberate and manual, so nothing
+has been changed — but the candidate list should be drawn from *fresh* measurements, and on that basis
+`b44b` @2297000 (99.0%) is the strongest checkpoint the project has, not the 500/500 at @1886000.
+
 ### What the failures look like
 
 About half of every arm's failures sit at score 90-94 — the endgame, within five food of a win — but three of
@@ -179,6 +233,10 @@ the four also died catastrophically early at least once:
 | `b44b` @2297000 | 10 | 2 | 0 | 0 | 8 | **4** |
 | `b44a` @2451000 | 17 | 3 | 2 | 3 | 9 | 20 |
 | `b43b` @1708000 | 19 | 0 | 6 | 5 | 8 | 59 |
+| `b29b` @1447k (HOF) | 25 | 0 | 6 | 2 | 17 | 54 |
+| `b40b` @1513k (HOF) | **41** | 4 | 15 | 4 | 18 | 38 |
+| `b24d` @1342k (HOF) | 26 | 3 | 9 | 4 | 10 | **7** |
+| `b24b` @2860k (HOF) | 34 | 0 | 7 | 10 | 17 | 72 |
 
 A score of **4** is dying almost immediately, and two arms did it once each in 1000 games. That is a different
 failure mode from losing the endgame and a 500-episode pass will often miss it entirely. Note also that
