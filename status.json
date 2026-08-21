@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-21T11:12:47",
-  "ts": 1787335967.3366284,
+  "iso": "2026-08-21T11:13:21",
+  "ts": 1787336001.8174124,
   "at_a_glance": {
     "running": [
-      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- training 96% (4 arms)"
+      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- training 95% (3 arms)"
     ],
     "queued": [
-      "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)"
+      "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (1 arm)"
     ]
   },
   "runtime": {
@@ -27,7 +27,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
@@ -39,10 +39,10 @@
         "b45a-lowlr8-b29b"
       ],
       "pid": 3719479,
-      "step": 4867000,
+      "step": 4870000,
       "max_steps": 5000000,
-      "steps_per_sec": 86.2,
-      "elapsed_s": 45220
+      "steps_per_sec": 87.0,
+      "elapsed_s": 45254
     },
     {
       "id": "b45b-lowlr8-b29a",
@@ -52,23 +52,10 @@
         "b45b-lowlr8-b29a"
       ],
       "pid": 3719480,
-      "step": 4659000,
+      "step": 4661000,
       "max_steps": 5000000,
-      "steps_per_sec": 86.2,
-      "elapsed_s": 45220
-    },
-    {
-      "id": "b45c-lowlr8-b40b",
-      "type": "train",
-      "policy": "b45c-lowlr8-b40b",
-      "policies": [
-        "b45c-lowlr8-b40b"
-      ],
-      "pid": 3719481,
-      "step": 4998000,
-      "max_steps": 5000000,
-      "steps_per_sec": 86.2,
-      "elapsed_s": 45220
+      "steps_per_sec": 58.0,
+      "elapsed_s": 45254
     },
     {
       "id": "b45d-lowlr8-b29c",
@@ -78,18 +65,18 @@
         "b45d-lowlr8-b29c"
       ],
       "pid": 3719482,
-      "step": 4764000,
+      "step": 4767000,
       "max_steps": 5000000,
-      "steps_per_sec": 57.5,
-      "elapsed_s": 45220
+      "steps_per_sec": 87.0,
+      "elapsed_s": 45254
     }
   ],
   "ledger": {
     "b45-closeout": "queued",
     "b45a-lowlr8-b29b": "running",
     "b45b-lowlr8-b29a": "running",
-    "b45c-lowlr8-b40b": "running",
     "b45d-lowlr8-b29c": "running",
+    "b45c-lowlr8-b40b": "done",
     "b44-hof-r2": "done",
     "b44-hof": "done",
     "b44b-lowlr7-b29a-closeout": "done",
@@ -334,8 +321,8 @@
   },
   "disk_free_gb": 122.1,
   "load_avg": [
-    14.0322265625,
-    15.5517578125,
-    15.81494140625
+    14.21142578125,
+    15.4892578125,
+    15.7880859375
   ]
 }
