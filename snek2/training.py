@@ -402,7 +402,7 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
         metrics.reset()
 
     if step % display_progress_interval == 0:
-        display_progress(metrics.eval_rows, metrics.resume_steps, screen, graph_path)
+        display_progress(metrics.eval_rows, metrics.resume_steps, screen, graph_path, policy_name)
         write_run_report(report_path, policy_name, run_config, metrics.eval_rows, os.path.basename(graph_path),
                          metrics.resume_steps)
 

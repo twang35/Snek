@@ -310,12 +310,21 @@ def trailing_average(values, window):
     return averaged
 
 
-def display_progress(eval_rows, resume_steps, screen, graph_path=None):
+def display_progress(eval_rows, resume_steps, screen, graph_path=None, policy_name=None):
     """Draws the whole history of a policy, across however many runs made it.
 
     Takes explicit (step, score, percent) rows rather than assuming evenly spaced
     evals from a starting step, because a resumed policy's history has gaps
     wherever it was stopped and restarted.
+
+    `policy_name` titles the chart. It has to be burned into the image rather than drawn by
+    whatever displays it, because both consumers are incapable of adding it: `chart_viewer`
+    renders each arm as a bare `imshow` panel with `axis('off')` and `apply_tight_grid`
+    deliberately reclaims the title space (a 2x2 grid loses ~8% of its height to it), and
+    `charts.md` embeds the PNG with nothing but a markdown caption beside it. So an untitled
+    figure is unidentifiable in a four-panel wave window, which is exactly where identifying it
+    matters. Falls back to `graph_path`'s stem so a caller that has the path but not the name
+    still gets a title, and stays optional so the tests that call this with neither still pass.
     """
     # SNEK_CHART_SCALE sets the PNG render dpi (dpi = 100 * scale). The decoupled
     # chart_viewer.py only *magnifies* the PNG (~1.5-2x), so a low dpi looks blurry blown
@@ -359,6 +368,18 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     score_axis.set_xlabel(xlabel, fontsize=label_size)
     score_axis.tick_params(axis='y', labelcolor=score_color, labelsize=tick_size)
     score_axis.tick_params(axis='x', labelsize=tick_size)
+
+    # The arm's name, at the top. See the docstring for why this cannot live in the viewer.
+    # A hair larger than the axis labels (label_size 6) so it reads as a heading rather than as
+    # another annotation, and black rather than either trace's colour so it is not mistaken for
+    # belonging to one axis. `pad=2` because the default (6.0pt) costs more of a 2.25in figure
+    # than the title itself occupies. Longest real name is 24 chars
+    # (`b40b-chasefree10g75seed2`), which fits at this size in a 3.65in width.
+    chart_title = policy_name
+    if chart_title is None and graph_path is not None:
+        chart_title = os.path.splitext(os.path.basename(graph_path))[0]
+    if chart_title:
+        score_axis.set_title(chart_title, fontsize=label_size + 1, color='black', pad=2)
     # score_axis.set_ylim(top=250)
 
     percent_color = 'tab:red'
