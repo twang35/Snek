@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-21T05:25:05",
-  "ts": 1787315105.9680145,
+  "iso": "2026-08-21T05:25:38",
+  "ts": 1787315138.7318728,
   "at_a_glance": {
     "running": [
-      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- training 65% (4 arms)"
+      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- training 66% (4 arms)"
     ],
     "queued": [
       "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (4 arms)"
@@ -39,10 +39,10 @@
         "b45a-lowlr8-b29b"
       ],
       "pid": 3719479,
-      "step": 3311000,
+      "step": 3313000,
       "max_steps": 5000000,
       "steps_per_sec": 61.0,
-      "elapsed_s": 24358
+      "elapsed_s": 24391
     },
     {
       "id": "b45b-lowlr8-b29a",
@@ -52,10 +52,10 @@
         "b45b-lowlr8-b29a"
       ],
       "pid": 3719480,
-      "step": 3145000,
+      "step": 3147000,
       "max_steps": 5000000,
-      "steps_per_sec": 91.5,
-      "elapsed_s": 24358
+      "steps_per_sec": 61.0,
+      "elapsed_s": 24391
     },
     {
       "id": "b45c-lowlr8-b40b",
@@ -65,10 +65,10 @@
         "b45c-lowlr8-b40b"
       ],
       "pid": 3719481,
-      "step": 3415000,
+      "step": 3417000,
       "max_steps": 5000000,
-      "steps_per_sec": 91.5,
-      "elapsed_s": 24358
+      "steps_per_sec": 61.0,
+      "elapsed_s": 24391
     },
     {
       "id": "b45d-lowlr8-b29c",
@@ -78,10 +78,10 @@
         "b45d-lowlr8-b29c"
       ],
       "pid": 3719482,
-      "step": 3224000,
+      "step": 3227000,
       "max_steps": 5000000,
-      "steps_per_sec": 61.0,
-      "elapsed_s": 24358
+      "steps_per_sec": 91.6,
+      "elapsed_s": 24391
     }
   ],
   "ledger": {
@@ -334,8 +334,8 @@
   },
   "disk_free_gb": 123.1,
   "load_avg": [
-    15.7841796875,
-    15.08544921875,
-    15.2734375
+    15.97314453125,
+    15.166015625,
+    15.29248046875
   ]
 }
