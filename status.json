@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-21T11:36:34",
-  "ts": 1787337394.5759106,
+  "iso": "2026-08-21T11:37:09",
+  "ts": 1787337429.0014393,
   "at_a_glance": {
     "running": [
-      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- training 98% (3 arms)"
+      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- training 97% (2 arms)"
     ],
     "queued": [
-      "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (1 arm)"
+      "b45 closeout eval -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- queued (2 arms)"
     ]
   },
   "runtime": {
@@ -27,23 +27,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b45a-lowlr8-b29b",
-      "type": "train",
-      "policy": "b45a-lowlr8-b29b",
-      "policies": [
-        "b45a-lowlr8-b29b"
-      ],
-      "pid": 3719479,
-      "step": 4997000,
-      "max_steps": 5000000,
-      "steps_per_sec": 93.1,
-      "elapsed_s": 46647
-    },
     {
       "id": "b45b-lowlr8-b29a",
       "type": "train",
@@ -52,10 +39,10 @@
         "b45b-lowlr8-b29a"
       ],
       "pid": 3719480,
-      "step": 4781000,
+      "step": 4784000,
       "max_steps": 5000000,
-      "steps_per_sec": 93.1,
-      "elapsed_s": 46647
+      "steps_per_sec": 87.1,
+      "elapsed_s": 46681
     },
     {
       "id": "b45d-lowlr8-b29c",
@@ -65,17 +52,17 @@
         "b45d-lowlr8-b29c"
       ],
       "pid": 3719482,
-      "step": 4894000,
+      "step": 4897000,
       "max_steps": 5000000,
-      "steps_per_sec": 93.1,
-      "elapsed_s": 46647
+      "steps_per_sec": 87.1,
+      "elapsed_s": 46681
     }
   ],
   "ledger": {
     "b45-closeout": "queued",
-    "b45a-lowlr8-b29b": "running",
     "b45b-lowlr8-b29a": "running",
     "b45d-lowlr8-b29c": "running",
+    "b45a-lowlr8-b29b": "done",
     "b45c-lowlr8-b40b": "done",
     "b44-hof-r2": "done",
     "b44-hof": "done",
@@ -321,8 +308,8 @@
   },
   "disk_free_gb": 122.0,
   "load_avg": [
-    7.8193359375,
-    9.64453125,
-    10.96875
+    8.275390625,
+    9.56982421875,
+    10.89453125
   ]
 }
