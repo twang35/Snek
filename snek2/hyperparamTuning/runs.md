@@ -82,7 +82,7 @@ checkpoints, one learning rate each, and both chains are armed. Nothing is owed 
 | host | state | measurement chain |
 |---|---|---|
 | **laptop** | **idle of trainers.** `b43a-d` are finished on all three instruments. Its last work was the **1000-episode re-measurement of the project's eight best checkpoints** (four `b43`/`b44` continuations, four `hallOfFame/` entries) — 8000 episodes, ~16 min, results in `runs/k1000*_checkpoint_evals_k1000.json`. **All eight fell**, mean −1.35 and −1.45 pp; see [the finding](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | **armed.** `scripts/chain_closeout_after_training.sh b43 120` running detached (reparented to pid 1, log `/tmp/b43_chain.log`): polls until the four arms self-terminate at the 3M cap, then close-out at gate 96, then the HOF-500 re-measure on anything ≥98%. **fired on time at 01:07.** The close-out is at 542-709 of 791-1196 checkpoints per arm after 7.3 h — `b43b` is the long pole at ~8 h remaining, so HOF-500 starts this evening. See the close-out cost warning below: this is expected, not stuck |
-| **desktop** | **`b45a-d` training**, ~31% of a 5M cap (1.48-1.66M, +133-142k past seed), 4 trainers, 0 evals. `b42`, `b43` and `b44` are all finished on training, close-out and HOF-500; `b44`'s HOF landed 2026-08-20 with all 2235 measurements and **874 rows ≥98%/500**. `b45`'s close-out is queued behind the training | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
+| **desktop** | **`b45a-d` training**, **85%** of a 5M cap (4.10-4.42M, **+2.75-2.91M past seed**), 4 trainers, 0 evals. `b42`, `b43` and `b44` are all finished on training, close-out and HOF-500; `b44`'s HOF landed 2026-08-20 with all 2235 measurements and **874 rows ≥98%/500**. `b45`'s close-out is queued behind the training | **explicit, not automatic.** A `kill -9` makes the trainings `failed`, and `auto_closeout` fires only on `ok` — so four `<policy>-closeout` specs were queued by hand *before* killing. They use **exactly the id the daemon would synthesize**, which `_scan_pending` keeps in preference to its own projection, so there is no double-run; and `_hof_owed` keys off the *close-out's* success, so HOF-500 still chains by itself |
 
 **The two hosts now run the same chain, which they did not before 2026-08-18.** The desktop daemon has
 chained `training → closeout → HOF` since 2026-08-15; the laptop's `chain_closeout_after_training.sh`
@@ -119,7 +119,7 @@ because both were queued within minutes of each other from different hosts, and 
 twice. **`b39` is a C51 zero-init batch (laptop, `launch_b39_zeroinit.sh`); the free-space batch below is
 `b40`.**
 
-## Batches 42-45 — what happens if you keep training a champion — **the answer is yes, and lower is better: 4 → 187 → 874 rows ≥98%/500 across 1e-5/1e-6/1e-7; `b45` at 1e-8 is training**
+## Batches 42-45 — what happens if you keep training a champion — **yes, and lower is better down to `1e-7`: 4 → 187 → 874 rows ≥98%/500 across 1e-5/1e-6/1e-7, and `1e-8` is the frozen floor**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
 *passed through* on its way to a worse endpoint. No arm has ever been continued **from its own best
@@ -132,8 +132,8 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
-| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd — [write-up](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays) | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **finished on all three instruments** — HOF-500 landed 2026-08-20, all 2235 measurements | **training on the desktop, ~31%** of a 5M cap; close-out queued |
-| self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | holding at ~31%: `sef` **99.3-100.0**, best-30 95.2-**99.2** |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd — [write-up](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays) | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **finished on all three instruments** — HOF-500 landed 2026-08-20, all 2235 measurements | **training on the desktop, 85%** of a 5M cap; close-out queued |
+| self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | **flat on all four**, drift −0.6 to +0.3 pp over 2.8M steps; best-30 **98.3-100.0** on an equal-episode window (99.2 raw) |
 | close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | queued |
 | HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **187 rows ≥98%**, best 99.6% (`b43b` @1661k) | **874 rows ≥98%**, 90 at ≥99%, and **two 500/500s** (`b44a` @2798k, `b44b` @1886k) — [both selection artefacts](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | — |
 
@@ -146,6 +146,34 @@ rungs, and the step sizes tell you where the plateau is: `1e-5` → `1e-6` bough
 bought **+2.0 pp**. Decelerating but not flat, so **`1e-8` is the obvious next rung** and the one thing that
 would settle whether this is a plateau or a slope. The close-outs now running are what decide it on the
 500-episode instrument; everything above is 10-episode self-eval.
+
+**‡ At 85% of its cap, `1e-8` reads as the plateau — and specifically as the frozen end of it.** The rung is
+**level with `1e-7`, not ahead of it**: mean best-30 99.32 vs 99.17 once the 10 → 20 episode graph-eval change is
+corrected for (see below). What separates it is that **nothing moves**. Per-0.5M-band drift, first band to last:
+
+| rung | drift, worst → best arm | band-to-band spread |
+|---|---|---|
+| `1e-6` | **−6.3** → −0.0 | 0.91 - 2.89 |
+| `1e-7` | −2.7 → **+1.2** | 0.19 - 1.67 |
+| `1e-8` | **−0.6 → +0.3** | **0.19 - 0.37** |
+
+`1e-8` stopped the decay and stopped the gain together — `b44a` climbed +1.2 pp and `b45a`, the *same seed*, drifts
+−0.4. Every arm holds within ±0.5 pp of its opening band across 2.8M steps, which is the pre-registered **"flat from
+early on"** branch, not the "still climbing at the cap" one. So the ladder's answer is `1e-7`, and the next question
+is not a fifth rung downward.
+
+**Two metrics stop working at this rung, and both flatter it.** `sef` (99.8-100.0, the ladder's highest) asks whether
+an arm ever fell below 80% perfect, which an arm that never moves gets for free; and **a count of rows ≥98%/500 is
+trivially maximised by a frozen arm parked near 98%**, so `b45`'s close-out will probably beat `b44`'s 874 without
+being better. **Read `b45` on its best row's rate, not its count.**
+
+**‡ `best_perfect30` is not comparable across the 2026-08-19 boundary, and the size of the gap is now measured.**
+`training.num_eval_episodes` went 10 → 20, so `b45` is the first arm set whose best-30 is a maximum over a *less
+noisy* window — which lowers it systematically. Recomputing every arm on windows holding the **same 300 episodes**
+(30 evals × 10 for `b43`/`b44`, 15 × 20 for `b45`) raises every `b45` arm by **+0.8 to +1.0 pp** and moves the older
+rungs by nothing. Uncorrected, `b45` reads 98.55 against `b44`'s 99.17 and looks like a regression; corrected, 99.32
+against 99.17. **The whole apparent deficit was the instrument.** Banded means are unaffected and are the metric to
+cross the boundary with.
 
 Config is b29's, byte-checked against `b29b`'s own spec with only `SNEK_SEED` substituted: `fc 320`,
 chase-safe `c=0.10` gate 75, IS off, target-update 1000, discount 0.9975, food-distance 0, fork-branches 4,
@@ -361,12 +389,18 @@ additional data.
 | reading | probability | what it would mean |
 |---|---|---|
 | `b45` beats `b44` by a further **+0.5 to +1.5 pp**, 3-4 of 4 seeds | ~45% | the ladder is a slope, not a plateau, and the useful rate is lower still |
-| **null against `b44`**, inside ±0.5 pp | ~40% | the plateau is real and sits between 1e-7 and 1e-8. **The outcome to plan around** — it makes 1e-7 the operating point and closes the ladder |
+| **null against `b44`**, inside ±0.5 pp | ~40% | the plateau is real and sits between 1e-7 and 1e-8. **The outcome to plan around** — it makes 1e-7 the operating point and closes the ladder. **← this is what happened**, on the training instrument at 85% of the cap: +0.15 pp, and flat from the first band |
 | `b45` is **worse** than `b44` | ~15% | two mechanisms, and **the peak's timing separates them**: still climbing at the 5M cap means merely too slow (raise the cap again); flat from early on means the step has fallen below the scale that changes the greedy action, and the arm is genuinely frozen — the real floor this ladder has been looking for |
 
 **Read the peak's timing, not only its height.** `best_perfect30`'s *step* is the discriminator between "frozen"
 and "still improving", and it is what made `b44`'s result legible. Given the last rung's pre-registration was
 wrong in exactly the direction of assuming saturation, the null branch above is the one to hold most loosely.
+
+**‡ In the event the discriminator that worked was neither the height nor the peak's step, but the *drift*.**
+`b45`'s peak steps scatter uninformatively — 1616k, 1957k, 2990k, 3040k on the equal-episode window — while the
+per-band drift separates the rungs cleanly and in one direction (table above). Peak step is a maximum over a noisy
+series, so it moves with the number of draws; band drift is a mean-of-means and does not. **Prefer drift next
+time**, and keep the peak's step for the qualitative question of whether an arm was still climbing when it stopped.
 
 ### ⚠ A continuation batch's close-out costs 10-20x a normal one's — budget for it
 
@@ -391,25 +425,19 @@ If a future continuation batch needs a cheaper close-out, the lever is the *sele
 `above:<threshold>` reads a prior close-out's 100-episode numbers instead of the graph, which is what the HOF
 pass already uses.
 
-### ⚠ `b45` is blocked behind `b44`'s HOF-500 (~13 h left as of 2026-08-20 10:05), and that is the wave barrier working as designed
+### ✅ Resolved — `b45` was blocked behind `b44`'s HOF-500, and letting it run was the right call
 
-As of 21:50 the desktop is running **one** job — `b44-hof` — and holding `b45`'s four trainings plus their
-close-out queued behind it, because nothing new starts while anything is running. `b44-hof` is ~6% done at
-128 of 2235 measurements, so on its own pace that is **~18 h of a 4-trainer box running one eval**.
+The wave barrier held `b45`'s four trainings while `b44-hof` ran alone on a 4-trainer box for ~18 h. **Nothing
+was killed and nothing was requeued**: `b44`'s HOF landed complete on 2026-08-20 with all **2235** measurements
+and **874 rows ≥98%/500**, which is the number the whole ladder is scored on, and `b45` started straight after.
+Two things this settled for the next time the barrier bites:
 
-**Nothing is broken and nothing needs doing tonight**, but it is a choice worth making deliberately rather than
-by default, and it is the user's call:
-
-| option | cost |
-|---|---|
-| **let it run** (default) | `b45` starts ~16:00 tomorrow; the ladder's decisive instrument for `b44` lands first |
-| **kill `b44-hof` and let `b45` train** | frees the box now; `b44`'s /500 tier is lost until it is requeued, and its 100-episode result already stands |
-| **requeue `b44-hof` with a stricter selector** | `above:99` is 1238 of the 2235 (~10 h — the 98-99 band is only the cheaper half); `above:99.5`, i.e. the 100%/100 rows alone, is **374 (~3 h)** |
-
-The third is the one to pick if the box is wanted back quickly, but only at `above:99.5`: a hall-of-fame
-promotion needs ≥98%/500, while the *record* question lives entirely in the top band, and `b44` has **160 and
-160** checkpoints at 100%/100 on its two best arms — far more than a record needs. `above:99` barely saves
-anything, because the 98-99 band is where the rows are cheapest to abandon.
+- **The 18 h estimate was roughly half bookkeeping, not measurement.** The controller's per-round write was
+  O(rows) × O(episodes); `eval_plan.WriteGate` and `RowCache` took a measurement's overhead from 58 s to 1 s
+  (fixed 2026-08-20). A comparable pass should now price nearer 9-10 h, so **the trade-off table above is
+  priced on the old code** — recheck before using it to justify killing an eval.
+- **The stricter-selector options were never needed.** They stay documented above because the reasoning about
+  *which* band to cut (`above:99.5`, not `above:99`) is what a future call turns on.
 
 ### How these arms were started — it is not an ordinary resume
 

@@ -64,43 +64,65 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *training on the desktop, ~31% of a 5M cap: holding on all four, and `b45c` has the strongest curve of the whole ladder so far*
+## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *training on the desktop, 85% of a 5M cap: **flat on all four**, and the flatness is the answer*
 
 The fourth and lowest rung. `b42`-`b44` walked the rate down 1e-5 → 1e-6 → 1e-7 and each step beat the last, so
 `b45` asks whether that is monotone or whether there is an optimum. **It is the first rung with a longer cap —
 5M rather than 3M** — because `b43c` did not peak until 2803k and `b44`'s best rows sit at 2.2-2.9M, so 3M was
 starting to look like the binding constraint rather than the arms' own limit.
 
-| arm | continues | step | past seed | best-30 | `sef` | recent-30 | `max_single` |
+| arm | continues | step | past seed | best-30 | **best-30, equal-episode** | `sef` | recent-30 |
 |---|---|---|---|---|---|---|---|
-| `b45c` | `b40b` @1513k | 1655k | +142k | **99.2** @1621k | **100.0** | 97.2 | 100 |
-| `b45a` | `b29b` @1447k | 1585k | +138k | 98.3 @1510k | **100.0** | 97.0 | 100 |
-| `b45b` | `b29a` @1347k | 1480k | +133k | 98.2 @1391k | **100.0** | 97.2 | 100 |
-| `b45d` | `b29c` @1396k | 1533k | +137k | 95.2 @1485k | 99.3 | 93.7 | 100 |
+| `b45a` | `b29b` @1447k | 4297k | +2850k | 99.2 @2990k | **100.0** @2990k | **100.0** | 97.5 |
+| `b45c` | `b40b` @1513k | 4421k | +2908k | 99.2 @1621k | 99.7 @1616k | 99.9 | 97.2 |
+| `b45b` | `b29a` @1347k | 4098k | +2751k | 98.5 @1662k | 99.3 @1957k | **100.0** | 97.5 |
+| `b45d` | `b29c` @1396k | 4195k | +2799k | 97.3 @3788k | 98.3 @3040k | 99.8 | 94.7 |
 
-**`zero_since` is null on all four**, and three arms have not produced a single eval below 80% perfect.
-**`b45c`'s best-30 of 99.2 is the highest any arm in this ladder has reached on the training instrument** — and
-it comes from the `b40b` seed, which was the *weakest* at `1e-6` (`b43c` held 1 checkpoint) and mid-pack at
-`1e-7` (`b44c` held 42). Worth watching rather than believing: these are 10-episode evals and the arms are only
-~135-142k past their seeds.
+**`zero_since` is null on all four** and every arm is ~2.8M steps past its seed, so this is no longer an early read.
 
-**`b45d` is the flat seed again**, 95.2 against its siblings' 98.2-99.2 — the same `b29c` seed that held 0 at
-both `1e-6` and `1e-7`. Four rungs in, that seed has never produced a ≥98%/500 checkpoint under continuation.
+**Read the `best-30, equal-episode` column, not the plain one — and this batch is where that starts to matter.**
+`training.num_eval_episodes` went 10 → 20 on 2026-08-19, so `b45` is the first arm set on the new instrument, and
+`best_perfect30` is a maximum over a *less noisy* statistic than `b43`/`b44` computed theirs from. The correction is
+not hypothetical: recomputing every arm on windows holding the **same 300 episodes** (30 evals × 10 for `b43`/`b44`,
+15 × 20 for `b45`) raises every `b45` arm by **+0.8 to +1.0 pp** and leaves the older rungs untouched. Mean best-30
+then reads **b44 99.17 vs b45 99.32** — level — where the uncorrected numbers read 99.17 vs 98.55 and look like a
+regression. **The apparent `b45 < b44` deficit is entirely the instrument.**
 
-**Do not read `sef` here against other batches.** These arms started at ~98%, so 100.0 says "it never dropped",
-not "it learned fast"; the only fair references are the other rungs, in
-[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-4--187--874-rows-98500-across-1e-51e-61e-7-b45-at-1e-8-is-training).
-The close-out and HOF-500 are queued behind the training and will be the real numbers — and on
-[today's re-measurement result](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) they should be read as ~1.4 pp
-optimistic when they land.
+**What is real is that the arms stopped moving.** Mean perfect rate per 0.5M band, first band vs last:
 
-### b45c-lowlr8-b40b — continues `b40b` @1513k
+| rung | drift, worst → best arm | band-to-band spread |
+|---|---|---|
+| `b43` @1e-6 | **−6.3** → −0.0 | 0.91 - 2.89 |
+| `b44` @1e-7 | −2.7 → **+1.2** | 0.19 - 1.67 |
+| `b45` @1e-8 | **−0.6 → +0.3** | **0.19 - 0.37** |
 
-![b45c](charts/b45c-lowlr8-b40b.png)
+`1e-8` bought stability by buying inaction. It stopped the decay — `b43d` shed 6.3 pp and `b44c` 2.7 pp over their
+runs, while `b45`'s *worst* arm moves 0.6 pp — but it equally stopped the gain: `b44a` climbed +1.2 pp and `b45a`,
+the same seed, drifts −0.4. Every arm sits within ±0.5 pp of its own opening band across 2.8M steps. That is the
+**"flat from early on"** branch of `b45`'s pre-registration, i.e. the step has fallen below the scale that changes
+the greedy action — not "too slow, raise the cap", which would show as a curve still climbing at 4.3M.
+
+**So `sef` at 99.8-100.0, the highest of any rung, is a symptom rather than a result.** It asks whether an arm ever
+dropped below 80% perfect, which an arm that never moves satisfies for free. The same warning applies to the metric
+the ladder has been scored on: **a count of checkpoints ≥98%/500 is trivially maximised by a frozen arm parked near
+98%**, so expect `b45`'s close-out to hold *more* rows than `b44`'s 874 without being better, and read it on its
+**best row's rate**, not its count. Comparisons across the four rungs are in
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--yes-and-lower-is-better-down-to-1e-7-4--187--874-rows-98500-across-1e-51e-61e-7-and-1e-8-is-the-frozen-floor).
+
+**`b45d` is the flat seed again**, 94.7 recent-30 against its siblings' 97.2-97.5 — the same `b29c` seed that held 0
+rows at both `1e-6` and `1e-7`. Four rungs in, that seed has never produced a ≥98%/500 checkpoint under continuation.
+
+The close-out is queued behind the training, and on
+[the re-measurement result](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20)
+its selected best should be read as ~1.4 pp optimistic when it lands.
 
 ### b45a-lowlr8-b29b — continues `b29b` @1447k
 
 ![b45a](charts/b45a-lowlr8-b29b.png)
+
+### b45c-lowlr8-b40b — continues `b40b` @1513k
+
+![b45c](charts/b45c-lowlr8-b40b.png)
 
 ### b45b-lowlr8-b29a — continues `b29a` @1347k
 
@@ -257,7 +279,7 @@ across b29 and b40 — ranked by their best **500-episode** perfect rate — to 
 config (`fc 320`, chase-safe `c=0.10` gate 75, no free-space term), with **`SNEK_LEARNING_RATE=1e-6`** the only
 change. The desktop's **`b42`** runs the identical four at the default `1e-5` as the seed-matched control.
 Rationale, the pre-registered outcome readings and the selection-bias warning are in
-[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--the-answer-is-yes-and-lower-is-better-4--187--874-rows-98500-across-1e-51e-61e-7-b45-at-1e-8-is-training);
+[`runs.md`](runs.md#batches-42-45--what-happens-if-you-keep-training-a-champion--yes-and-lower-is-better-down-to-1e-7-4--187--874-rows-98500-across-1e-51e-61e-7-and-1e-8-is-the-frozen-floor);
 launcher [`scripts/launch_b43_lowlr.sh`](scripts/launch_b43_lowlr.sh), seeding
 [`scripts/seed_from_checkpoint.sh`](scripts/seed_from_checkpoint.sh).
 

@@ -124,6 +124,8 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | finding | status |
 |---|---|
 | **`fraction of evals >= 80%` has the lowest between-seed variance** of the candidate metrics | **measured**, sd 5.8 vs 8.6 for best-30 |
+| **‡ `best_perfect30` is biased *down* by the 10 → 20 episode graph change, by +0.8 to +1.0 pp** | **measured 2026-08-21** on b45's four arms. It is a max over a window mean, so halving the window's noise lowers the max. Recomputed on equal-episode windows (30×10 vs 15×20) it erased the whole apparent `b45 < b44` deficit — 98.55 vs 99.17 became 99.32 vs 99.17. Banded means cross the boundary safely; **best-30 and `max_single_eval` do not**. See below |
+| **‡ `sef` and "count of rows ≥98%/500" are both maximised by an arm that never moves** | **measured 2026-08-21**, b45 at `1e-8`: band drift −0.6 to +0.3 pp over 2.8M steps, and `sef` **99.8-100.0**, the highest of any rung. Neither metric distinguishes "held a high level" from "improved"; use **per-band drift** for that |
 | Abandoning a checkpoint eval early is not worth it | **falsified for an arithmetic rule** — full-length work falls to 71 / 52 / 31% at gates of 85 / 90 / 95; only the *predictive* version was a mere 14% |
 | **n=4 cannot resolve an effect below ~10 pp**; 5 pp needs n≈17-37 depending on the metric | **established** |
 | 100-episode measurement reproduces within binomial noise | **established**, 51 repeats |
@@ -1382,6 +1384,40 @@ batches 10-11 found their best checkpoint in the 90% tier, which is ~4x larger. 
 **`b6b-alpha06` and `b6a-alpha04` were measured with the old smoothed selector and are
 underestimates.** They cannot be fixed by re-measuring — `b6a`'s best graph point in 1415 evals is
 50%, so the current thresholds yield nothing from it. The alpha comparison needs new seeds.
+
+## ‡ The 2026-08-19 graph-eval change biases `best_perfect30` down, and a flat arm tops both stability metrics
+
+Two measurement results from reading `b45` (`lr 1e-8`) against `b44` (`1e-7`), both of which would have produced a
+wrong conclusion if taken at face value.
+
+**`training.num_eval_episodes` went 10 → 20, and that lowers `best_perfect30`.** It is the maximum over windows of a
+window *mean*, so halving the per-eval noise shrinks the upward excursions the maximum is picking from. The direction
+was already written down; the size was not. Recomputing every arm on windows holding the **same 300 episodes** — 30
+evals × 10 for `b43`/`b44`, 15 × 20 for `b45` — moves the older rungs by **nothing** and every `b45` arm by **+0.8 to
++1.0 pp**:
+
+| arm | best-30 as reported | equal-episode window |
+|---|---|---|
+| `b45a` | 99.2 | **100.0** |
+| `b45b` | 98.5 | 99.3 |
+| `b45c` | 99.2 | 99.7 |
+| `b45d` | 97.3 | 98.3 |
+
+Mean best-30 then reads **b44 99.17 vs b45 99.32** — level — where the raw numbers read 99.17 vs 98.55 and look like a
+regression. **The entire apparent deficit was the instrument.** Banded mean perfect rate is an unbiased estimate of the
+same true rate at either episode count and is what should cross the boundary; `best_perfect30` and `max_single_eval`
+should not, in either direction.
+
+**And a frozen arm tops the two stability metrics for free.** `b45`'s four arms drift **−0.6 to +0.3 pp** between their
+first and last 0.5M-step band over 2.8M steps, with band-to-band spread 0.19-0.37 against `b44`'s 0.19-1.67 and `b43`'s
+0.91-2.89 — i.e. they neither decay nor improve. Their `sef` is **99.8-100.0**, the highest of the whole ladder, because
+`sef` asks whether an arm ever dropped below 80% perfect and an arm that never moves never does. The same applies to the
+metric this ladder is scored on: **a count of checkpoints ≥98%/500 is trivially maximised by an arm parked near 98%**,
+so a frozen rung can beat a genuinely better one on the count.
+
+**So report drift alongside level.** Per-band drift is a difference of means and does not move with the number of draws;
+peak height and peak *step* both do. On `b45` the peak steps scatter uninformatively (1616k, 1957k, 2990k, 3040k) while
+the drift separates the rungs cleanly and in one direction.
 
 ## Three measurement caveats
 
