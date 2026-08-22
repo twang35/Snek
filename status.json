@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-22T12:50:59",
-  "ts": 1787428259.6585984,
+  "iso": "2026-08-22T12:51:42",
+  "ts": 1787428302.9886444,
   "at_a_glance": {
     "running": [
       "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- closeout eval (2 arms)"
@@ -43,7 +43,7 @@
       "step": 4297000,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 88907
+      "elapsed_s": 88951
     }
   ],
   "ledger": {
@@ -297,8 +297,8 @@
   },
   "disk_free_gb": 121.8,
   "load_avg": [
-    18.6962890625,
-    18.9228515625,
-    18.9853515625
+    18.58251953125,
+    18.86865234375,
+    18.96533203125
   ]
 }
