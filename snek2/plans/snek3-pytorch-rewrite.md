@@ -95,11 +95,50 @@ steps** (22 per step) and `get_relative_pos` 93,722 times. Roughly 300 scalar he
 spread across the observation builder. Vectorising deletes all of it; memoising the flood fill
 deletes the wrong 19%.
 
-**Corollary: an incremental / memoised flood fill is not the thing to build.** If it is ever wanted,
-the right shape is union-find over open cells rather than caching — freeing the tail only ever
-*merges* regions, and blocking the new head only ever *splits* one, which is a local articulation
-test on at most four neighbours. But it is inherently sequential per env, so it fights the
-vectorisation that Finding 5 shows is worth far more.
+### Corollary: an incremental flood fill works, and still is not worth building
+
+Measured directly, because the idea is a good one and deserved a number rather than an argument.
+The premise is exactly right: **the open-cell set changes by at most two cells per step** — the new
+head cell blocks, the vacated tail cell opens, and food never changes it because food counts as
+open. Over 7,632 champion steps, 7,058 changed exactly 2, the 470 that changed 1 are the eating
+moves where the tail does not advance.
+
+Freeing the tail can only ever *merge* regions (one OR of bitmasks, zero dilations). Blocking the
+head can only ever *split* one, and the cost is a local articulation test on its at most four open
+neighbours — a multi-source dilation stopped the moment the waves meet.
+
+| | measured over champion play |
+|---|---|
+| from-scratch dilation rounds per `count_groups` call | mean **20**, median 19, p90 28, max 40 |
+| from-scratch rounds **per step** | **38.7** |
+| incremental reconnection rounds | mean **3.26**, median **1**, p90 14, max 37 |
+| free by degree <= 1 (cannot split) | 21.4% of moves |
+| genuine splits | 17.0% of moves |
+| **rounds per step** | **38.7 -> 6.3, a 6.1x reduction** |
+
+**And that 6.1x converts to 1.27x of wall clock.** Connectivity work per step: **9.82 us** now,
+**7.71 us** incremental, **5.48 us** at a steel-manned floor that carries the open mask perfectly
+and charges *nothing* for maintaining region masks or counts.
+
+The reason is that a dilation round was never expensive. It is about five bigint operations on one
+144-bit integer, and Python's cost is per *operation*, not per *cell* — which is the whole trick
+behind the current implementation. The incremental scheme trades 38.7 cheap operations for 6.3 plus
+branching, list manipulation and a pairwise wave merge, and the bookkeeping eats ~80% of the
+theoretical gain. The floor is generous besides: indices 10/12/14 need the region *count*, and
+`head_with_tail` / `safe_to_chase_food` need to know *which* region holds the tail and the food, so
+a real design must maintain exact masks across splits — the expensive branch, charged at zero above.
+
+At the floor, 4.34 us off a 92 us env step is 4.7% of the env and **~1.5% end to end**; inside the
+training loop, where the env is 3.6%, ~0.2%.
+
+**Batching beats it outright, which is the decisive point.** The vectorised env does step *plus the
+entire 30-value observation* in **5.1 us** at 1,024 envs — less than the 5.48 us floor for the
+scalar connectivity block alone. A dumb algorithm amortised over 1,024 boards in one numpy call
+beats a clever one running per env in Python, and the incremental scheme is inherently sequential
+per env, so adopting it means reintroducing the loop vectorisation exists to delete.
+
+Same trap this project already has on record: an 11x speedup of the observation code and a 6.8x
+speedup of policy inference both moved eval wall clock by approximately nothing.
 
 ## Finding 5 — a vectorised env, measured
 
