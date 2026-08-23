@@ -12,26 +12,31 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## What is running — 2026-08-22
+## What is running — 2026-08-23
 
 | host | state |
 |---|---|
-| **laptop** | **idle.** No trainers, no evals. `b43`'s three instruments and the 1000-episode champion re-measurement are all finished |
-| **desktop `the-claw-den`** | **`b45`'s close-out, wave 1 of 2.** `b45-closeout` (`b45a`, `b45c`) has been running 21.7 h and is in **stage B**, the chained HOF-500 re-measure, at 625 of 2755 measurements. `b45-closeout-w2` (`b45b`, `b45d`) is **queued** behind it — `max_evals` is 1 |
+| **laptop** | **idle.** No trainers, no evals |
+| **desktop `the-claw-den`** | **`b45`'s close-out, wave 2 of 2.** `b45-closeout-w2` (`b45b`, `b45d`) is in **stage A**, 1150 of 4437 measurements after 2.4 h. Wave 1 (`b45a`, `b45c`) **finished complete at 06:58** — see below |
 
-**`b45b` and `b45d` have not been measured at all yet**, and their absence from the desktop chart window is
-that, not a finished pass: the viewer's panel set for an eval wave is every chart in `evals/` whose batch the
-wave is measuring, and membership is the file existing on disk. Nothing has published either — `origin/results`
-carries training artifacts only for all four arms.
+**Wave 1 ran 42.8 h and completed everything it planned**: stage A, 6253 measurements in 15.2 h; stage B (the
+chained HOF-500), 2755 in 27.65 h; **100% lane utilisation in both**, `complete: true` in both output files.
+It needed no `-r2`. Results are published under **`results/b45-closeout/`** on the `results` branch and are
+copied into `runs/`.
 
-**The two waves exist because the job predates the grouping fix.** `b45-closeout` was dispatched under the old
-whole-env key, which split the batch into `{a,c}`, `{b}`, `{d}`; `1f2e9d96f` (2026-08-21 16:35) keys on
-`runner.EVAL_RELEVANT_ENV` instead and re-grouped the remainder into one `w2`, so the batch now costs two waves
-rather than three. It could not fold `{b,d}` into a wave already running.
+**‡ An eval job publishes under its own job id, not under each policy** — `results/b45-closeout/`, while a
+*training* job publishes under `results/<policy>/`. So `git ls-tree --name-only origin/results:results | grep
+<policy>` finds a per-arm eval (`b44a-lowlr7-b29b-closeout`) but **misses a batch-level one**, which is what
+`_auto_closeout_jobs` now produces for a whole batch. **Use `-r`.** Non-recursive, `b45a` matches only its
+training directory and the close-out reads as unpublished.
 
-**Do not raise `max_evals` to unblock wave 2.** Load average is 18.5 on 14 cores with 4 lanes × 4 workers
-already, so a second job splits the same cores and both finish later. The lever on a continuation batch's
-measurement bill is the *selector*, not parallelism.
+**Wave 2's remaining cost.** Stage A is running at 7.6 s per measurement, so ~7 h left on it; stage B's size
+depends on how many checkpoints clear ≥98%/100, and `b45d` is the `b29c` seed that has produced **zero**
+≥98%/500 rows on every rung, so expect stage B well under wave 1's 2755. Wave 1's own pace is the guide:
+**~145 lane-seconds per 500-episode measurement, flat from the first 250 to the last.**
+
+**Do not raise `max_evals` to run both waves at once.** Load average is 18.3 on 14 cores with 4 lanes × 4
+workers already, so a second job splits the same cores and both finish later.
 
 **Verify each host separately — neither check sees the other**, so a count is meaningless without naming the
 box. Laptop: `ps -Ao pid=,command= | grep "python -u sne[k]2.py"`. Desktop:
@@ -39,6 +44,15 @@ box. Laptop: `ps -Ao pid=,command= | grep "python -u sne[k]2.py"`. Desktop:
 the `iso` heartbeat. **The fetch is not optional** — without it you are shown an arbitrarily old local
 remote-tracking ref with no sign that it is old, which has produced three false "the daemon is dead" alarms.
 Ladder and rationale: [`CLAUDE.md`](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
+
+**‡ A batch-level eval job that dies mid-pass is marked `done` and re-dispatched under a new id, and `b44`'s
+HOF is the precedent — not `b45`'s.** `b44-hof` folded **1157 of 2235** and exited with no summary and no
+`error`, 35 minutes after `adbec2904` ("Eval writes: the controller was rewriting O(rows) files O(episodes)
+times") was committed — i.e. the deploy that restarted the daemon killed it. Dead pid on the same boot reads
+as `done`, so the daemon synthesized **`b44-hof-r2`** on its next poll, 45 s later, which ran the remaining
+1078 to completion in 12.9 h. **So `b44`'s 874 rows are two jobs**, and an `-r2` in the ledger means an
+interrupted pass, not a repeat measurement. Read the two `grep -c`s before assuming a long eval is stuck:
+lane completions (`episodes in`) against controller folds (`^[ n/N]`).
 
 ## Batches 42-45 — what happens if you keep training a champion — **yes, and lower is better down to `1e-7`: 4 → 187 → 874 rows ≥98%/500 across 1e-5/1e-6/1e-7, and `1e-8` is the frozen floor**
 
@@ -53,10 +67,10 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
-| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd — [write-up](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays) | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **finished on all three instruments** — HOF-500 landed 2026-08-20, all 2235 measurements | **trained to 4.10-4.42M and stopped.** Close-out running on the desktop as **two waves**: `{a,c}` is in its HOF stage, `{b,d}` is queued — see [What is running](#what-is-running--2026-08-22) |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd — [write-up](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays) | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **finished on all three instruments** — HOF-500 landed 2026-08-20, all 2235 measurements | **trained to 4.10-4.42M and stopped.** Close-out running on the desktop as **two waves**: `{a,c}` is in its HOF stage, `{b,d}` is queued — see [What is running](#what-is-running--2026-08-23) |
 | self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | **flat on all four**, drift −0.6 to +0.3 pp over 2.8M steps; best-30 **98.3-100.0** on an equal-episode window (99.2 raw) |
-| close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | **running** |
-| HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **187 rows ≥98%**, best 99.6% (`b43b` @1661k) | **874 rows ≥98%**, 90 at ≥99%, and **two 500/500s** (`b44a` @2798k, `b44b` @1886k) — [both selection artefacts](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | **running**, wave 1 at 625 of 2755 |
+| close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | `b45a` **49.2%** (1584/3222), `b45c` **38.6%** (1171/3031); `b45b`/`b45d` running |
+| HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **187 rows ≥98%**, best 99.6% (`b43b` @1661k) | **874 rows ≥98%**, 90 at ≥99%, and **two 500/500s** (`b44a` @2798k, `b44b` @1886k) — [both selection artefacts](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | **wave 1 done: 486 rows ≥98%** (`b45a` 349, `b45c` 137), best **99.4%** (`b45a` @1621k). Wave 2 running |
 
 `b44` existed because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
 into a hold. It asked where that stops, and **the answer is "not yet at 1e-7"** — see [the write-up](completedRuns.md#batch-44--the-same-four-checkpoints-at-lr-1e-7-the-best-rung-of-the-ladder--874-checkpoints-at-98500-and-it-falsified-its-own-pre-registration),
@@ -119,6 +133,37 @@ was **abandoned by the 98% gate**, so its 97.1% is not strictly comparable with 
 above it — it is the rank-4 arm on either reading, since rank 5 (`b40a` @1816k, 96.3%/294) sits behind it with
 a heavily overlapping CI.
 
+
+### ✅ b45's first two arms measure level-to-behind `1e-7` on the deepest instrument
+
+Wave 1 is complete on both instruments. The seed-matched comparison, **one row per starting checkpoint** so
+nothing is pooled across seeds — the ladder's own rule for this batch:
+
+| starting checkpoint | | `b43` 1e-6 | `b44` 1e-7 | `b45` 1e-8 |
+|---|---|---|---|---|
+| `b29b` @1447k (the record) | rows ≥98%/500 | 16 | **429** | 349 |
+| | share of its ≥98%/100 candidates | 10% (16/166) | **50%** (429/853) | 22% (349/1584) |
+| | best /500 | 99.4% @1618k | 100.0% @2798k → [98.2% on 1000](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | 99.4% @1621k |
+| `b40b` @1513k | rows ≥98%/500 | 1 | 42 | **137** |
+| | share of its candidates | 1% (1/133) | 10% (42/415) | **12%** (137/1171) |
+| | best /500 | 98.0% @1760k | 99.0% @2600k | 99.0% @1793k |
+
+**It is not monotone, and the record seed is where `1e-8` loses.** On `b29b` it holds 349 rows against `b44`'s
+429 and converts 22% of its candidates against 50%; on `b40b` it is ahead on both. Reading the **share** rather
+than the count matters here because `b45`'s 5M cap gave it ~2.85-2.91M steps past seed against `b44`'s
+~1.49-1.65M, so it had roughly 1.8× the checkpoints to draw from — the raw counts flatter it and it still comes
+second on the seed that matters most.
+
+**The pre-registered warning was half right.** It said a frozen arm parked near 98% would trivially beat
+`b44`'s 874 without being better. The frozen arm did *not* beat it: 486 from two arms, on pace for well under
+874 once `b45d` — the `b29c` seed with zero rows at every rung — is counted. So the count did not need
+discounting; the **best row's rate** is where the two rungs tie (99.4 vs 99.4 on one seed, 99.0 vs 99.0 on the
+other), which is the same "level with `1e-7`" verdict the training instrument gave.
+
+**No new record.** `b45a` @1621000 reads **99.4% (497/500, CI 98.3-99.8)**, a point above `b29b` @1447k's
+standing 99.0% and *identical* to `b43a` @1618000 — which was also never promoted. It is the maximum over 353
+full-length rows, and a selected /500 maximum in this family runs about **1.4 pp optimistic**. Treat it as a
+candidate for a 1000-episode re-measure, not a record.
 
 ### Batch 45 — `1e-8`, and the first rung with a longer cap
 
@@ -341,6 +386,6 @@ sweep was 2026-08-22, which took this file from 1075 lines to ~350 by retiring t
 notice, the closed rungs of the b42-b45 ladder, every closed-batch status section from b31 to b41, the gate
 ladder summary, the b20-b26 index, the max-progression table and the batch 11-19 one-liners.
 
-**Verifying what is running on each host is [above](#what-is-running--2026-08-22)** — and note that neither
+**Verifying what is running on each host is [above](#what-is-running--2026-08-23)** — and note that neither
 check sees the other box, so a count is meaningless without naming it. Full ladder for a desktop that looks
 dead: [`CLAUDE.md`](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
