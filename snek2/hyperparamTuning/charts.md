@@ -191,7 +191,7 @@ preserve; it improves more slowly and for longer. That is why the "it will just 
 five for their `1e-6` twins and one in fifteen for `1e-5`. `b44d` is the flat seed on every rung. Note that
 `b44`'s pool is the *least* selected of the three batches — 98% of all its checkpoints on two arms — so it
 carries the most dead weight in the denominator and still wins; the full comparison, with the caveats, is in
-[`runs.md`](runs.md#-the-100-episode-close-outs-agree-with-the-self-evals-and-the-effect-is-much-larger-than-the-self-evals-suggested).
+[`archive/runs-archive.md`](archive/runs-archive.md#retired-from-runsmd-2026-08-22--the-closed-rungs-of-the-b42-b45-ladder).
 
 **The HOF-500 finished 2026-08-20 — all 2235 measurements — and it decides the ladder against `b43`
 emphatically: 874 rows ≥98%/500 against `b43`'s 187**, a 4.7x gap on a *less* selected pool, and 90 rows at
@@ -354,7 +354,7 @@ carrying the candidate record at ~25% of the pass; it finished at 99.4% and was 
 [fell to 98.2% on 1000 fresh episodes](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20), as did `b43b` @1708000
 (98.1%). The note said the number worth watching
 was the count and not the maximum, and that is exactly how it turned out — see
-[`runs.md`](runs.md#-b43s-hof-500-is-done-b44s-is-half-done--and-its-500500-did-not-survive-re-measurement).
+[`archive/runs-archive.md`](archive/runs-archive.md#retired-from-runsmd-2026-08-22--the-closed-rungs-of-the-b42-b45-ladder).
 
 **`b43` is finished on all three instruments, and its canonical write-up is now in
 [`completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue)** — the per-seed `b42` comparison, the pooled equal-effort figures
