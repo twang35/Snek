@@ -196,3 +196,96 @@ def test_an_empty_stream_is_not_an_error():
     out, stats = _run([], episodes=10, width=10)
     assert out == {}
     assert stats['checkpoints'] == 0
+
+
+# --------------------------------------------------------------------------- start-order recording
+
+def test_a_job_banks_each_episode_at_its_start_slot_not_its_completion_order():
+    """The ordering guarantee `eval_plan.equal_effort_pooled` depends on, asserted directly.
+
+    Banking out of order is the normal case, not an edge case: lanes finish whenever their episode
+    ends, so slot 3 routinely lands before slot 0. An append-based implementation passes every other
+    test in this file — the row's totals are identical — and fails only here.
+    """
+    job = vec_engine._Job('ckpt', lambda obs: obs, 4)
+    job.started = 4                                  # as if all four lanes were assigned
+    job.record(2, 95, 95.0)                          # completions arrive scrambled
+    job.record(0, 40, 39.5)
+    job.record(3, 95, 95.0)
+    job.record(1, 95, 95.0)
+    assert job.scores == [40, 95, 95, 95], job.scores
+    assert job.perfect == [0, 1, 1, 1], job.perfect
+    assert job.rewards == [39.5, 95.0, 95.0, 95.0], job.rewards
+    assert job.banked == 4 and job.done == 4
+
+
+def test_banking_one_slot_twice_is_refused():
+    job = vec_engine._Job('ckpt', lambda obs: obs, 2)
+    job.record(0, 95, 95.0)
+    try:
+        job.record(0, 40, 39.0)
+    except RuntimeError as error:
+        assert 'twice' in str(error)
+    else:
+        raise AssertionError('a double-banked slot must raise')
+
+
+def test_a_partial_job_refuses_to_hand_out_a_sample():
+    """A gap would reach the result file as a JSON null, which no reader checks for."""
+    job = vec_engine._Job('ckpt', lambda obs: obs, 3)
+    job.record(0, 95, 95.0)
+    try:
+        job.held()
+    except RuntimeError as error:
+        assert 'banked' in str(error)
+    else:
+        raise AssertionError('held() must refuse a sample with an unfilled slot')
+
+
+def test_no_slot_is_left_unfilled_by_a_real_run():
+    results, _ = _run([('c%d' % i, survival_policy) for i in range(3)],
+                      episodes=24, width=64, max_live=8)
+    for key, held in results.items():
+        assert len(held['scores']) == 24, (key, len(held['scores']))
+        assert all(s is not None for s in held['scores']), key
+        assert all(p is not None for p in held['perfect']), key
+        assert all(r is not None for r in held['rewards']), key
+
+
+def test_a_prefix_of_a_row_is_a_fair_sample_of_it():
+    """The statistical property, on the real env: the first half must look like the second half.
+
+    This is the test that would have caught the completion-ordered bug in production. Episode length
+    correlates with outcome -- a high-scoring episode ate more food and ran longer, a quick death
+    ends in a few dozen steps -- so under completion ordering the outcomes arrive sorted by length
+    and a prefix is a biased sample. Measured on a real arm, failures landed at mean position 0.92
+    of a completion-ordered array and a 20-of-100 prefix read 0.25% failures against a true 2.23%.
+
+    **Measured on mean score, not on the perfect-game count, because the first version of this test
+    was vacuous.** `survival_policy` is a heuristic that never wins: over 360 episodes it scored a
+    mean of 42 with **zero** perfect games, so comparing perfect counts compared 0 against 0 and
+    passed under the very mutant it existed to catch. Score is the statistic that actually varies
+    here, and the guard below fails if that ever stops being true.
+    """
+    episodes = 60
+    results, _ = _run([('c%d' % i, survival_policy) for i in range(6)],
+                      episodes=episodes, width=128, max_live=16)
+    assert results, 'no checkpoints measured'
+    half = episodes // 2
+    first = [s for held in results.values() for s in held['scores'][:half]]
+    second = [s for held in results.values() for s in held['scores'][half:]]
+
+    # Vacuity guard: the comparison below is only meaningful while scores have real spread. If a
+    # future policy makes every episode identical this fails loudly instead of passing for free.
+    allsc = first + second
+    spread = max(allsc) - min(allsc)
+    assert spread >= 20, 'scores span only {0} — this test can no longer detect sorting'.format(spread)
+
+    mean_first = sum(first) / float(len(first))
+    mean_second = sum(second) / float(len(second))
+    # Loose on purpose: the point is to catch *sorting*, a gross effect, not to assay a mean. Under
+    # completion ordering this gap ran to ~30 points; ordinary sampling noise here is a few points.
+    assert abs(mean_first - mean_second) <= 0.20 * spread, (
+        'first half of each row means {0:.1f} and the second half {1:.1f} over a spread of {2} — the '
+        'episodes are sorted by length, so a prefix of this row is not a fair sample of '
+        'it'.format(mean_first, mean_second, spread))

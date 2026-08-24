@@ -33,6 +33,7 @@ the same selectors `eval_checkpoints.py` takes, because they *are* `eval_plan`'s
 | `VEC_EVAL_WIDTH` | 1024 | total env lanes |
 | `VEC_EVAL_MAX_LIVE` | derived | **leave it derived** — see the capacity trap below |
 | `VEC_EVAL_SEED` | 0 | the only stochastic input to a measurement |
+| `VEC_EVAL_SHARD` | unset | `i/n`, 1-based — this process's strided slice of the selection |
 | `EVAL_OUT_SUFFIX` | `_vec` | so a run can never overwrite a TF result |
 
 Charts go to **`evals/vec/`**, not `evals/`, and this driver never calls
@@ -68,6 +69,74 @@ Three measurements explain the shape, and they are the ones to re-take if any of
 So **the observation is 95% of a step and the policy is nearly free** — the inverse of the per-worker
 shape, where `tf.function` dispatch dominates. Two things follow: width is the lever, and one wide env
 can serve several checkpoints at once with a policy call each.
+
+## Filling the box: 12 processes, not 4
+
+One process saturates about **one core** — the observation build is single-threaded numpy and is 95%
+of a step — so a four-process run leaves most of a 14-core laptop idle. Measured on 240 checkpoints
+of `b45a`, 100 episodes each, machine-wide (10 P-cores + 4 E-cores, 36 GB):
+
+| processes | width | episodes/s | CPU idle | wall |
+|---|---|---|---|---|
+| 4 | 1024 | 168 | 59% | 151 s |
+| 8 | 1024 | 269 | 35% | 95 s |
+| **12** | **1024** | **347-350** | **2-6%** | **76 s** |
+| 13 | 1024 | 337-340 | 0.5% | 80 s |
+| 14 | 1024 | 329 | 0.0% | 82 s |
+| 16 | 1024 | 280 | 0.0% | 99 s |
+| 12 | 512 | 305 | 1.6% | 87 s |
+| 12 | 2048 | 329 | 5.7% | 88 s |
+
+**12 x width 1024 is the operating point.** Past it the box is oversubscribed and throughput *falls*
+while idle sits at zero — 16 processes are 20% slower than 12 — so "0% idle" is not the target;
+0-5% with the highest throughput is. Run-to-run noise is ~5%, so 12/13/14 need repeat measurements to
+separate: 12 won both repeats on both throughput and wall clock.
+
+Against `eval_checkpoints.py` at its own standing point of 4 processes x 4 workers (**8.55 eps/s**
+machine-wide), 348 eps/s is **40.7x**. An earlier note in this file put the figure at 22x and called a
+pre-registered 40x gate missed; that measurement was taken at 4 vec processes with 59% of the machine
+idle, and it was the process count that was wrong rather than the engine.
+
+`VEC_EVAL_SHARD` is how the processes are fed. The budget is **machine-wide**, so four arms measured
+together get three shards each, not twelve: allocate proportionally to each arm's selection size or
+the small arms finish early and their cores idle through the tail. Shards are **strided**
+(`steps[i-1::n]`), because per-checkpoint cost tracks policy quality and quality drifts along a run —
+contiguous blocks would hand one shard every slow checkpoint. Each shard writes its own
+`<suffix>-sNofM` file and `eval_plan.merge_checkpoint_evals` puts them back together; the merge is
+lossless for disjoint shards, which is what a stride guarantees.
+
+## Episode order in the output, and the ETA
+
+Two things in the result file were wrong in ways that only showed up under analysis.
+
+**`episode_scores` is in start order, not completion order.** `eval_plan.equal_effort_pooled` truncates
+a row to a common prefix, and its correctness rests on the episodes being exchangeable — "the first 20
+of a 100-episode measurement are as good a 20-episode sample". Appending on completion breaks exactly
+that, because episode length correlates with outcome: a starving lane burns its whole 500-step budget
+after its last meal while a perfect game ends sooner, so failures finish last. Measured on 40
+checkpoints of `b45a`, failures sat at mean position **0.92** of a completion-ordered array, and a
+20-of-100 prefix read **0.25%** failures against the row's true **2.23%**. The row's totals were never
+wrong — only its order — so `_Job.record` now banks each episode at the slot it was *started* in.
+
+Worth knowing when comparing engines: **`eval_checkpoints`' arrays are mildly completion-ordered too.**
+On the same rows, a 24-episode prefix of a desktop b45 close-out reads **+0.16 pp** (b45a) and +0.11 pp
+(b45c) above the full row. Small, but systematic and in the optimistic direction, so a prefix-based
+comparison between the two engines is biased toward whichever is more sorted. Only full-row-vs-full-row
+at matched depth is clean.
+
+**`num_workers` must be null in this file.** In this schema the field does not mean "how parallel is
+it" — it means "episodes advance in indivisible rounds of this size", and
+`eval_progress.remaining_episodes` multiplies every checkpoint still ahead by
+`whole_rounds(episodes, num_workers)`. That is right for the batched TF path, which really does run one
+episode per worker per round. This engine runs an exact quota, so reporting the 1024-lane width there
+rounded each 100-episode checkpoint up to a whole 1024-episode round and inflated the chart's ETA by
+**10.24x** — b45's four arms read 6-8 h against a true ~50 min. The fix is null, not a change to
+`whole_rounds`, which would under-price a real batched run.
+
+The driver now also publishes `arm_eta_seconds` from its own **completion rate** over a trailing window
+of 60, which `eval_progress.summarize` prefers over its own arithmetic. Completions are the right
+observable because up to `max_live` checkpoints are in flight at once, so a row's `seconds` field is
+concurrent wall clock and summing those over-counts by roughly the residency factor — 18x on b45a.
 
 ## The capacity trap — the one number that must not be set by hand
 

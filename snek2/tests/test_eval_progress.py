@@ -1478,3 +1478,36 @@ def test_the_eta_line_shows_the_episode_count_it_is_priced_on():
     """
     text = '\n'.join(eval_progress.ranking_lines(b43c_state()))
     assert '6,800 ep left' in text, text
+
+
+def test_a_flat_exact_quota_run_prices_its_remaining_episodes_exactly():
+    """`num_workers` is a *round size*, not a parallelism figure, and conflating them broke an ETA.
+
+    `remaining_episodes` multiplies every checkpoint still ahead by `whole_rounds(episodes,
+    num_workers)`, which is correct for the batched TF path: `evaluate` runs one episode per worker
+    per round and cannot stop mid-round, so 100 episodes on 12 workers really runs 108. The
+    vectorised driver runs an exact quota instead, and it reported its 1024-lane batch width in this
+    field -- so 100 episodes rounded up to a whole 1024-episode "round" and every b45 arm's chart
+    read a 6-8 h ETA against a true ~50 min, an exact 10.24x.
+
+    Both halves are pinned here, because the fix is *not* to make `whole_rounds` stop rounding -- that
+    would silently under-price a real batched run.
+    """
+    def run(workers):
+        return [{'episodes_per_checkpoint': 100, 'num_workers': workers,
+                 'measurements_planned': 3222, 'measurements_done': 2072,
+                 'stages': {'full': {'planned': 3222, 'done': 2072}}, 'screen_episodes': None}]
+
+    exact = eval_progress.remaining_episodes(run(None))
+    assert exact == (3222 - 2072) * 100 == 115000, exact
+
+    # The batched-path contract, kept deliberately: a round size larger than the request really does
+    # cost a whole round, so this number is right for a run that measures in rounds.
+    rounded = eval_progress.remaining_episodes(run(1024))
+    assert rounded == (3222 - 2072) * 1024 == 1177600, rounded
+    assert rounded == pytest_approx_ratio(exact, 10.24), (rounded, exact)
+
+
+def pytest_approx_ratio(base, ratio):
+    """The inflation factor spelled out, so the 10.24x in the docstring above is asserted."""
+    return int(round(base * ratio))

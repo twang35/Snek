@@ -55,6 +55,7 @@ Usage:
     EVAL_OUT_SUFFIX     output suffix (default '_vec')
 """
 
+import collections
 import os
 import sys
 import time
@@ -79,6 +80,23 @@ from vectorized import vec_engine
 
 POLICY_ROOT = 'savedPolicies'
 CHART_DIR = os.path.join('evals', 'vec')
+
+# How many recent completions the ETA averages over. Long enough that one slow checkpoint does not
+# swing it -- a coiled endgame arm's per-checkpoint time varies by ~2x -- and short enough that the
+# estimate tracks a real change in pace, such as a sibling process finishing and handing back cores.
+ETA_WINDOW = 60
+
+
+def _hms(seconds):
+    """`None` -> `--`, otherwise a compact `1h23m` / `4m12s`. An ETA nobody can read is not an ETA."""
+    if seconds is None:
+        return '--'
+    seconds = int(max(0, seconds))
+    if seconds >= 3600:
+        return '{0}h{1:02d}m'.format(seconds // 3600, (seconds % 3600) // 60)
+    if seconds >= 60:
+        return '{0}m{1:02d}s'.format(seconds // 60, seconds % 60)
+    return '{0}s'.format(seconds)
 DEFAULT_SUFFIX = '_vec'
 
 
@@ -173,6 +191,34 @@ class AgentPool:
         self.free.append(entry)
 
 
+def shard_steps(steps, shard, shards):
+    """This shard's slice of `steps`, strided so the shards interleave.
+
+    Every step lands in exactly one shard and their concatenation is a permutation of the input --
+    asserted in `tests/test_vec_eval_shard.py`, because a slice that dropped or duplicated a
+    checkpoint would produce a merged file that looks complete.
+    """
+    return list(steps)[shard - 1::shards]
+
+
+def parse_shard(raw):
+    """`"3/12"` -> `(3, 12)`; empty -> `(1, 1)`. Shards are 1-based so a shell `for i in $(seq 12)`
+    reads naturally, and `steps[shard - 1::shards]` is the stride that uses it.
+
+    Validated rather than trusted: a typo that silently measured the wrong slice would produce a
+    result file that looks complete and covers a third of the arm.
+    """
+    if not raw:
+        return 1, 1
+    try:
+        shard, shards = (int(part) for part in raw.split('/'))
+    except ValueError:
+        raise SystemExit('VEC_EVAL_SHARD must look like "3/12", got {0!r}'.format(raw))
+    if shards < 1 or not 1 <= shard <= shards:
+        raise SystemExit('VEC_EVAL_SHARD out of range: {0!r} (expected 1..n of n)'.format(raw))
+    return shard, shards
+
+
 def main(argv):
     if not argv:
         raise SystemExit(__doc__)
@@ -204,16 +250,46 @@ def main(argv):
         print('nothing selected for {0} — exiting cleanly'.format(policy_name))
         return 0
 
+    shard, shards = parse_shard(os.environ.get('VEC_EVAL_SHARD', ''))
+    if shards > 1:
+        # **Strided, not contiguous.** Per-checkpoint cost tracks policy quality -- a better
+        # checkpoint plays longer episodes -- and quality drifts monotonically along a training run,
+        # so contiguous blocks would hand one shard every slow checkpoint and another every fast one.
+        # A stride interleaves them, which is what makes the shards finish together instead of one
+        # process running long after the rest have freed their cores.
+        steps = shard_steps(steps, shard, shards)
+        # The suffix is extended rather than trusted to the caller: every shard writes
+        # `<policy>_checkpoint_evals<suffix>.json`, so a forgotten per-shard suffix would have twelve
+        # processes overwriting one file and the loss would look like a short selection rather than a
+        # collision. `eval_plan.merge_checkpoint_evals` globs `_checkpoint_evals*`, so it finds these.
+        suffix = '{0}-s{1}of{2}'.format(suffix, shard, shards)
+        if not steps:
+            print('shard {0}/{1} of {2} is empty — exiting cleanly'.format(
+                shard, shards, policy_name))
+            return 0
+
+    base_suffix = os.environ.get('EVAL_OUT_SUFFIX', DEFAULT_SUFFIX)
     out_path = os.path.join(snake_constants.RUNS_DIR,
                             '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
     chart_path = os.path.join(CHART_DIR, '{0}_eval_progress.png'.format(policy_name))
     os.makedirs(CHART_DIR, exist_ok=True)
+    # One writer per arm. The chart is drawn from the *arm's* files, and every shard would render the
+    # same picture from its own slice, so letting all of them write means N processes racing on one
+    # path for a strictly worse image -- each shard sees only its own stride. Shard 1 draws using
+    # every shard's suffix, so the picture is the arm's, not the shard's.
+    draws_chart = shards == 1 or shard == 1
+    chart_suffixes = ((suffix,) if shards == 1 else
+                      tuple('{0}-s{1}of{2}'.format(base_suffix, i, shards)
+                            for i in range(1, shards + 1)))
     eval_plan.backup_previous_results(out_path)
 
     print('vectorised eval: {0}'.format(policy_name))
     print('  {0} checkpoints x {1} episodes = {2} episodes, flat, no abandon gate'.format(
         len(steps), episodes, len(steps) * episodes))
     max_live = max_live or vec_engine.default_max_live(width, episodes)
+    if shards > 1:
+        print('  shard {0} of {1} (strided): {2} of the arm\'s checkpoints'.format(
+            shard, shards, len(steps)))
     print('  width {0} lanes, {1} checkpoints resident, seed {2}'.format(
         width, max_live, seed))
     print('  {0}'.format(C.describe()))
@@ -226,9 +302,16 @@ def main(argv):
 
     spec = eval_plan.PayloadSpec(
         policy_name=policy_name, num_episodes=episodes, all_steps=list(steps),
-        # The batch width is the honest analogue of a worker count: it is how many boards advance
-        # per step. It is recorded so a reader can tell a vec file's throughput from a TF file's.
-        num_workers=width,
+        # **None, and the batch width must not go here.** In this schema `num_workers` does not mean
+        # "how parallel is it" -- it means "episodes advance in indivisible rounds of this size", and
+        # `eval_progress.remaining_episodes` multiplies every checkpoint still ahead by
+        # `whole_rounds(episodes, num_workers)`. That is right for the batched TF path, which really
+        # does run one episode per worker per round. This engine runs an exact quota and never rounds,
+        # so reporting width=1024 against a 100-episode request rounded each checkpoint up to 1024
+        # and inflated the chart's ETA by **10.24x** -- b45's four arms read 6-8 h against a true
+        # ~50 min. `whole_rounds` returns the request unchanged for a falsy count, which is exactly
+        # the arithmetic this run wants. The width is in the run header and in `arm_eta_window`.
+        num_workers=None,
         screen_episodes=None, confirm_count=None,
         # Both None because there is no gate. `build_payload` writes them as null, which is exactly
         # what a reader needs to know: this file's rows are all full length.
@@ -245,6 +328,32 @@ def main(argv):
     chart_gate = eval_plan.WriteGate(eval_plan.CHART_MIN_INTERVAL)
     started_at = time.time()
     counters = {'measurements': 0, 'episodes': 0}
+    # Completion timestamps for the ETA, newest last. A trailing window rather than the whole run:
+    # the opening seconds include the TF import, the first `max_live` checkpoint restores and a batch
+    # that is still filling, so a run-long mean reads slow for the first few minutes and never fully
+    # recovers on a long arm.
+    completions = collections.deque(maxlen=ETA_WINDOW)
+
+    def eta_seconds():
+        """Wall-clock seconds until this arm finishes, from its own measured completion rate.
+
+        Priced in **checkpoints completed per second**, which is the one rate that already accounts
+        for this engine's concurrency: up to `max_live` checkpoints are in flight at once, so a row's
+        own `seconds` field is concurrent wall clock and summing those over-counts by roughly the
+        residency factor (18x on b45a). Completions are the observable that does not need correcting.
+
+        Returned as `arm_eta_seconds`, which `eval_progress.summarize` prefers over its own estimate
+        -- the right precedence, because this driver knows its pace and the file cannot express the
+        lane migration that produced it.
+        """
+        if len(completions) < 2:
+            return None, 0
+        span = completions[-1] - completions[0]
+        if span <= 0:
+            return None, len(completions)
+        rate = (len(completions) - 1) / span
+        remaining = max(0, len(steps) - counters['measurements'])
+        return remaining / rate, len(completions)
 
     def rows():
         return cache.rows(samples, {}, lambda step: selected_by.get(step))
@@ -259,6 +368,12 @@ def main(argv):
                     'session_seconds': time.time() - started_at,
                     'episodes_saved': 0, 'abandoned': 0,
                     'stage': 'full', 'full_done': done, 'screen_done': 0, 'confirm_done': 0}
+        eta, window = eta_seconds()
+        progress['arm_eta_seconds'] = eta
+        # Doubles as the width's home now that `num_workers` is None: the reader of an ETA wants to
+        # know what it was averaged over, and the lane count is what the pace is a property of.
+        progress['arm_eta_window'] = window
+        progress['wave_lanes'] = width
         # `in_flight` is deliberately left None. The payload's block describes **one** checkpoint —
         # its round, its running rate — and this driver has up to `max_live` in flight at once, so
         # there is no honest single value to put there and naming one of twelve would misreport the
@@ -269,11 +384,11 @@ def main(argv):
             spec, progress, samples, rows(), complete, in_flight=None))
 
     def redraw(force=False):
-        if not (force or chart_gate.due()):
+        if not (draws_chart and (force or chart_gate.due())):
             return
         chart_gate.record()
         try:
-            eval_progress.live_frame(policy_name, out_path=chart_path, suffixes=(suffix,))
+            eval_progress.live_frame(policy_name, out_path=chart_path, suffixes=chart_suffixes)
         except Exception as error:
             # A chart is never worth a measurement, the same rule the eval viewer follows.
             print('chart refresh failed ({0}: {1}) — measurement continues'.format(
@@ -294,11 +409,14 @@ def main(argv):
         counters['measurements'] += 1
         counters['episodes'] += len(held['scores'])
         row = cache.rows({step: held}, {}, lambda s: selected_by.get(s))[0]
+        completions.append(time.time())
         elapsed = time.time() - started_at
+        eta, _ = eta_seconds()
         print('[ {0:>4}/{1} ] {2:>9}  {3:>5.1f}% perfect  avg score {4:>5.2f}  '
-              '{5:.1f}s  ({6:.1f} ckpt/min)'.format(
+              '{5:.1f}s  ({6:.1f} ckpt/min, eta {7})'.format(
                   counters['measurements'], len(steps), step, row['perfect_percent'],
-                  row['avg_score'], held['seconds'], 60.0 * counters['measurements'] / elapsed))
+                  row['avg_score'], held['seconds'], 60.0 * counters['measurements'] / elapsed,
+                  _hms(eta)))
         flush()
         redraw()
 

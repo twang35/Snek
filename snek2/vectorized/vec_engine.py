@@ -80,22 +80,53 @@ class _Job:
     """One checkpoint being measured: its policy, its quota, and its accumulating sample."""
 
     __slots__ = ('key', 'policy_fn', 'episodes', 'started', 'scores', 'perfect', 'rewards',
-                 'started_at', 'live')
+                 'started_at', 'live', 'banked')
 
     def __init__(self, key, policy_fn, episodes):
         self.key = key
         self.policy_fn = policy_fn
         self.episodes = episodes
         self.started = 0
-        self.scores = []
-        self.perfect = []
-        self.rewards = []
+        # Preallocated, because an episode is banked at the index it was **started** at rather than
+        # the position it finished in. See `record` for why that distinction is statistical rather
+        # than cosmetic.
+        self.scores = [None] * episodes
+        self.perfect = [None] * episodes
+        self.rewards = [None] * episodes
         self.started_at = time.time()
         self.live = 0                    # lanes currently playing an episode for this job
+        self.banked = 0
 
     @property
     def done(self):
-        return len(self.scores)
+        return self.banked
+
+    def record(self, slot, score, reward):
+        """Bank one finished episode at the slot it was *started* in.
+
+        **Start order, not completion order, and this is a correctness requirement rather than
+        tidiness.** `eval_plan.equal_effort_pooled` truncates a row to a common prefix, and its
+        docstring rests on the episodes being exchangeable -- "the first 20 of a 100-episode
+        measurement are as good a 20-episode sample". Appending on completion breaks exactly that
+        assumption, because episode length correlates with outcome: a starving lane runs its whole
+        500-step budget after its last meal while a perfect game ends sooner, so failures finish
+        last. Measured on a 40-checkpoint arm, failures sat at mean position **0.92** of a
+        completion-ordered array against 0.56 for the reference eval, and a 20-of-100 prefix then
+        read 0.25% failures against the row's own true 2.23%.
+
+        The full row was never wrong -- only its order was -- so recording by start slot costs
+        nothing and removes a trap from every downstream reader of `episode_scores`.
+        """
+        if self.scores[slot] is not None:
+            raise RuntimeError(
+                'checkpoint {0} banked start-slot {1} twice'.format(self.key, slot))
+        self.scores[slot] = score
+        # Off the score, never the reward. Three counters in this project compared a final reward
+        # with the perfect-game reward, and the moment a shaping term shipped they all read 0% while
+        # the arms were filling boards.
+        self.perfect[slot] = int(score == C.MAX_POSSIBLE_SCORE)
+        self.rewards[slot] = float(reward)
+        self.banked += 1
 
     def wants_more(self):
         return self.started < self.episodes
@@ -109,6 +140,10 @@ class _Job:
         Raw per-episode lists rather than running totals, because that is what makes a row resumable
         and its median exact — a row rebuilt from summaries carries a quietly wrong median.
         """
+        if self.banked != self.episodes:
+            raise RuntimeError(
+                'checkpoint {0} handed out a sample with {1} of {2} episodes banked -- a gap would '
+                'reach the result file as a null'.format(self.key, self.banked, self.episodes))
         return {'scores': self.scores, 'perfect': self.perfect, 'rewards': self.rewards,
                 'seconds': time.time() - self.started_at, 'abandoned': False}
 
@@ -142,6 +177,9 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
     # -1 means the lane is idle. A lane is otherwise an index into `live`, which is compacted only
     # by removal, so the index is stable for a job's whole life.
     owner = np.full(width, -1, dtype=np.int64)
+    # Which of its checkpoint's `episodes` start-slots this lane is currently filling. Parallel to
+    # `owner`, and the reason a result lands in start order rather than completion order.
+    slot = np.full(width, -1, dtype=np.int64)
     running = np.zeros(width, dtype=np.float64)     # this episode's undiscounted return, per lane
     live = []                                       # resident jobs, in load order
     exhausted = False
@@ -186,6 +224,7 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
                     'checkpoint {0} was assigned a lane past its {1}-episode quota'.format(
                         job.key, job.episodes))
             owner[row] = live.index(job)
+            slot[row] = job.started          # before the increment: slots are 0-based
             job.started += 1
             job.live += 1
             if not already_fresh:
@@ -241,19 +280,14 @@ def measure_stream(next_job, on_complete, episodes, width=None, max_live=None, s
                 # its checkpoint's quota, and if it is, every rate in the output file is computed
                 # over the wrong denominator — a silent wrong answer, and the exact failure a
                 # mutation test produced as an infinite loop rather than a wrong number.
-                if len(job.scores) >= job.episodes:
+                if job.banked >= job.episodes:
                     raise RuntimeError(
                         'checkpoint {0} banked more than its {1} episodes — a lane was restarted '
                         'past its quota'.format(job.key, job.episodes))
-                score = int(vec.score[row])
-                job.scores.append(score)
-                # Off the score, never the reward. Three counters in this project compared a final
-                # reward with PERFECT_GAME_REWARD, and the moment a shaping term shipped they all
-                # read 0% while the arms were filling boards.
-                job.perfect.append(int(score == C.MAX_POSSIBLE_SCORE))
-                job.rewards.append(float(running[row]))
+                job.record(int(slot[row]), int(vec.score[row]), running[row])
                 job.live -= 1
                 owner[row] = -1
+                slot[row] = -1
             stats['episodes'] += int(hits.size)
 
             # Retire completed jobs before reassigning, so their slots are freed for the next
