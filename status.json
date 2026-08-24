@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-24T12:31:40",
-  "ts": 1787599900.1885579,
+  "iso": "2026-08-24T12:31:54",
+  "ts": 1787599914.9252472,
   "at_a_glance": {
     "running": [],
     "queued": []
@@ -19,7 +19,9 @@
     "drain": false,
     "viewer": true,
     "auto_closeout": true,
-    "auto_hof": true
+    "auto_hof": true,
+    "eval_engine": "vec",
+    "vec_wave_procs": 0
   },
   "config_notes": [],
   "counts": {
@@ -278,8 +280,8 @@
   },
   "disk_free_gb": 120.4,
   "load_avg": [
-    0.18701171875,
-    0.07958984375,
-    0.01416015625
+    0.212890625,
+    0.09130859375,
+    0.0185546875
   ]
 }
