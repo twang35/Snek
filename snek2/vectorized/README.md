@@ -58,8 +58,8 @@ parses argv with `eval_wave`'s own functions rather than its own copies, so `top
 | `EVAL_EPISODES` | 100 | stage A's depth; stage B is `eval_plan.HOF_EPISODES` |
 | `EVAL_OUT_SUFFIX` | none | the **canonical** path, because a wave *is* the close-out |
 
-**‡ `VEC_WAVE_PROCS` is bounded by memory before it is bounded by cores, and the default overshoots on
-`the-claw-den`** (measured 2026-08-24). One `vec_eval.py` process peaks at **644 MB at 100 episodes and
+**‡ `VEC_WAVE_PROCS` is bounded by memory before it is bounded by cores** (measured on `the-claw-den`
+2026-08-24). One `vec_eval.py` process peaks at **644 MB at 100 episodes and
 690 MB at 500** — flat in the episode count, because the cost is TensorFlow's arena plus the 1024-lane
 env, not the resident agent pool (44 agents against 12). So the shard count multiplies ~690 MB:
 
@@ -71,9 +71,18 @@ env, not the resident agent pool (44 agents against 12). So the shard count mult
 | **14** (the box's default: 16 cores − 2) | **~9.7 GB** |
 
 The desktop has **15,030 MB**, ~11.3 GB available idle, and its four trainers add ~4.2 GB. So 14 fits
-an idle box with under 2 GB spare and does *not* fit one that is training — set `vec_wave_procs` in
-`runtime.json` instead of taking the default. The laptop's measured point of 12 is a throughput
-optimum, not a memory one; check `free -m` on any host before raising it.
+an idle box with under 2 GB spare and does *not* fit one that is training.
+
+**It is left at the default regardless** (user's decision, 2026-08-24, taken with this table in front
+of them). `runtime.json` carries no `vec_wave_procs` key and should be left without one — the full 14
+shards are right for the common case, an idle box running a close-out chained off a finished training,
+and the exposure is narrow: `max_evals` is 1, so there is only ever one wave, and an OOM'd wave is
+recoverable rather than lost (`interrupted` → relaunched, and `vec_eval` resumes from banked rows of
+matching depth). **The one configuration that can OOM is a wave overlapping four live trainers; if that
+happens, this is the cause and `vec_wave_procs` is the fix** — do not pre-emptively pin it.
+
+The laptop's measured point of 12 is a throughput optimum, not a memory one; check `free -m` on any
+host before raising it.
 
 Two traps in that knob. **`EVAL_WORKERS` does nothing here** — it sizes TF worker processes and this
 engine has none — but `launch.py` reads `job.eval_workers or runtime['vec_wave_procs']`, so an old job

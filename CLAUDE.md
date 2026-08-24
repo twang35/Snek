@@ -424,23 +424,36 @@ connection is what produced the wrong call. Alias, no-config fallback and key re
 - **Training self-eval workers are *forked*** (Linux COW-shares the parent's TF pages), so they are
   nearly free: **4 trainers × 10 self-eval workers ≈ 4.2 GB total**. The overnight OOM was the
   cv2/XIO chart cascade plus orphan accumulation, *not* steady memory.
-- **‡ A `vec_wave` shard is ~690 MB, and the default of 14 does not fit** (measured on the box
+- **‡ A `vec_wave` shard is ~690 MB, so the box's default of 14 shards asks ~9.7 GB** (measured there
   2026-08-24, the day the vec engine was deployed there). Peak RSS of one `vec_eval.py` process is
   **644 MB at 100 episodes and 690 MB at 500** — essentially flat in the episode count, because the
   cost is TF's arena plus the 1024-lane env rather than the resident agent pool (44 agents vs 12).
   `VEC_WAVE_PROCS` defaults to `cores − 2` = **14** on this 16-core box, so a wave asks for **~9.7 GB**
   against **11.3 GB available idle** — inside the total but under the ≥3 GB headroom band, and *over*
-  the box if 4 trainers are also running (+4.2 GB → ~13.9 GB of 15,030 MB). **So set
-  `vec_wave_procs` in `runtime.json` rather than taking the default**: 8 processes is ~5.5 GB, 6 is
-  ~4.1 GB and is the only value that keeps ≥3 GB free with 4 trainers alongside. Note the wave's
-  shards are `eval_workers`-insensitive — that knob sizes TF worker processes, which this engine has
-  none of, and a job spec that still sets it *caps* `VEC_WAVE_PROCS` at its value (`launch.py` reads
+  the box if 4 trainers are also running (+4.2 GB → ~13.9 GB of 15,030 MB). For reference: 12 procs
+  is ~8.3 GB, 8 is ~5.5 GB, 6 is ~4.1 GB and is the only value that keeps ≥3 GB free with 4 trainers
+  alongside.
+
+  **The box stays at the default anyway — that is a decision, not an oversight** (user's call,
+  2026-08-24, made with these numbers in hand). So `runtime.json` carries no `vec_wave_procs` key and
+  **should be left without one**; do not "fix" this by pinning a lower number. What it buys is the
+  full 14 shards on an idle box, which is the common case since the chain runs a close-out after its
+  training finishes. What it costs is that a wave overlapping four live trainers is the configuration
+  that can OOM. **If one does, that is the cause** — set `vec_wave_procs` then, and say so, rather
+  than treating it as a new mystery.
+
+  Two things that make the risk smaller than the arithmetic suggests, and one that makes it worse.
+  `max_evals` is **1** on this box, so there is only ever one wave; a reboot mid-wave is recoverable
+  (`interrupted` → relaunched, and `vec_eval` resumes from banked rows at matching depth). Against
+  that: **both RSS figures are short-run**, taken over 54-68 s, so nothing has yet measured a
+  multi-hour wave and a slow leak would not have shown up. **Watch `free -m` through the first long
+  close-out.**
+
+  Unrelated to the count but easy to trip on: the wave's shards are `eval_workers`-insensitive —
+  that knob sizes TF worker processes, which this engine has none of — but a job spec that still sets
+  it *caps* `VEC_WAVE_PROCS` at its value (`launch.py` reads
   `job.eval_workers or runtime['vec_wave_procs']`), so an old spec carrying `eval_workers: 4` runs a
   4-process wave on a 16-core box.
-
-  **Both figures are short-run.** They were taken over 54-68 s; nothing has yet measured a
-  multi-hour vec wave's RSS on this box, so a slow leak would not have shown up. Watch `free -m`
-  through the first long close-out.
 
 Still measure with `free -m` before pushing `max_evals`/`eval_workers` past those bands.
 
