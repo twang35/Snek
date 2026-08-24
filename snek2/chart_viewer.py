@@ -561,7 +561,8 @@ def is_verification_policy(policy_name):
             or policy_name.startswith('bench'))
 
 
-def spawn_for_eval(policy_name, watch='eval_checkpoints.py {prefix}'):
+def spawn_for_eval(policy_name, watch='eval_checkpoints.py {prefix}', chart_dir='evals',
+                   slot_suffix='eval'):
     """Best-effort live chart window for an eval (close-out / HOF) launch. Returns the Popen or None.
 
     The training counterpart is `spawn_for_policy`; this differs only in what it points the viewer
@@ -578,6 +579,12 @@ def spawn_for_eval(policy_name, watch='eval_checkpoints.py {prefix}'):
     from the wave controller. A pattern that cannot match reads as "the eval stopped" and the window
     closes within six checks.
 
+    `chart_dir` and `slot_suffix` exist for the vectorised eval, which writes its charts to
+    `evals/vec/` and must not share a lock namespace with the TF eval. Both matter: pointing two
+    viewers at the same directory would give each the other's panels, and sharing the `-eval` slot
+    would let whichever launched first suppress the other's window entirely — the two are expected
+    to run side by side during validation, since that comparison is the whole point.
+
     Darwin-only via `viewer_enabled()` — the same gate as training — so this never fires on the
     desktop, where the runner daemon owns the viewer (it injects the graphical session's
     DISPLAY/XAUTHORITY; two owners would open two windows per wave). Every failure path is swallowed:
@@ -588,8 +595,8 @@ def spawn_for_eval(policy_name, watch='eval_checkpoints.py {prefix}'):
     # A lock namespace of its own (`<prefix>-eval`), so a training viewer's leftover claim never
     # suppresses an eval window, nor this one a later trainer's. The glob is relative and resolves
     # against the viewer's cwd (the snek2 dir), exactly as the training path's `runs/` glob does.
-    slot = '{0}-eval'.format(prefix)
-    glob_arg = os.path.join('evals', '{0}*_eval_progress.png'.format(prefix))
+    slot = '{0}-{1}'.format(prefix, slot_suffix)
+    glob_arg = os.path.join(chart_dir, '{0}*_eval_progress.png'.format(prefix))
     # pgrep catches a viewer opened by an earlier arm of the same wave whose lock has aged out of
     # tmp; the O_EXCL claim closes the race four arms starting in one second would otherwise lose.
     watch_pattern = watch.format(prefix=prefix)
@@ -598,12 +605,12 @@ def spawn_for_eval(policy_name, watch='eval_checkpoints.py {prefix}'):
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         log_path = os.path.join(tempfile.gettempdir(),
-                                'snek_chart_viewer_{0}-eval.log'.format(prefix))
+                                'snek_chart_viewer_{0}-{1}.log'.format(prefix, slot_suffix))
         log = open(log_path, 'ab')
         argv = [sys.executable, '-u', os.path.join(here, 'chart_viewer.py'),
                 '--glob', glob_arg,
                 '--watch', watch_pattern,
-                '--title', 'snek {0} eval — live'.format(prefix)]
+                '--title', 'snek {0} {1} — live'.format(prefix, slot_suffix)]
         proc = subprocess.Popen(argv, cwd=here, stdout=log, stderr=log,
                                 start_new_session=True, close_fds=True)
         hold_viewer_slot(slot, proc.pid)

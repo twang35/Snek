@@ -1,0 +1,325 @@
+"""Batched checkpoint evaluation: the vectorised replacement for `eval_checkpoints.py`.
+
+**What is reused and what is replaced.** Everything about the *result* — the row schema, the payload,
+the checkpoint selectors, the atomic write, the chart — comes from `eval_plan` and `eval_progress`
+unchanged, so a file written here is readable by every existing tool and directly comparable with a
+TF close-out. Only the measurement engine is new: `vectorized.vec_engine` runs one wide numpy env
+serving several checkpoints at once instead of `EVAL_WORKERS` processes serving one board each.
+
+Two builders of the same artefact that drift apart is a failure this project has already paid for
+(two `build_eval_agent`-shaped constructions, where `expect_partial()` hid the mismatch), which is why
+this imports the payload machinery rather than reimplementing a schema that merely looks the same.
+
+**Differences from `eval_checkpoints.py`, all deliberate:**
+
+| | eval_checkpoints | here |
+|---|---|---|
+| output suffix | `EVAL_OUT_SUFFIX`, default none | `_vec` by default, so a run can never overwrite a TF result |
+| chart directory | `evals/` | `evals/vec/`, so it cannot displace a real close-out's charts |
+| staging | screen / confirm tiers | **flat**: every checkpoint gets the same episode count |
+| abandon gate | `EVAL_MIN_ACHIEVABLE=97` | **none** |
+| algorithm | ddqn or c51 | ddqn only, hard-fail on c51 |
+
+The chart directory matters more than it looks. `archive_existing_eval_pngs` moves **every** chart at
+the top of `evals/` into the archive before any eval starts, and this has twice blanked a finished
+batch's panels. Writing to `evals/vec/` means this driver never calls it at all.
+
+Flat rather than staged is not a simplification for its own sake. Staging exists to avoid paying full
+length for a checkpoint that will not place; at ~20x the throughput that saving buys little, and it
+costs a lot of interpretive load — `pooled_equal_effort`, the `screen_episodes` field, the rule that
+rows of different depths must not be pooled, and the gate recorded in every payload all exist to cope
+with rows of unequal effort. Flat rows make all of that vacuously true.
+
+**c51 is refused rather than attempted.** The greedy action for a categorical agent is
+`argmax_a sum_i z_i p_i(s, a)`, so a c51 checkpoint restored against the wrong support loads
+perfectly and evaluates a *different policy*. Supporting it means reading the support out of
+`arch.json` and reducing over atoms here; until that is written and parity-tested, refusing is the
+only safe answer.
+
+Usage:
+
+    PYTHONPATH=. python -u vectorized/vec_eval.py <policy_name> [selector]
+
+    selector:  top50            the close-out selector, ranked on the graph eval (default)
+               above:98         checkpoints a prior close-out measured at >= 98%  (the HOF pass)
+               all              every checkpoint on disk
+               1234000,1235000  explicit steps
+
+    VEC_EVAL_EPISODES   episodes per checkpoint (default 100; the HOF pass uses 500)
+    VEC_EVAL_WIDTH      total env lanes (default 1024)
+    VEC_EVAL_MAX_LIVE   checkpoints resident at once (default: derived from width and
+                        episodes by vec_engine.default_max_live — see the note there, a value
+                        too low collapses utilisation to a few percent)
+    VEC_EVAL_SOURCE     result suffix `above:` selects from (default '', the close-out's own file)
+    VEC_EVAL_SEED       food-sampler seed (default 0); the only stochastic input to a measurement
+    EVAL_OUT_SUFFIX     output suffix (default '_vec')
+"""
+
+import os
+import sys
+import time
+
+os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+
+import numpy as np
+import tensorflow as tf
+from tf_agents.environments import tf_py_environment
+from tf_agents.trajectories import time_step as ts
+
+import chart_viewer
+import eval_agent
+import eval_plan
+import eval_progress
+import policy_arch
+import snake_constants
+from snake_environment import SnakeEnvironment
+from vectorized import config as C
+from vectorized import vec_engine
+
+POLICY_ROOT = 'savedPolicies'
+CHART_DIR = os.path.join('evals', 'vec')
+DEFAULT_SUFFIX = '_vec'
+
+
+def available_steps(policy_dir):
+    """Every checkpoint step on disk, ascending, read from the `.index` files.
+
+    Read off the files rather than the `checkpoint` metadata file, because a hall-of-fame directory
+    has no metadata file at all — which is how `tf.train.latest_checkpoint` once returned None and a
+    champion silently restored nothing, then scored 0.
+    """
+    steps = []
+    for name in os.listdir(policy_dir):
+        if name.startswith('ckpt-') and name.endswith('.index'):
+            try:
+                steps.append(int(name[len('ckpt-'):-len('.index')]))
+            except ValueError:
+                continue
+    return sorted(steps)
+
+
+def resolve_selection(policy_name, policy_dir, selector, source_suffix):
+    """`(steps, selected_by)` for a selector string, using `eval_plan`'s own selectors."""
+    steps = available_steps(policy_dir)
+    if not steps:
+        raise SystemExit('no checkpoints in {0}'.format(policy_dir))
+    if selector == 'all':
+        return steps, {step: {'selected_by': 'all'} for step in steps}
+    if selector.startswith('above:'):
+        return eval_plan.select_checkpoints_above(
+            policy_name, steps, float(selector.split(':', 1)[1]), source_suffix)
+    if selector.startswith('top'):
+        count = int(selector[3:]) if selector[3:] else eval_plan.DEFAULT_COUNT
+        return eval_plan.select_top_checkpoints(policy_name, steps, count=count)
+    explicit = [int(part) for part in selector.replace(',', ' ').split()]
+    missing = [step for step in explicit if step not in steps]
+    if missing:
+        raise SystemExit('no such checkpoint(s): {0}'.format(missing))
+    return explicit, {step: {'selected_by': 'explicit'} for step in explicit}
+
+
+class AgentPool:
+    """A fixed set of restorable greedy agents, handed out one per resident checkpoint.
+
+    Built once because building is nearly free (0.03 s) and restoring is cheaper still (0.005 s), so
+    the pool costs nothing and keeps the number of live TensorFlow graphs bounded and known.
+
+    Each agent gets its own `tf.function` with an `input_signature` whose batch dimension is `None`.
+    That is load-bearing: a job's lane count changes on almost every step as its episodes finish, and
+    without a fixed signature every change would retrace the policy — which is precisely the
+    per-call overhead this whole exercise exists to escape.
+    """
+
+    def __init__(self, size, py_env, tf_env, policy_dir):
+        self.policy_dir = policy_dir
+        self.free = []
+        self.entries = []
+        obs_len = int(py_env.observation_spec().shape[0])
+        for _ in range(size):
+            agent, checkpoint, _ = eval_agent.build_eval_agent(tf_env, py_env, policy_dir)
+            policy = agent.policy
+
+            @tf.function(input_signature=[tf.TensorSpec([None, obs_len], tf.float32)])
+            def act(observation, policy=policy):
+                rows = tf.shape(observation)[0]
+                step = ts.TimeStep(
+                    step_type=tf.fill([rows], tf.constant(ts.StepType.MID, dtype=tf.int32)),
+                    reward=tf.zeros([rows], dtype=tf.float32),
+                    discount=tf.ones([rows], dtype=tf.float32),
+                    observation=observation)
+                return policy.action(step).action
+
+            entry = {'agent': agent, 'checkpoint': checkpoint, 'act': act}
+            self.entries.append(entry)
+            self.free.append(entry)
+
+    def acquire(self, step):
+        """Restore `ckpt-<step>` into a free agent and return `(entry, policy_fn)`."""
+        entry = self.free.pop()
+        prefix = os.path.join(self.policy_dir, 'ckpt-{0}'.format(step))
+        # The explicit prefix, never `latest_checkpoint`. A directory without a `checkpoint`
+        # metadata file returns None from that, and `.restore(None).expect_partial()` restores
+        # nothing *silently* — measured once as a 90%-perfect champion scoring 0, 0, 1.
+        entry['checkpoint'].restore(prefix).expect_partial()
+        act = entry['act']
+
+        def policy_fn(observation):
+            return act(tf.convert_to_tensor(observation)).numpy()
+
+        return entry, policy_fn
+
+    def release(self, entry):
+        self.free.append(entry)
+
+
+def main(argv):
+    if not argv:
+        raise SystemExit(__doc__)
+    policy_name = argv[0]
+    selector = argv[1] if len(argv) > 1 else 'top50'
+
+    episodes = int(os.environ.get('VEC_EVAL_EPISODES', 100))
+    width = int(os.environ.get('VEC_EVAL_WIDTH', vec_engine.DEFAULT_WIDTH))
+    max_live = int(os.environ.get('VEC_EVAL_MAX_LIVE', 0)) or None
+    suffix = os.environ.get('EVAL_OUT_SUFFIX', DEFAULT_SUFFIX)
+    source_suffix = os.environ.get('VEC_EVAL_SOURCE', '')
+    # Seeds the env's food sampler. Exposed because it is the only stochastic input to a measurement
+    # — the policy is greedy and the opening board is fixed — so re-running with a different seed is
+    # exactly "draw another independent sample", which is how a difference between two engines is
+    # told apart from a difference between two samples.
+    seed = int(os.environ.get('VEC_EVAL_SEED', 0))
+    policy_dir = os.path.join(POLICY_ROOT, policy_name)
+    if not os.path.isdir(policy_dir):
+        raise SystemExit('no such policy directory: {0}'.format(policy_dir))
+
+    py_env = SnakeEnvironment()
+    tf_env = tf_py_environment.TFPyEnvironment(py_env)
+    # `refuse_categorical` rather than a hand-rolled check, so the refusal reads the sidecar through
+    # the same loader every other tool does and cannot disagree with it about what c51 looks like.
+    policy_arch.refuse_categorical(policy_dir, 'vectorized/vec_eval.py')
+
+    steps, selected_by = resolve_selection(policy_name, policy_dir, selector, source_suffix)
+    if not steps:
+        print('nothing selected for {0} — exiting cleanly'.format(policy_name))
+        return 0
+
+    out_path = os.path.join(snake_constants.RUNS_DIR,
+                            '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
+    chart_path = os.path.join(CHART_DIR, '{0}_eval_progress.png'.format(policy_name))
+    os.makedirs(CHART_DIR, exist_ok=True)
+    eval_plan.backup_previous_results(out_path)
+
+    print('vectorised eval: {0}'.format(policy_name))
+    print('  {0} checkpoints x {1} episodes = {2} episodes, flat, no abandon gate'.format(
+        len(steps), episodes, len(steps) * episodes))
+    max_live = max_live or vec_engine.default_max_live(width, episodes)
+    print('  width {0} lanes, {1} checkpoints resident, seed {2}'.format(
+        width, max_live, seed))
+    print('  {0}'.format(C.describe()))
+    print('  results -> {0}'.format(out_path))
+    print('  chart   -> {0}'.format(chart_path))
+    # Never `archive_existing_eval_pngs`: this writes into its own directory, so there is nothing
+    # of anyone else's to displace. That function is what blanked two batches' finished panels.
+    chart_viewer.spawn_for_eval(policy_name, watch='vec_eval.py {prefix}',
+                               chart_dir=CHART_DIR, slot_suffix='veceval')
+
+    spec = eval_plan.PayloadSpec(
+        policy_name=policy_name, num_episodes=episodes, all_steps=list(steps),
+        # The batch width is the honest analogue of a worker count: it is how many boards advance
+        # per step. It is recorded so a reader can tell a vec file's throughput from a TF file's.
+        num_workers=width,
+        screen_episodes=None, confirm_count=None,
+        # Both None because there is no gate. `build_payload` writes them as null, which is exactly
+        # what a reader needs to know: this file's rows are all full length.
+        min_achievable=None, abandon_floor=None,
+        measurements_planned=len(steps), episodes_planned=len(steps) * episodes,
+        full_planned=len(steps), screen_planned=0, confirm_planned=0)
+
+    pool = AgentPool(max_live, py_env, tf_env, policy_dir)
+    pending = list(steps)
+    in_use = {}
+    samples = {}
+    cache = eval_plan.RowCache()
+    gate = eval_plan.WriteGate()
+    chart_gate = eval_plan.WriteGate(eval_plan.CHART_MIN_INTERVAL)
+    started_at = time.time()
+    counters = {'measurements': 0, 'episodes': 0}
+
+    def rows():
+        return cache.rows(samples, {}, lambda step: selected_by.get(step))
+
+    def flush(complete=False, force=False):
+        if not (force or gate.due()):
+            return
+        gate.record()
+        done = counters['measurements']
+        progress = {'measurements': done, 'session_measurements': done,
+                    'session_episodes': counters['episodes'],
+                    'session_seconds': time.time() - started_at,
+                    'episodes_saved': 0, 'abandoned': 0,
+                    'stage': 'full', 'full_done': done, 'screen_done': 0, 'confirm_done': 0}
+        # `in_flight` is deliberately left None. The payload's block describes **one** checkpoint —
+        # its round, its running rate — and this driver has up to `max_live` in flight at once, so
+        # there is no honest single value to put there and naming one of twelve would misreport the
+        # other eleven. Nothing is lost: that block exists because a ~5-minute TF measurement is
+        # invisible until it lands, and here measurements land every few seconds, so the completed
+        # rows *are* the progress display.
+        eval_plan.write_payload(out_path, eval_plan.build_payload(
+            spec, progress, samples, rows(), complete, in_flight=None))
+
+    def redraw(force=False):
+        if not (force or chart_gate.due()):
+            return
+        chart_gate.record()
+        try:
+            eval_progress.live_frame(policy_name, out_path=chart_path, suffixes=(suffix,))
+        except Exception as error:
+            # A chart is never worth a measurement, the same rule the eval viewer follows.
+            print('chart refresh failed ({0}: {1}) — measurement continues'.format(
+                type(error).__name__, error))
+
+    def next_job():
+        if not pending:
+            return None
+        step = pending.pop(0)
+        entry, policy_fn = pool.acquire(step)
+        in_use[step] = entry
+        return step, policy_fn
+
+    def on_complete(step, held):
+        pool.release(in_use.pop(step))
+        samples[step] = held
+        cache.put(step, eval_plan.build_row(step, held, selected_by.get(step)))
+        counters['measurements'] += 1
+        counters['episodes'] += len(held['scores'])
+        row = cache.rows({step: held}, {}, lambda s: selected_by.get(s))[0]
+        elapsed = time.time() - started_at
+        print('[ {0:>4}/{1} ] {2:>9}  {3:>5.1f}% perfect  avg score {4:>5.2f}  '
+              '{5:.1f}s  ({6:.1f} ckpt/min)'.format(
+                  counters['measurements'], len(steps), step, row['perfect_percent'],
+                  row['avg_score'], held['seconds'], 60.0 * counters['measurements'] / elapsed))
+        flush()
+        redraw()
+
+    stats = vec_engine.measure_stream(
+        next_job, on_complete, episodes, width=width, max_live=max_live, seed=seed)
+    flush(complete=True, force=True)
+    redraw(force=True)
+
+    elapsed = stats.get('seconds', time.time() - started_at) or 1e-9
+    print('\ndone: {0} checkpoints, {1} episodes in {2:.1f}s'.format(
+        counters['measurements'], counters['episodes'], elapsed))
+    print('  {0:.2f} s/checkpoint, {1:.1f} episodes/s, {2:.0f} env-steps/s, '
+          'utilisation {3:.0f}%'.format(
+              elapsed / max(1, counters['measurements']), counters['episodes'] / elapsed,
+              stats['env_steps'] / elapsed, 100.0 * stats.get('utilisation', 0.0)))
+    best = eval_plan.best_full_length_row(rows(), episodes)
+    if best:
+        print('  best checkpoint: {0} at {1:.1f}% ({2} episodes)'.format(
+            best['step'], best['perfect_percent'], best['episodes']))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

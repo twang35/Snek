@@ -18,6 +18,7 @@ tripwire — the two eval paths do their counting inside a spawned worker and a 
 a unit test cannot reach, and a grep is a great deal better than nothing there.
 """
 import ast
+import glob
 import os
 
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -216,11 +217,24 @@ def test_no_perfect_game_counter_compares_a_reward():
     time it ran: these modules discuss the reward at length in comments and docstrings, and a rule
     that fires on documentation would be turned off within a week. `ast` sees only `==` and `!=`
     between real expressions.
+
+    **The module list is a glob, not a list, and that change has already earned itself.** It was four
+    hardcoded filenames, so `vectorized/vec_engine.py` — a fourth counter, banking a perfect flag per
+    episode — was outside the rule the day it was written, and a mutation test confirmed the reward
+    version of that line survived the whole suite. This is the same drift that left the test-suite
+    runner covering 18 of 22 modules while reporting a pass. Anything that counts, screens or reports
+    a perfect game belongs here, so the rule scans every top-level module and everything under
+    `vectorized/`, and exempts only `Snake.py`, which *assigns* the reward.
     """
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    exempt = {'Snake.py'}
+    paths = [p for p in sorted(glob.glob(os.path.join(here, '*.py')))
+             if os.path.basename(p) not in exempt]
+    paths += sorted(glob.glob(os.path.join(here, 'vectorized', '*.py')))
+    assert len(paths) >= 20, 'the glob found only {0} modules — run from snek2/'.format(len(paths))
     offenders = []
-    for name in ('under_the_hood.py', 'eval_workers.py', 'eval_checkpoints.py', 'training.py'):
-        path = os.path.join(here, name)
+    for path in paths:
+        name = os.path.relpath(path, here)
         with open(path) as handle:
             tree = ast.parse(handle.read(), filename=path)
         for node in ast.walk(tree):
@@ -231,7 +245,21 @@ def test_no_perfect_game_counter_compares_a_reward():
             names = {child.attr if isinstance(child, ast.Attribute) else child.id
                      for child in ast.walk(node)
                      if isinstance(child, (ast.Attribute, ast.Name))}
-            if 'PERFECT_GAME_REWARD' in names:
-                offenders.append('{0}:{1}'.format(name, node.lineno))
+            # Substring, not equality. The rule used to look for the exact name, so
+            # `final_reward == DEFAULT_PERFECT_GAME_REWARD` — the same bug spelled against the
+            # default — was invisible to it. Matching any name containing it closes that, and the
+            # constant-only exemption below is what keeps `snek2.py`'s override notice legal.
+            if not any('PERFECT_GAME_REWARD' in candidate for candidate in names):
+                continue
+            # A comparison between two *configuration constants* is reporting, not classification:
+            # `snek2.py` prints an override notice by testing the knob against its own default, and
+            # widening the glob turned that into a false positive. The exemption is "every name in
+            # the comparison is a constant", not "the other name looks like a default" — under the
+            # looser rule `final_reward == DEFAULT_PERFECT_GAME_REWARD` would slip through, which is
+            # precisely the bug wearing a different hat. Any runtime value in the expression is
+            # lower-case by convention here, so it still trips.
+            if all(candidate.isupper() or candidate.startswith('DEFAULT_') for candidate in names):
+                continue
+            offenders.append('{0}:{1}'.format(name, node.lineno))
     assert not offenders, ('a perfect game must be identified by its score, not its reward: '
                            + ', '.join(offenders))
