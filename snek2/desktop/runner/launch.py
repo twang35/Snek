@@ -48,8 +48,8 @@ def build_command(job, host, runtime):
         # faster than the TF path and was validated against it at four levels, ending in a
         # 24-checkpoint x 500-episode head-to-head that agreed to -0.058 pp (z = -0.28). Set
         # `SNEK_EVAL_ENGINE=scalar` -- in `runtime.json`'s `eval_engine`, or per job in the spec's
-        # `env` -- to force `eval_wave.py`. c51 arms need no opt-out: `vec_wave` refuses them and
-        # hands them to `eval_wave.py` itself, because the engine reads a scalar Q head.
+        # `env` -- to force `eval_wave.py`. A c51 batch needs no opt-out either: `vec_wave` measures
+        # categorical arms itself since 2026-08-24 (-0.17 pp, z = -0.10 against the scalar path).
         engine = env.get('SNEK_EVAL_ENGINE') or runtime.get('eval_engine', 'vec')
         if engine not in ('vec', 'scalar'):
             raise ValueError('eval_engine={0!r}: expected "vec" or "scalar"'.format(engine))

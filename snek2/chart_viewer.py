@@ -289,6 +289,41 @@ def wave_files(prefix, known):
     return [os.path.join('runs', policy + '.png') for policy in sorted(known)]
 
 
+def newest_glob_files(pattern, limit=MAX_WAVE_PANELS, names=None):
+    """The `limit` most recently written files matching `pattern`, returned in **name** order.
+
+    A cap is required here and was not, until the eval-chart sweep was removed on 2026-08-24. Until
+    then `evals/` held only the current wave, so `--glob evals/b20*_eval_progress.png` matched about
+    four files by construction. Nothing resets that folder any more -- deliberately, see
+    `tests/test_evals_dir_is_never_swept.py` -- so it accumulates, and `b20`'s 36 arms across several
+    waves would open a 36-panel window taller than the screen. That is the same failure `--arms` was
+    given `MAX_WAVE_PANELS` for, so it takes the same cap.
+
+    **Newest by mtime, not first alphabetically**, and that is the whole point: a running arm rewrites
+    its own chart every round, so mtime *is* "is this arm being measured right now". Taking
+    `sorted(...)[:8]` would have shown `b20a`-`b20h` regardless of which arms were live, which is the
+    wrong eight almost every time.
+
+    **Selected by mtime, ordered by name.** Sorting the window itself by mtime would reshuffle the
+    panels on every refresh as each arm writes, which is unreadable; the selection changes rarely and
+    the order then never does.
+    """
+    matched = sorted(globmod.glob(pattern)) if names is None else sorted(names)
+    if len(matched) <= limit:
+        return matched
+
+    def mtime(path):
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            # A file that vanished between the glob and the stat sorts oldest, so it is dropped
+            # rather than raising. The glob re-runs next refresh.
+            return float('-inf')
+
+    newest = sorted(matched, key=mtime, reverse=True)[:limit]
+    return sorted(newest)
+
+
 def policy_from_png(path):
     """The policy a chart PNG belongs to: `runs/b20q-fc25.png` -> `b20q-fc25`, and
     `evals/b20q-fc25_eval_progress.png` -> `b20q-fc25`. The two layouts are the trainer's
@@ -866,7 +901,7 @@ def main():
             files = wave_files(args.arms, wave_arms)
         else:
             files = sorted(args.files) if args.files else (
-                sorted(globmod.glob(args.glob)) if args.glob else [])
+                newest_glob_files(args.glob) if args.glob else [])
         # Always log a *change* to the panel set, not only under SNEK_VIEWER_DEBUG. The 3-of-4
         # window on 2026-08-14 could not be diagnosed after the fact because the log was empty:
         # one line per change is nothing (a wave produces two or three), and it is the only record

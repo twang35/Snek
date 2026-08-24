@@ -107,7 +107,7 @@ delete or overwrite `savedPolicies/train/`. **Never `rm -rf snek2/savedPolicies/
 | `snek2/savedPolicies/train/` | the user's own run |
 | `snek2/hallOfFame/` | record checkpoints, outside the `max_to_keep` rotation |
 | `snek2/runs/` | every real arm's graph, report and measurements |
-| `snek2/evals/archive/` | the only record of a chart no longer at the top level |
+| `snek2/evals/archive/` | every chart the retired eval-chart sweep took; nothing writes here since 2026-08-24 |
 
 A wrongly kept file costs a few KB; a wrongly deleted one costs a training run. When in doubt,
 keep it, and `grep -rn <name> --include='*.md' .` first — the tuning docs link files by name.
@@ -115,36 +115,38 @@ keep it, and `grep -rn <name> --include='*.md' .` first — the tuning docs link
 **Throwaway output is fine to delete**: smoke tests, speed benchmarks, `champion_*` and
 `bench-*` verification evals. Judge by what produced it, not where it lives.
 
-**`snek2/evals/` top level is meant to be current.** `eval_checkpoints.py` writes each arm's live
-`_eval_progress.png` there and moves whatever was there into `evals/archive/<timestamp>/` first —
-so starting an eval is when files move out, not when they are lost.
+**‡ `snek2/evals/` accumulates now, and nothing moves a chart out of it** (2026-08-24). Each eval
+writes `evals/<policy>_eval_progress.png` and overwrites its own file by name. That is the whole
+mechanism — there is no reset, no archive step, and **no way for one eval to affect another's chart.**
 
-**A throwaway `EVAL_OUT_SUFFIX` protects the results file but *not* `evals/`.** The suffix only
-renames `<policy>_checkpoint_evals<suffix>.json`; the chart path has no suffix in it, and
-`archive_existing_eval_pngs()` runs before any setup — before the checkpoint restore, before the
-worker spawn — so **any** eval launched for any reason displaces every chart at the top level. A
-one-checkpoint verification run is enough to do it. This has now happened twice: once to batch 11's
-four charts, once to batch 13's.
+**The removed thing was `archive_existing_eval_pngs`, and it is worth knowing why**, because eight
+months of this file warned about it and the warnings were the tell. Every eval entry point used to
+sweep every PNG at the top of `evals/` into `evals/archive/<timestamp>/` before doing anything else,
+so the folder would show "only the most recently completed work". The costs:
 
-Two consequences worth internalising:
+- **A one-checkpoint verification eval displaced a whole batch's finished panels.** Batch 11's four
+  charts, then batch 13's, then `b43`'s and `k1000`'s twelve — the last of those *while the removal
+  was being written*, which is a fair summary of the problem.
+- **`EVAL_OUT_SUFFIX` protected the results file and not the charts**, because the chart path has no
+  suffix in it and the sweep ran before any setup. There was no flag that made an eval harmless.
+- **A batch measured as several waves erased its own earlier waves.** `keep_batches` was added to
+  patch that, which made the rule *"an eval archives every chart except those of batches this
+  particular process happens to be measuring"* — unholdable, and it still displaced other batches.
+- **Restoring was lossless but manual**, and had to be remembered.
 
-- **Don't run a verification eval while a real close-out's charts matter.** There is no flag that
-  makes one harmless; the only safe options are to wait, or to accept the displacement and restore
-  afterwards.
-- **Restoring is easy and lossless** — `cp evals/archive/<timestamp>/<policy>_eval_progress.png
-  evals/`, and leave the archive directory in place. A *running* arm repairs itself within a round
-  because it rewrites its own chart every round regardless of what is there; only finished arms
-  need the copy back.
+**What it was protecting is free without it.** An arm rewrites its own chart by name, so `evals/`
+is self-correcting; it accumulates instead of resetting, and a stale entry is a stale chart of a real
+arm rather than a missing chart of a current one. That is the strictly better failure.
 
-**‡ One exemption exists now: an eval no longer archives charts of the batch it is measuring**
-(2026-08-21). `archive_existing_eval_pngs(keep_batches=...)` — both call sites pass the batch
-prefixes of the policies they are about to measure. It closes a hole that only opened when a
-batch's close-out arrived as *several* waves: `b45`'s ran as three, and wave 2's startup archived
-`b45a`'s and `b45c`'s finished charts, so panels the window had just filled went blank and nothing
-rewrote them. Keeping them is safe because every arm rewrites its own file by name — a re-run
-overwrites, and an arm a re-run leaves out keeps the chart it had, which is the point. **Everything
-above still holds for any *other* batch**, so a verification eval named `smoke` or `champion_*`
-still displaces a real close-out's charts, and the restore recipe is unchanged.
+**`evals/archive/` stays** — it holds every chart the sweep took, it is in the never-delete table
+above, and nothing writes there any more. Restoring an old chart from it is still just a `cp`.
+
+**Two consequences to carry.** `tests/test_evals_dir_is_never_swept.py` is a tripwire that fails if
+any eval entry point regains a `shutil.move`/`rmtree` — the absence is the invariant now. And **the
+viewer's panel cap became load-bearing**: the sweep was what kept `--glob evals/b20*` down to a
+wave's four files, so `chart_viewer.newest_glob_files` now caps at `MAX_WAVE_PANELS` (8) and selects
+by **mtime**, since a running arm rewrites its chart every round. Alphabetical would have shown
+`b20a`-`b20h` regardless of what was live.
 
 **`<policy>_checkpoint_evals<suffix>.json.previous` is a safety net.** Written before overwriting
 an existing *complete* result, because the first write of a new run destroys whatever was at that
@@ -856,8 +858,13 @@ Four things to carry:
 - **`EVAL_WORKERS` and `EVAL_LANES` do nothing to it**, and both hosts stop setting them. They size TF
   worker processes; this engine has none. The analogue is `VEC_WAVE_PROCS`, default **cores − 2**, which
   is 12 on the laptop — the measured point (2-6% idle; 16 processes reach 0% idle and are 20% *slower*).
-- **c51 arms fall back automatically.** The engine reads a scalar Q head, so `vec_wave` splits a
-  categorical arm out and hands it to `eval_wave.py`. No opt-out needed for a c51 batch.
+- **‡ c51 runs on it too, since 2026-08-24 — there is no longer a fallback.** `vec_eval` used to refuse
+  categorical policies and `vec_wave` used to hand them to `eval_wave.py`; both are gone, because the
+  engine never reads a Q head. It builds through `eval_agent.build_eval_agent` (which picks the agent
+  class off `arch.json`) and calls `policy.action(...)`, and a categorical agent's greedy policy reduces
+  over its own support. Validated on six `b38a-c51fc320eps3125seed1` checkpoints, 200 episodes per
+  checkpoint per engine: **−0.17 pp, z = −0.10**. So **every** batch is measured by one engine now, and
+  the only reason to reach for `eval_wave.py` is the opt-out below.
 - **The opt-out is `SNEK_EVAL_ENGINE=scalar`** — laptop script env, desktop `runtime.json`'s
   `eval_engine`, or a single job spec's `env`. Kept because it is the only way to reproduce a
   pre-switch measurement, and because a regression here has to be answerable without a deploy.

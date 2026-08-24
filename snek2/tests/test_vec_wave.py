@@ -1,5 +1,5 @@
-"""Pins the supervisor's own logic: the shard plan, the selector round-trip, the c51 split, and the
-environment it hands a shard.
+"""Pins the supervisor's own logic: the shard plan, the selector round-trip, the environment it
+hands a shard, and the absence of any routing that would send an arm to another engine.
 
 Everything else `vec_wave` does is delegated -- argv parsing to `eval_wave`, the recipe to
 `eval_plan.hof_settings`, the measurement to `vec_eval`. So these fixtures cover exactly the part
@@ -132,8 +132,8 @@ def test_the_child_writes_the_canonical_paths_not_vec_evals_probe_defaults():
     env = vec_wave.child_env(100, '', '')
     assert env['EVAL_OUT_SUFFIX'] == ''
     # `snake_constants.EVALS_DIR`, not the string 'evals': it is absolute, and it is what
-    # `archive_existing_eval_pngs` and `eval_checkpoints` write into. A relative copy would put the
-    # wave's charts somewhere the archive rule never looks whenever the cwd was not `snek2/`.
+    # `eval_checkpoints` and `eval_wave` write into. A relative copy would put the wave's charts
+    # somewhere no viewer looks whenever the cwd was not `snek2/`.
     assert env['VEC_EVAL_CHART_DIR'] == snake_constants.EVALS_DIR
     assert os.path.basename(env['VEC_EVAL_CHART_DIR']) == 'evals'
     # The knob has to actually be the one vec_eval reads, and it must differ from the probe default.
@@ -210,36 +210,70 @@ def test_the_argv_helpers_are_eval_waves_own_functions():
         assert callable(getattr(eval_wave, name)), name
 
 
-def test_a_c51_arm_is_split_out_and_a_scalar_one_is_not():
-    """Built from the real sidecar builder rather than a hand-written dict, so a change to how c51 is
-    spelled in `arch.json` fails here instead of routing a categorical arm into an engine that reads a
-    scalar Q head."""
-    import json
-    import shutil
-    import tempfile
-    import policy_arch
+# --------------------------------------------------- no arm is routed away by algorithm
 
-    root = tempfile.mkdtemp()
-    saved = vec_wave.POLICY_DIR
-    try:
-        vec_wave.POLICY_DIR = root
-        for name, arch in (
-                ('ddqn-arm', policy_arch.build_arch((256, 128), 3, 30, 3)),
-                ('c51-arm', policy_arch.build_arch((256, 128), 3, 30, 3,
-                                                   algo=policy_arch.CATEGORICAL_ALGO,
-                                                   num_atoms=51, v_min=-10.0, v_max=10.0))):
-            os.makedirs(os.path.join(root, name))
-            with open(os.path.join(root, name, policy_arch.ARCH_FILENAME), 'w') as handle:
-                json.dump(arch, handle)
-        os.makedirs(os.path.join(root, 'no-sidecar'))
-        scalar, categorical = vec_wave.split_arms(['ddqn-arm', 'c51-arm', 'no-sidecar'])
-        assert categorical == ['c51-arm'], (scalar, categorical)
-        # A missing sidecar stays with vec_eval, which refuses through the one loader every other
-        # tool uses -- this must not become a second, quieter opinion about what c51 looks like.
-        assert scalar == ['ddqn-arm', 'no-sidecar'], scalar
-    finally:
-        vec_wave.POLICY_DIR = saved
-        shutil.rmtree(root, ignore_errors=True)
+# Both files, because the refusal that used to live in `vec_eval` and the split that used to live in
+# `vec_wave` were two halves of one behaviour -- either one coming back reverts c51 support on its own.
+VEC_SOURCES = ('vectorized/vec_eval.py', 'vectorized/vec_wave.py')
+
+
+def _vec_source(name):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, name)) as handle:
+        return handle.read()
+
+
+def test_the_c51_split_and_its_fallback_are_gone():
+    """`vec_wave` measured a batch's categorical arms by shelling out to `eval_wave.py`, because
+    `vec_eval` refused them. It does not refuse them any more -- see
+    `tests/test_c51_eval_path.py`, which pins *why* -- so a wave has one engine and no routing.
+
+    Named functions rather than behaviour, deliberately: there is no output to assert about a code
+    path that should not exist, and the thing a future change would reach for is the name.
+    """
+    assert not hasattr(vec_wave, 'split_arms'), 'the algorithm split is back'
+    assert not hasattr(vec_wave, 'fallback'), 'the eval_wave fallback is back'
+
+
+def test_no_vec_file_refuses_a_categorical_policy():
+    """An AST scan, so a re-added `policy_arch.refuse_categorical(...)` fails here rather than turning
+    every c51 close-out into a `SystemExit` that only shows up when a c51 batch is next measured --
+    which could be months."""
+    import ast
+
+    for name in VEC_SOURCES:
+        for node in ast.walk(ast.parse(_vec_source(name))):
+            if not isinstance(node, ast.Call):
+                continue
+            called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(
+                node.func, 'id', None)
+            assert called != 'refuse_categorical', '{0} refuses categorical policies again'.format(
+                name)
+
+
+def test_vec_wave_never_spawns_the_scalar_wave():
+    """The fallback's other half. `vec_wave` still *imports* `eval_wave` -- for its argv parsing, which
+    is the point of the delegation tests above -- so the thing to pin is that it does not run it as a
+    subprocess, which is what a reintroduced fallback would do.
+
+    Docstrings are excluded rather than the whole file grepped, because this module's own header
+    discusses `eval_wave.py` at length and a substring search cannot tell prose from argv.
+    """
+    import ast
+
+    tree = ast.parse(_vec_source('vectorized/vec_wave.py'))
+    docstrings = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        body = getattr(node, 'body', None)
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+            docstrings.add(id(body[0].value))
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                and id(node) not in docstrings):
+            assert 'eval_wave.py' not in node.value, (
+                'vec_wave names eval_wave.py outside a docstring: {0!r}'.format(node.value))
 
 
 # ------------------------------------------------------------------ the payload stitch

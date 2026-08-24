@@ -86,7 +86,6 @@ from eval_plan import (
     PayloadSpec,
     RowCache,
     WriteGate,
-    archive_existing_eval_pngs,
     backup_previous_results,
     best_full_length_row,
     build_payload,
@@ -1262,13 +1261,6 @@ def main(argv):
     if not policies:
         raise SystemExit('no policies given')
 
-    # Before anything else, exactly as the single-policy path does it: this moves whatever charts are
-    # at the top level of `evals/` into `evals/archive/<timestamp>/`, and it happens whether or not
-    # the wave goes on to measure anything. A finished arm's chart does not come back by itself --
-    # which is why the batches this wave is about to measure are exempt: a batch closed out in two
-    # or three waves used to archive its own earlier waves' charts here.
-    import chart_viewer as _cv
-    archive_existing_eval_pngs(keep_batches={_cv.batch_prefix(p) for p in policies})
     if sys.platform == 'darwin':
         # HiDPI: chart_viewer only magnifies the PNG, so 110 dpi looks soft on a Retina panel.
         os.environ.setdefault('SNEK_EVAL_CHART_DPI', '220')

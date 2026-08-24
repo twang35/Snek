@@ -1673,3 +1673,102 @@ def test_the_watch_still_exits_when_the_process_list_really_is_empty():
         assert chart_viewer._training_alive('eval_checkpoints.py b43') is False
     finally:
         subprocess.run = real_run
+
+
+# ------------------------------------------------------- the --glob panel cap (2026-08-24)
+
+def test_a_glob_under_the_cap_is_returned_whole_and_in_name_order():
+    import shutil
+    import tempfile
+    root = tempfile.mkdtemp()
+    try:
+        names = ['b45c-x_eval_progress.png', 'b45a-y_eval_progress.png', 'b45b-z_eval_progress.png']
+        for name in names:
+            open(os.path.join(root, name), 'wb').write(b'x')
+        got = chart_viewer.newest_glob_files(os.path.join(root, 'b45*_eval_progress.png'))
+        assert [os.path.basename(f) for f in got] == sorted(names)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_a_glob_over_the_cap_keeps_the_arms_being_written_right_now():
+    """The regression the eval-chart sweep used to hide. `evals/` accumulates now, so
+    `--glob evals/b20*_eval_progress.png` can match every arm of a 36-arm batch — and
+    `sorted(...)[:8]` would have shown `b20a`-`b20h` whatever was actually running.
+
+    A running arm rewrites its chart every round, so mtime is the signal for "being measured".
+    """
+    import shutil
+    import tempfile
+    root = tempfile.mkdtemp()
+    try:
+        # 12 arms, a..l. The four *live* ones are late in the alphabet on purpose: an
+        # alphabetical cap would miss every one of them.
+        live = {'b20i', 'b20j', 'b20k', 'b20l'}
+        for index, letter in enumerate('abcdefghijkl'):
+            name = 'b20{0}-arm_eval_progress.png'.format(letter)
+            path = os.path.join(root, name)
+            open(path, 'wb').write(b'x')
+            # Older for the finished arms, newest for the live ones.
+            stamp = 2_000_000 + (index * 10 if 'b20' + letter in live else 0)
+            os.utime(path, (stamp, stamp))
+        got = [os.path.basename(f)
+               for f in chart_viewer.newest_glob_files(
+                   os.path.join(root, 'b20*_eval_progress.png'), limit=8)]
+        assert len(got) == 8, got
+        for arm in sorted(live):
+            assert any(f.startswith(arm + '-') for f in got), (arm, got)
+        # And the window is ordered by name, so panels do not reshuffle as arms write.
+        assert got == sorted(got), got
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_the_cap_is_the_same_one_the_arms_path_uses():
+    """One number for both paths. A viewer taller than the screen is the same failure whether the
+    panel set came from a glob or from the arm registry."""
+    got = chart_viewer.newest_glob_files(
+        '', limit=chart_viewer.MAX_WAVE_PANELS,
+        names=['p{0}.png'.format(i) for i in range(30)])
+    assert len(got) == chart_viewer.MAX_WAVE_PANELS
+
+
+def test_a_file_that_vanishes_between_the_glob_and_the_stat_is_dropped_not_raised():
+    """An eval can archive nothing now, but a chart can still be moved by hand mid-refresh. A
+    viewer must never die of it — the glob re-runs a second later."""
+    import shutil
+    import tempfile
+    root = tempfile.mkdtemp()
+    try:
+        real = []
+        for letter in 'abcdefghij':
+            path = os.path.join(root, 'b30{0}-arm_eval_progress.png'.format(letter))
+            open(path, 'wb').write(b'x')
+            real.append(path)
+        missing = os.path.join(root, 'b30z-gone_eval_progress.png')
+        got = chart_viewer.newest_glob_files('', limit=8, names=real + [missing])
+        assert len(got) == 8
+        assert missing not in got, 'a nonexistent path reached the window'
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_the_glob_refresh_path_actually_applies_the_cap():
+    """Source-level, because reaching the refresh loop means opening a Tk window. The bug being
+    guarded is a bare `sorted(glob(...))` coming back."""
+    import ast
+    source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               'chart_viewer.py')).read()
+    tree = ast.parse(source)
+    inside_helper = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == 'newest_glob_files':
+            inside_helper = {id(n) for n in ast.walk(node)}
+    bare = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'glob' and id(node) not in inside_helper):
+            bare.append(node.lineno)
+    assert not bare, (
+        'globmod.glob() called outside newest_glob_files at line(s) {0} — the panel set must go '
+        'through the cap'.format(bare))

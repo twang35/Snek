@@ -111,7 +111,9 @@ PYTHONPATH=. python -u vectorized/vec_eval.py b4c-schlongper top50  # one arm, b
 against the TF path to −0.058 pp (z = −0.28) over 24 checkpoints × 500 episodes. It is **flat and
 ungated**, so nothing below about screening tiers or `EVAL_MIN_ACHIEVABLE` applies to a file it wrote:
 every row is full length and directly poolable, and `min_achievable` reads `null`. The rest of this
-section describes the scalar path, which is still what `SNEK_EVAL_ENGINE=scalar` and every c51 arm run:
+section describes the scalar path, which is what `SNEK_EVAL_ENGINE=scalar` runs. **c51 arms are no
+longer an exception** — `vec_wave` measures them as of 2026-08-24 — so the scalar path is now only the
+opt-out, not the route for a whole class of batch:
 
 ```
 EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top50 \

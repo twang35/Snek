@@ -196,10 +196,10 @@ POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'savedPoli
 # Progress graphs are written here, one per policy name, rewritten each eval.
 RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
 
-# The live "what just finished" eval chart lives here instead of RUNS_DIR, so a glance at
-# this one folder shows only the current eval or batch. eval_checkpoints.py archives
-# whatever is already here into EVALS_ARCHIVE_DIR before it writes a new one — see its
-# archive_existing_eval_pngs().
+# Eval charts live here instead of RUNS_DIR, one per policy, rewritten by each eval. **Nothing
+# moves them any more** (2026-08-24): starting an eval used to sweep every chart at this level into
+# EVALS_ARCHIVE_DIR, which cost more than the tidiness was worth -- see CLAUDE.md. Each arm
+# overwrites its own file by name, so the folder accumulates and stays correct.
 # Observation indices to force to 0.0, from SNEK_ZERO_OBS as a comma-separated list of indices
 # and inclusive ranges — `SNEK_ZERO_OBS=26-29` zeroes the following-tail block and food-space.
 #
@@ -233,6 +233,8 @@ def _parse_zero_obs(raw):
 ZERO_OBS_INDICES = _parse_zero_obs(os.environ.get('SNEK_ZERO_OBS'))
 
 EVALS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'evals')
+# Historical only: nothing writes here since 2026-08-24. Kept because the directory still holds
+# every chart the old archiving swept up, and it is in CLAUDE.md's never-delete table.
 EVALS_ARCHIVE_DIR = os.path.join(EVALS_DIR, 'archive')
 
 CAPTION = 'MiniSnake'

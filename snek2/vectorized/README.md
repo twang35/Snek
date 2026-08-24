@@ -70,12 +70,11 @@ comparison — which is the whole reason to run one. A **wave** is the close-out
 and every tuning doc already look. `vec_wave` passes both to its children explicitly, so neither tool's
 behaviour depends on the other's default.
 
-Writing into `evals/` brings the archive rule with it: `vec_wave` calls
-`archive_existing_eval_pngs(keep_batches=...)` once for the whole wave, exempting the batches it is
-about to measure. **The shards never call it** — twelve of them archiving after the first ones had
-started writing is precisely the mistake that blanked two batches' finished panels. And the viewer's
-lock namespace follows the *directory*, not the tool: at `evals/` a vec eval contends for the same
-`-eval` slot a TF eval would, because two viewers over one directory would each show the other's panels.
+**Nothing is moved out of `evals/` to make room, by anything, since 2026-08-24.** Every eval used to
+sweep that folder into `evals/archive/<timestamp>/` on startup; it is gone, and an arm rewriting its
+own chart by name is all the correctness that was ever needed. The viewer's lock namespace still
+follows the *directory* rather than the tool: at `evals/` a vec eval contends for the same `-eval`
+slot a TF eval would, because two viewers over one directory would each show the other's panels.
 
 ## What it is worth — measured on this laptop, 2026-08-23
 
@@ -300,7 +299,7 @@ chosen by *step*, evenly across the arm, independent of both engines.
 |---|---|---|
 | staging | screen / confirm tiers | **flat** — every checkpoint gets the same episode count |
 | abandon gate | `EVAL_MIN_ACHIEVABLE=97` | **none** |
-| algorithm | ddqn or c51 | **ddqn only**, hard-fail on c51 |
+| algorithm | ddqn or c51 | the same — both read off `arch.json` |
 | `in_flight` payload block | one checkpoint's progress | omitted |
 
 Flat is not laziness. Staging exists to avoid paying full length for a checkpoint that will not place;
@@ -310,18 +309,42 @@ recorded in every payload all exist to cope with rows of unequal effort. Flat ro
 vacuously true. Same for the gate: an abandoned row is shorter than a full one, so a file holding both
 cannot be pooled directly and every reader has to know which gate produced it.
 
-**c51 is refused rather than attempted.** The greedy action for a categorical agent is
-`argmax_a sum_i z_i p_i(s, a)`, so a c51 checkpoint restored against the wrong support loads perfectly
-and evaluates a *different policy*. Until the support is read from `arch.json` and parity-tested,
-refusing is the only safe answer — `policy_arch.refuse_categorical` does it.
+**‡ c51 works here, and it needed no atom arithmetic** (2026-08-24). This engine shipped refusing
+categorical policies via `policy_arch.refuse_categorical`, on the stated reasoning that supporting them
+meant reading the support out of `arch.json` and reducing over atoms in `vec_eval.py`. That was wrong
+about *where* the reduction lives. `AgentPool` never touches a Q head — it builds through
+`eval_agent.build_eval_agent`, which picks the agent class off the sidecar, and then calls
+`policy.action(...)`. A `CategoricalDqnAgent`'s policy is a `GreedyPolicy` over a `CategoricalQPolicy`,
+which computes `argmax_a sum_i z_i p_i(s, a)` internally from the support the sidecar named. Deleting
+the refusal was the whole change; `split_arms` and the `eval_wave.py` fallback went with it, so a wave
+is one engine again.
 
-**A c51 batch is still measurable, and needs no opt-out.** `vec_wave` splits a wave by
-`policy_arch.is_categorical` and hands the categorical arms to `eval_wave.py`, inheriting the
-environment untouched — including the `EVAL_MIN_ACHIEVABLE`/`EVAL_WORKERS` knobs it strips from its own
-shards, which is the point: those arms are measured by the engine those knobs describe. A missing or
-unreadable `arch.json` counts as scalar and goes to `vec_eval`, which calls `refuse_categorical` itself
-and will say so properly; `split_arms` must not become a second, quieter opinion about what c51 looks
-like.
+Validated the same way the ddqn switch was: six `b38a-c51fc320eps3125seed1` checkpoints spanning
+35-96%, 200 episodes per checkpoint per engine, flat and ungated on both sides.
+
+| step | scalar | vec | diff |
+|---:|---:|---:|---:|
+| 480000 | 75.5% | 76.5% | +1.00 pp |
+| 1214000 | 40.0% | 35.0% | −5.00 pp |
+| 2355000 | 93.0% | 93.0% | 0.00 pp |
+| 2408000 | 93.0% | 90.5% | −2.50 pp |
+| 2687000 | 88.0% | 94.5% | +6.50 pp |
+| 2818000 | 81.5% | 80.5% | −1.00 pp |
+| **pooled (1200 ep each)** | **78.50%** | **78.33%** | **−0.17 pp, z = −0.10** |
+
+Per-checkpoint scatter is binomial: at n=200 a difference has SE ≈ 4.7 pp, so the +6.50 is z ≈ 1.4 and
+the −5.00 is z ≈ −0.9. The pooled figure is the comparison, and it matches the ddqn result (−0.058 pp,
+z = −0.28).
+
+**‡ And the range of the support turns out not to matter to an evaluation at all.** Found while
+mutation-testing the above: `sum_i p_i = 1`, so replacing `z` with `a·z + b` replaces every action's `Q`
+with `a·Q + b`, which for `a > 0` leaves the argmax alone. Measured over 256 states, supports `[-5, 120]`,
+`[-10, 10]`, `[0, 1]` and `[-1000, 3]` chose the **same action every time**; only a *reversed* support
+(`v_min > v_max`) differed, on all 256, because it is then an argmin. So `v_min`/`v_max` are **not** the
+field a c51 eval can be silently wrong about — `num_atoms` is, since it sets the logits width and a
+mismatch fails the restore on shape. The invariance covers greedy actions only: anything reading a `Q`
+*value* still needs the trained support, which is why `tests/test_c51_eval_path.py` pins the support at
+construction rather than through the chosen actions.
 
 `in_flight` is omitted because the payload's block describes **one** checkpoint and this driver has up
 to `max_live` in flight at once; naming one of twelve would misreport the other eleven. Nothing is

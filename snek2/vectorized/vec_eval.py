@@ -18,13 +18,13 @@ this imports the payload machinery rather than reimplementing a schema that mere
 | chart directory | `evals/` | `evals/vec/` by default, so it cannot displace a real close-out's charts (`VEC_EVAL_CHART_DIR`) |
 | staging | screen / confirm tiers | **flat**: every checkpoint gets the same episode count |
 | abandon gate | `EVAL_MIN_ACHIEVABLE=97` | **none** |
-| algorithm | ddqn or c51 | ddqn only, hard-fail on c51 |
+| algorithm | ddqn or c51 | the same, both read off `arch.json` |
 
-The chart directory matters more than it looks. `archive_existing_eval_pngs` moves **every** chart at
-the top of `evals/` into the archive before any eval starts, and this has twice blanked a finished
-batch's panels. Writing to `evals/vec/` means this driver never calls it at all. `vec_wave.py`, which
-*is* the close-out, points `VEC_EVAL_CHART_DIR` at `evals/` and does that archiving once for the whole
-wave -- so the rule is unchanged, it just belongs to the wave rather than to each of its shards.
+The chart directory used to matter far more than it looks: starting an eval swept every chart at the
+top of `evals/` into `evals/archive/<timestamp>/`, so `evals/vec/` existed partly to stay out of the
+way of that. **The sweep is gone** (2026-08-24) and the split now serves only its other purpose --
+letting a hand-run probe and a real close-out coexist, which is what a validation comparison needs.
+`vec_wave.py`, which *is* the close-out, points `VEC_EVAL_CHART_DIR` at `evals/`.
 
 Flat rather than staged is not a simplification for its own sake. Staging exists to avoid paying full
 length for a checkpoint that will not place; at ~20x the throughput that saving buys little, and it
@@ -32,11 +32,20 @@ costs a lot of interpretive load — `pooled_equal_effort`, the `screen_episodes
 rows of different depths must not be pooled, and the gate recorded in every payload all exist to cope
 with rows of unequal effort. Flat rows make all of that vacuously true.
 
-**c51 is refused rather than attempted.** The greedy action for a categorical agent is
-`argmax_a sum_i z_i p_i(s, a)`, so a c51 checkpoint restored against the wrong support loads
-perfectly and evaluates a *different policy*. Supporting it means reading the support out of
-`arch.json` and reducing over atoms here; until that is written and parity-tested, refusing is the
-only safe answer.
+**c51 needed no atom arithmetic here** (2026-08-24). This engine was written refusing categorical
+policies, on the assumption that supporting them meant reading the support out of `arch.json` and
+reducing over atoms in this file. It does not: `AgentPool` never touches a Q head. It calls
+`eval_agent.build_eval_agent`, which already selects the agent class from the sidecar, and then
+`policy.action(step).action` -- and a `CategoricalDqnAgent`'s policy is a `GreedyPolicy` over a
+`CategoricalQPolicy`, which computes `argmax_a sum_i z_i p_i(s, a)` internally from the support the
+sidecar named. So the two algorithms differ nowhere below this line, and the refusal was guarding a
+reduction that lives one layer down.
+
+The check that actually matters is still enforced, by the same call: `assert_restorable` hard-fails
+if the sidecar is missing or disagrees with the live env, which is what stops a c51 checkpoint being
+restored against the wrong support -- the failure mode the refusal was named for. That one loads
+perfectly and evaluates a *different policy*, so it has to be caught by the sidecar rather than by
+the restore.
 
 Usage:
 
@@ -67,7 +76,6 @@ import time
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 
-import numpy as np
 import tensorflow as tf
 from tf_agents.environments import tf_py_environment
 from tf_agents.trajectories import time_step as ts
@@ -76,7 +84,6 @@ import chart_viewer
 import eval_agent
 import eval_plan
 import eval_progress
-import policy_arch
 import snake_constants
 from snake_constants import EVALS_DIR
 from snake_environment import SnakeEnvironment
@@ -297,9 +304,10 @@ def main(argv):
 
     py_env = SnakeEnvironment()
     tf_env = tf_py_environment.TFPyEnvironment(py_env)
-    # `refuse_categorical` rather than a hand-rolled check, so the refusal reads the sidecar through
-    # the same loader every other tool does and cannot disagree with it about what c51 looks like.
-    policy_arch.refuse_categorical(policy_dir, 'vectorized/vec_eval.py')
+    # No algorithm check here on purpose. `AgentPool` builds through `eval_agent.build_eval_agent`,
+    # which reads the algorithm and the support off `arch.json` and hard-fails on a mismatch, so both
+    # ddqn and c51 arrive correctly built and a second opinion in this file could only disagree with
+    # the loader every other tool uses.
 
     steps, selected_by = resolve_selection(policy_name, policy_dir, selector, source_suffix)
     if not steps:
@@ -351,11 +359,9 @@ def main(argv):
     print('  {0}'.format(C.describe()))
     print('  results -> {0}'.format(out_path))
     print('  chart   -> {0}'.format(chart_path))
-    # Never `archive_existing_eval_pngs` *here*. At the default `evals/vec/` there is nothing of
-    # anyone else's to displace; and when `vec_wave.py` points this at `evals/`, the wave has already
-    # archived once with the right `keep_batches`, so a second call per shard -- twelve of them, after
-    # the first shards have started writing -- is exactly the mistake that blanked two batches'
-    # finished panels.
+    # Nothing here moves an existing chart, and nothing anywhere does since 2026-08-24: an arm
+    # rewrites its own file by name, so `evals/` is self-correcting and needs no sweep. See
+    # `tests/test_evals_dir_is_never_swept.py` for the account of what the sweep cost.
     # The lock namespace follows the directory, not the tool. Two viewers over one directory would
     # each show the other's panels, so a run writing into `evals/` has to contend for the *same*
     # `-eval` slot a TF eval would -- and a run writing into `evals/vec/` has to contend for its own,

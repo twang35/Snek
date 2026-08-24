@@ -188,7 +188,6 @@ from eval_plan import (  # noqa: F401 - re-exported for callers and tests
     WRITE_MIN_INTERVAL,
     WriteGate,
     achievable_percent,
-    archive_existing_eval_pngs,
     backup_previous_results,
     best_full_length_row,
     build_payload,
@@ -318,15 +317,9 @@ def main(argv):
         print(__doc__)
         return 1
     policy_name = argv[1]
-    # Exempts this policy's own batch, so a batch measured as four separate processes -- or in two
-    # passes -- does not archive the siblings' finished charts out from under the window. See
-    # `eval_plan.archive_existing_eval_pngs`.
-    import chart_viewer as _cv
-    archive_existing_eval_pngs(keep_batches={_cv.batch_prefix(policy_name)})
     # Live chart window on the laptop only. `viewer_enabled()` is darwin-gated, so this is a no-op
     # on the desktop, where the runner daemon owns the viewer (`desktop/runner/runner.py`) — two
-    # owners would open two windows per wave. It runs after archive_existing_eval_pngs() so the
-    # viewer globs the fresh charts, and it is best-effort: a chart is never worth an eval.
+    # owners would open two windows per wave. Best-effort: a chart is never worth an eval.
     if sys.platform == 'darwin':
         # HiDPI: chart_viewer only magnifies the PNG, and 110 dpi looks soft blown up on a Retina
         # panel while the 200-dpi training chart stays crisp. 220 gives the source enough pixels to

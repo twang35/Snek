@@ -903,17 +903,17 @@ def eval_batch_pngs(running_jobs, snek_dir, eval_dir_names):
     the last.
 
     **Membership is decided by the chart existing on disk**, which is the same rule the laptop's
-    `--glob evals/<prefix>*_eval_progress.png` uses, and it is what keeps two hard-won properties
-    intact. A panel is never blank-by-construction: `chart_viewer` deliberately has no per-panel
-    title, so a path for an arm that has not started yet would be an unlabelled empty box (see the
-    note above `_training_alive` in `chart_viewer.py`). And the set stays bounded without a TTL --
-    only arms whose charts are in `evals/` right now can appear, so a historically wide batch like
-    `b20` (36 arms over several waves) cannot open a window taller than the screen, which is the
-    failure the laptop's arm registry had to solve a different way.
+    `--glob evals/<prefix>*_eval_progress.png` uses, and it is what keeps a panel from ever being
+    blank-by-construction: `chart_viewer` deliberately has no per-panel title, so a path for an arm
+    that has not started yet would be an unlabelled empty box (see the note above `_training_alive`
+    in `chart_viewer.py`).
 
-    It relies on the batch's earlier waves *keeping* their charts, which they now do:
-    `eval_plan.archive_existing_eval_pngs` exempts the batches a wave is about to measure. Before
-    that, wave 2 archived wave 1's charts on startup and there was nothing on disk to find."""
+    **`MAX_VIEWER_PANELS` is what bounds the set, and since 2026-08-24 it is the only thing that
+    does.** The on-disk rule used to bound it too, because starting an eval swept `evals/` clean --
+    so a wide batch like `b20` (36 arms over several waves) had only its current wave on disk.
+    Nothing sweeps that folder any more (`tests/test_evals_dir_is_never_swept.py` has the account),
+    so it accumulates and the cap is load-bearing rather than a backstop. The laptop's glob path took
+    the same cap in the same change, via `chart_viewer.newest_glob_files`."""
     batches = set()
     for _category, policies in running_jobs:
         if isinstance(policies, str) or policies is None:

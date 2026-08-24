@@ -19,8 +19,8 @@
 # **Which engine.** `SNEK_EVAL_ENGINE=vec` (the default) runs `vectorized/vec_wave.py`;
 # `SNEK_EVAL_ENGINE=scalar` runs `eval_wave.py`. The vectorised engine measures ~40x faster and was
 # validated against the TF path at four levels, ending in a 24-checkpoint x 500-episode head-to-head
-# that agreed to -0.058 pp (z = -0.28). It refuses c51 policies and hands them to `eval_wave.py`
-# itself, so a categorical batch needs no opt-out.
+# that agreed to -0.058 pp (z = -0.28). It measures c51 arms too, since 2026-08-24 (-0.17 pp,
+# z = -0.10 on six b38a checkpoints), so a categorical batch needs no opt-out either.
 #
 # Two traps, both documented failures elsewhere in this project:
 #

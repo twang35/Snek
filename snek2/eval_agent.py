@@ -22,11 +22,25 @@ The optimizer and `target_update_period` are required by the agent's constructor
 nothing here trains. They are left at training's values so the checkpoint's variable set matches.
 
 **Which agent to build is read off `arch.json`, never off the environment.** A c51 checkpoint restored
-into a scalar network fails on shape, which is fine — but a c51 checkpoint restored against the *wrong
-support* would load perfectly and evaluate a different policy, since the greedy action is
-`argmax_a sum_i z_i p_i(s, a)`. So the algorithm and the support both come from the sidecar the
-checkpoint was written with, and `SNEK_ALGO`/`SNEK_V_MAX` are not read here at all — the same rule
-`SNEK_FC_LAYERS` already follows.
+into a scalar network fails on shape, which is fine. So the algorithm and the support both come from
+the sidecar the checkpoint was written with, and `SNEK_ALGO`/`SNEK_V_MAX` are not read here at all —
+the same rule `SNEK_FC_LAYERS` already follows.
+
+**‡ This docstring used to say a wrong *support* would "load perfectly and evaluate a different
+policy". For a greedy evaluation that is false, and it is worth knowing why** (measured 2026-08-24,
+pinned in `tests/test_c51_eval_path.py`). The greedy action is `argmax_a sum_i z_i p_i(s, a)`, and
+`sum_i p_i = 1`, so replacing the support `z` with `a·z + b` replaces every action's `Q` with
+`a·Q + b` — a monotone transform when `a > 0`, which leaves the argmax untouched. Measured on 256
+states: `[-5, 120]`, `[-10, 10]`, `[0, 1]` and `[-1000, 3]` all chose the *same* action every time,
+and only a **reversed** support (`v_min > v_max`, so `a < 0`) differed — on all 256, because it is
+then an argmin.
+
+Two things follow, and they cut in opposite directions. `v_min`/`v_max` are not the field an
+evaluation can be silently wrong about, so **do not cite the range as the reason a c51 eval needs the
+sidecar** — the reasons are `num_atoms`, which sets the logits width and therefore fails the restore
+on shape, and `algo` itself. And the invariance is *not* a licence to stop recording the range: it
+holds for the greedy action only, so anything that reads a `Q` *value* — a diagnostic, a saliency
+probe, a training resume — still needs the support the checkpoint was trained with.
 """
 import tensorflow as tf
 from tf_agents.agents.dqn import dqn_agent

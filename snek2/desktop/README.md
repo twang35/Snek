@@ -69,9 +69,10 @@ second *stage inside that job* rather than a job of its own:
 `runtime.json`, or `SNEK_EVAL_ENGINE` in a single job spec's `env`, to force `eval_wave.py` — the only
 way to reproduce a pre-switch measurement, and the answer to a regression here that does not need a
 deploy. `runtime.json` validates it as an enum and rejects the whole file on a typo, so the daemon keeps
-its last-known-good config rather than failing every eval dispatch one job at a time. **c51 arms need no
-opt-out**: `vec_wave` reads a scalar Q head, so it splits them out and hands them to `eval_wave.py`
-itself.
+its last-known-good config rather than failing every eval dispatch one job at a time. **A c51 batch
+needs no opt-out either** — `vec_wave` measures categorical arms itself since 2026-08-24, validated on
+six `b38a` checkpoints at 200 episodes per engine (−0.17 pp, z = −0.10). The split that used to hand them
+to `eval_wave.py` is gone.
 
 **The daemon carries no eval-protocol numbers.** It used to pin the closeout gate, the HOF gate, 500
 episodes, the flat-screen flag and the `_hof500` suffix, plus its own copy of the
@@ -105,8 +106,8 @@ only in `SNEK_SEED`, split into three waves: `b45-closeout` `{a,c}`, `b45-closeo
 `b45-closeout-w3` `{d}`. Two costs, and the second is the real one:
 
 - The chart window showed 2 panels, then 1, then 1 — a finished arm's chart was gone before anyone
-  came back to read it (see `eval_batch_pngs` and the `keep_batches` exemption in
-  `eval_plan.archive_existing_eval_pngs`).
+  came back to read it (see `eval_batch_pngs`; the sweep that removed those charts is itself gone
+  since 2026-08-24).
 - **Three sequential waves of 2/1/1 arms measure a batch at a quarter of the intended 4 lanes.** For a
   continuation batch, whose close-out is already priced in hours, that is the difference between one
   pass and three.

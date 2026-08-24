@@ -34,15 +34,22 @@ they are -- but this *is* the close-out now, so it has to land where `eval_progr
 already look. Both are passed to the children explicitly, so neither tool's behaviour depends on the
 other's default.
 
-Writing into `evals/` brings the archive rule with it, so this calls
-`archive_existing_eval_pngs(keep_batches=...)` the way `eval_wave` does.
+Nothing is moved out of `evals/` to make room. An arm rewrites its own chart by name, so the folder
+is self-correcting; the sweep that used to run at every eval's startup is gone (2026-08-24).
 
-## c51 arms are handed to `eval_wave.py`
+## Every arm comes here, c51 included
 
-`vec_eval` refuses categorical policies (`policy_arch.refuse_categorical`), and it should: the engine
-reads a scalar Q head, and a c51 checkpoint restored against the wrong support loads perfectly and
-evaluates a *different policy*. A wave mixing both kinds is split, each half measured by the tool that
-can measure it, so "default to vec" never means "c51 batches stop being measurable".
+This file used to split a wave in two and hand the categorical arms to `eval_wave.py`, because
+`vec_eval` refused them. **It no longer refuses** (2026-08-24) -- and the interesting part is that no
+atom arithmetic had to be written for that, because the engine never reads a Q head. It builds through
+`eval_agent.build_eval_agent`, which selects the agent class from `arch.json`, and asks
+`policy.action(...)`; a categorical agent's greedy policy reduces over its own support internally. So
+the split, the fallback and the "which engine can measure this arm" question are all gone, and
+`vec_wave` is now the one close-out path.
+
+Validated the same way the scalar comparison was: six `b38a-c51fc320eps3125seed1` checkpoints spanning
+35-96%, 200 episodes per checkpoint per engine, pooled **78.33% (vec) against 78.50% (scalar)** --
+**-0.17 pp, z = -0.10**. That is the same agreement as the ddqn head-to-head (-0.06 pp, z = -0.28).
 """
 
 import contextlib
@@ -58,7 +65,6 @@ os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 import chart_viewer
 import eval_plan
 import eval_wave
-import policy_arch
 from snake_constants import EVALS_DIR, POLICY_DIR, RUNS_DIR
 
 # **Cores minus two.** One process saturates about one core -- the observation build is
@@ -189,28 +195,13 @@ def stitch_payload(policy, suffix, pieces):
     eval_plan.write_payload(out_path, payload)
     return payload
 
-def split_arms(policies):
-    """`(scalar, categorical)`. A missing or unreadable sidecar counts as scalar and is left to
-    `vec_eval`, which calls `refuse_categorical` itself and will say so properly -- this must not
-    become a second, quieter opinion about what c51 looks like."""
-    scalar, categorical = [], []
-    for policy in policies:
-        try:
-            arch = policy_arch.read_arch(os.path.join(POLICY_DIR, policy))
-        except Exception:
-            arch = None
-        target = categorical if arch is not None and policy_arch.is_categorical(arch) else scalar
-        target.append(policy)
-    return scalar, categorical
-
-
 def selection_size(policy, selector, source_suffix):
     """How many checkpoints `selector` picks for `policy` -- the weight in the shard plan.
 
-    `vec_eval` is imported lazily because it pulls in TensorFlow, and an all-c51 wave (which falls
-    straight through to `eval_wave`) must not pay for it. A failure that is not a `SystemExit` returns
-    1 rather than propagating: the shard plan is an optimisation, and an arm whose size cannot be read
-    still has to be measured.
+    `vec_eval` is imported lazily because it pulls in TensorFlow, and the import is worth a good three
+    seconds that a wave which exits early -- nothing selected, a bad selector -- should not pay. A
+    failure that is not a `SystemExit` returns 1 rather than propagating: the shard plan is an
+    optimisation, and an arm whose size cannot be read still has to be measured.
     """
     from vectorized import vec_eval
     try:
@@ -311,21 +302,6 @@ def child_env(episodes, suffix, source_suffix):
     return env
 
 
-def fallback(chain, tokens, policies):
-    """Measure `policies` with `eval_wave.py`, inheriting this process's environment untouched --
-    including the scalar knobs `child_env` strips, which is the point: those arms are measured by the
-    engine those knobs describe."""
-    if not policies:
-        return 0
-    argv = [sys.executable, '-u', 'eval_wave.py']
-    if chain:
-        argv.append('--chain')
-    argv += list(tokens) + list(policies)
-    print('\nc51 arms go to eval_wave.py (vec_eval reads a scalar Q head): {0}'.format(
-        ' '.join(policies)))
-    return subprocess.call(argv)
-
-
 def main(argv):
     chain, tokens = eval_wave.parse_options(list(argv[1:]))
     kind, value, rest = eval_wave.parse_selector(tokens)
@@ -337,16 +313,6 @@ def main(argv):
     episodes = int(os.environ.get('EVAL_EPISODES', 100))
     suffix = os.environ.get('EVAL_OUT_SUFFIX', '')
 
-    scalar, categorical = split_arms(policies)
-    if not scalar:
-        return fallback(chain, tokens, categorical)
-
-    # Before anything else, exactly as `eval_wave` and `eval_checkpoints` do it, and for the same
-    # reason: this moves whatever is at the top of `evals/` into the archive, and the batches this
-    # wave is about to measure are exempt so a batch closed out in several waves does not erase its
-    # own earlier waves' charts.
-    eval_plan.archive_existing_eval_pngs(
-        keep_batches={chart_viewer.batch_prefix(p) for p in policies})
     if sys.platform == 'darwin':
         # HiDPI: chart_viewer only magnifies the PNG, so 110 dpi looks soft on a Retina panel.
         os.environ.setdefault('SNEK_EVAL_CHART_DPI', '220')
@@ -355,20 +321,20 @@ def main(argv):
             # command line, so the prefix pattern matches all twelve -- the window stays up until the
             # last shard of the last arm exits. Matching `vec_wave.py` instead would be one process
             # and would close the window on a stage boundary.
-            chart_viewer.spawn_for_eval(scalar[0], watch='vec_eval.py {prefix}')
+            chart_viewer.spawn_for_eval(policies[0], watch='vec_eval.py {prefix}')
         except Exception as error:
             print('chart viewer skipped ({0}: {1})'.format(type(error).__name__, error))
 
     print('vectorised wave: {0} arm(s), {1}, {2} episodes each, flat, no abandon gate'.format(
-        len(scalar), selector, episodes))
+        len(policies), selector, episodes))
     code = run_stage('stage A: {0}'.format(eval_wave.describe_selector(kind, value)),
-                     scalar, selector, episodes, suffix, '', procs)
+                     policies, selector, episodes, suffix, '', procs)
     if chain:
         # `hof_settings` is the only definition of the stage-B recipe -- 500 episodes, `above:98` out
         # of stage A's own file, into `_hof500`. Derived from stage A's settings rather than written
         # out here, so the two cannot disagree about which file the candidates come from.
         recipe = eval_plan.hof_settings({'suffix': suffix})
-        ready = eval_wave.completed_policies(scalar, suffix)
+        ready = eval_wave.completed_policies(policies, suffix)
         if not ready:
             print('\nno arm produced a complete close-out - nothing to re-measure')
         else:
@@ -379,8 +345,6 @@ def main(argv):
                 ready, 'above:{0:g}'.format(eval_plan.HOF_GATE), recipe['num_episodes'],
                 recipe['suffix'], recipe['source_suffix'], procs)
             code = code or hof_code
-    if categorical:
-        code = fallback(chain, tokens, categorical) or code
     return code
 
 
