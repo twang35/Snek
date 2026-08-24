@@ -1,10 +1,8 @@
 {
-  "iso": "2026-08-24T02:59:30",
-  "ts": 1787565570.5120375,
+  "iso": "2026-08-24T05:03:21",
+  "ts": 1787573001.4085834,
   "at_a_glance": {
-    "running": [
-      "b45 -- b45: continue the 4 best b29/b40 checkpoints to 5M, lr 1e-8 -- closeout eval (2 arms)"
-    ],
+    "running": [],
     "queued": []
   },
   "runtime": {
@@ -26,26 +24,11 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "b45-closeout-w2",
-      "type": "eval",
-      "policy": "b45b-lowlr8-b29a",
-      "policies": [
-        "b45b-lowlr8-b29a",
-        "b45d-lowlr8-b29c"
-      ],
-      "pid": 2171744,
-      "step": 4098000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 72045
-    }
-  ],
+  "running": [],
   "ledger": {
-    "b45-closeout-w2": "running",
+    "b45-closeout-w2": "done",
     "b45-closeout": "done",
     "b45b-lowlr8-b29a": "done",
     "b45d-lowlr8-b29c": "done",
@@ -295,8 +278,8 @@
   },
   "disk_free_gb": 120.1,
   "load_avg": [
-    18.775390625,
-    18.89892578125,
-    18.95947265625
+    0.53515625,
+    0.1396484375,
+    0.177734375
   ]
 }
