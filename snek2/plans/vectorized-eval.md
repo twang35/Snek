@@ -109,3 +109,94 @@ and episode accounting both add overhead the prototype never paid.
   consumption — which is why L1 and L2 force food rather than trying to align seeds. It also means
   the reference slows near a full board (~20-50 retries per draw at length 95) where this will not:
   a cost difference, not a behaviour difference.
+
+---
+
+## Results, 2026-08-23
+
+All three phases are built. **Parity is established; the throughput gate is missed** — 33x per lane
+against a pre-registered 40x. Code is in [`snek2/vectorized/`](../vectorized/README.md), which carries
+the full detail; this section records the outcome against the bars set above.
+
+### Parity: every bar green, plus one layer the plan did not ask for
+
+| layer | result |
+|---|---|
+| L1/L2, heuristic policy | **0 mismatches**, elementwise on all 30 indices, 36,000+ states across growth, coiled endgame, starve and win regimes |
+| **L1/L2, champion policy** | **0** observation, **0 action**, 0 reward and 0 done mismatches over **124,672 states**; 77/80 perfect games; max length 100 |
+| L3 mutation | **17 of 17** mutants killed, each named in `tests/test_vectorized_parity.py` |
+| L4 end-to-end | vec mean of 4 seeds **94.03%** vs `eval_checkpoints.py` **93.97%** — **+0.06 pp, z = +0.25** |
+
+**The champion lockstep is the layer that matters and it was nearly skipped.** The plan said "L2 runs
+at champion skill specifically", and the first implementation used a hand-written heuristic instead,
+which tops out at length 79 and never visits the coiled, long-episode states a 98%-perfect policy
+spends its time in. Driving the real checkpoint found nothing wrong — but it is the only test that
+could have, and zero *action* mismatches additionally rules out a float32 near-tie flipping an argmax
+between batch widths, which no observation comparison addresses.
+
+**L4 needed four samples, not one, and one would have been read as a failure.** Seed 0 alone came in
+0.42 pp low, and on `avg_score` that reached **t = -2.73** — a result that looks like a real systematic
+deficit. It is not: two runs of the *same* engine differed by a comparable amount, and the across-seed
+sd is 0.42 pp, twice the naive binomial SE because a pooled rate over 144 different checkpoints
+inherits their spread. **"Never conclude from a single run" applies to validating an instrument, not
+only to comparing arms** — an obvious point in hindsight that was one plausible table away from
+retracting a correct implementation.
+
+Two methodological traps worth carrying forward. **Do not validate against checkpoints selected by the
+measurement you are comparing to**: rows chosen because the TF pass scored them >= 98% carry an
+upward-biased TF value, so an unbiased re-measure reads low by construction. The 144 here were picked
+by *step*, evenly across the arm, independent of both engines. And `avg_reward` is not comparable
+across different `SNEK_*` shaping at all, since a reward is a sum of configured terms — the driver
+prints `config.describe()` in its header for that reason.
+
+### Throughput: 22x like-for-like, 33x per lane, gate missed
+
+Same machine, same work, `b43c-lowlr-b40b` (a continuation arm at champion skill — the expensive case).
+
+| configuration | episodes/s, machine-wide | s/checkpoint (500 eps) |
+|---|---|---|
+| `eval_checkpoints.py`, 4 processes x 4 workers | **8.55** | ~58.5 |
+| `vec_eval.py`, 1 process | 70.2 | **7.13** |
+| `vec_eval.py`, 4 processes | **190.5** | 2.62 |
+
+- **22x machine-wide** at the same 4-process allocation, and **33x per lane** on a 500-episode
+  measurement at the best measured utilisation (92%).
+- End-to-end on the 144-checkpoint/100-episode L4 set: **1684 s -> 267 s (6.3x) using one process
+  instead of four.**
+- The 4-process figure is pessimistic: each process got only 6 checkpoints, so utilisation fell to
+  67% against 92% single-process. A real close-out's hundreds of checkpoints per arm would sit near
+  the higher figure.
+
+**The gate was 40x per lane and the answer is 33x, so it is missed.** The plan already discounted the
+prototype's 80x to 40x for "TF inference and episode accounting"; the discount was not deep enough.
+What the prototype never paid for is that **the observation is 95% of an env step** (4323 us against
+211 us at n=512) and its cost falls only slowly with width — 55k steps/s at n=128 rising to 174k at
+n=2048 — so a measurement capped at `episodes` lanes cannot reach the prototype's width. Serving
+several checkpoints from one wide env recovers most of that and is why the figure is 33x rather than
+11x, which is what one checkpoint at a time gives.
+
+### The one bug that mattered, and it was a default
+
+`max_live * episodes` must **exceed** `width`, not equal it. A checkpoint's quota is consumed the
+moment its episodes are assigned but it holds its slot until its last episode ends, so at exact
+capacity no resident checkpoint ever has quota left and every finishing lane idles. Measured at
+**4% utilisation** — 568 s for work that takes 54 s. It presented as "the design is just slow", which
+is a worse failure than a crash, and the original defaults (width 4000, `max_live` 12) were inside
+that region for any episode count below ~333. `max_live` is now derived, `measure_stream` raises on a
+collapsing configuration, and both halves have fixtures.
+
+### Changed outside `vectorized/`
+
+- `chart_viewer.spawn_for_eval` takes `chart_dir` and `slot_suffix` (defaults unchanged), so the vec
+  eval's window watches `evals/vec/` under its own lock namespace and can run beside a TF eval.
+- `tests/test_perfect_game_counting.py`'s AST tripwire scanned **four hardcoded filenames**, so a new
+  counter was outside the rule the day it was written — a mutation test confirmed the reward version
+  of the vec engine's perfect flag survived the entire suite. It is now a glob over every top-level
+  module plus `vectorized/`, and it matches any name *containing* `PERFECT_GAME_REWARD`, which closes
+  a second hole: `final_reward == DEFAULT_PERFECT_GAME_REWARD` was previously invisible to it.
+
+### Not done
+
+The training loop is untouched, deliberately. c51 is refused rather than approximated. `snek3/` does
+not exist; when it does, these files are what gets copied, and `snek2/vectorized/` stays as the frozen
+record the parity evidence above refers to.
