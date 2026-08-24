@@ -14,15 +14,17 @@ this imports the payload machinery rather than reimplementing a schema that mere
 
 | | eval_checkpoints | here |
 |---|---|---|
-| output suffix | `EVAL_OUT_SUFFIX`, default none | `_vec` by default, so a run can never overwrite a TF result |
-| chart directory | `evals/` | `evals/vec/`, so it cannot displace a real close-out's charts |
+| output suffix | `EVAL_OUT_SUFFIX`, default none | `_vec` by default, so a *hand-run* can never overwrite a TF result |
+| chart directory | `evals/` | `evals/vec/` by default, so it cannot displace a real close-out's charts (`VEC_EVAL_CHART_DIR`) |
 | staging | screen / confirm tiers | **flat**: every checkpoint gets the same episode count |
 | abandon gate | `EVAL_MIN_ACHIEVABLE=97` | **none** |
 | algorithm | ddqn or c51 | ddqn only, hard-fail on c51 |
 
 The chart directory matters more than it looks. `archive_existing_eval_pngs` moves **every** chart at
 the top of `evals/` into the archive before any eval starts, and this has twice blanked a finished
-batch's panels. Writing to `evals/vec/` means this driver never calls it at all.
+batch's panels. Writing to `evals/vec/` means this driver never calls it at all. `vec_wave.py`, which
+*is* the close-out, points `VEC_EVAL_CHART_DIR` at `evals/` and does that archiving once for the whole
+wave -- so the rule is unchanged, it just belongs to the wave rather than to each of its shards.
 
 Flat rather than staged is not a simplification for its own sake. Staging exists to avoid paying full
 length for a checkpoint that will not place; at ~20x the throughput that saving buys little, and it
@@ -52,10 +54,12 @@ Usage:
                         too low collapses utilisation to a few percent)
     VEC_EVAL_SOURCE     result suffix `above:` selects from (default '', the close-out's own file)
     VEC_EVAL_SEED       food-sampler seed (default 0); the only stochastic input to a measurement
+    VEC_EVAL_CHART_DIR  where the progress chart goes (default `evals/vec/`)
     EVAL_OUT_SUFFIX     output suffix (default '_vec')
 """
 
 import collections
+import json
 import os
 import sys
 import time
@@ -74,12 +78,17 @@ import eval_plan
 import eval_progress
 import policy_arch
 import snake_constants
+from snake_constants import EVALS_DIR
 from snake_environment import SnakeEnvironment
 from vectorized import config as C
 from vectorized import vec_engine
 
 POLICY_ROOT = 'savedPolicies'
-CHART_DIR = os.path.join('evals', 'vec')
+# `evals/vec/` by default so a hand-run probe can never displace a real close-out's charts, and
+# so a vec eval and a TF eval can run side by side during a validation comparison -- which is the
+# whole point of such a comparison. `vec_wave.py` overrides it to `evals/`, because a wave *is* the
+# close-out and its charts have to land where every viewer and every doc already looks.
+CHART_DIR = os.environ.get('VEC_EVAL_CHART_DIR') or os.path.join('evals', 'vec')
 
 # How many recent completions the ETA averages over. Long enough that one slow checkpoint does not
 # swing it -- a coiled endgame arm's per-checkpoint time varies by ~2x -- and short enough that the
@@ -191,6 +200,50 @@ class AgentPool:
         self.free.append(entry)
 
 
+def load_resumable(out_path, episodes):
+    """`{step: held}` for rows in `out_path` that can stand as this run's measurement of that step.
+
+    A relaunched job re-measuring from zero is the whole cost this exists to avoid: the desktop marks
+    a job `interrupted` after a reboot and dispatches it again, and a HOF pass is thousands of
+    checkpoints. `eval_plan.held_from_row` is the inverse of `build_row`'s three `episode_*` fields
+    and returns None for anything it cannot rebuild faithfully, so a row that predates per-episode
+    storage, or one that was hand-edited, is silently re-measured rather than trusted.
+
+    **Depth has to match exactly.** A row measured at 100 episodes is not this run's 500-episode
+    measurement of that step, and pooling the two would produce a file whose rows have different
+    weights while claiming to be flat -- the precise property that makes a vec file safe to pool.
+    A whole-file depth mismatch is reported and the file ignored, because that means the caller
+    changed `VEC_EVAL_EPISODES` and almost certainly wants a fresh measurement.
+    """
+    if not os.path.exists(out_path):
+        return {}
+    try:
+        with open(out_path) as handle:
+            payload = json.load(handle)
+    except (ValueError, OSError) as error:
+        print('  resume: ignoring {0} ({1})'.format(os.path.basename(out_path), error))
+        return {}
+    stored = payload.get('episodes_per_checkpoint')
+    if stored is not None and stored != episodes:
+        print('  resume: ignoring {0} — it holds {1}-episode rows, this run wants {2}'.format(
+            os.path.basename(out_path), stored, episodes))
+        return {}
+    out, skipped = {}, 0
+    for row in payload.get('results', []):
+        if row.get('episodes') != episodes or row.get('abandoned'):
+            skipped += 1
+            continue
+        held = eval_plan.held_from_row(row)
+        if held is None:
+            skipped += 1
+            continue
+        out[row['step']] = held
+    if skipped:
+        print('  resume: {0} stored row(s) could not be reused and will be re-measured'.format(
+            skipped))
+    return out
+
+
 def shard_steps(steps, shard, shards):
     """This shard's slice of `steps`, strided so the shards interleave.
 
@@ -235,6 +288,9 @@ def main(argv):
     # exactly "draw another independent sample", which is how a difference between two engines is
     # told apart from a difference between two samples.
     seed = int(os.environ.get('VEC_EVAL_SEED', 0))
+    # On by default: a relaunch that silently re-measures thousands of checkpoints is the more
+    # surprising behaviour, and every row it reuses is depth-checked before it is trusted.
+    resume = os.environ.get('VEC_EVAL_RESUME', '1') != '0'
     policy_dir = os.path.join(POLICY_ROOT, policy_name)
     if not os.path.isdir(policy_dir):
         raise SystemExit('no such policy directory: {0}'.format(policy_dir))
@@ -295,10 +351,18 @@ def main(argv):
     print('  {0}'.format(C.describe()))
     print('  results -> {0}'.format(out_path))
     print('  chart   -> {0}'.format(chart_path))
-    # Never `archive_existing_eval_pngs`: this writes into its own directory, so there is nothing
-    # of anyone else's to displace. That function is what blanked two batches' finished panels.
+    # Never `archive_existing_eval_pngs` *here*. At the default `evals/vec/` there is nothing of
+    # anyone else's to displace; and when `vec_wave.py` points this at `evals/`, the wave has already
+    # archived once with the right `keep_batches`, so a second call per shard -- twelve of them, after
+    # the first shards have started writing -- is exactly the mistake that blanked two batches'
+    # finished panels.
+    # The lock namespace follows the directory, not the tool. Two viewers over one directory would
+    # each show the other's panels, so a run writing into `evals/` has to contend for the *same*
+    # `-eval` slot a TF eval would -- and a run writing into `evals/vec/` has to contend for its own,
+    # or whichever launched first would suppress the other's window entirely.
     chart_viewer.spawn_for_eval(policy_name, watch='vec_eval.py {prefix}',
-                               chart_dir=CHART_DIR, slot_suffix='veceval')
+                                chart_dir=CHART_DIR,
+                                slot_suffix='eval' if CHART_DIR == EVALS_DIR else 'veceval')
 
     spec = eval_plan.PayloadSpec(
         policy_name=policy_name, num_episodes=episodes, all_steps=list(steps),
@@ -320,14 +384,26 @@ def main(argv):
         full_planned=len(steps), screen_planned=0, confirm_planned=0)
 
     pool = AgentPool(max_live, py_env, tf_env, policy_dir)
-    pending = list(steps)
+    resumed = load_resumable(out_path, episodes) if resume else {}
+    pending = [step for step in steps if step not in resumed]
+    if resumed:
+        print('  resuming: {0} of {1} checkpoints already measured, {2} to go'.format(
+            len(resumed), len(steps), len(pending)))
     in_use = {}
-    samples = {}
+    # Seeded with the resumed rows so the file this run writes covers the whole selection rather
+    # than only the part it measured itself — a resumed run's output has to be indistinguishable
+    # from an uninterrupted one, or `complete` means nothing downstream.
+    samples = dict(resumed)
     cache = eval_plan.RowCache()
+    for step, held in resumed.items():
+        cache.put(step, eval_plan.build_row(step, held, selected_by.get(step)))
     gate = eval_plan.WriteGate()
     chart_gate = eval_plan.WriteGate(eval_plan.CHART_MIN_INTERVAL)
     started_at = time.time()
-    counters = {'measurements': 0, 'episodes': 0}
+    # `measurements` is the selection's progress and drives the ETA and the `[ n/N ]` line;
+    # `session` and `episodes` are this process's own work and drive the pace, which must not be
+    # diluted by rows it never ran.
+    counters = {'measurements': len(resumed), 'episodes': 0, 'session': 0}
     # Completion timestamps for the ETA, newest last. A trailing window rather than the whole run:
     # the opening seconds include the TF import, the first `max_live` checkpoint restores and a batch
     # that is still filling, so a run-long mean reads slow for the first few minutes and never fully
@@ -363,7 +439,7 @@ def main(argv):
             return
         gate.record()
         done = counters['measurements']
-        progress = {'measurements': done, 'session_measurements': done,
+        progress = {'measurements': done, 'session_measurements': counters['session'],
                     'session_episodes': counters['episodes'],
                     'session_seconds': time.time() - started_at,
                     'episodes_saved': 0, 'abandoned': 0,
@@ -407,6 +483,7 @@ def main(argv):
         samples[step] = held
         cache.put(step, eval_plan.build_row(step, held, selected_by.get(step)))
         counters['measurements'] += 1
+        counters['session'] += 1
         counters['episodes'] += len(held['scores'])
         row = cache.rows({step: held}, {}, lambda s: selected_by.get(s))[0]
         completions.append(time.time())
@@ -415,10 +492,16 @@ def main(argv):
         print('[ {0:>4}/{1} ] {2:>9}  {3:>5.1f}% perfect  avg score {4:>5.2f}  '
               '{5:.1f}s  ({6:.1f} ckpt/min, eta {7})'.format(
                   counters['measurements'], len(steps), step, row['perfect_percent'],
-                  row['avg_score'], held['seconds'], 60.0 * counters['measurements'] / elapsed,
+                  row['avg_score'], held['seconds'], 60.0 * counters['session'] / elapsed,
                   _hms(eta)))
         flush()
         redraw()
+
+    if not pending:
+        print('  every selected checkpoint is already measured — writing the payload and exiting')
+        flush(complete=True, force=True)
+        redraw(force=True)
+        return 0
 
     stats = vec_engine.measure_stream(
         next_job, on_complete, episodes, width=width, max_live=max_live, seed=seed)
@@ -426,11 +509,14 @@ def main(argv):
     redraw(force=True)
 
     elapsed = stats.get('seconds', time.time() - started_at) or 1e-9
-    print('\ndone: {0} checkpoints, {1} episodes in {2:.1f}s'.format(
-        counters['measurements'], counters['episodes'], elapsed))
+    # Totals and session work are reported separately, because a resumed run's rates are properties
+    # of what it actually ran: dividing this session's seconds by the whole selection would flatter
+    # a resume by exactly the fraction it inherited.
+    print('\ndone: {0} of {1} checkpoints ({2} measured here, {3} episodes) in {4:.1f}s'.format(
+        counters['measurements'], len(steps), counters['session'], counters['episodes'], elapsed))
     print('  {0:.2f} s/checkpoint, {1:.1f} episodes/s, {2:.0f} env-steps/s, '
           'utilisation {3:.0f}%'.format(
-              elapsed / max(1, counters['measurements']), counters['episodes'] / elapsed,
+              elapsed / max(1, counters['session']), counters['episodes'] / elapsed,
               stats['env_steps'] / elapsed, 100.0 * stats.get('utilisation', 0.0)))
     best = eval_plan.best_full_length_row(rows(), episodes)
     if best:

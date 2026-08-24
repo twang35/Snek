@@ -311,9 +311,13 @@ class Runner:
                 env.setdefault('DISPLAY', self.host['DISPLAY'])
                 if self.host.get('XAUTHORITY'):
                     env.setdefault('XAUTHORITY', self.host['XAUTHORITY'])
+            # Every entry point a job can run, or the window closes on a live wave: the pattern
+            # is an ERE and a miss reads as "the jobs stopped". `vec_eval.py` has to be here as much
+            # as `vec_wave.py` -- the supervisor is one short-lived process per stage while its
+            # shards are what run for hours, so between stages there is a moment with no shard.
+            watch = 'snek2.py|eval_wave.py|eval_checkpoints.py|vec_wave.py|vec_eval.py'
             argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
-                   ['--watch', 'snek2.py|eval_wave.py|eval_checkpoints.py',
-                    '--interval', '1',
+                   ['--watch', watch, '--interval', '1',
                     '--scale', viewer_scale(category), '--title', 'snek desktop']
             subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=env,
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)

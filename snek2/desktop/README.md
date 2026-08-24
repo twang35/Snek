@@ -55,18 +55,31 @@ idempotent across restarts (a job id never runs twice).
 
 ## The eval chain: training → closeout → HOF re-measure
 
-The daemon synthesizes two follow-on evals, each off a ledger marker, never as spec files:
+A finished training auto-queues **one** eval job for its whole batch, and the HOF re-measure is a
+second *stage inside that job* rather than a job of its own:
 
-| link | trigger | synthesized job | what it runs |
-|---|---|---|---|
-| **closeout** | a training finishes OK (`auto_closeout`) | `<policy>-closeout`, priority 10 | `eval_checkpoints.py <policy> top20` at `EVAL_MIN_ACHIEVABLE=96` |
-| **HOF re-measure** | a closeout finishes OK (`auto_hof`) | `<policy>-hof`, priority 11 | `eval_checkpoints.py <policy> above:98` at 500 episodes, flat |
+| link | trigger | what runs |
+|---|---|---|
+| **closeout** | a training finishes OK (`auto_closeout`) | one `<batch>-closeout` job, priority 10, carrying every arm |
+| **HOF re-measure** | the closeout's stage A finishes | stage B of the *same* process (`--chain`) |
 
-The closeout pins its abandonment gate at **`EVAL_MIN_ACHIEVABLE=96`** (`CLOSEOUT_EVAL_ENV`),
-overriding whatever the training env carried rather than falling to `eval_checkpoints`' default of
-95. It stays **below** the HOF gate of 98 on purpose: HOF's `above:98` selects only rows the
-closeout measured at full length, and a gate above 98 would abandon exactly those checkpoints and
-starve the re-measure.
+**The engine defaults to the vectorised one** (2026-08-24): `vectorized/vec_wave.py`, which measures
+~40x faster than the TF path and was validated against it at four levels, ending in a 24-checkpoint ×
+500-episode head-to-head that agreed to −0.058 pp (z = −0.28). Set `eval_engine: "scalar"` in
+`runtime.json`, or `SNEK_EVAL_ENGINE` in a single job spec's `env`, to force `eval_wave.py` — the only
+way to reproduce a pre-switch measurement, and the answer to a regression here that does not need a
+deploy. `runtime.json` validates it as an enum and rejects the whole file on a typo, so the daemon keeps
+its last-known-good config rather than failing every eval dispatch one job at a time. **c51 arms need no
+opt-out**: `vec_wave` reads a scalar Q head, so it splits them out and hands them to `eval_wave.py`
+itself.
+
+**The daemon carries no eval-protocol numbers.** It used to pin the closeout gate, the HOF gate, 500
+episodes, the flat-screen flag and the `_hof500` suffix, plus its own copy of the
+`closeout gate < HOF gate` assertion. All of that is `eval_plan.py`'s now, and the daemon *removes* the
+protocol keys from the env it inherits so the tool's own defaults decide (`EVAL_PROTOCOL_KEYS`). It
+cannot simply import the originals: it runs on base miniconda python so it can start before the `snek`
+env exists. For a vec wave `EVAL_WORKERS`/`EVAL_LANES` are not set at all — they size TF worker
+processes and that engine has none; `VEC_WAVE_PROCS` is its analogue, and unset means cores minus two.
 
 **A reboot mid-eval resumes rather than restarts.** When `_reattach` marks a running closeout or
 HOF `interrupted` (boot-id mismatch) and the job is re-synthesized on the next dispatch, its env
@@ -76,12 +89,13 @@ whole pass. A first-time eval (no prior ledger record) never gets the flag, so i
 from scratch. The flag is only set on the `interrupted` path, so a `done`/`failed` eval is never
 resumed from a stale file.
 
-The HOF re-measure reconfirms the checkpoints a closeout already found excellent. `above:98` reads
-the closeout's own `runs/<policy>_checkpoint_evals.json` and takes every checkpoint measured there
-at **≥98%**; the job runs those at **`EVAL_EPISODES=500 EVAL_SCREEN_EPISODES=0 EVAL_INDEPENDENT=1
-EVAL_MIN_ACHIEVABLE=98`** and writes **`EVAL_OUT_SUFFIX=_hof500`** — a separate file, so it never
-clobbers the closeout's result and the closeout's 100-episode rows are never mistaken for finished
-HOF work. Worker count is the runtime's `eval_workers` (the usual 4), like any eval.
+The HOF re-measure reconfirms the checkpoints the closeout already found excellent. `above:98` reads
+each arm's own `runs/<policy>_checkpoint_evals.json` and takes every checkpoint measured there at
+**≥98%**, then runs those at 500 episodes, flat, into **`_hof500`** — a separate file, so it never
+clobbers the closeout's result and the closeout's 100-episode rows are never mistaken for finished HOF
+work. The whole recipe is `eval_plan.hof_settings`, derived from stage A's settings rather than restated,
+which is what retired the copies that used to live here and in the laptop's chain script. An arm whose
+stage A did not come out `complete` is skipped rather than selected from a truncated file.
 
 **‡ A batch closes out as *one* wave, and what defines "one" is the measurement-relevant env**
 (2026-08-21). `_auto_closeout_jobs` groups the pending markers by `(batch, closeout_group_env(env))`,
@@ -105,12 +119,14 @@ never attributes one arm's seed or learning rate to its siblings. `runner.EVAL_R
 
 Three properties that matter:
 
-- **The HOF never races its own closeout.** The `hof: pending` marker is set only when the closeout
-  *reaps*, so its result file is complete (atomic `os.replace`) before the HOF job can be synthesized.
-- **No HOF-of-a-HOF, no HOF off a hand-queued eval.** The trigger keys on the `<policy>-closeout`
-  id the daemon itself mints; a `<policy>-hof` id and a manual `top20` eval both fail the check.
-- **Most arms produce an empty HOF.** If no closeout checkpoint reached 98%, `above:98` selects
-  nothing and the job exits 0 (marked `done`, not `failed`) — the common case.
+- **The HOF cannot race its own closeout, structurally.** Stage B is the next statement in the same
+  process, so there is nothing to schedule and no `hof: pending` marker any more — that marker, and the
+  window in which a second job could read a half-written result file, both went away with the chained
+  stage.
+- **No HOF-of-a-HOF, no HOF off a hand-queued eval.** `--chain` is set by the daemon only on the
+  `<batch>-closeout` job it mints itself; a hand-queued eval spec has to ask for it.
+- **Most arms produce an empty HOF.** If no closeout checkpoint reached 98%, `above:98` selects nothing
+  and the stage reports that and exits 0 — the common case, and not a failure.
 
 Turn either link off in `runtime.json` (`auto_closeout` / `auto_hof`); both default on. The
 `_hof500` files come back on the `results` branch like any other artifact. **Promotion into
@@ -475,8 +491,10 @@ the merge — do not trust piped output.
   "policy": "b20a-seed1",       // required for train/eval; checkpoint dir + runs/ prefix
   "env": {"SNEK_SEED": "1"},    // passed straight through as SNEK_* overrides
   "max_steps": 2000000,         // -> SNEK_MAX_STEPS (self-terminate)
-  "eval_args": ["top20"],       // eval only: extra argv for eval_checkpoints.py
-  "eval_workers": 10,           // eval only: overrides runtime eval_workers
+  "policies": ["b20a", "b20b"], // eval only: the whole wave in one job
+  "eval_args": ["top50"],       // eval only: the selector, and anything before the policies
+  "chain": true,                // eval only: run the HOF re-measure as stage B of the same process
+  "eval_workers": 10,           // eval only: vec shards, or scalar EVAL_WORKERS, per engine
   "priority": 10,               // lower runs first; default 100
   "label": "b40: free space + chase-safe shaping, gate=75, c=0.10",  // short, human; for at-a-glance
   "notes": "..."
@@ -485,6 +503,10 @@ the merge — do not trust piped output.
 
 `smoke`/`benchmark` force `SNEK_MIN_CHECKPOINT_SCORE=0` and default the policy to
 `smoke` / `bench-<id>` so they stay throwaway.
+
+`"env": {"SNEK_EVAL_ENGINE": "scalar"}` forces one eval job onto `eval_wave.py` without touching
+`runtime.json`, which is one setting for the whole box. It works in the other direction too, so a box
+configured for the scalar path can still be handed a vec wave.
 
 **Always give a training batch a `label`.** It is a short, human one-liner naming the batch and its
 key knobs (e.g. `"b40: free space + chase-safe shaping, gate=75, c=0.10"`), and it is what the

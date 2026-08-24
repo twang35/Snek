@@ -19,13 +19,25 @@ Tests live in `../tests/`: `test_vectorized_config.py`, `test_vectorized_env.py`
 
 ## Using it
 
+**`vec_wave.py` is the default engine on both hosts** (2026-08-24). It takes `eval_wave.py`'s CLI, so a
+close-out is one command and the HOF re-measure chains off it:
+
 ```
 cd snek2
+PYTHONPATH=. python -u vectorized/vec_wave.py --chain top50 b45      # a batch's whole measurement
+PYTHONPATH=. python -u vectorized/vec_wave.py top50 b45a-x b45b-y    # arms named explicitly
+```
+
+`vec_eval.py` is the single-arm tool underneath it, and stays the way to run one arm by hand:
+
+```
 PYTHONPATH=. python -u vectorized/vec_eval.py <policy_name> [selector]
 ```
 
 `selector` is `top50` (default), `above:98` (the HOF pass), `all`, or explicit comma-separated steps —
-the same selectors `eval_checkpoints.py` takes, because they *are* `eval_plan`'s selectors.
+the same selectors `eval_checkpoints.py` takes, because they *are* `eval_plan`'s selectors. `vec_wave`
+parses argv with `eval_wave`'s own functions rather than its own copies, so `top50`, `above:98`,
+`--chain` and a bare batch id cannot come to mean two different things depending on which was typed.
 
 | knob | default | notes |
 |---|---|---|
@@ -34,12 +46,36 @@ the same selectors `eval_checkpoints.py` takes, because they *are* `eval_plan`'s
 | `VEC_EVAL_MAX_LIVE` | derived | **leave it derived** — see the capacity trap below |
 | `VEC_EVAL_SEED` | 0 | the only stochastic input to a measurement |
 | `VEC_EVAL_SHARD` | unset | `i/n`, 1-based — this process's strided slice of the selection |
-| `EVAL_OUT_SUFFIX` | `_vec` | so a run can never overwrite a TF result |
+| `VEC_EVAL_RESUME` | `1` | reuse depth-matching rows already in the output file |
+| `VEC_EVAL_CHART_DIR` | `evals/vec` | `vec_wave` overrides it to `evals/` |
+| `EVAL_OUT_SUFFIX` | `_vec` | so a **hand-run** can never overwrite a TF result |
 
-Charts go to **`evals/vec/`**, not `evals/`, and this driver never calls
-`archive_existing_eval_pngs` — so it cannot displace a real close-out's panels, which that function
-has already done to two batches. The live window works the same way (`chart_viewer.spawn_for_eval`
-with its own `b43-veceval` lock namespace, so it and a TF eval window coexist).
+`vec_wave.py` adds two of its own, and passes everything above through:
+
+| knob | default | notes |
+|---|---|---|
+| `VEC_WAVE_PROCS` | cores − 2 | shards to spread across the wave's arms |
+| `EVAL_EPISODES` | 100 | stage A's depth; stage B is `eval_plan.HOF_EPISODES` |
+| `EVAL_OUT_SUFFIX` | none | the **canonical** path, because a wave *is* the close-out |
+
+### Where the output goes, and why the two tools differ
+
+`vec_eval.py` alone writes `_vec` and `evals/vec/`; a wave writes the canonical
+`runs/<policy>_checkpoint_evals.json` and `evals/<policy>_eval_progress.png`.
+
+That is not an inconsistency, it is the point. The probe defaults exist so a hand-run can never
+overwrite a TF result and so a vec eval and a TF eval can run side by side during a validation
+comparison — which is the whole reason to run one. A **wave** is the close-out, so it has to land where
+`eval_progress.best_of`, `select_checkpoints_above`, `refresh_charts.sh`, the desktop's publish globs
+and every tuning doc already look. `vec_wave` passes both to its children explicitly, so neither tool's
+behaviour depends on the other's default.
+
+Writing into `evals/` brings the archive rule with it: `vec_wave` calls
+`archive_existing_eval_pngs(keep_batches=...)` once for the whole wave, exempting the batches it is
+about to measure. **The shards never call it** — twelve of them archiving after the first ones had
+started writing is precisely the mistake that blanked two batches' finished panels. And the viewer's
+lock namespace follows the *directory*, not the tool: at `evals/` a vec eval contends for the same
+`-eval` slot a TF eval would, because two viewers over one directory would each show the other's panels.
 
 ## What it is worth — measured on this laptop, 2026-08-23
 
@@ -97,13 +133,32 @@ machine-wide), 348 eps/s is **40.7x**. An earlier note in this file put the figu
 pre-registered 40x gate missed; that measurement was taken at 4 vec processes with 59% of the machine
 idle, and it was the process count that was wrong rather than the engine.
 
-`VEC_EVAL_SHARD` is how the processes are fed. The budget is **machine-wide**, so four arms measured
-together get three shards each, not twelve: allocate proportionally to each arm's selection size or
-the small arms finish early and their cores idle through the tail. Shards are **strided**
+`VEC_EVAL_SHARD` is how the processes are fed, and **`vec_wave.plan_shards` is what fills it in** —
+one `vec_eval.py` process per shard, all started together, waited on, then merged. The budget is
+**machine-wide**, so four arms measured together get three shards each, not twelve: allocation is
+proportional to each arm's selection size (largest-remainder), because a wave's arms differ by an order
+of magnitude — b45's HOF selections were 1568 / 1264 / 1173 / 298 — and equal shares would leave the
+small arm's processes finished and its cores idle through the tail. Every arm with work gets at least
+one shard even if that overshoots the budget: dropping an arm to hold a process count would silently
+not measure it. Shards are **strided**
 (`steps[i-1::n]`), because per-checkpoint cost tracks policy quality and quality drifts along a run —
 contiguous blocks would hand one shard every slow checkpoint. Each shard writes its own
 `<suffix>-sNofM` file and `eval_plan.merge_checkpoint_evals` puts them back together; the merge is
 lossless for disjoint shards, which is what a stride guarantees.
+
+**The merge is a row combiner, not a payload builder**, and that needed one more step.
+`merge_checkpoint_evals` writes seven top-level keys and drops everything else `build_payload` emits —
+`requested_steps`, the protocol fields, the progress fields. Left alone that would make an arm's
+close-out file depend on *how many processes measured it*: a one-shard arm and a twelve-shard arm in
+the same wave publishing different-shaped files. So `vec_wave.stitch_payload` rebuilds the merged file
+through `eval_plan.build_payload` — the one definition — with the merged rows and the protocol read
+back out of the shards rather than restated. A field added to `build_payload` therefore reaches a
+merged file for free.
+
+**A shard's result file is also its resume state.** `VEC_EVAL_RESUME` (on by default) reuses any row
+already in the output file whose episode count matches the request, so a wave killed partway through
+re-measures only what it had not finished. The shard files are kept for that reason rather than cleaned
+up after the merge.
 
 ## Episode order in the output, and the ETA
 
@@ -117,6 +172,40 @@ after its last meal while a perfect game ends sooner, so failures finish last. M
 checkpoints of `b45a`, failures sat at mean position **0.92** of a completion-ordered array, and a
 20-of-100 prefix read **0.25%** failures against the row's true **2.23%**. The row's totals were never
 wrong — only its order — so `_Job.record` now banks each episode at the slot it was *started* in.
+
+### ‡ A *prefix* of one row is fair; prefixes pooled *across an arm* are not (2026-08-24)
+
+Start-order fixed the within-row property `equal_effort_pooled` needs. It did **not** make start-slot
+`k` independent across rows, and on a 100-episode close-out it is strongly not. Measured on `b45a`'s
+3222 rows:
+
+| | slot 0 | slots 1-2 | slots 3-19 | whole row |
+|---|---|---|---|---|
+| failure rate | **11.58%** | 1.96 / 1.43 | 0.25-0.68 | 2.71% |
+
+So a 20-episode prefix of that file reads **1.13%** failures against the rows' true **2.71%** — 1.6 pp
+optimistic — and pooling prefixes across the arm gave per-arm offsets of **+1.4, −1.4, +1.4, +1.0 pp**
+against the TF close-out, with **random sign**. A bias has one sign; this is variance with a tiny
+effective *n*.
+
+**The mechanism is the shared food RNG plus resident count.** One `VecSnake` owns one RNG for all
+lanes, so an episode's food stream depends on *when* its reset happened in the global sequence. At 100
+episodes `default_max_live(1024, 100)` is **44** checkpoints resident, so slot `k` of 44 different
+checkpoints is drawn from nearly the same stretch of that stream — slot `k` becomes a fixed scenario of
+fixed difficulty, and one slot in `b45a` fails **54%** of the time. At 500 episodes `max_live` is
+**12** and each checkpoint spans a much longer stretch: the same file shows slot 0 at 2.17% against a
+2.67% baseline, i.e. no structure at all.
+
+**Nothing published is affected, and that is not luck — it is the flat protocol.** The row totals
+average over every slot: dropping slot 0 from all 3222 rows moves the arm's pooled rate by **+0.09
+pp**. And `pooled_equal_effort` — the one field that *is* a prefix statistic — is `null` in every vec
+file, because it is only computed when `screen_episodes` is set and this engine never screens. So the
+statistic this affects is one no vec file reports.
+
+Two rules follow. **Never compare engines on prefixes** — compare full rows at matched depth, which is
+what the 500-episode head-to-head did. And **`tests/test_vec_engine.py::test_a_prefix_of_a_row_is_a_fair_sample_of_it`
+is a within-row claim only**; it splits one row in half, which averages slot 0 into 250 slots, so it
+neither tests nor contradicts any of the above.
 
 Worth knowing when comparing engines: **`eval_checkpoints`' arrays are mildly completion-ordered too.**
 On the same rows, a 24-episode prefix of a desktop b45 close-out reads **+0.16 pp** (b45a) and +0.11 pp
@@ -226,6 +315,14 @@ cannot be pooled directly and every reader has to know which gate produced it.
 and evaluates a *different policy*. Until the support is read from `arch.json` and parity-tested,
 refusing is the only safe answer — `policy_arch.refuse_categorical` does it.
 
+**A c51 batch is still measurable, and needs no opt-out.** `vec_wave` splits a wave by
+`policy_arch.is_categorical` and hands the categorical arms to `eval_wave.py`, inheriting the
+environment untouched — including the `EVAL_MIN_ACHIEVABLE`/`EVAL_WORKERS` knobs it strips from its own
+shards, which is the point: those arms are measured by the engine those knobs describe. A missing or
+unreadable `arch.json` counts as scalar and goes to `vec_eval`, which calls `refuse_categorical` itself
+and will say so properly; `split_arms` must not become a second, quieter opinion about what c51 looks
+like.
+
 `in_flight` is omitted because the payload's block describes **one** checkpoint and this driver has up
 to `max_live` in flight at once; naming one of twelve would misreport the other eleven. Nothing is
 lost, since that block exists to make a ~5-minute measurement visible and here they land every two
@@ -242,6 +339,33 @@ seconds.
   stays importable without TensorFlow; `vec_eval.py` imports it where it acts on it.
 - **Only `groups_mode='full'` is parity-correct.** `'fast'` and `'none'` exist to price the
   connectivity block and must never be used for a measurement.
+
+## Both hosts run this by default now (2026-08-24)
+
+| | how the engine is chosen | opt-out |
+|---|---|---|
+| laptop | `chain_closeout_after_training.sh` → `vec_wave.py` | `SNEK_EVAL_ENGINE=scalar` |
+| desktop | `launch.py` `build_command`, `runtime.json`'s `eval_engine` (default `vec`) | `eval_engine: "scalar"`, or `SNEK_EVAL_ENGINE` in a job spec's `env` |
+
+The knob is kept for two reasons: it is the only way to reproduce a pre-switch measurement, and a
+regression in this engine has to be answerable without a deploy. `runtime.json` validates it as an enum
+and rejects the whole file on a typo — the daemon then keeps its last-known-good config, which is much
+better than a bad value reaching `build_command` and failing every eval dispatch one job at a time.
+
+Three things the switch touched that are easy to miss:
+
+- **`chart_viewer --watch` had to learn both new names.** The pattern is an ERE and a miss reads as
+  "the jobs stopped" — six of those in a row close the window on a live wave. `vec_eval.py` matters as
+  much as `vec_wave.py`, because the supervisor is one short-lived process per stage while its shards
+  are what run for hours.
+- **`EVAL_WORKERS` / `EVAL_LANES` are not set for a vec wave**, and `vec_wave` strips them from what it
+  passes its shards. They size TF worker processes and this engine has none; a value silently ignored is
+  how someone concludes a wave ran with four workers when it ran twelve shards.
+- **`chain_closeout_after_training.sh` went 176 lines → 105.** Everything it lost was a second copy of
+  something `--chain` and `eval_plan.hof_settings` already own: the per-arm pid bookkeeping, the inline
+  `complete` check, the hand-copied HOF recipe, and its own `closeout gate < HOF gate` assertion. Its
+  header used to say "copied from `desktop/runner/runner.py`; if that changes, change this too", which
+  is the failure mode rather than the mitigation.
 
 ## Not done
 

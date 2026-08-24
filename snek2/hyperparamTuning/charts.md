@@ -64,7 +64,7 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *trained to 4.10-4.42M and stopped; close-out wave 1 done, wave 2 running: **flat on all four**, and level-to-behind `1e-7` on the 500-episode instrument*
+## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *complete, and measured twice on two engines: **flat on all four**, and `1e-7` still holds the rung — 593 rows ≥98%/500 against `b44`'s 874*
 
 The fourth and lowest rung. `b42`-`b44` walked the rate down 1e-5 → 1e-6 → 1e-7 and each step beat the last, so
 `b45` asks whether that is monotone or whether there is an optimum. **It is the first rung with a longer cap —
@@ -112,36 +112,74 @@ the ladder has been scored on: **a count of checkpoints ≥98%/500 is trivially 
 **`b45d` is the flat seed again**, 94.7 recent-30 against its siblings' 97.2-97.5 — the same `b29c` seed that held 0
 rows at both `1e-6` and `1e-7`. Four rungs in, that seed has never produced a ≥98%/500 checkpoint under continuation.
 
-### ✅ Close-out and HOF-500 — `b45a` and `b45c` are complete, `b45b`/`b45d` are still being measured
+### ✅ Close-out and HOF-500 — all four arms, measured independently by both engines
 
-Wave 1 ran 42.8 h on the desktop — stage A 6253 measurements in 15.2 h, stage B 2755 in 27.65 h, **100% lane
-utilisation in both** — and `complete: true` in both arms' files. One row per starting checkpoint, never pooled
-across seeds:
+The desktop measured the batch on the TF path (three waves, wave 1 alone ran 42.8 h); the laptop
+re-measured all four arms with the new vectorised engine. **Two independent instruments, same
+conclusion.** One row per starting checkpoint, never pooled across seeds:
 
-| starting checkpoint | | `b43` 1e-6 | `b44` 1e-7 | `b45` 1e-8 |
-|---|---|---|---|---|
-| `b29b` @1447k (the record) | ≥98%/100 candidates | 166 | 853 | 1584 |
-| | rows ≥98%/**500** | 16 | **429** | 349 |
-| | share held | 10% | **50%** | 22% |
-| | best /500 | 99.4% @1618k | 100.0% @2798k → [98.2%/1000](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | 99.4% @1621k |
-| `b40b` @1513k | ≥98%/100 candidates | 133 | 415 | 1171 |
-| | rows ≥98%/**500** | 1 | 42 | **137** |
-| | share held | 1% | 10% | **12%** |
-| | best /500 | 98.0% @1760k | 99.0% @2600k | 99.0% @1793k |
+| starting checkpoint | | `b43` 1e-6 | `b44` 1e-7 | `b45` 1e-8, TF | `b45` 1e-8, vec |
+|---|---|---|---|---|---|
+| `b29b` @1447k (the record) | candidates ≥98%/100 | 166 | 853 | 1584 | 1568 |
+| | rows ≥98%/**500** | 16 | **429** | 349 | 360 |
+| | share of candidates held | 10% | **50%** | 22.0% | 23.0% |
+| | best /500 | 99.4% @1618k | 100.0% @2798k → [98.2%/1000](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | **99.4% @1621k** | 99.2% @2129k |
+| `b29a` @1347k | candidates ≥98%/100 | 607 | 867 | 961 | 1264 |
+| | rows ≥98%/**500** | 170 | **403** | 106 | 152 |
+| | share of candidates held | 28% | **46%** | 11.0% | 12.0% |
+| | best /500 | 99.6% @1661k | 100.0% @1886k | **99.4% @1504k** | 99.0% @1639k |
+| `b40b` @1513k | candidates ≥98%/100 | 133 | 415 | 1171 | 1173 |
+| | rows ≥98%/**500** | 1 | 42 | 137 | 99 |
+| | share of candidates held | 1% | 10% | 11.7% | 8.4% |
+| | best /500 | 98.0% @1760k | 99.0% @2600k | 99.0% @1793k | 99.2% @1686k |
+| `b29c` @1396k (the flat seed) | candidates ≥98%/100 | 83 | 100 | 197 | 298 |
+| | rows ≥98%/**500** | 0 | 0 | **1** | **0** |
+| | best /500 | — | — | 98.0% @3454k | 97.8% @3695k |
+| **batch total** | rows ≥98%/**500** | **187** | **874** | **593** | **611** |
 
-**The ladder is not monotone at this rung, and the record seed is where `1e-8` loses.** Read the *share*, not the
-count: `b45`'s 5M cap gave each arm ~2.85-2.91M steps past seed against `b44`'s ~1.49-1.65M, so it had roughly
-1.8× the candidate pool. On `b29b` it converts 22% against `b44`'s 50%; on `b40b` it is ahead, 12% against 10%.
+**`1e-7` holds the rung. The ladder is not monotone.** 593 rows against `b44`'s 874 — and `b45` had
+the *larger* pool to draw from, since its 5M cap gave each arm ~2.75-2.91M steps past seed against
+`b44`'s ~1.49-1.65M. Read the **share**, not the count, and it is the same story on all three seeds
+that produce anything: 22-23% against 50% on `b29b`, 11-12% against 46% on `b29a`, 8-12% against 10%
+on `b40b`. `1e-8` also produced **no** 100%/500 row where `b44` produced two, and its best rate ties
+at 99.4 rather than beating it. Count, share and rate all say what the training curves said — level to
+behind.
 
-**The prediction on this page was half right.** It said a frozen arm parked near 98% would trivially beat
-`b44`'s 874 rows without being better. It did not beat it — 486 from two arms, with `b45d` (the `b29c` seed,
-zero rows at every rung) still to come. So the count needed no discounting; the tie is in the **best row's
-rate**, 99.4 vs 99.4 and 99.0 vs 99.0, which is the same "level with `1e-7`" verdict the training curves gave.
+**The prediction on this page was wrong, and usefully so.** It said a frozen arm parked near 98%
+would trivially beat `b44`'s 874 without being better, so the count would need discounting. It did not
+beat it. The count needed no discounting; `1e-8` simply did less.
 
-**No new record.** `b45a` @1621000 reads 99.4% (497/500, CI 98.3-99.8) — a point above `b29b` @1447k's standing
-99.0%, *identical* to `b43a` @1618000 which was never promoted, and the maximum over 353 full-length rows. A
-selected /500 maximum in this family runs ~1.4 pp optimistic, so it is a candidate for a 1000-episode
-re-measure, not a record.
+**`b29c` is 0 for 4 rungs.** The one TF row at 98.0% @3454k is a coin-flip at the gate — vec measured
+the same arm's 298 candidates and found **none** at 98%, best 97.8%. Four rungs of continuation and that
+seed has never produced a checkpoint this instrument will certify.
+
+#### ‡ The two engines agree, and the one place they look 1 pp apart is the gate, not the engine
+
+Paired on the checkpoints both passes measured at full length, vec reads **0.8-1.0 pp lower** than TF
+(−0.78 on `b45a` over 191 steps, −1.00 on `b45b` over 48, −0.97 on `b45c` over 62). **That is
+gate-conditioning and must not be read as an engine difference.** The TF pass abandons any checkpoint
+that can no longer reach 98%, so *every* full-length TF row is one whose TF sample was running above the
+gate — selection on the very value being compared. The symmetric check is the one that settles it:
+
+| arm | TF on TF's top-N | vec on TF's top-N | vec on vec's own top-N |
+|---|---|---|---|
+| `b45a` (N=191) | 98.29% | 97.50% | **98.32%** |
+| `b45b` (N=48) | 98.34% | 97.34% | **98.33%** |
+| `b45c` (N=62) | 98.23% | 97.26% | **98.08%** |
+
+Each engine on **its own** top-N, same size and same candidate pool, reads the same rate to within
+0.03 / 0.01 / 0.15 pp. Each reads ~1 pp lower on the *other's* selection. That is the signature of
+selection, not bias.
+
+**The reverse direction cannot be measured from these files at all**, and that is the point worth
+carrying: a gated file has no full-length rows outside its own gate, so there is no unbiased TF value
+for a checkpoint TF abandoned. It is exactly why the engines' head-to-head had to select its 24
+checkpoints **by step, in advance, with both gates off** — where they agreed to **−0.058 pp (z = −0.28)**
+over 500 episodes each. See [`vectorized/README.md`](../vectorized/README.md).
+
+**Which figure to quote for `b45`.** The **vec** column, because its rows are uncensored: 611 rows
+≥98%/500 out of 4303 candidates measured at full length, no abandonment. The TF column's count is
+conditional on its own gate and its share is the more honest of its two numbers.
 
 ### b45a-lowlr8-b29b — continues `b29b` @1447k
 

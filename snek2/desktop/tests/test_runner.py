@@ -174,31 +174,123 @@ def test_build_benchmark_defaults_steps_and_policy():
     assert env['SNEK_MIN_CHECKPOINT_SCORE'] == '0'
 
 
-def test_build_eval_command_runs_the_wave_and_sets_both_knobs():
+def test_the_box_defaults_to_the_vectorised_engine():
+    """The default lives in `RUNTIME_DEFAULTS`, not in `build_command`'s `.get` fallback -- so this is
+    where it has to be pinned. A box with no `eval_engine` in its `runtime.json` (which is every box
+    until someone adds one) reads its engine from here."""
+    assert cfg.RUNTIME_DEFAULTS['eval_engine'] == 'vec'
+    assert cfg.RUNTIME_DEFAULTS['vec_wave_procs'] == 0     # 0 = let vec_wave read the core count
+    empty, notes = cfg.parse_runtime_config('{}', _host())
+    assert empty['eval_engine'] == 'vec'
+
+
+def test_an_eval_runs_the_vectorised_wave_by_default():
+    """The default engine moved to `vec` on 2026-08-24. `EVAL_WORKERS`/`EVAL_LANES` size *TF worker
+    processes* and this engine has none, so they must not be set -- a value silently ignored is how
+    someone concludes a wave ran with four workers when it ran twelve shards."""
     j = jobmod.parse_job('{"id": "e1", "type": "eval", "policy": "b19a", "eval_args": ["top50"]}')
-    r = _runtime(); r['eval_workers'] = 4; r['eval_lanes'] = 4
+    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    assert argv == ['/py', '-u', 'vectorized/vec_wave.py', 'top50', 'b19a']
+    assert 'EVAL_WORKERS' not in env and 'EVAL_LANES' not in env
+
+
+def test_the_scalar_engine_is_still_reachable_and_still_sets_both_knobs():
+    """The opt-out. It is the only way to reproduce a pre-switch measurement, and the only answer to
+    a regression in the new engine that does not need a deploy."""
+    j = jobmod.parse_job('{"id": "e1", "type": "eval", "policy": "b19a", "eval_args": ["top50"]}')
+    r = _runtime(); r['eval_engine'] = 'scalar'; r['eval_workers'] = 4; r['eval_lanes'] = 4
     argv, env, log, policy = launch.build_command(j, _host(), r)
     assert argv == ['/py', '-u', 'eval_wave.py', 'top50', 'b19a']
     assert env['EVAL_WORKERS'] == '4' and env['EVAL_LANES'] == '4'
 
 
+def test_a_job_can_pick_the_engine_without_a_runtime_edit():
+    """`runtime.json` is one setting for the whole box; a single arm needing the old engine -- to
+    reproduce a number, or because something looks wrong -- must not require draining it."""
+    j = jobmod.parse_job(json.dumps({'id': 'e', 'type': 'eval', 'policy': 'p',
+                                     'eval_args': ['top50'],
+                                     'env': {'SNEK_EVAL_ENGINE': 'scalar'}}))
+    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    assert argv[2] == 'eval_wave.py'
+    # And the other direction, against a box configured for the scalar path.
+    j = jobmod.parse_job(json.dumps({'id': 'e', 'type': 'eval', 'policy': 'p',
+                                     'eval_args': ['top50'],
+                                     'env': {'SNEK_EVAL_ENGINE': 'vec'}}))
+    r = _runtime(); r['eval_engine'] = 'scalar'
+    argv, env, log, policy = launch.build_command(j, _host(), r)
+    assert argv[2] == 'vectorized/vec_wave.py'
+
+
+def test_an_unknown_engine_fails_the_launch_rather_than_guessing():
+    j = jobmod.parse_job(json.dumps({'id': 'e', 'type': 'eval', 'policy': 'p',
+                                     'eval_args': ['top50'],
+                                     'env': {'SNEK_EVAL_ENGINE': 'numpy'}}))
+    try:
+        launch.build_command(j, _host(), _runtime())
+        assert False, 'an unknown engine was accepted'
+    except ValueError:
+        pass
+
+
 def test_build_eval_command_puts_chain_before_the_selector():
     # Order is not cosmetic: `eval_wave.parse_options` reads leading `--chain` tokens and everything
-    # after the selector is a policy name, so `top50 --chain` would be rejected as a policy.
-    j = jobmod.parse_job(json.dumps({
+    # after the selector is a policy name, so `top50 --chain` would be rejected as a policy. Both
+    # engines share that parser -- `vec_wave` imports it -- so this holds for either.
+    spec = json.dumps({
         'id': 'b45-closeout', 'type': 'eval', 'policies': ['b45a', 'b45b'],
-        'eval_args': ['top50'], 'chain': True}))
-    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
-    assert argv == ['/py', '-u', 'eval_wave.py', '--chain', 'top50', 'b45a', 'b45b']
-    assert policy == 'b45a'                      # the throughput field: the wave's first arm
+        'eval_args': ['top50'], 'chain': True})
+    for engine, script in (('vec', 'vectorized/vec_wave.py'), ('scalar', 'eval_wave.py')):
+        r = _runtime(); r['eval_engine'] = engine
+        argv, env, log, policy = launch.build_command(jobmod.parse_job(spec), _host(), r)
+        assert argv == ['/py', '-u', script, '--chain', 'top50', 'b45a', 'b45b'], argv
+        assert policy == 'b45a'                  # the throughput field: the wave's first arm
 
 
 def test_build_eval_command_lets_a_spec_override_the_lane_count():
     j = jobmod.parse_job(json.dumps({'id': 'e', 'type': 'eval', 'policy': 'p',
                                      'eval_args': ['top50'], 'eval_lanes': 2,
                                      'eval_workers': 8}))
-    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    r = _runtime(); r['eval_engine'] = 'scalar'
+    argv, env, log, policy = launch.build_command(j, _host(), r)
     assert env['EVAL_LANES'] == '2' and env['EVAL_WORKERS'] == '8'
+
+
+def test_a_vec_wave_takes_its_process_count_from_the_spec_or_the_runtime():
+    """`eval_workers` is the spec field a job already has for "how much of the box", so it carries
+    over rather than adding a second one. Unset means `vec_wave` derives it from the core count,
+    which is the right answer on a box this config was not written for."""
+    j = jobmod.parse_job(json.dumps({'id': 'e', 'type': 'eval', 'policy': 'p',
+                                     'eval_args': ['top50'], 'eval_workers': 8}))
+    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    assert env['VEC_WAVE_PROCS'] == '8'
+    r = _runtime(); r['vec_wave_procs'] = 10
+    j = jobmod.parse_job('{"id": "e", "type": "eval", "policy": "p", "eval_args": ["top50"]}')
+    argv, env, log, policy = launch.build_command(j, _host(), r)
+    assert env['VEC_WAVE_PROCS'] == '10'
+    argv, env, log, policy = launch.build_command(j, _host(), _runtime())
+    assert 'VEC_WAVE_PROCS' not in env, 'an unset count must be left to vec_wave, not pinned here'
+
+
+def test_the_runtime_config_rejects_an_unknown_engine_and_keeps_the_last_good_one():
+    """`parse_runtime_config` returning None is what makes the daemon keep its previous config, so a
+    typo in `eval_engine` must land here rather than at every eval dispatch, one job at a time."""
+    good, notes = cfg.parse_runtime_config('{"eval_engine": "scalar"}', _host())
+    assert good is not None and good['eval_engine'] == 'scalar'
+    bad, errors = cfg.parse_runtime_config('{"eval_engine": "numpy"}', _host())
+    assert bad is None, bad
+    assert any('eval_engine' in e for e in errors), errors
+
+
+def test_the_viewer_watches_both_engines():
+    """`chart_viewer --watch` is an ERE, and a pattern that cannot match reads as "the jobs stopped"
+    -- six of those in a row close the window on a live wave. `vec_eval.py` has to be in it as much as
+    `vec_wave.py`: the supervisor is one short-lived process per stage, its shards run for hours."""
+    source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               'runner', 'runner.py')).read()
+    line = [l for l in source.splitlines() if 'snek2.py|' in l]
+    assert len(line) == 1, line
+    for tool in ('snek2.py', 'eval_wave.py', 'eval_checkpoints.py', 'vec_wave.py', 'vec_eval.py'):
+        assert tool in line[0], (tool, line[0])
 
 
 def test_build_threads_injected():

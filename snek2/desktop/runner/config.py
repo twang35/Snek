@@ -37,11 +37,26 @@ RUNTIME_DEFAULTS = {
     # whole file on an unknown key and keeps the last-known-good config, so renaming it would make a
     # deploy that landed before the `ops` edit reject every config until someone noticed.
     'auto_hof': True,
+    # Which engine measures a checkpoint. `vec` is `vectorized/vec_wave.py`, which runs one wide
+    # numpy env serving many checkpoints at once and measures ~40x faster than the TF path; `scalar`
+    # is `eval_wave.py`, spawned TF workers, one board each. The default moved to `vec` on
+    # 2026-08-24, after a 24-checkpoint x 500-episode head-to-head agreed to -0.058 pp (z = -0.28).
+    # Kept as a knob because it is the only way to reproduce a pre-switch measurement, and because a
+    # regression in the new engine has to be answerable without a deploy.
+    'eval_engine': 'vec',
+    # `VEC_WAVE_PROCS` for a vec wave: how many `vec_eval.py` shards fill the box. 0 leaves it to
+    # `vec_wave.DEFAULT_PROCS`, which is cores minus two -- derived rather than pinned, because one
+    # shard saturates about one core and the two hosts do not have the same number of them.
+    'vec_wave_procs': 0,
 }
 
 _INT_KEYS = ('max_trainers', 'max_evals', 'eval_workers', 'eval_lanes', 'poll_seconds',
-             'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
+             'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb', 'vec_wave_procs')
 _BOOL_KEYS = ('paused', 'drain', 'viewer', 'auto_closeout', 'auto_hof')
+# Keys whose value must be one of a fixed set. A typo here would otherwise reach `build_command` and
+# take down every eval dispatch with a ValueError, one job at a time, instead of being rejected with
+# the rest of the file.
+_ENUM_KEYS = {'eval_engine': ('vec', 'scalar')}
 
 _REQUIRED_HOST = ('REPO_PATH', 'SNEK_DIR', 'PYTHON_BIN', 'GIT_REMOTE',
                   'OPS_BRANCH', 'STATUS_BRANCH', 'RESULTS_BRANCH',
@@ -160,7 +175,9 @@ def parse_runtime_config(text, host):
         if key not in RUNTIME_DEFAULTS:
             errors.append('unknown key: {0}'.format(key))
             continue
-        if key in _BOOL_KEYS and not isinstance(val, bool):
+        if key in _ENUM_KEYS and val not in _ENUM_KEYS[key]:
+            errors.append('{0} must be one of {1}'.format(key, ' / '.join(_ENUM_KEYS[key])))
+        elif key in _BOOL_KEYS and not isinstance(val, bool):
             errors.append('{0} must be true/false'.format(key))
         elif key in _INT_KEYS and (isinstance(val, bool) or not isinstance(val, int)):
             errors.append('{0} must be an integer'.format(key))

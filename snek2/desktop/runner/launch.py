@@ -39,16 +39,35 @@ def build_command(job, host, runtime):
             env.setdefault('XAUTHORITY', host['XAUTHORITY'])
 
     if job.type == 'eval':
-        # `eval_wave.py`, not `eval_checkpoints.py`: one process owns the whole wave, so its lanes
-        # move to whichever arm still has work instead of a finished arm's share of the box sitting
-        # idle. `--chain` leads the argv because the selector has to follow it, and the policies
-        # trail the selector — the same spelling an agent types on the laptop, which is the point.
-        argv = [py, '-u', 'eval_wave.py']
+        # One process owns the whole wave -- not one `eval_checkpoints.py` per arm -- so work moves to
+        # whichever arm still has any instead of a finished arm's share of the box sitting idle.
+        # `--chain` leads the argv because the selector has to follow it, and the policies trail the
+        # selector: the same spelling an agent types on the laptop, which is the point.
+        #
+        # **The engine defaults to the vectorised one.** `vectorized/vec_wave.py` measures ~40x
+        # faster than the TF path and was validated against it at four levels, ending in a
+        # 24-checkpoint x 500-episode head-to-head that agreed to -0.058 pp (z = -0.28). Set
+        # `SNEK_EVAL_ENGINE=scalar` -- in `runtime.json`'s `eval_engine`, or per job in the spec's
+        # `env` -- to force `eval_wave.py`. c51 arms need no opt-out: `vec_wave` refuses them and
+        # hands them to `eval_wave.py` itself, because the engine reads a scalar Q head.
+        engine = env.get('SNEK_EVAL_ENGINE') or runtime.get('eval_engine', 'vec')
+        if engine not in ('vec', 'scalar'):
+            raise ValueError('eval_engine={0!r}: expected "vec" or "scalar"'.format(engine))
+        argv = [py, '-u', 'vectorized/vec_wave.py' if engine == 'vec' else 'eval_wave.py']
         if job.chain:
             argv.append('--chain')
         argv += list(job.eval_args) + list(job.policies)
-        env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 4))
-        env['EVAL_LANES'] = str(job.eval_lanes or runtime.get('eval_lanes', 4))
+        if engine == 'vec':
+            # Cores minus two by default (see `vec_wave.DEFAULT_PROCS`); `runtime.json` can say
+            # otherwise for a box whose cores are not the binding constraint. `EVAL_WORKERS`/
+            # `EVAL_LANES` size *TF worker processes* and this engine has none, so they are not set
+            # -- `vec_wave` strips them from what it passes its shards for the same reason.
+            procs = job.eval_workers or runtime.get('vec_wave_procs', 0)
+            if procs:
+                env['VEC_WAVE_PROCS'] = str(procs)
+        else:
+            env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 4))
+            env['EVAL_LANES'] = str(job.eval_lanes or runtime.get('eval_lanes', 4))
         return argv, env, 'eval-{0}.log'.format(job.id), job.policy
 
     # train / smoke / benchmark all invoke the trainer.

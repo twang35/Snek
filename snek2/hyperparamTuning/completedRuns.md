@@ -72,6 +72,10 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b45a-lowlr8-b29b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b29b` @1447k) | 5.00M | **99.4%** @1621k /500 | 100% | **97.51%** /eq §§ | 99.2% | ‡‡‡ § 349 rows ≥98%/500 (18 at ≥99%) against `b44a`'s 429 — 22% of its 1584 candidates against 50%, from **1.8× the pool**. Re-measured independently by the vectorised engine: 360 rows, best 99.2%. See [Batch 45](#batch-45--the-same-four-checkpoints-at-lr-1e-8-the-frozen-floor--the-ladder-closes-at-1e-7) |
+| `b45b-lowlr8-b29a` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b29a` @1347k) | 4.10M | **99.4%** @1504k /500 | 100% | 96.99% /eq §§ | 98.5% | ‡‡‡ § 106 rows ≥98%/500 (5 at ≥99%) against `b44b`'s 403 — **the batch's worst regression against `1e-7`**, 11% of candidates against 46%. vec: 152 rows, best 99.0% |
+| `b45c-lowlr8-b40b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b40b` @1513k) | 5.00M | 99.0% @1793k /500 | 100% | 96.92% /eq §§ | 99.2% | ‡‡‡ § 137 rows ≥98%/500 against `b44c`'s 42 — **the one seed where `1e-8` wins**, and only on the TF pass: vec measured all 1173 candidates and found **99**, best 99.2% @1686k. Read this arm as a tie, not a gain |
+| `b45d-lowlr8-b29c` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b29c` @1396k) | 4.20M | 98.0% @3454k /500 — **vec says 97.8%** | 100% | 95.05% /eq §§ | 97.3% | ‡‡‡ § **one row at exactly the gate, and the other engine found none.** Four rungs — 1e-5, 1e-6, 1e-7, 1e-8 — and the `b29c` seed has still produced nothing this instrument will certify |
 | `b44a-lowlr7-b29b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b29b` @1447k) | 3.00M | **100.0%** @2798k /500 | 100% | **97.69%** /eq §§ | 99.7% | ‡‡‡ § **429 checkpoints ≥98%/500 and 48 at ≥99% — the widest record region in the project by 2.5x**, against 170 for `b43b` and 18 for `b29b`. Its 500/500 @2798k is one of only two flawless rows ever measured here and **is a selection artefact** — its sibling's was re-measured at 98.2%/1000, and with 90 rows ≥99% two such rows is what chance produces. Read the count. See [Batch 44](#batch-44--the-same-four-checkpoints-at-lr-1e-7-the-best-rung-of-the-ladder--874-checkpoints-at-98500-and-it-falsified-its-own-pre-registration) |
 | `b44b-lowlr7-b29a` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b29a` @1347k) | 3.00M | **100.0%** @1886k /500 — **re-measures 98.2%/1000** | 100% | **97.69%** /eq §§ | **100.0%** | ‡‡‡ § 403 rows ≥98%/500, 41 at ≥99%, and **the only checkpoint in the project re-measured on 1000 fresh episodes: 982/1000 = 98.2%** (97.2-98.9), −1.8 pp on its selected figure. Also a best-30 of 100.0 at 2460k. The clearest single demonstration of the winner's curse here — see [the re-measurement](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) |
 | `b44c-lowlr7-b40b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-7`** (`b40b` @1513k) | 3.00M | **99.0%** @2600k /500 | 100% | 96.14% /eq §§ | 99.0% | ‡‡‡ § 42 rows ≥98%/500 against its `b43` twin's 1 — a 42x gain on the seed that responded *least* to `1e-6`. Carries the free-space confound: trained with that term, continued without it. See [Batch 44](#batch-44--the-same-four-checkpoints-at-lr-1e-7-the-best-rung-of-the-ladder--874-checkpoints-at-98500-and-it-falsified-its-own-pre-registration) |
@@ -319,6 +323,84 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 45 — the same four checkpoints at `lr 1e-8`: **the frozen floor — the ladder closes at `1e-7`**
+
+The fourth and last rung. `b42`-`b44` walked the rate down 1e-5 → 1e-6 → 1e-7 and each step beat the last, so
+`b45` asked whether that was a slope or had an optimum. **It has an optimum, and it is `1e-7`.**
+
+| | |
+|---|---|
+| arms | `b45a-d-lowlr8-*`, **5M absolute cap** (+2.75-2.91M past their seed checkpoints), desktop |
+| config | `b29` verbatim — `fc 320`, IS off, `TARGET_UPDATE_PERIOD 1000`, `DISCOUNT 0.9975`, `FORK_BRANCHES 4`, chase-safe `c=0.10` gate 75 — with **`SNEK_LEARNING_RATE=1e-8`** the only change |
+| control | `b42` at `1e-5`, `b43` at `1e-6`, `b44` at `1e-7`; byte-identical starting weights, the same four seeds |
+| measurement | **twice, on two engines.** Desktop TF path, three waves (wave 1 alone 42.8 h, 9008 measurements, 100% lane utilisation); laptop re-measure of all four arms with `vec_wave.py` |
+
+### Result
+
+| arm | continues | best-30/eq | `sef` | pooled/eq | ≥98%/100 | ≥98%/500 TF | ≥98%/500 vec | ≥99%/500 | best /500 |
+|---|---|---|---|---|---|---|---|---|---|
+| `b45a` | `b29b` @1447k | **100.0** @2990k | **100.0** | 97.51 | **1584** | 349 | 360 | 18 | **99.4% @1621k** |
+| `b45b` | `b29a` @1347k | 99.3 @1957k | **100.0** | 96.99 | 961 | 106 | 152 | 5 | **99.4% @1504k** |
+| `b45c` | `b40b` @1513k | 99.7 @1616k | 99.9 | 96.92 | 1171 | 137 | 99 | 3 | 99.0% @1793k |
+| `b45d` | `b29c` @1396k | 98.3 @3040k | 99.8 | 95.05 | 197 | **1** | **0** | 0 | 98.0% @3454k |
+| **group** | | | | | **3913** | **593** | **611** | **26** | |
+
+**593 rows against `b44`'s 874, from the larger pool.** The 5M cap gave each arm ~2.75-2.91M steps past seed
+against `b44`'s ~1.49-1.65M, so `b45` drew from roughly 1.8× the candidates and still came second. Read the
+**share**: 22-23% against 50% on `b29b`, 11-12% against 46% on `b29a`. It is ahead only on `b40b`, and only on
+one of the two engines. It produced **no** 100%/500 row where `b44` produced two, and its best rate ties at
+99.4 rather than beating it.
+
+### It is frozen, and the *drift* is what shows that — not the peak's height or its step
+
+Mean perfect rate per 0.5M band, first band against last:
+
+| rung | drift, worst → best arm | band-to-band spread |
+|---|---|---|
+| `b43` @1e-6 | **−6.3** → −0.0 | 0.91 - 2.89 |
+| `b44` @1e-7 | −2.7 → **+1.2** | 0.19 - 1.67 |
+| `b45` @1e-8 | **−0.6 → +0.3** | **0.19 - 0.37** |
+
+`1e-8` bought stability by buying inaction. It stopped the decay — `b43d` shed 6.3 pp over its run, `b45`'s
+*worst* arm moves 0.6 pp — but it equally stopped the gain: `b44a` climbed +1.2 pp and `b45a`, the same seed,
+drifts −0.4. Every arm sits within ±0.5 pp of its own opening band across 2.8M steps. That is the
+**"flat from early on"** branch of the pre-registration — the step has fallen below the scale that changes the
+greedy action — and not "too slow, raise the cap", which would show as a curve still climbing at the cap.
+
+**‡ The pre-registration named the wrong discriminator, twice over.** It said to read the peak's *step* to
+separate "frozen" from "still improving". `b45`'s peak steps scatter uninformatively — 1616k, 1957k, 2990k,
+3040k — because a peak is a maximum over a noisy series and moves with the number of draws. The per-band
+**drift** separates all three rungs cleanly and in one direction. **Prefer drift**, and keep the peak's step
+for the qualitative question of whether an arm was still climbing when it stopped.
+
+**‡ `sef` at 99.8-100.0 is the highest of any rung and means nothing here.** It asks whether an arm ever
+dropped below 80% perfect, which an arm that never moves satisfies for free. The same warning was written
+against the ladder's own metric — a count of checkpoints ≥98%/500 is trivially maximised by a frozen arm parked
+near 98% — and **that prediction was wrong**: the frozen arm did not inflate the count, it produced fewer. So
+the count needed no discounting after all, and the tie lives in the best row's rate.
+
+### ‡ Two engines, one conclusion — and the 1 pp that looks like disagreement is the gate
+
+Paired on the checkpoints both passes measured at full length, the vectorised engine reads **0.8-1.0 pp lower**
+than the TF path. **That is gate-conditioning, not an engine difference.** The TF pass abandons any checkpoint
+that can no longer reach 98%, so every full-length TF row is one whose TF sample was running above the gate —
+selection on the value being compared. Each engine on **its own** top-N, same size and same candidate pool,
+agrees to within 0.03 / 0.01 / 0.15 pp. The reverse direction cannot be measured from these files at all, since
+a gated file holds no unbiased value for a checkpoint it abandoned — which is why the engines' head-to-head had
+to fix its 24 checkpoints by step in advance with both gates off, where they agreed to **−0.058 pp (z = −0.28)**.
+Tables in [`charts.md`](charts.md#-the-two-engines-agree-and-the-one-place-they-look-1-pp-apart-is-the-gate-not-the-engine);
+mechanism in [`vectorized/README.md`](../vectorized/README.md).
+
+**Quote the vec column for this batch.** Its rows are uncensored — 611 rows ≥98%/500 out of 4303 candidates all
+measured at full length — where the TF count is conditional on its own gate.
+
+### Verdict
+
+**The ladder is closed and `1e-7` is the operating point.** `1e-8` is the floor this sweep was looking for: it
+does not damage the policy and it does not improve it. Nothing here is a record — `b45a` @1621k's 99.4% is
+identical to `b43a` @1618000, which was never promoted, and a selected /500 maximum in this family runs ~1.4 pp
+optimistic. The next question is not a lower rate.
 
 ## Batch 44 — the same four checkpoints at `lr 1e-7`: **the best rung of the ladder — 874 checkpoints at ≥98%/500, and it falsified its own pre-registration**
 
@@ -2311,5 +2393,5 @@ written as. Two consequences:
 - **The gate is calibrated above the population.** Zero of 394 rows reached 95% and only 24 reached
   90%, so at this skill level a 95 gate is not selecting good checkpoints — it is declining to measure
   almost all of them. See
-  [`hyperparamTuning.md`](hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy) for the
+  [`hyperparamTuning.md`](hyperparamTuning.md#measuring-a-policy-properly) for the
   standing recommendation that follows.

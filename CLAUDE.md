@@ -831,8 +831,39 @@ has to be run against the archive files too.
 
 ## Eval cost
 
+**‡ The default engine is the vectorised one, on both hosts** (2026-08-24). A close-out or HOF pass is
+one command, and everything in the rest of this section describes the **scalar** path it replaced:
+
+```
+cd snek2
+PYTHONPATH=. python -u vectorized/vec_wave.py --chain top50 b45     # a batch's whole measurement
+```
+
+It takes `eval_wave.py`'s CLI — same selectors, same `--chain`, a bare batch id expands to its arms —
+because it imports `eval_wave`'s own argv functions rather than copying them. It writes the **canonical**
+`runs/<policy>_checkpoint_evals.json` and `evals/<policy>_eval_progress.png`, so nothing downstream
+changes. Measured **~40x** the scalar path's throughput (348 vs 8.55 episodes/s machine-wide), and
+validated against it at four levels ending in a 24-checkpoint × 500-episode head-to-head that agreed to
+**−0.058 pp (z = −0.28)**. Full account: [`snek2/vectorized/README.md`](snek2/vectorized/README.md).
+
+Four things to carry:
+
+- **It is flat and ungated.** No screen/confirm tiers, no `EVAL_MIN_ACHIEVABLE`. So every row in one of
+  its files is full length and directly poolable, and `pooled_equal_effort` / `min_achievable` are
+  `null` rather than a number to check. **That is a file-format boundary like the gate boundaries
+  below** — a vec file's rows are not censored, so its graph-100% tier *is* comparable across arms in a
+  way a gated file's is not.
+- **`EVAL_WORKERS` and `EVAL_LANES` do nothing to it**, and both hosts stop setting them. They size TF
+  worker processes; this engine has none. The analogue is `VEC_WAVE_PROCS`, default **cores − 2**, which
+  is 12 on the laptop — the measured point (2-6% idle; 16 processes reach 0% idle and are 20% *slower*).
+- **c51 arms fall back automatically.** The engine reads a scalar Q head, so `vec_wave` splits a
+  categorical arm out and hands it to `eval_wave.py`. No opt-out needed for a c51 batch.
+- **The opt-out is `SNEK_EVAL_ENGINE=scalar`** — laptop script env, desktop `runtime.json`'s
+  `eval_engine`, or a single job spec's `env`. Kept because it is the only way to reproduce a
+  pre-switch measurement, and because a regression here has to be answerable without a deploy.
+
 **Run a close-out or a HOF eval as 4 parallel processes, each with at least 4 workers** (standing
-instruction, 2026-08-15). Give every arm in a wave its own `eval_checkpoints.py` process and start all
+instruction, 2026-08-15, and **scalar-path only** — a vec wave shards itself). Give every arm in a wave its own `eval_checkpoints.py` process and start all
 four at the same time. Set `EVAL_WORKERS` to 4 or more on each. The HOF-500 re-measure runs the same
 way. This is the measured throughput point — 4 processes × 4 workers fill the 14 cores (~12.7 busy), and
 it is how the desktop already closes out. **Do not run the arms one after another**; that leaves most
@@ -951,9 +982,12 @@ Abandoned rows carry `abandoned: true`, are shorter, and are **not comparable wi
 **97 leaves exactly one point of headroom under the HOF selection gate of 98**, and that invariant is
 load-bearing: HOF reads `above:98` out of the close-out's own file, and only rows reaching the close-out
 gate are measured full length, so a close-out gate at or above 98 would abandon precisely the rows the
-re-measure needs and starve it silently. `runner.py` asserts it, the laptop chain script refuses to start
-without it, and `tests/test_selection_tiers.py` pins it. **Do not raise either number without re-reading
-the other.**
+re-measure needs and starve it silently. **`tests/test_selection_tiers.py` is now the only thing that
+pins it**, and that is deliberate: `runner.py` and the laptop chain script each carried a copy of the
+assertion, and both copies are gone along with the gate numbers they asserted — the daemon strips the
+protocol keys from the env it inherits and the chain script sets none, so `eval_plan.py` is the single
+definition. **Do not raise either number without re-reading the other.** The invariant is vacuous for a
+`vec_wave` file, which has no gate to abandon rows with, and it still governs every scalar close-out.
 
 **At 97 most arms will have no full-length row**, since few checkpoints clear 97%.
 `best_full_length_row` then relaxes to **half-depth** rows and prints `[truncated]`. It must never
@@ -961,7 +995,9 @@ relax to *all* rows — that hands the title to a 20-episode screen on a lucky 2
 
 **A file's gate is in its payload as `min_achievable`; check it before pooling anything.** Batches 11
 and 13 have no gate, batch 14 has 90, batches 15-44 have 95 (96 where the desktop or the chain script
-pinned it), and **batch 45 onward has 97**. Cross-batch best-checkpoint stays valid for "did this arm
+pinned it), and **batch 45 onward has 97** — **except that a file measured by `vec_wave` has no gate at
+all** (`min_achievable: null`), which is the third era, not a missing field. Read the payload, never the
+batch number. Cross-batch best-checkpoint stays valid for "did this arm
 produce a ≥`gate`% checkpoint", since anything at or above a gate is measured full length under it — but
 the graph-100% tier is censored by any gate and must not be compared across them.
 

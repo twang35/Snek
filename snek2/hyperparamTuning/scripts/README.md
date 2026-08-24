@@ -9,7 +9,7 @@ files beside the tuning docs and they crowded out the files a session actually h
 | `refresh_charts.sh` | — | re-copies every `runs/*.png` into `../charts/` and prints the step each arm reached, so `charts.md` captions can be written to match. **Copies images only — it never edits `charts.md`** | reusable tool |
 | `seed_from_checkpoint.sh` | `<src-policy> <step> <dst-policy> [savedPolicies-root]` | builds a **fresh** policy dir that resumes from **one chosen checkpoint** of an existing arm — `arch.json`, that one `ckpt-*` pair, a copy of the source's `replay_buffer/`, and a `checkpoint` state file naming only that step. Refuses to clobber an existing dir, and refuses if the step or `arch.json` is missing | reusable tool |
 | `chain_after_evals.sh` | `<launcher-script> [poll-seconds]` | polls until every `eval_checkpoints.py` has drained, then `exec`s a launcher — queues a *wave* behind a close-out with nobody on the terminal | reusable tool |
-| `chain_closeout_after_training.sh` | `<batch-prefix> [poll-seconds]` | the mirror: polls until that batch's trainers drain (they self-terminate at `SNEK_MAX_STEPS`), then runs the close-out as one `eval_checkpoints.py` per arm at `EVAL_WORKERS=4`, **then the HOF-500 re-measure on any arm with a ≥98% close-out checkpoint**. The whole `training → closeout → HOF` chain, unattended. Selector `top50` and close-out gate `97` since 2026-08-19, matching the desktop | reusable tool |
+| `chain_closeout_after_training.sh` | `<batch-prefix> [poll-seconds]` | the mirror: polls until that batch's trainers drain (they self-terminate at `SNEK_MAX_STEPS`), then runs `vec_wave.py --chain top50 <prefix>` — the close-out and the HOF-500 re-measure, unattended, in one process. Since 2026-08-24 it pins **no** protocol values at all; `SNEK_EVAL_ENGINE=scalar` runs `eval_wave.py` instead | reusable tool |
 | `launch_c51_wave.sh` | `<prefix> <lr>:<seed> [...]` | the generic C51 launcher — one arm per `<lr>:<seed>` on b25's config plus the c51 knobs, 600k cap, `SNEK_CHART_VIEWER=0` plus one hand-started viewer for the wave | reusable tool |
 | `launch_b43_lowlr.sh` | — | batch 43: continues the four best b29/b40 checkpoints to 3M with `SNEK_LEARNING_RATE=1e-6` the only change from b29's config. Expects the policy dirs pre-seeded by `seed_from_checkpoint.sh`; the desktop's control is `b42` on the `ops` queue | record — do not edit |
 | `launch_c51_batch.sh` | `[batch-prefix]` (default `b31`) | the pilot→batch handoff, run unattended: waits out the pilot, waits for a free trainer slot, calls `pick_c51_lr.py` to choose the rate, launches 4 seeds at 2M, then regenerates and **commits** the pilot's doc regions | record of b31's launch |
@@ -61,33 +61,34 @@ restored net within a few thousand samples.
 this script by minutes: Adam's rate is a checkpointed Variable, so before that fix a resume silently
 restored the saved rate and `SNEK_LEARNING_RATE` was a no-op. Check the run prints its reset line.
 
-## The HOF stage exists to match the desktop, not to add a feature
+## ‡ The chain script is now the wait and nothing else (2026-08-24, 176 lines → 105)
 
-The desktop daemon has chained `training → closeout → HOF re-measure` off every training since
-2026-08-15 (`auto_hof`, default on). `chain_closeout_after_training.sh` stopped after the close-out,
-so **the same batch measured on the laptop produced strictly less than it would have on the desktop**,
-and the missing half is the one that decides whether a checkpoint is hall-of-fame material. The stage
-added on 2026-08-18 copies `desktop/runner/runner.py`'s `HOF_EVAL_ENV` and `HOF_EVAL_ARGS` verbatim —
-500 episodes, flat (`EVAL_SCREEN_EPISODES=0`), `EVAL_MIN_ACHIEVABLE=98`, `EVAL_OUT_SUFFIX=_hof500`,
-selecting `above:98`. **If the daemon's recipe changes, change this too**; there is no shared
-definition, and a silent divergence would make the two hosts' `_hof500` files non-comparable.
+**What it lost was five copies of things that have a single definition elsewhere**, and the copies were
+the failure mode rather than the mitigation. Its own header used to read *"copies
+`desktop/runner/runner.py`'s `HOF_EVAL_ENV` and `HOF_EVAL_ARGS` verbatim… if the daemon's recipe
+changes, change this too"* — an instruction nobody can be relied on to follow, which is exactly how the
+two hosts spent a period writing close-outs under different gates (the script inheriting
+`eval_checkpoints`' 95 while the daemon pinned 96), and a file's gate lives in its payload as
+`min_achievable`, which CLAUDE.md requires checking before anything is pooled across files.
 
-**It also pins the close-out gate at 97** (96 until 2026-08-19), which it did not pin at all before.
-The script inherited `eval_checkpoints`' default of 95 while the desktop pinned 96, so the two hosts
-wrote close-outs under different gates — and a file's gate lives in its payload as `min_achievable`, which CLAUDE.md requires
-checking before anything is pooled across files. `CLOSEOUT_GATE` and `HOF_GATE` override, and the
-script **refuses to start** if the close-out gate is not strictly below the HOF gate: HOF selects from
-the close-out's own file, only rows reaching the close-out gate are measured full length, so a gate at
-or above 98 would abandon exactly the rows the re-measure needs and starve it silently. The daemon
-asserts the same invariant.
+Gone, and where each one now lives:
 
-**Three things the chain deliberately does not do.** It does not give a HOF pass to an arm whose
-close-out exited nonzero, or whose result file is not `complete` — the selector reads that file, so a
-truncated one would re-measure a partial selection and look like a finished, empty result. And it does
-not promote anything: **`hallOfFame/` is still the manual, verified process.** An arm with no ≥98%
-close-out checkpoint is the normal outcome and exits 0 with "no HOF pass owed", not an error.
+| was in the script | now |
+|---|---|
+| the HOF recipe — 500 episodes, flat, `_hof500`, `above:98` | `eval_plan.hof_settings`, read by `--chain` |
+| `CLOSEOUT_GATE` / `HOF_GATE` and the `close-out gate < HOF gate` refusal | `eval_plan.py`'s defaults; `tests/test_selection_tiers.py` pins the invariant |
+| four background `eval_checkpoints.py` processes and per-arm pid bookkeeping | one wave process that owns the batch |
+| an inline python check that each close-out came out `complete` | `eval_wave.completed_policies`, called by `--chain` |
+| `ls -d savedPolicies/<prefix>[a-z]-*` to expand a batch | `eval_wave.resolve_policies`, which both engines use |
 
-**Set `CHAIN_HOF=0`** to stop after the close-out, which is the old behaviour.
+**What has not changed.** It still does not give a HOF pass to an arm whose close-out is not
+`complete` — the selector reads that file, so a truncated one would re-measure a partial selection and
+look like a finished, empty result. It still promotes nothing: **`hallOfFame/` is the manual, verified
+process.** An arm with no ≥98% close-out checkpoint is the normal outcome, not an error. **Set
+`CHAIN_HOF=0`** to stop after the close-out.
+
+**`SNEK_EVAL_ENGINE=scalar`** runs `eval_wave.py` instead of `vec_wave.py`. c51 batches need no
+opt-out: `vec_wave` reads a scalar Q head, so it splits categorical arms out and hands them over itself.
 
 ## Conventions every script in here follows
 
