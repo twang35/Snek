@@ -560,6 +560,7 @@ cd snek2
 PYTHONPATH=. /opt/miniconda3/envs/snek/bin/python -c "
 import sys, glob, os; sys.path.insert(0, 'tests'); import importlib
 mods = [os.path.basename(p)[:-3] for p in sorted(glob.glob('tests/test_*.py'))]
+assert len(mods) >= 30, 'found only {0} test modules - run this from snek2/'.format(len(mods))
 total = fails = 0
 for name in mods:
     mod = importlib.import_module(name)
@@ -570,8 +571,11 @@ for name in mods:
 print(len(mods), 'modules,', total, 'tests,', fails, 'failed')"
 ```
 
-As of 2026-08-23 that reads **36 modules, 878 tests, 0 failed**. A module count below 36 means the glob
-did not run from `snek2/`.
+**No exact count is pinned here on purpose.** The suite grows with almost every change, so a figure
+in this file is false within the week and reads as a failure when it is only stale. The `assert`
+carries the check instead, and it is the only thing that ever needed checking: run from the wrong
+directory and the glob finds a handful of modules or none, which the floor catches while any real
+count passes. What matters in the output is **`0 failed`**.
 
 **A passing suite is not coverage of the change you just made.** `group_obs` took a third signature
 and all 24 existing tests passed before and after, because every fixture was an open board where
