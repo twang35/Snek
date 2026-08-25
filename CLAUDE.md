@@ -446,15 +446,22 @@ connection is what produced the wrong call. Alias, no-config fallback and key re
   the oversubscribed regime the laptop measured as 20% slow — is **false**: throughput climbs past the
   physical cores to 16, so SMT is worth ~+10% here. **The cliff is at `cpu_count`**: 18 loses 6-10%,
   20 and 24 are 12-13% down, so running it harder than 16 is strictly worse, and the peak already sits
-  at **~6% idle** — the last few percent is not slack that can be converted. And **pinning the thread
-  pools is the biggest free win (+3.6%)**: a shard is 95% single-threaded numpy, but at the defaults it
-  holds **50 threads** — TF's Eigen pools plus oneDNN's separate OpenMP pool — so a 16-shard wave runs
-  **~800 threads on 16 hardware threads**, against ~80 with `TF_NUM_INTRAOP_THREADS`,
-  `TF_NUM_INTEROP_THREADS` and `OMP_NUM_THREADS` all at 1. The sweep sets all three, so which one
-  carries the gain is not isolated. **Do not check this with
+  at **~6% idle** — the last few percent is not slack that can be converted. And **`TF_NUM_INTEROP_THREADS=1`
+  is the biggest free win, +3.6% and ~33 MB a shard**: a shard is 95% single-threaded numpy, but TF
+  sizes its executor pool to the machine, so 14 shards dispatching across 16-thread pools put ~800
+  threads on 16 hardware threads. **Isolated to that one variable** — intra-op alone is +0.3%,
+  `OMP_NUM_THREADS` alone is −0.3%, inter-op alone is the whole effect. **Do not check it with
   `tf.config.threading.get_intra_op_parallelism_threads()`** — it reads the `ConfigProto` field and
   returns 0 either way, because TF reads the env var at pool creation; count the process's threads.
-  Untested on the laptop.
+
+  **‡ On the laptop the same change is null, and two traps live in measuring it there.**
+  `OMP_NUM_THREADS=1` *undoes* the thread reduction on arm64 (30 threads at the default, 17 with
+  inter-op pinned, **30 again with all three pinned**, reproducible — where the desktop goes 50 → 5),
+  so a laptop A/B run at "all three" compares 30 threads with 30 and measures nothing. Pinning
+  inter-op alone does shrink the pool there (30 → 17) and still buys **+0.55%** across four pairs with
+  RSS unchanged. And **the laptop needs paired configs**: its spread is **±4%** against the desktop's
+  **under 1%**, and a laptop sweep in launch order carries a warm-up drift that inverted the ranking
+  between two rounds. Alternate A/B/A/B there; the desktop does not need it.
 
   **The memory arithmetic this section used to carry was pessimistic by 3-4 GB.** It subtracted
   `procs × 690 MB` from `MemAvailable`, which double-counts reclaimable page cache. Measured: a shard

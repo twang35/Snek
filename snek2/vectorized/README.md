@@ -116,8 +116,45 @@ default was never measured on this host.
   **`tf.config.threading.get_intra_op_parallelism_threads()` cannot verify any of this** — it reads the
   `ConfigProto` field, which stays 0 (= auto) whatever the environment says, because TF reads the env
   var when it *creates* the pool (`process_util.cc`) rather than into that field. It returns 0 both
-  with and without, so it reads as "the knob did nothing". Count threads instead. Untested on the
-  laptop, where the operating point was measured at TensorFlow's defaults.
+  with and without, so it reads as "the knob did nothing". Count threads instead.
+
+### ‡ It is the inter-op pool, and only that (2026-08-24)
+
+Isolated at 14 shards on the desktop, each row the mean of two runs of 24,000 episodes:
+
+| pinned | episodes/s | vs default | RSS/shard |
+|---|---:|---:|---:|
+| nothing (TF's default) | 358.1 | — | 589 MB |
+| `TF_NUM_INTRAOP_THREADS` only | 359.2 | +0.3% | 589 MB |
+| `OMP_NUM_THREADS` only | 356.9 | −0.3% | 591 MB |
+| **`TF_NUM_INTEROP_THREADS` only** | **369.3** | **+3.1%** | **557 MB** |
+| inter + intra | 370.2 | +3.4% | 558 MB |
+| all three | 371.9 | +3.9% | 556 MB |
+
+**Inter-op alone is the whole effect** — intra-op and oneDNN each do nothing, and adding them to
+inter-op adds nothing beyond noise. That is the pool TensorFlow's executor uses to dispatch
+independent ops, so at TF's default sizing each of 14 shards dispatches its graph across a 16-thread
+pool: ~800 threads on 16 hardware threads, for ops small enough that dispatch costs more than it
+parallelises. The ~33 MB a shard comes from the same pool.
+
+**‡ On the laptop the same change is null, and the first attempt to measure it tested the wrong
+config.** Two things make arm64 different, both measured:
+
+- **`OMP_NUM_THREADS=1` *undoes* the reduction there.** Threads in one process: 30 at the default, 17
+  with inter-op pinned, 17 with intra-op pinned, and **30 again with all three pinned** — reproducible
+  across samples. On the desktop the same bundle goes 50 → 5. So the first laptop A/B, run at `1`
+  (all three), was comparing 30 threads against 30 threads; its null result measured nothing at all.
+- **Pinning inter-op alone does shrink the laptop's pool (30 → 17) and still buys nothing**: paired
+  A/B at 12 shards gives **+0.55%** across four pairs (+2.83, −0.89, −3.85, +4.11), and RSS is
+  unchanged at 537-539 MB a shard. So those 13 threads cost neither time nor memory on this hardware.
+
+**The laptop needs paired configs and the desktop does not**, which is worth knowing before running
+either sweep again. The laptop's run-to-run spread is **±4%** against the desktop's **under 1%**, and a
+laptop sweep in launch order also shows a **warm-up drift** — the same `default` config read 270.8 in
+round 1 and 305.8 in round 2, and every round-2 config beat its round-1 twin, which inverted the
+ranking between rounds. Alternating A/B/A/B cancels a monotone drift; reading configs in launch order
+does not, and that is how `omp1` came out "best" on one laptop round while doing nothing on the
+desktop.
 - **The cliff is at `cpu_count`, not at the cores.** 16 → 18 loses 6-10% and it never recovers; 20 and
   24 are 12-13% down. "Run it harder" past 16 is strictly worse, and **the peak already sits at ~6%
   idle** — there is no configuration on this box that is both busier and faster, so the last few
