@@ -30,9 +30,27 @@ Usage (from `snek2/`, on the host being measured):
     PYTHONPATH=. python -u hyperparamTuning/perDiagnostics/vec_wave_sweep.py b45a-lowlr8-b29b \\
         --configs 6 8 10 12 14 16 --checkpoints 240 --episodes 100
 
-A config is `procs[:width[:intraop]]`, so `12:2048` and `16::1` are both valid; `intraop` sets
-`TF_NUM_INTRAOP_THREADS` (with interop at half and `OMP_NUM_THREADS` to match), and 0 leaves
-TensorFlow's default of one pool per process sized to the whole machine.
+A config is `procs[:width[:threads]]`, so `12:2048` and `16::1` are both valid. The `threads` field
+selects **which pools are pinned**, because there are two independent ones and a bare number sets
+both:
+
+| spelling | `TF_NUM_INTRAOP` | `TF_NUM_INTEROP` | `OMP_NUM_THREADS` |
+|---|---|---|---|
+| omitted | TF's default | TF's default | TF's default |
+| `1` | 1 | 1 | 1 |
+| `tf1` | 1 | 1 | untouched |
+| `intra1` | 1 | untouched | untouched |
+| `omp1` | untouched | untouched | 1 |
+
+Measured on `the-claw-den`: one process holds **50** threads at the defaults, 20 with TF's two at 1,
+35 with `OMP_NUM_THREADS=1` alone and **5** with all three -- so TF's Eigen pools are ~30 of them and
+oneDNN's OpenMP pool is ~15, and a 16-shard wave runs ~800 threads on 16 hardware threads unless
+pinned. `tf.config.threading.get_intra_op_parallelism_threads()` is **not** a way to check this: it
+reads the `ConfigProto` field, which stays 0 whether or not the env var is set.
+
+**Platform split.** CPU idle and `MemAvailable` come from `/proc` and are Linux-only; mean load average
+and peak shard RSS are read on both, so darwin gets `episodes/s`, `wall` and `load` -- which is enough
+to pick a config, since throughput is the objective and the rest is diagnosis.
 """
 
 import argparse
@@ -96,14 +114,29 @@ def clear_outputs():
             os.remove(os.path.join(RUNS_DIR, name))
 
 
+LINUX = sys.platform.startswith('linux')
+
+
 def read_stat():
+    """`(total, idle)` jiffies from /proc/stat. Linux only; `None` elsewhere."""
+    if not LINUX:
+        return None
     with open('/proc/stat') as handle:
         parts = handle.readline().split()
     values = [int(x) for x in parts[1:]]
-    return sum(values), values[3]          # total jiffies, idle jiffies
+    return sum(values), values[3]
 
 
 def mem_available_mb():
+    """`MemAvailable` in MB, or `None` off Linux.
+
+    Deliberately not emulated on darwin. The honest analogue would be some combination of free,
+    inactive, purgeable and compressed pages, and a number assembled from a guess about which of those
+    the kernel would actually hand back is worse than no number -- especially here, where the laptop
+    has 36 GB and memory is not the constraint being measured.
+    """
+    if not LINUX:
+        return None
     with open('/proc/meminfo') as handle:
         for line in handle:
             if line.startswith('MemAvailable:'):
@@ -112,63 +145,137 @@ def mem_available_mb():
 
 
 def shard_rss_mb():
-    """Summed RSS of every live `vec_eval.py` process, read from /proc rather than `ps`.
+    """Summed RSS of every live `vec_eval.py` process.
 
-    Read by pid off /proc so the scan cannot match its own command line -- the project's repeated
-    `pgrep` trap -- and a process that exits mid-scan is skipped rather than raising.
+    On Linux this reads /proc by pid, so the scan cannot match its own command line -- the project's
+    repeated `pgrep` trap. On darwin it shells out to `ps` once and filters in Python for the same
+    reason: `ps -Ao rss=,command=` does not contain the pattern, so nothing can self-match. Either
+    way a process that exits mid-scan is skipped rather than raising.
     """
     total = 0
-    for pid in os.listdir('/proc'):
-        if not pid.isdigit():
-            continue
-        try:
-            with open('/proc/{0}/cmdline'.format(pid), 'rb') as handle:
-                cmd = handle.read().decode('utf-8', 'replace')
-            if 'vec_eval.py' not in cmd:
+    if LINUX:
+        for pid in os.listdir('/proc'):
+            if not pid.isdigit():
                 continue
-            with open('/proc/{0}/statm'.format(pid)) as handle:
-                total += int(handle.read().split()[1]) * os.sysconf('SC_PAGE_SIZE') // (1024 * 1024)
-        except (IOError, OSError, IndexError, ValueError):
-            continue
+            try:
+                with open('/proc/{0}/cmdline'.format(pid), 'rb') as handle:
+                    if 'vec_eval.py' not in handle.read().decode('utf-8', 'replace'):
+                        continue
+                with open('/proc/{0}/statm'.format(pid)) as handle:
+                    total += (int(handle.read().split()[1])
+                              * os.sysconf('SC_PAGE_SIZE') // (1024 * 1024))
+            except (IOError, OSError, IndexError, ValueError):
+                continue
+        return total
+    try:
+        out = subprocess.check_output(['ps', '-Ao', 'rss=,command='])
+    except (subprocess.CalledProcessError, OSError):
+        return 0
+    for line in out.decode('utf-8', 'replace').splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2 and 'vec_eval.py' in parts[1]:
+            try:
+                total += int(parts[0]) // 1024          # ps reports RSS in KB on both platforms
+            except ValueError:
+                continue
     return total
 
 
 class Sampler(threading.Thread):
-    """CPU idle, min MemAvailable and peak shard RSS across one config's run."""
+    """Mean load, CPU idle, min MemAvailable and peak shard RSS across one config's run.
+
+    Load average is sampled rather than read once at the end, because a config's whole point is what
+    it does *while* it runs -- and it is the one occupancy signal available on both platforms, so it is
+    what a cross-host comparison has to lean on.
+    """
 
     def __init__(self, interval=2.0):
         threading.Thread.__init__(self)
         self.daemon = True
         self.interval = interval
         self.stop_flag = threading.Event()
-        self.idle_pct = 0.0
+        self.idle_pct = None
         self.min_avail = mem_available_mb()
         self.peak_rss = 0
+        self.load_mean = 0.0
 
     def run(self):
-        total0, idle0 = read_stat()
+        start = read_stat()
+        loads = []
         while not self.stop_flag.wait(self.interval):
-            self.min_avail = min(self.min_avail, mem_available_mb())
+            avail = mem_available_mb()
+            if avail is not None:
+                self.min_avail = avail if self.min_avail is None else min(self.min_avail, avail)
             self.peak_rss = max(self.peak_rss, shard_rss_mb())
-        total1, idle1 = read_stat()
-        span = total1 - total0
-        self.idle_pct = 100.0 * (idle1 - idle0) / span if span else 0.0
+            try:
+                loads.append(os.getloadavg()[0])
+            except OSError:
+                pass
+        if loads:
+            self.load_mean = sum(loads) / len(loads)
+        end = read_stat()
+        if start and end:
+            span = end[0] - start[0]
+            self.idle_pct = 100.0 * (end[1] - start[1]) / span if span else 0.0
 
     def finish(self):
         self.stop_flag.set()
         self.join(timeout=self.interval * 3)
 
 
+THREAD_MODES = ('all', 'tf', 'intra', 'omp')
+
+
+def parse_threads(field):
+    """`(mode, value)` from a `threads` field: `''`, `'1'`, `'tf1'`, `'intra1'`, `'omp1'`.
+
+    A bare number keeps meaning "all three", so the rows already published in
+    `vectorized/README.md` are reproducible by the spelling they were taken with.
+    """
+    if not field:
+        return None, 0
+    for mode in ('intra', 'omp', 'tf'):        # 'intra' before 'tf' -- neither is a prefix of the
+        if field.startswith(mode):             # other, but order the loop by specificity anyway
+            return mode, int(field[len(mode):] or 1)
+    return 'all', int(field)
+
+
+def thread_env(mode, value):
+    """The env vars one thread mode sets. Empty dict for TensorFlow's default."""
+    if not mode:
+        return {}
+    env = {}
+    if mode in ('all', 'tf', 'intra'):
+        env['TF_NUM_INTRAOP_THREADS'] = str(value)
+    if mode in ('all', 'tf'):
+        env['TF_NUM_INTEROP_THREADS'] = str(value)
+    if mode in ('all', 'omp'):
+        env['OMP_NUM_THREADS'] = str(value)
+    return env
+
+
+def label_threads(mode, value):
+    return 'default' if not mode else '{0}{1}'.format('' if mode == 'all' else mode, value)
+
+
 def parse_config(token):
     parts = (token.split(':') + ['', ''])[:3]
     procs = int(parts[0])
     width = int(parts[1]) if parts[1] else 1024
-    intraop = int(parts[2]) if parts[2] else 0
-    return procs, width, intraop
+    mode, value = parse_threads(parts[2])
+    if mode and mode not in THREAD_MODES:
+        raise SystemExit('unknown thread mode {0!r} in {1!r}'.format(mode, token))
+    return procs, width, mode, value
 
 
-def run_config(steps, episodes, procs, width, intraop, log_dir):
-    """One `vec_wave.py` invocation, timed and sampled. Returns a result dict."""
+def run_config(steps, episodes, procs, width, mode, value, log_dir):
+    """One `vec_wave.py` invocation, timed and sampled. Returns a result dict.
+
+    Every thread var this script knows about is **cleared** before the mode's own are applied, so a
+    value inherited from the caller's shell cannot quietly become part of a config that was meant to
+    read TensorFlow's default -- which would attribute someone's exported `OMP_NUM_THREADS` to the
+    engine.
+    """
     clear_outputs()
     env = dict(os.environ)
     env['VEC_WAVE_PROCS'] = str(procs)
@@ -177,17 +284,13 @@ def run_config(steps, episodes, procs, width, intraop, log_dir):
     env['EVAL_OUT_SUFFIX'] = SUFFIX
     env['SNEK_CHART_VIEWER'] = '0'
     env['PYTHONPATH'] = SNEK2
-    if intraop:
-        env['TF_NUM_INTRAOP_THREADS'] = str(intraop)
-        env['TF_NUM_INTEROP_THREADS'] = str(max(1, intraop // 2))
-        env['OMP_NUM_THREADS'] = str(intraop)
-    else:
-        for key in ('TF_NUM_INTRAOP_THREADS', 'TF_NUM_INTEROP_THREADS', 'OMP_NUM_THREADS'):
-            env.pop(key, None)
+    for key in ('TF_NUM_INTRAOP_THREADS', 'TF_NUM_INTEROP_THREADS', 'OMP_NUM_THREADS'):
+        env.pop(key, None)
+    env.update(thread_env(mode, value))
 
     argv = [sys.executable, '-u', os.path.join('vectorized', 'vec_wave.py')]
     argv += [str(step) for step in steps] + [BENCH_NAME]
-    tag = '{0}p-{1}w-{2}t'.format(procs, width, intraop)
+    tag = '{0}p-{1}w-{2}'.format(procs, width, label_threads(mode, value))
     log_path = os.path.join(log_dir, 'vecsweep-{0}.log'.format(tag))
 
     sampler = Sampler()
@@ -200,11 +303,11 @@ def run_config(steps, episodes, procs, width, intraop, log_dir):
 
     measured = measured_episodes()
     return {
-        'procs': procs, 'width': width, 'intraop': intraop, 'exit': code,
+        'procs': procs, 'width': width, 'threads': label_threads(mode, value), 'exit': code,
         'wall': wall, 'episodes': measured,
         'eps_per_s': measured / wall if wall else 0.0,
         'idle_pct': sampler.idle_pct, 'min_avail_mb': sampler.min_avail,
-        'peak_rss_mb': sampler.peak_rss,
+        'peak_rss_mb': sampler.peak_rss, 'load_mean': sampler.load_mean,
         'rss_per_shard_mb': sampler.peak_rss // procs if procs else 0,
         'log': log_path,
     }
@@ -228,7 +331,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('policy')
     parser.add_argument('--configs', nargs='+', required=True,
-                        help='procs[:width[:intraop]] tokens, e.g. 8 12 16 12:2048 16::1')
+                        help='procs[:width[:threads]] tokens, e.g. 8 12 12:2048 14::1 14::tf1 14::omp1')
     parser.add_argument('--checkpoints', type=int, default=240)
     parser.add_argument('--episodes', type=int, default=100)
     parser.add_argument('--repeat', type=int, default=1)
@@ -238,40 +341,41 @@ def main(argv=None):
     parser.add_argument('--out', default='', help='write the result rows here as JSON')
     args = parser.parse_args(argv)
 
-    if not sys.platform.startswith('linux'):
-        raise SystemExit('the samplers read /proc; run this on the Linux host')
-
     steps = pick_steps(args.policy, args.checkpoints, args.spread)
     created = ensure_bench_link(args.policy)
     print('sweep: {0} -> {1}{2}'.format(args.policy, BENCH_NAME,
                                         ' (symlink created)' if created else ''))
     print('{0} checkpoints ({1} .. {2}), {3} episodes each = {4} episodes per config'.format(
         len(steps), steps[0], steps[-1], args.episodes, len(steps) * args.episodes))
-    print('cpu_count {0}, MemAvailable {1} MB\n'.format(os.cpu_count(), mem_available_mb()))
+    avail = mem_available_mb()
+    print('{0}, cpu_count {1}{2}\n'.format(
+        sys.platform, os.cpu_count(),
+        '' if avail is None else ', MemAvailable {0} MB'.format(avail)))
 
     rows = []
     plan = [parse_config(token) for token in args.configs] * args.repeat
-    for index, (procs, width, intraop) in enumerate(plan, 1):
-        print('[{0}/{1}] procs={2} width={3} intraop={4} ...'.format(
-            index, len(plan), procs, width, intraop or 'default'), end=' ')
+    for index, (procs, width, mode, value) in enumerate(plan, 1):
+        print('[{0}/{1}] procs={2} width={3} threads={4} ...'.format(
+            index, len(plan), procs, width, label_threads(mode, value)), end=' ')
         sys.stdout.flush()
-        row = run_config(steps, args.episodes, procs, width, intraop, args.log_dir)
+        row = run_config(steps, args.episodes, procs, width, mode, value, args.log_dir)
         rows.append(row)
-        print('{0:.0f}s  {1:.1f} eps/s  idle {2:.1f}%  minAvail {3} MB  peakRSS {4} MB '
-              '({5} MB/shard){6}'.format(
-                  row['wall'], row['eps_per_s'], row['idle_pct'], row['min_avail_mb'],
-                  row['peak_rss_mb'], row['rss_per_shard_mb'],
-                  '' if row['exit'] == 0 and row['episodes'] else '  ** SUSPECT **'))
+        print('{0:.0f}s  {1:.1f} eps/s  {2}load {3:.1f}  peakRSS {4} MB ({5} MB/shard){6}'.format(
+            row['wall'], row['eps_per_s'],
+            '' if row['idle_pct'] is None else 'idle {0:.1f}%  '.format(row['idle_pct']),
+            row['load_mean'], row['peak_rss_mb'], row['rss_per_shard_mb'],
+            '' if row['exit'] == 0 and row['episodes'] else '  ** SUSPECT **'))
 
-    print('\n| procs | width | intraop | episodes/s | wall | CPU idle | min avail | peak RSS |')
+    print('\n| procs | width | threads | episodes/s | wall | CPU idle | load | peak RSS |')
     print('|---|---|---|---|---|---|---|---|')
     for row in rows:
-        print('| {0} | {1} | {2} | {3:.1f} | {4:.0f} s | {5:.1f}% | {6} MB | {7} MB |'.format(
-            row['procs'], row['width'], row['intraop'] or 'default', row['eps_per_s'],
-            row['wall'], row['idle_pct'], row['min_avail_mb'], row['peak_rss_mb']))
+        print('| {0} | {1} | {2} | {3:.1f} | {4:.0f} s | {5} | {6:.1f} | {7} MB |'.format(
+            row['procs'], row['width'], row['threads'], row['eps_per_s'], row['wall'],
+            'n/a' if row['idle_pct'] is None else '{0:.1f}%'.format(row['idle_pct']),
+            row['load_mean'], row['peak_rss_mb']))
     best = max(rows, key=lambda r: r['eps_per_s'])
-    print('\nfastest: procs={0} width={1} intraop={2} at {3:.1f} eps/s'.format(
-        best['procs'], best['width'], best['intraop'] or 'default', best['eps_per_s']))
+    print('\nfastest: procs={0} width={1} threads={2} at {3:.1f} eps/s'.format(
+        best['procs'], best['width'], best['threads'], best['eps_per_s']))
 
     if args.out:
         with open(args.out, 'w') as handle:
