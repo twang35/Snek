@@ -249,6 +249,18 @@ not arithmetic — and only overtakes the CPU above ~8000 rows. Our net is 11,65
 width — at 16384 lanes a step is ~74 ms and the policy share falls to ~2%, so the 722 us saved is worth
 under 1%. A wave also runs `VEC_WAVE_PROCS` shards that would all contend for one GPU.
 
+**‡ The decision is closed, and the test env is deliberately gone** (user's call, 2026-08-25, taken with
+everything above in hand): MPS is too slow to be useful for this project's purposes, so the
+`snek-mps` clone and the throwaway comparison harness were deleted rather than kept. **The findings are
+kept and this section is why** — do not rebuild the env to re-derive them. `tensorflow-metal` is not
+installed in `snek` and nothing in the repo reaches for a GPU, so an eval here is CPU-only by
+construction rather than by configuration; there is no flag to get this wrong.
+
+`eval_device_split.py` **stays**, because it is not MPS-specific: its main output is the numpy/TF split
+above, it runs CPU-only in `snek` (printing one CPU row, which is itself the answer to "is an
+accelerator even visible"), and its `--verify` guards *any* new device, accelerator build or TF version
+— the guard is worth more than the plugin it caught.
+
 **The general point, and the reason not to revisit this without new evidence: the bottleneck is not on
 the GPU's side of the fence.** The policy is **8.2%** of a step at width 1024 (413 us of 5050 us) and the
 observation build alone is 4296 us — so **1.09x is the ceiling for any accelerator, however fast**. That
