@@ -49,16 +49,19 @@ oneDNN's OpenMP pool is ~15, and a 16-shard wave runs ~800 threads on 16 hardwar
 pinned. `tf.config.threading.get_intra_op_parallelism_threads()` is **not** a way to check this: it
 reads the `ConfigProto` field, which stays 0 whether or not the env var is set.
 
-**Platform split.** CPU idle and `MemAvailable` come from `/proc` and are Linux-only; mean load average
-and peak shard RSS are read on both, so darwin gets `episodes/s`, `wall` and `load` -- which is enough
-to pick a config, since throughput is the objective and the rest is diagnosis.
+**Platform split.** `MemAvailable` comes from `/proc` and is Linux-only. CPU idle is read from
+`/proc/stat` deltas there and from `top -l` samples on darwin -- **never from
+`resource.getrusage(RUSAGE_CHILDREN)`**, which only counts reaped children and undercounts a wave by
+about 3x because its shards live for the whole run. Mean load average and peak shard RSS work on both.
 """
 
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -182,6 +185,21 @@ def shard_rss_mb():
     return total
 
 
+TOP_IDLE = re.compile(r'CPU usage:.*?([\d.]+)%\s+idle')
+
+
+def parse_top_idle(text):
+    """Mean CPU idle % from `top -l` output, **dropping the first sample**.
+
+    `top`'s opening sample is cumulative since boot, so including it drags a busy run's average toward
+    whatever the machine was doing all day -- the same reason the project's CPU rule says `top -l 2`
+    rather than `top -l 1`. Returns `None` if fewer than two samples arrived, because one sample is
+    exactly the one that cannot be used.
+    """
+    values = [float(m) for m in TOP_IDLE.findall(text)]
+    return sum(values[1:]) / len(values[1:]) if len(values) > 1 else None
+
+
 class Sampler(threading.Thread):
     """Mean load, CPU idle, min MemAvailable and peak shard RSS across one config's run.
 
@@ -202,6 +220,7 @@ class Sampler(threading.Thread):
 
     def run(self):
         start = read_stat()
+        top, top_out = self.start_top()
         loads = []
         while not self.stop_flag.wait(self.interval):
             avail = mem_available_mb()
@@ -218,6 +237,47 @@ class Sampler(threading.Thread):
         if start and end:
             span = end[0] - start[0]
             self.idle_pct = 100.0 * (end[1] - start[1]) / span if span else 0.0
+        self.finish_top(top, top_out)
+
+    def start_top(self):
+        """`top -l 0` into a temp file on darwin, so this thread never has to drain a pipe.
+
+        A file rather than a `PIPE`: reading the pipe would have to interleave with the sampling loop,
+        and a full pipe buffer with nobody reading it blocks `top` -- which would silently truncate the
+        samples rather than fail.
+        """
+        if LINUX:
+            return None, None
+        handle = tempfile.NamedTemporaryFile(prefix='vecsweep-top-', suffix='.txt', delete=False)
+        try:
+            proc = subprocess.Popen(
+                ['top', '-l', '0', '-n', '0', '-s', str(int(self.interval))],
+                stdout=handle, stderr=subprocess.DEVNULL)
+        except OSError:
+            handle.close()
+            os.unlink(handle.name)
+            return None, None
+        return proc, handle
+
+    def finish_top(self, proc, handle):
+        if proc is None:
+            return
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()
+        handle.close()
+        try:
+            with open(handle.name) as opened:
+                self.idle_pct = parse_top_idle(opened.read())
+        except IOError:
+            pass
+        finally:
+            try:
+                os.unlink(handle.name)
+            except OSError:
+                pass
 
     def finish(self):
         self.stop_flag.set()
