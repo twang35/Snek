@@ -92,11 +92,32 @@ default was never measured on this host.
 
 **Three readings, in order of what they are worth.**
 
-- **Pinning `TF_NUM_INTRAOP_THREADS=1` is the largest single win, +3.6%, and it is free.** Every shard
-  otherwise opens an intra-op pool sized to the whole machine for a workload that is 95%
-  single-threaded numpy, so 16 shards ask for 256 threads on 16 hardware threads and pay pure
-  contention. It also takes ~35 MB off each shard. Untested on the laptop, where the operating point
-  was measured at TensorFlow's default.
+- **Pinning the thread pools is the largest single win, +3.6%, and it is free.** The sweep sets
+  **three** knobs together — `TF_NUM_INTRAOP_THREADS=1`, `TF_NUM_INTEROP_THREADS=1` and
+  `OMP_NUM_THREADS=1` — so the gain belongs to the bundle; which one carries it is not yet isolated.
+  Threads live in one process after 50 matmuls, measured on the box:
+
+  | environment | threads |
+  |---|---:|
+  | default | **50** |
+  | TF intra + inter = 1 | 20 |
+  | `OMP_NUM_THREADS=1` alone | 35 |
+  | all three | **5** |
+
+  **There are two pools, not one, and they are independent**: TF's Eigen pools are ~30 of those
+  threads and oneDNN's OpenMP pool is ~15 (`test_util.IsMklEnabled()` is True here), which is why
+  `OMP_NUM_THREADS` is in the bundle at all. So **a 16-shard wave at the defaults runs ~800 threads on
+  16 hardware threads; pinned it runs ~80.** For a workload that is 95% single-threaded numpy in the
+  observation build, with TF ops small enough that the fork-join barrier costs more than the tiling
+  saves, those 720 threads are pure scheduler contention — and Eigen's workers spin before sleeping, so
+  they burn cycles the other fifteen shards need. That is why the loss shows up as throughput at 5.8%
+  idle: part of "busy" is spin-wait. Pinning also takes ~35 MB off each shard.
+
+  **`tf.config.threading.get_intra_op_parallelism_threads()` cannot verify any of this** — it reads the
+  `ConfigProto` field, which stays 0 (= auto) whatever the environment says, because TF reads the env
+  var when it *creates* the pool (`process_util.cc`) rather than into that field. It returns 0 both
+  with and without, so it reads as "the knob did nothing". Count threads instead. Untested on the
+  laptop, where the operating point was measured at TensorFlow's defaults.
 - **The cliff is at `cpu_count`, not at the cores.** 16 → 18 loses 6-10% and it never recovers; 20 and
   24 are 12-13% down. "Run it harder" past 16 is strictly worse, and **the peak already sits at ~6%
   idle** — there is no configuration on this box that is both busier and faster, so the last few

@@ -446,9 +446,15 @@ connection is what produced the wrong call. Alias, no-config fallback and key re
   the oversubscribed regime the laptop measured as 20% slow — is **false**: throughput climbs past the
   physical cores to 16, so SMT is worth ~+10% here. **The cliff is at `cpu_count`**: 18 loses 6-10%,
   20 and 24 are 12-13% down, so running it harder than 16 is strictly worse, and the peak already sits
-  at **~6% idle** — the last few percent is not slack that can be converted. And **pinning intra-op
-  threads to 1 is the biggest free win (+3.6%)**, because a shard is 95% single-threaded numpy while
-  every one of them opens a pool sized to the whole machine. Untested on the laptop.
+  at **~6% idle** — the last few percent is not slack that can be converted. And **pinning the thread
+  pools is the biggest free win (+3.6%)**: a shard is 95% single-threaded numpy, but at the defaults it
+  holds **50 threads** — TF's Eigen pools plus oneDNN's separate OpenMP pool — so a 16-shard wave runs
+  **~800 threads on 16 hardware threads**, against ~80 with `TF_NUM_INTRAOP_THREADS`,
+  `TF_NUM_INTEROP_THREADS` and `OMP_NUM_THREADS` all at 1. The sweep sets all three, so which one
+  carries the gain is not isolated. **Do not check this with
+  `tf.config.threading.get_intra_op_parallelism_threads()`** — it reads the `ConfigProto` field and
+  returns 0 either way, because TF reads the env var at pool creation; count the process's threads.
+  Untested on the laptop.
 
   **The memory arithmetic this section used to carry was pessimistic by 3-4 GB.** It subtracted
   `procs × 690 MB` from `MemAvailable`, which double-counts reclaimable page cache. Measured: a shard
