@@ -931,6 +931,20 @@ Four things to carry:
   over its own support. Validated on six `b38a-c51fc320eps3125seed1` checkpoints, 200 episodes per
   checkpoint per engine: **−0.17 pp, z = −0.10**. So **every** batch is measured by one engine now, and
   the only reason to reach for `eval_wave.py` is the opt-out below.
+- **‡ A GPU cannot help this eval, and MPS silently breaks it** (tested 2026-08-24). The policy is
+  **8.2%** of a step at width 1024 and the numpy observation build is 4296 us of 5050 us, so **1.09x is
+  the ceiling for any accelerator, however fast** — the bottleneck is a bitboard flood fill, not a
+  tensor program. `tensorflow-metal` is also **2.4x slower** on the policy call at that width (a fixed
+  ~900 us a call against a 24 MFLOP batch), i.e. ~10% slower end to end. **But the reason it is
+  disqualified is correctness:** four hall-of-fame champions measuring 97-98% perfect measured **0.0%**
+  on MPS, with no error raised and a *faster* wall clock, because the composed `GreedyPolicy(QPolicy)`
+  graph disagrees with `argmax` over its own Q-values on 23 of 64 states — by a **median 0.64** in
+  reward units, so not float tie-breaking, and every component (`argmax` eager and graph,
+  `tfp.Categorical.mode`, the restored weights, the forward pass to 5.7e-06) is individually correct.
+  **Run [`perDiagnostics/eval_device_split.py`](snek2/hyperparamTuning/perDiagnostics/eval_device_split.py)
+  `--verify` before trusting any new device, accelerator build or TF version** — the failure mode is a
+  silent zero, which reads as a bad arm. Full account:
+  [`snek2/vectorized/README.md`](snek2/vectorized/README.md).
 - **The opt-out is `SNEK_EVAL_ENGINE=scalar`** — laptop script env, desktop `runtime.json`'s
   `eval_engine`, or a single job spec's `env`. Kept because it is the only way to reproduce a
   pre-switch measurement, and because a regression here has to be answerable without a deploy.

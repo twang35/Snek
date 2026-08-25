@@ -201,6 +201,62 @@ spec still carrying `eval_workers: 4` silently *caps* the wave at 4 shards. And 
 short-run (54-68 s); no multi-hour wave's memory has been measured on the box yet, so watch the first
 long close-out rather than assuming the peak is the plateau.
 
+### ‡ MPS (Metal) is disqualified, and being slower is the lesser reason (2026-08-24)
+
+Tested with `tensorflow-metal` 1.2.0 in a **clone of the `snek` env** — identical numpy 1.26.4, TF
+2.15.1 and tf-agents 0.18.0, differing only by the plugin — with the CPU arm produced by hiding the GPU
+inside that same env (`set_visible_devices([], 'GPU')` from a `sitecustomize`), so numpy could not drift
+between the arms. numpy is 92% of a step, so a cross-env comparison would have confounded the result
+with a numpy version.
+
+**It computes the wrong policy.** Four hall-of-fame champions, 300 episodes each:
+
+| checkpoint | CPU | MPS |
+|---|---|---|
+| 1447000 (`b29b`) | **97.3%** perfect, avg score 94.69 | **0.0%**, avg score 0.44 |
+| 1342000 (`b24d`) | **98.0%**, 94.36 | **0.0%**, 0.25 |
+| 1513000 (`b40b`) | **96.3%**, 94.55 | **0.0%**, 0.10 |
+| 2860000 (`b24b`) | **97.3%**, 94.58 | **0.0%**, 1.99 |
+
+**And it is not float tie-breaking**, which is the explanation this codebase would reach for first,
+since near-ties flipping an argmax between batch widths is already documented here. The Q-values agree
+to **5.7e-06**; bare `argmax`, graph-mode `argmax` and `tfp.Categorical.mode` are each individually
+**correct** on Metal; `act()` is deterministic across repeats on both devices; the restored weights are
+bit-identical. But the composed `GreedyPolicy(QPolicy)` graph disagrees with `argmax` over its own
+Q-values on **23 of 64 states**, and the action it discards is worse by a **median 0.64** in reward
+units — 22 of the 23 gaps exceed 0.1, and none is under 1e-4. A 5.7e-06 perturbation cannot cross a
+0.64 gap. Every component is right and the composition is wrong.
+
+**The failure mode is the dangerous part: a silent 0.0% and a *faster* wall clock.** The MPS run
+finished in 8.3 s against 27.4 s, because the episodes died immediately — 12x fewer env steps for the
+same episode count. Nothing raised, nothing warned. The tell was `env-steps/s` and `utilisation` in the
+run's own footer, not the wall clock. This is the same shape as the observation-era trap in the
+hall-of-fame README: a checkpoint that restores and plays like a beginner.
+
+**It would also have been slower.** Two measurements, before correctness was even in question:
+
+| batch | CPU | MPS | |
+|---:|---:|---:|---|
+| 256 | 250 us | 1044 us | 4.2x slower |
+| **1024** (the operating width) | **390 us** | **919 us** | **2.4x slower** |
+| 4096 | 830 us | 960 us | 1.2x slower |
+| 16384 | 2402 us | 1471 us | 1.63x *faster* |
+
+MPS carries a fixed ~900 us a call — 256 and 1024 cost nearly the same, which is dispatch and transfer,
+not arithmetic — and only overtakes the CPU above ~8000 rows. Our net is 11,650 MACs a row, so a
+1024-row batch is **~24 MFLOP**: far too little to amortise a round trip. At the operating width that is
+**~10% slower end to end**, and the crossover does not rescue it, because the numpy env cost scales with
+width — at 16384 lanes a step is ~74 ms and the policy share falls to ~2%, so the 722 us saved is worth
+under 1%. A wave also runs `VEC_WAVE_PROCS` shards that would all contend for one GPU.
+
+**The general point, and the reason not to revisit this without new evidence: the bottleneck is not on
+the GPU's side of the fence.** The policy is **8.2%** of a step at width 1024 (413 us of 5050 us) and the
+observation build alone is 4296 us — so **1.09x is the ceiling for any accelerator, however fast**. That
+observation build is a bitboard flood fill in numpy, which is not a tensor program. Re-take both numbers
+with [`perDiagnostics/eval_device_split.py`](../hyperparamTuning/perDiagnostics/eval_device_split.py),
+and **run its `--verify` before trusting any new device, accelerator build or TF version** — the failure
+mode is a silent zero, which looks exactly like a bad arm.
+
 ### Where the output goes, and why the two tools differ
 
 `vec_eval.py` alone writes `_vec` and `evals/vec/`; a wave writes the canonical
