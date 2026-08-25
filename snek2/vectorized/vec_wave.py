@@ -289,6 +289,8 @@ def child_env(episodes, suffix, source_suffix):
       they size TF worker processes, and this engine has none.
     * **The children never open a window.** One owner per wave, spawned by this process; twelve
       claimants racing one lock is the documented way to end up with two windows.
+    * **TensorFlow's inter-op pool is pinned to one thread**, which is worth **+3.6%** and ~33 MB a
+      shard. See below.
     """
     env = dict(os.environ)
     for key in ('EVAL_SCREEN_EPISODES', 'EVAL_MIN_ACHIEVABLE', 'EVAL_ABANDON_FLOOR',
@@ -299,6 +301,18 @@ def child_env(episodes, suffix, source_suffix):
     env['VEC_EVAL_SOURCE'] = source_suffix
     env['VEC_EVAL_CHART_DIR'] = EVALS_DIR
     env['SNEK_CHART_VIEWER'] = '0'
+    # **The inter-op pool is the one that costs.** TensorFlow sizes it to the whole machine, and a
+    # wave runs `VEC_WAVE_PROCS` shards -- so 14 shards each dispatching ops across a 16-thread
+    # executor pool put ~800 threads on 16 hardware threads, for a workload where the observation
+    # build is 95% of a step and single-threaded numpy. Measured on `the-claw-den` at 14 shards, 240
+    # checkpoints x 100 episodes, repeated: **+3.6%** (358.1 -> 370.2 episodes/s) and 589 -> 556 MB a
+    # shard. **Isolated to this one variable**: pinning intra-op alone is +0.3%, `OMP_NUM_THREADS`
+    # alone is -0.3%, and inter-op alone (369.3) is indistinguishable from inter+intra (370.2).
+    #
+    # `setdefault`, not assignment, so a sweep or an experiment can still ask for TensorFlow's own
+    # sizing -- and **the way to ask is `0`, not unset**, because 0 is TF's spelling of "auto"
+    # (verified: 0 and unset both leave 50 threads in a process, where 1 leaves 35).
+    env.setdefault('TF_NUM_INTEROP_THREADS', '1')
     return env
 
 

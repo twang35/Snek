@@ -242,9 +242,16 @@ def parse_threads(field):
 
 
 def thread_env(mode, value):
-    """The env vars one thread mode sets. Empty dict for TensorFlow's default."""
+    """The env vars one thread mode sets.
+
+    **The default mode sets explicit zeros rather than unsetting**, because `vec_wave.child_env`
+    `setdefault`s `TF_NUM_INTEROP_THREADS` to 1 -- so an absent variable would arrive at the shard as
+    the pinned config, and this script's own control would silently measure the treatment. 0 is
+    TensorFlow's spelling of "size it yourself" (verified: 0 and unset both leave 50 threads in a
+    process where 1 leaves 35), so an explicit 0 is a real opt-out rather than a sentinel.
+    """
     if not mode:
-        return {}
+        return {'TF_NUM_INTRAOP_THREADS': '0', 'TF_NUM_INTEROP_THREADS': '0', 'OMP_NUM_THREADS': '0'}
     env = {}
     if mode in ('all', 'tf', 'intra'):
         env['TF_NUM_INTRAOP_THREADS'] = str(value)

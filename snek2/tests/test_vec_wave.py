@@ -161,6 +161,38 @@ def test_the_scalar_protocols_knobs_are_dropped_rather_than_silently_ignored():
                 os.environ[key] = was
 
 
+def test_the_inter_op_pool_is_pinned_for_the_shards():
+    """A shard is 95% single-threaded numpy, but TensorFlow sizes its executor pool to the whole
+    machine -- so 14 shards each dispatching across 16 threads is ~800 threads on 16 of hardware.
+    Measured at +3.6% and ~33 MB a shard, and isolated to this one variable: intra-op alone is +0.3%
+    and OMP_NUM_THREADS alone is -0.3%."""
+    saved = os.environ.get('TF_NUM_INTEROP_THREADS')
+    try:
+        os.environ.pop('TF_NUM_INTEROP_THREADS', None)
+        assert vec_wave.child_env(100, '', '')['TF_NUM_INTEROP_THREADS'] == '1'
+    finally:
+        if saved is None:
+            os.environ.pop('TF_NUM_INTEROP_THREADS', None)
+        else:
+            os.environ['TF_NUM_INTEROP_THREADS'] = saved
+
+
+def test_an_explicit_inter_op_setting_survives_into_the_children():
+    """`setdefault`, not assignment, so a sweep can still measure TensorFlow's own sizing -- and the
+    way to ask for it is `0`, which is TF's spelling of "size it yourself", not an unset variable.
+    Assignment here would make `vec_wave_sweep.py`'s control config silently measure the treatment."""
+    saved = os.environ.get('TF_NUM_INTEROP_THREADS')
+    try:
+        for asked in ('0', '4'):
+            os.environ['TF_NUM_INTEROP_THREADS'] = asked
+            assert vec_wave.child_env(100, '', '')['TF_NUM_INTEROP_THREADS'] == asked
+    finally:
+        if saved is None:
+            os.environ.pop('TF_NUM_INTEROP_THREADS', None)
+        else:
+            os.environ['TF_NUM_INTEROP_THREADS'] = saved
+
+
 def test_a_stale_shard_setting_cannot_leak_into_the_children():
     """The parent's own `VEC_EVAL_SHARD` -- a leftover from a hand-run, or the desktop's job env --
     would override the plan for every arm that got only one shard, silently measuring a stride of it."""
