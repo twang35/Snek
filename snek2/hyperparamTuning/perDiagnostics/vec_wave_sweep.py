@@ -40,6 +40,7 @@ both:
 | `1` | 1 | 1 | 1 |
 | `tf1` | 1 | 1 | untouched |
 | `intra1` | 1 | untouched | untouched |
+| `inter1` | untouched | 1 | untouched |
 | `omp1` | untouched | untouched | 1 |
 
 Measured on `the-claw-den`: one process holds **50** threads at the defaults, 20 with TF's two at 1,
@@ -223,7 +224,7 @@ class Sampler(threading.Thread):
         self.join(timeout=self.interval * 3)
 
 
-THREAD_MODES = ('all', 'tf', 'intra', 'omp')
+THREAD_MODES = ('all', 'tf', 'intra', 'inter', 'omp')
 
 
 def parse_threads(field):
@@ -234,8 +235,8 @@ def parse_threads(field):
     """
     if not field:
         return None, 0
-    for mode in ('intra', 'omp', 'tf'):        # 'intra' before 'tf' -- neither is a prefix of the
-        if field.startswith(mode):             # other, but order the loop by specificity anyway
+    for mode in ('intra', 'inter', 'omp', 'tf'):   # no mode is a prefix of another, but order the
+        if field.startswith(mode):                 # loop by specificity anyway
             return mode, int(field[len(mode):] or 1)
     return 'all', int(field)
 
@@ -247,7 +248,7 @@ def thread_env(mode, value):
     env = {}
     if mode in ('all', 'tf', 'intra'):
         env['TF_NUM_INTRAOP_THREADS'] = str(value)
-    if mode in ('all', 'tf'):
+    if mode in ('all', 'tf', 'inter'):
         env['TF_NUM_INTEROP_THREADS'] = str(value)
     if mode in ('all', 'omp'):
         env['OMP_NUM_THREADS'] = str(value)
