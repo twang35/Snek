@@ -54,35 +54,73 @@ parses argv with `eval_wave`'s own functions rather than its own copies, so `top
 
 | knob | default | notes |
 |---|---|---|
-| `VEC_WAVE_PROCS` | cores − 2 | shards to spread across the wave's arms |
+| `VEC_WAVE_PROCS` | `os.cpu_count()` − 2 | shards to spread across the wave's arms. **Hardware threads, not cores** — see the sweep below |
+| `TF_NUM_INTRAOP_THREADS` | TensorFlow's | not ours, but **1 is +3.6% on the desktop**; a shard is single-threaded numpy |
 | `EVAL_EPISODES` | 100 | stage A's depth; stage B is `eval_plan.HOF_EPISODES` |
 | `EVAL_OUT_SUFFIX` | none | the **canonical** path, because a wave *is* the close-out |
 
-**‡ `VEC_WAVE_PROCS` is bounded by memory before it is bounded by cores** (measured on `the-claw-den`
-2026-08-24). One `vec_eval.py` process peaks at **644 MB at 100 episodes and
-690 MB at 500** — flat in the episode count, because the cost is TensorFlow's arena plus the 1024-lane
-env, not the resident agent pool (44 agents against 12). So the shard count multiplies ~690 MB:
+**‡ `VEC_WAVE_PROCS` is bounded by cores after all, and one shard is 553-601 MB rather than 690**
+(swept on `the-claw-den` 2026-08-24 with
+[`perDiagnostics/vec_wave_sweep.py`](../hyperparamTuning/perDiagnostics/vec_wave_sweep.py): 240
+checkpoints of `b45a-lowlr8-b29b`, 100 episodes each = 24,000 episodes per config, the same explicit
+step list every time, top rows repeated). **Run-to-run noise on this box is under 1%**, against ~5% on
+the laptop, so 1% differences are real here:
 
-| procs | memory |
-|---:|---:|
-| 6 | ~4.1 GB |
-| 8 | ~5.5 GB |
-| 12 | ~8.3 GB |
-| **14** (the box's default: 16 cores − 2) | **~9.7 GB** |
+| procs | width | intra-op | episodes/s | CPU idle | peak RSS | min `MemAvailable` |
+|---:|---:|---:|---:|---:|---:|---:|
+| 4 | 1024 | default | 238.0 | 74.8% | 2.4 GB | 9.7 GB |
+| 8 | 1024 | default | 326.3 | 50.1% | 4.7 GB | 8.4 GB |
+| 12 | 1024 | default | 344.1 | 28.9% | 7.0 GB | 7.1 GB |
+| 14 | 1024 | default | 358.5 | 17.3% | 8.3 GB | 6.7 GB |
+| 16 | 1024 | default | 361.2 | 5.7% | 9.4 GB | 6.1 GB |
+| 18 | 1024 | default | 328.9 | 5.8% | 10.7 GB | 5.1 GB |
+| 20 | 1024 | default | 313.0 | 5.8% | 11.9 GB | 4.6 GB |
+| 24 | 1024 | default | 317.7 | 4.1% | 14.0 GB | 3.7 GB |
+| 12 | 1024 | **1** | 360.7 | 29.9% | 6.7 GB | 7.8 GB |
+| 14 | 1024 | **1** | 371.4 | 18.3% | 7.8 GB | 7.2 GB |
+| **16** | **1024** | **1** | **373.9** | **5.8%** | **8.9 GB** | **6.7 GB** |
+| 18 | 1024 | **1** | 337.5 | 6.9% | 10.0 GB | 6.1 GB |
+| 16 | 2048 | default | 320.8 | 6.4% | 9.5 GB | 6.0 GB |
 
-The desktop has **15,030 MB**, ~11.3 GB available idle, and its four trainers add ~4.2 GB. So 14 fits
-an idle box with under 2 GB spare and does *not* fit one that is training.
+**The box is a Ryzen 7 9700X: 8 physical cores, 16 SMT threads.** `os.cpu_count()` reports the
+threads, so `DEFAULT_PROCS = cores − 2` has always meant *threads* − 2 here — and this file and
+CLAUDE.md both called it a "16-core box", which is where the 14 came from. The natural prediction from
+the topology, that 14 shards on 8 cores is the oversubscribed regime the laptop measured as 20% slower,
+is **wrong**: throughput climbs past the physical core count all the way to 16, so SMT is worth about
++10% here (326 → 361) even though one shard saturates about one core. What is right is that the
+default was never measured on this host.
 
-**It is left at the default regardless** (user's decision, 2026-08-24, taken with this table in front
-of them). `runtime.json` carries no `vec_wave_procs` key and should be left without one — the full 14
-shards are right for the common case, an idle box running a close-out chained off a finished training,
-and the exposure is narrow: `max_evals` is 1, so there is only ever one wave, and an OOM'd wave is
-recoverable rather than lost (`interrupted` → relaunched, and `vec_eval` resumes from banked rows of
-matching depth). **The one configuration that can OOM is a wave overlapping four live trainers; if that
-happens, this is the cause and `vec_wave_procs` is the fix** — do not pre-emptively pin it.
+**Three readings, in order of what they are worth.**
 
-The laptop's measured point of 12 is a throughput optimum, not a memory one; check `free -m` on any
-host before raising it.
+- **Pinning `TF_NUM_INTRAOP_THREADS=1` is the largest single win, +3.6%, and it is free.** Every shard
+  otherwise opens an intra-op pool sized to the whole machine for a workload that is 95%
+  single-threaded numpy, so 16 shards ask for 256 threads on 16 hardware threads and pay pure
+  contention. It also takes ~35 MB off each shard. Untested on the laptop, where the operating point
+  was measured at TensorFlow's default.
+- **The cliff is at `cpu_count`, not at the cores.** 16 → 18 loses 6-10% and it never recovers; 20 and
+  24 are 12-13% down. "Run it harder" past 16 is strictly worse, and **the peak already sits at ~6%
+  idle** — there is no configuration on this box that is both busier and faster, so the last few
+  percent of idle is not slack that can be converted.
+- **Width 2048 is 11% worse**, the same direction the laptop measured.
+
+**The memory table this section used to carry was pessimistic by 3-4 GB**, because it subtracted
+`procs × 690 MB` from `MemAvailable` — and `MemAvailable` counts reclaimable page cache, which the
+kernel duly hands back. Measured: 16 shards peak at **8.9 GB resident and leave 6.7 GB available**, not
+the ~1.6 GB the arithmetic predicted, and even 24 shards (14.0 GB) leave 3.7 GB without swapping
+anything to death. Per-shard RSS is **553 MB at `intraop=1`, 585-601 MB at TensorFlow's default** — the
+590-600 MB figure being roughly flat in the shard count is what says the cost is TF's arena plus the
+1024-lane env rather than anything shared.
+
+So the OOM risk this section was built around is smaller than it looked, but it has not disappeared:
+four trainers add ~4.2 GB, which against a 16-shard wave's 8.9 GB is 13.1 GB of 15,030 MB. **14 shards
+at `intraop=1` cost 0.7% of throughput and 1.1 GB of memory**, which is the trade to make if a wave has
+to overlap live training. Both RSS figures are still short-run (64-101 s per config), so a multi-hour
+wave's memory remains unmeasured — watch `free -m` through the first long close-out.
+
+The laptop's measured point of 12 × width 1024 is a throughput optimum on *its* topology (14 physical
+cores, no SMT); neither host's number transfers to the other, and the sweep script is how a third host
+would get its own.
+
 
 Two traps in that knob. **`EVAL_WORKERS` does nothing here** — it sizes TF worker processes and this
 engine has none — but `launch.py` reads `job.eval_workers or runtime['vec_wave_procs']`, so an old job

@@ -424,36 +424,53 @@ connection is what produced the wrong call. Alias, no-config fallback and key re
 - **Training self-eval workers are *forked*** (Linux COW-shares the parent's TF pages), so they are
   nearly free: **4 trainers × 10 self-eval workers ≈ 4.2 GB total**. The overnight OOM was the
   cv2/XIO chart cascade plus orphan accumulation, *not* steady memory.
-- **‡ A `vec_wave` shard is ~690 MB, so the box's default of 14 shards asks ~9.7 GB** (measured there
-  2026-08-24, the day the vec engine was deployed there). Peak RSS of one `vec_eval.py` process is
-  **644 MB at 100 episodes and 690 MB at 500** — essentially flat in the episode count, because the
-  cost is TF's arena plus the 1024-lane env rather than the resident agent pool (44 agents vs 12).
-  `VEC_WAVE_PROCS` defaults to `cores − 2` = **14** on this 16-core box, so a wave asks for **~9.7 GB**
-  against **11.3 GB available idle** — inside the total but under the ≥3 GB headroom band, and *over*
-  the box if 4 trainers are also running (+4.2 GB → ~13.9 GB of 15,030 MB). For reference: 12 procs
-  is ~8.3 GB, 8 is ~5.5 GB, 6 is ~4.1 GB and is the only value that keeps ≥3 GB free with 4 trainers
-  alongside.
+- **‡ The desktop's vec-eval optimum is 16 shards with `TF_NUM_INTRAOP_THREADS=1`, and the box is 8
+  cores, not 16** (swept 2026-08-24 by
+  [`perDiagnostics/vec_wave_sweep.py`](snek2/hyperparamTuning/perDiagnostics/vec_wave_sweep.py); full
+  table in [`snek2/vectorized/README.md`](snek2/vectorized/README.md)). It is a Ryzen 7 9700X: **8
+  physical cores, 16 SMT threads**, and `os.cpu_count()` reports the threads — so `DEFAULT_PROCS =
+  cores − 2` has always meant *threads* − 2 here, and this file's "16-core box" is where the 14 came
+  from. Throughput at 240 checkpoints × 100 episodes, noise **under 1%** on this box:
 
-  **The box stays at the default anyway — that is a decision, not an oversight** (user's call,
-  2026-08-24, made with these numbers in hand). So `runtime.json` carries no `vec_wave_procs` key and
-  **should be left without one**; do not "fix" this by pinning a lower number. What it buys is the
-  full 14 shards on an idle box, which is the common case since the chain runs a close-out after its
-  training finishes. What it costs is that a wave overlapping four live trainers is the configuration
-  that can OOM. **If one does, that is the cause** — set `vec_wave_procs` then, and say so, rather
-  than treating it as a new mystery.
+  | procs | intra-op | episodes/s |
+  |---:|---:|---:|
+  | 8 | default | 326.3 |
+  | 12 | default | 344.1 |
+  | 14 (the default) | default | 358.5 |
+  | 16 | default | 361.2 |
+  | 14 | **1** | 371.4 |
+  | **16** | **1** | **373.9** |
+  | 18 | 1 | 337.5 |
 
-  Two things that make the risk smaller than the arithmetic suggests, and one that makes it worse.
-  `max_evals` is **1** on this box, so there is only ever one wave; a reboot mid-wave is recoverable
-  (`interrupted` → relaunched, and `vec_eval` resumes from banked rows at matching depth). Against
-  that: **both RSS figures are short-run**, taken over 54-68 s, so nothing has yet measured a
-  multi-hour wave and a slow leak would not have shown up. **Watch `free -m` through the first long
-  close-out.**
+  **Three things to carry.** The plausible inference from the topology — that 14 shards on 8 cores is
+  the oversubscribed regime the laptop measured as 20% slow — is **false**: throughput climbs past the
+  physical cores to 16, so SMT is worth ~+10% here. **The cliff is at `cpu_count`**: 18 loses 6-10%,
+  20 and 24 are 12-13% down, so running it harder than 16 is strictly worse, and the peak already sits
+  at **~6% idle** — the last few percent is not slack that can be converted. And **pinning intra-op
+  threads to 1 is the biggest free win (+3.6%)**, because a shard is 95% single-threaded numpy while
+  every one of them opens a pool sized to the whole machine. Untested on the laptop.
+
+  **The memory arithmetic this section used to carry was pessimistic by 3-4 GB.** It subtracted
+  `procs × 690 MB` from `MemAvailable`, which double-counts reclaimable page cache. Measured: a shard
+  is **553 MB at `intraop=1` and 585-601 MB at TF's default**, and a 16-shard wave peaks at **8.9 GB
+  resident leaving 6.7 GB available** — where the old arithmetic predicted ~1.6 GB. Even 24 shards
+  (14.0 GB) leave 3.7 GB. So the "one configuration that can OOM" is less sharp than it read, though
+  four trainers plus a 16-shard wave is still 13.1 GB of 15,030 MB; **14 shards at `intraop=1` cost
+  0.7% and save 1.1 GB**, which is the trade for a wave overlapping live training. Both RSS figures are
+  still short-run (64-101 s), so a multi-hour wave's memory is unmeasured — **watch `free -m` through
+  the first long close-out.**
+
+  **`runtime.json`'s `tf_intraop_threads` cannot deliver that win, and reaching for it would be a
+  mistake.** `launch.py` applies the threading knobs to **every** job it starts, trainings included, so
+  setting it to 1 pins trainers to one intra-op thread as well — untested, and training is the half of
+  the box where batched gradient work can actually use a pool. The eval-only place for it is
+  `vec_wave.child_env`.
 
   Unrelated to the count but easy to trip on: the wave's shards are `eval_workers`-insensitive —
   that knob sizes TF worker processes, which this engine has none of — but a job spec that still sets
   it *caps* `VEC_WAVE_PROCS` at its value (`launch.py` reads
   `job.eval_workers or runtime['vec_wave_procs']`), so an old spec carrying `eval_workers: 4` runs a
-  4-process wave on a 16-core box.
+  4-process wave whatever the box.
 
 Still measure with `free -m` before pushing `max_evals`/`eval_workers` past those bands.
 
@@ -886,8 +903,10 @@ Four things to carry:
   below** — a vec file's rows are not censored, so its graph-100% tier *is* comparable across arms in a
   way a gated file's is not.
 - **`EVAL_WORKERS` and `EVAL_LANES` do nothing to it**, and both hosts stop setting them. They size TF
-  worker processes; this engine has none. The analogue is `VEC_WAVE_PROCS`, default **cores − 2**, which
-  is 12 on the laptop — the measured point (2-6% idle; 16 processes reach 0% idle and are 20% *slower*).
+  worker processes; this engine has none. The analogue is `VEC_WAVE_PROCS`, default `os.cpu_count()`
+  **− 2**, and **each host's optimum is its own** — 12 on the laptop (2-6% idle; 16 processes reach 0%
+  idle and are 20% *slower*), **16 with `TF_NUM_INTRAOP_THREADS=1` on the desktop**, whose 16 is SMT
+  threads over 8 cores. Neither number transfers; sweep a new host with `vec_wave_sweep.py`.
 - **‡ c51 runs on it too, since 2026-08-24 — there is no longer a fallback.** `vec_eval` used to refuse
   categorical policies and `vec_wave` used to hand them to `eval_wave.py`; both are gone, because the
   engine never reads a Q head. It builds through `eval_agent.build_eval_agent` (which picks the agent

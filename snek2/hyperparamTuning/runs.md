@@ -36,7 +36,9 @@ training directory and the close-out reads as unpublished.
 
 **Do not raise `max_evals` to run two waves of the scalar path at once.** Load average was 18.3 on 14 cores
 with 4 lanes × 4 workers already, so a second job splits the same cores and both finish later. **A `vec_wave`
-does not have this shape** — it shards itself across cores − 2 and there is nothing to run two of.
+does not have this shape** — it shards itself across `os.cpu_count()` − 2 and there is nothing to run
+two of. **Each host's shard optimum is measured, not derived**: 12 on the laptop, **16 with
+`TF_NUM_INTRAOP_THREADS=1` on the desktop** (+4.3% over its default of 14; past 16 it loses 6-13%).
 
 **Verify each host separately — neither check sees the other**, so a count is meaningless without naming the
 box. Laptop: `ps -Ao pid=,command= | grep "python -u sne[k]2.py"`. Desktop:
