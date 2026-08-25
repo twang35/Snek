@@ -144,9 +144,24 @@ config.** Two things make arm64 different, both measured:
   with inter-op pinned, 17 with intra-op pinned, and **30 again with all three pinned** — reproducible
   across samples. On the desktop the same bundle goes 50 → 5. So the first laptop A/B, run at `1`
   (all three), was comparing 30 threads against 30 threads; its null result measured nothing at all.
-- **Pinning inter-op alone does shrink the laptop's pool (30 → 17) and still buys nothing**: paired
-  A/B at 12 shards gives **+0.55%** across four pairs (+2.83, −0.89, −3.85, +4.11), and RSS is
-  unchanged at 537-539 MB a shard. So those 13 threads cost neither time nor memory on this hardware.
+- **Pinning inter-op alone shrinks the laptop's pool (30 → 17) and buys CPU rather than speed.**
+  Throughput is flat — paired A/B at 12 shards gives **+0.55%** across four pairs (+2.83, −0.89,
+  −3.85, +4.11) and RSS is unchanged at 537-539 MB — but **CPU idle goes 9.4% → 15.0%**, i.e. the same
+  work for **~0.8 fewer of the 14 cores**. The two hosts differ in where the saving lands, not in
+  whether there is one: the desktop runs 14 shards on 8 physical cores and is CPU-bound, so removing
+  dispatch overhead becomes +3.6% throughput; the laptop runs 12 shards on 14 real cores, so each
+  shard already owns one and the saving has nowhere to go but idle. **On the laptop that is the more
+  useful half anyway**, since it is the interactive machine.
+
+  **Idle resolves this effect where throughput cannot.** The pinned runs read 15.0% and 15.0% against
+  9.4% mean for auto, while `episodes/s` scatters ±4% — so on a noisy host, measure the utilisation
+  and not just the rate.
+
+**‡ Do not read the `load` column for a short run.** Load average is a 1-minute EMA and a config here
+takes 65-100 s, so each row carries the tail of the row before it — the CPU-utilisation pair above read
+`load` 13.3 for auto and 16.2 for pinned, the *opposite* order to their idle, and two back-to-back rows
+both read exactly 17.0. `idle` is a delta taken over precisely the run and is the trustworthy column;
+`load` is only worth reading across runs long enough for the EMA to converge.
 
 **The laptop needs paired configs and the desktop does not**, which is worth knowing before running
 either sweep again. The laptop's run-to-run spread is **±4%** against the desktop's **under 1%**, and a

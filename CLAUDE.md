@@ -458,8 +458,12 @@ connection is what produced the wrong call. Alias, no-config fallback and key re
   `OMP_NUM_THREADS=1` *undoes* the thread reduction on arm64 (30 threads at the default, 17 with
   inter-op pinned, **30 again with all three pinned**, reproducible — where the desktop goes 50 → 5),
   so a laptop A/B run at "all three" compares 30 threads with 30 and measures nothing. Pinning
-  inter-op alone does shrink the pool there (30 → 17) and still buys **+0.55%** across four pairs with
-  RSS unchanged. And **the laptop needs paired configs**: its spread is **±4%** against the desktop's
+  inter-op alone does shrink the pool there (30 → 17), and it **buys CPU rather than speed**:
+  throughput is flat (**+0.55%** across four pairs, RSS unchanged) while **CPU idle goes 9.4% → 15.0%**
+  — the same work for ~0.8 fewer of the 14 cores, which is the more useful half on the interactive
+  machine. The desktop is CPU-bound at 14 shards on 8 cores so the saving becomes throughput; the
+  laptop's 12 shards on 14 real cores each own a core already, so it becomes idle. **Idle resolves it
+  where throughput cannot** — 15.0%/15.0% against 9.4%, while `episodes/s` scatters ±4%. And **the laptop needs paired configs**: its spread is **±4%** against the desktop's
   **under 1%**, and a laptop sweep in launch order carries a warm-up drift that inverted the ranking
   between two rounds. Alternate A/B/A/B there; the desktop does not need it.
 
