@@ -19,11 +19,33 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | **laptop** | **idle.** No trainers, no evals |
 | **desktop `the-claw-den`** | **`b46` wave 1** — `b46a` (batch 512) on seeds 1-4, four trainers, **184-193k of 3M (6%)**. Heartbeat `2026-08-25T23:52:22`, `counts {trainer: 4, eval: 0}`. 12 arms queued as waves 2-4, plus wave 1's close-out |
 
-**Wave 1 finishes in ~20 h, around 2026-08-26 20:00.** Measured over its own 83-minute run: **37.1-38.9
-steps/s** per arm (step ÷ `elapsed_s`, four arms in parallel). That is the whole-run average, so it
-carries the startup cost and the true remaining time is slightly *under* the figure. **This is the
-slow wave** — batch 512 is ~4x the backward-pass FLOPs — so waves 2-4 should each land nearer 10-12 h,
-putting the batch's four training waves plus their close-outs at roughly **2.5-3 days** total.
+**Wave 1 finishes in ~22-24 h, so late on 2026-08-26.** **This is the slow wave** — batch 512 is ~4x
+the backward-pass FLOPs — so waves 2-4 should each land nearer 10-12 h, putting the batch's four
+training waves plus their close-outs at roughly **3 days**.
+
+**‡ The whole-run average is the wrong rate to project from here, and it errs in the direction that
+looks safe.** Over its first 80 minutes the wave averaged **39.0 steps/s**; a clean 10-minute window
+measured **35.0**. The natural reading of the average — "it carries the startup cost, so the truth is
+slightly faster" — is backwards: **the arm is getting slower as it gets better**, and the mechanism is
+its own self-eval. 20 episodes run every 1,000 steps, and a *better* policy plays *longer* episodes, so
+the per-1,000-step eval bill rises with skill:
+
+| step band | mean `avg_score` | mean perfect % |
+|---|---|---|
+| 0-40k | 46.7 | 3.6 |
+| 40-80k | 79.3 | 6.5 |
+| 120-160k | 80.7 | 8.5 |
+| 160-200k | 81.8 | **25.5** |
+| 200-240k | 82.1 | **39.5** |
+
+**And `avg_score` understates what is still coming**, which is the part worth carrying. It looks
+plateaued at ~82 from 40k on, so the obvious inference is that episode length has stopped growing. It
+has not: `avg_score` is capped at 95 and the *perfect* rate is still climbing hard (8.5 → 39.5 in 80k
+steps), and a perfect game is by definition the longest episode there is. So the tail of the length
+distribution is still filling in, and the rate should keep sagging until the perfect rate saturates.
+**Project from a recent window, not from `step ÷ elapsed_s`, and re-measure rather than extrapolating
+an ETA far ahead.** `status.json`'s own `steps_per_sec` is not the answer either — it read 30.5 for all
+four arms, because steps land in 1,000-step blocks and a 30 s poll quantizes badly.
 
 **No effect from batch 512 yet, and none is due.** Paired against each seed's own `b38` arm over every
 graph eval to 185k, banded mean perfect rate is **20.2 vs 20.0** — a 0.2 pp difference with the sign
