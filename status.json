@@ -1,12 +1,13 @@
 {
-  "iso": "2026-08-25T22:24:23",
-  "ts": 1787721863.3376276,
+  "iso": "2026-08-25T22:29:40",
+  "ts": 1787722180.178411,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 screen -- batch 512, soft target, 21 / 201 atoms (seed 2, vs b38b) -- training 1% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training (4 arms)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 screen -- batch 512, soft target, 21 / 201 atoms (seed 2, vs b38b) -- queued (4 arms)"
+      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (4 arms)",
+      "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (12 arms)"
     ]
   },
   "runtime": {
@@ -34,64 +35,76 @@
   },
   "running": [
     {
+      "id": "b46a-c51batch512seed1",
+      "type": "train",
+      "policy": "b46a-c51batch512seed1",
+      "policies": [
+        "b46a-c51batch512seed1"
+      ],
+      "pid": 28693,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
       "id": "b46a-c51batch512seed2",
       "type": "train",
       "policy": "b46a-c51batch512seed2",
       "policies": [
         "b46a-c51batch512seed2"
       ],
-      "pid": 18885,
-      "step": 32000,
+      "pid": 28694,
+      "step": null,
       "max_steps": 3000000,
-      "steps_per_sec": 30.6,
-      "elapsed_s": 527
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
-      "id": "b46b-c51softtgtseed2",
+      "id": "b46a-c51batch512seed3",
       "type": "train",
-      "policy": "b46b-c51softtgtseed2",
+      "policy": "b46a-c51batch512seed3",
       "policies": [
-        "b46b-c51softtgtseed2"
+        "b46a-c51batch512seed3"
       ],
-      "pid": 18886,
-      "step": 31000,
+      "pid": 28695,
+      "step": null,
       "max_steps": 3000000,
-      "steps_per_sec": 30.6,
-      "elapsed_s": 527
+      "steps_per_sec": null,
+      "elapsed_s": 0
     },
     {
-      "id": "b46c-c51atoms21seed2",
+      "id": "b46a-c51batch512seed4",
       "type": "train",
-      "policy": "b46c-c51atoms21seed2",
+      "policy": "b46a-c51batch512seed4",
       "policies": [
-        "b46c-c51atoms21seed2"
+        "b46a-c51batch512seed4"
       ],
-      "pid": 18887,
-      "step": 26000,
+      "pid": 28696,
+      "step": null,
       "max_steps": 3000000,
-      "steps_per_sec": 30.6,
-      "elapsed_s": 527
-    },
-    {
-      "id": "b46d-c51atoms201seed2",
-      "type": "train",
-      "policy": "b46d-c51atoms201seed2",
-      "policies": [
-        "b46d-c51atoms201seed2"
-      ],
-      "pid": 18888,
-      "step": 32000,
-      "max_steps": 3000000,
-      "steps_per_sec": 30.6,
-      "elapsed_s": 527
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
     "b46-closeout": "queued",
+    "b46b-c51softtgtseed1": "queued",
+    "b46b-c51softtgtseed2": "queued",
+    "b46b-c51softtgtseed3": "queued",
+    "b46b-c51softtgtseed4": "queued",
+    "b46c-c51atoms21seed1": "queued",
+    "b46c-c51atoms21seed2": "queued",
+    "b46c-c51atoms21seed3": "queued",
+    "b46c-c51atoms21seed4": "queued",
+    "b46d-c51atoms201seed1": "queued",
+    "b46d-c51atoms201seed2": "queued",
+    "b46d-c51atoms201seed3": "queued",
+    "b46d-c51atoms201seed4": "queued",
+    "b46a-c51batch512seed1": "running",
     "b46a-c51batch512seed2": "running",
-    "b46b-c51softtgtseed2": "running",
-    "b46c-c51atoms21seed2": "running",
-    "b46d-c51atoms201seed2": "running",
+    "b46a-c51batch512seed3": "running",
+    "b46a-c51batch512seed4": "running",
     "b45-closeout-w2": "done",
     "b45-closeout": "done",
     "b45b-lowlr8-b29a": "done",
@@ -340,10 +353,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 119.6,
+  "disk_free_gb": 119.7,
   "load_avg": [
-    17.53466796875,
-    14.3076171875,
-    7.4267578125
+    0.1796875,
+    5.9130859375,
+    5.87158203125
   ]
 }
