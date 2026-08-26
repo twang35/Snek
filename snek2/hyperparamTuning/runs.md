@@ -12,12 +12,12 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## What is running — 2026-08-24
+## What is running — 2026-08-25
 
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **idle**, nothing queued. Heartbeat `2026-08-24T11:00:20`, `counts {trainer: 0, eval: 0}` |
+| **desktop `the-claw-den`** | **`b46` wave 1** (`b46a`, batch 512, seeds 1-4), four trainers. 12 more arms queued as waves 2-4 |
 
 **`b45` is finished, and it was measured twice.** The desktop closed it out on the TF path in three waves; the
 laptop re-measured all four arms with the new vectorised engine. Both instruments say the same thing —
@@ -56,6 +56,89 @@ as `done`, so the daemon synthesized **`b44-hof-r2`** on its next poll, 45 s lat
 interrupted pass, not a repeat measurement. Read the two `grep -c`s before assuming a long eval is stuck:
 lane completions (`episodes in`) against controller folds (`^[ n/N]`).
 
+## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, launched 2026-08-25*
+
+Four one-knob variants of `b38`'s c51 config, each run on **all four of b38's seeds** — 16 arms, 3M
+steps, **one config per wave**.
+
+| wave | prio | arms | the one change from `b38` | why |
+|---|---|---|---|---|
+| 1 | 30 | `b46a-c51batch512seed1..4` | `BATCH_SIZE` 128 → **512** | a categorical head fits 51 atoms from the transition a scalar head uses for one number, so its per-sample gradient is noisier. Largest lever on that, so it goes first |
+| 2 | 31 | `b46b-c51softtgtseed1..4` | `TARGET_UPDATE_TAU=0.005`, `PERIOD=1` | the projected target is rebuilt from a net that jumps **across the whole support at once** every 1000 steps, and the projection is nonlinear, so the jump does not average away |
+| 3 | 32 | `b46c-c51atoms21seed1..4` | `NUM_ATOMS` 51 → **21** | 51 is the C51 paper's Atari number, never tested here. Fewer atoms = ~2.4x the data per atom |
+| 4 | 33 | `b46d-c51atoms201seed1..4` | `NUM_ATOMS` 51 → **201** | the other bracket. Returns cluster near a win, and at 2.50 an atom the win/no-win distinction may fall inside one bin |
+
+Everything else is b38's config verbatim — `c51`, `fc 320`, support `[-5, 120]`, `lr 1e-4`, Adam ε
+`3.125e-4`, IS off, `discount 0.9975`, `fork_branches 4`, no food-distance shaping — at a **3M** cap.
+
+**Why n=4 and why the seeds are b38's own.** Every arm has a **seed-matched control** in b38, so this
+is a *paired* comparison rather than two group means. b38's four arms pooled 78.51 / 71.79 / 72.53 /
+72.66 — a **6.7 pp** spread at n=1 — so a single unpaired arm cannot see anything smaller than its own
+seed. Pairing removes that variance instead of averaging over it, which is also why fresh seeds were
+not used: a fresh seed has nothing to pair with.
+
+**One config per wave, and the wave barrier is what enforces it.** The daemon starts nothing new until
+all four running jobs finish, and takes the four lowest-priority pending jobs, so priorities 30/31/32/33
+make each wave exactly one config at n=4. Every wave therefore lands a **complete, readable answer
+about one knob** — nothing has to wait for a later wave to become interpretable, and the batch can be
+stopped after any wave without leaving a half-measured config behind.
+
+**Budget ~3 days, and wave 1 is the slow one.** Four sequential waves plus a close-out each. `b46a` is
+~4x the backward-pass FLOPs of the others; waves 2-4 should run at roughly b38's speed. **If the
+schedule binds, cut wave 4** — `b46d` has the weakest prior of the four, and being last means cancelling
+it costs nothing already spent.
+
+**Why b38 and not b36 is the baseline.** The two differ only in Adam ε (b36 `1.5e-4`, b38 `3.125e-4`)
+and that dose is closed — sign test `p = 0.625`. b38 is also the batch whose four arms all ran the
+**full 3.00M**; b36 was stopped at **1.87-2.02M**. At this horizon b38 is the only exact 4-seed control
+that exists.
+
+**The hypothesis the batch is built on.** c51 has underperformed the scalar arms across b36/b38, and
+the suspicion is that the shortfall is in the **loss**, not the algorithm. Waves 1 and 2 attack the
+gradient's noise and the target's smoothness; 3 and 4 bracket 51 atoms. Every c51 arm in this project
+has run `BATCH_SIZE=128` and `TARGET_UPDATE_PERIOD=1000` — both DQN defaults, neither chosen for a
+distributional loss. **If all four waves come back null**, the shortfall is not in these knobs and the
+remaining places to look are the priority signal (`kl` vs `ce`) and `C51_DOUBLE`.
+
+**How to judge a wave.** Per-seed difference against the matched b38 arm, then a **sign test across the
+four seeds** — the reading the b42-b45 ladder used, where 4-of-4 at a mean of +2.0 pp closed a rung.
+Even at n=4 this project cannot resolve an effect below ~10 pp on score alone, so churn
+([`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py)) is the primary signal and score
+is the confirmation. **Do not read `peak_trailing`** — trailing average *score*, saturated at 95/95 for
+anything that fills a board.
+
+**`b46b`'s result will be confounded, and that is pre-registered.** `tau=0.005` at period 1 has a time
+constant of ~200 steps against a hard copy's ~500-step mean lag, so the wave changes the target's
+**smoothness** and makes it track **~2.5x faster**, together. The larger dose was kept because that is
+what a screen needs. **If wave 2 wins, run `tau=0.001` at period 1 at n=4 before concluding anything
+about smoothness** — it holds the lag at ~1000 steps and changes only the shape. If it loses, the cheap
+next probe is a hard copy at period 200: speed without smoothness.
+
+**If waves 3 and 4 are both null, the next batch is `C51_DOUBLE=0`, not a third atom count.** It was
+the other candidate for the wave-4 slot and is better-motivated on paper — double-Q's action selection
+interacts with a categorical head in a way nothing here has isolated — and was left out only to keep
+the batch to one theme per pair.
+
+**Not a HOF attempt.** 3M from scratch does not reach the ≥98% band, so expect `auto_hof` to exit
+`done` with nothing measured on all sixteen arms. That is normal.
+
+**Waves 3 and 4 are closed out at a non-default atom count, and that is safe.** `SNEK_NUM_ATOMS` is
+deliberately absent from `runner.EVAL_RELEVANT_ENV` because a categorical arm's atom count, `v_min` and
+`v_max` are recorded in its own **`arch.json`**, and `build_eval_agent` rebuilds the network from that
+sidecar rather than from the env. `BATCH_SIZE` and the target-update knobs are training-only and cannot
+reach a trained checkpoint at all. So one close-out wave measures a config's four seeds with no setting
+leaking between arms.
+
+**‡ This batch was restarted twice before it settled, and the reason is worth keeping.** The first
+version ran **one config per arm at a single seed** — n=1, below this project's own noise floor. It was
+killed ~8 minutes in, its data and its four ledger entries deleted, and re-queued. A second revision
+grouped waves by **seed** instead of by config; that was dropped before launch because a seed-grouped
+wave leaves *every* config at n=1 until the last wave lands. Nothing was lost either time. **The trap
+that made the restart non-trivial:** a killed job is marked `failed`, `failed` is in `TERMINAL`, and
+`_scan_pending` drops any spec whose id is terminal — so **re-queueing a killed arm under its own id
+would silently never dispatch**. The four ledger entries had to be removed (daemon stopped first, so
+`_save_ledger` could not overwrite the edit; backup at `~/.snek-runner/ledger.json.bak-b46-restructure`).
+
 ## Batches 42-45 — what happens if you keep training a champion — **yes, and lower is better down to `1e-7`: 4 → 187 → 874 rows ≥98%/500 across 1e-5/1e-6/1e-7, and `1e-8` is the frozen floor**
 
 **The question nobody here has asked.** Every record in this project is a checkpoint some 2M-step arm
@@ -69,9 +152,9 @@ checkpoint**. So: does a champion that keeps training improve, hold, or decay?
 | learning rate | **1e-5** (the default, the rate these checkpoints were trained at) | **1e-6** | **1e-7** | **1e-8** |
 | everything else | b29's config verbatim | b29's config verbatim | b29's config verbatim | b29's config verbatim |
 | cap | 3M, absolute | 3M, absolute | 3M, absolute | **5M**, absolute — see below |
-| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd — [write-up](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays) | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **finished on all three instruments** — HOF-500 landed 2026-08-20, all 2235 measurements | **trained to 4.10-4.42M and stopped.** Close-out running on the desktop as **two waves**: `{a,c}` is in its HOF stage, `{b,d}` is queued — see [What is running](#what-is-running--2026-08-24) |
+| state | **stopped at +385-421k — it decays.** Closed out and HOF-500'd — [write-up](completedRuns.md#batch-42--the-same-four-checkpoints-at-the-default-lr-1e-5-stopped-early-it-decays) | **finished on all three instruments** — [write-up in `completedRuns.md`](completedRuns.md#batch-43--continuing-the-four-best-checkpoints-at-lr-1e-6-a-record-region-10x-wider-than-anything-before-it-and-the-best-checkpoint-was-the-wrong-one-to-continue) | **finished on all three instruments** — HOF-500 landed 2026-08-20, all 2235 measurements | **finished on all three instruments, and measured twice.** Trained to 4.10-4.42M; the desktop closed it out on the TF path (3 waves) and the laptop re-measured all four arms on the vec engine — [both tables](charts.md#-close-out-and-hof-500--all-four-arms-measured-independently-by-both-engines) |
 | self-eval | pooled eq-effort mean **92.1**; its only ≥98%/500 rows are within 75k steps of its own seed | holds flat, `sef` 96.5-99.5, one seed hit a 100.0 best-30 window | **wins: 4 of 4 seeds over `b43`**, `sef` 98.7-99.9 | **flat on all four**, drift −0.6 to +0.3 pp over 2.8M steps; best-30 **98.3-100.0** on an equal-episode window (99.2 raw) |
-| close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | `b45a` **49.2%** (1584/3222), `b45c` **38.6%** (1171/3031); `b45b`/`b45d` running |
+| close-out (/100) | **≥98% on 2.2-14.1%** of its checkpoints | ≥98% on **6.0-38.7%** | **≥98% on 6.9-56.3%** — 3 of 4 seeds ahead of `b43`, and by a lot | ≥98% on **6.5-49.2%**; batch total **593** rows ≥98%/500 (vec: 611) against `b44`'s **874** — and on the *share* held it is 8-23% against 10-50%, so `1e-7` holds the rung |
 | HOF (/500) | 4 rows ≥98% in total, all within 75k of a seed | **187 rows ≥98%**, best 99.6% (`b43b` @1661k) | **874 rows ≥98%**, 90 at ≥99%, and **two 500/500s** (`b44a` @2798k, `b44b` @1886k) — [both selection artefacts](findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) | **wave 1 done: 486 rows ≥98%** (`b45a` 349, `b45c` 137), best **99.4%** (`b45a` @1621k). Wave 2 running |
 
 `b44` existed because `b42` and `b43` bracketed the effect on the first try: dropping the rate 10× turned decay
@@ -389,6 +472,6 @@ sweep was 2026-08-22, which took this file from 1075 lines to ~350 by retiring t
 notice, the closed rungs of the b42-b45 ladder, every closed-batch status section from b31 to b41, the gate
 ladder summary, the b20-b26 index, the max-progression table and the batch 11-19 one-liners.
 
-**Verifying what is running on each host is [above](#what-is-running--2026-08-24)** — and note that neither
+**Verifying what is running on each host is [above](#what-is-running--2026-08-25)** — and note that neither
 check sees the other box, so a count is meaningless without naming it. Full ladder for a desktop that looks
 dead: [`CLAUDE.md`](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).

@@ -9,6 +9,7 @@ moved: every image stays in `../charts/`, so the captions here still render.
 
 | retired | batch | why it went |
 |---|---|---|
+| 2026-08-25 | 37 | batch 46 (the four one-knob c51 screens) got its section, making seven. **Strict oldest.** Its conclusion — the 2-of-4 strong-seed pattern replicates but the ≥98%/500 record tier does not, 59 candidates giving zero — is carried by [`../findings.md`](../findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading), which is now the canonical statement of it |
 | 2026-08-20 | 28-29 | batch 45 (`lr 1e-8`, the fourth rung) got its section, making seven. **Strict oldest.** It is the source of three of the four checkpoints 42-45 continue, so it was held back once already; its conclusion — the gate is the lever, and gate 75 produced what looked like a record region — is now carried by [`../findings.md`](../findings.md), and that region has since been [shown to be seed noise](../findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading) and its record checkpoint [re-measured 1.5 pp lower](../findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20) |
 | 2026-08-19 | 36 | batch 44 (`lr 1e-7`, the third rung of the continuation ladder) got its section, making seven. **36 was being held only as the named control for 39**, and 39 was itself retired the evening before, so the reason expired. Retired ahead of the strict-oldest 28-29, which remains the source of three of the four checkpoints 42/43/44 continue. Its conclusion — C51 on `fc 320` is still well behind the scalar head at its own architecture — is carried by [`../findings.md`](../findings.md) |
 | 2026-08-18 | 39 | batch 42 got its section (the `lr 1e-5` control for 43), making seven. Retired ahead of the strict-oldest 28-29, which is the source of three of the four checkpoints 42/43/44 continue and the batch they are read against; 39 bears on none of the continuation work and its conclusion — zero-init loses through action separation, not calibration — is carried in full by [`../findings.md`](../findings.md) |
@@ -35,6 +36,43 @@ moved: every image stays in `../charts/`, so the captions here still render.
 | 2026-08-08 | 12 | batch 18 landed; batch 12 became the seventh-newest |
 
 ---
+
+## Batch 37 — **`b29` replicated on fresh seeds 5-8** — *done on the desktop: the /100 band replicates, the /500 record does not*
+
+**Byte-identical to `b29` except `SNEK_SEED`** — `fc 320`, chase-safe `c=0.10`, **gate 75**, IS off,
+`td_error`, 2M. Queued because b29's 21-checkpoint ≥98%/500 band rested on **2 of its 4 seeds**, and a
+record region that depends on the seed is a different claim from one that depends on the config.
+
+| arm | best-30 | `sef` | pooled/eq | ≥98%/100 | held ≥98%/500 |
+|---|---|---|---|---|---|
+| `b37b` | **97.7** | 56.0 | **90.50** | **43** | 0 — best 97.0%, abandoned at 361 ep |
+| `b37c` | 97.0 | **58.6** | 87.88 | 16 | 0 — best 96.9%, abandoned at 357 ep |
+| `b37a` | 91.3 | 49.8 | 82.19 | 0 | 0 |
+| `b37d` | 90.0 | 40.8 | 80.72 | 0 | 0 |
+| **group** | | | **85.32** | **59, 2 of 4 seeds** | **0 of 4** |
+
+**The 2-of-4 pattern replicates exactly** — two strong seeds carrying the ≥98%/100 tier, two contributing
+nothing — and `b37b`'s pooled **90.50** is the highest single arm in the chase-safe family. **The record tier
+does not replicate at all:** 59 candidates at ≥98%/100 produced **zero** that held 98% over 500 episodes, with
+the two best abandoned around 360 episodes at 96.9-97.0%.
+
+**Read this together with `b40` above.** The same config, fresh seeds, gives 0 where b29 gave 21; a different
+config with an added shaping term gives 1. **The ≥98%/500 count is the noisiest metric in this project** and a
+single batch's value should not be treated as a property of its config. Pooled equal-effort is what
+distinguishes these batches, and on that b37 (85.32) is the *weakest* of the family despite holding its best
+single arm.
+
+![b37a](../charts/b37a-chase10g75seed5.png)
+**b37a-chase10g75seed5** — seed 5, no ≥98%/100 checkpoint at all
+
+![b37b](../charts/b37b-chase10g75seed6.png)
+**b37b-chase10g75seed6** — strongest arm of the family on pooled (90.50), yet 0 held at 500
+
+![b37c](../charts/b37c-chase10g75seed7.png)
+**b37c-chase10g75seed7** — highest `sef` of the batch (58.6), 16 candidates, 0 held
+
+![b37d](../charts/b37d-chase10g75seed8.png)
+**b37d-chase10g75seed8** — the weak seed
 
 ## Batch 36 — **C51 on `fc 320`**, one wide layer instead of three narrow — *stopped at 1.87-2.02M, closed out*
 

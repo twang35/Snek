@@ -1169,7 +1169,7 @@ batches with indistinguishable /100 tiers produced held counts of 21, 1 and 0, s
 noise** and this family must be judged on pooled. The correction is in
 [`findings.md`](../findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading);
 rationale, per-arm rows and charts in [`completedRuns.md`](../completedRuns.md) and
-[`charts.md`](../charts.md#batch-37--b29-replicated-on-fresh-seeds-5-8--done-on-the-desktop-the-100-band-replicates-the-500-record-does-not).
+[`charts.md`](charts-archive.md#batch-37--b29-replicated-on-fresh-seeds-5-8--done-on-the-desktop-the-100-band-replicates-the-500-record-does-not).
 
 ## Batch 35 — chase-safe `c=0.10`, **gate 40** — *done on the desktop: null*
 

@@ -693,7 +693,7 @@ pre-registered (7.0 → ~27 @600-630k → 21 vs b36's monotone 49.6 → 21.6). F
 were correct.** All four arms completed training, close-out **and** HOF-500 at 2M. **Verdict and the correction
 it forces** are in
 [`findings.md`](findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading);
-per-arm rows in [`completedRuns.md`](completedRuns.md), charts in [`charts.md`](charts.md#batch-37--b29-replicated-on-fresh-seeds-5-8--done-on-the-desktop-the-100-band-replicates-the-500-record-does-not).
+per-arm rows in [`completedRuns.md`](completedRuns.md), charts in [`charts.md`](archive/charts-archive.md#batch-37--b29-replicated-on-fresh-seeds-5-8--done-on-the-desktop-the-100-band-replicates-the-500-record-does-not).
 
 | arm | pooled /eq | best ckpt /100 | ≥98%/100 | **held ≥98%/500** | best-30 | `sef` |
 |---|---|---|---|---|---|---|

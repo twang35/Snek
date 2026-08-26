@@ -1,21 +1,20 @@
 # Charts
 
-Progress graphs for the most recent batches — **28, 37, 40, 42, 43 and 44**, a cap of six, newest first.
+Progress graphs for the most recent batches — **40, 42, 43, 44, 45 and 46**, a cap of six, newest first.
 Per-arm numbers live in [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of
 each. A batch appears here **while it is still running**, with training-only numbers, not just once it has
 closed. Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched,
 **batch 30** followed when 34's results arrived, **batch 31** (a void, stopped C51 arm) when 35's arrived,
 **batch 33** when 38 launched, **batch 32** when 39 did, **batches 34 and 35** when 37's and 40's results
-landed, and **the C51 pilot plus batch 38** when 42/43 launched, and **batch 39** when 42 got its section, and **batch 36** when 44 got its. 36 was being held only as the named control for 39, and 39 is now archived itself. 39 went ahead of the strict-oldest 28-29 for the same reason 28-29 has been held four times now: it is the source of three of the four checkpoints 42/43/44 continue, and it is what they are read against. 39 bears on none of that.
+landed, and **the C51 pilot plus batch 38** when 42/43 launched, and **batch 39** when 42 got its section, **batch 36** when 44 got its, **batches 28-29** when 45 got its, and **batch 37** when 46 got its. 36 was being held only as the named control for 39, and 39 is now archived itself. 39 went ahead of the strict-oldest 28-29 for the same reason 28-29 has been held four times now: it is the source of three of the four checkpoints 42/43/44 continue, and it is what they are read against. 39 bears on none of that.
 
-**`b37`, `b40` and `b42` are fully closed** — training, close-out *and* HOF-500. **`b43` and `b44` are through
-their close-outs** (2026-08-19: 15 h on the laptop, 11.2-14.9 h on the desktop) **and their HOF-500 re-measures
-are running** — `b43`'s on the laptop at ~25%, `b44`'s on the desktop at ~6%, the latter ~18 h of work. Both
-passes are **slow by nature, not stuck** — see
-[the cost warning](#-a-continuation-batchs-close-out-costs-10-20x-a-normal-ones) in batch 44's section. **`b42`
-was stopped early** at +385-421k, once its answer had resolved on 4 of 4 seeds. The gate ladder's two null rungs (34, 70 and 35, 40) were retired earlier,
-since the ladder's conclusion is now carried by 28-29, 37 and 40 — the batches that bear on whether gate 75's
-record region was real.
+**`b40`, `b42`, `b43`, `b44` and `b45` are fully closed** — training, close-out *and* HOF-500. `b45` was
+measured **twice**, by both engines, and they agree. **`b46` is the only live batch** — 16 arms at n=4, run as four
+waves of one config each; wave 1 (`b46a`, batch 512) is on the desktop now. A continuation batch's HOF pass is **slow by nature, not stuck** —
+see [the cost warning](#-a-continuation-batchs-close-out-costs-10-20x-a-normal-ones) in batch 44's section.
+**`b42` was stopped early** at +385-421k, once its answer had resolved on 4 of 4 seeds. The gate ladder's two
+null rungs (34, 70 and 35, 40) were retired earlier, since the ladder's conclusion is now carried by 28-29, 37
+and 40 — the batches that bear on whether gate 75's record region was real.
 
 **`b37` and `b39` are not a numbering slip:** `b37` was queued from the desktop the same evening `b38` was
 launched from the laptop, so the two hosts took adjacent numbers out of order. **`b41` has no section here
@@ -63,6 +62,36 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 `best30-drivers` and `gate-behavior-b27-vs-b29` are diagnostic figures referenced from
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
+
+## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, one config per wave, launched 2026-08-25*
+
+**No charts yet.** Wave 1 started at 23:0x on 2026-08-25 and a desktop training publishes under
+`results/<policy>/` when it finishes, so there is nothing to show until wave 1 lands. The per-arm
+sections go in with their images on the first pull. The batch is listed here anyway because a running
+batch with no entry in this file is the bug this rule exists to prevent.
+
+| wave | arms | the one change from `b38` |
+|---|---|---|
+| 1 | `b46a-c51batch512seed1..4` | `BATCH_SIZE` 128 → **512** |
+| 2 | `b46b-c51softtgtseed1..4` | `TARGET_UPDATE_TAU=0.005`, `PERIOD=1` (soft, not a hard copy every 1000) |
+| 3 | `b46c-c51atoms21seed1..4` | `NUM_ATOMS` 51 → **21** |
+| 4 | `b46d-c51atoms201seed1..4` | `NUM_ATOMS` 51 → **201** |
+
+16 arms, 3M steps, everything else `b38`'s config verbatim, **each arm paired against the b38 arm of
+its own seed**. Design rationale, the pre-registered readings and the confound in wave 2 are in
+[`runs.md`](runs.md#batch-46--four-c51-knobs-each-at-n4--running-on-the-desktop-launched-2026-08-25).
+
+**Read these charts against b38's, not against each other's absolute height.** b38's four arms pooled
+78.51 / 71.79 / 72.53 / 72.66 — a **6.7 pp** seed spread — so the comparison that carries information
+is per-seed and paired, then a sign test across the four. Churn
+([`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py)) is the primary signal; even n=4
+cannot resolve an effect below ~10 pp on score alone.
+
+**Two era boundaries govern how these curves read against b36/b38's.** Graph evals are 20 episodes from
+batch 45 onward, so the red curve moves in steps of 5 rather than 10 and `best_perfect30` is biased
+**down** against the older batches — the bias is identical across all sixteen arms, so it cancels
+*within* b46 and only distorts the comparison to b38. And the close-out runs on the **vec** engine,
+flat and ungated (`min_achievable: null`), where b38's rows were gated at 95.
 
 ## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *complete, and measured twice on two engines: **flat on all four**, and `1e-7` still holds the rung — 593 rows ≥98%/500 against `b44`'s 874*
 
@@ -601,40 +630,3 @@ a HOF-promotion candidate — third-best /500 on record behind `b29b`'s 99.0 and
 
 ![b40d](charts/b40d-chasefree10g75seed4.png)
 **b40d-chasefree10g75seed4** — the weak seed, as in every batch of this family
-
-## Batch 37 — **`b29` replicated on fresh seeds 5-8** — *done on the desktop: the /100 band replicates, the /500 record does not*
-
-**Byte-identical to `b29` except `SNEK_SEED`** — `fc 320`, chase-safe `c=0.10`, **gate 75**, IS off,
-`td_error`, 2M. Queued because b29's 21-checkpoint ≥98%/500 band rested on **2 of its 4 seeds**, and a
-record region that depends on the seed is a different claim from one that depends on the config.
-
-| arm | best-30 | `sef` | pooled/eq | ≥98%/100 | held ≥98%/500 |
-|---|---|---|---|---|---|
-| `b37b` | **97.7** | 56.0 | **90.50** | **43** | 0 — best 97.0%, abandoned at 361 ep |
-| `b37c` | 97.0 | **58.6** | 87.88 | 16 | 0 — best 96.9%, abandoned at 357 ep |
-| `b37a` | 91.3 | 49.8 | 82.19 | 0 | 0 |
-| `b37d` | 90.0 | 40.8 | 80.72 | 0 | 0 |
-| **group** | | | **85.32** | **59, 2 of 4 seeds** | **0 of 4** |
-
-**The 2-of-4 pattern replicates exactly** — two strong seeds carrying the ≥98%/100 tier, two contributing
-nothing — and `b37b`'s pooled **90.50** is the highest single arm in the chase-safe family. **The record tier
-does not replicate at all:** 59 candidates at ≥98%/100 produced **zero** that held 98% over 500 episodes, with
-the two best abandoned around 360 episodes at 96.9-97.0%.
-
-**Read this together with `b40` above.** The same config, fresh seeds, gives 0 where b29 gave 21; a different
-config with an added shaping term gives 1. **The ≥98%/500 count is the noisiest metric in this project** and a
-single batch's value should not be treated as a property of its config. Pooled equal-effort is what
-distinguishes these batches, and on that b37 (85.32) is the *weakest* of the family despite holding its best
-single arm.
-
-![b37a](charts/b37a-chase10g75seed5.png)
-**b37a-chase10g75seed5** — seed 5, no ≥98%/100 checkpoint at all
-
-![b37b](charts/b37b-chase10g75seed6.png)
-**b37b-chase10g75seed6** — strongest arm of the family on pooled (90.50), yet 0 held at 500
-
-![b37c](charts/b37c-chase10g75seed7.png)
-**b37c-chase10g75seed7** — highest `sef` of the batch (58.6), 16 candidates, 0 held
-
-![b37d](charts/b37d-chase10g75seed8.png)
-**b37d-chase10g75seed8** — the weak seed
