@@ -1,9 +1,13 @@
 {
-  "iso": "2026-08-25T22:14:53",
-  "ts": 1787721293.0384572,
+  "iso": "2026-08-25T22:15:36",
+  "ts": 1787721336.0613487,
   "at_a_glance": {
-    "running": [],
-    "queued": []
+    "running": [
+      "b46 -- b46: c51 screen -- batch 512, soft target, 21 / 201 atoms (seed 2, vs b38b) -- training (4 arms)"
+    ],
+    "queued": [
+      "b46 closeout eval -- b46: c51 screen -- batch 512, soft target, 21 / 201 atoms (seed 2, vs b38b) -- queued (4 arms)"
+    ]
   },
   "runtime": {
     "max_trainers": 4,
@@ -25,11 +29,69 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 4,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b46a-c51batch512seed2",
+      "type": "train",
+      "policy": "b46a-c51batch512seed2",
+      "policies": [
+        "b46a-c51batch512seed2"
+      ],
+      "pid": 18885,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b46b-c51softtgtseed2",
+      "type": "train",
+      "policy": "b46b-c51softtgtseed2",
+      "policies": [
+        "b46b-c51softtgtseed2"
+      ],
+      "pid": 18886,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b46c-c51atoms21seed2",
+      "type": "train",
+      "policy": "b46c-c51atoms21seed2",
+      "policies": [
+        "b46c-c51atoms21seed2"
+      ],
+      "pid": 18887,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b46d-c51atoms201seed2",
+      "type": "train",
+      "policy": "b46d-c51atoms201seed2",
+      "policies": [
+        "b46d-c51atoms201seed2"
+      ],
+      "pid": 18888,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
+    "b46-closeout": "queued",
+    "b46a-c51batch512seed2": "running",
+    "b46b-c51softtgtseed2": "running",
+    "b46c-c51atoms21seed2": "running",
+    "b46d-c51atoms201seed2": "running",
     "b45-closeout-w2": "done",
     "b45-closeout": "done",
     "b45b-lowlr8-b29a": "done",
@@ -280,8 +342,8 @@
   },
   "disk_free_gb": 119.7,
   "load_avg": [
-    0.10107421875,
-    0.0419921875,
-    0.0322265625
+    0.05078125,
+    0.0341796875,
+    0.0283203125
   ]
 }
