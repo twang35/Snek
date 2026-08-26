@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-26T13:15:29",
-  "ts": 1787775329.3646545,
+  "iso": "2026-08-26T13:16:02",
+  "ts": 1787775362.3196857,
   "at_a_glance": {
     "running": [
       "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 71% (4 arms)"
@@ -42,10 +42,10 @@
         "b46a-c51batch512seed1"
       ],
       "pid": 28693,
-      "step": 2199000,
+      "step": 2200000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.5,
-      "elapsed_s": 53149
+      "steps_per_sec": 30.3,
+      "elapsed_s": 53182
     },
     {
       "id": "b46a-c51batch512seed2",
@@ -55,10 +55,10 @@
         "b46a-c51batch512seed2"
       ],
       "pid": 28694,
-      "step": 2184000,
+      "step": 2185000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.5,
-      "elapsed_s": 53149
+      "steps_per_sec": 30.3,
+      "elapsed_s": 53182
     },
     {
       "id": "b46a-c51batch512seed3",
@@ -68,10 +68,10 @@
         "b46a-c51batch512seed3"
       ],
       "pid": 28695,
-      "step": 2091000,
+      "step": 2093000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.5,
-      "elapsed_s": 53149
+      "steps_per_sec": 60.7,
+      "elapsed_s": 53182
     },
     {
       "id": "b46a-c51batch512seed4",
@@ -81,10 +81,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 2057000,
+      "step": 2058000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.5,
-      "elapsed_s": 53149
+      "steps_per_sec": 30.3,
+      "elapsed_s": 53182
     }
   ],
   "ledger": {
@@ -355,8 +355,8 @@
   },
   "disk_free_gb": 111.6,
   "load_avg": [
-    17.88037109375,
-    18.91796875,
-    19.29638671875
+    20.11279296875,
+    19.24072265625,
+    19.384765625
   ]
 }
