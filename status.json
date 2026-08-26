@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-26T14:31:21",
-  "ts": 1787779881.2564833,
+  "iso": "2026-08-26T14:31:53",
+  "ts": 1787779913.944548,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 77% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 78% (4 arms)"
     ],
     "queued": [
       "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (4 arms)",
@@ -42,10 +42,10 @@
         "b46a-c51batch512seed1"
       ],
       "pid": 28693,
-      "step": 2404000,
+      "step": 2405000,
       "max_steps": 3000000,
-      "steps_per_sec": 46.6,
-      "elapsed_s": 57701
+      "steps_per_sec": 30.6,
+      "elapsed_s": 57734
     },
     {
       "id": "b46a-c51batch512seed2",
@@ -55,10 +55,10 @@
         "b46a-c51batch512seed2"
       ],
       "pid": 28694,
-      "step": 2363000,
+      "step": 2364000,
       "max_steps": 3000000,
-      "steps_per_sec": 46.6,
-      "elapsed_s": 57701
+      "steps_per_sec": 30.6,
+      "elapsed_s": 57734
     },
     {
       "id": "b46a-c51batch512seed3",
@@ -68,10 +68,10 @@
         "b46a-c51batch512seed3"
       ],
       "pid": 28695,
-      "step": 2294000,
+      "step": 2295000,
       "max_steps": 3000000,
-      "steps_per_sec": 46.6,
-      "elapsed_s": 57701
+      "steps_per_sec": 30.6,
+      "elapsed_s": 57734
     },
     {
       "id": "b46a-c51batch512seed4",
@@ -81,10 +81,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 2237000,
+      "step": 2239000,
       "max_steps": 3000000,
-      "steps_per_sec": 46.6,
-      "elapsed_s": 57701
+      "steps_per_sec": 61.2,
+      "elapsed_s": 57734
     }
   ],
   "ledger": {
@@ -355,8 +355,8 @@
   },
   "disk_free_gb": 110.9,
   "load_avg": [
-    16.16748046875,
-    18.46728515625,
-    18.99658203125
+    19.22509765625,
+    18.82861328125,
+    19.0908203125
   ]
 }
