@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-26T13:08:29",
-  "ts": 1787774909.872236,
+  "iso": "2026-08-26T13:09:02",
+  "ts": 1787774942.8731122,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 70% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 71% (4 arms)"
     ],
     "queued": [
       "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (4 arms)",
@@ -42,10 +42,10 @@
         "b46a-c51batch512seed1"
       ],
       "pid": 28693,
-      "step": 2180000,
+      "step": 2182000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.5,
-      "elapsed_s": 52730
+      "steps_per_sec": 60.6,
+      "elapsed_s": 52763
     },
     {
       "id": "b46a-c51batch512seed2",
@@ -55,10 +55,10 @@
         "b46a-c51batch512seed2"
       ],
       "pid": 28694,
-      "step": 2168000,
+      "step": 2169000,
       "max_steps": 3000000,
-      "steps_per_sec": 61.1,
-      "elapsed_s": 52730
+      "steps_per_sec": 30.3,
+      "elapsed_s": 52763
     },
     {
       "id": "b46a-c51batch512seed3",
@@ -68,10 +68,10 @@
         "b46a-c51batch512seed3"
       ],
       "pid": 28695,
-      "step": 2072000,
+      "step": 2074000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.5,
-      "elapsed_s": 52730
+      "steps_per_sec": 60.6,
+      "elapsed_s": 52763
     },
     {
       "id": "b46a-c51batch512seed4",
@@ -81,10 +81,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 2040000,
+      "step": 2041000,
       "max_steps": 3000000,
-      "steps_per_sec": 61.1,
-      "elapsed_s": 52730
+      "steps_per_sec": 30.3,
+      "elapsed_s": 52763
     }
   ],
   "ledger": {
@@ -355,8 +355,8 @@
   },
   "disk_free_gb": 111.7,
   "load_avg": [
-    24.552734375,
-    20.888671875,
-    19.984375
+    19.830078125,
+    20.08740234375,
+    19.74560546875
   ]
 }
