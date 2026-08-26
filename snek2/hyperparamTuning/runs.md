@@ -17,86 +17,48 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 1** — `b46a` (batch 512) on seeds 1-4, four trainers, **184-193k of 3M (6%)**. Heartbeat `2026-08-25T23:52:22`, `counts {trainer: 4, eval: 0}`. 12 arms queued as waves 2-4, plus wave 1's close-out |
+| **desktop `the-claw-den`** | **`b46` wave 1** — `b46a` (batch 512) on seeds 1-4, four trainers, **1.43-1.53M of 3M (48%)**. Heartbeat `2026-08-26T08:46:50`, `counts {trainer: 4, eval: 0}`. 12 arms queued as waves 2-4, plus wave 1's close-out |
 
-**Wave 1 finishes in ~22-24 h, so late on 2026-08-26.** **This is the slow wave** — batch 512 is ~4x
-the backward-pass FLOPs — so waves 2-4 should each land nearer 10-12 h, putting the batch's four
-training waves plus their close-outs at roughly **3 days**.
+**Wave 1 finishes ~20:05 on 2026-08-26, about 11 h out.** Per-arm rates over a **9.0-hour** recent window
+(differencing last night's readings against this morning's): 38.6 / 38.8 / 40.8 / 41.6 steps/s. The wave
+barrier means it ends with its *slowest* arm, `b46c`'s seed 3 at 11.3 h. Total wave 1 wall clock will be
+~21.6 h, so **waves 2-4 at batch 128 should each be well under that** and the batch's four waves plus
+close-outs still land near 3 days.
 
-**‡ The whole-run average is the wrong rate to project from here, and it errs in the direction that
-looks safe.** Over its first 80 minutes the wave averaged **39.0 steps/s**; a clean 10-minute window
-measured **35.0**. The natural reading of the average — "it carries the startup cost, so the truth is
-slightly faster" — is backwards: **the arm is getting slower as it gets better**, and the mechanism is
-its own self-eval. 20 episodes run every 1,000 steps, and a *better* policy plays *longer* episodes, so
-the per-1,000-step eval bill rises with skill:
+**‡ Retraction: the "it slows as it improves" reading was wrong, and it came from a 10-minute window.**
+That sample measured 35.0 steps/s against the first 80 minutes' 39.0, and the mechanism offered for it —
+self-eval cost rising as better policies play longer episodes — is real in principle but is **not** what
+the throughput does. Over the 9.0 hours since, the arms averaged **40.0 steps/s**, i.e. slightly *faster*
+than the early phase, and the whole-run average has risen 38.7 → 40.6 rather than sagging. So the 35.0 was
+noise in a short window, and the original ~20 h estimate was right.
 
-| step band | mean `avg_score` | mean perfect % |
-|---|---|---|
-| 0-40k | 46.7 | 3.6 |
-| 40-80k | 79.3 | 6.5 |
-| 120-160k | 80.7 | 8.5 |
-| 160-200k | 81.8 | **25.5** |
-| 200-240k | 82.1 | **39.5** |
+**The general lesson is about the measurement, not the arm.** A 10-minute window on a process that writes
+its step in 1,000-step blocks holds ~21 observable increments, which is nowhere near enough to separate a
+trend from a fluctuation — and a plausible mechanism was available to explain the noise, which is what made
+it convincing. **Project from hours, not minutes**, and note that `status.json`'s own `steps_per_sec` is
+worse still (it read 30.5 on all four arms at once, a 30 s poll against 1,000-step blocks).
 
-**And `avg_score` understates what is still coming**, which is the part worth carrying. It looks
-plateaued at ~82 from 40k on, so the obvious inference is that episode length has stopped growing. It
-has not: `avg_score` is capped at 95 and the *perfect* rate is still climbing hard (8.5 → 39.5 in 80k
-steps), and a perfect game is by definition the longest episode there is. So the tail of the length
-distribution is still filling in, and the rate should keep sagging until the perfect rate saturates.
-**Project from a recent window, not from `step ÷ elapsed_s`, and re-measure rather than extrapolating
-an ETA far ahead.** `status.json`'s own `steps_per_sec` is not the answer either — it read 30.5 for all
-four arms, because steps land in 1,000-step blocks and a 30 s poll quantizes badly.
+**No gain from batch 512 at 48%, and a consistent deficit on the primary metric.** Paired against each
+seed's own `b38` arm to step 1,428,000: banded mean perfect rate **52.2 vs 53.3** (−1.1 pp, and 3 of 4
+seeds nominally *ahead* — the mean is carried entirely by seed 1's −6.5), while `strong_eval_fraction` on a
+common footing is **−4.8 pp at 0 of 4**. `best_perfect30` and trailing score both land inside the noise.
+Full table and per-arm charts:
+[`charts.md`](charts.md#-wave-1-at-143m-of-3m-48--no-gain-and-a-consistent-deficit-on-the-primary-metric).
 
-**No effect from batch 512 yet, and none is due.** Paired against each seed's own `b38` arm over every
-graph eval to 185k, banded mean perfect rate is **20.2 vs 20.0** — a 0.2 pp difference with the sign
-test at **1 of 4**. All four arms are healthy (`zero_since` null everywhere, trailing 76-90,
-`max_single_eval` already 70-90). At 6% of the run that is exactly the expected reading: `b38a`'s own
-best checkpoint arrived at **2355k**. Table and per-arm charts in
-[`charts.md`](charts.md#-wave-1-at-185k-of-3m--no-effect-yet-and-there-should-not-be-one).
+**‡ Half of that `sef` deficit was a measurement artefact, and the correction is now a script.** The raw
+comparison reads **−11.3 pp**; `sef` counts evals at ≥80% perfect, so it rewards noise, and b38's
+10-episode evals cross that line **5.3x** more often than 20-episode evals at a true rate of 0.55.
+[`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py) puts a 20-episode arm on the
+10-episode footing exactly and moves it to **−4.8 pp** with the sign test unchanged. **Every batch-45+ arm
+read against batches 1-44 needs this** — the primary metric does not survive the 2026-08-19 boundary, which
+the docs previously flagged only for `best_perfect30` and `max_single_eval`.
 
-**‡ A null here would be a cost, not a wash, and that is worth fixing in advance.** Batch size changes
-how many *replayed* transitions a gradient step consumes, not how many *environment* transitions get
-collected — collection is one step per step either way. So a comparison at equal steps is fair on
-environment interaction, and `b46a` is spending ~4x the compute to reach the same place. If the curves
-are still matched at 3M, batch 512 is strictly worse per unit of compute and the noisy-loss hypothesis
-loses most of its weight.
-
-**`b45` is finished, and it was measured twice.** The desktop closed it out on the TF path in three waves; the
-laptop re-measured all four arms with the new vectorised engine. Both instruments say the same thing —
-`1e-7` holds the rung. Numbers, per starting checkpoint and per engine, in
-[`charts.md`](charts.md#-close-out-and-hof-500--all-four-arms-measured-independently-by-both-engines).
-
-**Wave 1 ran 42.8 h and completed everything it planned**: stage A, 6253 measurements in 15.2 h; stage B (the
-chained HOF-500), 2755 in 27.65 h; **100% lane utilisation in both**. It needed no `-r2`. Results are published
-under **`results/b45-closeout/`** on the `results` branch and are copied into `runs/`.
-
-**‡ An eval job publishes under its own job id, not under each policy** — `results/b45-closeout/`, while a
-*training* job publishes under `results/<policy>/`. So `git ls-tree --name-only origin/results:results | grep
-<policy>` finds a per-arm eval (`b44a-lowlr7-b29b-closeout`) but **misses a batch-level one**, which is what
-`_auto_closeout_jobs` now produces for a whole batch. **Use `-r`.** Non-recursive, `b45a` matches only its
-training directory and the close-out reads as unpublished.
-
-**Do not raise `max_evals` to run two waves of the scalar path at once.** Load average was 18.3 on 14 cores
-with 4 lanes × 4 workers already, so a second job splits the same cores and both finish later. **A `vec_wave`
-does not have this shape** — it shards itself across `os.cpu_count()` − 2 and there is nothing to run
-two of. **Each host's shard optimum is measured, not derived**: 12 on the laptop, **16 with
-`TF_NUM_INTRAOP_THREADS=1` on the desktop** (+4.3% over its default of 14; past 16 it loses 6-13%).
-
-**Verify each host separately — neither check sees the other**, so a count is meaningless without naming the
-box. Laptop: `ps -Ao pid=,command= | grep "python -u sne[k]2.py"`. Desktop:
-**`git fetch origin ops-status &&`** `git show origin/ops-status:status.json`, then read `counts`, `running` and
-the `iso` heartbeat. **The fetch is not optional** — without it you are shown an arbitrarily old local
-remote-tracking ref with no sign that it is old, which has produced three false "the daemon is dead" alarms.
-Ladder and rationale: [`CLAUDE.md`](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).
-
-**‡ A batch-level eval job that dies mid-pass is marked `done` and re-dispatched under a new id, and `b44`'s
-HOF is the precedent — not `b45`'s.** `b44-hof` folded **1157 of 2235** and exited with no summary and no
-`error`, 35 minutes after `adbec2904` ("Eval writes: the controller was rewriting O(rows) files O(episodes)
-times") was committed — i.e. the deploy that restarted the daemon killed it. Dead pid on the same boot reads
-as `done`, so the daemon synthesized **`b44-hof-r2`** on its next poll, 45 s later, which ran the remaining
-1078 to completion in 12.9 h. **So `b44`'s 874 rows are two jobs**, and an `-r2` in the ledger means an
-interrupted pass, not a repeat measurement. Read the two `grep -c`s before assuming a long eval is stuck:
-lane completions (`episodes in`) against controller folds (`^[ n/N]`).
+**Reading it against the pre-registered outcomes:** this is tracking (2), the null, with a lean toward (3).
+And a null here is a **cost** — batch size changes how many *replayed* transitions a gradient step consumes,
+not how many *environment* transitions are collected, so both sides have equal environment interaction at
+1.43M and `b46a` spent ~4x the backward-pass compute to arrive slightly behind. **Not final, though:** b38's
+arms did their best work in the second half (`b38a`'s best checkpoint at 2355k, the only arm whose pooled
+figure rose past 2M), so the remaining 1.5M is where the control is strongest.
 
 ## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, launched 2026-08-25*
 

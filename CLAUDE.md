@@ -1088,13 +1088,40 @@ batch number. Cross-batch best-checkpoint stays valid for "did this arm
 produce a ≥`gate`% checkpoint", since anything at or above a gate is measured full length under it — but
 the graph-100% tier is censored by any gate and must not be compared across them.
 
-**‡ 2026-08-19 is also a *graph* boundary, not only a gate one, and it biases one metric.**
-`training.num_eval_episodes` went 10 → 20, so batches 1-44 report `perfect_percent` in multiples of 10 and
-batch 45 onward in multiples of 5. **Banded mean perfect rate stays comparable** — a 20-episode estimate of
-the same true rate has the same expectation. **`best_perfect30` and `max_single_eval` do not**: they are
-maxima over a noisy statistic, and halving the noise lowers them systematically, so a 20-episode arm looks
-slightly *worse* on those than a 10-episode arm of identical quality. Compare those two metrics only within
-an era, and prefer banded means or the close-out across the boundary.
+**‡ 2026-08-19 is also a *graph* boundary, not only a gate one, and it biases three metrics — including
+the primary one.** `training.num_eval_episodes` went 10 → 20, so batches 1-44 report `perfect_percent` in
+multiples of 10 and batch 45 onward in multiples of 5. **Banded mean perfect rate stays comparable** — a
+20-episode estimate of the same true rate has the same expectation, so it is the metric to reach for across
+the line. **`best_perfect30` and `max_single_eval` do not**: they are maxima over a noisy statistic, and
+halving the noise lowers them systematically, so a 20-episode arm looks slightly *worse* on those than a
+10-episode arm of identical quality.
+
+**‡ And `strong_eval_fraction` does not either, which matters more because it is the primary metric**
+(found 2026-08-26, comparing `b46a` with `b38`). It is the share of evals at ≥80% perfect — a
+*threshold-crossing* fraction, so it **rewards noise**, and fewer episodes per eval means more crossings at
+identical quality. The bias is not small and it is not uniform:
+
+| true perfect rate | P(≥80% of 10) | P(≥80% of 20) | ratio |
+|---:|---:|---:|---:|
+| 0.50 | 0.055 | 0.006 | **9.3x** |
+| 0.55 | 0.100 | 0.019 | **5.3x** |
+| 0.65 | 0.262 | 0.118 | 2.2x |
+| 0.80 | 0.678 | 0.630 | 1.08x |
+| 0.90 | 0.930 | 0.957 | 0.97x |
+
+So it is huge through the middle band where arms spend most of a run and **vanishes once an arm is
+genuinely strong** — which means no point estimate resolves it, since an arm's `sef` is a mixture over its
+own trajectory. **The direction is always the same: a batch-45+ arm's raw `sef` understates it, so the
+older arm always looks better than it is.**
+
+**Correct it exactly rather than arguing about it.**
+[`perDiagnostics/sef_common_footing.py`](snek2/hyperparamTuning/perDiagnostics/sef_common_footing.py)
+puts a 20-episode arm on the 10-episode footing with no simulation — an eval that scored `k` of 20 would,
+at 10 episodes, have scored `X ~ Hypergeometric(20, k, 10)` and counts as strong iff `X ≥ 8`. On `b46a`
+vs `b38` at 1.43M it moved an apparent **−11.3 pp** to **−4.8 pp** with the sign test unchanged at 0 of 4,
+i.e. it halved the effect without flipping it. **Run it before reporting any cross-boundary `sef`
+comparison**, and note the same reasoning applies to any threshold metric added later — a rate is safe
+across the boundary, a threshold crossing is not.
 
 Two consequences for reading the output file: rows have **different episode counts**, so pooling
 them over-weights the winners and reads high — use the equal-effort figure the run prints, or the
