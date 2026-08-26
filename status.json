@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-26T05:33:30",
-  "ts": 1787747610.887027,
+  "iso": "2026-08-26T05:34:03",
+  "ts": 1787747643.7783198,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 33% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 34% (4 arms)"
     ],
     "queued": [
       "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (4 arms)",
@@ -42,10 +42,10 @@
         "b46a-c51batch512seed1"
       ],
       "pid": 28693,
-      "step": 1022000,
+      "step": 1023000,
       "max_steps": 3000000,
-      "steps_per_sec": 52.7,
-      "elapsed_s": 25431
+      "steps_per_sec": 30.4,
+      "elapsed_s": 25464
     },
     {
       "id": "b46a-c51batch512seed2",
@@ -55,10 +55,10 @@
         "b46a-c51batch512seed2"
       ],
       "pid": 28694,
-      "step": 1050000,
+      "step": 1051000,
       "max_steps": 3000000,
-      "steps_per_sec": 52.7,
-      "elapsed_s": 25431
+      "steps_per_sec": 30.4,
+      "elapsed_s": 25464
     },
     {
       "id": "b46a-c51batch512seed3",
@@ -68,10 +68,10 @@
         "b46a-c51batch512seed3"
       ],
       "pid": 28695,
-      "step": 971000,
+      "step": 972000,
       "max_steps": 3000000,
-      "steps_per_sec": 26.3,
-      "elapsed_s": 25431
+      "steps_per_sec": 30.4,
+      "elapsed_s": 25464
     },
     {
       "id": "b46a-c51batch512seed4",
@@ -81,10 +81,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 976000,
+      "step": 977000,
       "max_steps": 3000000,
-      "steps_per_sec": 52.7,
-      "elapsed_s": 25431
+      "steps_per_sec": 30.4,
+      "elapsed_s": 25464
     }
   ],
   "ledger": {
@@ -355,8 +355,8 @@
   },
   "disk_free_gb": 115.9,
   "load_avg": [
-    19.34521484375,
-    19.95947265625,
-    20.048828125
+    20.44775390625,
+    20.30322265625,
+    20.1689453125
   ]
 }
