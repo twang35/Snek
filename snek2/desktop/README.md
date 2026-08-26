@@ -192,6 +192,33 @@ Forked self-eval workers outlive the parent for a moment, so finish with `pkill 
 and confirm with `free -m`. **`pgrep -f snek2.py` will match its own shell** — the two "leftovers" after
 that cleanup were `bash -c ps -o … $(pgrep …)`, not trainers.
 
+**‡ Over ssh, that `pkill` kills the shell running it, and the kill still works** (2026-08-25, abandoning
+`b46`'s first wave). `ssh the-claw-den 'kill -9 …; pkill -9 -f "snek2.py b46"; ps …'` returned **exit 255**
+with no output, because the remote shell's own command line contains `snek2.py b46` — so `pkill` matched it
+and SIGKILLed the session before the verification could run. **Read this as "cannot confirm", never as
+"failed"**: a follow-up `ps` showed 0 b46 processes and `free -m` back to 11 GB. Same family as the `pgrep`
+self-match above, but worse in one way — `pkill` *acts* on the match instead of merely counting it. Put the
+verification in a **separate** ssh invocation, or bracket the pattern (`sne[k]2.py b46`).
+
+**‡ A killed job cannot be re-queued under its own id, and this is the thing to know before abandoning a
+batch you intend to relaunch.** `_launch` writes `failed` for a non-zero exit, `failed` is in `TERMINAL`, and
+`_scan_pending` drops any spec whose id is already terminal — so pushing the same spec again is silently a
+no-op. It never dispatches, nothing reports an error, and the arm simply does not appear. Three ways out,
+in order of preference:
+
+1. **Give the relaunched arms new ids.** No daemon surgery, and the ledger keeps an honest record of both
+   attempts. Costs you the naming continuity, which matters if the ids encode the experiment (`…seed2`).
+2. **Delete the ledger entries.** `systemctl stop snek-runner` **first** — the daemon holds the ledger in
+   memory and `_save_ledger()` will overwrite an edit made underneath it — then remove the keys from
+   `~/.snek-runner/ledger.json`, keep a `.bak`, and start the service again. This is what `b46`'s restart
+   did, and it is right when the ids are part of the experiment's design.
+3. Not `interrupted`. It is non-terminal and does get relaunched, but a training *resumes from its
+   checkpoint*, so it is the wrong tool unless you are also deleting the checkpoints.
+
+**Deleting a discarded batch's data is four paths**, and none of it reaches `results` if the arms never
+finished: `savedPolicies/<policy>/`, `runs/<policy>_evals.json` + `.md` + `.png`, `evals/<policy>*.png`, and
+`desktop/logs/train-<id>.log`.
+
 **The boot id is load-bearing in two ways, and both were silent bugs before 2026-08-13.** Without
 it a dead pid after a reboot read as `done`, so (1) a truncated training was published to `results`
 as a finished arm *and* spent its `closeout: pending` measuring the partial checkpoint set, and
