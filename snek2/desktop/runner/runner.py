@@ -318,7 +318,8 @@ class Runner:
             watch = 'snek2.py|eval_wave.py|eval_checkpoints.py|vec_wave.py|vec_eval.py'
             argv = [self.host['PYTHON_BIN'], '-u', 'chart_viewer.py'] + pngs + \
                    ['--watch', watch, '--interval', '1',
-                    '--scale', viewer_scale(category), '--title', 'snek desktop']
+                    '--scale', viewer_scale(category), '--title', 'snek desktop',
+                    '--max-size', VIEWER_MAX_FIG_IN]
             subprocess.Popen(argv, cwd=self.host['SNEK_DIR'], env=env,
                              stdout=log, stderr=log, start_new_session=True, close_fds=True)
             self._viewer_pngs = pngs
@@ -931,13 +932,28 @@ def eval_batch_pngs(running_jobs, snek_dir, eval_dir_names):
     return sorted(pngs)[:MAX_VIEWER_PANELS]
 
 
+# The desktop's monitor is 3840x2160, so `chart_viewer.fit_figure_to_screen` permits ~36.5 x 19.0in
+# at Linux's 100 dpi -- while `figure_dims`' default ceiling of 18.2 x 13.0in, chosen as a *laptop*
+# fallback for when the screen probe fails, is what actually sized this window. So `--scale` alone
+# could not make it bigger: doubling the training scale would have been clamped to +44%, and doubling
+# the eval scale to exactly nothing, since the eval grid was already pinned at the 13.0in height.
+# Both knobs move together or neither does. Passed only from here, so the laptop keeps the default.
+VIEWER_MAX_FIG_IN = '36.4,26.0'
+
+
 def viewer_scale(category):
     """Window-size multiplier for the desktop viewer, by wave category. Eval charts run a
-    bit larger (1.95 vs 1.5, ~30% up) because their detail -- the per-checkpoint eval points
+    bit larger (3.9 vs 3.0, ~30% up) because their detail -- the per-checkpoint eval points
     packed along 3M steps -- is what gets read closely; the training curve is coarser and
-    fine at 1.5. `category` is the comma-joined set from `_ensure_viewer`, so a pure eval wave
-    is exactly 'eval'; anything with a trainer in it stays at the smaller size."""
-    return '1.95' if category == 'eval' else '1.5'
+    fine at 3.0. `category` is the comma-joined set from `_ensure_viewer`, so a pure eval wave
+    is exactly 'eval'; anything with a trainer in it stays at the smaller size.
+
+    **Doubled from 1.5/1.95 on 2026-08-25, on request, and it needs `VIEWER_MAX_FIG_IN` to land.**
+    A 2x2 training wave goes 12.6 x 7.8in (1260x778 px on a 4K panel) to 25.2 x 15.6in -- exactly
+    2x. The eval grid cannot double: 2x its 13.0in height is 26.0in = 2600 px against a 2160 px
+    screen, so `fit_figure_to_screen` correctly clamps it to the screen's 19.0in, about 1.46x. That
+    is the largest window the display can hold, which is what asking for 3.9 gets you."""
+    return '3.9' if category == 'eval' else '3.0'
 
 
 def sticky_wave_pngs(prev_pngs, prev_category, category, current_pngs):

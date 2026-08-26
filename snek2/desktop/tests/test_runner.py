@@ -15,12 +15,18 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# snek2/ itself, for `chart_viewer` -- the viewer's figure budget and the runner's
+# `viewer_scale` are one change in two files and one fixture below spans both.
+sys.path.insert(0, os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))))
 
 from runner import config as cfg
 from runner import gitbus
 from runner import job as jobmod
 from runner import launch
 from runner import runner as runnermod
+
+import chart_viewer as chart_viewermod
 
 
 def _host():
@@ -778,9 +784,44 @@ def test_viewer_scale_is_larger_for_eval_waves():
     # Eval charts get a ~30% bigger window; anything with a trainer in it stays smaller.
     # `category` is the comma-joined set _ensure_viewer builds, so only a pure eval wave
     # is 'eval' -- a mixed set (should not happen under the wave-barrier, but be safe) is not.
-    assert runnermod.viewer_scale('eval') == '1.95'
-    assert runnermod.viewer_scale('trainer') == '1.5'
-    assert runnermod.viewer_scale('eval,trainer') == '1.5'
+    assert runnermod.viewer_scale('eval') == '3.9'
+    assert runnermod.viewer_scale('trainer') == '3.0'
+    assert runnermod.viewer_scale('eval,trainer') == '3.0'
+
+
+def test_the_desktop_budget_is_large_enough_for_its_own_scales():
+    """`viewer_scale` and `VIEWER_MAX_FIG_IN` are one change in two constants: the budget in
+    `chart_viewer.figure_dims` is what sized this window, not the scale, so raising the scale
+    without the budget is a no-op (the eval grid was already pinned to the 13.0in default).
+
+    This fixture fails if either half is lowered without the other -- it asserts the requested
+    training grid arrives *unclamped*, which is only true while the budget covers it."""
+    max_w, max_h = chart_viewermod.parse_max_size(runnermod.VIEWER_MAX_FIG_IN)
+    scale = float(runnermod.viewer_scale('trainer'))
+    w, h = chart_viewermod.figure_dims(2, 2, scale, 1.62, max_w, max_h)
+    assert abs(w - 2 * 4.2 * scale) < 1e-9, 'training grid is being clamped by the budget'
+    # the default budget would have clamped it, which is why the flag exists
+    assert chart_viewermod.figure_dims(2, 2, scale, 1.62)[0] < w
+
+
+def test_the_viewer_argv_carries_the_raised_budget():
+    """A scale the budget will not honour is the silent half of this change, so the flag has to
+    actually reach the process.
+
+    Asserted against `_ensure_viewer`'s source rather than a captured launch, because this module
+    deliberately does not stub the subprocess glue -- and a fixture that got that wrong would open
+    real 4K windows on whatever machine ran the suite. `ast` sees the string literals and the
+    `VIEWER_MAX_FIG_IN` reference in the argv list, which is the whole assertion."""
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'runner', 'runner.py')).read()
+    tree = ast.parse(src)
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == '_ensure_viewer')
+    strings = {n.value for n in ast.walk(fn) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+    names = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)}
+    assert '--max-size' in strings, 'the viewer is launched without the size budget'
+    assert 'VIEWER_MAX_FIG_IN' in names, 'the budget flag is not fed from the module constant'
+    assert '--scale' in strings and 'viewer_scale' in names
 
 
 def test_sticky_wave_resets_when_idle_or_fresh():

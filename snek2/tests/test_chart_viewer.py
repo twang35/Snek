@@ -1772,3 +1772,54 @@ def test_the_glob_refresh_path_actually_applies_the_cap():
     assert not bare, (
         'globmod.glob() called outside newest_glob_files at line(s) {0} — the panel set must go '
         'through the cap'.format(bare))
+
+
+def test_parse_max_size_reads_a_pair_of_inches_or_nothing():
+    """None/'' mean "use the module defaults", which is how the laptop keeps its behaviour: the
+    flag is passed only by the desktop runner."""
+    assert chart_viewer.parse_max_size('36.4,26.0') == (36.4, 26.0)
+    assert chart_viewer.parse_max_size(' 20 , 15 ') == (20.0, 15.0)
+    assert chart_viewer.parse_max_size(None) is None
+    assert chart_viewer.parse_max_size('') is None
+
+
+def test_parse_max_size_rejects_junk_instead_of_ignoring_it():
+    """A silently-dropped budget presents as "the window did not get bigger" with nothing to point
+    at -- the exact failure this flag exists to fix -- so it raises rather than falling back."""
+    for bad in ('18.2', '18.2,13.0,9', 'wide,tall', '0,13', '-4,13', '18.2,0'):
+        try:
+            chart_viewer.parse_max_size(bad)
+        except ValueError:
+            continue
+        raise AssertionError('parse_max_size accepted {0!r}'.format(bad))
+
+
+def test_figure_dims_honours_an_explicit_budget():
+    """The desktop's 4K panel can take a window the laptop-safe default would clamp. With the
+    budget raised, a 2x2 at scale 3.0 comes out at its full requested 25.2 x 15.56in."""
+    w, h = chart_viewer.figure_dims(2, 2, 3.0, 1.62, 36.4, 26.0)
+    assert abs(w - 25.2) < 1e-9 and abs(h - 2 * 4.2 * 3.0 / 1.62) < 1e-9
+    # and the default budget would have clamped exactly that request
+    dw, dh = chart_viewer.figure_dims(2, 2, 3.0, 1.62)
+    assert dw < w and dh < h
+    assert abs(dw - chart_viewer.MAX_FIG_W_IN) < 1e-9
+
+
+def test_a_raised_budget_still_only_ever_shrinks():
+    """Raising the ceiling must not inflate a grid that already fits -- the budget is a cap, not a
+    target, so a single panel is still sized by its scale alone."""
+    assert chart_viewer.figure_dims(1, 1, 2.0, 1.4, 99.0, 99.0) == \
+        chart_viewer.figure_dims(1, 1, 2.0, 1.4)
+
+
+def test_scale_alone_cannot_grow_a_clamped_grid():
+    """The reason `--scale` and `--max-size` have to move together, pinned as a fixture because it
+    is the whole point of the flag. An eval grid (aspect 1.11) at the desktop's old scale is already
+    pinned to the default height budget, so doubling the scale changes nothing at all."""
+    before = chart_viewer.figure_dims(2, 2, 1.95, 1.11)
+    after = chart_viewer.figure_dims(2, 2, 3.9, 1.11)
+    assert before == after                      # doubling the scale did literally nothing
+    assert abs(before[1] - chart_viewer.MAX_FIG_H_IN) < 1e-9
+    # with the budget raised, the same request does grow
+    raised = chart_viewer.figure_dims(2, 2, 3.9, 1.11, 36.4, 26.0)
+    assert raised[1] > before[1]

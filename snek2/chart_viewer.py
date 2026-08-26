@@ -766,7 +766,24 @@ def image_aspect(images, default=DEFAULT_PANEL_ASPECT):
     return default
 
 
-def figure_dims(rows, cols, scale, aspect=DEFAULT_PANEL_ASPECT):
+def parse_max_size(text):
+    """`--max-size W,H` in inches -> (float, float); None/'' -> None, meaning "use the defaults".
+
+    Pure so the parse is testable without a display. Raises ValueError on anything that is not two
+    positive numbers, because a silently-ignored budget would present as "the window did not grow"
+    with nothing to point at."""
+    if not text:
+        return None
+    parts = [part.strip() for part in str(text).split(',')]
+    if len(parts) != 2:
+        raise ValueError('--max-size wants W,H in inches, got {0!r}'.format(text))
+    w, h = float(parts[0]), float(parts[1])
+    if w <= 0 or h <= 0:
+        raise ValueError('--max-size must be positive, got {0!r}'.format(text))
+    return w, h
+
+
+def figure_dims(rows, cols, scale, aspect=DEFAULT_PANEL_ASPECT, max_w=None, max_h=None):
     """Panel-grid size in inches, shrunk uniformly (aspect preserved) to the laptop-safe budget.
 
     Uniform, not per-axis: clamping width and height independently would distort the charts.
@@ -783,7 +800,9 @@ def figure_dims(rows, cols, scale, aspect=DEFAULT_PANEL_ASPECT):
     """
     aspect = aspect or DEFAULT_PANEL_ASPECT
     panel_w = 4.2 * scale
-    return clamp_dims(cols * panel_w, rows * panel_w / aspect, MAX_FIG_W_IN, MAX_FIG_H_IN)
+    return clamp_dims(cols * panel_w, rows * panel_w / aspect,
+                      MAX_FIG_W_IN if max_w is None else max_w,
+                      MAX_FIG_H_IN if max_h is None else max_h)
 
 
 def apply_tight_grid(fig, gap=0.01):
@@ -840,12 +859,12 @@ def viewer_dpi(platform, override=None):
 
 
 def make_figure(plt, rows, cols, scale, title, dpi=None,
-                aspect=DEFAULT_PANEL_ASPECT):
+                aspect=DEFAULT_PANEL_ASPECT, max_w=None, max_h=None):
     """Build the chart grid, then (re)install the signal handler — one operation, in that
     order, because separating them silently breaks the clean exit. See
     `install_signal_exit`: Tk overwrites the OS-level handler while creating this window,
     so any install that does not follow a `subplots()` call is dead code."""
-    dims = figure_dims(rows, cols, scale, aspect)
+    dims = figure_dims(rows, cols, scale, aspect, max_w, max_h)
     fig, grid = plt.subplots(rows, cols, squeeze=False, figsize=dims,
                              dpi=viewer_dpi(sys.platform, dpi))
     fit_figure_to_screen(fig, *dims)
@@ -870,6 +889,13 @@ def build_parser():
     # as soon as it exists. The desktop runner passes its own --interval/--scale.
     ap.add_argument('--interval', type=float, default=1.0)
     ap.add_argument('--scale', type=float, default=2.6, help='multiply the window size')
+    # Raises the `figure_dims` ceiling for a display that can take it. The desktop is a 3840x2160
+    # panel where `fit_figure_to_screen` allows ~36.5 x 19.0in, so the 18.2/13.0 default -- chosen
+    # as a laptop-safe *fallback* -- is what actually sets its window, and --scale alone cannot get
+    # past it. Left unset everywhere else, so the laptop is unchanged.
+    ap.add_argument('--max-size', default=None, metavar='W,H',
+                    help='max figure size in inches (default {0},{1}); raise it on a large '
+                         'display'.format(MAX_FIG_W_IN, MAX_FIG_H_IN))
     ap.add_argument('--title', default='snek charts')
     ap.add_argument('--dpi', type=int, default=None,
                     help='figure render dpi; default 200 on darwin (Retina), 100 elsewhere')
@@ -878,6 +904,7 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
+    max_w, max_h = parse_max_size(args.max_size) or (None, None)
 
     import matplotlib
     matplotlib.use('TkAgg')
@@ -931,7 +958,7 @@ def main():
             if fig is not None:
                 plt.close(fig)
             fig, axes = make_figure(plt, rows, cols, args.scale, args.title, args.dpi,
-                                    aspect=aspect)
+                                    aspect=aspect, max_w=max_w, max_h=max_h)
             fignum = fig.number
         rendered_files, rendered_aspect = files, aspect
         for ax in axes:
