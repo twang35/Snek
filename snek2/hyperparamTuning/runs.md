@@ -17,7 +17,27 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 1** (`b46a`, batch 512, seeds 1-4), four trainers. 12 more arms queued as waves 2-4 |
+| **desktop `the-claw-den`** | **`b46` wave 1** — `b46a` (batch 512) on seeds 1-4, four trainers, **184-193k of 3M (6%)**. Heartbeat `2026-08-25T23:52:22`, `counts {trainer: 4, eval: 0}`. 12 arms queued as waves 2-4, plus wave 1's close-out |
+
+**Wave 1 finishes in ~20 h, around 2026-08-26 20:00.** Measured over its own 83-minute run: **37.1-38.9
+steps/s** per arm (step ÷ `elapsed_s`, four arms in parallel). That is the whole-run average, so it
+carries the startup cost and the true remaining time is slightly *under* the figure. **This is the
+slow wave** — batch 512 is ~4x the backward-pass FLOPs — so waves 2-4 should each land nearer 10-12 h,
+putting the batch's four training waves plus their close-outs at roughly **2.5-3 days** total.
+
+**No effect from batch 512 yet, and none is due.** Paired against each seed's own `b38` arm over every
+graph eval to 185k, banded mean perfect rate is **20.2 vs 20.0** — a 0.2 pp difference with the sign
+test at **1 of 4**. All four arms are healthy (`zero_since` null everywhere, trailing 76-90,
+`max_single_eval` already 70-90). At 6% of the run that is exactly the expected reading: `b38a`'s own
+best checkpoint arrived at **2355k**. Table and per-arm charts in
+[`charts.md`](charts.md#-wave-1-at-185k-of-3m--no-effect-yet-and-there-should-not-be-one).
+
+**‡ A null here would be a cost, not a wash, and that is worth fixing in advance.** Batch size changes
+how many *replayed* transitions a gradient step consumes, not how many *environment* transitions get
+collected — collection is one step per step either way. So a comparison at equal steps is fair on
+environment interaction, and `b46a` is spending ~4x the compute to reach the same place. If the curves
+are still matched at 3M, batch 512 is strictly worse per unit of compute and the noisy-loss hypothesis
+loses most of its weight.
 
 **`b45` is finished, and it was measured twice.** The desktop closed it out on the TF path in three waves; the
 laptop re-measured all four arms with the new vectorised engine. Both instruments say the same thing —
