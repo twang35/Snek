@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T09:49:23",
-  "ts": 1787849363.544761,
+  "iso": "2026-08-27T09:50:17",
+  "ts": 1787849417.55441,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 24% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 25% (4 arms)"
     ],
     "queued": [
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (4 arms)"
@@ -41,10 +41,10 @@
         "b46c-c51atoms21seed1"
       ],
       "pid": 1606875,
-      "step": 752000,
+      "step": 757000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.6,
-      "elapsed_s": 8041
+      "steps_per_sec": 92.6,
+      "elapsed_s": 8095
     },
     {
       "id": "b46c-c51atoms21seed2",
@@ -54,10 +54,10 @@
         "b46c-c51atoms21seed2"
       ],
       "pid": 1606876,
-      "step": 748000,
+      "step": 753000,
       "max_steps": 3000000,
-      "steps_per_sec": 60.4,
-      "elapsed_s": 8041
+      "steps_per_sec": 92.6,
+      "elapsed_s": 8095
     },
     {
       "id": "b46c-c51atoms21seed3",
@@ -67,10 +67,10 @@
         "b46c-c51atoms21seed3"
       ],
       "pid": 1606877,
-      "step": 685000,
+      "step": 690000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.6,
-      "elapsed_s": 8041
+      "steps_per_sec": 92.6,
+      "elapsed_s": 8095
     },
     {
       "id": "b46c-c51atoms21seed4",
@@ -80,10 +80,10 @@
         "b46c-c51atoms21seed4"
       ],
       "pid": 1606878,
-      "step": 740000,
+      "step": 745000,
       "max_steps": 3000000,
-      "steps_per_sec": 120.8,
-      "elapsed_s": 8041
+      "steps_per_sec": 92.6,
+      "elapsed_s": 8095
     }
   ],
   "ledger": {
@@ -354,10 +354,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 95.5,
+  "disk_free_gb": 95.4,
   "load_avg": [
-    5.45556640625,
-    4.55419921875,
-    4.3076171875
+    4.84375,
+    4.57177734375,
+    4.3310546875
   ]
 }
