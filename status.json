@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-26T19:05:21",
-  "ts": 1787796321.11588,
+  "iso": "2026-08-26T19:06:10",
+  "ts": 1787796370.5972984,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 99% (2 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 98% (1 arm)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (2 arms)",
+      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (3 arms)",
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (12 arms)"
     ]
   },
@@ -30,23 +30,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b46a-c51batch512seed3",
-      "type": "train",
-      "policy": "b46a-c51batch512seed3",
-      "policies": [
-        "b46a-c51batch512seed3"
-      ],
-      "pid": 28695,
-      "step": 2998000,
-      "max_steps": 3000000,
-      "steps_per_sec": 70.2,
-      "elapsed_s": 74141
-    },
     {
       "id": "b46a-c51batch512seed4",
       "type": "train",
@@ -55,10 +42,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 2949000,
+      "step": 2953000,
       "max_steps": 3000000,
-      "steps_per_sec": 46.8,
-      "elapsed_s": 74141
+      "steps_per_sec": 80.8,
+      "elapsed_s": 74190
     }
   ],
   "ledger": {
@@ -75,8 +62,8 @@
     "b46d-c51atoms201seed2": "queued",
     "b46d-c51atoms201seed3": "queued",
     "b46d-c51atoms201seed4": "queued",
-    "b46a-c51batch512seed3": "running",
     "b46a-c51batch512seed4": "running",
+    "b46a-c51batch512seed3": "done",
     "b46a-c51batch512seed2": "done",
     "b46a-c51batch512seed1": "done",
     "b45-closeout-w2": "done",
@@ -327,10 +314,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 108.4,
+  "disk_free_gb": 108.3,
   "load_avg": [
-    5.4951171875,
-    6.9296875,
-    9.4072265625
+    4.041015625,
+    6.33154296875,
+    9.07373046875
   ]
 }
