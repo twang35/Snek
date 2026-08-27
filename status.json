@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-26T18:49:27",
-  "ts": 1787795367.4114718,
+  "iso": "2026-08-26T18:50:22",
+  "ts": 1787795422.5837286,
   "at_a_glance": {
     "running": [
       "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 97% (2 arms)"
@@ -42,10 +42,10 @@
         "b46a-c51batch512seed3"
       ],
       "pid": 28695,
-      "step": 2937000,
+      "step": 2941000,
       "max_steps": 3000000,
-      "steps_per_sec": 58.0,
-      "elapsed_s": 73187
+      "steps_per_sec": 72.5,
+      "elapsed_s": 73242
     },
     {
       "id": "b46a-c51batch512seed4",
@@ -55,10 +55,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 2888000,
+      "step": 2892000,
       "max_steps": 3000000,
-      "steps_per_sec": 58.0,
-      "elapsed_s": 73187
+      "steps_per_sec": 72.5,
+      "elapsed_s": 73242
     }
   ],
   "ledger": {
@@ -329,8 +329,8 @@
   },
   "disk_free_gb": 108.5,
   "load_avg": [
-    8.8330078125,
-    10.67041015625,
-    13.87109375
+    9.4609375,
+    10.46630859375,
+    13.61279296875
   ]
 }
