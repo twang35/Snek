@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-27T07:33:18",
-  "ts": 1787841198.1530335,
+  "iso": "2026-08-27T07:33:53",
+  "ts": 1787841233.4450693,
   "at_a_glance": {
     "running": [
       "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- closeout eval (4 arms)"
@@ -46,8 +46,8 @@
       "pid": 1604576,
       "step": 3000000,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 35
     }
   ],
   "ledger": {
@@ -320,8 +320,8 @@
   },
   "disk_free_gb": 96.9,
   "load_avg": [
-    0.93115234375,
-    1.39453125,
-    2.4091796875
+    11.4189453125,
+    3.95947265625,
+    3.2314453125
   ]
 }
