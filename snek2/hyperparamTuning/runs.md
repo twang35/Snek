@@ -12,53 +12,52 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## What is running — 2026-08-25
+## What is running — 2026-08-26
 
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 1** — `b46a` (batch 512) on seeds 1-4, four trainers, **1.43-1.53M of 3M (48%)**. Heartbeat `2026-08-26T08:46:50`, `counts {trainer: 4, eval: 0}`. 12 arms queued as waves 2-4, plus wave 1's close-out |
+| **desktop `the-claw-den`** | **`b46` wave 2** — `b46b` (soft target) on seeds 1-4, **485-561k of 3M (17%)**. Heartbeat `2026-08-26T22:29:51`. Queued: **`b46a-closeout` (prio 9)**, then waves 3-4 (8 arms) |
 
-**Wave 1 finishes ~20:05 on 2026-08-26, about 11 h out.** Per-arm rates over a **9.0-hour** recent window
-(differencing last night's readings against this morning's): 38.6 / 38.8 / 40.8 / 41.6 steps/s. The wave
-barrier means it ends with its *slowest* arm, `b46c`'s seed 3 at 11.3 h. Total wave 1 wall clock will be
-~21.6 h, so **waves 2-4 at batch 128 should each be well under that** and the batch's four waves plus
-close-outs still land near 3 days.
+**Wave 1 is done and its result is in** — `BATCH_SIZE=512` is a null-to-worse at 4 seeds for 4x the
+compute; numbers in
+[`charts.md`](charts.md#-wave-1-complete--batch_size512-is-a-null-to-worse-at-4-seeds-for-4x-the-compute).
+**Wave 2 ends in ~16.6 h**, so around 15:00 on 2026-08-27; it runs 42-49 steps/s against wave 1's ~40,
+as expected at batch 128.
 
-**‡ Retraction: the "it slows as it improves" reading was wrong, and it came from a 10-minute window.**
-That sample measured 35.0 steps/s against the first 80 minutes' 39.0, and the mechanism offered for it —
-self-eval cost rising as better policies play longer episodes — is real in principle but is **not** what
-the throughput does. Over the 9.0 hours since, the arms averaged **40.0 steps/s**, i.e. slightly *faster*
-than the early phase, and the whole-run average has risen 38.7 → 40.6 rather than sagging. So the 35.0 was
-noise in a short window, and the original ~20 h estimate was right.
+### ‡ Wave 1's close-out failed in 2 seconds and nothing would ever have retried it
 
-**The general lesson is about the measurement, not the arm.** A 10-minute window on a process that writes
-its step in 1,000-step blocks holds ~21 observable increments, which is nowhere near enough to separate a
-trend from a fluctuation — and a plausible mechanism was available to explain the noise, which is what made
-it convincing. **Project from hours, not minutes**, and note that `status.json`'s own `steps_per_sec` is
-worse still (it read 30.5 on all four arms at once, a 30 s poll against 1,000-step blocks).
+**The bug.** `vectorized/vec_wave.py` lives in `snek2/vectorized/`, so Python seeds `sys.path[0]` with
+*that* directory, not the `snek2/` above it where `chart_viewer` lives. Every documented invocation
+passes `PYTHONPATH=.`, which is why the laptop always worked; **the runner passes none, and never had
+to** — the scalar entry points sit *in* `snek2/`. So making the vec engine the desktop default on
+2026-08-24 broke every eval the daemon could launch, and `b46` wave 1's close-out was the first one
+queued after that switch. Fixed by a `sys.path` bootstrap in **both** `vec_wave.py` and `vec_eval.py`
+(the shards need it independently), deployed 2026-08-26, verified on the box.
 
-**No gain from batch 512 at 48%, and a consistent deficit on the primary metric.** Paired against each
-seed's own `b38` arm to step 1,428,000: banded mean perfect rate **52.2 vs 53.3** (−1.1 pp, and 3 of 4
-seeds nominally *ahead* — the mean is carried entirely by seed 1's −6.5), while `strong_eval_fraction` on a
-common footing is **−4.8 pp at 0 of 4**. `best_perfect30` and trailing score both land inside the noise.
-Full table and per-arm charts:
-[`charts.md`](charts.md#-wave-1-at-143m-of-3m-48--no-gain-and-a-consistent-deficit-on-the-primary-metric).
+**The expensive half was not the crash.** `runner._measured_policies` counts a `failed` wave as
+*measured* — by design, "the reason is usually not transient" — so all four arms were permanently marked
+done, `_auto_closeout_jobs` skipped them, and **no retry was ever synthesized.** The batch trained 21 h,
+lost its measurement in 2 s, and moved to wave 2 with `status.json` reading healthy the whole time. The
+only tell was `b46-closeout: failed` in the ledger.
 
-**‡ Half of that `sef` deficit was a measurement artefact, and the correction is now a script.** The raw
-comparison reads **−11.3 pp**; `sef` counts evals at ≥80% perfect, so it rewards noise, and b38's
-10-episode evals cross that line **5.3x** more often than 20-episode evals at a true rate of 0.55.
-[`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py) puts a 20-episode arm on the
-10-episode footing exactly and moves it to **−4.8 pp** with the sign test unchanged. **Every batch-45+ arm
-read against batches 1-44 needs this** — the primary metric does not survive the 2026-08-19 boundary, which
-the docs previously flagged only for `best_perfect30` and `max_single_eval`.
+**Re-queued by hand as `b46a-closeout`** at priority 9, one ahead of `AUTO_CLOSEOUT_PRIORITY`, so the
+wave barrier runs it the moment wave 2's training finishes and before waves 3-4. Detection commands and
+the recovery recipe:
+[`desktop/README.md`](../desktop/README.md#-a-failed-close-out-is-never-retried-and-b46-wave-1-lost-its-measurement-to-that).
 
-**Reading it against the pre-registered outcomes:** this is tracking (2), the null, with a lean toward (3).
-And a null here is a **cost** — batch size changes how many *replayed* transitions a gradient step consumes,
-not how many *environment* transitions are collected, so both sides have equal environment interaction at
-1.43M and `b46a` spent ~4x the backward-pass compute to arrive slightly behind. **Not final, though:** b38's
-arms did their best work in the second half (`b38a`'s best checkpoint at 2355k, the only arm whose pooled
-figure rose past 2M), so the remaining 1.5M is where the control is strongest.
+**Two things to carry.** **Check the ledger for `*-closeout: failed` after any eval-path deploy** — it
+does not surface in `at_a_glance`, and the disappearance of a batch's `closeout eval` line is the visible
+symptom. And **a batch's close-out disappearing from `queued` without an eval having run is never
+benign**; that is what this looks like.
+
+### Wave 2 early read: ahead, but the lead is one slow control
+
+At 483k (16%) soft target leads by **+11.2 pp** mean perfect rate, 3 of 4 seeds. **The figure is not
+usable.** It is carried by seed 4, whose control `b38d` sat at 17.3 mean pp there and finished the run at
+54.4 — a slow starter, not a weak arm. Excluding it: **+3.0 / +3.4 / 0.0, mean +2.1.** And **wave 1
+already ran this trap to its conclusion** — its seed 4 led by +10.3 pp at 6% and finished −3.9. At 16%
+this is a learning-*speed* reading and nothing more.
 
 ## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, launched 2026-08-25*
 

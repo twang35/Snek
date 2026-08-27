@@ -65,9 +65,9 @@ Anything *else* the check prints is a real gap.
 
 ## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, one config per wave, launched 2026-08-25*
 
-**Wave 1 is 48% in and its charts are live** — pulled by `rsync` off the box rather than from the
-`results` branch, which only publishes when a job *finishes*. So these four curves are ~1.43-1.53M of 3M
-steps and are replaced on each update; waves 2-4 have not started and have no charts.
+**Wave 1 is complete and published; wave 2 is 16% in and its charts are live** — wave 1's came off the
+`results` branch, wave 2's by `rsync`, since `results` only publishes when a job *finishes*. Waves 3-4
+have not started and have no charts.
 
 | wave | arms | the one change from `b38` |
 |---|---|---|
@@ -92,76 +92,100 @@ batch 45 onward, so the red curve moves in steps of 5 rather than 10 and `best_p
 *within* b46 and only distorts the comparison to b38. And the close-out runs on the **vec** engine,
 flat and ungated (`min_achievable: null`), where b38's rows were gated at 95.
 
-### ⏳ Wave 1 at 1.43M of 3M (48%) — **no gain, and a consistent deficit on the primary metric**
+### ✅ Wave 1 complete — **`BATCH_SIZE=512` is a null-to-worse at 4 seeds, for 4x the compute**
 
-Matched at every graph eval up to step 1,428,000 — 1,429 evals a side — against each seed's own `b38`
-arm. `sef` is corrected onto a common 10-episode footing by
-[`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py); its raw column is shown
-because the gap between them *is* the measurement artefact.
+Full 3M on all four arms, 3,001 evals a side, paired against each seed's own `b38` arm. `sef` is on a
+common 10-episode footing via
+[`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py).
 
-| seed | mean pp `b46a`/`b38` | Δ | `sef` raw | `sef` **as-if /10** | `b38` `sef` | Δ corrected | trailing `b46a`/`b38` |
+| seed | mean pp `b46a`/`b38` | Δ | `sef` corrected | `b38` `sef` | Δ | `best30` Δ | trailing Δ |
 |---|---|---|---|---|---|---|---|
-| 1 | 52.1 / 58.6 | **−6.5** | 13.0% | 20.5% | 31.0% | **−10.5** | 93.9 / 88.7 |
-| 2 | 53.7 / 53.3 | +0.4 | 13.1% | 20.3% | 21.3% | −1.0 | 75.9 / 91.9 |
-| 3 | 56.1 / 54.7 | +1.4 | 15.7% | 22.5% | 23.4% | −1.0 | 88.3 / 92.0 |
-| 4 | 47.1 / 46.7 | +0.4 | 8.5% | 13.0% | 19.9% | **−6.9** | 92.3 / 84.7 |
-| **mean** | **52.2 / 53.3** | −1.1 | 12.6% | **19.1%** | **23.9%** | **−4.8** | 87.6 / 89.3 |
+| 1 | 56.2 / 60.4 | −4.2 | 20.9% | 31.0% | **−10.1** | −3.1 | −0.3 |
+| 2 | 47.6 / 51.0 | −3.4 | 12.8% | 15.5% | −2.7 | −5.3 | **+11.1** |
+| 3 | 55.5 / 53.9 | **+1.6** | 19.6% | 18.6% | **+1.0** | **+9.5** | −0.8 |
+| 4 | 50.5 / 54.4 | −3.9 | 13.3% | 22.2% | −8.9 | −5.1 | +0.1 |
+| **mean** | **52.5 / 54.9** | **−2.5** | **19.1%** | **21.8%** | **−5.2** | −1.0 | +2.5 |
+| | | *1 of 4* | | | *1 of 4* | *1 of 4* | *2 of 4* |
 
-**On the unbiased metric it is a wash; on the primary metric it is behind, 0 of 4.** Banded mean perfect
-rate is −1.1 pp with **3 of 4** seeds nominally *ahead* — the mean is carried entirely by seed 1's −6.5.
-Corrected `sef` is −4.8 pp with **0 of 4**, which is the more troubling column precisely because it is
-unanimous: `sef` is the metric with the lowest between-seed variance, so a consistent small deficit there
-is worth more than a noisy large one anywhere else. `best_perfect30` (84.0 vs 85.0) and trailing score
-(87.6 vs 89.3) both land inside the noise.
+**Three of four seeds behind on both the unbiased and the primary metric, and the exception is the
+same seed on both.** Banded mean perfect rate −2.5 pp, corrected `sef` −5.2 pp, `best_perfect30` −1.0,
+each at 1 of 4. Only trailing *score* favours `b46a` (+2.5, 2 of 4), and that metric saturates at 95 so
+it is the least informative of the set. Seed 3 is the one arm ahead, on all three.
 
-**Half of that deficit was never real, which is the reusable part.** The raw `sef` comparison reads
-**−11.3 pp**; the correction moves it to **−4.8** without flipping the sign test. `sef` counts evals at
-≥80% perfect, so it rewards noise, and b38's 10-episode evals cross that line far more often at equal
-quality — 5.3x more often at a true rate of 0.55. **Any cross-boundary `sef` number that has not been put
-on a common footing is roughly double its real size**, and that now applies to every batch-45-onward arm
-read against batches 1-44.
+**This is the batch's most informative null, and it is a clear cost.** Batch size changes how many
+*replayed* transitions a gradient step consumes, not how many *environment* transitions are collected,
+so both sides had equal environment interaction across the whole 3M and `b46a` spent **~4x the
+backward-pass compute** to finish slightly behind. Wave 1 was pre-registered as the largest single lever
+on the "c51's shortfall is variance in the loss" hypothesis — so a null here takes most of that
+hypothesis's weight with it, and there is no case for a 1024 rung.
 
-**And this is a compute comparison, not just an outcome one.** Batch size changes how many *replayed*
-transitions a gradient step consumes, not how many *environment* transitions are collected, so at 1.43M
-both sides have interacted with the environment equally and `b46a` has spent **~4x the backward-pass
-compute** to arrive slightly behind. **On the evidence at 48%, batch 512 is not the fix** — but b38's own
-arms peaked late (`b38a`'s best checkpoint at **2355k**, and it was the only arm whose pooled figure rose
-past 2M), so the second half is where its control did its best work and the verdict is not final.
+**Half of the apparent deficit was measurement, and that part generalises.** The raw `sef` comparison
+reads **−12.0 pp**; the correction moves it to **−5.2** without changing the conclusion. `sef` counts
+evals at ≥80% perfect, so it rewards noise, and b38's 10-episode evals cross that line far more often at
+equal quality. **Any cross-boundary `sef` figure that has not been put on a common footing is roughly
+double its true size.**
 
-### b46a-c51batch512seed1 — the arm dragging the mean, against the control that finishes strongest
+**Its close-out has not run yet** — the auto one failed on a `sys.path` bug and was re-queued by hand;
+see [`runs.md`](runs.md#what-is-running--2026-08-26). So everything above is training self-eval, and the
+100-episode instrument could still move it, though not plausibly reverse a −5 pp.
 
-Mean pp **52.1** against `b38a`'s **58.6** and corrected `sef` **20.5%** against **31.0%** — the widest
-gap in the wave on both. It is also, awkwardly, the pairing where the control has the most left to give:
-`b38a` was the only arm of its batch whose best checkpoint arrived late (2355k) and whose pooled figure
-*rose* past 2M. Its trailing score is the one thing ahead (93.9 vs 88.7).
+### b46a-c51batch512seed3 — the one arm ahead, on every metric that matters
 
-![b46a-c51batch512seed1](charts/b46a-c51batch512seed1.png)
-
-### b46a-c51batch512seed3 — the best of the four, and the only one ahead on two of three
-
-Mean pp **56.1** (highest in the wave) against **54.7**, `best30` **89.5** against 80.0 — the one arm
-clearly ahead of its control on the curve metrics, while still −1.0 on corrected `sef`. If batch 512 has
-an effect at all, this is where to look for it.
+Mean pp **55.5** against 53.9, corrected `sef` **19.6%** against 18.6%, `best30` **89.5** against 80.0 —
+the only arm of the four ahead of its control, and ahead on all three. Its `b38` twin was the batch's
+lowest `best30` (80.0), so part of this is a weak control.
 
 ![b46a-c51batch512seed3](charts/b46a-c51batch512seed3.png)
 
-### b46a-c51batch512seed2 — high ceiling, and the wave's only unstable floor
+### b46a-c51batch512seed1 — the widest deficit, against the strongest control
 
-Mean pp **53.7** against **53.3**, essentially level, but trailing score **75.9** against **91.9** — a
-16-point gap and the only arm in the wave under 80. It held the same signature at 185k. This is the arm
-whose `b38` twin was itself the "highest best-30 on the lowest pooled" case, so the character may be the
-seed's rather than the knob's.
+Mean pp **56.2** against **60.4** and corrected `sef` **20.9%** against **31.0%**. It is the highest
+absolute mean pp in the wave and still the biggest loss, because `b38a` is the best c51 arm this project
+has trained — the only one of its batch whose best checkpoint arrived late (2355k) and whose pooled
+figure rose past 2M. Its recent-30 fell to **45.0** against b38a's 66.7.
+
+![b46a-c51batch512seed1](charts/b46a-c51batch512seed1.png)
+
+### b46a-c51batch512seed4 — the early lead that reversed
+
+Mean pp **50.5** against 54.4, corrected `sef` **13.3%** against 22.2%. **At 185k this arm led by +10.3
+pp**, the wave's only clear gain at the time; it finished −3.9. Worth remembering the next time a 6%
+reading looks like a result.
+
+![b46a-c51batch512seed4](charts/b46a-c51batch512seed4.png)
+
+### b46a-c51batch512seed2 — level on the curve, and the one place batch 512 helped stability
+
+Mean pp **47.6** against 51.0 (the lowest pair on both sides) but trailing score **85.7** against
+`b38b`'s **74.6** — a +11.1 gap, the widest in the wave. `b38b` was the arm whose trailing fell
+81.2 → 74.6 over its last 700k, and this arm did not do that. **The one hint in the wave that a bigger
+batch buys stability**, on the seed selected for exactly that defect — but it comes with mean pp and
+`sef` both behind, so it did not convert into perfect games.
 
 ![b46a-c51batch512seed2](charts/b46a-c51batch512seed2.png)
 
-### b46a-c51batch512seed4 — level on the curve, worst on stability
+### ⏳ Wave 2 (soft target) at 16% — **ahead, and the lead is mostly one seed**
 
-Mean pp **47.1** against **46.7** — the lowest pair in the wave on both sides, so the seed is simply hard
-— with trailing **92.3** against 84.7 but corrected `sef` **13.0%** against **19.9%**, the second-widest
-deficit. Note it was the one arm *ahead* at 185k (+10.3 pp), so that early lead did not survive; a good
-reminder of what a 6% reading is worth.
+`TARGET_UPDATE_TAU=0.005`, `PERIOD=1`, at step 483,000 (16%):
 
-![b46a-c51batch512seed4](charts/b46a-c51batch512seed4.png)
+| seed | `b46b` mean pp | `b38` mean pp | Δ |
+|---|---|---|---|
+| 1 | 52.8 | 49.8 | +3.0 |
+| 2 | 56.6 | 53.2 | +3.4 |
+| 3 | 52.5 | 52.5 | 0.0 |
+| 4 | 55.6 | **17.3** | **+38.3** |
+| **mean** | 54.4 | 43.2 | **+11.2** |
+
+**Do not read that +11.2.** It is carried by seed 4, whose control `b38d` was simply a slow starter — it
+sat at 17.3 mean pp here and finished the run at 54.4. Excluding it the deltas are +3.0 / +3.4 / 0.0,
+mean **+2.1**, which is a modest early lead and no more. **And wave 1 already produced this exact
+trap:** its seed 4 led by +10.3 pp at 6% and finished −3.9. At 16% this is a learning-*speed* reading,
+not an endpoint one.
+
+![b46b-c51softtgtseed4](charts/b46b-c51softtgtseed4.png)
+![b46b-c51softtgtseed2](charts/b46b-c51softtgtseed2.png)
+![b46b-c51softtgtseed1](charts/b46b-c51softtgtseed1.png)
+![b46b-c51softtgtseed3](charts/b46b-c51softtgtseed3.png)
 
 ## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *complete, and measured twice on two engines: **flat on all four**, and `1e-7` still holds the rung — 593 rows ≥98%/500 against `b44`'s 874*
 
