@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T03:25:38",
-  "ts": 1787826338.2313654,
+  "iso": "2026-08-27T03:26:16",
+  "ts": 1787826376.1545227,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 57% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 58% (4 arms)"
     ],
     "queued": [
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (8 arms)"
@@ -41,10 +41,10 @@
         "b46b-c51softtgtseed1"
       ],
       "pid": 1282535,
-      "step": 1646000,
+      "step": 1650000,
       "max_steps": 3000000,
-      "steps_per_sec": 77.2,
-      "elapsed_s": 9565
+      "steps_per_sec": 105.5,
+      "elapsed_s": 9603
     },
     {
       "id": "b46b-c51softtgtseed2",
@@ -54,10 +54,10 @@
         "b46b-c51softtgtseed2"
       ],
       "pid": 1282536,
-      "step": 1770000,
+      "step": 1773000,
       "max_steps": 3000000,
-      "steps_per_sec": 77.2,
-      "elapsed_s": 9565
+      "steps_per_sec": 79.1,
+      "elapsed_s": 9603
     },
     {
       "id": "b46b-c51softtgtseed3",
@@ -67,10 +67,10 @@
         "b46b-c51softtgtseed3"
       ],
       "pid": 1282537,
-      "step": 1743000,
+      "step": 1746000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 9565
+      "steps_per_sec": 79.1,
+      "elapsed_s": 9603
     },
     {
       "id": "b46b-c51softtgtseed4",
@@ -80,10 +80,10 @@
         "b46b-c51softtgtseed4"
       ],
       "pid": 1282538,
-      "step": 1739000,
+      "step": 1743000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 9565
+      "steps_per_sec": 105.5,
+      "elapsed_s": 9603
     }
   ],
   "ledger": {
@@ -353,10 +353,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 101.8,
+  "disk_free_gb": 101.7,
   "load_avg": [
-    4.75341796875,
-    4.708984375,
-    4.7431640625
+    4.88623046875,
+    4.732421875,
+    4.74755859375
   ]
 }
