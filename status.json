@@ -1,12 +1,11 @@
 {
-  "iso": "2026-08-27T16:44:04",
-  "ts": 1787874244.7004488,
+  "iso": "2026-08-27T16:44:54",
+  "ts": 1787874294.0160294,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 100% (1 arm)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- closeout eval (4 arms)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (3 arms)",
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (4 arms)"
     ]
   },
@@ -30,31 +29,34 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b46c-c51atoms21seed3",
-      "type": "train",
-      "policy": "b46c-c51atoms21seed3",
+      "id": "b46-closeout-w3",
+      "type": "eval",
+      "policy": "b46c-c51atoms21seed1",
       "policies": [
-        "b46c-c51atoms21seed3"
+        "b46c-c51atoms21seed1",
+        "b46c-c51atoms21seed2",
+        "b46c-c51atoms21seed3",
+        "b46c-c51atoms21seed4"
       ],
-      "pid": 1606877,
-      "step": 2995000,
-      "max_steps": 3000000,
-      "steps_per_sec": 92.2,
-      "elapsed_s": 32922
+      "pid": 2029755,
+      "step": 3000000,
+      "max_steps": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "b46-closeout-w3": "queued",
     "b46d-c51atoms201seed1": "queued",
     "b46d-c51atoms201seed2": "queued",
     "b46d-c51atoms201seed3": "queued",
     "b46d-c51atoms201seed4": "queued",
-    "b46c-c51atoms21seed3": "running",
+    "b46-closeout-w3": "running",
+    "b46c-c51atoms21seed3": "done",
     "b46c-c51atoms21seed4": "done",
     "b46c-c51atoms21seed2": "done",
     "b46c-c51atoms21seed1": "done",
@@ -319,8 +321,8 @@
   },
   "disk_free_gb": 91.0,
   "load_avg": [
-    1.1025390625,
-    1.22021484375,
-    1.8623046875
+    0.88916015625,
+    1.1513671875,
+    1.80322265625
   ]
 }
