@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-26T18:44:55",
-  "ts": 1787795095.5184639,
+  "iso": "2026-08-26T18:45:31",
+  "ts": 1787795131.9561613,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 98% (3 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 97% (2 arms)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (1 arm)",
+      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (2 arms)",
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (12 arms)"
     ]
   },
@@ -30,23 +30,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b46a-c51batch512seed2",
-      "type": "train",
-      "policy": "b46a-c51batch512seed2",
-      "policies": [
-        "b46a-c51batch512seed2"
-      ],
-      "pid": 28694,
-      "step": 2999000,
-      "max_steps": 3000000,
-      "steps_per_sec": 61.1,
-      "elapsed_s": 72915
-    },
     {
       "id": "b46a-c51batch512seed3",
       "type": "train",
@@ -55,10 +42,10 @@
         "b46a-c51batch512seed3"
       ],
       "pid": 28695,
-      "step": 2919000,
+      "step": 2921000,
       "max_steps": 3000000,
-      "steps_per_sec": 61.1,
-      "elapsed_s": 72915
+      "steps_per_sec": 54.9,
+      "elapsed_s": 72952
     },
     {
       "id": "b46a-c51batch512seed4",
@@ -68,10 +55,10 @@
         "b46a-c51batch512seed4"
       ],
       "pid": 28696,
-      "step": 2872000,
+      "step": 2874000,
       "max_steps": 3000000,
-      "steps_per_sec": 30.6,
-      "elapsed_s": 72915
+      "steps_per_sec": 54.9,
+      "elapsed_s": 72952
     }
   ],
   "ledger": {
@@ -88,9 +75,9 @@
     "b46d-c51atoms201seed2": "queued",
     "b46d-c51atoms201seed3": "queued",
     "b46d-c51atoms201seed4": "queued",
-    "b46a-c51batch512seed2": "running",
     "b46a-c51batch512seed3": "running",
     "b46a-c51batch512seed4": "running",
+    "b46a-c51batch512seed2": "done",
     "b46a-c51batch512seed1": "done",
     "b45-closeout-w2": "done",
     "b45-closeout": "done",
@@ -342,8 +329,8 @@
   },
   "disk_free_gb": 108.5,
   "load_avg": [
-    11.02099609375,
-    12.716796875,
-    15.4296875
+    8.123046875,
+    11.8125,
+    15.02685546875
   ]
 }
