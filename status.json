@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T05:22:22",
-  "ts": 1787833342.548237,
+  "iso": "2026-08-27T05:23:10",
+  "ts": 1787833390.2284179,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 78% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 79% (4 arms)"
     ],
     "queued": [
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (8 arms)"
@@ -41,10 +41,10 @@
         "b46b-c51softtgtseed1"
       ],
       "pid": 1282535,
-      "step": 2284000,
+      "step": 2288000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.9,
-      "elapsed_s": 16570
+      "steps_per_sec": 83.9,
+      "elapsed_s": 16617
     },
     {
       "id": "b46b-c51softtgtseed2",
@@ -54,10 +54,10 @@
         "b46b-c51softtgtseed2"
       ],
       "pid": 1282536,
-      "step": 2389000,
+      "step": 2394000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.9,
-      "elapsed_s": 16570
+      "steps_per_sec": 104.9,
+      "elapsed_s": 16617
     },
     {
       "id": "b46b-c51softtgtseed3",
@@ -67,10 +67,10 @@
         "b46b-c51softtgtseed3"
       ],
       "pid": 1282537,
-      "step": 2396000,
+      "step": 2400000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.9,
-      "elapsed_s": 16570
+      "steps_per_sec": 83.9,
+      "elapsed_s": 16617
     },
     {
       "id": "b46b-c51softtgtseed4",
@@ -80,10 +80,10 @@
         "b46b-c51softtgtseed4"
       ],
       "pid": 1282538,
-      "step": 2335000,
+      "step": 2339000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.9,
-      "elapsed_s": 16570
+      "steps_per_sec": 83.9,
+      "elapsed_s": 16617
     }
   ],
   "ledger": {
@@ -353,10 +353,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 99.4,
+  "disk_free_gb": 99.3,
   "load_avg": [
-    4.0849609375,
-    4.3203125,
-    4.4384765625
+    4.54638671875,
+    4.42724609375,
+    4.46923828125
   ]
 }
