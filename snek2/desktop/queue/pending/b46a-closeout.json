@@ -1,0 +1,32 @@
+{
+  "id": "b46a-closeout",
+  "type": "eval",
+  "policies": [
+    "b46a-c51batch512seed1",
+    "b46a-c51batch512seed2",
+    "b46a-c51batch512seed3",
+    "b46a-c51batch512seed4"
+  ],
+  "eval_args": [
+    "top50"
+  ],
+  "chain": true,
+  "env": {
+    "SNEK_ALGO": "c51",
+    "SNEK_NUM_ATOMS": "51",
+    "SNEK_V_MIN": "-5",
+    "SNEK_V_MAX": "120",
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_LEARNING_RATE": "1e-4",
+    "SNEK_ADAM_EPSILON": "3.125e-4",
+    "SNEK_BATCH_SIZE": "512"
+  },
+  "priority": 9,
+  "label": "b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave (vs b38)",
+  "notes": "WAVE 1'S CLOSE-OUT, RE-QUEUED BY HAND. The auto-spawned `b46-closeout` died at 19:16 on 2026-08-26,\n2 seconds in, on `ModuleNotFoundError: No module named 'chart_viewer'` -- `vectorized/vec_wave.py`\nlives in `snek2/vectorized/`, so Python seeds `sys.path[0]` with that directory and not the `snek2/`\nabove it, and the runner passes no PYTHONPATH. The scalar entry points sit IN `snek2/`, so this could\nnot happen until `vec_wave.py` became the desktop's default eval on 2026-08-24; b46's wave 1 was the\nfirst close-out queued after that, so it was the first to hit it. Fixed by a `sys.path` bootstrap\ninside both `vec_wave.py` and `vec_eval.py` -- reproduced with a scrubbed env, verified end to end,\nthree regression tests, all three mutations caught.\n\nWHY A MANUAL SPEC AND NOT A RETRY. `_measured_policies` counts a `failed` wave as measured, on the\nstated reasoning that \"the reason is usually not transient\" -- so all four b46a arms read as measured,\n`_auto_closeout_jobs` skips them, and no `-w2` was ever synthesized. That is correct behaviour for the\ngeneral case and exactly wrong for this one, so the wave has to be asked for explicitly. The id ends in\n`-closeout` deliberately: `_CLOSEOUT_ID_RE` is `-closeout(-w\\d+)?$`, so once this runs\n`_measured_policies` will cover these four policies and nothing will re-measure them. It is keyed on\n`b46a` rather than `b46`, so it cannot collide with the `b46-closeout-w<k>` series the auto path hands\nto waves 2-4.\n\nPRIORITY 9, ONE AHEAD OF `AUTO_CLOSEOUT_PRIORITY` (10). Both sit well ahead of waves 3 and 4 (31/33),\nso the wave barrier will run this the moment wave 2's training finishes, before any further training.\nThe 9 breaks the tie with wave 2's own auto close-out in favour of this one, which has been waiting\nsince 19:16.\n\nENV. `_auto_closeout_jobs` would have passed the arms' inherited env with disagreeing settings dropped;\nthey differ only in `SNEK_SEED`, which cannot reach a measurement of an already-trained checkpoint, so\nthis is that env verbatim minus the seed. `SNEK_FOOD_DISTANCE_REWARD=0` is the load-bearing one -- the\ndefault is **0.001**, so leaving it out would silently change `avg_reward`.\n\nWHAT IT MEASURES. `top50` over the four arms, `--chain` for the HOF re-measure as stage B. Expect stage\nB to find nothing: 3M from scratch does not reach the >=98% band, so an empty HOF stage is the normal\noutcome here and not a failure. Runs on the vec engine, so the rows are flat and ungated\n(`min_achievable: null`) and directly poolable -- b38's rows were gated at 95, so compare via the\ngraph-100% tier or by re-reading each payload's gate."
+}
