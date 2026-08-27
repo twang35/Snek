@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T03:30:47",
-  "ts": 1787826647.9377522,
+  "iso": "2026-08-27T03:31:35",
+  "ts": 1787826695.7751179,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 58% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 59% (4 arms)"
     ],
     "queued": [
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (8 arms)"
@@ -41,10 +41,10 @@
         "b46b-c51softtgtseed1"
       ],
       "pid": 1282535,
-      "step": 1677000,
+      "step": 1682000,
       "max_steps": 3000000,
-      "steps_per_sec": 105.9,
-      "elapsed_s": 9875
+      "steps_per_sec": 104.5,
+      "elapsed_s": 9923
     },
     {
       "id": "b46b-c51softtgtseed2",
@@ -54,10 +54,10 @@
         "b46b-c51softtgtseed2"
       ],
       "pid": 1282536,
-      "step": 1793000,
+      "step": 1797000,
       "max_steps": 3000000,
-      "steps_per_sec": 79.4,
-      "elapsed_s": 9875
+      "steps_per_sec": 83.6,
+      "elapsed_s": 9923
     },
     {
       "id": "b46b-c51softtgtseed3",
@@ -67,10 +67,10 @@
         "b46b-c51softtgtseed3"
       ],
       "pid": 1282537,
-      "step": 1772000,
+      "step": 1777000,
       "max_steps": 3000000,
-      "steps_per_sec": 79.4,
-      "elapsed_s": 9875
+      "steps_per_sec": 104.5,
+      "elapsed_s": 9923
     },
     {
       "id": "b46b-c51softtgtseed4",
@@ -80,10 +80,10 @@
         "b46b-c51softtgtseed4"
       ],
       "pid": 1282538,
-      "step": 1769000,
+      "step": 1774000,
       "max_steps": 3000000,
-      "steps_per_sec": 105.9,
-      "elapsed_s": 9875
+      "steps_per_sec": 104.5,
+      "elapsed_s": 9923
     }
   ],
   "ledger": {
@@ -353,10 +353,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 101.7,
+  "disk_free_gb": 101.6,
   "load_avg": [
-    5.5703125,
-    5.0517578125,
-    4.86279296875
+    5.044921875,
+    4.99462890625,
+    4.853515625
   ]
 }
