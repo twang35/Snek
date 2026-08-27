@@ -21,15 +21,33 @@ anchor, which renders as plain text rather than erroring. Twice was enough.
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 2, relaunched on the vec self-eval** — `b46b` (soft target) seeds 1-4, resumed from **821-902k of 3M**. Queued: waves 3-4 (8 arms) |
+| **desktop `the-claw-den`** | **`b46` wave 3** — `b46c` (`NUM_ATOMS=21`) seeds 1-4 at **461-536k of 3M (17%)**. Heartbeat fresh. Queued: wave 4 (4 arms) |
 
-**Wave 1 is done, and its close-out is finally measured.** `BATCH_SIZE=512` is a null-to-worse at 4
-seeds for 4x the compute; numbers in
-[`charts.md`](charts.md#-wave-1-complete--batch_size512-is-a-null-to-worse-at-4-seeds-for-4x-the-compute).
-The re-queued `b46a-closeout` ran on the fixed vec engine in **~3 minutes** — the first successful
-desktop vec eval since the `sys.path` bug — against the hours the scalar path would have taken.
+**Waves 1 and 2 are both complete, closed out, and both are null-to-worse.**
 
-### ‡ Wave 2 was restarted on 2026-08-27 to pick up the vec self-eval
+| wave | change | mean pp vs `b38` | seeds ahead | corrected `sef` | close-out pooled | rows ≥98% |
+|---|---|---:|---:|---:|---:|---:|
+| 1 `b46a` | `BATCH_SIZE=512` | **−2.5** | 1 of 4 | −5.2 | 80.77% | 1 |
+| 2 `b46b` | soft target, τ=0.005 | **−1.7** | 2 of 4 | −5.2 | 82.41% | 0 |
+
+**Wave 2's +11.2 pp early lead closed exactly as the slow-starter analysis predicted**, and wave 1's
+lone ≥98% checkpoint fell to **91.8% at 500 episodes** — a −6.2 pp winner's curse, and nowhere near the
+project record of 99.0%. Full tables in
+[`charts.md`](charts.md#-wave-2-complete--the-soft-target-is-a-null-to-worse-too-17-pp-mean-perfect-2-of-4).
+**So two of the four c51 knobs are closed and neither moved anything.**
+
+**‡ The one actionable finding is not about c51 — the close-out selection thresholds are now
+miscalibrated.** They are absolute percentages of a *sample*, so 20 → 100 episodes moved
+`ALWAYS_EVAL_SINGLE=95` from gating on true rate 0.917 to **0.943**, which no c51 arm sustains. Wave 3
+currently has **0-4** evals per arm clearing it, against ~50 for a 20-episode arm. **Recommend
+recalibrating to `92/87`** before wave 3 closes out —
+[derivation](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
+This retracts a claim made in these docs yesterday that the tiers survived the change unchanged.
+
+**Wave 1's re-queued close-out ran on the fixed vec engine in ~3 minutes** — the first successful desktop
+vec eval since the `sys.path` bug — against the hours the scalar path would have taken.
+
+### ‡ Wave 2 was restarted mid-run to pick up the vec self-eval — what it bought and what it cost
 
 **Why**: the forked self-eval was measured at **88% of an arm's wall clock**
 ([`findings.md`](findings.md#-the-training-self-eval-is-88-of-a-training-arms-wall-clock-and-the-vec-engine-never-touched-it-2026-08-26)),

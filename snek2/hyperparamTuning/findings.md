@@ -138,6 +138,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
 | **‡‡ The training self-eval was 88% of a training arm's wall clock — the vec engine had never touched it** | **measured 2026-08-26, fixed 2026-08-27** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spent ~18.5 h measuring and **~2.3 h learning**; the 40x vec speedup only ever covered *checkpoint* measurement. Now on the in-process vec engine (`self_eval.py`) with **0 forked children** and the graph at **100 episodes**, which the engine made free. See below |
+| **‡ Close-out selection thresholds are stated as percentages of a *sample*, so 20 -> 100 episodes gutted coverage while looking like a saving** | **found 2026-08-27**. `ALWAYS_EVAL_SINGLE=95` gates on true rate **0.917** at 20 episodes and **0.943** at 100 — above anything c51 sustains. `b46b` wave 2 selected **172 of 175** checkpoints from before its mid-run switch; `b46c` wave 3 has **0-4** evals clearing 95 and **2-29** clearing 90, against ~50 before. Equivalent recalibration is **92/87**. Retracts this file's own "the tiers survive unchanged". See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
 | The graph misranks arms badly — `b5c` is 2nd by graph, last by measurement | **established** |
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
@@ -233,14 +234,15 @@ written down.
   [`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py). Note the bias now runs
   the *other* way for batch 47+ against batch 45-46.
 
-**`eval_plan`'s selection tiers were re-derived at 100 episodes and survive unchanged**, which is the
-part that needed checking rather than assuming: 95 and 90 both sit on a 1% grid, the mandatory tier
-widens from {95, 100} to {95..100} and the fill band from {90} to {90..94}. What changed is what a
-threshold *means* — a checkpoint whose true rate is 0.90 reads >=95% on 20 episodes about **39%** of the
-time and on 100 episodes about **4%** — so the mandatory tier admits roughly an order of magnitude fewer
-marginal checkpoints. Since the uncapped full-length tier was the dominant cost of a close-out
-(791-1300 checkpoints per arm on b43/b44), **close-outs get cheaper as a side effect, with no constant
-touched.**
+**‡ RETRACTED 2026-08-27 — "the selection tiers survive unchanged" was wrong, and the arithmetic that
+looked like a saving was a coverage cliff.** This entry originally said 95 and 90 both sit on a 1% grid,
+the tiers do not collapse, and the order-of-magnitude drop in admissions was a free saving because it
+"admits fewer *marginal* checkpoints". The first two clauses are true and the conclusion is not: the
+thresholds are absolute percentages on the *estimate*, and these arms' true rates are 0.80-0.90, i.e.
+**below** the threshold. At 20 episodes noise lifted them over 95 often enough to populate the tier; at
+100 episodes it cannot, so the tier empties for any arm under ~0.93 true. Measured consequence in the
+section below. **The re-derivation asked "do the thresholds still land on the grid" and "is the fill band
+non-empty" — both yes — and never asked "does any real checkpoint still clear them."**
 
 **And two fixtures did not survive, one of them inverted.** `test_selection_tiers` had `n = 20` baked
 into assertions whose docstrings claimed something weaker. The worst was
@@ -249,6 +251,62 @@ as "the fill band must be screened"; at n=100 it is **98, four points inside the
 the fixture was asserting the opposite of the invariant it documented. **A fixture written against a
 literal that coincides with the invariant is indistinguishable from one written against the invariant
 until the coincidence breaks.**
+
+---
+
+## ‡ A selection threshold is a statement about an estimator, not a quality (2026-08-27)
+
+**`eval_plan`'s close-out selection thresholds were left at 95/90 when the graph went from 20 to 100
+episodes, and that silently gutted close-out coverage.** Found by reading `b46`'s wave 2 and wave 3
+selections, one wave either side of the change.
+
+**The measurement.** `select_top_checkpoints` reads each checkpoint's *graph* `perfect_percent`:
+`ALWAYS_EVAL_SINGLE = 95` is the mandatory tier, `MIN_EVAL_SINGLE = 90` opens the count-bounded fill
+band. How many of an arm's graph evals clear those:
+
+| arm era | evals | ≥95 | ≥90 |
+|---|---:|---:|---:|
+| `b46b` wave 2, **before** the switch (20 ep) | 821-904 each | 14-27 | 35-77 |
+| `b46b` wave 2, **after** the switch (100 ep) | 2097-2180 each | **0** | **0-2** |
+| `b46c` wave 3, uniformly 100 ep, at ~500k | 472-537 each | **0-4** | **2-29** |
+
+**Wave 2's close-out selected 172 of 175 checkpoints from before the switch** — seed 2's highest selected
+step is 883k on an arm that trained to 3M. Its last 2.1M steps were never measured.
+
+**Why: a threshold on a noisy estimate gates on quality only through the estimator.** The 50%-admission
+true rate is the honest way to read one:
+
+| threshold | gates on true rate |
+|---|---:|
+| 95% of 20 ep (19/20) | 0.917 |
+| 90% of 20 ep (18/20) | 0.869 |
+| **95% of 100 ep** | **0.943** |
+| 92% of 100 ep | 0.914 |
+| 90% of 100 ep | 0.894 |
+| **87% of 100 ep** | **0.864** |
+
+So holding the *number* fixed moved the mandatory tier from gating on 0.917 to gating on **0.943** — and
+no c51 arm in this project sustains 0.94. **The equivalent recalibration is 95/90 → `92/87`**, which
+reproduces the old gate points to within 0.005 and lands on the 1% grid. On wave 3 it takes selection
+from 0-4 / 2-29 to **2-15 / 4-59**.
+
+**Two things this generalises to.**
+
+- **Any absolute threshold on a sampled rate has to be re-derived when the sample size changes, and
+  "does it still land on the grid" is not that derivation.** The right check is the admission
+  probability, or its 50% point. The same question applies to `ALWAYS_FULL_SINGLE` (tied to
+  `ALWAYS_EVAL_SINGLE`), and **not** to `EVAL_MIN_ACHIEVABLE=97` or the HOF gate of 98, which act on
+  measured 100-episode close-out rows and were always on that footing.
+- **Changing episode count mid-arm creates a coverage cliff no threshold can straddle**, because one arm
+  then carries two estimators. Wave 2 is the only arm set in this project that does; waves 3-4 onward are
+  uniform.
+
+**But the cliff is not purely artifact, and the two separate cleanly** because a mean rate is unbiased
+across episode counts. Wave 2's post-switch mean perfect rate fell **−4.2 / −10.1 / −0.7 / −7.3** (mean
+**−5.6**) against wave 1's **+0.2** over the same step range, and recalibrating to 92/87 would have
+recovered only **0-6** post-switch checkpoints per arm. So those arms genuinely declined late; the stale
+threshold made it impossible to measure by how much. **Do not use the retraction above to explain away
+wave 2's result** — its unbiased graph comparison is a −1.7 pp loss and stands on its own.
 
 ---
 

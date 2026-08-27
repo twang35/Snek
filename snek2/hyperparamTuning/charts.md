@@ -164,35 +164,93 @@ batch buys stability**, on the seed selected for exactly that defect — but it 
 
 ![b46a-c51batch512seed2](charts/b46a-c51batch512seed2.png)
 
-### ⏳ Wave 2 (soft target) — **ahead at 16%, and the lead is mostly one seed**
+### ✅ Wave 2 complete — **the soft target is a null-to-worse too: −1.7 pp mean perfect, 2 of 4**
 
-**‡ These four charts cross a measurement boundary mid-curve.** The arms were restarted on 2026-08-27
-at 821-902k to pick up the vec self-eval, so each curve is **20-episode graph points up to ~850k and
-100-episode points after** — `perfect_percent` moves from a 5% grid to a 1% grid at that step, and the
-visible effect is a curve that suddenly gets *smoother* rather than better. The exploration schedule
-changed there too, since `perfect_percent` drives `epsilon_for`'s refinement phase. Deliberate, and it
-makes this batch a poor choice for fine cross-batch work.
+`TARGET_UPDATE_TAU=0.005`, `PERIOD=1`, full 3M on all four arms. **The +11.2 pp early lead was the
+slow-starter trap and it closed exactly as predicted** — at 16% seed 4 led its control by +38.3 pp
+because `b38d` sat at 17.3 there and finished at 54.4.
 
-`TARGET_UPDATE_TAU=0.005`, `PERIOD=1`, at step 483,000 (16%):
+Paired against each seed's own `b38` arm. `sef` is on a common **10-episode** footing, which here needs
+a per-row correction rather than a per-arm one — see the boundary note below.
 
-| seed | `b46b` mean pp | `b38` mean pp | Δ |
-|---|---|---|---|
-| 1 | 52.8 | 49.8 | +3.0 |
-| 2 | 56.6 | 53.2 | +3.4 |
-| 3 | 52.5 | 52.5 | 0.0 |
-| 4 | 55.6 | **17.3** | **+38.3** |
-| **mean** | 54.4 | 43.2 | **+11.2** |
+| seed | `b46b` meanPP | `b38` meanPP | Δ meanPP | `b46b` sef@10 | `b38` sef@10 | Δ sef |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 51.4 | **60.4** | **−9.0** | 14.7 | 31.0 | −16.3 |
+| 2 | 52.6 | 51.0 | +1.6 | 16.3 | 15.5 | +0.9 |
+| 3 | 54.8 | 53.9 | +0.9 | 18.0 | 18.6 | −0.6 |
+| 4 | 54.0 | 54.4 | −0.4 | 17.4 | 22.2 | −4.9 |
+| **mean** | 53.2 | 54.9 | **−1.7** | 16.6 | 21.8 | **−5.2** |
+| **seeds ahead** | | | **2 of 4** | | | **1 of 4** |
 
-**Do not read that +11.2.** It is carried by seed 4, whose control `b38d` was simply a slow starter — it
-sat at 17.3 mean pp here and finished the run at 54.4. Excluding it the deltas are +3.0 / +3.4 / 0.0,
-mean **+2.1**, which is a modest early lead and no more. **And wave 1 already produced this exact
-trap:** its seed 4 led by +10.3 pp at 6% and finished −3.9. At 16% this is a learning-*speed* reading,
-not an endpoint one.
+**The raw `sef` here would have been −15.8 and it would have been nonsense.** These arms' last ~2.15M
+steps are 100-episode evals against `b38`'s 10, and `sef` is a threshold-crossing fraction, so the
+uncorrected gap is mostly estimator noise. The correction is per row, using each row's own era: the
+switch step is detectable because a 20-episode reading is always a multiple of 5, and the first
+non-multiple lands at **821k / 904k / 856k / 845k** — matching each arm's own resume line exactly.
 
-![b46b-c51softtgtseed4](charts/b46b-c51softtgtseed4.png)
+**As with wave 1, seed 1 carries the deficit against the strongest control.** `b38a` is the best of the
+four controls at 60.4 mean pp against 51.0-54.4; both treatments lose most against it. Two arms of four
+is the batch's own noise floor.
+
+**‡ These four curves cross a measurement boundary mid-run, and the close-out could not see past it.**
+The arms were restarted at 821-904k onto the vec self-eval at 100 episodes, so each curve gets visibly
+*smoother* partway along without getting better. The consequence is not cosmetic:
+`select_top_checkpoints` reads the graph, and **172 of 175 selected checkpoints came from before the
+switch** — seed 2's selection tops out at step 883k on an arm that ran to 3M. So **wave 2's close-out
+measures its arms' first ~28% and essentially nothing after.** Cause and size in
+[`findings.md`](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
+
+**Part of that is real decline, not artifact**, and the two separate cleanly because a mean rate is
+unbiased across episode counts: post-switch mean pp fell **−4.2 / −10.1 / −0.7 / −7.3** (mean **−5.6**)
+against wave 1's **+0.2** over the same step range. So these arms did get worse late; the threshold
+merely made it impossible to see how much.
+
+**Close-out (vec, 100 episodes, flat/ungated) — reported, but not comparable with wave 1's:**
+
+| arm | rows | pooled % | best % | best step | rows ≥98% |
+|---|---:|---:|---:|---:|---:|
+| `b46b-c51softtgtseed1` | 44 | 80.59 | 94.0 | 321k | 0 |
+| `b46b-c51softtgtseed2` | 50 | **87.10** | **97.0** | 198k | 0 |
+| `b46b-c51softtgtseed3` | 35 | 78.86 | 92.0 | 103k | 0 |
+| `b46b-c51softtgtseed4` | 46 | 81.74 | 92.0 | 477k | 0 |
+| **batch** | 175 | **82.41** | | | **0** |
+
+Wave 1 pooled 80.77% over 18,700 episodes against this 82.41% over 17,500 — **do not read that +1.6 as
+soft target winning.** Wave 1's selection spans 191k-2.96M while wave 2's is concentrated below 900k,
+and these arms decline with training, so the selection era alone favours wave 2. The graph's mean
+perfect rate is the only unbiased comparison available for this batch, and it says **−1.7**.
+
 ![b46b-c51softtgtseed2](charts/b46b-c51softtgtseed2.png)
+![b46b-c51softtgtseed4](charts/b46b-c51softtgtseed4.png)
 ![b46b-c51softtgtseed1](charts/b46b-c51softtgtseed1.png)
 ![b46b-c51softtgtseed3](charts/b46b-c51softtgtseed3.png)
+
+### ⏳ Wave 3 (`NUM_ATOMS=21`) at ~17% — **the first wave measured on one footing throughout**
+
+`SNEK_NUM_ATOMS=21` against b38's 51, at 461-536k of 3M. **These are the first arms whose whole run is
+100-episode graph evals**, so their curves carry no internal boundary and their close-out selection will
+be internally consistent — unlike wave 2 above.
+
+| seed | meanPP | best30 | trailing | max single eval |
+|---|---:|---:|---:|---:|
+| 1 | 51.5 | 83.6 | 84.3 | 98 |
+| 2 | 44.3 | 64.5 | 72.7 | 94 |
+| 3 | 51.2 | 71.6 | 89.5 | 94 |
+| 4 | 49.5 | 82.6 | 91.9 | 98 |
+
+**Too early to read against b38** — waves 1 and 2 both led early and finished behind, and seed 2 is a
+visible slow starter here, which is the same shape that produced wave 2's false +11.2.
+
+**‡ What is worth acting on now is the selection thresholds, not the result.** At 100 episodes only
+**0-4** evals per arm clear `ALWAYS_EVAL_SINGLE=95` and **2-29** clear `MIN_EVAL_SINGLE=90`, against the
+~50 a 20-episode arm offered. Recalibrating to **92/87** — the thresholds that gate on the *same true
+rate* — takes that to 2-15 and 4-59. Detail and the derivation:
+[`findings.md`](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
+
+![b46c-c51atoms21seed1](charts/b46c-c51atoms21seed1.png)
+![b46c-c51atoms21seed4](charts/b46c-c51atoms21seed4.png)
+![b46c-c51atoms21seed3](charts/b46c-c51atoms21seed3.png)
+![b46c-c51atoms21seed2](charts/b46c-c51atoms21seed2.png)
 
 ## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *complete, and measured twice on two engines: **flat on all four**, and `1e-7` still holds the rung — 593 rows ≥98%/500 against `b44`'s 874*
 
