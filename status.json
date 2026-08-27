@@ -1,11 +1,12 @@
 {
-  "iso": "2026-08-27T07:09:29",
-  "ts": 1787839769.596193,
+  "iso": "2026-08-27T07:10:09",
+  "ts": 1787839809.5898385,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 98% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 97% (3 arms)"
     ],
     "queued": [
+      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (1 arm)",
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (8 arms)"
     ]
   },
@@ -29,7 +30,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
@@ -41,10 +42,10 @@
         "b46b-c51softtgtseed1"
       ],
       "pid": 1282535,
-      "step": 2855000,
+      "step": 2859000,
       "max_steps": 3000000,
-      "steps_per_sec": 89.6,
-      "elapsed_s": 22997
+      "steps_per_sec": 100.0,
+      "elapsed_s": 23037
     },
     {
       "id": "b46b-c51softtgtseed2",
@@ -54,23 +55,10 @@
         "b46b-c51softtgtseed2"
       ],
       "pid": 1282536,
-      "step": 2973000,
+      "step": 2977000,
       "max_steps": 3000000,
-      "steps_per_sec": 89.6,
-      "elapsed_s": 22997
-    },
-    {
-      "id": "b46b-c51softtgtseed3",
-      "type": "train",
-      "policy": "b46b-c51softtgtseed3",
-      "policies": [
-        "b46b-c51softtgtseed3"
-      ],
-      "pid": 1282537,
-      "step": 2998000,
-      "max_steps": 3000000,
-      "steps_per_sec": 89.6,
-      "elapsed_s": 22997
+      "steps_per_sec": 100.0,
+      "elapsed_s": 23037
     },
     {
       "id": "b46b-c51softtgtseed4",
@@ -80,13 +68,14 @@
         "b46b-c51softtgtseed4"
       ],
       "pid": 1282538,
-      "step": 2925000,
+      "step": 2929000,
       "max_steps": 3000000,
-      "steps_per_sec": 59.7,
-      "elapsed_s": 22997
+      "steps_per_sec": 100.0,
+      "elapsed_s": 23037
     }
   ],
   "ledger": {
+    "b46-closeout-w2": "queued",
     "b46c-c51atoms21seed1": "queued",
     "b46c-c51atoms21seed2": "queued",
     "b46c-c51atoms21seed3": "queued",
@@ -97,8 +86,8 @@
     "b46d-c51atoms201seed4": "queued",
     "b46b-c51softtgtseed1": "running",
     "b46b-c51softtgtseed2": "running",
-    "b46b-c51softtgtseed3": "running",
     "b46b-c51softtgtseed4": "running",
+    "b46b-c51softtgtseed3": "done",
     "b46a-closeout": "done",
     "b46-closeout": "failed",
     "b46a-c51batch512seed4": "done",
@@ -355,8 +344,8 @@
   },
   "disk_free_gb": 97.1,
   "load_avg": [
-    4.646484375,
-    4.9365234375,
-    4.8994140625
+    4.2392578125,
+    4.80078125,
+    4.85546875
   ]
 }
