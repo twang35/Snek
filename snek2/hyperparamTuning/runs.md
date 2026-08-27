@@ -12,18 +12,55 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 | [`hyperparamTuning.md`](hyperparamTuning.md) | the protocol: metrics, how to judge, how to launch |
 | [`charts.md`](charts.md) | progress graph per arm |
 
-## What is running — 2026-08-26
+## What is running
+
+**As of 2026-08-27.** The date lives here rather than in the heading: it used to be
+`## What is running — <date>`, and every update silently broke every inbound `#what-is-running--<old-date>`
+anchor, which renders as plain text rather than erroring. Twice was enough.
 
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 2** — `b46b` (soft target) on seeds 1-4, **485-561k of 3M (17%)**. Heartbeat `2026-08-26T22:29:51`. Queued: **`b46a-closeout` (prio 9)**, then waves 3-4 (8 arms) |
+| **desktop `the-claw-den`** | **`b46` wave 2, relaunched on the vec self-eval** — `b46b` (soft target) seeds 1-4, resumed from **821-902k of 3M**. Queued: waves 3-4 (8 arms) |
 
-**Wave 1 is done and its result is in** — `BATCH_SIZE=512` is a null-to-worse at 4 seeds for 4x the
-compute; numbers in
+**Wave 1 is done, and its close-out is finally measured.** `BATCH_SIZE=512` is a null-to-worse at 4
+seeds for 4x the compute; numbers in
 [`charts.md`](charts.md#-wave-1-complete--batch_size512-is-a-null-to-worse-at-4-seeds-for-4x-the-compute).
-**Wave 2 ends in ~16.6 h**, so around 15:00 on 2026-08-27; it runs 42-49 steps/s against wave 1's ~40,
-as expected at batch 128.
+The re-queued `b46a-closeout` ran on the fixed vec engine in **~3 minutes** — the first successful
+desktop vec eval since the `sys.path` bug — against the hours the scalar path would have taken.
+
+### ‡ Wave 2 was restarted on 2026-08-27 to pick up the vec self-eval
+
+**Why**: the forked self-eval was measured at **88% of an arm's wall clock**
+([`findings.md`](findings.md#-the-training-self-eval-is-88-of-a-training-arms-wall-clock-and-the-vec-engine-never-touched-it-2026-08-26)),
+so the arms were spending ~6 of every 7 hours measuring. Restarting to pick up `self_eval.py` was worth
+more than the wall clock it cost, which was none: the arms **resumed from their checkpoints** at
+821-902k with their replay buffers intact, so nothing was thrown away.
+
+**Measured result: 92.4 steps/s per arm against 40.0 before — 2.31x — while taking 5x more episodes
+per graph point.** Per episode the engine is **13.9x**; the difference went into sample size rather than
+speed. Wave 2's remaining 8.23M arm-steps now finish in **~6.2 h** instead of ~14.3 h.
+
+**What changed for these arms**, mid-run and deliberately:
+
+| | before the restart | after |
+|---|---|---|
+| self-eval engine | 20 forked pygame envs | in-process vec, 100 lanes |
+| episodes per graph point | 20 | **100** |
+| forked children per trainer | 20 | **0** |
+
+**Two consequences, both accepted.** Each arm's `_evals.json` now holds 20-episode rows for its first
+~850k steps and 100-episode rows after, so **its own curve crosses a measurement boundary mid-arm** —
+`perfect_percent` goes from a 5% grid to a 1% grid at that step. And `perfect_percent` feeds
+`epsilon_for`'s refinement phase, so the exploration schedule changed at the same point. Neither is a
+bug; both make this batch a poor choice for any fine cross-batch comparison, which the user explicitly
+waived.
+
+**The restart needed the ledger cleared, not just a kill.** A killed job reads `done` (same boot, dead
+pid), which is terminal, so `_scan_pending` drops its id and the daemon will not re-dispatch it. The
+sequence that works: stop the daemon, kill by **explicit pid** (a `pkill -f "snek2.py b46"` over ssh
+previously killed the invoking shell), remove the four ledger entries with a `.bak`, restart the daemon.
+Each trainer had exactly 20 children before the kill, which is the 88% made visible.
 
 ### ‡ Wave 1's close-out failed in 2 seconds and nothing would ever have retried it
 
@@ -475,6 +512,6 @@ sweep was 2026-08-22, which took this file from 1075 lines to ~350 by retiring t
 notice, the closed rungs of the b42-b45 ladder, every closed-batch status section from b31 to b41, the gate
 ladder summary, the b20-b26 index, the max-progression table and the batch 11-19 one-liners.
 
-**Verifying what is running on each host is [above](#what-is-running--2026-08-25)** — and note that neither
+**Verifying what is running on each host is [above](#what-is-running)** — and note that neither
 check sees the other box, so a count is meaningless without naming it. Full ladder for a desktop that looks
 dead: [`CLAUDE.md`](../../CLAUDE.md#there-are-two-compute-hosts--say-which-one-you-mean).

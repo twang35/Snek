@@ -895,6 +895,67 @@ like the charts are handled when no caption has been written. That drifted once 
 arms across batches 5-7**. The completeness check at the top of `charts.md` is what catches it, and it
 has to be run against the archive files too.
 
+## Training self-eval cost — the graph is 100 episodes on the vec engine
+
+**‡ The training self-eval is the *other* eval, and it was 88% of a training arm's wall clock until
+2026-08-27.** Do not confuse it with the checkpoint eval below. Two different things measure a policy:
+
+| | what it measures | engine | when |
+|---|---|---|---|
+| **training self-eval** | the live policy, every 1000 steps, for the graph | `self_eval.py` → in-process `vec_engine.measure` | during training |
+| **checkpoint eval** | saved checkpoints, for close-outs and HOF | `vectorized/vec_wave.py` | after training |
+
+**The 40x figure belongs to the second row only.** The vec engine became the checkpoint default on
+2026-08-24 and did not touch the self-eval, which kept running 20 episodes through a
+`ParallelPyEnvironment` of 20 forked pygame envs. Measured on two live `b46b` arms by sampling their
+forked children in `/proc`: **88.8% and 88.0% of wall clock was self-eval**, so a 3M-step arm spent
+~18.5 h measuring and **~2.3 h learning**. The cause was contention, not episode cost — four arms × 20
+envs is **80 processes on 8 physical cores**, ~9.9 cores of demand on 8, 0.09 of a core each.
+
+**Now: `num_eval_episodes = 100`, in-process, and zero forked children per trainer.** 100 episodes puts
+`perfect_percent` on a **1% grid** instead of 5%, which is the fix for the graph noise that makes
+`best_perfect30` and `strong_eval_fraction` fragile. Measured on the desktop, same 4-arm configuration:
+
+| | old (20 ep, forked) | new (100 ep, vec) |
+|---|---:|---:|
+| per-arm throughput | 40.0 steps/s | **92.4 steps/s** |
+| self-eval per episode | 1.105 s | **0.079 s** |
+| self-eval share of wall clock | 88% | **73%** |
+
+**‡ 2.31x end-to-end but 13.9x per episode, and the gap is the point: most of the engine's gain was
+spent on sample size, not speed.** At 20 episodes it would have been ~223 steps/s (5.6x) with the
+self-eval at 35% of wall clock. **So the self-eval is still the majority of a training arm's wall clock,
+and `num_eval_episodes` / `eval_interval` are now the two levers on training throughput** —
+`eval_interval` (1000) being the untouched one, since doubling it halves the eval bill without
+coarsening any individual graph point.
+
+**Four things to carry.**
+
+- **The opt-out needs two knobs, not one.** `SNEK_TRAIN_EVAL_ENGINE=scalar` alone leaves the episode
+  count at 100, which means **100 forked pygame envs** — that did not finish a single eval in 120 s on
+  the laptop. Reproducing pre-2026-08-27 behaviour is
+  `SNEK_TRAIN_EVAL_ENGINE=scalar SNEK_GRAPH_EVAL_EPISODES=20`.
+- **It is a *training* change, not only a reporting one.** `metrics.last_eval_perfect_percent` feeds
+  `training.epsilon_for`'s refinement phase, so the exploration schedule moved with it. Same coupling as
+  the chase-safe shaping bug that pinned epsilon at 0.0125 for 300k+ steps.
+- **The forked eval envs are built only on the scalar path, and the gate's *position* is the saving.**
+  `snek2.main` asks `self_eval.needs_eval_envs()` **before** constructing them; a check inside the
+  evaluator would read identically and still pay for 20 processes per arm.
+  `tests/test_self_eval.py` pins the gate's position, not just its existence.
+- **`eval_plan`'s selection tiers were re-derived at 100 episodes and are unchanged** — 95 and 90 both
+  sit on a 1% grid. But a threshold on a less noisy estimate is *stricter*: a checkpoint whose true rate
+  is 0.90 reads ≥95% on 20 episodes ~**39%** of the time and on 100 episodes ~**4%**, so the mandatory
+  tier admits about an order of magnitude fewer marginal checkpoints and **close-outs get cheaper with no
+  constant touched.** `tests/test_selection_tiers.py` is the only thing tying the two files together.
+
+**‡ And the fixture lesson, because it cost two silent failures.** That test module had `n = 20` baked
+into assertions whose docstrings claimed something weaker, and one **inverted** at n=100:
+`assert not skips_screening((n - 2) / n)` meant "the fill band must be screened" at n=20, where
+`(n-2)/n` is 90 — the band's only value — and at n=100 it is **98, four points inside the mandatory
+tier**, so the fixture asserted the opposite of what it documented. **A fixture written against a
+literal that coincides with the invariant is indistinguishable from one written against the invariant
+until the coincidence breaks.**
+
 ## Eval cost
 
 **‡ The default engine is the vectorised one, on both hosts** (2026-08-24). A close-out or HOF pass is
@@ -1090,7 +1151,11 @@ the graph-100% tier is censored by any gate and must not be compared across them
 
 **‡ 2026-08-19 is also a *graph* boundary, not only a gate one, and it biases three metrics — including
 the primary one.** `training.num_eval_episodes` went 10 → 20, so batches 1-44 report `perfect_percent` in
-multiples of 10 and batch 45 onward in multiples of 5. **Banded mean perfect rate stays comparable** — a
+multiples of 10 and batches 45-46 in multiples of 5. **There is now a third era: 100 episodes from
+2026-08-27**, i.e. a 1% grid — see the self-eval section below. Everything in this bullet applies to both
+boundaries, and the *direction* is the same at each: more episodes means less noise, which lowers a maximum
+and lowers a threshold-crossing fraction, so **the arm with fewer episodes always looks better than it
+is.** **Banded mean perfect rate stays comparable** — a
 20-episode estimate of the same true rate has the same expectation, so it is the metric to reach for across
 the line. **`best_perfect30` and `max_single_eval` do not**: they are maxima over a noisy statistic, and
 halving the noise lowers them systematically, so a 20-episode arm looks slightly *worse* on those than a

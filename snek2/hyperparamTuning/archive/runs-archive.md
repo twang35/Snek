@@ -168,7 +168,7 @@ killed it: the gate sits above the whole blob, so nearly all of it is out of con
 Measured on batch 13's first 505 full-length rows, full-length work drops to 71% / 52% / **31%** at
 gates of 85 / 90 / 95. **The gate is 95**, since that is the bar a checkpoint has to clear to be worth
 keeping at all; what it costs is in
-[`hyperparamTuning.md`](../hyperparamTuning.md#measuring-a-policy-properly-eval_checkpointspy).
+[`hyperparamTuning.md`](../hyperparamTuning.md#measuring-a-policy-properly).
 
 A close-out is also resumable now (`EVAL_RESUME=1`), which is what made switching the worker
 count mid-run cost only the checkpoint in flight rather than the 333 already measured.

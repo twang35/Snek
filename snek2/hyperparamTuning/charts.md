@@ -126,7 +126,7 @@ equal quality. **Any cross-boundary `sef` figure that has not been put on a comm
 double its true size.**
 
 **Its close-out has not run yet** — the auto one failed on a `sys.path` bug and was re-queued by hand;
-see [`runs.md`](runs.md#what-is-running--2026-08-26). So everything above is training self-eval, and the
+see [`runs.md`](runs.md#what-is-running). So everything above is training self-eval, and the
 100-episode instrument could still move it, though not plausibly reverse a −5 pp.
 
 ### b46a-c51batch512seed3 — the one arm ahead, on every metric that matters
@@ -164,7 +164,14 @@ batch buys stability**, on the seed selected for exactly that defect — but it 
 
 ![b46a-c51batch512seed2](charts/b46a-c51batch512seed2.png)
 
-### ⏳ Wave 2 (soft target) at 16% — **ahead, and the lead is mostly one seed**
+### ⏳ Wave 2 (soft target) — **ahead at 16%, and the lead is mostly one seed**
+
+**‡ These four charts cross a measurement boundary mid-curve.** The arms were restarted on 2026-08-27
+at 821-902k to pick up the vec self-eval, so each curve is **20-episode graph points up to ~850k and
+100-episode points after** — `perfect_percent` moves from a 5% grid to a 1% grid at that step, and the
+visible effect is a curve that suddenly gets *smoother* rather than better. The exploration schedule
+changed there too, since `perfect_percent` drives `epsilon_for`'s refinement phase. Deliberate, and it
+makes this batch a poor choice for fine cross-batch work.
 
 `TARGET_UPDATE_TAU=0.005`, `PERIOD=1`, at step 483,000 (16%):
 

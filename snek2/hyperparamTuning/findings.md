@@ -137,7 +137,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
-| **‡‡ The training self-eval is 88% of a training arm's wall clock, and it never moved to the vec engine** | **measured 2026-08-26** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spends ~18.5 h measuring and **~2.3 h learning**. The 40x vec speedup only ever covered *checkpoint* measurement. See below |
+| **‡‡ The training self-eval was 88% of a training arm's wall clock — the vec engine had never touched it** | **measured 2026-08-26, fixed 2026-08-27** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spent ~18.5 h measuring and **~2.3 h learning**; the 40x vec speedup only ever covered *checkpoint* measurement. Now on the in-process vec engine (`self_eval.py`) with **0 forked children** and the graph at **100 episodes**, which the engine made free. See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
 | The graph misranks arms badly — `b5c` is 2nd by graph, last by measurement | **established** |
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
@@ -174,26 +174,81 @@ expensive; it is that the wave runs 80 of them in lockstep on a box that has 8 c
 measurement would not reproduce 88%**, and the figure is specific to the 4-arm wave — which is the
 configuration every batch actually runs.
 
-**The engine is already callable in-process.** `vectorized/vec_engine.py` exposes
-`measure(policy_fn, episodes, lanes=None, seed=0, shaping_discount=1.0)`, so the substitution is at
-`training.compute_avg_return`'s call site rather than a new engine. **Not attempted yet** — this entry
-is the measurement, not a change.
+### ✅ Fixed 2026-08-27: `self_eval.py`, and the graph went to 100 episodes in the same change
 
-**Three things to settle before touching it, two of which are traps.**
+`vectorized/vec_engine.measure` is callable in-process, so the substitution was at
+`training.compute_avg_return`'s call site rather than a new engine. Shipped as `self_eval.py` with a
+`SNEK_TRAIN_EVAL_ENGINE=scalar` opt-out.
 
-- **`perfect_percent` is not only a report — it drives `training.epsilon_for`'s refinement phase.** So a
-  self-eval engine change changes *training*, not just the graph. This is the same hazard as the
-  chase-safe shaping bug, which pinned epsilon at 0.0125 for 300k+ steps across eight arms.
-- **It is a measurement boundary**, like the 10 -> 20 episode change of 2026-08-19. The engines agreed to
-  **-0.058 pp (z = -0.28)** on checkpoints, so the bias is small, but that was validated on *greedy*
-  policies at fixed checkpoints — a self-eval runs an epsilon-greedy policy mid-training, which the
-  head-to-head never covered. Validate at the self-eval's own operating point before trusting it.
-- **If it becomes cheap, 20 episodes is probably the wrong number.** The graph's noise is what makes
-  `best_perfect30` and `strong_eval_fraction` fragile in the first place, and a cheap self-eval could run
-  100+ episodes and largely remove that. **But raising it is a third boundary**, and `sef` is a
-  threshold-crossing statistic, so it must go through
-  [`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py) rather than being
-  compared raw.
+| | old | new |
+|---|---|---|
+| engine | 20 forked pygame envs | in-process vec, 100 lanes |
+| episodes per graph point | 20 | **100** |
+| forked child processes per trainer | 20 | **0** (verified on the box) |
+| laptop smoke, 4000 steps / 5 evals, equal episodes | 63 s | **10 s** |
+| desktop per-arm throughput, 4 arms | 40.0 steps/s | **92.4 steps/s** (87.9-100.0 across seeds) |
+
+**‡ 2.31x end-to-end, 13.9x per episode, and the gap between those two numbers is the whole story.**
+Measured on the desktop over 330 s with four arms running, against the same 4-arm configuration that
+gave 40.0 steps/s before. Decomposing the 1000-step cycle, holding the training-side cost fixed at the
+2.90 s the old 88% figure implies:
+
+| | old (20 ep, forked) | new (100 ep, vec) |
+|---|---:|---:|
+| cycle per 1000 steps | 25.00 s | **10.82 s** |
+| of which training | 2.90 s | 2.90 s |
+| of which self-eval | 22.10 s | **7.92 s** |
+| per episode | 1.105 s | **0.079 s** |
+| self-eval share of wall clock | 88% | **73%** |
+
+**So the engine is 13.9x per episode and most of that was spent on measurement quality rather than
+speed** — a deliberate choice. Had the count stayed at 20, throughput would be **~223 steps/s (5.6x)**
+with the self-eval down to 35% of wall clock. At 100 episodes the self-eval is *still* the majority of
+a training arm's wall clock, so **`num_eval_episodes` and `eval_interval` are now the two levers on
+training throughput**, and `eval_interval` (1000) is the untouched one: doubling it would halve the eval
+bill without coarsening any individual graph point.
+
+**The episode bump is what the engine bought, and it was free.** A 6000-step laptop smoke with
+100-episode evals ran in the same 10 s as a 4000-step one with 20-episode evals, so 5x the sample
+costs nothing measurable. That matters because graph noise is the root cause of `best_perfect30` and
+`strong_eval_fraction` being fragile — 100 episodes puts `perfect_percent` on a 1% grid instead of 5%.
+
+**One caveat here was wrong and is retracted.** This entry previously warned that the engines'
+**-0.058 pp** agreement was validated on *greedy* policies at fixed checkpoints while a self-eval
+"runs an epsilon-greedy policy mid-training". Only the second half is true: `training` calls the
+self-eval with **`agent.policy`**, which is the greedy policy — `agent.collect_policy` is the
+epsilon-greedy one and is never evaluated. So the validated regime *is* the regime, and the only
+untested difference is that the weights are live rather than restored, which no part of the engine can
+observe. **The lesson is that the caveat was invented from the shape of the situation rather than read
+off the call site**, and one `grep` for `compute_avg_return` would have settled it before it was
+written down.
+
+**Two consequences that are real and were accepted deliberately.**
+
+- **`perfect_percent` drives `training.epsilon_for`'s refinement phase**, so this changed the
+  *exploration schedule*, not only the report — the same coupling as the chase-safe shaping bug that
+  pinned epsilon at 0.0125 for 300k+ steps across eight arms.
+- **20 -> 100 is a third measurement boundary** after 10 -> 20. A rate is comparable across it;
+  `strong_eval_fraction` is a threshold-crossing statistic and is **not**, so it must go through
+  [`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py). Note the bias now runs
+  the *other* way for batch 47+ against batch 45-46.
+
+**`eval_plan`'s selection tiers were re-derived at 100 episodes and survive unchanged**, which is the
+part that needed checking rather than assuming: 95 and 90 both sit on a 1% grid, the mandatory tier
+widens from {95, 100} to {95..100} and the fill band from {90} to {90..94}. What changed is what a
+threshold *means* — a checkpoint whose true rate is 0.90 reads >=95% on 20 episodes about **39%** of the
+time and on 100 episodes about **4%** — so the mandatory tier admits roughly an order of magnitude fewer
+marginal checkpoints. Since the uncapped full-length tier was the dominant cost of a close-out
+(791-1300 checkpoints per arm on b43/b44), **close-outs get cheaper as a side effect, with no constant
+touched.**
+
+**And two fixtures did not survive, one of them inverted.** `test_selection_tiers` had `n = 20` baked
+into assertions whose docstrings claimed something weaker. The worst was
+`assert not skips_screening((n - 2) / n)` — at n=20 that is 90, the fill band's only value, so it read
+as "the fill band must be screened"; at n=100 it is **98, four points inside the mandatory tier**, so
+the fixture was asserting the opposite of the invariant it documented. **A fixture written against a
+literal that coincides with the invariant is indistinguishable from one written against the invariant
+until the coincidence breaks.**
 
 ---
 
