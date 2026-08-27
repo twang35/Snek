@@ -339,7 +339,16 @@ while idle sits at zero — 16 processes are 20% slower than 12 — so "0% idle"
 separate: 12 won both repeats on both throughput and wall clock.
 
 Against `eval_checkpoints.py` at its own standing point of 4 processes x 4 workers (**8.55 eps/s**
-machine-wide), 348 eps/s is **40.7x**. An earlier note in this file put the figure at 22x and called a
+machine-wide), 348 eps/s is **40.7x**.
+
+**That 40.7x is *checkpoint* measurement only, and the scope is worth stating because it has been
+misread.** This engine replaced `eval_checkpoints.py` — close-outs and HOF passes. It did **not** touch
+the training self-eval, which still runs 20 episodes every 1000 steps through a `ParallelPyEnvironment`
+of 20 forked pygame envs and is **88% of a training arm's wall clock** (measured 2026-08-26; see
+[`findings.md`](../hyperparamTuning/findings.md#-the-training-self-eval-is-88-of-a-training-arms-wall-clock-and-the-vec-engine-never-touched-it-2026-08-26)).
+So a batch's *measurement* got 40x faster and its *training* got no faster at all. `vec_engine.measure`
+is callable in-process and would be the substitution point, but `perfect_percent` feeds the epsilon
+schedule, so that is a training change and not just a speedup. An earlier note in this file put the figure at 22x and called a
 pre-registered 40x gate missed; that measurement was taken at 4 vec processes with 59% of the machine
 idle, and it was the process count that was wrong rather than the engine.
 

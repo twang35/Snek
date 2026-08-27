@@ -137,9 +137,63 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A 100% single graph eval is the only graph value with a usable floor | **measured**, 9 of 9 above 64% |
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
+| **‡‡ The training self-eval is 88% of a training arm's wall clock, and it never moved to the vec engine** | **measured 2026-08-26** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spends ~18.5 h measuring and **~2.3 h learning**. The 40x vec speedup only ever covered *checkpoint* measurement. See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
 | The graph misranks arms badly — `b5c` is 2nd by graph, last by measurement | **established** |
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
+
+---
+
+## ‡‡ The training self-eval is 88% of a training arm's wall clock, and the vec engine never touched it (2026-08-26)
+
+**The 40x speedup measured on 2026-08-24 covered `vec_wave` replacing `eval_checkpoints` — checkpoint
+measurement, i.e. close-outs and HOF passes. Training was never in scope, and the training *self-eval*
+is still on the original scalar path.** It is also almost the entire cost of a training run.
+
+`training.py` self-evals **20 episodes every 1000 steps** (`num_eval_episodes = 20`,
+`eval_interval = 1000`), through a `ParallelPyEnvironment` of 20 forked pygame envs. Measured on two
+live `b46b` arms by sampling each trainer's 20 forked children in `/proc` at 2 Hz:
+
+| arm | window | eval-active wall | eval bursts | child CPU | root CPU |
+|---|---:|---:|---|---:|---:|
+| `b46b-c51softtgtseed1` | 240 s | **88.8%** | 10, median 23.0 s, max 25.5 s | 1.59 cores | 0.88 cores |
+| `b46b-c51softtgtseed3` | 150 s | **88.0%** | 8, median 20.0 s, max 24.0 s | 1.58 cores | 0.88 cores |
+
+**The burst count is an independent check on the whole reading.** 10 bursts in 240 s is one eval per
+24 s, and one eval is 1000 steps, so end-to-end throughput is **41.7 steps/s** — against the **40.0
+steps/s** measured separately from `global_step` deltas over 9 hours. Two unrelated instruments agree,
+so the 88% is not a sampling artifact.
+
+**What it means for a 3M-step arm: ~18.5 h measuring, ~2.3 h learning.** The gradient stepping itself
+runs at roughly 500-1000 steps/s; everything else is the self-eval.
+
+**Why it is this bad is contention, and that is the actionable half.** Four arms x 20 forked eval envs
+is **80 eval processes on 8 physical cores**, plus the four trainers — 4 x (1.59 + 0.88) = **9.9 cores of
+demand on 8**. Each eval worker gets 0.09 of a core. So the cost is not that a snake episode is
+expensive; it is that the wave runs 80 of them in lockstep on a box that has 8 cores. **A single-arm
+measurement would not reproduce 88%**, and the figure is specific to the 4-arm wave — which is the
+configuration every batch actually runs.
+
+**The engine is already callable in-process.** `vectorized/vec_engine.py` exposes
+`measure(policy_fn, episodes, lanes=None, seed=0, shaping_discount=1.0)`, so the substitution is at
+`training.compute_avg_return`'s call site rather than a new engine. **Not attempted yet** — this entry
+is the measurement, not a change.
+
+**Three things to settle before touching it, two of which are traps.**
+
+- **`perfect_percent` is not only a report — it drives `training.epsilon_for`'s refinement phase.** So a
+  self-eval engine change changes *training*, not just the graph. This is the same hazard as the
+  chase-safe shaping bug, which pinned epsilon at 0.0125 for 300k+ steps across eight arms.
+- **It is a measurement boundary**, like the 10 -> 20 episode change of 2026-08-19. The engines agreed to
+  **-0.058 pp (z = -0.28)** on checkpoints, so the bias is small, but that was validated on *greedy*
+  policies at fixed checkpoints — a self-eval runs an epsilon-greedy policy mid-training, which the
+  head-to-head never covered. Validate at the self-eval's own operating point before trusting it.
+- **If it becomes cheap, 20 episodes is probably the wrong number.** The graph's noise is what makes
+  `best_perfect30` and `strong_eval_fraction` fragile in the first place, and a cheap self-eval could run
+  100+ episodes and largely remove that. **But raising it is a third boundary**, and `sef` is a
+  threshold-crossing statistic, so it must go through
+  [`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py) rather than being
+  compared raw.
 
 ---
 
