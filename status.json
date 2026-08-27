@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-27T13:04:03",
-  "ts": 1787861043.8459215,
+  "iso": "2026-08-27T13:04:47",
+  "ts": 1787861087.6755934,
   "at_a_glance": {
     "running": [
       "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 61% (4 arms)"
@@ -41,10 +41,10 @@
         "b46c-c51atoms21seed1"
       ],
       "pid": 1606875,
-      "step": 1875000,
+      "step": 1880000,
       "max_steps": 3000000,
-      "steps_per_sec": 89.0,
-      "elapsed_s": 19721
+      "steps_per_sec": 114.1,
+      "elapsed_s": 19765
     },
     {
       "id": "b46c-c51atoms21seed2",
@@ -54,10 +54,10 @@
         "b46c-c51atoms21seed2"
       ],
       "pid": 1606876,
-      "step": 1842000,
+      "step": 1846000,
       "max_steps": 3000000,
-      "steps_per_sec": 89.0,
-      "elapsed_s": 19721
+      "steps_per_sec": 91.3,
+      "elapsed_s": 19765
     },
     {
       "id": "b46c-c51atoms21seed3",
@@ -67,10 +67,10 @@
         "b46c-c51atoms21seed3"
       ],
       "pid": 1606877,
-      "step": 1739000,
+      "step": 1743000,
       "max_steps": 3000000,
-      "steps_per_sec": 118.6,
-      "elapsed_s": 19721
+      "steps_per_sec": 91.3,
+      "elapsed_s": 19765
     },
     {
       "id": "b46c-c51atoms21seed4",
@@ -80,10 +80,10 @@
         "b46c-c51atoms21seed4"
       ],
       "pid": 1606878,
-      "step": 1859000,
+      "step": 1863000,
       "max_steps": 3000000,
-      "steps_per_sec": 89.0,
-      "elapsed_s": 19721
+      "steps_per_sec": 91.3,
+      "elapsed_s": 19765
     }
   ],
   "ledger": {
@@ -356,8 +356,8 @@
   },
   "disk_free_gb": 93.3,
   "load_avg": [
-    4.33203125,
-    4.4677734375,
-    4.404296875
+    4.0224609375,
+    4.3681640625,
+    4.37158203125
   ]
 }
