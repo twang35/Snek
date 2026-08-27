@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T00:57:03",
-  "ts": 1787817423.3180192,
+  "iso": "2026-08-27T00:57:37",
+  "ts": 1787817457.6369789,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 30% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 31% (4 arms)"
     ],
     "queued": [
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (8 arms)"
@@ -41,10 +41,10 @@
         "b46b-c51softtgtseed1"
       ],
       "pid": 1282535,
-      "step": 874000,
+      "step": 877000,
       "max_steps": 3000000,
-      "steps_per_sec": 92.0,
-      "elapsed_s": 650
+      "steps_per_sec": 87.4,
+      "elapsed_s": 685
     },
     {
       "id": "b46b-c51softtgtseed2",
@@ -54,10 +54,10 @@
         "b46b-c51softtgtseed2"
       ],
       "pid": 1282536,
-      "step": 961000,
+      "step": 964000,
       "max_steps": 3000000,
-      "steps_per_sec": 92.0,
-      "elapsed_s": 650
+      "steps_per_sec": 87.4,
+      "elapsed_s": 685
     },
     {
       "id": "b46b-c51softtgtseed3",
@@ -67,10 +67,10 @@
         "b46b-c51softtgtseed3"
       ],
       "pid": 1282537,
-      "step": 912000,
+      "step": 916000,
       "max_steps": 3000000,
-      "steps_per_sec": 92.1,
-      "elapsed_s": 650
+      "steps_per_sec": 116.6,
+      "elapsed_s": 685
     },
     {
       "id": "b46b-c51softtgtseed4",
@@ -80,10 +80,10 @@
         "b46b-c51softtgtseed4"
       ],
       "pid": 1282538,
-      "step": 906000,
+      "step": 910000,
       "max_steps": 3000000,
-      "steps_per_sec": 92.1,
-      "elapsed_s": 650
+      "steps_per_sec": 116.6,
+      "elapsed_s": 685
     }
   ],
   "ledger": {
@@ -353,10 +353,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 104.9,
+  "disk_free_gb": 104.8,
   "load_avg": [
-    3.9482421875,
-    5.298828125,
-    10.68408203125
+    4.5869140625,
+    5.29931640625,
+    10.48291015625
   ]
 }
