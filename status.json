@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T04:43:04",
-  "ts": 1787830984.0812106,
+  "iso": "2026-08-27T04:43:41",
+  "ts": 1787831021.898098,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 71% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 72% (4 arms)"
     ],
     "queued": [
       "b46 training -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (8 arms)"
@@ -41,10 +41,10 @@
         "b46b-c51softtgtseed1"
       ],
       "pid": 1282535,
-      "step": 2082000,
+      "step": 2086000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.5,
-      "elapsed_s": 14211
+      "steps_per_sec": 105.8,
+      "elapsed_s": 14249
     },
     {
       "id": "b46b-c51softtgtseed2",
@@ -54,10 +54,10 @@
         "b46b-c51softtgtseed2"
       ],
       "pid": 1282536,
-      "step": 2182000,
+      "step": 2186000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.5,
-      "elapsed_s": 14211
+      "steps_per_sec": 105.8,
+      "elapsed_s": 14249
     },
     {
       "id": "b46b-c51softtgtseed3",
@@ -67,10 +67,10 @@
         "b46b-c51softtgtseed3"
       ],
       "pid": 1282537,
-      "step": 2174000,
+      "step": 2178000,
       "max_steps": 3000000,
-      "steps_per_sec": 90.5,
-      "elapsed_s": 14211
+      "steps_per_sec": 105.8,
+      "elapsed_s": 14249
     },
     {
       "id": "b46b-c51softtgtseed4",
@@ -80,10 +80,10 @@
         "b46b-c51softtgtseed4"
       ],
       "pid": 1282538,
-      "step": 2132000,
+      "step": 2136000,
       "max_steps": 3000000,
-      "steps_per_sec": 60.3,
-      "elapsed_s": 14211
+      "steps_per_sec": 105.8,
+      "elapsed_s": 14249
     }
   ],
   "ledger": {
@@ -353,10 +353,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 100.2,
+  "disk_free_gb": 100.1,
   "load_avg": [
-    4.47119140625,
-    4.65625,
-    4.69482421875
+    4.18798828125,
+    4.55810546875,
+    4.6591796875
   ]
 }
