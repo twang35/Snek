@@ -666,12 +666,29 @@ def best_full_length_row(results, num_episodes):
 
 
 # Selection thresholds, in single-eval percentage points. **A graph point is `training.
-# num_eval_episodes` episodes — 20 since 2026-08-19, 10 before it — so these are coarser than they
-# look and the granularity is load-bearing.** At 20 episodes the reportable values are multiples of
-# 5, so the mandatory tier is {95, 100} and the fill band is exactly {90}. At the old 10 they were
-# multiples of 10, which is why the thresholds used to be 90/60: a 95 tier would have collapsed to
-# {100} and been indistinguishable from ALWAYS_FULL_SINGLE. **If num_eval_episodes changes again,
-# re-derive these** rather than assuming the bands survive.
+# num_eval_episodes` episodes — 100 since 2026-08-27, 20 since 2026-08-19, 10 before it — so these
+# can be coarser than they look and the granularity is load-bearing.** At 20 episodes the reportable
+# values are multiples of 5, so the mandatory tier was {95, 100} and the fill band exactly {90}. At
+# the old 10 they were multiples of 10, which is why the thresholds used to be 90/60: a 95 tier
+# would have collapsed to {100} and been indistinguishable from ALWAYS_FULL_SINGLE. **If
+# num_eval_episodes changes again, re-derive these** rather than assuming the bands survive.
+#
+# **Re-derived at 100 episodes and unchanged, which is the answer that needed checking.** 95 and 90
+# are both reportable on a 1% grid; the mandatory tier widens to {95..100} and the fill band to
+# {90..94}, so `top<N>`'s count still bounds something and no tier collapsed.
+#
+# **What did change is what a threshold *means*, and it makes close-outs cheaper.** These are
+# thresholds on a noisy estimate, so their strictness depends on the episode count. A checkpoint
+# whose true rate is 0.90 reads >=95% on 20 episodes (19 of 20) about **39%** of the time and on 100
+# episodes about **4%** — so the mandatory tier now admits roughly an order of magnitude fewer
+# marginal checkpoints, and the ones it admits are far more likely to deserve it. The uncapped
+# full-length tier was the dominant cost of a close-out (791-1300 checkpoints per arm on b43/b44),
+# so this is a large saving that arrives without touching a constant.
+#
+# The trade is coverage in the 90-95 band, which the graph used to scatter into the mandatory tier by
+# luck and now correctly leaves to the fill band and `count`. That is the right direction given the
+# measured finding that 6 of 8 arms' best checkpoints sat below the graph-100% tier: the fix for that
+# was a *better estimate*, which is what 100 episodes is, rather than a looser threshold.
 ALWAYS_EVAL_SINGLE = 95.0   # every checkpoint at or above this is measured, even past `count`
 MIN_EVAL_SINGLE = 90.0      # below this, a checkpoint is not worth 100 episodes
 DEFAULT_COUNT = 50          # target total; the mandatory tier may exceed it

@@ -223,8 +223,27 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
 
     rewards, scores, total_steps = run_parallel_eval_episodes(
         parallel_environment, policy, num_episodes)
-    episode_rewards = rewards.tolist()
-    episode_scores = scores.tolist()
+
+    if snake_constants.DEBUG_LOGGING:
+        print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
+
+    return fold_episode_sample(rewards.tolist(), scores.tolist(), metrics, eval_only, num_episodes)
+
+
+def fold_episode_sample(episode_rewards, episode_scores, metrics, eval_only, num_episodes):
+    """Folds one self-eval's per-episode rewards and scores into `metrics`.
+
+    **Extracted so both self-eval engines share it rather than reimplementing it.** The scalar path
+    above and `self_eval.VecSelfEval` produce the same two lists by completely different means, and
+    everything downstream of a self-eval -- the graph row, `metrics.max_score`, the perfect rate that
+    drives `training.epsilon_for`'s refinement phase -- reads only what happens here. A second copy
+    of this bookkeeping is exactly the kind of drift that made three separate perfect-game counters
+    read 0% for 300k steps, so there is one copy and both engines call it.
+    """
+    if len(episode_rewards) != num_episodes or len(episode_scores) != num_episodes:
+        raise ValueError(
+            'self-eval handed back {0} rewards and {1} scores for {2} episodes'.format(
+                len(episode_rewards), len(episode_scores), num_episodes))
 
     for episode_reward in episode_rewards:
         if metrics.min_reward > episode_reward:
@@ -241,9 +260,6 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
     # Counted off the score, never off `last_rewards`. See `state_helpers.is_perfect_score`: the
     # reward test this replaces read 0% perfect for every shaped arm, which also pinned epsilon.
     perfect_games = sum(1 for score in episode_scores if is_perfect_score(score))
-
-    if snake_constants.DEBUG_LOGGING:
-        print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
 
     metrics.last_eval_perfect_percent = perfect_games / num_episodes
     if eval_only:

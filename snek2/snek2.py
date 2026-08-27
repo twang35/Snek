@@ -21,6 +21,7 @@ _os.environ['SDL_AUDIODRIVER'] = 'dummy'
 import categorical_agent
 import chart_viewer
 import policy_arch
+import self_eval as self_eval_mod
 from forking_collector import ForkingCollector, validate_config
 from prioritized_replay_buffer import TrajectoryPrioritizedReplayBuffer
 from shielded_policy import ShieldedEpsilonGreedyPolicy
@@ -361,9 +362,17 @@ def main(argv):
             return SnakeEnvironment(discount=discount, display=False, policy_name=policy_name)
         return build
 
-    eval_parallel_env = tf_py_environment.TFPyEnvironment(
-        parallel_py_environment.ParallelPyEnvironment(
-            [make_headless_eval_env(stream) for stream in range(1, num_eval_episodes + 1)]))
+    # **Built only on the scalar opt-out, and that is the whole point of the 2026-08-27 change.**
+    # These forked pygame workers were 88% of a training arm's wall clock — four arms x 20 of them is
+    # 80 processes on the desktop's 8 cores. The vec engine measures in-process, so on the default
+    # path there are no eval environments at all and nothing here runs. Asking
+    # `self_eval.needs_eval_envs()` *before* constructing them is the only way to get that saving;
+    # a check inside the evaluator would already have paid for them.
+    eval_parallel_env = None
+    if self_eval_mod.needs_eval_envs():
+        eval_parallel_env = tf_py_environment.TFPyEnvironment(
+            parallel_py_environment.ParallelPyEnvironment(
+                [make_headless_eval_env(stream) for stream in range(1, num_eval_episodes + 1)]))
 
     # fc_layer_params = (100, 50)
     fc_layer_params = tuned('FC_LAYERS', (50, 100, 50),
@@ -432,6 +441,17 @@ def main(argv):
 
     agent.initialize()
 
+    # The self-eval, on whichever engine is configured. Built here because it closes over
+    # `agent.policy` — the *greedy* policy, which is what the graph has always measured; the
+    # epsilon-greedy `collect_policy` is never evaluated. The vec evaluator compiles its
+    # `tf.function` once, in this constructor, so the 3000 evals of a 3M-step arm share one trace.
+    self_eval = self_eval_mod.build(
+        agent.policy,
+        obs_len=int(train_py_env.observation_spec().shape[0]),
+        seed=seed,
+        shaping_discount=discount,
+        parallel_environment=eval_parallel_env)
+
     eval_policy = agent.policy
     # Scheduled alongside epsilon and for the same reason a Variable is used there: the collect
     # policy runs inside a tf.function, so a plain float would be frozen at trace time. Starts
@@ -493,7 +513,7 @@ def main(argv):
             max_branches=fork_branches, fork_prob=fork_prob,
             fork_min_length=fork_min_length, fork_max_steps=fork_max_steps,
             guided_flag=collect_policy.guided_episode,
-            seed=derive_seed(seed, stream=num_eval_episodes + 1))
+            seed=derive_seed(seed, stream=self_eval_mod.FORK_SEED_STREAM))
 
     # The replay buffer holds 100k transitions, far more than the ~188 KB of agent
     # weights, so keeping it in the full history would mean gigabytes per policy. It
@@ -604,7 +624,8 @@ def main(argv):
             beta_anneal_steps) if use_is_weights else 'disabled',
         'max_steps': max_steps,
         'initial_populate_steps': initial_populate_replay_buffer_steps,
-        'eval': '{0} episodes every {1} steps'.format(num_eval_episodes, eval_interval),
+        'eval': '{0} episodes every {1} steps, engine {2}'.format(
+            num_eval_episodes, eval_interval, self_eval_mod.describe(num_eval_episodes)),
         'grid': '{0}x{0}, max possible score {1}'.format(GRID_LENGTH, int(MAX_POSSIBLE_SCORE)),
         'DEATH_REWARD': DEATH_REWARD,
         'FOOD_REWARD': FOOD_REWARD,
@@ -634,7 +655,7 @@ def main(argv):
     if not eval_only:
         chart_viewer.spawn_for_policy(policy_name)
 
-    train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+    train(max_steps, self_eval, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction_var, guided_fraction,
           eval_only, policy_name, run_config, priority_signal, use_is_weights,

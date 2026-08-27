@@ -24,7 +24,26 @@ log_interval = 200
 # changes the exploration schedule as well as the report; and `best_perfect30` / `sef` are computed
 # from these evals, so **an arm measured at 20 episodes is not strictly comparable with the
 # batches 1-44 measured at 10** — the estimator is less noisy, which moves the tails most.
-num_eval_episodes = 20
+#
+# **20 -> 100 on 2026-08-27, and it is a third boundary of the same kind.** It became affordable
+# because the self-eval moved to the vectorised engine (`self_eval.py`): the forked path was 88% of
+# an arm's wall clock, so 100 in-process lanes cost far less than 20 forked processes did. 100
+# episodes puts `perfect_percent` on a 1% grid instead of 5%, which is what makes `best_perfect30`
+# and `strong_eval_fraction` usable rather than tail-driven — but `sef` is a threshold-crossing
+# statistic, so comparing a 100-episode arm with a 20- or 10-episode one needs
+# `hyperparamTuning/perDiagnostics/sef_common_footing.py`, never a raw difference.
+#
+# **Settable, and the reason is the opt-out.** `SNEK_TRAIN_EVAL_ENGINE=scalar` exists to reproduce a
+# pre-2026-08-27 measurement without a deploy, and it cannot do that alone: the engine and the
+# episode count changed together, and scalar at 100 episodes means 100 forked pygame envs, which did
+# not finish a single eval in 120 s on the laptop. So reproducing b46 wave 2's first 520k steps is
+# `SNEK_TRAIN_EVAL_ENGINE=scalar SNEK_GRAPH_EVAL_EPISODES=20`, and an opt-out that needs both knobs
+# has to expose both. Read here rather than through `snek2.tuned()` because this is a module
+# constant that `eval_plan`'s selection tiers are derived against — see
+# `tests/test_selection_tiers.py`, which asserts the two stay consistent.
+num_eval_episodes = int(os.environ.get('SNEK_GRAPH_EVAL_EPISODES') or 100)
+if num_eval_episodes < 1:
+    raise ValueError('SNEK_GRAPH_EVAL_EPISODES must be >= 1, got {0}'.format(num_eval_episodes))
 eval_interval = 1000
 display_progress_interval = eval_interval
 buffer_save_interval = 10 * eval_interval
@@ -87,7 +106,7 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
 
-def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+def train(max_steps, self_eval, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction, configured_guided_fraction,
           eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True,
@@ -135,8 +154,8 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
             training_metrics.resume_steps.append(int(initial_step))
             training_metrics.resume_steps.sort()
 
-    avg_reward, avg_score = compute_avg_return(eval_parallel_env, agent.policy, training_metrics,
-                                               eval_only, num_eval_episodes)
+    avg_reward, avg_score = self_eval.run(training_metrics, eval_only, num_eval_episodes,
+                                         int(global_step.numpy()))
     merge_eval_row(training_metrics.eval_rows,
                    build_eval_row(int(initial_step), avg_score, avg_score, avg_reward, training_metrics, epsilon))
     if snake_constants.DEBUG_LOGGING:
@@ -184,7 +203,7 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
             replay_buffer.update_priorities(indexes, signal.numpy())
 
         step += 1
-        log_messages_and_eval(training_metrics, loss_info, eval_parallel_env, agent, train_py_env, screen,
+        log_messages_and_eval(training_metrics, loss_info, self_eval, agent, train_py_env, screen,
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
                               replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
                               guided_fraction, configured_guided_fraction, step,
@@ -254,7 +273,7 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
     return row
 
 
-def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py_env, screen, graph_path,
+def log_messages_and_eval(metrics, loss_info, self_eval, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
                           global_step, epsilon, initial_epsilon, min_epsilon, guided_fraction,
                           configured_guided_fraction, step, eval_only, initial_step,
@@ -279,8 +298,7 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
             print('training time: ', get_time(metrics.training_start_time))
             print('train_py_env high score: ', train_py_env.high_score)
         metrics.eval_start_time = time.time()
-        avg_reward, avg_score = compute_avg_return(eval_parallel_env, agent.policy, metrics, eval_only,
-                                                   num_eval_episodes)
+        avg_reward, avg_score = self_eval.run(metrics, eval_only, num_eval_episodes, step)
         if debug:
             print('eval time: ', get_time(metrics.eval_start_time))
 
@@ -398,7 +416,7 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
                               fork['forks'], fork['live_now'], fork['branch_share'],
                               fork['terminated'], fork['truncated'], fork['skipped_full']),
                           flush=True)
-        # restart time because compute_avg_return() takes a while and messes up the timing
+        # restart time because the self-eval takes a while and messes up the timing
         metrics.reset()
 
     if step % display_progress_interval == 0:

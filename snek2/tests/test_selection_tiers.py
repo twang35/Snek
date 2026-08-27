@@ -7,6 +7,18 @@ of `100/num_eval_episodes` — at 10 episodes a 95% threshold collapses to exact
 indistinguishable from ALWAYS_FULL_SINGLE, which would silently merge the mandatory tier into the
 uncapped full-length tier and make a close-out *more* expensive, not less.
 
+Raised again on 2026-08-27: 20 -> 100 episodes, when the self-eval moved to the vectorised engine.
+**The thresholds survived that re-derivation unchanged** — 95 and 90 are both reportable on the
+100-episode grid, the mandatory tier is {95..100} instead of {95, 100}, and the fill band widens from
+{90} to {90..94}, so every property this module defends still holds. What did *not* survive was two
+fixtures that had `n = 20` baked into their assertions while their docstrings claimed something
+weaker, and one of them (`(n - 2) / n`) inverted at n=100: 98 is four points inside the mandatory
+tier, so the fixture asserting it must *not* skip screening was asserting the opposite of the
+invariant it documented. Both are now expressed off the thresholds and the grid.
+
+Worth carrying: a fixture written against a literal that *coincides* with the invariant is
+indistinguishable from one written against the invariant until the coincidence breaks.
+
 Nothing else in the repo ties these two files together, so without these fixtures a future change
 to `training.num_eval_episodes` looks local and is not.
 """
@@ -23,6 +35,16 @@ def grid():
     """The perfect-percent values a single graph eval can actually report."""
     n = training.num_eval_episodes
     return [100.0 * k / n for k in range(n + 1)]
+
+
+def fill_band():
+    """The reportable values that `top<N>`'s count actually bounds.
+
+    At or above MIN_EVAL_SINGLE and below ALWAYS_EVAL_SINGLE — one value (90) at n=20, five
+    (90-94) at n=100.
+    """
+    return [x for x in grid()
+            if eval_checkpoints.MIN_EVAL_SINGLE <= x < eval_checkpoints.ALWAYS_EVAL_SINGLE]
 
 
 def test_the_graph_granularity_is_what_the_thresholds_assume():
@@ -55,13 +77,26 @@ def test_the_mandatory_tier_is_the_full_length_tier():
     """
     assert eval_checkpoints.ALWAYS_FULL_SINGLE == eval_checkpoints.ALWAYS_EVAL_SINGLE
     n = training.num_eval_episodes
-    for made, total in ((n, n), (n - 1, n)):        # 20/20 and 19/20
-        single = 100.0 * made / total
+    # The two lowest values of the mandatory tier, whatever the episode count makes them: at n=20
+    # that is 19/20 and 20/20, at n=100 it is 95/100 and 96/100. Expressed off the threshold rather
+    # than off `n` because the *tier* is what has to skip the screen — an `n - 1` literal only
+    # happened to name the tier's floor while the grid was coarse enough for the tier to hold two
+    # values, and at n=100 it names 99, four points inside it.
+    mandatory = [x for x in grid() if x >= eval_checkpoints.ALWAYS_EVAL_SINGLE]
+    assert len(mandatory) >= 2, 'mandatory tier {0} needs at least two reportable values'.format(
+        mandatory)
+    for single in (mandatory[0], mandatory[-1]):
         assert eval_checkpoints.skips_screening({'selected_by': 'x', 'single_eval': single}), (
-            '{0}/{1} = {2}% must go straight to full length'.format(made, total, single))
-    # 18/20 must NOT, or the fill band would skip screening too and `count` would stop bounding it.
-    assert not eval_checkpoints.skips_screening(
-        {'selected_by': 'x', 'single_eval': 100.0 * (n - 2) / n})
+            '{0}% is in the mandatory tier and must go straight to full length'.format(single))
+    # **The whole fill band must NOT skip screening**, or `count` stops bounding selection. This is
+    # the assertion an `n - 2` literal was standing in for: at n=20 the band was the single value 90
+    # and `(n - 2) / n` happened to be exactly it, but at n=100 `(n - 2) / n` is 98 -- inside the
+    # mandatory tier -- so the literal was testing the opposite of what it claimed.
+    for single in fill_band():
+        assert not eval_checkpoints.skips_screening(
+            {'selected_by': 'x', 'single_eval': single}), (
+            '{0}% is in the fill band and must be screened, not sent straight to full '
+            'length'.format(single))
 
 
 def test_the_uncapped_full_tier_is_only_affordable_because_of_the_gate():
@@ -83,9 +118,12 @@ def test_the_fill_band_is_not_empty():
     With an empty band the `top<N>` count can never do anything: selection becomes the mandatory
     tier alone and raising N has no effect at all.
     """
-    band = [x for x in grid()
-            if eval_checkpoints.MIN_EVAL_SINGLE <= x < eval_checkpoints.ALWAYS_EVAL_SINGLE]
-    assert band == [90.0], 'fill band is {0}, expected exactly [90.0]'.format(band)
+    band = fill_band()
+    assert band, (
+        'the fill band is empty at num_eval_episodes={0}: MIN_EVAL_SINGLE={1} and '
+        'ALWAYS_EVAL_SINGLE={2} leave no reportable value between them, so `top<N>` is dead'.format(
+            training.num_eval_episodes, eval_checkpoints.MIN_EVAL_SINGLE,
+            eval_checkpoints.ALWAYS_EVAL_SINGLE))
 
 
 def test_thresholds_are_ordered():
