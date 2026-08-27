@@ -234,6 +234,54 @@ kept dispatching, but `status.json` never updated again — indistinguishable fr
 `gitbus.clear_stale_locks` now sweeps locks older than 60 s from both bus worktrees before each
 write. The age gate is what makes it safe: a live git holds the lock for milliseconds.
 
+## ‡ A failed close-out is never retried, and `b46` wave 1 lost its measurement to that
+
+**The bug, for the record.** `vectorized/vec_wave.py` lives in `snek2/vectorized/`, so Python seeds
+`sys.path[0]` with *that* directory, not the `snek2/` above it where `chart_viewer`, `eval_plan` and
+`eval_wave` live. Every documented invocation passes `PYTHONPATH=.` from `snek2/` — which is exactly
+what hid it, because the laptop always worked. **The runner passes no `PYTHONPATH`, and never had to:**
+`eval_wave.py` and `eval_checkpoints.py` sit *in* `snek2/`, so their own script directory is already
+right. The moment `vec_wave.py` became the desktop's default eval (2026-08-24) the next close-out died
+2 seconds in on `ModuleNotFoundError: No module named 'chart_viewer'`. `b46`'s wave 1 was the first
+close-out queued after that switch, so it was the first to hit it. Fixed by a `sys.path` bootstrap
+inside **both** `vec_wave.py` and `vec_eval.py` — the shards need it too, since the parent spawns them
+as `[sys.executable, '-u', 'vectorized/vec_eval.py', ...]`.
+
+**The expensive half is what happened next, and it is a design decision working as intended.**
+`_measured_policies` counts a **`failed`** wave as *measured*, documented as "a wave that failed is not
+retried automatically, because the reason is usually not transient". So:
+
+| what you see | what it means |
+|---|---|
+| `<batch>-closeout` = `failed` in the ledger | the wave ran and died |
+| every arm still `closeout: pending` | the marker is never cleared; it means "was trained", not "needs measuring" |
+| **no `-w2` in `queued`** | `_measured_policies` covers those policies, so `_auto_closeout_jobs` skips the group entirely |
+
+**So a batch can train for 21 hours, fail its close-out in 2 seconds, and go on to the next wave with
+nothing measured and nothing queued** — `status.json` shows a healthy box the whole time. The `failed`
+state is the only tell, and it is in the ledger rather than in `at_a_glance`.
+
+**Check for it after any eval-path deploy**, and any time a batch's `closeout eval` line disappears
+from `at_a_glance` without an eval having run:
+
+```
+ssh the-claw-den 'python3 -c "
+import json
+d = json.load(open(\"/home/claw/.snek-runner/ledger.json\"))
+print([k for k, v in d.items() if k.endswith(\"closeout\") and v.get(\"state\") == \"failed\"])"'
+ssh the-claw-den 'tail -5 ~/.snek-runner/logs/eval-<batch>-closeout.log'
+```
+
+**Recovering one is a manual spec, not a nudge.** Nothing will re-derive it, so queue an eval job with
+an id that ends in `-closeout` (`_CLOSEOUT_ID_RE` is `-closeout(-w\d+)?$`) so that once it runs
+`_measured_policies` covers its policies and nothing double-measures them. Key it on the *wave's* arm
+prefix rather than the batch — `b46a-closeout`, not `b46-closeout-w2` — so it cannot collide with the
+series `_closeout_id` hands to later waves. Give it **priority 9**, one ahead of
+`AUTO_CLOSEOUT_PRIORITY`, so the wave barrier runs it before any further training. Carry the arms'
+inherited env minus whatever they disagree on, and **do not drop
+`SNEK_FOOD_DISTANCE_REWARD`** — its default is `0.001`, so omitting it silently changes `avg_reward`.
+`snek2/desktop/queue/pending/b46a-closeout.json` on `ops` is the worked example.
+
 ## Driving it from the laptop
 
 **Launch jobs** — drop one JSON file per job into `queue/pending/` on `ops` and

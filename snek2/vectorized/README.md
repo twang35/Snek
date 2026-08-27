@@ -601,6 +601,44 @@ Three things the switch touched that are easy to miss:
   header used to say "copied from `desktop/runner/runner.py`; if that changes, change this too", which
   is the failure mode rather than the mitigation.
 
+## ‡ Both entry points bootstrap `sys.path`, and they have to (2026-08-26)
+
+`vec_wave.py` and `vec_eval.py` live in **`snek2/vectorized/`**, so Python seeds `sys.path[0]` with that
+directory — not the `snek2/` above it, where `chart_viewer`, `eval_plan`, `eval_wave`, `eval_agent` and
+the `vectorized` package itself all live. Every invocation in this file passes `PYTHONPATH=.` from
+`snek2/`, and that is precisely what hid the gap for two days: **the laptop always worked.**
+
+**The desktop runner passes no `PYTHONPATH`, and it never had to.** The scalar entry points it used to
+launch — `eval_wave.py`, `eval_checkpoints.py` — sit *in* `snek2/`, so their own script directory is
+already the right one. The switch that made this engine the desktop default (2026-08-24) therefore broke
+every eval the daemon could launch, and the first one it tried, `b46`'s wave 1 close-out, died two
+seconds in:
+
+```
+File "/home/claw/Snek/snek2/vectorized/vec_wave.py", line 65, in <module>
+    import chart_viewer
+ModuleNotFoundError: No module named 'chart_viewer'
+```
+
+Three things about the fix are deliberate. It lives **in the entry points, not in `launch.py`** — the
+knowledge belongs with the thing that needs it, so a bare `python vectorized/vec_wave.py` works too. It
+is in **both files, because the shards need it independently**: the parent spawns them as
+`[sys.executable, '-u', 'vectorized/vec_eval.py', ...]`, so fixing only the parent would move the
+failure one level down. And it **inserts at the front**, matching what `PYTHONPATH=.` does, which is
+safe only because no file in `snek2/` collides with a stdlib module name — 23 modules, zero collisions,
+**re-check that if one is added.**
+
+**Ordering is the load-bearing part and it has a fixture.** A bootstrap placed after the snek2-level
+imports is dead code — the same shape as `chart_viewer`'s signal handler, which must follow
+`subplots()` or it silently does nothing. `tests/test_vec_wave.py` compares the two line numbers with
+`ast`, runs `vec_wave.py` in a subprocess with a scrubbed environment, and both mutations (bootstrap
+removed, bootstrap moved after the imports) fail a test.
+
+**The costly part was not the crash.** `runner._measured_policies` counts a `failed` wave as *measured*,
+so wave 1's four arms were permanently marked done and no retry was ever synthesized — 21 hours of
+training with nothing measured and nothing queued, while `status.json` read healthy. Detection and
+recovery: [`../desktop/README.md`](../desktop/README.md#-a-failed-close-out-is-never-retried-and-b46-wave-1-lost-its-measurement-to-that).
+
 ## Not done
 
 Training still runs on TF-Agents and pygame — deliberately, so this can be validated against the

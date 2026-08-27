@@ -76,6 +76,28 @@ import time
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 
+# **`snek2/` on the path, and this is load-bearing rather than defensive.** Both entry points in this
+# package live in `snek2/vectorized/`, so Python seeds `sys.path[0]` with *that* directory -- not the
+# `snek2/` above it, where `chart_viewer`, `eval_plan`, `eval_wave` and the `vectorized` package
+# itself all live. Every documented invocation passes `PYTHONPATH=.` from `snek2/`, which is exactly
+# what hid the gap: the laptop always worked.
+#
+# **The desktop runner passes no PYTHONPATH**, and it did not have to while the scalar engine was the
+# default -- `eval_wave.py` and `eval_checkpoints.py` sit *in* `snek2/`, so their own script directory
+# is already the right one. The moment `vec_wave.py` became the desktop's default eval (2026-08-24) the
+# first close-out it launched died on `import chart_viewer`, and `b46`'s wave 1 lost its measurement:
+# a failed wave counts as measured in `_measured_policies`, so nothing retried it.
+#
+# Fixed here rather than in `launch.py` for two reasons. The knowledge belongs with the thing that
+# needs it, so any launcher works -- a bare `python vectorized/vec_eval.py` included. And `vec_wave`
+# spawns its shards as `[sys.executable, '-u', 'vectorized/vec_eval.py', ...]`, so the shards have the
+# same problem and are fixed by the same line in `vec_eval.py` rather than by the parent remembering
+# to export something.
+#
+# Insert at the front, matching what `PYTHONPATH=.` does. Safe because no file in `snek2/` collides
+# with a stdlib module name (checked: 23 modules, zero collisions) -- re-check that if one is added.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tensorflow as tf
 from tf_agents.environments import tf_py_environment
 from tf_agents.trajectories import time_step as ts

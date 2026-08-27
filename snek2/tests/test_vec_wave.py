@@ -588,3 +588,81 @@ def test_a_stage_with_nothing_selected_succeeds_without_spawning_anything():
         assert vec_wave.run_stage('stage B: test', ['arm-a'], 'above:98', 500, '', '', 12) == 0
     finally:
         (vec_wave.selection_size, subprocess.Popen, vec_wave.subprocess.Popen) = saved
+
+
+# --- the sys.path bootstrap -------------------------------------------------------------------
+#
+# `vec_wave.py` and `vec_eval.py` live in `snek2/vectorized/`, so Python seeds `sys.path[0]` with
+# that directory and NOT the `snek2/` above it. Every documented invocation passes `PYTHONPATH=.`,
+# which hid the gap for months; the desktop runner passes none, so the first close-out it launched
+# after the vec engine became its default died on `import chart_viewer` and b46 wave 1 lost its
+# measurement (a failed wave counts as measured, so nothing retried it).
+
+VECTORIZED_ENTRY_POINTS = ('vec_wave.py', 'vec_eval.py')
+
+# Modules that live in `snek2/`, not in `snek2/vectorized/` -- an import of any of these before the
+# bootstrap runs is the bug.
+SNEK2_LEVEL_IMPORTS = ('chart_viewer', 'eval_plan', 'eval_wave', 'eval_agent', 'eval_progress',
+                       'policy_arch', 'snake_constants', 'snake_environment', 'vectorized')
+
+
+def _entry_point_source(name):
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(os.path.dirname(here), 'vectorized', name)
+    return path, open(path).read()
+
+
+def test_both_vectorized_entry_points_bootstrap_sys_path():
+    """Each entry point must put `snek2/` on `sys.path` itself, so any launcher works."""
+    for name in VECTORIZED_ENTRY_POINTS:
+        path, src = _entry_point_source(name)
+        assert 'sys.path.insert' in src, '{0} has no sys.path bootstrap'.format(name)
+        assert 'os.path.dirname(os.path.dirname(os.path.abspath(__file__)))' in src, \
+            '{0} bootstraps something other than its parent directory'.format(name)
+
+
+def test_the_bootstrap_runs_before_any_snek2_level_import():
+    """**Ordering is the whole point, and a bootstrap placed after the imports is dead code** --
+    the same shape as `chart_viewer`'s signal handler, which had to follow `subplots()` or it
+    silently did nothing. Compared by line number against the first snek2-level import, using `ast`
+    so a comment mentioning either one cannot satisfy it."""
+    import ast
+    for name in VECTORIZED_ENTRY_POINTS:
+        path, src = _entry_point_source(name)
+        tree = ast.parse(src)
+        boot = min((n.lineno for n in ast.walk(tree)
+                    if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                    and n.func.attr == 'insert'
+                    and getattr(n.func.value, 'attr', None) == 'path'), default=None)
+        assert boot is not None, '{0}: no sys.path.insert call found by ast'.format(name)
+        first = None
+        for node in ast.walk(tree):
+            mods = []
+            if isinstance(node, ast.Import):
+                mods = [a.name.split('.')[0] for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                mods = [node.module.split('.')[0]]
+            if any(m in SNEK2_LEVEL_IMPORTS for m in mods):
+                first = node.lineno if first is None else min(first, node.lineno)
+        assert first is not None, '{0}: no snek2-level import found -- update the list'.format(name)
+        assert boot < first, \
+            '{0}: bootstrap at line {1} runs AFTER the first snek2-level import at {2}'.format(
+                name, boot, first)
+
+
+def test_vec_wave_starts_with_no_pythonpath():
+    """The regression itself, run the way the desktop daemon runs it: `cwd=snek2`, no PYTHONPATH.
+
+    Asserts on the *absence* of `ModuleNotFoundError` rather than on a successful measurement --
+    the argv is deliberately empty, so a non-zero exit and a usage message are the expected
+    outcome. Only `vec_wave.py` is exercised because `vec_eval.py` imports TensorFlow at module
+    scope and would add several seconds to the suite; the ast test above covers both.
+    """
+    import subprocess
+    snek2 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin')}   # no PYTHONPATH, deliberately
+    r = subprocess.run([sys.executable, '-u', os.path.join('vectorized', 'vec_wave.py')],
+                       cwd=snek2, env=env, capture_output=True, text=True)
+    combined = r.stdout + r.stderr
+    assert 'ModuleNotFoundError' not in combined, combined[-800:]
+
