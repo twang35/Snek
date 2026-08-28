@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-28T16:48:43",
-  "ts": 1787960923.497962,
+  "iso": "2026-08-28T16:58:50",
+  "ts": 1787961530.6622229,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 95% (3 arms)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 95% (2 arms)"
     ],
     "queued": [
-      "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (1 arm)"
+      "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (2 arms)"
     ]
   },
   "runtime": {
@@ -30,7 +30,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
@@ -42,23 +42,10 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 1790000,
+      "step": 1852000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.6,
-      "elapsed_s": 19223
-    },
-    {
-      "id": "b47b-vecrepro-seed2",
-      "type": "train",
-      "policy": "b47b-vecrepro-seed2",
-      "policies": [
-        "b47b-vecrepro-seed2"
-      ],
-      "pid": 2960182,
-      "step": 1990000,
-      "max_steps": 2000000,
-      "steps_per_sec": 96.6,
-      "elapsed_s": 19223
+      "steps_per_sec": 128.1,
+      "elapsed_s": 19830
     },
     {
       "id": "b47d-vecrepro-seed4",
@@ -68,17 +55,17 @@
         "b47d-vecrepro-seed4"
       ],
       "pid": 2960184,
-      "step": 1907000,
+      "step": 1966000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.6,
-      "elapsed_s": 19223
+      "steps_per_sec": 64.1,
+      "elapsed_s": 19830
     }
   ],
   "ledger": {
     "b47-closeout": "queued",
     "b47a-vecrepro-seed1": "running",
-    "b47b-vecrepro-seed2": "running",
     "b47d-vecrepro-seed4": "running",
+    "b47b-vecrepro-seed2": "done",
     "b47c-vecrepro-seed3": "done",
     "b46-closeout-w4": "done",
     "b46d-c51atoms201seed1": "done",
@@ -349,10 +336,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 52.4,
+  "disk_free_gb": 52.3,
   "load_avg": [
-    3.3427734375,
-    3.22412109375,
-    3.544921875
+    1.98876953125,
+    2.20263671875,
+    2.8544921875
   ]
 }
