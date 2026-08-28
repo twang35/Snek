@@ -138,7 +138,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
 | **‡‡ The training self-eval was 88% of a training arm's wall clock — the vec engine had never touched it** | **measured 2026-08-26, fixed 2026-08-27** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spent ~18.5 h measuring and **~2.3 h learning**; the 40x vec speedup only ever covered *checkpoint* measurement. Now on the in-process vec engine (`self_eval.py`) with **0 forked children** and the graph at **100 episodes**, which the engine made free. See below |
-| **‡ Close-out selection thresholds are stated as percentages of a *sample*, so 20 -> 100 episodes gutted coverage while looking like a saving** | **found 2026-08-27**. `ALWAYS_EVAL_SINGLE=95` gates on true rate **0.917** at 20 episodes and **0.943** at 100 — above anything c51 sustains. `b46b` wave 2 selected **172 of 175** checkpoints from before its mid-run switch; `b46c` wave 3 has **0-4** evals clearing 95 and **2-29** clearing 90, against ~50 before. Equivalent recalibration is **92/87**. Retracts this file's own "the tiers survive unchanged". See below |
+| **‡ Close-out selection thresholds are stated as percentages of a *sample*, so 20 -> 100 episodes gutted coverage while looking like a saving** | **found 2026-08-27**. `ALWAYS_EVAL_SINGLE=95` gates on true rate **0.917** at 20 episodes and **0.943** at 100 — above anything c51 sustains. `b46b` wave 2 selected **172 of 175** checkpoints from before its mid-run switch; `b46c` wave 3 has **0-4** evals clearing 95 and **2-29** clearing 90, against ~50 before. Equivalent recalibration would be **92/87** but **it was declined 2026-08-27 and must not be applied** — the tier exists to find >=0.99 champions, so a 0.943 gate is still loose against that target and 0.914 moves away from it. Retracts this file's own "the tiers survive unchanged". See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
 | The graph misranks arms badly — `b5c` is 2nd by graph, last by measurement | **established** |
 | This domain is very noisy: the same config has produced 62.5 and 18.0 | **established** |
@@ -286,9 +286,25 @@ true rate is the honest way to read one:
 | **87% of 100 ep** | **0.864** |
 
 So holding the *number* fixed moved the mandatory tier from gating on 0.917 to gating on **0.943** — and
-no c51 arm in this project sustains 0.94. **The equivalent recalibration is 95/90 → `92/87`**, which
-reproduces the old gate points to within 0.005 and lands on the 1% grid. On wave 3 it takes selection
-from 0-4 / 2-29 to **2-15 / 4-59**.
+no c51 arm in this project sustains 0.94. The *arithmetically* equivalent recalibration is 95/90 →
+`92/87`, which reproduces the old gate points to within 0.005 and lands on the 1% grid; on wave 3 it
+would take selection from 0-4 / 2-29 to **2-15 / 4-59**.
+
+**‡ It was declined on 2026-08-27, and the reason corrects the framing above.** "Equivalent" is a
+statement about the *estimator* and says nothing about whether the old gate point was the right one. The
+mandatory tier's purpose is to find checkpoints worth a hall-of-fame promotion, and the target is the
+project record of **99.0%** — so **a checkpoint that cannot plausibly reach a true rate of 0.99 is not
+worth 100 episodes.** Measured against *that*, the drifted gate at 0.943 is still **loose**, and
+restoring 0.914 would admit more of exactly what nobody wants. Taken further, the same reasoning argues
+for *raising* the tier rather than lowering it — though not to 99% of 100 episodes, because the graph
+eval is itself noisy and a gate at the target would reject the 97% readings that some true-0.99
+checkpoints produce. The headroom between 0.943 and 0.99 is doing useful work.
+
+**The general lesson is one level up from the original one.** Re-deriving a threshold when the sample
+size changes is necessary but not sufficient: it restores whatever bar you last had, which is only
+correct if that bar was chosen against a goal. **So ask what the threshold is selecting *for* before
+asking what value preserves it** — here, "preserve the old coverage" and "find champions" wanted
+opposite moves, and only the second is the project's actual objective.
 
 **Two things this generalises to.**
 
@@ -304,7 +320,7 @@ from 0-4 / 2-29 to **2-15 / 4-59**.
 **But the cliff is not purely artifact, and the two separate cleanly** because a mean rate is unbiased
 across episode counts. Wave 2's post-switch mean perfect rate fell **−4.2 / −10.1 / −0.7 / −7.3** (mean
 **−5.6**) against wave 1's **+0.2** over the same step range, and recalibrating to 92/87 would have
-recovered only **0-6** post-switch checkpoints per arm. So those arms genuinely declined late; the stale
+recovered only **0-6** post-switch checkpoints per arm (a counterfactual — the recalibration was declined). So those arms genuinely declined late; the stale
 threshold made it impossible to measure by how much. **Do not use the retraction above to explain away
 wave 2's result** — its unbiased graph comparison is a −1.7 pp loss and stands on its own.
 

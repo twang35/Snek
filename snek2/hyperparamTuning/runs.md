@@ -51,17 +51,29 @@ project record of 99.0%. Full tables in
 [`charts.md`](charts.md#-wave-2-complete--the-soft-target-is-a-null-to-worse-too-17-pp-mean-perfect-2-of-4).
 **So two of the four c51 knobs are closed and neither moved anything.**
 
-**‡ The one actionable finding is not about c51 — the close-out selection thresholds are
-miscalibrated, and wave 3 closed out before the fix landed.** They are absolute percentages of a
-*sample*, so 20 → 100 episodes moved `ALWAYS_EVAL_SINGLE=95` from gating on true rate 0.917 to
-**0.943**, which no c51 arm sustains. **Recommend recalibrating to `92/87`** —
+**‡ The close-out selection thresholds drifted when the graph went to 100 episodes, and the decision is
+to leave them alone** (user's call, 2026-08-27). They are absolute percentages of a *sample*, so
+`ALWAYS_EVAL_SINGLE=95` moved from gating on true rate 0.917 at 20 episodes to **0.943** at 100 —
 [derivation](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
-This retracts a claim made in these docs on 2026-08-26 that the tiers survived the change unchanged.
+This still retracts the claim made on 2026-08-26 that the tiers survived the change unchanged.
 
-**What it actually cost wave 3 was coverage, not correctness** — 82 rows instead of ~180, with seeds 2
-and 3 down to **8 and 9**. Every row is full length and ungated, so the rows that exist are sound and
-the ranking among them holds; what is missing is the checkpoints that were never measured. **Wave 4 is
-the one to recalibrate before**, and it is still ~2.5 days from its close-out.
+**‡ Do NOT recalibrate to `92/87`. The drift is in the wanted direction.** The mandatory tier's job is
+to find checkpoints worth a hall-of-fame promotion, and **a checkpoint with no chance of a true rate over
+0.99 is not worth measuring** — the project record is 99.0%. Against that target the drifted gate at
+**0.943 is still loose, not strict**, and recalibrating to 0.914 would move *away* from the goal. The
+earlier recommendation in this file treated the threshold as a coverage knob and ignored what the
+coverage was *for*; it is withdrawn.
+
+**What the drift costs is one column, and it is a column the docs already say not to compare.** Wave 3
+selected 82 rows instead of ~180 (seeds 2 and 3 down to **8 and 9**), so its close-out `pooled` is
+censored upward and is not comparable across the boundary. **No config verdict depends on it**: the
+per-wave comparisons are banded mean perfect rate and corrected `sef`, both read off the graph
+self-eval, which these thresholds never touch. Every row that does exist is full length and ungated, so
+the rows are sound and the ranking among them holds.
+
+**The forward plan is new configs, not new instruments** — let wave 4 finish as configured, then keep
+testing ideas that could raise the *true* perfect rate. Three of the four c51 knobs are closed at null,
+so b46 is nearly out of runway and the next batch needs a fresh hypothesis rather than another rung.
 
 **‡ `sef` correction across a *mixed-era* arm: the obvious calculation is wrong, and `b46b` is the
 case.** `sef_common_footing.py` hardcodes `OLD_EPISODES=10` / `NEW_EPISODES=20`, but `b46b` switched to
