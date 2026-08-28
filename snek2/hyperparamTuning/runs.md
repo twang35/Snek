@@ -187,6 +187,33 @@ stopped after any wave without leaving a half-measured config behind.
 schedule binds, cut wave 4** — `b46d` has the weakest prior of the four, and being last means cancelling
 it costs nothing already spent.
 
+**‡ Measured after the fact, and the pre-registration got the reason right but the cause wrong**
+(2026-08-27). Wall clock for 3M steps, four arms in parallel on the desktop:
+
+| wave | atoms | training self-eval | steps/s | 3M wall clock |
+|---|---:|---|---:|---:|
+| `b46a` | 51 | **old forked, 20 ep** | 41 | **20.4 h** |
+| `b46b` (post-restart) | 51 | vec, 100 ep | 92 | ~9 h equivalent |
+| `b46c` | 21 | vec, 100 ep | 94 | **8.9 h** |
+| `b46d` | **201** | vec, 100 ep | 44 | ~19 h projected |
+
+**Wave 1 was the slow one, but mostly because of the self-eval, not `BATCH_SIZE`.** The vec self-eval
+landed between waves 1 and 2 and took throughput 41 → 92 steps/s, so wave 1 paid the old 20-episode
+forked cost that was ~88% of an arm's wall clock. That confounds the "4x the backward-pass FLOPs"
+reading: batch size can only have acted on the ~12% that was not self-eval, so **wave 1's 20.4 h is not
+a measurement of what `BATCH_SIZE=512` costs.** It does not touch wave 1's *result*, which is a null on
+the graph metrics either way.
+
+**Two planning numbers to carry.** A 4-arm wave to 3M now costs **~9 h at ≤51 atoms**, and atom count is
+free up to there — 21 and 51 both run ~93 steps/s, because env stepping and the self-eval dominate. At
+**201 atoms it is ~19 h**, a 2.1x cost, since the head is 4x wider than 51 and the C51 projection is
+O(atoms). So `NUM_ATOMS` is a cheap knob downward and an expensive one upward.
+
+**`b46b`'s ledger wall clock understates its cost** — it resumed at 821-903k, so its 6.5 h covers ~2.14M
+steps, not 3M. Read a restarted arm's throughput from `resumes` in its `_evals.json`, never from
+`max_steps / elapsed`; the same arithmetic makes a *running* job's ledger rate meaningless, since it
+divides the cap by elapsed-so-far (it reported `b46d` at 152.8 steps/s against a true 44).
+
 **Why b38 and not b36 is the baseline.** The two differ only in Adam ε (b36 `1.5e-4`, b38 `3.125e-4`)
 and that dose is closed — sign test `p = 0.625`. b38 is also the batch whose four arms all ran the
 **full 3.00M**; b36 was stopped at **1.87-2.02M**. At this horizon b38 is the only exact 4-seed control
