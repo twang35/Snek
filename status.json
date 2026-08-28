@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T12:36:26",
-  "ts": 1787945786.1521096,
+  "iso": "2026-08-28T12:46:31",
+  "ts": 1787946391.5994837,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 19% (4 arms)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 22% (4 arms)"
     ],
     "queued": [
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
@@ -42,10 +42,10 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 312000,
+      "step": 369000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 4086
+      "steps_per_sec": 95.6,
+      "elapsed_s": 4691
     },
     {
       "id": "b47b-vecrepro-seed2",
@@ -55,10 +55,10 @@
         "b47b-vecrepro-seed2"
       ],
       "pid": 2960182,
-      "step": 415000,
+      "step": 486000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 4086
+      "steps_per_sec": 127.5,
+      "elapsed_s": 4691
     },
     {
       "id": "b47c-vecrepro-seed3",
@@ -68,10 +68,10 @@
         "b47c-vecrepro-seed3"
       ],
       "pid": 2960183,
-      "step": 389000,
+      "step": 453000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 4086
+      "steps_per_sec": 95.6,
+      "elapsed_s": 4691
     },
     {
       "id": "b47d-vecrepro-seed4",
@@ -81,10 +81,10 @@
         "b47d-vecrepro-seed4"
       ],
       "pid": 2960184,
-      "step": 414000,
+      "step": 479000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 4086
+      "steps_per_sec": 95.6,
+      "elapsed_s": 4691
     }
   ],
   "ledger": {
@@ -364,8 +364,8 @@
   },
   "disk_free_gb": 53.5,
   "load_avg": [
-    4.083984375,
-    4.0654296875,
-    4.13427734375
+    4.046875,
+    4.078125,
+    4.08984375
   ]
 }
