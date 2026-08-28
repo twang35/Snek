@@ -1,13 +1,11 @@
 {
-  "iso": "2026-08-28T11:25:38",
-  "ts": 1787941538.7198431,
+  "iso": "2026-08-28T11:35:53",
+  "ts": 1787942153.839342,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 100% (1 arm)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 2% (4 arms)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (3 arms)",
-      "b47 training -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)",
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
     ]
   },
@@ -32,32 +30,71 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
+    "trainer": 4,
     "eval": 0
   },
   "running": [
     {
-      "id": "b46d-c51atoms201seed1",
+      "id": "b47a-vecrepro-seed1",
       "type": "train",
-      "policy": "b46d-c51atoms201seed1",
+      "policy": "b47a-vecrepro-seed1",
       "policies": [
-        "b46d-c51atoms201seed1"
+        "b47a-vecrepro-seed1"
       ],
-      "pid": 2032121,
-      "step": 2995000,
-      "max_steps": 3000000,
-      "steps_per_sec": 64.3,
-      "elapsed_s": 67118
+      "pid": 2960181,
+      "step": 40000,
+      "max_steps": 2000000,
+      "steps_per_sec": 63.6,
+      "elapsed_s": 453
+    },
+    {
+      "id": "b47b-vecrepro-seed2",
+      "type": "train",
+      "policy": "b47b-vecrepro-seed2",
+      "policies": [
+        "b47b-vecrepro-seed2"
+      ],
+      "pid": 2960182,
+      "step": 44000,
+      "max_steps": 2000000,
+      "steps_per_sec": 95.3,
+      "elapsed_s": 453
+    },
+    {
+      "id": "b47c-vecrepro-seed3",
+      "type": "train",
+      "policy": "b47c-vecrepro-seed3",
+      "policies": [
+        "b47c-vecrepro-seed3"
+      ],
+      "pid": 2960183,
+      "step": 43000,
+      "max_steps": 2000000,
+      "steps_per_sec": 63.6,
+      "elapsed_s": 453
+    },
+    {
+      "id": "b47d-vecrepro-seed4",
+      "type": "train",
+      "policy": "b47d-vecrepro-seed4",
+      "policies": [
+        "b47d-vecrepro-seed4"
+      ],
+      "pid": 2960184,
+      "step": 49000,
+      "max_steps": 2000000,
+      "steps_per_sec": 95.3,
+      "elapsed_s": 453
     }
   ],
   "ledger": {
-    "b46-closeout-w4": "queued",
-    "b47a-vecrepro-seed1": "queued",
-    "b47b-vecrepro-seed2": "queued",
-    "b47c-vecrepro-seed3": "queued",
-    "b47d-vecrepro-seed4": "queued",
     "b47-closeout": "queued",
-    "b46d-c51atoms201seed1": "running",
+    "b47a-vecrepro-seed1": "running",
+    "b47b-vecrepro-seed2": "running",
+    "b47c-vecrepro-seed3": "running",
+    "b47d-vecrepro-seed4": "running",
+    "b46-closeout-w4": "done",
+    "b46d-c51atoms201seed1": "done",
     "b46d-c51atoms201seed3": "done",
     "b46d-c51atoms201seed2": "done",
     "b46d-c51atoms201seed4": "done",
@@ -327,8 +364,8 @@
   },
   "disk_free_gb": 53.8,
   "load_avg": [
-    2.13232421875,
-    4.80517578125,
-    7.46875
+    4.4521484375,
+    4.7734375,
+    6.3583984375
   ]
 }
