@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-28T11:15:30",
-  "ts": 1787940930.0111215,
+  "iso": "2026-08-28T11:25:38",
+  "ts": 1787941538.7198431,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 99% (2 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 100% (1 arm)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (2 arms)",
+      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (3 arms)",
       "b47 training -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)",
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
     ]
@@ -32,7 +32,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
@@ -44,23 +44,10 @@
         "b46d-c51atoms201seed1"
       ],
       "pid": 2032121,
-      "step": 2948000,
+      "step": 2995000,
       "max_steps": 3000000,
-      "steps_per_sec": 95.9,
-      "elapsed_s": 66510
-    },
-    {
-      "id": "b46d-c51atoms201seed3",
-      "type": "train",
-      "policy": "b46d-c51atoms201seed3",
-      "policies": [
-        "b46d-c51atoms201seed3"
-      ],
-      "pid": 2032123,
-      "step": 2963000,
-      "max_steps": 3000000,
-      "steps_per_sec": 63.9,
-      "elapsed_s": 66510
+      "steps_per_sec": 64.3,
+      "elapsed_s": 67118
     }
   ],
   "ledger": {
@@ -71,7 +58,7 @@
     "b47d-vecrepro-seed4": "queued",
     "b47-closeout": "queued",
     "b46d-c51atoms201seed1": "running",
-    "b46d-c51atoms201seed3": "running",
+    "b46d-c51atoms201seed3": "done",
     "b46d-c51atoms201seed2": "done",
     "b46d-c51atoms201seed4": "done",
     "b46-closeout-w3": "done",
@@ -338,10 +325,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 54.1,
+  "disk_free_gb": 53.8,
   "load_avg": [
-    4.60693359375,
-    5.7294921875,
-    9.46435546875
+    2.13232421875,
+    4.80517578125,
+    7.46875
   ]
 }
