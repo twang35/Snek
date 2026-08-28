@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T13:26:52",
-  "ts": 1787948812.9816952,
+  "iso": "2026-08-28T13:36:58",
+  "ts": 1787949418.359904,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 35% (4 arms)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 38% (4 arms)"
     ],
     "queued": [
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
@@ -42,10 +42,10 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 614000,
+      "step": 674000,
       "max_steps": 2000000,
-      "steps_per_sec": 128.5,
-      "elapsed_s": 7112
+      "steps_per_sec": 96.3,
+      "elapsed_s": 7718
     },
     {
       "id": "b47b-vecrepro-seed2",
@@ -55,10 +55,10 @@
         "b47b-vecrepro-seed2"
       ],
       "pid": 2960182,
-      "step": 754000,
+      "step": 820000,
       "max_steps": 2000000,
-      "steps_per_sec": 128.5,
-      "elapsed_s": 7112
+      "steps_per_sec": 96.3,
+      "elapsed_s": 7718
     },
     {
       "id": "b47c-vecrepro-seed3",
@@ -68,10 +68,10 @@
         "b47c-vecrepro-seed3"
       ],
       "pid": 2960183,
-      "step": 712000,
+      "step": 775000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 7112
+      "steps_per_sec": 96.3,
+      "elapsed_s": 7718
     },
     {
       "id": "b47d-vecrepro-seed4",
@@ -81,10 +81,10 @@
         "b47d-vecrepro-seed4"
       ],
       "pid": 2960184,
-      "step": 736000,
+      "step": 795000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 7112
+      "steps_per_sec": 96.3,
+      "elapsed_s": 7718
     }
   ],
   "ledger": {
@@ -362,10 +362,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 53.3,
+  "disk_free_gb": 53.2,
   "load_avg": [
-    4.0654296875,
-    4.06494140625,
-    4.01953125
+    4.98486328125,
+    4.4765625,
+    4.17724609375
   ]
 }
