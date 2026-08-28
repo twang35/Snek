@@ -1,11 +1,14 @@
 {
-  "iso": "2026-08-27T22:28:20",
-  "ts": 1787894900.9353702,
+  "iso": "2026-08-27T22:31:38",
+  "ts": 1787895098.9605987,
   "at_a_glance": {
     "running": [
       "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 30% (4 arms)"
     ],
-    "queued": []
+    "queued": [
+      "b47 training -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)",
+      "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
+    ]
   },
   "runtime": {
     "max_trainers": 4,
@@ -40,10 +43,10 @@
         "b46d-c51atoms201seed1"
       ],
       "pid": 2032121,
-      "step": 843000,
+      "step": 852000,
       "max_steps": 3000000,
-      "steps_per_sec": 32.0,
-      "elapsed_s": 20481
+      "steps_per_sec": 0.0,
+      "elapsed_s": 20679
     },
     {
       "id": "b46d-c51atoms201seed2",
@@ -53,10 +56,10 @@
         "b46d-c51atoms201seed2"
       ],
       "pid": 2032122,
-      "step": 970000,
+      "step": 980000,
       "max_steps": 3000000,
-      "steps_per_sec": 63.9,
-      "elapsed_s": 20481
+      "steps_per_sec": 71.2,
+      "elapsed_s": 20679
     },
     {
       "id": "b46d-c51atoms201seed3",
@@ -66,10 +69,10 @@
         "b46d-c51atoms201seed3"
       ],
       "pid": 2032123,
-      "step": 852000,
+      "step": 860000,
       "max_steps": 3000000,
-      "steps_per_sec": 32.0,
-      "elapsed_s": 20481
+      "steps_per_sec": 0.0,
+      "elapsed_s": 20679
     },
     {
       "id": "b46d-c51atoms201seed4",
@@ -79,13 +82,18 @@
         "b46d-c51atoms201seed4"
       ],
       "pid": 2032124,
-      "step": 952000,
+      "step": 961000,
       "max_steps": 3000000,
-      "steps_per_sec": 63.9,
-      "elapsed_s": 20481
+      "steps_per_sec": 0.0,
+      "elapsed_s": 20679
     }
   ],
   "ledger": {
+    "b47a-vecrepro-seed1": "queued",
+    "b47b-vecrepro-seed2": "queued",
+    "b47c-vecrepro-seed3": "queued",
+    "b47d-vecrepro-seed4": "queued",
+    "b47-closeout": "queued",
     "b46d-c51atoms201seed1": "running",
     "b46d-c51atoms201seed2": "running",
     "b46d-c51atoms201seed3": "running",
@@ -354,10 +362,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 79.5,
+  "disk_free_gb": 79.3,
   "load_avg": [
-    20.47998046875,
-    18.82421875,
-    16.78369140625
+    22.99169921875,
+    19.591796875,
+    17.41845703125
   ]
 }
