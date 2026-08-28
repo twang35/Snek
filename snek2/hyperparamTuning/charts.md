@@ -65,9 +65,12 @@ Anything *else* the check prints is a real gap.
 
 ## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, one config per wave, launched 2026-08-25*
 
-**Wave 1 is complete and published; wave 2 is 16% in and its charts are live** — wave 1's came off the
-`results` branch, wave 2's by `rsync`, since `results` only publishes when a job *finishes*. Waves 3-4
-have not started and have no charts.
+**Waves 1, 2 and 3 are complete, closed out, and all three are null-to-worse; wave 4 is ~17% in**
+(2026-08-27). Waves 1-3's charts came off the `results` branch, wave 4's by `rsync`, since `results`
+only publishes when a job *finishes*.
+
+**‡ Three of the four knobs are now closed and none of them moved anything**, which takes most of the
+weight out of the "c51's shortfall is variance in the loss" hypothesis the batch was built on.
 
 | wave | arms | the one change from `b38` |
 |---|---|---|
@@ -86,11 +89,28 @@ is per-seed and paired, then a sign test across the four. Churn
 ([`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py)) is the primary signal; even n=4
 cannot resolve an effect below ~10 pp on score alone.
 
-**Two era boundaries govern how these curves read against b36/b38's.** Graph evals are 20 episodes from
-batch 45 onward, so the red curve moves in steps of 5 rather than 10 and `best_perfect30` is biased
-**down** against the older batches — the bias is identical across all sixteen arms, so it cancels
-*within* b46 and only distorts the comparison to b38. And the close-out runs on the **vec** engine,
-flat and ungated (`min_achievable: null`), where b38's rows were gated at 95.
+**‡ Three graph eras run through this one batch, and the bias does NOT cancel within b46.** That was
+the claim here until 2026-08-27 and it is wrong: the 100-episode self-eval landed mid-batch, so the
+sixteen arms do not share a footing. Measured off the granularity of their own `perfect_percent` values
+(gcd 10 → 10 episodes, 5 → 20, 1 → 100):
+
+| arms | episodes | how it reads |
+|---|---:|---|
+| `b38` (control) | **10** | values in steps of 10 |
+| `b46a` | **20** | steps of 5 throughout |
+| `b46b` | **20 → 100 at 821-904k** | steps of 5, then 1 — **~71% of each arm is at 100** |
+| `b46c`, `b46d` | **100** | steps of 1 throughout |
+
+**So every cross-wave comparison in this section is corrected, and two of the corrections point in
+opposite directions.** `sef` is a threshold-crossing fraction, so more episodes means *fewer* crossings
+and the newer wave looks **worse** than it is — corrected onto a common 10-episode footing with
+[`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py). Close-out **pooled**
+moves the other way: the selection thresholds are absolute percentages of a sample, so at 100 episodes
+they admit only the very best checkpoints, a thinner and better pool reads **higher**, and the newer
+wave looks **better** than it is. Banded mean perfect rate is the only column that needs no correction.
+
+And the close-out runs on the **vec** engine, flat and ungated (`min_achievable: null`), where b38's
+rows were gated at 95.
 
 ### ✅ Wave 1 complete — **`BATCH_SIZE=512` is a null-to-worse at 4 seeds, for 4x the compute**
 
@@ -225,32 +245,83 @@ perfect rate is the only unbiased comparison available for this batch, and it sa
 ![b46b-c51softtgtseed1](charts/b46b-c51softtgtseed1.png)
 ![b46b-c51softtgtseed3](charts/b46b-c51softtgtseed3.png)
 
-### ⏳ Wave 3 (`NUM_ATOMS=21`) at ~17% — **the first wave measured on one footing throughout**
+### ✅ Wave 3 complete — **`NUM_ATOMS=21` is a third null-to-worse: −1.6 pp mean perfect, 1 of 4**
 
-`SNEK_NUM_ATOMS=21` against b38's 51, at 461-536k of 3M. **These are the first arms whose whole run is
-100-episode graph evals**, so their curves carry no internal boundary and their close-out selection will
-be internally consistent — unlike wave 2 above.
+Full 3M on all four arms, 3,001 evals a side, paired against each seed's own `b38` arm. These are the
+first arms whose **whole run** is 100-episode graph evals, so their curves carry no internal boundary —
+but that is exactly why `sef` needs the 100 → 10 correction below rather than wave 1's 20 → 10.
 
-| seed | meanPP | best30 | trailing | max single eval |
+| seed | mean pp `b46c`/`b38` | Δ | `sef` corrected | `b38` `sef` | Δ | `best30` Δ | trailing Δ |
+|---|---|---|---|---|---|---|---|
+| 1 | 55.5 / 60.4 | −4.8 | 23.1% | 31.0% | **−7.9** | −0.7 | +3.3 |
+| 2 | 49.2 / 51.0 | −1.8 | 13.6% | 15.5% | −1.9 | **−12.6** | **+18.0** |
+| 3 | 54.3 / 53.9 | **+0.4** | 19.4% | 18.6% | **+0.8** | −0.2 | −3.4 |
+| 4 | 54.1 / 54.4 | −0.3 | 18.2% | 22.2% | −4.0 | −4.7 | −1.9 |
+| **mean** | **53.3 / 54.9** | **−1.6** | **18.6%** | **21.8%** | **−3.2** | −4.6 | +4.0 |
+| | | *1 of 4* | | | *1 of 4* | *0 of 4* | *2 of 4* |
+
+**Same shape as waves 1 and 2, and the same lone seed carries it.** Seed 3 is the only arm ahead, on
+both the unbiased and the primary metric — as it was in wave 1. `best_perfect30` is behind on **all
+four** arms, which is the worst column of the three waves.
+
+**‡ The raw `sef` here would have read −16 pp, and that would have been an artefact.** Uncorrected these
+arms post **9.1 / 2.9 / 6.4 / 5.0** (mean 5.9%) against b38's 21.8% — a catastrophic-looking deficit
+that is almost entirely the episode count. The 100 → 10 correction triples them to a mean of 18.6%, and
+the honest answer is **−3.2 pp at 1 of 4**. The correction is ~3x here against ~1.4x across the older
+20 → 10 boundary, so **the newer the arm, the more indispensable it is.**
+
+#### ✅ Close-out — pooled 88.54%, and the number is not comparable with waves 1-2
+
+| wave | rows | episodes | pooled | best row |
 |---|---:|---:|---:|---:|
-| 1 | 51.5 | 83.6 | 84.3 | 98 |
-| 2 | 44.3 | 64.5 | 72.7 | 94 |
-| 3 | 51.2 | 71.6 | 89.5 | 94 |
-| 4 | 49.5 | 82.6 | 91.9 | 98 |
+| 1 `b46a` | 187 | 18,700 | 80.77% | 98.0% |
+| 2 `b46b` | 175 | 17,500 | 82.41% | 97.0% |
+| **3 `b46c`** | **82** | **8,200** | **88.54%** | **98.0%** |
 
-**Too early to read against b38** — waves 1 and 2 both led early and finished behind, and seed 2 is a
-visible slow starter here, which is the same shape that produced wave 2's false +11.2.
+**Wave 3 looks 6-8 pp better and mostly is not.** It selected **82** checkpoints against 187 and 175 —
+under half — because the selection thresholds gate on an absolute percentage of a sample and at 100
+episodes admit only the very best. Seeds 2 and 3 contributed **8 and 9 rows**. A thinner, better pool
+reads higher, so this column is censored in the newer wave's favour and **pooled must not be compared
+across the boundary** any more than raw `sef` can be. Per-arm: 88.27 / 87.00 / 89.11 / 89.14.
 
-**‡ What is worth acting on now is the selection thresholds, not the result.** At 100 episodes only
-**0-4** evals per arm clear `ALWAYS_EVAL_SINGLE=95` and **2-29** clear `MIN_EVAL_SINGLE=90`, against the
-~50 a 20-episode arm offered. Recalibrating to **92/87** — the thresholds that gate on the *same true
-rate* — takes that to 2-15 and 4-59. Detail and the derivation:
-[`findings.md`](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
+**The recalibration to 92/87 recommended before this close-out did not happen in time** — wave 3 was
+measured on the miscalibrated 95/90. That cost coverage, not correctness: every row is full length and
+ungated, so the rows that exist are sound and the ranking among them holds. It is wave 4 that should
+get the recalibrated thresholds.
 
+**HOF-500: seed 3's 98.0% checkpoint at step 249k re-measured to 94.8% over 500 episodes** — a −3.2 pp
+winner's curse, against wave 1's −6.2. That is **the batch's best checkpoint so far** and still far
+short of the project record of 99.0%.
+
+![b46c-c51atoms21seed3](charts/b46c-c51atoms21seed3.png)
 ![b46c-c51atoms21seed1](charts/b46c-c51atoms21seed1.png)
 ![b46c-c51atoms21seed4](charts/b46c-c51atoms21seed4.png)
-![b46c-c51atoms21seed3](charts/b46c-c51atoms21seed3.png)
 ![b46c-c51atoms21seed2](charts/b46c-c51atoms21seed2.png)
+
+### ⏳ Wave 4 (`NUM_ATOMS=201`) at ~17% — the last rung, and the one with the weakest prior
+
+`SNEK_NUM_ATOMS=201` against b38's 51, at **485-578k of 3M**, 3.4 h in, 100-episode graph evals
+throughout. The pre-registered reason it is last: returns cluster near a win, and at 2.50 reward an atom
+the win/no-win distinction may fall inside a single bin — so 201 is the bracket opposite wave 3's 21.
+
+| seed | meanPP | best30 (step) | trailing | `sef` raw | max single eval |
+|---|---:|---:|---:|---:|---:|
+| 1 | — | 65.8 (423k) | **52.7** | **0.4** | 86 |
+| 2 | — | **90.9** (249k) | 89.8 | 21.7 | 99 |
+| 3 | — | 73.5 (363k) | 86.7 | 4.4 | 89 |
+| 4 | — | 81.7 (211k) | **92.7** | **26.4** | 94 |
+
+**Too early to read against b38, and the spread is the story so far**: seed 1 is badly behind on every
+column while seeds 2 and 4 are the strongest early arms of the whole batch. Waves 1 and 2 both led early
+and finished behind, and wave 3's seed 2 was a visible slow starter that recovered — so a 4-arm spread
+this wide at 17% is normal for this batch and carries no signal yet. `sef` is left **raw** here on
+purpose: it is not comparable with b38 until corrected, and at this step count the correction would be
+fitted to a fifth of a run.
+
+![b46d-c51atoms201seed4](charts/b46d-c51atoms201seed4.png)
+![b46d-c51atoms201seed2](charts/b46d-c51atoms201seed2.png)
+![b46d-c51atoms201seed3](charts/b46d-c51atoms201seed3.png)
+![b46d-c51atoms201seed1](charts/b46d-c51atoms201seed1.png)
 
 ## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *complete, and measured twice on two engines: **flat on all four**, and `1e-7` still holds the rung — 593 rows ≥98%/500 against `b44`'s 874*
 

@@ -21,14 +21,29 @@ anchor, which renders as plain text rather than erroring. Twice was enough.
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 3** — `b46c` (`NUM_ATOMS=21`) seeds 1-4 at **461-536k of 3M (17%)**. Heartbeat fresh. Queued: wave 4 (4 arms) |
+| **desktop `the-claw-den`** | **`b46` wave 4** — `b46d` (`NUM_ATOMS=201`) seeds 1-4 at **485-578k of 3M (17%)**, 3.4 h in. Heartbeat fresh. Nothing queued behind it — **wave 4 is the last rung** |
 
-**Waves 1 and 2 are both complete, closed out, and both are null-to-worse.**
+**Waves 1, 2 and 3 are all complete, closed out, and all three are null-to-worse.**
 
-| wave | change | mean pp vs `b38` | seeds ahead | corrected `sef` | close-out pooled | rows ≥98% |
-|---|---|---:|---:|---:|---:|---:|
-| 1 `b46a` | `BATCH_SIZE=512` | **−2.5** | 1 of 4 | −5.2 | 80.77% | 1 |
-| 2 `b46b` | soft target, τ=0.005 | **−1.7** | 2 of 4 | −5.2 | 82.41% | 0 |
+| wave | change | mean pp vs `b38` | seeds ahead | corrected `sef` | close-out pooled ‡ | rows ≥98% | HOF-500 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 1 `b46a` | `BATCH_SIZE=512` | **−2.5** | 1 of 4 | −5.2 | 80.77% | 1 | 91.8% |
+| 2 `b46b` | soft target, τ=0.005 | **−1.7** | 2 of 4 | −5.2 | 82.41% | 0 | — |
+| 3 `b46c` | `NUM_ATOMS=21` | **−1.6** | 1 of 4 | −3.2 | 88.54% | 1 | **94.8%** |
+| 4 `b46d` | `NUM_ATOMS=201` | *running, 17%* | | | | | |
+
+**‡ The pooled column is not comparable across waves and wave 3 is the reason.** Wave 3 selected **82**
+checkpoints against 187 and 175, because the selection thresholds are absolute percentages of a sample
+and at 100 episodes admit only the very best — a thinner, better pool reads higher. Read it as
+"wave 3's *measured* checkpoints were good", never as "wave 3 was 6 pp better".
+
+**‡ Three of four knobs are closed and none moved anything**, so most of the weight is now off the
+"c51's shortfall is variance in the loss" hypothesis this batch was built to test. Wave 4 is the last
+rung; there is no wave 5 planned and no case for a `BATCH_SIZE=1024` rung.
+
+**Wave 3's one real gain is a checkpoint, not a config**: seed 3's step-249k checkpoint measured 98.0%
+at 100 episodes and **94.8% at 500** — the batch's best, a −3.2 pp winner's curse against wave 1's
+−6.2, and still well short of the project record 99.0%.
 
 **Wave 2's +11.2 pp early lead closed exactly as the slow-starter analysis predicted**, and wave 1's
 lone ≥98% checkpoint fell to **91.8% at 500 episodes** — a −6.2 pp winner's curse, and nowhere near the
@@ -36,13 +51,27 @@ project record of 99.0%. Full tables in
 [`charts.md`](charts.md#-wave-2-complete--the-soft-target-is-a-null-to-worse-too-17-pp-mean-perfect-2-of-4).
 **So two of the four c51 knobs are closed and neither moved anything.**
 
-**‡ The one actionable finding is not about c51 — the close-out selection thresholds are now
-miscalibrated.** They are absolute percentages of a *sample*, so 20 → 100 episodes moved
-`ALWAYS_EVAL_SINGLE=95` from gating on true rate 0.917 to **0.943**, which no c51 arm sustains. Wave 3
-currently has **0-4** evals per arm clearing it, against ~50 for a 20-episode arm. **Recommend
-recalibrating to `92/87`** before wave 3 closes out —
+**‡ The one actionable finding is not about c51 — the close-out selection thresholds are
+miscalibrated, and wave 3 closed out before the fix landed.** They are absolute percentages of a
+*sample*, so 20 → 100 episodes moved `ALWAYS_EVAL_SINGLE=95` from gating on true rate 0.917 to
+**0.943**, which no c51 arm sustains. **Recommend recalibrating to `92/87`** —
 [derivation](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
-This retracts a claim made in these docs yesterday that the tiers survived the change unchanged.
+This retracts a claim made in these docs on 2026-08-26 that the tiers survived the change unchanged.
+
+**What it actually cost wave 3 was coverage, not correctness** — 82 rows instead of ~180, with seeds 2
+and 3 down to **8 and 9**. Every row is full length and ungated, so the rows that exist are sound and
+the ranking among them holds; what is missing is the checkpoints that were never measured. **Wave 4 is
+the one to recalibrate before**, and it is still ~2.5 days from its close-out.
+
+**‡ `sef` correction across a *mixed-era* arm: the obvious calculation is wrong, and `b46b` is the
+case.** `sef_common_footing.py` hardcodes `OLD_EPISODES=10` / `NEW_EPISODES=20`, but `b46b` switched to
+100-episode evals at **821-904k**, so **~71% of each arm is at 100**. Correcting the whole arm at
+20 → 10 gives **−7.7 pp**; splitting it at the switch and correcting the tail at 100 → 10 gives
+**−5.2 pp**, which is the figure in the table above and is the right one. The module's
+`sef_on_old_footing(rows, n_have, n_want)` is fully general — only the defaults are pinned — so pass
+`n_have` explicitly and **never let the defaults pick it for a batch-46 arm.** Determine an arm's era
+from the gcd of its own `perfect_percent` values (10 → 10 episodes, 5 → 20, 1 → 100) rather than from
+its batch number, because the boundary now falls *inside* a batch and inside individual arms.
 
 **Wave 1's re-queued close-out ran on the fixed vec engine in ~3 minutes** — the first successful desktop
 vec eval since the `sys.path` bug — against the hours the scalar path would have taken.
