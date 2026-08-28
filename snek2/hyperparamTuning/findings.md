@@ -139,6 +139,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
 | **‡‡ The training self-eval was 88% of a training arm's wall clock — the vec engine had never touched it** | **measured 2026-08-26, fixed 2026-08-27** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spent ~18.5 h measuring and **~2.3 h learning**; the 40x vec speedup only ever covered *checkpoint* measurement. Now on the in-process vec engine (`self_eval.py`) with **0 forked children** and the graph at **100 episodes**, which the engine made free. See below |
 | **‡‡ The process-noise floor is level-dependent: a config reproduces, its champion does not** | **measured 2026-08-27** from `b41` vs `b29` — same config, same 4 seeds, same 10-ep graph era and gate-95 close-out, so no correction applies. Graph metrics reproduce (mean perfect −2.7, `best30` −0.6); **champion counts scramble**: ≥98%/100 rows went 59/64/9/1 → **1/0/38/15** and the record seed produced **zero** candidates against `b29b`'s 64. The seed ranking **inverted**. So ≥98% counts have a run-to-run floor spanning their whole range and **cannot carry a verdict**; read them as existence, never magnitude. Confirms `b29b`'s 99.0%/500 was a property of the run. See below |
+| **‡‡ No checkpoint in this project has a demonstrated ≥99% perfect rate — every 99% figure on record is a selection artefact** | **measured 2026-08-28** by a 23-candidate sweep of `b43`/`b44` at 1000 episodes, then the top 5 at 2000 *fresh* episodes. The screen produced a 99.1%; it fell to **98.10%** on confirmation and went first to last. Best is `b44a` @2739000 at **98.73%/3000**. A true-98.7% policy reads ≥99.0%/1000 **25%** of the time, so with 23 candidates a spurious 99% was **99.9%** certain. Retracts `b44b` @2297000's 99.0%/1000. See below |
 | **‡‡ Four c51 knobs are all null at n=4 — and `b46`'s whole spread fits inside one seed's noise, so the batch could not have resolved them** | **closed 2026-08-28.** `BATCH_SIZE=512`, a soft target at τ=0.005, `NUM_ATOMS=21` and `NUM_ATOMS=201`, each 4 arms against its own-seed `b38` control: mean perfect rate **−2.5 / −1.7 / −1.6 / −0.0** pp, a **2.5 pp** spread against `b41`'s measured per-seed floor of 1.1-10.1. Every wave landed at or below its control and none above, which is the only signal that survives. See below |
 | **‡ Close-out selection thresholds are stated as percentages of a *sample*, so 20 -> 100 episodes gutted coverage while looking like a saving** | **found 2026-08-27**. `ALWAYS_EVAL_SINGLE=95` gates on true rate **0.917** at 20 episodes and **0.943** at 100 — above anything c51 sustains. `b46b` wave 2 selected **172 of 175** checkpoints from before its mid-run switch; `b46c` wave 3 has **0-4** evals clearing 95 and **2-29** clearing 90, against ~50 before. Equivalent recalibration would be **92/87** but **it was declined 2026-08-27 and must not be applied** — the tier exists to find >=0.99 champions, so a 0.943 gate is still loose against that target and 0.914 moves away from it. Retracts this file's own "the tiers survive unchanged". See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
@@ -255,6 +256,56 @@ literal that coincides with the invariant is indistinguishable from one written 
 until the coincidence breaks.**
 
 ---
+
+## ‡‡ No checkpoint in this project has a demonstrated ≥99% perfect rate — the 23-candidate sweep (2026-08-28)
+
+**The question was which `b43`/`b44` checkpoint deserves hall-of-fame promotion.** Those two batches hold **163 of
+the project's 165 rows at ≥99%/500** — `b44` (`lr 1e-7`) 90 of 875 measured checkpoints, `b45` (`1e-8`) 54 of 4606,
+`b43` (`1e-6`) 19 of 189, against **one** from every base-learning-rate batch combined and **zero** from c51.
+
+**Two stages, and the second one overturned the first.** Stage 1 took the 23 highest-ranked checkpoints by existing
+500-episode rate (all ≥99.4%/500) and re-measured each at **1000** episodes on the vec engine. Stage 2 took that
+result's top 5 and re-measured them at **2000 fresh** episodes.
+
+| policy | step | /500 (selected on) | stage 1 /1000 | **stage 2 /2000 fresh** | **pooled /3000** | 95% CI |
+|---|---:|---:|---:|---:|---:|---|
+| **`b44a-lowlr7-b29b`** | **2739k** | 99.4% | 98.9% | **98.65%** | **98.73%** | 98.3-99.1% |
+| `b44b-lowlr7-b29a` | 2416k | 99.4% | 98.7% | 98.40% | 98.50% | 98.0-98.9% |
+| `b44a-lowlr7-b29b` | 2789k | 99.4% | 98.7% | 98.35% | 98.47% | 98.0-98.8% |
+| `b44b-lowlr7-b29a` | 1854k | 99.4% | **99.1%** | **98.10%** | 98.43% | 97.9-98.8% |
+| `b44b-lowlr7-b29a` | 1810k | 99.4% | 98.7% | 98.20% | 98.37% | 97.8-98.8% |
+
+**Three results, in order of how much they should change behaviour.**
+
+**1. The 99% is not there.** Stage 1's winner read **99.1%/1000** and confirmed at **98.10%** — first of five to last
+of five. No candidate clears 99% on fresh episodes. The best measurement in the project is now `b44a` @2739000 at
+**98.73% over 3000 episodes**, and the honest ceiling statement is **~98.5%**, not 99%.
+
+**2. The arithmetic made a spurious 99% certain, so the screen was never evidence.** A policy whose true rate is
+0.987 reads ≥99.0% on 1000 episodes **25.0%** of the time. Across 23 candidates the chance at least one does is
+**99.9%**. **So "we found a 99% checkpoint" was the expected output of the procedure whatever the truth was** — the
+same shape as the winner's curse, but at 1000 episodes rather than 500, which is the part worth carrying: *depth
+does not fix selection, only fresh episodes do.*
+
+**3. The top 5 are statistically indistinguishable**, every pairwise comparison against @2739000 giving **p ≥ 0.23**.
+Pooled as one family they are 14775/15000 = **98.50%** (CI 98.29-98.68), beating the admitted record's 97.5% by
+**+1.00 pp at p = 0.047** — real, and marginal. **So promote for the point estimate, but never claim a ranking
+inside this family**, and treat "the `b44` family is ~98.5%" as the finding rather than any single step.
+
+**What this retracts.** `hallOfFame/README.md` stated the strongest checkpoint was `b44b` @2297000 at 99.0%/1000;
+on 2000 fresh episodes it measured 98.0%, pooling to **98.5%/2000**. Two independent 1000-episode measurements of
+the *same* checkpoint therefore read 99.0 and 98.0 — a 1.0 pp swing at n=1000, which is itself the calibration for
+how much weight a single deep measurement carries.
+
+**Mean drop from the 500-episode selection reading to 1000 fresh episodes was −1.25 pp** across all 23 (range −0.5
+to −2.4), and both 100.0%/500 rows landed at 98.3%/1000. **A ≥99%/500 row predicts ~97.8-98.5% true**, so
+`ALWAYS_EVAL_SINGLE`-style thresholds on 500-episode rates should be read as selecting the ~98% band, not the 99%
+band — which is the quantitative version of the standing decision not to recalibrate those tiers.
+
+**Method notes.** Vec engine, flat and ungated, so every row is exactly full length and poolable. `b44` is
+desktop-only, so its 19 checkpoints were rsynced to the laptop with `arch.json` (era `b09c616`, matching); `b43`
+was already local. Results are under `EVAL_OUT_SUFFIX` `_hof1000` and `_confirm2k` so no canonical close-out file
+was touched. Total cost ~33,000 episodes, about 20 minutes on the idle laptop at 12 shards.
 
 ## ‡‡ Four c51 knobs, four nulls — and `b46` could not have resolved them (closed 2026-08-28)
 

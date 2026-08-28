@@ -275,6 +275,14 @@ from `b29b` @1447000: **80% → 50% perfect without the buffer, 90-100% with it.
 
 ## Record status
 
+**‡ Superseded on the deep instrument, 2026-08-28.** A 23-candidate sweep of `b43`/`b44` at 1000 episodes plus
+a 2000-fresh-episode confirmation puts **`b44a-lowlr7-b29b` @2739000 at 98.73%/3000** (CI 98.3-99.1), **+1.23 pp**
+over this entry's 97.5%/1000 re-measure (p = 0.021). It is **not promoted** — that is manual and deliberate. Two
+things the sweep settled and this section must be read against:
+**no checkpoint in the project has a demonstrated ≥99% true rate**, and the top five `b44` candidates are
+statistically indistinguishable from each other (all p ≥ 0.23), pooling to 98.50%.
+[Full result](findings.md#-no-checkpoint-in-this-project-has-a-demonstrated-99-perfect-rate--the-23-candidate-sweep-2026-08-28).
+
 **The record is `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI 97.7-99.6), set
 2026-08-16 and promoted to [`../hallOfFame/`](../hallOfFame/README.md) with the copy verified to load and play.
 It is the highest /500 point estimate on record; the lead over `b24d`'s 98.0%/500 is inside the CIs, so it is a

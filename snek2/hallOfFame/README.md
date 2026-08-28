@@ -31,14 +31,20 @@ being twice-measured bought nothing. **Treat every figure in the table below as 
 survivor of the four — the only one of b40's 90 ≥98%/100 candidates to hold at 500 — and it fell furthest, which
 is the selection mechanism showing through.
 
-**Four checkpoints not in this folder beat all four of these**, pooling 98.40% against 96.85%
-(z=4.55, p=5×10⁻⁶): `b44b` @2297000, `b44b` @1886000, `b44a` @2451000 and `b43b` @1708000, all continuations of
-`b29a`/`b29b`/`b40b` at a lower learning rate. **Nothing has been promoted** — that stays deliberate and manual —
-but the candidate list should be drawn from fresh measurements, and on that basis the strongest checkpoint the
-project has is **`b44b` @2297000 at 99.0%/1000**. Full result, method and failure breakdown:
-[`findings.md`](../hyperparamTuning/findings.md#-the-winners-curse-measured-four-selected-champions-all-fell-and-the-500500-did-not-reproduce-2026-08-20).
+**Checkpoints not in this folder beat all four of these**, and a 23-candidate sweep on 2026-08-28 settled
+which one and at what level. The candidates are continuations of `b29a`/`b29b`/`b40b` at a lower learning rate:
+`b43`/`b44`, which between them hold **163 of the project's 165 rows at ≥99%/500**. **Nothing has been
+promoted** — that stays deliberate and manual.
 
-## The record as admitted: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000` — **re-measures 97.5%/1000**
+**‡ The strongest checkpoint is `b44a-lowlr7-b29b` @2739000 at 98.73% over 3000 episodes** (2962/3000, CI
+98.3-99.1). This **retracts this file's own previous claim** that it was `b44b` @2297000 at 99.0%/1000: on
+2000 fresh episodes @2297000 measured 98.0%, pooling to **98.5%/2000**. Method and the full table:
+[`findings.md`](../hyperparamTuning/findings.md#-no-checkpoint-in-this-project-has-a-demonstrated-99-perfect-rate--the-23-candidate-sweep-2026-08-28).
+
+**‡ No checkpoint in this project has a demonstrated true perfect rate ≥99%, and the 99% figures in the
+older docs are all selection artefacts.** Read the next section before quoting any record number.
+
+## The record as admitted: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000` — **re-measures 97.5%/1000, and is now 1.2 pp behind an unpromoted `b44` checkpoint**
 
 Batches 11-40 train on the **30-value observation vector** — the current one (era `b09c616`), after the
 following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these thirteen entries all load on
