@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-27T21:37:29",
-  "ts": 1787891849.8680675,
+  "iso": "2026-08-27T21:47:39",
+  "ts": 1787892459.3462155,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 26% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 27% (4 arms)"
     ],
     "queued": []
   },
@@ -40,10 +40,10 @@
         "b46d-c51atoms201seed1"
       ],
       "pid": 2032121,
-      "step": 710000,
+      "step": 738000,
       "max_steps": 3000000,
-      "steps_per_sec": 31.9,
-      "elapsed_s": 17429
+      "steps_per_sec": 63.3,
+      "elapsed_s": 18039
     },
     {
       "id": "b46d-c51atoms201seed2",
@@ -53,10 +53,10 @@
         "b46d-c51atoms201seed2"
       ],
       "pid": 2032122,
-      "step": 826000,
+      "step": 855000,
       "max_steps": 3000000,
-      "steps_per_sec": 63.9,
-      "elapsed_s": 17429
+      "steps_per_sec": 63.3,
+      "elapsed_s": 18039
     },
     {
       "id": "b46d-c51atoms201seed3",
@@ -66,10 +66,10 @@
         "b46d-c51atoms201seed3"
       ],
       "pid": 2032123,
-      "step": 724000,
+      "step": 750000,
       "max_steps": 3000000,
-      "steps_per_sec": 63.9,
-      "elapsed_s": 17429
+      "steps_per_sec": 31.7,
+      "elapsed_s": 18039
     },
     {
       "id": "b46d-c51atoms201seed4",
@@ -79,10 +79,10 @@
         "b46d-c51atoms201seed4"
       ],
       "pid": 2032124,
-      "step": 817000,
+      "step": 842000,
       "max_steps": 3000000,
-      "steps_per_sec": 63.9,
-      "elapsed_s": 17429
+      "steps_per_sec": 31.7,
+      "elapsed_s": 18039
     }
   ],
   "ledger": {
@@ -354,10 +354,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 81.2,
+  "disk_free_gb": 80.9,
   "load_avg": [
-    14.13427734375,
-    15.9287109375,
-    16.19384765625
+    18.77685546875,
+    17.1474609375,
+    16.30859375
   ]
 }
