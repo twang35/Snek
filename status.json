@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T12:46:31",
-  "ts": 1787946391.5994837,
+  "iso": "2026-08-28T12:56:37",
+  "ts": 1787946997.1832676,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 22% (4 arms)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 26% (4 arms)"
     ],
     "queued": [
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
@@ -42,10 +42,10 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 369000,
+      "step": 431000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.6,
-      "elapsed_s": 4691
+      "steps_per_sec": 95.9,
+      "elapsed_s": 5297
     },
     {
       "id": "b47b-vecrepro-seed2",
@@ -55,10 +55,10 @@
         "b47b-vecrepro-seed2"
       ],
       "pid": 2960182,
-      "step": 486000,
+      "step": 557000,
       "max_steps": 2000000,
-      "steps_per_sec": 127.5,
-      "elapsed_s": 4691
+      "steps_per_sec": 127.9,
+      "elapsed_s": 5297
     },
     {
       "id": "b47c-vecrepro-seed3",
@@ -68,10 +68,10 @@
         "b47c-vecrepro-seed3"
       ],
       "pid": 2960183,
-      "step": 453000,
+      "step": 517000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.6,
-      "elapsed_s": 4691
+      "steps_per_sec": 127.9,
+      "elapsed_s": 5297
     },
     {
       "id": "b47d-vecrepro-seed4",
@@ -81,10 +81,10 @@
         "b47d-vecrepro-seed4"
       ],
       "pid": 2960184,
-      "step": 479000,
+      "step": 541000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.6,
-      "elapsed_s": 4691
+      "steps_per_sec": 127.9,
+      "elapsed_s": 5297
     }
   ],
   "ledger": {
@@ -362,10 +362,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 53.5,
+  "disk_free_gb": 53.4,
   "load_avg": [
-    4.046875,
-    4.078125,
-    4.08984375
+    3.9560546875,
+    3.98388671875,
+    4.015625
   ]
 }
