@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T08:12:14",
-  "ts": 1787929934.2970104,
+  "iso": "2026-08-28T08:22:25",
+  "ts": 1787930545.8046398,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 83% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 84% (4 arms)"
     ],
     "queued": [
       "b47 training -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)",
@@ -43,10 +43,10 @@
         "b46d-c51atoms201seed1"
       ],
       "pid": 2032121,
-      "step": 2422000,
+      "step": 2450000,
       "max_steps": 3000000,
-      "steps_per_sec": 31.8,
-      "elapsed_s": 55514
+      "steps_per_sec": 32.0,
+      "elapsed_s": 56125
     },
     {
       "id": "b46d-c51atoms201seed2",
@@ -56,10 +56,10 @@
         "b46d-c51atoms201seed2"
       ],
       "pid": 2032122,
-      "step": 2526000,
+      "step": 2553000,
       "max_steps": 3000000,
-      "steps_per_sec": 31.8,
-      "elapsed_s": 55514
+      "steps_per_sec": 32.0,
+      "elapsed_s": 56125
     },
     {
       "id": "b46d-c51atoms201seed3",
@@ -69,10 +69,10 @@
         "b46d-c51atoms201seed3"
       ],
       "pid": 2032123,
-      "step": 2420000,
+      "step": 2452000,
       "max_steps": 3000000,
-      "steps_per_sec": 63.6,
-      "elapsed_s": 55514
+      "steps_per_sec": 63.9,
+      "elapsed_s": 56125
     },
     {
       "id": "b46d-c51atoms201seed4",
@@ -82,10 +82,10 @@
         "b46d-c51atoms201seed4"
       ],
       "pid": 2032124,
-      "step": 2558000,
+      "step": 2585000,
       "max_steps": 3000000,
-      "steps_per_sec": 31.8,
-      "elapsed_s": 55514
+      "steps_per_sec": 32.0,
+      "elapsed_s": 56125
     }
   ],
   "ledger": {
@@ -362,10 +362,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 60.6,
+  "disk_free_gb": 60.2,
   "load_avg": [
-    18.17333984375,
-    17.57080078125,
-    16.77001953125
+    11.65283203125,
+    15.1103515625,
+    16.0341796875
   ]
 }
