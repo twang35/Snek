@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-28T10:55:11",
-  "ts": 1787939711.705218,
+  "iso": "2026-08-28T11:05:23",
+  "ts": 1787940323.230236,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 97% (3 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 97% (2 arms)"
     ],
     "queued": [
-      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (1 arm)",
+      "b46 closeout eval -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- queued (2 arms)",
       "b47 training -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)",
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
     ]
@@ -32,7 +32,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
@@ -44,23 +44,10 @@
         "b46d-c51atoms201seed1"
       ],
       "pid": 2032121,
-      "step": 2868000,
+      "step": 2902000,
       "max_steps": 3000000,
-      "steps_per_sec": 60.3,
-      "elapsed_s": 65291
-    },
-    {
-      "id": "b46d-c51atoms201seed2",
-      "type": "train",
-      "policy": "b46d-c51atoms201seed2",
-      "policies": [
-        "b46d-c51atoms201seed2"
-      ],
-      "pid": 2032122,
-      "step": 2966000,
-      "max_steps": 3000000,
-      "steps_per_sec": 60.3,
-      "elapsed_s": 65291
+      "steps_per_sec": 90.7,
+      "elapsed_s": 65903
     },
     {
       "id": "b46d-c51atoms201seed3",
@@ -70,10 +57,10 @@
         "b46d-c51atoms201seed3"
       ],
       "pid": 2032123,
-      "step": 2885000,
+      "step": 2918000,
       "max_steps": 3000000,
-      "steps_per_sec": 60.3,
-      "elapsed_s": 65291
+      "steps_per_sec": 60.5,
+      "elapsed_s": 65903
     }
   ],
   "ledger": {
@@ -84,8 +71,8 @@
     "b47d-vecrepro-seed4": "queued",
     "b47-closeout": "queued",
     "b46d-c51atoms201seed1": "running",
-    "b46d-c51atoms201seed2": "running",
     "b46d-c51atoms201seed3": "running",
+    "b46d-c51atoms201seed2": "done",
     "b46d-c51atoms201seed4": "done",
     "b46-closeout-w3": "done",
     "b46c-c51atoms21seed3": "done",
@@ -351,10 +338,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 54.7,
+  "disk_free_gb": 54.4,
   "load_avg": [
-    16.2392578125,
-    15.87646484375,
-    16.30078125
+    9.197265625,
+    11.57275390625,
+    13.67919921875
   ]
 }
