@@ -51,6 +51,15 @@ Batch 10's checkpoints stopped loading on `master` when this landed.
 **95** from 16. ***trunc*** in `best ckpt` means no full-length row survived the gate, so the figure
 comes from a shorter row and reads noisier.
 
+**§§§ marks arms measured by the vectorised engine, whose `measured` column has no gate at all** —
+`vec_wave.py` is flat and ungated (`min_achievable: null`), so every row is full length and the figure is a
+plain pooled rate rather than `pooled_equal_effort` or the graph-100% tier. That is a **third** gate era
+after "none through 13" and "90/95 from 14": read the payload, never the batch number. The same marker also
+says the arm's graph ran **100-episode** self-evals, which lowers `best perfect-30` and `sef` systematically
+against every earlier arm — so those two columns understate a §§§ row. Correct `sef` with
+[`perDiagnostics/sef_common_footing.py`](perDiagnostics/sef_common_footing.py); `best perfect-30` needs the
+same hypergeometric refooting, worth ~2 pp at 100-vs-10 episodes.
+
 **§ marks arms trained after the epsilon rewrite of 2026-08-04.** Not an environment change —
 the observation vector is untouched and every ‡‡‡ checkpoint still loads — but a config change,
 and a large one: every arm above ran at epsilon exactly 0.0 for 96.8% of its steps, and § arms
@@ -72,6 +81,22 @@ number of knobs tried across batches — see the note at the end of [`runs.md`](
 
 | policy | config change | final steps | best ckpt | top-3 | **measured** | best perfect-30 | verdict |
 |---|---|---|---|---|---|---|---|
+| `b46d-c51atoms201seed2` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****201 atoms** (vs 51)** | 3.00M | 98.0% @210k /100 | 98/96/96 | 89.97% | 90.9% | ‡‡‡ § §§§ **the batch's best arm and best checkpoint of all sixteen.** Its one ≥98%/100 row re-measured **95.4%/500** — the batch ceiling, and 3.6 pp under `b29b`'s 99.0% record. Highest `best perfect-30` of the batch despite the 100-episode graph that suppresses it. Wave verdict is still a null: +1.9 mean pp |
+| `b46c-c51atoms21seed3` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****21 atoms** (vs 51)** | 3.00M | 98.0% @249k /100 | 98/93/92 | 89.11% | 79.8% | ‡‡‡ § §§§ one ≥98%/100 row, re-measured **94.8%/500** — second best of the batch. Only **9** rows selected, so its pooled is a thin, upward-censored pool and not comparable with wave 1/2 |
+| `b46a-c51batch512seed4` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****batch 512** (vs 128)** | 3.00M | 98.0% @409k /100 | 98/93/90 | 75.46% | 82.2% | ‡‡‡ § §§§ one ≥98%/100 row, re-measured **91.8%/500** — the batch's largest winner's curse at −6.2 pp, and the only ≥98% selected on a *20*-episode graph. Lowest pooled of the batch |
+| `b46d-c51atoms201seed4` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****201 atoms** (vs 51)** | 3.00M | 94.0% @191k /100 | 94/94/94 | 88.69% | 81.7% | ‡‡‡ § §§§ +1.5 mean pp. Three rows within 0.5 pp of each other at the top — a flat, consistent region with no candidate |
+| `b46d-c51atoms201seed1` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****201 atoms** (vs 51)** | 3.00M | 97.0% @560k /100 | 97/96/87 | 88.00% | 84.1% | ‡‡‡ § §§§ **the wave's only losing seed, −4.7 mean pp**, and it ended in a deep late drawdown: trailing 87.7 at 2.95M, **56.0** at the cap, dipping to 11-20% over 2995-2999k. `zero_since` is `null`, so a drawdown not a death |
+| `b46c-c51atoms21seed1` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****21 atoms** (vs 51)** | 3.00M | 97.0% @289k /100 | 97/97/95 | 88.27% | 83.6% | ‡‡‡ § §§§ **the wave's *worst* arm on the graph, −4.8 mean pp**, and the wave's highest `best perfect-30` at the same time — the two columns disagree sharply on this arm. No ≥98% row |
+| `b46b-c51softtgtseed2` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****soft target** τ=0.005, period 1** | 3.00M | 97.0% @198k /100 | 97/97/95 | 87.10% | 86.5% | ‡‡‡ § §§§ highest pooled of wave 2 and its best `best perfect-30`; no candidate. This arm is mid-batch on the graph era — 20-episode evals to ~821k, 100 after |
+| `b46a-c51batch512seed3` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****batch 512** (vs 128)** | 3.00M | 96.0% @626k /100 | 96/95/94 | 85.76% | 89.5% | ‡‡‡ § §§§ **the one arm of wave 1 ahead on every metric that matters**, and the wave was still a −2.5 pp null. No ≥98% row |
+| `b46c-c51atoms21seed4` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****21 atoms** (vs 51)** | 3.00M | 96.0% @290k /100 | 96/96/96 | 89.14% | 82.6% | ‡‡‡ § §§§ three top rows identical at 96% — the flattest strong region in the batch. Highest pooled of any b46 arm, on 28 rows |
+| `b46a-c51batch512seed2` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****batch 512** (vs 128)** | 3.00M | 95.0% @222k /100 | 95/94/94 | 82.90% | 83.0% | ‡‡‡ § §§§ the wave's worst on mean perfect (47.6, lowest of all sixteen) yet mid-pack on pooled — the split that makes `measured` a within-arm check, not a ranking |
+| `b46c-c51atoms21seed2` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****21 atoms** (vs 51)** | 3.00M | 95.0% @76k /100 | 95/91/91 | 87.00% | 75.7% | ‡‡‡ § §§§ **only 8 rows selected**, the thinnest pool of the batch, and its best is at 76k — an early peak it never returned to. −1.8 mean pp on the lowest absolute mean of the wave (49.2) |
+| `b46b-c51softtgtseed1` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****soft target** τ=0.005, period 1** | 3.00M | 94.0% @321k /100 | 94/93/92 | 80.59% | 75.8% | ‡‡‡ § §§§ **the widest deficit of all sixteen arms, −9.0 mean pp**, and the lowest `best perfect-30` of the batch. Mid-batch graph era |
+| `b46b-c51softtgtseed4` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****soft target** τ=0.005, period 1** | 3.00M | 92.0% @477k /100 | 92/91/91 | 81.74% | 78.7% | ‡‡‡ § §§§ −0.4 mean pp, i.e. level, and no candidate. Mid-batch graph era |
+| `b46b-c51softtgtseed3` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****soft target** τ=0.005, period 1** | 3.00M | 92.0% @103k /100 | 92/90/89 | 78.86% | 78.5% | ‡‡‡ § §§§ best row at 103k, i.e. in the first 3.4% of the run, and never bettered over the remaining 2.9M steps. Mid-batch graph era |
+| `b46d-c51atoms201seed3` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****201 atoms** (vs 51)** | 3.00M | 90.0% @927k /100 | 90/89/89 | 85.57% | 82.5% | ‡‡‡ § §§§ +1.1 mean pp with the batch's **weakest best checkpoint** — only **7** rows cleared selection. Highest trailing of the wave (89.1) on the lowest ceiling |
+| `b46a-c51batch512seed1` ‡‡‡ § §§§ | **c51** `fc 320`, Adam ε 3.125e-4, `lr 1e-4`, IS off, kl priority — ****batch 512** (vs 128)** | 3.00M | 90.0% @342k /100 | 90/89/88 | 77.58% | 81.2% | ‡‡‡ § §§§ **−4.2 mean pp against `b38a`, the strongest control arm** — the widest deficit of wave 1, though not of the batch (`b46b` seed 1's −9.0 is). No row above 90% |
 | `b45a-lowlr8-b29b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b29b` @1447k) | 5.00M | **99.4%** @1621k /500 | 100% | **97.51%** /eq §§ | 99.2% | ‡‡‡ § 349 rows ≥98%/500 (18 at ≥99%) against `b44a`'s 429 — 22% of its 1584 candidates against 50%, from **1.8× the pool**. Re-measured independently by the vectorised engine: 360 rows, best 99.2%. See [Batch 45](#batch-45--the-same-four-checkpoints-at-lr-1e-8-the-frozen-floor--the-ladder-closes-at-1e-7) |
 | `b45b-lowlr8-b29a` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b29a` @1347k) | 4.10M | **99.4%** @1504k /500 | 100% | 96.99% /eq §§ | 98.5% | ‡‡‡ § 106 rows ≥98%/500 (5 at ≥99%) against `b44b`'s 403 — **the batch's worst regression against `1e-7`**, 11% of candidates against 46%. vec: 152 rows, best 99.0% |
 | `b45c-lowlr8-b40b` ‡‡‡ § | **fc 320**, chase-safe `c=0.10` (gate 75), IS off, td_error — **continued from a checkpoint at `lr 1e-8`** (`b40b` @1513k) | 5.00M | 99.0% @1793k /500 | 100% | 96.92% /eq §§ | 99.2% | ‡‡‡ § 137 rows ≥98%/500 against `b44c`'s 42 — **the one seed where `1e-8` wins**, and only on the TF pass: vec measured all 1173 candidates and found **99**, best 99.2% @1686k. Read this arm as a tie, not a gain |
@@ -327,6 +352,249 @@ largest number in this table and it died; the same arm's best checkpoint came at
 arms peaked at ~2.5-3M and were stopped well past it. Everything below them was stopped before
 ~2.1M, and the four next-best at ~1.06M, so **this ranking compares most configs at a horizon where
 they had not finished improving** — see [`findings.md`](findings.md).
+
+## Batch 46 — four c51 knobs at n=4 each: **four nulls**
+
+**Closed 2026-08-28.** Sixteen arms, four waves of four, 3M steps each, everything else `b38`'s config
+verbatim and each arm paired against the `b38` arm of its own seed. Charts:
+[`charts.md`](charts.md#batch-46--four-c51-knobs-each-at-n4--complete-four-nulls-and-the-batchs-whole-spread-fits-inside-one-seeds-noise--launched-2026-08-25).
+Verdict and the power analysis:
+[`findings.md`](findings.md#-four-c51-knobs-four-nulls--and-b46-could-not-have-resolved-them-closed-2026-08-28).
+
+| wave | change | mean pp Δ | seeds ahead | corrected `sef` Δ | rows | ≥98%/100 | HOF-500 | h/arm |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 `b46a` | `BATCH_SIZE` 128 → 512 | −2.5 | 1 of 4 | −5.2 | 187 | 1 | 91.8% | ~14 |
+| 2 `b46b` | soft target τ=0.005, period 1 | −1.7 | 2 of 4 | −5.2 | 175 | **0** | — | ~8.7 |
+| 3 `b46c` | `NUM_ATOMS` 51 → 21 | −1.6 | 1 of 4 | −3.2 | 82 | 1 | 94.8% | ~8.4 |
+| 4 `b46d` | `NUM_ATOMS` 51 → 201 | **−0.0** | 3 of 4 | −2.3 | 68 | 1 | **95.4%** | **18.5** |
+
+**Three ≥98% checkpoints from sixteen arms, all three fell on re-measurement** (91.8 / 94.8 / 95.4 at 500
+episodes). Batch ceiling **95.4%** against `b29b`'s 99.0% record. The four wave means span **2.5 pp**, which
+is smaller than `b41`'s *mean* per-seed swing under no change at all (4.1 pp) — so the batch was
+underpowered for the effects it went looking for, and its most transferable result is that fact.
+
+**Original design rationale and the per-wave narratives follow, as written while it ran.**
+
+Four one-knob variants of `b38`'s c51 config, each run on **all four of b38's seeds** — 16 arms, 3M
+steps, **one config per wave**.
+
+| wave | prio | arms | the one change from `b38` | why |
+|---|---|---|---|---|
+| 1 | 30 | `b46a-c51batch512seed1..4` | `BATCH_SIZE` 128 → **512** | a categorical head fits 51 atoms from the transition a scalar head uses for one number, so its per-sample gradient is noisier. Largest lever on that, so it goes first |
+| 2 | 31 | `b46b-c51softtgtseed1..4` | `TARGET_UPDATE_TAU=0.005`, `PERIOD=1` | the projected target is rebuilt from a net that jumps **across the whole support at once** every 1000 steps, and the projection is nonlinear, so the jump does not average away |
+| 3 | 32 | `b46c-c51atoms21seed1..4` | `NUM_ATOMS` 51 → **21** | 51 is the C51 paper's Atari number, never tested here. Fewer atoms = ~2.4x the data per atom |
+| 4 | 33 | `b46d-c51atoms201seed1..4` | `NUM_ATOMS` 51 → **201** | the other bracket. Returns cluster near a win, and at 2.50 an atom the win/no-win distinction may fall inside one bin |
+
+Everything else is b38's config verbatim — `c51`, `fc 320`, support `[-5, 120]`, `lr 1e-4`, Adam ε
+`3.125e-4`, IS off, `discount 0.9975`, `fork_branches 4`, no food-distance shaping — at a **3M** cap.
+
+**Why n=4 and why the seeds are b38's own.** Every arm has a **seed-matched control** in b38, so this
+is a *paired* comparison rather than two group means. b38's four arms pooled 78.51 / 71.79 / 72.53 /
+72.66 — a **6.7 pp** spread at n=1 — so a single unpaired arm cannot see anything smaller than its own
+seed. Pairing removes that variance instead of averaging over it, which is also why fresh seeds were
+not used: a fresh seed has nothing to pair with.
+
+**One config per wave, and the wave barrier is what enforces it.** The daemon starts nothing new until
+all four running jobs finish, and takes the four lowest-priority pending jobs, so priorities 30/31/32/33
+make each wave exactly one config at n=4. Every wave therefore lands a **complete, readable answer
+about one knob** — nothing has to wait for a later wave to become interpretable, and the batch can be
+stopped after any wave without leaving a half-measured config behind.
+
+**Budget ~3 days, and wave 1 is the slow one.** Four sequential waves plus a close-out each. `b46a` is
+~4x the backward-pass FLOPs of the others; waves 2-4 should run at roughly b38's speed. **If the
+schedule binds, cut wave 4** — `b46d` has the weakest prior of the four, and being last means cancelling
+it costs nothing already spent.
+
+**‡ Measured after the fact, and the pre-registration got the reason right but the cause wrong**
+(2026-08-27). Wall clock for 3M steps, four arms in parallel on the desktop:
+
+| wave | atoms | training self-eval | steps/s | 3M wall clock |
+|---|---:|---|---:|---:|
+| `b46a` | 51 | **old forked, 20 ep** | 41 | **20.4 h** |
+| `b46b` (post-restart) | 51 | vec, 100 ep | 92 | ~9 h equivalent |
+| `b46c` | 21 | vec, 100 ep | 94 | **8.9 h** |
+| `b46d` | **201** | vec, 100 ep | 44 | ~19 h projected |
+
+**Wave 1 was the slow one, but mostly because of the self-eval, not `BATCH_SIZE`.** The vec self-eval
+landed between waves 1 and 2 and took throughput 41 → 92 steps/s, so wave 1 paid the old 20-episode
+forked cost that was ~88% of an arm's wall clock. That confounds the "4x the backward-pass FLOPs"
+reading: batch size can only have acted on the ~12% that was not self-eval, so **wave 1's 20.4 h is not
+a measurement of what `BATCH_SIZE=512` costs.** It does not touch wave 1's *result*, which is a null on
+the graph metrics either way.
+
+**Two planning numbers to carry.** A 4-arm wave to 3M now costs **~9 h at ≤51 atoms**, and atom count is
+free up to there — 21 and 51 both run ~93 steps/s, because env stepping and the self-eval dominate. At
+**201 atoms it is ~19 h**, a 2.1x cost, since the head is 4x wider than 51 and the C51 projection is
+O(atoms). So `NUM_ATOMS` is a cheap knob downward and an expensive one upward.
+
+**`b46b`'s ledger wall clock understates its cost** — it resumed at 821-903k, so its 6.5 h covers ~2.14M
+steps, not 3M. Read a restarted arm's throughput from `resumes` in its `_evals.json`, never from
+`max_steps / elapsed`; the same arithmetic makes a *running* job's ledger rate meaningless, since it
+divides the cap by elapsed-so-far (it reported `b46d` at 152.8 steps/s against a true 44).
+
+**Why b38 and not b36 is the baseline.** The two differ only in Adam ε (b36 `1.5e-4`, b38 `3.125e-4`)
+and that dose is closed — sign test `p = 0.625`. b38 is also the batch whose four arms all ran the
+**full 3.00M**; b36 was stopped at **1.87-2.02M**. At this horizon b38 is the only exact 4-seed control
+that exists.
+
+**The hypothesis the batch is built on.** c51 has underperformed the scalar arms across b36/b38, and
+the suspicion is that the shortfall is in the **loss**, not the algorithm. Waves 1 and 2 attack the
+gradient's noise and the target's smoothness; 3 and 4 bracket 51 atoms. Every c51 arm in this project
+has run `BATCH_SIZE=128` and `TARGET_UPDATE_PERIOD=1000` — both DQN defaults, neither chosen for a
+distributional loss. **If all four waves come back null**, the shortfall is not in these knobs and the
+remaining places to look are the priority signal (`kl` vs `ce`) and `C51_DOUBLE`.
+
+**How to judge a wave.** Per-seed difference against the matched b38 arm, then a **sign test across the
+four seeds** — the reading the b42-b45 ladder used, where 4-of-4 at a mean of +2.0 pp closed a rung.
+Even at n=4 this project cannot resolve an effect below ~10 pp on score alone, so churn
+([`perDiagnostics/c51_stability.py`](perDiagnostics/c51_stability.py)) is the primary signal and score
+is the confirmation. **Do not read `peak_trailing`** — trailing average *score*, saturated at 95/95 for
+anything that fills a board.
+
+**`b46b`'s result will be confounded, and that is pre-registered.** `tau=0.005` at period 1 has a time
+constant of ~200 steps against a hard copy's ~500-step mean lag, so the wave changes the target's
+**smoothness** and makes it track **~2.5x faster**, together. The larger dose was kept because that is
+what a screen needs. **If wave 2 wins, run `tau=0.001` at period 1 at n=4 before concluding anything
+about smoothness** — it holds the lag at ~1000 steps and changes only the shape. If it loses, the cheap
+next probe is a hard copy at period 200: speed without smoothness.
+
+**If waves 3 and 4 are both null, the next batch is `C51_DOUBLE=0`, not a third atom count.** It was
+the other candidate for the wave-4 slot and is better-motivated on paper — double-Q's action selection
+interacts with a categorical head in a way nothing here has isolated — and was left out only to keep
+the batch to one theme per pair.
+
+**Not a HOF attempt.** 3M from scratch does not reach the ≥98% band, so expect `auto_hof` to exit
+`done` with nothing measured on all sixteen arms. That is normal.
+
+**Waves 3 and 4 are closed out at a non-default atom count, and that is safe.** `SNEK_NUM_ATOMS` is
+deliberately absent from `runner.EVAL_RELEVANT_ENV` because a categorical arm's atom count, `v_min` and
+`v_max` are recorded in its own **`arch.json`**, and `build_eval_agent` rebuilds the network from that
+sidecar rather than from the env. `BATCH_SIZE` and the target-update knobs are training-only and cannot
+reach a trained checkpoint at all. So one close-out wave measures a config's four seeds with no setting
+leaking between arms.
+
+**‡ This batch was restarted twice before it settled, and the reason is worth keeping.** The first
+version ran **one config per arm at a single seed** — n=1, below this project's own noise floor. It was
+killed ~8 minutes in, its data and its four ledger entries deleted, and re-queued. A second revision
+grouped waves by **seed** instead of by config; that was dropped before launch because a seed-grouped
+wave leaves *every* config at n=1 until the last wave lands. Nothing was lost either time. **The trap
+that made the restart non-trivial:** a killed job is marked `failed`, `failed` is in `TERMINAL`, and
+`_scan_pending` drops any spec whose id is terminal — so **re-queueing a killed arm under its own id
+would silently never dispatch**. The four ledger entries had to be removed (daemon stopped first, so
+`_save_ledger` could not overwrite the edit; backup at `~/.snek-runner/ledger.json.bak-b46-restructure`).
+
+**The batch's one real gain is a checkpoint, not a config, and it is still short of the record.** Wave 3
+seed 3's step-249k checkpoint measured 98.0%/100 and **94.8%/500** — a −3.2 pp winner's curse, against
+wave 1's lone ≥98% checkpoint falling from 98% to **91.8%/500**, −6.2. Neither approaches the project
+record of 99.0%. Wave 4's close-out has not run, so it may yet add one; on three waves' base rate,
+expect zero or one. Full tables in [`charts.md`](charts.md#batch-46--four-c51-knobs-each-at-n4--complete-four-nulls-and-the-batchs-whole-spread-fits-inside-one-seeds-noise--launched-2026-08-25).
+
+**‡ The close-out selection thresholds drifted when the graph went to 100 episodes, and the decision is
+to leave them alone** (user's call, 2026-08-27). They are absolute percentages of a *sample*, so
+`ALWAYS_EVAL_SINGLE=95` moved from gating on true rate 0.917 at 20 episodes to **0.943** at 100 —
+[derivation](findings.md#-a-selection-threshold-is-a-statement-about-an-estimator-not-a-quality-2026-08-27).
+This still retracts the claim made on 2026-08-26 that the tiers survived the change unchanged.
+
+**‡ Do NOT recalibrate to `92/87`. The drift is in the wanted direction.** The mandatory tier's job is
+to find checkpoints worth a hall-of-fame promotion, and **a checkpoint with no chance of a true rate over
+0.99 is not worth measuring** — the project record is 99.0%. Against that target the drifted gate at
+**0.943 is still loose, not strict**, and recalibrating to 0.914 would move *away* from the goal. The
+earlier recommendation in this file treated the threshold as a coverage knob and ignored what the
+coverage was *for*; it is withdrawn.
+
+**What the drift costs is one column, and it is a column the docs already say not to compare.** Wave 3
+selected 82 rows instead of ~180 (seeds 2 and 3 down to **8 and 9**), so its close-out `pooled` is
+censored upward and is not comparable across the boundary. **No config verdict depends on it**: the
+per-wave comparisons are banded mean perfect rate and corrected `sef`, both read off the graph
+self-eval, which these thresholds never touch. Every row that does exist is full length and ungated, so
+the rows are sound and the ranking among them holds.
+
+**The forward plan is new configs, not new instruments.** All four c51 knobs are closed at null and b46
+is out of runway, so after `b47` validates the vec stack the next batch needs a fresh hypothesis rather
+than another rung. **And it needs more than n=4 per cell, or an effect larger than ~4 pp to look for** —
+b46's whole spread fitting inside one seed's noise is the batch's most transferable result. The cheap way
+to buy power is fewer cells: two arms of a knob against two controls resolves nothing, while eight arms
+of one promising change against its own eight-arm control might.
+
+**‡ `sef` correction across a *mixed-era* arm: the obvious calculation is wrong, and `b46b` is the
+case.** `sef_common_footing.py` hardcodes `OLD_EPISODES=10` / `NEW_EPISODES=20`, but `b46b` switched to
+100-episode evals at **821-904k**, so **~71% of each arm is at 100**. Correcting the whole arm at
+20 → 10 gives **−7.7 pp**; splitting it at the switch and correcting the tail at 100 → 10 gives
+**−5.2 pp**, which is the figure in the table above and is the right one. The module's
+`sef_on_old_footing(rows, n_have, n_want)` is fully general — only the defaults are pinned — so pass
+`n_have` explicitly and **never let the defaults pick it for a batch-46 arm.** Determine an arm's era
+from the gcd of its own `perfect_percent` values (10 → 10 episodes, 5 → 20, 1 → 100) rather than from
+its batch number, because the boundary now falls *inside* a batch and inside individual arms.
+
+**Wave 1's re-queued close-out ran on the fixed vec engine in ~3 minutes** — the first successful desktop
+vec eval since the `sys.path` bug — against the hours the scalar path would have taken.
+
+### ‡ Wave 2 was restarted mid-run to pick up the vec self-eval — what it bought and what it cost
+
+**Why**: the forked self-eval was measured at **88% of an arm's wall clock**
+([`findings.md`](findings.md#-the-training-self-eval-is-88-of-a-training-arms-wall-clock-and-the-vec-engine-never-touched-it-2026-08-26)),
+so the arms were spending ~6 of every 7 hours measuring. Restarting to pick up `self_eval.py` was worth
+more than the wall clock it cost, which was none: the arms **resumed from their checkpoints** at
+821-902k with their replay buffers intact, so nothing was thrown away.
+
+**Measured result: 92.4 steps/s per arm against 40.0 before — 2.31x — while taking 5x more episodes
+per graph point.** Per episode the engine is **13.9x**; the difference went into sample size rather than
+speed. Wave 2's remaining 8.23M arm-steps now finish in **~6.2 h** instead of ~14.3 h.
+
+**What changed for these arms**, mid-run and deliberately:
+
+| | before the restart | after |
+|---|---|---|
+| self-eval engine | 20 forked pygame envs | in-process vec, 100 lanes |
+| episodes per graph point | 20 | **100** |
+| forked children per trainer | 20 | **0** |
+
+**Two consequences, both accepted.** Each arm's `_evals.json` now holds 20-episode rows for its first
+~850k steps and 100-episode rows after, so **its own curve crosses a measurement boundary mid-arm** —
+`perfect_percent` goes from a 5% grid to a 1% grid at that step. And `perfect_percent` feeds
+`epsilon_for`'s refinement phase, so the exploration schedule changed at the same point. Neither is a
+bug; both make this batch a poor choice for any fine cross-batch comparison, which the user explicitly
+waived.
+
+**The restart needed the ledger cleared, not just a kill.** A killed job reads `done` (same boot, dead
+pid), which is terminal, so `_scan_pending` drops its id and the daemon will not re-dispatch it. The
+sequence that works: stop the daemon, kill by **explicit pid** (a `pkill -f "snek2.py b46"` over ssh
+previously killed the invoking shell), remove the four ledger entries with a `.bak`, restart the daemon.
+Each trainer had exactly 20 children before the kill, which is the 88% made visible.
+
+### ‡ Wave 1's close-out failed in 2 seconds and nothing would ever have retried it
+
+**The bug.** `vectorized/vec_wave.py` lives in `snek2/vectorized/`, so Python seeds `sys.path[0]` with
+*that* directory, not the `snek2/` above it where `chart_viewer` lives. Every documented invocation
+passes `PYTHONPATH=.`, which is why the laptop always worked; **the runner passes none, and never had
+to** — the scalar entry points sit *in* `snek2/`. So making the vec engine the desktop default on
+2026-08-24 broke every eval the daemon could launch, and `b46` wave 1's close-out was the first one
+queued after that switch. Fixed by a `sys.path` bootstrap in **both** `vec_wave.py` and `vec_eval.py`
+(the shards need it independently), deployed 2026-08-26, verified on the box.
+
+**The expensive half was not the crash.** `runner._measured_policies` counts a `failed` wave as
+*measured* — by design, "the reason is usually not transient" — so all four arms were permanently marked
+done, `_auto_closeout_jobs` skipped them, and **no retry was ever synthesized.** The batch trained 21 h,
+lost its measurement in 2 s, and moved to wave 2 with `status.json` reading healthy the whole time. The
+only tell was `b46-closeout: failed` in the ledger.
+
+**Re-queued by hand as `b46a-closeout`** at priority 9, one ahead of `AUTO_CLOSEOUT_PRIORITY`, so the
+wave barrier runs it the moment wave 2's training finishes and before waves 3-4. Detection commands and
+the recovery recipe:
+[`desktop/README.md`](../desktop/README.md#-a-failed-close-out-is-never-retried-and-b46-wave-1-lost-its-measurement-to-that).
+
+**Two things to carry.** **Check the ledger for `*-closeout: failed` after any eval-path deploy** — it
+does not surface in `at_a_glance`, and the disappearance of a batch's `closeout eval` line is the visible
+symptom. And **a batch's close-out disappearing from `queued` without an eval having run is never
+benign**; that is what this looks like.
+
+### Wave 2 early read: ahead, but the lead is one slow control
+
+At 483k (16%) soft target leads by **+11.2 pp** mean perfect rate, 3 of 4 seeds. **The figure is not
+usable.** It is carried by seed 4, whose control `b38d` sat at 17.3 mean pp there and finished the run at
+54.4 — a slow starter, not a weak arm. Excluding it: **+3.0 / +3.4 / 0.0, mean +2.1.** And **wave 1
+already ran this trap to its conclusion** — its seed 4 led by +10.3 pp at 6% and finished −3.9. At 16%
+this is a learning-*speed* reading and nothing more.
 
 ## Batch 45 — the same four checkpoints at `lr 1e-8`: **the frozen floor — the ladder closes at `1e-7`**
 

@@ -263,19 +263,29 @@ paired against the `b38` arm of its own seed. The knobs were chosen to test one 
 shortfall against the scalar head is **variance in the distributional loss**, which a larger batch, a
 smoother target or a different atom count would damp.
 
-| wave | the one change | mean pp Δ | seeds ahead | corrected `sef` Δ | wall clock / arm | disk / arm |
-|---|---|---:|---:|---:|---:|---:|
-| 1 `b46a` | `BATCH_SIZE` 128 → 512 | −2.5 | 1 of 4 | −5.2 | ~14 h | 2.6 GB |
-| 2 `b46b` | `TARGET_UPDATE_TAU=0.005`, `PERIOD=1` | −1.7 | 2 of 4 | −5.2 | ~8.7 h | 2.6 GB |
-| 3 `b46c` | `NUM_ATOMS` 51 → 21 | −1.6 | 1 of 4 | −3.2 | ~8.4 h | **1.4 GB** |
-| 4 `b46d` | `NUM_ATOMS` 51 → 201 | **−0.0** | 3 of 4 | −2.2 | **18.5 h** | **9.0 GB** |
-| **spread** | | **2.5 pp** | | 3.0 pp | 2.2x | 6x |
+| wave | the one change | mean pp Δ | seeds ahead | corrected `sef` Δ | rows | ≥98%/100 | HOF-500 | h/arm | GB/arm |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 `b46a` | `BATCH_SIZE` 128 → 512 | −2.5 | 1 of 4 | −5.2 | 187 | 1 | 91.8% | ~14 | 2.6 |
+| 2 `b46b` | `TARGET_UPDATE_TAU=0.005`, `PERIOD=1` | −1.7 | 2 of 4 | −5.2 | 175 | **0** | — | ~8.7 | 2.6 |
+| 3 `b46c` | `NUM_ATOMS` 51 → 21 | −1.6 | 1 of 4 | −3.2 | 82 | 1 | 94.8% | ~8.4 | **1.4** |
+| 4 `b46d` | `NUM_ATOMS` 51 → 201 | **−0.0** | 3 of 4 | −2.3 | 68 | 1 | **95.4%** | **18.5** | **9.0** |
+| **spread** | | **2.5 pp** | | 3.0 pp | | | | 2.2x | 6x |
 
-**The hypothesis is not supported, and the batch is closed.** No knob produced a gain on any instrument.
-Wave 4 is the closest to an exact null: −0.0 pp with *three of four* seeds nominally ahead, because seed
-1's −4.6 cancels the others' +1.1 to +1.9 — which is what a null looks like when one seed swings, not
-"three wins and one loss". The batch's best checkpoint is wave 3 seed 3's, at **94.8%/500** against the
-project record of 99.0%.
+**The hypothesis is not supported, and the batch is closed on all three instruments.** No knob produced a
+gain on any of them. Wave 4 is the closest to an exact null: −0.0 pp with *three of four* seeds nominally
+ahead, because seed 1's −4.7 cancels the others' +1.1 to +1.9 — which is what a null looks like when one
+seed swings, not "three wins and one loss".
+
+**Three ≥98% checkpoints from sixteen arms, and all three fell on re-measurement** — to 91.8, 94.8 and
+**95.4** percent at 500 episodes. The batch ceiling is 95.4% (wave 4 seed 2 @210k) against `b29b`'s 99.0%
+record, so b46 produced no checkpoint in the record region either.
+
+**‡ One free side result: the winner's curse is shrinking, and the 100-episode graph is why.** Wave 1
+selected its champion on a 20-episode graph and it fell **−6.2** pp; waves 3 and 4 selected on a
+100-episode graph and fell **−3.2** and **−2.6**. Less noisy selection means less regression on
+re-measurement — the mechanism working exactly as the winner's-curse finding predicts, and a side benefit
+of the self-eval change rather than anything this batch tested. Three points, so consistent-with rather
+than measured.
 
 **‡ The result about *power* is more transferable than the result about the knobs.** The four wave means
 span 2.5 pp. `b41` measured the paired per-seed swing on a **re-run of an identical config** at
