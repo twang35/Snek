@@ -65,14 +65,16 @@ comm -23 /tmp/have /tmp/doc   # anything listed is an undocumented arm
 [`findings.md`](findings.md) and [`perDiagnostics/`](perDiagnostics/README.md), not training graphs.
 Anything *else* the check prints is a real gap.
 
-## Batch 46 — **four c51 knobs, each at n=4** — *running on the desktop, one config per wave, launched 2026-08-25*
+## Batch 46 — **four c51 knobs, each at n=4** — *all sixteen arms trained; **four nulls**, and the batch's whole spread fits inside one seed's noise — launched 2026-08-25*
 
-**Waves 1, 2 and 3 are complete, closed out, and all three are null-to-worse; wave 4 is ~17% in**
-(2026-08-27). Waves 1-3's charts came off the `results` branch, wave 4's by `rsync`, since `results`
-only publishes when a job *finishes*.
+**All four waves have finished training** (2026-08-28); waves 1-3 are closed out, wave 4's close-out is
+queued. Waves 1-3's charts came off the `results` branch, wave 4's by `rsync`, since `results` only
+publishes when a job *finishes*.
 
-**‡ Three of the four knobs are now closed and none of them moved anything**, which takes most of the
-weight out of the "c51's shortfall is variance in the loss" hypothesis the batch was built on.
+**‡ All four knobs are closed and none of them moved anything**, which takes the weight out of the
+"c51's shortfall is variance in the loss" hypothesis the batch was built on. The batch-level reading —
+including why n=4 could not have resolved these effects — is at the [end of this
+section](#-batch-46-as-a-whole--four-knobs-four-nulls-and-the-batch-could-not-have-resolved-them).
 
 | wave | arms | the one change from `b38` |
 |---|---|---|
@@ -300,30 +302,76 @@ short of the project record of 99.0%.
 ![b46c-c51atoms21seed4](charts/b46c-c51atoms21seed4.png)
 ![b46c-c51atoms21seed2](charts/b46c-c51atoms21seed2.png)
 
-### ⏳ Wave 4 (`NUM_ATOMS=201`) at ~17% — the last rung, and the one with the weakest prior
+### ✅ Wave 4 complete — **`NUM_ATOMS=201` is the fourth null, and the closest to an exact one: −0.0 pp mean perfect**
 
-`SNEK_NUM_ATOMS=201` against b38's 51, at **485-578k of 3M**, 3.4 h in, 100-episode graph evals
-throughout. The pre-registered reason it is last: returns cluster near a win, and at 2.50 reward an atom
-the win/no-win distinction may fall inside a single bin — so 201 is the bracket opposite wave 3's 21.
+`SNEK_NUM_ATOMS=201` against b38's 51, all four arms at **2.95-3.00M of 3M**, 100-episode graph evals
+throughout, 18.5 h each. Seeds 2 and 4 hit the cap; seeds 1 and 3 were within 1.5% of it when read.
+Close-out **pending** — it is queued behind the two arms that finished last.
 
-| seed | meanPP | best30 (step) | trailing | `sef` raw | max single eval |
-|---|---:|---:|---:|---:|---:|
-| 1 | — | 65.8 (423k) | **52.7** | **0.4** | 86 |
-| 2 | — | **90.9** (249k) | 89.8 | 21.7 | 99 |
-| 3 | — | 73.5 (363k) | 86.7 | 4.4 | 89 |
-| 4 | — | 81.7 (211k) | **92.7** | **26.4** | 94 |
+| seed | meanPP b46d / b38 | Δ | best30 (step) | trailing | `sef` raw → corrected | b38 `sef` | Δ | max eval |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 55.8 / 60.4 | **−4.6** | 84.1 (568k) | 87.7 | 5.2 → 21.3 | 31.0 | −9.7 | 93 |
+| 2 | 52.9 / 51.0 | **+1.9** | **90.9** (249k) | 91.0 | 7.2 → 18.1 | 15.5 | +2.6 | **99** |
+| 3 | 54.9 / 53.9 | **+1.1** | 82.5 (962k) | **93.5** | 5.3 → 19.9 | 18.6 | +1.3 | 92 |
+| 4 | 55.9 / 54.4 | **+1.5** | 81.7 (211k) | 91.6 | 5.7 → 19.2 | 22.2 | −3.0 | 94 |
+| **mean** | **54.9 / 54.9** | **−0.0** | 84.8 (−0.2) | 90.9 | → **19.6** | 21.8 | **−2.2** | |
+| | | *3 of 4 ahead* | *2 of 4* | | | | *2 of 4* | |
 
-**Too early to read against b38, and the spread is the story so far**: seed 1 is badly behind on every
-column while seeds 2 and 4 are the strongest early arms of the whole batch. Waves 1 and 2 both led early
-and finished behind, and wave 3's seed 2 was a visible slow starter that recovered — so a 4-arm spread
-this wide at 17% is normal for this batch and carries no signal yet. `sef` is left **raw** here on
-purpose: it is not comparable with b38 until corrected, and at this step count the correction would be
-fitted to a fifth of a run.
+**An exact null on the unbiased column, with the sign test pointing the wrong way for a null.** Three of
+four seeds are nominally ahead on mean perfect rate, but the mean is **−0.0 pp** — seed 1's −4.6 cancels
+the other three's +1.1 to +1.9. That shape is what a null looks like when one seed swings: it is not
+"three wins and one loss", it is four draws with one of them larger.
 
-![b46d-c51atoms201seed4](charts/b46d-c51atoms201seed4.png)
+**The corrected `sef` is −2.2 and the raw figure would have read −16.**  Raw `sef` is 5.2-7.2 here against
+b38's 15.5-31.0, which as a headline number would have made this the worst wave in the batch. The
+difference is entirely the 100-vs-10 episode footing, and it is the fourth time in this batch that the
+correction changed a verdict's sign or size — see the era table at the top of this section.
+
+**The 17% read of this wave was wrong in the direction the batch had already taught, and that is the
+useful part.** At 485-578k, seed 1 sat at best30 **65.8** and trailing **52.7** — "badly behind on every
+column" — while seeds 2 and 4 were the strongest early arms of the whole batch. Seed 1 finished at best30
+**84.1** and trailing **87.7**, i.e. level with its siblings, and seeds 2 and 4 gave the early lead back.
+The section written at 17% said a 4-arm spread that wide carried no signal yet and declined to correct
+`sef` on a fifth of a run; both calls held. **A wave of this batch has now led early and finished level or
+behind three times out of four** (waves 1, 2 and 4), so an early lead in this configuration is worth no
+weight at all.
+
+**It cost 2.1x the wall clock and 3.4x the disk for that null.** 18.5 h an arm against wave 2's ~8.7 h,
+and **9.0 GB per arm of `savedPolicies/` against `b46b`'s 2.6 GB** — every one of ~3,000 checkpoints
+carries the categorical head, so size runs near-linear in `NUM_ATOMS`: **1.4 / 2.6 / 9.0 GB** an arm at
+21 / 51 / 201 atoms, about 41 MB per atom. Wave 4 alone is **36.2 GB**.
+
 ![b46d-c51atoms201seed2](charts/b46d-c51atoms201seed2.png)
+![b46d-c51atoms201seed4](charts/b46d-c51atoms201seed4.png)
 ![b46d-c51atoms201seed3](charts/b46d-c51atoms201seed3.png)
 ![b46d-c51atoms201seed1](charts/b46d-c51atoms201seed1.png)
+
+### ⛔ Batch 46 as a whole — **four knobs, four nulls, and the batch could not have resolved them**
+
+| wave | change | mean pp Δ | seeds ahead | corrected `sef` Δ | wall clock / arm |
+|---|---|---:|---:|---:|---:|
+| 1 `b46a` | `BATCH_SIZE` 128 → 512 | −2.5 | 1 of 4 | −5.2 | ~14 h |
+| 2 `b46b` | soft target, τ=0.005 | −1.7 | 2 of 4 | −5.2 | ~8.7 h |
+| 3 `b46c` | `NUM_ATOMS` 51 → 21 | −1.6 | 1 of 4 | −3.2 | ~8.4 h |
+| 4 `b46d` | `NUM_ATOMS` 51 → 201 | **−0.0** | 3 of 4 | −2.2 | **18.5 h** |
+| **spread** | | **2.5 pp** | | 3.0 pp | |
+
+**‡ The whole four-wave spread of wave means fits inside one seed's noise.** `b41` measured the paired
+per-seed swing on a *re-run of an identical config* at **1.1 / 1.5 / 3.5 / 10.1 pp** of mean perfect rate
+([finding](findings.md#-the-process-noise-floor-measured-the-config-reproduces-the-champion-does-not-b41-vs-b29-2026-08-27)).
+b46's four wave means span **2.5 pp** — smaller than b41's *mean* per-seed swing of 4.1, and a quarter of
+its worst. So the honest reading of this batch is not "four knobs are null" but **"n=4 could not tell
+these four knobs apart from nothing, and would not have been able to."** The direction is at least
+consistent — every wave landed at or below its control, none above — and that consistency across four
+independent knobs is itself weak evidence that nothing here is a lever.
+
+**One caveat on the transfer, and it cuts against certainty rather than for it.** b41's floor was measured
+on the `b29` scalar-DQN config at 10-episode graph evals; b46 is c51 at 100. More episodes per eval means
+a *less* noisy `perfect_percent`, so b46's per-seed floor on mean perfect rate is plausibly lower than
+4.1 pp — but mean perfect rate is a banded average over hundreds of evals, where the per-eval sampling
+noise is already mostly averaged out, and the floor b41 measured is dominated by **trajectory** divergence
+(worker ordering, threaded FP reductions) rather than by eval sampling. So treat 4.1 pp as an estimate of
+the right order, not a measurement on this config.
 
 ## Batch 45 — the **same four checkpoints at `lr 1e-8`** — *complete, and measured twice on two engines: **flat on all four**, and `1e-7` still holds the rung — 593 rows ≥98%/500 against `b44`'s 874*
 

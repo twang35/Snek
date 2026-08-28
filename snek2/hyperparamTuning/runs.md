@@ -14,32 +14,59 @@ conclusions live elsewhere so this stays short enough to actually keep accurate.
 
 ## What is running
 
-**As of 2026-08-27.** The date lives here rather than in the heading: it used to be
+**As of 2026-08-28.** The date lives here rather than in the heading: it used to be
 `## What is running — <date>`, and every update silently broke every inbound `#what-is-running--<old-date>`
 anchor, which renders as plain text rather than erroring. Twice was enough.
 
 | host | state |
 |---|---|
 | **laptop** | **idle.** No trainers, no evals |
-| **desktop `the-claw-den`** | **`b46` wave 4** — `b46d` (`NUM_ATOMS=201`) seeds 1-4 at **485-578k of 3M (17%)**, 3.4 h in. Heartbeat fresh. Nothing queued behind it — **wave 4 is the last rung** |
+| **desktop `the-claw-den`** | **`b46` wave 4 finished training.** Seeds 2 and 4 hit the 3M cap; seeds 1 and 3 were at 2.95M/2.97M when last read and finish within the hour. **Wave 4's close-out is queued**, then `b47`'s four training arms and their close-out. Heartbeat fresh |
 
-**Waves 1, 2 and 3 are all complete, closed out, and all three are null-to-worse.**
+**All four waves are trained, three are closed out, and all four are null-to-worse.**
 
 | wave | change | mean pp vs `b38` | seeds ahead | corrected `sef` | close-out pooled ‡ | rows ≥98% | HOF-500 |
 |---|---|---:|---:|---:|---:|---:|---:|
 | 1 `b46a` | `BATCH_SIZE=512` | **−2.5** | 1 of 4 | −5.2 | 80.77% | 1 | 91.8% |
 | 2 `b46b` | soft target, τ=0.005 | **−1.7** | 2 of 4 | −5.2 | 82.41% | 0 | — |
 | 3 `b46c` | `NUM_ATOMS=21` | **−1.6** | 1 of 4 | −3.2 | 88.54% | 1 | **94.8%** |
-| 4 `b46d` | `NUM_ATOMS=201` | *running, 17%* | | | | | |
+| 4 `b46d` | `NUM_ATOMS=201` | **−0.0** | 3 of 4 | −2.2 | *queued* | | |
 
 **‡ The pooled column is not comparable across waves and wave 3 is the reason.** Wave 3 selected **82**
 checkpoints against 187 and 175, because the selection thresholds are absolute percentages of a sample
 and at 100 episodes admit only the very best — a thinner, better pool reads higher. Read it as
 "wave 3's *measured* checkpoints were good", never as "wave 3 was 6 pp better".
 
-**‡ Three of four knobs are closed and none moved anything**, so most of the weight is now off the
-"c51's shortfall is variance in the loss" hypothesis this batch was built to test. Wave 4 is the last
-rung; there is no wave 5 planned and no case for a `BATCH_SIZE=1024` rung.
+**‡ Wave 4 is the closest thing to an exact null in the batch, and it cost the most.** −0.0 pp with three
+of four seeds nominally ahead: seed 1's −4.6 cancels the other three's +1.1 to +1.9, which is what a null
+looks like when one seed swings. It ran **18.5 h an arm** against wave 2's 8.7, and each arm holds **9.0 GB
+of `savedPolicies/` against `b46b`'s 2.6 GB** — checkpoint size is near-linear in `NUM_ATOMS` (1.4 / 2.6 /
+9.0 GB an arm at 21 / 51 / 201), so wave 4 alone is 36.2 GB.
+Its 17% snapshot read seed 1 as badly behind and seeds 2/4 as the batch's strongest; all three reverted to
+the mean. **Three of this batch's four waves led early and finished level or behind**, so an early lead
+here is worth no weight.
+
+**‡ The batch is closed, and the finding is about power as much as about the knobs.** The four wave means
+span **2.5 pp** of mean perfect rate. `b41` measured the paired per-seed swing on a *re-run of an identical
+config* at 1.1 / 1.5 / 3.5 / **10.1** pp
+([finding](findings.md#-the-process-noise-floor-measured-the-config-reproduces-the-champion-does-not-b41-vs-b29-2026-08-27)),
+so the whole batch's spread is smaller than one seed's typical noise. So: **n=4 could not tell these four
+knobs apart from nothing, and could not have.** What survives is the *consistency of direction* — every
+wave landed at or below its control, none above, across four independent knobs — which is weak evidence
+that none of them is a lever, and is why there is no wave 5 and no case for a `BATCH_SIZE=1024` rung.
+Caveat on transferring b41's floor: it was measured on the `b29` scalar config at 10-episode evals, so
+treat 4.1 pp as an estimate of the right order rather than a measurement on c51.
+
+**Disk is the thing to watch on the desktop.** Free space went **84.4 → 51 GB in ~13 h** while wave 4 ran,
+and `savedPolicies/` is now **119 GB of a 221 GB volume (76% used)**. `disk_min_gb` is 5, so nothing is at
+risk yet, but `b47` plus wave 4's close-out will add to it and the accumulation is across every batch
+back to b38 — worth a deliberate decision about which old `savedPolicies/` dirs are still needed as
+continuation sources before it becomes urgent.
+
+**Outstanding: `b46`'s sixteen rows in [`completedRuns.md`](completedRuns.md).** The batch has no rows
+there yet, deliberately — the ranked table's `best ckpt` / `top-3` / `measured` columns come from the
+close-out, and wave 4's is queued. Write all sixteen in one pass when it lands; the config verdicts are
+already final and are in [`findings.md`](findings.md#-four-c51-knobs-four-nulls--and-b46-could-not-have-resolved-them-closed-2026-08-28).
 
 ## Queued next: `b47` — `b29`'s record config on the vec stack
 
@@ -66,15 +93,11 @@ phase, so the exploration schedule differs from `b29`/`b41`; this tests the stac
 than isolating the vec engine. If it comes back materially low, the clean follow-up is one arm at
 `SNEK_TRAIN_EVAL_ENGINE=scalar SNEK_GRAPH_EVAL_EPISODES=10`.
 
-**Wave 3's one real gain is a checkpoint, not a config**: seed 3's step-249k checkpoint measured 98.0%
-at 100 episodes and **94.8% at 500** — the batch's best, a −3.2 pp winner's curse against wave 1's
-−6.2, and still well short of the project record 99.0%.
-
-**Wave 2's +11.2 pp early lead closed exactly as the slow-starter analysis predicted**, and wave 1's
-lone ≥98% checkpoint fell to **91.8% at 500 episodes** — a −6.2 pp winner's curse, and nowhere near the
-project record of 99.0%. Full tables in
-[`charts.md`](charts.md#-wave-2-complete--the-soft-target-is-a-null-to-worse-too-17-pp-mean-perfect-2-of-4).
-**So two of the four c51 knobs are closed and neither moved anything.**
+**The batch's one real gain is a checkpoint, not a config, and it is still short of the record.** Wave 3
+seed 3's step-249k checkpoint measured 98.0%/100 and **94.8%/500** — a −3.2 pp winner's curse, against
+wave 1's lone ≥98% checkpoint falling from 98% to **91.8%/500**, −6.2. Neither approaches the project
+record of 99.0%. Wave 4's close-out has not run, so it may yet add one; on three waves' base rate,
+expect zero or one. Full tables in [`charts.md`](charts.md#batch-46--four-c51-knobs-each-at-n4--all-sixteen-arms-trained-four-nulls-and-the-batchs-whole-spread-fits-inside-one-seeds-noise--launched-2026-08-25).
 
 **‡ The close-out selection thresholds drifted when the graph went to 100 episodes, and the decision is
 to leave them alone** (user's call, 2026-08-27). They are absolute percentages of a *sample*, so
@@ -96,9 +119,12 @@ per-wave comparisons are banded mean perfect rate and corrected `sef`, both read
 self-eval, which these thresholds never touch. Every row that does exist is full length and ungated, so
 the rows are sound and the ranking among them holds.
 
-**The forward plan is new configs, not new instruments** — let wave 4 finish as configured, then keep
-testing ideas that could raise the *true* perfect rate. Three of the four c51 knobs are closed at null,
-so b46 is nearly out of runway and the next batch needs a fresh hypothesis rather than another rung.
+**The forward plan is new configs, not new instruments.** All four c51 knobs are closed at null and b46
+is out of runway, so after `b47` validates the vec stack the next batch needs a fresh hypothesis rather
+than another rung. **And it needs more than n=4 per cell, or an effect larger than ~4 pp to look for** —
+b46's whole spread fitting inside one seed's noise is the batch's most transferable result. The cheap way
+to buy power is fewer cells: two arms of a knob against two controls resolves nothing, while eight arms
+of one promising change against its own eight-arm control might.
 
 **‡ `sef` correction across a *mixed-era* arm: the obvious calculation is wrong, and `b46b` is the
 case.** `sef_common_footing.py` hardcodes `OLD_EPISODES=10` / `NEW_EPISODES=20`, but `b46b` switched to

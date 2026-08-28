@@ -139,6 +139,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
 | **‡‡ The training self-eval was 88% of a training arm's wall clock — the vec engine had never touched it** | **measured 2026-08-26, fixed 2026-08-27** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spent ~18.5 h measuring and **~2.3 h learning**; the 40x vec speedup only ever covered *checkpoint* measurement. Now on the in-process vec engine (`self_eval.py`) with **0 forked children** and the graph at **100 episodes**, which the engine made free. See below |
 | **‡‡ The process-noise floor is level-dependent: a config reproduces, its champion does not** | **measured 2026-08-27** from `b41` vs `b29` — same config, same 4 seeds, same 10-ep graph era and gate-95 close-out, so no correction applies. Graph metrics reproduce (mean perfect −2.7, `best30` −0.6); **champion counts scramble**: ≥98%/100 rows went 59/64/9/1 → **1/0/38/15** and the record seed produced **zero** candidates against `b29b`'s 64. The seed ranking **inverted**. So ≥98% counts have a run-to-run floor spanning their whole range and **cannot carry a verdict**; read them as existence, never magnitude. Confirms `b29b`'s 99.0%/500 was a property of the run. See below |
+| **‡‡ Four c51 knobs are all null at n=4 — and `b46`'s whole spread fits inside one seed's noise, so the batch could not have resolved them** | **closed 2026-08-28.** `BATCH_SIZE=512`, a soft target at τ=0.005, `NUM_ATOMS=21` and `NUM_ATOMS=201`, each 4 arms against its own-seed `b38` control: mean perfect rate **−2.5 / −1.7 / −1.6 / −0.0** pp, a **2.5 pp** spread against `b41`'s measured per-seed floor of 1.1-10.1. Every wave landed at or below its control and none above, which is the only signal that survives. See below |
 | **‡ Close-out selection thresholds are stated as percentages of a *sample*, so 20 -> 100 episodes gutted coverage while looking like a saving** | **found 2026-08-27**. `ALWAYS_EVAL_SINGLE=95` gates on true rate **0.917** at 20 episodes and **0.943** at 100 — above anything c51 sustains. `b46b` wave 2 selected **172 of 175** checkpoints from before its mid-run switch; `b46c` wave 3 has **0-4** evals clearing 95 and **2-29** clearing 90, against ~50 before. Equivalent recalibration would be **92/87** but **it was declined 2026-08-27 and must not be applied** — the tier exists to find >=0.99 champions, so a 0.943 gate is still loose against that target and 0.914 moves away from it. Retracts this file's own "the tiers survive unchanged". See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
 | The graph misranks arms badly — `b5c` is 2nd by graph, last by measurement | **established** |
@@ -254,6 +255,54 @@ literal that coincides with the invariant is indistinguishable from one written 
 until the coincidence breaks.**
 
 ---
+
+## ‡‡ Four c51 knobs, four nulls — and `b46` could not have resolved them (closed 2026-08-28)
+
+Sixteen arms, four waves of four, 3M steps each, **everything else `b38`'s config verbatim** and each arm
+paired against the `b38` arm of its own seed. The knobs were chosen to test one hypothesis: that c51's
+shortfall against the scalar head is **variance in the distributional loss**, which a larger batch, a
+smoother target or a different atom count would damp.
+
+| wave | the one change | mean pp Δ | seeds ahead | corrected `sef` Δ | wall clock / arm | disk / arm |
+|---|---|---:|---:|---:|---:|---:|
+| 1 `b46a` | `BATCH_SIZE` 128 → 512 | −2.5 | 1 of 4 | −5.2 | ~14 h | 2.6 GB |
+| 2 `b46b` | `TARGET_UPDATE_TAU=0.005`, `PERIOD=1` | −1.7 | 2 of 4 | −5.2 | ~8.7 h | 2.6 GB |
+| 3 `b46c` | `NUM_ATOMS` 51 → 21 | −1.6 | 1 of 4 | −3.2 | ~8.4 h | **1.4 GB** |
+| 4 `b46d` | `NUM_ATOMS` 51 → 201 | **−0.0** | 3 of 4 | −2.2 | **18.5 h** | **9.0 GB** |
+| **spread** | | **2.5 pp** | | 3.0 pp | 2.2x | 6x |
+
+**The hypothesis is not supported, and the batch is closed.** No knob produced a gain on any instrument.
+Wave 4 is the closest to an exact null: −0.0 pp with *three of four* seeds nominally ahead, because seed
+1's −4.6 cancels the others' +1.1 to +1.9 — which is what a null looks like when one seed swings, not
+"three wins and one loss". The batch's best checkpoint is wave 3 seed 3's, at **94.8%/500** against the
+project record of 99.0%.
+
+**‡ The result about *power* is more transferable than the result about the knobs.** The four wave means
+span 2.5 pp. `b41` measured the paired per-seed swing on a **re-run of an identical config** at
+**1.1 / 1.5 / 3.5 / 10.1** pp of mean perfect rate ([below](#-the-process-noise-floor-measured-the-config-reproduces-the-champion-does-not-b41-vs-b29-2026-08-27)).
+So the entire batch's between-knob spread is smaller than one seed's *mean* swing under no change at all.
+**n=4 per cell could not tell these knobs apart from nothing, and would not have been able to** whatever
+the outcome — a design fact, decidable before launch, not a disappointing result.
+
+Two things this does not license. It is **not** "the knobs might be big effects we missed": the direction
+was consistent — every one of the four landed at or below its control, none above — and four independent
+knobs all pointing down is weak evidence that none is a lever. And b41's floor is an **estimate** here,
+not a measurement: it came from the `b29` scalar config at 10-episode graph evals, while b46 is c51 at
+100. Mean perfect rate is a banded average over hundreds of evals, so per-eval sampling noise is mostly
+averaged out of it either way and the floor is dominated by *trajectory* divergence — but treat 4.1 pp as
+the right order of magnitude rather than this config's number.
+
+**The design lesson is to spend arms on fewer cells.** Four knobs × 4 arms buys four underpowered
+comparisons; eight arms of one change against its own eight-arm control buys one that can resolve
+roughly half the effect. Given a floor near 4 pp and a project that is chasing the gap between 94.8% and
+99.0%, a batch should either look for an effect it can actually see or be a **validation** run where the
+pass condition is batch-level (which is what `b47` is).
+
+**One knob has a cost worth remembering independently of its null, and checkpoint size is near-linear in
+`NUM_ATOMS`.** Measured per arm on the desktop: **1.4 GB at 21 atoms, 2.6 at 51, 9.0 at 201** — about
+**41 MB per atom** over a ~0.5 GB fixed base, since every one of ~3,000 checkpoints carries the head.
+Wave 4 alone is **36.2 GB** and ran **2.1x** wave 2's wall clock, so it spent ~74 h and 36 GB on a −0.0.
+Budget `NUM_ATOMS` as a disk knob as well as a compute one.
 
 ## ‡‡ The process-noise floor, measured: the config reproduces, the champion does not (`b41` vs `b29`, 2026-08-27)
 
