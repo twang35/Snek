@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T13:47:03",
-  "ts": 1787950023.981234,
+  "iso": "2026-08-28T13:57:09",
+  "ts": 1787950629.2440555,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 41% (4 arms)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 44% (4 arms)"
     ],
     "queued": [
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)"
@@ -42,10 +42,10 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 729000,
+      "step": 784000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.5,
-      "elapsed_s": 8323
+      "steps_per_sec": 96.1,
+      "elapsed_s": 8929
     },
     {
       "id": "b47b-vecrepro-seed2",
@@ -55,10 +55,10 @@
         "b47b-vecrepro-seed2"
       ],
       "pid": 2960182,
-      "step": 885000,
+      "step": 948000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.5,
-      "elapsed_s": 8323
+      "steps_per_sec": 96.1,
+      "elapsed_s": 8929
     },
     {
       "id": "b47c-vecrepro-seed3",
@@ -68,10 +68,10 @@
         "b47c-vecrepro-seed3"
       ],
       "pid": 2960183,
-      "step": 838000,
+      "step": 904000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.5,
-      "elapsed_s": 8323
+      "steps_per_sec": 128.1,
+      "elapsed_s": 8929
     },
     {
       "id": "b47d-vecrepro-seed4",
@@ -81,10 +81,10 @@
         "b47d-vecrepro-seed4"
       ],
       "pid": 2960184,
-      "step": 854000,
+      "step": 914000,
       "max_steps": 2000000,
-      "steps_per_sec": 95.5,
-      "elapsed_s": 8323
+      "steps_per_sec": 96.1,
+      "elapsed_s": 8929
     }
   ],
   "ledger": {
@@ -362,10 +362,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 53.2,
+  "disk_free_gb": 53.1,
   "load_avg": [
-    4.04150390625,
-    4.08642578125,
-    4.09375
+    3.9404296875,
+    3.96337890625,
+    4.02294921875
   ]
 }
