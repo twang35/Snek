@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T01:34:55",
-  "ts": 1787906095.724155,
+  "iso": "2026-08-28T01:45:05",
+  "ts": 1787906705.4879184,
   "at_a_glance": {
     "running": [
-      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 47% (4 arms)"
+      "b46 -- b46: c51 at n=4 -- batch 512, soft target, 21 / 201 atoms, one config a wave ... -- training 48% (4 arms)"
     ],
     "queued": [
       "b47 training -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (4 arms)",
@@ -43,10 +43,10 @@
         "b46d-c51atoms201seed1"
       ],
       "pid": 2032121,
-      "step": 1365000,
+      "step": 1395000,
       "max_steps": 3000000,
-      "steps_per_sec": 62.6,
-      "elapsed_s": 31675
+      "steps_per_sec": 63.9,
+      "elapsed_s": 32285
     },
     {
       "id": "b46d-c51atoms201seed2",
@@ -56,10 +56,10 @@
         "b46d-c51atoms201seed2"
       ],
       "pid": 2032122,
-      "step": 1459000,
+      "step": 1488000,
       "max_steps": 3000000,
-      "steps_per_sec": 31.3,
-      "elapsed_s": 31675
+      "steps_per_sec": 31.9,
+      "elapsed_s": 32285
     },
     {
       "id": "b46d-c51atoms201seed3",
@@ -69,10 +69,10 @@
         "b46d-c51atoms201seed3"
       ],
       "pid": 2032123,
-      "step": 1335000,
+      "step": 1359000,
       "max_steps": 3000000,
-      "steps_per_sec": 62.6,
-      "elapsed_s": 31675
+      "steps_per_sec": 63.9,
+      "elapsed_s": 32285
     },
     {
       "id": "b46d-c51atoms201seed4",
@@ -82,10 +82,10 @@
         "b46d-c51atoms201seed4"
       ],
       "pid": 2032124,
-      "step": 1455000,
+      "step": 1483000,
       "max_steps": 3000000,
-      "steps_per_sec": 31.3,
-      "elapsed_s": 31675
+      "steps_per_sec": 31.9,
+      "elapsed_s": 32285
     }
   ],
   "ledger": {
@@ -362,10 +362,10 @@
     "smoke-2": "failed",
     "smoke-1": "failed"
   },
-  "disk_free_gb": 72.9,
+  "disk_free_gb": 72.6,
   "load_avg": [
-    22.623046875,
-    18.9921875,
-    17.7890625
+    15.673828125,
+    16.83154296875,
+    17.271484375
   ]
 }
