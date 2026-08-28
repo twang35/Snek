@@ -2122,3 +2122,48 @@ endgame is winnable. Full write-up:
 
 ![b28d](../charts/b28d-chase20g85seed4.png)
 **b28d-chase20g85seed4** (`c=0.20`, null)
+
+
+<!-- retired from charts.md 2026-08-27, when batch 41 was written up and the six-batch cap bound. -->
+## Batch 40 — chase-safe **plus a global free-space term** — *done on the desktop: null, and it makes b29's record region look like seed luck*
+
+**`b29`'s config with `SNEK_FREE_SPACE_SHAPING` added on top** — `Φ = 1 / (number of open regions)`, the tail
+cell freed before the count, *added to* chase-safe rather than replacing it (PBRS terms sum). `fc 320`,
+`c=0.10`, **gate 75**, IS off, `td_error`, 2M, seeds 1-4. The hypothesis was that an explicit
+"don't cut the board in two" signal would carry the last few meals, where the chase-safe potential is
+measurably exhausted (98-99 carries 0.00-0.04).
+
+| arm | best-30 | `sef` | pooled/eq | ≥98%/100 | held ≥98%/500 |
+|---|---|---|---|---|---|
+| `b40b` | **97.7** | **62.7** | 89.52 | **63** | **1 — 98.2% @1513k** |
+| `b40c` | 95.3 | 61.5 | 89.11 | 9 | 0 |
+| `b40a` | 96.3 | 45.0 | 88.28 | 16 | 0 |
+| `b40d` | 94.0 | 56.8 | 85.68 | 2 | 0 |
+| **group** | | | **88.15** | **90, 4 of 4 seeds** | **1** |
+
+**Two arms produced a flawless 100.0%/100 checkpoint** — `b40a` @1562k and `b40b` @1424k — and every seed
+reached the ≥98%/100 tier, which no unshaped batch has done.
+
+**‡ But against `b29` it is a null, and the /100 agreement is what makes that convincing.** b40's ≥98%/100
+counts are **16 / 63 / 9 / 2** against b29's **59 / 64 / 9 / 1** — nearly the same distribution, same
+4-of-4 shape — and pooled ties the family (**88.15** vs b29 87.83, b35 88.20, b34 86.43). The free-space term
+moved neither metric.
+
+**Where they diverge is the tier that turns out to be noise.** b29 held **21** checkpoints at ≥98%/500; b40
+holds **1**. And `b37`, an exact `b29` replication on fresh seeds, holds **0** — see below. So the honest
+reading is that **the ≥98%/500 band is seed-dependent, not config-dependent**: three batches with
+indistinguishable /100 tiers produced 21, 1 and 0 held checkpoints. **90 ≥98%/100 checkpoints in b40 yielded
+one that survived 500 episodes**, which is the attrition rate to expect, and `b40b` @1513k (**98.2%/500**) is
+a HOF-promotion candidate — third-best /500 on record behind `b29b`'s 99.0 and `b29a`'s 98.4.
+
+![b40a](../charts/b40a-chasefree10g75seed1.png)
+**b40a-chasefree10g75seed1** — 100.0%/100 @1562k, 16 at ≥98%/100, none held at 500
+
+![b40b](../charts/b40b-chasefree10g75seed2.png)
+**b40b-chasefree10g75seed2** — the batch's arm: 100.0%/100 @1424k, 63 at ≥98%/100, **98.2%/500 @1513k**
+
+![b40c](../charts/b40c-chasefree10g75seed3.png)
+**b40c-chasefree10g75seed3** — pooled 89.11, 9 candidates, none held
+
+![b40d](../charts/b40d-chasefree10g75seed4.png)
+**b40d-chasefree10g75seed4** — the weak seed, as in every batch of this family

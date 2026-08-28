@@ -41,6 +41,31 @@ and at 100 episodes admit only the very best — a thinner, better pool reads hi
 "c51's shortfall is variance in the loss" hypothesis this batch was built to test. Wave 4 is the last
 rung; there is no wave 5 planned and no case for a `BATCH_SIZE=1024` rung.
 
+## Queued next: `b47` — `b29`'s record config on the vec stack
+
+Four arms, env byte-identical to `b41a`'s spec (itself `b29`'s verbatim), seed N pinned to arm letter N,
+2M cap, priority 30 — so it runs after wave 4 and its close-out. A **validation batch**: confirm the
+current vec training + vec eval pipeline still reaches `b29`'s record region before new ideas are stacked
+on it. ~6 h for the wave plus a chained close-out and HOF-500.
+
+**‡ Read it at BATCH level, not per seed, and `b41` is why.** The pass condition is **did a ≥98%/500
+region appear on any arm**, plus graph metrics within ~4 pp of `b29`/`b41`. A per-seed comparison against
+`b29b` would be measuring the process-noise floor: on that same config and seed, ≥98%/100 counts ran
+59/64/9/1 in `b29` and **1/0/38/15** in `b41`, so any single arm's tail number is uninformative
+([finding](findings.md#-the-process-noise-floor-measured-the-config-reproduces-the-champion-does-not-b41-vs-b29-2026-08-27)).
+**Do not read a b47 arm that misses 99.0% as a vec regression** — `b29b`'s own seed already failed to
+reproduce it once.
+
+**Two corrections it will need.** `b47` runs 100-episode graph evals against `b29`/`b41`'s 10, so its raw
+`sef` reads ~3x low — correct with `sef_common_footing.py` passing `n_have=100 n_want=10` **explicitly**
+(its defaults are 20/10). Banded mean perfect rate needs no correction and is the column to lead with.
+Close-out pooled is not comparable across that boundary either.
+
+**One confound, pre-registered.** The 100-episode self-eval feeds `training.epsilon_for`'s refinement
+phase, so the exploration schedule differs from `b29`/`b41`; this tests the stack **as shipped** rather
+than isolating the vec engine. If it comes back materially low, the clean follow-up is one arm at
+`SNEK_TRAIN_EVAL_ENGINE=scalar SNEK_GRAPH_EVAL_EPISODES=10`.
+
 **Wave 3's one real gain is a checkpoint, not a config**: seed 3's step-249k checkpoint measured 98.0%
 at 100 episodes and **94.8% at 500** — the batch's best, a −3.2 pp winner's curse against wave 1's
 −6.2, and still well short of the project record 99.0%.
@@ -461,14 +486,14 @@ per-batch best-checkpoint table: [`archive/runs-archive.md`](archive/runs-archiv
 
 ## Outstanding, highest-value, in order
 
-1. **`b41` finished on the desktop and has no write-up anywhere** — training, close-out and HOF-500 all read
-   `done` in the ledger, and there is no section in `completedRuns.md`, `findings.md` or `charts.md`. It is the
-   **b29 same-seed determinism probe**: b29's exact config re-run on seeds 1-4 to measure the process-noise
-   floor that every seed-matched verdict in this folder sits on top of, since `ParallelPyEnvironment` worker
-   ordering and TF's threaded FP reductions make a same-seed re-run diverge. Nobody has pinned that number, and
-   **if `b29b`'s 99.0%/500 does not reappear on its own seed it is the strongest confirmation yet that the /500
-   record was noise rather than a property of the seed or the config.** Rationale as written at launch:
-   [`archive/runs-archive.md`](archive/runs-archive.md).
+1. ~~**`b41` has no write-up anywhere**~~ — **done 2026-08-27.** It did not reappear: `b29b`'s record seed
+   produced **zero** ≥98%/100 candidates against `b29b`'s 64, and the per-seed ranking **inverted**, while the
+   graph metrics reproduced to −2.7 pp at 2 of 4. **The config reproduces and the champion does not.** The
+   noise floor is level-dependent — usable on `best_perfect30` and mean perfect rate, **useless on ≥98% row
+   counts, which span 0 to 64 on one seed** — so champion counts must be read as existence, never magnitude.
+   [finding](findings.md#-the-process-noise-floor-measured-the-config-reproduces-the-champion-does-not-b41-vs-b29-2026-08-27) ·
+   [charts](charts.md#batch-41--b29s-record-config-re-run-on-the-same-four-seeds--complete-the-config-reproduces-and-the-champion-does-not) ·
+   [arm rows](completedRuns.md)
 2. **`b45`'s close-out is the ladder's last measurement.** Wave 1 is in its HOF stage, wave 2 is queued. **Read
    it on its best row's rate, not on its count of ≥98%/500 rows** — a frozen arm parked near 98% maximises that
    count without being better, so `b45` will probably beat `b44`'s 874 while being level with it.

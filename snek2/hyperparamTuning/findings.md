@@ -138,6 +138,7 @@ replaced (20, 21, 23, 26 values) and per-batch config results that later batches
 | A high single 10-episode eval predicts a good checkpoint; smoothing is anti-predictive | **established**, +0.64 vs −0.40 |
 | Policy quality changes materially within 1000 training steps | **established**, up to 27 points |
 | **‡‡ The training self-eval was 88% of a training arm's wall clock — the vec engine had never touched it** | **measured 2026-08-26, fixed 2026-08-27** on two live `b46b` arms. 20 episodes every 1000 steps on 20 forked pygame envs: eval-active wall clock **88.8%** and **88.0%**, eval bursts median 20-23 s against a 24 s cycle. So a 3M-step arm spent ~18.5 h measuring and **~2.3 h learning**; the 40x vec speedup only ever covered *checkpoint* measurement. Now on the in-process vec engine (`self_eval.py`) with **0 forked children** and the graph at **100 episodes**, which the engine made free. See below |
+| **‡‡ The process-noise floor is level-dependent: a config reproduces, its champion does not** | **measured 2026-08-27** from `b41` vs `b29` — same config, same 4 seeds, same 10-ep graph era and gate-95 close-out, so no correction applies. Graph metrics reproduce (mean perfect −2.7, `best30` −0.6); **champion counts scramble**: ≥98%/100 rows went 59/64/9/1 → **1/0/38/15** and the record seed produced **zero** candidates against `b29b`'s 64. The seed ranking **inverted**. So ≥98% counts have a run-to-run floor spanning their whole range and **cannot carry a verdict**; read them as existence, never magnitude. Confirms `b29b`'s 99.0%/500 was a property of the run. See below |
 | **‡ Close-out selection thresholds are stated as percentages of a *sample*, so 20 -> 100 episodes gutted coverage while looking like a saving** | **found 2026-08-27**. `ALWAYS_EVAL_SINGLE=95` gates on true rate **0.917** at 20 episodes and **0.943** at 100 — above anything c51 sustains. `b46b` wave 2 selected **172 of 175** checkpoints from before its mid-run switch; `b46c` wave 3 has **0-4** evals clearing 95 and **2-29** clearing 90, against ~50 before. Equivalent recalibration would be **92/87** but **it was declined 2026-08-27 and must not be applied** — the tier exists to find >=0.99 champions, so a 0.943 gate is still loose against that target and 0.914 moves away from it. Retracts this file's own "the tiers survive unchanged". See below |
 | Checkpoint-to-checkpoint variance is large, and it is not sampling noise | **established** |
 | The graph misranks arms badly — `b5c` is 2nd by graph, last by measurement | **established** |
@@ -253,6 +254,72 @@ literal that coincides with the invariant is indistinguishable from one written 
 until the coincidence breaks.**
 
 ---
+
+## ‡‡ The process-noise floor, measured: the config reproduces, the champion does not (`b41` vs `b29`, 2026-08-27)
+
+**`b41` re-ran `b29`'s record config verbatim on the same four seeds, and it is the cleanest paired
+comparison this project has** — byte-identical env, both 2.00M steps, both 2,001 graph evals at **10
+episodes**, both close-outs at **gate 95.0 / 100 episodes**. No era correction applies to any column.
+`b41` finished around 2026-08-18 and was never written up until now.
+
+**It answers the question it was launched to answer, and the answer splits by level.**
+
+| level | metric | `b29` | `b41` | verdict |
+|---|---|---|---|---|
+| **graph** (no selection) | mean perfect | 73.8 | 71.1 | **reproduces** (−2.7, 2 of 4) |
+| graph | `sef` | 60.9% | 56.0% | reproduces (−4.9) |
+| graph | `best_perfect30` | 96.4 | 95.8 | reproduces (−0.6) |
+| **close-out** | ≥98%/100 rows, per seed | **59 / 64 / 9 / 1** | **1 / 0 / 38 / 15** | **scrambled** |
+| **HOF** | ≥98%/500 rows, per seed | **3 / 18 / 0 / 0** | **0 / 0 / 1 / 0** | **scrambled** |
+| HOF | best /500 in the batch | **99.0%** (seed 2) | 98.0% (seed 3) | record did not reappear |
+
+**‡ The record seed produced zero ≥98%/100 candidates.** `b29b` had **64**, including an 18-checkpoint
+≥98%/500 band at 1446k-1529k and the 99.0%/500 project record. On the same seed, same config, `b41b`'s
+best close-out row is **97.0%/100** and no HOF stage ran at all, because nothing qualified. **So the
+record is a property of the *run*, not of the seed and not of the config.** This is the confirmation
+`runs.md` pre-registered as "the strongest confirmation yet that the /500 record was noise".
+
+**‡ The per-seed ranking inverted.** `b29` ordered its seeds 2 > 1 > 3 > 4 on ≥98%/100 count; `b41`
+ordered them 3 > 4 > 1 > 2 — the reverse. The two seeds carrying `b29`'s "region on 2 of 4 seeds" are
+the two that produced almost nothing in the re-run, and the two `b29` called weak produced 38 and 15.
+
+**What this calibrates, and it is the useful half.** The noise floor is *level-dependent*, so the same
+n=4 batch can support a verdict on one metric and none at all on another:
+
+| metric | per-seed \|Δ\| across the re-run | usable at n=4? |
+|---|---|---|
+| `best_perfect30` | 1.3 / 1.4 / 3.4 / 6.0 (mean **3.0**) | yes, above ~6 pp |
+| mean perfect rate | 1.1 / 1.5 / 3.5 / 10.1 (mean **4.1**) | yes, above ~10 pp |
+| `sef` | 2.4 / 3.2 / 4.5 / 20.6 (mean **7.7**) | marginal — one seed moved 20.6 |
+| ≥98%/100 row count | 14 / 29 / 58 / 64 | **no. The floor spans 0 to 64 on one seed** |
+
+**So champion counts cannot carry a verdict and this project has repeatedly treated them as though they
+could.** "N checkpoints held ≥98%/500" is a selection statistic on the tail of a noisy curve, and its
+run-to-run floor is the full range of values it takes. Read it as *existence* — did this config produce
+a region anywhere — never as a magnitude, and never per seed. The graph metrics are the ones with a
+floor small enough to compare, and CLAUDE.md's standing "n=4 cannot resolve an effect below ~10 pp" is
+now **measured** rather than asserted: 10.1 pp is exactly the worst per-seed swing on mean perfect rate.
+
+**‡ Divergence is immediate, and one obvious metric for it is worthless.** The first differing eval
+arrives at step **10k-44k of 2M** — 0.5-2% in — so a same-seed re-run is not tracking and then parting;
+it separates almost at once, as `ParallelPyEnvironment` worker ordering and TF's threaded FP reductions
+compound through the RL loop. **Mean per-eval \|difference\| is not evidence of any of this**: it reads
+13.5-17.1 pp, and two *independent 10-episode evals of the identical policy* differ by **12.2-16.1 pp**
+at these rates. The observation sits inside its own null. Use the first-divergence step; discard the
+mean.
+
+**Three consequences to carry.**
+
+- **A promoted checkpoint's provenance is a run, not a recipe.** `b29b`'s HOF entry stands — it was
+  measured, re-measured at /500 and again at /1000 — but "re-run the config to get another one" is now
+  known to fail. The argument that made it a record, *a region rather than an isolated point*, holds
+  within its run and does not transfer across runs.
+- **Seed-matching buys less than it appears to.** Its value is removing *initialisation* variance; it
+  removes none of the trajectory variance measured here, and on the tail metrics that variance is
+  larger than any effect the project has chased.
+- **`b47` must be read at batch level.** Queued 2026-08-27 to validate the vec stack on this same
+  config: the pass condition is **did a ≥98%/500 region appear on any arm**, plus graph metrics within
+  ~4 pp of `b29`/`b41`. A per-seed comparison against `b29b` would be measuring this noise floor.
 
 ## ‡ A selection threshold is a statement about an estimator, not a quality (2026-08-27)
 

@@ -921,7 +921,7 @@ also retires the claim that gate 75 produces a *record region* — three batches
 produced 21, 1 and 0 held checkpoints, so that count is seed noise. Full account in
 [`findings.md`](../findings.md#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading);
 rationale, per-arm rows and charts in [`completedRuns.md`](../completedRuns.md) and
-[`charts.md`](../charts.md#batch-40--chase-safe-plus-a-global-free-space-term--done-on-the-desktop-null-and-it-makes-b29s-record-region-look-like-seed-luck).
+[`charts-archive.md`](charts-archive.md#batch-40--chase-safe-plus-a-global-free-space-term--done-on-the-desktop-null-and-it-makes-b29s-record-region-look-like-seed-luck).
 
 **`b40b` @1513k is a HOF-promotion candidate** — 98.2%/500 sits behind `b29b` (99.0) and `b29a` (98.4) and ahead
 of `b24b`/`b24d` (98.0). Promotion is still the manual, verified process; it has not been done.

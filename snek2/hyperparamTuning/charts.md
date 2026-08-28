@@ -1,6 +1,7 @@
 # Charts
 
-Progress graphs for the most recent batches — **40, 42, 43, 44, 45 and 46**, a cap of six, newest first.
+Progress graphs for the most recent batches — **41, 42, 43, 44, 45 and 46**, a cap of six, newest first.
+**Batch 40 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) on 2026-08-27**, when batch 41's late write-up made seven. `b41` is out of launch order here on purpose: it is the `b29` control the b42-b45 ladder and `b47` both read against, so it sits with them rather than in the archive.
 Per-arm numbers live in [`completedRuns.md`](completedRuns.md); this file is images plus a short reading of
 each. A batch appears here **while it is still running**, with training-only numbers, not just once it has
 closed. Batch 27 was retired to [`archive/charts-archive.md`](archive/charts-archive.md) when 36 launched,
@@ -17,8 +18,9 @@ null rungs (34, 70 and 35, 40) were retired earlier, since the ladder's conclusi
 and 40 — the batches that bear on whether gate 75's record region was real.
 
 **`b37` and `b39` are not a numbering slip:** `b37` was queued from the desktop the same evening `b38` was
-launched from the laptop, so the two hosts took adjacent numbers out of order. **`b41` has no section here
-either** — it is the b29 same-seed determinism probe, still closing out on the desktop.
+launched from the laptop, so the two hosts took adjacent numbers out of order. **`b41` now has a section**
+(added 2026-08-27) — it is the b29 same-seed determinism probe, and it finished around 2026-08-18 but went
+unanalysed for nine days.
 
 **Batch 42 and 43 arms do not start at step 0**, so their curves begin mid-chart at the step of the checkpoint
 each one continues. There is no resume line at the left edge because the graph history was deliberately not
@@ -818,45 +820,58 @@ gate-abandoned 378-episode row, not a 500-episode number, so it is not strictly 
 
 ![b42d](charts/b42d-cont3m-b29c.png)
 
-## Batch 40 — chase-safe **plus a global free-space term** — *done on the desktop: null, and it makes b29's record region look like seed luck*
+## Batch 41 — **`b29`'s record config re-run on the same four seeds** — *complete; the config reproduces and the champion does not*
 
-**`b29`'s config with `SNEK_FREE_SPACE_SHAPING` added on top** — `Φ = 1 / (number of open regions)`, the tail
-cell freed before the count, *added to* chase-safe rather than replacing it (PBRS terms sum). `fc 320`,
-`c=0.10`, **gate 75**, IS off, `td_error`, 2M, seeds 1-4. The hypothesis was that an explicit
-"don't cut the board in two" signal would carry the last few meals, where the chase-safe potential is
-measurably exhausted (98-99 carries 0.00-0.04).
+Written up 2026-08-27, nine days late. The cleanest paired comparison in this project: env byte-identical to
+`b29`'s, both 2.00M steps, both 2,001 graph evals at **10 episodes**, both close-outs at **gate 95.0 / 100
+episodes**. **No era correction applies to any column here** — which is not true of anything after batch 44.
 
-| arm | best-30 | `sef` | pooled/eq | ≥98%/100 | held ≥98%/500 |
-|---|---|---|---|---|---|
-| `b40b` | **97.7** | **62.7** | 89.52 | **63** | **1 — 98.2% @1513k** |
-| `b40c` | 95.3 | 61.5 | 89.11 | 9 | 0 |
-| `b40a` | 96.3 | 45.0 | 88.28 | 16 | 0 |
-| `b40d` | 94.0 | 56.8 | 85.68 | 2 | 0 |
-| **group** | | | **88.15** | **90, 4 of 4 seeds** | **1** |
+| seed | mean pp `b41`/`b29` | Δ | `sef` `b41`/`b29` | Δ | `best30` Δ | ≥98%/100 `b41`/`b29` | ≥98%/500 `b41`/`b29` |
+|---|---|---|---|---|---|---|---|
+| 1 | 62.5 / 72.6 | **−10.1** | 39.7 / 60.3 | **−20.6** | −6.0 | **1 / 59** | 0 / 3 |
+| 2 | 72.0 / 70.9 | **+1.1** | 58.8 / 55.6 | +3.2 | −1.3 | **0 / 64** | **0 / 18** |
+| 3 | 73.7 / 77.2 | −3.5 | 63.4 / 67.9 | −4.5 | **+1.4** | **38 / 9** | **1 / 0** |
+| 4 | 76.0 / 74.5 | **+1.5** | 62.1 / 59.7 | +2.4 | **+3.4** | **15 / 1** | 0 / 0 |
+| **mean** | **71.1 / 73.8** | **−2.7** | **56.0 / 60.9** | −4.9 | −0.6 | 13.5 / 33.3 | 0.25 / 5.25 |
+| | | *2 of 4* | | *2 of 4* | *2 of 4* | | |
 
-**Two arms produced a flawless 100.0%/100 checkpoint** — `b40a` @1562k and `b40b` @1424k — and every seed
-reached the ≥98%/100 tier, which no unshaped batch has done.
+**The two halves of this table disagree, and that is the result.** On the graph the config reproduces — mean
+perfect −2.7 at 2 of 4, `best_perfect30` −0.6 at 2 of 4, i.e. a coin flip. On the tail it scrambles
+completely: the ≥98%/100 counts go 59/64/9/1 → **1/0/38/15**, an inversion of the seed ranking.
 
-**‡ But against `b29` it is a null, and the /100 agreement is what makes that convincing.** b40's ≥98%/100
-counts are **16 / 63 / 9 / 2** against b29's **59 / 64 / 9 / 1** — nearly the same distribution, same
-4-of-4 shape — and pooled ties the family (**88.15** vs b29 87.83, b35 88.20, b34 86.43). The free-space term
-moved neither metric.
+**‡‡ The record seed produced nothing.** `b29b` gave 64 rows ≥98%/100, an 18-checkpoint ≥98%/500 band at
+1446k-1529k, and the 99.0%/500 project record. On the same seed and the same config, `b41b`'s best close-out
+row is **97.0%/100**, zero rows reached 98, and **no HOF stage ran because nothing qualified** — while its
+graph metrics came out slightly *ahead* of `b29b`'s (+1.1 mean perfect). **The record was a property of the
+run.** Full derivation, the per-metric noise floor it calibrates, and why mean per-eval difference is a
+worthless divergence metric here:
+[`findings.md`](findings.md#-the-process-noise-floor-measured-the-config-reproduces-the-champion-does-not-b41-vs-b29-2026-08-27).
 
-**Where they diverge is the tier that turns out to be noise.** b29 held **21** checkpoints at ≥98%/500; b40
-holds **1**. And `b37`, an exact `b29` replication on fresh seeds, holds **0** — see below. So the honest
-reading is that **the ≥98%/500 band is seed-dependent, not config-dependent**: three batches with
-indistinguishable /100 tiers produced 21, 1 and 0 held checkpoints. **90 ≥98%/100 checkpoints in b40 yielded
-one that survived 500 episodes**, which is the attrition rate to expect, and `b40b` @1513k (**98.2%/500**) is
-a HOF-promotion candidate — third-best /500 on record behind `b29b`'s 99.0 and `b29a`'s 98.4.
+**Divergence is immediate**: the first differing eval lands at step **10k-44k of 2M**. A same-seed re-run does
+not track and then part; it separates inside the first 2%.
 
-![b40a](charts/b40a-chasefree10g75seed1.png)
-**b40a-chasefree10g75seed1** — 100.0%/100 @1562k, 16 at ≥98%/100, none held at 500
+### b41c-b29repro-seed3 — the re-run's best arm, on the seed `b29` ranked third
 
-![b40b](charts/b40b-chasefree10g75seed2.png)
-**b40b-chasefree10g75seed2** — the batch's arm: 100.0%/100 @1424k, 63 at ≥98%/100, **98.2%/500 @1513k**
+38 rows ≥98%/100 against `b29c`'s 9, and the batch's only ≥98%/500 (98.0% @1279k). Pooled 90.61%, the highest
+of either batch.
 
-![b40c](charts/b40c-chasefree10g75seed3.png)
-**b40c-chasefree10g75seed3** — pooled 89.11, 9 candidates, none held
+![b41c-b29repro-seed3](charts/b41c-b29repro-seed3.png)
 
-![b40d](charts/b40d-chasefree10g75seed4.png)
-**b40d-chasefree10g75seed4** — the weak seed, as in every batch of this family
+### b41b-b29repro-seed2 — **the record seed, and it produced no candidate at all**
+
+The single most informative arm in the pair. Graph curve is level with `b29b`'s; the tail is empty.
+
+![b41b-b29repro-seed2](charts/b41b-b29repro-seed2.png)
+
+### b41d-b29repro-seed4 — `b29`'s weak seed, second-best here
+
+15 rows ≥98%/100 against `b29d`'s 1. Best partial 97.4% abandoned at 421 episodes, so 0 held ≥98%/500.
+
+![b41d-b29repro-seed4](charts/b41d-b29repro-seed4.png)
+
+### b41a-b29repro-seed1 — the worst per-seed swing in the project's paired data
+
+−10.1 mean perfect and −20.6 `sef` against `b29a`, plus 1 row ≥98%/100 against 59. **This arm is the number
+behind the ~10 pp resolution floor** — it is what a same-config, same-seed re-run can cost.
+
+![b41a-b29repro-seed1](charts/b41a-b29repro-seed1.png)
