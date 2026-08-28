@@ -32,8 +32,9 @@ LOCK_NAMES = ('index.lock', 'HEAD.lock')
 def clear_stale_locks(worktree, max_age=LOCK_MAX_AGE_SECONDS):
     """Removes leftover git lock files in `worktree` older than `max_age`. Returns what it removed.
 
-    **Why this exists.** `publish_status` commits and pushes every poll, so the daemon is inside
-    a git write for a slice of every 30 seconds. Kill it there -- a reboot, an OOM -- and the
+    **Why this exists.** `publish_status` commits and pushes on every *network* cycle, so the
+    daemon is inside a git write for a slice of every `git_seconds` (every 30 s before that cycle
+    was split out from the poll on 2026-08-27). Kill it there -- a reboot, an OOM -- and the
     lock outlives the process. Every later `git add` then fails with "Unable to create
     index.lock: File exists", `_commit_and_push` raises, `_publish` logs it and carries on: the
     daemon keeps running and keeps dispatching jobs, but **status.json never updates again**. The

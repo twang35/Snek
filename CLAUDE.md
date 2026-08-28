@@ -380,7 +380,23 @@ by git: you commit a job spec, it runs it, it pushes results back. Full docs in
 |---|---|---|
 | limit | **4 trainers** | `max_trainers` ≤ 4, `max_evals` ≤ 4 |
 | check | `pgrep -fl "python -u snek2.py"` | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
-| queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch |
+| queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
+| start it now | — | `ssh the-claw-den 'Snek/snek2/desktop/trigger'` |
+
+**‡ The desktop's git cycle is 10 minutes, not 30 seconds, and `status.json` is stale by design**
+(2026-08-27). `git_seconds` (600) paces the fetch and the `status.json` push on their own, apart from
+`poll_seconds` (30), which still paces the local reap-and-dispatch. It cut the box from ~2,880 fetches
+and ~2,880 pushes to github.com a day to ~144 of each. Two consequences for reading the box:
+
+- **A `status.json` up to 10 minutes old is a healthy daemon.** The staleness bar for "is it dead?"
+  moved by an order of magnitude, so the fetch-first ladder below matters more, not less.
+- **A queued batch waits up to 10 minutes unless you trigger it.** `ssh the-claw-den
+  'Snek/snek2/desktop/trigger'` forces a fetch + dispatch + publish within a second and prints the
+  fresh `at_a_glance`, so **one command both starts the work and answers "did it start?"** — exit 0
+  means the cycle completed, 1 means the daemon is not polling (it prints `systemctl is-active`), 2
+  means alive but mid-cycle. **Push the spec first**: the daemon reads `ops` from the ref it just
+  fetched, so a spec still on the laptop is not there to find. Full contract:
+  [`snek2/desktop/README.md`](snek2/desktop/README.md#-trigger-a-git-cycle-on-demand-over-ssh).
 
 **`git fetch` is not optional in that command, and leaving it out is the single most repeated mistake
 in this project's history with the desktop.** `git show origin/ops-status:…` reads a **local
@@ -396,9 +412,12 @@ already finished that batch *and* its close-outs, and had moved on to the next o
 desktop as down, drained, stuck or off-LAN from an unfetched read. The ladder, in order:
 
 1. **`git fetch origin ops-status`**, then re-read. This resolves it almost every time.
-2. **Try `ssh the-claw-den` — actually run it**, with `-o ConnectTimeout=8 -o BatchMode=yes` so a
+2. **`ssh the-claw-den 'Snek/snek2/desktop/trigger'`** — one round trip that makes the daemon publish
+   *now* and reports whether it is polling at all, which is the question. It also removes the "is it
+   just the 10-minute cycle?" ambiguity that `git_seconds` introduced.
+3. **Try `ssh the-claw-den` — actually run it**, with `-o ConnectTimeout=8 -o BatchMode=yes` so a
    genuine failure returns in seconds instead of hanging. One command settles reachability.
-3. Only after 1 and 2 both fail is the box worth calling unreachable.
+4. Only after all three fail is the box worth calling unreachable.
 
 **Neither check sees the other host.** The `pgrep` rule above is laptop-local, and desktop jobs never
 appear in it — so **"N arms running" is meaningless without naming the box**, and a progress report

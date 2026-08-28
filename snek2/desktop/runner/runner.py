@@ -139,6 +139,20 @@ class _StubJob:
         return 'eval' if self.type == 'eval' else 'trainer'
 
 
+def trigger_path(host):
+    """The file that makes the daemon do a network cycle now, instead of at its next `git_seconds`.
+
+    Derived from `LEDGER_PATH`'s directory (`~/.snek-runner/trigger`) rather than being its own
+    `host.env` key, and that is deliberate: `host.env` is not in git -- only `host.env.example` is
+    -- so a new required key would have to be hand-edited on the box during the same deploy that
+    started depending on it, and a deploy that lands first would crash `load_host_config` on every
+    start. `TRIGGER_PATH` still overrides it for a host that wants the file somewhere else.
+
+    The directory already exists wherever the daemon has ever written its ledger."""
+    return host.get('TRIGGER_PATH') or os.path.join(
+        os.path.dirname(host['LEDGER_PATH']), 'trigger')
+
+
 class Runner:
     def __init__(self, host):
         self.host = host
@@ -151,6 +165,8 @@ class Runner:
         self._wave_pngs = []       # sticky panel set for the current wave (grows, never shrinks)
         self._wave_category = None # the wave's category, so a train->eval flip resets the set
         self._queued = []          # launchable jobs waiting for the next wave, priority order
+        # When the loop last *attempted* its network half. 0 so the first cycle does one.
+        self._last_git = 0.0
         self.stop = False
         self._reattach()
 
@@ -224,8 +240,48 @@ class Runner:
         self._save_ledger()
 
     # -------------------------------------------------------------------- loop
-    def poll_once(self):
-        gitbus.fetch(self.host)
+    def git_due(self):
+        """Whether this cycle should do its network half. `git_seconds` of 0 means every cycle."""
+        interval = int(self.runtime.get('git_seconds', 0) or 0)
+        return interval <= 0 or (time.time() - self._last_git) >= interval
+
+    def take_trigger(self):
+        """Consumes a manual trigger if one is waiting, returning whether there was one.
+
+        The trigger is a file `runner/trigger.py` drops over ssh, and **the unlink *is* the test**:
+        checking for the file and then removing it would be two operations with a window between
+        them, which is the same shape as the `O_EXCL` claim-lock hole in `chart_viewer`. A single
+        `unlink` cannot be seen by two readers.
+
+        It exists because the network half now runs every `git_seconds` (10 minutes), so a batch
+        pushed to `ops` would otherwise wait up to that long to start. Consuming a trigger forces
+        the next cycle's fetch + dispatch + publish immediately."""
+        try:
+            os.unlink(trigger_path(self.host))
+        except OSError:
+            return False
+        sys.stderr.write('manual trigger consumed; forcing a git cycle\n')
+        return True
+
+    def poll_once(self, git=None):
+        """One cycle of the loop.
+
+        **The cycle has a local half and a network half, and they run at different rates.** The
+        local half -- reap, re-read the already-fetched `ops` ref, dispatch, keep the viewer up --
+        touches no network and runs every `poll_seconds`, so work the box generates for itself (a
+        finished training's closeout, a chained HOF stage) still starts within seconds. The network
+        half is one `git fetch` and one status.json push, and runs every `git_seconds`.
+
+        `git=None` decides from `git_seconds`; True forces it, which is what a manual trigger does.
+        """
+        if git is None:
+            git = self.git_due()
+        if git:
+            # Stamped before the attempt, not after: an attempt is what costs traffic, so a fetch
+            # that fails (this box's DNS for github.com flaps) must not turn into a retry every
+            # `poll_seconds` -- which would put the traffic straight back to where it was.
+            self._last_git = time.time()
+            gitbus.fetch(self.host)
         self._apply_runtime()
         self._reap()
         # Scan every poll -- not only when dispatching -- so status.json's `queued` list stays
@@ -236,7 +292,8 @@ class Runner:
         for rj in self.running.values():
             launch.update_throughput(rj, self.host)
         self._ensure_viewer()
-        self._publish()
+        if git:
+            self._publish()
 
     def _ensure_viewer(self):
         """Best-effort: while jobs run, keep one decoupled chart viewer up on the display,
@@ -1046,15 +1103,30 @@ def main():
     signal.signal(signal.SIGTERM, handle)
     signal.signal(signal.SIGINT, handle)
 
+    forced = False
     while not runner.stop:
         try:
-            runner.poll_once()
+            # `forced or None`: a trigger forces the network half, otherwise poll_once decides
+            # from `git_seconds`. Not `forced` alone -- False would *suppress* a due cycle.
+            runner.poll_once(git=True if forced else None)
         except Exception as e:  # the loop must never die
             sys.stderr.write('poll error: {0}\n'.format(e))
-        for _ in range(int(runner.runtime['poll_seconds'])):
-            if runner.stop:
-                break
-            time.sleep(1)
+        forced = _wait_for_next_poll(runner)
+
+
+def _wait_for_next_poll(runner):
+    """Sleeps `poll_seconds` in one-second steps, returning early on a stop or a manual trigger.
+
+    Returns True when a trigger was consumed, so the caller forces the next cycle's network half.
+    The one-second granularity is what makes an ssh trigger feel immediate; it predates the
+    trigger and is why the trigger could be a plain file rather than a signal handler."""
+    for _ in range(int(runner.runtime['poll_seconds'])):
+        if runner.stop:
+            return False
+        if runner.take_trigger():
+            return True
+        time.sleep(1)
+    return False
 
 
 if __name__ == '__main__':

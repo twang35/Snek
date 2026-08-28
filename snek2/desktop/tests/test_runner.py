@@ -1531,3 +1531,169 @@ def test_a_zero_max_evals_does_not_divide_by_zero():
     host = _host(); host['HARD_MAX_EVALS'] = 4
     out, notes = cfg.parse_runtime_config('{"max_evals": 0, "eval_workers": 40}', host)
     assert out['max_evals'] == 0 and out['eval_workers'] >= 1
+
+
+# ------------------------------------- the network half: git_seconds and the manual trigger
+#
+# The daemon's poll used to do one `git fetch` and one status.json push per `poll_seconds` (30 s),
+# i.e. ~2,880 of each a day from a home connection. `git_seconds` (600) separates that network half
+# from the local half, and `trigger.py` over ssh forces one when a batch should start now. These
+# fixtures pin the split, because the failure mode of getting it wrong is invisible: a `git=False`
+# that leaks into the local half means the box stops dispatching, and a `git=None` mishandled in
+# `main` means the traffic quietly comes back.
+
+def _trigger_runner(tmpdir, **runtime):
+    h = _host()
+    h['LEDGER_PATH'] = os.path.join(tmpdir, 'ledger.json')
+    h['TRIGGER_PATH'] = os.path.join(tmpdir, 'trigger')
+    h['REPO_PATH'] = tmpdir          # _publish reads free disk from it
+    r = runnermod.Runner(h)
+    r.runtime.update(runtime)
+    return r
+
+
+def test_git_seconds_defaults_to_ten_minutes_and_clamps():
+    assert cfg.RUNTIME_DEFAULTS['git_seconds'] == 600
+    host = _host()
+    out, notes = cfg.parse_runtime_config('{"git_seconds": 600}', host)
+    assert out['git_seconds'] == 600
+    # 0 is legal and is the opt-out (a network cycle every poll), so it must NOT be floored at
+    # MIN_POLL_SECONDS the way `poll_seconds` is.
+    out, notes = cfg.parse_runtime_config('{"git_seconds": 0}', host)
+    assert out['git_seconds'] == 0, out['git_seconds']
+    out, notes = cfg.parse_runtime_config('{"git_seconds": 999999}', host)
+    assert out['git_seconds'] == 86400 and notes
+
+
+def test_a_runtime_json_without_git_seconds_still_gets_the_slow_default():
+    # The ordering that matters for the deploy: the code can land before the `ops` edit, because a
+    # key absent from the file takes RUNTIME_DEFAULTS. (The reverse would reject the whole file.)
+    out, notes = cfg.parse_runtime_config('{"poll_seconds": 30}', _host())
+    assert out['git_seconds'] == 600 and out['poll_seconds'] == 30
+
+
+def test_git_due_holds_the_interval_and_zero_means_every_cycle():
+    tmp = tempfile.mkdtemp()
+    try:
+        r = _trigger_runner(tmp, git_seconds=600)
+        assert r.git_due() is True                  # _last_git is 0: the first cycle always fetches
+        r._last_git = time.time()
+        assert r.git_due() is False
+        r._last_git = time.time() - 601
+        assert r.git_due() is True
+        r = _trigger_runner(tmp, git_seconds=0)
+        r._last_git = time.time()
+        assert r.git_due() is True                  # 0 = pre-2026-08-27 behaviour
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_failed_fetch_still_spends_the_interval():
+    """`_last_git` is stamped before the fetch, not after.
+
+    Mutating the order puts the traffic straight back: this box's DNS for github.com flaps, and a
+    fetch that raised would otherwise be retried every `poll_seconds` for as long as it kept
+    failing -- exactly the sustained-traffic pattern `git_seconds` exists to stop."""
+    tmp = tempfile.mkdtemp()
+    calls = []
+    real_fetch, real_runtime = runnermod.gitbus.fetch, runnermod.Runner._apply_runtime
+    try:
+        r = _trigger_runner(tmp, git_seconds=600)
+        def boom(host):
+            calls.append(1)
+            raise RuntimeError('DNS flap')
+        runnermod.gitbus.fetch = boom
+        try:
+            r.poll_once(git=True)
+        except RuntimeError:
+            pass
+        assert calls == [1]
+        assert r.git_due() is False, 'a failed fetch must not retry on the next poll'
+    finally:
+        runnermod.gitbus.fetch = real_fetch
+        runnermod.Runner._apply_runtime = real_runtime
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_local_cycle_dispatches_but_touches_no_network():
+    """The whole point of the split: `git=False` must skip fetch and publish and nothing else.
+
+    If it skipped `_reap`/`_dispatch` too, a closeout queued by a training that just finished would
+    wait up to `git_seconds` to launch, and the box would idle ten minutes between waves."""
+    tmp = tempfile.mkdtemp()
+    seen = []
+    real_fetch, real_publish = runnermod.gitbus.fetch, runnermod.gitbus.publish_status
+    real_runtime = runnermod.Runner._apply_runtime
+    try:
+        runnermod.gitbus.fetch = lambda host: seen.append('fetch')
+        runnermod.gitbus.publish_status = lambda host, text: seen.append('publish')
+        runnermod.Runner._apply_runtime = lambda self: None
+        r = _trigger_runner(tmp, git_seconds=600, viewer=False)
+        r._dispatch = lambda: seen.append('dispatch')
+        r._scan_pending = lambda: []
+        r._last_git = time.time()
+        r.poll_once()                    # not due
+        assert seen == ['dispatch'], seen
+        seen[:] = []
+        r.poll_once(git=True)            # forced, e.g. by a trigger
+        assert seen == ['fetch', 'dispatch', 'publish'], seen
+    finally:
+        runnermod.gitbus.fetch = real_fetch
+        runnermod.gitbus.publish_status = real_publish
+        runnermod.Runner._apply_runtime = real_runtime
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_trigger_path_derives_from_the_ledger_dir_and_is_overridable():
+    h = _host()
+    h['LEDGER_PATH'] = '/home/claw/.snek-runner/ledger.json'
+    assert runnermod.trigger_path(h) == '/home/claw/.snek-runner/trigger'
+    h['TRIGGER_PATH'] = '/somewhere/else'
+    assert runnermod.trigger_path(h) == '/somewhere/else'
+
+
+def test_take_trigger_consumes_exactly_once():
+    """The unlink IS the test, so two readers cannot both see one trigger -- the same reason
+    `chart_viewer` needs an `O_EXCL` claim rather than a check-then-act."""
+    tmp = tempfile.mkdtemp()
+    try:
+        r = _trigger_runner(tmp)
+        assert r.take_trigger() is False          # nothing waiting
+        with open(runnermod.trigger_path(r.host), 'w') as fh:
+            fh.write('now')
+        assert r.take_trigger() is True
+        assert r.take_trigger() is False          # and it is gone
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_waiting_for_the_next_poll_returns_early_on_a_trigger():
+    tmp = tempfile.mkdtemp()
+    try:
+        r = _trigger_runner(tmp, poll_seconds=30)
+        with open(runnermod.trigger_path(r.host), 'w') as fh:
+            fh.write('now')
+        started = time.time()
+        assert runnermod._wait_for_next_poll(r) is True
+        assert time.time() - started < 2, 'a trigger must not wait out poll_seconds'
+        r.stop = True
+        assert runnermod._wait_for_next_poll(r) is False
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_main_forces_the_network_half_only_when_triggered():
+    """`git=True if forced else None` -- reading it as plain `forced` would pass False on an
+    untriggered pass and *suppress* every due cycle, so status.json would only ever be published
+    by a manual trigger. An ast check, because running `main` needs a real box."""
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'runner', 'runner.py')).read()
+    tree = ast.parse(src)
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'main')
+    calls = [n for n in ast.walk(fn)
+             if isinstance(n, ast.Call) and getattr(n.func, 'attr', None) == 'poll_once']
+    assert len(calls) == 1, calls
+    kw = {k.arg: k.value for k in calls[0].keywords}
+    assert 'git' in kw, 'poll_once must be told whether this cycle is a network one'
+    assert isinstance(kw['git'], ast.IfExp), ast.dump(kw['git'])
+    assert kw['git'].orelse.value is None, 'the untriggered branch must defer to git_seconds'

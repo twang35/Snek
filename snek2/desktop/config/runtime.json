@@ -3,6 +3,7 @@
   "max_evals": 1,
   "eval_workers": 4,
   "poll_seconds": 30,
+  "git_seconds": 600,
   "tf_intraop_threads": 0,
   "omp_num_threads": 0,
   "nice": 0,

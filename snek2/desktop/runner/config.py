@@ -22,7 +22,18 @@ RUNTIME_DEFAULTS = {
     # regardless of which arm it belongs to. So `max_evals` normally reads 1 and this is the knob
     # that fills the box. 4 x 4 is the measured throughput point (~12.7 of 14 cores busy).
     'eval_lanes': 4,
+    # How often the loop runs its LOCAL half: reap, read the already-fetched ops ref, dispatch,
+    # keep the viewer up. Cheap and off-network, so it stays fast -- a closeout queued by a
+    # training that just finished should not wait for the next git cycle to launch.
     'poll_seconds': 30,
+    # How often the loop runs its NETWORK half: one `git fetch` of the three bus branches and one
+    # status.json commit+push. Separated from `poll_seconds` on 2026-08-27 because at 30 s the box
+    # made ~2,880 fetches and ~2,880 pushes to github.com a day, which is enough sustained
+    # machine-shaped traffic to be worth not making from a home connection. 600 s cuts both to 144
+    # while costing nothing locally, and `runner/trigger.py` over ssh forces a cycle on demand when
+    # a batch should start now rather than within ten minutes. 0 restores the pre-2026-08-27
+    # behaviour of one network cycle per poll.
+    'git_seconds': 600,
     'tf_intraop_threads': 0,  # 0 = leave TensorFlow's default
     'omp_num_threads': 0,     # 0 = leave oneDNN's default
     'nice': 0,
@@ -51,7 +62,8 @@ RUNTIME_DEFAULTS = {
 }
 
 _INT_KEYS = ('max_trainers', 'max_evals', 'eval_workers', 'eval_lanes', 'poll_seconds',
-             'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb', 'vec_wave_procs')
+             'git_seconds', 'tf_intraop_threads', 'omp_num_threads', 'nice', 'disk_min_gb',
+             'vec_wave_procs')
 _BOOL_KEYS = ('paused', 'drain', 'viewer', 'auto_closeout', 'auto_hof')
 # Keys whose value must be one of a fixed set. A typo here would otherwise reach `build_command` and
 # take down every eval dispatch with a ValueError, one job at a time, instead of being rejected with
@@ -115,6 +127,9 @@ def clamp_runtime(cfg, host):
     clamp('eval_workers', 1, 64)
     clamp('eval_lanes', 1, host['HARD_MAX_EVALS'])
     clamp('poll_seconds', host['MIN_POLL_SECONDS'], 3600)
+    # Not floored at MIN_POLL_SECONDS: 0 is the meaningful opt-out (a network cycle every
+    # poll, which is what the daemon did before this knob existed). Ceiling is a day.
+    clamp('git_seconds', 0, 86400)
     clamp('tf_intraop_threads', 0, 64)
     clamp('omp_num_threads', 0, 64)
     clamp('nice', 0, 19)

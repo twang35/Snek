@@ -47,11 +47,62 @@ Each branch has exactly one writer, so there are never merge conflicts.
 reads `ops` straight from the fetched ref (never checks it out) and writes its two
 branches through dedicated worktrees, so nothing races.
 
-The daemon (`runner/`) polls every `poll_seconds`: fetch → re-read `runtime.json`
-→ reap finished jobs → launch pending ones up to the concurrency limits → publish
-status. Jobs are launched **detached**, so a daemon restart never kills a running
-trainer; they self-terminate via `SNEK_MAX_STEPS`. A local ledger makes launches
-idempotent across restarts (a job id never runs twice).
+The daemon (`runner/`) polls every `poll_seconds`: re-read `runtime.json` → reap finished jobs →
+launch pending ones up to the concurrency limits. Jobs are launched **detached**, so a daemon
+restart never kills a running trainer; they self-terminate via `SNEK_MAX_STEPS`. A local ledger
+makes launches idempotent across restarts (a job id never runs twice).
+
+**‡ The `git fetch` and the `status.json` push are a *separate*, much slower cycle** (2026-08-27).
+They ran once per `poll_seconds` until then, so at 30 s the box made **~2,880 fetches and ~2,880
+pushes to github.com a day** — sustained machine-shaped traffic from a home connection, and the
+kind of thing worth not doing on principle. `git_seconds` (default **600**) now paces the network
+half on its own, cutting both to **~144 a day**, and
+[`runner/trigger.py`](#-trigger-a-git-cycle-on-demand-over-ssh) forces one when a batch should start
+*now* rather than within ten minutes.
+
+**Splitting the two rather than just slowing the poll is the whole design.** The local half touches
+no network — it reaps, re-reads the already-fetched `ops` ref, dispatches, keeps the viewer up — so
+it stays at 30 s and **work the box generates for itself still starts within seconds**: a finished
+training's closeout, a chained HOF stage, a relaunch after an `interrupted`. A single slow poll
+would have idled the box up to ten minutes between every wave for no traffic saving at all.
+
+Two things follow for reading the box. **`status.json`'s `iso` is now up to 10 minutes old even on a
+perfectly healthy daemon**, so the staleness bar for "is it dead?" moved by an order of magnitude —
+and the fix is the trigger, which answers the question in one round trip instead of by inference. And
+**a fetch that fails still spends the interval**: `_last_git` is stamped *before* the attempt, because
+this box's DNS for `github.com` flaps and a retry every `poll_seconds` would put the traffic straight
+back. Set `git_seconds: 0` to restore the old one-network-cycle-per-poll behaviour.
+
+## ‡ Trigger a git cycle on demand, over ssh
+
+```
+ssh the-claw-den 'Snek/snek2/desktop/trigger'
+```
+
+One command: it drops `~/.snek-runner/trigger`, the daemon consumes it within a second (the unlink
+*is* the check, so two readers cannot both claim one trigger), and the next cycle fetches, dispatches
+and publishes immediately. The script then waits for the daemon to republish `status.json` and prints
+that file's `at_a_glance`, so **the same call that starts the work also tells you what the box decided
+to do with it**. Exit code says which half of the round trip worked:
+
+| exit | meaning |
+|---|---|
+| **0** | consumed *and* `status.json` republished — the cycle completed; the `at_a_glance` printed is fresh |
+| **2** | consumed, no new `status.json` inside the timeout — alive and mid-cycle (a dispatch can take a while), or the publish path is broken |
+| **1** | never consumed — the daemon is not running the loop; the printed `systemctl is-active snek-runner` says whether the unit is even up |
+
+A trigger file already present when the script starts is *reported, not an error*: it means an earlier
+trigger was never consumed, which is the same evidence as exit 1.
+
+Two notes. The exit-0 print comes from the **status worktree**, not from git, so it advances even when
+the push itself fails — it proves the daemon ran a cycle, and whether the laptop can *see* it is the
+separate question `git fetch origin ops-status` answers. And **the trigger only forces a cycle; it
+never starts a job the daemon would not have started anyway** — capacity, `paused`/`drain` and the
+wave barrier all still apply. Argument is a timeout in seconds (default 90).
+
+**Push the batch first, then trigger.** The daemon reads `ops` from a ref it has just fetched, so a
+spec still sitting on the laptop is not on the box's `ops` yet and the triggered cycle will find
+nothing.
 
 ## The eval chain: training → closeout → HOF re-measure
 
@@ -228,8 +279,9 @@ restart low after a boot, so a stored low pid could match an unrelated process, 
 that phantom would idle the box permanently behind the wave barrier.
 
 **A killed git leaves a lock, and that used to freeze the heartbeat.** `publish_status` commits and
-pushes every poll, so the daemon is inside a git write for a slice of every 30 seconds; killed
-there, the `index.lock` outlives it and every later `git add` fails. The daemon kept running and
+pushes on every network cycle, so the daemon is inside a git write for a slice of every `git_seconds`
+(and of every 30 s before that cycle was split out); killed there, the `index.lock` outlives it and
+every later `git add` fails. The daemon kept running and
 kept dispatching, but `status.json` never updated again — indistinguishable from a dead daemon.
 `gitbus.clear_stale_locks` now sweeps locks older than 60 s from both bus worktrees before each
 write. The age gate is what makes it safe: a live git holds the lock for milliseconds.
@@ -296,13 +348,15 @@ git add snek2/desktop/queue/pending/b20a-seed1.json && git commit -m "queue b20a
 ```
 
 **Tune it live** — edit `config/runtime.json` on `ops`, commit, push. The change
-applies within one poll, no restart:
+applies on the next **network** cycle, so within `git_seconds` (or immediately, with the trigger
+above) and with no restart:
 
 | key | meaning |
 |---|---|
 | `max_trainers` / `max_evals` | concurrent trainer / eval jobs (capped by `HARD_MAX_*`) |
 | `eval_workers` | `EVAL_WORKERS` per eval job |
-| `poll_seconds` | poll cadence (floored by `MIN_POLL_SECONDS`) |
+| `poll_seconds` | **local** cycle cadence — reap and dispatch (floored by `MIN_POLL_SECONDS`) |
+| `git_seconds` | **network** cycle cadence — one fetch + one `status.json` push (default 600; `0` = every poll) |
 | `tf_intraop_threads` / `omp_num_threads` | TF / oneDNN threads per job — the main throughput lever |
 | `nice` | launch priority |
 | `disk_min_gb` | refuse to launch below this much free space |
