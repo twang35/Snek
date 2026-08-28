@@ -33,21 +33,50 @@ is the selection mechanism showing through.
 
 **Checkpoints not in this folder beat all four of these**, and a 23-candidate sweep on 2026-08-28 settled
 which one and at what level. The candidates are continuations of `b29a`/`b29b`/`b40b` at a lower learning rate:
-`b43`/`b44`, which between them hold **163 of the project's 165 rows at ≥99%/500**. **Nothing has been
-promoted** — that stays deliberate and manual.
+`b43`/`b44`, which between them hold **163 of the project's 165 rows at ≥99%/500**.
 
-**‡ The strongest checkpoint is `b44a-lowlr7-b29b` @2739000 at 98.73% over 3000 episodes** (2962/3000, CI
-98.3-99.1). This **retracts this file's own previous claim** that it was `b44b` @2297000 at 99.0%/1000: on
-2000 fresh episodes @2297000 measured 98.0%, pooling to **98.5%/2000**. Method and the full table:
+**‡ The strongest is `b44a-lowlr7-b29b` @2739000 at 98.73% over 3000 episodes** (2962/3000, CI 98.3-99.1),
+and it was **promoted on 2026-08-28** — it is the top row of the entries table below. This **retracts this
+file's own previous claim** that the strongest was `b44b` @2297000 at 99.0%/1000: on 2000 fresh episodes
+@2297000 measured 98.0%, pooling to **98.5%/2000**. The other four sweep candidates are **not** promoted,
+deliberately — they are statistically indistinguishable from the one that was, so promoting them would imply
+a ranking the data cannot support. Method and the full table:
 [`findings.md`](../hyperparamTuning/findings.md#-no-checkpoint-in-this-project-has-a-demonstrated-99-perfect-rate--the-23-candidate-sweep-2026-08-28).
 
 **‡ No checkpoint in this project has a demonstrated true perfect rate ≥99%, and the 99% figures in the
 older docs are all selection artefacts.** Read the next section before quoting any record number.
 
-## The record as admitted: **99.0% over 500 episodes**, `b29b-chase10g75seed2-ckpt1447000` — **re-measures 97.5%/1000, and is now 1.2 pp behind an unpromoted `b44` checkpoint**
+## The record: **98.73% over 3000 episodes**, `b44a-lowlr7-b29b-ckpt2739000` — admitted 2026-08-28, and the first record set on a *confirmed* measurement
+
+**‡ This record was admitted differently from every one before it, and that is the point.** All thirteen
+earlier entries were admitted on a **500-episode** re-measurement of a checkpoint *selected* on a shorter
+measurement. That standard is now known to overstate by **~1.25 pp**: the 23-candidate sweep of 2026-08-28
+re-measured `b43`/`b44`'s best at 1000 fresh episodes and the mean drop from the 500-episode selection reading
+was −1.25 pp, with both 100.0%/500 rows landing at 98.3%. **So a ≥99%/500 row selects the ~98% band, not the
+99% band.**
+
+`b44a-lowlr7-b29b-ckpt2739000` was admitted on **2000 fresh episodes** after a 1000-episode screen — 2962/3000
+pooled = **98.73%** (CI 98.3-99.1) — and it is the **only** entry here whose number survived a confirmation on
+episodes it was not chosen on. Two consequences worth carrying:
+
+- **It is not a 99% policy, and neither is anything else.** No checkpoint in this project has a demonstrated
+  true perfect rate ≥99%. The screen's apparent winner read 99.1%/1000 and confirmed at **98.10%**, falling from
+  first of five to last. A true-98.7% policy reads ≥99.0%/1000 **25%** of the time, so across 23 candidates a
+  spurious 99% was **99.9%** certain — the procedure was going to manufacture one whatever the truth was.
+- **Its lead over the field is a point lead, not a separation.** The top five candidates are statistically
+  indistinguishable (every pairwise p ≥ 0.23) and pool to **98.50%**. It is promoted alone *because* the family
+  cannot be ranked — adding several would imply an ordering the data does not support.
+
+Full method and tables:
+[`findings.md`](../hyperparamTuning/findings.md#-no-checkpoint-in-this-project-has-a-demonstrated-99-perfect-rate--the-23-candidate-sweep-2026-08-28).
+
+**It is also a continuation of the entry it replaces.** `b44a` was seeded from `b29b-ckpt1447000` — the previous
+record — and trained a further ~1.29M steps at `lr 1e-7`. So the ladder's premise held: continuing a champion at
+a low rate produced a measurably better policy than the champion, **+1.23 pp** over `b29b`'s 97.5%/1000
+(p = 0.021).
 
 Batches 11-40 train on the **30-value observation vector** — the current one (era `b09c616`), after the
-following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these thirteen entries all load on
+following-tail block (26-28) and food-space (29) landed 2026-08-03 — so **these fourteen entries all load on
 `master` as it stands.** Each came from a batch close-out or, for batches 24, 29 and 40, its 500-episode HOF
 re-measurement. Most are the default `FC_LAYERS=50,100,50`; **the batch-24, batch-29 and batch-40 entries are
 the only non-default architecture here (`fc 320`)** and load because `arch.json` (copied in with each) rebuilds
@@ -66,6 +95,7 @@ selection and mostly does not survive (see the batch-24 note below: 199 ≥97%/1
 
 | checkpoint | measured | config |
 |---|---|---|
+| **`b44a-lowlr7-b29b-ckpt2739000`** | **2962/3000 = 98.73%** (CI **98.3-99.1**) — **the record**, and the only entry admitted on a *confirmed* measurement: 98.9% on a 1000-episode screen, **98.65% on 2000 fresh episodes**, pooled above. Verified copy re-measured twice on the **scalar** engine (an independent engine from the vec sweep): 98/100 and 197/200, **295/300 = 98.33%**. Continues `b29b-ckpt1447000`, the entry it replaces, by ~1.29M steps. Added 2026-08-28 | `fc 320`, chase-safe `c=0.10` (gate 75), **`lr 1e-7`**, IS off, td_error priority, `TARGET_UPDATE_PERIOD=1000`, `DISCOUNT=0.9975`, `FOOD_DISTANCE_REWARD=0`, `FORK_BRANCHES=4`, `SNEK_SEED=2`, no free-space shaping |
 | **`b29b-chase10g75seed2-ckpt1447000`** | **495/500 = 99.0%** (CI **97.7-99.6**) — **the record**; it *rose* from 98.0/100 on re-measurement, the genuine-region signature, and is the head of an **18-checkpoint ≥98%/500 band** (1446k-1529k) — a region, not a point. First record from reward shaping (`c=0.10`, gate 75) and from `fc 320` chase-safe. 98/100 on the copy here. Added 2026-08-16; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, **`CHASE_SAFE_SHAPING=0.1`, gate 75**, `SNEK_SEED=2` |
 | **`b40b-chasefree10g75seed2-ckpt1513000`** | **491/500 = 98.2%** (CI **96.6-99.1**) — third-best /500 measured here, behind `b29b` (99.0) and ahead of `b24b`/`b24d` (98.0); it *rose* from 98.0/100, the genuine-region signature. **The only one of b40's 90 ≥98%/100 candidates that held at 500** — and its batch is a **null**, which is why it is here on its own number and not as evidence for its config. 97/100 on the copy here. Added 2026-08-18; see below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, **`CHASE_SAFE_SHAPING=0.1`, gate 75, plus `FREE_SPACE_SHAPING`**, `SNEK_SEED=2` |
 | **`b24d-fc320noisseed4-ckpt1342000`** | **490/500 = 98.0%** (CI **96.4-98.9**) — the prior record (2026-08-13), within CI of `b29b`; it *rose* from 97.0/100 on re-measurement, the genuine-region signature. First non-default-arch record (`fc 320`). See below | `FC_LAYERS=320`, IS off (`SNEK_IS_WEIGHTS=0`), `td_error`, `DISCOUNT=0.9975`, `TARGET_UPDATE_PERIOD=1000`, forking on, `FOOD_DISTANCE_REWARD=0`, `SNEK_SEED=4` |

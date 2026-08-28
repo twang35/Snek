@@ -277,7 +277,8 @@ from `b29b` @1447000: **80% → 50% perfect without the buffer, 90-100% with it.
 
 **‡ Superseded on the deep instrument, 2026-08-28.** A 23-candidate sweep of `b43`/`b44` at 1000 episodes plus
 a 2000-fresh-episode confirmation puts **`b44a-lowlr7-b29b` @2739000 at 98.73%/3000** (CI 98.3-99.1), **+1.23 pp**
-over this entry's 97.5%/1000 re-measure (p = 0.021). It is **not promoted** — that is manual and deliberate. Two
+over this entry's 97.5%/1000 re-measure (p = 0.021), and it **is now the promoted record** (2026-08-28, verified
+copy reads 98.0%/100). Two
 things the sweep settled and this section must be read against:
 **no checkpoint in the project has a demonstrated ≥99% true rate**, and the top five `b44` candidates are
 statistically indistinguishable from each other (all p ≥ 0.23), pooling to 98.50%.

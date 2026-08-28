@@ -279,7 +279,9 @@ result's top 5 and re-measured them at **2000 fresh** episodes.
 
 **1. The 99% is not there.** Stage 1's winner read **99.1%/1000** and confirmed at **98.10%** — first of five to last
 of five. No candidate clears 99% on fresh episodes. The best measurement in the project is now `b44a` @2739000 at
-**98.73% over 3000 episodes**, and the honest ceiling statement is **~98.5%**, not 99%.
+**98.73% over 3000 episodes**, and the honest ceiling statement is **~98.5%**, not 99%. **That checkpoint was
+promoted to [`hallOfFame/`](../hallOfFame/README.md) on 2026-08-28** — alone, and on a *confirmed* number, which no
+earlier entry was; the verified copy reads 98.0%/100 on the scalar engine.
 
 **2. The arithmetic made a spurious 99% certain, so the screen was never evidence.** A policy whose true rate is
 0.987 reads ≥99.0% on 1000 episodes **25.0%** of the time. Across 23 candidates the chance at least one does is
