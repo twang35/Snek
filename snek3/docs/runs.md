@@ -44,11 +44,18 @@ summary instead of snek2's own b47 spec. Read the spec.
 Seed N is pinned to arm letter N, so every arm is seed-matched against b29a-d, b41a-d, b47a-d **and**
 snek3's own b1a-d. Budget ~7 h an arm; the desktop auto-queues one stage-B wave for the batch.
 
-### ‡ Interim reading at 0.36-0.41M of 3M — the phase-3 gate is met, and b2 is ahead of b47 on every seed
+### ‡ Interim reading at 0.36-0.41M of 3M — the phase-3 gate is met; the lead over b47 was a units artefact
 
-Read 2026-08-29 09:13, ~1 h in, at **106 agent steps/s an arm** (the 290 st/s in the log excludes the
+Read 2026-08-29 09:13, ~1 h in, at **106 counted steps/s an arm** (the 290 st/s in the log excludes the
 self-eval; stage A is ~2/3 of the wall clock). ETA ~16:00. Both tables are 100-episode graph evals, so
 b2 and b47 are on the same instrument and the counts are directly comparable.
+
+**‡ Corrected 2026-08-29: a snek3 counted step is four game moves and a snek2 step was one.** See
+[`findings.md`](findings.md). Every b2 step number below is 4x a b47 step number in game moves,
+buffer rows and gradient steps alike, so **the "b2 leads b47 on every seed" headline compares b2 at
+1.4-1.6M transitions against b47 at 0.34-0.39M.** The b47 column is truncated to the same *counter*
+value, which is not the same work. Data efficiency is identical in both eras (1 gradient step per
+transition), so nothing here is a learning-rate difference — it is a budget difference.
 
 | seed | step | b2 ≥95 | b2 ≥98 | b2 best30 | b47 ≥95 | b47 ≥98 | b47 best30 |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -57,9 +64,14 @@ b2 and b47 are on the same instrument and the counts are directly comparable.
 | 3 | 0.34M | 0 | 0 | 81.0 | 0 | 0 | 55.0 |
 | 4 | 0.39M | **52** | **17** | **96.8** | 0 | 0 | 68.3 |
 
-b47's column is *truncated to the same step count*, which is the only fair read. For context, b47 at
-its own furthest point — 1.38-1.63M, where snek2 froze mid-batch — had best30 82.2 / 90.5 / **96.0** /
-83.6 and ≥95 counts 0 / 8 / 173 / 0. **b2d at 0.39M has already passed b47c's best30 at 1.63M.**
+b47 at its own furthest point — 1.38-1.63M, where snek2 froze mid-batch — had best30 82.2 / 90.5 /
+**96.0** / 83.6 and ≥95 counts 0 / 8 / 173 / 0.
+
+**‡ "b2d at 0.39M has already passed b47c's best30 at 1.63M" is withdrawn.** b2d at 0.39M counted
+steps had done **1.56M** transitions and 1.56M gradient steps; b47c at 1.63M had done 1.63M and 1.63M.
+The two are at matched values on both axes, so the correct statement is **b2d matches b47c at matched
+work**, not that it beats it at a quarter of the budget. The matched-work comparison is the one to
+make from here: read b2 at 4x b47's step number.
 
 **The phase-3 gate (≥90% perfect) is met on both readings and by two arms.** b2d's trailing-30 perfect
 rate peaks at 96.8% and it has 52 single evals at ≥95/100 including a 100; b2b is at 92.7% with 7. b1
@@ -77,6 +89,10 @@ assured — snek2's winner's-curse drops on this instrument were −2.6, −3.2 
 side of that comparison is **b29's own close-out, not b47's**: b47 was frozen at 69-81% of its 2M cap
 and never closed out, so no b47 ≥98%/500 data exists.
 
+**b1-vs-b2 is unaffected by the correction** — both arms ran the same collector at the same ratio, so
+they share the 4x and their step axes are directly comparable. "The five knobs are the whole
+difference" stands.
+
 **b1 is closed** ([`results.md`](results.md)): four arms at 3M, peak perfect 42.1 / 58.3 / 56.7 /
 81.9%, **no checkpoint anywhere at 95/100**, every arm still climbing at its cap. Its stage-B wave
 has run and published 0 rows an arm, which is the honest measurement rather than a failure.
@@ -88,10 +104,22 @@ has run and published 0 rows an arm, which is the honest measurement rather than
    precisely to have the yardstick.
 2. **Phase 6 — `ppo/`.** The reason snek3 exists.
 
-**Decide the stage-A batching question before phase 6, not after.** Stage A at 16.9 ep/s is ~90% of
-an arm's wall clock and the 5.7x is recoverable, but every way of recovering it makes the epsilon
-schedule's feedback lag ([`invariants.md`](invariants.md) invariant 2). b1 is the baseline any such
-change is measured against, and a 6M-step arm makes the cost twice as visible.
+**The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
+is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
+[`findings.md`](findings.md). Cutting episodes does not work: 4x fewer buys 1.6x, because the cost is
+lane drain. Every way of recovering it makes the epsilon schedule's feedback lag
+([`invariants.md`](invariants.md) invariant 2), so the lag must be **bounded** rather than left to
+float. b1 is the baseline any such change is measured against.
+
+| an arm at 3M counted steps | training | stage A | total |
+|---|---:|---:|---:|
+| as b2 runs today | 2.79 h | 5.33 h | **8.1 h** |
+| + the two bit-exact fixes (landed) | 2.33 h | 5.33 h | 7.7 h |
+| + a bounded eval queue, 2 workers per 4 trainers | 2.33 h | ~0 | **2.3 h** |
+
+The queue's arithmetic closes: 4 trainers at 299 st/s demand 1.20 checkpoints/s, and one streamed
+worker supplies 0.54-0.89, so **two workers serve four trainers** — six processes on the desktop's 16
+cores.
 
 ## Backlog
 
@@ -101,7 +129,7 @@ One line per idea, with a prior. A design that is settled enough to implement ge
 | idea | prior |
 |---|---|
 | **PPO** | the reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
-| **Batched or asynchronous self-eval** | **worth 5.7x on an arm, and measured, not projected.** ~5 h an arm becomes ~1 h. The win is keeping the lanes full rather than overlapping with training, so batching K checkpoints into one `measure_stream` call gets nearly all of it. Cost either way is a K-interval lag on the epsilon schedule, which is a feedback loop rather than a readout — pre-register it |
-| **Replay ratio < 1** | the only way past ~4,000 agent steps/s for DQN, and a learning-dynamics change rather than a free win. Pre-register it |
+| **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
+| **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
 | **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |
 | **Munchausen-DQN, SAC-discrete** | the discrete off-policy actor-critic options, if PPO underperforms. **TD3 does not apply** — it is continuous-action and this task has three discrete actions |

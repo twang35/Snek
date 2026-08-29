@@ -58,6 +58,103 @@ Two rules follow, and the second is the one that matters.
   the 500 episodes stage B actually runs, the per-row sd is 0.7 pp instead of 1.6 and the number
   begins to mean something. **Do not compare a region width across two different episode counts.**
 
+### A snek3 step is four game moves and a snek2 step was one, so "3M steps" is not one budget
+
+**Measured 2026-08-29: exactly 4.00 transitions per `collector.step()`** under b2's config
+(`collect_envs=1`, `fork_branches=4`). `VecSnake` advances every lane on every call, `_bank` banks one
+transition per lane, and `_learn` spends its gradient budget **per transition** — so one counted step
+is four game moves, four buffer rows and four `agent.update()` calls, while `self.step += 1` happens
+once.
+
+snek2 is one of each. `snek2/forking_collector.py:16` is explicit: branches advance **in round robin,
+"one counted environment step per call"**, so they *share* the main line's budget and "the 1 collect
+step : 1 gradient step ratio the training loop relies on is unchanged".
+
+| per counted step | snek2 b29 | snek3 b2 |
+|---|---:|---:|
+| game moves | 1 | **4** |
+| buffer rows | 1 | **4** |
+| gradient steps | 1 | **4** |
+| **gradient steps per transition** | 1.0 | **1.0** |
+
+**The last row is the one that matters, and it is why `SNEK_REPLAY_RATIO` is the wrong lever.** Data
+efficiency is *identical* — each new transition buys one batch of 128 in both eras — so `train.py`'s
+per-transition budget does reproduce snek2, exactly as its docstring claims. What differs is only what
+the counter means. **b2 at 3M has not learned harder than b29 at 3M; it has run four times longer.**
+Dropping the ratio to 0.25 would make snek3 4x *less* data-efficient than snek2 ever was.
+
+So the equivalence is **`b2 @ 750k counted steps ≈ b29 @ 3M`**, and it holds on every axis including
+the awkward one: snek2's main line got roughly a quarter of its counted steps, so at 3M it played
+~750k primary moves against b2's 750k at the matched point.
+
+**This confounds the b2-vs-b47 interim reading** — see [`runs.md`](runs.md). b2d at 0.39M counted steps
+had done 1.56M transitions and 1.56M gradient steps; b47c at 1.63M had done 1.63M and 1.63M. The two
+arms were at matched values on **both** axes when b2d "passed b47c at 4x fewer steps". **b1-vs-b2 is
+unaffected** — both ran the same collector at the same ratio — so "the five knobs are the whole
+difference" survives; only comparisons that cross the eras at matched *step counts* do not.
+
+**Two corollaries for anything reading a step count.** Never compare a snek3 step count to a snek2 one
+without the 4x; and `SNEK_FORK_BRANCHES` silently rescales the x-axis of every snek3 chart, so an
+ablation that changes it changes what its own step numbers mean.
+
+### Raising `SNEK_COLLECT_ENVS` speeds up transitions and slows down the arm
+
+Two units wear the name "steps/s" and they differ by the lane count. `train.py`'s
+`steps_per_second` counts **counted steps**; the throughput table below is in **transitions/s**. At
+b2's width of 4 they are 4x apart, which is enough to invert a conclusion.
+
+**`self.step += 1` runs once per `collector.step()`, so the cap is in counted steps.** Raising
+`collect_envs` from 1 to 8 therefore makes a 3M-*step* arm consume 8x the experience and do 8x the
+backprop. Measured: transitions/s rises 1.46x (1,947 → 2,379 after the fixes below), so **time to the
+same cap rises ~5.5x.** The earlier reading of this — "raising `SNEK_COLLECT_ENVS` buys 1.9x" — is
+true per transition and backwards per arm. It is a **width** knob, not a speed knob; the way to spend
+it is to lower the cap by the same factor.
+
+### Two bit-exact changes are worth 20% of the training half
+
+Neither changes a number an arm produces, which is why both could land mid-batch.
+
+| change | before | after | evidence it is identical |
+|---|---:|---:|---|
+| `SumTree.set_one` — a scalar walk instead of `set([leaf],[v])` | 43.4 us | **2.6 us** | `nodes` equal element for element over 3,000 random updates |
+| `torch.optim.Adam(fused=True)` | 240.7 us | **162.1 us** | max absolute parameter difference **0.0** after 2,000 seeded steps |
+
+**The sum tree was 8% of an arm's entire wall clock.** `add` runs once per transition — four per
+counted step — and the vectorised `set` spends a 17-level walk allocating size-1 index arrays to move
+eight bytes per level. The batch path is genuinely faster at 128 leaves (50.4 us against ~330 us of
+scalar walks), so both exist and the choice is purely a cost one.
+
+End to end on the real loop: **406 → 487 counted steps/s, +20%.**
+
+**Two things that still do not work, re-confirmed at every batch size.** More torch threads are slower
+at 128 through 4,096 (1 thread beats 2 and 4 everywhere), and samples/s scales only **2.3x** from batch
+128 to 1,024 before degrading — 310k, 482k, 616k, 724k, 599k, 514k. So there is no large win hiding in
+the batch dimension, and the gradient half's floor is ~1,950 transitions/s per core.
+
+### Stage A's cost is lane drain, so cutting episodes barely helps
+
+The obvious economy is the wrong one. **Four times fewer episodes buys 1.6x, not 4x**, because a
+single checkpoint's measurement is dominated by its *tail* — the last long episodes running alone at
+width 1 — and the tail is set by episode *length*, not count.
+
+| episodes per eval | champion (98.8%) | b1a @3M |
+|---:|---:|---:|
+| 25 | 2.06 s | 3.69 s |
+| 100 | 3.87 s | 6.05 s |
+| 200 | 6.87 s | 8.69 s |
+
+**Width is the only lever, and only streaming supplies it.** The same 100 episodes measured inside a
+sustained `measure_stream` cost **1.13 s** (champion) and **1.85 s** (b1a) per checkpoint at 0.85-0.86
+utilisation — **3.3-3.4x**, not the 5.7x the 3,222-checkpoint pass suggested, because that figure
+compared against a slower stage-A sample.
+
+**A cheaper in-loop eval is nevertheless safe, if it is ever wanted for latency rather than cost.**
+Simulated on b45a's 3,222 real rows by taking each row's first 25 episodes — a fair sample, since
+rows are banked in start order: the trailing-30 perfect rate moves by **0.49 pp rms** (1.97 pp worst
+case), and `screen:92` on 25 episodes recovers **98.1%** of what `screen:95` on 100 selects while
+admitting 1.03x as many. So the 100 is not load-bearing for the schedule. It is load-bearing for
+nothing else either — but it is also not where the time goes.
+
 ### Stage A costs 5.3 h an arm, not 1.85 h, and the cause is lane drain rather than episode count
 
 **Measured, same arm, same 322,200 episodes, three ways.** Stage A's shape — one checkpoint, 100
@@ -75,6 +172,17 @@ shard**.
 with: 100 episodes start together and the batch drains toward width 1 as they finish, so the last few
 episodes carry the full per-step numpy cost alone. `engine.measure` says so in a comment and is
 correct to — the drain is inherent to measuring one checkpoint, not a defect.
+
+**‡ The 5.3 h is confirmed and the "90% of wall clock" is not.** Measured on b2a from a single
+source, 2026-08-29: 533,000 counted steps in 5,192 s wall = 102.7 st/s, against the log's own
+training-only 299 st/s. That is 5.44 ms of stage A against 3.34 ms of training per step, so a 3M-step
+arm is **8.1 h — stage A 5.33 h (66%), training 2.79 h (34%)**. The 5.33 h independently reproduces
+the 5.30 h above; only the share was wrong, and it was wrong because the training half had never been
+measured on the same arm at the same time.
+
+**One trap in reading that.** The desktop's `status.json` `steps_per_sec` is a **wall-clock** rate — it
+is a step delta over a real-time delta, so it includes stage A — while `runs/<arm>_evals.json`'s
+`steps_per_second` excludes it. The two differ by 3x on a healthy arm and neither is labelled.
 
 **This corrects the plan and this file's own arithmetic.** [`../plans/pytorch-port.md`](../plans/pytorch-port.md)
 §6 estimated stage A at 1.85 h from snek2's ~45 episodes/s and concluded "an arm is ~2 h and stage A
@@ -99,6 +207,11 @@ thread.** Agent steps/s:
 | 1 | **809** | | |
 | 16 | **1,512** | | |
 | 64 | **1,587** | 2,280 | 3,703 |
+
+**‡ The table's unit is transitions/s, not counted steps/s.** At 64 lanes a counted step banks 64
+transitions, so 1,587 counted steps/s would be 101k gradient steps/s — 50x the measured ceiling. Read
+every row as transitions/s, and see "Raising `SNEK_COLLECT_ENVS`..." above for why the same numbers say
+the opposite about an arm's wall clock.
 
 **Retraction 1: raising `SNEK_COLLECT_ENVS` does not "buy nothing".** It buys 1.9x. The plan reasoned
 that the gradient work scales with the lane count so nothing is gained — true of the gradient half,

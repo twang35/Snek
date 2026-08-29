@@ -108,13 +108,19 @@ screen/confirm split and no min-achievable gate — so **every row in every resu
 and directly comparable**, which was not true of snek2's files. `min_achievable` is absent, not null
 with a number to check.
 
-Three consequences worth holding on to:
+Four consequences worth holding on to:
 
 - **Stage A is measurement, not a progress readout.** It must run at 100 episodes on every
-  checkpoint or a checkpoint exists that no screen can select. That makes it ~90% of a training arm's
-  wall clock, and an arm **~5 h** — measured, and the cost of the protocol rather than waste. The
-  rate is 16.9 ep/s against a stage-B shard's 96, because one checkpoint's 100 episodes drain the
-  lanes with nothing to refill them; see [`docs/findings.md`](docs/findings.md).
+  checkpoint or a checkpoint exists that no screen can select. That costs **5.3 h of an arm's 8.1 h
+  (66%)** — measured, and the cost of the protocol rather than waste. The cause is **lane drain**: one
+  checkpoint's 100 episodes start together and the batch empties toward width 1, so the same episodes
+  cost 3.3x less inside a streamed wave. **Cutting the episode count does not help** — 4x fewer buys
+  1.6x, because the tail is set by episode length. See [`docs/findings.md`](docs/findings.md).
+- **A counted step is not a game move.** `collector.step()` advances *every* lane, so at b2's
+  `fork_branches=4` one counted step is **four** game moves, four buffer rows and four gradient steps,
+  while `SNEK_MAX_STEPS` counts one. snek2's step was one of each. **Never compare a snek3 step count
+  to a snek2 one without the 4x**, and remember that `SNEK_COLLECT_ENVS` and `SNEK_FORK_BRANCHES`
+  rescale the x-axis of every chart.
 - **`perfect_percent` is not only a report.** It feeds the epsilon refinement schedule, so breaking
   the measurement changes the training. In snek2 a shaping term silenced the perfect-game counter and
   eight arms trained with epsilon pinned at its ceiling for 300k+ steps while reading 0%.
