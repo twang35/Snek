@@ -43,7 +43,7 @@ this section.
 | fact | number | consequence for snek3 |
 |---|---|---|
 | TF-Agents `policy.action`, batch 1 | **217 us**, of which the network is ~1% | the framework is the bill, not the arithmetic |
-| a torch batch-128 gradient step | **245 us** (4,074/s) | the training half caps at ~4,000 agent steps/s without changing the replay ratio |
+| a torch batch-128 gradient step | **245 us** (4,074/s) *in isolation* | ~~the training half caps at ~4,000 agent steps/s~~ — **measured at 802 us for a whole learn step; see the section below** |
 | the vectorised numpy env, 1024 lanes | **196k env-steps/s, 221 episodes/s** | already built in snek2 and parity-exact — snek3 inherits it |
 | snek2's training self-eval | **73% of a training arm's wall clock** at 100 episodes | it becomes ~90% in snek3, and under the single-stage protocol that is the *measurement*, not overhead |
 
@@ -240,23 +240,59 @@ share one.
 ### Collect width, and the knob that actually sets throughput
 
 snek2 does one env step and one batch-128 gradient step per iteration. That fixes the **replay
-ratio** at 1.0 and caps the loop at ~4,000 agent steps/s whatever the env costs. snek3 exposes the
-two halves separately:
+ratio** at 1.0. snek3 exposes the two halves separately:
 
 | knob | default | meaning |
 |---|---|---|
 | `SNEK_COLLECT_ENVS` | 1 | lanes of `VecSnake` the collector advances per iteration |
-| `SNEK_REPLAY_RATIO` | 1.0 | gradient steps per env step |
+| `SNEK_REPLAY_RATIO` | 1.0 | gradient steps per **transition banked** |
 | `SNEK_BATCH_SIZE` | 128 | as snek2 |
+| `SNEK_TORCH_THREADS` | 1 | see below; the default of one-per-core is 1.4x slower |
 
 **The default reproduces snek2's dynamics**, and that is deliberate: a rewrite that changes
 framework, collector, replay ratio and RNG at once will not reproduce 99% by construction, and this
 project's largest single result came from diffing snek2 against `theSchlong`. Framework details
 demonstrably matter here.
 
-Raising `SNEK_COLLECT_ENVS` above 1 while holding the ratio at 1.0 buys nothing — the gradient work
-scales with it. **Lowering the replay ratio is the only way past ~4,000 steps/s, and it is a
-learning-dynamics change, not a free win.** Pre-register it as an experiment.
+#### Measured 2026-08-28, and two claims here were wrong
+
+Every figure below is agent steps/s on the laptop with the self-eval off, `fc_layer_params=(320,)`,
+batch 128, one torch thread.
+
+| lanes | ratio 1.0 | ratio 0.5 | ratio 0.25 |
+|---:|---:|---:|---:|
+| 1 | **809** | | |
+| 16 | **1,512** | | |
+| 64 | **1,587** | 2,280 | 3,703 |
+
+**Retracted: "raising `SNEK_COLLECT_ENVS` above 1 buys nothing — the gradient work scales with it."**
+It buys **1.9x**, because the *env* work does not scale with it. A `VecSnake.step` costs 536 us at
+one lane and 950 us at 64 — almost all of it per-call numpy overhead, not per-lane work — so at one
+lane the env is 0.5 ms of every agent step and at 64 lanes it is 0.015 ms. The gradient work does
+scale, which is why the curve flattens at ~1,600 rather than continuing.
+
+**Retracted: "~4,000 agent steps/s" as the ratio-1.0 ceiling.** A whole learn step is **802 us**, not
+the 245 us the isolated gradient benchmark predicted: `agent.update` 514 us, `buffer.update_priorities`
+147 us, `buffer.sample` 71 us. At ratio 1.0 one agent step *is* one learn step, so the ceiling is
+~1,250/s, and the 1,587 above is what dropping `np.unique` from the sum-tree repair bought.
+
+Two things did **not** help, and are recorded so they are not retried:
+
+- **`torch.compile` is slower here** — 1,643/s against 2,001/s eager. The net is 30 -> 320 -> 3; there
+  is no kernel worth fusing and the guard overhead dominates.
+- **More torch threads is slower** — 950 gradient steps/s at 10 threads against 1,314 at one. Every
+  op is far too small to amortise a fork-join. Hence the `SNEK_TORCH_THREADS=1` default, which
+  compounds on the laptop where four arms run side by side.
+
+**Lowering the replay ratio remains the only way past ~1,600 steps/s, and it is a learning-dynamics
+change, not a free win.** Pre-register it as an experiment.
+
+**But the wall-clock consequence is small, and that is the real conclusion.** Stage A is 5.0 h of a
+3M-step arm. Training at 809/s is 62 min of it; at 1,587/s it is 32 min. So doubling training
+throughput takes the arm from 6.0 h to 5.5 h — **an 8% saving.** The throughput gate in §10 is worth
+meeting because a slow loop makes every smoke test slow, not because it moves an arm's wall clock.
+The cost is the eval, and the batching idea in [`../docs/runs.md`](../docs/runs.md) is where the
+hours are.
 
 ### The self-eval, which is now stage A of the measurement
 
@@ -274,9 +310,9 @@ wasteful.** The arithmetic, for a 3M-step arm:
 
 | | episodes | measured |
 |---|---:|---:|
-| training (collect + gradient) | — | 12.5 min at 4,000 steps/s |
+| training (collect + gradient) | — | 62 min at 809 steps/s (32 min at 16 lanes) |
 | stage A, the graph eval | 3,000 × 100 = **300,000** | **5.0 h** at 16.9 ep/s |
-| **arm wall clock, synchronous** | | **~5.2 h** |
+| **arm wall clock, synchronous** | | **~6.0 h** |
 
 **Corrected 2026-08-28: this table read 1.85 h and ~2.0 h, from snek2's ~45 ep/s.** Measured on
 `b45a`'s own 3,222 checkpoints, stage A's shape runs at **16.9 ep/s** and the same episodes streamed
@@ -580,7 +616,7 @@ Each phase has a pre-registered pass condition. Phase 1 is the one that makes th
 | 0 | The instruction split and the `docs/` skeleton (§14), then `env/` + `vectorized/` + the parity harness. No learning code. | three `CLAUDE.md` files, no stale `snek2/` reference outside `snek2/`; parity harness green — 0 mismatches on all 30 indices over ≥18,000 states, ≥12 hand-made mutants killed. **Met 2026-08-28**: 36,000 states × 30 indices, 0 mismatches, 17 of 17 mutants killed, 167 tests green |
 | 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it. **Met 2026-08-28**: 98.8% (2964/3000), and the conversion is exact — 12,864 states, max \|ΔQ\| 2.7e-5 on Q ~30.6, argmax identical on every one |
 | 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise. **Met 2026-08-28**: 3,222 rows, mean per-row difference **−0.004 pp** against a 0.041 pp standard error (0.09 SEs), observed spread / predicted spread **1.00**. A second snek3 seed gives +0.028 pp. 14 min on 4 shards |
-| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*. ~5 h for a 3M-step arm with it on, not the ~2 h this row first claimed |
+| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect** — *outstanding* — and **≥1,500 agent steps/s** on the laptop with the self-eval *off* — **met: 1,512 at `SNEK_COLLECT_ENVS=16`**, 809 at the default of 1. ~6 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
 | 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box |
 | 5 | A seed-matched b47-class comparison, 4 arms. | a ≥98%/500 region of comparable width on comparable seeds. **Not** a matched point estimate |
 | 6 | `ppo/` | the actual research |

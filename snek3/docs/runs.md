@@ -35,8 +35,10 @@ The phase table in [`../plans/pytorch-port.md`](../plans/pytorch-port.md) §10 i
 only what is immediately next.
 
 1. **Phase 3 — `dqn/`.** DDQN + PER + the epsilon schedule + the forking collector + the shield.
-   Gate: one arm at ≥90% perfect, ≥1,500 agent steps/s with the self-eval off. Budget **~5 h** for a
-   3M-step arm with it on, not the ~2 h the plan first assumed.
+   **Built and tested 2026-08-28; the throughput half of the gate is measured and met, the ≥90%
+   half needs an arm.** 809 agent steps/s at the default one collect lane, **1,512 at 16**, against a
+   gate of 1,500 — and the ~1,600 ceiling at replay ratio 1.0 is now measured rather than estimated
+   at 4,000 ([`findings.md`](findings.md)). Budget **~6 h** for a 3M-step arm with stage A on.
 2. **Phase 4 — `desktop/`.** The git-bus queue, with a `project` field.
 3. **Phase 5 —** a seed-matched b47-class comparison, 4 arms.
 

@@ -33,21 +33,23 @@ a misconfigured control arm gets caught**, and it has been.
 
 | knob | default | notes |
 |---|---|---|
-| `SNEK_SEED` | unset | unset means unseeded and not reproducible. Set it and it is recorded in `runs/<policy>.md` |
+| `SNEK_SEED` | 1 | seeds the network initialisation, the exploration coins, the replay sampler, the env's food and every eval. Recorded in `runs/<policy>.md`, so two arms of the same config are the same arm |
 | `SNEK_MAX_STEPS` | 10,000,000 | **absolute**, not "run this many more" — `global_step` is restored on resume. An arm at its cap prints so and exits after its opening eval |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40 | below this no checkpoint is written, so a short smoke run writes none and cannot resume. Set 0 to test resume |
 | `SNEK_DEBUG` | 0 | verbose logging. For debugging, not status |
+| `SNEK_TORCH_THREADS` | 1 | **measured 1.4x faster than one-per-core**: a 30 -> 320 -> 3 net has no op large enough to amortise a fork-join. Compounds when four arms share the laptop |
 
 ### Network and optimiser
 
 | knob | default |
 |---|---|
-| `SNEK_FC_LAYERS` | `50,100,50` |
+| `SNEK_FC_LAYERS` | `320` — one hidden layer, which is what every record-holding snek2 arm used. snek2's *code* default was `50,100,50`; no champion ran it |
 | `SNEK_LEARNING_RATE` | 1e-5 |
 | `SNEK_ADAM_EPSILON` | 1e-7 |
 | `SNEK_BATCH_SIZE` | 128 |
 | `SNEK_DISCOUNT` | 0.99 |
 | `SNEK_TARGET_UPDATE_PERIOD` | 8 |
+| `SNEK_TARGET_UPDATE_TAU` | 1.0 (a hard copy) |
 | `SNEK_GRADIENT_CLIPPING` | 0 (off) |
 | `SNEK_N_STEP_UPDATE` | 1 |
 
@@ -67,8 +69,9 @@ a misconfigured control arm gets caught**, and it has been.
 | `SNEK_PRIORITY_EXPONENT` | 0.6 |
 | `SNEK_IS_BETA`, `SNEK_IS_BETA_FINAL`, `SNEK_BETA_ANNEAL_STEPS` | 0.4, 1.0, 300,000 |
 | `SNEK_IS_WEIGHTS` | 1 |
-| `SNEK_REPLAY_RATIO` | 1.0 — gradient steps per env step. **The only lever past ~4,000 steps/s, and a learning-dynamics change** |
-| `SNEK_COLLECT_ENVS` | 1 — collect lanes per iteration. Raising it alone buys nothing; the gradient work scales with it |
+| `SNEK_INITIAL_COLLECT_STEPS` | 2,000 — collected before the first gradient step, at the initial epsilon rather than uniformly |
+| `SNEK_REPLAY_RATIO` | 1.0 — gradient steps per **transition banked**, so the ratio is exact whether forking is on or off. **The only lever past ~1,600 agent steps/s, and a learning-dynamics change** |
+| `SNEK_COLLECT_ENVS` | 1 — collect lanes per iteration. **Raising it to 16 is 1.9x** (809 -> 1,512 steps/s): the gradient work scales with it but `VecSnake.step` costs the same for 1 lane as for 64. It is still a dynamics change — 16 concurrent episodes feeding one buffer — so it is not the default |
 
 ### Collection
 
@@ -94,7 +97,11 @@ a misconfigured control arm gets caught**, and it has been.
 | knob | default | notes |
 |---|---|---|
 | `SNEK_GRAPH_EVAL_EPISODES` | 100 | **pinned.** The stage-A gate is literally "95 of 100"; a different denominator is a different gate |
-| `SNEK_EVAL_INTERVAL` | 1000 | **pinned** to the checkpoint interval, or a checkpoint exists that no screen can select |
+| `SNEK_EVAL_INTERVAL` | 1000 | **sets the checkpoint interval too, from the same value.** They must be equal — a checkpoint at a step no eval screens can never be measured — so there is one knob rather than two that can disagree. Lower it for a smoke test and nothing else |
+
+**A run report's config rows are the knobs.** Every key in `runs/<arm>.md`'s Config table is its
+`SNEK_` variable lowercased, so `| priority_exponent | 0.6 |` means `SNEK_PRIORITY_EXPONENT` with no
+lookup. `tests/test_train.py` pins both the correspondence and the defaults in this file.
 
 ### Stage B — flags, not environment variables
 

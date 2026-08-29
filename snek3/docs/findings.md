@@ -89,6 +89,53 @@ the same and it is a real one — the epsilon refinement schedule reads `perfect
 ([`invariants.md`](invariants.md) invariant 2), so its feedback would lag by up to K intervals. That
 is a change to the training, and it should be pre-registered rather than slipped in as a speed-up.
 
+### The training loop's throughput ceiling is 1,600 steps/s, and two of the plan's claims about it were wrong
+
+**Measured 2026-08-28 on the laptop, self-eval off, `fc_layer_params=(320,)`, batch 128, one torch
+thread.** Agent steps/s:
+
+| lanes (`SNEK_COLLECT_ENVS`) | ratio 1.0 | ratio 0.5 | ratio 0.25 |
+|---:|---:|---:|---:|
+| 1 | **809** | | |
+| 16 | **1,512** | | |
+| 64 | **1,587** | 2,280 | 3,703 |
+
+**Retraction 1: raising `SNEK_COLLECT_ENVS` does not "buy nothing".** It buys 1.9x. The plan reasoned
+that the gradient work scales with the lane count so nothing is gained — true of the gradient half,
+but the *env* half does not scale: `VecSnake.step` costs **536 us at one lane and 950 us at 64**,
+because almost all of it is per-call numpy overhead rather than per-lane work. At one lane the env is
+0.5 ms of every agent step; at 64 lanes it is 0.015 ms. The curve flattens at ~1,600 because the
+gradient half then dominates, which is the half the plan's reasoning applied to.
+
+**Retraction 2: the ratio-1.0 ceiling is ~1,250/s, not ~4,000/s.** A whole learn step is **802 us**,
+against the 245 us an isolated `agent.update` benchmark predicted — `agent.update` 514 us,
+`buffer.update_priorities` 147 us, `buffer.sample` 71 us. At ratio 1.0 one agent step *is* one learn
+step, so the isolated gradient benchmark was measuring a third of the real cost.
+
+**Two optimisations that do not work here, recorded so they are not retried.** `torch.compile` is
+*slower* — 1,643/s against 2,001/s eager, because a 30 -> 320 -> 3 net has no kernel worth fusing and
+the guard overhead dominates. So is more than one torch thread: **950 gradient steps/s at 10 threads
+against 1,314 at one**, every op being far too small to amortise a fork-join. Hence
+`SNEK_TORCH_THREADS=1` as the default, which matters more on the laptop where four arms run at once.
+
+**And the conclusion that actually matters: none of this moves an arm's wall clock much.** Stage A is
+5.0 h of a 3M-step arm; training is 62 min at 809 steps/s and 32 min at 1,587. So a 2x throughput win
+takes an arm from ~6.0 h to ~5.5 h — **8%**. Training throughput is worth having because it makes
+smoke tests and short experiments fast, not because it shortens an arm. The hours are in the eval.
+
+### Deduplicating a sum tree's parents costs more than it saves
+
+**0.167 ms per batch-128 priority update with `np.unique` per level, 0.067 ms without — 2.5x, and it
+was 18% of a whole gradient step.** A batch of 128 leaves shares ancestors near the root, so
+deduplicating each level looks like the obvious saving. It is not: every duplicate entry reads the
+same two children and computes the same sum, so the repeated scatter writes are **idempotent** and
+uniqueness buys only a shorter array — while costing 17 `np.unique` sorts. The arrays are small enough
+that the sorts dominate.
+
+`tests/test_replay.py` pins the repair against a one-leaf-at-a-time walk to the root, because this is
+the rare case where a mutation test cannot help: deduplicating is *equivalent*, so no assertion can
+distinguish it, and the mutation correctly survives.
+
 ### The port is faithful at the level of the policy, not just of the win rate
 
 **A snek2 checkpoint converted to torch computes the same function, to float32.** Over 12,864 states

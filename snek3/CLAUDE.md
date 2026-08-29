@@ -132,14 +132,24 @@ survive in the diff.
 a test fails.** snek2 took a third signature for its observation grouper and all 24 existing tests
 passed before and after, because every fixture was an open board where old and new answers agree.
 
-**Clear `__pycache__` after restoring a mutation, or set `PYTHONDONTWRITEBYTECODE=1` while mutating.**
-A `.pyc` is revalidated on the source's *mtime and size*, and the natural harness — copy to `.bak`,
-mutate, run, `mv` the `.bak` back — defeats both checks at once: `mv` restores the backup's older
-mtime, and a one-character mutation like `3` to `1` has the same size. The mutated bytecode is then
-reused for every later run, so **the mutation outlives its own restore and the next result is
-silently wrong.** It happened here: `NEGATIVE_CHECKS = 3` read as 1 for two runs after the file on
-disk was correct, and the test that caught it looked like a broken assertion rather than a stale
-cache.
+**Use `tools/mutate.py`; do not write the shell version.** Every hazard below is one an ad-hoc harness
+walked into in this repository, and all four are handled there:
+
+    PYTHONPATH=. python -m tools.mutate spec.json
+
+| hazard | what an ad-hoc harness does | why it is silent |
+|---|---|---|
+| a stale `.pyc` | `mv` the backup back, restoring an older mtime | bytecode is revalidated on mtime **and size**, and `3` to `1` changes neither |
+| a pattern that does not match | abort *after* checking, before writing a backup | the next restore puts the *previous* file's backup over the wrong module |
+| the harness is killed | nothing | `finally` unwinds on an exception, **not on a signal** — the mutation in flight survives |
+| the mutant hangs | wait forever | an outer command timeout then kills the harness, which is hazard 3 |
+
+The last two are one chain and it fired twice in one session: dropping the decrement from a
+`while debt >= 1.0:` accumulator turns it into an infinite loop, the 2-minute command timeout killed
+the harness, and `train.py` was left holding the mutation — **detectable only because a suite that
+still passes after a mutation is the definition of the thing you are looking for.** `mutate.py` now
+raises on `SIGTERM`/`SIGINT` so the restore runs, and gives each mutant 6x the baseline's own wall
+clock before calling it hung. A hung mutant counts as **killed**: the tests noticed.
 
 **Check the failure *type*.** Thirteen of snek2's tests were dead for two signature generations —
 they called a function with an argument it had stopped taking, so they raised `TypeError` rather than
@@ -181,6 +191,18 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
 | `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them; the launcher opens it |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
+| `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |
+
+And the training side, which is the other direction — from a knob to an arm:
+
+| module | does |
+|---|---|
+| `train.py` | the loop, and everything not algorithm-specific: the config, seeding, the sidecar, the checkpoint cadence, stage A, the chart, the report, the cap |
+| `dqn/net.py` | the Q network and a greedy `policy_fn`. The only file that decides an initialiser |
+| `dqn/agent.py` | double DQN, the target copy, and the exploration shield's action mask |
+| `dqn/replay.py` | prioritised replay over a numpy sum tree, with importance weights |
+| `dqn/schedules.py` | epsilon and the shield fraction, as pure functions of the eval history |
+| `dqn/collect.py` | N lanes in lockstep, n-step windows, and forking. Owns its own loop |
 
 Keep the split clean: `runs.md` is current state and forward plan only, results go to `results.md`,
 conclusions to `findings.md`, anything about *how to measure or judge* to `protocol.md`. snek2's
