@@ -1,0 +1,164 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+
+=== the arms, by hidden-layer parameter count
+arm                            fc                   params    steps      peak  at step    ends
+b20u-fc60x30x30x30x30seed1     60,30,30,30,30         6300  3000000      40.7  2668000    21.7
+b20m-fc320seed1                320                    9600  3000000      73.0  2486000    66.3
+b24b-fc320noisseed2            320                    9600  3000000      96.7  1024000    90.0
+b24d-fc320noisseed4            320                    9600  3000000      96.7  1353000    60.3
+b18b-tgt1000seed2              50,100,50             11500  2400000      86.0  1600000    56.3
+b20d-fc50seed4                 50,100,50             11500  3000000      80.3   917000    55.0
+b23b-beta01seed2               50,100,50             11500  3000000      91.0   792000    77.7
+b20i-fc200x50seed1             200,50                16000  3000000      72.7  2789000    53.7
+b20ah-fc100x200x100seed4       100,200,100           43000  3000000      83.0  1446000    69.3
+
+=== control -> peak -> end, per arm  (control is a fresh net of the same shape)
+arm                            when     dormant   dead  const  srank_c stable_c   growth move/100k
+b20u-fc60x30x30x30x30seed1     fresh      0.190  0.056  0.074     22.1     2.08    1.003         -
+                               rise       0.161  0.089  0.094     22.0     1.92    1.321    0.0454
+                               peak       0.156  0.083  0.089     22.0     1.65    1.401    0.0339
+                               end        0.156  0.083  0.083     22.0     1.62    1.410    0.0331
+b20m-fc320seed1                fresh      0.148  0.030  0.044    259.9     4.21    1.000         -
+                               rise       0.034  0.019  0.019    226.0     3.38    2.431    0.0200
+                               peak       0.031  0.016  0.019    224.0     3.35    2.397    0.0169
+                               end        0.028  0.016  0.019    225.0     3.34    2.381    0.0173
+b24b-fc320noisseed2            fresh      0.148  0.030  0.044    259.9     4.21    1.000         -
+                               rise       0.028  0.016  0.016    210.0     3.94    1.721    0.0887
+                               peak       0.025  0.016  0.016    216.0     3.86    1.600    0.0836
+                               end        0.028  0.009  0.009    233.0     3.84    1.702    0.0391
+b24d-fc320noisseed4            fresh      0.148  0.030  0.044    259.9     4.21    1.000         -
+                               rise       0.037  0.025  0.025    211.0     3.86    1.623    0.0599
+                               peak       0.028  0.022  0.022    216.0     3.94    1.591    0.0658
+                               end        0.028  0.022  0.022    221.0     4.23    1.705    0.0352
+b18b-tgt1000seed2              fresh      0.171  0.046  0.062     42.1     2.95    1.003         -
+                               rise       0.095  0.035  0.040     40.0     2.07    1.843    0.1074
+                               peak       0.090  0.035  0.035     41.0     2.48    2.298    0.0706
+                               end        0.090  0.035  0.035     41.0     2.62    2.724    0.0562
+b20d-fc50seed4                 fresh      0.171  0.046  0.062     42.1     2.95    1.003         -
+                               rise       0.095  0.075  0.075     37.0     2.18    1.450    0.1133
+                               peak       0.095  0.075  0.075     37.0     2.15    1.478    0.0471
+                               end        0.085  0.070  0.070     38.0     1.87    1.589    0.0356
+b23b-beta01seed2               fresh      0.171  0.046  0.062     42.1     2.95    1.003         -
+                               rise       0.090  0.035  0.035     38.0     2.56    1.400    0.2072
+                               peak       0.085  0.035  0.035     39.0     2.46    1.733    0.1122
+                               end        0.095  0.040  0.040     40.0     2.88    2.643    0.0377
+b20i-fc200x50seed1             fresh      0.150  0.033  0.049     41.9     3.41    1.000         -
+                               rise       0.056  0.024  0.024     42.0     1.97    1.890    0.0387
+                               peak       0.056  0.024  0.024     42.0     1.88    2.009    0.0305
+                               end        0.056  0.024  0.024     42.0     1.87    2.024    0.0301
+b20ah-fc100x200x100seed4       fresh      0.181  0.046  0.065     80.5     3.56    1.001         -
+                               rise       0.100  0.062  0.065     79.0     1.80    1.315    0.0542
+                               peak       0.098  0.060  0.062     79.0     1.83    1.377    0.0610
+                               end        0.100  0.055  0.058     81.0     1.75    1.553    0.0445
+
+=== question 2: the metrics at the point each arm first reached a 50% perfect rate
+    (an arm that never got there has no endgame row — that is the comparison)
+arm                              params  crossed@  dormant   dead  srank_c   growth move/100k
+b20u-fc60x30x30x30x30seed1         6300     never        -      -        -        -         -   <- never reached 50%, peak 40.7
+b20m-fc320seed1                    9600   1264000    0.034  0.019    226.0    2.431    0.0200
+b24b-fc320noisseed2                9600    229000    0.037  0.019    226.0    1.371    0.4872
+b24d-fc320noisseed4                9600    117000    0.044  0.025    244.0    1.200    0.5296
+b18b-tgt1000seed2                 11500    270000    0.075  0.035     40.0    1.337    0.1915
+b20d-fc50seed4                    11500    201000    0.095  0.070     39.0    1.146    0.2709
+b23b-beta01seed2                  11500    273000    0.095  0.035     38.0    1.311    0.2518
+b20i-fc200x50seed1                16000   1558000    0.060  0.024     42.0    1.913    0.0330
+b20ah-fc100x200x100seed4          43000    261000    0.102  0.062     79.0    1.194    0.2393
+
+=== drawdown events (>= 15 pp below a running peak)
+arm                                peak@   trough@  depth span/M  rec   d_dorm  d_srank d_growth     move
+b18b-tgt1000seed2                 209000    240000   35.7   0.03    y   +0.000     +0.0   +0.021   0.2412
+b18b-tgt1000seed2                 328000    382000   38.3   0.05    y   -0.005     +0.0   +0.046   0.2338
+b18b-tgt1000seed2                 582000   1177000   57.7   0.59    y   +0.020     +0.0   +0.345   0.0961
+b18b-tgt1000seed2                1602000   1888000   53.0   0.29   NO   -0.005     +0.0   +0.151   0.0623
+b20ah-fc100x200x100seed4          777000    868000   18.3   0.09    y   +0.003     +0.0   +0.003   0.0527
+b20ah-fc100x200x100seed4         1449000   2820000   25.3   1.37   NO   +0.000     +1.0   +0.144   0.0539
+b20d-fc50seed4                    921000   2703000   44.7   1.78   NO   -0.005     +1.0   +0.100   0.0394
+b20i-fc200x50seed1                381000    824000   24.7   0.44    y   +0.000     +0.0   +0.317   0.1123
+b20i-fc200x50seed1               2463000   2492000   15.7   0.03    y   +0.000     +0.0   +0.003   0.0331
+b20i-fc200x50seed1               2789000   2998000   20.7   0.21   NO   +0.000     +0.0   +0.014   0.0293
+b20m-fc320seed1                   421000    956000   19.3   0.54    y   -0.006    -11.0   +0.807   0.1164
+b20u-fc60x30x30x30x30seed1       1070000   1947000   16.7   0.88    y   +0.000     +0.0   +0.081   0.0611
+b20u-fc60x30x30x30x30seed1       2672000   2985000   21.3   0.31   NO   +0.000     +0.0   +0.008   0.0342
+b23b-beta01seed2                  210000    245000   31.0   0.04    y   +0.010     +0.0   +0.045   0.3254
+b23b-beta01seed2                 1321000   2339000   28.0   1.02   NO   +0.000     +1.0   +0.393   0.0503
+b24b-fc320noisseed2              1026000   1356000   21.7   0.33   NO   +0.000     +3.0   -0.008   0.0829
+b24d-fc320noisseed4               304000    456000   16.0   0.15    y   +0.000     +4.0   -0.030   0.0651
+b24d-fc320noisseed4               605000    717000   16.7   0.11    y   +0.000     +1.0   -0.028   0.0814
+b24d-fc320noisseed4               942000   1157000   15.7   0.21    y   -0.003     +2.0   +0.016   0.0917
+b24d-fc320noisseed4              1377000   2999000   36.7   1.62   NO   -0.003     +5.0   +0.121   0.0510
+
+=== question 5: later drawdowns vs earlier ones, matched on depth
+  split at peak step 931500: 10 early, 10 late
+  group           n   depth    d_dorm   d_srank  d_growth      move
+  early          10    30.2    +0.002      -0.5    +0.162    0.1364
+  late           10    25.5    -0.001      +1.2    +0.092    0.0550
+  mean depth 30.2 early vs 25.5 late — comparable
+  group           n   depth   dorm/pp  srank/pp growth/pp
+  early          10    30.2   +0.0000    -0.024   +0.0063
+  late           10    25.5   -0.0000    +0.048   +0.0033
+
+=== question 6: stretches where the perfect rate is flat (range <= 6 pp over >= 400k)
+arm                                 from        to    mean   range    dorm/M   srank/M  growth/M    move/M
+b20m-fc320seed1                   400000    800000    30.4     3.3   -0.0229    -28.67    +2.195   -0.5781
+b20m-fc320seed1                  1800000   2200000    64.8     5.7   +0.0031     -0.67    -0.006   +0.0054
+
+=== drift per 1M steps, first half vs second half of each arm
+arm                            half       dorm/M   srank/M  stable/M  growth/M    move/M
+b20u-fc60x30x30x30x30seed1     first     -0.0055     +0.77    -0.462    +0.204   -0.1321
+                               second    -0.0053     +0.00    -0.192    +0.048   -0.0061
+b20m-fc320seed1                first     -0.0127    -16.93    +0.043    +1.029   -0.2878
+                               second    -0.0026     -0.53    -0.031    -0.030   +0.0000
+b24b-fc320noisseed2            first     -0.0148    -11.47    +0.030    +0.210   -0.2211
+                               second    +0.0028     +6.60    -0.056    +0.069   -0.0079
+b24d-fc320noisseed4            first     -0.0110     -4.59    +0.176    +0.079   -0.1736
+                               second    -0.0008     +3.16    +0.211    +0.075   -0.0139
+b18b-tgt1000seed2              first     +0.0148     -0.68    -0.443    +0.871   -0.3280
+                               second    -0.0084     +0.41    +0.200    +0.539   -0.0319
+b20d-fc50seed4                 first     -0.0040     -0.60    -0.161    +0.275   -0.2198
+                               second    -0.0045     -0.00    -0.115    +0.048   -0.0050
+b23b-beta01seed2               first     -0.0025     -0.19    -0.249    +0.714   -0.2232
+                               second    +0.0030     +0.96    +0.325    +0.365   -0.0115
+b20i-fc200x50seed1             first     -0.0092     -0.10    -0.337    +0.523   -0.2687
+                               second    -0.0007     -0.00    -0.059    +0.084   -0.0010
+b20ah-fc100x200x100seed4       first     -0.0103     -0.11    -0.218    +0.186   -0.1582
+                               second    +0.0022     +0.59    -0.065    +0.112   -0.0042
+
+wrote /private/tmp/claude-501/-Users-tony-wang-Projects-Snek/54a9a9db-0a53-4765-98c2-060b1985ec73/scratchpad/plast/plasticity_summary.json
+
+=== the direct probe: can the checkpoint still fit a new target?
+    fit/frozen are shares of target variance removed; rel* are against a fresh net of the
+    same shape. d_* are paired first->last changes over the same teachers.
+arm                              fresh   first    last   rel1   relN    d_fit   d_froz
+b18b-tgt1000seed2               0.5019  0.5643  0.5829   1.12   1.16  +0.0186  -0.0099
+                                                                       0.0101   0.0168   <- sd of the paired change
+b20ah-fc100x200x100seed4        0.7313  0.7027  0.7245   0.96   0.99  +0.0219  +0.0403
+                                                                       0.0285   0.0411   <- sd of the paired change
+b20d-fc50seed4                  0.5019  0.5699  0.5563   1.14   1.11  -0.0135  -0.0274
+                                                                       0.0149   0.0110   <- sd of the paired change
+b20i-fc200x50seed1              0.5353  0.5604  0.5503   1.05   1.03  -0.0102  -0.0289
+                                                                       0.0023   0.0031   <- sd of the paired change
+b20m-fc320seed1                 0.6525  0.6875  0.6819   1.05   1.05  -0.0057  -0.0076
+                                                                       0.0046   0.0071   <- sd of the paired change
+b20u-fc60x30x30x30x30seed1      0.3977  0.6027  0.5821   1.52   1.46  -0.0206  -0.0617
+                                                                       0.0047   0.0094   <- sd of the paired change
+b23b-beta01seed2                0.5019  0.5694  0.5807   1.13   1.16  +0.0113  -0.0149
+                                                                       0.0204   0.0249   <- sd of the paired change
+b24b-fc320noisseed2             0.6525  0.6942  0.7024   1.06   1.08  +0.0082  +0.0130
+                                                                       0.0023   0.0021   <- sd of the paired change
+b24d-fc320noisseed4             0.6525  0.6933  0.7060   1.06   1.08  +0.0127  +0.0126
+                                                                       0.0053   0.0086   <- sd of the paired change
+
+    per-checkpoint trend across the whole ladder (per 1M steps, paired per teacher):
+arm                                 fit/M   frozen/M teachers
+b18b-tgt1000seed2                 +0.0050    -0.0116        3
+b20ah-fc100x200x100seed4          +0.0099    +0.0048        3
+b20d-fc50seed4                    +0.0011    -0.0029        3
+b20i-fc200x50seed1                -0.0015    -0.0079        3
+b20m-fc320seed1                   -0.0017    -0.0022        3
+b20u-fc60x30x30x30x30seed1        -0.0058    -0.0205        3
+b23b-beta01seed2                  +0.0031    -0.0045        3
+b24b-fc320noisseed2               +0.0036    +0.0052        3
+b24d-fc320noisseed4               +0.0042    +0.0038        3
+wrote /private/tmp/claude-501/-Users-tony-wang-Projects-Snek/54a9a9db-0a53-4765-98c2-060b1985ec73/scratchpad/plast/plasticity.png

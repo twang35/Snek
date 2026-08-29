@@ -2,16 +2,22 @@ from __future__ import absolute_import, division, print_function
 
 import snake_constants
 from snake_constants import *
+from state_helpers import is_perfect_score
 
 import imageio
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import numpy as np
 import os
 import random
 import time
 
 import tensorflow as tf
+from tf_agents.networks import categorical_q_network
 from tf_agents.networks import sequential
+from tf_agents.utils import common
+
+import categorical_agent
 
 
 # Share of the perfect-game score an arm has to reach before display_progress draws the
@@ -78,29 +84,15 @@ def dense_layer(num_units):
             scale=2.0, mode='fan_in', distribution='truncated_normal'))
 
 
-def eval_fc_layer_params():
-    """Layer widths for rebuilding a trained network, honouring SNEK_FC_LAYERS.
-
-    Training reads its widths from the same variable, so anything that restores a checkpoint
-    has to read it too. eval_checkpoints.py used to hardcode (50, 100, 50), which was right
-    for every run so far only because nobody has set the override — and a mismatch would not
-    have been loud, because restore() is called with expect_partial() and would simply not
-    populate the layers it could not match.
-    """
-    raw = os.environ.get('SNEK_FC_LAYERS')
-    if raw is None:
-        return 50, 100, 50
-    return tuple(int(width) for width in raw.split(','))
-
-
-def build_q_net(num_actions, fc_layer_params=None):
+def build_q_net(num_actions, fc_layer_params):
     """The Q-network training builds, so restored weights line up.
 
-    Shared by eval_checkpoints.py and watch.py. Keeping a second copy of the architecture is
-    how the two quietly drift apart.
+    Shared by snek2.main, eval_agent.py and watch.py — one architecture, built in one place, since a
+    second copy is how they quietly drift apart. ``fc_layer_params`` is required: a fresh run reads
+    it from SNEK_FC_LAYERS, and anything restoring a checkpoint reads it from that checkpoint's
+    arch.json (see policy_arch.py), so the shape can no longer default silently to (50, 100, 50) and
+    mis-restore. That silent default, driven off an unset SNEK_FC_LAYERS, was the exact bite.
     """
-    if fc_layer_params is None:
-        fc_layer_params = eval_fc_layer_params()
     dense_layers = [dense_layer(num_units) for num_units in fc_layer_params]
     q_values_layer = tf.keras.layers.Dense(
         num_actions,
@@ -108,6 +100,106 @@ def build_q_net(num_actions, fc_layer_params=None):
         kernel_initializer=tf.keras.initializers.RandomUniform(minval=-0.03, maxval=0.03),
         bias_initializer=tf.keras.initializers.Constant(0.0))
     return sequential.Sequential(dense_layers + [q_values_layer])
+
+
+def build_categorical_q_net(observation_spec, action_spec, fc_layer_params, num_atoms,
+                            v_min=None, v_max=None, zero_init=False):
+    """The C51 network, built in one place for the same reason `build_q_net` is.
+
+    Uses `tf_agents`' `CategoricalQNetwork`, whose hidden layers come out **identical** to
+    `dense_layer()` above: `encoding_network` defaults its kernel initializer to
+    `VarianceScaling(scale=2.0, mode='fan_in', distribution='truncated_normal')`, which is exactly what
+    `dense_layer` passes. So a c51 arm and its ddqn control differ in the head and the loss, not in how
+    their trunks are initialised. The head differs from `build_q_net`'s only in a constant bias (-0.2
+    against 0.0), which cancels in the per-action softmax over atoms.
+
+    Unlike `build_q_net` this needs the specs, because the output has to be checked against
+    `(num_actions, num_atoms)` and the network reshapes to it.
+
+    `zero_init` applies the bias ramp described in `categorical_agent.zero_init_lambda` — see
+    `apply_zero_init`. It needs `v_min`/`v_max` because the correction depends on the support, which the
+    network itself does not carry.
+    """
+    num_actions = int(action_spec.maximum - action_spec.minimum + 1)
+    net = categorical_q_network.CategoricalQNetwork(
+        observation_spec, action_spec, num_atoms=int(num_atoms),
+        fc_layer_params=tuple(fc_layer_params))
+    # Built here rather than left to the agent, so the head bias exists to be rewritten below and so a
+    # shape complaint surfaces at build time rather than inside a training step.
+    net.create_variables()
+    if zero_init:
+        apply_zero_init(net, num_actions, int(num_atoms), v_min, v_max)
+    return net
+
+
+def categorical_head_bias(net, num_actions, num_atoms):
+    """The head's bias variable, located by shape rather than by attribute path.
+
+    `CategoricalQNetwork` wraps a private `QNetwork` whose private `q_value_layer` holds the head, and
+    reaching through both names would break silently on a `tf_agents` rename. A bias of length
+    `num_actions * num_atoms` is unambiguous in practice — and when it is not (a hidden layer of
+    exactly that width), this raises rather than picking one.
+    """
+    wanted = num_actions * num_atoms
+    matches = [variable for variable in net.trainable_variables
+               if variable.shape.rank == 1 and int(variable.shape[0]) == wanted
+               and 'bias' in variable.name]
+    if len(matches) != 1:
+        raise ValueError(
+            'expected exactly one bias of length {0} (num_actions {1} x num_atoms {2}) in the '
+            'categorical head, found {3}: {4}. A hidden layer of that exact width would do this — '
+            'change the width or the atom count.'
+            .format(wanted, num_actions, num_atoms, len(matches),
+                    [variable.name for variable in matches]))
+    return matches[0]
+
+
+def apply_zero_init(net, num_actions, num_atoms, v_min, v_max):
+    """Rewrites the head bias so the network's initial *expected* Q is 0 rather than the grid midpoint.
+
+    A categorical head starts with near-uniform atom logits, so its initial expected Q is
+    `(v_min + v_max) / 2` — 57.5 on the shipped grid, against a scalar head that starts near 0. That is
+    a second difference between a c51 arm and its ddqn control on top of the algorithm, and this removes
+    it. Off by default: standard initialisation is what the literature does, and this is the knob that
+    lets the confound be measured rather than assumed away.
+
+    The flat head is action-major (`CategoricalQNetwork.call` reshapes `[-1, num_actions, num_atoms]`),
+    so the per-atom ramp is tiled once per action.
+    """
+    if v_min is None or v_max is None:
+        raise ValueError('zero_init needs v_min and v_max; the network does not carry its support')
+    rate = categorical_agent.zero_init_lambda(float(v_min), float(v_max), num_atoms)
+    support = np.linspace(float(v_min), float(v_max), num_atoms)
+    ramp = -rate * (support - float(v_min))
+    bias = categorical_head_bias(net, num_actions, num_atoms)
+    bias.assign(np.tile(ramp, num_actions).astype(bias.dtype.as_numpy_dtype))
+    return rate
+
+
+def expected_q(net, observations, support=None, step_type=None):
+    """`Q(s, .)` from either network kind, so a caller does not branch on the algorithm.
+
+    A scalar net already returns Q. A categorical net returns `[batch, num_actions, num_atoms]` logits,
+    reduced here through `common.convert_q_logits_to_values` — the same call `CategoricalQPolicy` uses,
+    so this cannot disagree with the greedy action the policy actually takes.
+
+    `support` is required for a categorical net and rejected for a scalar one, both loudly. Passing the
+    wrong one silently would reproduce this project's favourite failure: a number that looks like a Q
+    value and is not. Get it from `policy_arch.support_from_arch`.
+    """
+    if step_type is None:
+        # StepType.MID, matching what the diagnostics already pass by hand.
+        step_type = tf.fill([tf.shape(observations)[0]], 1)
+    is_categorical = hasattr(net, 'num_atoms')
+    if is_categorical and support is None:
+        raise ValueError('this is a categorical network ({0} atoms); expected_q needs its support. '
+                         'Use policy_arch.support_from_arch(arch).'.format(net.num_atoms))
+    if not is_categorical and support is not None:
+        raise ValueError('a support was given for a scalar Q network, which would silently ignore it')
+    output, _ = net(observations, step_type=step_type)
+    if not is_categorical:
+        return output
+    return common.convert_q_logits_to_values(output, tf.constant(support, dtype=tf.float32))
 
 
 def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_episodes=10):
@@ -129,11 +221,29 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
     """
     start_time = time.time()
 
-    rewards, scores, last_rewards_array, total_steps = run_parallel_eval_episodes(
+    rewards, scores, total_steps = run_parallel_eval_episodes(
         parallel_environment, policy, num_episodes)
-    episode_rewards = rewards.tolist()
-    episode_scores = scores.tolist()
-    last_rewards = last_rewards_array.tolist()
+
+    if snake_constants.DEBUG_LOGGING:
+        print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
+
+    return fold_episode_sample(rewards.tolist(), scores.tolist(), metrics, eval_only, num_episodes)
+
+
+def fold_episode_sample(episode_rewards, episode_scores, metrics, eval_only, num_episodes):
+    """Folds one self-eval's per-episode rewards and scores into `metrics`.
+
+    **Extracted so both self-eval engines share it rather than reimplementing it.** The scalar path
+    above and `self_eval.VecSelfEval` produce the same two lists by completely different means, and
+    everything downstream of a self-eval -- the graph row, `metrics.max_score`, the perfect rate that
+    drives `training.epsilon_for`'s refinement phase -- reads only what happens here. A second copy
+    of this bookkeeping is exactly the kind of drift that made three separate perfect-game counters
+    read 0% for 300k steps, so there is one copy and both engines call it.
+    """
+    if len(episode_rewards) != num_episodes or len(episode_scores) != num_episodes:
+        raise ValueError(
+            'self-eval handed back {0} rewards and {1} scores for {2} episodes'.format(
+                len(episode_rewards), len(episode_scores), num_episodes))
 
     for episode_reward in episode_rewards:
         if metrics.min_reward > episode_reward:
@@ -147,10 +257,9 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
         if metrics.max_score < episode_score:
             metrics.max_score = episode_score
 
-    perfect_games = sum(1 for reward in last_rewards if reward == snake_constants.PERFECT_GAME_REWARD)
-
-    if snake_constants.DEBUG_LOGGING:
-        print('eval steps/second: ', round(total_steps / (time.time() - start_time), 2))
+    # Counted off the score, never off `last_rewards`. See `state_helpers.is_perfect_score`: the
+    # reward test this replaces read 0% perfect for every shaped arm, which also pinned epsilon.
+    perfect_games = sum(1 for score in episode_scores if is_perfect_score(score))
 
     metrics.last_eval_perfect_percent = perfect_games / num_episodes
     if eval_only:
@@ -162,12 +271,18 @@ def compute_avg_return(parallel_environment, policy, metrics, eval_only, num_epi
 
 
 def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
+    """One greedy episode per worker. Returns per-episode totals, scores and the step count.
+
+    It used to return each episode's *final* reward as a fourth array, for the sole purpose of
+    identifying perfect games by `== PERFECT_GAME_REWARD`. Removed with that test rather than left
+    unused: the array is exactly the wrong signal to leave lying around, since any new reward term
+    shifts it while looking harmless. `state_helpers.is_perfect_score` has the history.
+    """
     worker_envs = parallel_environment.pyenv.envs
 
     time_step = parallel_environment.reset()
     episode_rewards = np.zeros(num_parallel, dtype=np.float32)
     episode_scores = np.zeros(num_parallel, dtype=np.float32)
-    last_rewards = np.zeros(num_parallel, dtype=np.float32)
     done = np.zeros(num_parallel, dtype=bool)
     total_steps = 0
 
@@ -190,20 +305,61 @@ def run_parallel_eval_episodes(parallel_environment, policy, num_parallel):
             score_promises = [worker_envs[i].call('get_score') for i in finished_indices]
             for i, promise in zip(finished_indices, score_promises):
                 episode_scores[i] = promise()
-            last_rewards[newly_done] = rewards[newly_done]
         done = done | newly_done
 
-    return episode_rewards, episode_scores, last_rewards, total_steps
+    return episode_rewards, episode_scores, total_steps
 
 
-def display_progress(eval_rows, resume_steps, screen, graph_path=None):
+def trailing_average(values, window):
+    """Trailing moving average: element i is the mean of the last `window` values up to and
+    including i, with a shorter window at the very start where fewer values exist yet.
+
+    Trailing rather than centred on purpose -- the chart is read live, so the newest point must
+    reflect only evals already seen; a centred average would pull the latest point toward values
+    that do not exist yet. Used to overlay a readable perfect-rate trend on the thin, noisy raw
+    trace in display_progress.
+    """
+    averaged = []
+    for i in range(len(values)):
+        chunk = values[max(0, i - window + 1):i + 1]
+        averaged.append(sum(chunk) / len(chunk))
+    return averaged
+
+
+def display_progress(eval_rows, resume_steps, screen, graph_path=None, policy_name=None):
     """Draws the whole history of a policy, across however many runs made it.
 
     Takes explicit (step, score, percent) rows rather than assuming evenly spaced
     evals from a starting step, because a resumed policy's history has gaps
     wherever it was stopped and restarted.
+
+    `policy_name` titles the chart. It has to be burned into the image rather than drawn by
+    whatever displays it, because both consumers are incapable of adding it: `chart_viewer`
+    renders each arm as a bare `imshow` panel with `axis('off')` and `apply_tight_grid`
+    deliberately reclaims the title space (a 2x2 grid loses ~8% of its height to it), and
+    `charts.md` embeds the PNG with nothing but a markdown caption beside it. So an untitled
+    figure is unidentifiable in a four-panel wave window, which is exactly where identifying it
+    matters. Falls back to `graph_path`'s stem so a caller that has the path but not the name
+    still gets a title, and stays optional so the tests that call this with neither still pass.
     """
-    fig, score_axis = plt.subplots(figsize=(3.65, 2.25))
+    # SNEK_CHART_SCALE sets the PNG render dpi (dpi = 100 * scale). The decoupled
+    # chart_viewer.py only *magnifies* the PNG (~1.5-2x), so a low dpi looks blurry blown
+    # up. Default 2.0 keeps the on-screen chart crisp on both hosts without anyone setting
+    # an env var; scaling dpi rather than figsize keeps text and line weights proportional.
+    # Cosmetic and safe to raise now that the per-eval matplotlib leak below is fixed -- a
+    # high value used to amplify it. Override with the env var if a sharper/lighter PNG is
+    # wanted. (env baked at launch, so a change only affects new runs, not ones already up.)
+    chart_scale = float(os.environ.get('SNEK_CHART_SCALE', '2.0'))
+    # Build the figure through the OO API (Figure + FigureCanvasAgg) rather than
+    # plt.subplots(). pyplot registers every figure in a process-global manager (Gcf)
+    # and a callback registry, and in this matplotlib version plt.close() does not fully
+    # release them -- so a new figure per eval leaked Line2D/Text/Transform artists and
+    # grew the trainer ~1 MB/eval (worse at high SNEK_CHART_SCALE, where it OOM'd the
+    # desktop). A bare Figure() is never registered, so it is freed when it goes out of
+    # scope and there is nothing to close. Do NOT switch this back to plt.subplots.
+    fig = Figure(figsize=(3.65, 2.25), dpi=100 * chart_scale)
+    FigureCanvasAgg(fig)
+    score_axis = fig.add_subplot(1, 1, 1)
     steps = [row['step'] for row in eval_rows]
     scores = [row['avg_score'] for row in eval_rows]
     perfect_percents = [row['perfect_percent'] for row in eval_rows]
@@ -218,9 +374,28 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     # whole band one color; chosen by comparing 0.3/0.5/0.8/1.2 side by side on a real arm.
     score_axis.plot(steps, scores, color=score_color, linewidth=0.3)
     score_axis.set_ylabel('Average Score', color=score_color, fontsize=label_size)
-    score_axis.set_xlabel('Iterations', fontsize=label_size)
+    # Put the latest step in the x label so how far the run has progressed reads at a glance --
+    # late in training the traces fill the plot and the axis's own "1e6" offset is coarse, so
+    # otherwise there is no number on the chart saying where it is now. Comma-grouped thousands:
+    # 2685000 -> "Iterations (2,685k steps)".
+    xlabel = 'Iterations'
+    if steps:
+        xlabel = 'Iterations ({:,}k steps)'.format(steps[-1] // 1000)
+    score_axis.set_xlabel(xlabel, fontsize=label_size)
     score_axis.tick_params(axis='y', labelcolor=score_color, labelsize=tick_size)
     score_axis.tick_params(axis='x', labelsize=tick_size)
+
+    # The arm's name, at the top. See the docstring for why this cannot live in the viewer.
+    # A hair larger than the axis labels (label_size 6) so it reads as a heading rather than as
+    # another annotation, and black rather than either trace's colour so it is not mistaken for
+    # belonging to one axis. `pad=2` because the default (6.0pt) costs more of a 2.25in figure
+    # than the title itself occupies. Longest real name is 24 chars
+    # (`b40b-chasefree10g75seed2`), which fits at this size in a 3.65in width.
+    chart_title = policy_name
+    if chart_title is None and graph_path is not None:
+        chart_title = os.path.splitext(os.path.basename(graph_path))[0]
+    if chart_title:
+        score_axis.set_title(chart_title, fontsize=label_size + 1, color='black', pad=2)
     # score_axis.set_ylim(top=250)
 
     percent_color = 'tab:red'
@@ -241,6 +416,20 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     for level in (20, 40, 60, 80):
         percent_axis.axhline(level, color=percent_color, linestyle=(0, (4, 3)),
                              linewidth=0.5, alpha=0.55, zorder=1)
+
+    # A trailing 10-eval moving average of the perfect-game %, drawn over the thin raw trace.
+    # Late in a long run the 0.3pt red line packs thousands of evals into ~300px and smears into a
+    # band with no readable level; this answers "what has the perfect rate been lately" at a glance.
+    # Same axis and same red family as the trace it summarises -- it is the smoothed version of that
+    # signal, not a new quantity -- just darker so it reads as the level through the noise. Width
+    # 0.4 is only a hair over the raw trace's 0.3 on purpose: a 10-eval average still wiggles at
+    # this density, and a bold line just reprints the noise heavier (tried 1.1, too heavy). darkred
+    # over tab:red gives the contrast instead. zorder 3 keeps it above both traces (2) and the
+    # dashed guides (1). Window 10 chosen against 5 on a real ~3000-eval arm: 5 barely smoothed.
+    if perfect_percents:
+        percent_trend = trailing_average(perfect_percents, 10)
+        percent_axis.plot(steps, percent_trend, color='darkred', linewidth=0.4,
+                          alpha=0.9, zorder=3)
 
     # The perfect-game score (MAX_POSSIBLE_SCORE, 95 on a 10x10 board — a perfect game triggers at
     # 95 food eaten, since the snake starts with START_SEGMENTS + 1 cells already on the board).
@@ -274,7 +463,8 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
     # matplotlib produces RGB — so passing `image` straight through swapped red and blue in the
     # window, making the blue score trace look red and vice versa. The saved PNG was always
     # correct, which is why this went unnoticed. Reverse the channels for the window only.
-    screen.update(image[:, :, ::-1])
+    if screen is not None:  # None on a headless box; the PNG below is the durable chart
+        screen.update(image[:, :, ::-1])
     if graph_path is not None:
         # Same array that goes to the window, so the file always matches what's
         # on screen. Written beside the target and renamed so anything reading it
@@ -283,16 +473,5 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None):
         partial = graph_path + '.partial.png'
         imageio.imwrite(partial, image)
         os.replace(partial, graph_path)
-    plt.close(fig)
-
-
-def create_policy_eval_video(eval_py_env, eval_env, policy, filename, num_episodes=5, fps=30):
-    filename = filename + ".mp4"
-    with imageio.get_writer(filename, fps=fps) as video:
-        for _ in range(num_episodes):
-            time_step = eval_env.reset()
-            video.append_data(eval_py_env.render())
-            while not time_step.is_last():
-                action_step = policy.action(time_step)
-                time_step = eval_env.step(action_step.action)
-                video.append_data(eval_py_env.render())
+    # No plt.close(): this Figure was never registered with pyplot, so it is collected
+    # normally when the function returns. That is the whole point of the OO API above.

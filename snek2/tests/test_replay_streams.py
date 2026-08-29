@@ -249,3 +249,25 @@ def test_sampling_and_priorities_still_work_across_streams():
     assert len(indexes) == 4
     assert abs(float(np.mean(weights)) - 1.0) < 1e-6, 'IS weights are rescaled to mean 1'
     buffer.update_priorities(indexes, np.ones(4, dtype=np.float32))
+
+
+# ------------------------------------------------------------------ beta annealing
+
+def test_beta_anneals_to_final_beta_and_holds():
+    """`final_beta` is the anneal target, added 2026-08-10 for batch 21. Default is 1.0 (full IS
+    correction, which cancels prioritization); a value below 1.0 leaves IS partial so the priority
+    signal still reaches the gradient. beta ramps linearly over beta_anneal_steps then holds."""
+    buffer = TrajectoryPrioritizedReplayBuffer(
+        SPEC, 1000, initial_beta=0.4, final_beta=0.5, beta_anneal_steps=300000, sequence_length=2)
+    assert buffer.beta(0) == 0.4
+    assert abs(buffer.beta(150000) - 0.45) < 1e-9   # halfway
+    assert buffer.beta(300000) == 0.5               # target reached
+    assert buffer.beta(3000000) == 0.5              # and held past the anneal, not overshooting
+
+
+def test_default_final_beta_is_one():
+    """Every run that does not set IS_BETA_FINAL must still anneal to 1.0, unchanged."""
+    buffer = TrajectoryPrioritizedReplayBuffer(
+        SPEC, 1000, initial_beta=0.4, beta_anneal_steps=300000, sequence_length=2)
+    assert buffer.beta(300000) == 1.0
+    assert buffer.beta(3000000) == 1.0

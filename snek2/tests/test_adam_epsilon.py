@@ -1,0 +1,221 @@
+"""`SNEK_ADAM_EPSILON` — that it reaches both optimizers, and that it is not a no-op.
+
+Batch 32 rests entirely on the claim that Adam's `epsilon` changes which coordinates move, so that
+claim gets a fixture rather than a comment. Without one, the knob reads like a divide-by-zero guard
+and the obvious "simplification" is to delete it.
+
+**There are two crossovers, and the one that matters for training is the second.** Keras folds the bias
+correction into the step size and adds `epsilon` to the *raw* `sqrt(v)` accumulator, so the two regimes
+sit in different places depending on how far along `v` is:
+
+- **From rest (t=1)**, `v` has only just started accumulating: the step is `lr * x/(x + eps)` with
+  `x = sqrt(1 - beta_2) * |g| = 0.0316 * |g|`, putting the half-step point at `|g| ~ 31.6 * eps`.
+- **In steady state**, `v` has converged to `mean(g^2)` and the bias correction cancels that factor
+  entirely: the step is `lr * mean(g)/(RMS(g) + eps)` and the half-step point is at `RMS(g) ~ eps`.
+
+Measured at `lr=1e-4`, `eps=3.125e-4`: gradient `1e-2` moves 5.03e-5 at t=1 (half a step) but 9.70e-5
+at t=4000 (97% of a full step), while gradient `3.125e-4` moves 4.98e-5 at t=4000 — exactly half.
+
+Both are pinned below, because getting this wrong in either direction misprices the knob. A first
+version of this file assumed the crossover was at `eps` and chose test gradients that all landed on the
+wrong side of the t=1 form; the fix then over-corrected into treating `31.6 * eps` as *the* threshold,
+which would have suggested `3.125e-4` damps everything below `1e-2` when in training it damps below
+`~3e-4`. The 31.6 is a transient of the opening ~`1/(1 - beta_2)` = 1000 steps, so it makes `epsilon`
+temporarily more aggressive while a run starts and then stops mattering.
+"""
+import ast
+import os
+import sys
+
+import tensorflow as tf
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+import snek2
+
+SNEK2_PATH = os.path.join(os.path.dirname(__file__), '..', 'snek2.py')
+DOPAMINE_C51_EPSILON = 3.125e-4      # Dopamine's published C51 config, with lr 2.5e-4
+RAINBOW_EPSILON = 1.5e-4             # Dopamine's published Rainbow config, with lr 6.25e-5
+# sqrt(1 - beta_2) at Keras's default beta_2=0.999. Scales the *t=1* crossover only: from rest the
+# half-step gradient is eps / FIRST_STEP_SCALE, i.e. ~31.6 * eps. In steady state it is eps itself.
+FIRST_STEP_SCALE = 0.001 ** 0.5
+# beta_2's own timescale, 1/(1 - beta_2): how long the transient above takes to decay.
+STEADY_STATE_STEPS = 4000
+
+
+def _source_default(knob):
+    """The default literal `snek2.py` actually passes to `tuned(knob, ...)`.
+
+    Parsed out of the source so a test cannot accidentally assert its own argument back at itself,
+    which is the way a default-value test ends up asserting nothing at all.
+    """
+    tree = ast.parse(open(SNEK2_PATH).read())
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == 'tuned' and node.args
+                and isinstance(node.args[0], ast.Constant) and node.args[0].value == knob):
+            return ast.literal_eval(node.args[1])
+    raise AssertionError('snek2.py has no tuned({0!r}, ...) call'.format(knob))
+
+
+def _first_step(epsilon, gradient, learning_rate=1e-4):
+    """How far one Adam step moves a scalar with a constant gradient."""
+    variable = tf.Variable(0.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=epsilon)
+    optimizer.apply_gradients([(tf.constant(gradient), variable)])
+    return abs(float(variable.numpy()))
+
+
+def test_default_matches_keras_so_earlier_arms_are_unchanged():
+    """Unset, the knob must reproduce the optimizer every arm before batch 32 was trained with.
+
+    Asserted against Keras's own attribute rather than the literal 1e-7, so a framework upgrade that
+    moved the default would fail here instead of silently redefining what "no override" means for
+    every ddqn arm in the project.
+    """
+    os.environ.pop('SNEK_ADAM_EPSILON', None)
+    assert float(tf.keras.optimizers.Adam().epsilon) == 1e-7
+    assert snek2.tuned('ADAM_EPSILON', 1e-7) == 1e-7
+    # Read out of the source, not passed in from here. A first version of this test supplied its own
+    # 1e-7 as the default argument, so raising snek2.py's real default to a C51 value — which would
+    # silently retrain every ddqn arm in the project under a different optimizer — passed it.
+    assert _source_default('ADAM_EPSILON') == 1e-7, (
+        'snek2.py defaults SNEK_ADAM_EPSILON to something other than the Keras default, so an arm '
+        'that sets nothing no longer reproduces every arm trained before batch 32')
+
+
+def test_env_override_is_read_as_a_float():
+    os.environ['SNEK_ADAM_EPSILON'] = '3.125e-4'
+    try:
+        value = snek2.tuned('ADAM_EPSILON', 1e-7)
+        assert value == DOPAMINE_C51_EPSILON
+        assert isinstance(value, float)
+    finally:
+        os.environ.pop('SNEK_ADAM_EPSILON', None)
+
+
+def test_it_reaches_the_optimizer():
+    assert float(tf.keras.optimizers.Adam(
+        learning_rate=1e-4, epsilon=DOPAMINE_C51_EPSILON).epsilon) == DOPAMINE_C51_EPSILON
+
+
+def test_every_adam_built_in_snek2_passes_epsilon():
+    """The tripwire: a new agent branch that forgets `epsilon` would silently train at 1e-7.
+
+    Walks the AST rather than grepping so a reformatted call cannot slip through on whitespace, and
+    asserts the property over *every* `Adam(...)` site rather than a fixed count of them. It was
+    written as `== 2` when there was one call per algorithm branch, and it failed — correctly, as a
+    tripwire — the moment those were hoisted into a single shared optimizer so
+    `training.enforce_learning_rate` could reach the object the checkpointer restores into. A count
+    is the wrong assertion here: it fires on a refactor that cannot break the knob and would still
+    have to be edited by hand by whoever adds a third branch, which is the person most likely to
+    just bump the number. `>= 1` plus "all of them pass both knobs" catches the real failure — a new
+    branch building its own bare `Adam()` — and is indifferent to how many sites exist.
+    """
+    tree = ast.parse(open(SNEK2_PATH).read())
+    calls = [node for node in ast.walk(tree)
+             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+             and node.func.attr == 'Adam']
+    assert calls, 'snek2.py builds no Adam at all'
+    for call in calls:
+        keywords = {kw.arg: kw.value for kw in call.keywords}
+        assert 'epsilon' in keywords, (
+            'the Adam at snek2.py:{0} does not pass epsilon, so it would train at the Keras '
+            'default whatever SNEK_ADAM_EPSILON says'.format(call.lineno))
+        assert 'learning_rate' in keywords, 'snek2.py:{0}'.format(call.lineno)
+        # It has to be *the knob*, not a literal that happens to equal the default. A wired-but-ignored
+        # `epsilon=1e-7` passes a presence check and would make batch 32 a silent null result — every
+        # arm training identically while its report claimed otherwise. Same for learning_rate, which
+        # has had a live sweep on it for the whole project.
+        for knob, expected in (('epsilon', 'adam_epsilon'), ('learning_rate', 'learning_rate')):
+            value = keywords[knob]
+            assert isinstance(value, ast.Name) and value.id == expected, (
+                'snek2.py:{0} passes {1}={2}, not the {3} variable, so the override would be read, '
+                'printed and recorded but never applied'.format(
+                    call.lineno, knob, ast.dump(value), expected))
+
+
+def _steady_step(epsilon, gradient, learning_rate=1e-4):
+    """Per-step movement after `v` has converged, which is where a run spends its life.
+
+    A constant gradient is used rather than a noisy one so the number is exact: `m` converges to `g`
+    and `v` to `g**2`, making the step `lr * g/(|g| + eps)` with no sampling error to average out.
+    """
+    variable = tf.Variable(0.0)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=epsilon)
+    for _ in range(STEADY_STATE_STEPS):
+        optimizer.apply_gradients([(tf.constant(gradient), variable)])
+    before = float(variable.numpy())
+    optimizer.apply_gradients([(tf.constant(gradient), variable)])
+    return abs(float(variable.numpy()) - before)
+
+
+def test_a_large_epsilon_barely_changes_a_well_driven_gradient():
+    """Well above the crossover both settings take essentially the full `lr` step.
+
+    This is the half that makes the knob safe: it does not scale learning down across the board, so a
+    b32 arm is not simply a lower-learning-rate arm in disguise. If this collapsed, the epsilon
+    experiment would be confounded with the learning-rate sweep it is meant to be independent of.
+    """
+    default = _first_step(1e-7, 1.0)
+    dopamine = _first_step(DOPAMINE_C51_EPSILON, 1.0)
+    assert dopamine / default > 0.98, (default, dopamine)
+
+
+def test_a_large_epsilon_strongly_damps_a_noise_sized_gradient():
+    """Below the crossover the step becomes proportional again — the whole point of the knob.
+
+    At 1e-7 a gradient 100,000x smaller than the one above still buys the majority of a full step,
+    which is the behaviour suspected of driving the C51 arms' churn: a coordinate carrying nothing but
+    batch noise moves nearly as far as one carrying signal.
+    """
+    default = _first_step(1e-7, 1e-5)
+    dopamine = _first_step(DOPAMINE_C51_EPSILON, 1e-5)
+    assert default / _first_step(1e-7, 1.0) > 0.5, 'at 1e-7 a tiny gradient still moves ~half of lr'
+    assert default / dopamine > 100, (default, dopamine)
+
+
+def test_the_first_step_crossover_sits_at_31_times_epsilon():
+    """From rest, half a step at `|g| = eps / sqrt(1 - beta_2)` — the opening transient.
+
+    Worth pinning because it is the regime a *fresh* run starts in: for roughly the first
+    1/(1 - beta_2) steps `epsilon` bites ~31x harder than its steady-state threshold, so an arm is
+    damped most while it is starting. It is emphatically **not** the training-relevant crossover, which
+    the next test covers.
+    """
+    for epsilon in (RAINBOW_EPSILON, DOPAMINE_C51_EPSILON):
+        half_step_gradient = epsilon / FIRST_STEP_SCALE
+        at_crossover = _first_step(epsilon, half_step_gradient)
+        assert abs(at_crossover - 1e-4 * 0.5) < 1e-4 * 0.02, (epsilon, at_crossover)
+        # And one order of magnitude below it really is in the damped regime, so the crossover is a
+        # crossover rather than a point the curve merely passes through.
+        assert _first_step(epsilon, half_step_gradient / 10) < 1e-4 * 0.15, epsilon
+
+
+def test_the_steady_state_crossover_sits_at_epsilon_itself():
+    """Once `v` has converged the half-step gradient is `eps`, with no sqrt(1 - beta_2) factor.
+
+    **This is the number to reason with when choosing a value**, and the one an intuition built on the
+    t=1 form gets wrong by 31x. Under `eps=3.125e-4` a gradient of 1e-2 keeps ~97% of its step here
+    while giving up half of it at t=1 — so the knob does not damp anything like the band the first-step
+    form suggests.
+    """
+    for epsilon in (RAINBOW_EPSILON, DOPAMINE_C51_EPSILON):
+        at_crossover = _steady_step(epsilon, epsilon)
+        assert abs(at_crossover - 1e-4 * 0.5) < 1e-4 * 0.05, (epsilon, at_crossover)
+        # An order of magnitude above eps is essentially undamped, an order below is essentially off.
+        assert _steady_step(epsilon, epsilon * 10) > 1e-4 * 0.85, epsilon
+        assert _steady_step(epsilon, epsilon / 10) < 1e-4 * 0.15, epsilon
+
+
+def test_the_two_batch_32_settings_are_meaningfully_different():
+    """1.5e-4 and 3.125e-4 must separate on a real gradient, or b32's two halves test one thing.
+
+    Compared in steady state at the gradient between their thresholds, since that is where the arms
+    spend all but their first thousand steps. The separation is a factor of ~2 in threshold, not the
+    ~60x the t=1 form would imply — a check on the experiment's design, not on Keras.
+    """
+    between = (RAINBOW_EPSILON + DOPAMINE_C51_EPSILON) / 2
+    rainbow = _steady_step(RAINBOW_EPSILON, between)
+    dopamine = _steady_step(DOPAMINE_C51_EPSILON, between)
+    assert rainbow / dopamine > 1.2, (rainbow, dopamine)

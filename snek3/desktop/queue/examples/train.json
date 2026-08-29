@@ -1,0 +1,10 @@
+{
+  "project": "snek3",
+  "id": "b1b-baseline-seed2",
+  "type": "train",
+  "policy": "b1b-baseline-seed2",
+  "max_steps": 3000000,
+  "env": {"SNEK_SEED": "2"},
+  "label": "b1: DDQN baseline, seed 2",
+  "notes": "Phase-3 gate arm. Defaults throughout; only the seed varies across b1a-b1d."
+}

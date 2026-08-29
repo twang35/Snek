@@ -39,33 +39,53 @@ def rows(scores):
             for index, score in enumerate(scores)]
 
 
-def draw(scores, resume_steps=()):
-    """Runs display_progress and returns its figure's axes, newest figure last.
+def perfect_rows(percents):
+    """Eval rows carrying the given perfect-game percents, one every 1000 steps."""
+    return [{'step': (index + 1) * 1000, 'avg_score': 90.0, 'perfect_percent': percent,
+             'trailing_avg_score': 90.0, 'epsilon': 0.002}
+            for index, percent in enumerate(percents)]
 
-    display_progress closes its own figure, so the axes are captured by patching plt.subplots —
-    less invasive than changing production code to hand a figure back for testing.
+
+def render(eval_rows, resume_steps=(), policy_name=None, graph_name=None):
+    """Runs display_progress on explicit rows and returns (figure, score_axis).
+
+    display_progress builds its figure through the OO API (under_the_hood.Figure) rather than
+    pyplot, to avoid the per-eval matplotlib leak — so the figure is captured by patching that
+    Figure, less invasive than changing production code to hand one back for testing. The score
+    axis is the figure's first (the percent axis is the twinx() second).
     """
     captured = {}
-    real_subplots = plt.subplots
+    real_figure = under_the_hood.Figure
 
     def capture(*args, **kwargs):
-        figure, axis = real_subplots(*args, **kwargs)
+        figure = real_figure(*args, **kwargs)
         captured['figure'] = figure
-        captured['score_axis'] = axis
-        return figure, axis
+        return figure
 
     handle, path = tempfile.mkstemp(suffix='.png')
     os.close(handle)
-    plt.subplots = capture
+    # `graph_name` renames the temp file so the title's path fallback has something predictable to
+    # derive from -- mkstemp's own stem is random, which is fine for every other test here but
+    # untestable for that one branch.
+    if graph_name is not None:
+        renamed = os.path.join(os.path.dirname(path), graph_name + '.png')
+        os.replace(path, renamed)
+        path = renamed
+    under_the_hood.Figure = capture
     try:
-        under_the_hood.display_progress(rows(scores), list(resume_steps), StubScreen(),
-                                        graph_path=path)
+        under_the_hood.display_progress(eval_rows, list(resume_steps), StubScreen(),
+                                        graph_path=path, policy_name=policy_name)
     finally:
-        plt.subplots = real_subplots
+        under_the_hood.Figure = real_figure
         for leftover in (path, path + '.partial.png'):
             if os.path.exists(leftover):
                 os.remove(leftover)
-    return captured['figure'], captured['score_axis']
+    return captured['figure'], captured['figure'].axes[0]
+
+
+def draw(scores, resume_steps=()):
+    """Runs display_progress on rows built from `scores`; see `render`."""
+    return render(rows(scores), resume_steps)
 
 
 def horizontal_lines(axis):
@@ -180,27 +200,159 @@ def test_a_resume_draws_a_vertical_line_per_restart():
     plt.close(figure)
 
 
+# ----------------------------------------------------------- the x-axis step label
+
+def test_the_x_label_shows_the_latest_step():
+    # rows() spaces evals every 1000 steps, so three of them end at step 3000 -> "3k steps".
+    figure, score_axis = draw([10.0, 50.0, 90.0])
+    assert score_axis.get_xlabel() == 'Iterations (3k steps)', score_axis.get_xlabel()
+    plt.close(figure)
+
+
+def test_the_x_label_groups_thousands_with_a_comma():
+    # The latest step is the last row's, and thousands are comma-grouped so a mid-millions run
+    # reads cleanly rather than as a wall of digits.
+    rows_in = [{'step': 2685000, 'avg_score': 90.0, 'perfect_percent': 50.0,
+                'trailing_avg_score': 90.0, 'epsilon': 0.002}]
+    figure, score_axis = render(rows_in)
+    assert score_axis.get_xlabel() == 'Iterations (2,685k steps)', score_axis.get_xlabel()
+    plt.close(figure)
+
+
+# ----------------------------------------------------------- the trailing-average trend line
+
+def test_trailing_average_is_a_causal_moving_mean():
+    # Element i is the mean of the last `window` values up to and including i; the window is
+    # shorter at the start where fewer values exist. The last element never depends on values
+    # after it — that is what "trailing, not centred" buys.
+    assert under_the_hood.trailing_average([10, 20, 30], 5) == [10, 15, 20]
+    assert under_the_hood.trailing_average([0, 0, 0, 0, 100], 5) == [0, 0, 0, 0, 20]
+
+
+def test_trailing_average_window_only_looks_back():
+    # A window of 2 over a step change lags the change, it does not anticipate it: the point at
+    # the jump averages the jump with the value before, never with the one after.
+    assert under_the_hood.trailing_average([0, 0, 100, 100], 2) == [0, 0, 50, 100]
+
+
+def test_trailing_average_of_nothing_is_nothing():
+    assert under_the_hood.trailing_average([], 5) == []
+
+
+def test_the_trend_line_is_on_the_percent_axis_bold_and_above_the_raw_trace():
+    """The whole point of the overlay: a bold smoothed line the eye can follow through the noisy
+    thin raw trace, on the same axis and colour so it reads as the same quantity, drawn on top."""
+    percents = [10.0, 90.0, 20.0, 80.0, 95.0, 30.0, 70.0]
+    figure, score_axis = render(perfect_rows(percents))
+    percent_axis = [axis for axis in figure.axes if axis is not score_axis][0]
+
+    # Window 10 must match display_progress's overlay; change both together if it moves.
+    expected_trend = [round(v, 6) for v in under_the_hood.trailing_average(percents, 10)]
+    assert expected_trend != [round(v, 6) for v in percents], \
+        'chosen percents must make the trend differ from the raw trace, or the test proves nothing'
+
+    raw = trend = None
+    for line in percent_axis.get_lines():
+        ydata = [round(v, 6) for v in line.get_ydata()]
+        if len(ydata) != len(percents):
+            continue  # skip the 2-point dashed guides
+        if ydata == [round(v, 6) for v in percents]:
+            raw = line
+        elif ydata == expected_trend:
+            trend = line
+    assert raw is not None, 'the raw perfect-% trace is missing'
+    assert trend is not None, 'the trailing-average trend line is missing'
+    assert trend.get_linewidth() > raw.get_linewidth(), 'the trend must be bolder than the raw trace'
+    assert trend.get_zorder() > raw.get_zorder(), 'the trend must draw on top of the raw trace'
+    assert 'red' in str(trend.get_color()), 'the trend belongs to the red perfect-% family'
+    plt.close(figure)
+
+
 def test_the_chart_is_written_and_the_window_updated():
-    captured = {}
-    real_subplots = plt.subplots
-
-    def capture(*args, **kwargs):
-        figure, axis = real_subplots(*args, **kwargs)
-        captured['figure'] = figure
-        return figure, axis
-
     directory = tempfile.mkdtemp()
     path = os.path.join(directory, 'nested', 'arm.png')
     screen = StubScreen()
-    plt.subplots = capture
-    try:
-        under_the_hood.display_progress(rows([50.0, 90.0]), [], screen, graph_path=path)
-    finally:
-        plt.subplots = real_subplots
+    # No figure capture needed: display_progress builds an OO Figure that is not registered
+    # with pyplot, so there is nothing to close -- it is collected when the call returns.
+    under_the_hood.display_progress(rows([50.0, 90.0]), [], screen, graph_path=path)
     assert screen.frames == 1
     assert os.path.exists(path), 'the PNG was not written'
     assert not os.path.exists(path + '.partial.png'), 'the temporary file was left behind'
-    plt.close(captured['figure'])
     os.remove(path)
     os.rmdir(os.path.dirname(path))
     os.rmdir(directory)
+
+# ----------------------------------------------------------- the chart title (the arm's name)
+#
+# The name has to be burned into the PNG: chart_viewer renders each arm as a bare `imshow` panel
+# with `axis('off')` and reclaims the title space, and charts.md embeds the image with only a
+# markdown caption. So an untitled figure is unidentifiable in the four-panel wave window, which
+# is the one place it matters. The precedence below is the part worth pinning -- three branches
+# that would be easy to collapse into "whichever is not None".
+
+
+def test_the_chart_is_titled_with_the_policy_name():
+    figure, score_axis = render(rows([90.0]), policy_name='b45c-lowlr8-b40b')
+    assert score_axis.get_title() == 'b45c-lowlr8-b40b', score_axis.get_title()
+    plt.close(figure)
+
+
+def test_the_title_falls_back_to_the_graph_paths_stem():
+    # A caller with the path but not the name still gets an identified chart, and the `.png`
+    # comes off -- a title reading "b44a-lowlr7-b29b.png" would be the filename, not the arm.
+    figure, score_axis = render(rows([90.0]), graph_name='b44a-lowlr7-b29b')
+    assert score_axis.get_title() == 'b44a-lowlr7-b29b', score_axis.get_title()
+    plt.close(figure)
+
+
+def test_an_explicit_name_wins_over_the_path_stem():
+    # The mutant this catches is checking graph_path first. On the real training path both are
+    # present and agree, so a wrong precedence would never show up there -- only somewhere like
+    # the k1000 re-measurements, where the directory is named per checkpoint and not per arm.
+    figure, score_axis = render(rows([90.0]), policy_name='b29b-chase10g75seed2',
+                                graph_name='k1000e-b29b-1447k')
+    assert score_axis.get_title() == 'b29b-chase10g75seed2', score_axis.get_title()
+    plt.close(figure)
+
+
+def test_no_name_and_no_path_leaves_the_chart_untitled():
+    # display_progress is called with neither by a headless caller that only wants the window,
+    # and matplotlib's default title is the empty string -- so this asserts we add nothing rather
+    # than a literal "None".
+    captured = {}
+    real_figure = under_the_hood.Figure
+
+    def capture(*args, **kwargs):
+        figure = real_figure(*args, **kwargs)
+        captured['figure'] = figure
+        return figure
+
+    under_the_hood.Figure = capture
+    try:
+        under_the_hood.display_progress(rows([90.0]), [], StubScreen())
+    finally:
+        under_the_hood.Figure = real_figure
+    assert captured['figure'].axes[0].get_title() == '', captured['figure'].axes[0].get_title()
+    plt.close(captured['figure'])
+
+
+def test_the_title_is_larger_than_the_axis_labels_so_it_reads_as_a_heading():
+    # At 3.65x2.25in everything is small; the title being the same size as the axis labels made
+    # it read as another annotation rather than as the chart's identity.
+    figure, score_axis = render(rows([90.0]), policy_name='b45a-lowlr8-b29b')
+    title_size = score_axis.title.get_fontsize()
+    label_size = score_axis.xaxis.label.get_fontsize()
+    assert title_size > label_size, (title_size, label_size)
+    plt.close(figure)
+
+
+def test_the_longest_real_arm_name_still_fits_the_figure_width():
+    # 24 chars (`b40b-chasefree10g75seed2`) is the longest name this project has produced. Measured
+    # against the figure's own width rather than eyeballed, so a later font bump cannot silently
+    # start clipping it.
+    figure, score_axis = render(rows([90.0]), policy_name='b40b-chasefree10g75seed2')
+    figure.canvas.draw()
+    extent = score_axis.title.get_window_extent(figure.canvas.get_renderer())
+    assert extent.width < figure.get_window_extent().width, (
+        extent.width, figure.get_window_extent().width)
+    plt.close(figure)

@@ -26,3 +26,9 @@ dependencies:
       - pillow==12.3.0
       - protobuf==4.25.9
       - cpprb
+      - imageio==2.37.4
+      # opencv (GUI build) backs the live pyformulas chart window on the monitor;
+      # needs system libs `libgl1 libglib2.0-0` (see SETUP.md). Pinned to a numpy-1.x
+      # build so it can't drag in numpy 2 (which breaks gym/tf).
+      - opencv-python==4.9.0.80
+      - pyformulas==0.2.11

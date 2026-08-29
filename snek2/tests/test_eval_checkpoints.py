@@ -12,6 +12,7 @@ import json
 import os
 
 import eval_checkpoints
+import eval_plan
 from snake_constants import RUNS_DIR
 
 
@@ -286,6 +287,91 @@ def test_build_row_ci_widens_as_the_sample_shrinks():
     assert wide['perfect_percent'] == narrow['perfect_percent'] == 70.0
     assert (wide['perfect_ci95'][1] - wide['perfect_ci95'][0]) > \
            (narrow['perfect_ci95'][1] - narrow['perfect_ci95'][0])
+
+
+# ------------------------------------------------------------ RowCache / WriteGate
+
+def test_a_cached_row_is_not_rebuilt_on_the_next_pass():
+    """The point of the cache. Both writers assemble the whole row list on every write, so a rebuild
+    per pass is a rebuild per round — 97 ms x 125 on a 513-row arm."""
+    cache = eval_checkpoints.RowCache()
+    samples = {1000: held([True] * 7 + [False] * 3)}
+    builds = []
+    # Patched in `eval_plan`, not in `eval_checkpoints`: `RowCache.rows` resolves `build_row` in the
+    # namespace it is defined in, and the re-export is a separate binding to the same function.
+    real = eval_plan.build_row
+
+    def counting(step, sample, meta=None):
+        builds.append(step)
+        return real(step, sample, meta)
+
+    eval_plan.build_row = counting
+    try:
+        first = cache.rows(samples, {}, lambda step: None)
+        second = cache.rows(samples, {}, lambda step: None)
+    finally:
+        eval_plan.build_row = real
+    assert builds == [1000], builds
+    # By reference, which is what makes the second pass free. Safe only because build_row copies the
+    # episode_* lists out of the sample.
+    assert second[0] is first[0]
+
+
+def test_a_topped_up_sample_needs_a_put_or_its_row_freezes():
+    """The invariant, stated as the failure it prevents: a screened row topped up to full length
+    keeps reporting its screen depth if the mutator forgets to `put`."""
+    cache = eval_checkpoints.RowCache()
+    sample = held([True] * 15 + [False] * 5)
+    samples = {1000: sample}
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 20
+    # A top-up, the way `measure` and `Wave.on_done` both do it: extend in place, then re-put.
+    sample['perfect'].extend([True] * 80)
+    sample['scores'].extend(range(80))
+    sample['rewards'].extend([1.0] * 80)
+    cache.put(1000, eval_checkpoints.build_row(1000, sample))
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 100
+
+
+def test_clear_drops_rows_cached_against_a_replaced_samples_dict():
+    cache = eval_checkpoints.RowCache()
+    samples = {1000: held([True] * 4)}
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 4
+    cache.clear()
+    samples[1000] = held([True] * 9)
+    assert cache.rows(samples, {}, lambda step: None)[0]['episodes'] == 9
+
+
+def test_a_step_still_being_measured_has_no_row_yet():
+    """An empty sample is the checkpoint in flight; its state travels in `in_flight`, not as a row
+    with no episodes in it."""
+    cache = eval_checkpoints.RowCache()
+    samples = {1000: held([True] * 4), 2000: held([])}
+    assert [r['step'] for r in cache.rows(samples, {}, lambda step: None)] == [1000]
+
+
+def test_rows_come_out_in_step_order_whatever_the_dict_order():
+    cache = eval_checkpoints.RowCache()
+    samples = {3000: held([True]), 1000: held([True]), 2000: held([True])}
+    resumed = {500: {'step': 500, 'episodes': 100}}
+    assert [r['step'] for r in cache.rows(samples, resumed, lambda step: None)] == \
+        [500, 1000, 2000, 3000]
+
+
+def test_the_write_gate_admits_one_write_per_interval():
+    gate = eval_checkpoints.WriteGate(interval=2.0)
+    gate.record(now=100.0)
+    assert not gate.due(now=101.9)
+    assert gate.due(now=102.0)
+    # Pure: asking does not consume the slot, so a caller that asks twice and writes once is honest.
+    assert gate.due(now=102.0)
+    gate.record(now=102.0)
+    assert not gate.due(now=103.0)
+
+
+def test_the_write_gate_defaults_to_the_shared_constant():
+    # Read late rather than as a default argument, so the constant is patchable and so the class can
+    # be defined above it in the file.
+    assert eval_checkpoints.WriteGate().interval == eval_checkpoints.WRITE_MIN_INTERVAL
 
 
 # --------------------------------------------------------------- skips_screening
@@ -683,25 +769,32 @@ def test_the_gate_scales_with_a_shorter_target():
     assert test(13, 20) is True
 
 
-def test_the_default_gate_is_95_and_stops_a_100_episode_run_after_6_failures():
+def test_the_default_gate_is_97_and_stops_a_100_episode_run_after_4_failures():
     # The gate is the bar a checkpoint has to clear to be worth keeping at all. Pinned as
     # arithmetic rather than as a bare constant, because what matters downstream is where the rule
     # fires, not the number itself.
-    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 95.0
+    #
+    # Raised 95 -> 97 on 2026-08-19, with the selection tiers and the 20-episode graph eval. The
+    # old form of this test read "after 6 failures"; at 97 it is 4, which is the point of the
+    # change — a tighter gate abandons sooner and is most of the close-out saving on arms whose
+    # checkpoints sit just under the bar.
+    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE == 97.0
     test = eval_checkpoints.make_abandon_test(eval_checkpoints.DEFAULT_MIN_ACHIEVABLE, 100,
-                                              eval_checkpoints.DEFAULT_ABANDON_FLOOR)
-    # 5 failures still allow exactly 95%, so the run continues; the 6th makes 95% unreachable.
-    assert eval_checkpoints.achievable_percent(45, 50, 100) == 95.0
-    assert test(45, 50) is False
-    assert test(44, 50) is True
-    # A 90% gate tolerates 10 failures and would keep both of those going, so a revert to any
-    # looser gate cannot pass silently.
-    for looser in (90.0, 85.0):
-        assert eval_checkpoints.make_abandon_test(looser, 100, 20)(44, 50) is False
+                                             eval_checkpoints.DEFAULT_ABANDON_FLOOR)
+    # 3 failures still allow exactly 97%, so the run continues; the 4th makes 97% unreachable.
+    assert eval_checkpoints.achievable_percent(47, 50, 100) == 97.0
+    assert test(47, 50) is False
+    assert test(46, 50) is True
+    # Every looser gate tolerates more failures and would keep that going, so a revert to any of
+    # them cannot pass silently. 95 is included because that is the value this replaced.
+    for looser in (95.0, 90.0, 85.0):
+        assert eval_checkpoints.make_abandon_test(looser, 100, 20)(46, 50) is False
+    # And the gate must stay strictly below the HOF selection gate, or the re-measure starves.
+    assert eval_checkpoints.DEFAULT_MIN_ACHIEVABLE < eval_checkpoints.DEFAULT_ABOVE_THRESHOLD
 
-    # The floor still binds first: 95% of 100 is unreachable after 6 failures, which can happen
+    # The floor still binds first: 97% of 100 is unreachable after 4 failures, which can happen
     # inside the first 20 episodes, so the floor is what keeps a row long enough for
-    # equal_effort_pooled. This is the gate at which the floor stops being slack.
+    # equal_effort_pooled. The tighter gate makes the floor bind more often, not less.
     assert test(4, 10) is False, 'the floor must suppress a check below 20 episodes'
     assert test(4, 20) is True
 
@@ -854,3 +947,57 @@ def test_the_deeper_partial_wins_when_two_files_hold_the_same_step():
     finally:
         os.remove(first)
         os.remove(second)
+
+
+# --------------------------------------------------------- select_checkpoints_above (HOF)
+
+def test_select_above_takes_only_checkpoints_at_or_above_the_threshold():
+    pol = '_hoftest_above'
+    path = write_result_file(pol, '', [
+        row(1000, perfect=97),   # 97.0% -> below 98, excluded
+        row(2000, perfect=98),   # 98.0% -> at the bar, included
+        row(3000, perfect=100),  # 100%  -> included
+    ])
+    try:
+        steps, meta = eval_checkpoints.select_checkpoints_above(pol, {1000, 2000, 3000}, 98)
+    finally:
+        os.remove(path)
+    assert steps == [2000, 3000], steps
+    assert meta[2000]['closeout_percent'] == 98.0
+    assert meta[2000]['selected_by'] == 'above98'
+    # No single_eval key -> the step skips screening and goes straight to full length.
+    assert 'single_eval' not in meta[2000]
+
+
+def test_select_above_skips_abandoned_and_missing_checkpoints():
+    pol = '_hoftest_above2'
+    rows = [row(1000, perfect=99),
+            row(2000, episodes=30, perfect=30),   # 100% but its checkpoint file is gone
+            {'step': 3000, 'episodes': 40, 'perfect_games': 40, 'perfect_percent': 100.0,
+             'abandoned': True}]                   # abandoned rows never qualify, even at 100%
+    path = write_result_file(pol, '', rows)
+    try:
+        # 3000 IS available, so its exclusion is the abandoned filter, not a missing checkpoint;
+        # 2000 is absent from `available`, standing in for an evicted checkpoint.
+        steps, _ = eval_checkpoints.select_checkpoints_above(pol, {1000, 3000}, 98)
+    finally:
+        os.remove(path)
+    assert steps == [1000], steps
+
+
+def test_select_above_returns_empty_when_nothing_qualifies():
+    pol = '_hoftest_above3'
+    path = write_result_file(pol, '', [row(1000, perfect=90), row(2000, perfect=95)])
+    try:
+        steps, meta = eval_checkpoints.select_checkpoints_above(pol, {1000, 2000}, 98)
+    finally:
+        os.remove(path)
+    assert steps == [] and meta == {}
+
+
+def test_select_above_missing_file_is_an_error():
+    try:
+        eval_checkpoints.select_checkpoints_above('_hoftest_no_such_policy', {1}, 98)
+        assert False, 'expected SystemExit'
+    except SystemExit:
+        pass

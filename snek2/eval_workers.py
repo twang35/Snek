@@ -79,6 +79,7 @@ quota is designed to avoid, so `collect_results` keeps draining until every work
 import collections
 import multiprocessing
 import os
+import threading
 import time
 
 # Message tags on the results queue. One queue, many writers, so every message carries its rank.
@@ -89,6 +90,50 @@ TAG_DONE = 'done'
 TAG_ERROR = 'error'
 
 Episode = collections.namedtuple('Episode', ['rank', 'score', 'perfect', 'reward', 'steps'])
+
+
+# How often a worker checks that its controller is still there. Two seconds is well under the cost of
+# the memory being held (16 workers ~= 3.7 GB) and far above any scheduling jitter.
+PARENT_POLL_SECONDS = 2.0
+
+
+def watch_parent(parent_pid, poll_seconds=PARENT_POLL_SECONDS, on_orphan=None):
+    """Blocks while this process is still `parent_pid`'s child, then exits it.
+
+    Run in a daemon thread by `install_parent_watchdog`. `on_orphan` is for tests; in production it
+    is `os._exit(0)`, deliberately: a worker holds no durable state -- every result travels back over
+    the queue as it is produced -- so there is nothing to flush, and an orphaned worker running
+    interpreter finalisation from a thread is the `chart_viewer` Tk crash in a different costume.
+    Exit code 0 because being orphaned is not this process's failure.
+    """
+    while os.getppid() == parent_pid:
+        time.sleep(poll_seconds)
+    (on_orphan or (lambda: os._exit(0)))()
+
+
+def install_parent_watchdog(poll_seconds=PARENT_POLL_SECONDS):
+    """Makes this worker die with its controller. Returns the thread, for tests.
+
+    `daemon=True` on the `Process` only covers a *clean* parent exit -- it is implemented as an
+    atexit hook in the parent -- so it does nothing for `kill -9`, and nothing for a default SIGTERM
+    either. This project's house style for stopping a run is `kill -9` (a trainer ignores SIGTERM
+    outright), so the uncovered case is the normal case: killing an `eval_wave` controller on
+    2026-08-19 left **16** spawned workers holding ~3.7 GB, reparented to launchd and invisible to
+    `pgrep -f eval_wave` because their argv reads `python -c from multiprocessing.spawn import ...`.
+
+    Polling `getppid()` rather than a pipe or `PR_SET_PDEATHSIG`: the pipe wants a plumbing change at
+    every call site, and `prctl` does not exist on darwin, where half of this project's evals run.
+    The recorded pid is compared for *change*, not against 1, because a reparented process lands on
+    whatever the platform's reaper is -- launchd's pid is 1, but a user session's reaper need not be.
+
+    Installed before the TensorFlow import, since that import is ~8 s of the worker's life and an
+    orphan made during it would otherwise wait for the load command that is never coming.
+    """
+    parent = os.getppid()
+    thread = threading.Thread(target=watch_parent, args=(parent, poll_seconds),
+                              daemon=True, name='parent-watchdog')
+    thread.start()
+    return thread
 
 
 def split_quota(episodes, num_workers):
@@ -203,6 +248,7 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
     for tracing.
     """
     try:
+        install_parent_watchdog()
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
         os.environ['SDL_AUDIODRIVER'] = 'dummy'
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -225,14 +271,21 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
         from tf_agents.environments import tf_py_environment
         from tf_agents.utils import common
 
-        import snake_constants
+        import policy_arch
         from eval_agent import build_eval_agent
         from snake_environment import SnakeEnvironment
+        from state_helpers import is_perfect_score
 
         py_env = SnakeEnvironment(discount=0.99, display=False, policy_name=policy_name)
         tf_env = tf_py_environment.TFPyEnvironment(py_env)
-        agent, checkpoint, global_step = build_eval_agent(tf_env, py_env)
+        agent, checkpoint, global_step = build_eval_agent(tf_env, py_env, ckpt_dir)
         policy_action = common.function(agent.policy.action)
+        # The arch this network was built for. A `load` naming a different directory is checked
+        # against it before anything is restored -- see policy_arch.assert_same_network for why a
+        # matching tensor shape is not enough. Cached per directory because a wave alternates
+        # between the same few arms and re-reading the sidecar per unit is pointless.
+        built_arch = policy_arch.require_arch(ckpt_dir)
+        checked_dirs = {ckpt_dir: built_arch}
 
         def one_episode():
             steps = 0
@@ -246,10 +299,11 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
                 steps += 1
                 if bool(time_step.is_last().numpy()[0]):
                     # Read the score before the next reset overwrites it, exactly as the batched
-                    # path does with its `call('get_score')`.
-                    return (py_env.get_score(),
-                            reward == snake_constants.PERFECT_GAME_REWARD,
-                            total_reward, steps)
+                    # path does with its `call('get_score')`. The score is also what decides
+                    # whether this was a perfect game — never the final reward, which a shaping
+                    # term shifts off `PERFECT_GAME_REWARD`. See `state_helpers.is_perfect_score`.
+                    score = py_env.get_score()
+                    return score, is_perfect_score(score), total_reward, steps
 
         results.put((TAG_READY, rank))
 
@@ -258,9 +312,18 @@ def _worker_main(rank, policy_name, ckpt_dir, commands, results, stop_flag):
             if command[0] == 'exit':
                 return
             if command[0] == 'load':
+                # ('load', step) restores from this worker's own policy; ('load', step, dir) from
+                # another one's, which is what lets a lane take work from a sibling arm without the
+                # ~8s of TensorFlow import and graph build a new pool would cost. The network is
+                # untouched either way -- a restore writes into the same variables, which is already
+                # what happens between checkpoints of one arm.
                 step = command[1]
+                target_dir = command[2] if len(command) > 2 and command[2] else ckpt_dir
+                if target_dir not in checked_dirs:
+                    checked_dirs[target_dir] = policy_arch.assert_same_network(
+                        built_arch, policy_arch.require_arch(target_dir), ckpt_dir, target_dir)
                 checkpoint.restore(
-                    os.path.join(ckpt_dir, 'ckpt-{0}'.format(step))).expect_partial()
+                    os.path.join(target_dir, 'ckpt-{0}'.format(step))).expect_partial()
                 results.put((TAG_LOADED, rank, int(global_step.numpy())))
                 continue
             if command[0] == 'run':
@@ -322,10 +385,17 @@ class IndependentWorkerPool:
                 values.append(message)
         return values
 
-    def load(self, step):
-        """Restores one checkpoint in every worker. Returns the global_step they read back."""
+    def load(self, step, ckpt_dir=None):
+        """Restores one checkpoint in every worker. Returns the global_step they read back.
+
+        `ckpt_dir` defaults to the pool's own policy. Passing another policy's directory is how a
+        wave lane switches arms: the workers check its `arch.json` against the network they built
+        (`policy_arch.assert_same_network`) and then restore, so the switch costs one restore rather
+        than a new pool. A mismatch raises `ArchMismatch` out of `_await` instead of restoring
+        weights whose values no longer mean what the network thinks they mean.
+        """
         for queue in self._commands:
-            queue.put(('load', step))
+            queue.put(('load', step, ckpt_dir or self._ckpt_dir))
         acks = self._await(TAG_LOADED, self._num_workers)
         restored = {ack[2] for ack in acks}
         if len(restored) != 1:

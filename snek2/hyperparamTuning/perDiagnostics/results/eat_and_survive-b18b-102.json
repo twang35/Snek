@@ -1,0 +1,91 @@
+{
+ "target": "hallOfFame/b18b-tgt1000seed2-ckpt1588000/ckpt-1588000",
+ "checkpoint": "ckpt-1588000",
+ "global_step": 1588000,
+ "seed": 102,
+ "episodes": 60,
+ "mismatches": 0,
+ "board": "10x10",
+ "survival_depths": [
+  100,
+  50,
+  20,
+  5,
+  1
+ ],
+ "outcomes": {
+  "perfect": 57,
+  "starved": 2,
+  "collision": 1
+ },
+ "losses": [
+  {
+   "episode": 15,
+   "outcome": "starved",
+   "final_length": 71,
+   "steps": 1429,
+   "at_last_geom": {
+    "status": "unknown",
+    "moves_before_death": 0
+   },
+   "at_last_eat_and_survive": {
+    "status": "resolved",
+    "moves_before_death": 0,
+    "length": 71,
+    "moves_to_food": 22
+   }
+  },
+  {
+   "episode": 19,
+   "outcome": "starved",
+   "final_length": 47,
+   "steps": 1205,
+   "at_last_geom": {
+    "status": "resolved",
+    "moves_before_death": 0,
+    "routes": 200,
+    "routes_truncated": true,
+    "length": 47,
+    "food_free_neighbours": 2,
+    "moves_to_food": 16,
+    "perfect": false,
+    "legal": true,
+    "tail": true,
+    "survival_depth": 100,
+    "survival_unknown": false
+   },
+   "at_last_eat_and_survive": {
+    "status": "resolved",
+    "moves_before_death": 0,
+    "length": 47,
+    "moves_to_food": 16
+   }
+  },
+  {
+   "episode": 30,
+   "outcome": "collision",
+   "final_length": 96,
+   "steps": 2733,
+   "at_last_geom": {
+    "status": "resolved",
+    "moves_before_death": 0,
+    "routes": 200,
+    "routes_truncated": true,
+    "length": 96,
+    "food_free_neighbours": 0,
+    "moves_to_food": 2,
+    "perfect": false,
+    "legal": true,
+    "tail": true,
+    "survival_depth": 100,
+    "survival_unknown": false
+   },
+   "at_last_eat_and_survive": {
+    "status": "resolved",
+    "moves_before_death": 0,
+    "length": 96,
+    "moves_to_food": 2
+   }
+  }
+ ]
+}

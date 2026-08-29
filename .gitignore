@@ -2,6 +2,47 @@ theSchlong/savedPolicies/
 snek2/savedPolicies/
 # Everything in snek2/runs/ is committed on purpose: the .png and .md are the
 # write-up, and <policy>_evals.json is the record later tuning sessions read.
+
+# Staging copies of finished desktop jobs, landed by
+# `git checkout origin/results -- results/<job-id>` on the way into snek2/runs/
+# (desktop/README.md#getting-a-finished-job-into-the-analysis-workflow). Redundant
+# the moment they are copied across, and still on the `results` branch regardless.
+#
+# ANCHORED, and it has to stay that way. Bare `results/` would match a `results`
+# directory at any depth; the leading slash pins it to the repo root, which is the
+# only place these appear.
+#
+# This CANNOT reach the desktop's results worktree, and that matters: the daemon
+# publishes with `git add -A results/<job-id>` and then tests `git status
+# --porcelain`, which hides ignored files -- so a rule that did reach it would make
+# _commit_and_push find nothing staged and return early, and results would stop
+# being published with no error anywhere. It cannot, for two independent reasons:
+# gitignore lookup never walks above a working tree's own root, and the `results`
+# branch that worktree checks out has no .gitignore of its own (it is orphan-style:
+# just `results/`). Verified 2026-08-13 by adding this rule, checking out a real
+# worktree of origin/results, and running the daemon's exact sequence -- `git add -A
+# results/<id>` then `git status --porcelain` -- which staged and reported the file.
+#
+# So use THIS file, never `.git/info/exclude`. The instinct to keep a local-only
+# pattern out of a tracked file is exactly backwards here: info/exclude lives in the
+# COMMON git dir and is shared by every linked worktree, so the same pattern there
+# does reach the results worktree and does silently stop publishing. Measured, same
+# day, on the same worktree -- git resolved it to the main checkout's
+# .git/info/exclude for a worktree rooted elsewhere entirely.
+/results/
 __pycache__/
 *.pyc
 .idea/
+
+# Scratch recordings from record_gif.py. The committed gallery is
+# snek2/hallOfFame/gifs/, referenced from hallOfFame/HOF.md; everything written
+# here is a one-off preview, regenerable in seconds from its seed.
+/snek2/gifs/
+
+# snek3. Checkpoints are ~45 KB each and written every 1000 steps, so an arm is
+# ~135 MB; runs/, evals/ and hallOfFame/ are committed on purpose, like snek2's.
+/snek3/savedPolicies/
+
+# Scratch recordings from record_gif.py. The committed gallery is
+# snek3/hallOfFame/gifs/, referenced from hallOfFame/HOF.md.
+/snek3/gifs/

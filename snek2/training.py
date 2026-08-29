@@ -11,7 +11,39 @@ import pyformulas as pf
 
 trailing_avg_window = 5
 log_interval = 200
-num_eval_episodes = 10
+# 20, raised from 10 on 2026-08-19. This is the graph eval, and its episode count sets the
+# *granularity* of every downstream selection threshold: a 10-episode eval can only report
+# multiples of 10, so `eval_checkpoints.ALWAYS_FULL_SINGLE = 100` meant "10 perfect games out of
+# 10" and admitted ~66% of a champion arm's checkpoints to the uncapped full-length tier, which is
+# what made a continuation close-out cost ~15 h. At 20 episodes the same 100% means 20/20 and
+# admits ~44%, and a 95% tier becomes expressible at all ({95, 100} rather than collapsing to
+# {100}). Measured on b43/b44's own curves: close-out episodes -25%, against +15,500 self-eval
+# episodes per arm here — roughly a 2:1 trade in the close-out's favour.
+#
+# Two consequences to remember. `perfect_percent` feeds `epsilon_for`'s refinement phase, so this
+# changes the exploration schedule as well as the report; and `best_perfect30` / `sef` are computed
+# from these evals, so **an arm measured at 20 episodes is not strictly comparable with the
+# batches 1-44 measured at 10** — the estimator is less noisy, which moves the tails most.
+#
+# **20 -> 100 on 2026-08-27, and it is a third boundary of the same kind.** It became affordable
+# because the self-eval moved to the vectorised engine (`self_eval.py`): the forked path was 88% of
+# an arm's wall clock, so 100 in-process lanes cost far less than 20 forked processes did. 100
+# episodes puts `perfect_percent` on a 1% grid instead of 5%, which is what makes `best_perfect30`
+# and `strong_eval_fraction` usable rather than tail-driven — but `sef` is a threshold-crossing
+# statistic, so comparing a 100-episode arm with a 20- or 10-episode one needs
+# `hyperparamTuning/perDiagnostics/sef_common_footing.py`, never a raw difference.
+#
+# **Settable, and the reason is the opt-out.** `SNEK_TRAIN_EVAL_ENGINE=scalar` exists to reproduce a
+# pre-2026-08-27 measurement without a deploy, and it cannot do that alone: the engine and the
+# episode count changed together, and scalar at 100 episodes means 100 forked pygame envs, which did
+# not finish a single eval in 120 s on the laptop. So reproducing b46 wave 2's first 520k steps is
+# `SNEK_TRAIN_EVAL_ENGINE=scalar SNEK_GRAPH_EVAL_EPISODES=20`, and an opt-out that needs both knobs
+# has to expose both. Read here rather than through `snek2.tuned()` because this is a module
+# constant that `eval_plan`'s selection tiers are derived against — see
+# `tests/test_selection_tiers.py`, which asserts the two stay consistent.
+num_eval_episodes = int(os.environ.get('SNEK_GRAPH_EVAL_EPISODES') or 100)
+if num_eval_episodes < 1:
+    raise ValueError('SNEK_GRAPH_EVAL_EPISODES must be >= 1, got {0}'.format(num_eval_episodes))
 eval_interval = 1000
 display_progress_interval = eval_interval
 buffer_save_interval = 10 * eval_interval
@@ -74,7 +106,7 @@ def random_play(time_step_spec, action_spec, train_py_env, rb_observer, initial_
         max_steps=initial_collect_steps).run(train_py_env.reset())
 
 
-def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, batch_size, replay_buffer,
+def train(max_steps, self_eval, train_py_env, agent, collect_driver, batch_size, replay_buffer,
           train_checkpointer, replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
           guided_fraction, configured_guided_fraction,
           eval_only, policy_name, run_config, priority_signal='td_error', use_is_weights=True,
@@ -87,7 +119,22 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
     # Reset the train step.
     # agent.train_step_counter.assign(0)
 
-    screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
+    # Live results window. **Off by default now** -- the decoupled chart_viewer.py
+    # is the way to watch charts (it only reads the PNGs written every eval, so it
+    # cannot affect training). The in-process cv2 window is the old way and is unsafe
+    # on an X11 box under memory pressure: if the X session breaks (e.g. an OOM kill
+    # disrupts it) it raises a *fatal* XIO error that calls exit() below Python and
+    # cannot be caught -- which killed all four desktop arms at once on 2026-08-09.
+    # Set SNEK_CHART_WINDOW=1 to opt back in; opening it is still best-effort.
+    if os.environ.get('SNEK_CHART_WINDOW', '0') in ('0', '', 'false', 'False'):
+        screen = None
+    else:
+        try:
+            screen = pf.screen(np.zeros((480, 560)), '{0} results'.format(policy_name))
+        except Exception as _e:
+            print('live results window unavailable ({0}: {1}); charts still saved to disk'.format(
+                type(_e).__name__, _e))
+            screen = None
     # Every eval refreshes the window and these three files, so a run always leaves
     # behind its own graph and write-up without anyone having to screenshot it.
     graph_path = os.path.join(snake_constants.RUNS_DIR, '{0}.png'.format(policy_name))
@@ -107,8 +154,8 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
             training_metrics.resume_steps.append(int(initial_step))
             training_metrics.resume_steps.sort()
 
-    avg_reward, avg_score = compute_avg_return(eval_parallel_env, agent.policy, training_metrics,
-                                               eval_only, num_eval_episodes)
+    avg_reward, avg_score = self_eval.run(training_metrics, eval_only, num_eval_episodes,
+                                         int(global_step.numpy()))
     merge_eval_row(training_metrics.eval_rows,
                    build_eval_row(int(initial_step), avg_score, avg_score, avg_reward, training_metrics, epsilon))
     if snake_constants.DEBUG_LOGGING:
@@ -130,8 +177,9 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
         #
         # The forking collector is a drop-in for the driver that advances one of several branches
         # of the same game instead of only the main line, still one counted step per iteration —
-        # see forking_collector.py. `None` unless SNEK_FORK_BRANCHES is set above 1, so the default
-        # path is the PyDriver call it always was plus one `is None` test.
+        # see forking_collector.py. `None` only when SNEK_FORK_BRANCHES is 1, which since the
+        # 2026-08-14 default raise means someone asked for it explicitly; the PyDriver branch is
+        # kept because that is the plain single-line collect every arm before batch 17 ran.
         if forking_collector is None:
             time_step, _ = collect_driver.run(time_step)
         else:
@@ -155,7 +203,7 @@ def train(max_steps, eval_parallel_env, train_py_env, agent, collect_driver, bat
             replay_buffer.update_priorities(indexes, signal.numpy())
 
         step += 1
-        log_messages_and_eval(training_metrics, loss_info, eval_parallel_env, agent, train_py_env, screen,
+        log_messages_and_eval(training_metrics, loss_info, self_eval, agent, train_py_env, screen,
                               graph_path, report_path, graph_history_path, train_checkpointer, replay_buffer,
                               replay_buffer_dir, global_step, epsilon, initial_epsilon, min_epsilon,
                               guided_fraction, configured_guided_fraction, step,
@@ -225,7 +273,7 @@ def build_eval_row(step, avg_score, trailing_avg_score, avg_reward, metrics, eps
     return row
 
 
-def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py_env, screen, graph_path,
+def log_messages_and_eval(metrics, loss_info, self_eval, agent, train_py_env, screen, graph_path,
                           report_path, graph_history_path, train_checkpointer, replay_buffer, replay_buffer_dir,
                           global_step, epsilon, initial_epsilon, min_epsilon, guided_fraction,
                           configured_guided_fraction, step, eval_only, initial_step,
@@ -250,8 +298,7 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
             print('training time: ', get_time(metrics.training_start_time))
             print('train_py_env high score: ', train_py_env.high_score)
         metrics.eval_start_time = time.time()
-        avg_reward, avg_score = compute_avg_return(eval_parallel_env, agent.policy, metrics, eval_only,
-                                                   num_eval_episodes)
+        avg_reward, avg_score = self_eval.run(metrics, eval_only, num_eval_episodes, step)
         if debug:
             print('eval time: ', get_time(metrics.eval_start_time))
 
@@ -369,11 +416,11 @@ def log_messages_and_eval(metrics, loss_info, eval_parallel_env, agent, train_py
                               fork['forks'], fork['live_now'], fork['branch_share'],
                               fork['terminated'], fork['truncated'], fork['skipped_full']),
                           flush=True)
-        # restart time because compute_avg_return() takes a while and messes up the timing
+        # restart time because the self-eval takes a while and messes up the timing
         metrics.reset()
 
     if step % display_progress_interval == 0:
-        display_progress(metrics.eval_rows, metrics.resume_steps, screen, graph_path)
+        display_progress(metrics.eval_rows, metrics.resume_steps, screen, graph_path, policy_name)
         write_run_report(report_path, policy_name, run_config, metrics.eval_rows, os.path.basename(graph_path),
                          metrics.resume_steps)
 
@@ -531,6 +578,39 @@ def maybe_update_guided_fraction(avg_reward, initial_epsilon, configured_fractio
         if configured_fraction > 0.0:
             print('exploration shield {0} (guided fraction {1})'.format(
                 'ON' if target > 0.0 else 'OFF', target), flush=True)
+
+
+def enforce_learning_rate(optimizer, configured_lr):
+    """Re-asserts the configured learning rate over whatever the checkpoint restored.
+
+    Adam's `learning_rate` is a `tf.Variable`, not a plain attribute, so `common.Checkpointer`
+    saves it alongside the moment estimates and `initialize_or_restore()` silently overwrites the
+    value the constructor was given. Measured on tf 2.15.1 / keras 2.15.0: an optimizer built at
+    1e-6 reads 1e-5 back after restoring a checkpoint written at 1e-5. That makes
+    `SNEK_LEARNING_RATE` a **no-op on every resume** — the knob works on a fresh arm and is
+    discarded by exactly the runs that most want it, which is the same silent-config-override shape
+    as the `v_max` and observation-era traps `policy_arch.py` exists to catch, and it is quieter
+    because nothing about the run looks wrong afterwards.
+
+    `epsilon` needs no equivalent: it is a plain Python float on the optimizer, so nothing restores
+    it. `iterations` and the `m`/`v` moments are genuine training state and are deliberately left
+    alone — this puts back the hyperparameter, not the history.
+
+    Comparison is on the float32 round-trip because that is what the Variable holds: a configured
+    1e-5 reads back as 9.999999747e-06, so comparing the raw floats would call every resume an
+    override. `round(x, 6)` — the idiom `maybe_update_epsilon` uses — does separate 1e-5 from 1e-6,
+    but it floors anything at or below 5e-7 to 0.0, so it would call 1e-7 and 1e-8 equal and
+    silently drop a retune in that range. float32 equality needs no threshold and is what the
+    Variable can actually represent.
+
+    Returns the restored value when it differed from the configured one and was replaced, else
+    None, so a caller can report the override.
+    """
+    restored = float(optimizer.learning_rate.numpy())
+    if np.float32(restored) == np.float32(configured_lr):
+        return None
+    optimizer.learning_rate.assign(configured_lr)
+    return restored
 
 
 def maybe_update_epsilon(avg_reward, perfect_rate, epsilon, initial_epsilon, min_epsilon):

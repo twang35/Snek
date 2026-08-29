@@ -14,41 +14,48 @@ Usage:
     PYTHONPATH=. python -u eval_checkpoints.py <policy_name> <step> [<step> ...]
 
     # the normal close-out
-    EVAL_WORKERS=10 PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top20
+    EVAL_WORKERS=10 PYTHONPATH=. python -u eval_checkpoints.py <policy_name> top50
 
     # flat one-pass protocol (every arm before batch 10 was measured this way)
-    EVAL_SCREEN_EPISODES=0 ... top20
+    EVAL_SCREEN_EPISODES=0 ... top50
 
     # continue an interrupted close-out
-    EVAL_RESUME=1 ... top20
+    EVAL_RESUME=1 ... top50
 
-Selection (`top20`, `top`, `top:20`) ranks on the single 10-episode graph eval, breaking ties
-on the surrounding rate:
+Selection (`top50`, `top`, `top:50`) ranks on the single graph eval, breaking ties
+on the surrounding rate. Selection (`above:98`, `above`) instead reads a *prior close-out's*
+100-episode measurement and takes every checkpoint whose `perfect_percent` is at or above the
+threshold — the HOF re-measure path, which reconfirms already-excellent checkpoints rather than
+re-discovering them from the noisy graph (see select_checkpoints_above):
 
-- every checkpoint at **>=90%** is measured, even past N
-- remaining slots go to the best of the rest down to **>=60%**
-- nothing below 60% is measured
+- every checkpoint at **>=95%** is measured, even past N
+- remaining slots go to the best of the rest down to **>=90%**
+- nothing below 90% is measured
 
-N is a target, not a quota — a weak arm may run 1 or 0. Because a graph point is 10 episodes,
-the mandatory tier is exactly {90, 100} and the fill band is {60, 70, 80}. Adjacent steps are
+N is a target, not a quota — a weak arm may run 1 or 0, and a *strong* arm blows past N, which is
+what makes a continuation close-out expensive. Because a graph point is **20 episodes** (since
+2026-08-19; it was 10 before, and the thresholds were 90/60 to match), the mandatory tier is
+exactly {95, 100} and the fill band is exactly {90}. Adjacent steps are
 allowed through on purpose: 1000 train steps can change the perfect rate by tens of points, so
 neighbours are separate policies rather than repeat samples.
 
 Three stages when screening is on (the default):
 
-1. every checkpoint whose graph point is **100%**, plus any explicitly named step, gets the
-   full EVAL_EPISODES immediately. Uncapped.
+1. every checkpoint whose graph point is **>=95%** (19/20 or 20/20 of a 20-episode graph eval),
+   plus any explicitly named step, gets the full EVAL_EPISODES immediately. Uncapped — but bounded
+   by EVAL_MIN_ACHIEVABLE, which abandons a row once the gate is unreachable, and that is what
+   makes an uncapped tier affordable. See ALWAYS_FULL_SINGLE.
 2. everything else selected gets EVAL_SCREEN_EPISODES (20)
 3. the best EVAL_CONFIRM_COUNT **of those screened** get the remaining 80
 
 A promoted checkpoint ends with exactly EVAL_EPISODES, so its number is comparable with arms
 measured flat. The 100% tier is excluded from confirmation slots — it already has the
-measurement a slot would buy. **That tier is coverage, not a shortlist of champions**; the
-larger 90% tier holds more of the actual best checkpoints, and finding them is stage 3's job.
+measurement a slot would buy. Since 2026-08-19 the full tier *is* the mandatory tier, so stage 2
+holds only the fill band (>=90% and <95%) and stage 3 ranks within it.
 
-Early abandonment (EVAL_MIN_ACHIEVABLE, default 95) stops a checkpoint once its ceiling — its
-rate if every remaining episode were perfect — falls below the gate. At 100 episodes and a 95%
-gate that is "stop once more than 5 have failed". The rule is arithmetic, not predictive, which
+Early abandonment (EVAL_MIN_ACHIEVABLE, default 97) stops a checkpoint once its ceiling — its
+rate if every remaining episode were perfect — falls below the gate. At 100 episodes and a 97%
+gate that is "stop once more than 3 have failed". The rule is arithmetic, not predictive, which
 is what makes it safe: a checkpoint that would reach the gate is never stopped, and an abandoned
 row's own rate is always below the gate, so it can never outrank a kept one.
 
@@ -78,7 +85,7 @@ Environment:
     EVAL_OUT_SUFFIX   appended to the output filename
     EVAL_SCREEN_EPISODES  screen depth before promotion (default 20; 0 turns screening off)
     EVAL_CONFIRM_COUNT    how many screened checkpoints get promoted (default 100)
-    EVAL_MIN_ACHIEVABLE   abandon once this rate is unreachable (default 95; 0 disables)
+    EVAL_MIN_ACHIEVABLE   abandon once this rate is unreachable (default 97; 0 disables)
     EVAL_ABANDON_FLOOR    never abandon before this many episodes (default 20, raised to
                       EVAL_SCREEN_EPISODES if larger)
     EVAL_RESUME       1 to skip checkpoints already measured at full length, or a
@@ -131,10 +138,8 @@ compose: EVAL_WORKERS spreads one checkpoint's episodes, and several copies of t
 run on different checkpoints. Give each copy its own EVAL_OUT_SUFFIX or they overwrite each
 other; merge afterwards with merge_checkpoint_evals().
 """
-import glob
 import json
 import os
-import shutil
 import sys
 import time
 
@@ -147,7 +152,6 @@ os.environ['SDL_AUDIODRIVER'] = 'dummy'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import numpy as np
-import tensorflow as tf
 from tf_agents.environments import parallel_py_environment
 from tf_agents.environments import tf_py_environment
 from tf_agents.system import system_multiprocessing
@@ -156,415 +160,55 @@ from tf_agents.utils import common
 import snake_constants
 from eval_agent import build_eval_agent
 from eval_workers import IndependentWorkerPool
-from snake_constants import EVALS_ARCHIVE_DIR, EVALS_DIR, POLICY_DIR, RUNS_DIR
+from snake_constants import EVALS_DIR, POLICY_DIR, RUNS_DIR
 from snake_environment import SnakeEnvironment
+from state_helpers import is_perfect_score
 
-
-def backup_previous_results(out_path):
-    """Copies an existing *complete* result file to `<out_path>.previous` before the first write.
-
-    `write_results()` rewrites the whole file from the very first round — seconds in, not at the
-    end — so a run killed early destroys a prior complete measurement at the same
-    `EVAL_OUT_SUFFIX` with no warning. That cost a 246-checkpoint close-out once. A throwaway
-    suffix is the real protection; this is the safety net for when that is forgotten.
-
-    One rolling backup, not history: a second overwrite replaces the same `.previous`.
-    """
-    if not os.path.exists(out_path):
-        return
-    try:
-        with open(out_path) as handle:
-            payload = json.load(handle)
-    except (json.JSONDecodeError, OSError):
-        return
-    if not payload.get('complete'):
-        return
-    shutil.copy2(out_path, out_path + '.previous')
-
-
-def resume_suffixes(spec, own_suffix):
-    """Which result-file suffixes EVAL_RESUME asks us to treat as already-measured work.
-
-    `1`/`true` means "this run's own output file", which is the case that matters: a killed run
-    is continued by relaunching the identical command with EVAL_RESUME=1. Anything else is read
-    as a comma-separated list of explicit suffixes, for pulling in work done under a different
-    EVAL_OUT_SUFFIX.
-    """
-    if spec is None or spec in ('', '0', 'false', 'False'):
-        return []
-    if spec in ('1', 'true', 'True'):
-        return [own_suffix]
-    return [s.strip() for s in spec.split(',') if s.strip()]
-
-
-def resolve_screen_episodes(requested, num_episodes):
-    """How long the screening stage runs, from EVAL_SCREEN_EPISODES. Returns (episodes, note).
-
-    0 means no screening: one flat pass at `num_episodes`, which is how every arm before batch 10
-    was measured. Screening is the default, so `requested` is None in the normal case.
-
-    A screen at least as long as the full measurement has nothing left to confirm. **An explicit
-    request for that is an error; the default running into it is not** — a short run, say
-    `EVAL_EPISODES=20` to sanity-check one checkpoint, has nothing to gain from screening, and a
-    default that made such a run fail would be a trap rather than a safeguard. So the default
-    stands down with a note and the explicit request raises.
-    """
-    if requested is not None and requested != '':
-        screen = int(requested)
-        if screen and screen >= num_episodes:
-            raise SystemExit(
-                'EVAL_SCREEN_EPISODES={0} must be below EVAL_EPISODES={1} — a screen that already '
-                'runs the full length has nothing left to confirm'.format(screen, num_episodes))
-        return screen, None
-    if DEFAULT_SCREEN_EPISODES >= num_episodes:
-        return 0, ('screening off: EVAL_EPISODES={0} is not longer than the default {1}-episode '
-                   'screen'.format(num_episodes, DEFAULT_SCREEN_EPISODES))
-    return DEFAULT_SCREEN_EPISODES, None
-
-
-def load_finished_results(policy_name, suffixes, num_episodes):
-    """Rows from earlier runs that are already measured to this run's full episode count.
-
-    Returns `(rows, steps, source_screens, partial)`.
-
-    `steps` is the set to skip outright — rows already measured to `num_episodes`.
-
-    `partial` maps step -> a `held` sample for rows measured to *less* than `num_episodes` that carry
-    their per-episode results. Those are **reused, not discarded**: a resumed screen counts as
-    screened, and stage 3 tops it up to full length. Before per-episode storage existed this was not
-    possible — topping up meant pooling summary statistics, and the median cannot be pooled — so a run
-    killed mid-screening lost every screen it had done (192 rows and 7,534 episodes on `b18a` in one
-    incident). Rows from files predating the fields yield None from `held_from_row` and fall back to
-    being re-measured.
-
-    `source_screens` is the set of `screen_episodes` values the source files **recorded** — the
-    protocol each was actually run under. It exists because inferring the protocol from row depths
-    is wrong, and was wrong in production: see `protocol_from_sources`.
-
-    A step appearing in two source files is loaded once — first file listed wins — because these
-    are alternative records of the same frozen checkpoint, not extra samples to combine. Use
-    merge_checkpoint_evals() when pooling repeat measurements is what you actually want.
-    """
-    rows, steps, source_screens = [], set(), set()
-    partial = {}
-    for suffix in suffixes:
-        path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, suffix))
-        if not os.path.exists(path):
-            continue
-        with open(path) as handle:
-            payload = json.load(handle)
-        contributed = False
-        for row in payload.get('results', []):
-            step = row['step']
-            if step in steps:
-                continue
-            if row.get('episodes', 0) >= num_episodes:
-                rows.append(row)
-                steps.add(step)
-                # A full-length row supersedes any partial one carried from an earlier file.
-                partial.pop(step, None)
-                contributed = True
-                continue
-            # Shorter than full length: reusable as a partial sample when the row carries its
-            # per-episode results. Deeper wins if two files hold the same step, since more episodes
-            # is strictly more information about the same frozen checkpoint.
-            held = held_from_row(row)
-            if held is None:
-                continue
-            if len(held['scores']) > len(partial.get(step, {}).get('scores', [])):
-                partial[step] = held
-                contributed = True
-        if contributed:
-            # Files written before this field existed record nothing; `None` is the honest answer
-            # and `protocol_from_sources` treats it as "unknown", not as "flat".
-            source_screens.add(payload.get('screen_episodes'))
-    return sorted(rows, key=lambda r: r['step']), steps, source_screens, partial
-
-
-def protocol_from_sources(source_screens):
-    """Whether a resume should keep screening, from what the source files recorded.
-
-    **The guard.** Resume used to decide this by looking at the resumed rows: they were at full
-    length, so the arm "must have been" measured flat, so screening was switched off for the rest of
-    it. That inference is unsound, and it misfired on batch 18 — `b18a` and `b18d` were resumed from
-    3 and 2 full-length rows that were the **stage-1 tier** of the three-stage protocol, where any
-    checkpoint whose graph point read 100% is measured at full length immediately. The heuristic read
-    them as a flat run and turned screening off, which cost ~3x the episodes and left those two arms
-    with no `pooled_equal_effort` while their siblings had one — half the batch's seeds unusable on
-    the metric that compares arms.
-
-    The fix is to stop inferring: the payload has recorded `screen_episodes` all along.
-
-    | recorded in sources | meaning | return |
-    |---|---|---|
-    | any value > 0 | the arm was screened | `True` — keep screening, at that depth |
-    | only 0 | genuinely a flat run | `False` |
-    | only None | predates the field | `None` — unknown, caller decides |
-    | a mix of 0 and >0 | the arm is already inconsistent | `True`, and the caller warns |
-
-    Returns `(keep_screening, depth)`, where `depth` is the screen depth to continue at when a
-    source recorded one, so a resumed arm cannot silently change its own screen length either.
-    """
-    screened = {value for value in source_screens if value}
-    if screened:
-        return True, max(screened)
-    if source_screens and source_screens != {None}:
-        return False, 0
-    return None, 0
-
-
-def archive_existing_eval_pngs():
-    """Moves whatever is currently in EVALS_DIR into a timestamped EVALS_ARCHIVE_DIR
-    subfolder, so a new eval or batch starts from an empty folder and evals/ always shows
-    only the most recently completed work.
-
-    Safe when several processes start at once, which is the normal case for a batch: the
-    move happens before this process writes anything of its own, so whichever process gets
-    here first archives the previous batch's leftovers and the rest find nothing left to
-    move. A FileNotFoundError from a sibling winning that race is swallowed rather than
-    raised.
-    """
-    os.makedirs(EVALS_DIR, exist_ok=True)
-    pngs = [name for name in os.listdir(EVALS_DIR) if name.endswith('.png')]
-    if not pngs:
-        return
-    dest = os.path.join(EVALS_ARCHIVE_DIR, time.strftime('%Y%m%d-%H%M%S'))
-    os.makedirs(dest, exist_ok=True)
-    for name in pngs:
-        try:
-            shutil.move(os.path.join(EVALS_DIR, name), os.path.join(dest, name))
-        except FileNotFoundError:
-            pass
-
-
-def wilson_interval(successes, trials, z=1.96):
-    """95% confidence interval for a rate. Normal approximation breaks down for
-    the small counts and near-0 rates here, so use Wilson's score interval."""
-    if trials == 0:
-        return 0.0, 0.0
-    p = successes / trials
-    denom = 1.0 + z * z / trials
-    centre = (p + z * z / (2 * trials)) / denom
-    spread = z * ((p * (1 - p) / trials + z * z / (4 * trials * trials)) ** 0.5) / denom
-    return max(0.0, centre - spread), min(1.0, centre + spread)
-
-
-def build_row(step, held, meta=None):
-    """One result row from a checkpoint's accumulated episodes.
-
-    `held` carries the raw per-episode lists rather than running totals, so a screening pass
-    that is later topped up to full length recomputes the median and the extremes exactly
-    instead of approximating them from two summaries.
-    """
-    scores = held['scores']
-    perfect = int(sum(held['perfect']))
-    meta = meta or {'selected_by': 'explicit'}
-    low, high = wilson_interval(perfect, len(scores))
-    return {
-        'step': step,
-        'selected_by': meta.get('selected_by', 'explicit'),
-        'graph_single_eval': meta.get('single_eval'),
-        'graph_surrounding': meta.get('surrounding'),
-        'episodes': len(scores),
-        'perfect_games': perfect,
-        'perfect_percent': round(100.0 * perfect / len(scores), 1),
-        'perfect_ci95': [round(100.0 * low, 1), round(100.0 * high, 1)],
-        'avg_score': round(float(np.mean(scores)), 2),
-        'median_score': round(float(np.median(scores)), 1),
-        'min_score': round(float(np.min(scores)), 1),
-        'max_score': round(float(np.max(scores)), 1),
-        'avg_reward': round(float(np.mean(held['rewards'])), 2),
-        # True when EVAL_MIN_ACHIEVABLE stopped this checkpoint short because it could no longer
-        # reach the threshold. Such a row is a valid but *shorter* sample whose rate is always
-        # below the threshold, so it can be read as "below the bar" but not compared on equal
-        # footing with a full-length row. `equal_effort_pooled` is unaffected — see
-        # `make_abandon_test` for why the floor guarantees that.
-        'abandoned': bool(held.get('abandoned')),
-        # Wall-clock per checkpoint, so eval_progress.py can give an ETA from this run's own
-        # throughput rather than a hardcoded guess. Strong policies play longer episodes and
-        # measure slower, so a fixed estimate is wrong in both directions.
-        'seconds': round(held['seconds'], 1),
-        # The raw per-episode results, from 2026-08-08. Everything above is derivable from
-        # these, and storing them is what makes a screen *resumable*: load_finished_results can
-        # seed a checkpoint's sample from a killed run and let stage 3 top it up, instead of
-        # discarding the screen and measuring it again from zero.
-        #
-        # Leaving them out was not free. A run killed mid-screening lost every screen it had
-        # done - 192 rows and 7,534 episodes on b18a, 193 and 6,865 on b18d, in one incident.
-        # Summaries cannot substitute: perfect_games, episodes, min and max pool exactly and the
-        # averages pool from sums, but the *median does not*, so a topped-up row rebuilt from
-        # summaries would carry a median that is quietly wrong.
-        #
-        # Cost is ~1.6 KB a row, so ~1 MB on a 600-row arm against a 145 KB payload. Scores are
-        # whole food counts and stored as ints; perfect flags as 0/1 rather than true/false,
-        # which is smaller and is what sum() already treats them as.
-        'episode_scores': [int(score) for score in scores],
-        'episode_perfect': [int(bool(flag)) for flag in held['perfect']],
-        'episode_rewards': [round(float(reward), 2) for reward in held['rewards']],
-    }
-
-
-def held_from_row(row):
-    '''A `held` sample rebuilt from a stored row, or None if the row predates per-episode
-    storage.
-
-    The inverse of the three `episode_*` fields `build_row` writes. Returning None rather than
-    raising is deliberate: every result file written before 2026-08-08 lacks them, and a resume
-    against one of those has to fall back to re-measuring rather than fail.
-    '''
-    scores = row.get('episode_scores')
-    perfect = row.get('episode_perfect')
-    rewards = row.get('episode_rewards')
-    if not scores or perfect is None or rewards is None:
-        return None
-    if not (len(scores) == len(perfect) == len(rewards) == row.get('episodes', -1)):
-        # A truncated or hand-edited row. Re-measuring is cheap; pooling a mismatched sample is
-        # a silent wrong answer, which is the trade this whole module is written around.
-        return None
-    return {'scores': list(scores), 'perfect': list(perfect), 'rewards': list(rewards),
-            'seconds': float(row.get('seconds') or 0.0),
-            'abandoned': bool(row.get('abandoned'))}
-
-
-
-def skips_screening(meta, threshold=None):
-    """True when a checkpoint goes straight to a full-length measurement, no screen first.
-
-    Two cases qualify. A **graph point at `threshold`** (100% — ten perfect games out of ten) is
-    the strongest selector this project has, and measuring every one of them completely is a
-    coverage guarantee: the strongest tier is never represented by a 20-episode row. An
-    **explicitly named step** qualifies too, because naming one is a request to measure it — the
-    docs already say explicit steps bypass the selection thresholds, and screening one to 20
-    episodes and possibly leaving it there would quietly break that.
-
-    This tier is uncapped and on a strong arm it is large — hundreds of checkpoints.
-
-    `threshold` defaults to ALWAYS_FULL_SINGLE, resolved in the body rather than the signature
-    because the constants block sits below the helpers here and a default would be evaluated at
-    import time.
-    """
-    if threshold is None:
-        threshold = ALWAYS_FULL_SINGLE
-    if meta is None:
-        return True
-    single = meta.get('single_eval')
-    if single is None:
-        return True
-    return single >= threshold
-
-
-def equal_effort_pooled(samples, episodes):
-    """(perfect, episodes, checkpoints) over the first `episodes` of every measured checkpoint.
-
-    The arm-level pooled rate, and the only version of it that means anything once checkpoints are
-    measured to different depths. Pooling the finished rows instead weights the deeply-measured
-    ones — which are, by construction, the arm's best — five times as heavily as the rest, so it
-    reads high by an amount that depends on the protocol rather than on the policy.
-
-    Truncating every checkpoint to the same prefix restores equal effort. It is a valid sample of
-    each: episodes are i.i.d., so the first 20 of a 100-episode measurement are as good a
-    20-episode sample as a screen that stopped there. That also lets the 100%-tier checkpoints
-    count, which a snapshot taken at the end of a screening stage could not — they never had a
-    screening stage.
-    """
-    perfect = total = count = 0
-    for held in samples.values():
-        flags = held['perfect'][:episodes]
-        if len(flags) < episodes:
-            continue
-        perfect += int(sum(flags))
-        total += len(flags)
-        count += 1
-    return perfect, total, count
-
-
-def plan_stages(requested_steps, selected_by, screen_episodes, confirm_count, num_episodes,
-                num_workers, resumed=0):
-    """Splits the work into stages and prices it. Returns a dict; see the keys below.
-
-    Separated from main() so it can be tested without loadable checkpoints — which matters more
-    than usual here, because an observation change makes every existing checkpoint unloadable and
-    there is then no arm in the repository to rehearse a protocol against.
-
-    Episode counts are rounded up to whole rounds, because `evaluate` runs one episode per worker
-    per round and cannot stop part-way through one. That is why a worker count dividing
-    `num_episodes` is worth preferring: at 12 workers a 100-episode request really runs 108.
-    """
-    def whole_rounds(episodes):
-        return -(-episodes // num_workers) * num_workers
-
-    if not screen_episodes:
-        total = resumed + len(requested_steps)
-        return {'full': list(requested_steps), 'screened': [], 'confirmed': 0,
-                'measurements_planned': total,
-                'episodes_planned': total * whole_rounds(num_episodes),
-                'flat_episodes': total * whole_rounds(num_episodes)}
-
-    full = [s for s in requested_steps if skips_screening(selected_by.get(s))]
-    screened = [s for s in requested_steps if not skips_screening(selected_by.get(s))]
-    # A floor, not a cap: `pick_finalists` confirms every 20/20 screen even past the quota, and how
-    # many of those there will be is unknowable until the screens have run. main() raises the totals
-    # once the finalists are known, so a plan printed here can read slightly low.
-    confirmed = min(confirm_count, len(screened))
-    return {
-        'full': full,
-        'screened': screened,
-        'confirmed': confirmed,
-        'measurements_planned': resumed + len(full) + len(screened) + confirmed,
-        'episodes_planned': (resumed * whole_rounds(num_episodes)
-                             + len(full) * whole_rounds(num_episodes)
-                             + len(screened) * whole_rounds(screen_episodes)
-                             + confirmed * whole_rounds(num_episodes - screen_episodes)),
-        'flat_episodes': (resumed + len(requested_steps)) * whole_rounds(num_episodes),
-    }
-
-
-def pick_finalists(rows, count, already_full=None):
-    """The screened checkpoints that earn a full-length measurement.
-
-    Ranked on the screen rate, then on the surrounding graph rate, then on step. The
-    tie-break is doing real work rather than making the order deterministic: a 20-episode
-    screen can only return 21 distinct rates, so dozens of checkpoints arrive on the same
-    value and something has to separate them. The surrounding rate is the right something —
-    across 88 checkpoints that had all already cleared 80%, it correlated +0.48 with the true
-    rate while the graph point itself managed +0.10 (see select_top_checkpoints).
-
-    **A perfect screen is mandatory and ignores `count`.** Any checkpoint that went 20/20 is
-    confirmed even if that takes the confirm stage past `EVAL_CONFIRM_COUNT`, mirroring the rule
-    `select_top_checkpoints` already applies one stage earlier, where a graph point of >=90% is
-    measured however many slots are left. The reason is the same in both places: **the quota exists
-    to ration a large middling pool, and the whole point of the close-out is not to miss the best
-    checkpoint.** A 20/20 screen is the strongest signal screening can produce, and dropping one
-    because the quota filled would be selection working directly against the goal — a checkpoint that
-    would have read 95+ never gets the episodes that would show it.
-
-    It is also cheap in the case that matters. Rates are quantised at screen depth, so 20/20 is rare:
-    across batch 15's four arms it was **2 of 596 screens**, and on `b17b` — the arm that produced the
-    project record — **11 of 186**. A dead arm produces none at all. So the cost is a handful of extra
-    measurements on the arms where an extra measurement is most likely to find something.
-
-    `already_full` names steps that came in from a resumed run at full length. They are
-    excluded because they already have the measurement this stage would buy them, so letting
-    them occupy a slot would spend it on work that is finished.
-    """
-    already_full = already_full or {}
-    pool = [r for r in rows if r['step'] not in already_full]
-    ranked = sorted(pool, key=lambda r: (-r['perfect_games'] / r['episodes'],
-                                         -(r.get('graph_surrounding') or 0.0), r['step']))
-    chosen = ranked[:count]
-    # Perfect screens past the quota, appended in the same ranked order. Kept as a separate pass
-    # rather than a bigger slice so the intent survives a future edit to `count`. The `chosen_steps`
-    # guard is what makes this idempotent: scanning `ranked` instead of `ranked[count:]` is an
-    # equivalent mutant precisely because of it, which is the guard doing its job rather than a gap.
-    chosen_steps = {r['step'] for r in chosen}
-    mandatory = [r for r in ranked[count:]
-                 if r['perfect_games'] == r['episodes'] and r['step'] not in chosen_steps]
-    if mandatory:
-        print('    {0} checkpoint{1} screened 100% past the confirm quota of {2} and will be '
-              'confirmed anyway: {3}'.format(
-                  len(mandatory), '' if len(mandatory) == 1 else 's', count,
-                  ', '.join(str(r['step']) for r in mandatory)))
-    return chosen + mandatory
+# The planning and record-keeping half of this file now lives in `eval_plan.py`, which is
+# deliberately TensorFlow-free so `eval_wave.py` can plan a wave without paying for an arena. This
+# re-export is the compatibility surface: every name below used to be defined here, so callers and
+# the 90 fixtures in `tests/test_eval_checkpoints.py` keep resolving `eval_checkpoints.build_row`
+# and friends. Do not collapse it into `import eval_plan` — that would break them all.
+from eval_plan import (  # noqa: F401 - re-exported for callers and tests
+    ALWAYS_EVAL_SINGLE,
+    ALWAYS_FULL_SINGLE,
+    CHART_MIN_INTERVAL,
+    DEFAULT_ABANDON_FLOOR,
+    DEFAULT_ABOVE_THRESHOLD,
+    DEFAULT_CONFIRM_COUNT,
+    DEFAULT_COUNT,
+    DEFAULT_MIN_ACHIEVABLE,
+    DEFAULT_SCREEN_EPISODES,
+    HOF_EPISODES,
+    HOF_GATE,
+    HOF_SUFFIX,
+    MIN_EVAL_SINGLE,
+    PayloadSpec,
+    RowCache,
+    WRITE_MIN_INTERVAL,
+    WriteGate,
+    achievable_percent,
+    backup_previous_results,
+    best_full_length_row,
+    build_payload,
+    build_row,
+    equal_effort_pooled,
+    held_from_row,
+    hof_settings,
+    load_finished_results,
+    make_abandon_test,
+    merge_checkpoint_evals,
+    pick_finalists,
+    plan_stages,
+    protocol_from_sources,
+    resolve_screen_episodes,
+    resume_suffixes,
+    select_checkpoints_above,
+    select_top_checkpoints,
+    skips_screening,
+    wilson_interval,
+    write_payload,
+)
 
 
 def run_round(parallel_env, policy_action, worker_envs):
@@ -610,72 +254,12 @@ def run_round(parallel_env, policy_action, worker_envs):
             promises = [worker_envs[i].call('get_score') for i in indices]
             for i, promise in zip(indices, promises):
                 scores[i] = promise()
-                perfect[i] = step_rewards[i] == snake_constants.PERFECT_GAME_REWARD
+                # From the score, not `step_rewards[i]`: a shaping term moves the winning step's
+                # reward off `PERFECT_GAME_REWARD`. See `state_helpers.is_perfect_score`.
+                perfect[i] = is_perfect_score(scores[i])
         done |= is_last
 
     return scores.tolist(), perfect.tolist(), rewards.tolist(), steps
-
-
-def achievable_percent(perfect_so_far, episodes_so_far, target_episodes):
-    """The best perfect rate a checkpoint can still reach, if every remaining episode is perfect.
-
-    Monotonically non-increasing as episodes land, which is what makes it usable as a stopping
-    rule: once it drops below a threshold it can never come back.
-    """
-    remaining = max(0, target_episodes - episodes_so_far)
-    return 100.0 * (perfect_so_far + remaining) / target_episodes
-
-
-def make_abandon_test(min_achievable, target_episodes, floor_episodes):
-    """Stopping rule: give up on a checkpoint that can no longer reach `min_achievable`.
-
-    Returns None when disabled, so the caller can skip the mechanism entirely.
-
-    Two guards. **`floor_episodes`** never stops before this many episodes, however hopeless,
-    because `equal_effort_pooled` truncates to `screen_episodes` and *skips shorter rows* —
-    abandoning above the floor leaves that arm-level figure identical to the un-gated protocol,
-    abandoning below it would silently delete rows from the one number meant to compare across
-    arms. **`episodes_so_far >= target_episodes`** means a completed checkpoint is never
-    "abandoned".
-
-    The rule is exact rather than predictive: it fires only when the remaining episodes cannot
-    arithmetically reach the threshold. So a checkpoint that would have finished at or above
-    `min_achievable` is never stopped, and an abandoned row's rate is always below the threshold —
-    it can never outrank a kept one.
-    """
-    if not min_achievable:
-        return None
-
-    def should_abandon(perfect_total, episodes_total):
-        if episodes_total < floor_episodes or episodes_total >= target_episodes:
-            return False
-        return achievable_percent(perfect_total, episodes_total, target_episodes) < min_achievable
-
-    return should_abandon
-
-
-def best_full_length_row(results, num_episodes):
-    """The best checkpoint, ranked over rows deep enough for a maximum to mean anything.
-
-    A screened-out checkpoint has a 20-episode rate whose interval is ~5x wider than a
-    100-episode one, so across hundreds of screens some read 19/20 or 20/20 on luck alone.
-    Letting one of those win would crown a checkpoint the protocol deliberately declined to
-    measure, so ranking is over rows at `num_episodes` whenever any exist.
-
-    **The fallback is why this is a function.** At `EVAL_MIN_ACHIEVABLE=95` most arms have *no*
-    full-length row, since few checkpoints clear 95%. Falling back to all rows would hand the
-    title to a 20-episode screen on a lucky 20/20 — the outcome the deep-row rule exists to
-    prevent, reintroduced exactly when the arm is too weak to defend itself. So the fallback
-    relaxes the depth requirement rather than dropping it: rows at half `num_episodes` or better,
-    matching `eval_progress.deep_rows`, and only then everything.
-    """
-    if not results:
-        return None
-    for minimum in (num_episodes, num_episodes / 2.0, 0):
-        deep = [r for r in results if r['episodes'] >= minimum]
-        if deep:
-            return max(deep, key=lambda r: r['perfect_percent'])
-    return None
 
 
 def evaluate(parallel_env, policy_action, num_episodes, on_round=None, should_abandon=None):
@@ -728,217 +312,24 @@ def evaluate(parallel_env, policy_action, num_episodes, on_round=None, should_ab
     return scores, perfect_flags, rewards, elapsed, abandoned
 
 
-# Selection thresholds, in single-eval (10-episode) percentage points. A graph point is 10
-# episodes, so these are coarser than they look: the mandatory tier is {90, 100} and the fill
-# band is exactly {60, 70, 80}.
-ALWAYS_EVAL_SINGLE = 90.0   # every checkpoint at or above this is measured, even past `count`
-MIN_EVAL_SINGLE = 60.0      # below this, a checkpoint is not worth 100 episodes
-DEFAULT_COUNT = 20          # target total; the mandatory tier may exceed it
-
-# Screen depth: every selected checkpoint gets this many episodes, then only the best
-# DEFAULT_CONFIRM_COUNT go on to EVAL_EPISODES. 0 gives the flat one-pass protocol.
-DEFAULT_SCREEN_EPISODES = 20
-
-# Abandon a checkpoint once it can no longer reach this perfect rate even if every remaining
-# episode is perfect. `EVAL_MIN_ACHIEVABLE=0` turns it off.
-#
-# 95 because that is the bar a checkpoint has to clear to be interesting at all; anything lower is
-# not a hall-of-fame candidate and does not need 100 episodes to be ruled out. At 100 episodes this
-# stops a run once more than 5 have failed, which is most of them.
-#
-# The cost is that **most arms will have no full-length row**, since few checkpoints clear 95%.
-# best_full_length_row handles that by relaxing to half-depth rows; pooled_equal_effort is
-# unaffected at any gate. Cross-batch best-checkpoint stays valid for the question that matters
-# here — "did this arm produce a >=95% checkpoint" — because any checkpoint at or above the gate is
-# measured full length under it.
-DEFAULT_MIN_ACHIEVABLE = 95.0
-
-# Never abandon before this many episodes, so an abandoned row is always long enough to count in
-# equal_effort_pooled. Raised to the screen depth at startup — see make_abandon_test.
-DEFAULT_ABANDON_FLOOR = 20
-
-# Graph single-eval at or above which a checkpoint skips the screen and goes straight to full
-# length. 100% is ten perfect games out of ten, and the tier is uncapped — see skips_screening.
-# It is a coverage guarantee, not a champion shortlist: the larger 90% tier holds more of the
-# actual best checkpoints. Finding those is EVAL_CONFIRM_COUNT's job.
-ALWAYS_FULL_SINGLE = 100.0
-
-# How many screened checkpoints get promoted to full length. 100 is the knee of the recall curve:
-# at 30 the arm's true best checkpoint made the cut only 57% of the time, at 100 it is 97%, for
-# ~23% more episodes. A 20-episode screen cannot rank a population clustered between 60% and 80%.
-DEFAULT_CONFIRM_COUNT = 100
-
-# Seconds between live-chart refreshes. A frame is ~0.1s and a round ~4s, so this only bites
-# early in a run when episodes are short and rounds finish fast.
-CHART_MIN_INTERVAL = 2.0
-
-
-def select_top_checkpoints(policy_name, available, count=DEFAULT_COUNT, window=10):
-    """Every checkpoint at >=90% single eval, then the best of >=60% up to `count` total.
-
-    1. Everything at `ALWAYS_EVAL_SINGLE` or better is measured, even past `count`.
-    2. Remaining slots go to the highest single evals down to `MIN_EVAL_SINGLE`, ordered by
-       the surrounding perfect rate within an equal-eval tier.
-    3. Nothing below `MIN_EVAL_SINGLE` is measured at all.
-
-    Fewer than `count` is a normal outcome, not an error.
-
-    Two measured results this rests on. **Rank on the raw single eval, not a smoothed
-    region** — raw correlates +0.64 with the 100-episode measurement across the full range
-    where a smoothed rate correlates -0.40. **Inside the high band that reverses**, which is
-    why the surrounding rate orders the fill tier: over 88 checkpoints already past 80%, the
-    surrounding rate correlated +0.48 against the graph value's +0.10.
-
-    An outlier eval is not luck. Against the checkpoints 1000 steps either side, outliers won
-    3 of 3 by 9.0, 11.5 and 27.5 points; if a policy's true rate were 27%, a 10-episode eval
-    reading 7+ perfect has probability 0.006.
-    """
-    path = os.path.join(RUNS_DIR, '{0}_evals.json'.format(policy_name))
-    with open(path) as handle:
-        evals = json.load(handle)['evals']
-
-    rates = [e['perfect_percent'] for e in evals]
-    candidates = []
-    for index, entry in enumerate(evals):
-        if entry['step'] not in available:
-            continue
-        lo = max(0, index - window // 2)
-        smoothed = sum(rates[lo:lo + window]) / len(rates[lo:lo + window])
-        candidates.append({'step': entry['step'],
-                           'single': entry['perfect_percent'],
-                           'smoothed': smoothed})
-
-    if not candidates:
-        raise SystemExit('no eval steps in {0} have checkpoints in savedPolicies'.format(path))
-
-    # Primary: the single-eval spike. Secondary: the surrounding perfect rate.
-    def rank(entry):
-        return (-entry['single'], -entry['smoothed'], entry['step'])
-
-    mandatory = sorted([c for c in candidates if c['single'] >= ALWAYS_EVAL_SINGLE], key=rank)
-    fill_pool = sorted([c for c in candidates
-                        if MIN_EVAL_SINGLE <= c['single'] < ALWAYS_EVAL_SINGLE], key=rank)
-    excluded = len(candidates) - len(mandatory) - len(fill_pool)
-
-    for entry in mandatory:
-        entry['selected_by'] = 'threshold90'
-    fill = fill_pool[:max(0, count - len(mandatory))]
-    for entry in fill:
-        entry['selected_by'] = 'outlier'
-    chosen = mandatory + fill
-
-    if not chosen:
-        best = max(candidates, key=lambda c: c['single'])
-        raise SystemExit(
-            'no checkpoint in {0} reached {1:.0f}% on its graph point (best was '
-            '{2:.0f}% at step {3}), so there is nothing worth measuring for this arm'.format(
-                path, MIN_EVAL_SINGLE, best['single'], best['step']))
-
-    print('selected {0} of {1} available checkpoints: {2} at >={3:.0f}% (all measured), '
-          '{4} filled from the {5:.0f}-{6:.0f}% band, {7} skipped below {5:.0f}%'.format(
-              len(chosen), len(candidates), len(mandatory), ALWAYS_EVAL_SINGLE,
-              len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE - 10, excluded))
-    if len(chosen) < count:
-        print('    only {0} of {1} slots filled — everything else was below {2:.0f}%, '
-              'which is not worth 100 episodes'.format(
-                  len(chosen), count, MIN_EVAL_SINGLE))
-    if len(mandatory) > count:
-        print('    {0} checkpoints at >={1:.0f}% exceeds the {2}-slot target on purpose'.format(
-            len(mandatory), ALWAYS_EVAL_SINGLE, count))
-    if len(fill_pool) > len(fill):
-        print('    {0} more in the {1:.0f}-{2:.0f}% band were not measured (cap is {3})'.format(
-            len(fill_pool) - len(fill), MIN_EVAL_SINGLE, ALWAYS_EVAL_SINGLE - 10, count))
-    for entry in sorted(chosen, key=lambda c: c['step']):
-        print('    {0:>8}  single eval {1:>5.1f}%   surrounding {2:>5.1f}%   {3}'.format(
-            entry['step'], entry['single'], entry['smoothed'], entry['selected_by']))
-    return [c['step'] for c in sorted(chosen, key=lambda c: c['step'])], \
-        {c['step']: {'selected_by': c['selected_by'],
-                     'single_eval': c['single'],
-                     'surrounding': round(c['smoothed'], 1)} for c in chosen}
-
-
-def merge_checkpoint_evals(policy_name, suffixes=None, out_suffix='_merged'):
-    """Combines several result files for one policy into one, and writes it.
-
-    Parallel processes on one arm each need their own EVAL_OUT_SUFFIX or they overwrite each
-    other; this puts the pieces back together.
-
-    **A step measured more than once is combined, not deduplicated.** Repeat measurements of a
-    frozen checkpoint are independent samples of the same quantity, so summing episodes and
-    perfect games is correct and tightens the interval. `perfect_percent` and the Wilson interval
-    are recomputed from the combined counts.
-
-    Pass `suffixes` explicitly, or leave it None to pick up every
-    `<policy>_checkpoint_evals*.json` except previous merges. Returns the merged payload.
-    """
-    pattern = os.path.join(RUNS_DIR, '{0}_checkpoint_evals*.json'.format(policy_name))
-    if suffixes is None:
-        paths = [p for p in sorted(glob.glob(pattern)) if not p.endswith(out_suffix + '.json')]
-    else:
-        paths = [os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, s))
-                 for s in suffixes]
-
-    by_step, episodes_per, sources, incomplete = {}, set(), [], []
-    for path in paths:
-        if not os.path.exists(path):
-            raise SystemExit('no such result file: {0}'.format(path))
-        with open(path) as handle:
-            payload = json.load(handle)
-        sources.append(os.path.basename(path))
-        episodes_per.add(payload.get('episodes_per_checkpoint'))
-        if payload.get('complete') is False:
-            incomplete.append(os.path.basename(path))
-        for row in payload.get('results', []):
-            existing = by_step.get(row['step'])
-            if existing is None:
-                by_step[row['step']] = dict(row)
-                continue
-            # Same checkpoint measured twice: pool the episodes.
-            total_episodes = existing['episodes'] + row['episodes']
-            total_perfect = existing['perfect_games'] + row['perfect_games']
-            weight, other = existing['episodes'], row['episodes']
-            existing['avg_score'] = round(
-                (existing['avg_score'] * weight + row['avg_score'] * other) / total_episodes, 2)
-            existing['episodes'] = total_episodes
-            existing['perfect_games'] = total_perfect
-            existing['perfect_percent'] = round(100.0 * total_perfect / total_episodes, 1)
-            low, high = wilson_interval(total_perfect, total_episodes)
-            existing['perfect_ci95'] = [round(100.0 * low, 1), round(100.0 * high, 1)]
-            existing['measurements'] = existing.get('measurements', 1) + 1
-            # min/max are order statistics, so take the extremes across both runs.
-            existing['min_score'] = min(existing['min_score'], row['min_score'])
-            existing['max_score'] = max(existing['max_score'], row['max_score'])
-
-    results = [by_step[step] for step in sorted(by_step)]
-    payload = {'policy_name': policy_name,
-               'episodes_per_checkpoint': (episodes_per.pop() if len(episodes_per) == 1 else
-                                           sorted(e for e in episodes_per if e is not None)),
-               'checkpoints_requested': len(results),
-               'complete': not incomplete,
-               'merged_from': sources,
-               'incomplete_sources': incomplete,
-               'results': results}
-
-    out_path = os.path.join(RUNS_DIR, '{0}_checkpoint_evals{1}.json'.format(policy_name, out_suffix))
-    partial_path = out_path + '.partial'
-    with open(partial_path, 'w') as handle:
-        json.dump(payload, handle, indent=2)
-    os.replace(partial_path, out_path)
-
-    repeats = sum(1 for r in results if r.get('measurements', 1) > 1)
-    print('merged {0} files -> {1} checkpoints ({2} measured more than once), wrote {3}'.format(
-        len(sources), len(results), repeats, out_path))
-    if incomplete:
-        print('    note: {0} source(s) were incomplete: {1}'.format(len(incomplete), ', '.join(incomplete)))
-    return payload
-
-
 def main(argv):
     if len(argv) < 3:
         print(__doc__)
         return 1
-    archive_existing_eval_pngs()
     policy_name = argv[1]
+    # Live chart window on the laptop only. `viewer_enabled()` is darwin-gated, so this is a no-op
+    # on the desktop, where the runner daemon owns the viewer (`desktop/runner/runner.py`) — two
+    # owners would open two windows per wave. Best-effort: a chart is never worth an eval.
+    if sys.platform == 'darwin':
+        # HiDPI: chart_viewer only magnifies the PNG, and 110 dpi looks soft blown up on a Retina
+        # panel while the 200-dpi training chart stays crisp. 220 gives the source enough pixels to
+        # match, at the same window size. setdefault so an explicit SNEK_EVAL_CHART_DPI still wins.
+        os.environ.setdefault('SNEK_EVAL_CHART_DPI', '220')
+        try:
+            import chart_viewer
+            chart_viewer.spawn_for_eval(policy_name)
+        except Exception as error:
+            print('chart viewer skipped ({0}: {1})'.format(type(error).__name__, error))
     num_episodes = int(os.environ.get('EVAL_EPISODES', 100))
     # 4, lowered from 10 on 2026-08-08. Measured on the real close-out shape (4 parallel eval
     # processes, 800 episodes each): with independent workers 4 gives 117s against 118s at 5 and
@@ -983,6 +374,16 @@ def main(argv):
         rest = argv[2][len('top'):].lstrip(':=')
         count = int(rest) if rest else (int(argv[3]) if len(argv) > 3 else DEFAULT_COUNT)
         requested_steps, selected_by = select_top_checkpoints(policy_name, available, count)
+    elif argv[2].startswith('above'):
+        rest = argv[2][len('above'):].lstrip(':=')
+        threshold = float(rest) if rest else (
+            float(argv[3]) if len(argv) > 3 else DEFAULT_ABOVE_THRESHOLD)
+        requested_steps, selected_by = select_checkpoints_above(policy_name, available, threshold)
+        # No qualifying checkpoint is the common case, not a failure: exit clean so the job is
+        # marked done rather than failed (and never re-tried on the desktop).
+        if not requested_steps:
+            print('no close-out checkpoint reached {0:g}% — nothing to re-measure'.format(threshold))
+            return 0
     else:
         requested_steps = [int(a) for a in argv[2:]]
         selected_by = {step: {'selected_by': 'explicit'} for step in requested_steps}
@@ -1060,7 +461,7 @@ def main(argv):
     # One definition, shared with every independent worker in eval_workers.py. A second copy of
     # this construction is the failure mode this project has hit twice: expect_partial() hides a
     # mismatch, so two builders that drift produce a policy that loads silently and plays badly.
-    agent, checkpoint, global_step = build_eval_agent(spec_tf_env, spec_env)
+    agent, checkpoint, global_step = build_eval_agent(spec_tf_env, spec_env, ckpt_dir)
 
     def make_headless_worker():
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
@@ -1157,90 +558,54 @@ def main(argv):
                 'stage': 'full' if screen_episodes else 'flat',
                 'full_done': 0, 'screen_done': 0, 'confirm_done': 0}
 
+    # Everything the payload needs that does not change once measuring starts. Paired with
+    # `progress` above, which is the half that does.
+    payload_spec = PayloadSpec(
+        policy_name=policy_name, num_episodes=num_episodes, all_steps=all_steps,
+        num_workers=num_workers, screen_episodes=screen_episodes, confirm_count=confirm_count,
+        min_achievable=min_achievable, abandon_floor=abandon_floor,
+        measurements_planned=measurements_planned, episodes_planned=episodes_planned,
+        full_planned=len(full_steps), screen_planned=len(screen_steps),
+        confirm_planned=plan['confirmed'])
+
+    # The `WRITE_MIN_INTERVAL` gate on `on_round`'s progress writes. Recorded by every write,
+    # including the unconditional per-checkpoint one, or the round after it would write again at once.
+    write_gate = WriteGate()
+
     def write_results(results, complete, in_flight=None):
-        """Rewrites the whole file after every checkpoint, and after every round.
+        """Rewrites the whole file after every checkpoint, and on a wall-clock tick within one.
 
         A long run is expensive — 20 checkpoints x 100 episodes is well over an hour, and a
         63-checkpoint run took four — so writing only at the end means any interruption
         throws all of it away. The numbers would still be in the log, but nothing
         machine-readable would survive. Rewriting is cheap next to a checkpoint's runtime.
 
-        `complete` distinguishes a finished run from a partial one, so a later reader does
-        not quietly treat 6 checkpoints as the arm's full measurement. The write goes via
-        .partial + os.replace, so a reader never sees a half-written file even if the
-        process dies mid-write.
+        The payload itself is built by `eval_plan.build_payload`, which is the single definition
+        shared with `eval_wave.py` — two builders that drift is a failure class this project has
+        already paid for. `write_payload` does the `.partial` + `os.replace` so a reader never sees
+        a half-written file even if the process dies mid-write.
         """
-        payload = {'policy_name': policy_name,
-                   'episodes_per_checkpoint': num_episodes,
-                   'checkpoints_requested': len(all_steps),
-                   # Recorded rather than inferred from episodes/rounds, which is wrong for any
-                   # checkpoint being topped up — the episode count includes the screen already on
-                   # file while the round count does not.
-                   'num_workers': num_workers,
-                   'complete': complete,
-                   'requested_steps': all_steps,
-                   # Screening protocol, or None for the flat one-pass measurement. Recorded
-                   # because a pooled rate only compares across arms when the selection rule
-                   # matches, and this is part of the rule.
-                   'screen_episodes': screen_episodes or None,
-                   'confirm_count': confirm_count if screen_episodes else None,
-                   # Also part of the selection rule, so also recorded: a file measured with the
-                   # gate on holds shorter rows below the threshold than one measured without it,
-                   # and pooling the two sets of raw rows would compare different protocols.
-                   'min_achievable': min_achievable or None,
-                   'abandon_floor': abandon_floor if min_achievable else None,
-                   'abandoned': progress.get('abandoned', 0),
-                   'episodes_saved': progress.get('episodes_saved', 0),
-                   # Progress in measurements and in episodes. Both are needed once checkpoints
-                   # can be measured twice at different lengths: the first tracks the stage plan,
-                   # the second is what an ETA can actually be built from.
-                   'measurements_planned': measurements_planned,
-                   'measurements_done': progress['measurements'],
-                   # This process's own throughput, for the ETA. See `progress` above for why
-                   # the pace cannot be averaged over resumed rows.
-                   'session_measurements': progress['session_measurements'],
-                   'session_episodes': progress['session_episodes'],
-                   'session_seconds': round(progress['session_seconds'], 1),
-                   # Which pass is running and how far through each one is, so the chart can show
-                   # the shape of a three-stage close-out rather than one bar that stalls.
-                   'stage': progress['stage'],
-                   # The arm-level rate: every checkpoint truncated to its first `screen_episodes`,
-                   # because pooling rows of different depths weights the full-length ones — the
-                   # arm's best by construction — 5x. None for a flat run, already equal effort.
-                   'pooled_equal_effort': (
-                       (lambda t: round(100.0 * t[0] / t[1], 2) if t[1] else None)(
-                           equal_effort_pooled(samples, screen_episodes))
-                       if screen_episodes else None),
-                   'stages': {
-                       'full': {'planned': len(full_steps), 'done': progress['full_done']},
-                       'screen': {'planned': len(screen_steps), 'done': progress['screen_done']},
-                       'confirm': {'planned': plan['confirmed'],
-                                   'done': progress['confirm_done']},
-                   } if screen_episodes else None,
-                   'episodes_planned': episodes_planned,
-                   'episodes_done': sum(r['episodes'] for r in results),
-                   # The checkpoint being measured right now, updated every round, or None
-                   # between checkpoints. eval_progress.py renders this; without it a
-                   # ~5-minute checkpoint is invisible until it lands.
-                   'in_flight': in_flight,
-                   'updated_at': time.time(),
-                   # Step order, not measurement order: a resumed run appends new checkpoints
-                   # after the rows it loaded, which would otherwise interleave arbitrarily.
-                   'results': sorted(results, key=lambda r: r['step'])}
-        partial_path = out_path + '.partial'
-        with open(partial_path, 'w') as handle:
-            json.dump(payload, handle, indent=2)
-        os.replace(partial_path, out_path)
+        write_gate.record()
+        write_payload(out_path, build_payload(
+            payload_spec, progress, samples, results, complete, in_flight))
         update_chart()
 
     # Live progress window, same mechanism as training's graph. Refreshed from write_results()
     # so it advances every round; a frame is ~0.1s against a ~4s round.
     #
     # Always on, deliberately — update_chart() disables itself if no window can be opened, so an
-    # unattended run needs no configuration. live_frame() reads every result file for the policy,
-    # so parallel EVAL_OUT_SUFFIX processes each show the whole job rather than their own slice.
+    # unattended run needs no configuration. The chart is scoped to this job's suffixes — its own
+    # EVAL_OUT_SUFFIX plus any it resumes — so parallel EVAL_OUT_SUFFIX processes still show the
+    # whole job, but a *different* eval that left a result file on this arm is not merged in. That
+    # last case is why the scoping is explicit: load_runs' mtime-window guess pulled a close-out
+    # finished <1h earlier into an HOF re-measurement's live chart, reading ~1700 checkpoints.
+    chart_suffixes = {suffix} | set(resume_suffixes(os.environ.get('EVAL_RESUME'), suffix))
     chart_path = os.path.join(EVALS_DIR, '{0}_eval_progress.png'.format(policy_name))
-    chart = {'screen': None, 'last': 0.0, 'off': False}
+    # 'off' disables everything after a real error. 'window_off' disables only the live
+    # window (SNEK_CHART_WINDOW=0, the default) while live_frame() keeps writing the PNG on
+    # every update -- conflating the two once meant a headless eval wrote the chart a single
+    # time and it looked frozen (the decoupled chart_viewer.py then showed a stale snapshot).
+    chart = {'screen': None, 'last': 0.0, 'off': False, 'window_off': False}
 
     def update_chart(force=False):
         if chart['off']:
@@ -1251,10 +616,19 @@ def main(argv):
         chart['last'] = now
         try:
             import eval_progress
-            frame = eval_progress.live_frame(policy_name, chart_path)
+            frame = eval_progress.live_frame(policy_name, chart_path, suffixes=chart_suffixes)
             if frame is None:
                 return
+            if chart['window_off']:
+                return  # the PNG was written by live_frame() above; only the window is off
             if chart['screen'] is None:
+                # Window off by default (the decoupled chart_viewer.py is the way to
+                # watch); live_frame() above still writes the PNG every update. Set
+                # SNEK_CHART_WINDOW=1 to opt back in. See training.py for why an
+                # in-process live window is a fatal-XIO liability under memory pressure.
+                if os.environ.get('SNEK_CHART_WINDOW', '0') in ('0', '', 'false', 'False'):
+                    chart['window_off'] = True
+                    return
                 import pyformulas
                 chart['screen'] = pyformulas.screen(
                     np.zeros(frame.shape[:2], dtype=np.uint8),
@@ -1275,6 +649,11 @@ def main(argv):
     # median and extremes are recomputed from the pooled raw episodes rather than approximated.
     samples = {step: dict(held) for step, held in resumed_partial.items()}
     resumed_by_step = {row['step']: row for row in resumed_rows}
+    # Rows are memoised per step, so **`samples[step]` may be mutated only by `measure`**, which
+    # pairs the mutation with a `row_cache.put`. See `eval_plan.RowCache` for the cost this bounds
+    # (a 1,300-checkpoint close-out rebuilt every row 125 times per measurement) and for what a
+    # broken invariant looks like.
+    row_cache = RowCache()
 
     def current_results():
         """Result rows for every checkpoint with episodes banked.
@@ -1284,11 +663,7 @@ def main(argv):
         is no rate to report. Its running state travels in the payload's `in_flight` block
         instead, which is what eval_progress.py draws it from.
         """
-        rows = dict(resumed_by_step)
-        for step, held in samples.items():
-            if held['scores']:
-                rows[step] = build_row(step, held, selected_by.get(step))
-        return [rows[step] for step in sorted(rows)]
+        return row_cache.rows(samples, resumed_by_step, selected_by.get)
 
     def measure(step, episodes, label, stage=None):
         """Restores one checkpoint and adds `episodes` more episodes to its sample."""
@@ -1311,6 +686,11 @@ def main(argv):
         started_at = time.time()
 
         def on_round(round_index, rounds_total, perfect_so_far, episodes_so_far, per_round):
+            # One progress write per `WRITE_MIN_INTERVAL`, not one per round: the write is O(banked
+            # rows) and rounds arrive O(episodes), so the two multiplied. Nothing durable is at stake
+            # here — this block is progress only, and the measurement's own write is unconditional.
+            if not write_gate.due():
+                return
             # Report the checkpoint's whole sample, screening episodes included, so a topped-up
             # finalist shows its true running rate rather than restarting from zero.
             total_perfect = sum(held['perfect']) + perfect_so_far
@@ -1361,6 +741,10 @@ def main(argv):
         progress['session_seconds'] += elapsed
 
         row = build_row(step, held, selected_by.get(step))
+        # Built from the sample just extended above, so it is exactly what `current_results` would
+        # produce for this step. This is the `put` the cache's invariant requires: `measure` is the
+        # only place a sample is mutated, so it is the only place the cache can go stale.
+        row_cache.put(step, row)
         write_results(current_results(), complete=False)
         print('    perfect {0}/{1} = {2}%  (95% CI {3}-{4}%)'.format(
             row['perfect_games'], row['episodes'], row['perfect_percent'],

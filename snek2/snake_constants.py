@@ -31,10 +31,93 @@ FOOD_REWARD = 1.0
 DEFAULT_FOOD_DISTANCE_REWARD = 0.001
 FOOD_DISTANCE_REWARD = float(os.environ.get('SNEK_FOOD_DISTANCE_REWARD',
                                             DEFAULT_FOOD_DISTANCE_REWARD))
+# Potential-based shaping on "are the head, the food and the tail in one region" — the coefficient
+# `c` in `F = c * (gamma * Phi(s') - Phi(s))`. Read from the environment for the same reason
+# FOOD_DISTANCE_REWARD is: the term is consumed inside `Snake.step`, which runs in the parallel env
+# worker processes, and `from snake_constants import *` binds a copy at import, so an assignment in
+# the parent would never reach a worker.
+#
+# **0.0 is off and is a clean ablation.** The whole block is skipped, and `count_groups` draws no
+# randomness, so skipping it cannot shift the food stream — at 0.0 the reward is bit-identical to a
+# build without the term. Default 0.0, so every existing arm and every historical number is
+# unaffected.
+#
+# **`c` is not a free parameter.** Measured 2026-08-14: the discounted shaping telescopes to exactly
+# `-c * Phi(s0)`, so `c` is invisible in the return and has to be calibrated against the
+# per-transition reward instead. Genuine Phi flips run 2.5-3.6 per meal for a struggling policy, and
+# holding the budget at ~25% of FOOD_REWARD per meal gives 0.10. See
+# ../plans/chase-safe-reward-shaping.md.
+DEFAULT_CHASE_SAFE_SHAPING = 0.0
+CHASE_SAFE_SHAPING = float(os.environ.get('SNEK_CHASE_SAFE_SHAPING',
+                                          DEFAULT_CHASE_SAFE_SHAPING))
+# Snake length below which the potential is identically 0, so no shaping is paid there at all.
+# Defaults to 85 because that is the variant Phase 0 selected: a record policy spends only ~10.8%
+# of its steps at or above it while a struggling one spends 41.2%, so the dose lands on the endgame
+# and the early game — which needs no help — is left untouched. 85 also matches FORK_MIN_LENGTH, so
+# the shaped transitions are the ones the forking collector already oversamples.
+#
+# **The gate keeps the invariance**: the theorem holds for any bounded function of state, and a
+# length gate is one. It also makes the telescope exactly 0, since a length-5 opening board is below
+# any gate, so `Phi(s0) = 0`.
+#
+# `SNEK_CHASE_SAFE_GATE=0` selects the ungated form (variant A in the plan). Irrelevant when
+# CHASE_SAFE_SHAPING is 0.0, since the whole term is skipped.
+DEFAULT_CHASE_SAFE_GATE = 85
+CHASE_SAFE_GATE = int(os.environ.get('SNEK_CHASE_SAFE_GATE', DEFAULT_CHASE_SAFE_GATE))
+# Potential-based shaping on "is the free space a single connected piece" — the coefficient `c` in
+# `F = c * (gamma * Phi(s') - Phi(s))`, with Phi = 1 / (number of open regions), the tail cell freed
+# first. Read from the environment for the same reason CHASE_SAFE_SHAPING is: it is consumed inside
+# `Snake.step`, which runs in the parallel env workers, where a parent assignment never reaches a
+# `from snake_constants import *` copy.
+#
+# **Why 1/count and not a size-weighted measure.** In a perfect game every open cell must eventually
+# be filled, so a *single* permanently stranded cell loses the game — the number of pieces is the
+# fatal quantity, not how the space is divided. `largest / total` reads 0.95 for a 19+1 split and so
+# barely reacts to the first break; `1 / count` cliffs to 0.5 the moment the board stops being one
+# piece, which is the intent.
+#
+# Complements CHASE_SAFE_SHAPING rather than replacing it. Chase-safety is a *local, binary* "can I
+# eat this food and still reach my tail"; this is a *global* "has the board fragmented at all". They
+# disagree on the cases that matter — a board can be one eat-trap from death while 98% of its free
+# space is in one piece, and vice versa — so an arm may run both, and their PBRS terms simply add.
+#
+# **0.0 is off and is a clean ablation**, on the same argument as CHASE_SAFE_SHAPING: the block is
+# skipped and `count_groups` draws no randomness, so the food stream is untouched. Default 0.0, so
+# every existing arm and historical number is unaffected.
+DEFAULT_FREE_SPACE_SHAPING = 0.0
+FREE_SPACE_SHAPING = float(os.environ.get('SNEK_FREE_SPACE_SHAPING', DEFAULT_FREE_SPACE_SHAPING))
+# Snake length below which this potential is identically 0, matching CHASE_SAFE_GATE's default of 85.
+# Gated for the same reason and with the same invariance argument: a length gate is a bounded function
+# of state, so the shaping stays policy-invariant, and a length-5 opening board sits below it, so
+# Phi(s0) = 0 and the episode's discounted shaping telescopes to 0. `SNEK_FREE_SPACE_GATE=0` ungates.
+DEFAULT_FREE_SPACE_GATE = 85
+FREE_SPACE_GATE = int(os.environ.get('SNEK_FREE_SPACE_GATE', DEFAULT_FREE_SPACE_GATE))
 DEATH_REWARD = -5.0  # maybe avoid deaths more?
 STARVE_REWARD = -0.5
 global PERFECT_GAME_REWARD
-PERFECT_GAME_REWARD = 100
+# What a filled board pays. Read from the environment for the same reason FOOD_DISTANCE_REWARD is —
+# `Snake.step` pays it inside the parallel env worker processes, and `from snake_constants import *`
+# binds a copy at import, so an assignment in the parent would never reach a worker.
+#
+# **Changing it changes the objective, not just the scale, and it changes the shape of the return.**
+# At `gamma=0.9975` the discounted return from a state is `F + gamma^(T-t) * W`, where `F` is the
+# remaining food discounted to now. `F` is largest at the *start* of an episode (~20.8, all 95 meals
+# still to come) and smallest at the end (~3.6, four meals left). So at `W=100` the maximum return is
+# just before the win (~102.6, measured 104.4) while at `W=10` it moves to the *opening* (~20.8) —
+# `v_max` has to be re-derived rather than divided by 10, and this is why `SNEK_V_MAX` is not
+# adjusted automatically here.
+#
+# It also rescales the urgency to finish: delaying the win 100 steps costs `W*(1 - 0.9975^100)`,
+# so 22 reward at `W=100` and 2.2 at `W=10`. Endgame hunting speed is the measured elite-vs-mediocre
+# discriminator, so a smaller `W` is a real change of what the agent is asked to do. See
+# hyperparamTuning/findings.md.
+#
+# **Nothing identifies a perfect game by this value.** `state_helpers.is_perfect_score(score)` is the
+# single definition and `tests/test_perfect_game_counting.py` has an `ast` tripwire that fails if a
+# comparison against this constant reappears — which is what makes the knob safe to turn at all.
+DEFAULT_PERFECT_GAME_REWARD = 100
+PERFECT_GAME_REWARD = float(os.environ.get('SNEK_PERFECT_GAME_REWARD',
+                                           DEFAULT_PERFECT_GAME_REWARD))
 global PERFECT_GAME_WAIT_MS
 PERFECT_GAME_WAIT_MS = 500
 
@@ -113,10 +196,10 @@ POLICY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'savedPoli
 # Progress graphs are written here, one per policy name, rewritten each eval.
 RUNS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs')
 
-# The live "what just finished" eval chart lives here instead of RUNS_DIR, so a glance at
-# this one folder shows only the current eval or batch. eval_checkpoints.py archives
-# whatever is already here into EVALS_ARCHIVE_DIR before it writes a new one — see its
-# archive_existing_eval_pngs().
+# Eval charts live here instead of RUNS_DIR, one per policy, rewritten by each eval. **Nothing
+# moves them any more** (2026-08-24): starting an eval used to sweep every chart at this level into
+# EVALS_ARCHIVE_DIR, which cost more than the tidiness was worth -- see CLAUDE.md. Each arm
+# overwrites its own file by name, so the folder accumulates and stays correct.
 # Observation indices to force to 0.0, from SNEK_ZERO_OBS as a comma-separated list of indices
 # and inclusive ranges — `SNEK_ZERO_OBS=26-29` zeroes the following-tail block and food-space.
 #
@@ -150,6 +233,8 @@ def _parse_zero_obs(raw):
 ZERO_OBS_INDICES = _parse_zero_obs(os.environ.get('SNEK_ZERO_OBS'))
 
 EVALS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'evals')
+# Historical only: nothing writes here since 2026-08-24. Kept because the directory still holds
+# every chart the old archiving swept up, and it is in CLAUDE.md's never-delete table.
 EVALS_ARCHIVE_DIR = os.path.join(EVALS_DIR, 'archive')
 
 CAPTION = 'MiniSnake'

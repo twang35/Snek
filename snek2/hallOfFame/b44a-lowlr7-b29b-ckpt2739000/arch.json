@@ -1,0 +1,8 @@
+{
+  "fc_layer_params": [
+    320
+  ],
+  "num_actions": 3,
+  "obs_era": "b09c616",
+  "obs_len": 30
+}

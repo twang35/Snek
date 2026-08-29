@@ -55,7 +55,7 @@ def get_observations(old_grid,
 
     **Changing the length changes the MDP.** A checkpoint only restores against the vector it
     trained on, so every checkpoint from before a change here stops loading — see
-    ../hallOfFame/README.md, which tracks which era each entry belongs to.
+    ../hallOfFame/HOF.md, which tracks which era each entry belongs to.
     """
     observations = []
 
@@ -478,6 +478,93 @@ def group_obs(old_grid, head_pos, tail_pos, next_tail_pos, head_move_dir, curren
         food_observations.append(safe_to_chase_food)
 
     return observations, food_observations, wall_hug_observations
+
+
+def chase_safe_state(grid, head_pos, tail_pos, current_food):
+    """1 when the head, the food and the tail all sit in one open region of `grid`.
+
+    The *state* form of the per-action flag at observation indices 15-17, and the potential
+    function behind `CHASE_SAFE_SHAPING`. `group_obs` asks "would this move leave them in one
+    region"; a potential needs "are they in one region **now**". Kept separate rather than folded
+    into `group_obs`, which short-circuits fatal moves and builds a post-move grid per action —
+    neither of which applies to a state.
+
+    **Do not substitute `obs[15 + a]` for this.** On a step that ate, the food has already
+    respawned by the time the potential is read, while the per-action flag was computed against
+    the food that was just consumed. That mismatch is the whole reason this exists as its own
+    function; the old distance-shaping term needed an explicit exclusion for the same situation.
+
+    The head and tail cells are occupied, so they get `get_adjacent_groups`; the food cell is open
+    and belongs to a region of its own, so it gets containment. Testing the food against the
+    *intersection* rather than against the head's regions alone is the point — the head can
+    neighbour two regions at once, and reaching the food through one while the tail is only
+    reachable through the other is exactly the trap the flag names. See `group_obs`' comment.
+
+    Returns an int, so a caller that wants a float converts once. Measured to agree with
+    `obs[15 + a]` on the post-move board over 4,460 consecutive greedy decisions with zero
+    disagreements, and `tests/test_observation_spec.py` pins the agreement on fixtures.
+    """
+    if current_food == 'no food':
+        return 0
+    cols = grid.shape[1]
+    regions, _ = count_groups(grid)
+    escape = (get_adjacent_groups(regions, cols, head_pos)
+              & get_adjacent_groups(regions, cols, tail_pos))
+    if not escape:
+        return 0
+    food_bit = 1 << ((current_food.position[1] + 1) * cols + (current_food.position[0] + 1))
+    return 1 if any(regions[index] & food_bit for index in escape) else 0
+
+
+def free_space_pieces(grid, tail_pos):
+    """`1 / (number of connected open regions of grid)`, with the tail's cell freed first.
+
+    The state form of the "keep the free space in one piece" potential behind `FREE_SPACE_SHAPING`.
+    One region -> 1.0, two -> 0.5, k -> 1/k, so the value cliffs the moment the board stops being a
+    single piece, whatever the *sizes* of the pieces. That is deliberate: in a perfect game every
+    open cell must eventually be filled, so a single stranded cell loses the game, and a size-weighted
+    measure (`largest / total`) reads 0.95 for a 19+1 split and misses it.
+
+    The tail cell is freed before the count, for the reason `update_grid` documents: the tail vacates
+    on the next ordinary move, so a region reachable only through it is not really sealed. Counting
+    the tail as a wall made the region count wrong on 12.1% of steps overall and 40% of steps past
+    score 80 for the 92% policy — exactly the endgame this potential is gated to — always in the
+    pessimistic direction. Freeing one cell is the state analogue of that per-action fix.
+
+    Unlike `chase_safe_state` this is a *global* board measure, so it needs no head or food: it asks
+    only how fragmented the open space is, not whether a particular meal is reachable. The two are
+    meant to be read together, not one instead of the other.
+
+    `.copy()` because `count_groups` reads the grid and the caller's board must not be mutated.
+    Returns a float in (0, 1]; a board with no open cell cannot occur before the terminal step, where
+    the caller returns 0.0 without calling this, but the `count` guard keeps the function total.
+    """
+    grid = grid.copy()
+    set_number(grid, tail_pos, 0)
+    _, count = count_groups(grid)
+    return 1.0 / count if count else 0.0
+
+
+def is_perfect_score(score):
+    """True when `score` is a filled board. The one definition of "this episode was perfect".
+
+    `Snake.check_perfect_game` is the game rule and it fires at exactly one score, so score and
+    perfect-game are the same fact — which is why this can be asked of a finished episode that
+    nobody watched. Every counter must ask it this way rather than testing the final reward
+    against `PERFECT_GAME_REWARD`, and that is not a style preference:
+
+    **Reward equality broke the moment a shaping term was added.** `CHASE_SAFE_SHAPING` pays
+    `-c * Phi(s)` at the winning step (Phi(terminal) = 0, as the theory requires), so a perfect
+    game returns 99.9 rather than 100 whenever the pre-win board was chase-safe — which is the
+    tail-chasing endgame every competent policy plays. Three counters compared with `==` and all
+    three read 0% perfect games for arms that were winning boards from step 9k: batch 27 on the
+    desktop and batch 30 on the laptop both trained blind, and the training loop's epsilon
+    schedule, which is driven by the trailing perfect rate, sat pinned at its refinement ceiling
+    of 0.0125 for 300k+ steps instead of annealing toward the floor.
+
+    A reward is a sum of terms and any new term shifts it. A score is a count of food.
+    """
+    return int(round(score)) == int(MAX_POSSIBLE_SCORE)
 
 
 def starve_budget(snake_len):

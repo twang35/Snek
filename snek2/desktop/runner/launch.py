@@ -28,9 +28,46 @@ def build_command(job, host, runtime):
         env['OMP_NUM_THREADS'] = str(runtime['omp_num_threads'])
     env.update(job.env)  # per-job SNEK_* overrides win
 
+    # Put the job's live chart window on the desktop's session display, if host.env
+    # names one. The runner is a systemd service outside the graphical session, so a
+    # launched job only reaches the monitor with the session's DISPLAY + X authority.
+    # If it can't (display gone), training.py's window is best-effort and the job
+    # still runs and writes its PNG.
+    if host.get('DISPLAY'):
+        env.setdefault('DISPLAY', host['DISPLAY'])
+        if host.get('XAUTHORITY'):
+            env.setdefault('XAUTHORITY', host['XAUTHORITY'])
+
     if job.type == 'eval':
-        argv = [py, '-u', 'eval_checkpoints.py', job.policy] + list(job.eval_args)
-        env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 10))
+        # One process owns the whole wave -- not one `eval_checkpoints.py` per arm -- so work moves to
+        # whichever arm still has any instead of a finished arm's share of the box sitting idle.
+        # `--chain` leads the argv because the selector has to follow it, and the policies trail the
+        # selector: the same spelling an agent types on the laptop, which is the point.
+        #
+        # **The engine defaults to the vectorised one.** `vectorized/vec_wave.py` measures ~40x
+        # faster than the TF path and was validated against it at four levels, ending in a
+        # 24-checkpoint x 500-episode head-to-head that agreed to -0.058 pp (z = -0.28). Set
+        # `SNEK_EVAL_ENGINE=scalar` -- in `runtime.json`'s `eval_engine`, or per job in the spec's
+        # `env` -- to force `eval_wave.py`. A c51 batch needs no opt-out either: `vec_wave` measures
+        # categorical arms itself since 2026-08-24 (-0.17 pp, z = -0.10 against the scalar path).
+        engine = env.get('SNEK_EVAL_ENGINE') or runtime.get('eval_engine', 'vec')
+        if engine not in ('vec', 'scalar'):
+            raise ValueError('eval_engine={0!r}: expected "vec" or "scalar"'.format(engine))
+        argv = [py, '-u', 'vectorized/vec_wave.py' if engine == 'vec' else 'eval_wave.py']
+        if job.chain:
+            argv.append('--chain')
+        argv += list(job.eval_args) + list(job.policies)
+        if engine == 'vec':
+            # Cores minus two by default (see `vec_wave.DEFAULT_PROCS`); `runtime.json` can say
+            # otherwise for a box whose cores are not the binding constraint. `EVAL_WORKERS`/
+            # `EVAL_LANES` size *TF worker processes* and this engine has none, so they are not set
+            # -- `vec_wave` strips them from what it passes its shards for the same reason.
+            procs = job.eval_workers or runtime.get('vec_wave_procs', 0)
+            if procs:
+                env['VEC_WAVE_PROCS'] = str(procs)
+        else:
+            env['EVAL_WORKERS'] = str(job.eval_workers or runtime.get('eval_workers', 4))
+            env['EVAL_LANES'] = str(job.eval_lanes or runtime.get('eval_lanes', 4))
         return argv, env, 'eval-{0}.log'.format(job.id), job.policy
 
     # train / smoke / benchmark all invoke the trainer.
@@ -104,7 +141,11 @@ def spawn(job, host, runtime):
 
 def update_throughput(rj, host):
     """Refreshes rj.current_step and rj.steps_per_sec from the policy's evals.json
-    summary. Cheap and best-effort -- a missing or half-written file is ignored."""
+    summary. Cheap and best-effort -- a missing or half-written file is ignored.
+
+    Reads `rj.policy`, which for an eval wave is the first of its arms. That is right rather than
+    approximate: the field exists to show a *training's* progress, and a wave has no single step to
+    report."""
     path = os.path.join(host['SNEK_DIR'], 'runs', str(rj.policy) + '_evals.json')
     try:
         with open(path) as fh:

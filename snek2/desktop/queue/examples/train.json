@@ -10,5 +10,6 @@
   },
   "max_steps": 2000000,
   "priority": 10,
+  "label": "b20a: example arm, discount=0.9975, target_update=1000",
   "notes": "example train arm; env values are passed straight through as SNEK_* overrides"
 }

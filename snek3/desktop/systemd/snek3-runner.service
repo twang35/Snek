@@ -1,0 +1,25 @@
+[Unit]
+Description=snek3 unattended training/eval runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=claw
+WorkingDirectory=/home/claw/Snek/snek3/desktop
+Environment=SNEK_RUNNER_HOST_ENV=/home/claw/Snek/snek3/desktop/config/host.env
+# The daemon is stdlib-only, so it runs on BASE miniconda python and can start
+# before the `snek3` conda env is built. Jobs are launched with PYTHON_BIN from
+# host.env, which is the env python and the thing that actually needs torch.
+ExecStart=/home/claw/miniconda3/bin/python -u -m runner.runner
+Restart=always
+RestartSec=10
+
+# Stop ONLY the daemon on stop/restart, never its children. Jobs are launched
+# detached (setsid) and self-terminate at SNEK_MAX_STEPS, so a deploy can restart
+# the daemon with four arms mid-run and they keep going. The daemon re-adopts them
+# by pid on the next poll.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

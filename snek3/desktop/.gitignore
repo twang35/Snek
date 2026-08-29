@@ -1,0 +1,4 @@
+# Desktop-local, never committed.
+__pycache__/
+*.pyc
+config/host.env

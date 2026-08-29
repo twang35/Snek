@@ -889,7 +889,7 @@ def test_observation_spec_matches_what_the_game_emits():
 
     The literal below is a deliberate tripwire, not redundancy with the equality: adding a block
     is supposed to fail here so the count, the layout docstring in get_observations and
-    hallOfFame/README.md's era markers all get updated in the same pass. 26 -> 29 on 2026-08-03
+    hallOfFame/HOF.md's era markers all get updated in the same pass. 26 -> 29 on 2026-08-03
     when the following-tail block landed, then 29 -> 30 the same day for food-space.
     """
     import os

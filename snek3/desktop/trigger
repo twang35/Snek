@@ -1,0 +1,6 @@
+#!/bin/sh
+# Force a git cycle on the runner daemon now. See runner/trigger.py for the exit-code ladder.
+#   ssh the-claw-den 'Snek/snek3/desktop/trigger'
+# Stdlib-only, so any python3 will do -- SNEK_RUNNER_PYTHON overrides.
+cd "$(dirname "$0")" || exit 1
+exec "${SNEK_RUNNER_PYTHON:-python3}" -m runner.trigger "$@"

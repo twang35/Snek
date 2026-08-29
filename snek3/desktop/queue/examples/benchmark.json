@@ -1,0 +1,9 @@
+{
+  "project": "snek3",
+  "id": "bench-1",
+  "type": "benchmark",
+  "max_steps": 20000,
+  "env": {"SNEK_COLLECT_ENVS": "16"},
+  "label": "training-loop throughput at 16 lanes",
+  "notes": "Stage A is turned off rather than shrunk (SNEK_EVAL_INTERVAL == SNEK_MAX_STEPS): it is ~90% of an arm's wall clock and would be most of what the benchmark measured."
+}

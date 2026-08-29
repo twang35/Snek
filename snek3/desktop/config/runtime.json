@@ -1,0 +1,14 @@
+{
+  "max_trainers": 4,
+  "max_evals": 1,
+  "eval_shards": 16,
+  "poll_seconds": 30,
+  "git_seconds": 600,
+  "torch_threads": 1,
+  "omp_num_threads": 1,
+  "nice": 0,
+  "disk_min_gb": 5,
+  "paused": false,
+  "drain": false,
+  "auto_stage_b": true
+}

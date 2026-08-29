@@ -16,8 +16,9 @@ than any single run.
 | [`completedRuns.md`](completedRuns.md) | every finished arm: config, final numbers, verdict | when an arm finishes |
 | [`findings.md`](findings.md) | what is established, what has been falsified | when something is learned |
 | [`failureModes.md`](failureModes.md) | the four ways a policy degrades, and how to tell them apart | rarely |
-| [`charts.md`](charts.md) | progress graph for every arm, with captions | when charts are refreshed |
-| `charts/` | snapshot copies of the graphs | via `refresh_charts.sh` |
+| [`charts.md`](charts.md) | progress graph for every arm, with captions | every progress update / docs change, finished or not |
+| `charts/` | snapshot copies of the graphs | via `scripts/refresh_charts.sh` |
+| [`scripts/`](scripts/README.md) | the launchers, the chaining scripts and `refresh_charts.sh` | one row per script in its README |
 
 **Start with [`runs.md`](runs.md)** if you are picking this up mid-flight — it says
 what is in progress and what to do next. Read this file for how the machinery works,
@@ -95,23 +96,36 @@ usefulness:
 | 5 | **steps to first reach score N** | learning speed | — |
 | 6 | **max drawdown** | diagnostic for *why* a config is erratic | can't tell noisy-but-high from collapsed |
 
-### Measuring a policy properly: `eval_checkpoints.py`
+### Measuring a policy properly
 
 Everything above is for comparing *runs*. To measure what a specific **policy** actually
 does, reload its checkpoint and evaluate it over hundreds of episodes:
 
 ```
 cd snek2
-EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top20 \
-  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top20
+PYTHONPATH=. python -u vectorized/vec_wave.py --chain top50 b45     # the default: a whole batch
+PYTHONPATH=. python -u vectorized/vec_eval.py b4c-schlongper top50  # one arm, by hand
+```
+
+**`vec_wave.py` is the default engine on both hosts since 2026-08-24** — ~40x the throughput, validated
+against the TF path to −0.058 pp (z = −0.28) over 24 checkpoints × 500 episodes. It is **flat and
+ungated**, so nothing below about screening tiers or `EVAL_MIN_ACHIEVABLE` applies to a file it wrote:
+every row is full length and directly poolable, and `min_achievable` reads `null`. The rest of this
+section describes the scalar path, which is what `SNEK_EVAL_ENGINE=scalar` runs. **c51 arms are no
+longer an exception** — `vec_wave` measures them as of 2026-08-24 — so the scalar path is now only the
+opt-out, not the route for a whole class of batch:
+
+```
+EVAL_WORKERS=10 EVAL_OUT_SUFFIX=_top50 \
+  PYTHONPATH=. python -u eval_checkpoints.py b4c-schlongper top50
 ```
 
 **Screening is on by default** and is **3.6x cheaper than measuring every selected checkpoint at
 100 episodes, for the same answer** — see "Screening" below. `EVAL_SCREEN_EPISODES=0` gets the flat
 one-pass protocol every arm before batch 10 was measured under.
 
-**Early abandonment is on by default at `EVAL_MIN_ACHIEVABLE=95`**: a checkpoint stops being measured
-the moment it cannot reach the gate even if every remaining episode is perfect. It cannot change any
+**Early abandonment is on by default at `EVAL_MIN_ACHIEVABLE=97`** (95 before 2026-08-19): a checkpoint
+stops being measured the moment it cannot reach the gate even if every remaining episode is perfect. It cannot change any
 ranking among rows that reach the gate — the test is arithmetic, so a checkpoint that would have
 reached it is never stopped, and an abandoned row's own rate is always below it.
 `pooled_equal_effort` truncates to the screen depth, so it is exact at any gate.
@@ -123,7 +137,12 @@ Simulated on batch 13's 505 full-length rows, full-length work as a share of a f
 |---|---|---|
 | 85 | 71% | 16 failures |
 | 90 | 52% | 11 failures |
-| **95** | **31%** | **6 failures** |
+| 95 | 31% | 6 failures |
+| **97** (default since 2026-08-19) | **not simulated** | **4 failures** |
+
+**The 97 row is deliberately blank.** The percentages above come from replaying batch 13's 505
+full-length rows; nobody has replayed them at 97, so quoting a number here would be inventing one. It
+is necessarily below 31%, and the saving still tracks arm quality inversely — see the ‡ note below.
 
 **‡ Those are batch 13's distribution and they over-predict the saving on a strong arm.** The realised
 total saving under the 90% gate was **34.8% of planned episodes on batch 14 and 28.1% on batch 15**,
@@ -159,6 +178,28 @@ The reason is throughput of *decisions*, not of episodes: after many batches the
 fast a finished batch can be turned into a verdict, and a close-out that finishes in 30 minutes
 instead of 90 gets the next batch launched sooner. Training is resumable and loses nothing but wall
 clock; an un-analysed batch blocks everything behind it.
+
+**Nobody has to wait up for the launch.** [`chain_closeout_after_training.sh <prefix>`](scripts/chain_closeout_after_training.sh)
+polls until that batch's trainers exit — at their `SNEK_MAX_STEPS` cap, so unattended — then runs
+`vec_wave.py --chain top50 <prefix>`, log in `/tmp/<prefix>_closeout.log`. It is the mirror of
+[`chain_after_evals.sh`](scripts/chain_after_evals.sh), which queues a *wave* behind a close-out. First used on `b39`:
+trainers drained 08:00, close-out done 08:50, no intervention.
+
+**The script is now the wait and nothing else** (2026-08-24, 176 lines → 105). It used to carry the whole
+two-stage measurement: four `eval_checkpoints.py` processes, per-arm pid bookkeeping, an inline check that
+each close-out came out `complete`, a hand-copied HOF recipe and its own copy of the
+`close-out gate < HOF gate` invariant. Every one of those was a second copy of something `--chain` and
+`eval_plan.hof_settings` own, and the copies *were* the failure mode — its header used to read "copied
+from `desktop/runner/runner.py`; if that changes, change this too". It now pins **no** protocol values, so
+the two hosts cannot disagree about a gate. `SNEK_EVAL_ENGINE=scalar` runs `eval_wave.py` instead;
+`CHAIN_HOF=0` restores the close-out-only behaviour;
+`CLOSEOUT_GATE`/`HOF_GATE` override the gates, and the script refuses to start unless the close-out gate is
+strictly below the HOF gate, since HOF selects from the close-out's own file. Details and the reason the
+recipe is duplicated rather than shared:
+[`scripts/README.md`](scripts/README.md#-the-chain-script-is-now-the-wait-and-nothing-else-2026-08-24-176-lines--105). Both scripts count processes rather than tracking
+pids, because `kill -0` succeeds on a zombie, and both filter `pgrep` output — a bare `pgrep -f snek2.py` matches
+git pathspecs and the telemetry `curl`, and a bare `pgrep -f eval_checkpoints.py` matches the `chart_viewer` that
+outlives the evals by design and would hold the wait open forever.
 
 What that means in practice:
 
@@ -228,20 +269,27 @@ project record. A weak arm produces none. So the extra measurements land on the 
 hiding something, and the stage plan is raised when they appear (an over-quota confirm cannot be
 predicted before the screens run, so a plan printed at launch reads slightly low).
 
-`top20` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single
-10-episode eval** from the graph, using the surrounding perfect rate to order within an
-equal-eval tier, and applies two thresholds:
+`top50` (or `top`, `top:N`) is the normal way to close out an arm. It ranks on the **single graph
+eval**, using the surrounding perfect rate to order within an equal-eval tier, and applies two
+thresholds:
 
 | rule | threshold | effect |
 |---|---|---|
-| always measure | single eval **>=90%** | every such checkpoint runs, even past N |
-| fill remaining slots | **>=60%**, best first | at 10-episode granularity this is {60, 70, 80} |
-| never measure | below **60%** | skipped entirely, however few slots are filled |
+| always measure | single eval **>=95%** | every such checkpoint runs, even past N |
+| fill remaining slots | **>=90%**, best first | at 20-episode granularity this is exactly {90} |
+| never measure | below **90%** | skipped entirely, however few slots are filled |
 
-**N is a target, not a quota.** A graph point is 10 episodes, so `perfect_percent` only takes
-values 0, 10, … 100 — which makes those thresholds coarser than they look. `>=90%` is the set
-{90, 100} and the fill band is exactly {60, 70, 80}. `b8f-disc9975seed2` has 32 checkpoints at
->=90% and runs all 32; `b8e-clipseed2` has one point above the floor in 1165 evals and runs one.
+**N is a target, not a quota**, and the *granularity is load-bearing.* A graph point is
+`training.num_eval_episodes` episodes — **20 since 2026-08-19**, 10 before — so `perfect_percent`
+only takes values on a grid of `100/n`, which makes these thresholds coarser than they look. At 20
+the mandatory tier `>=95%` is the set {95, 100} and the fill band is exactly {90}. **At the old 10
+the thresholds had to be 90/60**, because `>=95%` would have collapsed to {100} and merged the
+mandatory tier into the uncapped full-length tier — which is why the two changes shipped together
+and why `tests/test_selection_tiers.py` fails if either moves alone.
+
+`b8f-disc9975seed2` has 32 checkpoints in the old `>=90%` tier and runs all 32; `b8e-clipseed2` has
+one point above the floor in 1165 evals and runs one. A *continuation* arm is the opposite extreme —
+`b43`'s arms selected 791-1196 each, because a champion never drops below the mandatory threshold.
 
 Explicit steps still work (`... b4c-schlongper 869000 871000`) when a specific checkpoint is
 the question, and they bypass both thresholds.
@@ -250,16 +298,29 @@ the question, and they bypass both thresholds.
 
 Three stages instead of one:
 
-1. every checkpoint whose **graph point is 100%** (ten perfect games out of ten) gets the full
-   **100 episodes** immediately. Uncapped, and large on a strong arm — 47/142/7/146 across batch
-   10's four arms. Explicitly named steps join this tier, since naming one is a request to measure it.
-2. everything else selected gets **20 episodes**
+1. every checkpoint whose **graph point is >=95%** (`ALWAYS_FULL_SINGLE`; at 20-episode graph evals
+   that is **19/20 or 20/20**) gets the full **100 episodes** immediately. Uncapped, and large on a
+   strong arm — 47/142/7/146 across batch 10's four arms *under the old 100% threshold*, and
+   790-1400 per arm on a continuation batch. Explicitly named steps join this tier, since naming one
+   is a request to measure it.
+2. everything else selected gets **20 episodes** — since 2026-08-19 that is only the fill band
+   (>=90% and <95%), because stage 1's threshold now equals the mandatory tier's
 3. the best **100** (`EVAL_CONFIRM_COUNT`) **of those screened** get **80 more**, reaching 100
 
 A promoted checkpoint ends with exactly 100 episodes — the screen counts toward the total — so its
 number is directly comparable with every arm measured under the flat protocol. Checkpoints that
 miss the cut keep their 20-episode row, whose much wider Wilson interval says how little it is worth.
-Confirmation slots exclude the 100% tier, which already has the measurement a slot would buy.
+Confirmation slots exclude stage 1's tier, which already has the measurement a slot would buy.
+
+**‡ Stage 1's threshold was 100% until 2026-08-19, and lowering it to 95% is almost free *because of
+the gate*.** An uncapped tier that admits every 19/20 checkpoint sounds ruinous; simulated on b43/b44's
+own curves it changed total close-out episodes by **-1%**, every arm within ±3%, because
+`EVAL_MIN_ACHIEVABLE=97` abandons such a checkpoint after 4 failures — often at the 20-episode floor,
+for what the screen would have cost. **The saving is conditional on the gate staying stricter than the
+tier**, so the two move together or not at all. What it buys is coverage: 427-575 checkpoints per arm
+previously sat at 19/20, were screened, and were capped by `EVAL_CONFIRM_COUNT`, so an arm's best
+checkpoint could end on a 20-episode row — which is exactly the failure the batch-10 evidence below
+warned about.
 
 **Cost on a batch-10-shaped arm**, against measuring all 660 selected checkpoints at 100:
 
@@ -375,7 +436,7 @@ to the screen depth, abandonment cannot fire before the floor, so it is exact at
 arm's *unselected* graph-100% rows, and under a gate those rows are abandoned and downward-biased by
 optional stopping. A shrunk figure cannot be computed for a gated arm by the existing method. The
 substitute is a second independent 100-episode measurement of the champion, which is worth more
-anyway — see `b14a` in [`../hallOfFame/README.md`](../hallOfFame/README.md).
+anyway — see `b14a` in [`../hallOfFame/HOF.md`](../hallOfFame/HOF.md).
 
 **Ranking uses the screen rate, ties broken on the surrounding graph rate.** 20 episodes admit
 only 21 distinct values, so ties are the common case and the tie-break does real work — the
@@ -463,11 +524,63 @@ intended behaviour (the decline is real and should cost the arm something), but 
 horizon has to be fixed before comparing, exactly as the pre-registered best-30 comparison already
 required.
 
+**‡ These variances are level-dependent, and the ranking inverts near the ceiling.** Re-measured on
+batches 22-24 on 2026-08-14: `best_perfect30`'s between-seed sd falls to **0.67** at b24's level while
+`sef`'s is **5.59**, and in a seed-paired design `best_perfect30` resolves ~3.6 pp against `sef`'s ~21.3.
+The table below still governs arms far from the ceiling; see
+[the subsection under the peak-trailing warning](#-the-variance-ranking-above-inverts-near-the-ceiling--re-measured-2026-08-14).
+
 **The honest ceiling.** At these variances, detecting a **5 pp** effect needs n≈17 arms per group
 on the new metric and n≈37 on the old one. Nothing feasible here resolves 5 pp on `best_perfect30`,
 and an earlier claim in [`runs.md`](runs.md) that "n=12 at 2M would detect ~5 pp" was true only for
 a low-variance metric — on best-30 it is 8.7 pp. Choosing the metric is the only lever that moves
 this materially; adding arms runs into a square root.
+
+### ‡ Do not judge a ceiling on `peak_trailing` — it is capped at 95 and already pegged
+
+Added 2026-08-14. `trailing_avg_score` is the mean **`avg_score`** of the last 5 evals, `avg_score` is
+food eaten, and `MAX_POSSIBLE_SCORE` is **95**, so `peak_trailing` cannot exceed 95.00 — and all four
+batch-24 arms reach exactly that. Below the cap it moves **2.2 points across 60 pp of perfect rate**,
+because a failed endgame episode still eats ~88-90 food. `max_single_eval` is worse: 100 on 12 of 12
+recent arms. Full numbers:
+[`findings.md`](findings.md#-peak-trailing-is-a-saturated-metric--it-is-capped-at-95-and-four-arms-already-sit-on-the-cap).
+
+**What to use instead, by the question being asked:**
+
+| question | metric | why |
+|---|---|---|
+| did it move what we actually want? | **`best_perfect30`** | on the perfect rate itself, max 100, control at 95.3-96.7 so there is headroom — **and at this level it is also the sharpest test**, see below |
+| did the config move the arm? | `strong_eval_fraction` | the standing primary, and still the right choice for arms *far* from the ceiling, where `best_perfect30`'s max-statistic variance dominates |
+| will it produce a hall-of-fame checkpoint? | **count of full-length ≥98% rows in the HOF-500 chain** | the literal criterion. `best_perfect30` is its best training-time predictor (4 of 4 on batch 24) |
+| is the arm winning whole 50-episode stretches? | **count of trailing-95.00 windows** | the discriminating form of the saturated metric: 0-0-0-0 for b22, 7-22-10-17 for b24 |
+
+#### ‡ The variance ranking above inverts near the ceiling — re-measured 2026-08-14
+
+The sd table in the previous section is a **batch-11** measurement, at a level where arms spanned a wide
+range. It does not describe batches 22-24. Between-seed sd of four identical configs, per batch, and the
+seed-paired b24−b22 differences the chase-safe plan's design uses:
+
+| | `best_perfect30` | `strong_eval_fraction` |
+|---|---|---|
+| b22 mean (sd) | 86.2 (**2.28**) | 30.5 (10.75) |
+| b23 mean (sd) | 85.8 (**4.02**) | 33.0 (15.48) |
+| b24 mean (sd) | 96.2 (**0.67**) | 66.0 (5.59) |
+| paired b24−b22: mean, sd of pairs | **+9.93, 2.56** | +35.53, 15.35 |
+| **resolves at n=4 paired** | **~3.6 pp** | ~21.3 pp |
+
+**`best_perfect30` is roughly 6× sharper in the paired design at this level**, and it wins on
+signal-to-noise as well as on scale (effect/sd 3.9 against 2.3), so this is not just the compression that
+comes with sitting near a cap. Two caveats. An sd from four points is itself very uncertain (~±40%), so
+treat the ratio as a strong hint rather than a calibration. And `best_perfect30` has **3.8 pp of headroom
+left** — it is on the same road `peak_trailing` already reached the end of, and will need replacing once
+arms sit above ~99.
+
+**So for a batch launched against a b24-class control, pre-register `best_perfect30` as the primary and
+report `sef` alongside.** For an arm nowhere near the ceiling, the batch-11 ranking still applies.
+
+Peak trailing keeps one honest job — **a cheap sanity check that an arm reached the endgame at all**, and
+a comparable number for arms far from the cap. It is quoted as ceiling evidence throughout the older
+findings; those readings hold on other evidence, but do not extend them.
 
 ### Comparing arms fairly
 
@@ -514,18 +627,32 @@ only 4 were running, which would have looked like the cap was already blown.
 A human-started `python snek2.py train` counts against the budget. Leave it
 alone; never touch `snek2/savedPolicies/train*`.
 
+### Keep `charts.md` current while a batch runs — not only at stop
+
+**`charts.md` is refreshed on every progress update and every time the tuning docs are touched, whether
+or not the arms have finished.** The file's job is to show every current arm's graph *in one place*, so
+an arm training right now still gets its section — with its training self-eval readings (peak trailing,
+best-30, `sef`), and the close-out pooled and any HOF-500 marked *running* until they land. **Do not
+defer the section to batch close**; a running batch with no chart entry is the exact drift this rule
+prevents, and it has been missed repeatedly. The steps are the same as the stop checklist below — run
+`refresh_charts.sh`, add or upkeep the batch's section, run the completeness check — minus the
+retire-the-oldest move, which happens only when a *new* batch pushes the count past six.
+
 ### When you stop a batch of arms
 
-**A batch is not stopped until its charts are filed.** This list exists because the charts drifted
-once to twelve undocumented arms, and because a successful `refresh_charts.sh` *looks* like the charts
-are handled when it has only copied images — it never edits `charts.md`.
+**A batch is not stopped until its charts are filed** — and by stop time the section usually already
+exists (see above), so this is the *finalization*: fill in the close-out/HOF-500 numbers and retire the
+oldest. This list exists because the charts drifted once to twelve undocumented arms, and because a
+successful `refresh_charts.sh` *looks* like the charts are handled when it has only copied images — it
+never edits `charts.md`.
 
 Do these in order, the moment the arms are killed:
 
-1. **`zsh hyperparamTuning/refresh_charts.sh`** — copies every `runs/*.png` into
+1. **`zsh hyperparamTuning/scripts/refresh_charts.sh`** — copies every `runs/*.png` into
    `hyperparamTuning/charts/` and prints the step each one reached, which is what the captions quote.
-2. **Add the batch's section to the top of [`charts.md`](charts.md)**, newest first: a batch-level
-   table, then one subsection per arm ordered best result first, each with its step, peak trailing,
+2. **Add or finalize the batch's section at the top of [`charts.md`](charts.md)** (it is usually
+   already there from progress updates — see above), newest first: a batch-level table, then one
+   subsection per arm ordered best result first, each with its step, peak trailing,
    best-30, `sef` and recent-30. Say plainly which figures are comparable to the batches below and
    which are not — `sef` is a fraction of an arm's *own* evals, so a longer batch reads higher for
    free and the number is only meaningful against a matched truncation.
@@ -552,6 +679,19 @@ Do these in order, the moment the arms are killed:
 lines, which is still readable end to end. The archive is history only and is never loaded during
 normal work, so nothing is lost by moving a section there — the live file is the one that has to stay
 short enough to actually be read.
+
+**`completedRuns.md` needs the same treatment, less often.** Its narratives grow ~60-100 lines a batch
+and it passed 1,700 lines on 2026-08-12. When that happens, retire the **oldest batch narratives** to
+`archive/batches<N>-<M>.md` — batches 1-11 and 12-15 are already there — and keep roughly **batch 16
+onward live**. Two rules: **the canonical arm table never moves** (it is one row per arm and is the
+thing every other doc cites), and the retired file gets the same `../` link repair plus a check of
+everything that linked *into* the moved sections. `findings.md` and both archive files linked into the
+batch 12-15 narratives, and all nine of those links broke silently on the move.
+
+**Verify links by resolving them, not by reading them.** Slugs with `β`, `→`, `0.1` or `≥` in the
+heading are impossible to get right by hand — three of the ones written on 2026-08-12 were wrong on the
+first try. Resolve every `](target#anchor)` in the tuning docs against the actual headings after any
+move; a wrong anchor renders as ordinary link text and never errors.
 
 ### Launching a run
 
@@ -610,7 +750,7 @@ Notes that matter:
 | `SNEK_MIN_EPSILON` | 0.002 | floor. **0 is rejected**, as is any value at or above `INITIAL_EPSILON / 32` |
 | `SNEK_GUIDED_FRACTION` | 0.8 | share of refinement-phase episodes whose epsilon move avoids fatal actions; 0 disables the shield. Raised 0.5 → 0.8 on 2026-08-07 to match what every arm from batch 15 on passes explicitly |
 | `SNEK_MAX_STEPS` | 10000000 | **absolute** step at which training stops, so a wave self-terminates |
-| `SNEK_FC_LAYERS` | 50,100,50 | comma separated |
+| `SNEK_FC_LAYERS` | 50,100,50 | comma separated. **Changing it creates a new checkpoint era** — see the warning below |
 | `SNEK_REPLAY_BUFFER_MAX_LENGTH` | 100000 | |
 | `SNEK_PRIORITY_EXPONENT` | 0.6 | alpha; 0.0 disables prioritization |
 | `SNEK_PRIORITY_SIGNAL` | `td_error` | or `td_loss` (element-wise Huber), which is what `theSchlong` used |
@@ -620,10 +760,26 @@ Notes that matter:
 | `SNEK_INITIAL_POPULATE_STEPS` | 1000 | |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40.0 | below this a checkpoint is not written at all |
 | `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | penalty per move that increases the distance to food; 0 ablates the shaping |
-| `SNEK_FORK_BRANCHES` | 1 (off) | max live collect branches **including the main line**; 1 is today's single-line collect |
+| `SNEK_CHASE_SAFE_SHAPING` | 0.0 (off) | `c` in the potential-based term `c·(γΦ′−Φ)`, Φ = head, food and tail in one region. **0.0 is a clean ablation** — the block is skipped and `count_groups` draws no randomness, so the food stream is untouched. `c` is calibrated, not free: see [Phase 0](../plans/chase-safe-reward-shaping.md#-phase-0-results-2026-08-14) |
+| `SNEK_CHASE_SAFE_GATE` | 85 | snake length below which Φ is identically 0, so the term only acts in the endgame. `0` selects the ungated form. Keeps the invariance — the theorem holds for any bounded Φ — and makes the telescope exactly 0, since the opening board is below any gate |
+| `SNEK_FORK_BRANCHES` | **4** | max live collect branches **including the main line**; `1` is off (plain single-line collect). **Default raised 1 → 4 on 2026-08-14**: every arm from batch 17 on passed 4 explicitly, so the old default described no run that existed and an arm launched without the knob silently differed from its batch |
 | `SNEK_FORK_PROB` | 0.5 | chance of forking at an eligible endgame decision point |
 | `SNEK_FORK_MIN_LENGTH` | 85 | snake length at or above which forking is allowed |
 | `SNEK_FORK_MAX_STEPS` | 60 | steps a branch may run before it is dropped; 0 runs it to its terminal state |
+
+### ‡ `SNEK_FC_LAYERS` creates a checkpoint era, and a mismatch is silent
+
+**A checkpoint trained at one set of widths, rebuilt at another, restores with no error and simply
+leaves the mismatched layers unpopulated** — `restore()` is called with `expect_partial()`. The policy
+then plays like a beginner, which looks like a bad run rather than a loading bug.
+`under_the_hood.eval_fc_layer_params()` exists for exactly this reason: `eval_checkpoints.py` used to
+hardcode `(50, 100, 50)`, which was correct only because nobody had ever set the override.
+
+So whenever an arm sets `SNEK_FC_LAYERS`, **the same value must be set on every eval of its checkpoints
+and on any `watch.py` run.** This is the same failure class as the observation-vector trap that took a
+90.3% champion down to scoring 0, 0, 1 — see
+[`../hallOfFame/HOF.md`](../hallOfFame/HOF.md). Any hall-of-fame entry from a non-default width
+has to record that width alongside it.
 
 **`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added
 2026-08-05; before it, `num_iterations` was hardcoded to 1e9 and every batch had to be stopped by
@@ -825,7 +981,7 @@ link to them directly: if `runs/` is ever cleaned out, every chart in `charts.md
 would silently vanish. Instead `charts/` holds snapshot **copies**, refreshed with:
 
 ```
-snek2/hyperparamTuning/refresh_charts.sh
+snek2/hyperparamTuning/scripts/refresh_charts.sh
 ```
 
 which re-copies each graph and prints the step it is at, so captions in
