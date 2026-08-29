@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T13:53:11",
-  "ts": 1788036791.5443084,
+  "iso": "2026-08-29T14:03:14",
+  "ts": 1788037394.715839,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 72% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 74% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -40,10 +40,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2083000,
+      "step": 2141000,
       "max_steps": 3000000,
-      "steps_per_sec": 154.0,
-      "elapsed_s": 20623
+      "steps_per_sec": 96.4,
+      "elapsed_s": 21226
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -53,10 +53,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2174000,
+      "step": 2230000,
       "max_steps": 3000000,
-      "steps_per_sec": 77.0,
-      "elapsed_s": 20623
+      "steps_per_sec": 96.4,
+      "elapsed_s": 21226
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -66,10 +66,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 2212000,
+      "step": 2275000,
       "max_steps": 3000000,
-      "steps_per_sec": 154.0,
-      "elapsed_s": 20623
+      "steps_per_sec": 96.4,
+      "elapsed_s": 21226
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -79,10 +79,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 2181000,
+      "step": 2240000,
       "max_steps": 3000000,
-      "steps_per_sec": 154.0,
-      "elapsed_s": 20623
+      "steps_per_sec": 96.4,
+      "elapsed_s": 21226
     }
   ],
   "ledger": {
@@ -96,10 +96,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 49.2,
+  "disk_free_gb": 49.1,
   "load_avg": [
-    4.0,
-    4.00634765625,
-    4.0
+    4.119140625,
+    4.0810546875,
+    4.02197265625
   ]
 }
