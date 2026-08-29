@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T12:04:55",
-  "ts": 1788030295.0715554,
+  "iso": "2026-08-29T12:14:57",
+  "ts": 1788030897.8078995,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 50% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 52% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -40,10 +40,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 1455000,
+      "step": 1515000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 14127
+      "steps_per_sec": 97.0,
+      "elapsed_s": 14729
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -53,10 +53,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 1527000,
+      "step": 1585000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 14127
+      "steps_per_sec": 97.0,
+      "elapsed_s": 14729
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -66,10 +66,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 1484000,
+      "step": 1551000,
       "max_steps": 3000000,
-      "steps_per_sec": 129.3,
-      "elapsed_s": 14127
+      "steps_per_sec": 97.0,
+      "elapsed_s": 14729
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -79,10 +79,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 1527000,
+      "step": 1587000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 14127
+      "steps_per_sec": 97.0,
+      "elapsed_s": 14729
     }
   ],
   "ledger": {
@@ -98,8 +98,8 @@
   },
   "disk_free_gb": 49.3,
   "load_avg": [
-    4.328125,
-    4.2109375,
-    4.12158203125
+    4.01904296875,
+    4.08349609375,
+    4.09228515625
   ]
 }
