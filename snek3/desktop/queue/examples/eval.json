@@ -1,0 +1,9 @@
+{
+  "project": "snek3",
+  "id": "b1-stageb",
+  "type": "eval",
+  "policies": ["b1b-baseline-seed2", "b1c-baseline-seed3", "b1d-baseline-seed4"],
+  "priority": 10,
+  "label": "b1 stage B",
+  "notes": "One wave owns every arm, so its shards take whichever checkpoint is next rather than letting a finished arm's share of the box go idle. Selector and episodes are omitted on purpose: evaluate.py's own defaults ARE the protocol (screen:95, 500 episodes)."
+}

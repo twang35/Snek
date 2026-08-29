@@ -1,0 +1,7 @@
+{
+  "project": "snek3",
+  "id": "smoke-1",
+  "type": "smoke",
+  "label": "5k-step end-to-end check",
+  "notes": "Everything a smoke needs is set by the launcher: a 0 checkpoint gate (a smoke scores ~0 and would otherwise write nothing and be unable to resume), 5k steps, evals every 500 at 20 episodes."
+}
