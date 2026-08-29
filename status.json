@@ -1,13 +1,13 @@
 {
-  "iso": "2026-08-29T07:31:31",
-  "ts": 1788013891.0425282,
+  "iso": "2026-08-29T07:41:33",
+  "ts": 1788014493.899073,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "b1 \u2014 b1: DDQN baseline at defaults, seed 2 \u2014 stage B (3 arms)"
-    ],
+    "running": [],
     "queued": [],
-    "attention": []
+    "attention": [
+      "** b1-stageb failed and will NOT be retried automatically (rc=2). Its arms count as measured; delete its ledger record to re-queue."
+    ]
   },
   "runtime": {
     "max_trainers": 4,
@@ -27,43 +27,23 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "b1-stageb",
-      "type": "eval",
-      "policy": "b1b-baseline-seed2",
-      "policies": [
-        "b1b-baseline-seed2",
-        "b1c-baseline-seed3",
-        "b1d-baseline-seed4"
-      ],
-      "pid": 3743295,
-      "step": 3000000,
-      "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
-    }
-  ],
+  "running": [],
   "ledger": {
-    "b1-stageb": "running",
+    "b1-stageb": "failed",
     "b1c-baseline-seed3": "done",
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
   "viewer": {
-    "up": true,
-    "policies": [
-      "b1b-baseline-seed2",
-      "b1c-baseline-seed3",
-      "b1d-baseline-seed4"
-    ]
+    "up": false,
+    "policies": []
   },
   "disk_free_gb": 49.7,
   "load_avg": [
-    0.60546875,
-    0.9775390625,
-    1.5498046875
+    0.74755859375,
+    0.5947265625,
+    0.99462890625
   ]
 }
