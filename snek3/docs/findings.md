@@ -154,6 +154,46 @@ Kept as a finding rather than a test because it needs both conda envs at once: T
 `snek` and torch in `snek3`, so nothing in `tests/` can assert it. What `tests/test_net.py` does
 assert is the transpose itself, against an independent numpy forward pass.
 
+### A test can pin the wrong contract, and 53 green fixtures did
+
+The desktop daemon built its stage-B command as `evaluate.py <arg…> <policy> <policy> <policy>
+--selector screen:95 --episodes 500 --shards 16`. `evaluate.py`'s real signature is
+`evaluate.py <policy> [selector]` — **one** policy, and the selector **positional**. Every wave the
+box could ever dispatch was going to exit 2 with `unrecognized arguments`, and the first one did.
+
+`tests/test_desktop_runner.py` had four fixtures over `build_command`, all green. They asserted the
+argv I believed in. Nothing compared it to the parser that has to accept it, so the suite pinned my
+assumption and the mutation run confirmed the fixtures were sensitive to *changing* the assumption.
+This is the sibling of "a fixture whose subject cannot violate it": here the subject could violate
+it, but the fixture was pointed at the wrong subject.
+
+**The check that would have caught it is one line** — hand the built argv to the real parser and
+assert it parses:
+
+    argv, *_ = launch.build_command(job, HOST, runtime())
+    evaluate.build_parser().parse_args(argv[3:])      # raises SystemExit if the daemon is wrong
+
+The daemon cannot import `evaluate` at runtime — it runs on base python before the conda env exists —
+but a **test** runs in the env and can. The constraint that made the duplication necessary does not
+extend to the fixture that guards it.
+
+What kept this from costing the batch is the `attention` list, which is in the daemon for the snek2
+incident where a failed eval was never retried and never surfaced: `** b1-stageb failed and will NOT
+be retried automatically (rc=2)`. Built for one incident, caught a different one.
+
+### Every arm of batch b1 was still improving at its step cap
+
+All four seeds of the DDQN baseline ran 3M steps and **none plateaued** — b1a's trailing perfect rate
+went ~20% at 500k to ~40% at 3M, b1d's 0% to ~80%, monotonically, with b1d's best band in its final
+500k. So 3M steps measures how fast this config climbs, not what it converges to, and no verdict
+about the learning code can be read off it.
+
+Two things follow. A step cap is a *measurement choice* and has to be justified against the curve it
+truncates; snek2's records came from 2.00M-step arms **with chase-safe shaping**, which is what made
+that cap enough there. And the seed spread — 42.1% to 81.9% peak, **39.8 pp** — is far wider than the
+~10 pp this project already says n=4 cannot resolve, so at this horizon the four arms cannot rank two
+configs at all.
+
 ## Falsified
 
 *Nothing yet.*

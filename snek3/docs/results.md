@@ -3,10 +3,38 @@
 The canonical arm table. One row per arm, filled in when the arm stops and its stage-B measurement
 lands. Config, final numbers, verdict.
 
-*No arms yet.* snek3 has no learning code — `dqn/` is phase 3.
+**Batch b1 — the DDQN baseline at every default, seeds 1-4, 3M steps.** Closed 2026-08-29. No
+stage-B column: **no checkpoint in any of the four reached 95/100 in stage A**, so `screen:95`
+selects nothing and there is nothing to measure at 500 episodes. The stage-A numbers are the result.
 
-| arm | config | steps | best 500-ep | ≥98%/500 count | sef | verdict |
-|---|---|---|---|---|---|---|
+| arm | config | steps | trailing score | peak best30 | best single eval | ≥95/100 | verdict |
+|---|---|---:|---:|---:|---:|---:|---|
+| `b1a-baseline-seed1` | defaults | 3.00M | 92.26 | 42.1% | 49% | 0 | still rising at the cap |
+| `b1b-baseline-seed2` | defaults | 3.00M | 92.65 | 58.3% | 70% | 0 | still rising at the cap |
+| `b1c-baseline-seed3` | defaults | 3.00M | 92.87 | 56.7% | 68% | 0 | still rising at the cap |
+| `b1d-baseline-seed4` | defaults | 3.00M | 94.17 | **81.9%** | **91%** | 0 | still rising at the cap |
+
+**The phase-3 gate (≥90% perfect) is not met, and the batch does not say the learning code is
+wrong.** Three separate reasons, in order of how much they matter:
+
+1. **All four arms were cut off mid-climb.** Not one had plateaued: b1a's perfect rate went 20% at
+   500k to ~40% at 3M, b1d's 0% to ~80%, both monotonically, and b1d's highest band is its last
+   500k. The 3M cap is the binding constraint, not convergence.
+2. **The config was never snek2's record config.** snek3's defaults are chase-safe shaping `c=0.0`
+   and **IS weights on**; snek2's record is `c=0.10` at **gate 75** with **IS off**, and its own
+   batch 28-29 finding is that *the gate is the lever*. b1 is the no-shaping baseline class, which
+   in snek2 was also far from records. Gating phase 3 on it was my mistake — the plan's own phase 5
+   names the b29/b47-class config, and that is what the gate needed.
+3. **The gate's wording does not say which number it means.** snek2's best *pooled equal-effort* was
+   90.50% while its headline 98-99% figures are single selected checkpoints at 500 episodes. Read as
+   a trailing rate, "≥90% perfect" sits at snek2's absolute ceiling; read as "some checkpoint gets
+   there", b1d's 91% single eval already passes.
+
+The perfect-game counter is alive, which is worth confirming rather than assuming
+([`invariants.md`](invariants.md) invariant 2 is about exactly this failing silently): b1d's
+non-perfect games average **91.5 of 95**, so the arm is dying with three or four squares left, which
+is the endgame this task has always been about.
+
 
 ## Imported policies
 

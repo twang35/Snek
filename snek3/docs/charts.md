@@ -1,9 +1,8 @@
 # Charts — one graph per arm
 
-**Batch b1 is running.** Only `b1a`'s chart is committed: it is the laptop's own arm. **A running
-desktop arm's `runs/` files must not be committed from here** — the box writes those same paths every
-eval, so a committed copy makes its next `git merge --ff-only` abort and blocks every deploy. The
-desktop three arrive on the `results` branch at close-out and get their images then.
+**Batch b1 closed 2026-08-29.** All four charts are committed now that the arms have stopped — while
+a desktop arm is *live* its `runs/` files must not be committed from here, because the box rewrites
+those paths every eval and a committed copy makes its next `git merge --ff-only` abort.
 
 ## Imported policies
 
@@ -51,22 +50,27 @@ One or two sentences: what the curve does, and what it means for the hypothesis.
 The batch changes nothing but `SNEK_SEED`, so these four curves are this codebase's noise floor as
 much as they are a result. Read them together.
 
-**All four show the same early spike and crash**, which is the one thing worth reading now.
-`b1b` reached **69% perfect at step 5,000** and fell to ~14% by 10,000; `b1a` scored 89 at ~5,000,
-sagged to 65 by 15,000, and recovered to ~85 by 40,000. That is not a port artefact — snek2's
-`b13d-shieldseed4` scored 91.2 with **80% perfect at step 20,000** and finished a 3.5M-step arm at
-70%. Early competence in this task is cheap and unstable; the last few percent is what 3M steps buy.
+step 3.00M · trailing score 92.3-94.2 · peak best30 42.1 / 58.3 / 56.7 / **81.9%** · ≥95/100: **0**
+
+**Every one of the four is still climbing at its cap, and that is the finding.** b1a goes ~20% at
+500k to ~40% at 3M; b1d goes 0% to ~80% with its highest band in the final 500k. Neither plateaued,
+so 3M steps measures how fast this config climbs and not what it converges to. The seed spread of
+**39.8 pp** at this horizon is four times what n=4 can resolve.
+
+The early spike and crash all four share is a separate, real feature of the task rather than a port
+artefact: snek2's `b13d-shieldseed4` scored 91.2 with **80% perfect at step 20,000** and finished a
+3.5M-step arm at 70%. Early competence here is cheap and unstable.
+
+The weakest and the strongest seed, which between them are the whole story — the same config, the
+same cap, 42.1% against 81.9%:
 
 ![b1a-baseline-seed1](../runs/b1a-baseline-seed1.png)
+![b1d-baseline-seed4](../runs/b1d-baseline-seed4.png)
 
-The desktop's three at 2026-08-28 23:47, from `status.json` and their own summaries — images at
-close-out:
+The middle two sit between them and add nothing a reader needs:
 
-| arm | step | trailing | recent30 | max single eval | epsilon |
-|---|---:|---:|---:|---:|---:|
-| `b1b-baseline-seed2` | 19,000 | 60.20 | 5.2% | 70% | 0.01109 |
-| `b1c-baseline-seed3` | 19,000 | 58.32 | 0.1% | 1% | 0.01248 |
-| `b1d-baseline-seed4` | 17,000 | 56.47 | 0.7% | 4% | 0.01230 |
+![b1b-baseline-seed2](../runs/b1b-baseline-seed2.png)
+![b1c-baseline-seed3](../runs/b1c-baseline-seed3.png)
 
 **Refresh this file in the same pass as any doc edit or progress update**, whether or not the arms
 have finished — a running batch with no chart entry is a bug, not a "wait until it closes" state.

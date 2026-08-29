@@ -1,9 +1,8 @@
 # Runs — current state and forward plan
 
-**Batch b1 is running on both hosts.** snek3 closed **phases 0 through 4** of
-[`../plans/pytorch-port.md`](../plans/pytorch-port.md) on 2026-08-28: `env/`, `vectorized/`, the
-measurement engine, checkpoint I/O, the eval wave, the charts, the viewers, `dqn/`, `train.py` and
-the desktop daemon are all in, and the box now runs snek3 rather than snek2.
+**Phases 0-4 are closed and batch b1 has run.** `env/`, `vectorized/`, the measurement engine,
+checkpoint I/O, the eval wave, the charts, the viewers, `dqn/`, `train.py` and the desktop daemon are
+all in, and the box runs snek3 rather than snek2. **The phase-3 gate is still open** — see Now.
 
 **Phase 0 — the two env implementations agree.** 36,000 states × 30 observation indices, **0
 mismatches**, across a growth regime (24,000 states, 49 episodes, lengths to 60) and a coiled endgame
@@ -24,40 +23,40 @@ stage A** — see [`findings.md`](findings.md).
 
 ## Now
 
-**Batch b1 — the DDQN baseline at every default, 3M steps, only `SNEK_SEED` varying.** One batch
-serves two gates: phase 3 wants any arm at **90% perfect**, phase 5 wants a four-seed region
-comparison against snek2's b47 class.
+**Nothing is running.** Batch b1 closed 2026-08-29: all four seeds ran their full 3M steps on
+schedule, and the desktop published cleanly. The numbers are in [`results.md`](results.md).
 
-| arm | seed | host | launched |
-|---|---:|---|---|
-| `b1a-baseline-seed1` | 1 | laptop | 2026-08-28 23:26 |
-| `b1b-baseline-seed2` | 2 | desktop | 2026-08-28 23:45 |
-| `b1c-baseline-seed3` | 3 | desktop | 2026-08-28 23:45 |
-| `b1d-baseline-seed4` | 4 | desktop | 2026-08-28 23:45 |
+| | |
+|---|---|
+| laptop | idle |
+| desktop `the-claw-den` | idle. `snek3-runner` owns the box; `b1-stageb` is `failed` in its ledger |
 
-Split across both hosts deliberately, so the four arms run **in parallel** rather than serialised
-behind the desktop's wave barrier. Budget **~7 h** each with stage A on. The desktop auto-queues
-stage B for its three when they finish; `b1a`'s has to be launched by hand or its checkpoints
-rsync'd across, since the git bus carries specs and not weights.
+**The phase-3 gate is not met and b1 cannot settle it.** Peak trailing perfect rate by seed: 42.1 /
+58.3 / 56.7 / **81.9%**, against a gate of 90. But **no arm had plateaued** — every one was still
+climbing at its cap — and **no checkpoint in any arm reached 95/100**, so stage B had nothing to
+select even before its command failed. Read b1 as a rate-of-climb measurement, not a verdict.
 
-**`SNEK_COLLECT_ENVS` is at its default 1 (4 lanes with the fork branches) on all four.** 16 lanes
-measures 1.9x faster, but raising it on only the three desktop arms would confound the seed
-comparison, and the hours are in stage A anyway — a 2x training speed-up moves an arm 8%. It waits
-for a batch where all four arms can take it.
+Two defects to clear before the next batch, in this order:
+
+1. **`launch.py` builds a stage-B command `evaluate.py` cannot parse** — it passes several policies
+   and `--selector`, and the real signature is `evaluate.py <policy> [selector]`. Every wave exits 2.
+   Fix, and add the fixture that hands the built argv to the real parser
+   ([`findings.md`](findings.md)).
+2. **The phase-3 gate needs to name its number.** "≥90% perfect" is a trailing rate at snek2's
+   ceiling or a single checkpoint b1d already cleared, depending on how it is read.
 
 ## Next, in order
 
-The phase table in [`../plans/pytorch-port.md`](../plans/pytorch-port.md) §10 is the plan; this is
-only what is immediately next.
-
-1. **Close b1.** Any arm at 90% closes the phase-3 gate; all four together are phase 5's comparison.
-   Stage B on every checkpoint that screened at ≥95/100.
+1. **Re-run the gate on the b29/b47-class config**, not on bare defaults: chase-safe shaping
+   `c=0.10` at **gate 75**, IS **off**, fc 320. snek2's own batch 28-29 result is that the gate is
+   the lever, and b1's defaults have shaping at 0.0 with IS on. Give it **6M steps** — b1d was still
+   rising at 3M — or accept that a 3M arm measures the climb.
 2. **Phase 6 — `ppo/`.** The reason snek3 exists.
 
 **Decide the stage-A batching question before phase 6, not after.** Stage A at 16.9 ep/s is ~90% of
 an arm's wall clock and the 5.7x is recoverable, but every way of recovering it makes the epsilon
 schedule's feedback lag ([`invariants.md`](invariants.md) invariant 2). b1 is the baseline any such
-change has to be measured against.
+change is measured against, and a 6M-step arm makes the cost twice as visible.
 
 ## Backlog
 
