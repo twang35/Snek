@@ -468,7 +468,13 @@ class Trainer(object):
             batch, indexes, weights = drawn
             td_errors, _ = self.agent.update(batch, weights)
             self.buffer.update_priorities(indexes, td_errors)
-            self.agent.maybe_update_target()
+            # No `maybe_update_target()` here: `agent.update` already calls it, and the agent is the
+            # only thing that knows `train_step`, which is what the period is counted in. Calling it
+            # from both places was a no-op at the default `tau` of 1.0 — a second hard copy of weights
+            # that were just copied — but at `tau < 1.0` it applied the Polyak step twice at the same
+            # train_step, so a requested 0.05 ran at 1 - (1 - 0.05)^2 = 0.0975. The period itself was
+            # never affected, because `maybe_update_target` gates on `train_step` rather than counting
+            # its own calls.
 
     # ------------------------------------------------------------ the eval
 

@@ -48,16 +48,26 @@ class StubBuffer(object):
 
 
 class StubAgent(object):
+    """Mirrors the real agent's contract, including that **`update` refreshes the target itself.**
+
+    That detail is not incidental to the stub: while `update` was a no-op on this point, a `_learn`
+    that also called `maybe_update_target` looked correct here and doubled the Polyak step in
+    production. See `test_a_gradient_step_refreshes_the_target_once_and_not_twice`.
+    """
+
     def __init__(self):
         self.train_step = 0
         self.updates = 0
+        self.target_updates = 0
 
     def update(self, batch, weights=None):
         self.updates += 1
+        self.train_step += 1
+        self.maybe_update_target()
         return np.zeros(2), {}
 
     def maybe_update_target(self):
-        pass
+        self.target_updates += 1
 
 
 # --- the intervals ----------------------------------------------------------------------------
@@ -271,6 +281,21 @@ def test_every_gradient_step_feeds_its_priorities_back():
     trainer = learner(1.0)
     trainer._learn(5)
     assert trainer.buffer.samples == 5 == trainer.buffer.updates
+
+
+def test_a_gradient_step_refreshes_the_target_once_and_not_twice():
+    """`agent.update` owns the target refresh; `_learn` must not call it again.
+
+    `_learn` did until 2026-08-29, and at the default `tau` of 1.0 nothing could see it — a hard copy
+    of weights just copied is idempotent. At `tau < 1.0` it applied the Polyak step twice at one
+    `train_step`, so a requested 0.05 ran at 1 - (1 - 0.05)^2 = 0.0975. The update *period* was never
+    affected, because `maybe_update_target` gates on `train_step` rather than counting its own calls,
+    which is why this is a call-count assertion and not a period one.
+    """
+    trainer = learner(1.0)
+    trainer._learn(5)
+    assert trainer.agent.updates == 5
+    assert trainer.agent.target_updates == 5, 'the target is being refreshed twice per gradient step'
 
 
 def test_an_empty_buffer_does_not_bank_debt_for_later():

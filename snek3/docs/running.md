@@ -62,7 +62,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_BATCH_SIZE` | 128 |
 | `SNEK_DISCOUNT` | 0.99 |
 | `SNEK_TARGET_UPDATE_PERIOD` | 8 |
-| `SNEK_TARGET_UPDATE_TAU` | 1.0 (a hard copy) |
+| `SNEK_TARGET_UPDATE_TAU` | 1.0 (a hard copy). **Below 1.0 was applying twice per gradient step until 2026-08-29** — `train.py` called `maybe_update_target()` after `agent.update()`, which already calls it, so a requested 0.05 ran at 1 - (1 - 0.05)² = 0.0975. Invisible at 1.0, where a second hard copy is idempotent, so no arm ever run was affected. The *period* was never wrong |
 | `SNEK_GRADIENT_CLIPPING` | 0 (off) |
 | `SNEK_N_STEP_UPDATE` | 1 |
 

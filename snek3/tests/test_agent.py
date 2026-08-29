@@ -396,3 +396,45 @@ def test_a_gradient_step_actually_moves_the_weights():
     moved = any(not torch.equal(old, new)
                 for old, new in zip(before, agent.net.parameters()))
     assert moved
+
+
+def test_one_gradient_step_applies_the_polyak_step_exactly_once():
+    """A soft update must move the target by `tau`, not by `1 - (1 - tau)^2`.
+
+    `train.py` used to call `maybe_update_target()` after `agent.update()`, which already calls it.
+    At the default `tau` of 1.0 that was invisible — a hard copy of weights just copied is idempotent
+    — so the duplicate survived until a sweep looked at the soft-update path. At `tau=0.5` a doubled
+    step lands the target at 0.75 of the way to the online net instead of 0.5, which is measurable
+    here and was not measurable anywhere before.
+    """
+    agent = make_agent(target_update_period=1, target_update_tau=0.5)
+    with torch.no_grad():
+        for parameter in agent.net.parameters():
+            parameter.fill_(1.0)
+        for parameter in agent.target.parameters():
+            parameter.fill_(0.0)
+    online = [p.detach().clone() for p in agent.net.parameters()]
+
+    agent.update(batch_of(8), None)
+
+    # The online net moves under the optimiser, so the target is compared against where the online
+    # net *was*: target == (1 - tau) * 0 + tau * online_before.
+    for before, lagged in zip(online, agent.target.parameters()):
+        assert torch.allclose(lagged, 0.5 * before, atol=1e-6), (
+            'target moved by something other than tau — a second Polyak step is being applied')
+
+
+def test_the_update_period_counts_gradient_steps_and_not_calls():
+    """`maybe_update_target` gates on `train_step`, so calling it twice cannot halve the period.
+
+    Worth pinning separately from the tau arithmetic: if it ever grew its own call counter, the
+    duplicate call that motivated the test above would have silently doubled every arm's target
+    refresh rate, including at `tau=1.0` where the tau test cannot see anything.
+    """
+    agent = make_agent(target_update_period=4, target_update_tau=1.0)
+    agent.train_step = 3
+    assert agent.maybe_update_target() is False
+    assert agent.maybe_update_target() is False, 'a second call at the same step must still be idle'
+    agent.train_step = 4
+    assert agent.maybe_update_target() is True
+    assert agent.maybe_update_target() is True, 'gating is on train_step, not on a call count'
