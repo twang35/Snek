@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T15:34:21",
-  "ts": 1788042861.3875873,
+  "iso": "2026-08-29T15:44:24",
+  "ts": 1788043464.6548605,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 92% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 94% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -39,10 +39,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2659000,
+      "step": 2715000,
       "max_steps": 3000000,
-      "steps_per_sec": 64.4,
-      "elapsed_s": 26693
+      "steps_per_sec": 96.2,
+      "elapsed_s": 27296
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -52,10 +52,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2743000,
+      "step": 2801000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 26693
+      "steps_per_sec": 96.2,
+      "elapsed_s": 27296
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -65,10 +65,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 2829000,
+      "step": 2892000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 26693
+      "steps_per_sec": 128.3,
+      "elapsed_s": 27296
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -78,10 +78,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 2774000,
+      "step": 2833000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 26693
+      "steps_per_sec": 96.2,
+      "elapsed_s": 27296
     }
   ],
   "ledger": {
@@ -97,8 +97,8 @@
   },
   "disk_free_gb": 49.0,
   "load_avg": [
-    4.03271484375,
-    4.0185546875,
-    4.0
+    4.080078125,
+    4.0234375,
+    4.00537109375
   ]
 }
