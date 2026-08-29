@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T11:34:45",
-  "ts": 1788028485.873489,
+  "iso": "2026-08-29T11:44:49",
+  "ts": 1788029089.0144944,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 44% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 46% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -40,10 +40,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 1268000,
+      "step": 1332000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.6,
-      "elapsed_s": 12317
+      "steps_per_sec": 128.2,
+      "elapsed_s": 12920
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -53,10 +53,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 1334000,
+      "step": 1398000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.8,
-      "elapsed_s": 12317
+      "steps_per_sec": 96.1,
+      "elapsed_s": 12920
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -66,10 +66,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 1280000,
+      "step": 1348000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.8,
-      "elapsed_s": 12317
+      "steps_per_sec": 96.1,
+      "elapsed_s": 12920
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -79,10 +79,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 1341000,
+      "step": 1404000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.6,
-      "elapsed_s": 12317
+      "steps_per_sec": 128.2,
+      "elapsed_s": 12920
     }
   ],
   "ledger": {
@@ -98,8 +98,8 @@
   },
   "disk_free_gb": 49.3,
   "load_avg": [
-    4.0615234375,
-    4.02587890625,
-    4.00537109375
+    4.01513671875,
+    4.0078125,
+    4.0
   ]
 }
