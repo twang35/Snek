@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T06:11:01",
-  "ts": 1788009061.9003882,
+  "iso": "2026-08-29T06:21:04",
+  "ts": 1788009664.7678466,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b1 \u2014 b1: DDQN baseline at defaults, seed 2 \u2014 training 85% (3 arms)"
+      "b1 \u2014 b1: DDQN baseline at defaults, seed 2 \u2014 training 87% (3 arms)"
     ],
     "queued": [
       "b1 stage B \u2014 b1: DDQN baseline at defaults, seed 2 \u2014 queued (3 arms)"
@@ -40,10 +40,10 @@
         "b1b-baseline-seed2"
       ],
       "pid": 3537338,
-      "step": 2557000,
+      "step": 2623000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.4,
-      "elapsed_s": 23106
+      "steps_per_sec": 96.9,
+      "elapsed_s": 23709
     },
     {
       "id": "b1c-baseline-seed3",
@@ -53,10 +53,10 @@
         "b1c-baseline-seed3"
       ],
       "pid": 3537339,
-      "step": 2465000,
+      "step": 2531000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.4,
-      "elapsed_s": 23106
+      "steps_per_sec": 96.9,
+      "elapsed_s": 23709
     },
     {
       "id": "b1d-baseline-seed4",
@@ -66,10 +66,10 @@
         "b1d-baseline-seed4"
       ],
       "pid": 3537340,
-      "step": 2617000,
+      "step": 2687000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.4,
-      "elapsed_s": 23106
+      "steps_per_sec": 96.9,
+      "elapsed_s": 23709
     }
   ],
   "ledger": {
@@ -88,8 +88,8 @@
   },
   "disk_free_gb": 49.8,
   "load_avg": [
-    3.001953125,
-    3.00927734375,
-    3.0
+    3.0244140625,
+    3.193359375,
+    3.10888671875
   ]
 }
