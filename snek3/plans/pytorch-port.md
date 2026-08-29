@@ -1,6 +1,6 @@
 # snek3 — the PyTorch port
 
-**Status: proposed 2026-08-28, not approved, nothing built.** This is the plan for standing up
+**Status: approved 2026-08-28, phase 0 in progress.** This is the plan for standing up
 `snek3/` as a clean-slate PyTorch project that keeps everything snek2 can do — train, evaluate,
 chart, watch, record GIFs, queue batches to the desktop — with the learning framework replaced and
 the accumulated shape of the thing thrown away.
@@ -17,6 +17,13 @@ and is the point.
 | **Desktop** | snek3's daemon takes over the box on the same three branches. Every spec carries a `project` field so a stale snek2 spec cannot be dispatched. §9 |
 | **Gate** | Full DDQN reproduction before PPO — phases 3 and 5 both stand. §10 |
 | **Day one** | Reward shaping (free, already inside `vec_env`), the exploration shield, and the forking collector. **c51 deferred.** |
+| **Observation** | **Identical to snek2** — 9x9 playable, 30 values, era `b09c616`. Phases 1-2 depend on it |
+| **Champion transfer** | **Yes.** Convert `b44a-lowlr7-b29b-ckpt2739000` and make its 98.73%/3000 the phase-1 gate. §10 |
+| **Instructions** | **Three `CLAUDE.md` files.** snek2's 1,080 lines of mechanics move verbatim into `snek2/CLAUDE.md`. §14 |
+| **Self-eval** | **Synchronous, 100 episodes every 1,000 steps.** ~2 h an arm. Async is a measured follow-up, not a day-one default. §5 |
+| **Stage-A gate** | **95/100.** Tunable later; it is the cost knob |
+| **Tools dir** | **`tools/`**, not `scripts/` — it holds libraries as well as executables |
+| **Conda env** | New `snek3` env: python 3.12, torch, numpy, pygame, matplotlib, pillow, imageio, **pytest** |
 
 The eval decision has a consequence worth stating up front, because it inverts an earlier draft of
 this plan: **the graph self-eval is now load-bearing measurement, not a progress readout.** It has to
@@ -83,7 +90,7 @@ snek3/
     net.py  replay.py  agent.py  collect.py  schedules.py
   ppo/                   later. README only until then
 
-  scripts/               the tools and the libraries behind them
+  tools/                 the tools and the libraries behind them
     eval_plan.py  run_report.py  arch.py  checkpoints.py
     selectors.py  progress_chart.py  chart_viewer.py  eval_progress.py  seeding.py
 
@@ -118,10 +125,9 @@ entire reason for `refresh_charts.sh`, the completeness-check snippet, and the ~
 that surround it. `docs/charts.md` will link `../runs/<policy>.png` directly. `charts/` then holds
 only the handful of one-off figures a finding refers to.
 
-**`scripts/` is the tools layer, libraries included.** `eval_plan.py` and `run_report.py` are
-libraries that `train.py` and `evaluate.py` both import; they are here because that is where this
-project expects to find them, not because they are executables. `tools/` would be the more accurate
-name if a rename is wanted.
+**`tools/`, not `scripts/`.** It holds libraries as well as executables — `eval_plan.py` and
+`run_report.py` are imported by `train.py` and `evaluate.py` — and "scripts" would promise only the
+second kind.
 
 ---
 
@@ -139,9 +145,9 @@ near-mechanical copies. The table is the whole port.
 | `state_helpers.py` | 739 | `env/observations.py` | the scalar reference `vec_env` is asserted against |
 | `Snake.py` | 738 | `env/game.py` + `env/render.py` | trim the retired display paths |
 | `record_gif.py` | 597 | `record_gif.py` | four seams change (§8); everything else is framework-free and hard-won |
-| `run_report.py` | 226 | `scripts/run_report.py` | fix one wart: `max_score` is a string `"95/95"` while `min_score` is an int |
-| `under_the_hood.display_progress` + `trailing_average` | ~150 | `scripts/progress_chart.py` | keep the `Figure`/`FigureCanvasAgg` rule; `plt.subplots` leaked ~1 MB an eval and OOM'd the desktop |
-| `under_the_hood.fold_episode_sample` | ~35 | `scripts/run_report.py` | the shared fold, and the single perfect-game counter |
+| `run_report.py` | 226 | `tools/run_report.py` | fix one wart: `max_score` is a string `"95/95"` while `min_score` is an int |
+| `under_the_hood.display_progress` + `trailing_average` | ~150 | `tools/progress_chart.py` | keep the `Figure`/`FigureCanvasAgg` rule; `plt.subplots` leaked ~1 MB an eval and OOM'd the desktop |
+| `under_the_hood.fold_episode_sample` | ~35 | `tools/run_report.py` | the shared fold, and the single perfect-game counter |
 | `desktop/runner/{config,job,gitbus,trigger}.py` | 596 | same | zero snek2 imports; coupling is string-level only |
 | `vectorized/README.md` | 656 | `docs/environment.md` (excerpted) | the engine's design record. Excerpt, don't copy whole |
 
@@ -149,14 +155,14 @@ near-mechanical copies. The table is the whole port.
 
 | snek2 | lines | snek3 | what goes |
 |---|---|---|---|
-| `eval_plan.py` | 1012 | `scripts/eval_plan.py` (~400) | keep the payload/row schema, `wilson_interval`, `RowCache`, `WriteGate`, `merge_checkpoint_evals`, both selectors. Drop the three-stage protocol, the abandon gate, `equal_effort_pooled`, and every pre-2026-08-08 branch — see §6 |
-| `eval_progress.py` | 1387 | `scripts/eval_progress.py` (~450) | keep the analysis and text layers, minus the stage/screen/abandon/`num_workers` paths. Rewrite the 370-line matplotlib block. Drop `pyformulas` window mode |
+| `eval_plan.py` | 1012 | `tools/eval_plan.py` (~400) | keep the payload/row schema, `wilson_interval`, `RowCache`, `WriteGate`, `merge_checkpoint_evals`, both selectors. Drop the three-stage protocol, the abandon gate, `equal_effort_pooled`, and every pre-2026-08-08 branch — see §6 |
+| `eval_progress.py` | 1387 | `tools/eval_progress.py` (~450) | keep the analysis and text layers, minus the stage/screen/abandon/`num_workers` paths. Rewrite the 370-line matplotlib block. Drop `pyformulas` window mode |
 | `vectorized/vec_wave.py` + `vec_eval.py` | 945 | `vectorized/wave.py` + `shard.py` (~450) | drop the 35-line `sys.path` bootstrap duplicated in both, the chart-viewer lock negotiation, the dead protocol fields |
-| `eval_wave.py` | 1328 | `scripts/selectors.py` (~120) | keep only the argv layer: `parse_selector`, `resolve_policies`, `arms_for_prefix`, `batch_of`, `describe_selector`. The lane/thread/worker-pool model is what `vectorized/` replaced |
-| `policy_arch.py` | 328 | `scripts/arch.py` (~120) | keep `obs_len`, `obs_era`, `num_actions`, the atomic sidecar, `assert_same_network`. Torch's `load_state_dict(strict=True)` covers the shape half; **`obs_era` is the half no shape check can catch** |
+| `eval_wave.py` | 1328 | `tools/selectors.py` (~120) | keep only the argv layer: `parse_selector`, `resolve_policies`, `arms_for_prefix`, `batch_of`, `describe_selector`. The lane/thread/worker-pool model is what `vectorized/` replaced |
+| `policy_arch.py` | 328 | `tools/arch.py` (~120) | keep `obs_len`, `obs_era`, `num_actions`, the atomic sidecar, `assert_same_network`. Torch's `load_state_dict(strict=True)` covers the shape half; **`obs_era` is the half no shape check can catch** |
 | `self_eval.py` | 177 | `dqn/collect.py` (inline) | one `tf.function` becomes a `torch.no_grad()` call. The fresh-seed-per-eval rule stays |
 | `forking_collector.py` | 330 | `dqn/collect.py` (~250) | day one. It exists because the buffer holds the consequence of the action *taken* at an endgame decision point and never the alternative, so `Q(s, a_good)` for the untaken safe action trains on nothing. Default in snek2 since batch 17; the record holder used 4 branches |
-| `chart_viewer.py` | 1010 | `scripts/chart_viewer.py` (~300) | see §7 |
+| `chart_viewer.py` | 1010 | `tools/chart_viewer.py` (~300) | see §7 |
 | `training.py` epsilon schedule | ~180 | `dqn/schedules.py` | the two-phase bootstrap/refine schedule ports as pure functions |
 | `shielded_policy.py` | 137 | `dqn/agent.py` (inline, ~30) | a mask over the exploration draw only, never the greedy action |
 | `prioritized_replay_buffer.py` | 176 | `dqn/replay.py` (~150) | **replace cpprb with a numpy sum tree** — cpprb silently ignores `seed=`, which is incompatible with §5 |
@@ -429,7 +435,7 @@ rounds of this size", not "how parallel is this". Reporting the batch width ther
 
 ## 7. Charts and the viewer
 
-`under_the_hood.display_progress` ports almost unchanged into `scripts/progress_chart.py` — the
+`under_the_hood.display_progress` ports almost unchanged into `tools/progress_chart.py` — the
 twin-axis layout, the guides, the title burned into the image, `.partial.png` + `os.replace`, and
 above all the `Figure` + `FigureCanvasAgg` construction. `plt.subplots` kept its artists alive
 through pyplot's global figure manager, leaked ~0.45 MB an eval, and OOM'd the desktop. Do not
@@ -443,7 +449,7 @@ others.*
 
 **Remove the requirement.** In snek3 the **launcher** opens the window — one explicit process per
 wave, given an explicit file list, which is exactly what the desktop daemon already does and why the
-desktop never had any of these bugs. A `scripts/launch_wave.sh` (or the desktop's dispatcher) starts
+desktop never had any of these bugs. A `tools/launch_wave.sh` (or the desktop's dispatcher) starts
 four trainers and one viewer. That deletes the registry, the claim lock, the zombie handling, the
 `pgrep` corroboration and the `--arms` mode: **~300 lines of viewer and ~150 of test** instead of
 1,010 and 1,825.
@@ -604,18 +610,13 @@ a training run.
 
 ## 12. Still open
 
-| # | question | recommendation |
-|---:|---|---|
-| 1 | **Convert snek2 champion weights into snek3?** (§10 phase 1) | yes. ~40 lines for the strongest test in the plan. `hallOfFame/` then starts with a real 98.7% entry instead of empty |
-| 2 | **Keep the observation and grid identical at day one?** 9x9 playable, 30 values, era `b09c616`. | yes, so phases 1-2 are possible at all. Free to change afterwards, with the era bumped |
-| 3 | Is `≥95/100` the right stage-A gate, or should it be tighter? (§6) | start at 95. It is the cost knob, and this project has repeatedly had to *lower* such a threshold rather than raise it |
-| 4 | `docs/` file set, and whether `runs.md` / `results.md` / `findings.md` keep their snek2 names. | keep the names; a future session's habits are worth more than a better word |
-| 5 | New conda env `snek3` — Python 3.12, torch 2.13, numpy 2.x, pygame, matplotlib, pillow, **pytest**. | yes, and install pytest. snek2's env has none, so its suite runs through a 12-line `importlib` loop that silently skipped 4 modules and 51 tests while reporting "0 failed" |
-| 6 | `scripts/` or `tools/` for the tools layer. | either. `scripts/` as asked |
-| 7 | **The instruction split** — §14 recommends three `CLAUDE.md` files and moving snek2's 1,080 lines into `snek2/CLAUDE.md`. Approve? | yes, and in phase 0. The alternative — a pointer at the root, leaving 1,283 lines of snek2 mechanics loading into every snek3 session — is the version that actively misleads |
+Everything in this section was answered on 2026-08-28 and is recorded in the decisions table at the
+top of the file. Nothing is outstanding.
 
-Answered on 2026-08-28 and recorded at the top of this file: the desktop hand-over, the single-stage
-eval, the full DDQN reproduction gate, and the day-one feature set.
+The one item deliberately parked rather than settled: **the asynchronous self-eval** (§5). It is the
+next 8x on training wall clock and the only thing standing between a 2-hour arm and a 20-minute one,
+but it puts `epsilon_for`'s refinement phase on a lag of one eval interval. Revisit once a phase-3
+arm has a measured curve to compare a lagged one against.
 
 ---
 
