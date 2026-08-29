@@ -58,18 +58,32 @@ Each is 200x247 at 50 fps, 82-110 s, 2.0-2.9 MB (**32 MB for the section**). The
 **reproducible**: food placement is the only randomness in `Snake.py` and a greedy policy is
 deterministic, so the same command reproduces the same bytes.
 
+**The second column says what makes each entry worth keeping, which is not the same as what makes it
+good.** Four of the fourteen are here for reasons other than their rate — a counter-example, a
+protocol check, a second seed, and a null batch's lone survivor — and reading the folder as a ranking
+misses that.
+
 ```
 cd snek2
 PYTHONPATH=. python -u record_gif.py <entry> --tile 20 --colors 32 --out hallOfFame/gifs/<entry>.gif
 ```
 
-| | | |
-|:--:|:--:|:--:|
-| ![b44a-lowlr7-b29b](gifs/b44a-lowlr7-b29b-ckpt2739000.gif)<br>**`b44a-lowlr7-b29b`** @2739k<br>**98.73% /3000** — the record | ![b29b-chase10g75seed2](gifs/b29b-chase10g75seed2-ckpt1447000.gif)<br>**`b29b-chase10g75seed2`** @1447k<br>97.5% /1000 | ![b24d-fc320noisseed4](gifs/b24d-fc320noisseed4-ckpt1342000.gif)<br>**`b24d-fc320noisseed4`** @1342k<br>97.4% /1000 |
-| ![b24b-fc320noisseed2](gifs/b24b-fc320noisseed2-ckpt2860000.gif)<br>**`b24b-fc320noisseed2`** @2860k<br>96.6% /1000 | ![b40b-chasefree10g75seed2](gifs/b40b-chasefree10g75seed2-ckpt1513000.gif)<br>**`b40b-chasefree10g75seed2`** @1513k<br>95.9% /1000 | ![b18b-tgt1000seed2](gifs/b18b-tgt1000seed2-ckpt1588000.gif)<br>**`b18b-tgt1000seed2`** @1588k<br>97.6% /700 |
-| ![b17b-forkseed2](gifs/b17b-forkseed2-ckpt1248000.gif)<br>**`b17b-forkseed2`** @1248k<br>96.6% /500 | ![b18b-tgt1000seed2](gifs/b18b-tgt1000seed2-ckpt1601000.gif)<br>**`b18b-tgt1000seed2`** @1601k<br>94.7% /700 | ![b17b-forkseed2](gifs/b17b-forkseed2-ckpt1190000.gif)<br>**`b17b-forkseed2`** @1190k<br>94.2% /5120 |
-| ![b14a-disc9975seed1](gifs/b14a-disc9975seed1-ckpt3702000.gif)<br>**`b14a-disc9975seed1`** @3702k<br>93.5% /200 | ![b15b-nstep3seed2](gifs/b15b-nstep3seed2-ckpt3245000.gif)<br>**`b15b-nstep3seed2`** @3245k<br>93.0% /300 | ![b11b-obs30seed2](gifs/b11b-obs30seed2-ckpt855000.gif)<br>**`b11b-obs30seed2`** @855k<br>96 /100 |
-| ![b13d-shieldseed4](gifs/b13d-shieldseed4-ckpt986000.gif)<br>**`b13d-shieldseed4`** @986k<br>95 /100 | ![b11a-obs30seed1](gifs/b11a-obs30seed1-ckpt671000.gif)<br>**`b11a-obs30seed1`** @671k<br>94 /100 |  |
+| recording | how it differs from the others |
+|:--|:--|
+| ![b44a-lowlr7-b29b](gifs/b44a-lowlr7-b29b-ckpt2739000.gif)<br>**`b44a-lowlr7-b29b`**<br>@2739k<br>**98.73% /3000** — the record | The only entry whose number was **confirmed on episodes it was not chosen on** — 98.9% on a 1000-episode screen, then 98.65% on 2000 fresh ones. Every other entry here was admitted on a re-measurement of a checkpoint *selected* on a shorter one, a standard now known to overstate by ~1.25 pp. Also the only **continuation**: seeded from `b29b` @1447k, the entry it replaces, and trained ~1.29M further steps at `lr 1e-7`. |
+| ![b29b-chase10g75seed2](gifs/b29b-chase10g75seed2-ckpt1447000.gif)<br>**`b29b-chase10g75seed2`**<br>@1447k<br>97.5% /1000 | The first record from **reward shaping** (chase-safe, `c=0.10`, gate 75), and the only one that is a **region rather than a point**: 18 consecutive checkpoints of this arm hold ≥98%/500 across 1446k-1529k, where `b24`'s and `b18b`'s records are isolated peaks a few thousand steps wide. |
+| ![b24d-fc320noisseed4](gifs/b24d-fc320noisseed4-ckpt1342000.gif)<br>**`b24d-fc320noisseed4`**<br>@1342k<br>97.4% /1000 | The first record from a **non-default architecture** — a single `fc 320` layer instead of `50,100,50` — and from importance sampling being turned *off*. No shaping of any kind, so it is the entry that isolates width from the shaping that arrived later. |
+| ![b24b-fc320noisseed2](gifs/b24b-fc320noisseed2-ckpt2860000.gif)<br>**`b24b-fc320noisseed2`**<br>@2860k<br>96.6% /1000 | `b24d`'s config at a **different seed**, which is the entire reason it is kept: it ties that record from a second arm, so `fc 320` is not one lucky run. It also peaks very late (2.86M against `b24d`'s 1.34M) on identical settings. |
+| ![b40b-chasefree10g75seed2](gifs/b40b-chasefree10g75seed2-ckpt1513000.gif)<br>**`b40b-chasefree10g75seed2`**<br>@1513k<br>95.9% /1000 | The only entry from a **null batch**. It adds free-space shaping on top of chase-safe, which measured as no improvement — so it is here on its own number and explicitly *not* as evidence for its config. It was also the only one of that batch's 90 ≥98%/100 candidates to survive a 500-episode re-measurement. |
+| ![b18b-tgt1000seed2](gifs/b18b-tgt1000seed2-ckpt1588000.gif)<br>**`b18b-tgt1000seed2`**<br>@1588k<br>97.6% /700 | The **first selected high in this project that did not shrink** on re-measurement, which is why the folder has an admission rule at all. Default architecture and no shaping: its whole lever was `TARGET_UPDATE_PERIOD=1000`. |
+| ![b17b-forkseed2](gifs/b17b-forkseed2-ckpt1248000.gif)<br>**`b17b-forkseed2`**<br>@1248k<br>96.6% /500 | Forking (`FORK_BRANCHES=4`) with the target period left alone, so it is the entry that isolates forking from `b18b`'s lever. The better of two steps kept from this one arm. |
+| ![b18b-tgt1000seed2](gifs/b18b-tgt1000seed2-ckpt1601000.gif)<br>**`b18b-tgt1000seed2`**<br>@1601k<br>94.7% /700 | Kept as a **counter-example, not a champion**: the same arm 13k steps after its record, and 2.9 pp worse. It is what a narrow peak looks like from the far side, and the reason a single checkpoint's reading is not read as the arm's quality. |
+| ![b17b-forkseed2](gifs/b17b-forkseed2-ckpt1190000.gif)<br>**`b17b-forkseed2`**<br>@1190k<br>94.2% /5120 | The **most heavily measured checkpoint in the project** — 5,120 episodes, against 100-1000 for everything else. It is kept to pin the measurement protocol rather than for its rate, and it is the cross-check that validated re-measuring at all: 95.5% on 200 fresh episodes against its recorded 94.24%. |
+| ![b14a-disc9975seed1](gifs/b14a-disc9975seed1-ckpt3702000.gif)<br>**`b14a-disc9975seed1`**<br>@3702k<br>93.5% /200 | The **latest peak in the folder** at 3.7M steps, which is the standing counter-example to the idea that arms peak between 1M and 3.4M — that rule partly described where humans stopped runs. |
+| ![b15b-nstep3seed2](gifs/b15b-nstep3seed2-ckpt3245000.gif)<br>**`b15b-nstep3seed2`**<br>@3245k<br>93.0% /300 | The only entry trained with **multi-step returns** (`N_STEP_UPDATE=3`). Also a late peak at 3.2M, on the older `DISCOUNT=0.995`. |
+| ![b11b-obs30seed2](gifs/b11b-obs30seed2-ckpt855000.gif)<br>**`b11b-obs30seed2`**<br>@855k<br>96 /100 | One of the two **oldest entries that still load on `master`**, and so the baseline the whole 30-value observation era is measured against: default width, no shaping, no forking, no multi-step. |
+| ![b13d-shieldseed4](gifs/b13d-shieldseed4-ckpt986000.gif)<br>**`b13d-shieldseed4`**<br>@986k<br>95 /100 | The only entry with a different **exploration schedule** — an epsilon handover at 0.0125 and `GUIDED_FRACTION=0.5`, where its neighbours use 0.8 or the default. |
+| ![b11a-obs30seed1](gifs/b11a-obs30seed1-ckpt671000.gif)<br>**`b11a-obs30seed1`**<br>@671k<br>94 /100 | `b11b`'s **sibling seed** and the **earliest peak here** at 671k steps. The pair is kept together because two seeds reproducing the era-30 baseline is the claim, not either number. |
 
 **Six entries are missing, and the `arch.json` sidecar is why.** `b8d-disc995clip` and the three
 `b8f-disc9975seed2` entries are observation era **`e4514a8`** (20 values); `b10b`/`b10d` are era
