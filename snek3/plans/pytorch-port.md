@@ -1,6 +1,6 @@
 # snek3 — the PyTorch port
 
-**Status: approved 2026-08-28. Phases 0 and 1 closed 2026-08-28; phase 2 next.** This is the plan for
+**Status: approved 2026-08-28. Phases 0-4 closed 2026-08-28; batch b1 is running for the phase-3 and phase-5 gates.** This is the plan for
 standing up `snek3/` as a clean-slate PyTorch project that keeps everything snek2 can do — train, evaluate,
 chart, watch, record GIFs, queue batches to the desktop — with the learning framework replaced and
 the accumulated shape of the thing thrown away.
@@ -594,6 +594,16 @@ surface it in `at_a_glance` at minimum.
 **Simplify the eval chain to match §6.** `_auto_closeout_jobs` synthesises one eval job per
 `(batch, closeout_group_env)` and `auto_hof` then chains a second job behind each. There is only one
 stage now, so the `auto_hof` path, the `-hof` id handling and the `phase_of` legacy branch all go.
+
+**Retracted 2026-08-28: `_ensure_viewer` stays, at a quarter of the size.** This section had it
+deleted outright on the grounds that snek2's window killed four arms with one XIO error. That
+incident was real but it indicts the wrong thing — snek2's window was the *trainer's* own
+in-process cv2 canvas, and snek3's trainer never draws. `tools/chart_viewer.py` is a separate
+process that only reads the PNGs, so a display failure costs a window. The ~200 lines were never
+about drawing anyway: they were a process registry, an `O_EXCL` claim lock, a grace period, zombie
+detection and a dedupe, all so four peer trainers could share one window while knowing nothing
+about each other. One process starts the arms here, so ~50 lines do it. On by default,
+`runtime.json`'s `viewer` turns it off.
 `EVAL_RELEVANT_ENV` stays, and so does the reason for it: keying a wave on the *whole* inherited env
 split `b45` — four arms differing only in `SNEK_SEED` — into three waves of 2/1/1, measuring a batch
 at a quarter of the intended lanes. A seed, a learning rate or a target-update period cannot reach a
@@ -616,8 +626,8 @@ Each phase has a pre-registered pass condition. Phase 1 is the one that makes th
 | 0 | The instruction split and the `docs/` skeleton (§14), then `env/` + `vectorized/` + the parity harness. No learning code. | three `CLAUDE.md` files, no stale `snek2/` reference outside `snek2/`; parity harness green — 0 mismatches on all 30 indices over ≥18,000 states, ≥12 hand-made mutants killed. **Met 2026-08-28**: 36,000 states × 30 indices, 0 mismatches, 17 of 17 mutants killed, 167 tests green |
 | 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it. **Met 2026-08-28**: 98.8% (2964/3000), and the conversion is exact — 12,864 states, max \|ΔQ\| 2.7e-5 on Q ~30.6, argmax identical on every one |
 | 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise. **Met 2026-08-28**: 3,222 rows, mean per-row difference **−0.004 pp** against a 0.041 pp standard error (0.09 SEs), observed spread / predicted spread **1.00**. A second snek3 seed gives +0.028 pp. 14 min on 4 shards |
-| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect** — *outstanding* — and **≥1,500 agent steps/s** on the laptop with the self-eval *off* — **met: 1,512 at `SNEK_COLLECT_ENVS=16`**, 809 at the default of 1. ~6 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
-| 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box |
+| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect** — *batch `b1` is running for it, 4 seeds × 3M steps* — and **≥1,500 agent steps/s** on the laptop with the self-eval *off* — **met: 1,512 at `SNEK_COLLECT_ENVS=16`**, 809 at the default of 1. ~6 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
+| 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box. **Deployed 2026-08-28**: `snek3-runner` replaced `snek-runner` on `the-claw-den`, the three `b1` desktop arms dispatched from one `ops` commit plus a trigger, and 589 tests pass on the box. The publish half closes when b1 does |
 | 5 | A seed-matched b47-class comparison, 4 arms. | a ≥98%/500 region of comparable width on comparable seeds. **Not** a matched point estimate |
 | 6 | `ppo/` | the actual research |
 

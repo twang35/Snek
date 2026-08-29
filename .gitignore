@@ -46,3 +46,8 @@ __pycache__/
 # Scratch recordings from record_gif.py. The committed gallery is
 # snek3/hallOfFame/gifs/, referenced from hallOfFame/HOF.md.
 /snek3/gifs/
+
+# Shard logs from an eval wave. The measurements themselves land in snek3/runs/;
+# these are the stdout of the processes that produced them, useful while a wave
+# runs and never afterwards.
+/snek3/logs/

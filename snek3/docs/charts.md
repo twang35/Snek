@@ -1,6 +1,7 @@
 # Charts — one graph per arm
 
-*No arms yet.* snek3 has no learning code — `dqn/` is phase 3, so nothing has a stage-A curve.
+**Batch b1 is running** — four arms, all four charts below, refreshed 2026-08-28 23:47. The desktop's
+three are rsynced copies; they arrive on the `results` branch for real at close-out.
 
 ## Imported policies
 
@@ -42,6 +43,22 @@ One or two sentences: what the curve does, and what it means for the hypothesis.
 
 ![b1a-example](../runs/b1a-example.png)
 ```
+
+### b1 — the DDQN baseline at every default, seeds 1-4
+
+The batch changes nothing but `SNEK_SEED`, so these four curves are this codebase's noise floor as
+much as they are a result. Read them together.
+
+**All four show the same early spike and crash**, which is the one thing worth reading now.
+`b1b` reached **69% perfect at step 5,000** and fell to ~14% by 10,000; `b1a` scored 89 at ~5,000,
+sagged to 65 by 15,000, and recovered to ~85 by 40,000. That is not a port artefact — snek2's
+`b13d-shieldseed4` scored 91.2 with **80% perfect at step 20,000** and finished a 3.5M-step arm at
+70%. Early competence in this task is cheap and unstable; the last few percent is what 3M steps buy.
+
+![b1a-baseline-seed1](../runs/b1a-baseline-seed1.png)
+![b1b-baseline-seed2](../runs/b1b-baseline-seed2.png)
+![b1c-baseline-seed3](../runs/b1c-baseline-seed3.png)
+![b1d-baseline-seed4](../runs/b1d-baseline-seed4.png)
 
 **Refresh this file in the same pass as any doc edit or progress update**, whether or not the arms
 have finished — a running batch with no chart entry is a bug, not a "wait until it closes" state.

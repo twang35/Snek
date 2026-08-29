@@ -1,9 +1,9 @@
 # Runs — current state and forward plan
 
-**Nothing is running.** snek3 closed **phases 0, 1 and 2** of
-[`../plans/pytorch-port.md`](../plans/pytorch-port.md) on 2026-08-28. `env/`, `vectorized/`, the
-measurement engine, checkpoint I/O, the eval wave, the charts and the two viewers are in; there is
-still no learning code.
+**Batch b1 is running on both hosts.** snek3 closed **phases 0 through 4** of
+[`../plans/pytorch-port.md`](../plans/pytorch-port.md) on 2026-08-28: `env/`, `vectorized/`, the
+measurement engine, checkpoint I/O, the eval wave, the charts, the viewers, `dqn/`, `train.py` and
+the desktop daemon are all in, and the box now runs snek3 rather than snek2.
 
 **Phase 0 — the two env implementations agree.** 36,000 states × 30 observation indices, **0
 mismatches**, across a growth regime (24,000 states, 49 episodes, lengths to 60) and a coiled endgame
@@ -24,29 +24,40 @@ stage A** — see [`findings.md`](findings.md).
 
 ## Now
 
-| | |
-|---|---|
-| laptop | idle |
-| desktop `the-claw-den` | idle for snek3. snek2's daemon still owns the box until the snek3 runner is deployed (phase 4) |
+**Batch b1 — the DDQN baseline at every default, 3M steps, only `SNEK_SEED` varying.** One batch
+serves two gates: phase 3 wants any arm at **90% perfect**, phase 5 wants a four-seed region
+comparison against snek2's b47 class.
+
+| arm | seed | host | launched |
+|---|---:|---|---|
+| `b1a-baseline-seed1` | 1 | laptop | 2026-08-28 23:26 |
+| `b1b-baseline-seed2` | 2 | desktop | 2026-08-28 23:45 |
+| `b1c-baseline-seed3` | 3 | desktop | 2026-08-28 23:45 |
+| `b1d-baseline-seed4` | 4 | desktop | 2026-08-28 23:45 |
+
+Split across both hosts deliberately, so the four arms run **in parallel** rather than serialised
+behind the desktop's wave barrier. Budget **~7 h** each with stage A on. The desktop auto-queues
+stage B for its three when they finish; `b1a`'s has to be launched by hand or its checkpoints
+rsync'd across, since the git bus carries specs and not weights.
+
+**`SNEK_COLLECT_ENVS` is at its default 1 (4 lanes with the fork branches) on all four.** 16 lanes
+measures 1.9x faster, but raising it on only the three desktop arms would confound the seed
+comparison, and the hours are in stage A anyway — a 2x training speed-up moves an arm 8%. It waits
+for a batch where all four arms can take it.
 
 ## Next, in order
 
 The phase table in [`../plans/pytorch-port.md`](../plans/pytorch-port.md) §10 is the plan; this is
 only what is immediately next.
 
-1. **Phase 3 — `dqn/`.** DDQN + PER + the epsilon schedule + the forking collector + the shield.
-   **Built and tested 2026-08-28; the throughput half of the gate is measured and met, the ≥90%
-   half needs an arm.** 809 agent steps/s at the default one collect lane, **1,512 at 16**, against a
-   gate of 1,500 — and the ~1,600 ceiling at replay ratio 1.0 is now measured rather than estimated
-   at 4,000 ([`findings.md`](findings.md)). Budget **~6 h** for a 3M-step arm with stage A on.
-2. **Phase 4 — `desktop/`.** The git-bus queue, with a `project` field.
-3. **Phase 5 —** a seed-matched b47-class comparison, 4 arms.
+1. **Close b1.** Any arm at 90% closes the phase-3 gate; all four together are phase 5's comparison.
+   Stage B on every checkpoint that screened at ≥95/100.
+2. **Phase 6 — `ppo/`.** The reason snek3 exists.
 
-**Decide the stage-A batching question before phase 3 ships, not after.** Stage A at 16.9 ep/s is
-~90% of an arm's wall clock and the 5.7x is recoverable, but every way of recovering it makes the
-epsilon schedule's feedback lag ([`invariants.md`](invariants.md) invariant 2). Building the
-synchronous version first is still right — it is the baseline the change has to be measured against —
-but the arm budget should be set knowing it is ~5 h.
+**Decide the stage-A batching question before phase 6, not after.** Stage A at 16.9 ep/s is ~90% of
+an arm's wall clock and the 5.7x is recoverable, but every way of recovering it makes the epsilon
+schedule's feedback lag ([`invariants.md`](invariants.md) invariant 2). b1 is the baseline any such
+change has to be measured against.
 
 ## Backlog
 
