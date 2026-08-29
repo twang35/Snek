@@ -1,13 +1,13 @@
 {
-  "iso": "2026-08-29T07:11:22",
-  "ts": 1788012682.0442626,
+  "iso": "2026-08-29T07:21:26",
+  "ts": 1788013286.6096141,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b1 \u2014 b1: DDQN baseline at defaults, seed 2 \u2014 training 97% (2 arms)"
+      "b1 \u2014 b1: DDQN baseline at defaults, seed 3 \u2014 training 98% (1 arm)"
     ],
     "queued": [
-      "b1 stage B \u2014 b1: DDQN baseline at defaults, seed 2 \u2014 queued (1 arm)"
+      "b1 stage B \u2014 b1: DDQN baseline at defaults, seed 3 \u2014 queued (2 arms)"
     ],
     "attention": []
   },
@@ -28,23 +28,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b1b-baseline-seed2",
-      "type": "train",
-      "policy": "b1b-baseline-seed2",
-      "policies": [
-        "b1b-baseline-seed2"
-      ],
-      "pid": 3537338,
-      "step": 2959000,
-      "max_steps": 3000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 26726
-    },
     {
       "id": "b1c-baseline-seed3",
       "type": "train",
@@ -53,29 +40,28 @@
         "b1c-baseline-seed3"
       ],
       "pid": 3537339,
-      "step": 2868000,
+      "step": 2935000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.6,
-      "elapsed_s": 26726
+      "steps_per_sec": 96.6,
+      "elapsed_s": 27331
     }
   ],
   "ledger": {
     "b1-stageb": "queued",
-    "b1b-baseline-seed2": "running",
     "b1c-baseline-seed3": "running",
+    "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
   "viewer": {
     "up": true,
     "policies": [
-      "b1b-baseline-seed2",
       "b1c-baseline-seed3"
     ]
   },
   "disk_free_gb": 49.7,
   "load_avg": [
-    2.0107421875,
-    2.31494140625,
-    2.69384765625
+    1.013671875,
+    1.46875,
+    2.107421875
   ]
 }
