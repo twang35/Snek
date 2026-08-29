@@ -1,13 +1,13 @@
 {
-  "iso": "2026-08-29T16:04:32",
-  "ts": 1788044672.5620203,
+  "iso": "2026-08-29T16:14:37",
+  "ts": 1788045277.121626,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 96% (3 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 97% (2 arms)"
     ],
     "queued": [
-      "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (1 arm)"
+      "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (2 arms)"
     ],
     "attention": []
   },
@@ -27,7 +27,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
@@ -39,10 +39,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2823000,
+      "step": 2876000,
       "max_steps": 3000000,
-      "steps_per_sec": 64.6,
-      "elapsed_s": 28504
+      "steps_per_sec": 64.5,
+      "elapsed_s": 29109
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -52,30 +52,17 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2910000,
+      "step": 2967000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 28504
-    },
-    {
-      "id": "b2d-b29repro-seed4",
-      "type": "train",
-      "policy": "b2d-b29repro-seed4",
-      "policies": [
-        "b2d-b29repro-seed4"
-      ],
-      "pid": 3761122,
-      "step": 2951000,
-      "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 28504
+      "steps_per_sec": 96.7,
+      "elapsed_s": 29109
     }
   ],
   "ledger": {
     "b2-stageb": "queued",
     "b2a-b29repro-seed1": "running",
     "b2b-b29repro-seed2": "running",
-    "b2d-b29repro-seed4": "running",
+    "b2d-b29repro-seed4": "done",
     "b2c-b29repro-seed3": "done",
     "b1-stageb": "done",
     "b1c-baseline-seed3": "done",
@@ -84,8 +71,8 @@
   },
   "disk_free_gb": 49.0,
   "load_avg": [
-    3.072265625,
-    3.70556640625,
-    3.916015625
+    2.2841796875,
+    2.8720703125,
+    3.39013671875
   ]
 }
