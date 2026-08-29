@@ -7,7 +7,7 @@ The architecture is read from each checkpoint's **own tensor shapes** — the gr
 dense kernels are ``[obs_len, w0], [w0, w1], ..., [w_last, num_actions]`` in layer order — rather
 than trusting a config file that could have drifted. Where ``runs/<policy>.md`` records
 ``fc_layer_params``, it is cross-checked and any disagreement is printed loudly. ``obs_era`` is
-mapped from the observed ``obs_len`` via the era markers in ``hallOfFame/README.md``; that cannot
+mapped from the observed ``obs_len`` via the era markers in ``hallOfFame/HOF.md``; that cannot
 distinguish two meanings at the *same* length, but every such case here predates the 30-value vector
 and does not load on ``master`` regardless, so the length alone is enough to make the current
 environment reject it.

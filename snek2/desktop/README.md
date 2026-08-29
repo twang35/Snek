@@ -182,7 +182,7 @@ Three properties that matter:
 
 Turn either link off in `runtime.json` (`auto_closeout` / `auto_hof`); both default on. The
 `_hof500` files come back on the `results` branch like any other artifact. **Promotion into
-`hallOfFame/` is still the manual, verified process** in [`hallOfFame/README.md`](../hallOfFame/README.md)
+`hallOfFame/` is still the manual, verified process** in [`hallOfFame/HOF.md`](../hallOfFame/HOF.md)
 — this automation only produces the re-measurement; it never copies a checkpoint in.
 
 ## Rebooting the box, and what recovers by itself
@@ -560,7 +560,7 @@ Three things to know, each of which has cost a failed job:
   so never add it to `--exclude`.
 - **Auto-closeout does not fire for these**, and so neither does the auto-HOF that chains off a
   closeout. Both trigger on a desktop job finishing, and a laptop-trained arm never trained here.
-  Queue the eval by hand (and, if you want the HOF re-measure, run the `hallOfFame/README.md`
+  Queue the eval by hand (and, if you want the HOF re-measure, run the `hallOfFame/HOF.md`
   recipe by hand too).
 - **A ~4-arm wave is ~2.3 GB** (~574 MB/arm), a couple of minutes over the LAN.
 

@@ -50,7 +50,7 @@ close-out's ranking among its own best rows carries no information.
 measured on step counts rather than on a selected eval.
 
 The checkpoint is in `savedPolicies/b17b-forkseed2/` and is worth promoting to
-[`../hallOfFame/`](../../hallOfFame/README.md) as a 95.17%/600 champion — a stronger provenance than any
+[`../hallOfFame/`](../../hallOfFame/HOF.md) as a 95.17%/600 champion — a stronger provenance than any
 current entry, all of which rest on 100-300 episodes.
 
 ## ‡ The reasoning error: a selected sample cannot defend itself against selection
@@ -92,7 +92,7 @@ produced. It does not move the record. **Every champion, corrected, lands in the
 | `b14a` @3702k | 96/100 | 93.5% (CI 89.2-96.2) | re-measured: 91/100, pooled 187/200 |
 | `b11b` @855k | 96/100 | ~94.0% | shrunk against a Beta prior on its 104 unselected graph-100% rows |
 
-All three are in [`../hallOfFame/`](../../hallOfFame/README.md) and all three load on `master`. Their
+All three are in [`../hallOfFame/`](../../hallOfFame/HOF.md) and all three load on `master`. Their
 intervals overlap almost entirely, so **the honest statement is that five batches have produced the
 same ~93-94% policy three times**, not a rising record.
 
@@ -326,7 +326,7 @@ carry forward rather than re-derive:
 
 **Outstanding, and the highest-value item on this page:** re-measure `b17b` @1205k and @1248k with
 `EVAL_MIN_ACHIEVABLE=0` over fresh episodes, then promote to
-[`../hallOfFame/`](../../hallOfFame/README.md). Until that lands the record is "a ≥95% policy exists",
+[`../hallOfFame/`](../../hallOfFame/HOF.md). Until that lands the record is "a ≥95% policy exists",
 not "99%".
 
 **Forking stays *on* for batch 18** at the user's direction, which makes batch 18 a clean one-knob

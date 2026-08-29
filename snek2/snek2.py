@@ -661,9 +661,6 @@ def main(argv):
           eval_only, policy_name, run_config, priority_signal, use_is_weights,
           forking_collector)
 
-    # todo: fix video creation by using the display surface
-    # print(create_policy_eval_video(agent.policy, "trained-agent"))
-
     print('done')
 
 

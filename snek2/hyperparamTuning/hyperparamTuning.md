@@ -436,7 +436,7 @@ to the screen depth, abandonment cannot fire before the floor, so it is exact at
 arm's *unselected* graph-100% rows, and under a gate those rows are abandoned and downward-biased by
 optional stopping. A shrunk figure cannot be computed for a gated arm by the existing method. The
 substitute is a second independent 100-episode measurement of the champion, which is worth more
-anyway — see `b14a` in [`../hallOfFame/README.md`](../hallOfFame/README.md).
+anyway — see `b14a` in [`../hallOfFame/HOF.md`](../hallOfFame/HOF.md).
 
 **Ranking uses the screen rate, ties broken on the surrounding graph rate.** 20 episodes admit
 only 21 distinct values, so ties are the common case and the tie-break does real work — the
@@ -778,7 +778,7 @@ hardcode `(50, 100, 50)`, which was correct only because nobody had ever set the
 So whenever an arm sets `SNEK_FC_LAYERS`, **the same value must be set on every eval of its checkpoints
 and on any `watch.py` run.** This is the same failure class as the observation-vector trap that took a
 90.3% champion down to scoring 0, 0, 1 — see
-[`../hallOfFame/README.md`](../hallOfFame/README.md). Any hall-of-fame entry from a non-default width
+[`../hallOfFame/HOF.md`](../hallOfFame/HOF.md). Any hall-of-fame entry from a non-default width
 has to record that width alongside it.
 
 **`SNEK_MAX_STEPS` is absolute, and it is what makes an unattended wave safe.** Added

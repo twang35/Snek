@@ -98,7 +98,7 @@ start. The pre-registered decision rule stands: the observations are kept.
 #### A new best measured checkpoint: `b11b` @855000, 96/100
 
 The highest single-checkpoint measurement in the project, ahead of `b10d`'s 93% @1695000, and
-preserved in [`../hallOfFame/`](../../hallOfFame/README.md).
+preserved in [`../hallOfFame/`](../../hallOfFame/HOF.md).
 
 **Corrected for the winner's curse it is ~94%.** It is the maximum of 204 full-length measurements
 in its own arm, so some of the 96 is luck. Fitting a Beta prior by moment-matching on `b11b`'s 104
@@ -187,7 +187,7 @@ horizon, which is suggestive but not the isolating comparison a future batch wou
 the claim safely.
 
 Both champion checkpoints are preserved in
-[`../hallOfFame/`](../../hallOfFame/README.md#-b17b-1190000--the-first-entry-measured-deeply-before-being-called-a-record).
+[`../hallOfFame/`](../../hallOfFame/HOF.md#-b17b-1190000--the-first-entry-measured-deeply-before-being-called-a-record).
 
 ## Batch 9 — 0.995 against 0.9975 on the post-audit environment
 
@@ -768,7 +768,7 @@ Step 5.47M (stopped 2026-08-01) · peak score **89.4** (at 1716k) · **best 30-e
 **The project record.** Its close-out measured 52 checkpoints: best **92.0%** at 2816k
 (CI 84.9-95.9), top-3 86.7%, pooled **66.3%** over 5200 episodes, with **38 of 52 above 60%** and
 only one below 40%. Both the 92% and the earlier 88% checkpoint are saved in
-[`../hallOfFame/`](../../hallOfFame/README.md).
+[`../hallOfFame/`](../../hallOfFame/HOF.md).
 
 It leads every statistic in the file, graph and measured alike, and recorded the **first 100%
 single eval** in the project. Its block means climb from 1.3% over the first 300k to **56.8%
@@ -801,7 +801,7 @@ Step **11.64M** (stopped 2026-08-01) · peak score 86.9 (at 2058k) · **best 30-
 
 **Second best arm in the project.** Its ceiling is **80.0%** at 2538k (CI 71.1-86.7), from the
 mid-run measurement; its close-out over 20 different checkpoints peaked at 76.0% @5027k with pooled
-60.4%. The 2538k checkpoint is saved in [`../hallOfFame/`](../../hallOfFame/README.md).
+60.4%. The 2538k checkpoint is saved in [`../hallOfFame/`](../../hallOfFame/HOF.md).
 
 Notable that its 76% came at step **5027k** — well past the 2.5-3M peak band — so elite checkpoints
 do persist into the decline phase even as the average collapses.

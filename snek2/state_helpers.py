@@ -55,7 +55,7 @@ def get_observations(old_grid,
 
     **Changing the length changes the MDP.** A checkpoint only restores against the vector it
     trained on, so every checkpoint from before a change here stops loading — see
-    ../hallOfFame/README.md, which tracks which era each entry belongs to.
+    ../hallOfFame/HOF.md, which tracks which era each entry belongs to.
     """
     observations = []
 

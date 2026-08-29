@@ -475,15 +475,3 @@ def display_progress(eval_rows, resume_steps, screen, graph_path=None, policy_na
         os.replace(partial, graph_path)
     # No plt.close(): this Figure was never registered with pyplot, so it is collected
     # normally when the function returns. That is the whole point of the OO API above.
-
-
-def create_policy_eval_video(eval_py_env, eval_env, policy, filename, num_episodes=5, fps=30):
-    filename = filename + ".mp4"
-    with imageio.get_writer(filename, fps=fps) as video:
-        for _ in range(num_episodes):
-            time_step = eval_env.reset()
-            video.append_data(eval_py_env.render())
-            while not time_step.is_last():
-                action_step = policy.action(time_step)
-                time_step = eval_env.step(action_step.action)
-                video.append_data(eval_py_env.render())

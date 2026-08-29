@@ -310,7 +310,7 @@ step 350k, where every batch-12 arm was at 0%. Whatever the rewrite is worth, th
   and one null measured five independent ways. The `min_epsilon` floor and the anti-ratchet are worth
   keeping on mechanism; the elevated exploration is not worth pursuing further at n=4.
 - **No new record.** `b13d`'s 95% @986k is the second-best checkpoint on record and does not beat
-  `b11b`'s 96%. It is in [`../hallOfFame/`](../../hallOfFame/README.md) because a 95% on the current
+  `b11b`'s 96%. It is in [`../hallOfFame/`](../../hallOfFame/HOF.md) because a 95% on the current
   environment is worth keeping, not because it changed the ceiling.
 - **The shield is unproven.** It fixed batch 12's decay at handover 0.05 (see
   `b12s-shield05seed1`), but at 0.0125 there is no decay to fix and nothing separates it from batch

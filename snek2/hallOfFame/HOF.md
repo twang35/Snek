@@ -46,6 +46,37 @@ a ranking the data cannot support. Method and the full table:
 **‡ No checkpoint in this project has a demonstrated true perfect rate ≥99%, and the 99% figures in the
 older docs are all selection artefacts.** Read the next section before quoting any record number.
 
+## Recordings — every entry that runs on `master`
+
+Three complete greedy games each, captured with [`record_gif.py`](../record_gif.py). It reads
+frames straight off the offscreen pygame surface under `SDL_VIDEODRIVER=dummy`, one frame per game
+step, so a recording costs a training run nothing and needs no screen recorder and no encoder. **The
+numbers under each are its measurement from the tables below, not anything the recording shows** — a
+recording is three games, which settles nothing about a rate.
+
+Each is 200x247 at 50 fps, 82-110 s, 2.0-2.9 MB (**32 MB for the section**). They are
+**reproducible**: food placement is the only randomness in `Snake.py` and a greedy policy is
+deterministic, so the same command reproduces the same bytes.
+
+```
+cd snek2
+PYTHONPATH=. python -u record_gif.py <entry> --tile 20 --colors 32 --out hallOfFame/gifs/<entry>.gif
+```
+
+| | | |
+|:--:|:--:|:--:|
+| ![b44a-lowlr7-b29b](gifs/b44a-lowlr7-b29b-ckpt2739000.gif)<br>**`b44a-lowlr7-b29b`** @2739k<br>**98.73% /3000** — the record | ![b29b-chase10g75seed2](gifs/b29b-chase10g75seed2-ckpt1447000.gif)<br>**`b29b-chase10g75seed2`** @1447k<br>97.5% /1000 | ![b24d-fc320noisseed4](gifs/b24d-fc320noisseed4-ckpt1342000.gif)<br>**`b24d-fc320noisseed4`** @1342k<br>97.4% /1000 |
+| ![b24b-fc320noisseed2](gifs/b24b-fc320noisseed2-ckpt2860000.gif)<br>**`b24b-fc320noisseed2`** @2860k<br>96.6% /1000 | ![b40b-chasefree10g75seed2](gifs/b40b-chasefree10g75seed2-ckpt1513000.gif)<br>**`b40b-chasefree10g75seed2`** @1513k<br>95.9% /1000 | ![b18b-tgt1000seed2](gifs/b18b-tgt1000seed2-ckpt1588000.gif)<br>**`b18b-tgt1000seed2`** @1588k<br>97.6% /700 |
+| ![b17b-forkseed2](gifs/b17b-forkseed2-ckpt1248000.gif)<br>**`b17b-forkseed2`** @1248k<br>96.6% /500 | ![b18b-tgt1000seed2](gifs/b18b-tgt1000seed2-ckpt1601000.gif)<br>**`b18b-tgt1000seed2`** @1601k<br>94.7% /700 | ![b17b-forkseed2](gifs/b17b-forkseed2-ckpt1190000.gif)<br>**`b17b-forkseed2`** @1190k<br>94.2% /5120 |
+| ![b14a-disc9975seed1](gifs/b14a-disc9975seed1-ckpt3702000.gif)<br>**`b14a-disc9975seed1`** @3702k<br>93.5% /200 | ![b15b-nstep3seed2](gifs/b15b-nstep3seed2-ckpt3245000.gif)<br>**`b15b-nstep3seed2`** @3245k<br>93.0% /300 | ![b11b-obs30seed2](gifs/b11b-obs30seed2-ckpt855000.gif)<br>**`b11b-obs30seed2`** @855k<br>96 /100 |
+| ![b13d-shieldseed4](gifs/b13d-shieldseed4-ckpt986000.gif)<br>**`b13d-shieldseed4`** @986k<br>95 /100 | ![b11a-obs30seed1](gifs/b11a-obs30seed1-ckpt671000.gif)<br>**`b11a-obs30seed1`** @671k<br>94 /100 |  |
+
+**Six entries are missing, and the `arch.json` sidecar is why.** `b8d-disc995clip` and the three
+`b8f-disc9975seed2` entries are observation era **`e4514a8`** (20 values); `b10b`/`b10d` are era
+**`450e66e`** (26). `master` is era `b09c616` (30), so `policy_arch.assert_restorable` hard-fails
+them — which is the sidecar working, not a fault. Recording those needs a checkout of their own era,
+where the environment they were trained against still exists.
+
 ## The record: **98.73% over 3000 episodes**, `b44a-lowlr7-b29b-ckpt2739000` — admitted 2026-08-28, and the first record set on a *confirmed* measurement
 
 **‡ This record was admitted differently from every one before it, and that is the point.** All thirteen

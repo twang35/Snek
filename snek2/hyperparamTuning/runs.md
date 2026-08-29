@@ -285,7 +285,7 @@ statistically indistinguishable from each other (all p ≥ 0.23), pooling to 98.
 [Full result](findings.md#-no-checkpoint-in-this-project-has-a-demonstrated-99-perfect-rate--the-23-candidate-sweep-2026-08-28).
 
 **The record is `b29b-chase10g75seed2` @1447000 — 99.0% over 500 fresh episodes** (495/500, CI 97.7-99.6), set
-2026-08-16 and promoted to [`../hallOfFame/`](../hallOfFame/README.md) with the copy verified to load and play.
+2026-08-16 and promoted to [`../hallOfFame/`](../hallOfFame/HOF.md) with the copy verified to load and play.
 It is the highest /500 point estimate on record; the lead over `b24d`'s 98.0%/500 is inside the CIs, so it is a
 *point* lead, taken under the folder's 500-episode standard exactly as `b24d` was taken over `b18b`.
 
@@ -426,7 +426,7 @@ rather than at the ceiling.
 - **Resuming any arm from batch 10 or earlier** — every checkpoint on record from before
   batch 11 was trained on an observation vector this project has since changed (20, 23 or 26
   values against the 30 batch 11 trained on), so none of them load; see
-  [`../hallOfFame/README.md`](../hallOfFame/README.md#the-entries-below-predate-2026-08-02-and-do-not-run-on-master).
+  [`../hallOfFame/HOF.md`](../hallOfFame/HOF.md#the-entries-below-predate-2026-08-02-and-do-not-run-on-master).
   **Batches 11 onward are all resumable** — 11-15 share the 30-value vector. The arms worth resuming
   are the ones stopped mid-climb: **`b15a` and `b15d`, both still gaining in their final 500k band at
   5.5-6.0M**, then `b14c`, `b11d` and `b13c`. Resuming needs `SNEK_MAX_STEPS` raised above the arm's

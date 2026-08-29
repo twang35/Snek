@@ -33,3 +33,8 @@ snek2/savedPolicies/
 __pycache__/
 *.pyc
 .idea/
+
+# Scratch recordings from record_gif.py. The committed gallery is
+# snek2/hallOfFame/gifs/, referenced from hallOfFame/HOF.md; everything written
+# here is a one-off preview, regenerable in seconds from its seed.
+/snek2/gifs/

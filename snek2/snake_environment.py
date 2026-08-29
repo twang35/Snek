@@ -14,7 +14,7 @@ from tensorflow import convert_to_tensor
 # is the trap CLAUDE.md's hall-of-fame section documents (game_over -> board_fill at a constant 20
 # values, restoring silently and playing like a beginner). policy_arch.py records it in arch.json
 # and a restore hard-fails on a mismatch, so a checkpoint from an older meaning can no longer load
-# without a word. History, matching the era commits in hallOfFame/README.md: 'e4514a8' = 20 values,
+# without a word. History, matching the era commits in hallOfFame/HOF.md: 'e4514a8' = 20 values,
 # '450e66e' = 26, 'b09c616' = 30 (current). Update this and test_observation_spec together.
 OBS_ERA = 'b09c616'
 

@@ -280,7 +280,7 @@ result's top 5 and re-measured them at **2000 fresh** episodes.
 **1. The 99% is not there.** Stage 1's winner read **99.1%/1000** and confirmed at **98.10%** — first of five to last
 of five. No candidate clears 99% on fresh episodes. The best measurement in the project is now `b44a` @2739000 at
 **98.73% over 3000 episodes**, and the honest ceiling statement is **~98.5%**, not 99%. **That checkpoint was
-promoted to [`hallOfFame/`](../hallOfFame/README.md) on 2026-08-28** — alone, and on a *confirmed* number, which no
+promoted to [`hallOfFame/`](../hallOfFame/HOF.md) on 2026-08-28** — alone, and on a *confirmed* number, which no
 earlier entry was; the verified copy reads 98.0%/100 on the scalar engine.
 
 **2. The arithmetic made a spurious 99% certain, so the screen was never evidence.** A policy whose true rate is
@@ -294,7 +294,7 @@ Pooled as one family they are 14775/15000 = **98.50%** (CI 98.29-98.68), beating
 **+1.00 pp at p = 0.047** — real, and marginal. **So promote for the point estimate, but never claim a ranking
 inside this family**, and treat "the `b44` family is ~98.5%" as the finding rather than any single step.
 
-**What this retracts.** `hallOfFame/README.md` stated the strongest checkpoint was `b44b` @2297000 at 99.0%/1000;
+**What this retracts.** `hallOfFame/HOF.md` stated the strongest checkpoint was `b44b` @2297000 at 99.0%/1000;
 on 2000 fresh episodes it measured 98.0%, pooling to **98.5%/2000**. Two independent 1000-episode measurements of
 the *same* checkpoint therefore read 99.0 and 98.0 — a 1.0 pp swing at n=1000, which is itself the calibration for
 how much weight a single deep measurement carries.
@@ -535,7 +535,7 @@ is the best policy here" is the pooled fresh estimate: **3936/4000 = 98.40% (97.
 ### ‡ Surviving one re-measurement does not inoculate — the four `hallOfFame/` entries fell just as far
 
 The obvious objection to the table above is that those four checkpoints were selected on a *single* 500-episode
-maximum. `hallOfFame/` admits nothing that way: [its rule](../hallOfFame/README.md) is that an entry enters on a
+maximum. `hallOfFame/` admits nothing that way: [its rule](../hallOfFame/HOF.md) is that an entry enters on a
 **re-measured** number, never its close-out /100, precisely because a selected /100 is inflated 5-6 pp. So the
 four best entries in that folder are twice-measured, and three of them *rose* on the second pass — the
 "genuine-region signature" the README describes. **They were re-measured on 1000 fresh episodes anyway:**
@@ -1499,7 +1499,7 @@ a one-run point lead, not a resolved win. What is *outside* noise is the **regio
 ≥98%/500 checkpoints across 4 seeds, `b29` produced 21 across 2, an 18-wide contiguous band in one arm. A record
 this project has only ever hit as isolated points now appears as a plateau — **but see the
 [2026-08-18 correction below](#-corrected-2026-08-18-the-record-region-does-not-replicate--the-98500-count-is-seed-noise-and-pooled-is-the-only-metric-of-this-family-worth-reading): the region did not replicate on fresh seeds, and the count is seed noise.**
-**`b29b` @1447k is now the folder record**, promoted to [`../hallOfFame/`](../hallOfFame/README.md) on
+**`b29b` @1447k is now the folder record**, promoted to [`../hallOfFame/`](../hallOfFame/HOF.md) on
 2026-08-16 (rsynced off the desktop, the copy re-measured 98/100 on fresh laptop episodes); its 99.0%/500
 edges `b24d`'s 98.0%/500 within the CI, but it is the first record that is a genuine region rather than a point.
 
@@ -3172,7 +3172,7 @@ not a best-of-N artefact: it is 20 points above the pooled figure that stood the
 non-overlapping with it. `b8f` has 35 of 63 checkpoints at >=60%.
 
 **The two configs stay tied on pooled** (overlapping intervals) with `b8f` ahead on best. The
-champion checkpoint is preserved in [`../hallOfFame/`](../hallOfFame/README.md).
+champion checkpoint is preserved in [`../hallOfFame/`](../hallOfFame/HOF.md).
 
 ### The late-checkpoint hypothesis: confirmed for supply, mixed for quality
 

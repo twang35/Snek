@@ -160,8 +160,9 @@ the curve instead of continuing it.
 Copies of the best policies, outside `savedPolicies/` so the `max_to_keep` rotation cannot evict
 them. That has already destroyed evidence once (`b5c-schlongIS`'s 17.0% peak). **Never delete
 anything here**, and add an entry whenever a run produces a checkpoint worth keeping — two files,
-~190 KB. The README has the copy-in-and-evaluate procedure; verify the *copy* loads and plays, not
-just the original.
+~190 KB. **The folder's document is [`HOF.md`](snek2/hallOfFame/HOF.md)**, renamed from `README.md`
+on 2026-08-28; it has the copy-in-and-evaluate procedure, and a **recording of every entry that runs
+on `master`** (see `record_gif.py` below). Verify the *copy* loads and plays, not just the original.
 
 **Matching widths do not mean a working checkpoint, and this has bitten.** A checkpoint restores
 whenever the vector is the same *length*; nothing checks the values still mean what they meant. On
@@ -171,8 +172,9 @@ went from **90.3%** to scoring **0, 0, 1**. An input that was previously constan
 trap: `game_over` sat at 0 in every state a policy acts in, so its weights were unconstrained, and
 the index it occupied now carried board-fill.
 
-So **when the observation changes, record which indices changed meaning in the hall-of-fame README
-and name the last commit whose observation matches those checkpoints.** Era markers: `e4514a8` =
+So **when the observation changes, record which indices changed meaning in
+[`hallOfFame/HOF.md`](snek2/hallOfFame/HOF.md) and name the last commit whose observation matches
+those checkpoints.** Era markers: `e4514a8` =
 20 values, `450e66e` = 26, `b09c616` = the current 30.
 
 **`arch.json` now makes both traps loud (`policy_arch.py`, 2026-08-11).** Every policy dir carries a
@@ -703,6 +705,69 @@ PYTHONPATH=. python -u watch.py <policy_name> <step>    # pins one checkpoint
 It renders in its own process, reloads the newest checkpoint between episodes so a live arm's
 progress shows up, and costs training nothing. `WATCH_FPS` caps the frame rate (default 90; drop to
 20-30 to follow the moves).
+
+**To record a policy to a GIF, use `record_gif.py`** — no window, no screen recorder, no ffmpeg
+(which is installed on neither host):
+
+```
+cd snek2
+PYTHONPATH=. python -u record_gif.py hof            # the HOF record, 60 s -> gifs/<label>.gif
+PYTHONPATH=. python -u record_gif.py --list         # hallOfFame entries, the record marked *
+```
+
+It reads frames straight off the offscreen surface under the dummy driver, one per game step, at
+**0.68 ms/frame** — a whole episode in under a second on one core, so there is nothing to trim and
+nothing to transcode. Output lands in `gifs/`, which is **throwaway**: judged by what produced it,
+like a smoke test. Three things are worth knowing.
+
+- **‡ 60 fps is not available in a GIF, and asking for it plays at 10 fps.** The container stores
+  each delay in *hundredths* of a second and **truncates**, so the naive `int(1000 / 60)` = 16 ms is
+  written as **10 ms** — and every major browser clamps a delay at or below 10 ms to **100 ms**. The
+  request therefore lands two and a half times *slower* than the 20 fps default, in a file whose
+  stored delay is exactly what was asked for. The only playable rates are **50, 33.3, 25 and 20
+  fps**; `gif_delay_ms` quantises to the grid and floors at 20 ms, making **50 fps the ceiling**.
+  `--format webp` has no grid, if an exact rate is ever needed.
+- **One frame is one game step, so the rate and the length are coupled.** A champion's perfect game
+  is 1200-1600 steps, i.e. only 24-32 s at 50 fps. **A recording is a whole number of complete games,
+  and `--seconds` is a floor rather than a target**: it runs for `--min-games` (default **3**) games
+  *or* `--seconds` (default 60), whichever is longer, so a champion's three games come out at
+  82-110 s. Nothing is cut off mid-game or thinned to fit a clock — `fit_length` may lengthen a
+  recording and never shortens it. A shortfall under the floor is absorbed by holding the final frame
+  when it is within `PAD_BUDGET_S`, because a whole extra game to cover a 34-frame gap forced a
+  **35%** resample, and one frame in three dropped is visible motion-skip where two more seconds on
+  an already-static board is not.
+- **The game cannot draw either of its own ending frames, and the HUD is unreadable.** `step()`
+  clears the sprites and `render()` returns early on **both** `perfect_game` and `finished`, so the
+  game's last frame is a blank card carrying 'PERFECT GAME!!!', 'DED' or 'NO FUD' — **the filled
+  board, and the position the snake actually died in, are never drawn at all.** `redraw_board` draws
+  the board and `overlay_win_message`/`overlay_death_message` put the text over it, then each ending
+  is held (0.5 s on the board, 1.4 s on a win's message, 0.5 s on a death's) because a single frame
+  at 50 fps is 20 ms and invisible. Note a resample thins held frames along with everything else, so
+  a short `--seconds` shortens the pauses proportionally. Separately, the HUD is blitted *before*
+  `self.all.draw()`, so the score and step readouts are buried as the board fills; they are hidden
+  (`suppress_game_hud`, which must patch `Snake`'s globals, not `snake_constants`' — the star import
+  bound copies) in favour of a header composited outside the board.
+
+**Two output locations, and only one is disposable.** `snek2/gifs/` is scratch — gitignored since
+2026-08-28 — while **`snek2/hallOfFame/gifs/` is the committed gallery** shown in `HOF.md`, one
+recording per entry that loads on `master` (14 of 20; the other six are older observation eras and
+hard-fail `assert_restorable`, which is the sidecar working). Those are **regenerable**, unlike the
+checkpoints beside them: food placement is the only randomness in `Snake.py` and a greedy policy is
+deterministic, so re-running the same command reproduces the **same bytes** (verified with `cmp`). So
+they are not evidence and need not be treated as irreplaceable — but do not delete them either, since
+`HOF.md` links every one.
+
+**Size is driven by frame count, not by resolution or palette**, which is worth knowing before trying
+to shrink one: on a 4334-frame recording a **4x** cut in pixel area saved only **29%**, dropping the
+palette from 255 to 16 colours saved 34%, and animated **WebP was three times *worse*** (13.5 MB
+lossless against 4.35 MB). The gallery is 200px at `--colors 32`, ~2.3 MB an entry, 32 MB in total.
+
+`tests/test_record_gif.py` pins all of this, and the frame-rate fixture **measures** the container's
+truncation through the encoder rather than restating the arithmetic — the first version of it asserted
+a "naive" formula that rounded exactly the way the real one does, so it failed while the code was
+right. A palette fixture had the same shape of bug: it asserted a *bound* on frames that only had six
+colours, which any cap satisfies, so it passed with the knob ignored. **A fixture whose subject cannot
+violate it is not a fixture.**
 
 **A laptop training launch opens its own chart window** — `snek2.main()` calls
 `chart_viewer.spawn_for_policy()`, so no one has to remember to start one. One window per *wave*: the
