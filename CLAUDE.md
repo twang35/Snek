@@ -140,6 +140,25 @@ self-matching count is 1, not 0**, so it reads as "still running" — which fail
 check and fails *open* for a wait-loop. Never write a wait-loop whose condition greps for a string
 its own command line contains.
 
+**And bracketing does not save you when the pattern sits inside an enclosing `zsh -c` string.**
+`[t]ools.shard` protects the `grep` process itself, but the tool runs commands through
+`zsh -c '... grep '[t]ools.shard' ...'`, and *that* shell's command line contains the bracketed
+pattern **verbatim** — brackets and all — so `ps -Ao command=` matches the wrapper and the check
+reads "still running" forever. Measured 2026-08-28: a `[t]ools.shard` check printed two matches when
+nothing was running, both of them its own wrapper. When the answer must be trustworthy, **match on
+something the scanner cannot contain** — the interpreter path (`snek3/bin/python`) plus a `grep -v
+'zsh -c'`, or a pid file the job writes.
+
+**A wait-loop needs a sleep in every loop body, including its guard.** This one burned a full core
+for 2 h 08 m:
+
+    until [ ! -e /proc/self ] && false; do :; done   # never exits, never sleeps
+
+On macOS `/proc/self` does not exist, so the test is true, `&& false` makes the condition false, and
+`until` spins on `:` at 100% CPU without ever reaching the `sleep 20` loop below it. It was not the
+*condition* that was wrong — it was that a loop existed with no sleep in it at all. **Prefer the
+`Monitor` tool over a hand-written wait-loop**, and if you write one, put the `sleep` first.
+
 The inverse is equally real: a `pgrep` that *errored* once read as "nothing is running" and closed a
 live chart window with five hours left to run, because `pgrep` exits 0 on a match, 1 on no match and
 ≥2 on an error, and all three produce empty stdout. **A process scan can over-report and
