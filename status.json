@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T14:13:56",
-  "ts": 1788038036.9094172,
+  "iso": "2026-08-29T14:24:00",
+  "ts": 1788038640.193151,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 76% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 78% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -39,10 +39,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2202000,
+      "step": 2260000,
       "max_steps": 3000000,
-      "steps_per_sec": 97.6,
-      "elapsed_s": 21868
+      "steps_per_sec": 96.5,
+      "elapsed_s": 22472
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -52,10 +52,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2289000,
+      "step": 2344000,
       "max_steps": 3000000,
-      "steps_per_sec": 48.8,
-      "elapsed_s": 21868
+      "steps_per_sec": 64.3,
+      "elapsed_s": 22472
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -65,10 +65,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 2342000,
+      "step": 2403000,
       "max_steps": 3000000,
-      "steps_per_sec": 97.6,
-      "elapsed_s": 21868
+      "steps_per_sec": 96.5,
+      "elapsed_s": 22472
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -78,10 +78,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 2302000,
+      "step": 2361000,
       "max_steps": 3000000,
-      "steps_per_sec": 97.6,
-      "elapsed_s": 21868
+      "steps_per_sec": 96.5,
+      "elapsed_s": 22472
     }
   ],
   "ledger": {
@@ -97,8 +97,8 @@
   },
   "disk_free_gb": 49.1,
   "load_avg": [
-    4.13720703125,
-    4.22998046875,
-    4.125
+    4.013671875,
+    4.03369140625,
+    4.05810546875
   ]
 }
