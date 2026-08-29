@@ -38,3 +38,11 @@ __pycache__/
 # snek2/hallOfFame/gifs/, referenced from hallOfFame/HOF.md; everything written
 # here is a one-off preview, regenerable in seconds from its seed.
 /snek2/gifs/
+
+# snek3. Checkpoints are ~45 KB each and written every 1000 steps, so an arm is
+# ~135 MB; runs/, evals/ and hallOfFame/ are committed on purpose, like snek2's.
+/snek3/savedPolicies/
+
+# Scratch recordings from record_gif.py. The committed gallery is
+# snek3/hallOfFame/gifs/, referenced from hallOfFame/HOF.md.
+/snek3/gifs/
