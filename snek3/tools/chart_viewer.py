@@ -4,7 +4,7 @@ Its own process, so if it dies — a Tk error, an OOM kill — nothing it was wa
 separation is the whole design: snek2's in-process cv2 window took down all four desktop arms at once
 with one fatal XIO error.
 
-    PYTHONPATH=. python -m tools.chart_viewer runs/b48*.png
+    PYTHONPATH=. python -m tools.chart_viewer --runs-dir runs        # every training on this box
     PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/b48*.png' --watch-pid 8123,8124,8125
     PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/*_checkpoint_evals_*.png' --interval 5
     PYTHONPATH=. python -m tools.chart_viewer runs/b1*.png --scale 0.6   # a smaller window
@@ -12,11 +12,18 @@ with one fatal XIO error.
 The window fills the display it opens on. `--scale` is a fraction of that, not a number of inches —
 see `fit_dims`.
 
-**The launcher opens this, with an explicit file list.** snek2's version was 1,010 lines and ~500 of
-them existed because four peer trainers each tried to open one shared window while knowing nothing
-about each other: a process registry, an `O_EXCL` claim lock, a grace period, zombie detection and a
-dedupe, every line a dated scar. None of that is here, because the requirement is gone — one process
-starts the arms, so one process starts the window.
+**A training opens this, and there is one per box** — `tools/chart_window.py`. snek2's version was
+1,010 lines and ~500 of them existed because four peer trainers each tried to open one shared window
+while knowing nothing about each other: a process registry, a grace period, an `O_EXCL` claim lock,
+`pgrep` corroboration, zombie detection and a dedupe, every line a dated scar. The requirement is the
+same here and the answer is ~140 lines, because the registry stores each arm's **pid** — so liveness
+is a question about a known process instead of a pattern, and none of the grace-period machinery has
+anything to do.
+
+**The normal mode is `--runs-dir`**, which shows the trainings registered in `runs/.live/` — panels
+appear and vanish as arms start and finish, and the window closes itself once the box has been idle
+for `IDLE_CLOSE_SECONDS`. `tools/chart_window.py` is what starts it that way. Explicit paths and
+`--glob` remain for looking at arbitrary charts.
 
 `--watch-pid` is the same idea applied to the exit condition. snek2 asked `pgrep -f <pattern>`
 whether training was still running, which is unsafe twice over: the invoking shell's own command line
@@ -43,11 +50,18 @@ import matplotlib
 # Figure/FigureCanvasAgg object API instead, because pyplot's global manager keeps artists alive.
 import matplotlib.pyplot as plt
 
+from tools import live_runs
+
 DEFAULT_INTERVAL = 2.0
 DEFAULT_MAX_PANELS = 8
 # A negative liveness answer has to repeat before it is believed. One is a race against a launcher
 # that has not spawned its trainers yet, or a `ps` that lost.
 NEGATIVE_CHECKS = 3
+# How long the window stays up after the last training on the box finishes. It is not zero, because a
+# batch's next wave starts seconds to minutes after the previous one drains and closing the window in
+# that gap would mean reopening it — and it is not never, because a box that has stopped training
+# should not be holding a window open on a chart that stopped moving.
+IDLE_CLOSE_SECONDS = 300
 # Never `plt.pause`: it runs a nested event loop and re-enters the draw, which on the Tk backend
 # deadlocks against a resize. `flush_events` plus a plain sleep does the same job.
 FLUSH_SLICE = 0.05
@@ -323,16 +337,62 @@ class Viewer(object):
             time.sleep(FLUSH_SLICE)
 
 
+def live_panels(runs_dir, prune=True):
+    """`(arms, chart_paths)` for the trainings registered in `runs_dir`.
+
+    Two values because they answer different questions and the difference matters: the **arms** are
+    what decides whether the window should still be up, and the **paths** are what it draws. An arm
+    that has just started is in the first and not yet in the second, which is why the exit condition
+    is never "no panels" — that would close the window on a wave whose trainers were still importing
+    torch.
+    """
+    arms = live_runs.live(runs_dir, prune)
+    paths = []
+    for policy, _ in arms:
+        path = os.path.join(runs_dir, policy + '.png')
+        if os.path.exists(path):
+            paths.append(path)
+    return arms, paths
+
+
+def idle_close(arms, seen_arms, empty_since, now):
+    """`(seen_arms, empty_since, close)` for one refresh of a `--runs-dir` window.
+
+    The state machine is three lines and one of them is the whole point: **`close` is never True
+    before an arm has been seen.** A window opened by hand a minute before a batch launches, or one
+    whose first trainer is still importing torch, has an empty registry for reasons that have nothing
+    to do with the box being idle — and closing for that would make the window useless exactly when
+    someone is watching for a run to start.
+    """
+    if arms:
+        return True, None, False
+    if not seen_arms:
+        return False, None, False
+    empty_since = now if empty_since is None else empty_since
+    return True, empty_since, now - empty_since >= IDLE_CLOSE_SECONDS
+
+
 def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
-        max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None):
+        max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None,
+        runs_dir=None, now=time.time):
     viewer = Viewer(title, interval, max_panels, scale, dpi)
     plt.ion()
     negatives = 0
+    seen_arms = False
+    empty_since = None
     while True:
-        found = panels(paths, glob_pattern, max_panels)
-        if not viewer.refresh(found):
+        found = list(paths)
+        if runs_dir is not None:
+            arms, live_paths = live_panels(runs_dir)
+            found.extend(live_paths)
+            seen_arms, empty_since, close = idle_close(arms, seen_arms, empty_since, now())
+            if close:
+                print('no training running for {0:.0f}s; closing'.format(now() - empty_since))
+                viewer.exit_now(0)
+
+        if not viewer.refresh(panels(found, glob_pattern, max_panels)):
             if viewer.figure is None:
-                print('nothing to show yet: {0}'.format(glob_pattern or paths))
+                print('nothing to show yet: {0}'.format(glob_pattern or runs_dir or paths))
                 time.sleep(interval)
                 continue
 
@@ -357,6 +417,10 @@ def main(argv=None):
     parser.add_argument('paths', nargs='*', help='PNG paths to show')
     parser.add_argument('--glob', dest='glob_pattern', default=None,
                         help='pattern re-expanded every refresh, so new charts appear')
+    parser.add_argument('--runs-dir', default=None,
+                        help='show the trainings registered in this runs directory: panels appear '
+                             'and vanish as arms start and finish, and the window closes once none '
+                             'has been running for a while')
     parser.add_argument('--watch-pid', default='',
                         help='comma-separated pids; the window closes once none of them is alive')
     parser.add_argument('--interval', type=float, default=DEFAULT_INTERVAL)
@@ -367,11 +431,11 @@ def main(argv=None):
     parser.add_argument('--dpi', type=int, default=None,
                         help='figure render dpi; default 200 on darwin (Retina), 100 elsewhere')
     args = parser.parse_args(argv)
-    if not args.paths and not args.glob_pattern:
-        parser.error('give PNG paths or --glob')
+    if not args.paths and not args.glob_pattern and args.runs_dir is None:
+        parser.error('give PNG paths, --glob or --runs-dir')
     pids = [int(token) for token in args.watch_pid.split(',') if token.strip()]
     run(args.paths, args.glob_pattern, pids, args.interval, args.max_panels, args.title,
-        args.scale, args.dpi)
+        args.scale, args.dpi, args.runs_dir)
     return 0
 
 

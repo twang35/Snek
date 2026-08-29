@@ -39,9 +39,12 @@ from dqn.agent import DdqnAgent
 from dqn.replay import PrioritizedReplay
 from env import constants
 from tools import arch as arch_tools
+from tools import chart_window
 from tools import checkpoints
+from tools import live_runs
 from tools import progress_chart
 from tools import run_report
+from vectorized import config as reward_config
 from vectorized import engine
 from vectorized.vec_env import VecSnake
 
@@ -245,6 +248,7 @@ class Trainer(object):
         self.epsilon = config['initial_epsilon']
         self.eval_rows = []
         self.resume_steps = []
+        self.chart_window = None        # set by `run`; None unless this arm opened the box's window
         self.skipped_checkpoints = 0
         self.gradient_debt = 0.0
         self._resume()
@@ -302,6 +306,23 @@ class Trainer(object):
         self._prefill()
         print('{0}: training to {1:,} steps, {2} lane(s), replay ratio {3}'.format(
             self.policy, cap, self.collector.vec.n, self.config['replay_ratio']), flush=True)
+        # The reward and shaping terms, which `hyperparameter override:` does NOT cover: those knobs
+        # are read by `env/constants.py` at import, not through `tuned()`, so grepping the log for
+        # overrides — which the docs name as the way to confirm an arm got its config — is silent on
+        # exactly the settings a shaping experiment is about. b2's `SNEK_CHASE_SAFE_SHAPING` had to be
+        # confirmed by reading `/proc/<pid>/environ`, which is not a thing anyone should have to do.
+        print('reward config: ' + reward_config.describe(), flush=True)
+        # Two steps, in this order, and both here rather than in `main` so they only happen for a run
+        # that is actually going to train — and after the config lines, so those stay the first thing
+        # in the log.
+        #
+        # Registering first is what puts this arm in the window even when another arm opened it: the
+        # window draws the registry, so a panel appears for every arm that got this far. `ensure` then
+        # opens the box's one window if no live one is up, which for every arm but the first is a
+        # no-op returning None. The trainer holds the handle solely to reap it — see
+        # `tools/chart_window.py` for why nothing in this loop may ever depend on it.
+        live_runs.register(self.policy)
+        self.chart_window = chart_window.ensure()
 
         window_start, window_step = time.time(), self.step
         while self.step < cap:
@@ -316,8 +337,15 @@ class Trainer(object):
                 self._save_resume()
             if self.step % REPORT_INTERVAL == 0:
                 self._write_report()
+                # A window that has exited stays a zombie until someone waits on it, and this parent
+                # lives for hours. `reap` polls; it never blocks on the window.
+                chart_window.reap(self.chart_window)
         self._save_resume()
         self._write_report()
+        # Not in a `finally`, and not worth one: `live_runs.live` drops an entry whose pid is gone, so
+        # a `kill -9`, a crash and a Ctrl-C all clean up on the next read. This call is only so the
+        # window loses the panel the moment the arm finishes rather than at the next scan.
+        live_runs.unregister(self.policy)
         print('done at step {0:,}'.format(self.step), flush=True)
 
     def _prefill(self):

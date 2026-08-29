@@ -57,6 +57,7 @@ PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:95, 50
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
+PYTHONPATH=. python -m tools.chart_window                # the box's chart window, if it is not up
 ```
 
 **The snek2 champion converts in one command**, and is the reference policy for any A/B:
@@ -82,9 +83,17 @@ is the set a shaping experiment is *about*: b2's `SNEK_CHASE_SAFE_SHAPING=0.1` h
 reading `/proc/<pid>/environ` on the desktop. So also
 `grep 'reward config:'`, which `train.py` prints at startup from `vectorized/config.describe()`.
 
-**Training never draws.** A display flip costs ~5.2 ms and the game flips once per step — a round
-trip to the window server, not our drawing code. `watch.py` and `record_gif.py` are the only ways to
-see a game, and they run in their own processes so they cost training nothing.
+**Training never draws the game.** A display flip costs ~5.2 ms and the game flips once per step — a
+round trip to the window server, not our drawing code. `watch.py` and `record_gif.py` are the only
+ways to see a game, and they run in their own processes so they cost training nothing.
+
+**It does open a chart window, and there is exactly one per box.** Every training registers itself in
+`runs/.live/` and calls `chart_window.ensure()`; the first arm opens the window, later arms join it,
+and it closes itself a few minutes after the last one finishes. Nothing needs launching by hand, on
+this laptop or on the desktop. **The window is disposable and the training is not** — its own session,
+never read from, never waited on, never reopened by a run — so killing or relaunching it while four
+arms train cannot touch them. `SNEK_CHART_WINDOW=0` turns it off, which is what the test suite and
+every benchmark do.
 
 ## The eval protocol is one stage
 
@@ -197,7 +206,9 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/run_report.py` | stage-A history, its summary block, and `runs/<policy>.md` |
 | `tools/progress_chart.py` | `runs/<policy>.png` — one arm's stage-A history |
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
-| `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them; the launcher opens it |
+| `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them, never writes and never trains |
+| `tools/chart_window.py` | the box's one window: who opens it, and why killing it is free |
+| `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
 | `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |
 

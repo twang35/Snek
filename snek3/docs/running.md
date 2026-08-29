@@ -1,8 +1,6 @@
 # Running things
 
-**`train.py` does not exist yet** — it arrives with `dqn/` in phase 3, so the training knobs below
-are the decided design rather than a description. Everything else here runs today. Once `train.py`
-exists, `tuned()` in it is the authoritative knob list and this file is a summary.
+`tuned()` in `train.py` is the authoritative knob list; this file is a summary of it.
 
 ```
 conda activate snek3       # or /opt/miniconda3/envs/snek3/bin/python directly
@@ -13,8 +11,13 @@ PYTHONPATH=. python -u evaluate.py <policy> [selector]  # a stage-B wave
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
+PYTHONPATH=. python -m tools.chart_window               # the box's chart window, if it is not up
 python -m pytest -q                                     # the suite; conftest.py handles the path
 ```
+
+**A training opens the chart window itself** — one per box, every running arm in it, nothing to launch
+(`../CLAUDE.md`). The command above is only for putting it back after closing it; killing it, closing
+it and relaunching it are all free, because no training reads it, waits on it or reopens it.
 
 **`conda run` buffers stdout**, even with `python -u` — a backgrounded run's log can stay empty for
 90+ seconds while the process is fine, and `kill -9` then discards the buffer permanently. Call the
@@ -46,6 +49,8 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40 | below this no checkpoint is written, so a short smoke run writes none and cannot resume. Set 0 to test resume |
 | `SNEK_DEBUG` | 0 | verbose logging. For debugging, not status |
 | `SNEK_TORCH_THREADS` | 1 | **measured 1.4x faster than one-per-core**: a 30 -> 320 -> 3 net has no op large enough to amortise a fork-join. Compounds when four arms share the laptop |
+| `SNEK_CHART_WINDOW` | 1 | 0 opens no window. The test suite sets it (a suite that ran the loop opened real windows), the desktop sets it for benchmarks, and `runtime.json`'s `viewer: false` sets it for every job on the box |
+| `SNEK_CHART_WINDOW_SCALE` | 1.0 | fraction of the screen the window fills. There is one window per box, so the default is the whole screen |
 
 ### Network and optimiser
 

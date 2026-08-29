@@ -69,11 +69,15 @@ RUNTIME_DEFAULTS = {
     # snek2's `auto_closeout` + `auto_hof` were two hops of a tiered close-out, and there is one
     # stage now, so carrying the old names would be archaeology rather than continuity.
     'auto_stage_b': True,
-    # A chart window on the box's physical monitor while jobs run. On by default here and off in
-    # snek2 for a reason that changed: snek2's window was the *trainer's* own in-process cv2 canvas,
-    # and one fatal XIO error under memory pressure took all four arms down with it on 2026-08-09.
-    # snek3's trainer never draws. The window is `tools/chart_viewer.py` in its own process, reading
-    # the PNGs the trainer writes, so the worst a display failure can now do is kill a window.
+    # Whether the trainings this box launches open a chart window on its monitor. The daemon does not
+    # open one — `train.py` does, for its own arm — so this reaches the job as
+    # `SNEK_CHART_WINDOW=0` rather than being acted on here.
+    #
+    # On by default, where snek2 kept it off, and the reason it is safe changed rather than the risk
+    # being accepted: snek2's window was the *trainer's* own in-process cv2 canvas, and one fatal XIO
+    # error under memory pressure took all four arms down with it on 2026-08-09. snek3's trainer never
+    # draws. The window is a separate session reading the PNGs the trainer writes, so the worst a
+    # display failure can do is kill a window.
     'viewer': True,
 }
 

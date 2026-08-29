@@ -178,7 +178,7 @@ near-mechanical copies. The table is the whole port.
 | `eval_agent.py`, `snake_environment.py`, `under_the_hood` net builders | ~400 | TF-Agents constructors |
 | `categorical_agent.py` | 391 | c51. **Deferred, not rejected** — it runs on the vec engine fine, but it is a second agent class to maintain before PPO exists |
 | `backfill_arch.py`, `pick_c51_lr.py`, `hyperparamTuning/{diagnostics,perDiagnostics}/` | ~5,000 | snek2's measurement tools, tied to snek2's internals |
-| `chart_viewer` arm registry, claim lock, `--arms` mode | ~500 | §7 |
+| `chart_viewer` arm registry, claim lock, `--arms` mode | ~500 | §7 — **partly un-cut on 2026-08-29**: a pid registry and the `O_EXCL` claim, ~140 lines |
 | tiered selection, the min-achievable gate, `EVAL_SCREEN_EPISODES`, `EVAL_CONFIRM_COUNT`, the `closeout → HOF` chain | ~600 | §6 |
 | `pyformulas` / `cv2` in-process windows | — | already off by default; a fatal XIO error killed four desktop arms at once on 2026-08-09 |
 
@@ -512,6 +512,17 @@ four trainers and one viewer. That deletes the registry, the claim lock, the zom
 `pgrep` corroboration and the `--arms` mode: **~300 lines of viewer and ~150 of test** instead of
 1,010 and 1,825.
 
+**Retracted 2026-08-29: the requirement is real and the registry comes back — 100 lines of it, not
+500.** "The launcher opens the window" only holds where there *is* a launcher, and on the laptop there
+is not: a hand-started `train.py` got no window at all, which is where most one-off arms run. The
+requirement stands as snek2 stated it — peer trainers sharing one window, none knowing about the
+others — and what was actually wrong was snek2's answer to it. `runs/.live/<policy>` holds the
+trainer's **own pid**, so liveness is a question about a known process rather than a `pgrep` pattern,
+and the entry cannot exist before the process does. That deletes the grace period, the TTL, the
+`pgrep` corroboration and the dedupe on its own; the `O_EXCL` claim lock is kept and is six lines.
+`tools/live_runs.py` plus `tools/chart_window.py` are ~140 lines with the reasoning in them, against
+~500. See [`../docs/findings.md`](../docs/findings.md).
+
 Five things from the scars are kept regardless, because they are cheap and each was expensive to
 learn:
 
@@ -595,15 +606,18 @@ surface it in `at_a_glance` at minimum.
 `(batch, closeout_group_env)` and `auto_hof` then chains a second job behind each. There is only one
 stage now, so the `auto_hof` path, the `-hof` id handling and the `phase_of` legacy branch all go.
 
-**Retracted 2026-08-28: `_ensure_viewer` stays, at a quarter of the size.** This section had it
-deleted outright on the grounds that snek2's window killed four arms with one XIO error. That
-incident was real but it indicts the wrong thing — snek2's window was the *trainer's* own
-in-process cv2 canvas, and snek3's trainer never draws. `tools/chart_viewer.py` is a separate
-process that only reads the PNGs, so a display failure costs a window. The ~200 lines were never
-about drawing anyway: they were a process registry, an `O_EXCL` claim lock, a grace period, zombie
-detection and a dedupe, all so four peer trainers could share one window while knowing nothing
-about each other. One process starts the arms here, so ~50 lines do it. On by default,
-`runtime.json`'s `viewer` turns it off.
+**Retracted 2026-08-28, then again 2026-08-29: the daemon has no viewer at all, and the window is
+better for it.** The first version of this section deleted `_ensure_viewer` outright on the grounds
+that snek2's window killed four arms with one XIO error — true incident, wrong target: snek2's window
+was the *trainer's* own in-process cv2 canvas, and snek3's trainer never draws. The second version
+brought it back at ~50 lines, on the reasoning that one process starts the arms so one process can
+open their window. That is what shipped and it was wrong twice: it drew a fixed 2x2 of the wave and so
+had to close and reopen the window whenever an arm joined or finished, and it left the laptop with no
+window at all. Both follow from the same error — the daemon is not what knows a training is happening.
+
+The daemon now owes the window exactly two things: `DISPLAY`/`XAUTHORITY` forwarded into every job's
+environment, and `runtime.json`'s `viewer: false` translated to `SNEK_CHART_WINDOW=0`. The trainings
+open it themselves, one window per box, on the desktop and the laptop identically — §7.
 `EVAL_RELEVANT_ENV` stays, and so does the reason for it: keying a wave on the *whole* inherited env
 split `b45` — four arms differing only in `SNEK_SEED` — into three waves of 2/1/1, measuring a batch
 at a quarter of the intended lanes. A seed, a learning rate or a target-update period cannot reach a

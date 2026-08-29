@@ -218,6 +218,40 @@ the line**, rather than that its name appears in it — `describe()` prints `dis
 `gate=`, so a name match would have failed while the code was right, which is this project's
 own fixture trap.
 
+### The thing that knows what is running should own the window, and a pid is what makes that cheap
+
+snek3's chart window was built twice, and the second version is a fifth of the size because of one
+change in what the registry stores.
+
+**Version 1: the desktop daemon opened it.** A fixed 2x2 of the wave it had just launched, closed and
+reopened whenever an arm joined or finished, and **no window at all on the laptop**, where most one-off
+arms actually run. Both failures are the same mistake — the daemon is not what knows a training is
+happening.
+
+**Version 2, briefly: each trainer opened its own.** That makes the laptop work and removes the
+reopen, at the cost of four overlapping windows on a box running four arms. Rejected by the user on
+sight, which was right: the window is a thing to look at, not a thing to manage.
+
+**What works is one window per box that reads a registry of live arms.** Each trainer writes
+`runs/.live/<policy>` holding **its own pid** before its first step, then calls `ensure()`: the first
+arm opens the window, the rest get `None`, and panels appear and vanish as arms start and finish
+without anything being reopened. It closes itself five minutes after the last arm goes.
+
+**Storing the pid is what shrinks it.** snek2's viewer had the same registry idea with a *name and a
+timestamp* per arm, so nothing in the file could be asked whether it was still true, and it needed
+`pgrep` liveness plus a 120 s grace window plus a 12 h TTL to compensate — which still opened **eight
+panels for four arms** when a batch was relaunched inside the TTL, and separately showed **3 of 4** when
+a wave's `exec` landed after the scan. A pid the process wrote about itself has neither hole: there is
+no interval where the entry exists and the process does not, so there is no grace period to tune, and
+`os.kill(pid, 0)` on a pid handed to you cannot match the wrong thing the way a `pgrep` pattern can
+(including, famously, its own command line). Dead entries are dropped on the next read, which is also
+why a trainer needs no `finally` and a `kill -9` cleans up after itself.
+
+The window remains **disposable**: its own session, never read from, never waited on, never reopened by
+a run. That is what makes it safe to kill and relaunch one while four arms are training — the property
+snek2 could not offer, having lost all four arms of a batch to one XIO error in the trainer's own
+canvas.
+
 ## Falsified
 
 *Nothing yet.*

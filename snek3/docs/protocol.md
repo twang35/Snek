@@ -11,7 +11,8 @@ PYTHONPATH=. python -u evaluate.py <policy> one --episodes 1000 # a record re-me
 PYTHONPATH=. python -m tools.compare_results <file-a> <file-b>  # is the gap noise?
 PYTHONPATH=. python -m tools.progress_chart <policy>            # redraw runs/<policy>.png
 PYTHONPATH=. python -m tools.stage_b_chart <policy> --label L   # the pass, drawn and summarised
-PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/b48*.png'  # a live window
+PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/b48*.png'  # a window over arbitrary PNGs
+PYTHONPATH=. python -m tools.chart_window                       # the box's own window, if it is down
 ```
 
 ## Two stages, and only two

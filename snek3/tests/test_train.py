@@ -12,11 +12,13 @@ Three of these are silent when broken and would cost a whole arm:
 
 import json
 import os
+import re
 
 import numpy as np
 import pytest
 
 import train
+from vectorized import config as reward_config
 from dqn import collect
 from tools import arch as arch_tools
 from tools import run_report
@@ -524,3 +526,77 @@ def test_the_resume_state_carries_the_schedules(tmp_path, monkeypatch):
     again = make_trainer(tmp_path, monkeypatch=monkeypatch, guided_fraction=0.8)
     assert again.epsilon == pytest.approx(0.0125)
     assert again.collector.guided_fraction == pytest.approx(0.8)
+
+
+# --- the config an arm actually got ---------------------------------------------------------------
+#
+# `grep 'hyperparameter override:'` is what the docs name as the way to confirm an arm got its
+# config, and it is silent on every knob `env/constants.py` reads at import — which is the shaping
+# set, and therefore exactly what a shaping batch is about. b2's `SNEK_CHASE_SAFE_SHAPING=0.1` had to
+# be confirmed by reading `/proc/<pid>/environ` on the desktop. `train.py` prints
+# `vectorized.config.describe()` at startup so it never has to be done that way again.
+
+CONSTANTS_KNOB_RE = re.compile(r"_num\('([A-Z_]+)'")
+
+# Read by the trainer's own config rather than describing the reward, so it already appears as a
+# `hyperparameter override:` line and `describe()` is the wrong place for it.
+KNOBS_NOT_IN_DESCRIBE = {'MIN_CHECKPOINT_SCORE'}
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def constants_env_knobs():
+    """Every `SNEK_*` knob `env/constants.py` reads through `_num`."""
+    source = open(os.path.join(PROJECT_ROOT, 'env', 'constants.py')).read()
+    return set(CONSTANTS_KNOB_RE.findall(source))
+
+
+def describe_with(monkeypatch, knob, value):
+    """`describe()` as it would read in a process started with `SNEK_<knob>=<value>`.
+
+    Both modules are reloaded because these knobs are read **at import**, which is the whole reason
+    they print no override line.
+    """
+    import importlib
+    from env import constants as constants_module
+    monkeypatch.setenv('SNEK_' + knob, str(value))
+    importlib.reload(constants_module)
+    importlib.reload(reward_config)
+    return reward_config.describe()
+
+
+@pytest.fixture(autouse=True)
+def _restore_constants():
+    """Puts both modules back, so a reload here cannot leak into another test."""
+    yield
+    import importlib
+    from env import constants as constants_module
+    importlib.reload(constants_module)
+    importlib.reload(reward_config)
+
+
+@pytest.mark.parametrize('knob', sorted(constants_env_knobs() - KNOBS_NOT_IN_DESCRIBE))
+def test_describe_reflects_every_shaping_knob_the_overrides_miss(knob, monkeypatch):
+    """Asserted by *changing* the knob, not by matching its name.
+
+    `describe()` prints short labels — `dist`, `perfect`, `gate=` — so a name match would fail while
+    the code was right, which is the fixture trap this project already has a rule about. Changing the
+    value is the property that matters: a knob whose value cannot move the line is a knob nobody
+    reading the log can confirm.
+
+    The failure this prevents is a shaping batch that silently trained without its shaping.
+    """
+    before = reward_config.describe()
+    after = describe_with(monkeypatch, knob, 7)
+    assert after != before, '{0} does not appear in the reward-config line'.format(knob)
+
+
+def test_the_trainer_prints_the_reward_config_not_just_the_overrides():
+    assert 'reward_config.describe()' in open(
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     'train.py')).read()
+
+
+def test_describe_shows_a_shaping_term_that_is_on(monkeypatch):
+    """The point of the line: a `c=0.1` arm must be distinguishable from a `c=0.0` one in the log."""
+    assert 'chase_safe c=0.0' in reward_config.describe(), 'default is off'

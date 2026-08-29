@@ -105,7 +105,7 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | `disk_min_gb` | 5 | refuse to launch below this much free |
 | `paused` / `drain` | false | finish what is running, start nothing new |
 | `auto_stage_b` | true | a finished training auto-queues its stage-B wave at priority 10 |
-| `viewer` | true | a live chart window on the box's monitor while jobs run — see below |
+| `viewer` | true | let the trainings this box launches open their chart window — see below |
 
 **Cores are the binding constraint, not memory** — which is a change from snek2. Measured 2026-08-28
 on this code: an eval shard peaks at **202 MB** (193 of it torch's import) and a trainer at **290
@@ -122,27 +122,33 @@ a batch should start *now*.
 
 ## The chart window
 
-**While anything is running, the box's monitor shows a live grid of that batch's charts** —
-`tools/chart_viewer.py`, started by the daemon with an explicit panel list and the pids it launched.
-It closes when the box goes idle, and restarts when an arm joins or finishes, because the panel list
-is explicit rather than a glob (a glob over `runs/` would show every arm the box has ever run).
+**While anything is training, the box's monitor shows one window with every running arm in it** — and
+the daemon does not open it. Each trainer does, for the box: the first arm to start opens the window,
+later arms join the one already up, and it closes itself a few minutes after the last arm finishes.
+The mechanism is `tools/chart_window.py` and the pid registry in `tools/live_runs.py`, and it is
+identical on the laptop, which is the point of moving it out of the daemon.
+
+**The daemon owed the window two things and it still owes exactly those two.** `DISPLAY` and
+`XAUTHORITY` from `host.env` are forwarded into every job's environment — without them a job cannot
+reach the monitor, because the daemon runs outside the graphical session — and `runtime.json`'s
+`viewer: false` reaches the trainer as `SNEK_CHART_WINDOW=0`. Benchmarks get that too, since a window
+would land in the numbers they exist to produce. Those two keys are the only optional ones in
+`host.env`; without them jobs run headless and no window appears.
+
+**A daemon-owned window was the first design and it was wrong twice over.** It drew a fixed 2x2 of the
+wave it launched, so it had to be closed and reopened whenever an arm joined or finished — and it left
+the laptop with no window at all, which is where most one-off arms actually run. Both fall out of the
+same mistake: the daemon is not the thing that knows what is training.
 
 **This is on in snek3 and was off in snek2, and the reason it is now safe is the important part.**
 snek2's window was the *trainer's* own in-process cv2 canvas, and one fatal XIO error under memory
 pressure killed all four arms at once on 2026-08-09 — which is why `SNEK_CHART_WINDOW=0` is in
-snek2's unit file. snek3's trainer never draws. This is a separate process that only *reads* the PNGs
-the trainer already writes, so the worst a display failure can do is kill a window.
+snek2's unit file. snek3's trainer never draws. The window is a separate session that only *reads* the
+PNGs the trainer already writes, so the worst a display failure can do is kill a window: nothing in a
+training loop reads it, waits on it, or reopens it.
 
-Two behaviours worth knowing:
-
-- **A window you close stays closed.** The tool treats closing as an instruction, not a failure, so
-  the daemon does not reopen it on the next poll and fight you. It comes back when the set of running
-  arms changes, which is when there is new content to show.
-- **A window that *crashed* is reopened.** A non-zero exit is not an instruction.
-
-It needs `DISPLAY` and `XAUTHORITY` in `host.env`; those are the only two optional keys there, and
-without them the daemon runs headless and skips the window silently. `runtime.json`'s `viewer: false`
-turns it off on a running box, which closes any open window on the next poll.
+**A window you close stays closed**, and closing one while four arms train is safe. Nothing reopens it
+until the next arm starts; to get it back now, `PYTHONPATH=. python -m tools.chart_window`.
 
 **The window is sized from the display, not from a number of inches.** It fills 95% x 88% of whatever
 screen it opens on — 3086x1951 on this box's 3840x2160 panel. The first version asked for a fixed

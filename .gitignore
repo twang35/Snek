@@ -51,3 +51,10 @@ __pycache__/
 # these are the stdout of the processes that produced them, useful while a wave
 # runs and never afterwards.
 /snek3/logs/
+
+# Which trainings are running on THIS box, one file per arm holding its pid, plus
+# the chart window's own pid (tools/live_runs.py). Machine-local by definition:
+# committing a laptop's pids would tell the desktop that four arms it has never
+# heard of are live. Self-healing -- an entry whose process is gone is dropped on
+# the next read -- so nothing here needs keeping.
+/snek3/runs/.live/
