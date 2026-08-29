@@ -13,6 +13,49 @@ instructions; **this file is only what is true of the whole repository.**
 deliberate. If a rule you need is missing from `snek3/CLAUDE.md`, it may be in `snek2/CLAUDE.md`
 describing snek2's version of the same thing; carry it across rather than editing snek2.
 
+**`README.md` is for humans and stays barebones** — the eras, a sentence each, a gif each. Anything
+an agent needs belongs here or in an era's own manual, not there. Details that were moved out of it
+on 2026-08-29 are the two sections below.
+
+## What each era is, and how to run it
+
+| era | headline | env | train |
+|---|---|---|---|
+| snek2 | TensorFlow + TF-Agents, batches 1-47, peaking at a **98.7% perfect-game rate**. **Frozen 2026-08-28** — runnable for A/B against snek3, not developed further | `snek` | `cd snek2 && python snek2.py <policy_name>` |
+| snek3 | PyTorch, the active one. Same game and same 30-value observation as snek2, so a snek2 champion's weights convert straight across; a clean-slate implementation of everything else | `snek3` | `cd snek3 && PYTHONPATH=. python -u train.py <policy_name>` |
+
+The argument is the policy name, and in both eras it doubles as the checkpoint directory under
+`savedPolicies/<policy_name>/` and as the prefix for the run's own graph and report in `runs/`, so
+several policies train independently without overwriting each other.
+
+Every snek3 eval writes `runs/<policy>.png` (the graph, covering the policy's whole history across
+restarts), `runs/<policy>.md` (graph, config and eval table, generated from the values the run
+actually used) and `runs/<policy>_evals.json` (the measurements later sessions read).
+
+To watch a snek3 policy play, or record it:
+
+```
+PYTHONPATH=. python -u watch.py <policy_name>
+PYTHONPATH=. python -u record_gif.py <policy_name>
+```
+
+Where the rest is written: snek2's investigation is [`snek2/hyperparamTuning/`](snek2/hyperparamTuning/)
+and its record checkpoints and recordings are [`snek2/hallOfFame/HOF.md`](snek2/hallOfFame/HOF.md);
+snek3's investigation is [`snek3/docs/`](snek3/docs/).
+
+## Every training opens a chart window, and no agent launches one by hand
+
+**One window per box, showing every training running on it**, on the laptop and the desktop alike. The
+first arm to start opens it, later arms join it, and it closes itself a few minutes after the last one
+finishes. Nothing has to be launched, and a `runs/*.png` glob is no longer the way to watch a batch.
+
+The window is **disposable and the training is not**: it runs in its own session, no training reads
+from or waits on it, and no training reopens it. So killing it, closing it, or relaunching it with
+`cd snek3 && PYTHONPATH=. python -m tools.chart_window` cannot affect a run — which is what makes it
+safe to fix a window while four arms are training. `SNEK_CHART_WINDOW=0` in a training's environment
+turns it off; the mechanism is [`snek3/tools/chart_window.py`](snek3/tools/chart_window.py) and
+[`snek3/tools/live_runs.py`](snek3/tools/live_runs.py).
+
 ## Work as a collaborator
 
 **Ask questions when a request is ambiguous** in a way that changes the work — which arms to stop,
