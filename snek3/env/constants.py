@@ -78,6 +78,52 @@ OBS_LEN = 30
 # champion's `arch.json` matches. See docs/environment.md for the index layout.
 OBS_ERA = 'b09c616'
 
+# The observation's blocks, in order, as `(name, width)`. The sum is the vector length and each
+# entry's offset is its index range — so this table *is* the layout in docs/environment.md.
+#
+# **It lives here, beside `OBS_LEN`, and not in `env/scalar_env.py` where it started.** Two reasons.
+# Keeping the length and the blocks that sum to it in one module is what lets the consistency check
+# below fire at the earliest possible import rather than whenever something happens to touch the
+# scalar env. And `dqn/agent.py` needs one block's range for the exploration shield: `scalar_env`
+# imports `env.game` and therefore pygame, which `dqn/` may not, so reading the layout from there
+# would have broken the layering invariant `tests/test_module_layering.py` asserts.
+#
+# Kept as data rather than as arithmetic inside a spec function so a test can pin each block to its
+# range by comparing against the function in `env.observations` that produces it. snek2's earlier
+# test compared against hardcoded literals and an ordering bug passed it, because two blocks
+# coincidentally held the same values.
+OBS_BLOCKS = (
+    ('food', 6),                 # 0-5    [is closer, 1/(distance+1)] per action
+    ('body_and_wall', 3),        # 6-8    is the move safe. The only place legality is stated
+    ('head_with_tail_groups', 6),  # 9-14 [can reach tail, lg(open regions)] per action
+    ('safe_to_chase_food', 3),   # 15-17  head, food and tail in one region
+    ('perfect_game_move', 3),    # 18-20  nonzero in <0.03% of states; not meaningfully trained
+    ('starve_budget', 1),        # 21
+    ('board_fill', 1),           # 22     rank 1 of 30 by saliency in every snek2 arm measured
+    ('hugging_wall', 3),         # 23-25
+    ('not_following_tail', 3),   # 26-28  a *fatal* move also reads 1 here
+    ('food_space', 1),           # 29     sits at 1 in ~99.95% of states
+)
+
+
+def observation_length():
+    return sum(width for _, width in OBS_BLOCKS)
+
+
+def block_ranges():
+    """`{name: (start, stop)}`, stop exclusive."""
+    out, at = {}, 0
+    for name, width in OBS_BLOCKS:
+        out[name] = (at, at + width)
+        at += width
+    return out
+
+
+if observation_length() != OBS_LEN:
+    raise ImportError('OBS_BLOCKS sums to {0} but OBS_LEN is {1}'.format(
+        observation_length(), OBS_LEN))
+
+
 
 def _parse_zero_obs(raw):
     """`SNEK_ZERO_OBS=26-29,12` -> {12, 26, 27, 28, 29}. Indices and inclusive ranges."""

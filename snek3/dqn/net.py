@@ -25,15 +25,15 @@ class QNet(nn.Module):
     `tools/import_tf_checkpoint.py`.
     """
 
-    def __init__(self, obs_len, fc_layer_params, num_actions):
+    def __init__(self, obs_len, fc_layer_params, num_actions, seed=None):
         super().__init__()
         widths = [int(obs_len)] + [int(width) for width in fc_layer_params]
         self.hidden = nn.ModuleList(
             [nn.Linear(widths[i], widths[i + 1]) for i in range(len(widths) - 1)])
         self.head = nn.Linear(widths[-1], int(num_actions))
-        self.reset_parameters()
+        self.reset_parameters(seed)
 
-    def reset_parameters(self):
+    def reset_parameters(self, seed=None):
         """snek2's initialisers, spelled out in torch.
 
         The hidden layers used Keras `VarianceScaling(scale=2.0, mode='fan_in',
@@ -42,13 +42,26 @@ class QNet(nn.Module):
         variance *down*, so a plain `trunc_normal_` at He's σ would start ~12% narrower than every
         snek2 arm did. The head used `RandomUniform(-0.03, 0.03)` with zero bias, which keeps the
         opening Q-values near zero and the opening policy near uniform.
+
+        **`seed` draws from a local `torch.Generator`, not the global one, and it is not optional for
+        a comparison.** Two nets built in one process with the same configured seed were *different
+        networks* before this existed, because `nn.init` reads torch's global RNG and the second call
+        continues where the first stopped. Every "seed-matched" arm would have differed in its
+        initialisation — the one thing a seed is supposed to pin — and nothing in a run report would
+        have shown it. This is the same class of defect that disqualified cpprb, whose buffer
+        silently ignored `seed=`.
         """
+        generator = None
+        if seed is not None:
+            generator = torch.Generator(device=self.head.weight.device)
+            generator.manual_seed(int(seed))
         for layer in self.hidden:
             fan_in = layer.weight.shape[1]
             stddev = math.sqrt(2.0 / fan_in) / 0.87962566103423978
-            nn.init.trunc_normal_(layer.weight, std=stddev, a=-2 * stddev, b=2 * stddev)
+            nn.init.trunc_normal_(layer.weight, std=stddev, a=-2 * stddev, b=2 * stddev,
+                                  generator=generator)
             nn.init.zeros_(layer.bias)
-        nn.init.uniform_(self.head.weight, -0.03, 0.03)
+        nn.init.uniform_(self.head.weight, -0.03, 0.03, generator=generator)
         nn.init.zeros_(self.head.bias)
 
     def forward(self, observations):
@@ -58,9 +71,13 @@ class QNet(nn.Module):
         return self.head(values)
 
 
-def build(arch, device='cpu'):
-    """A `QNet` sized by an `arch.json` dict. The sidecar is authoritative."""
-    net = QNet(arch['obs_len'], arch['fc_layer_params'], arch['num_actions'])
+def build(arch, device='cpu', seed=None):
+    """A `QNet` sized by an `arch.json` dict. The sidecar is authoritative.
+
+    `seed` pins the initialisation. Leave it None when the weights are about to be overwritten by a
+    checkpoint restore, which is every path in `tools/`.
+    """
+    net = QNet(arch['obs_len'], arch['fc_layer_params'], arch['num_actions'], seed=seed)
     return net.to(device)
 
 

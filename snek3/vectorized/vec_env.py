@@ -228,6 +228,14 @@ def _enumerate(pk, head_nb, tail_nb, food_bit, max_regions=NCELL):
     raise RuntimeError('region enumeration exceeded {0} regions'.format(max_regions))
 
 
+# Every per-row state array, named once so `copy_rows` cannot silently miss one. A missed field means
+# a forked lane inherits part of its parent's game and part of whatever it was playing before — a
+# board that never existed, stored as if it had. `tests/test_vec_env.py` checks this tuple against
+# the arrays `__init__` actually creates, so adding a field without adding it here fails the suite.
+STATE_FIELDS = ('body', 'hp', 'length', 'head_dir', 'food', 'step_count', 'last_food_step',
+                'score', 'open_', 'chase_safe_potential', 'free_space_potential')
+
+
 class VecSnake:
     """`num_envs` games in lockstep. One `step` is one agent decision in every game.
 
@@ -387,6 +395,35 @@ class VecSnake:
         has = self.food[rows] >= 0
         self.open_[rows[has], self.food[rows][has]] = True
         self._refresh_potentials(rows)
+
+    def copy_rows(self, source, destination):
+        """Copies each `source` lane's whole game state onto the matching `destination` lane.
+
+        This is what makes forking cheap here. snek2 needed a snapshot object, a validator and a pool
+        of spare scalar environments to put one game's state into another; N games in lockstep make
+        it a row assignment.
+
+        Copies **every** field in `STATE_FIELDS`, including the two shaping potentials. Those are
+        carried incrementally rather than derived from the board, so leaving them behind would give
+        the forked lane its predecessor's potential and a first shaping reward computed against a
+        board it was never on.
+
+        The destination lane's own episode is abandoned mid-flight, which is correct: whatever it
+        already stored in the replay buffer genuinely happened, and the caller drops the lane's
+        partial n-step window so no transition is stitched across the discontinuity.
+        """
+        source = np.atleast_1d(np.asarray(source, dtype=np.int64))
+        destination = np.atleast_1d(np.asarray(destination, dtype=np.int64))
+        if source.shape != destination.shape:
+            raise ValueError('need one destination per source, got {0} and {1}'.format(
+                source.shape, destination.shape))
+        overlap = np.intersect1d(source, destination)
+        if overlap.size:
+            raise ValueError('a lane cannot be both a fork source and its destination: {0}'.format(
+                overlap.tolist()))
+        for name in STATE_FIELDS:
+            array = getattr(self, name)
+            array[destination] = array[source]
 
     def starve_budget(self):
         return np.maximum(C.MIN_STARVE_BUDGET,

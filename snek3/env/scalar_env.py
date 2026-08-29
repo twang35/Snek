@@ -22,43 +22,12 @@ from env import constants
 from env.constants import ACTION_INDEX_TO_NAME, OBS_ERA, OBS_LEN
 from env.game import Game
 
-# The observation's blocks, in order, as `(name, width)`. The sum is the vector length and each
-# entry's offset is its index range — so this table *is* the layout in docs/environment.md.
-#
-# Kept as data rather than as arithmetic inside a spec function so a test can pin each block to its
-# range by comparing against the function in `env.observations` that produces it. snek2's earlier
-# test compared against hardcoded literals and an ordering bug passed it, because two blocks
-# coincidentally held the same values.
-OBS_BLOCKS = (
-    ('food', 6),                 # 0-5    [is closer, 1/(distance+1)] per action
-    ('body_and_wall', 3),        # 6-8    is the move safe. The only place legality is stated
-    ('head_with_tail_groups', 6),  # 9-14 [can reach tail, lg(open regions)] per action
-    ('safe_to_chase_food', 3),   # 15-17  head, food and tail in one region
-    ('perfect_game_move', 3),    # 18-20  nonzero in <0.03% of states; not meaningfully trained
-    ('starve_budget', 1),        # 21
-    ('board_fill', 1),           # 22     rank 1 of 30 by saliency in every snek2 arm measured
-    ('hugging_wall', 3),         # 23-25
-    ('not_following_tail', 3),   # 26-28  a *fatal* move also reads 1 here
-    ('food_space', 1),           # 29     sits at 1 in ~99.95% of states
-)
-
-
-def observation_length():
-    return sum(width for _, width in OBS_BLOCKS)
-
-
-def block_ranges():
-    """`{name: (start, stop)}`, stop exclusive."""
-    out, at = {}, 0
-    for name, width in OBS_BLOCKS:
-        out[name] = (at, at + width)
-        at += width
-    return out
-
-
-if observation_length() != OBS_LEN:
-    raise ImportError('OBS_BLOCKS sums to {0} but OBS_LEN is {1}'.format(
-        observation_length(), OBS_LEN))
+# The observation layout lives in `env.constants`, beside `OBS_LEN`, so the length and the blocks
+# that sum to it cannot drift apart and so `dqn/` can read a block range without importing pygame.
+# Re-exported here because this module is where the observation *spec* is asked for.
+OBS_BLOCKS = constants.OBS_BLOCKS
+observation_length = constants.observation_length
+block_ranges = constants.block_ranges
 
 
 class SnakeEnv:

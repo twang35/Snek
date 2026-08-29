@@ -9,6 +9,7 @@ form, the region count against an independent BFS, the food sampler's distributi
 """
 
 import numpy as np
+import pytest
 
 from vectorized import config as C
 from vectorized import vec_env as V
@@ -320,3 +321,86 @@ def test_only_the_full_groups_mode_is_parity_correct_and_the_others_say_so():
     assert np.array_equal(none[:, others], full[:, others]), (
         'groups_mode changed an index outside the group block'
     )
+
+
+# --- copy_rows: what makes a fork an array assignment -----------------------------------------
+
+def test_state_fields_names_every_per_row_array_the_env_holds():
+    """The guard that makes `copy_rows` safe to extend.
+
+    A field added to `__init__` and not to `STATE_FIELDS` would leave a forked lane holding part of
+    its parent's game and part of whatever it was playing before — a board that never existed,
+    stored in the replay buffer as if it had. Nothing about that fails loudly, so this compares the
+    tuple against the arrays the env actually creates.
+
+    `rows` is excluded because it is the index vector, not state.
+    """
+    env = V.VecSnake(4, seed=0)
+    env.reset_all()
+    per_row = {name for name, value in vars(env).items()
+               if isinstance(value, np.ndarray) and value.shape and value.shape[0] == env.n
+               and name != 'rows'}
+    assert per_row == set(V.STATE_FIELDS), (
+        'in __init__ but not STATE_FIELDS: {0}; in STATE_FIELDS but not on the env: {1}'.format(
+            sorted(per_row - set(V.STATE_FIELDS)),
+            sorted(set(V.STATE_FIELDS) - per_row)))
+
+
+def test_copy_rows_makes_the_destination_an_exact_copy():
+    env = V.VecSnake(4, seed=0)
+    env.reset_all()
+    for _ in range(40):
+        env.step(np.array([0, 1, 2, 0], dtype=np.int64))
+    env.copy_rows([0], [3])
+    for name in V.STATE_FIELDS:
+        array = getattr(env, name)
+        assert np.array_equal(array[0], array[3]), name
+
+
+def test_a_copied_lane_then_plays_identically_given_the_same_action():
+    # The real requirement: not just equal arrays, but a lane that continues the same game.
+    env = V.VecSnake(4, seed=0)
+    env.reset_all()
+    for _ in range(40):
+        env.step(np.array([0, 0, 0, 0], dtype=np.int64))
+    env.copy_rows([0], [3])
+    obs = env.observe()
+    assert np.allclose(obs[0], obs[3]), 'the observation is what the policy sees'
+
+
+def test_copy_rows_carries_the_shaping_potentials():
+    # Carried incrementally rather than derived from the board, so a missed copy gives the forked
+    # lane its predecessor's potential and a first shaping reward against a board it was never on.
+    env = V.VecSnake(4, seed=0)
+    env.reset_all()
+    env.chase_safe_potential[0] = 7.5
+    env.free_space_potential[0] = -2.5
+    env.copy_rows([0], [2])
+    assert env.chase_safe_potential[2] == 7.5
+    assert env.free_space_potential[2] == -2.5
+
+
+def test_copy_rows_handles_several_lanes_at_once():
+    env = V.VecSnake(6, seed=0)
+    env.reset_all()
+    env.score[:] = [10, 11, 12, 13, 14, 15]
+    env.copy_rows([0, 1], [4, 5])
+    assert env.score.tolist() == [10, 11, 12, 13, 10, 11]
+
+
+def test_copy_rows_refuses_a_lane_that_is_both_source_and_destination():
+    # Silently self-assigning would look like a fork that produced a duplicate of the parent, and
+    # the parent's own trajectory would then be stored twice under two lanes.
+    env = V.VecSnake(4, seed=0)
+    env.reset_all()
+    with pytest.raises(ValueError, match='source and its destination'):
+        env.copy_rows([0, 1], [1, 2])
+
+
+def test_copy_rows_refuses_mismatched_lane_counts():
+    # numpy would raise on the assignment too, with a broadcast error naming neither argument. The
+    # explicit check exists for the message, so the message is what is asserted.
+    env = V.VecSnake(4, seed=0)
+    env.reset_all()
+    with pytest.raises(ValueError, match='one destination per source'):
+        env.copy_rows([0, 1], [2])

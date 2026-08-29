@@ -57,6 +57,28 @@ def test_the_game_rules_are_importable_without_a_display():
     assert not torch
 
 
+def test_the_learning_code_never_reaches_pygame():
+    """`dqn/` may import torch and may not import pygame.
+
+    Caught a real violation: `dqn/agent.py` read the exploration shield's observation slice from
+    `env.scalar_env.block_ranges()`, and `scalar_env` imports `env.game` and therefore pygame. The
+    only reason anyone noticed was the SDL banner printing during a smoke run. The layout table moved
+    to `env.constants`, which is pygame-free by rule, and this assertion exists so the next one is
+    caught by the suite instead of by a banner.
+    """
+    pygame, torch = loaded_after_importing('dqn.agent', 'dqn.replay', 'dqn.schedules', 'dqn.net')
+    assert not pygame, 'dqn/ reached pygame; a trainer must not open an audio device'
+    assert torch, 'dqn/ is where torch belongs, so not reaching it means this probe is wrong'
+
+
+def test_the_measurement_tools_never_reach_pygame():
+    # `tools/` may import torch for checkpoint I/O, and several of these run as eval shard
+    # subprocesses where a CoreAudio stream per process was a measured 15% of a core.
+    pygame, _ = loaded_after_importing('tools.results', 'tools.shard', 'tools.eval_wave',
+                                       'tools.stage_b_chart', 'tools.step_selectors')
+    assert not pygame, 'tools/ reached pygame'
+
+
 def test_the_probe_would_notice_pygame():
     # A fixture whose subject cannot violate it is not a fixture: this proves the three assertions
     # above are testing something, by importing the one module that *does* pull pygame in.
