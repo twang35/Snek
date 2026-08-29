@@ -1,7 +1,9 @@
 # Charts — one graph per arm
 
-**Batch b1 is running** — four arms, all four charts below, refreshed 2026-08-28 23:47. The desktop's
-three are rsynced copies; they arrive on the `results` branch for real at close-out.
+**Batch b1 is running.** Only `b1a`'s chart is committed: it is the laptop's own arm. **A running
+desktop arm's `runs/` files must not be committed from here** — the box writes those same paths every
+eval, so a committed copy makes its next `git merge --ff-only` abort and blocks every deploy. The
+desktop three arrive on the `results` branch at close-out and get their images then.
 
 ## Imported policies
 
@@ -56,9 +58,15 @@ sagged to 65 by 15,000, and recovered to ~85 by 40,000. That is not a port artef
 70%. Early competence in this task is cheap and unstable; the last few percent is what 3M steps buy.
 
 ![b1a-baseline-seed1](../runs/b1a-baseline-seed1.png)
-![b1b-baseline-seed2](../runs/b1b-baseline-seed2.png)
-![b1c-baseline-seed3](../runs/b1c-baseline-seed3.png)
-![b1d-baseline-seed4](../runs/b1d-baseline-seed4.png)
+
+The desktop's three at 2026-08-28 23:47, from `status.json` and their own summaries — images at
+close-out:
+
+| arm | step | trailing | recent30 | max single eval | epsilon |
+|---|---:|---:|---:|---:|---:|
+| `b1b-baseline-seed2` | 19,000 | 60.20 | 5.2% | 70% | 0.01109 |
+| `b1c-baseline-seed3` | 19,000 | 58.32 | 0.1% | 1% | 0.01248 |
+| `b1d-baseline-seed4` | 17,000 | 56.47 | 0.7% | 4% | 0.01230 |
 
 **Refresh this file in the same pass as any doc edit or progress update**, whether or not the arms
 have finished — a running batch with no chart entry is a bug, not a "wait until it closes" state.
