@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-28T23:55:58",
-  "ts": 1787986558.8717804,
+  "iso": "2026-08-28T23:56:14",
+  "ts": 1787986574.3786297,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -23,7 +23,8 @@
     "disk_min_gb": 5,
     "paused": false,
     "drain": false,
-    "auto_stage_b": true
+    "auto_stage_b": true,
+    "viewer": true
   },
   "config_notes": [],
   "counts": {
@@ -39,10 +40,10 @@
         "b1b-baseline-seed2"
       ],
       "pid": 3537338,
-      "step": 67000,
+      "step": 68000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.7,
-      "elapsed_s": 603
+      "steps_per_sec": null,
+      "elapsed_s": 618
     },
     {
       "id": "b1c-baseline-seed3",
@@ -52,10 +53,10 @@
         "b1c-baseline-seed3"
       ],
       "pid": 3537339,
-      "step": 60000,
+      "step": 62000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 603
+      "steps_per_sec": null,
+      "elapsed_s": 618
     },
     {
       "id": "b1d-baseline-seed4",
@@ -65,10 +66,10 @@
         "b1d-baseline-seed4"
       ],
       "pid": 3537340,
-      "step": 63000,
+      "step": 65000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.5,
-      "elapsed_s": 603
+      "steps_per_sec": null,
+      "elapsed_s": 618
     }
   ],
   "ledger": {
@@ -77,10 +78,18 @@
     "b1c-baseline-seed3": "running",
     "b1d-baseline-seed4": "running"
   },
+  "viewer": {
+    "up": true,
+    "policies": [
+      "b1b-baseline-seed2",
+      "b1c-baseline-seed3",
+      "b1d-baseline-seed4"
+    ]
+  },
   "disk_free_gb": 50.2,
   "load_avg": [
-    3.00439453125,
-    2.673828125,
-    1.55419921875
+    3.08349609375,
+    2.70703125,
+    1.5830078125
   ]
 }
