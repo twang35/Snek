@@ -1,10 +1,14 @@
 {
-  "iso": "2026-08-29T08:08:53",
-  "ts": 1788016133.855872,
+  "iso": "2026-08-29T08:09:28",
+  "ts": 1788016168.52386,
   "project": "snek3",
   "at_a_glance": {
-    "running": [],
-    "queued": [],
+    "running": [
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training (4 arms)"
+    ],
+    "queued": [
+      "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
+    ],
     "attention": []
   },
   "runtime": {
@@ -24,24 +28,87 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 4,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b2a-b29repro-seed1",
+      "type": "train",
+      "policy": "b2a-b29repro-seed1",
+      "policies": [
+        "b2a-b29repro-seed1"
+      ],
+      "pid": 3761119,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b2b-b29repro-seed2",
+      "type": "train",
+      "policy": "b2b-b29repro-seed2",
+      "policies": [
+        "b2b-b29repro-seed2"
+      ],
+      "pid": 3761120,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b2c-b29repro-seed3",
+      "type": "train",
+      "policy": "b2c-b29repro-seed3",
+      "policies": [
+        "b2c-b29repro-seed3"
+      ],
+      "pid": 3761121,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b2d-b29repro-seed4",
+      "type": "train",
+      "policy": "b2d-b29repro-seed4",
+      "policies": [
+        "b2d-b29repro-seed4"
+      ],
+      "pid": 3761122,
+      "step": null,
+      "max_steps": 3000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
+    "b2-stageb": "queued",
+    "b2a-b29repro-seed1": "running",
+    "b2b-b29repro-seed2": "running",
+    "b2c-b29repro-seed3": "running",
+    "b2d-b29repro-seed4": "running",
     "b1-stageb": "done",
     "b1c-baseline-seed3": "done",
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
   "viewer": {
-    "up": false,
-    "policies": []
+    "up": true,
+    "policies": [
+      "b2a-b29repro-seed1",
+      "b2b-b29repro-seed2",
+      "b2c-b29repro-seed3",
+      "b2d-b29repro-seed4"
+    ]
   },
   "disk_free_gb": 49.7,
   "load_avg": [
-    1.29541015625,
-    0.49560546875,
-    0.34619140625
+    0.72119140625,
+    0.43896484375,
+    0.33251953125
   ]
 }
