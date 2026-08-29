@@ -1,11 +1,9 @@
 {
-  "iso": "2026-08-29T16:44:49",
-  "ts": 1788047089.6266983,
+  "iso": "2026-08-29T16:55:00",
+  "ts": 1788047700.3573556,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 stage B (4 arms)"
-    ],
+    "running": [],
     "queued": [],
     "attention": []
   },
@@ -26,28 +24,11 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "b2-stageb",
-      "type": "eval",
-      "policy": "b2a-b29repro-seed1",
-      "policies": [
-        "b2a-b29repro-seed1",
-        "b2b-b29repro-seed2",
-        "b2c-b29repro-seed3",
-        "b2d-b29repro-seed4"
-      ],
-      "pid": 3986195,
-      "step": 3000000,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 422
-    }
-  ],
+  "running": [],
   "ledger": {
-    "b2-stageb": "running",
+    "b2-stageb": "done",
     "b2a-b29repro-seed1": "done",
     "b2b-b29repro-seed2": "done",
     "b2d-b29repro-seed4": "done",
@@ -57,10 +38,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 49.0,
+  "disk_free_gb": 48.9,
   "load_avg": [
-    15.900390625,
-    12.06884765625,
-    6.7685546875
+    0.9384765625,
+    8.39599609375,
+    8.4677734375
   ]
 }
