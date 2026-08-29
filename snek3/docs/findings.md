@@ -371,6 +371,64 @@ a run. That is what makes it safe to kill and relaunch one while four arms are t
 snek2 could not offer, having lost all four arms of a batch to one XIO error in the trainer's own
 canvas.
 
+### Queue depth, not worker count, is stage A's bottleneck — depth 16 makes an arm train-bound
+
+**23 configurations, laptop (14 cores: 10P + 4E), arms warm-started from the b44a champion so stage A
+costs what it costs at 58-87% perfect. Each config settled until its queue filled, then its true
+training cursor sampled over a 120 s window; `iostat -c` idle over the same window.**
+
+| arms | workers | depth | per-arm st/s | h to 3M | box st/s | evals/s | idle | bound by |
+|---|---|---|---|---|---|---|---|---|
+| 4 | — | queue off | 91.3 | 9.12 | 365 | 0.365 | 63.0% | stage A, in-loop |
+| 4 | 2 | 8 | 172.2 | 4.84 | 689 | 0.680 | 60.2% | eval |
+| 4 | 6 | 8 | 259.4 | 3.21 | 1038 | 1.062 | 27.0% | eval |
+| 4 | 10 | 8 | 235.1 | 3.55 | 940 | 0.973 | 4.1% | eval |
+| 4 | 4 | 16 | 321.7 | 2.59 | 1287 | 1.336 | 34.8% | **train** |
+| **4** | **6** | **16** | **350.0** | **2.38** | 1400 | 1.516 | 19.7% | **train** |
+| 4 | 6 | 24 | 342.1 | 2.44 | 1368 | 1.401 | 5.0% | **train** |
+| **8** | **6** | **16** | 226.9 | 3.67 | **1815** | 1.857 | 10.2% | eval |
+| 8 | 8 | 16 | 229.2 | 3.64 | 1833 | 2.032 | 0.2% | eval |
+| 12 | 6 | 8 | 126.7 | 6.58 | 1520 | 1.578 | 14.9% | eval |
+
+**A queued arm does nothing but wait for stage A, and the wait is exactly predictable:**
+
+    per-arm st/s = evals/s x EVAL_INTERVAL / arms
+
+within 3% across every queued config. So arm count is a pure divisor of an eval pool, and the only
+question is what sizes that pool.
+
+**It is not worker count.** Workers turn over: at 4 arms the peak is 6, and 10 workers are *slower*
+than 6 while taking the box from 27% to 4.1% idle, because they starve the trainers — measured
+unblocked rate falls 380 -> 306 st/s. Eight workers at 4 arms match six exactly.
+
+**It is outstanding checkpoints — `arms x depth` — because a deeper `measure_stream` round packs lanes
+better.** The same 4 workers deliver 0.513 evals/s at 2 arms and 1.071 at 8, a 2.09x spread from queue
+population alone. Which is why depth is the lever: at 4 arms it is the *only* way to raise the
+population without adding arms.
+
+**Depth 16 is a phase change, not a trend.** Every one of the 19 depth-8 configs — 2 to 12 arms, 2 to
+10 workers — sat pinned against its cap with the trainer idle. At depth 16 the queue drains to 11-13
+and the arm runs at **94% of its unblocked rate**: the workers are finally ahead. Depth 24 regresses
+(2.44 h) because there is nothing left to win. Depth 12 captures only 63% of the gain and is still
+eval-bound.
+
+**Idle CPU is not the objective, and targeting it selects badly.** The fastest config runs at 19.7%
+idle; the two configs driven to ~0-4% idle (4a/10w, 8a/8w/d16) are slower or flat while their trainers
+lose 20-25% of their unblocked rate. Depth is the opposite trade — 4a/4w goes 3.94 h -> 2.59 h *and*
+47% -> 34.8% idle, because it makes the existing work cheaper rather than buying more of it.
+
+**Recommended invocations** (both are env knobs; no default changed):
+
+| goal | config | result |
+|---|---|---|
+| one arm to 3M fastest | `SNEK_EVAL_QUEUE=1 SNEK_EVAL_QUEUE_DEPTH=16 SNEK_EVAL_WORKERS=6`, 4 arms | 2.38 h/arm, **3.83x** |
+| most arms per day | same, 8 arms | 8 arms in 3.67 h, **4.97x** box throughput |
+
+**The cost is schedule lag, and it is the whole cost.** Depth is how many eval intervals the epsilon and
+guided schedules read behind; 16 doubles the 8 chosen for that reason. 16,000 counted steps is 0.5% of a
+3M arm but proportionally much more over the first tens of thousands of steps, where those schedules
+move fastest. Nothing here measures whether that harms learning — only what it buys in wall time.
+
 ## Falsified
 
 *Nothing yet.*

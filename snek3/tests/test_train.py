@@ -14,6 +14,8 @@ import json
 import os
 import re
 
+import time
+
 import numpy as np
 import pytest
 
@@ -21,6 +23,8 @@ import train
 from vectorized import config as reward_config
 from dqn import collect
 from tools import arch as arch_tools
+from tools import checkpoints
+from tools import eval_queue
 from tools import run_report
 
 
@@ -285,10 +289,17 @@ def test_an_empty_buffer_does_not_bank_debt_for_later():
 # --- the sidecar ------------------------------------------------------------------------------
 
 def make_trainer(tmp_path, policy='t1', monkeypatch=None, **overrides):
-    """A Trainer rooted in `tmp_path`, with the intervals shrunk so a test can reach an eval."""
+    """A Trainer rooted in `tmp_path`, with the intervals shrunk so a test can reach an eval.
+
+    **`eval_queue` is pinned off here rather than inherited from `build_config`**, so that a test about
+    the in-loop path keeps testing the in-loop path. It was inherited until 2026-08-29, when the
+    default flipped to on and five tests began asserting against `eval_rows` that the queue had not
+    filled yet — failing for a reason unrelated to what any of them was about. A test that cares about
+    the queue passes `eval_queue=True` explicitly, which is also how it reads.
+    """
     config = train.build_config()
     config.update({'replay_buffer_max_length': 2000, 'initial_collect_steps': 50, 'max_steps': 40,
-                   'batch_size': 8, 'seed': 3})
+                   'batch_size': 8, 'seed': 3, 'eval_queue': False})
     config.update(overrides)
     monkeypatch.setattr(train.constants, 'POLICY_DIR', str(tmp_path / 'savedPolicies'))
     monkeypatch.setattr(train.constants, 'RUNS_DIR', str(tmp_path / 'runs'))
@@ -335,7 +346,7 @@ def test_a_worthless_checkpoint_is_skipped_and_counted(tmp_path, monkeypatch):
     """
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=40.0)
     trainer.step = 10
-    assert trainer._maybe_checkpoint(1.0, 1.0) is False
+    assert trainer._settle_checkpoint(trainer.step, 1.0, 1.0) is False
     assert trainer.skipped_checkpoints == 1
     assert not os.path.exists(os.path.join(trainer.policy_dir, 'ckpt-10.pt'))
 
@@ -346,10 +357,10 @@ def test_either_this_eval_or_the_trailing_mean_clearing_the_bar_is_enough(tmp_pa
     A trailing-only gate would skip exactly the one worth keeping while an arm is recovering.
     """
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=40.0)
-    trainer.step = 20
-    assert trainer._maybe_checkpoint(80.0, 1.0) is True, 'a spike must be kept'
-    trainer.step = 30
-    assert trainer._maybe_checkpoint(1.0, 80.0) is True, 'a good neighbourhood must be kept'
+    # The step is an argument now rather than read off the trainer, which is what lets a queued row
+    # settle a checkpoint several intervals after the loop moved past it.
+    assert trainer._settle_checkpoint(20, 80.0, 1.0) is True, 'a spike must be kept'
+    assert trainer._settle_checkpoint(30, 1.0, 80.0) is True, 'a good neighbourhood must be kept'
     for step in (20, 30):
         assert os.path.exists(os.path.join(trainer.policy_dir, 'ckpt-{0}.pt'.format(step)))
 
@@ -600,3 +611,261 @@ def test_the_trainer_prints_the_reward_config_not_just_the_overrides():
 def test_describe_shows_a_shaping_term_that_is_on(monkeypatch):
     """The point of the line: a `c=0.1` arm must be distinguishable from a `c=0.0` one in the log."""
     assert 'chase_safe c=0.0' in reward_config.describe(), 'default is off'
+
+
+# ---------------------------------------------------------------- the stage-A queue
+
+def _run_arm(tmp_path, policy, monkeypatch, **overrides):
+    """Trains one short arm to its cap and returns its eval rows. `SNEK_CHART_WINDOW` is already off."""
+    trainer = make_trainer(tmp_path, policy=policy, monkeypatch=monkeypatch, **overrides)
+    trainer.run()
+    return trainer.eval_rows
+
+
+MEASURED_FIELDS = ('step', 'avg_score', 'trailing_avg_score', 'min_score', 'max_score',
+                   'avg_reward', 'perfect_percent')
+
+
+def test_a_depth_zero_queue_reproduces_an_unqueued_arm_measurement_for_measurement(
+        tmp_path, monkeypatch):
+    """**The fixture the whole queue rests on.** At depth 0 the trainer reclaims each checkpoint in the
+    same drain that offered it, so the row is built from the just-written `ckpt-<step>.pt` at the same
+    seed with the schedule applied at the same point — every difference between the two modes is
+    removed *except* the assembly path itself. So this exercises, end to end and with a bit-exact
+    expectation: the two halves of a row meeting in the trainer, the step-ordered merge, the inverted
+    checkpoint gate, `summarise` being one function, and the reclaim.
+
+    `steps_per_second` is excluded because it is wall clock. `epsilon` and `guided_fraction` are
+    excluded because they are deliberately a *different quantity* in the two modes — see the table in
+    `Trainer._record` — and the next fixture pins that shift rather than waving at it.
+    """
+    unqueued = _run_arm(tmp_path / 'off', 'q1', monkeypatch, eval_queue=False)
+    queued = _run_arm(tmp_path / 'on', 'q1', monkeypatch,
+                      eval_queue=True, eval_queue_depth=0, eval_workers=0)
+    assert len(queued) == len(unqueued) > 1
+    for expected, actual in zip(unqueued, queued):
+        assert ({key: expected[key] for key in MEASURED_FIELDS}
+                == {key: actual[key] for key in MEASURED_FIELDS})
+
+
+# A measurement good enough to clear a bootstrap reward threshold, so the schedule actually moves.
+# **A fixture where epsilon never changes proves nothing about which epsilon a row reports**, and the
+# end-to-end version of this test was exactly that: four evals of a freshly initialised net all sat at
+# `initial_epsilon`, so asserting a one-row shift passed with the two columns identical. A mutation
+# swapping the queued branch for the unqueued one survived it.
+STRONG = {'avg_score': 30.0, 'min_score': 10.0, 'max_score': 40.0, 'avg_reward': 25.0,
+          'perfect': 0.0}
+
+
+def _fields(epsilon, guided=0.0):
+    return {'epsilon': epsilon, 'guided_fraction': guided, 'steps_per_second': 100.0, 'fork': None}
+
+
+def test_a_queued_row_reports_the_epsilon_the_arm_ran_under_not_the_one_just_computed(
+        tmp_path, monkeypatch):
+    """Queued, the column governs the interval *ending* at that step — see the table in `_record`.
+
+    Driven through `_record` with a measurement that provably moves the schedule, so the two candidate
+    values are different numbers and the assertion has something to distinguish.
+    """
+    trainer = make_trainer(tmp_path, policy='q2', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=8, eval_workers=0,
+                           min_checkpoint_score=1e9)
+    trainer._record(10, STRONG, _fields(epsilon=0.4, guided=0.0))
+    row = trainer.eval_rows[-1]
+    assert trainer.epsilon != 0.4, 'the measurement must move the schedule or this proves nothing'
+    assert row['epsilon'] == 0.4, 'a queued row reports what the arm ran under'
+    assert row['guided_fraction'] == 0.0
+
+
+def test_an_unqueued_row_reports_the_epsilon_its_own_eval_just_set(tmp_path, monkeypatch):
+    """The mirror, so the two modes' meanings are both pinned rather than only their difference."""
+    trainer = make_trainer(tmp_path, policy='q2b', monkeypatch=monkeypatch,
+                           eval_queue=False, min_checkpoint_score=1e9)
+    trainer._record(10, STRONG, _fields(epsilon=0.4))
+    row = trainer.eval_rows[-1]
+    assert trainer.epsilon != 0.4
+    assert row['epsilon'] == trainer.epsilon, 'an unqueued row reports what it just set'
+
+
+def test_the_queued_epsilon_column_is_the_previous_rows_unqueued_value(tmp_path, monkeypatch):
+    """The same difference end to end, over an arm whose epsilon is *checked* to be non-constant."""
+    unqueued = _run_arm(tmp_path / 'off', 'q2c', monkeypatch, eval_queue=False,
+                        initial_epsilon=0.4, max_steps=60)
+    queued = _run_arm(tmp_path / 'on', 'q2c', monkeypatch,
+                      eval_queue=True, eval_queue_depth=0, eval_workers=0,
+                      initial_epsilon=0.4, max_steps=60)
+    columns = [row['epsilon'] for row in unqueued]
+    if len(set(columns)) == 1:
+        pytest.skip('this arm never moved epsilon, so the shift is not observable here')
+    assert [row['epsilon'] for row in queued][1:] == columns[:-1]
+
+
+def test_every_landed_row_merges_without_waiting_for_an_earlier_one(tmp_path, monkeypatch):
+    """**‡ The opposite of what this fixture first asserted, and the reversal is the finding.**
+
+    Strict step order looked like a correctness requirement — it makes the trailing window hold exactly
+    what an unqueued arm's would. But a streamed round does not complete in step order and cannot:
+    `measure_stream` keeps every queued checkpoint resident and interleaves their episodes across 1024
+    lanes, so completion order follows lane availability. Waiting for the front serialised the arm
+    behind the slowest member of a round — measured at step 9,000 for 55 s with 2 of 9 rows unmerged.
+
+    So a gap at the front must **not** hold anything back. Set up exactly that: 20 and 30 have landed,
+    10 has not.
+    """
+    trainer = make_trainer(tmp_path, policy='q8', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=8, eval_workers=0)
+    trainer.pending_evals = [10, 20, 30]
+    scores = {10: 10.0, 20: 20.0, 30: 30.0}
+
+    def land(step):
+        held = {'scores': [scores[step]], 'perfect': [0], 'rewards': [1.0]}
+        eval_queue.enqueue('q8', step, _fields(0.4), 1)
+        eval_queue.claim('q8', step)
+        eval_queue.complete('q8', step, held, _fields(0.4))
+
+    land(20)
+    land(30)
+    assert trainer._merge_landed() == 2, 'a gap at the front must not hold up what is ready'
+    assert trainer.pending_evals == [10], 'only the unmeasured step stays outstanding'
+
+    land(10)
+    assert trainer._merge_landed() == 1
+    # **The file is still in step order** — that is what `merge_eval_row` is for, and it is the
+    # property downstream readers actually depend on.
+    assert [row['step'] for row in trainer.eval_rows] == [10, 20, 30]
+
+
+def test_the_depth_bound_counts_work_still_being_measured(tmp_path, monkeypatch):
+    """Otherwise the bound would count rows waiting to merge, and `_merge_landed` takes those every
+    pass — so the number it bounded would be a different quantity from the schedule's blind spot."""
+    trainer = make_trainer(tmp_path, policy='q8b', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=8, eval_workers=0)
+    trainer.pending_evals = [10, 20]
+    eval_queue.enqueue('q8b', 20, _fields(0.4), 1)
+    eval_queue.claim('q8b', 20)
+    eval_queue.complete('q8b', 20, {'scores': [1.0], 'perfect': [0], 'rewards': [1.0]},
+                        _fields(0.4))
+    trainer._merge_landed()
+    assert trainer.pending_evals == [10]
+
+
+def test_a_queued_arm_leaves_the_same_checkpoints_on_disk_as_an_unqueued_one(tmp_path, monkeypatch):
+    """The gate is inverted, not removed: with the queue the file must exist for a worker to restore
+    it, so `_settle_checkpoint` prunes instead of skipping. The set that survives has to be identical,
+    or the queue would quietly change which checkpoints a stage-B wave can even select.
+    """
+    _run_arm(tmp_path / 'off', 'q3', monkeypatch, eval_queue=False)
+    _run_arm(tmp_path / 'on', 'q3', monkeypatch,
+             eval_queue=True, eval_queue_depth=0, eval_workers=0)
+    kept = lambda root: sorted(checkpoints.steps(str(root / 'savedPolicies' / 'q3')))
+    assert kept(tmp_path / 'on') == kept(tmp_path / 'off')
+
+
+def test_a_queued_arm_finishes_with_no_rows_owed(tmp_path, monkeypatch):
+    """The final drain. An arm that stopped with its queue full would otherwise close out missing rows
+    for its last `depth` intervals — the newest region, which is the part a close-out reads.
+
+    Run with a depth deeper than the arm has evals, so *every* row is still outstanding when the loop
+    reaches the cap and only the final drain can produce them.
+    """
+    trainer = make_trainer(tmp_path, policy='q4', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=99, eval_workers=0)
+    trainer.run()
+    assert trainer.pending_evals == []
+    assert [row['step'] for row in trainer.eval_rows] == [10, 20, 30, 40]
+
+
+def test_a_queued_arm_makes_progress_with_no_workers_at_all(tmp_path, monkeypatch):
+    """The forward-progress guarantee, stated as a test rather than as a comment.
+
+    No worker is ever started here, so every row exists only because the trainer took the work back on
+    reaching its bound. If the reclaim were removed this hangs instead of failing, which is why the
+    step cap is small.
+    """
+    rows = _run_arm(tmp_path, 'q5', monkeypatch,
+                    eval_queue=True, eval_queue_depth=1, eval_workers=0)
+    assert [row['step'] for row in rows] == [10, 20, 30, 40]
+
+
+def test_a_resume_adopts_the_rows_the_previous_run_never_merged(tmp_path, monkeypatch):
+    """A killed arm's outstanding requests are owed rows, and the gap would land at the resume
+    boundary — the worst place, since the resume step is re-measured and would sit beside holes.
+    """
+    first = make_trainer(tmp_path, policy='q6', monkeypatch=monkeypatch,
+                         eval_queue=True, eval_queue_depth=99, eval_workers=0)
+    first.run()
+    # Put the arm back where a kill would leave it: history saved, three steps still owed.
+    for step in (20, 30, 40):
+        eval_queue.enqueue('q6', step, {'epsilon': 0.4, 'guided_fraction': 0.0,
+                                        'steps_per_second': 1.0, 'fork': None}, 4)
+    first.eval_rows = [row for row in first.eval_rows if row['step'] < 20]
+    run_report.save_history(first.history_path, first.eval_rows, first.resume_steps)
+
+    again = make_trainer(tmp_path, policy='q6', monkeypatch=monkeypatch,
+                         eval_queue=True, eval_queue_depth=99, eval_workers=0)
+    assert again.pending_evals == [20, 30, 40]
+
+
+def test_a_resume_does_not_re_adopt_a_step_it_already_has_a_row_for(tmp_path, monkeypatch):
+    """Otherwise a stale request would make the arm re-measure a step it has already published, and
+    `merge_eval_row` would replace a good row with one measured from different weights."""
+    first = make_trainer(tmp_path, policy='q7', monkeypatch=monkeypatch,
+                         eval_queue=True, eval_queue_depth=99, eval_workers=0)
+    first.run()
+    eval_queue.enqueue('q7', 20, {'epsilon': 0.4, 'guided_fraction': 0.0,
+                                  'steps_per_second': 1.0, 'fork': None}, 4)
+    again = make_trainer(tmp_path, policy='q7', monkeypatch=monkeypatch,
+                         eval_queue=True, eval_queue_depth=99, eval_workers=0)
+    assert 20 not in again.pending_evals
+
+
+def test_a_front_a_live_worker_is_measuring_is_left_alone(tmp_path, monkeypatch):
+    """**The flaw that cost the whole speed-up, pinned.** A worker's round completes its checkpoints in
+    whatever order lanes free up, so the front of the trainer's queue is often among the last to land
+    while later steps pile up behind it as `.done`. The trainer then hit its bound and re-measured the
+    front itself — 100 duplicated episodes per eval, and the worker's own result discarded.
+
+    This process stands in for the worker: it holds the claim and is alive.
+    """
+    trainer = make_trainer(tmp_path, policy='q9', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=1, eval_workers=0)
+    eval_queue.enqueue('q9', 10, _fields(0.4), 1)
+    eval_queue.claim('q9', 10)
+    assert trainer._leave_to_worker(10, waiting_since=time.time()) is True
+
+
+def test_the_wait_for_a_worker_is_a_clock_and_not_a_queue_length(tmp_path, monkeypatch):
+    """**The length version deadlocked and this is the fixture that says why.**
+
+    "Wait while fewer than 4x depth are outstanding" can never fire: `_drain` blocks before returning
+    to the training step that would grow the queue, so the length it waits on is frozen. A clock always
+    advances, so a spent one must hand the work back even to a live holder.
+    """
+    trainer = make_trainer(tmp_path, policy='q9b', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=1, eval_workers=0)
+    eval_queue.enqueue('q9b', 10, _fields(0.4), 1)
+    eval_queue.claim('q9b', 10)
+    spent = time.time() - train.QUEUE_WAIT_PATIENCE - 1.0
+    assert trainer._leave_to_worker(10, waiting_since=spent) is False
+
+
+def test_an_unclaimed_front_is_taken_immediately(tmp_path, monkeypatch):
+    """No worker has it, so there is nothing to wait for — this is the no-workers-at-all path."""
+    trainer = make_trainer(tmp_path, policy='q9c', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=1, eval_workers=0)
+    eval_queue.enqueue('q9c', 10, _fields(0.4), 1)
+    assert trainer._leave_to_worker(10, waiting_since=time.time()) is False
+
+
+def test_a_dead_workers_claim_does_not_hold_the_queue(tmp_path, monkeypatch):
+    """The other side of the same check: a claim is only worth waiting for while its owner exists.
+
+    A pid that cannot exist stands in for a killed worker. Reading the pid out of the filename is what
+    makes this answerable at all — a lock file with no pid in it could only be aged out.
+    """
+    queue = str(tmp_path / 'runs')
+    eval_queue.enqueue('qa', 10, _fields(0.4), 1, queue)
+    folder = eval_queue.policy_directory('qa', queue)
+    os.rename(os.path.join(folder, '10.req'), os.path.join(folder, '10.claim.999999999'))
+    assert eval_queue.held_by_live_worker('qa', 10, queue) is False

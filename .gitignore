@@ -58,3 +58,10 @@ __pycache__/
 # heard of are live. Self-healing -- an entry whose process is gone is dropped on
 # the next read -- so nothing here needs keeping.
 /snek3/runs/.live/
+
+# The stage-A work queue: checkpoints offered by a trainer and not yet measured
+# (tools/eval_queue.py). Machine-local and in-flight by definition -- the results it carries are
+# merged into runs/<policy>_evals.json by the trainer that owns that file, so nothing here is a
+# record. It also MUST stay ignored for the desktop's sake: an untracked file under a live arm's
+# runs/ path is exactly what makes `git merge --ff-only` abort a deploy.
+/snek3/runs/.evalq/

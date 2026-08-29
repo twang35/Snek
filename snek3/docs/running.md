@@ -83,8 +83,8 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_IS_BETA`, `SNEK_IS_BETA_FINAL`, `SNEK_BETA_ANNEAL_STEPS` | 0.4, 1.0, 300,000 |
 | `SNEK_IS_WEIGHTS` | 1 |
 | `SNEK_INITIAL_COLLECT_STEPS` | 2,000 — collected before the first gradient step, at the initial epsilon rather than uniformly |
-| `SNEK_REPLAY_RATIO` | 1.0 — gradient steps per **transition banked**, so the ratio is exact whether forking is on or off. **The only lever past ~1,600 agent steps/s, and a learning-dynamics change** |
-| `SNEK_COLLECT_ENVS` | 1 — collect lanes per iteration. **Raising it to 16 is 1.9x** (809 -> 1,512 steps/s): the gradient work scales with it but `VecSnake.step` costs the same for 1 lane as for 64. It is still a dynamics change — 16 concurrent episodes feeding one buffer — so it is not the default |
+| `SNEK_REPLAY_RATIO` | 1.0 — gradient steps per **transition banked**, so the ratio is exact whether forking is on or off, and it already matches snek2's 1 gradient step per transition. **Do not lower it to reproduce a snek2 arm** — that makes snek3 *less* data-efficient than snek2 ever was; `SNEK_MAX_STEPS` is the comparability knob. As a dynamics change it is worth ~2x at batch 512 |
+| `SNEK_COLLECT_ENVS` | 1 — collect lanes per iteration. **It is a width knob, not a speed knob, and it makes an arm slower.** Transitions/s rises ~1.46x at 8 lanes, but `SNEK_MAX_STEPS` counts *counted steps* and each one now banks 8x the transitions — so time to the same cap rises ~5.5x. Spend it only alongside a cap lowered by the same factor. It is also a dynamics change: 8 concurrent episodes feeding one buffer |
 
 ### Collection
 
@@ -111,6 +111,58 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 |---|---|---|
 | `SNEK_GRAPH_EVAL_EPISODES` | 100 | **pinned.** The stage-A gate is literally "95 of 100"; a different denominator is a different gate |
 | `SNEK_EVAL_INTERVAL` | 1000 | **sets the checkpoint interval too, from the same value.** They must be equal — a checkpoint at a step no eval screens can never be measured — so there is one knob rather than two that can disagree. Lower it for a smoke test and nothing else |
+| `SNEK_EVAL_QUEUE` | **1** | hands stage A to shared worker processes instead of measuring it in the training loop. **Measured 3.83x** end to end at the tuned defaults (9.12 h -> 2.38 h per arm to 3M, four arms, laptop). It **changes the training** — bounded schedule lag, and stage-A rows are no longer bit-reproducible from the arm's seed — so `0` is what an arm being diffed against b1 or b2 must use. See below |
+| `SNEK_EVAL_QUEUE_DEPTH` | **16** | how many checkpoints may be **unmeasured**. **This is both the schedule's blind spot and the throughput lever**: at 16 the epsilon and shield schedules read a measurement up to 16,000 counted steps old. 16 is where an arm stops being eval-bound — all 19 swept configurations at depth 8 sat pinned against their cap with the trainer waiting, while at 16 the queue drains and the arm reaches 94% of its unblocked rate. 24 regresses, 12 gets 63% of the gain. **0 is the verification mode** — the trainer measures each checkpoint before resuming, which reproduces an unqueued arm bit for bit and recovers nothing |
+| `SNEK_EVAL_WORKERS` | **6** | worker processes **per box**, shared by every arm on it. Unlike depth this turns over: at four arms the sweep measured 4.84 h (2w), 3.94 h (4w), **3.21 h (6w)**, 3.27 h (8w), 3.55 h (10w) — past six, workers starve the trainers, whose unblocked rate falls 380 -> 306 st/s, and the box reaches 4% idle to run *slower*. **Idle CPU is not the target**; the fastest configuration leaves ~20% of the box free. Starting none is safe — the arm measures its own and runs at today's speed |
+
+**Where the 1.67x comes from, and why it is not more.** The saving is the *streaming efficiency* —
+a checkpoint measured inside a sustained round costs ~1.1-1.9 s against ~4.2 s drained — plus whatever
+of the remainder overlaps with training. It is **not** free parallelism: total CPU work is roughly
+conserved, and the laptop test was core-bound, with the arms' own training rate falling from 426 to
+270 counted steps/s while two workers ran. A box with spare cores overlaps more; a saturated one gets
+only the efficiency.
+
+#### What the queue changes about the training, which is two things and not one
+
+Both are pre-registered rather than slipped in as a speed-up, because `perfect_percent` steers
+exploration ([`invariants.md`](invariants.md) invariant 2) and is a feedback loop rather than a readout.
+
+- **The schedule's feedback lags by up to `DEPTH` evals**, bounded — the trainer takes the work back
+  at the bound, so the worst case is today's behaviour and never an unbounded drift.
+- **Stage-A rows stop being bit-reproducible from the arm's seed.** A queued measurement shares one
+  wide `VecSnake` with the other checkpoints in its round and lanes migrate between them, which is
+  exactly why streaming is faster — so a job cannot own its RNG and does not see the boards
+  `eval_seed(seed, step)` would draw. The two instruments agree to 0.09 standard errors over 3,222
+  rows (phase 2), so nothing is lost statistically, but **a queued arm cannot be diffed byte for byte
+  against an unqueued one.**
+
+**A queued row's trailing window is "the last N rows that have landed", not "the last N steps".** A
+streamed round completes in lane order, so rows arrive out of step order; holding them back to fix that
+serialised the arm behind the slowest member of a round and was worth nothing (measured: stalled at
+step 9,000 for 55 s with 2 of 9 rows unmerged). The file itself stays in step order, and every row's
+own content is independent of when its neighbours arrive.
+
+**One column shifts, and nothing selects on it.** A queued row's `epsilon` and `guided_fraction` are
+what the arm *ran under* — governing the interval **ending** at that step — where an unqueued row's are
+what its own eval just set, governing the interval **starting** there. Exactly one row apart, measured.
+The measurement half of every row — score, reward, perfect rate, trailing mean — is bit-identical, and
+`screen:95` reads only that half.
+
+**Nothing can deadlock.** A trainer at its depth bound measures the oldest checkpoint itself. In the
+steady state it never asks whether a worker exists or is keeping up; reaching the bound *is* the
+signal. So killing every worker mid-batch slows the arms down and cannot stop them. (The tail drain is
+the one place that checks, and only to decide how long to wait for a backlog that is landing.)
+
+**The desktop needs no changes to run it** — the workers are started by the first arm that wants one,
+exactly as the chart window is, so a job spec turns it on with nothing else:
+
+```json
+{"project": "snek3", "id": "...", "type": "train", "policy": "...",
+ "env": {"SNEK_SEED": "1", "SNEK_EVAL_QUEUE": "1"}}
+```
+
+Wave-barrier scheduling means trainings and evals never overlap on the box, so four trainers plus two
+workers is six processes on sixteen cores and the 16-shard stage-B wave still comes afterwards.
 
 **A run report's config rows are the knobs.** Every key in `runs/<arm>.md`'s Config table is its
 `SNEK_` variable lowercased, so `| priority_exponent | 0.6 |` means `SNEK_PRIORITY_EXPONENT` with no

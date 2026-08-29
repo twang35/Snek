@@ -41,8 +41,10 @@ from env import constants
 from tools import arch as arch_tools
 from tools import chart_window
 from tools import checkpoints
+from tools import eval_queue
 from tools import live_runs
 from tools import progress_chart
+from tools import restore
 from tools import run_report
 from vectorized import config as reward_config
 from vectorized import engine
@@ -92,6 +94,25 @@ TRAILING_WINDOW = 30
 # One log line per this many evals, plus the first and every new best.
 QUIET_EVAL_INTERVAL = 25
 
+# How long a blocked trainer waits for a live worker to publish the front of its queue before
+# measuring it itself. A whole round of 32 checkpoints lands inside this, so a slow worker is never
+# mistaken for a stuck one; a worker that is alive and not progressing costs one duplicated eval per
+# `QUEUE_WAIT_PATIENCE` and nothing more.
+QUEUE_WAIT_PATIENCE = 45.0
+
+# The tail drain's patience: how long nothing may land before the trainer stops waiting and measures
+# the backlog itself. Generous, because at the cap the queue is at its deepest and a worker is at its
+# most efficient — one streamed checkpoint lands in ~1-2 s, so silence this long means a worker that is
+# gone rather than one that is busy. Being wrong costs seconds; being impatient cost 3x.
+FINAL_DRAIN_PATIENCE = 20.0
+FINAL_DRAIN_POLL = 0.25
+
+# How long a blocked trainer waits for a worker that already holds the checkpoint it needs, before
+# measuring it anyway. Short, because the wait is only worth taking when it saves a duplicate: one
+# streamed checkpoint lands in ~1-2 s, and past that a stalled arm costs more than 100 repeated
+# episodes.
+RECLAIM_GRACE_SECONDS = 2.0
+
 # The report and the chart are rewritten on their own cadence: both rewrite the whole file from the
 # whole series, so doing it per eval would spend a growing fraction of the run on I/O.
 REPORT_INTERVAL = 10 * EVAL_INTERVAL
@@ -139,6 +160,14 @@ def build_config():
         'is_beta_final': tuned('IS_BETA_FINAL', 1.0),
         'beta_anneal_steps': int(tuned('BETA_ANNEAL_STEPS', 300000, int)),
         'is_weights': bool(int(tuned('IS_WEIGHTS', 1, int))),
+        # Read through `tuned()` like every other knob, so all three print an
+        # `hyperparameter override:` line and appear in `runs/<arm>.md` as a row that greps straight
+        # back to its variable. They were briefly read inside `tools/eval_queue.py` instead, which
+        # broke that contract twice over: the report rows had no matching knob, and a config passed in
+        # programmatically was ignored in favour of the environment.
+        'eval_queue': bool(int(tuned('EVAL_QUEUE', 1, int))),
+        'eval_queue_depth': int(tuned('EVAL_QUEUE_DEPTH', eval_queue.DEFAULT_DEPTH, int)),
+        'eval_workers': int(tuned('EVAL_WORKERS', eval_queue.DEFAULT_WORKERS, int)),
         'graph_eval_episodes': EVAL_EPISODES,
         'eval_interval': EVAL_INTERVAL,
         'min_checkpoint_score': constants.MIN_CHECKPOINT_SCORE,
@@ -175,20 +204,36 @@ def eval_seed(seed, step):
     return int(np.random.SeedSequence([int(seed), int(step)]).generate_state(1, dtype=np.uint32)[0])
 
 
-def self_eval(agent, step, seed, episodes=EVAL_EPISODES):
-    """Stage A: `episodes` greedy episodes, summarised.
+def summarise(held):
+    """One measured sample as the five fields a row stores.
+
+    Split from `self_eval` because a queued measurement arrives as a `held` sample from another
+    process and must become the same five numbers by the same arithmetic — two summarisers is how the
+    in-process and queued paths would quietly disagree about what an `avg_reward` is.
 
     Every field comes from this one sample, including the extremes. snek2 tracked min and max across
     the whole training interval instead and printed them on the same table line as this eval's mean,
     which describes two different things in one row.
     """
-    held = engine.measure(agent.policy_fn, episodes, seed=eval_seed(seed, step))
     scores = held['scores']
     return {'avg_score': float(np.mean(scores)),
             'min_score': float(np.min(scores)),
             'max_score': float(np.max(scores)),
             'avg_reward': float(np.mean(held['rewards'])),
             'perfect': float(np.mean(held['perfect']))}
+
+
+def self_eval(agent, step, seed, episodes):
+    """Stage A in this process: `episodes` greedy episodes of the agent's current weights.
+
+    **`episodes` is required, and it used to default to `EVAL_EPISODES`.** A default argument is
+    evaluated once at import, so the default froze whatever the module constant was *then* while every
+    other reader — `_evaluate`, `_reclaim_oldest` — takes it at call time. Nothing in an arm noticed,
+    because both are 100. A test that shrank `train.EVAL_EPISODES` to 4 did: the unqueued path kept
+    measuring 100 episodes and the queued path measured 4, so a bit-exactness fixture failed with a
+    diff in `avg_reward` that pointed nowhere near the cause.
+    """
+    return summarise(engine.measure(agent.policy_fn, episodes, seed=eval_seed(seed, step)))
 
 
 def build_eval_row(step, measured, trailing, epsilon, guided_fraction, steps_per_second,
@@ -249,6 +294,12 @@ class Trainer(object):
         self.eval_rows = []
         self.resume_steps = []
         self.chart_window = None        # set by `run`; None unless this arm opened the box's window
+        # Steps offered to the queue and not yet merged, oldest first. In-memory because it is only a
+        # cursor — every field a row needs lives in the queue's own files, so a resume rebuilds this
+        # from the directory rather than from a checkpointed list.
+        self.pending_evals = []
+        self.queue_depth = int(config['eval_queue_depth'])
+        self.eval_workers = []
         self.skipped_checkpoints = 0
         self.gradient_debt = 0.0
         self._resume()
@@ -294,6 +345,17 @@ class Trainer(object):
         self.resume_steps = list(resumes) + [self.step]
         print('resumed at step {0:,}: {1} eval row(s), buffer {2}'.format(
             self.step, len(self.eval_rows), 'restored' if loaded else 'empty'), flush=True)
+        if self.config['eval_queue']:
+            # Whatever the previous run offered and never merged. Adopted rather than discarded so the
+            # history has no gap at the resume boundary, which is the worst place for one — the resume
+            # step is re-measured and would sit beside missing neighbours.
+            measured = {row['step'] for row in self.eval_rows}
+            self.pending_evals = [step for step in eval_queue.outstanding(self.policy)
+                                  if step not in measured]
+            if self.pending_evals:
+                print('adopted {0} queued eval(s) from {1:,} to {2:,}'.format(
+                    len(self.pending_evals), self.pending_evals[0], self.pending_evals[-1]),
+                    flush=True)
 
     # ------------------------------------------------------------ the loop
 
@@ -323,6 +385,21 @@ class Trainer(object):
         # `tools/chart_window.py` for why nothing in this loop may ever depend on it.
         live_runs.register(self.policy)
         self.chart_window = chart_window.ensure()
+        if self.config['eval_queue']:
+            # Shared across every arm on this box, and idempotent: the slot claim means four arms
+            # launched in the same second produce `eval_workers` workers rather than four times as
+            # many. Starting none is not a failure — `_reclaim_oldest` measures this arm's own
+            # checkpoints, so the arm runs at today's speed instead of not running.
+            # `target` from the config, not from the environment. `ensure_workers` defaults to
+            # reading `SNEK_EVAL_WORKERS` itself, and letting it do that here meant a caller that set
+            # `eval_workers` in the config — every test, and any programmatic launch — was ignored:
+            # a fixture asking for zero workers got two, which then measured its checkpoints at their
+            # own seed and broke a bit-exactness assertion in a way that pointed at the wrong module.
+            self.eval_workers = eval_queue.ensure_workers(self.config['eval_workers'])
+            print('stage-A queue on: depth {0}, {1} worker(s) wanted, {2} started here. Rows arrive '
+                  'up to {0} evals behind, and the epsilon schedule reads them at that lag.'.format(
+                      self.queue_depth, self.config['eval_workers'], len(self.eval_workers)),
+                  flush=True)
 
         window_start, window_step = time.time(), self.step
         while self.step < cap:
@@ -340,7 +417,19 @@ class Trainer(object):
                 # A window that has exited stays a zombie until someone waits on it, and this parent
                 # lives for hours. `reap` polls; it never blocks on the window.
                 chart_window.reap(self.chart_window)
+                # Same reason, same non-blocking poll: a worker this arm started is its child, and a
+                # batch outlives several worker generations at five minutes of idle each.
+                self.eval_workers = eval_queue.reap(self.eval_workers)
         self._save_resume()
+        # Before the report, so the close-out reads a complete history. An arm that stopped with its
+        # queue full would otherwise be missing rows for its last `depth` intervals — the newest
+        # region, which is exactly the part a close-out and a stage-B screen look at.
+        if self.config['eval_queue']:
+            self._drain(final=True)
+            # Anything a worker published after this arm reclaimed the step. Rare — `complete` drops
+            # its claim first and refuses to publish without one — and this is what makes rare into
+            # gone, since the directory is otherwise never revisited.
+            eval_queue.sweep(self.policy, keep=self.pending_evals)
         self._write_report()
         # Not in a `finally`, and not worth one: `live_runs.live` drops an entry whose pid is gone, so
         # a `kill -9`, a crash and a Ctrl-C all clean up on the next read. This call is only so the
@@ -383,9 +472,50 @@ class Trainer(object):
 
     # ------------------------------------------------------------ the eval
 
-    def _evaluate(self, steps_per_second):
-        measured = self_eval(self.agent, self.step, self.config['seed'])
+    def _trainer_fields(self, steps_per_second):
+        """The half of an eval row that only the trainer knows, captured at the step it describes.
 
+        `epsilon` and `guided_fraction` are what the arm was **using** while it collected this step.
+        With the queue on they are the whole reason the row can still be built correctly several
+        intervals later: by then the schedule has moved, and reading them at merge time would label a
+        step with an epsilon it never ran under. `steps_per_second` and the fork counters are the same
+        kind of thing — a window of training that is over and cannot be reconstructed.
+        """
+        return {'epsilon': float(self.epsilon),
+                'guided_fraction': float(self.collector.guided_fraction),
+                'steps_per_second': float(steps_per_second),
+                'fork': self.collector.snapshot() if self.config['fork'].enabled else None}
+
+    def _evaluate(self, steps_per_second):
+        """Stage A for the step just reached — measured here, or offered to the queue.
+
+        **The two modes share `_record`, so the arithmetic is the same in both.** What differs is when
+        the measurement arrives, and therefore how far behind the schedule's view is. Without the
+        queue the row is complete before this returns and the arm stays bit-reproducible from its
+        seed; with it, see `tools/eval_queue.py` for the two things that changes.
+        """
+        fields = self._trainer_fields(steps_per_second)
+        if not self.config['eval_queue']:
+            self._record(self.step,
+                         self_eval(self.agent, self.step, self.config['seed'], EVAL_EPISODES),
+                         fields)
+            return
+        # Written before the offer and unconditionally, because a worker measures a checkpoint by
+        # restoring it. That inverts the gate rather than removing it: `_settle_checkpoint` prunes the
+        # file when the row lands below the bar, so the set left on disk is the same one.
+        checkpoints.save(self.policy_dir, self.step, self.agent.net)
+        eval_queue.enqueue(self.policy, self.step, fields, EVAL_EPISODES)
+        self.pending_evals.append(self.step)
+        self._drain()
+
+    def _record(self, step, measured, fields):
+        """Turns one measurement into the arm's next row: schedule, gate, history, log.
+
+        Called at the step's own eval interval without the queue and up to `eval_queue_depth`
+        intervals later with it. Every read of `self.eval_rows` here is "the rows before this one",
+        which holds in both modes because `_drain` merges strictly in step order — that ordering is
+        the reason the same three schedule calls can serve both.
+        """
         # Both schedules read the *same* reward signal, computed before this row is merged so the
         # window is the last N evals including this one and no row is counted twice. Same signal so
         # the shield switches on at exactly the eval the bootstrap phase hands over on.
@@ -400,26 +530,220 @@ class Trainer(object):
 
         trailing = schedules.trailing_mean(self.eval_rows, 'avg_score', measured['avg_score'],
                                            TRAILING_WINDOW)
-        keep = self._maybe_checkpoint(measured['avg_score'], trailing)
-        row = build_eval_row(self.step, measured, trailing, self.epsilon, guided, steps_per_second,
-                             self.collector.snapshot() if self.config['fork'].enabled else None)
+        keep = self._settle_checkpoint(step, measured['avg_score'], trailing)
+        # **The epsilon column shifts by one row between the two modes, and it is measured: every
+        # queued row carries the value the unqueued row *before* it carries.** Verified bit-exact at
+        # depth 0 over an 8-row arm. The two columns are different quantities and both are true:
+        #
+        # | mode | `row.epsilon` at step S is |
+        # |---|---|
+        # | unqueued | what this eval just set, so it governs the interval **starting** at S |
+        # | queued | what the arm actually ran under, so it governs the interval **ending** at S |
+        #
+        # The queued spelling is the one a chart can plot honestly, because the value the schedule
+        # computes here does not begin governing until `depth` intervals later — attributing it to S
+        # would draw epsilon dropping before the eval that dropped it. The unqueued spelling is kept
+        # as it is so b1 and b2 stay reproducible.
+        #
+        # **Nothing selects on this column**, which is why the shift is acceptable: `screen:95` reads
+        # `perfect_percent`, and the measurement half of the row — score, reward, perfect rate and the
+        # trailing mean — is bit-identical between the modes. `tests/test_train.py` pins both halves of
+        # that sentence.
+        if self.config['eval_queue']:
+            epsilon, reported_guided = fields['epsilon'], fields['guided_fraction']
+        else:
+            epsilon, reported_guided = self.epsilon, guided
+        row = build_eval_row(step, measured, trailing, epsilon, reported_guided,
+                             fields['steps_per_second'], fields.get('fork'))
         run_report.merge_eval_row(self.eval_rows, row)
         summary = run_report.save_history(self.history_path, self.eval_rows, self.resume_steps)
         self._log(row, summary, keep)
 
-    def _maybe_checkpoint(self, avg_score, trailing):
-        """Writes `ckpt-<step>.pt` unless the arm is not worth keeping.
+    def _settle_checkpoint(self, step, avg_score, trailing):
+        """Keeps or prunes `ckpt-<step>.pt`. The same final set on disk in either mode.
 
         Gated on `max(this eval, trailing)` rather than trailing alone: the best checkpoints in this
         project are outliers that spike above their neighbourhood, so a trailing-only test could skip
         exactly the one worth keeping while an arm recovers. Either signal clearing the bar is enough.
+
+        **Only the direction differs by mode.** Without the queue the eval is in hand, so the file is
+        written only if it is wanted. With the queue the file had to exist for a worker to restore, so
+        this prunes instead — and it must never re-save, because by now `self.agent.net` holds much
+        later weights and writing them under an old step number would forge a checkpoint.
         """
         keep = max(avg_score, trailing) >= self.config['min_checkpoint_score']
-        if keep:
-            checkpoints.save(self.policy_dir, self.step, self.agent.net)
-        else:
+        if not keep:
             self.skipped_checkpoints += 1
+            checkpoints.discard(self.policy_dir, step)
+        elif not self.config['eval_queue']:
+            checkpoints.save(self.policy_dir, step, self.agent.net)
         return keep
+
+    # ------------------------------------------------------------ the queue
+
+    def _drain(self, final=False):
+        """Merges finished measurements and takes work back while the queue is over its bound.
+
+        **The bound counts work still being measured, not rows still to merge**, because
+        `_merge_landed` takes everything ready on every pass — so `pending_evals` holds exactly the
+        steps no worker has finished. That is the quantity worth bounding: it is the schedule's blind
+        spot and the queue's size at once.
+
+        `final` drains to empty regardless of the bound, which is what the end of a run needs: an arm
+        that stopped with `depth` measurements in flight would otherwise close out with that many
+        missing rows at the top of its history — exactly the region a close-out and a stage-B screen
+        read.
+        """
+        self._merge_landed()
+        if final:
+            self._drain_patiently()
+            return
+        waiting_since = time.time()
+        while self.pending_evals and len(self.pending_evals) > self.queue_depth:
+            if self._merge_landed():
+                waiting_since = time.time()
+                continue
+            # **Do not seize a checkpoint a live worker is already measuring.** A round completes in
+            # whatever order its lanes free up, not in step order, so the front of this queue is often
+            # among the last of a round to land while later steps pile up behind it as `.done`.
+            # Reclaiming then costs 100 duplicated episodes *and* discards the worker's own result for
+            # the same step — measured as the difference between no speed-up and the real one. Waiting
+            # is the depth bound doing its job: the arm must not run further ahead of its schedule.
+            #
+            # **The patience is a clock and not a queue length, and the length version deadlocked.**
+            # "Wait while fewer than 4x depth are outstanding" cannot fire: this loop blocks before
+            # returning to the training step, so the queue it is waiting on can never grow. A clock
+            # always advances, so the reclaim below is always eventually reached.
+            if self._leave_to_worker(self.pending_evals[0], waiting_since):
+                time.sleep(FINAL_DRAIN_POLL)
+                continue
+            self._reclaim_oldest()
+            waiting_since = time.time()
+
+    def _drain_patiently(self):
+        """Waits for the backlog rather than seizing it. Only reclaims once nothing is landing.
+
+        **The impatient version cost most of the queue's win and it measured as a 1.13x.** At the cap
+        the arm holds its deepest queue of the whole run, which is exactly when a worker is at its most
+        efficient — `measure_stream` refills a finished lane from the next checkpoint, so a backlog of
+        16 costs ~1.1 s each against ~4.2 s drained. Reclaiming the moment nothing had landed *yet*
+        turned that backlog back into serial drained measurements, and the trainer and the worker then
+        raced to redo the same work.
+
+        So the rule inverts for the tail: wait while progress is being made, and reclaim only after
+        `FINAL_DRAIN_PATIENCE` seconds of silence — which is a dead worker, not a busy one. Forward
+        progress is still guaranteed, just no longer instant.
+        """
+        quiet_since = time.time()
+        while self.pending_evals:
+            if self._merge_landed():
+                quiet_since = time.time()
+                continue
+            # **Waiting is only worth it if something is coming.** This is the one place the trainer
+            # asks whether a worker exists, and it has to: with none alive the patience below is 20
+            # seconds of sleep per checkpoint for no reason — it turned a 5-second fixture into 80.
+            # The steady-state path still asks nothing, because there reaching the bound is itself the
+            # signal.
+            if not eval_queue.live_workers():
+                self._reclaim_oldest()
+                continue
+            # No `held_by_live_worker` short-circuit here, and that is deliberate: the patience below
+            # already expresses "wait for a live worker", and a `continue` above it would jump the
+            # clock and spin forever on a front that never lands. `quiet_since` advances only on a
+            # merge, so a stuck round times out.
+            if time.time() - quiet_since >= FINAL_DRAIN_PATIENCE:
+                self._reclaim_oldest()
+                quiet_since = time.time()
+                continue
+            time.sleep(FINAL_DRAIN_POLL)
+
+    def _leave_to_worker(self, step, waiting_since):
+        """Whether to wait for the worker holding `step` rather than measuring it here.
+
+        A predicate rather than an inline condition because it is the rule that decides whether the
+        queue pays for itself, and a rule worth a fixture is worth a name. Two clauses, both
+        load-bearing:
+
+        - **the holder must still exist** — a dead worker's claim is not a promise, and reading its pid
+          out of the claim filename is what makes that answerable rather than merely age-outable;
+        - **the wait is a clock** — `QUEUE_WAIT_PATIENCE` from when this arm last made progress. It was
+          a queue length first and that version **deadlocked**: "wait while fewer than 4x depth are
+          outstanding" can never fire, because the caller blocks before reaching the training step that
+          would grow the queue. A clock always advances.
+        """
+        if time.time() - waiting_since >= QUEUE_WAIT_PATIENCE:
+            return False
+        return eval_queue.held_by_live_worker(self.policy, step)
+
+    def _merge_landed(self):
+        """Merges every measurement that has landed, oldest step first. Returns how many.
+
+        **‡ This held finished rows back until their predecessor landed, and that was wrong.** The
+        reasoning was sound and the premise was not: strict step order does make the trailing window
+        contain exactly what an unqueued arm's would, but a streamed round does not complete in step
+        order and cannot be made to. `engine.measure_stream` keeps every queued checkpoint resident —
+        `max_live` derives to 44 at width 1024 — and interleaves their episodes across all 1024 lanes,
+        so which one finishes first is set by lane availability and is effectively arbitrary. Waiting
+        for the front therefore serialises the whole arm behind the *slowest* member of a round.
+        Measured: an arm sat at step 9,000 for 55 s with 2 of 9 landed rows unmerged, and the queue was
+        worth nothing.
+
+        So the order constraint is dropped and the trailing window becomes "the last N rows that have
+        landed". That is a real difference from an unqueued arm and it is the honest one to accept: the
+        schedule is already reading a measurement up to `depth` intervals old, so the window's exact
+        membership is the smaller of the two approximations by a wide margin. **What is not
+        approximate is any row's own content** — a measurement is of one checkpoint and does not
+        depend on when its neighbours arrive — and `merge_eval_row` keeps the file in step order
+        regardless. The depth-0 fixture still pins the bit-exact case, because at depth 0 rows arrive
+        in order by construction.
+
+        `pending_evals` is ascending (appends are), so iterating it merges oldest-first among whatever
+        is ready, which keeps the trailing window's sequence sensible.
+        """
+        merged = 0
+        for step in list(self.pending_evals):
+            payload = eval_queue.landed(self.policy, step)
+            if payload is None:
+                continue
+            self.pending_evals.remove(step)
+            self._record(step, summarise(payload['held']), payload.get('fields') or {})
+            eval_queue.retire(self.policy, step)
+            merged += 1
+        return merged
+
+    def _reclaim_oldest(self):
+        """Measures the oldest outstanding checkpoint in this process. The forward-progress guarantee.
+
+        **This is why no arm can ever wait on a worker that is not coming.** It asks nothing about
+        whether workers exist or are keeping up — reaching the bound is itself the signal — so with no
+        workers at all the arm simply behaves as it does with the queue off, at that speed. (The one
+        place that *does* ask is `_drain_patiently`, and only to decide how long to wait before calling
+        this.)
+
+        It measures **the front** of the queue rather than the first unclaimed step, because
+        `_merge_landed` merges in step order: a row measured out of turn would sit waiting behind the
+        front anyway and the bound would not move.
+
+        `take_back` claims the request when it is still unclaimed, which is the common case and costs
+        a worker nothing. When a worker does hold it, this measures it anyway after one short wait:
+        a duplicated 100 episodes is a few seconds and a stalled arm is hours. Whichever sample the
+        merge sees first wins and `retire` removes the other.
+        """
+        step = self.pending_evals[0]
+        fields = eval_queue.take_back(self.policy, step)
+        if fields is None:
+            time.sleep(RECLAIM_GRACE_SECONDS)
+            if eval_queue.landed(self.policy, step) is not None:
+                return
+            fields = eval_queue.fields_of(self.policy, step) or {}
+        # Restored rather than measured from `self.agent.net`: the arm has trained on since this step
+        # and stage A is a measurement of the checkpoint, not of the current weights.
+        policy_fn, _, _ = restore.restore(self.policy_dir, step=step, device=self.device)
+        held = engine.measure(policy_fn, EVAL_EPISODES,
+                              seed=eval_seed(self.config['seed'], step))
+        self.pending_evals.pop(0)
+        self._record(step, summarise(held), fields)
+        eval_queue.retire(self.policy, step)
 
     def _save_resume(self):
         """Net, optimiser, step, schedules — and the buffer beside it, under the same call."""
@@ -446,9 +770,12 @@ class Trainer(object):
         `> 0` on the best-30 value matters: with no perfect games yet `best_perfect30` is 0.0 and its
         step falls back to the current step, which would mark every eval as a new best.
         """
-        index = self.step // EVAL_INTERVAL
+        # The row's step, not `self.step`. With the queue on those differ by up to `depth` intervals,
+        # and reading the loop's position here would mark the wrong eval as a new best and quiet the
+        # log on the wrong cadence.
+        index = row['step'] // EVAL_INTERVAL
         is_best = (summary['best_perfect30']['value'] > 0
-                   and summary['best_perfect30']['step'] == self.step)
+                   and summary['best_perfect30']['step'] == row['step'])
         if not (index % QUIET_EVAL_INTERVAL == 0 or is_best or index <= 1):
             return
         note = '  <- best so far' if is_best else ('' if keep else '  no ckpt')

@@ -153,7 +153,7 @@ of 2026-08-28**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.m
 
 | | laptop | desktop `the-claw-den` |
 |---|---|---|
-| limit | **4 trainers** | `max_trainers` ≤ 4, `max_evals` ≤ 4 |
+| limit | **8 trainers** | `max_trainers` ≤ 8, `max_evals` ≤ 4 |
 | check | `ps -Ao pid=,command= \| grep '[t]rain.py'` | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
 | queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |

@@ -100,7 +100,7 @@ every benchmark do.
 
 | stage | who | selection | episodes |
 |---|---|---|---:|
-| **A** | the trainer, in-process, every 1,000 steps | every checkpoint | 100 |
+| **A** | the trainer, every 1,000 steps — in-process, or `SNEK_EVAL_QUEUE=1` for shared workers | every checkpoint | 100 |
 | **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥95/100** in stage A | 500 |
 
 **Stage B is the hall-of-fame measurement.** There is no third stage, no tiered selection, no
@@ -115,7 +115,10 @@ Four consequences worth holding on to:
   (66%)** — measured, and the cost of the protocol rather than waste. The cause is **lane drain**: one
   checkpoint's 100 episodes start together and the batch empties toward width 1, so the same episodes
   cost 3.3x less inside a streamed wave. **Cutting the episode count does not help** — 4x fewer buys
-  1.6x, because the tail is set by episode length. See [`docs/findings.md`](docs/findings.md).
+  1.6x, because the tail is set by episode length. `SNEK_EVAL_QUEUE=1` moves it to shared workers and
+  recovers most of it, at a bounded lag on the epsilon schedule; it is off by default, and
+  [`docs/running.md`](docs/running.md) states what it changes. See
+  [`docs/findings.md`](docs/findings.md).
 - **A counted step is not a game move.** `collector.step()` advances *every* lane, so at b2's
   `fork_branches=4` one counted step is **four** game moves, four buffer rows and four gradient steps,
   while `SNEK_MAX_STEPS` counts one. snek2's step was one of each. **Never compare a snek3 step count
@@ -208,6 +211,8 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/results.py` | where result files live and what they are called. The one place that builds those paths |
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
+| `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
+| `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |
 | `tools/eval_plan.py` | a measured checkpoint as a result row, plus the Wilson interval |
 | `tools/compare_results.py` | two result files against each other, with the spread sampling predicts |
 | `tools/run_report.py` | stage-A history, its summary block, and `runs/<policy>.md` |
@@ -273,7 +278,8 @@ Neither is a verdict — a snek2 arm recovered from 1.2M steps near zero to 63.7
 
 ## Two rules that are easy to get wrong
 
-- **Never run more than 4 trainers at once on the laptop**, counting human-started ones. Check with
+- **Never run more than 8 trainers at once on the laptop**, counting human-started ones — raised from
+  4 on 2026-08-29, when the stage-A queue made eight arms cheaper than four used to be. Check with
   `ps -Ao pid=,command= | grep '[t]rain.py'`, not `pgrep -f` — see the root file on why a process
   scan both over- and under-reports.
 - **This domain is very noisy** — the same snek2 config produced 62.5 and 18.0. Never conclude from a

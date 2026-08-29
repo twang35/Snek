@@ -366,3 +366,33 @@ def test_a_restored_agent_explores_the_same_way():
     restored = make_agent(seed=99)
     restored.load_state_dict(state)
     assert list(restored.act(obs, 0.5, guided=True)) == list(agent.act(obs, 0.5, guided=True))
+
+
+def test_the_optimiser_holds_every_parameter_of_the_net():
+    """The fused-Adam fallback takes a generator, and consuming it twice would silently freeze the net.
+
+    `Optimizer.__init__` consumes `net.parameters()` before torch validates `fused`, so a fallback
+    that re-iterated the same generator would build an optimiser over an empty parameter list —
+    which raises nothing and trains forever at the initialisation. Counting tensors is what
+    distinguishes that from a working optimiser.
+    """
+    agent = make_agent()
+    held = sum(len(group['params']) for group in agent.optimizer.param_groups)
+    assert held == len(list(agent.net.parameters()))
+    assert held > 0
+
+
+def test_a_gradient_step_actually_moves_the_weights():
+    """The other half of the same guard, from the outside: an empty optimiser would pass silently."""
+    agent = make_agent()
+    before = [parameter.detach().clone() for parameter in agent.net.parameters()]
+    batch = {'obs': np.random.RandomState(0).randn(32, constants.OBS_LEN).astype(np.float32),
+             'next_obs': np.random.RandomState(1).randn(32, constants.OBS_LEN).astype(np.float32),
+             'action': np.zeros(32, dtype=np.int64),
+             'reward': np.ones(32, dtype=np.float32),
+             'discount': np.full(32, 0.99, dtype=np.float32)}
+    for _ in range(5):
+        agent.update(batch, None)
+    moved = any(not torch.equal(old, new)
+                for old, new in zip(before, agent.net.parameters()))
+    assert moved

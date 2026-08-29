@@ -1,5 +1,5 @@
 {
-  "max_trainers": 4,
+  "max_trainers": 8,
   "max_evals": 1,
   "eval_shards": 16,
   "poll_seconds": 30,

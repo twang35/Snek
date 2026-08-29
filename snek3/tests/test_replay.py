@@ -325,3 +325,35 @@ def test_setting_no_leaves_at_all_leaves_the_tree_alone():
     tree.set([3], [2.0])
     tree.set([], [])
     assert tree.total == pytest.approx(2.0)
+
+
+def test_set_one_matches_the_vectorised_set_exactly():
+    """`set_one` is a speed path, so the only thing worth pinning is that it changes nothing.
+
+    Element-for-element on the whole node array, over a stream of random single updates, because a
+    sum tree's defect mode is a *parent* that stops matching its children — the leaf is always
+    right and `total` can stay plausible while an interior node is stale.
+    """
+    from dqn.replay import SumTree
+    vectorised, scalar = SumTree(1024), SumTree(1024)
+    rng = np.random.default_rng(11)
+    for _ in range(3000):
+        leaf = int(rng.integers(0, 1024))
+        value = float(rng.random())
+        vectorised.set([leaf], [value])
+        scalar.set_one(leaf, value)
+    assert np.array_equal(vectorised.nodes, scalar.nodes)
+    assert scalar.total == vectorised.total
+
+
+def test_set_one_repairs_every_ancestor_not_just_the_root():
+    """A scalar walk that stopped one level early would still give the right `total`.
+
+    So the fixture reads an interior node directly: leaf 0's parent must hold leaves 0 and 1.
+    """
+    from dqn.replay import SumTree
+    tree = SumTree(8)
+    tree.set_one(0, 3.0)
+    tree.set_one(1, 4.0)
+    assert tree.nodes[tree.size // 2 + 0] == 7.0      # the parent of leaves 0 and 1
+    assert tree.total == 7.0

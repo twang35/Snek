@@ -94,8 +94,8 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 
 | knob | default | notes |
 |---|---:|---|
-| `max_trainers` | 4 | concurrent train/smoke/benchmark jobs |
-| `max_evals` | 1 | concurrent eval *jobs*. A job is a whole wave, so 1 is normal |
+| `max_trainers` | 8 | concurrent train/smoke/benchmark jobs **in one wave**. Not what keeps waves from overlapping — see below |
+| `max_evals` | 1 | concurrent eval *jobs*. A job is a whole wave, so 1 is normal, and the wave barrier makes any other value meaningless |
 | `eval_shards` | 16 | **this is the knob that fills the box**, not `max_evals` |
 | `poll_seconds` | 30 | the local half: reap, read the fetched ref, dispatch. Off-network, so it stays fast |
 | `git_seconds` | 600 | the network half: one fetch, one status push, one retry of any local-only commit |
@@ -106,6 +106,34 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | `paused` / `drain` | false | finish what is running, start nothing new |
 | `auto_stage_b` | true | a finished training auto-queues its stage-B wave at priority 10 |
 | `viewer` | true | let the trainings this box launches open their chart window — see below |
+
+### One wave at a time is structural, and no limit enforces it
+
+**`runner.py:_dispatch` returns early whenever anything is running at all:**
+
+    if self.running or not desired:
+        return
+
+That single line is the whole guarantee. A wave is a set of same-type jobs launched together; nothing
+new starts until every one of them finishes, a freed slot is never backfilled mid-wave, and trainings
+and evals therefore never overlap. It holds for any value of any knob below, including 0.
+
+So **`max_trainers` is not the mechanism** — it only caps how *wide* one wave may be, and its job is
+now purely to stop a queue commit with twenty specs from launching twenty trainers. It was 4 because
+snek2's TensorFlow workers cost 230 MB of arena each and memory ran out first; on this code a trainer
+is 290 MB and the ceiling is threads, so 8 trainers beside the stage-A queue's 6 workers is 14
+single-threaded processes on 16 threads — the same shape as the 16-shard eval wave the box is already
+tuned for. Raised to 8 on 2026-08-29.
+
+`max_evals` is redundant with the barrier rather than merely unusual at 1: an eval job *is* a whole
+wave, so no second one can start regardless. It is a candidate for deletion along with
+`HARD_MAX_EVALS`, which would also collapse `clamp_total_shards` into a plain `eval_shards` clamp.
+Left in place for now because removing a config key touches the parser, the clamp, the status payload
+and their tests, and none of that buys a running batch anything.
+
+**`HARD_MAX_TRAINERS` in `host.env` is the one that bites first**, because `runtime.json` is clamped
+to it and the request is merely *noted* in `status.json` rather than refused — so a commit asking for
+8 against a host ceiling of 4 runs 4 arms and looks like it worked. Raise both or neither.
 
 **Cores are the binding constraint, not memory** — which is a change from snek2. Measured 2026-08-28
 on this code: an eval shard peaks at **202 MB** (193 of it torch's import) and a trainer at **290

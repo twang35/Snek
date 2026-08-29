@@ -26,7 +26,8 @@ workers. **None of that carries.** Measured 2026-08-28 on this code:
 | one eval shard, width 1024, 100 episodes | **202 MB** | 193 MB |
 | one trainer, 100k-transition buffer, 3k steps | **290 MB** | 191 MB |
 
-A full box — 4 trainers and 16 eval shards — is **4.4 GB of 15,030**, 29%. The per-process cost is
+A full box — 8 trainers, 6 stage-A queue workers and 16 eval shards, never at once because waves do
+not overlap — is at worst **4.4 GB of 15,030**, 29%. The per-process cost is
 almost entirely a fixed torch import; the actual work is 8 MB for a shard. So there is one ceiling
 here rather than snek2's three-way clamp, and it is set by **threads, not bytes**: the box is a Ryzen
 7 9700X with 8 physical cores and 16 SMT threads, its measured vec-eval optimum is 16 shards at one
@@ -41,7 +42,12 @@ import json
 
 # Used until a valid `runtime.json` is read, and to fill in any key a valid one omits.
 RUNTIME_DEFAULTS = {
-    'max_trainers': 2,          # concurrent train/smoke/benchmark jobs
+    # Concurrent train/smoke/benchmark jobs **in one wave**. This is not what stops waves from
+    # overlapping — `_dispatch` returns early whenever anything is running at all — so its only job is
+    # to keep a queue commit with twenty specs from launching twenty trainers. Low here because these
+    # defaults are the fallback for an unreadable `runtime.json`, where running fewer arms than asked
+    # is the safe direction.
+    'max_trainers': 2,
     'max_evals': 1,             # concurrent eval jobs. A job is a whole wave, so 1 is normal
     # Shard processes per eval job. This is the knob that fills the box, not `max_evals`: one wave
     # owns every arm of a batch and its shards take whichever checkpoint is next regardless of which

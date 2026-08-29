@@ -71,6 +71,25 @@ def save(policy_dir, step, net, extra=None):
     return final
 
 
+def discard(policy_dir, step):
+    """Removes `ckpt-<step>.pt`. Returns whether there was one to remove.
+
+    Exists because the stage-A queue inverts the checkpoint gate. Without a queue the trainer knows
+    the eval before it decides to write the file; with one, a worker has to *restore* the checkpoint
+    in order to measure it, so the file must exist first and the gate becomes a prune. The final set
+    on disk is the same either way — this is the second half of that, not a new policy about what is
+    kept.
+
+    Missing counts as removed rather than raising: a checkpoint can be pruned twice if a duplicate
+    measurement lands, and the caller's intent is satisfied either way.
+    """
+    try:
+        os.remove(path(policy_dir, step))
+    except OSError:
+        return False
+    return True
+
+
 def load(checkpoint_path, net=None, device='cpu'):
     """The payload, with `net` populated from it if given.
 
