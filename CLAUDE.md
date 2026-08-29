@@ -111,6 +111,13 @@ of 2026-08-28**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.m
 | queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
 
+**Never commit a *live* desktop arm's `runs/<policy>.{md,png}` or `runs/<policy>_evals.json`.** The box
+rewrites those paths on every eval, so a committed copy makes its `git merge --ff-only` abort as
+"untracked working tree files would be overwritten" — and unlike the harmless version of that
+collision the copies always differ, so it comes back after every fix and blocks every deploy for the
+hours the arm runs. Desktop artifacts arrive on the `results` branch at close-out; that is what it is
+for. A laptop arm's own files are fine.
+
 **Neither check sees the other host**, so **"N arms running" is meaningless without naming the box**,
 and any progress report has to check both.
 
