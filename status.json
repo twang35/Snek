@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-29T14:04:40",
-  "ts": 1788037480.490209,
+  "iso": "2026-08-29T14:05:01",
+  "ts": 1788037501.208906,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -39,10 +39,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2149000,
+      "step": 2151000,
       "max_steps": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 21312
+      "steps_per_sec": 96.5,
+      "elapsed_s": 21333
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -52,10 +52,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2238000,
+      "step": 2240000,
       "max_steps": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 21312
+      "steps_per_sec": 96.5,
+      "elapsed_s": 21333
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -65,10 +65,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 2284000,
+      "step": 2286000,
       "max_steps": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 21312
+      "steps_per_sec": 96.5,
+      "elapsed_s": 21333
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -78,10 +78,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 2249000,
+      "step": 2251000,
       "max_steps": 3000000,
-      "steps_per_sec": null,
-      "elapsed_s": 21312
+      "steps_per_sec": 96.5,
+      "elapsed_s": 21333
     }
   ],
   "ledger": {
@@ -97,8 +97,8 @@
   },
   "disk_free_gb": 49.1,
   "load_avg": [
-    4.08935546875,
-    4.0732421875,
-    4.01953125
+    4.0576171875,
+    4.06591796875,
+    4.01708984375
   ]
 }
