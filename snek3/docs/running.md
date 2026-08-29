@@ -1,18 +1,19 @@
 # Running things
 
-**Phase 0 note:** the entry points below are the decided design
-([`../plans/pytorch-port.md`](../plans/pytorch-port.md)); only `env/` and `vectorized/` exist so far.
-Once `train.py` exists, `tuned()` in it is the authoritative knob list and this file is a summary.
+**`train.py` does not exist yet** — it arrives with `dqn/` in phase 3, so the training knobs below
+are the decided design rather than a description. Everything else here runs today. Once `train.py`
+exists, `tuned()` in it is the authoritative knob list and this file is a summary.
 
 ```
 conda activate snek3       # or /opt/miniconda3/envs/snek3/bin/python directly
 cd snek3
 
 PYTHONPATH=. python -u train.py <policy>                # train
-PYTHONPATH=. python -u evaluate.py <policy|batch> [sel]  # a stage-B wave
-PYTHONPATH=. python -u watch.py <policy> [step]          # a live window
-PYTHONPATH=. python -u record_gif.py <policy|hof>        # -> gifs/, throwaway
-PYTHONPATH=. python -m pytest -q                         # the suite
+PYTHONPATH=. python -u evaluate.py <policy> [selector]  # a stage-B wave
+PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
+PYTHONPATH=. python -u watch.py <policy> [step]         # a live window
+PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
+python -m pytest -q                                     # the suite; conftest.py handles the path
 ```
 
 **`conda run` buffers stdout**, even with `python -u` — a backgrounded run's log can stay empty for
@@ -88,20 +89,37 @@ a misconfigured control arm gets caught**, and it has been.
 `SNEK_PERFECT_GAME_REWARD` cannot be moved without re-deriving `SNEK_DISCOUNT` — see
 [`invariants.md`](invariants.md) invariant 6.
 
-### Eval
+### Stage A, inside training
 
 | knob | default | notes |
 |---|---|---|
 | `SNEK_GRAPH_EVAL_EPISODES` | 100 | **pinned.** The stage-A gate is literally "95 of 100"; a different denominator is a different gate |
 | `SNEK_EVAL_INTERVAL` | 1000 | **pinned** to the checkpoint interval, or a checkpoint exists that no screen can select |
-| `SNEK_EVAL_EPISODES` | 500 | stage B |
-| `SNEK_SCREEN_THRESHOLD` | 95 | stage-A perfect count that admits a checkpoint to stage B. The cost knob |
-| `VEC_WAVE_PROCS` | `cpu_count − 2` | **each host's optimum is its own** — 12 on the laptop, 16 on the desktop (whose 16 are SMT threads over 8 cores). Neither transfers; sweep a new host |
+
+### Stage B — flags, not environment variables
+
+**A deliberate split.** A hyperparameter is an env var so an arm's config travels with its launch and
+is recorded; a *measurement* parameter is a flag, so a re-measure is a command you can read rather
+than an environment you have to reconstruct. snek2 had `SNEK_EVAL_EPISODES`,
+`SNEK_SCREEN_THRESHOLD`, `EVAL_MIN_ACHIEVABLE`, `EVAL_SCREEN_EPISODES`, `EVAL_CONFIRM_COUNT` and
+`VEC_WAVE_PROCS`, and a result file recorded none of them.
+
+| flag | default | notes |
+|---|---|---|
+| `<selector>` | `screen` = `screen:95` | which checkpoints. See [`../tools/step_selectors.py`](../tools/step_selectors.py) |
+| `--episodes` | 500 | stage B's depth. 100 when reproducing a snek2 close-out |
+| `--shards` | 4 | how parallel, and nothing else. Measured **96 episodes/s per shard** on the laptop with 4 — against 16.9 for a single checkpoint measured on its own, because a shard's lanes are refilled from the next checkpoint and never drain |
+| `--label` | none | names the pass, so an A/B does not overwrite the file it is compared with |
+| `--width` | derived | games in lockstep per shard. The engine picks; there has been no reason to override it |
+| `--seed` | 0 | the food stream. Two seeds are two independent samples of the same policy |
+| `--no-resume` | off | re-measure rows already on disk instead of skipping them |
 
 ### Diagnostics
 
 | knob | notes |
 |---|---|
 | `SNEK_ZERO_OBS` | comma-separated observation indices to zero, for ablations. Zeroes rather than deletes, so the checkpoint still loads |
-| `SNEK_TILE_PIXELS` | window size, cosmetic only — every pixel constant derives from it. **Must be set before `env.constants` is imported** |
-| `WATCH_FPS` | default 90; drop to 20-30 to follow the moves |
+| `SNEK_CHART_SCALE` | 2.0 — the chart PNG's dpi is `100 x` this. A viewer magnifies the PNG ~1.5-2x, so a lower value looks blurry blown up |
+| `SNEK_TILE_PIXELS` | window size, cosmetic only — every pixel constant derives from it. **Must be set before `env.render` is imported** |
+| `WATCH_FPS` | default 60; drop to 20-30 to follow the moves. 0 is uncapped, which tops out near 180 because of the display flip |
+| `SNEK2_PYTHON` | `/opt/miniconda3/envs/snek/bin/python` — the interpreter `tools/import_tf_checkpoint.py` runs its TensorFlow half under |

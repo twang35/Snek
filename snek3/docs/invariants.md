@@ -126,6 +126,14 @@ snek3 runs 100 episodes throughout, so this only bites when comparing against a 
 it exactly rather than arguing about it: an eval that scored `k` of 20 would, at 10 episodes, have
 scored `X ~ Hypergeometric(20, k, 10)` and counts as strong iff `X ≥ 8`.
 
+**Two stage-B statistics belong in the "not safe" list, and one of them the protocol asks you to lead
+with.** The count of rows at or above a threshold, and the *widest run* of consecutive such rows, are
+both threshold crossings. Measured: at 100 episodes two seeds of the same code counted 187 and 222
+rows at exactly 100/100 out of 3,222 — a 16% spread with no difference in the underlying policy —
+and `b45a`'s widest ≥98% run is 9, which describes the food streams rather than the arm. Both settle
+down at the 500 episodes stage B actually runs, where the per-row sd is 0.7 pp instead of 1.6.
+**A region width or a threshold count is comparable only against another pass at the same depth.**
+
 ## 9. This domain is very noisy
 
 The same config has produced **62.5 and 18.0**. Never conclude from a single run; repeat promising

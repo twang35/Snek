@@ -20,7 +20,7 @@ and is the point.
 | **Observation** | **Identical to snek2** — 9x9 playable, 30 values, era `b09c616`. Phases 1-2 depend on it |
 | **Champion transfer** | **Yes.** Convert `b44a-lowlr7-b29b-ckpt2739000` and make its 98.73%/3000 the phase-1 gate. §10 |
 | **Instructions** | **Three `CLAUDE.md` files.** snek2's 1,080 lines of mechanics move verbatim into `snek2/CLAUDE.md`. §14 |
-| **Self-eval** | **Synchronous, 100 episodes every 1,000 steps.** ~2 h an arm. Async is a measured follow-up, not a day-one default. §5 |
+| **Self-eval** | **Synchronous, 100 episodes every 1,000 steps.** ~5 h an arm, measured. Async is a follow-up, and it is worth 5.7x rather than the 8x first assumed — see §5 |
 | **Stage-A gate** | **95/100.** Tunable later; it is the cost knob |
 | **Tools dir** | **`tools/`**, not `scripts/` — it holds libraries as well as executables |
 | **Conda env** | New `snek3` env: python 3.12, torch, numpy, pygame, matplotlib, pillow, imageio, **pytest** |
@@ -92,7 +92,7 @@ snek3/
 
   tools/                 the tools and the libraries behind them
     eval_plan.py  run_report.py  arch.py  checkpoints.py
-    selectors.py  progress_chart.py  chart_viewer.py  eval_progress.py  seeding.py
+    step_selectors.py  progress_chart.py  chart_viewer.py  stage_b_chart.py
 
   desktop/               the git-bus job queue, unchanged in design
     runner/  systemd/  config/  README.md
@@ -156,13 +156,13 @@ near-mechanical copies. The table is the whole port.
 | snek2 | lines | snek3 | what goes |
 |---|---|---|---|
 | `eval_plan.py` | 1012 | `tools/eval_plan.py` (~400) | keep the payload/row schema, `wilson_interval`, `RowCache`, `WriteGate`, `merge_checkpoint_evals`, both selectors. Drop the three-stage protocol, the abandon gate, `equal_effort_pooled`, and every pre-2026-08-08 branch — see §6 |
-| `eval_progress.py` | 1387 | `tools/eval_progress.py` (~450) | keep the analysis and text layers, minus the stage/screen/abandon/`num_workers` paths. Rewrite the 370-line matplotlib block. Drop `pyformulas` window mode |
-| `vectorized/vec_wave.py` + `vec_eval.py` | 945 | `vectorized/wave.py` + `shard.py` (~450) | drop the 35-line `sys.path` bootstrap duplicated in both, the chart-viewer lock negotiation, the dead protocol fields |
+| `eval_progress.py` | 1387 | `tools/stage_b_chart.py` (**265**) | **less survived than planned, and the estimate was the thing that was wrong.** Two of its three panels answer questions snek3 does not have, and its text layer is the wave's own stdout. See below |
+| `vectorized/vec_wave.py` + `vec_eval.py` | 945 | `tools/eval_wave.py` + `shard.py` (~450) | drop the 35-line `sys.path` bootstrap duplicated in both, the chart-viewer lock negotiation, the dead protocol fields |
 | `eval_wave.py` | 1328 | `tools/selectors.py` (~120) | keep only the argv layer: `parse_selector`, `resolve_policies`, `arms_for_prefix`, `batch_of`, `describe_selector`. The lane/thread/worker-pool model is what `vectorized/` replaced |
 | `policy_arch.py` | 328 | `tools/arch.py` (~120) | keep `obs_len`, `obs_era`, `num_actions`, the atomic sidecar, `assert_same_network`. Torch's `load_state_dict(strict=True)` covers the shape half; **`obs_era` is the half no shape check can catch** |
 | `self_eval.py` | 177 | `dqn/collect.py` (inline) | one `tf.function` becomes a `torch.no_grad()` call. The fresh-seed-per-eval rule stays |
 | `forking_collector.py` | 330 | `dqn/collect.py` (~250) | day one. It exists because the buffer holds the consequence of the action *taken* at an endgame decision point and never the alternative, so `Q(s, a_good)` for the untaken safe action trains on nothing. Default in snek2 since batch 17; the record holder used 4 branches |
-| `chart_viewer.py` | 1010 | `tools/chart_viewer.py` (~300) | see §7 |
+| `chart_viewer.py` | 1010 | `tools/chart_viewer.py` (**239**) | see §7 |
 | `training.py` epsilon schedule | ~180 | `dqn/schedules.py` | the two-phase bootstrap/refine schedule ports as pure functions |
 | `shielded_policy.py` | 137 | `dqn/agent.py` (inline, ~30) | a mask over the exploration draw only, never the greedy action |
 | `prioritized_replay_buffer.py` | 176 | `dqn/replay.py` (~150) | **replace cpprb with a numpy sum tree** — cpprb silently ignores `seed=`, which is incompatible with §5 |
@@ -272,17 +272,31 @@ so three things are pinned rather than tunable:
 **So the self-eval stays ~90% of a training arm's wall clock, and that is now correct rather than
 wasteful.** The arithmetic, for a 3M-step arm:
 
-| | episodes | at 45 ep/s |
+| | episodes | measured |
 |---|---:|---:|
 | training (collect + gradient) | — | 12.5 min at 4,000 steps/s |
-| stage A, the graph eval | 3,000 × 100 = **300,000** | **1.85 h** |
-| **arm wall clock, synchronous** | | **~2.0 h** |
+| stage A, the graph eval | 3,000 × 100 = **300,000** | **5.0 h** at 16.9 ep/s |
+| **arm wall clock, synchronous** | | **~5.2 h** |
 
-Against snek2's ~20 h for the same arm plus an 8-hour close-out, ~2 h is a 10-14x win and it is
-enough. **Start synchronous.** It is the simple thing, it needs no weight-snapshot IPC, and it keeps
-the epsilon feedback path exact.
+**Corrected 2026-08-28: this table read 1.85 h and ~2.0 h, from snek2's ~45 ep/s.** Measured on
+`b45a`'s own 3,222 checkpoints, stage A's shape runs at **16.9 ep/s** and the same episodes streamed
+through `engine.measure_stream` run at **96 ep/s** — a **5.7x** gap, and it is lane drain, not episode
+count. One checkpoint's 100 episodes start together and the batch empties toward width 1 as they
+finish, with no next checkpoint to refill from. See [`../docs/findings.md`](../docs/findings.md).
 
-**The next 8x is the asynchronous eval, and it should be pre-registered rather than assumed.** Two or
+Against snek2's ~20 h for the same arm plus an 8-hour close-out, ~5 h is still a 5x win. **Start
+synchronous anyway.** It is the simple thing, it needs no weight-snapshot IPC, and it keeps the
+epsilon feedback path exact — and the fix below is now worth much more than it looked, so it should be
+measured against a synchronous baseline rather than replacing one that never existed.
+
+**The next 5.7x is mostly *not* asynchrony — it is keeping the lanes full.** Holding K pending
+checkpoints and measuring them in one `measure_stream` call with `max_live=K` recovers the whole gap
+above without any second process, at the cost of the epsilon schedule seeing its feedback up to K
+intervals late. Detaching the eval then removes what training time is left. Both changes cost the same
+thing — feedback lag on a loop that steers exploration (invariant 2) — so **pre-register either, and
+do not file it as a speed-up.**
+
+**The asynchronous eval should be pre-registered rather than assumed.** Two or
 four worker processes measuring off a weight snapshot would take an arm to ~20-30 minutes. The cost
 is that `perfect_percent` feeds `epsilon_for`'s refinement phase, so the exploration schedule goes
 onto a lag of one eval interval — this is a feedback loop, not a readout, the same property that made
@@ -354,11 +368,14 @@ invariant that only a test held together and that had already drifted across two
 
 Projected for a snek3 champion-class arm, 3M steps, ~3,000 checkpoints:
 
-| | episodes | 1 process | 4 shards | 16 shards |
-|---|---:|---:|---:|---:|
-| stage A (inside training) | 300,000 | 1.85 h | — | — |
-| stage B, if ~50% clear ≥95/100 | 750,000 | 4.6 h | 1.2 h | 18 min |
-| stage B, if ~70% clear | 1,050,000 | 6.5 h | 1.6 h | 25 min |
+| | episodes | 1 process | 4 shards |
+|---|---:|---:|---:|
+| stage A (inside training), at 16.9 ep/s | 300,000 | **5.0 h** | — |
+| stage B, if ~50% clear ≥95/100, at 96 ep/s a shard | 750,000 | 2.2 h | 33 min |
+| stage B, if ~70% clear | 1,050,000 | 3.0 h | 46 min |
+
+Both rates are measured rather than projected, on `b45a`'s 3,222 checkpoints. The 16-shard column is
+gone: it was a desktop projection and the desktop has never run a snek3 wave.
 
 **Total measurement compute is roughly what snek2 already spends** — the win is that snek2's 322,200
 close-out episodes were duplicated work, and that a batch now has one eval wave to queue and wait for
@@ -408,29 +425,6 @@ The two selectors that remain are `screen:<threshold>` — read `runs/<policy>_e
 checkpoint at or above the threshold, default 95 — and `above:<threshold>` reading a prior stage-B
 file, for the record re-measure. Nothing else.
 
-### What is kept from `eval_plan.py`, and why
-
-`RowCache` and `WriteGate` look like micro-optimisations and are not. Without them the controller
-rebuilt every banked row and re-serialised the whole file 125 times per 500-episode measurement — 58
-s of single-threaded bookkeeping against the 46 s four lanes needed to produce one measurement, so
-the controller overtook its own lanes and `b43`'s HOF pass folded a backlog for 90 minutes with 16
-workers idle. Keep both, and keep the diagnostic: when `grep -c "episodes in"` runs ahead of
-`grep -cE "^\[ *[0-9]+/"`, the controller is the bottleneck, not the box.
-
-Keep the row schema whole, including `episode_scores` / `episode_perfect` / `episode_rewards`. Those
-three arrays at ~1.6 KB a row are what make a pass resumable and a median poolable; storing only
-summaries lost 192 rows and 7,534 episodes once.
-
-Keep three contracts from the engine that each have an incident behind them: episodes are banked at
-the slot they **started** in, not appended on completion (episode length correlates with outcome, so
-completion order put a 20-of-100 prefix at 0.25% failures against a true 2.23%); `max_live` is
-**derived** as `max(8, 4·ceil(width/episodes))` and raises if it is too small (getting it wrong
-measured 4% utilisation and a 10x slowdown); and the stall cap raises rather than spinning.
-
-**Do not carry `num_workers` semantics.** In that schema it means "episodes advance in indivisible
-rounds of this size", not "how parallel is this". Reporting the batch width there inflated an ETA by
-10.24x.
-
 ---
 
 ## 7. Charts and the viewer
@@ -440,6 +434,34 @@ twin-axis layout, the guides, the title burned into the image, `.partial.png` + 
 above all the `Figure` + `FigureCanvasAgg` construction. `plt.subplots` kept its artists alive
 through pyplot's global figure manager, leaked ~0.45 MB an eval, and OOM'd the desktop. Do not
 revert it.
+
+### `eval_progress.py` mostly does not port, and that is a result about the protocol
+
+**Built as `tools/stage_b_chart.py`, 265 lines against a planned 450 and an original 1,387.** The
+plan said "keep the analysis and text layers". Writing it showed that two thirds of the analysis was
+about the *shape of snek2's eval job* rather than about a policy:
+
+| snek2 panel | fate | why |
+|---|---|---|
+| in-flight convergence, one line per process | **gone** | snek2 pooled a checkpoint's episodes over ~10 rounds, so a checkpoint had a partial rate worth watching converge. A snek3 shard measures a checkpoint straight through and writes one row |
+| completed checkpoints by step | **kept, and it is the whole module** | the only panel that describes the arm. The screen/confirm depth split goes with the tiers — every snek3 row is full length |
+| the stage block, with the screen's cut rate | **gone** | one stage, no screen, no cut |
+| percent complete and an ETA | **gone** | `tools/eval_wave.py` prints both, on one line, read off the shard files |
+
+Two things were added instead, and both came from looking at the first real output.
+
+**A trailing mean over 40 rows.** Without it the panel is a cloud: a 100-episode row is quantised to
+whole percent and carries 1.6 pp of sampling noise, which is larger than any real difference between
+neighbouring checkpoints, so the arm's shape only exists as an average over rows. With it, `b45a`
+visibly peaks near 98% around 1.8-2.4M and sags to ~96.5% near 3.9M.
+
+**The widest contiguous run above the level, not just a count of rows above it.**
+[`../docs/protocol.md`](../docs/protocol.md) already says to lead a stage-B comparison with the width
+of the record region rather than the best row; this reports it. It also exposed that **the statistic
+is depth-sensitive** — see §11's invariant 8 — because at 100 episodes and p≈0.973 a run of
+consecutive rows all ≥98% is mostly a run of lucky samples. On `b45a` the widest such run is 9,
+which says nothing about the arm. At the 500 episodes stage B actually runs, the per-row sd is 0.7 pp
+instead of 1.6 and the number starts to mean something.
 
 `chart_viewer.py` is 1,010 lines of which **~500 are auto-spawn machinery**: a `pgrep`/`ps` liveness
 scan, an arm registry with a grace period, an `O_EXCL` claim lock, zombie detection, and a dedupe.
@@ -466,6 +488,21 @@ learn:
 - A negative liveness answer needs corroboration. `pgrep` exits 0 on a match, 1 on no match and ≥2
   on an error, and all three produce empty stdout; reading only stdout turned a *failed* check into
   the strongest possible answer and closed a live window with five hours left to run.
+
+**Built at 239 lines, and the liveness check changed shape.** Because the launcher starts both the
+arms and the window, it can pass the pids it started: `--watch-pid 8123,8124,8125`. That deletes the
+pattern entirely, and with it the whole self-matching trap — a `pgrep -f` pattern appears verbatim on
+the command line of the shell running it, so the check counts itself. Three properties fall out, and
+all three are pinned by fixtures:
+
+- `pids_alive()` returns **True, False or None**, where None is "could not tell". A `ps` that failed
+  and a `ps` that found nothing print the same empty stdout.
+- It runs **one `ps -Ao pid=,stat=` scan**, not `ps -p <list>`. macOS `ps -p` rejects the entire
+  request if any single pid in the list is invalid — `ps -p 999991,<live pid>` exits 1 with no
+  output — so the obvious implementation would have closed the window on three running shards the
+  moment the first finished. Found by writing the fixture, before the module was ever run for real.
+- A **zombie is not alive.** `os.kill(pid, 0)` would have been one line and would have said it was,
+  for as long as the parent left the child unreaped.
 
 ---
 
@@ -542,8 +579,8 @@ Each phase has a pre-registered pass condition. Phase 1 is the one that makes th
 |---:|---|---|
 | 0 | The instruction split and the `docs/` skeleton (§14), then `env/` + `vectorized/` + the parity harness. No learning code. | three `CLAUDE.md` files, no stale `snek2/` reference outside `snek2/`; parity harness green — 0 mismatches on all 30 indices over ≥18,000 states, ≥12 hand-made mutants killed. **Met 2026-08-28**: 36,000 states × 30 indices, 0 mismatches, 17 of 17 mutants killed, 167 tests green |
 | 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it. **Met 2026-08-28**: 98.8% (2964/3000), and the conversion is exact — 12,864 states, max \|ΔQ\| 2.7e-5 on Q ~30.6, argmax identical on every one |
-| 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise |
-| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*, ~2 h for a 3M-step arm with it on |
+| 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise. **Met 2026-08-28**: 3,222 rows, mean per-row difference **−0.004 pp** against a 0.041 pp standard error (0.09 SEs), observed spread / predicted spread **1.00**. A second snek3 seed gives +0.028 pp. 14 min on 4 shards |
+| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*. ~5 h for a 3M-step arm with it on, not the ~2 h this row first claimed |
 | 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box |
 | 5 | A seed-matched b47-class comparison, 4 arms. | a ≥98%/500 region of comparable width on comparable seeds. **Not** a matched point estimate |
 | 6 | `ppo/` | the actual research |
@@ -559,8 +596,9 @@ the env, the observation vector, the policy path, the eval engine, the watcher a
 **before any training code exists**, against a number snek2 measured over 3,000 episodes. A ~40-line
 script buys the strongest test in the plan.
 
-**Phase 2 extends it into a 3,222-row A/B between two independent stacks.** It costs ~2 hours of
-compute and it is the only way to know the flat eval agrees with the tiered one it replaces.
+**Phase 2 extends it into a 3,222-row A/B between two independent stacks.** It cost 14 minutes on
+four shards, not the ~2 hours projected, and it is the only way to know the flat eval agrees with the
+tiered one it replaces. It also produced three findings, one of which corrects §5's cost model.
 
 **Phase 5 is the honest gate on the port, and it should not be set at 99%.** `b29b`'s 99.0%/500 is
 partly a selected high — it re-measured 97.5% over 1,000 fresh episodes, and the four best HOF

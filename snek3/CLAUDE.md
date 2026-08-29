@@ -52,10 +52,11 @@ weights — and that costs nothing, because nothing in the measurement loop call
 
 ```
 cd snek3
-PYTHONPATH=. python -u train.py <policy>                  # policy name doubles as the checkpoint dir
-PYTHONPATH=. python -u evaluate.py <policy> [--episodes N]  # measure one checkpoint
-PYTHONPATH=. python -u watch.py <policy> [step]           # a live window, follows the newest checkpoint
-PYTHONPATH=. python -u record_gif.py <policy|hof>         # -> gifs/, throwaway
+PYTHONPATH=. python -u train.py <policy>               # the name doubles as the checkpoint dir
+PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:95, 500 eps, 4 shards
+PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
+PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
+PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
 ```
 
 **The snek2 champion converts in one command**, and is the reference policy for any A/B:
@@ -92,8 +93,10 @@ with a number to check.
 Three consequences worth holding on to:
 
 - **Stage A is measurement, not a progress readout.** It must run at 100 episodes on every
-  checkpoint or a checkpoint exists that no screen can select. That makes it ~90% of a training
-  arm's wall clock, and an arm ~2 h — which is the cost of the protocol, not waste.
+  checkpoint or a checkpoint exists that no screen can select. That makes it ~90% of a training arm's
+  wall clock, and an arm **~5 h** — measured, and the cost of the protocol rather than waste. The
+  rate is 16.9 ep/s against a stage-B shard's 96, because one checkpoint's 100 episodes drain the
+  lanes with nothing to refill them; see [`docs/findings.md`](docs/findings.md).
 - **`perfect_percent` is not only a report.** It feeds the epsilon refinement schedule, so breaking
   the measurement changes the training. In snek2 a shaping term silenced the perfect-game counter and
   eight arms trained with epsilon pinned at its ceiling for 300k+ steps while reading 0%.
@@ -129,6 +132,15 @@ survive in the diff.
 a test fails.** snek2 took a third signature for its observation grouper and all 24 existing tests
 passed before and after, because every fixture was an open board where old and new answers agree.
 
+**Clear `__pycache__` after restoring a mutation, or set `PYTHONDONTWRITEBYTECODE=1` while mutating.**
+A `.pyc` is revalidated on the source's *mtime and size*, and the natural harness — copy to `.bak`,
+mutate, run, `mv` the `.bak` back — defeats both checks at once: `mv` restores the backup's older
+mtime, and a one-character mutation like `3` to `1` has the same size. The mutated bytecode is then
+reused for every later run, so **the mutation outlives its own restore and the next result is
+silently wrong.** It happened here: `NEGATIVE_CHECKS = 3` read as 1 for two runs after the file on
+disk was correct, and the test that caught it looked like a broken assertion rather than a stale
+cache.
+
 **Check the failure *type*.** Thirteen of snek2's tests were dead for two signature generations —
 they called a function with an argument it had stopped taking, so they raised `TypeError` rather than
 failing an assertion, and a `TypeError` looks like noise if nobody is watching.
@@ -153,6 +165,22 @@ thousand steps catches what assertions do not.
 | [`docs/invariants.md`](docs/invariants.md) | the nine |
 | [`docs/charts.md`](docs/charts.md) | one graph per arm, linked straight from `runs/` |
 | [`docs/running.md`](docs/running.md) | every `SNEK_*` knob and what it does |
+
+The tools behind those entry points, in the order a measurement passes through them:
+
+| module | does |
+|---|---|
+| `tools/step_selectors.py` | which checkpoints a wave measures. `screen:<n>`, `above:<n>`, `steps:<path>`, `all` — and nothing else |
+| `tools/results.py` | where result files live and what they are called. The one place that builds those paths |
+| `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
+| `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
+| `tools/eval_plan.py` | a measured checkpoint as a result row, plus the Wilson interval |
+| `tools/compare_results.py` | two result files against each other, with the spread sampling predicts |
+| `tools/run_report.py` | stage-A history, its summary block, and `runs/<policy>.md` |
+| `tools/progress_chart.py` | `runs/<policy>.png` — one arm's stage-A history |
+| `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
+| `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them; the launcher opens it |
+| `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
 
 Keep the split clean: `runs.md` is current state and forward plan only, results go to `results.md`,
 conclusions to `findings.md`, anything about *how to measure or judge* to `protocol.md`. snek2's
