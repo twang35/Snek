@@ -1,0 +1,20 @@
+{
+  "project": "snek3",
+  "id": "b2d-b29repro-seed4",
+  "type": "train",
+  "policy": "b2d-b29repro-seed4",
+  "max_steps": 3000000,
+  "env": {
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_IS_WEIGHTS": "0",
+    "SNEK_TARGET_UPDATE_PERIOD": "1000",
+    "SNEK_DISCOUNT": "0.9975",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FORK_BRANCHES": "4",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_SEED": "4"
+  },
+  "label": "b2: b29's record config on the torch stack, seed 4 (fc320, chase c=0.10 gate 75, IS off)",
+  "notes": "The phase-3 gate, on the config snek2 actually set records with. Env is copied from snek2's own b47 spec, which was b29's verbatim -- b29b-chase10g75seed2-ckpt1447000 is the hall of fame's admitted record at 99.0%/500 (97.5% re-measured over 1000). Seed N is pinned to arm letter N so every arm is seed-matched against b29a-d, b41a-d, b47a-d and snek3's own b1a-d.\n\nFIVE knobs differ from snek3's defaults, not the two the results table suggested: IS weights off (default on), target_update_period 1000 (default 8), discount 0.9975 (default 0.99), food_distance_reward 0 (default 0.001), chase-safe c=0.10 at gate 75 (default 0.0 at gate 85). The target-update period and the discount are substantial algorithmic differences and were nearly missed -- read the spec, not the summary table.\n\nNO free-space shaping: the term defaults off, as in b29.\n\n3M steps rather than b29's 2M, because b1 showed every arm of this project still climbing at 3M. Read against b1 (snek3's no-shaping defaults, same seeds, same cap) and against b29/b41/b47. A b2-vs-b29 difference smaller than the b29-vs-b41 process-noise gap is noise.\n\nThe stage-A confound b47's spec names applies here too: perfect_percent feeds the epsilon refinement schedule, so a 100-episode self-eval is not purely a measurement change against b29's 10-episode one. This tests the stack as shipped, which is the right target for a go/no-go."
+}
