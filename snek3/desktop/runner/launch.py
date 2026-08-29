@@ -17,6 +17,16 @@ import time
 # installed modules — `conftest.py` covers the test path only.
 BASE_ENV = {'PYTHONPATH': '.'}
 
+# The chart window: `tools/chart_viewer.py`, in its own process. Its refresh is slower than the
+# tool's own 2 s default because the trainer rewrites a PNG once per eval — roughly every 3 s per arm
+# at 350 steps/s — and a window that redraws faster than the files change only costs CPU.
+VIEWER_MODULE = 'tools.chart_viewer'
+VIEWER_INTERVAL_SECONDS = 15
+# The two optional `host.env` keys. The daemon is a system service outside the graphical session, so
+# a job only reaches the physical monitor with the session's display and X authority; without them
+# the viewer is skipped rather than failing.
+VIEWER_ENV_KEYS = ('DISPLAY', 'XAUTHORITY')
+
 
 def build_command(job, host, runtime):
     """`(argv, env_overrides, log_name, resolved_policy)`. `env_overrides` merges over `os.environ`.
@@ -168,3 +178,45 @@ def update_throughput(running_job, host):
             round(delta / (now - running_job._last_step_time), 1) if delta >= 0 else None)
     running_job.current_step = step
     running_job._last_step, running_job._last_step_time = step, now
+
+
+def viewer_command(policies, pids, host):
+    """`(argv, env_overrides)` for a chart window over these arms' PNGs.
+
+    **The panel list is explicit, not a glob.** A glob over `runs/` would pull in every arm the box
+    has ever run — the tool caps panels at 8 by mtime, so it would still draw, just not the thing
+    asked for — and the window exists to show what is running *now*.
+
+    `--watch-pid` carries the pids the daemon launched, so the window closes itself if the daemon
+    dies without reaping it. That is the safe form of the question: see `tools/chart_viewer.py` on
+    why asking `pgrep` instead once closed a live window with five hours left to run.
+    """
+    argv = [host['PYTHON_BIN'], '-u', '-m', VIEWER_MODULE]
+    argv += [os.path.join('runs', str(name) + '.png') for name in policies]
+    if pids:
+        argv += ['--watch-pid', ','.join(str(int(pid)) for pid in pids)]
+    argv += ['--interval', str(VIEWER_INTERVAL_SECONDS)]
+    argv += ['--title', 'snek3 — ' + ', '.join(str(name) for name in policies)]
+    env = dict(BASE_ENV)
+    for key in VIEWER_ENV_KEYS:
+        if host.get(key):
+            env[key] = host[key]
+    return argv, env
+
+
+def spawn_viewer(policies, pids, host):
+    """Starts a chart window. Returns the Popen, or None if the host has no display configured.
+
+    Not `setsid` — unlike a job, the window is worthless without the daemon that feeds it pids, and
+    leaving it in the daemon's process group means a `systemctl stop` closes it instead of leaving an
+    orphan window on the monitor showing a batch that is no longer running.
+    """
+    if not any(host.get(key) for key in VIEWER_ENV_KEYS):
+        return None
+    argv, overrides = viewer_command(policies, pids, host)
+    full_env = dict(os.environ)
+    full_env.update(overrides)
+    os.makedirs(host['LOG_DIR'], exist_ok=True)
+    log_handle = open(os.path.join(host['LOG_DIR'], 'viewer.log'), 'ab')
+    return subprocess.Popen(argv, cwd=host['SNEK_DIR'], env=full_env,
+                            stdout=log_handle, stderr=subprocess.STDOUT, close_fds=True)

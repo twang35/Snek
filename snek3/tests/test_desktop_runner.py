@@ -469,3 +469,217 @@ def test_attention_lines_are_carried_through():
 
 def test_attention_is_empty_in_the_normal_case():
     assert runner_module.build_at_a_glance([], [], {})['attention'] == []
+
+
+# --- the chart window -----------------------------------------------------------------------------
+#
+# snek3 turns this back on where snek2 kept it off, and the reason it is safe now is the one thing
+# worth pinning: snek2's window was the trainer's own in-process cv2 canvas and one XIO error killed
+# all four arms; this is a separate process reading PNGs. So these fixtures are about the *policy* —
+# when it opens, when it closes, and the one case where it must stay shut.
+
+VIEWER_HOST = dict(HOST, DISPLAY=':0', XAUTHORITY='/run/user/1000/gdm/Xauthority')
+
+
+class _FakeViewer(object):
+    """A stand-in Popen: `status=None` means still running."""
+
+    def __init__(self, status=None):
+        self.returncode = status
+        self.terminated = False
+        self.killed = False
+        self.waited = False
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self):
+        self.killed = True
+        self.returncode = -9
+
+    def wait(self, timeout=None):
+        self.waited = True
+        return self.returncode
+
+
+class _FakeRunning(object):
+    def __init__(self, policies, pid):
+        self.job = parse_job(spec(policies=None))
+        self.job.policies = list(policies)
+        self.pid = pid
+
+
+def _runner_with(monkeypatch, running, host=None, **runtime_overrides):
+    """A Runner with its ledger, reattach and git side stubbed out — only the viewer path runs."""
+    monkeypatch.setattr(runner_module.Runner, '_load_ledger', lambda self: {})
+    monkeypatch.setattr(runner_module.Runner, '_reattach', lambda self: None)
+    instance = runner_module.Runner(host or VIEWER_HOST)
+    instance.runtime.update(runtime_overrides)
+    instance.running = {'j{0}'.format(i): job for i, job in enumerate(running)}
+    return instance
+
+
+def _record_spawns(monkeypatch, result=None):
+    calls = []
+
+    def fake_spawn(policies, pids, host):
+        calls.append({'policies': tuple(policies), 'pids': tuple(pids), 'host': host})
+        return result if result is not None else _FakeViewer()
+    monkeypatch.setattr(launch, 'spawn_viewer', fake_spawn)
+    return calls
+
+
+def test_the_viewer_opens_for_the_running_arms(monkeypatch):
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11), _FakeRunning(['b1c'], 12)])
+    instance._ensure_viewer()
+    assert len(calls) == 1
+    assert calls[0]['policies'] == ('b1b', 'b1c'), 'sorted, so the panel order is stable'
+    assert calls[0]['pids'] == (11, 12), 'the pids it launched, not a pgrep pattern'
+
+
+def test_an_already_open_viewer_is_left_alone(monkeypatch):
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    instance._ensure_viewer()
+    instance._ensure_viewer()
+    assert len(calls) == 1, 'a poll every 30 s must not restart the window every 30 s'
+
+
+def test_the_viewer_restarts_when_an_arm_joins(monkeypatch):
+    """The panel list is explicit, so a changed set of arms is the one case needing a restart."""
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    first = instance._viewer
+    instance.running['j1'] = _FakeRunning(['b1c'], 12)
+    instance._ensure_viewer()
+    assert len(calls) == 2 and calls[1]['policies'] == ('b1b', 'b1c')
+    assert first.terminated and first.waited, 'the old window is closed AND reaped, not orphaned'
+
+
+def test_the_viewer_closes_when_the_box_goes_idle(monkeypatch):
+    _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    opened = instance._viewer
+    instance.running = {}
+    instance._ensure_viewer()
+    assert opened.terminated and opened.waited
+    assert instance._viewer is None and instance._viewer_policies == ()
+
+
+def test_a_window_the_user_closed_stays_closed(monkeypatch):
+    """`chart_viewer` exits 0 when its window is closed, and calls that an instruction.
+
+    Respawning it on the next poll would fight whoever is sitting at the box, so a clean exit with
+    the same arms still running must not reopen.
+    """
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    instance._viewer.returncode = 0          # the user closed the window
+    instance._ensure_viewer()
+    assert len(calls) == 1, 'a deliberate close is honoured'
+    assert instance._viewer is None
+
+
+def test_a_crashed_window_is_reopened(monkeypatch):
+    """The opposite case, and the one the request is actually about: a display failure."""
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    instance._viewer.returncode = 1          # an XIO error, an OOM kill
+    instance._ensure_viewer()
+    assert len(calls) == 2, 'a crash is not an instruction'
+
+
+def test_a_closed_window_reopens_when_the_arms_change(monkeypatch):
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    instance._viewer.returncode = 0
+    instance.running['j1'] = _FakeRunning(['b1c'], 12)
+    instance._ensure_viewer()
+    assert len(calls) == 2, 'new content is a new window, even after a deliberate close'
+
+
+def test_the_viewer_knob_turns_it_off(monkeypatch):
+    calls = _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)], viewer=False)
+    instance._ensure_viewer()
+    assert calls == [] and instance._viewer is None
+
+
+def test_turning_the_knob_off_closes_an_open_window(monkeypatch):
+    _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    opened = instance._viewer
+    instance.runtime['viewer'] = False
+    instance._ensure_viewer()
+    assert opened.terminated and instance._viewer is None
+
+
+def test_a_headless_host_is_not_an_error(monkeypatch):
+    """No DISPLAY is a valid configuration, so `spawn_viewer` declines and the daemon carries on."""
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)], host=HOST)
+    instance._ensure_viewer()
+    assert instance._viewer is None and instance._viewer_policies == ()
+
+
+def test_spawn_viewer_declines_without_a_display():
+    assert launch.spawn_viewer(('b1b',), (11,), HOST) is None
+
+
+def test_a_viewer_that_will_not_die_is_killed(monkeypatch):
+    import subprocess as sp
+    _record_spawns(monkeypatch)
+    instance = _runner_with(monkeypatch, [_FakeRunning(['b1b'], 11)])
+    instance._ensure_viewer()
+    stubborn = instance._viewer
+
+    def refuse(timeout=None):
+        raise sp.TimeoutExpired('viewer', timeout)
+    stubborn.wait = refuse
+    instance.running = {}
+    instance._ensure_viewer()
+    assert stubborn.killed, 'SIGTERM ignored means SIGKILL, not a leaked window'
+
+
+# --- the viewer command ---------------------------------------------------------------------------
+
+def test_the_viewer_command_names_each_arms_png():
+    argv, env = launch.viewer_command(('b1b', 'b1c'), (11, 12), VIEWER_HOST)
+    assert argv[:4] == ['/py', '-u', '-m', 'tools.chart_viewer']
+    assert 'runs/b1b.png' in argv and 'runs/b1c.png' in argv
+    assert '--glob' not in argv, 'an explicit list, so the window shows what is running now'
+
+
+def test_the_viewer_command_passes_the_pids_it_launched():
+    argv, env = launch.viewer_command(('b1b',), (11, 12), VIEWER_HOST)
+    assert argv[argv.index('--watch-pid') + 1] == '11,12'
+
+
+def test_the_viewer_command_carries_the_session_display():
+    argv, env = launch.viewer_command(('b1b',), (11,), VIEWER_HOST)
+    assert env['DISPLAY'] == ':0'
+    assert env['XAUTHORITY'] == '/run/user/1000/gdm/Xauthority'
+    assert env['PYTHONPATH'] == '.'
+
+
+def test_the_viewer_command_omits_display_when_the_host_has_none():
+    argv, env = launch.viewer_command(('b1b',), (11,), HOST)
+    assert 'DISPLAY' not in env and 'XAUTHORITY' not in env
+
+
+def test_viewer_is_a_bool_knob():
+    parsed, notes = config_module.parse_runtime_config('{"viewer": 1}', HOST)
+    assert parsed is None and any('viewer' in note for note in notes)
+    parsed, notes = config_module.parse_runtime_config('{"viewer": false}', HOST)
+    assert parsed is not None and parsed['viewer'] is False

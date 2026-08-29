@@ -43,6 +43,10 @@ TERMINAL = ('done', 'failed')
 # point of the auto chain: never train the next thing before measuring the last.
 AUTO_STAGE_B_PRIORITY = 10
 
+# How long the chart window gets to exit after SIGTERM before it is killed. Its only shutdown work
+# is closing a figure, so this is generous rather than tight.
+VIEWER_STOP_SECONDS = 5
+
 # `SNEK_*` that belong to a *training* and must not be inherited by its measurement. Each would
 # change what the wave does rather than what it measures: a step cap is meaningless to an eval, and
 # the stage-A knobs describe the screen that already happened.
@@ -70,7 +74,7 @@ TRAINING_ONLY_KEYS = ('SNEK_MAX_STEPS', 'SNEK_EVAL_INTERVAL', 'SNEK_GRAPH_EVAL_E
 # at eval time and `tools/restore.py` reads it, so a differing architecture is already handled.
 #
 # `SNEK_ZERO_OBS` is here because it changes the *observation*, which is an input to the policy at
-# measurement time, not a property of training. `tests/test_runner.py` checks this tuple against
+# measurement time, not a property of training. `tests/test_desktop_runner.py` checks this tuple against
 # `env/constants.py` so a renamed knob fails loudly instead of silently splitting waves.
 EVAL_RELEVANT_ENV = ('SNEK_ZERO_OBS', 'SNEK_CHASE_SAFE_SHAPING', 'SNEK_CHASE_SAFE_GATE',
                      'SNEK_FREE_SPACE_SHAPING', 'SNEK_FREE_SPACE_GATE',
@@ -170,6 +174,9 @@ class Runner(object):
         # When the loop last *attempted* its network half. 0 so the first cycle does one.
         self._last_git = 0.0
         self.stop = False
+        # The chart window, and the arms it was opened for. `None` means no window is up.
+        self._viewer = None
+        self._viewer_policies = ()
         self._reattach()
 
     # ------------------------------------------------------------------ ledger
@@ -285,6 +292,7 @@ class Runner(object):
             self._dispatch()
         for running_job in self.running.values():
             launch.update_throughput(running_job, self.host)
+        self._ensure_viewer()
         if git:
             self._publish()
 
@@ -512,6 +520,78 @@ class Runner(object):
                 self._publish_results(running_job)
         self._save_ledger()
 
+    def _ensure_viewer(self):
+        """Keeps a chart window on the box's monitor for whatever is running.
+
+        **Why this is on in snek3 and was off in snek2.** snek2's window was the *trainer's* own
+        in-process cv2 canvas, and one fatal XIO error under memory pressure killed all four arms at
+        once on 2026-08-09. snek3's trainer never draws: this is `tools/chart_viewer.py` in a separate
+        process reading the PNGs the trainer already writes, so a display failure now costs a window
+        and nothing else.
+
+        **A window that exited cleanly stays closed until the arms change.** The tool treats the user
+        closing it as an instruction rather than a failure, and respawning it every 30 s would fight
+        whoever is sitting at the box. A window that *crashed* is respawned, because that is the case
+        the user asked to be protected from. So the rule is: open when the set of running policies
+        changes, reopen on a crash, and never re-open a deliberate close.
+        """
+        policies = tuple(sorted(
+            {name for running_job in self.running.values() for name in running_job.job.policies}))
+        alive = self._viewer is not None and self._viewer.poll() is None
+
+        if not policies or not self.runtime.get('viewer', True):
+            # Nothing to watch, or turned off on `ops`. Closed rather than left showing a batch that
+            # has finished.
+            self._close_viewer()
+            return
+
+        if alive:
+            if policies == self._viewer_policies:
+                return
+            # An arm joined or finished, so the panel list is stale. The list is explicit, so a
+            # restart is the only way to change it.
+            self._close_viewer()
+        elif self._viewer is not None:
+            status = self._viewer.returncode
+            unchanged = policies == self._viewer_policies
+            self._viewer, self._viewer_policies = None, ()
+            if status == 0 and unchanged:
+                return                    # closed on purpose; leave it closed
+            if status != 0:
+                sys.stderr.write(
+                    'chart viewer died with status {0}; reopening\n'.format(status))
+
+        pids = sorted(running_job.pid for running_job in self.running.values())
+        try:
+            self._viewer = launch.spawn_viewer(policies, pids, self.host)
+        except OSError as error:
+            sys.stderr.write('could not open the chart viewer: {0}\n'.format(error))
+            self._viewer = None
+        self._viewer_policies = policies if self._viewer is not None else ()
+
+    def _close_viewer(self):
+        """Terminates the window and **reaps it**, then forgets it.
+
+        The `wait` is the point. Dropping the handle after `terminate` leaves a zombie for as long as
+        the daemon runs, and the daemon runs for weeks — so a batch that restarts the window a few
+        times a day would accumulate them. The timeout is short because the viewer's only shutdown
+        work is closing a figure; if it somehow ignores SIGTERM it is killed.
+        """
+        if self._viewer is None:
+            self._viewer_policies = ()
+            return
+        if self._viewer.poll() is None:
+            self._viewer.terminate()
+            try:
+                self._viewer.wait(timeout=VIEWER_STOP_SECONDS)
+            except subprocess.TimeoutExpired:
+                self._viewer.kill()
+                try:
+                    self._viewer.wait(timeout=VIEWER_STOP_SECONDS)
+                except subprocess.TimeoutExpired:
+                    sys.stderr.write('chart viewer would not die; leaking one process\n')
+        self._viewer, self._viewer_policies = None, ()
+
     def _publish_results(self, running_job):
         """Publishes every arm this job owned, **one push per arm**.
 
@@ -651,6 +731,8 @@ class Runner(object):
             'counts': self._counts(),
             'running': running,
             'ledger': self._ledger_view(order),
+            'viewer': {'up': self._viewer is not None and self._viewer.poll() is None,
+                       'policies': list(self._viewer_policies)},
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
             'load_avg': list(os.getloadavg()),
         }
@@ -900,6 +982,9 @@ def main():
         except Exception as error:      # the loop must never die
             sys.stderr.write('poll error: {0}\n'.format(error))
         forced = _wait_for_next_poll(runner)
+    # The jobs are detached and keep running; the window is not, and one left behind would show a
+    # batch nobody is watching any more. `KillMode=process` spares it, so closing it is on us.
+    runner._close_viewer()
 
 
 def _wait_for_next_poll(runner):

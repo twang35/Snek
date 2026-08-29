@@ -105,6 +105,7 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | `disk_min_gb` | 5 | refuse to launch below this much free |
 | `paused` / `drain` | false | finish what is running, start nothing new |
 | `auto_stage_b` | true | a finished training auto-queues its stage-B wave at priority 10 |
+| `viewer` | true | a live chart window on the box's monitor while jobs run — see below |
 
 **Cores are the binding constraint, not memory** — which is a change from snek2. Measured 2026-08-28
 on this code: an eval shard peaks at **202 MB** (193 of it torch's import) and a trainer at **290
@@ -118,6 +119,30 @@ running fewer than asked would be a surprising way to honour a thread limit.
 pushes to github a day — enough sustained machine-shaped traffic from a home connection to be worth
 not making. 600 s cuts both to 144 while costing nothing locally, and `trigger` covers the case where
 a batch should start *now*.
+
+## The chart window
+
+**While anything is running, the box's monitor shows a live grid of that batch's charts** —
+`tools/chart_viewer.py`, started by the daemon with an explicit panel list and the pids it launched.
+It closes when the box goes idle, and restarts when an arm joins or finishes, because the panel list
+is explicit rather than a glob (a glob over `runs/` would show every arm the box has ever run).
+
+**This is on in snek3 and was off in snek2, and the reason it is now safe is the important part.**
+snek2's window was the *trainer's* own in-process cv2 canvas, and one fatal XIO error under memory
+pressure killed all four arms at once on 2026-08-09 — which is why `SNEK_CHART_WINDOW=0` is in
+snek2's unit file. snek3's trainer never draws. This is a separate process that only *reads* the PNGs
+the trainer already writes, so the worst a display failure can do is kill a window.
+
+Two behaviours worth knowing:
+
+- **A window you close stays closed.** The tool treats closing as an instruction, not a failure, so
+  the daemon does not reopen it on the next poll and fight you. It comes back when the set of running
+  arms changes, which is when there is new content to show.
+- **A window that *crashed* is reopened.** A non-zero exit is not an instruction.
+
+It needs `DISPLAY` and `XAUTHORITY` in `host.env`; those are the only two optional keys there, and
+without them the daemon runs headless and skips the window silently. `runtime.json`'s `viewer: false`
+turns it off on a running box, which closes any open window on the next poll.
 
 ## Set the box up
 
@@ -152,7 +177,7 @@ run artifacts on the box abort the fast-forward**, and piping the merge to `tail
 |---|---|
 | a required `project` field | `ops` holds ~150 retired snek2 specs whose `script` would resolve to a TensorFlow trainer that does not exist here |
 | one eval stage, not two | `training → closeout → HOF` becomes `training → stage B`, so the `auto_hof` hop, the `-hof` id handling and the legacy phase branch all go |
-| `_ensure_viewer` deleted (~200 lines) | snek3's trainer writes PNGs and never opens a window. An X11 session under memory pressure once XIO-crashed all four arms |
+| `_ensure_viewer` shrinks from ~200 lines to ~50 | snek2 needed a process registry, an `O_EXCL` claim lock, a grace period, zombie detection and a dedupe because four peer trainers each tried to open one shared window knowing nothing about each other. One process starts the arms here, so one process starts the window |
 | `publish_results` reports its push, and `push_unpushed` retries | a failed push left the commit local while the ledger said `done` — **indistinguishable from a pass that legitimately found nothing.** It hid four 500-episode result files, one a 98.2% checkpoint, for hours |
 | a `failed` eval reaches `attention` | silently never retrying one cost snek2's batch 46 wave 1 its whole measurement |
 | no episode count or gate in the launcher | snek2's daemon carried five protocol numbers as a second copy of what `eval_plan.py` defines, and they drifted |

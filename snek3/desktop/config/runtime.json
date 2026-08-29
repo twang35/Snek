@@ -10,5 +10,6 @@
   "disk_min_gb": 5,
   "paused": false,
   "drain": false,
-  "auto_stage_b": true
+  "auto_stage_b": true,
+  "viewer": true
 }

@@ -11,6 +11,10 @@ daemon — and a *partially* applied config is worse than a rejected one, becaus
 worked. Values are then clamped to the host ceilings, so no commit can push the box past
 `HARD_MAX_*` or below the poll floor.
 
+`DISPLAY` and `XAUTHORITY` are the two **optional** `host.env` keys: with them the daemon can put a
+chart window on the box's physical monitor, and without them it skips that silently, because a
+headless box is a valid configuration and must not be a startup failure.
+
 ## The binding constraint moved from memory to cores
 
 snek2's ceiling arithmetic was about memory: a spawned TF eval worker carried its own ~230 MB arena,
@@ -65,11 +69,17 @@ RUNTIME_DEFAULTS = {
     # snek2's `auto_closeout` + `auto_hof` were two hops of a tiered close-out, and there is one
     # stage now, so carrying the old names would be archaeology rather than continuity.
     'auto_stage_b': True,
+    # A chart window on the box's physical monitor while jobs run. On by default here and off in
+    # snek2 for a reason that changed: snek2's window was the *trainer's* own in-process cv2 canvas,
+    # and one fatal XIO error under memory pressure took all four arms down with it on 2026-08-09.
+    # snek3's trainer never draws. The window is `tools/chart_viewer.py` in its own process, reading
+    # the PNGs the trainer writes, so the worst a display failure can now do is kill a window.
+    'viewer': True,
 }
 
 _INT_KEYS = ('max_trainers', 'max_evals', 'eval_shards', 'poll_seconds', 'git_seconds',
              'torch_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
-_BOOL_KEYS = ('paused', 'drain', 'auto_stage_b')
+_BOOL_KEYS = ('paused', 'drain', 'auto_stage_b', 'viewer')
 
 _REQUIRED_HOST = ('REPO_PATH', 'SNEK_DIR', 'PYTHON_BIN', 'GIT_REMOTE',
                   'OPS_BRANCH', 'STATUS_BRANCH', 'RESULTS_BRANCH',
