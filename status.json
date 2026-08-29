@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T14:34:03",
-  "ts": 1788039243.0443678,
+  "iso": "2026-08-29T14:44:06",
+  "ts": 1788039846.1966817,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 80% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 82% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -39,10 +39,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2320000,
+      "step": 2375000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 23075
+      "steps_per_sec": 96.6,
+      "elapsed_s": 23678
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -52,10 +52,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2401000,
+      "step": 2459000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 23075
+      "steps_per_sec": 96.6,
+      "elapsed_s": 23678
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -65,10 +65,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 2464000,
+      "step": 2525000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 23075
+      "steps_per_sec": 96.6,
+      "elapsed_s": 23678
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -78,10 +78,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 2420000,
+      "step": 2480000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.9,
-      "elapsed_s": 23075
+      "steps_per_sec": 96.6,
+      "elapsed_s": 23678
     }
   ],
   "ledger": {
@@ -97,8 +97,8 @@
   },
   "disk_free_gb": 49.1,
   "load_avg": [
-    4.04296875,
-    4.021484375,
-    4.01611328125
+    4.025390625,
+    4.12353515625,
+    4.10595703125
   ]
 }
