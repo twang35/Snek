@@ -44,6 +44,39 @@ summary instead of snek2's own b47 spec. Read the spec.
 Seed N is pinned to arm letter N, so every arm is seed-matched against b29a-d, b41a-d, b47a-d **and**
 snek3's own b1a-d. Budget ~7 h an arm; the desktop auto-queues one stage-B wave for the batch.
 
+### ‡ Interim reading at 0.36-0.41M of 3M — the phase-3 gate is met, and b2 is ahead of b47 on every seed
+
+Read 2026-08-29 09:13, ~1 h in, at **106 agent steps/s an arm** (the 290 st/s in the log excludes the
+self-eval; stage A is ~2/3 of the wall clock). ETA ~16:00. Both tables are 100-episode graph evals, so
+b2 and b47 are on the same instrument and the counts are directly comparable.
+
+| seed | step | b2 ≥95 | b2 ≥98 | b2 best30 | b47 ≥95 | b47 ≥98 | b47 best30 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 0.36M | 0 | 0 | 85.9 | 0 | 0 | 34.1 |
+| 2 | 0.37M | 7 | 1 | 92.7 | 0 | 0 | 67.0 |
+| 3 | 0.34M | 0 | 0 | 81.0 | 0 | 0 | 55.0 |
+| 4 | 0.39M | **52** | **17** | **96.8** | 0 | 0 | 68.3 |
+
+b47's column is *truncated to the same step count*, which is the only fair read. For context, b47 at
+its own furthest point — 1.38-1.63M, where snek2 froze mid-batch — had best30 82.2 / 90.5 / **96.0** /
+83.6 and ≥95 counts 0 / 8 / 173 / 0. **b2d at 0.39M has already passed b47c's best30 at 1.63M.**
+
+**The phase-3 gate (≥90% perfect) is met on both readings and by two arms.** b2d's trailing-30 perfect
+rate peaks at 96.8% and it has 52 single evals at ≥95/100 including a 100; b2b is at 92.7% with 7. b1
+never reached one such eval in 3M steps, so the five knobs are the whole difference — which is snek2's
+own batch-28/29 finding, reproduced.
+
+**‡ Same shape as b47, different carrier.** One arm carries the batch and two produce nothing ≥95, as
+in b47 (carrier seed 3) and b41 (also seed 3) and b29 (seed 2). b2's carrier is seed 4, so it is now 1
+of 4 for every seed and the carrier is a coin, not a property of the seed. **Do not read b2a or b2c as
+a regression**: snek2 saw the same on the same config.
+
+**What is not yet answered is phase 5**, which needs a ≥98%/500 *region* from the stage-B wave rather
+than these 100-episode rows. b2d's 17 rows ≥98/100 and 7 ≥99/100 make a region plausible and not
+assured — snek2's winner's-curse drops on this instrument were −2.6, −3.2 and −6.2 pp. And the snek2
+side of that comparison is **b29's own close-out, not b47's**: b47 was frozen at 69-81% of its 2M cap
+and never closed out, so no b47 ≥98%/500 data exists.
+
 **b1 is closed** ([`results.md`](results.md)): four arms at 3M, peak perfect 42.1 / 58.3 / 56.7 /
 81.9%, **no checkpoint anywhere at 95/100**, every arm still climbing at its cap. Its stage-B wave
 has run and published 0 rows an arm, which is the honest measurement rather than a failure.

@@ -1,8 +1,11 @@
 # Charts — one graph per arm
 
-**Batch b2 is running** — b29's record config, seeds 1-4, all four on the desktop. Its charts arrive
-on the `results` branch at close-out; a live desktop arm's `runs/` files must not be committed from
-here, because the box rewrites those paths every eval and a committed copy aborts its next ff-merge.
+**Batch b2 is running** — b29's record config, seeds 1-4, all four on the desktop, at 0.36-0.41M of
+3M as of 2026-08-29 09:13. Its charts arrive on the `results` branch at close-out; a live desktop
+arm's `runs/` files must not be committed from here, because the box rewrites those paths every eval
+and a committed copy aborts its next ff-merge. The interim numbers, including the seed-matched
+comparison against snek2's b47 at the same step count, are in [`runs.md`](runs.md) — **b2d is at 96.8%
+best30 and 52 evals ≥95/100, so the phase-3 gate is met**.
 
 **Batch b1 closed 2026-08-29.** All four charts are committed now that the arms have stopped — while
 a desktop arm is *live* its `runs/` files must not be committed from here, because the box rewrites
