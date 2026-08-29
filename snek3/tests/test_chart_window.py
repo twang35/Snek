@@ -8,6 +8,8 @@ which a dead window can affect a run.
 
 import os
 import subprocess
+import sys
+import textwrap
 
 import pytest
 
@@ -305,3 +307,122 @@ def test_a_ps_that_cannot_answer_is_not_a_zombie(monkeypatch):
 
 def test_a_live_process_is_not_a_zombie():
     assert live_runs.zombie(os.getpid()) is False
+
+
+# --- a wave is read as a wave -----------------------------------------------------------------
+
+
+def test_an_arm_that_finishes_keeps_its_panel():
+    """Three arms done and one still going is a batch worth glancing at, not a single chart."""
+    known = chart_viewer.wave_panels([], ['runs/b3a.png', 'runs/b3b.png'], new_wave=False)
+    assert chart_viewer.wave_panels(known, ['runs/b3b.png'], new_wave=False) == known
+
+
+def test_an_arm_that_starts_later_joins_without_displacing_anyone():
+    known = chart_viewer.wave_panels([], ['runs/b3a.png'], new_wave=False)
+    assert chart_viewer.wave_panels(known, ['runs/b3a.png', 'runs/b3b.png'], new_wave=False) == [
+        'runs/b3a.png', 'runs/b3b.png']
+
+
+def test_a_panel_is_not_added_twice():
+    known = ['runs/b3a.png']
+    assert chart_viewer.wave_panels(known, ['runs/b3a.png'], new_wave=False) == known
+
+
+def test_the_next_wave_starts_from_nothing():
+    """Otherwise a batch launched inside the idle grace draws its predecessor's charts too — snek2
+    opened a window with eight panels for four arms this way."""
+    known = chart_viewer.wave_panels([], ['runs/b3a.png', 'runs/b3b.png'], new_wave=False)
+    assert chart_viewer.wave_panels(known, ['runs/b4a.png'], new_wave=True) == ['runs/b4a.png']
+
+
+def test_the_finished_wave_stays_up_until_the_window_closes():
+    """The registry is empty for the whole idle grace. The last thing a batch shows is all of its
+    arms, not none of them."""
+    known = chart_viewer.wave_panels([], ['runs/b3a.png', 'runs/b3b.png'], new_wave=False)
+    assert chart_viewer.wave_panels(known, [], new_wave=False) == known
+
+
+# --- the loop that ties it together ---------------------------------------------------------------
+#
+# `run()` is a `while True` around a live figure, so a fixture cannot call it. These two drive the
+# real loop in a subprocess on the Agg backend with a fake clock, because the wiring is where the
+# sticky rule can be right in `wave_panels` and wrong in the caller — a `new_wave` that forgot to
+# check for arms drops the finished wave's panels during the idle grace, and nothing above notices.
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+PROGRAM = """
+import os, sys
+os.environ['MPLBACKEND'] = 'Agg'
+sys.path.insert(0, {root!r})
+from tools import chart_viewer, live_runs
+
+runs_dir = {runs_dir!r}
+chart_viewer.IDLE_CLOSE_SECONDS = {idle}
+for arm in ('armA', 'armB'):
+    live_runs.register(arm, pid=os.getpid(), runs_dir=runs_dir)
+
+clock = {{'t': 0.0}}
+original = chart_viewer.Viewer.refresh
+
+
+def spy(self, paths):
+    print('t={{0:.0f}} {{1}}'.format(clock['t'], sorted(os.path.basename(p) for p in paths)),
+          flush=True)
+    return original(self, paths)
+
+
+chart_viewer.Viewer.refresh = spy
+
+
+def fake_now():
+    clock['t'] += 1.0
+    {script}
+    return clock['t']
+
+
+chart_viewer.run([], interval=0.01, runs_dir=runs_dir, now=fake_now, dpi=60)
+"""
+
+
+def run_loop(tmp_path, script, idle=3, arms=('armA', 'armB')):
+    """Runs the real loop until it closes itself, and returns its panel lines."""
+    for arm in arms:
+        chart(tmp_path, arm)
+    chart(tmp_path, 'armC')
+    program = PROGRAM.format(root=ROOT, runs_dir=runs(tmp_path), idle=idle,
+                             script=textwrap.indent(textwrap.dedent(script), ' ' * 4).strip())
+    result = subprocess.run([sys.executable, '-c', program], stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, timeout=120)
+    output = result.stdout.decode('utf-8', 'replace')
+    assert result.returncode == 0, output
+    return [line for line in output.splitlines() if line.startswith('t=')], output
+
+
+def test_the_loop_keeps_a_finished_arms_panel_until_the_window_closes(tmp_path):
+    """One arm left of two, and the window still shows both — then keeps both while it idles out."""
+    lines, output = run_loop(tmp_path, """
+        if clock['t'] == 2.0:
+            live_runs.unregister('armA', runs_dir=runs_dir)
+        if clock['t'] == 4.0:
+            live_runs.unregister('armB', runs_dir=runs_dir)
+    """)
+    assert lines, output
+    assert all("['armA.png', 'armB.png']" in line for line in lines), output
+    assert 'no training running' in output, output
+
+
+def test_the_loop_starts_the_next_wave_from_nothing(tmp_path):
+    """A batch launched inside the idle grace must not inherit its predecessor's panels."""
+    lines, output = run_loop(tmp_path, """
+        if clock['t'] == 2.0:
+            for arm in ('armA', 'armB'):
+                live_runs.unregister(arm, runs_dir=runs_dir)
+        if clock['t'] == 4.0:
+            live_runs.register('armC', pid=os.getpid(), runs_dir=runs_dir)
+        if clock['t'] == 6.0:
+            live_runs.unregister('armC', runs_dir=runs_dir)
+    """, idle=2)
+    assert lines[-1].endswith("['armC.png']"), output
+    assert "['armA.png', 'armB.png', 'armC.png']" not in output, output

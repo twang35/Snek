@@ -11,7 +11,9 @@ those paths every eval and a committed copy makes its next `git merge --ff-only`
 ## Watching them live
 
 **One window per box, opened by the trainings themselves**, showing every arm running there. Nothing
-launches it; the first arm to start opens it and the last one to finish takes it away. To put it back
+launches it; the first arm to start opens it and the last one to finish takes it away — and a panel
+stays for the rest of the wave once it appears, so a batch with one arm left still shows all four. To
+put it back
 after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closing it and relaunching
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).

@@ -234,8 +234,14 @@ sight, which was right: the window is a thing to look at, not a thing to manage.
 
 **What works is one window per box that reads a registry of live arms.** Each trainer writes
 `runs/.live/<policy>` holding **its own pid** before its first step, then calls `ensure()`: the first
-arm opens the window, the rest get `None`, and panels appear and vanish as arms start and finish
-without anything being reopened. It closes itself five minutes after the last arm goes.
+arm opens the window, the rest get `None`, and panels appear as arms start without anything being
+reopened. It closes itself five minutes after the last arm goes.
+
+**Panels are sticky within a wave**, added 2026-08-29 at the user's request and for the right reason:
+a batch is read as a batch, so with one arm left of four the other three are most of the answer. That
+needs a rule for when a wave *ends*, or the set grows forever — here, the registry going empty and an
+arm appearing again. snek2 had the sticky property and no such rule, and drew **eight panels for four
+arms** when a batch was relaunched inside its 12 h TTL.
 
 **Storing the pid is what shrinks it.** snek2's viewer had the same registry idea with a *name and a
 timestamp* per arm, so nothing in the file could be asked whether it was still true, and it needed

@@ -124,7 +124,8 @@ a batch should start *now*.
 
 **While anything is training, the box's monitor shows one window with every running arm in it** — and
 the daemon does not open it. Each trainer does, for the box: the first arm to start opens the window,
-later arms join the one already up, and it closes itself a few minutes after the last arm finishes.
+later arms join the one already up, each arm's panel stays for the rest of the wave, and it closes
+itself a few minutes after the last arm finishes.
 The mechanism is `tools/chart_window.py` and the pid registry in `tools/live_runs.py`, and it is
 identical on the laptop, which is the point of moving it out of the daemon.
 

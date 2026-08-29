@@ -20,9 +20,10 @@ same here and the answer is ~140 lines, because the registry stores each arm's *
 is a question about a known process instead of a pattern, and none of the grace-period machinery has
 anything to do.
 
-**The normal mode is `--runs-dir`**, which shows the trainings registered in `runs/.live/` — panels
-appear and vanish as arms start and finish, and the window closes itself once the box has been idle
-for `IDLE_CLOSE_SECONDS`. `tools/chart_window.py` is what starts it that way. Explicit paths and
+**The normal mode is `--runs-dir`**, which shows the trainings registered in `runs/.live/`. Panels
+appear as arms start and **stay for the rest of the wave** once they do, so a batch with one arm left
+still shows all four; the window closes itself, panels and all, once the box has been idle for
+`IDLE_CLOSE_SECONDS`. `tools/chart_window.py` is what starts it that way. Explicit paths and
 `--glob` remain for looking at arbitrary charts.
 
 `--watch-pid` is the same idea applied to the exit condition. snek2 asked `pgrep -f <pattern>`
@@ -355,6 +356,29 @@ def live_panels(runs_dir, prune=True):
     return arms, paths
 
 
+def wave_panels(known, live_paths, new_wave):
+    """The panels to show: the live arms **plus the ones that already finished**.
+
+    Sticky on purpose. A batch is read as a batch — with one arm left of four, a glance should still
+    show all four, because what the three finished ones did is most of the answer. So a panel is
+    added when an arm appears and never removed while the wave lasts.
+
+    `new_wave` is what stops that from accumulating forever: when the registry has been empty and an
+    arm appears again, the previous wave's panels go. Without it a batch launched inside the idle
+    grace would draw its predecessor's charts beside its own — which is how snek2 came to open a
+    window with **eight panels for four arms**, by a different route (a 12 h TTL) but the same
+    mistake of never deciding when one wave ends.
+
+    The order is append order and does not matter: `panels` sorts by path, because ordering the panel
+    list by anything that moves is what made the window flash.
+    """
+    known = [] if new_wave else list(known)
+    for path in live_paths:
+        if path not in known:
+            known.append(path)
+    return known
+
+
 def idle_close(arms, seen_arms, empty_since, now):
     """`(seen_arms, empty_since, close)` for one refresh of a `--runs-dir` window.
 
@@ -380,11 +404,19 @@ def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
     negatives = 0
     seen_arms = False
     empty_since = None
+    known = []
+    # Whether the registry was empty last time round, which is how a *new* wave is told from an arm
+    # joining the one already running.
+    was_idle = False
     while True:
         found = list(paths)
         if runs_dir is not None:
             arms, live_paths = live_panels(runs_dir)
-            found.extend(live_paths)
+            known = wave_panels(known, live_paths, new_wave=bool(arms) and was_idle)
+            was_idle = not arms
+            # The finished arms stay up, including through the idle grace before the window closes:
+            # the last thing a batch shows is all of its arms, not none of them.
+            found.extend(known)
             seen_arms, empty_since, close = idle_close(arms, seen_arms, empty_since, now())
             if close:
                 print('no training running for {0:.0f}s; closing'.format(now() - empty_since))
@@ -418,9 +450,9 @@ def main(argv=None):
     parser.add_argument('--glob', dest='glob_pattern', default=None,
                         help='pattern re-expanded every refresh, so new charts appear')
     parser.add_argument('--runs-dir', default=None,
-                        help='show the trainings registered in this runs directory: panels appear '
-                             'and vanish as arms start and finish, and the window closes once none '
-                             'has been running for a while')
+                        help='show the trainings registered in this runs directory: a panel appears '
+                             'when an arm starts and stays for the rest of the wave, and the window '
+                             'closes once none has been running for a while')
     parser.add_argument('--watch-pid', default='',
                         help='comma-separated pids; the window closes once none of them is alive')
     parser.add_argument('--interval', type=float, default=DEFAULT_INTERVAL)

@@ -49,6 +49,10 @@ snek3's investigation is [`snek3/docs/`](snek3/docs/).
 first arm to start opens it, later arms join it, and it closes itself a few minutes after the last one
 finishes. Nothing has to be launched, and a `runs/*.png` glob is no longer the way to watch a batch.
 
+**A panel stays for the rest of the wave once it appears**, so a batch with one arm left still shows
+all four — three finished arms are most of what a glance is for. The accumulated set is dropped when
+the box goes quiet and a new arm appears, so the next batch does not draw its predecessor's charts.
+
 The window is **disposable and the training is not**: it runs in its own session, no training reads
 from or waits on it, and no training reopens it. So killing it, closing it, or relaunching it with
 `cd snek3 && PYTHONPATH=. python -m tools.chart_window` cannot affect a run — which is what makes it

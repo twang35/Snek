@@ -89,7 +89,8 @@ ways to see a game, and they run in their own processes so they cost training no
 
 **It does open a chart window, and there is exactly one per box.** Every training registers itself in
 `runs/.live/` and calls `chart_window.ensure()`; the first arm opens the window, later arms join it,
-and it closes itself a few minutes after the last one finishes. Nothing needs launching by hand, on
+each arm's panel stays for the rest of the wave, and it closes itself a few minutes after the last one
+finishes. Nothing needs launching by hand, on
 this laptop or on the desktop. **The window is disposable and the training is not** — its own session,
 never read from, never waited on, never reopened by a run — so killing or relaunching it while four
 arms train cannot touch them. `SNEK_CHART_WINDOW=0` turns it off, which is what the test suite and
