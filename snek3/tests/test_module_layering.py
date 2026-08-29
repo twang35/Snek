@@ -16,11 +16,14 @@ These are import-time facts, so they need a subprocess — by the time this modu
 has already imported `env.game` and pygame is in `sys.modules`.
 """
 
+import glob
 import os
 import subprocess
 import sys
+import sysconfig
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PACKAGES = ('env', 'vectorized', 'dqn', 'ppo', 'tools')
 
 
 def loaded_after_importing(*modules):
@@ -59,3 +62,48 @@ def test_the_probe_would_notice_pygame():
     # above are testing something, by importing the one module that *does* pull pygame in.
     pygame, _ = loaded_after_importing('env.game')
     assert pygame, 'the probe cannot see pygame, so the assertions above prove nothing'
+
+
+# ------------------------------------------------------------- shadowing the standard library
+
+def project_modules():
+    """Every module in the tree, as `(import name, path)`, excluding tests."""
+    found = []
+    for path in sorted(glob.glob(os.path.join(ROOT, '*.py'))):
+        found.append((os.path.basename(path)[:-3], path))
+    for package in PACKAGES:
+        for path in sorted(glob.glob(os.path.join(ROOT, package, '*.py'))):
+            name = os.path.basename(path)[:-3]
+            if name != '__init__':
+                found.append((name, path))
+    return found
+
+
+def test_no_module_shadows_the_standard_library():
+    """A module named after a stdlib one is loaded *instead of* it, and the error names neither.
+
+    This has already cost a debugging session. `tools/selectors.py` shadowed the standard library's
+    `selectors`, which `subprocess` imports — so running any script from inside `tools/`, where
+    `sys.path[0]` is `tools/`, made `import subprocess` load the project's file, which imports torch,
+    which imports `multiprocessing`, which imports `subprocess` again. The traceback reported a
+    circular import inside `subprocess.py` and pointed nowhere near the actual file.
+
+    Checked against the real stdlib listing rather than a hand-kept denylist, because the point is
+    to catch the name nobody thought of.
+    """
+    stdlib = {name for name in sys.stdlib_module_names if not name.startswith('_')}
+    # `sysconfig`'s stdlib directory catches submodule-level names an import could still resolve to.
+    stdlib |= {os.path.basename(path)[:-3]
+               for path in glob.glob(os.path.join(sysconfig.get_paths()['stdlib'], '*.py'))}
+
+    offenders = [(name, os.path.relpath(path, ROOT))
+                 for name, path in project_modules() if name in stdlib]
+    assert not offenders, (
+        'these modules shadow standard-library modules of the same name: {0}'.format(offenders))
+
+
+def test_the_shadowing_check_would_have_caught_the_real_one():
+    # A fixture whose subject cannot violate it is not a fixture: `selectors` is the name that
+    # actually bit, so the check has to consider it a stdlib name.
+    stdlib = {name for name in sys.stdlib_module_names if not name.startswith('_')}
+    assert 'selectors' in stdlib and 'subprocess' in stdlib

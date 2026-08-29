@@ -103,10 +103,10 @@ class _Job:
         """Bank one finished episode at the slot it was *started* in.
 
         **Start order, not completion order, and this is a correctness requirement rather than
-        tidiness.** `eval_plan.equal_effort_pooled` truncates a row to a common prefix, and its
-        docstring rests on the episodes being exchangeable -- "the first 20 of a 100-episode
-        measurement are as good a 20-episode sample". Appending on completion breaks exactly that
-        assumption, because episode length correlates with outcome: a starving lane runs its whole
+        tidiness.** Every reader of `episode_scores` is entitled to treat a prefix as a fair sample
+        of the row -- "the first 20 of a 100-episode measurement are as good a 20-episode sample",
+        which is what makes a partial row worth anything. Appending on completion breaks exactly
+        that, because episode length correlates with outcome: a starving lane runs its whole
         500-step budget after its last meal while a perfect game ends sooner, so failures finish
         last. Measured on a 40-checkpoint arm, failures sat at mean position **0.92** of a
         completion-ordered array against 0.56 for the reference eval, and a 20-of-100 prefix then

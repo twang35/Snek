@@ -1,20 +1,21 @@
-"""Dumps a snek2 TF checkpoint's online Q-network to an `.npz`. **Runs under the `snek` env.**
+"""Dumps snek2 TF checkpoints' online Q-networks to an `.npz`. **Runs under the `snek` env.**
+
+    /opt/miniconda3/envs/snek/bin/python tools/tf_export.py <policy-dir> <out.npz> [steps.txt]
 
 The only file in snek3 that touches TensorFlow, and it is never imported — `import_tf_checkpoint.py`
 runs it as a subprocess with the `snek` env's python, because snek3's env has no TensorFlow and
-snek2's has no torch, so no single interpreter can do both halves of the conversion.
+snek2's has no torch, so no single interpreter can do both halves of a conversion.
 
-    /opt/miniconda3/envs/snek/bin/python tools/tf_export.py <ckpt-prefix> <out.npz>
+**Every checkpoint in one process, because the import is the cost.** TensorFlow takes ~5 s to import,
+so converting b45a's 3,554 checkpoints one subprocess at a time would be five hours of nothing but
+imports. Reading them all in one process is a couple of minutes.
 
-`<ckpt-prefix>` is the path *without* the `.index`/`.data-...` suffix, e.g.
-`../snek2/hallOfFame/b44a-lowlr7-b29b-ckpt2739000/ckpt-2739000`.
-
-Writes one array per layer parameter, named `kernel0`, `bias0`, `kernel1`, ... in network order,
-plus `layers` holding the count. Kernels come out in TensorFlow's `(in, out)` orientation and are
-transposed on the torch side, not here — this half stays a faithful dump so that a disagreement can
-only be in one of the two places.
+Keys are `<step>/kernel<i>` and `<step>/bias<i>` in network order, plus `<step>/layers` holding the
+count. Kernels come out in TensorFlow's `(in, out)` orientation and are transposed on the torch side,
+not here — this half stays a faithful dump so a disagreement can only be in one of the two places.
 """
 
+import os
 import re
 import sys
 
@@ -27,8 +28,17 @@ import tensorflow as tf
 # `target_update_period` steps, so it would convert cleanly and measure slightly worse.
 _KERNEL = re.compile(r'/_q_network/_sequential_layers/(\d+)/kernel/\.ATTRIBUTES/VARIABLE_VALUE$')
 
+_STEM = 'agent/_q_network/_sequential_layers/{0}/{1}/.ATTRIBUTES/VARIABLE_VALUE'
 
-def export(prefix, destination):
+
+def steps_in(policy_dir):
+    """Checkpoint steps present in a snek2 policy directory, ascending."""
+    return sorted(int(name[len('ckpt-'):-len('.index')]) for name in os.listdir(policy_dir)
+                  if name.startswith('ckpt-') and name.endswith('.index'))
+
+
+def read_one(prefix):
+    """`{'layers': n, 'kernel0': ..., 'bias0': ...}` for one checkpoint prefix."""
     reader = tf.train.load_checkpoint(prefix)
     shapes = reader.get_variable_to_shape_map()
 
@@ -41,21 +51,47 @@ def export(prefix, destination):
 
     arrays = {'layers': np.asarray(len(indices))}
     for index in indices:
-        stem = 'agent/_q_network/_sequential_layers/{0}/'.format(index)
-        kernel = reader.get_tensor(stem + 'kernel/.ATTRIBUTES/VARIABLE_VALUE')
-        bias = reader.get_tensor(stem + 'bias/.ATTRIBUTES/VARIABLE_VALUE')
+        kernel = reader.get_tensor(_STEM.format(index, 'kernel'))
+        bias = reader.get_tensor(_STEM.format(index, 'bias'))
         if kernel.ndim != 2 or bias.ndim != 1 or kernel.shape[1] != bias.shape[0]:
-            raise SystemExit('layer {0} is not a dense layer: kernel {1}, bias {2}'.format(
-                index, kernel.shape, bias.shape))
+            raise SystemExit('layer {0} of {1} is not a dense layer: kernel {2}, bias {3}'.format(
+                index, prefix, kernel.shape, bias.shape))
         arrays['kernel{0}'.format(index)] = np.asarray(kernel, dtype=np.float32)
         arrays['bias{0}'.format(index)] = np.asarray(bias, dtype=np.float32)
-        print('layer {0}: kernel {1}, bias {2}'.format(index, kernel.shape, bias.shape))
+    return arrays
 
-    np.savez(destination, **arrays)
-    print('wrote {0}'.format(destination))
+
+def export(policy_dir, destination, steps=None):
+    """Every requested checkpoint of `policy_dir`, namespaced by step, into one `.npz`."""
+    present = steps_in(policy_dir)
+    if not present:
+        raise SystemExit('no ckpt-*.index in {0}'.format(policy_dir))
+    wanted = present if steps is None else [step for step in steps if step in set(present)]
+    if steps is not None and len(wanted) != len(set(steps)):
+        raise SystemExit('{0} of {1} requested steps are not in {2}'.format(
+            len(set(steps)) - len(wanted), len(set(steps)), policy_dir))
+
+    out = {}
+    for number, step in enumerate(wanted, 1):
+        arrays = read_one(os.path.join(policy_dir, 'ckpt-{0}'.format(step)))
+        for key, value in arrays.items():
+            out['{0}/{1}'.format(step, key)] = value
+        if number == 1 or number % 250 == 0 or number == len(wanted):
+            print('read {0}/{1} (step {2})'.format(number, len(wanted), step))
+            sys.stdout.flush()
+
+    out['steps'] = np.asarray(wanted, dtype=np.int64)
+    np.savez(destination, **out)
+    print('wrote {0}: {1} checkpoint(s), {2:.1f} MB'.format(
+        destination, len(wanted), os.path.getsize(destination) / 1e6))
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         raise SystemExit(__doc__)
-    export(sys.argv[1], sys.argv[2])
+    requested = None
+    if len(sys.argv) == 4:
+        with open(sys.argv[3]) as handle:
+            requested = [int(line.split('#')[0].strip()) for line in handle
+                         if line.split('#')[0].strip()]
+    export(sys.argv[1], sys.argv[2], requested)
