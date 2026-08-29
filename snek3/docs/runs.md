@@ -102,7 +102,8 @@ has run and published 0 rows an arm, which is the honest measurement rather than
 1. **Read b2 against b1 and against b29/b41/b47.** A b2-vs-b29 difference smaller than the
    b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
    precisely to have the yardstick.
-2. **Phase 6 — `ppo/`.** The reason snek3 exists.
+2. **Phase 6 — `ppo/`.** The reason snek3 exists. The design is drafted in
+   [`../plans/ppo.md`](../plans/ppo.md) and is **not approved yet**.
 
 **The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
 is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
@@ -128,7 +129,7 @@ One line per idea, with a prior. A design that is settled enough to implement ge
 
 | idea | prior |
 |---|---|
-| **PPO** | the reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
+| **PPO** | [`../plans/ppo.md`](../plans/ppo.md) — drafted 2026-08-29, awaiting review. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
 | **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
 | **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
 | **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |
