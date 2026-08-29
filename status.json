@@ -1,9 +1,9 @@
 {
-  "iso": "2026-08-28T17:08:57",
-  "ts": 1787962137.4759538,
+  "iso": "2026-08-28T17:19:02",
+  "ts": 1787962742.8560414,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 96% (1 arm)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 99% (1 arm)"
     ],
     "queued": [
       "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (3 arms)"
@@ -42,10 +42,10 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 1917000,
+      "step": 1979000,
       "max_steps": 2000000,
-      "steps_per_sec": 96.4,
-      "elapsed_s": 20437
+      "steps_per_sec": 127.2,
+      "elapsed_s": 21042
     }
   ],
   "ledger": {
@@ -325,8 +325,8 @@
   },
   "disk_free_gb": 52.3,
   "load_avg": [
-    1.482421875,
-    1.572265625,
-    2.23486328125
+    1.22705078125,
+    1.1875,
+    1.6904296875
   ]
 }
