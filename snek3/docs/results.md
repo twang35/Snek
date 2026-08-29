@@ -3,10 +3,34 @@
 The canonical arm table. One row per arm, filled in when the arm stops and its stage-B measurement
 lands. Config, final numbers, verdict.
 
-*No arms yet.* snek3 is in phase 0.
+*No arms yet.* snek3 has no learning code — `dqn/` is phase 3.
 
 | arm | config | steps | best 500-ep | ≥98%/500 count | sef | verdict |
 |---|---|---|---|---|---|---|
+
+## Imported policies
+
+Not arms: snek2 checkpoints converted to torch, kept as reference policies for A/B. They carry
+snek2's training, so their numbers say something about **snek3's environment and measurement**, not
+about snek3 as a learner.
+
+| policy | source | episodes | perfect | snek2's own number |
+|---|---|---|---|---|
+| `b44a-import` @2739000 | `../../snek2/hallOfFame/b44a-lowlr7-b29b-ckpt2739000` | 3,000 | **98.8%** [98.3, 99.1] | 98.73% / 3,000 |
+
+Regenerated rather than committed, in one deterministic command — see
+[`../CLAUDE.md`](../CLAUDE.md). The measurement is [`../runs/b44a-import_phase1.json`](../runs/b44a-import_phase1.json).
+
+**The 0.07 pp gap is two episodes and it is not evidence of anything.** 2964/3000 against
+2962/3000, on different food streams, and the two 95% intervals are identical to a tenth of a point.
+What *is* evidence is that the conversion is exact upstream of the measurement — see
+[`findings.md`](findings.md).
+
+**`avg_reward` is not comparable and `perfect_percent` is.** snek2 trained `b44a` with chase-safe
+shaping at `c=0.10` and `FOOD_DISTANCE_REWARD=0`; the measurement above ran under snek3's defaults,
+`c=0.0` and `0.001`. A greedy policy's action is an argmax over its own Q-values, so the reward
+config cannot change which moves it plays or what it scores — it only changes the number the reward
+terms add up to. That is why a reward figure is never the basis of a comparison here.
 
 ## Reading this table
 

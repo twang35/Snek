@@ -27,32 +27,47 @@ reason.
 |---|---|---|---|
 | `env/` | the scalar game: constants, drawing, `Game`, the reference observation builder | **yes, and only here** | no |
 | `vectorized/` | `VecSnake` (N games in lockstep, pure numpy) plus the measurement engine and wave | no | no |
-| `dqn/`, `ppo/` | learning algorithms | no | yes |
-| `tools/` | the tools and the libraries behind them: `eval_plan`, `run_report`, `arch`, charts | no | no |
+| `dqn/`, `ppo/` | learning algorithms: the network, the replay, the agent, the collector | no | yes |
+| `tools/` | the tools and the libraries behind them: `arch`, `checkpoints`, `restore`, `eval_plan`, `run_report`, charts | no | yes, for checkpoint I/O |
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `docs/` | the investigation | | |
 | `plans/` | designs | | |
 | `tests/` | | | |
 
-**The pygame column is an invariant, not a convention.** `pygame.init()` opens a real CoreAudio
-stream per process and `SDL_VIDEODRIVER=dummy` does not affect audio. Keeping the vectorised and
-eval paths pygame-free removes the trap instead of guarding against it. `env/constants.py` holds no
+**The two columns are invariants, not conventions, and the load-bearing cells are `env/` for torch
+and `vectorized/` for both.** `pygame.init()` opens a real CoreAudio stream per process and
+`SDL_VIDEODRIVER=dummy` does not affect audio, so keeping the vectorised and eval paths pygame-free
+removes the trap instead of guarding against it. `env/constants.py` holds no
 pygame objects for the same reason — that is what `env/render.py` is for.
 
-**`torch` appears only inside a `policy_fn`.** The engine's seam is one function of shape
-`(m, 30) float32 -> (m,) int64`, which is what lets the whole measurement stack be tested against a
-hand-written heuristic policy with no framework imported. Do not thread a tensor through
-`vectorized/`.
+**`vectorized/` sees torch through one function and nothing else.** The engine's seam is a plain
+callable of shape `(m, 30) float32 -> (m,) int64`, which is what lets the whole measurement stack be
+tested against a hand-written heuristic with no framework imported. Do not thread a tensor through
+`vectorized/`. `tools/checkpoints.py` and `tools/restore.py` do import torch — they read and write
+weights — and that costs nothing, because nothing in the measurement loop calls them.
+
+`tests/test_module_layering.py` asserts both columns in a subprocess.
 
 ## Running things
 
 ```
 cd snek3
-PYTHONPATH=. python -u train.py <policy>                 # policy name doubles as the checkpoint dir
-PYTHONPATH=. python -u evaluate.py <policy|batch> [sel]   # the eval wave
+PYTHONPATH=. python -u train.py <policy>                  # policy name doubles as the checkpoint dir
+PYTHONPATH=. python -u evaluate.py <policy> [--episodes N]  # measure one checkpoint
 PYTHONPATH=. python -u watch.py <policy> [step]           # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>         # -> gifs/, throwaway
 ```
+
+**The snek2 champion converts in one command**, and is the reference policy for any A/B:
+
+```
+PYTHONPATH=. python tools/import_tf_checkpoint.py \
+    ../snek2/hallOfFame/b44a-lowlr7-b29b-ckpt2739000 savedPolicies/b44a-import
+```
+
+It is regenerated rather than committed — `savedPolicies/` is gitignored, the source checkpoint is
+in git, and the conversion is deterministic. It needs both conda envs: the read half runs as a
+subprocess under `snek`, because snek3's env has no TensorFlow and snek2's has no torch.
 
 **Always pass `smoke` for verification runs**, so output is isolated in `savedPolicies/smoke/` and is
 safe to delete. Hyperparameters come from `SNEK_*` env vars, so variants run side by side without

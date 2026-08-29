@@ -1,6 +1,6 @@
 # snek3 — the PyTorch port
 
-**Status: approved 2026-08-28. Phase 0 closed 2026-08-28; phase 1 next.** This is the plan for
+**Status: approved 2026-08-28. Phases 0 and 1 closed 2026-08-28; phase 2 next.** This is the plan for
 standing up `snek3/` as a clean-slate PyTorch project that keeps everything snek2 can do — train, evaluate,
 chart, watch, record GIFs, queue batches to the desktop — with the learning framework replaced and
 the accumulated shape of the thing thrown away.
@@ -541,7 +541,7 @@ Each phase has a pre-registered pass condition. Phase 1 is the one that makes th
 | # | phase | gate |
 |---:|---|---|
 | 0 | The instruction split and the `docs/` skeleton (§14), then `env/` + `vectorized/` + the parity harness. No learning code. | three `CLAUDE.md` files, no stale `snek2/` reference outside `snek2/`; parity harness green — 0 mismatches on all 30 indices over ≥18,000 states, ≥12 hand-made mutants killed. **Met 2026-08-28**: 36,000 states × 30 indices, 0 mismatches, 17 of 17 mutants killed, 167 tests green |
-| 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it |
+| 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it. **Met 2026-08-28**: 98.8% (2964/3000), and the conversion is exact — 12,864 states, max \|ΔQ\| 2.7e-5 on Q ~30.6, argmax identical on every one |
 | 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise |
 | 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*, ~2 h for a 3M-step arm with it on |
 | 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box |

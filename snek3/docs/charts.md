@@ -1,6 +1,6 @@
 # Charts — one graph per arm
 
-*No arms yet.* snek3 is in phase 0.
+*No arms yet.* snek3 has no learning code — `dqn/` is phase 3, so nothing has a curve.
 
 Every arm gets a `### <policy> — <what it changes>` section with a stats line, a short reading, and
 its image. **Images are linked straight from `../runs/`** — there is no copy step and no separate

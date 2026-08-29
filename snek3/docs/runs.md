@@ -1,14 +1,19 @@
 # Runs — current state and forward plan
 
-**Nothing is running.** snek3 closed **phase 0** of
-[`../plans/pytorch-port.md`](../plans/pytorch-port.md) on 2026-08-28: `env/` and `vectorized/` are
-in and validated, with no learning code yet.
+**Nothing is running.** snek3 closed **phases 0 and 1** of
+[`../plans/pytorch-port.md`](../plans/pytorch-port.md) on 2026-08-28. `env/`, `vectorized/`, the
+measurement engine, checkpoint I/O and the two viewers are in; there is still no learning code.
 
-The phase-0 gate was parity between the two env implementations, and it came out clean: **36,000
-states × 30 observation indices, 0 mismatches**, across a growth regime (24,000 states, 49 episodes,
-lengths to 60) and a coiled endgame regime (12,000 states, 280 episodes, 26 perfect games), with
-rewards, terminations, both shaping terms and the win path in parity too. **17 of 17 hand-made
-mutants killed.** 167 tests green in ~2 min.
+**Phase 0 — the two env implementations agree.** 36,000 states × 30 observation indices, **0
+mismatches**, across a growth regime (24,000 states, 49 episodes, lengths to 60) and a coiled endgame
+regime (12,000 states, 280 episodes, 26 perfect games), with rewards, terminations, both shaping
+terms and the win path in parity too. **17 of 17 hand-made mutants killed.**
+
+**Phase 1 — the snek2 champion plays in torch.** `b44a-lowlr7-b29b-ckpt2739000` converted and
+measured **98.8% perfect over 3,000 episodes** against snek2's 98.73%, inside the ±0.6 pp gate. The
+conversion itself is exact rather than close: on 12,864 states the two networks' Q-values differ by
+at most 2.7e-5 on values of magnitude ~30.6, and the **argmax is identical on every state**, so the
+policies are the same function. `watch.py` plays it and `record_gif.py` records it.
 
 ## Now
 
@@ -22,12 +27,13 @@ mutants killed.** 167 tests green in ~2 min.
 The phase table in [`../plans/pytorch-port.md`](../plans/pytorch-port.md) §10 is the plan; this is
 only what is immediately next.
 
-1. **Phase 1 — the champion transfer.** Convert `snek2/hallOfFame/b44a-lowlr7-b29b-ckpt2739000` to a
-   torch `state_dict` and measure it. Gate: **98.7% ± 0.6 pp over 3,000 episodes.** This validates
-   the env, the observation, the policy path and the eval engine with no training code at all.
-2. **Phase 2 — the eval wave**, then a 3,222-row A/B against snek2's own
-   `b45a-lowlr8-b29b_checkpoint_evals_vec.json`.
-3. **Phase 3 — `dqn/`.** DDQN + PER + the epsilon schedule + the forking collector + the shield.
+1. **Phase 2 — the eval wave.** `vectorized/shard.py`, `vectorized/wave.py`, the `steps:<file>`
+   selector, `run_report`, `arch` and the charts. Then a **3,222-row A/B** against snek2's own
+   `b45a-lowlr8-b29b_checkpoint_evals_vec.json`, converting every checkpoint of that arm. ~2 h of
+   compute, and the only way to know the flat protocol agrees with the tiered one it replaces.
+2. **Phase 3 — `dqn/`.** DDQN + PER + the epsilon schedule + the forking collector + the shield.
+   Gate: one arm at ≥90% perfect, ≥1,500 agent steps/s with the self-eval off.
+3. **Phase 4 — `desktop/`.**
 
 ## Backlog
 
