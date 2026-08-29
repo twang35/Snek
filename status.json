@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T09:44:14",
-  "ts": 1788021854.3965132,
+  "iso": "2026-08-29T09:54:17",
+  "ts": 1788022457.3526824,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 20% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 22% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -40,10 +40,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 587000,
+      "step": 649000,
       "max_steps": 3000000,
       "steps_per_sec": 96.3,
-      "elapsed_s": 5686
+      "elapsed_s": 6289
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -53,10 +53,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 597000,
+      "step": 663000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.3,
-      "elapsed_s": 5686
+      "steps_per_sec": 128.4,
+      "elapsed_s": 6289
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -66,10 +66,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 559000,
+      "step": 621000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.3,
-      "elapsed_s": 5686
+      "steps_per_sec": 128.4,
+      "elapsed_s": 6289
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -79,10 +79,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 615000,
+      "step": 680000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.3,
-      "elapsed_s": 5686
+      "steps_per_sec": 128.4,
+      "elapsed_s": 6289
     }
   ],
   "ledger": {
@@ -98,8 +98,8 @@
   },
   "disk_free_gb": 49.5,
   "load_avg": [
-    4.09130859375,
-    4.0341796875,
-    4.00537109375
+    4.326171875,
+    4.1357421875,
+    4.04150390625
   ]
 }
