@@ -7,6 +7,10 @@ with one fatal XIO error.
     PYTHONPATH=. python -m tools.chart_viewer runs/b48*.png
     PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/b48*.png' --watch-pid 8123,8124,8125
     PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/*_checkpoint_evals_*.png' --interval 5
+    PYTHONPATH=. python -m tools.chart_viewer runs/b1*.png --scale 0.6   # a smaller window
+
+The window fills the display it opens on. `--scale` is a fraction of that, not a number of inches —
+see `fit_dims`.
 
 **The launcher opens this, with an explicit file list.** snek2's version was 1,010 lines and ~500 of
 them existed because four peer trainers each tried to open one shared window while knowing nothing
@@ -48,6 +52,30 @@ NEGATIVE_CHECKS = 3
 # deadlocks against a resize. `flush_events` plus a plain sleep does the same job.
 FLUSH_SLICE = 0.05
 
+# The window is sized from the **screen**, not from a fixed number of inches, and that is the whole
+# fix for "the window is very small". A fixed size cannot be right on a monitor nobody measured: the
+# first version asked for 6x3 inches a panel and opened 1201x650 on the desktop's 3840x2160 display,
+# 31% of its width. snek2 tuned fixed caps for years — 14.0x8.0 to 18.2x13.0 inches over three
+# revisions, each one a clipped bottom row — and even the last would reach only 47% here. Asking the
+# display is one call and adapts to any of them.
+SCREEN_WIDTH_FRACTION = 0.95
+SCREEN_HEIGHT_FRACTION = 0.88        # leaves the title bar and the shell's top panel
+# 1.0 fills that budget. Lower it for a window you want to put something beside.
+DEFAULT_SCALE = 1.0
+# Used only when Tk cannot be asked — a non-Tk backend, or a probe that raised. Deliberately sized
+# for a laptop rather than a 4K panel: a window that is too small is a nuisance, while one taller
+# than the display hides its bottom row and reads as missing charts.
+FALLBACK_PANEL_WIDTH_IN = 6.5
+# A fallback only. The real aspect is read from the image, because `imshow` preserves the image's own
+# aspect inside its box, so any disagreement between the two becomes letterboxing — once per row,
+# which is what puts a band between the panels and shrinks the charts inside them.
+DEFAULT_PANEL_ASPECT = 730.0 / 450.0
+# Darwin's built-in panels are 2x Retina while the conda Tk build reports scaling 1.0, so matplotlib
+# renders at 1x and the compositor upsamples — soft charts however sharp the PNG. Rendering at 2x
+# gives the figure the pixels the panel really has. The screen probe divides by the same dpi, so the
+# window still comes out the same physical size.
+HIDPI_DPI = 200
+
 
 def panels(paths, glob_pattern, max_panels):
     """The PNGs to show, newest first, capped.
@@ -61,9 +89,14 @@ def panels(paths, glob_pattern, max_panels):
     found = list(paths)
     if glob_pattern:
         found.extend(globmod.glob(glob_pattern))
-    unique = sorted({os.path.abspath(path) for path in found if os.path.exists(path)})
-    unique.sort(key=lambda path: os.path.getmtime(path), reverse=True)
-    return unique[:max_panels]
+    unique = {os.path.abspath(path) for path in found if os.path.exists(path)}
+    chosen = sorted(unique, key=lambda path: os.path.getmtime(path), reverse=True)[:max_panels]
+    # **Returned in path order, and that is load-bearing rather than tidy.** mtime decides *which*
+    # panels survive the cap; ordering the *output* by it permutes the list every time an arm writes
+    # its PNG, and `refresh` rebuilds the figure whenever the panel set changes. Three arms writing
+    # on their own clocks therefore closed and reopened the window every few seconds — a visible
+    # flash per refresh on the desktop, taking any resize with it. Measured 2026-08-29.
+    return sorted(chosen)
 
 
 def grid_shape(count):
@@ -110,6 +143,76 @@ def pids_alive(pids):
     return False
 
 
+def viewer_dpi(platform, override=None):
+    """The dpi to render at: 2x on darwin (see `HIDPI_DPI`), 100 elsewhere. `--dpi` wins.
+
+    Pure, so the platform rule is testable without a display.
+    """
+    if override:
+        return override
+    return HIDPI_DPI if platform == 'darwin' else 100
+
+
+def panel_aspect(path, fallback=DEFAULT_PANEL_ASPECT):
+    """A PNG's width/height, or `fallback` when it cannot be read.
+
+    Read rather than assumed because the two chart shapes here differ a lot — a training chart is
+    1.62 and an eval chart 2.08 — and a panel box that disagrees with its image letterboxes it.
+    """
+    try:
+        pixels = imageio.imread(path)
+        height, width = pixels.shape[0], pixels.shape[1]
+    except Exception:
+        return fallback
+    return float(width) / float(height) if height and width else fallback
+
+
+def screen_inches(figure):
+    """The display's size in inches, or None if Tk cannot be asked.
+
+    Inches rather than pixels so the caller never has to think about dpi: this divides by the
+    figure's own, which is what keeps a 2x darwin render the same physical size.
+    """
+    try:
+        window = figure.canvas.manager.window
+        dpi = float(figure.get_dpi())
+        return (window.winfo_screenwidth() / dpi, window.winfo_screenheight() / dpi)
+    except Exception:
+        return None
+
+
+def fit_dims(rows, columns, aspect, scale=DEFAULT_SCALE, screen=None):
+    """Figure size in inches: the panel grid's own aspect, filled into the screen budget.
+
+    **Grows as well as shrinks**, which is the difference from snek2's version and the reason the
+    window is now the size of the monitor. A shrink-only fit cannot exceed the inches it was asked
+    for, so the fixed request stayed the binding constraint on any large display.
+
+    Uniform in both axes — the grid's aspect is preserved, so a panel never distorts. `screen=None`
+    falls back to fixed inches.
+    """
+    grid = (columns * float(aspect)) / rows          # width / height of the whole grid
+    if screen is None:
+        width = columns * FALLBACK_PANEL_WIDTH_IN * scale
+        return width, width / grid
+    width = min(screen[0] * SCREEN_WIDTH_FRACTION * scale,
+                screen[1] * SCREEN_HEIGHT_FRACTION * scale * grid)
+    return width, width / grid
+
+
+def apply_tight_grid(figure, gap=0.01):
+    """Pushes the panels out to the figure edges with a hairline between them.
+
+    Replaces `tight_layout`, which reserves room for the titles, labels and ticks that axes holding
+    a bare `imshow` do not have — about 8% of the height on a 2x2 grid, all of it visible as a band
+    between the rows, and all of it taken off the charts.
+    """
+    try:
+        figure.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0, wspace=gap, hspace=gap)
+    except Exception:
+        pass
+
+
 class Viewer(object):
     """One window, one figure, and one image artist per panel, reused across refreshes.
 
@@ -118,9 +221,12 @@ class Viewer(object):
     the window's size.
     """
 
-    def __init__(self, title, interval, max_panels):
+    def __init__(self, title, interval, max_panels, scale=DEFAULT_SCALE, dpi=None):
         self.interval = interval
         self.max_panels = max_panels
+        self.scale = scale
+        self.dpi = dpi
+        self.aspect = DEFAULT_PANEL_ASPECT
         self.figure = None
         self.axes = []
         self.images = {}
@@ -129,16 +235,27 @@ class Viewer(object):
         self.title = title
 
     def _build(self, count):
+        """Makes the window, then resizes it to the display.
+
+        Two steps because of a chicken and egg: the screen can only be read through a live Tk
+        window, and there is no window until `subplots` has made one. So it opens at the fallback
+        size and is resized before anything is drawn into it.
+        """
         rows, columns = grid_shape(count)
         if self.figure is not None:
             plt.close(self.figure)
-        self.figure, axes = plt.subplots(rows, columns, figsize=(6.0 * columns, 3.0 * rows))
+        dpi = viewer_dpi(sys.platform, self.dpi)
+        self.figure, axes = plt.subplots(
+            rows, columns, dpi=dpi,
+            figsize=fit_dims(rows, columns, self.aspect, self.scale, None))
         self.axes = list(axes.flat) if hasattr(axes, 'flat') else [axes]
         for axis in self.axes:
             axis.set_axis_off()
         self.images = {}
         self.figure.canvas.manager.set_window_title(self.title)
-        self.figure.tight_layout(pad=0.2)
+        self.figure.set_size_inches(
+            *fit_dims(rows, columns, self.aspect, self.scale, screen_inches(self.figure)))
+        apply_tight_grid(self.figure)
 
         # Installed *after* subplots(), not before. Tk installs its own SIGTERM handler inside the
         # first subplots() call and overwrites anything set earlier — 5 of 5 kills still aborted the
@@ -164,9 +281,16 @@ class Viewer(object):
         """Redraws whatever changed. Returns False if there is nothing to show."""
         if not paths:
             return False
-        if paths != self.shown or self.figure is None:
+        # **The panel SET, not the list.** The artists are keyed by path and stay on the axis they
+        # were created on, so a reordering needs no rebuild — and rebuilding on one is exactly what
+        # made the window flash. `panels` returns a stable order now, so this is the second guard on
+        # the same bug rather than the fix, and it states the invariant the fix relies on.
+        if set(paths) != set(self.shown) or self.figure is None:
+            # The panel box matches the image, so its aspect has to be known before the figure
+            # exists. One extra read per rebuild, and rebuilds are rare now.
+            self.aspect = panel_aspect(paths[0], self.aspect)
             self._build(len(paths))
-            self.shown = paths
+            self.shown = list(paths)
             self.mtimes = {}
 
         for index, path in enumerate(paths):
@@ -200,8 +324,8 @@ class Viewer(object):
 
 
 def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
-        max_panels=DEFAULT_MAX_PANELS, title='snek3 charts'):
-    viewer = Viewer(title, interval, max_panels)
+        max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None):
+    viewer = Viewer(title, interval, max_panels, scale, dpi)
     plt.ion()
     negatives = 0
     while True:
@@ -238,11 +362,16 @@ def main(argv=None):
     parser.add_argument('--interval', type=float, default=DEFAULT_INTERVAL)
     parser.add_argument('--max-panels', type=int, default=DEFAULT_MAX_PANELS)
     parser.add_argument('--title', default='snek3 charts')
+    parser.add_argument('--scale', type=float, default=DEFAULT_SCALE,
+                        help='fraction of the screen to fill; 1.0 is as large as it goes')
+    parser.add_argument('--dpi', type=int, default=None,
+                        help='figure render dpi; default 200 on darwin (Retina), 100 elsewhere')
     args = parser.parse_args(argv)
     if not args.paths and not args.glob_pattern:
         parser.error('give PNG paths or --glob')
     pids = [int(token) for token in args.watch_pid.split(',') if token.strip()]
-    run(args.paths, args.glob_pattern, pids, args.interval, args.max_panels, args.title)
+    run(args.paths, args.glob_pattern, pids, args.interval, args.max_panels, args.title,
+        args.scale, args.dpi)
     return 0
 
 
