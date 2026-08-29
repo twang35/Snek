@@ -95,8 +95,7 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | knob | default | notes |
 |---|---:|---|
 | `max_trainers` | 8 | concurrent train/smoke/benchmark jobs **in one wave**. Not what keeps waves from overlapping — see below |
-| `max_evals` | 1 | concurrent eval *jobs*. A job is a whole wave, so 1 is normal, and the wave barrier makes any other value meaningless |
-| `eval_shards` | 16 | **this is the knob that fills the box**, not `max_evals` |
+| `eval_shards` | 16 | **this is the knob that fills the box.** One wave owns every arm of a batch |
 | `poll_seconds` | 30 | the local half: reap, read the fetched ref, dispatch. Off-network, so it stays fast |
 | `git_seconds` | 600 | the network half: one fetch, one status push, one retry of any local-only commit |
 | `torch_threads` | 1 | measured, not cautious. `SNEK_TORCH_THREADS` |
@@ -125,23 +124,32 @@ is 290 MB and the ceiling is threads, so 8 trainers beside the stage-A queue's 6
 single-threaded processes on 16 threads — the same shape as the 16-shard eval wave the box is already
 tuned for. Raised to 8 on 2026-08-29.
 
-`max_evals` is redundant with the barrier rather than merely unusual at 1: an eval job *is* a whole
-wave, so no second one can start regardless. It is a candidate for deletion along with
-`HARD_MAX_EVALS`, which would also collapse `clamp_total_shards` into a plain `eval_shards` clamp.
-Left in place for now because removing a config key touches the parser, the clamp, the status payload
-and their tests, and none of that buys a running batch anything.
+**Three settings were removed on 2026-08-29 for being unable to affect anything.**
 
-**`HARD_MAX_TRAINERS` in `host.env` is the one that bites first**, because `runtime.json` is clamped
-to it and the request is merely *noted* in `status.json` rather than refused — so a commit asking for
-8 against a host ceiling of 4 runs 4 arms and looks like it worked. Raise both or neither.
+`max_evals` and `HARD_MAX_EVALS` are gone: an eval job *is* a whole wave, so the barrier already
+prevented a second one and the count's only legal value was the 1 it shipped as. `clamp_total_shards`
+went with them — it existed to divide the shard ceiling by the wave count, which meant asking for two
+waves silently halved the width of the one wave that could actually run. `eval_shards` is now clamped
+straight to `HARD_MAX_EVAL_SHARDS`, which is a real ceiling: threads.
+
+`HARD_MAX_TRAINERS` is gone because wave width is not a safety property, and as a second tier it was
+worse than redundant — `runtime.json` was clamped to it and the request merely *noted* in
+`status.json`, so a commit asking for 8 arms against a stale ceiling of 4 ran 4 and looked like it had
+worked. That is precisely what happened on 2026-08-29. `max_trainers` is now honoured as written,
+bounded only by a far-away sanity clamp, and its job is simply to stop a queue commit with twenty
+specs from launching twenty trainers.
+
+**A `runtime.json` still naming `max_evals` is now rejected whole**, not ignored — the unknown-key
+path keeps the last known-good config and says so in `status.json`, which is the right outcome for a
+stale `ops` commit. **A `host.env` still carrying the two removed ceilings is fine**; extra keys are
+ignored, so an unchanged box keeps working and a rollback stays possible.
 
 **Cores are the binding constraint, not memory** — which is a change from snek2. Measured 2026-08-28
 on this code: an eval shard peaks at **202 MB** (193 of it torch's import) and a trainer at **290
 MB**, so a full box is **4.4 GB of 15,030**, 29%. snek2's memory-driven three-way clamp therefore
 collapses into one ceiling tied to the box's **16 SMT threads** (Ryzen 7 9700X, 8 physical cores): 16
-shards at one intra-op thread each is the measured optimum, and 18 loses 6-10%. `eval_shards` gives
-way to that ceiling, never `max_evals` — how many waves run is a scheduling decision, and quietly
-running fewer than asked would be a surprising way to honour a thread limit.
+shards at one intra-op thread each is the measured optimum, and 18 loses 6-10%. `eval_shards` is
+clamped straight to that ceiling.
 
 `git_seconds` is separate from `poll_seconds` because at 30 s the box made ~2,880 fetches and ~2,880
 pushes to github a day — enough sustained machine-shaped traffic from a home connection to be worth

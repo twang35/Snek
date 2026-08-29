@@ -48,10 +48,11 @@ RUNTIME_DEFAULTS = {
     # defaults are the fallback for an unreadable `runtime.json`, where running fewer arms than asked
     # is the safe direction.
     'max_trainers': 2,
-    'max_evals': 1,             # concurrent eval jobs. A job is a whole wave, so 1 is normal
-    # Shard processes per eval job. This is the knob that fills the box, not `max_evals`: one wave
-    # owns every arm of a batch and its shards take whichever checkpoint is next regardless of which
-    # arm it belongs to, so widening the wave beats running two.
+    # Shard processes per eval job — **the knob that fills the box.** One wave owns every arm of a
+    # batch and its shards take whichever checkpoint is next regardless of which arm it belongs to,
+    # so widening the wave beats running two. There is no `max_evals` beside it: an eval job *is* a
+    # whole wave and `_dispatch` will not start anything while one runs, so the count was structurally
+    # 1 and the knob only invited a value that could not take effect. Removed 2026-08-29.
     'eval_shards': 16,
     # How often the loop runs its LOCAL half: reap, read the already-fetched `ops` ref, dispatch.
     # Cheap and off-network, so it stays fast — a close-out queued by a training that just finished
@@ -87,7 +88,7 @@ RUNTIME_DEFAULTS = {
     'viewer': True,
 }
 
-_INT_KEYS = ('max_trainers', 'max_evals', 'eval_shards', 'poll_seconds', 'git_seconds',
+_INT_KEYS = ('max_trainers', 'eval_shards', 'poll_seconds', 'git_seconds',
              'torch_threads', 'omp_num_threads', 'nice', 'disk_min_gb')
 _BOOL_KEYS = ('paused', 'drain', 'auto_stage_b', 'viewer')
 
@@ -95,11 +96,9 @@ _REQUIRED_HOST = ('REPO_PATH', 'SNEK_DIR', 'PYTHON_BIN', 'GIT_REMOTE',
                   'OPS_BRANCH', 'STATUS_BRANCH', 'RESULTS_BRANCH',
                   'STATUS_WORKTREE', 'RESULTS_WORKTREE', 'LEDGER_PATH', 'LOG_DIR',
                   'QUEUE_DIR', 'RUNTIME_PATH',
-                  'HARD_MAX_TRAINERS', 'HARD_MAX_EVALS', 'HARD_MAX_EVAL_SHARDS',
-                  'MIN_POLL_SECONDS')
+                  'HARD_MAX_EVAL_SHARDS', 'MIN_POLL_SECONDS')
 
-_HOST_INT_KEYS = ('HARD_MAX_TRAINERS', 'HARD_MAX_EVALS', 'HARD_MAX_EVAL_SHARDS',
-                  'MIN_POLL_SECONDS')
+_HOST_INT_KEYS = ('HARD_MAX_EVAL_SHARDS', 'MIN_POLL_SECONDS')
 
 
 class ConfigError(Exception):
@@ -132,9 +131,15 @@ def load_host_config(path):
 def clamp_runtime(config, host):
     """Clamps a runtime dict in place. Returns notes for anything clamped.
 
-    Notes rather than errors: a request for 10 trainers is *honoured* as `HARD_MAX_TRAINERS` and
-    noted in `status.json`, because refusing the whole file over an ambitious number would be a
-    worse failure than running fewer arms than asked.
+    Notes rather than errors: an out-of-range number is *honoured* as the nearest legal value and
+    noted in `status.json`, because refusing the whole file over an ambitious number would be a worse
+    failure than running with a clamped one.
+
+    **`max_trainers` has no host ceiling any more.** `HARD_MAX_TRAINERS` was removed on 2026-08-29:
+    wave width is not a safety property — `_dispatch` refuses to start anything while a wave runs, for
+    any value — so the second tier only produced a request that was quietly honoured as something
+    smaller. Asking for 8 against a stale ceiling of 4 ran 4 arms and looked like it had worked. The
+    64 below is a sanity bound of the same kind as `torch_threads`, not a tuned limit.
     """
     notes = []
 
@@ -145,8 +150,7 @@ def clamp_runtime(config, host):
             notes.append('{0} {1} clamped to {2}'.format(key, value, clamped))
         config[key] = clamped
 
-    clamp('max_trainers', 0, host['HARD_MAX_TRAINERS'])
-    clamp('max_evals', 0, host['HARD_MAX_EVALS'])
+    clamp('max_trainers', 0, 64)
     clamp('eval_shards', 1, host['HARD_MAX_EVAL_SHARDS'])
     clamp('poll_seconds', host['MIN_POLL_SECONDS'], 3600)
     # Not floored at MIN_POLL_SECONDS: 0 is the meaningful opt-out — a network cycle every poll,
@@ -156,32 +160,7 @@ def clamp_runtime(config, host):
     clamp('omp_num_threads', 1, 64)
     clamp('nice', 0, 19)
     clamp('disk_min_gb', 0, 100000)
-    notes += clamp_total_shards(config, host)
     return notes
-
-
-def clamp_total_shards(config, host):
-    """Holds `max_evals x eval_shards` at or under `HARD_MAX_EVAL_SHARDS`.
-
-    **Both multiply, and this is the whole ceiling** — snek2 needed a three-way version of this
-    because a worker cost 230 MB of TensorFlow arena and memory ran out first. Here 16 shards is
-    3.2 GB of 15, so the limit is the box's 16 SMT threads: past `cpu_count` throughput *falls*, and
-    two waves of 16 is a 2x oversubscription that makes both slower than one.
-
-    `eval_shards` gives way, never `max_evals`: how many waves run is a scheduling decision, and
-    quietly running fewer than asked would be a surprising way to honour a thread limit. A narrower
-    wave merely measures more slowly.
-    """
-    ceiling = host['HARD_MAX_EVAL_SHARDS']
-    jobs = max(1, config['max_evals'])
-    total = jobs * config['eval_shards']
-    if total <= ceiling:
-        return []
-    reduced = max(1, ceiling // jobs)
-    note = ('max_evals {0} x eval_shards {1} = {2} shard processes exceeds {3}; reduced to {4} '
-            'shards'.format(config['max_evals'], config['eval_shards'], total, ceiling, reduced))
-    config['eval_shards'] = reduced
-    return [note]
 
 
 def parse_runtime_config(text, host):

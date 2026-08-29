@@ -36,7 +36,7 @@ HOST = {
     'RESULTS_WORKTREE': '/wt/results', 'LEDGER_PATH': '/var/snek/ledger.json',
     'LOG_DIR': '/var/snek/logs', 'QUEUE_DIR': 'snek3/desktop/queue/pending',
     'RUNTIME_PATH': 'snek3/desktop/config/runtime.json',
-    'HARD_MAX_TRAINERS': 4, 'HARD_MAX_EVALS': 4, 'HARD_MAX_EVAL_SHARDS': 16,
+    'HARD_MAX_EVAL_SHARDS': 16,
     'MIN_POLL_SECONDS': 10,
 }
 
@@ -171,10 +171,21 @@ def test_an_unknown_key_rejects_the_file():
 
 
 def test_a_value_over_the_ceiling_is_clamped_and_noted_not_refused():
-    # An ambitious number is honoured as the ceiling; refusing the file would be the worse failure.
-    config, notes = config_module.parse_runtime_config('{"max_trainers": 99}', HOST)
-    assert config['max_trainers'] == HOST['HARD_MAX_TRAINERS']
-    assert any('max_trainers 99 clamped to 4' in note for note in notes)
+    # An ambitious number is honoured as the nearest legal value; refusing the file would be worse.
+    config, notes = config_module.parse_runtime_config('{"eval_shards": 99}', HOST)
+    assert config['eval_shards'] == HOST['HARD_MAX_EVAL_SHARDS']
+    assert any('eval_shards 99 clamped to 16' in note for note in notes)
+
+
+def test_wave_width_has_no_host_ceiling_because_it_is_not_a_safety_property():
+    """`HARD_MAX_TRAINERS` is gone; `_dispatch` is what keeps waves from overlapping.
+
+    The second tier was worse than redundant: `runtime.json` was clamped to it and the request merely
+    *noted*, so a commit asking for 8 arms against a stale ceiling of 4 ran 4 and looked like it had
+    worked. 8 is now honoured exactly, and the sanity bound is far away.
+    """
+    config, notes = config_module.parse_runtime_config('{"max_trainers": 8}', HOST)
+    assert config['max_trainers'] == 8 and notes == []
 
 
 def test_the_poll_floor_holds():
@@ -188,16 +199,40 @@ def test_git_seconds_may_be_zero_because_zero_is_the_opt_out():
     assert config['git_seconds'] == 0 and notes == []
 
 
-def test_two_waves_of_sixteen_shards_is_clamped_to_one_box_worth():
-    """`max_evals x eval_shards` is the whole ceiling, and both multiply.
+def test_a_stage_b_wave_does_not_inherit_the_stage_a_queue_knobs():
+    """The queue configures how a *training* measures itself; a wave measures finished checkpoints.
 
-    Past `cpu_count` throughput *falls*, so two waves of 16 makes both slower than one.
+    `evaluate.py` reads none of the three, so carrying them was harmless — but this tuple exists to
+    stop a training-loop setting being attributed to a measurement, and `runs/<policy>.md` would
+    otherwise report a wave as having run under a worker count that never applied to it.
     """
-    config, notes = config_module.parse_runtime_config(
-        '{"max_evals": 2, "eval_shards": 16}', HOST)
-    assert config['max_evals'] == 2, 'how many waves run is a scheduling decision, never clamped'
-    assert config['eval_shards'] == 8
-    assert any('32 shard processes exceeds 16' in note for note in notes)
+    inherited = runner_module.inherited_eval_env({
+        'SNEK_EVAL_QUEUE': '1', 'SNEK_EVAL_QUEUE_DEPTH': '16', 'SNEK_EVAL_WORKERS': '6',
+        'SNEK_CHASE_SAFE_GATE': '75', 'SNEK_SEED': '2',
+    })
+    assert inherited == {'SNEK_CHASE_SAFE_GATE': '75', 'SNEK_SEED': '2'}
+
+
+def test_max_evals_is_gone_and_naming_it_is_an_error_rather_than_a_no_op():
+    """Removed 2026-08-29: an eval job *is* a wave, so the count could only ever be 1.
+
+    Rejected rather than ignored, because a `runtime.json` still carrying it would otherwise look
+    applied. The unknown-key path already refuses the whole file and keeps the last known-good config,
+    which is the right outcome for a stale ops commit.
+    """
+    config, errors = config_module.parse_runtime_config('{"max_evals": 2}', HOST)
+    assert config is None
+    assert any('unknown key: max_evals' in error for error in errors)
+
+
+def test_the_shard_ceiling_is_the_thread_count_and_is_no_longer_divided_by_a_wave_count():
+    """Past `cpu_count` throughput *falls*, so 16 single-threaded shards is the measured optimum.
+
+    It used to be `HARD_MAX_EVAL_SHARDS // max_evals`, which meant asking for two waves silently
+    halved the width of the one wave that could actually run.
+    """
+    config, notes = config_module.parse_runtime_config('{"eval_shards": 16}', HOST)
+    assert config['eval_shards'] == 16 and notes == []
 
 
 def test_threads_default_to_one_because_more_is_measured_slower():

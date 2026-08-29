@@ -52,9 +52,16 @@ AUTO_STAGE_B_PRIORITY = 10
 # The rule is inverted here: strip what belongs to the training and let `evaluate.py`'s own defaults
 # be the protocol. The daemon cannot import the original anyway; it runs on base python so it can
 # start before the conda env exists, and `eval_plan` needs numpy.
+# The stage-A queue's three knobs belong here for the same reason `SNEK_EVAL_INTERVAL` does: they
+# configure *how the training measures itself as it runs*, and a stage-B wave measures finished
+# checkpoints with `evaluate.py`, which reads none of them. Leaving them in a wave's env was harmless
+# but wrong in the way this tuple exists to prevent — it attributes a training-loop setting to a
+# measurement, and `runs/<policy>.md` would report a wave as having run under a worker count that
+# never applied to it.
 TRAINING_ONLY_KEYS = ('SNEK_MAX_STEPS', 'SNEK_EVAL_INTERVAL', 'SNEK_GRAPH_EVAL_EPISODES',
                       'SNEK_MIN_CHECKPOINT_SCORE', 'SNEK_INITIAL_COLLECT_STEPS',
-                      'SNEK_REPLAY_BUFFER_MAX_LENGTH', 'SNEK_TORCH_THREADS')
+                      'SNEK_REPLAY_BUFFER_MAX_LENGTH', 'SNEK_TORCH_THREADS',
+                      'SNEK_EVAL_QUEUE', 'SNEK_EVAL_QUEUE_DEPTH', 'SNEK_EVAL_WORKERS')
 
 # The `SNEK_*` a *measurement* actually depends on, and therefore the only env a batch's arms have to
 # agree about to share one wave.
@@ -445,7 +452,10 @@ class Runner(object):
                 'disk low ({0} GB < {1}) — not launching'.format(
                     free, self.runtime['disk_min_gb'])]
             return
-        limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
+        # An eval job is a whole wave and `_dispatch` starts nothing while a wave runs, so the eval
+        # limit is structurally 1. It was `runtime['max_evals']` until 2026-08-29, a knob whose only
+        # legal value was the one it was hardcoded to.
+        limits = {'trainer': self.runtime['max_trainers'], 'eval': 1}
         desired = self._queued
         # **Wave-barrier scheduling.** A wave is a set of same-type jobs launched together, up to
         # that type's limit, and nothing new starts until the whole wave finishes. So trainings and
@@ -544,7 +554,10 @@ class Runner(object):
         Each queued batch's stage-B wave is slotted where it will actually run. Shared by the ledger
         view and the at-a-glance summary so both agree.
         """
-        limits = {'trainer': self.runtime['max_trainers'], 'eval': self.runtime['max_evals']}
+        # An eval job is a whole wave and `_dispatch` starts nothing while a wave runs, so the eval
+        # limit is structurally 1. It was `runtime['max_evals']` until 2026-08-29, a knob whose only
+        # legal value was the one it was hardcoded to.
+        limits = {'trainer': self.runtime['max_trainers'], 'eval': 1}
         auto = self.runtime.get('auto_stage_b', True)
         queued = [{'id': job.id, 'type': job.type, 'policy': job.policy,
                    'policies': list(job.policies), 'priority': job.priority}
