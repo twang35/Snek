@@ -1,14 +1,12 @@
 {
-  "iso": "2026-08-29T16:34:44",
-  "ts": 1788046484.4699512,
+  "iso": "2026-08-29T16:44:49",
+  "ts": 1788047089.6266983,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 100% (1 arm)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 stage B (4 arms)"
     ],
-    "queued": [
-      "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (3 arms)"
-    ],
+    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -27,27 +25,30 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b2a-b29repro-seed1",
-      "type": "train",
+      "id": "b2-stageb",
+      "type": "eval",
       "policy": "b2a-b29repro-seed1",
       "policies": [
-        "b2a-b29repro-seed1"
+        "b2a-b29repro-seed1",
+        "b2b-b29repro-seed2",
+        "b2c-b29repro-seed3",
+        "b2d-b29repro-seed4"
       ],
-      "pid": 3761119,
-      "step": 2985000,
-      "max_steps": 3000000,
-      "steps_per_sec": 96.6,
-      "elapsed_s": 30316
+      "pid": 3986195,
+      "step": 3000000,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 422
     }
   ],
   "ledger": {
-    "b2-stageb": "queued",
-    "b2a-b29repro-seed1": "running",
+    "b2-stageb": "running",
+    "b2a-b29repro-seed1": "done",
     "b2b-b29repro-seed2": "done",
     "b2d-b29repro-seed4": "done",
     "b2c-b29repro-seed3": "done",
@@ -58,8 +59,8 @@
   },
   "disk_free_gb": 49.0,
   "load_avg": [
-    1.02001953125,
-    1.248046875,
-    1.8798828125
+    15.900390625,
+    12.06884765625,
+    6.7685546875
   ]
 }
