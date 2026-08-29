@@ -72,7 +72,15 @@ subprocess under `snek`, because snek3's env has no TensorFlow and snek2's has n
 
 **Always pass `smoke` for verification runs**, so output is isolated in `savedPolicies/smoke/` and is
 safe to delete. Hyperparameters come from `SNEK_*` env vars, so variants run side by side without
-editing files; `grep 'hyperparameter override:'` on a log confirms an arm got its config.
+editing files.
+
+**Two greps confirm an arm got its config, and one of them is not optional.**
+`grep 'hyperparameter override:'` covers what `train.py` reads through `tuned()`.
+It is **silent on every knob `env/constants.py` reads at import** — the shaping doses and gates, the
+food-distance term, `SNEK_ZERO_OBS` — because those are read before the trainer's config exists. That
+is the set a shaping experiment is *about*: b2's `SNEK_CHASE_SAFE_SHAPING=0.1` had to be confirmed by
+reading `/proc/<pid>/environ` on the desktop. So also
+`grep 'reward config:'`, which `train.py` prints at startup from `vectorized/config.describe()`.
 
 **Training never draws.** A display flip costs ~5.2 ms and the game flips once per step — a round
 trip to the window server, not our drawing code. `watch.py` and `record_gif.py` are the only ways to

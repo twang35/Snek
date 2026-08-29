@@ -29,6 +29,14 @@ Every hyperparameter comes from a `SNEK_*` environment variable, so variants run
 editing files. Each override prints a `hyperparameter override:` line at startup — **that grep is how
 a misconfigured control arm gets caught**, and it has been.
 
+**It does not cover every knob, and the gap is the shaping set.** `hyperparameter override:` only
+reports what `train.py` reads through `tuned()`. The reward and shaping knobs are read by
+`env/constants.py` **at import**, before the trainer's config exists, so they print no override line
+— `SNEK_CHASE_SAFE_SHAPING`, `SNEK_CHASE_SAFE_GATE`, `SNEK_FREE_SPACE_*`,
+`SNEK_FOOD_DISTANCE_REWARD`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`. For those, grep
+**`reward config:`**, one line printed at startup from `vectorized/config.describe()`. Before it
+existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` on the desktop.
+
 ### Run control
 
 | knob | default | notes |

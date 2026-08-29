@@ -23,34 +23,36 @@ stage A** — see [`findings.md`](findings.md).
 
 ## Now
 
-**Nothing is running.** Batch b1 closed 2026-08-29: all four seeds ran their full 3M steps on
-schedule, and the desktop published cleanly. The numbers are in [`results.md`](results.md).
+**Batch b2 — b29's record config on the torch stack, seeds 1-4, 3M steps.** All four on the desktop,
+launched 2026-08-29 08:09. This is the phase-3 gate re-run on the configuration snek2 actually set
+records with; b1 ran snek3's bare defaults and that was the wrong batch to gate on.
 
-| | |
-|---|---|
-| laptop | idle |
-| desktop `the-claw-den` | idle. `snek3-runner` owns the box; `b1-stageb` is `failed` in its ledger |
+| knob | snek3 default | b2 = b29 |
+|---|---|---|
+| `SNEK_IS_WEIGHTS` | 1 | **0** |
+| `SNEK_TARGET_UPDATE_PERIOD` | 8 | **1000** |
+| `SNEK_DISCOUNT` | 0.99 | **0.9975** |
+| `SNEK_FOOD_DISTANCE_REWARD` | 0.001 | **0** |
+| `SNEK_CHASE_SAFE_SHAPING` | 0.0 | **0.1** |
+| `SNEK_CHASE_SAFE_GATE` | 85 | **75** |
+| `SNEK_FC_LAYERS` | 320 | 320 |
 
-**The phase-3 gate is not met and b1 cannot settle it.** Peak trailing perfect rate by seed: 42.1 /
-58.3 / 56.7 / **81.9%**, against a gate of 90. But **no arm had plateaued** — every one was still
-climbing at its cap — and **no checkpoint in any arm reached 95/100**, so stage B had nothing to
-select even before its command failed. Read b1 as a rate-of-climb measurement, not a verdict.
+**Five knobs differ, not the two b1's write-up first suggested.** The target-update period and the
+discount are substantial algorithmic differences, and they were nearly missed by reading the results
+summary instead of snek2's own b47 spec. Read the spec.
 
-Two defects to clear before the next batch, in this order:
+Seed N is pinned to arm letter N, so every arm is seed-matched against b29a-d, b41a-d, b47a-d **and**
+snek3's own b1a-d. Budget ~7 h an arm; the desktop auto-queues one stage-B wave for the batch.
 
-1. **`launch.py` builds a stage-B command `evaluate.py` cannot parse** — it passes several policies
-   and `--selector`, and the real signature is `evaluate.py <policy> [selector]`. Every wave exits 2.
-   Fix, and add the fixture that hands the built argv to the real parser
-   ([`findings.md`](findings.md)).
-2. **The phase-3 gate needs to name its number.** "≥90% perfect" is a trailing rate at snek2's
-   ceiling or a single checkpoint b1d already cleared, depending on how it is read.
+**b1 is closed** ([`results.md`](results.md)): four arms at 3M, peak perfect 42.1 / 58.3 / 56.7 /
+81.9%, **no checkpoint anywhere at 95/100**, every arm still climbing at its cap. Its stage-B wave
+has run and published 0 rows an arm, which is the honest measurement rather than a failure.
 
 ## Next, in order
 
-1. **Re-run the gate on the b29/b47-class config**, not on bare defaults: chase-safe shaping
-   `c=0.10` at **gate 75**, IS **off**, fc 320. snek2's own batch 28-29 result is that the gate is
-   the lever, and b1's defaults have shaping at 0.0 with IS on. Give it **6M steps** — b1d was still
-   rising at 3M — or accept that a 3M arm measures the climb.
+1. **Read b2 against b1 and against b29/b41/b47.** A b2-vs-b29 difference smaller than the
+   b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
+   precisely to have the yardstick.
 2. **Phase 6 — `ppo/`.** The reason snek3 exists.
 
 **Decide the stage-A batching question before phase 6, not after.** Stage A at 16.9 ep/s is ~90% of

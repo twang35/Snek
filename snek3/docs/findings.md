@@ -194,6 +194,30 @@ that cap enough there. And the seed spread — 42.1% to 81.9% peak, **39.8 pp** 
 ~10 pp this project already says n=4 cannot resolve, so at this horizon the four arms cannot rank two
 configs at all.
 
+### The documented way to confirm an arm's config was blind to the shaping knobs
+
+`grep 'hyperparameter override:'` is what both instruction files name as the check that an arm got
+its config, and it reports only what `train.py` reads through `tuned()`. The reward and shaping knobs
+are read by `env/constants.py` **at import** — before the trainer's config object exists — so they
+print nothing. The blind set is precisely `CHASE_SAFE_SHAPING`, `CHASE_SAFE_GATE`, `FREE_SPACE_*`,
+`FOOD_DISTANCE_REWARD`, `PERFECT_GAME_REWARD` and `ZERO_OBS`: the settings a shaping batch exists to
+test.
+
+Found while launching b2, whose whole purpose is `c=0.10` at gate 75. Its four logs listed seven
+overrides and **not one of the three shaping values**, so the only way to confirm the batch was
+running the config it was queued with was `sudo tr '\0' '\n' < /proc/<pid>/environ` on the box.
+
+`train.py` now prints `vectorized/config.describe()` at startup, which already existed for eval
+report headers and names every one of them:
+
+    reward config: grid 10x10, max score 95, food 1.0, death -5.0, starve -0.5, perfect 100.0,
+                   dist 0.0, chase_safe c=0.1 gate=75, free_space c=0.0 gate=85
+
+The fixture is parametrised over the knobs `env/constants.py` reads and asserts each one **changes
+the line**, rather than that its name appears in it — `describe()` prints `dist`, `perfect` and
+`gate=`, so a name match would have failed while the code was right, which is this project's
+own fixture trap.
+
 ## Falsified
 
 *Nothing yet.*

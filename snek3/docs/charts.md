@@ -1,5 +1,9 @@
 # Charts — one graph per arm
 
+**Batch b2 is running** — b29's record config, seeds 1-4, all four on the desktop. Its charts arrive
+on the `results` branch at close-out; a live desktop arm's `runs/` files must not be committed from
+here, because the box rewrites those paths every eval and a committed copy aborts its next ff-merge.
+
 **Batch b1 closed 2026-08-29.** All four charts are committed now that the arms have stopped — while
 a desktop arm is *live* its `runs/` files must not be committed from here, because the box rewrites
 those paths every eval and a committed copy makes its next `git merge --ff-only` abort.
