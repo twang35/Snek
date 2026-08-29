@@ -144,6 +144,18 @@ It needs `DISPLAY` and `XAUTHORITY` in `host.env`; those are the only two option
 without them the daemon runs headless and skips the window silently. `runtime.json`'s `viewer: false`
 turns it off on a running box, which closes any open window on the next poll.
 
+**The window is sized from the display, not from a number of inches.** It fills 95% x 88% of whatever
+screen it opens on — 3086x1951 on this box's 3840x2160 panel. The first version asked for a fixed
+6x3 inches per panel and opened at 1201x650, 31% of the width; snek2 tuned fixed caps through three
+revisions and its last would still only have reached 47% here. `--scale` is a fraction of the screen
+budget, so `--scale 0.6` gives a window you can put something beside.
+
+**If it ever appears to flash, the daemon is not the cause** — check that first and check it cheaply:
+the viewer's pid in `ps` and `journalctl -u snek3-runner | grep viewer`. A stable pid with no journal
+lines means the process was never restarted and the flicker is inside it. That was the case on
+2026-08-29: `panels` returned its list in mtime order, so every eval an arm wrote permuted it, and
+`refresh` rebuilds the figure — a `plt.close` and a new window — whenever the panel set changes.
+
 ## Set the box up
 
 ```
