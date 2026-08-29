@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-28T16:58:50",
-  "ts": 1787961530.6622229,
+  "iso": "2026-08-28T17:08:57",
+  "ts": 1787962137.4759538,
   "at_a_glance": {
     "running": [
-      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 95% (2 arms)"
+      "b47 -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- training 96% (1 arm)"
     ],
     "queued": [
-      "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (2 arms)"
+      "b47 closeout eval -- b47: b29's record config re-run on the vec stack, seeds 1-4 (fc320, chase c=0... -- queued (3 arms)"
     ]
   },
   "runtime": {
@@ -30,7 +30,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
@@ -42,29 +42,16 @@
         "b47a-vecrepro-seed1"
       ],
       "pid": 2960181,
-      "step": 1852000,
+      "step": 1917000,
       "max_steps": 2000000,
-      "steps_per_sec": 128.1,
-      "elapsed_s": 19830
-    },
-    {
-      "id": "b47d-vecrepro-seed4",
-      "type": "train",
-      "policy": "b47d-vecrepro-seed4",
-      "policies": [
-        "b47d-vecrepro-seed4"
-      ],
-      "pid": 2960184,
-      "step": 1966000,
-      "max_steps": 2000000,
-      "steps_per_sec": 64.1,
-      "elapsed_s": 19830
+      "steps_per_sec": 96.4,
+      "elapsed_s": 20437
     }
   ],
   "ledger": {
     "b47-closeout": "queued",
     "b47a-vecrepro-seed1": "running",
-    "b47d-vecrepro-seed4": "running",
+    "b47d-vecrepro-seed4": "done",
     "b47b-vecrepro-seed2": "done",
     "b47c-vecrepro-seed3": "done",
     "b46-closeout-w4": "done",
@@ -338,8 +325,8 @@
   },
   "disk_free_gb": 52.3,
   "load_avg": [
-    1.98876953125,
-    2.20263671875,
-    2.8544921875
+    1.482421875,
+    1.572265625,
+    2.23486328125
   ]
 }
