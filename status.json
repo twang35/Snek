@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T13:45:25",
-  "ts": 1788036325.792508,
+  "iso": "2026-08-29T13:52:27",
+  "ts": 1788036747.043986,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 71% (4 arms)"
+      "b2 \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 training 72% (4 arms)"
     ],
     "queued": [
       "b2 stage B \u2014 b2: b29's record config on the torch stack, seed 1 (fc320, chase c=0.10 gate ... \u2014 queued (4 arms)"
@@ -12,7 +12,7 @@
     "attention": []
   },
   "runtime": {
-    "max_trainers": 4,
+    "max_trainers": 8,
     "max_evals": 1,
     "eval_shards": 16,
     "poll_seconds": 30,
@@ -40,10 +40,10 @@
         "b2a-b29repro-seed1"
       ],
       "pid": 3761119,
-      "step": 2039000,
+      "step": 2079000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.1,
-      "elapsed_s": 20157
+      "steps_per_sec": null,
+      "elapsed_s": 20579
     },
     {
       "id": "b2b-b29repro-seed2",
@@ -53,10 +53,10 @@
         "b2b-b29repro-seed2"
       ],
       "pid": 3761120,
-      "step": 2129000,
+      "step": 2170000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.1,
-      "elapsed_s": 20157
+      "steps_per_sec": null,
+      "elapsed_s": 20579
     },
     {
       "id": "b2c-b29repro-seed3",
@@ -66,10 +66,10 @@
         "b2c-b29repro-seed3"
       ],
       "pid": 3761121,
-      "step": 2163000,
+      "step": 2207000,
       "max_steps": 3000000,
-      "steps_per_sec": 128.1,
-      "elapsed_s": 20157
+      "steps_per_sec": null,
+      "elapsed_s": 20579
     },
     {
       "id": "b2d-b29repro-seed4",
@@ -79,10 +79,10 @@
         "b2d-b29repro-seed4"
       ],
       "pid": 3761122,
-      "step": 2135000,
+      "step": 2176000,
       "max_steps": 3000000,
-      "steps_per_sec": 96.1,
-      "elapsed_s": 20157
+      "steps_per_sec": null,
+      "elapsed_s": 20579
     }
   ],
   "ledger": {
@@ -98,8 +98,8 @@
   },
   "disk_free_gb": 49.2,
   "load_avg": [
-    4.0048828125,
-    4.02001953125,
+    4.001953125,
+    4.0107421875,
     4.0
   ]
 }
