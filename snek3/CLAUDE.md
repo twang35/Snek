@@ -98,8 +98,11 @@ before changing the observation, the reward, or anything that counts a perfect g
 pytest is installed here, unlike in the `snek` env:
 
 ```
-cd snek3 && PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m pytest -q
+cd snek3 && /opt/miniconda3/envs/snek3/bin/python -m pytest -q
 ```
+
+`conftest.py` puts the project root on `sys.path`, so no `PYTHONPATH` is needed here — unlike the
+scripts, which are run as `PYTHONPATH=. python -u train.py`.
 
 **When a change has logic worth pinning down, add a test in the same pass.** Worth a fixture whenever
 a change involves a conditional whose branches could later collapse, an index or coordinate

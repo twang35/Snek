@@ -1,8 +1,14 @@
 # Runs — current state and forward plan
 
-**Nothing is running.** snek3 is in phase 0 of
-[`../plans/pytorch-port.md`](../plans/pytorch-port.md): the environment and the measurement engine,
-with no learning code yet.
+**Nothing is running.** snek3 closed **phase 0** of
+[`../plans/pytorch-port.md`](../plans/pytorch-port.md) on 2026-08-28: `env/` and `vectorized/` are
+in and validated, with no learning code yet.
+
+The phase-0 gate was parity between the two env implementations, and it came out clean: **36,000
+states × 30 observation indices, 0 mismatches**, across a growth regime (24,000 states, 49 episodes,
+lengths to 60) and a coiled endgame regime (12,000 states, 280 episodes, 26 perfect games), with
+rewards, terminations, both shaping terms and the win path in parity too. **17 of 17 hand-made
+mutants killed.** 167 tests green in ~2 min.
 
 ## Now
 
