@@ -53,7 +53,19 @@ def measure_one(policy, step=None, episodes=500, lanes=None, seed=0, out=None):
     return row
 
 
-def main(argv=None):
+def build_parser():
+    """This script's command-line contract, as an object.
+
+    Extracted from `main` so a test can hand it a command line **the desktop daemon built** and find
+    out whether it parses. The daemon cannot import this module — it runs on base python, before the
+    conda env exists, so it duplicates the spelling of this interface by hand — and that duplication
+    silently drifted: it passed several policies and a `--selector` flag against the single positional
+    `policy` and positional `selector` below, so every stage-B wave the box dispatched exited 2. Four
+    green fixtures asserted the argv the daemon builds and none asked this parser to accept it.
+
+    A test *does* run in the env, so the constraint that forces the duplication does not extend to
+    the fixture that guards it. See `tests/test_desktop_runner.py`.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('policy')
     parser.add_argument('selector', nargs='?', default='screen',
@@ -67,7 +79,11 @@ def main(argv=None):
     parser.add_argument('--out', default=None, help="with 'one': write the row here")
     parser.add_argument('--no-resume', action='store_true')
     parser.add_argument('--no-merge', action='store_true')
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
 
     if args.selector == 'one':
         measure_one(args.policy, args.step, args.episodes, args.width, args.seed, args.out)

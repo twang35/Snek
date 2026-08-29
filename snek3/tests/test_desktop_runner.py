@@ -237,13 +237,43 @@ def test_a_training_invokes_train_py_with_its_policy():
     assert env['PYTHONPATH'] == '.', 'snek3 entry points need the project root on the path'
 
 
-def test_an_eval_wave_invokes_evaluate_py_with_every_arm():
+def test_a_batch_is_one_job_measuring_its_arms_in_sequence():
+    """One ledger record and one publish per batch, one `evaluate.py` per arm inside it.
+
+    `evaluate.py` takes a single policy, so the wave is sequential. That idles the lanes between arms
+    and is the accepted cost of keeping a batch together at this layer (2026-08-29).
+    """
     job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None))
     argv, _, log, _ = launch.build_command(job, HOST, runtime(eval_shards=16))
-    assert argv[:3] == ['/py', '-u', 'evaluate.py']
-    assert argv[3:5] == ['b1a', 'b1b']
-    assert '--shards' in argv and argv[argv.index('--shards') + 1] == '16'
+    assert argv[:2] == ['sh', '-c']
+    script = argv[2]
+    assert script.count('evaluate.py') == 2, 'one invocation per arm'
+    assert script.index('b1a') < script.index('b1b'), 'in the order the spec named them'
+    assert '--shards 16' in script
     assert log == 'eval-b1a-thing.log'
+
+
+def test_one_arm_failing_does_not_drop_the_arms_behind_it():
+    """`;` and not `&&`. A wave losing a batch's whole measurement to one bad arm is the incident."""
+    job = parse_job(spec(type='eval', policies=['b1a', 'b1b', 'b1c'], policy=None))
+    script = launch.build_command(job, HOST, runtime())[0][2]
+    assert '&&' not in script
+    assert script.count('|| status=$?') == 3
+    assert script.endswith('exit $status')
+
+
+def test_a_single_arm_eval_needs_no_shell():
+    job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
+    argv, _, _, _ = launch.build_command(job, HOST, runtime())
+    assert argv[:4] == ['/py', '-u', 'evaluate.py', 'b1a']
+
+
+def test_a_policy_name_is_data_not_shell_syntax():
+    job = parse_job(spec(type='eval', policies=['b1a; rm -rf /', 'b1b'], policy=None))
+    script = launch.build_command(job, HOST, runtime())[0][2]
+    assert 'rm -rf /' in script, 'the name is still passed through'
+    assert "'b1a; rm -rf /'" in script, 'but quoted, so the shell sees one argument'
+    assert script.count('evaluate.py') == 2, 'and it did not become a third command'
 
 
 def test_no_episode_count_or_gate_is_passed_unless_the_spec_asked():
@@ -255,15 +285,59 @@ def test_no_episode_count_or_gate_is_passed_unless_the_spec_asked():
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
     argv, _, _, _ = launch.build_command(job, HOST, runtime())
     assert '--episodes' not in argv
-    assert '--selector' not in argv
+    assert 'screen' not in ' '.join(argv)
 
 
 def test_a_spec_may_still_name_a_selector_and_a_depth():
+    """The selector is a POSITIONAL, following the policy — not a `--selector` flag."""
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None,
                          selector='screen:98', episodes=1000))
     argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert argv[argv.index('--selector') + 1] == 'screen:98'
+    assert argv[3:5] == ['b1a', 'screen:98']
     assert argv[argv.index('--episodes') + 1] == '1000'
+    assert '--selector' not in argv
+
+
+# --- the command must parse, asked of the real parser ---------------------------------------------
+#
+# This is the one place these tests deliberately cross the stdlib-only line, and the reason is the
+# bug it exists for. The daemon runs on base python before the conda env exists, so it duplicates
+# `evaluate.py`'s command line by hand -- and got it wrong twice, several policies where one is taken
+# and `--selector` where the selector is positional, so every wave the box dispatched exited 2. Four
+# green fixtures asserted the argv the daemon builds; none asked the parser to accept it. A test runs
+# in the env even though the daemon does not, so the constraint that forces the duplication does not
+# extend to the fixture that guards it.
+
+def parsed(argv):
+    """`evaluate.py`'s own parser applied to a command the daemon built. Raises if it would exit 2."""
+    import evaluate
+    return evaluate.build_parser().parse_args(argv[3:])       # drop python -u evaluate.py
+
+
+@pytest.mark.parametrize('overrides', [
+    {},
+    {'selector': 'screen:98'},
+    {'episodes': 1000},
+    {'selector': 'one', 'episodes': 3000},
+    {'eval_args': ['--label', 'ab']},
+])
+def test_every_command_the_daemon_builds_parses(overrides):
+    job = parse_job(spec(type='eval', policies=['b1a'], policy=None, **overrides))
+    for argv in launch.eval_commands(job, HOST, runtime(eval_shards=16)):
+        parsed(argv)              # SystemExit here is the daemon being wrong, not the test
+
+
+def test_each_arm_of_a_wave_parses_and_names_its_own_policy():
+    job = parse_job(spec(type='eval', policies=['b1a', 'b1b', 'b1c'], policy=None))
+    commands = launch.eval_commands(job, HOST, runtime())
+    assert [parsed(argv).policy for argv in commands] == ['b1a', 'b1b', 'b1c']
+
+
+def test_an_unadorned_wave_inherits_the_protocol_from_evaluate_py():
+    """What the daemon leaves unsaid has to arrive as `screen:95` at 500 episodes."""
+    job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
+    args = parsed(launch.eval_commands(job, HOST, runtime())[0])
+    assert args.selector == 'screen' and args.episodes == 500
 
 
 def test_the_thread_knobs_reach_the_subprocess():
