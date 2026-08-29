@@ -1,0 +1,10 @@
+{
+  "project": "snek3",
+  "id": "b1c-baseline-seed3",
+  "type": "train",
+  "policy": "b1c-baseline-seed3",
+  "max_steps": 3000000,
+  "env": {"SNEK_SEED": "3"},
+  "label": "b1: DDQN baseline at defaults, seed 3",
+  "notes": "Seed-matched with b1a-baseline-seed1, which is running on the laptop. Every knob is a default and only SNEK_SEED varies, so the four arms serve both the phase-3 gate (any arm reaching 90% perfect) and phase 5's b47-class region comparison. Deliberately NOT raising SNEK_COLLECT_ENVS: the measured 1.9x from 16 lanes would confound the seed comparison against b1a, so it waits for a batch where all four arms can take it."
+}
