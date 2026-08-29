@@ -228,12 +228,33 @@ And the training side, which is the other direction — from a knob to an arm:
 
 | module | does |
 |---|---|
-| `train.py` | the loop, and everything not algorithm-specific: the config, seeding, the sidecar, the checkpoint cadence, stage A, the chart, the report, the cap |
+| `train.py` | the loop, and everything not algorithm-specific: the config, seeding, the sidecar, the checkpoint cadence, stage A and its queue, the chart, the report, the cap |
+| `dqn/algo.py` | **the seam `train.py` drives.** DQN's config, its loop body, its schedules' call sites and its resume state, behind fourteen members `train.py` knows by name |
 | `dqn/net.py` | the Q network and a greedy `policy_fn`. The only file that decides an initialiser |
 | `dqn/agent.py` | double DQN, the target copy, and the exploration shield's action mask |
 | `dqn/replay.py` | prioritised replay over a numpy sum tree, with importance weights |
 | `dqn/schedules.py` | epsilon and the shield fraction, as pure functions of the eval history |
 | `dqn/collect.py` | N lanes in lockstep, n-step windows, and forking. Owns its own loop |
+
+**One `train.py` serves every algorithm, and that is a measurement rule rather than a tidiness one.**
+An arm's numbers are comparable across algorithms only if the same code screened its checkpoints, ran
+the same 100 episodes, wrote the same rows and drew the same chart — so a second algorithm adds a
+module and one entry in `train.ALGOS`, never a second trainer.
+[`dqn/algo.py`](dqn/algo.py) documents the seam; `tests/test_train.py` asserts it over every entry in
+the registry, so `ppo/algo.py` is covered the moment it is added. Two consequences worth knowing:
+
+- **`SNEK_ALGO` selects the algorithm** and an unknown value is refused by name. The knob list now
+  spans two files — `train.py` for what is not algorithm-specific, `dqn/algo.py` for the rest — and
+  `grep 'hyperparameter override:'` is unaffected, because both read through the same `tuned()`.
+- **An eval and a checkpoint land on whole algorithm steps.** DQN's step granularity is 1, so its
+  intervals are exactly the constants and **a DQN arm is byte-identical across the seam landing**
+  (verified: three arms, every row, the final weights, the step and the transition count). An
+  algorithm whose smallest step is a 16,384-transition rollout gets its intervals rounded up to a
+  multiple of it, which is what keeps "every checkpoint is screened" true at any width.
+
+**A counted step is not a game move, and now every row says so.** Each eval row and the summary block
+carry `transitions` beside `step` — game moves, prefill included. Read that, not `step`, when
+comparing anything across a change in `SNEK_COLLECT_ENVS`, `SNEK_FORK_BRANCHES`, or eras.
 
 Keep the split clean: `runs.md` is current state and forward plan only, results go to `results.md`,
 conclusions to `findings.md`, anything about *how to measure or judge* to `protocol.md`. snek2's

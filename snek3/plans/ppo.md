@@ -1,7 +1,13 @@
 # snek3 — PPO
 
-**Status: draft for review, 2026-08-29. Not approved, no code written.** Phase 6 of
+**Status: approved 2026-08-29. Phase 6a is closed; 6b is next.** Phase 6 of
 [`pytorch-port.md`](pytorch-port.md), which calls it "the actual research".
+
+**Four decisions taken at approval**, which supersede §11's questions: γ is settled by the p0 tuning
+pass and p1 uses the winner; **action masking is out of scope** for now, so `SNEK_PPO_ACTION_MASK`
+is not built; `transitions` was added to DQN rows and **not** back-filled onto b2, which was running;
+and the `train.py` refactor was taken, gated on byte-identical DQN output. The shaping-discount bug
+§1 found is fixed.
 
 The whole design question is not "how do you write PPO" — that is ~200 lines — but **how much of the
 existing stack a PPO arm can share, so that a PPO-vs-DQN result is a statement about the algorithm
@@ -9,9 +15,9 @@ and not about two measurement paths.** The answer is: everything below the algor
 measurement protocol, unchanged. What has to go is four DQN-specific mechanisms, and one of them
 (forking) PPO replaces for free.
 
-## Decisions proposed
+## Decisions taken
 
-| | proposal |
+| | decision |
 |---|---|
 | **Env, observation, rewards** | **byte-identical.** No change to `env/` or `vectorized/` at all |
 | **Reward shaping** | **stays, and matters more than it does for DQN.** It is reward-side and algorithm-agnostic. §3 |
@@ -23,7 +29,7 @@ measurement protocol, unchanged. What has to go is four DQN-specific mechanisms,
 | **Eval protocol** | **unchanged.** Stage A 100 episodes on every checkpoint, stage B 500 on every checkpoint at ≥95/100, `screen:95`, the same charts and reports |
 | **Eval policy** | **argmax over the logits**, the analogue of DQN's greedy. Sampled evaluation is a later knob |
 | **Step unit** | **a PPO step is one transition = one game move.** Every row of both algorithms gains a `transitions` field. §4 |
-| **`train.py`** | **one entry point, one eval/checkpoint/report path**, with the algorithm behind a five-method object. §5 |
+| **`train.py`** | **one entry point, one eval/checkpoint/report path**, with the algorithm behind a fourteen-member seam. **Landed 2026-08-29**, byte-identical for DQN. §5 |
 | **First batch** | **a 2-arm tuning pass before the 4-arm gate.** b1 gated on untuned defaults and answered nothing; do not repeat it. §10 |
 
 ---
@@ -45,12 +51,13 @@ DQN arm will be measured by the same instrument, on the same board, with the sam
 the same episode counts — so `docs/protocol.md`'s judging rules apply to the comparison as written,
 and `tools/compare_results.py` can put a PPO stage-B pass against b2's directly.
 
-**One pre-existing bug found while reading, and it is not PPO's:** `train.py` builds
-`VecSnake(width, seed=...)` and never passes `shaping_discount`, so it stays 1.0 while b2 trains at
+**‡ One pre-existing bug was found while reading and is now fixed:** `train.py` built
+`VecSnake(width, seed=...)` and never passed `shaping_discount`, so it stayed 1.0 while b2 trains at
 γ=0.9975. Potential-based shaping pays `c·(γ·Φ(s') − Φ(s))` and the invariance theorem needs the
-*agent's* γ, so b2's shaping is off by `c·(1−γ)·Φ ≈ 2.5e-4` per step — the same order as
-`FOOD_DISTANCE_REWARD`, and it biases toward staying alive in a high-Φ state. Small, real, and it
-should be fixed for PPO. Fixing it for DQN changes b2's dynamics, so that is a separate decision.
+*agent's* γ, so b2's shaping was off by `c·(1−γ)·Φ ≈ 2.5e-4` per step — the same order as
+`FOOD_DISTANCE_REWARD`, and a standing bonus for staying alive in a high-Φ state. Fixed 2026-08-29;
+it is a no-op for an arm with shaping off, which is measured rather than argued. Full write-up in
+[`../docs/findings.md`](../docs/findings.md), including why the first check of it could not fail.
 
 ---
 
@@ -93,12 +100,15 @@ this is **two settings, not three**:
 
 | `SNEK_PPO_ACTION_MASK` | meaning |
 |---|---|
-| `0` (default for the comparison batch) | no mask anywhere. The clean A/B against b2 |
+| `0` | no mask anywhere. The clean A/B against b2 |
 | `1` | masked at collect **and** at eval. A deliberately different, probably better, artefact |
 
-A collect-only mask is not offered: it would train π_masked and measure π_unmasked. Note that `1`
-costs nothing structurally — the mask is derived from the observation, so `greedy_policy_fn` stays a
-`(m, 30) -> (m,)` callable and the seam holds.
+A collect-only mask is not offered: it would train π_masked and measure π_unmasked.
+
+**‡ Out of scope as of 2026-08-29 — the knob is not built.** p1 runs unmasked, which is the `0` column,
+so nothing is lost by leaving the mask unwritten until there is a result to compare it against. It
+stays cheap to add whenever that happens: the mask is derived from the observation, so
+`greedy_policy_fn` stays a `(m, 30) -> (m,)` callable and the seam holds.
 
 ### PER, the target network, double-Q, n-step windows and the prefill go
 
@@ -285,7 +295,7 @@ with a named error** under `SNEK_ALGO=ppo`.
 | `SNEK_PPO_LEARNING_RATE` | 3e-4 | **not** DQN's 1e-5 |
 | `SNEK_PPO_TARGET_KL` | 0 (off) | early-stop the epoch loop; reported either way |
 | `SNEK_PPO_NORMALIZE_ADV` | 1 | per minibatch |
-| `SNEK_PPO_ACTION_MASK` | 0 | 1 masks at collect **and** eval. §2 |
+| ~~`SNEK_PPO_ACTION_MASK`~~ | — | **not built.** Out of scope 2026-08-29; §2 |
 | `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse` |
 | `SNEK_PPO_INIT` | `snek2` | or `orthogonal` |
 | `SNEK_PPO_EVAL_ROLLOUTS` | 2 | evals (and checkpoints) every this many rollouts |
@@ -341,11 +351,22 @@ log-prob. Ten, against phase 0's bar of twelve.
 
 | # | phase | gate |
 |---:|---|---|
-| **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | a fixed-seed DQN arm is **byte-identical** before and after. Lands after b2 closes |
+| **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | **Met 2026-08-29.** Three fixed-seed arms — the defaults, a `chase_safe` arm and a `free_space` arm at `n_step=3`, `collect_envs=2`, `ratio=0.5` — came out **byte-identical** across the refactor on every eval row, the final weights (SHA-256 of the whole `state_dict`), the step, the transition count, epsilon and the checkpoint set. 743 tests green, 26 of 26 mutants killed. **Not yet deployed to the desktop:** b2 is still training |
 | **6b** | `ppo/` plus the fixtures and the mutant spec | suite green, 10 of 10 mutants killed, and a `smoke` arm learns *something* — avg score above the ~4 an untrained policy gets |
 | **6c** | **batch p0 — tuning, 2-4 arms, 2M transitions each** | not a gate. Its output is a config: LR, entropy coef, λ, γ. Cheap enough (§4) to run more than four |
 | **6d** | **batch p1 — 4 seed-matched arms at b2's transition budget (12M)** | phase 3's bar, restated: **one arm reaches ≥90% perfect in a stage-A eval.** Plus a measured transitions/s and wall clock |
 | **6e** | stage B on p1, and the comparison | lead with the **≥98%/500 count** — the width of the record region — against b2's own close-out, and the sign test across the four seeds on `strong_eval_fraction` at a matched transition horizon |
+
+### What 6a actually landed
+
+| change | effect on a DQN arm |
+|---|---|
+| `shaping_discount` passed to the collect env | **the only behaviour change.** Nothing for an arm with shaping off; b2's config now shapes at 0.9975 rather than 1.0 |
+| `transitions` on every eval row and in the summary | additive; `step` unchanged |
+| the fourteen-member algorithm seam, `dqn/algo.py`, `SNEK_ALGO`, intervals rounded to whole algorithm steps | **none, byte-for-byte** |
+
+The seam is what 6b writes against, and `tests/test_train.py` asserts it over every entry in
+`train.ALGOS` — so `ppo/algo.py` is covered by the contract fixtures the moment it is registered.
 
 **6c exists because b1 was gated on untuned defaults and answered nothing.** `docs/runs.md` says it
 plainly: "b1 ran snek3's bare defaults and that was the wrong batch to gate on", and the five knobs b2

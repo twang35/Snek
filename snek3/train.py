@@ -4,10 +4,14 @@
     SNEK_SEED=2 SNEK_FORK_BRANCHES=4 python train.py b1b-fork4
 
 **What lives here is what is not algorithm-specific**: the environment-variable config, seeding, the
-`arch.json` sidecar, the checkpoint cadence, the stage-A self-eval, the epsilon and shield schedules'
-call sites, the progress chart, the run report and the step cap. The DDQN loop itself is
-`dqn/collect.py` plus `dqn/agent.py`, and a later `ppo/` gets its own collector rather than bending
-this one — an on-policy rollout and a replay-driven step do not share a loop.
+`arch.json` sidecar, the checkpoint cadence, the stage-A self-eval and its queue, the progress chart,
+the run report and the step cap. **The algorithm sits behind the seam `dqn/algo.py` documents** —
+fourteen members, of which `advance()` is the whole loop body — so a second algorithm adds a module
+and one entry in `ALGOS` rather than a second copy of this file.
+
+That is not tidiness. An arm's numbers are comparable across algorithms only if the same code screened
+the checkpoints, ran the same 100 episodes, wrote the same rows and drew the same chart, so **the one
+thing that must not be duplicated for PPO is this file.** See [`plans/ppo.md`](plans/ppo.md).
 
 ## The two intervals that are not knobs
 
@@ -17,26 +21,34 @@ the checkpoint interval — otherwise a checkpoint exists that no screen can sel
 count must be 100, because the gate is literally "95 of 100". Both are constants below rather than
 `tuned()` calls, and `SNEK_GRAPH_EVAL_EPISODES` exists only to make a smoke test cheap.
 
+**The equality survives an algorithm whose step is larger than the interval**, which is the one
+thing the seam had to add here: both are rounded up to a whole number of algorithm steps by
+`_whole_steps`, so they stay equal by construction at any width. DQN's granularity is 1, so nothing
+about a DQN arm moved.
+
 ## Cost, stated plainly
 
 Stage A dominates an arm's wall clock and that is now correct rather than wasteful: a single
 checkpoint's 100 episodes drain the measurement engine's lanes with nothing to refill them, so it
-runs at ~17 ep/s against ~96 ep/s streamed. A 3M-step arm is ~5 hours, ~90% of it evaluating.
-[`docs/runs.md`](docs/runs.md) carries the batching idea that would recover most of it.
+runs at ~17 ep/s against ~96 ep/s streamed. Measured on a 3M-step DQN arm, that is **5.3 h of 8.1 h
+(66%)**, not the ~90% this note first claimed. `SNEK_EVAL_QUEUE` — on by default — moves it to shared
+streamed workers and recovers 3.3-3.4x of it, at a bounded lag on the schedule that
+[`tools/eval_queue.py`](tools/eval_queue.py) states exactly.
 """
 
 import argparse
-import json
 import os
 import time
 
 import numpy as np
 import torch
 
-from dqn import collect
+from dqn import algo as dqn_algo
+# For `trailing_mean` only, which is a plain windowed average over the eval rows and is not about
+# epsilon. It lives beside the epsilon schedule because that is its other caller; when `ppo/` lands
+# and needs the same trailing score, it moves somewhere both algorithms can reach without one
+# importing the other.
 from dqn import schedules
-from dqn.agent import DdqnAgent
-from dqn.replay import PrioritizedReplay
 from env import constants
 from tools import arch as arch_tools
 from tools import chart_window
@@ -48,7 +60,11 @@ from tools import restore
 from tools import run_report
 from vectorized import config as reward_config
 from vectorized import engine
-from vectorized.vec_env import VecSnake
+
+# **The algorithms this build knows, by their `SNEK_ALGO` value.** A dict rather than an `if`, for the
+# reason `tools/restore.py` gives for the same shape: adding PPO is one line, and an unrecognised
+# value names itself in the error instead of falling through to a default.
+ALGOS = {dqn_algo.NAME: dqn_algo}
 
 # ---------------------------------------------------------------- config
 
@@ -118,6 +134,19 @@ RECLAIM_GRACE_SECONDS = 2.0
 REPORT_INTERVAL = 10 * EVAL_INTERVAL
 
 
+def _whole_steps(target, granularity):
+    """`target` rounded up to a whole number of algorithm steps, and never zero.
+
+    DQN's granularity is 1, so all three intervals come out exactly as written and a DQN arm is
+    unaffected. PPO's smallest step is a whole rollout — 16,384 transitions at the planned default —
+    and an interval that is not a multiple of it would put an eval on a step the loop never reaches,
+    which for stage A means a checkpoint no screen can select.
+    """
+    granularity = max(1, int(granularity))
+    whole = -(-int(target) // granularity)
+    return granularity * max(1, whole)
+
+
 def build_config():
     """Every knob, read once. The returned dict is also what the run report prints.
 
@@ -126,12 +155,12 @@ def build_config():
     a report row that cannot be grepped back to a knob is a config nobody can reproduce.
     `tests/test_train.py` pins the correspondence.
     """
-    fork = collect.ForkConfig(branches=int(tuned('FORK_BRANCHES', 4, int)),
-                              prob=tuned('FORK_PROB', 0.5),
-                              min_length=int(tuned('FORK_MIN_LENGTH', 85, int)),
-                              max_steps=int(tuned('FORK_MAX_STEPS', 60, int)))
+    name = str(tuned('ALGO', dqn_algo.NAME, str))
+    if name not in ALGOS:
+        raise ValueError('SNEK_ALGO={0!r} is not an algorithm this build knows; it has {1}'.format(
+            name, sorted(ALGOS)))
     config = {
-        'algo': 'dqn',
+        'algo': name,
         'seed': int(tuned('SEED', 1, int)),
         'torch_threads': int(tuned('TORCH_THREADS', 1, int)),
         'max_steps': int(tuned('MAX_STEPS', 10000000, int)),
@@ -140,26 +169,6 @@ def build_config():
         # is not the thing being varied.
         'fc_layers': tuple(int(width) for width in
                            str(tuned('FC_LAYERS', '320', str)).split(',')),
-        'learning_rate': tuned('LEARNING_RATE', 1e-5),
-        'adam_epsilon': tuned('ADAM_EPSILON', 1e-7),
-        'batch_size': int(tuned('BATCH_SIZE', 128, int)),
-        'discount': tuned('DISCOUNT', 0.99),
-        'n_step_update': int(tuned('N_STEP_UPDATE', 1, int)),
-        'target_update_period': int(tuned('TARGET_UPDATE_PERIOD', 8, int)),
-        'target_update_tau': tuned('TARGET_UPDATE_TAU', 1.0),
-        'gradient_clipping': tuned('GRADIENT_CLIPPING', 0.0),
-        'initial_epsilon': tuned('INITIAL_EPSILON', 0.4),
-        'min_epsilon': tuned('MIN_EPSILON', 0.002),
-        'guided_fraction': tuned('GUIDED_FRACTION', 0.8),
-        'collect_envs': int(tuned('COLLECT_ENVS', 1, int)),
-        'replay_ratio': tuned('REPLAY_RATIO', 1.0),
-        'replay_buffer_max_length': int(tuned('REPLAY_BUFFER_MAX_LENGTH', 100000, int)),
-        'initial_collect_steps': int(tuned('INITIAL_COLLECT_STEPS', 2000, int)),
-        'priority_exponent': tuned('PRIORITY_EXPONENT', 0.6),
-        'is_beta': tuned('IS_BETA', 0.4),
-        'is_beta_final': tuned('IS_BETA_FINAL', 1.0),
-        'beta_anneal_steps': int(tuned('BETA_ANNEAL_STEPS', 300000, int)),
-        'is_weights': bool(int(tuned('IS_WEIGHTS', 1, int))),
         # Read through `tuned()` like every other knob, so all three print an
         # `hyperparameter override:` line and appear in `runs/<arm>.md` as a row that greps straight
         # back to its variable. They were briefly read inside `tools/eval_queue.py` instead, which
@@ -171,25 +180,17 @@ def build_config():
         'graph_eval_episodes': EVAL_EPISODES,
         'eval_interval': EVAL_INTERVAL,
         'min_checkpoint_score': constants.MIN_CHECKPOINT_SCORE,
-        'fork': fork,
     }
-    if config['min_epsilon'] < schedules.EPSILON_HARD_FLOOR:
-        raise ValueError('SNEK_MIN_EPSILON={0} is below the hard floor {1}'.format(
-            config['min_epsilon'], schedules.EPSILON_HARD_FLOOR))
-    if config['replay_ratio'] <= 0.0:
-        raise ValueError('SNEK_REPLAY_RATIO={0} must be positive'.format(config['replay_ratio']))
+    # **The algorithm's own knobs, and its own validation, come from its module.** One flat dict
+    # still, because `runs/<arm>.md` prints it as one table and every key is still its `SNEK_`
+    # variable lowercased — what moved is only where the call sits.
+    config.update(ALGOS[name].build_config(tuned))
     return config
 
 
 def reportable(config):
-    """`run_config` for the report: the fork object flattened, everything else as-is."""
-    out = {key: value for key, value in config.items() if key != 'fork'}
-    fork = config['fork']
-    out['fork_branches'] = fork.branches
-    if fork.enabled:
-        out.update({'fork_prob': fork.prob, 'fork_min_length': fork.min_length,
-                    'fork_max_steps': fork.max_steps})
-    return out
+    """`run_config` for the report: whatever the algorithm cannot print as a table row, flattened."""
+    return ALGOS[config['algo']].reportable(config)
 
 
 # ---------------------------------------------------------------- the self-eval
@@ -223,7 +224,7 @@ def summarise(held):
             'perfect': float(np.mean(held['perfect']))}
 
 
-def self_eval(agent, step, seed, episodes):
+def self_eval(algo, step, seed, episodes):
     """Stage A in this process: `episodes` greedy episodes of the agent's current weights.
 
     **`episodes` is required, and it used to default to `EVAL_EPISODES`.** A default argument is
@@ -233,11 +234,32 @@ def self_eval(agent, step, seed, episodes):
     measuring 100 episodes and the queued path measured 4, so a bit-exactness fixture failed with a
     diff in `avg_reward` that pointed nowhere near the cause.
     """
-    return summarise(engine.measure(agent.policy_fn, episodes, seed=eval_seed(seed, step)))
+    return summarise(engine.measure(algo.policy_fn, episodes, seed=eval_seed(seed, step)))
 
 
-def build_eval_row(step, measured, trailing, epsilon, guided_fraction, steps_per_second,
-                   fork_counters=None):
+def build_eval_row(step, measured, trailing, steps_per_second, algo_fields=None,
+                   transitions=None):
+    """One eval as the row the history stores.
+
+    **`transitions` is the game-move count and `step` is not**, which is the units trap
+    [`docs/findings.md`](docs/findings.md) records: `collector.step()` advances every lane, so at b2's
+    `fork_branches=4` one counted step is four game moves, four buffer rows and four gradient steps.
+    Recording both removes the ambiguity at the source rather than leaving it to a doc warning, and it
+    is what a PPO row will be compared against — see [`plans/ppo.md`](plans/ppo.md).
+
+    It counts the prefill, because those moves were played and are learned from, so it is not
+    `step * width` plus nothing: a fresh arm's first row already carries
+    `initial_collect_steps`-worth of them.
+
+    **Absent rather than null when it is unknown.** An arm resumed from a `resume.pt` written before
+    this field existed cannot know its true count, and a wrong absolute number on a comparison axis
+    is worse than a missing one.
+
+    `algo_fields` is merged verbatim and is **already rounded by the algorithm** — `epsilon` and
+    `guided_fraction` for DQN, an entropy coefficient and its diagnostics for PPO. Merged rather than
+    named so this function never has to know which algorithm produced the row; a `None` value is
+    dropped, which is what keeps a control arm's row free of a `fork` field it never used.
+    """
     row = {'step': int(step),
            'avg_score': round(measured['avg_score'], 2),
            'trailing_avg_score': round(trailing, 2),
@@ -245,11 +267,12 @@ def build_eval_row(step, measured, trailing, epsilon, guided_fraction, steps_per
            'max_score': round(measured['max_score'], 1),
            'avg_reward': round(measured['avg_reward'], 3),
            'perfect_percent': round(100.0 * measured['perfect'], 1),
-           'epsilon': round(float(epsilon), 5),
-           'guided_fraction': round(float(guided_fraction), 3),
            'steps_per_second': round(float(steps_per_second), 1)}
-    if fork_counters is not None:
-        row['fork'] = fork_counters
+    if transitions is not None:
+        row['transitions'] = int(transitions)
+    for key, value in (algo_fields or {}).items():
+        if value is not None:
+            row[key] = value
     return row
 
 
@@ -268,29 +291,34 @@ class Trainer(object):
         self.graph_path = progress_chart.chart_path(policy)
 
         self.arch = self._sidecar()
-        self.agent = DdqnAgent(self.arch,
-                               learning_rate=config['learning_rate'],
-                               adam_epsilon=config['adam_epsilon'],
-                               target_update_period=config['target_update_period'],
-                               target_update_tau=config['target_update_tau'],
-                               gradient_clipping=config['gradient_clipping'],
-                               use_is_weights=config['is_weights'],
-                               seed=config['seed'], device=device)
-        self.buffer = PrioritizedReplay(config['replay_buffer_max_length'], self.arch['obs_len'],
-                                        alpha=config['priority_exponent'],
-                                        initial_beta=config['is_beta'],
-                                        final_beta=config['is_beta_final'],
-                                        beta_anneal_steps=config['beta_anneal_steps'],
-                                        seed=config['seed'])
-        width = config['collect_envs'] * config['fork'].branches
-        self.collector = collect.Collector(
-            VecSnake(width, seed=config['seed']), self.agent, self.buffer,
-            discount=config['discount'], n_step=config['n_step_update'],
-            collect_envs=config['collect_envs'], fork=config['fork'],
-            guided_fraction=0.0, seed=config['seed'])
+        self.algo = ALGOS[config['algo']].build(config, self.arch, device=device)
+
+        # **The intervals are rounded up to whole algorithm steps, and that is what makes one
+        # `train.py` serve both algorithms.** The self-eval *is* stage A, so a checkpoint written at a
+        # step no eval screens can never be measured — and an algorithm whose smallest step is a
+        # 16,384-transition rollout cannot land on a 1,000 grid. Rounding up to a multiple of the
+        # granularity keeps eval and checkpoint equal by construction at any width. At DQN's
+        # granularity of 1 every one of the three is unchanged, which is why the fingerprint of a DQN
+        # arm is byte-identical across this refactor.
+        self.eval_interval = _whole_steps(EVAL_INTERVAL, self.algo.step_granularity)
+        # **The other two round to multiples of the *eval* interval, not of the granularity**, which
+        # keeps `RESUME_INTERVAL % EVAL_INTERVAL == 0` true at any width — the property
+        # `tests/test_train.py` asserts on the constants. Rounding both to the granularity instead
+        # would give 12 and 20 from the test's own values, and 20 is not a multiple of 12: a resume
+        # written at a step no eval produced a row for. It is a no-op at DQN's granularity, where the
+        # eval interval already divides both.
+        self.resume_interval = _whole_steps(RESUME_INTERVAL, self.eval_interval)
+        self.report_interval = _whole_steps(REPORT_INTERVAL, self.eval_interval)
+        # The report prints `run_config`, so it has to print the interval the arm *ran*, not the one
+        # the knob asked for. They differ only when the algorithm's granularity rounded it up, which
+        # for DQN is never — but a PPO report that claimed 1,000 while evaluating every 16,384 would
+        # be a config row nobody could reproduce from.
+        self.config['eval_interval'] = self.eval_interval
 
         self.step = 0
-        self.epsilon = config['initial_epsilon']
+        # Game moves played, which `self.step` is not — see `build_eval_row`. `None` means "an older
+        # resume file did not record it", which every row then omits rather than guessing.
+        self.transitions = 0
         self.eval_rows = []
         self.resume_steps = []
         self.chart_window = None        # set by `run`; None unless this arm opened the box's window
@@ -301,7 +329,6 @@ class Trainer(object):
         self.queue_depth = int(config['eval_queue_depth'])
         self.eval_workers = []
         self.skipped_checkpoints = 0
-        self.gradient_debt = 0.0
         self._resume()
 
     # ------------------------------------------------------------ setup and resume
@@ -336,11 +363,17 @@ class Trainer(object):
         if not os.path.exists(path):
             return
         payload = torch.load(path, map_location=self.device, weights_only=True)
-        self.agent.load_state_dict(payload['agent'])
+        # **A pre-seam `resume.pt` has no `algo` block** — it holds `agent`, `epsilon` and
+        # `guided_fraction` at the top level. Handing the payload itself to the algorithm in that case
+        # reads those files correctly rather than stranding b1's and b2's, and it cannot misread one:
+        # the key names are identical in both layouts, so a wrong guess would raise on a missing key
+        # rather than restore something else.
+        self.algo.load_state_dict(payload.get('algo', payload))
         self.step = int(payload['step'])
-        self.epsilon = float(payload['epsilon'])
-        self.collector.set_guided_fraction(float(payload.get('guided_fraction', 0.0)))
-        loaded = self.buffer.load(self.policy_dir)
+        self.transitions = payload.get('transitions')
+        if self.transitions is not None:
+            self.transitions = int(self.transitions)
+        loaded = self.algo.load_side_state(self.policy_dir)
         self.eval_rows, resumes = run_report.load_history(self.history_path)
         self.resume_steps = list(resumes) + [self.step]
         print('resumed at step {0:,}: {1} eval row(s), buffer {2}'.format(
@@ -365,9 +398,9 @@ class Trainer(object):
             print('already at or past the {0:,}-step cap — nothing to train. Raise SNEK_MAX_STEPS '
                   'to continue this arm.'.format(cap), flush=True)
             return
-        self._prefill()
-        print('{0}: training to {1:,} steps, {2} lane(s), replay ratio {3}'.format(
-            self.policy, cap, self.collector.vec.n, self.config['replay_ratio']), flush=True)
+        self._bank_transitions(self.algo.prefill())
+        print('{0}: training to {1:,} steps, {2}'.format(
+            self.policy, cap, self.algo.describe()), flush=True)
         # The reward and shaping terms, which `hyperparameter override:` does NOT cover: those knobs
         # are read by `env/constants.py` at import, not through `tuned()`, so grepping the log for
         # overrides — which the docs name as the way to confirm an arm got its config — is silent on
@@ -397,22 +430,26 @@ class Trainer(object):
             # own seed and broke a bit-exactness assertion in a way that pointed at the wrong module.
             self.eval_workers = eval_queue.ensure_workers(self.config['eval_workers'])
             print('stage-A queue on: depth {0}, {1} worker(s) wanted, {2} started here. Rows arrive '
-                  'up to {0} evals behind, and the epsilon schedule reads them at that lag.'.format(
+                  "up to {0} evals behind, and the algorithm's schedule reads them at that lag.".format(
                       self.queue_depth, self.config['eval_workers'], len(self.eval_workers)),
                   flush=True)
 
         window_start, window_step = time.time(), self.step
         while self.step < cap:
-            transitions = self.collector.step(self.epsilon)
-            self.step += 1
-            self._learn(transitions)
-            if self.step % EVAL_INTERVAL == 0:
+            previous = self.step
+            steps, transitions = self.algo.advance()
+            self.step += steps
+            self._bank_transitions(transitions)
+            # **"Crossed a multiple of", not "is a multiple of".** An algorithm whose step advances by
+            # more than one would step straight over an exact test and never evaluate at all. At DQN's
+            # increment of 1 the two are the same expression.
+            if self._crossed(previous, self.eval_interval):
                 elapsed = max(time.time() - window_start, 1e-9)
                 self._evaluate((self.step - window_step) / elapsed)
                 window_start, window_step = time.time(), self.step
-            if self.step % RESUME_INTERVAL == 0:
+            if self._crossed(previous, self.resume_interval):
                 self._save_resume()
-            if self.step % REPORT_INTERVAL == 0:
+            if self._crossed(previous, self.report_interval):
                 self._write_report()
                 # A window that has exited stays a zombie until someone waits on it, and this parent
                 # lives for hours. `reap` polls; it never blocks on the window.
@@ -437,44 +474,19 @@ class Trainer(object):
         live_runs.unregister(self.policy)
         print('done at step {0:,}'.format(self.step), flush=True)
 
-    def _prefill(self):
-        """Random-ish experience before the first gradient step.
+    def _crossed(self, previous, interval):
+        """Whether the step just taken passed a multiple of `interval`."""
+        return self.step // interval > previous // interval
 
-        At the agent's own initial epsilon rather than a uniform policy: with a shielded arm the
-        difference is exactly the shield, and pre-filling unshielded would seed the buffer with the
-        deaths the shield exists to avoid.
+    def _bank_transitions(self, transitions):
+        """Adds to the game-move count, unless this arm does not know what its count is.
+
+        A `None` stays `None` for the life of the run: a resume from a `resume.pt` that predates the
+        field cannot recover the moves the earlier runs played, and counting from there would put a
+        confident wrong number on a comparison axis.
         """
-        target = self.config['initial_collect_steps']
-        if self.buffer.size >= target:
-            return
-        while self.buffer.size < target:
-            self.collector.step(1.0)
-
-    def _learn(self, transitions):
-        """`replay_ratio` gradient steps per *transition*, carrying the fraction across iterations.
-
-        Per transition rather than per iteration, so the ratio holds whether forking is on or off and
-        whatever `collect_envs` is. The debt accumulator is what makes a ratio below 1.0 mean what it
-        says instead of rounding to zero every iteration.
-        """
-        self.gradient_debt += transitions * self.config['replay_ratio']
-        while self.gradient_debt >= 1.0:
-            self.gradient_debt -= 1.0
-            drawn = self.buffer.sample(self.config['batch_size'], self.agent.train_step)
-            if drawn is None:
-                # Nothing to sample yet. The debt already spent stays spent rather than accruing: a
-                # buffer that fills on step 3 must not owe three batches at once.
-                continue
-            batch, indexes, weights = drawn
-            td_errors, _ = self.agent.update(batch, weights)
-            self.buffer.update_priorities(indexes, td_errors)
-            # No `maybe_update_target()` here: `agent.update` already calls it, and the agent is the
-            # only thing that knows `train_step`, which is what the period is counted in. Calling it
-            # from both places was a no-op at the default `tau` of 1.0 — a second hard copy of weights
-            # that were just copied — but at `tau < 1.0` it applied the Polyak step twice at the same
-            # train_step, so a requested 0.05 ran at 1 - (1 - 0.05)^2 = 0.0975. The period itself was
-            # never affected, because `maybe_update_target` gates on `train_step` rather than counting
-            # its own calls.
+        if self.transitions is not None:
+            self.transitions += int(transitions)
 
     # ------------------------------------------------------------ the eval
 
@@ -487,10 +499,9 @@ class Trainer(object):
         step with an epsilon it never ran under. `steps_per_second` and the fork counters are the same
         kind of thing — a window of training that is over and cannot be reconstructed.
         """
-        return {'epsilon': float(self.epsilon),
-                'guided_fraction': float(self.collector.guided_fraction),
-                'steps_per_second': float(steps_per_second),
-                'fork': self.collector.snapshot() if self.config['fork'].enabled else None}
+        return {'steps_per_second': float(steps_per_second),
+                'transitions': self.transitions,
+                'algo': self.algo.fields()}
 
     def _evaluate(self, steps_per_second):
         """Stage A for the step just reached — measured here, or offered to the queue.
@@ -503,13 +514,13 @@ class Trainer(object):
         fields = self._trainer_fields(steps_per_second)
         if not self.config['eval_queue']:
             self._record(self.step,
-                         self_eval(self.agent, self.step, self.config['seed'], EVAL_EPISODES),
+                         self_eval(self.algo, self.step, self.config['seed'], EVAL_EPISODES),
                          fields)
             return
         # Written before the offer and unconditionally, because a worker measures a checkpoint by
         # restoring it. That inverts the gate rather than removing it: `_settle_checkpoint` prunes the
         # file when the row lands below the bar, so the set left on disk is the same one.
-        checkpoints.save(self.policy_dir, self.step, self.agent.net)
+        checkpoints.save(self.policy_dir, self.step, self.algo.net)
         eval_queue.enqueue(self.policy, self.step, fields, EVAL_EPISODES)
         self.pending_evals.append(self.step)
         self._drain()
@@ -518,21 +529,18 @@ class Trainer(object):
         """Turns one measurement into the arm's next row: schedule, gate, history, log.
 
         Called at the step's own eval interval without the queue and up to `eval_queue_depth`
-        intervals later with it. Every read of `self.eval_rows` here is "the rows before this one",
-        which holds in both modes because `_drain` merges strictly in step order — that ordering is
-        the reason the same three schedule calls can serve both.
+        intervals later with it. Every read of `self.eval_rows` here is "the rows that have landed
+        before this one", and one `algo.on_eval` serves both modes for that reason.
+
+        **‡ Not "the rows before this one in step order".** That is what this docstring claimed and
+        `_merge_landed` retracted: a streamed round does not complete in step order and cannot be made
+        to, so `_merge_landed` merges in ascending step order among whatever is *ready* rather than
+        waiting for the front. The trailing window is therefore the last N landed rows. See that
+        method for why waiting instead cost the queue its whole value.
         """
-        # Both schedules read the *same* reward signal, computed before this row is merged so the
-        # window is the last N evals including this one and no row is counted twice. Same signal so
-        # the shield switches on at exactly the eval the bootstrap phase hands over on.
-        reward_signal = schedules.trailing_reward(self.eval_rows, measured['avg_reward'])
-        perfect_rate = schedules.trailing_perfect_rate(self.eval_rows, measured['perfect'])
-        self.epsilon = schedules.epsilon_for(reward_signal, perfect_rate,
-                                             self.config['initial_epsilon'],
-                                             self.config['min_epsilon'])
-        guided = schedules.guided_fraction_for(reward_signal, self.config['initial_epsilon'],
-                                               self.config['guided_fraction'])
-        self.collector.set_guided_fraction(guided)
+        # **Always, in both modes: this is what moves the algorithm's schedule on.** What differs by
+        # mode is only which of its two spellings reaches the row — see the table below.
+        computed = self.algo.on_eval(self.eval_rows, measured)
 
         trailing = schedules.trailing_mean(self.eval_rows, 'avg_score', measured['avg_score'],
                                            TRAILING_WINDOW)
@@ -555,12 +563,15 @@ class Trainer(object):
         # `perfect_percent`, and the measurement half of the row — score, reward, perfect rate and the
         # trailing mean — is bit-identical between the modes. `tests/test_train.py` pins both halves of
         # that sentence.
-        if self.config['eval_queue']:
-            epsilon, reported_guided = fields['epsilon'], fields['guided_fraction']
-        else:
-            epsilon, reported_guided = self.epsilon, guided
-        row = build_eval_row(step, measured, trailing, epsilon, reported_guided,
-                             fields['steps_per_second'], fields.get('fork'))
+        #
+        # The two spellings are merged rather than chosen between, because only the *schedule's* keys
+        # differ: the fork counters are captured at the step in both modes and there is no computed
+        # version of them to prefer.
+        reported = dict(fields.get('algo') or {})
+        if not self.config['eval_queue']:
+            reported.update(computed)
+        row = build_eval_row(step, measured, trailing, fields['steps_per_second'],
+                             reported, fields.get('transitions'))
         run_report.merge_eval_row(self.eval_rows, row)
         summary = run_report.save_history(self.history_path, self.eval_rows, self.resume_steps)
         self._log(row, summary, keep)
@@ -574,7 +585,7 @@ class Trainer(object):
 
         **Only the direction differs by mode.** Without the queue the eval is in hand, so the file is
         written only if it is wanted. With the queue the file had to exist for a worker to restore, so
-        this prunes instead — and it must never re-save, because by now `self.agent.net` holds much
+        this prunes instead — and it must never re-save, because by now `self.algo.net` holds much
         later weights and writing them under an old step number would forge a checkpoint.
         """
         keep = max(avg_score, trailing) >= self.config['min_checkpoint_score']
@@ -582,7 +593,7 @@ class Trainer(object):
             self.skipped_checkpoints += 1
             checkpoints.discard(self.policy_dir, step)
         elif not self.config['eval_queue']:
-            checkpoints.save(self.policy_dir, step, self.agent.net)
+            checkpoints.save(self.policy_dir, step, self.algo.net)
         return keep
 
     # ------------------------------------------------------------ the queue
@@ -742,7 +753,7 @@ class Trainer(object):
             if eval_queue.landed(self.policy, step) is not None:
                 return
             fields = eval_queue.fields_of(self.policy, step) or {}
-        # Restored rather than measured from `self.agent.net`: the arm has trained on since this step
+        # Restored rather than measured from `self.algo.net`: the arm has trained on since this step
         # and stage A is a measurement of the checkpoint, not of the current weights.
         policy_fn, _, _ = restore.restore(self.policy_dir, step=step, device=self.device)
         held = engine.measure(policy_fn, EVAL_EPISODES,
@@ -753,15 +764,14 @@ class Trainer(object):
 
     def _save_resume(self):
         """Net, optimiser, step, schedules — and the buffer beside it, under the same call."""
-        payload = {'agent': self.agent.state_dict(), 'step': int(self.step),
-                   'epsilon': float(self.epsilon),
-                   'guided_fraction': float(self.collector.guided_fraction)}
+        payload = {'step': int(self.step), 'transitions': self.transitions,
+                   'algo': self.algo.state_dict()}
         path = self._resume_path()
         os.makedirs(self.policy_dir, exist_ok=True)
         staging = path + '.partial'
         torch.save(payload, staging)
         os.replace(staging, path)
-        self.buffer.save(self.policy_dir)
+        self.algo.save_side_state(self.policy_dir)
 
     def _write_report(self):
         progress_chart.render(self.eval_rows, self.graph_path, name=self.policy,
@@ -779,23 +789,20 @@ class Trainer(object):
         # The row's step, not `self.step`. With the queue on those differ by up to `depth` intervals,
         # and reading the loop's position here would mark the wrong eval as a new best and quiet the
         # log on the wrong cadence.
-        index = row['step'] // EVAL_INTERVAL
+        index = row['step'] // self.eval_interval
         is_best = (summary['best_perfect30']['value'] > 0
                    and summary['best_perfect30']['step'] == row['step'])
         if not (index % QUIET_EVAL_INTERVAL == 0 or is_best or index <= 1):
             return
         note = '  <- best so far' if is_best else ('' if keep else '  no ckpt')
         print('{0:>9,}  score {1:>5.1f}  trail {2:>5.1f}  pf {3:>3.0f}%  best30 {4:>4.1f}%  '
-              'eps {5:<7} {6:>5.0f} st/s{7}'.format(
+              '{5} {6:>5.0f} st/s{7}'.format(
                   row['step'], row['avg_score'], row['trailing_avg_score'], row['perfect_percent'],
-                  summary['best_perfect30']['value'], row['epsilon'], row['steps_per_second'], note),
+                  summary['best_perfect30']['value'], self.algo.log_note(row),
+                  row['steps_per_second'], note),
               flush=True)
-        if row.get('fork'):
-            fork = row['fork']
-            print('           forks {0:,}  live {1}  ended {2:,}/trunc {3:,}  '
-                  'eligible {4:,}  no slot {5:,}'.format(
-                      fork['forks'], fork['live_branches'], fork['terminated'], fork['truncated'],
-                      fork['eligible'], fork['skipped_full']), flush=True)
+        for line in self.algo.log_extra(row):
+            print(line, flush=True)
 
 
 def main(argv=None):

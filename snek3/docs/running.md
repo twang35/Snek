@@ -1,6 +1,8 @@
 # Running things
 
-`tuned()` in `train.py` is the authoritative knob list; this file is a summary of it.
+`tuned()` is the authoritative knob list and it is read in **two** files — `train.py` for what is not
+algorithm-specific, and the algorithm's own `algo.py` (today only [`dqn/algo.py`](../dqn/algo.py)) for
+the rest. This file is a summary of both.
 
 ```
 conda activate snek3       # or /opt/miniconda3/envs/snek3/bin/python directly
@@ -32,8 +34,9 @@ Every hyperparameter comes from a `SNEK_*` environment variable, so variants run
 editing files. Each override prints a `hyperparameter override:` line at startup — **that grep is how
 a misconfigured control arm gets caught**, and it has been.
 
-**It does not cover every knob, and the gap is the shaping set.** `hyperparameter override:` only
-reports what `train.py` reads through `tuned()`. The reward and shaping knobs are read by
+**It does not cover every knob, and the gap is the shaping set.** `hyperparameter override:` covers
+everything read through `tuned()`, in `train.py` and in the algorithm's module alike — they share the
+one function, which is why the split cost the grep nothing. The reward and shaping knobs are read by
 `env/constants.py` **at import**, before the trainer's config exists, so they print no override line
 — `SNEK_CHASE_SAFE_SHAPING`, `SNEK_CHASE_SAFE_GATE`, `SNEK_FREE_SPACE_*`,
 `SNEK_FOOD_DISTANCE_REWARD`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`. For those, grep
@@ -44,8 +47,9 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 
 | knob | default | notes |
 |---|---|---|
+| `SNEK_ALGO` | `dqn` | which algorithm to train. An unknown value is **refused by name** rather than defaulting, so an arm launched as something this build has no code for cannot quietly train DQN and be reported as the other thing |
 | `SNEK_SEED` | 1 | seeds the network initialisation, the exploration coins, the replay sampler, the env's food and every eval. Recorded in `runs/<policy>.md`, so two arms of the same config are the same arm |
-| `SNEK_MAX_STEPS` | 10,000,000 | **absolute**, not "run this many more" — `global_step` is restored on resume. An arm at its cap prints so and exits after its opening eval |
+| `SNEK_MAX_STEPS` | 10,000,000 | **absolute**, not "run this many more" — `global_step` is restored on resume. An arm at its cap prints so and exits after its opening eval. **Counted steps, not game moves**: at the default `fork_branches=4` a DQN step is four moves, and every eval row carries `transitions` for that reason |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40 | below this no checkpoint is written, so a short smoke run writes none and cannot resume. Set 0 to test resume |
 | `SNEK_DEBUG` | 0 | verbose logging. For debugging, not status |
 | `SNEK_TORCH_THREADS` | 1 | **measured 1.4x faster than one-per-core**: a 30 -> 320 -> 3 net has no op large enough to amortise a fork-join. Compounds when four arms share the laptop |
@@ -110,7 +114,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | knob | default | notes |
 |---|---|---|
 | `SNEK_GRAPH_EVAL_EPISODES` | 100 | **pinned.** The stage-A gate is literally "95 of 100"; a different denominator is a different gate |
-| `SNEK_EVAL_INTERVAL` | 1000 | **sets the checkpoint interval too, from the same value.** They must be equal — a checkpoint at a step no eval screens can never be measured — so there is one knob rather than two that can disagree. Lower it for a smoke test and nothing else |
+| `SNEK_EVAL_INTERVAL` | 1000 | **sets the checkpoint interval too, from the same value.** They must be equal — a checkpoint at a step no eval screens can never be measured — so there is one knob rather than two that can disagree. Lower it for a smoke test and nothing else. **Rounded up to a whole algorithm step**, which changes nothing for DQN (granularity 1) and is what lets an algorithm whose step is a whole rollout keep the equality; `runs/<policy>.md` records the interval the arm actually ran |
 | `SNEK_EVAL_QUEUE` | **1** | hands stage A to shared worker processes instead of measuring it in the training loop. **Measured 3.83x** end to end at the tuned defaults (9.12 h -> 2.38 h per arm to 3M, four arms, laptop). It **changes the training** — bounded schedule lag, and stage-A rows are no longer bit-reproducible from the arm's seed — so `0` is what an arm being diffed against b1 or b2 must use. See below |
 | `SNEK_EVAL_QUEUE_DEPTH` | **16** | how many checkpoints may be **unmeasured**. **This is both the schedule's blind spot and the throughput lever**: at 16 the epsilon and shield schedules read a measurement up to 16,000 counted steps old. 16 is where an arm stops being eval-bound — all 19 swept configurations at depth 8 sat pinned against their cap with the trainer waiting, while at 16 the queue drains and the arm reaches 94% of its unblocked rate. 24 regresses, 12 gets 63% of the gain. **0 is the verification mode** — the trainer measures each checkpoint before resuming, which reproduces an unqueued arm bit for bit and recovers nothing |
 | `SNEK_EVAL_WORKERS` | **6** | worker processes **per box**, shared by every arm on it. Unlike depth this turns over: at four arms the sweep measured 4.84 h (2w), 3.94 h (4w), **3.21 h (6w)**, 3.27 h (8w), 3.55 h (10w) — past six, workers starve the trainers, whose unblocked rate falls 380 -> 306 st/s, and the box reaches 4% idle to run *slower*. **Idle CPU is not the target**; the fastest configuration leaves ~20% of the box free. Starting none is safe — the arm measures its own and runs at today's speed |

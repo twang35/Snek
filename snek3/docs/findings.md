@@ -14,6 +14,41 @@ snek3.
 
 ## Established
 
+### Potential-based shaping was not policy-invariant: b1 and b2 shaped at γ=1.0 while discounting at 0.99 and 0.9975
+
+`train.py` built its collect env as `VecSnake(width, seed=...)` and never passed `shaping_discount`,
+so it kept the constructor's default of 1.0. Shaping pays `c·(γ·Φ(s') − Φ(s))`, and the theorem that
+makes `c` free — the discounted sum telescopes to exactly `−c·Φ(s₀)`, so `c` cannot change the optimal
+policy — holds only when that γ is the agent's own.
+
+| arm | shaped at | discounted at | un-cancelled potential per step |
+|---|---:|---:|---:|
+| b1 | 1.0 | 0.99 | 0 — shaping was off |
+| b2 | 1.0 | **0.9975** | `c·(1−γ)·Φ` = **2.5e-4** at `c=0.1` |
+
+That is the same order as `FOOD_DISTANCE_REWARD` (0.001), and unlike the shaping it is meant to be, it
+does not cancel: it is a **standing bonus for being alive in a high-potential state**. Fixed
+2026-08-29 by passing the agent's `discount`.
+
+**It changed nothing for an arm with shaping off, and that is measured rather than argued.**
+`VecSnake.step` only reaches `_shaping_reward` when a coefficient is non-zero. Fingerprinting three
+short arms before and after — every eval row, the final weights, the step, the transition count and
+epsilon — left the shaping-free arm **byte-identical** and moved both shaping arms. So b1 and every
+b1-class comparison stand; only a shaping arm's dynamics change, and b2 was already running.
+
+**The eval path still shapes at 1.0, deliberately.** `engine.measure` is handed a checkpoint and has
+no agent to ask for a γ, and `SNEK_DISCOUNT` is not in `EVAL_RELEVANT_ENV` for the good reason that a
+learning-rate-class knob must not re-shard a wave. It moves `avg_reward` only — never `avg_score` or
+`perfect_percent`, which is what every gate and screen reads.
+
+**‡ The first version of the check could not fail, and finding that out is the transferable part.**
+The exactness harness ran its shaping arm at b2's own `CHASE_SAFE_GATE=75`. A 1,200-step arm plays a
+snake of length 4-10, so Φ was identically 0, the shaping term contributed exactly 0.0 whatever γ
+was, and a deliberately reintroduced `shaping_discount=1.0` came back **IDENTICAL**. Dropping the
+gate to 5 — cleared by the first meal — is what made the check able to fail. This is
+[`../CLAUDE.md`](../CLAUDE.md)'s "a fixture whose subject cannot violate it is not a fixture", found
+in a verification harness rather than in a test.
+
 ### The flat one-stage protocol reproduces snek2's tiered close-out, row for row
 
 **3,222 checkpoints of `b45a-lowlr8-b29b`, 100 episodes each, measured independently by both stacks.**

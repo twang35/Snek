@@ -138,6 +138,9 @@ def build_summary(eval_rows, perfect_window=30, dead_window=30, dead_threshold=1
         'dead_since': dead_since,
         'zero_since': zero_since,
         'epsilon': last.get('epsilon'),
+        # Game moves, which `step` is not — see `train.build_eval_row`. Absent on an arm whose rows
+        # predate the field, which is what `.get` returning None spells.
+        'transitions': last.get('transitions'),
     }
 
 

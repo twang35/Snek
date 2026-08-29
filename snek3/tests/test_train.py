@@ -21,6 +21,7 @@ import pytest
 
 import train
 from vectorized import config as reward_config
+from dqn import algo as dqn_algo
 from dqn import collect
 from tools import arch as arch_tools
 from tools import checkpoints
@@ -112,7 +113,10 @@ def test_every_config_key_is_its_knob_lowercased():
     to catch a key that was renamed without its knob or the reverse.
     """
     import re
-    source = open(train.__file__).read()
+    # **Both modules, because the knobs now live in two files.** `train.py` reads what is not
+    # algorithm-specific and `dqn/algo.py` reads the rest; a test that looked at only one would pass
+    # while every DQN row in the report was unmatched.
+    source = open(train.__file__).read() + open(dqn_algo.__file__).read()
     knobs = {name.lower() for name in re.findall(r"tuned\('([A-Z_]+)'", source)}
     keys = set(train.build_config())
     # `algo` and `min_checkpoint_score` are not `tuned()` calls — one is fixed, the other is read in
@@ -202,13 +206,18 @@ def test_the_eval_seed_moves_with_the_step_and_with_the_arm():
 
 # --- the eval row -----------------------------------------------------------------------------
 
+def _algo(epsilon=0.01, guided=0.0, fork=None):
+    """The algorithm's half of a row, in the shape `DqnAlgo.fields()` returns it."""
+    return {'epsilon': epsilon, 'guided_fraction': guided, 'fork': fork}
+
+
 def measured(avg_score=42.0, perfect=0.3):
     return {'avg_score': avg_score, 'min_score': 1.0, 'max_score': 95.0,
             'avg_reward': 12.5, 'perfect': perfect}
 
 
 def test_the_row_carries_every_column_the_report_prints():
-    row = train.build_eval_row(1000, measured(), 40.0, 0.01, 0.0, 900.0)
+    row = train.build_eval_row(1000, measured(), 40.0, 900.0, _algo(0.01))
     for key, _ in run_report.EVAL_COLUMNS:
         assert key in row, key
         assert row[key] is not None, key
@@ -216,45 +225,167 @@ def test_the_row_carries_every_column_the_report_prints():
 
 def test_the_row_summarises_this_evals_own_episodes():
     # Not a mix of this eval's mean with a training interval's extremes, which is what snek2 printed.
-    row = train.build_eval_row(1000, measured(avg_score=42.0), 40.0, 0.01, 0.0, 900.0)
+    row = train.build_eval_row(1000, measured(avg_score=42.0), 40.0, 900.0, _algo(0.01))
     assert row['avg_score'] == 42.0
     assert row['min_score'] == 1.0 and row['max_score'] == 95.0
 
 
 def test_the_perfect_column_is_a_percentage_not_a_fraction():
     # Stored on 0-100 because every reader — the chart, the summary, the schedules — assumes it.
-    row = train.build_eval_row(1000, measured(perfect=0.37), 40.0, 0.01, 0.0, 900.0)
+    row = train.build_eval_row(1000, measured(perfect=0.37), 40.0, 900.0, _algo(0.01))
     assert row['perfect_percent'] == 37.0
 
 
 def test_the_row_feeds_the_summary_builder_without_a_key_error():
-    rows = [train.build_eval_row(step, measured(), 40.0, 0.01, 0.0, 900.0)
+    rows = [train.build_eval_row(step, measured(), 40.0, 900.0, _algo(0.01))
             for step in (1000, 2000, 3000)]
     summary = run_report.build_summary(rows)
     assert summary['step'] == 3000 and summary['evals'] == 3
 
 
 def test_a_control_arm_writes_no_fork_field():
-    row = train.build_eval_row(1000, measured(), 40.0, 0.01, 0.0, 900.0)
+    row = train.build_eval_row(1000, measured(), 40.0, 900.0, _algo(0.01))
     assert 'fork' not in row
+
+
+# --- the algorithm seam --------------------------------------------------------------------------
+#
+# `train.py` owns the measurement path and the algorithm owns its loop. The reason that split has to
+# hold is not tidiness: a PPO arm's numbers are comparable to a DQN arm's only if the same code
+# screened the checkpoints, ran the same 100 episodes and wrote the same rows — so the file that must
+# never be duplicated for a second algorithm is `train.py`. These fixtures are what a future
+# `ppo/algo.py` is held to.
+
+# Every member `train.Trainer` calls on the algorithm object. Listed here rather than discovered, so
+# adding a call site without adding it to the seam is a failing test rather than a surprise for the
+# next algorithm.
+SEAM = ('step_granularity', 'prefill', 'advance', 'fields', 'on_eval', 'net', 'policy_fn',
+        'state_dict', 'load_state_dict', 'save_side_state', 'load_side_state', 'describe',
+        'log_note', 'log_extra')
+
+MODULE_SEAM = ('NAME', 'build', 'build_config', 'reportable')
+
+
+@pytest.mark.parametrize('name', sorted(train.ALGOS))
+def test_every_algorithm_module_offers_the_whole_seam(name):
+    module = train.ALGOS[name]
+    assert module.NAME == name, 'the registry key and the module name must agree'
+    missing = [member for member in MODULE_SEAM if not hasattr(module, member)]
+    assert not missing, missing
+
+
+@pytest.mark.parametrize('name', sorted(train.ALGOS))
+def test_every_algorithm_object_offers_the_whole_seam(name, monkeypatch):
+    """Parametrised over the registry rather than written against DQN.
+
+    So `ppo/algo.py` is covered the moment it is added to `ALGOS`, which is the only way a contract
+    test earns its place — one written against the single existing implementation asserts that the
+    implementation is itself.
+    """
+    monkeypatch.setenv('SNEK_ALGO', name)
+    config = train.build_config()
+    config.update({'seed': 3, 'replay_buffer_max_length': 500})
+    arch = arch_tools.build_arch(config['fc_layers'], train.constants.NUM_ACTIONS,
+                                 train.constants.OBS_LEN, train.constants.OBS_ERA, algo=name)
+    algo = train.ALGOS[name].build(config, arch)
+    missing = [member for member in SEAM if not hasattr(algo, member)]
+    assert not missing, missing
+    assert int(algo.step_granularity) >= 1
+
+
+def test_the_default_algorithm_is_dqn():
+    assert train.build_config()['algo'] == 'dqn'
+
+
+def test_an_unknown_algorithm_names_itself_rather_than_defaulting(monkeypatch):
+    """`SNEK_ALGO=ppo` on a build with no PPO must not quietly train DQN.
+
+    The failure it prevents is a whole batch of arms launched as PPO, reported as PPO, and actually
+    DQN — which is the `arch.json` silent-default failure in a different costume.
+    """
+    monkeypatch.setenv('SNEK_ALGO', 'ppo')
+    with pytest.raises(ValueError, match='not an algorithm this build knows'):
+        train.build_config()
+
+
+# --- the intervals at a granularity greater than one ---------------------------------------------
+
+@pytest.mark.parametrize('target,granularity,expected', [
+    (1000, 1, 1000),          # DQN: unchanged, which is what keeps a DQN arm bit-exact
+    (10000, 1, 10000),
+    (1000, 16384, 16384),     # a PPO rollout is larger than the interval: one rollout per eval
+    (1000, 300, 1200),        # rounds up, never down
+    (1200, 300, 1200),        # an exact multiple is left alone
+    (0, 1, 1),                # never zero, or the crossing test divides by zero
+    (1000, 0, 1000),          # a nonsense granularity is treated as one
+])
+def test_an_interval_is_rounded_up_to_whole_algorithm_steps(target, granularity, expected):
+    assert train._whole_steps(target, granularity) == expected
+
+
+def test_at_a_granularity_of_one_the_crossing_test_is_the_modulo_test():
+    """**The fixture the refactor rests on.** The loop used `step % EVAL_INTERVAL == 0`.
+
+    If these two disagree anywhere, a DQN arm evaluates at different steps than b1 and b2 did and
+    every comparison against them is off. Checked over 5,000 steps rather than argued.
+    """
+    trainer = train.Trainer.__new__(train.Trainer)
+    for step in range(1, 5000):
+        trainer.step = step
+        assert trainer._crossed(step - 1, 1000) == (step % 1000 == 0), step
+
+
+def test_a_step_that_jumps_clear_over_a_multiple_still_fires():
+    """Which `% == 0` does not, and it would silently never evaluate.
+
+    A PPO step is a whole rollout — 16,384 transitions at the planned default — so an exact test
+    would be true only when the rollout size happened to divide the interval.
+    """
+    trainer = train.Trainer.__new__(train.Trainer)
+    trainer.step = 16384
+    assert trainer._crossed(0, 1000)
+    assert trainer.step % 1000 != 0, 'the case is only interesting if the exact test fails'
+
+
+def test_the_report_records_the_interval_the_arm_ran_not_the_one_asked_for(tmp_path, monkeypatch):
+    """A config row nobody can reproduce from is worse than no row.
+
+    Driven by faking a granularity of 4 rather than waiting for PPO: the interval the knob asks for
+    is 10 here, so a granularity of 4 rounds it to 12 and the two numbers are distinguishable.
+    """
+    monkeypatch.setattr(dqn_algo.DqnAlgo, 'step_granularity', 4)
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch)
+    assert trainer.eval_interval == 12
+    assert trainer.config['eval_interval'] == 12
+    # 24, not the 20 the knob asks for: the resume and report intervals are whole multiples of the
+    # *eval* interval, so a resume is never written at a step no eval produced a row for.
+    assert trainer.resume_interval == 24 and trainer.report_interval == 24
+    assert trainer.resume_interval % trainer.eval_interval == 0
+    assert trainer.report_interval % trainer.eval_interval == 0
 
 
 # --- the gradient budget ----------------------------------------------------------------------
 
 def learner(ratio, batch_size=8):
-    trainer = train.Trainer.__new__(train.Trainer)
-    trainer.config = {'replay_ratio': ratio, 'batch_size': batch_size}
-    trainer.buffer = StubBuffer()
-    trainer.agent = StubAgent()
-    trainer.gradient_debt = 0.0
-    return trainer
+    """A `DqnAlgo` with stubs for everything `_learn` touches, and nothing else built.
+
+    The gradient budget moved out of `train.py` with the rest of the DQN loop; these fixtures moved
+    with it rather than being rewritten, because what they pin — that a ratio below 1.0 does not
+    round to zero every iteration — is unchanged by where the code lives.
+    """
+    algo = dqn_algo.DqnAlgo.__new__(dqn_algo.DqnAlgo)
+    algo.config = {'replay_ratio': ratio, 'batch_size': batch_size}
+    algo.buffer = StubBuffer()
+    algo.agent = StubAgent()
+    algo.gradient_debt = 0.0
+    return algo
 
 
 def test_a_ratio_of_one_is_one_gradient_step_per_transition():
-    trainer = learner(1.0)
+    algo = learner(1.0)
     for _ in range(10):
-        trainer._learn(3)
-    assert trainer.agent.updates == 30
+        algo._learn(3)
+    assert algo.agent.updates == 30
 
 
 def test_a_ratio_below_one_accumulates_across_iterations_instead_of_rounding_away():
@@ -263,24 +394,24 @@ def test_a_ratio_below_one_accumulates_across_iterations_instead_of_rounding_awa
     Rounded per iteration, `0.25` with one transition per iteration would floor to zero every time
     and the arm would collect for hours without a single gradient step.
     """
-    trainer = learner(0.25)
+    algo = learner(0.25)
     for _ in range(100):
-        trainer._learn(1)
-    assert trainer.agent.updates == 25
+        algo._learn(1)
+    assert algo.agent.updates == 25
 
 
 def test_a_ratio_above_one_does_several_gradient_steps_per_transition():
-    trainer = learner(3.0)
-    trainer._learn(2)
-    assert trainer.agent.updates == 6
+    algo = learner(3.0)
+    algo._learn(2)
+    assert algo.agent.updates == 6
 
 
 def test_every_gradient_step_feeds_its_priorities_back():
     # A sampled batch whose priorities are never updated keeps its old weight forever, which turns
     # prioritised replay into a slow uniform buffer.
-    trainer = learner(1.0)
-    trainer._learn(5)
-    assert trainer.buffer.samples == 5 == trainer.buffer.updates
+    algo = learner(1.0)
+    algo._learn(5)
+    assert algo.buffer.samples == 5 == algo.buffer.updates
 
 
 def test_a_gradient_step_refreshes_the_target_once_and_not_twice():
@@ -292,10 +423,10 @@ def test_a_gradient_step_refreshes_the_target_once_and_not_twice():
     affected, because `maybe_update_target` gates on `train_step` rather than counting its own calls,
     which is why this is a call-count assertion and not a period one.
     """
-    trainer = learner(1.0)
-    trainer._learn(5)
-    assert trainer.agent.updates == 5
-    assert trainer.agent.target_updates == 5, 'the target is being refreshed twice per gradient step'
+    algo = learner(1.0)
+    algo._learn(5)
+    assert algo.agent.updates == 5
+    assert algo.agent.target_updates == 5, 'the target is being refreshed twice per gradient step'
 
 
 def test_an_empty_buffer_does_not_bank_debt_for_later():
@@ -304,11 +435,11 @@ def test_an_empty_buffer_does_not_bank_debt_for_later():
     Otherwise the first gradient steps of every run come in a burst against the smallest, least
     diverse buffer the run will ever have.
     """
-    trainer = learner(1.0)
-    trainer.buffer.sample = lambda batch_size, step: None
-    trainer._learn(10)
-    assert trainer.agent.updates == 0
-    assert trainer.gradient_debt < 1.0
+    algo = learner(1.0)
+    algo.buffer.sample = lambda batch_size, step: None
+    algo._learn(10)
+    assert algo.agent.updates == 0
+    assert algo.gradient_debt < 1.0
 
 
 # --- the sidecar ------------------------------------------------------------------------------
@@ -458,15 +589,15 @@ def test_the_epsilon_schedule_is_applied_at_every_eval(tmp_path, monkeypatch):
     would just show an arm that never refines.
     """
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=0.0)
-    assert trainer.epsilon == trainer.config['initial_epsilon']
+    assert trainer.algo.epsilon == trainer.config['initial_epsilon']
     scripted(monkeypatch, measured(avg_score=90.0, perfect=0.0))
     trainer.step = 10
     trainer._evaluate(900.0)
     # An avg_reward of 12.5 clears the first two bootstrap rungs and no more, so the ceiling halves
     # twice: this pins that the schedule ran, not merely that epsilon changed.
-    assert trainer.epsilon == pytest.approx(train.schedules.epsilon_for(
+    assert trainer.algo.epsilon == pytest.approx(train.schedules.epsilon_for(
         12.5, 0.0, trainer.config['initial_epsilon'], trainer.config['min_epsilon']))
-    assert trainer.epsilon < trainer.config['initial_epsilon']
+    assert trainer.algo.epsilon < trainer.config['initial_epsilon']
 
 
 def test_the_shield_fraction_reaches_the_collector(tmp_path, monkeypatch):
@@ -477,11 +608,11 @@ def test_the_shield_fraction_reaches_the_collector(tmp_path, monkeypatch):
     """
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=0.0,
                            guided_fraction=0.8)
-    assert trainer.collector.guided_fraction == 0.0, 'the shield is off during bootstrap'
+    assert trainer.algo.collector.guided_fraction == 0.0, 'the shield is off during bootstrap'
     scripted(monkeypatch, dict(measured(), avg_reward=25.0))
     trainer.step = 10
     trainer._evaluate(900.0)
-    assert trainer.collector.guided_fraction == pytest.approx(0.8)
+    assert trainer.algo.collector.guided_fraction == pytest.approx(0.8)
 
 
 def test_the_trailing_score_is_a_window_and_not_this_eval_alone(tmp_path, monkeypatch):
@@ -521,17 +652,17 @@ def test_the_buffer_is_prefilled_before_the_first_gradient_step(tmp_path, monkey
     learning pressure of the run.
     """
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=120)
-    assert trainer.buffer.size == 0
-    trainer._prefill()
-    assert trainer.buffer.size >= 120
+    assert trainer.algo.buffer.size == 0
+    trainer.algo.prefill()
+    assert trainer.algo.buffer.size >= 120
 
 
 def test_a_prefilled_buffer_is_not_filled_twice(tmp_path, monkeypatch):
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=50)
-    trainer._prefill()
-    size = trainer.buffer.size
-    trainer._prefill()
-    assert trainer.buffer.size == size, 'a resume must not re-run the prefill'
+    trainer.algo.prefill()
+    size = trainer.algo.buffer.size
+    trainer.algo.prefill()
+    assert trainer.algo.buffer.size == size, 'a resume must not re-run the prefill'
 
 
 def test_the_resume_state_carries_the_buffer_beside_the_weights(tmp_path, monkeypatch):
@@ -542,26 +673,55 @@ def test_the_resume_state_carries_the_buffer_beside_the_weights(tmp_path, monkey
     at whatever epsilon the schedule has reached, which is not the same experience.
     """
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=60)
-    trainer._prefill()
+    trainer.algo.prefill()
     trainer.step = 10
     trainer._save_resume()
     assert os.path.exists(os.path.join(trainer.policy_dir, 'replay.npz'))
 
     again = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=60)
     assert again.step == 10
-    assert again.buffer.size >= 60, 'the buffer did not come back with the weights'
+    assert again.algo.buffer.size >= 60, 'the buffer did not come back with the weights'
+
+
+def test_a_pre_seam_resume_file_still_restores(tmp_path, monkeypatch):
+    """b1's and b2's `resume.pt` hold the agent and the schedules at the top level, not under `algo`.
+
+    Stranding them would cost nothing anyone wants and would be silent until someone tried to
+    continue an arm. It cannot misread one either: the key names are identical in both layouts, so a
+    wrong guess raises on a missing key rather than restoring something else.
+    """
+    import torch
+
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, guided_fraction=0.8)
+    trainer.algo.epsilon = 0.0125
+    trainer.algo.collector.set_guided_fraction(0.8)
+    trainer.step = 10
+    trainer._save_resume()
+
+    path = os.path.join(trainer.policy_dir, train.RESUME_FILENAME)
+    payload = torch.load(path, weights_only=True)
+    assert 'algo' in payload, 'this fixture is about flattening the current layout'
+    torch.save({'agent': payload['algo']['agent'], 'step': payload['step'],
+                'epsilon': payload['algo']['epsilon'],
+                'guided_fraction': payload['algo']['guided_fraction']}, path)
+
+    again = make_trainer(tmp_path, monkeypatch=monkeypatch, guided_fraction=0.8)
+    assert again.step == 10
+    assert again.algo.epsilon == pytest.approx(0.0125)
+    assert again.algo.collector.guided_fraction == pytest.approx(0.8)
+    assert again.transitions is None, 'a pre-seam file has no move count to restore'
 
 
 def test_the_resume_state_carries_the_schedules(tmp_path, monkeypatch):
     # Or a resumed arm restarts exploring at its initial epsilon, undoing the refinement it earned.
     trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, guided_fraction=0.8)
-    trainer.epsilon = 0.0125
-    trainer.collector.set_guided_fraction(0.8)
+    trainer.algo.epsilon = 0.0125
+    trainer.algo.collector.set_guided_fraction(0.8)
     trainer.step = 10
     trainer._save_resume()
     again = make_trainer(tmp_path, monkeypatch=monkeypatch, guided_fraction=0.8)
-    assert again.epsilon == pytest.approx(0.0125)
-    assert again.collector.guided_fraction == pytest.approx(0.8)
+    assert again.algo.epsilon == pytest.approx(0.0125)
+    assert again.algo.collector.guided_fraction == pytest.approx(0.8)
 
 
 # --- the config an arm actually got ---------------------------------------------------------------
@@ -638,6 +798,175 @@ def test_describe_shows_a_shaping_term_that_is_on(monkeypatch):
     assert 'chase_safe c=0.0' in reward_config.describe(), 'default is off'
 
 
+# --- the transition count ------------------------------------------------------------------------
+#
+# `step` and "game moves" are different numbers and the gap cost this project a whole interim
+# reading: `collector.step()` advances every lane, so at the default `fork_branches=4` one counted
+# step is four game moves, four buffer rows and four gradient steps. `docs/findings.md` records it.
+# The row now carries both, which is what a PPO arm — whose step *is* a transition — is compared on.
+
+def test_the_transition_count_advances_by_the_lane_width_each_step(tmp_path, monkeypatch):
+    """**Exactly the width, not approximately.** This is the 4x itself, as a fixture.
+
+    Holds at `n_step_update=1`, which is the default and every arm run so far: a lane banks one
+    transition per call. It is deliberately not asserted for `n_step > 1`, where a lane's first `n-1`
+    steps bank nothing — a fixture that tried to cover both would have to encode the warm-up and
+    would pass against a count that was merely monotonic.
+
+    **Driven through `advance()`, which is what reports the number.** The first version stepped the
+    collector directly and banked the result itself; an `advance()` that returned `1, 1` — a counted
+    step mistaken for a game move, which is the exact confusion this field exists to end — survived
+    it, because the fixture never asked `advance()` anything.
+    """
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=0)
+    assert trainer.transitions == 0
+    width = trainer.algo.collector.vec.n
+    assert width == trainer.config['collect_envs'] * trainer.config['fork'].branches
+    for _ in range(5):
+        steps, transitions = trainer.algo.advance()
+        assert (steps, transitions) == (1, width)
+        trainer._bank_transitions(transitions)
+    assert trainer.transitions == 5 * width
+
+
+def test_the_prefill_counts_because_those_moves_were_played(tmp_path, monkeypatch):
+    """So `transitions` is not `step * width`, and it should not be.
+
+    The prefill's transitions are in the buffer and are learned from, so an env-interaction axis has
+    to include them. Stated as a fixture because the tempting "simplification" is to derive
+    `transitions` from `step` and drop the counter, which would silently drop these.
+    """
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=40)
+    trainer._bank_transitions(trainer.algo.prefill())
+    assert trainer.step == 0
+    assert trainer.transitions >= 40
+
+
+def test_an_eval_row_carries_the_move_count_beside_the_step(tmp_path, monkeypatch):
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=0.0)
+    trainer.run()
+    row = trainer.eval_rows[-1]
+    assert row['transitions'] > row['step'], 'a counted step is more than one game move'
+
+
+def test_the_row_reports_the_count_at_its_own_step_not_at_merge_time(tmp_path, monkeypatch):
+    """The queue lands a row up to `depth` intervals late, and by then the count has moved on.
+
+    `transitions` belongs to the same set as `epsilon` and `steps_per_second` — a window of training
+    that is over and cannot be reconstructed — so it is captured in `_trainer_fields` rather than read
+    when the measurement arrives.
+
+    **Driven through `_record`, not through `build_eval_row`.** The first version of this fixture
+    called the row builder with `_trainer_fields`' own output, which asserts nothing about the call
+    site: a `_record` that ignored its `fields` and read `self.transitions` survived it. The two
+    values are set apart here so only the captured one can produce the expected row.
+    """
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=0.0)
+    trainer.transitions = 400
+    captured = trainer._trainer_fields(900.0)
+    assert captured['transitions'] == 400, 'the field is captured when the step happens'
+
+    trainer.transitions = 4000
+    trainer._record(10, measured(), captured)
+    assert trainer.eval_rows[-1]['transitions'] == 400
+
+
+def test_the_captured_fields_report_the_live_schedule_not_its_starting_value(
+        tmp_path, monkeypatch):
+    """`fields()` is "what the arm ran under", and the whole queue rests on it being *live*.
+
+    A `fields()` that reported `initial_epsilon` would be right on the first eval of every arm and
+    wrong for the rest of the run — and silent, because nothing selects on the epsilon column. It
+    survived the queued/unqueued fixtures, which hand `_record` a field dict of their own rather than
+    asking the algorithm for one.
+    """
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, guided_fraction=0.8)
+    assert trainer.config['initial_epsilon'] == 0.4, 'the two values must differ to prove anything'
+    trainer.algo.epsilon = 0.0125
+    trainer.algo.collector.set_guided_fraction(0.8)
+
+    captured = trainer._trainer_fields(900.0)['algo']
+    assert captured['epsilon'] == pytest.approx(0.0125)
+    assert captured['guided_fraction'] == pytest.approx(0.8)
+
+
+def test_the_resume_state_carries_the_move_count(tmp_path, monkeypatch):
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=40)
+    trainer._bank_transitions(trainer.algo.prefill())
+    banked = trainer.transitions
+    trainer.step = 10
+    trainer._save_resume()
+    again = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=40)
+    assert again.transitions == banked
+
+
+def test_a_resume_that_cannot_know_the_count_reports_no_count(tmp_path, monkeypatch):
+    """**Absent, not a confident wrong number.** The rule `min_achievable` is remembered for.
+
+    A `resume.pt` written before this field existed cannot say how many moves the earlier runs
+    played. Counting from zero would put a number on a comparison axis that is wrong by however far
+    the arm had already trained, and nothing downstream could tell.
+    """
+    import torch
+
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=40)
+    trainer._bank_transitions(trainer.algo.prefill())
+    trainer.step = 10
+    trainer._save_resume()
+    path = os.path.join(trainer.policy_dir, train.RESUME_FILENAME)
+    payload = torch.load(path, weights_only=True)
+    del payload['transitions']
+    torch.save(payload, path)
+
+    again = make_trainer(tmp_path, monkeypatch=monkeypatch, initial_collect_steps=40)
+    assert again.transitions is None
+    again._bank_transitions(4)
+    assert again.transitions is None, 'a partial count is worse than none'
+    row = train.build_eval_row(10, measured(), 40.0, 900.0, _algo(0.01), again.transitions)
+    assert 'transitions' not in row
+
+
+def test_the_summary_surfaces_the_move_count(tmp_path, monkeypatch):
+    # `docs/protocol.md` says to read status from the summary block, so a units field that is only in
+    # the rows is a units field nobody checking progress will see.
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, min_checkpoint_score=0.0)
+    trainer.run()
+    summary = run_report.build_summary(trainer.eval_rows)
+    assert summary['transitions'] == trainer.eval_rows[-1]['transitions']
+
+
+# --- the shaping discount belongs to the agent --------------------------------------------------
+
+@pytest.mark.parametrize('discount', [0.99, 0.9975, 0.9])
+def test_the_collect_env_shapes_with_the_agents_own_discount(tmp_path, monkeypatch, discount):
+    """**b1 and b2 ran this at 1.0 while discounting at 0.99 and 0.9975.**
+
+    Potential-based shaping pays `c * (gamma * Phi(s') - Phi(s))`, and it is policy-invariant only
+    when that gamma is the agent's. At 1.0 against an agent at 0.9975 every step keeps
+    `c * (1 - gamma) * Phi(s')` of un-cancelled potential — 2.5e-4 at b2's `c=0.1`, the same order as
+    `FOOD_DISTANCE_REWARD`, and a standing bonus for staying alive in a high-potential state.
+
+    Parametrised over three discounts rather than asserted at one, because the failure mode is a
+    *constant* — `1.0`, or `constants.DISCOUNT` read from the wrong place — and a single-value fixture
+    passes against any constant that happens to equal it.
+    """
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, discount=discount)
+    assert trainer.algo.collector.vec.shaping_discount == pytest.approx(discount)
+
+
+def test_the_shaping_discount_is_the_discount_the_report_records(tmp_path, monkeypatch):
+    """One value, not two that can disagree.
+
+    `runs/<arm>.md` records `discount`, and a reader takes that to be the gamma every discounted
+    quantity in the arm used. The eval path is the one place it is *not* — `engine.measure` shapes at
+    1.0, because a shard measuring a checkpoint has no agent to ask — and that only moves
+    `avg_reward`, never `avg_score` or `perfect_percent`.
+    """
+    trainer = make_trainer(tmp_path, monkeypatch=monkeypatch, discount=0.9975)
+    assert (trainer.algo.collector.vec.shaping_discount
+            == train.reportable(trainer.config)['discount'])
+
+
 # ---------------------------------------------------------------- the stage-A queue
 
 def _run_arm(tmp_path, policy, monkeypatch, **overrides):
@@ -683,7 +1012,9 @@ STRONG = {'avg_score': 30.0, 'min_score': 10.0, 'max_score': 40.0, 'avg_reward':
 
 
 def _fields(epsilon, guided=0.0):
-    return {'epsilon': epsilon, 'guided_fraction': guided, 'steps_per_second': 100.0, 'fork': None}
+    """What `_trainer_fields` captures: the trainer's own half, plus the algorithm's under `algo`."""
+    return {'steps_per_second': 100.0, 'transitions': None,
+            'algo': {'epsilon': epsilon, 'guided_fraction': guided, 'fork': None}}
 
 
 def test_a_queued_row_reports_the_epsilon_the_arm_ran_under_not_the_one_just_computed(
@@ -698,7 +1029,7 @@ def test_a_queued_row_reports_the_epsilon_the_arm_ran_under_not_the_one_just_com
                            min_checkpoint_score=1e9)
     trainer._record(10, STRONG, _fields(epsilon=0.4, guided=0.0))
     row = trainer.eval_rows[-1]
-    assert trainer.epsilon != 0.4, 'the measurement must move the schedule or this proves nothing'
+    assert trainer.algo.epsilon != 0.4, 'the measurement must move the schedule or this proves nothing'
     assert row['epsilon'] == 0.4, 'a queued row reports what the arm ran under'
     assert row['guided_fraction'] == 0.0
 
@@ -709,8 +1040,8 @@ def test_an_unqueued_row_reports_the_epsilon_its_own_eval_just_set(tmp_path, mon
                            eval_queue=False, min_checkpoint_score=1e9)
     trainer._record(10, STRONG, _fields(epsilon=0.4))
     row = trainer.eval_rows[-1]
-    assert trainer.epsilon != 0.4
-    assert row['epsilon'] == trainer.epsilon, 'an unqueued row reports what it just set'
+    assert trainer.algo.epsilon != 0.4
+    assert row['epsilon'] == trainer.algo.epsilon, 'an unqueued row reports what it just set'
 
 
 def test_the_queued_epsilon_column_is_the_previous_rows_unqueued_value(tmp_path, monkeypatch):
