@@ -7,7 +7,7 @@
   "omp_num_threads": 1,
   "nice": 0,
   "disk_min_gb": 5,
-  "paused": false,
+  "paused": true,
   "drain": false,
-  "auto_stage_b": true
+  "auto_stage_b": false
 }
