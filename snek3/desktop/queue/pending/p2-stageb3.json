@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "p2-stageb3",
+  "type": "eval",
+  "policies": [
+    "p2a-ep8-seed1",
+    "p2b-ep8-seed2",
+    "p2c-ep8-seed3",
+    "p2d-ep8-seed4",
+    "p2e-ep8-seed5",
+    "p2f-ep8-seed6",
+    "p2g-ep8-seed7",
+    "p2h-ep8-seed8"
+  ],
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0"
+  },
+  "label": "p2 stage B, restarted for the 99% chart guide (eight arms, 255-271M transitions)",
+  "notes": "The same pass as `p2-stageb2`, restarted at 08:41 on 2026-08-30 for one reason: the stage-B chart's dotted guide moved from 98% to 99% (user's call) and **a running process cannot pick that up** -- `REGION_LEVEL` is read when `tools/stage_b_chart.py` is imported, and `p2-stageb2` started two minutes before the commit landed. So the box's window was drawing a guide the laptop's was not.\n\n**Nothing is lost by the restart:** every shard resumes from its own rows on disk. p2a was already complete at 3,836 rows and re-merges in seconds, which also redraws its chart at the new guide -- the one arm whose final PNG had been written at 98.\n\nNo selector, deliberately: the protocol's default decides, and that is `screen:97`. The reward env is carried so stage B's `avg_reward` column is on the objective the arms trained on."
+}
