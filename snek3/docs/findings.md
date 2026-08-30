@@ -401,6 +401,39 @@ sharing a 14-core laptop; b2's DQN arms took **~7-8 h each** for 18M on the 16-c
 per transition. The 3,000-episode re-measurement of a selected high fell **2.0 pp** from its 500-episode
 value, consistent with the 1.4 pp mean fall across snek2's four best hall-of-fame entries.
 
+### Six eval workers is the wrong number for eight PPO trainers, and for PPO the bound is free to raise
+
+Measured 2026-08-30 with batches p2 (8 arms, desktop) and p3 (8 arms, laptop) both at ~25M
+transitions and best30 ~97%:
+
+| | eval workers | trainers | cores | box idle |
+|---|---|---|---|---|
+| desktop, 16 cores | **598 of 600%** — pinned | 492 of 800% | 16 | ~1/3 |
+| laptop, 14 cores | **576 of 600%** — pinned | 371 of 800% | 14 | ~1/3 |
+
+**Stage A is the binding constraint and the workers are saturated while the trainers idle at half
+capacity.** That stage A dominates is already established above; what is new is that the *worker count*
+is now the limit rather than lane drain. [`running.md`](running.md)'s 6-worker optimum was measured at
+**four DQN trainers**, and PPO trains ~14x faster per transition, so eight PPO arms demand far more
+eval throughput per unit time than that sweep ever saw. Per-arm rates at the time: 9,262 transitions/s
+on the desktop, 7,850 on the laptop.
+
+**And the reason the queue bound exists does not apply to PPO.** Queue depth is bounded because a
+lagging row delays DQN's epsilon *refinement* schedule, which reads `perfect_percent` back out of eval
+rows ([`invariants.md`](invariants.md) invariant 2). PPO's only schedule is the entropy coefficient and
+it is a pure function of the step, so **queue lag cannot change a PPO arm's trajectory, only its
+speed.** The second objection also does not apply: a queued worker's eval seed already mixes clock, pid
+and round number rather than deriving from the arm's seed — `eval_queue.py` states this as the queue's
+accepted cost — so extra workers introduce no new class of variation.
+
+**What is measured and what is not.** Measured: the saturation, the idle third, the per-arm rates.
+**Not** measured: how much a higher worker count actually buys. The `running.md` sweep found the curve
+turns over past six *for DQN*, where extra workers starve the trainers — and PPO's trainers are the
+half that is idle here, so the same turnover need not apply. The test is one arm-hour: run p3 at
+`SNEK_EVAL_WORKERS=10` and compare transitions/s. Extra workers can also be added to a *running* box
+without restarting anything, because trainers only manage slots `0..target-1` and claim work by rename:
+`python -m tools.eval_worker --slot 6` joins the same queue untracked.
+
 ### Two hidden layers beat every single-layer width, and width past 320 actively hurts
 
 From batch p0's fc sweep, at 10M transitions each on b2's reward function, ranked by the statistic a
