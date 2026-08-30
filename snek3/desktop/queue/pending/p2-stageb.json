@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "p2-stageb",
+  "type": "eval",
+  "policies": [
+    "p2a-ep8-seed1",
+    "p2b-ep8-seed2",
+    "p2c-ep8-seed3",
+    "p2d-ep8-seed4",
+    "p2e-ep8-seed5",
+    "p2f-ep8-seed6",
+    "p2g-ep8-seed7",
+    "p2h-ep8-seed8"
+  ],
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0"
+  },
+  "label": "p2 stage B: eight arms stopped at 255-271M transitions",
+  "notes": "Queued **explicitly** rather than left to `auto_stage_b`, because the arms were stopped by\nhand rather than reaching their 400M cap. A killed trainer exits -15, `_reap` classifies that as\n`failed` rather than `ok`, and `wants_stage_b` fires only on `ok` -- so the automatic chain would have\nskipped this batch entirely and the ledger would have said `failed` with no measurement.\n\n**No selector, deliberately**: the protocol's default decides, and that is now `screen:97` (raised from\n95 on 2026-08-30). The reward env is carried so stage B's `avg_reward` column is on the same objective\nthe arms trained on; `perfect_percent` and `avg_score` do not depend on it.\n\nEach arm has 3,000-5,600 stage-A evals at >=97, so expect ~34,000 checkpoints across the batch at 500\nepisodes each -- roughly 17M episodes. At `screen:95` it would have been several times that.\n\nThe twin batch p3 (fc 200,100, eight seeds) is being measured on the laptop by its own scheduler."
+}
