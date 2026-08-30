@@ -1,17 +1,12 @@
 {
-  "iso": "2026-08-29T20:31:20",
-  "ts": 1788060680.6498303,
+  "iso": "2026-08-29T20:41:33",
+  "ts": 1788061293.30941,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p0l \u2014 p0 sweep: one wider hidden layer \u2014 stage B (1 arm)"
+      "p0q \u2014 p0 sweep: eight passes over each rollout \u2014 stage B (1 arm)"
     ],
     "queued": [
-      "p0m stage B \u2014 p0 sweep: one narrower hidden layer \u2014 queued (1 arm)",
-      "p0n stage B \u2014 p0 sweep: two hidden layers, 300 then 100 \u2014 queued (1 arm)",
-      "p0o stage B \u2014 p0 sweep: gamma between 0.99 and b2's 0.9975 \u2014 queued (1 arm)",
-      "p0p stage B \u2014 p0 sweep: 8,192 transitions per update: twice as many updates \u2014 queued (1 arm)",
-      "p0q stage B \u2014 p0 sweep: eight passes over each rollout \u2014 queued (1 arm)",
       "p0r stage B \u2014 p0 sweep: four times the minibatch, four times fewer gradient steps \u2014 queued (1 arm)"
     ],
     "attention": []
@@ -37,27 +32,27 @@
   },
   "running": [
     {
-      "id": "p0l-stageb",
+      "id": "p0q-stageb",
       "type": "eval",
-      "policy": "p0l-fc500",
+      "policy": "p0q-ep8",
       "policies": [
-        "p0l-fc500"
+        "p0q-ep8"
       ],
-      "pid": 4094975,
+      "pid": 4099056,
       "step": 10010624,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 92
     }
   ],
   "ledger": {
-    "p0m-stageb": "queued",
-    "p0n-stageb": "queued",
-    "p0o-stageb": "queued",
-    "p0p-stageb": "queued",
-    "p0q-stageb": "queued",
     "p0r-stageb": "queued",
-    "p0l-stageb": "running",
+    "p0q-stageb": "running",
+    "p0p-stageb": "done",
+    "p0o-stageb": "done",
+    "p0n-stageb": "done",
+    "p0m-stageb": "done",
+    "p0l-stageb": "done",
     "p0k-stageb": "done",
     "p0p-roll64": "done",
     "p0r-mb1024": "done",
@@ -79,8 +74,8 @@
   },
   "disk_free_gb": 48.5,
   "load_avg": [
-    11.5400390625,
-    10.44482421875,
-    9.60205078125
+    14.70849609375,
+    12.62158203125,
+    11.15478515625
   ]
 }
