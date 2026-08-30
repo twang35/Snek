@@ -1,12 +1,14 @@
 {
-  "iso": "2026-08-30T08:18:49",
-  "ts": 1788103129.074101,
+  "iso": "2026-08-30T08:20:21",
+  "ts": 1788103221.3269215,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "p2 \u2014 p2 stage B: eight arms stopped at 255-271M transitions \u2014 stage B (8 arms)"
     ],
-    "queued": [],
+    "queued": [
+      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume"
+    ],
     "attention": []
   },
   "runtime": {
@@ -18,7 +20,7 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": false,
+    "paused": true,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
@@ -46,8 +48,8 @@
       "pid": 219689,
       "step": 271368192,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 1810
+      "steps_per_sec": 0.0,
+      "elapsed_s": 1902
     }
   ],
   "ledger": {
@@ -89,8 +91,8 @@
   },
   "disk_free_gb": 42.3,
   "load_avg": [
-    16.01513671875,
-    16.10205078125,
-    15.9560546875
+    14.9443359375,
+    15.4716796875,
+    15.7314453125
   ]
 }
