@@ -1,9 +1,14 @@
 # snek3 — the PyTorch port
 
-**Status: approved 2026-08-28. Phases 0-4 closed 2026-08-28; batch b1 is running for the phase-3 and phase-5 gates.** This is the plan for
-standing up `snek3/` as a clean-slate PyTorch project that keeps everything snek2 can do — train, evaluate,
-chart, watch, record GIFs, queue batches to the desktop — with the learning framework replaced and
-the accumulated shape of the thing thrown away.
+**Status: CLOSED 2026-08-30. Phases 0-5 all met — the last two by batch `b2`, §10.** Phase 6 (`ppo/`)
+is the research this port existed to enable and it has its own plan, [`ppo.md`](ppo.md), and its own
+batches. **§15 is the close-out**: what shipped, what this file got wrong, and what it deliberately
+left parked. Read it before trusting any number in the sections above — five claims here were
+retracted while the port was built, each one inline where it was made.
+
+This was the plan for standing up `snek3/` as a clean-slate PyTorch project that keeps everything
+snek2 can do — train, evaluate, chart, watch, record GIFs, queue batches to the desktop — with the
+learning framework replaced and the accumulated shape of the thing thrown away.
 
 `snek2/` is frozen from here. Nothing moves out of it, nothing in it is edited, and it stays
 runnable in the `snek` conda env for A/B. Code duplication between the two directories is expected
@@ -305,8 +310,15 @@ so three things are pinned rather than tunable:
 | `SNEK_EVAL_INTERVAL` | **1000** | it must equal the checkpoint interval, or a checkpoint exists that no screen can select |
 | checkpoint interval | **1000** | as above |
 
-**So the self-eval stays ~90% of a training arm's wall clock, and that is now correct rather than
-wasteful.** The arithmetic, for a 3M-step arm:
+**So the self-eval stays the majority of a training arm's wall clock, and that is now correct rather
+than wasteful.** The arithmetic, for a 3M-step arm:
+
+**‡ Revised 2026-08-30: the measured share is 66%, not the ~90% this section claims twice.** The
+absolute cost was right — 5.33 h of stage A on an 8.1 h arm — but the *training* half was
+undercounted, because **a snek3 counted step is four game moves and four gradient steps** where
+snek2's was one. See [`../docs/findings.md`](../docs/findings.md), which also carries the consequence
+this plan never states: "3M steps" is not the same budget in the two eras, so a b2-vs-b47 comparison
+at equal counted steps is not equal effort.
 
 | | episodes | measured |
 |---|---:|---:|
@@ -644,10 +656,10 @@ Each phase has a pre-registered pass condition. Phase 1 is the one that makes th
 | 0 | The instruction split and the `docs/` skeleton (§14), then `env/` + `vectorized/` + the parity harness. No learning code. | three `CLAUDE.md` files, no stale `snek2/` reference outside `snek2/`; parity harness green — 0 mismatches on all 30 indices over ≥18,000 states, ≥12 hand-made mutants killed. **Met 2026-08-28**: 36,000 states × 30 indices, 0 mismatches, 17 of 17 mutants killed, 167 tests green |
 | 1 | **Import a snek2 champion.** Convert its TF weights to a torch `state_dict`. | `engine.measure` scores `b44a-lowlr7-b29b-ckpt2739000` at **98.7% ± 0.6 pp over 3,000 episodes** (snek2: 98.73%). `watch.py` plays it; `record_gif.py` records it. **Met 2026-08-28**: 98.8% (2964/3000), and the conversion is exact — 12,864 states, max \|ΔQ\| 2.7e-5 on Q ~30.6, argmax identical on every one |
 | 2 | The eval wave, `run_report`, `arch`, charts. | convert **all 3,222** checkpoints of `b45a-lowlr8-b29b` and reproduce snek2's own `_checkpoint_evals_vec.json` row for row within noise. **Met 2026-08-28**: 3,222 rows, mean per-row difference **−0.004 pp** against a 0.041 pp standard error (0.09 SEs), observed spread / predicted spread **1.00**. A second snek3 seed gives +0.028 pp. 14 min on 4 shards |
-| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect** — *batch `b1` is running for it, 4 seeds × 3M steps* — and **≥1,500 agent steps/s** on the laptop with the self-eval *off* — **met: 1,512 at `SNEK_COLLECT_ENVS=16`**, 809 at the default of 1. ~6 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
+| 3 | `dqn/` — DDQN + PER + the epsilon schedule + the forking collector + the shield. **Code and tests done 2026-08-28.** | one arm reaches **≥90% perfect**, and **≥1,500 agent steps/s** on the laptop with the self-eval *off*. Throughput **met 2026-08-28**: 1,512 at `SNEK_COLLECT_ENVS=16`, 809 at the default of 1. Perfect rate **met 2026-08-29 by batch `b2`, and by all four of its arms** — trailing-30 peaks of 93.6 / 95.8 / 95.9 / 96.9%, and 1,135 checkpoints across the batch clearing the stage-A screen. **`b1` did not meet it and was the wrong batch to gate on**: on snek3's bare defaults it never produced one ≥95/100 eval in 3M steps, while b2 ran b29's five knobs and crossed 90% at 324k. Budget ~8 h for a 3M-step arm with stage A on, not the ~2 h this row first claimed |
 | 4 | `desktop/` | a 4-arm batch dispatches, runs its one eval wave, and publishes without a hand touching the box. **Deployed 2026-08-28**: `snek3-runner` replaced `snek-runner` on `the-claw-den`, the three `b1` desktop arms dispatched from one `ops` commit plus a trigger, and 589 tests pass on the box. The publish half closes when b1 does |
-| 5 | A seed-matched b47-class comparison, 4 arms. | a ≥98%/500 region of comparable width on comparable seeds. **Not** a matched point estimate |
-| 6 | `ppo/` | the actual research |
+| 5 | A seed-matched b47-class comparison, 4 arms. | a ≥98%/500 region of comparable width on comparable seeds. **Not** a matched point estimate. **Met 2026-08-29 by `b2d`**: five rows ≥98%/500 between 350k and 451k, topping at **99.2%** [98.0, 99.7], out of 1,135 measured checkpoints. The other three arms produced none, which *is* the b47 shape — one carrier arm — and snek2's own b47 re-run of this config never got a region at all, having been frozen at 69-81% of its cap. So the comparison target is `b29b`'s 99.0%/500 and `b44`'s HOF-500s, and 99.2% matches them. **The region is thin and the top row is selected**: a record claim still needs a fresh ≥1,000-episode re-measure of `ckpt-355000` (§11 invariant 9) |
+| 6 | `ppo/` | the actual research. Underway in [`ppo.md`](ppo.md) — the `p0` sweep has run |
 
 Phase 2 runs on an **explicit step list**, not the `screen:95` selector — the converted checkpoints
 have no snek3 graph evals to screen on. That is worth keeping as a third selector (`steps:<file>`)
@@ -720,6 +732,10 @@ next 8x on training wall clock and the only thing standing between a 2-hour arm 
 but it puts `epsilon_for`'s refinement phase on a lag of one eval interval. Revisit once a phase-3
 arm has a measured curve to compare a lagged one against.
 
+**Still parked as of the close-out, and the curves now exist** — b1's four arms and b2's four are the
+baseline any lagged version is measured against. What changed is the size of the prize: at 66% of wall
+clock rather than 90% the ceiling on this is ~3x, not ~8x.
+
 ---
 
 ## 13. Risks
@@ -784,3 +800,46 @@ adds a file to `snek2/` and edits nothing that is already there, which is inside
 **Do it in phase 0, before any snek3 code exists.** Both directions of this go wrong if it is left to
 the end: a snek3 file written under snek2's instructions, or a snek2 instruction quietly deleted
 because it looked stale from inside snek3.
+
+---
+
+## 15. Closed 2026-08-30 — the port in numbers, and what this file got wrong
+
+| | the plan said | what shipped |
+|---|---|---|
+| non-test Python | ~2,400 lines copied near-verbatim, the rest written | **13,324 lines**, against snek2's 43,036 |
+| tests | a fixture per invariant, mutation-tested | **12,140 lines, 886 fixtures** |
+| phases | six | **0-5 met**; 6 continues in [`ppo.md`](ppo.md) |
+| the champion | 98.73% in TF | **98.8% in torch**, and the argmax identical on all 12,864 states tested |
+| the protocol | one stage replaces snek2's two | **3,222 rows agreeing to 0.09 SEs** with the tiered pass it replaced |
+| the ceiling | `b29b`'s 99.0%/500, and *do not* gate on it | **`b2d`'s 99.2%/500** |
+
+**Phases 1 and 2 are why this closed cheaply, and they are the transferable part of the method.**
+Converting a snek2 champion and reproducing 3,222 of its checkpoint measurements — both *before any
+training code existed* — meant a phase-3 arm that underperformed could only be the learning code. That
+is exactly what happened with `b1`, and it took hours rather than a batch to localise.
+
+**Five claims in the sections above were retracted while the port was built.** Each is marked inline
+where it was made; they are collected here because a reader arriving at a closed plan should know its
+error rate.
+
+| § | the claim | what it turned out to be |
+|---|---|---|
+| 5 | raising `SNEK_COLLECT_ENVS` above 1 buys nothing | **1.9x** (809 → 1,512 steps/s); the env costs the same for 1 lane as for 64 |
+| 5 | the training half caps at ~4,000 agent steps/s | a whole learn step is **802 us**, not the 245 us of the gradient in isolation |
+| 6 | the stage-A screen is `≥95/100` | raised to **97** once PPO arms sat at 97-98% best30 and a 400M-transition arm would have queued ~20,000 checkpoints |
+| 7 | the peer-trainer window registry is deleted, because one launcher opens the window | the requirement was real; the registry came back at **~140 lines instead of ~500** by storing each arm's pid |
+| 9 | the daemon opens the chart window | deleted, restored at a quarter size, then **deleted again** — the daemon is not what knows a training is happening |
+
+**Two more were wrong and are not marked inline, because they are about this section's own subject.**
+Stage A is **66%** of a training arm, not the ~90% claimed twice in §1 and §5 — a snek3 counted step is
+four game moves, so the training half was undercounted, and that units difference also means "3M
+steps" is not one budget across the two eras. And **the phase-3 gate was pointed at the wrong batch**:
+`b1` ran snek3's own defaults, which no snek2 record was ever set with, and gating a *port* on a
+configuration snek2 never used had no way to distinguish a port bug from a bad config. `b2` — b29's
+five knobs, verbatim — met the gate on all four arms.
+
+**Where the work goes from here** is [`ppo.md`](ppo.md) for the algorithm and
+[`../docs/runs.md`](../docs/runs.md) for the current batch. This file is history; the live protocol is
+[`../docs/protocol.md`](../docs/protocol.md) and the live instructions are
+[`../CLAUDE.md`](../CLAUDE.md).
