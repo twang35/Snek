@@ -1,15 +1,12 @@
 {
-  "iso": "2026-08-30T12:30:58",
-  "ts": 1788118258.8672457,
+  "iso": "2026-08-30T12:41:17",
+  "ts": 1788118877.753533,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "sw2w6 \u2014 sweep w6: 6 stage-A workers, 8 arms, wave 2 of 6 \u2014 benchmark 100% (8 arms)"
+      "sw5w12 \u2014 sweep w12: 12 stage-A workers, 8 arms, wave 5 of 6 \u2014 benchmark 100% (8 arms)"
     ],
     "queued": [
-      "sw3w8 benchmark \u2014 sweep w8: 8 stage-A workers, 8 arms, wave 3 of 6 \u2014 queued (8 arms)",
-      "sw4w10 benchmark \u2014 sweep w10: 10 stage-A workers, 8 arms, wave 4 of 6 \u2014 queued (8 arms)",
-      "sw5w12 benchmark \u2014 sweep w12: 12 stage-A workers, 8 arms, wave 5 of 6 \u2014 queued (8 arms)",
       "sw6w12 benchmark \u2014 sweep w12: 12 stage-A workers, 8 arms, wave 6 of 6 \u2014 queued (8 arms)",
       "sse8 eval \u2014 sweep s8: 8 stage-B shards on one arm \u2014 queued (1 arm)",
       "sse12 eval \u2014 sweep s12: 12 stage-B shards on one arm \u2014 queued (1 arm)",
@@ -40,135 +37,111 @@
   },
   "running": [
     {
-      "id": "sw2w6-a",
+      "id": "sw5w12-a",
       "type": "benchmark",
       "policy": "bwa",
       "policies": [
         "bwa"
       ],
-      "pid": 373801,
-      "step": 257605632,
-      "max_steps": 257605632,
-      "steps_per_sec": 9977.9,
-      "elapsed_s": 152
+      "pid": 398568,
+      "step": 260947968,
+      "max_steps": 261193728,
+      "steps_per_sec": 7222.0,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-b",
+      "id": "sw5w12-b",
       "type": "benchmark",
       "policy": "bwb",
       "policies": [
         "bwb"
       ],
-      "pid": 373802,
-      "step": 257605632,
-      "max_steps": 257605632,
-      "steps_per_sec": 8402.5,
-      "elapsed_s": 152
+      "pid": 398569,
+      "step": 260866048,
+      "max_steps": 261193728,
+      "steps_per_sec": 6706.3,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-c",
+      "id": "sw5w12-c",
       "type": "benchmark",
       "policy": "bwc",
       "policies": [
         "bwc"
       ],
-      "pid": 373803,
-      "step": 257605632,
-      "max_steps": 257605632,
-      "steps_per_sec": 11028.4,
-      "elapsed_s": 152
+      "pid": 398570,
+      "step": 260866048,
+      "max_steps": 261193728,
+      "steps_per_sec": 7222.2,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-d",
+      "id": "sw5w12-d",
       "type": "benchmark",
       "policy": "bwd",
       "policies": [
         "bwd"
       ],
-      "pid": 373804,
-      "step": 257572864,
-      "max_steps": 257605632,
-      "steps_per_sec": 12603.9,
-      "elapsed_s": 152
+      "pid": 398571,
+      "step": 260882432,
+      "max_steps": 261193728,
+      "steps_per_sec": 5674.6,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-e",
+      "id": "sw5w12-e",
       "type": "benchmark",
       "policy": "bwe",
       "policies": [
         "bwe"
       ],
-      "pid": 373805,
-      "step": 257589248,
-      "max_steps": 257605632,
-      "steps_per_sec": 13129.2,
-      "elapsed_s": 152
+      "pid": 398572,
+      "step": 260898816,
+      "max_steps": 261193728,
+      "steps_per_sec": 5674.6,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-f",
+      "id": "sw5w12-f",
       "type": "benchmark",
       "policy": "bwf",
       "policies": [
         "bwf"
       ],
-      "pid": 373806,
-      "step": 257605632,
-      "max_steps": 257605632,
-      "steps_per_sec": 13129.3,
-      "elapsed_s": 152
+      "pid": 398573,
+      "step": 260882432,
+      "max_steps": 261193728,
+      "steps_per_sec": 6705.7,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-g",
+      "id": "sw5w12-g",
       "type": "benchmark",
       "policy": "bwg",
       "policies": [
         "bwg"
       ],
-      "pid": 373807,
-      "step": 257572864,
-      "max_steps": 257605632,
-      "steps_per_sec": 12604.2,
-      "elapsed_s": 152
+      "pid": 398574,
+      "step": 260866048,
+      "max_steps": 261193728,
+      "steps_per_sec": 6705.6,
+      "elapsed_s": 154
     },
     {
-      "id": "sw2w6-h",
+      "id": "sw5w12-h",
       "type": "benchmark",
       "policy": "bwh",
       "policies": [
         "bwh"
       ],
-      "pid": 373808,
-      "step": 257605632,
-      "max_steps": 257605632,
-      "steps_per_sec": 12604.3,
-      "elapsed_s": 152
+      "pid": 398575,
+      "step": 260767744,
+      "max_steps": 261193728,
+      "steps_per_sec": 6189.1,
+      "elapsed_s": 154
     }
   ],
   "ledger": {
-    "sw3w8-a": "queued",
-    "sw3w8-b": "queued",
-    "sw3w8-c": "queued",
-    "sw3w8-d": "queued",
-    "sw3w8-e": "queued",
-    "sw3w8-f": "queued",
-    "sw3w8-g": "queued",
-    "sw3w8-h": "queued",
-    "sw4w10-a": "queued",
-    "sw4w10-b": "queued",
-    "sw4w10-c": "queued",
-    "sw4w10-d": "queued",
-    "sw4w10-e": "queued",
-    "sw4w10-f": "queued",
-    "sw4w10-g": "queued",
-    "sw4w10-h": "queued",
-    "sw5w12-a": "queued",
-    "sw5w12-b": "queued",
-    "sw5w12-c": "queued",
-    "sw5w12-d": "queued",
-    "sw5w12-e": "queued",
-    "sw5w12-f": "queued",
-    "sw5w12-g": "queued",
-    "sw5w12-h": "queued",
     "sw6w12-a": "queued",
     "sw6w12-b": "queued",
     "sw6w12-c": "queued",
@@ -182,14 +155,38 @@
     "sse16": "queued",
     "sse20": "queued",
     "sse24": "queued",
-    "sw2w6-a": "running",
-    "sw2w6-b": "running",
-    "sw2w6-c": "running",
-    "sw2w6-d": "running",
-    "sw2w6-e": "running",
-    "sw2w6-f": "running",
-    "sw2w6-g": "running",
-    "sw2w6-h": "running",
+    "sw5w12-a": "running",
+    "sw5w12-b": "running",
+    "sw5w12-c": "running",
+    "sw5w12-d": "running",
+    "sw5w12-e": "running",
+    "sw5w12-f": "running",
+    "sw5w12-g": "running",
+    "sw5w12-h": "running",
+    "sw4w10-h": "done",
+    "sw4w10-g": "done",
+    "sw4w10-f": "done",
+    "sw4w10-e": "done",
+    "sw4w10-d": "done",
+    "sw4w10-c": "done",
+    "sw4w10-a": "done",
+    "sw4w10-b": "done",
+    "sw3w8-h": "done",
+    "sw3w8-g": "done",
+    "sw3w8-f": "done",
+    "sw3w8-e": "done",
+    "sw3w8-d": "done",
+    "sw3w8-c": "done",
+    "sw3w8-b": "done",
+    "sw3w8-a": "done",
+    "sw2w6-h": "done",
+    "sw2w6-g": "done",
+    "sw2w6-f": "done",
+    "sw2w6-e": "done",
+    "sw2w6-d": "done",
+    "sw2w6-c": "done",
+    "sw2w6-b": "done",
+    "sw2w6-a": "done",
     "sw1w4-h": "done",
     "sw1w4-g": "done",
     "sw1w4-f": "done",
@@ -236,10 +233,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 41.0,
+  "disk_free_gb": 40.9,
   "load_avg": [
-    12.4521484375,
-    11.8955078125,
-    13.8779296875
+    20.017578125,
+    15.287109375,
+    14.25830078125
   ]
 }
