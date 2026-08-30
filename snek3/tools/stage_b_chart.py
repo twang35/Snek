@@ -39,7 +39,11 @@ from tools import progress_chart, results
 # One deliberately wider figure than `progress_chart`'s: a stage-B pass has one series and up to a
 # few thousand points along the step axis, where an arm's chart has two axes and a trend line.
 FIGSIZE = (5.0, 2.4)
-REGION_LEVEL = 98.0
+# The dotted guide, the rug beneath it and the title's count all read this one number. **99 since
+# 2026-08-30** (user's call), and 98 before: an arm's stage-B rows now reach 99.2%, so a 98% guide sat
+# under most of the cloud and marked a region that was no longer the interesting one. `--level` still
+# moves it, and `summarise` reports 95/98/99/100 whatever it is set to.
+REGION_LEVEL = 99.0
 POINT_COLOR = 'tab:red'
 REGION_COLOR = 'tab:green'
 TREND_COLOR = 'darkred'
@@ -246,7 +250,7 @@ def main(argv=None):
     parser.add_argument('--label', default=None, help='names the pass, as passed to the wave')
     parser.add_argument('--out', default=None, help='PNG path; defaults beside the result file')
     parser.add_argument('--level', type=float, default=REGION_LEVEL,
-                        help='the region threshold, in percent (default 98)')
+                        help='the region threshold, in percent (default 99)')
     parser.add_argument('--watch', type=float, default=0.0, metavar='SECONDS',
                         help='redraw every SECONDS; works on a wave still running')
     args = parser.parse_args(argv)

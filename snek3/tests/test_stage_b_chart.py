@@ -139,8 +139,10 @@ def test_the_y_floor_is_pinned_below_both_the_worst_row_and_the_level():
     low, high = axis.get_ylim()
     assert low <= 94.0 and high >= 100.0, (low, high)
     # A run of rows that all clear the level must not push the floor above the level's guide line.
+    # Stated against `REGION_LEVEL` rather than a number, so moving the level cannot make this fail
+    # while the property it is about still holds (it did, when the level moved to 99 on 2026-08-30).
     figure, axis = stage_b_chart.build_figure([row(1000, 100), row(2000, 100)], name='x')
-    assert axis.get_ylim()[0] <= 96.0
+    assert axis.get_ylim()[0] < stage_b_chart.REGION_LEVEL
 
 
 def test_render_writes_a_png_atomically_and_leaves_no_partial(runs_dir):
