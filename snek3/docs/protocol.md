@@ -91,6 +91,26 @@ Three cautions:
   change in episodes per eval. snek3 runs 100 throughout, so this only bites against snek2 numbers —
   see [`invariants.md`](invariants.md) invariant 8.
 
+### Which of them wins an argument, in order
+
+**Stated by the user 2026-08-29, during PPO's tuning sweep, and it applies to any config comparison:**
+
+| rank | what | field |
+|---:|---|---|
+| **1** | **peak perfect rate** | `best_perfect30` |
+| 2 | **consistent learning** — a rate that stays up once it is up, rather than one that spikes and drops back | the spread of `perfect_percent` over the last ~30 evals, and `strong_eval_fraction` |
+| 3 | speed of learning — least important of the three | transitions to first cross a given `best_perfect30` |
+
+Two consequences worth holding on to.
+
+**An arm still rising at its cap has not reported its best30**, so a best30 read at a cap is a read of
+the budget. Batch p0's first wave hit this: all four arms were climbing at 3M transitions, which is why
+the sweep moved to 10M. **Raise the cap before ranking on rank 1.**
+
+**Speed being last inverts the usual reading of a sweep.** A knob that reaches 80% faster but tops out
+lower loses; the interesting arm is the slow one that is still climbing. This is why the crossing
+tables in the p0 write-ups are reported *under* the peak rather than beside it.
+
 ## Judging a batch
 
 **A batch is four seed-matched arms.** One arm answers nothing: the same config has produced 62.5 and
