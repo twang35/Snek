@@ -426,13 +426,34 @@ speed.** The second objection also does not apply: a queued worker's eval seed a
 and round number rather than deriving from the arm's seed — `eval_queue.py` states this as the queue's
 accepted cost — so extra workers introduce no new class of variation.
 
-**What is measured and what is not.** Measured: the saturation, the idle third, the per-arm rates.
-**Not** measured: how much a higher worker count actually buys. The `running.md` sweep found the curve
-turns over past six *for DQN*, where extra workers starve the trainers — and PPO's trainers are the
-half that is idle here, so the same turnover need not apply. The test is one arm-hour: run p3 at
-`SNEK_EVAL_WORKERS=10` and compare transitions/s. Extra workers can also be added to a *running* box
-without restarting anything, because trainers only manage slots `0..target-1` and claim work by rename:
+**Measured 2026-08-30: eight workers beat six by ~12%, and eight is the ceiling on a 16-core box.**
+Two extra workers were attached to the *running* desktop batch at slots 6 and 7 — no restart needed,
+because trainers only manage slots `0..target-1` and work is claimed by rename, so
 `python -m tools.eval_worker --slot 6` joins the same queue untracked.
+
+| desktop p2, 8 arms | workers | per-arm rate | window |
+|---|---:|---:|---|
+| baseline | 6 | 8,262 transitions/s | 35 min |
+| after | **8** | **8,556 transitions/s** | 30 min |
+
+**Raw that is only +3.6%, and the honest number is +12%.** The laptop's p3 batch stayed at six workers
+and served as a control: over the same hour its rate decayed **7,850 → 7,250/s (−7.6%)** as its policies
+matured and episodes lengthened. So a six-worker desktop would have been at ~7,630/s, and holding
+8,556/s means the extra pair bought back the decay and more. **A before/after on a maturing arm
+understates a speed change by roughly the decay rate** — which is why the control matters more than the
+window length here.
+
+**Ten workers is past the edge, and this is where `running.md`'s DQN sweep does transfer.** At eight
+workers plus eight trainers the box reads **load 14.1 of 16, 91.4% user, 8.3% idle** — and that sweep's
+finding was that past the optimum the box "reaches 4% idle to run *slower*", because the fastest
+configuration leaves ~20% free. The PPO-specific argument (its trainers are the idle half) bought one
+pair, not two. **Eight is the number for eight PPO trainers on 16 cores**; the laptop's 14 cores
+should take fewer.
+
+**‡ `ps -o %cpu` is the wrong instrument for this and cost a wrong reading.** On Linux it is CPU time
+over the process's *whole lifetime*, so the trainers — two hours old — reported 492% → 503% across the
+change and looked unaffected while the throughput moved 12%. Use `/proc/loadavg` or `top -bn1` for
+anything instantaneous.
 
 ### Two hidden layers beat every single-layer width, and width past 320 actively hurts
 
