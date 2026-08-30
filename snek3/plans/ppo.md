@@ -1,6 +1,6 @@
 # snek3 — PPO
 
-**Status: approved 2026-08-29. Phases 6a and 6b are closed; 6c — batch p0 — is next.** Phase 6 of
+**Status: approved 2026-08-29. Phases 6a, 6b and 6c are closed; 6d — batch p1 — is next.** Phase 6 of
 [`pytorch-port.md`](pytorch-port.md), which calls it "the actual research".
 
 **Four decisions taken at approval**, which supersede §11's questions: γ is settled by the p0 tuning
@@ -373,8 +373,8 @@ most ordinary costume: 24 passing PPO tests, and the load-bearing line was untes
 |---:|---|---|
 | **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | **Met 2026-08-29.** Three fixed-seed arms — the defaults, a `chase_safe` arm and a `free_space` arm at `n_step=3`, `collect_envs=2`, `ratio=0.5` — came out **byte-identical** across the refactor on every eval row, the final weights (SHA-256 of the whole `state_dict`), the step, the transition count, epsilon and the checkpoint set. 743 tests green, 26 of 26 mutants killed. **Not yet deployed to the desktop:** b2 is still training |
 | **6b** | `ppo/` plus the fixtures and the mutant spec | **Met 2026-08-29.** 869 tests green, **14 of 14** mutants killed, and the gate arm reached avg score **79.5 with a 1.2%/500 perfect rate at 508k transitions**, against the **0.9** an untrained policy scores. See below |
-| **6c** | **batch p0 — tuning, 2-4 arms, 2M transitions each** | not a gate. Its output is a config: LR, entropy coef, λ, γ. Cheap enough (§4) to run more than four |
-| **6d** | **batch p1 — 4 seed-matched arms at b2's transition budget (12M)** | phase 3's bar, restated: **one arm reaches ≥90% perfect in a stage-A eval.** Plus a measured transitions/s and wall clock |
+| **6c** | **batch p0 — tuning** | **Closed 2026-08-29 at 15 arms x 10M transitions, not 4 x 2M.** Output: **no winner and no lever among lr, λ, entropy, γ or width** — nine configs inside 0.8 pp. One axis did move: **gradient steps per transition**. See below |
+| **6d** | **batch p1 — 4 seed-matched arms at b2's transition budget** | **‡ the budget is 18M transitions, not the 12M this table first said** — b2 is 3M counted steps at a measured **6** transitions per step, not 4. Phase 3's bar, restated: **one arm reaches ≥90% perfect in a stage-A eval** — already cleared by p0, so p1's real job is the seed-matched comparison, not the gate |
 | **6e** | stage B on p1, and the comparison | lead with the **≥98%/500 count** — the width of the record region — against b2's own close-out, and the sign test across the four seeds on `strong_eval_fraction` at a matched transition horizon |
 
 ### What 6a actually landed
@@ -416,6 +416,40 @@ with a max score of 95 — perfect games, so nothing about the terminal reward i
 plainly: "b1 ran snek3's bare defaults and that was the wrong batch to gate on", and the five knobs b2
 changed were the whole difference. PPO out of the box has *more* untuned knobs than DQN did, and §4
 says an arm is cheap. Spending one short batch on a config is the same lesson applied one phase later.
+
+### What 6c actually found, and what it did not
+
+15 arms, seed 1, 10M transitions each, all on b2's reward function, each one knob off a reference of
+lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.
+Full table in [`../docs/results.md`](../docs/results.md); the two findings are in
+[`../docs/findings.md`](../docs/findings.md).
+
+**Nine of the fifteen finished inside 0.8 pp of each other on `best_perfect30` (96.4 - 97.2).** At
+n=1 per config, in a domain where the same config has produced 62.5 and 18.0, that is one number. So
+**there is no tuned config to hand p1** — the reference is as good as anything the sweep found, and
+the four knobs §7 flagged as the interesting ones are flat.
+
+**The one axis that moved is gradient steps per transition**, and it moved 7.5 pp monotonically:
+
+| config | updates per transition | best30 |
+|---|---|---:|
+| minibatch 1024 | 0.25x | **89.7** — the worst arm in the sweep |
+| the reference | 1x | 96.6 |
+| epochs 8 | 2x | **97.2** — the best |
+
+**Rollout size is a second, separate axis.** `p0p-roll64` holds updates-per-transition fixed and
+halves the rollout, and it lost ~2.5 pp — noisier advantages and less diverse minibatches, not fewer
+updates. So the two must be swept separately, which the first pass did not know.
+
+**On the network:** two narrow layers beat one wide one. `fc 200,100` reached 97.1 and `fc 300,100`
+produced the most ≥95 checkpoints of any arm (233), while **`fc 500` was clearly worse (94.7)** and
+`fc 200` matched the 320 baseline. This task does not want width. p1 stays at **fc 320 anyway**,
+because a seed-matched comparison against b2 has to hold the network fixed — the depth result is a
+*better agent* question for a p2, exactly as §11 handles action masking.
+
+**Three metrics gave three different orderings**, which is the cleanest statement that 6c found no
+winner: `best_perfect30` ranks `p0q` first, the ≥98%/500 count ranks `p0e` first, and stage-B peak
+ranks `p0g` first. Pick the metric before the arm, not after.
 
 **p1 runs b2's env config**, so the reward function is matched: `SNEK_CHASE_SAFE_SHAPING=0.1`,
 `SNEK_CHASE_SAFE_GATE=75`, `SNEK_FOOD_DISTANCE_REWARD=0`, `SNEK_FC_LAYERS=320`, seed N pinned to arm
