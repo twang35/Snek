@@ -1,17 +1,17 @@
 {
-  "iso": "2026-08-29T19:59:50",
-  "ts": 1788058790.5183787,
+  "iso": "2026-08-29T20:09:53",
+  "ts": 1788059393.7357218,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p0k \u2014 p0 sweep: two hidden layers, 200 then 100 \u2014 training (1 arm)",
-      "p0l \u2014 p0 sweep: one wider hidden layer \u2014 training (1 arm)",
-      "p0m \u2014 p0 sweep: one narrower hidden layer \u2014 training (1 arm)",
-      "p0n \u2014 p0 sweep: two hidden layers, 300 then 100 \u2014 training (1 arm)",
-      "p0o \u2014 p0 sweep: gamma between 0.99 and b2's 0.9975 \u2014 training (1 arm)",
-      "p0p \u2014 p0 sweep: 8,192 transitions per update: twice as many updates \u2014 training (1 arm)",
-      "p0q \u2014 p0 sweep: eight passes over each rollout \u2014 training (1 arm)",
-      "p0r \u2014 p0 sweep: four times the minibatch, four times fewer gradient steps \u2014 training (1 arm)"
+      "p0k \u2014 p0 sweep: two hidden layers, 200 then 100 \u2014 training 44% (1 arm)",
+      "p0l \u2014 p0 sweep: one wider hidden layer \u2014 training 41% (1 arm)",
+      "p0m \u2014 p0 sweep: one narrower hidden layer \u2014 training 41% (1 arm)",
+      "p0n \u2014 p0 sweep: two hidden layers, 300 then 100 \u2014 training 42% (1 arm)",
+      "p0o \u2014 p0 sweep: gamma between 0.99 and b2's 0.9975 \u2014 training 42% (1 arm)",
+      "p0p \u2014 p0 sweep: 8,192 transitions per update: twice as many updates \u2014 training 21% (1 arm)",
+      "p0q \u2014 p0 sweep: eight passes over each rollout \u2014 training 41% (1 arm)",
+      "p0r \u2014 p0 sweep: four times the minibatch, four times fewer gradient steps \u2014 training 38% (1 arm)"
     ],
     "queued": [
       "p0k stage B \u2014 p0 sweep: two hidden layers, 200 then 100 \u2014 queued (1 arm)",
@@ -53,10 +53,10 @@
         "p0k-fc200x100"
       ],
       "pid": 4074531,
-      "step": null,
+      "step": 4374528,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 8441.8,
+      "elapsed_s": 603
     },
     {
       "id": "p0l-fc500",
@@ -66,10 +66,10 @@
         "p0l-fc500"
       ],
       "pid": 4074532,
-      "step": null,
+      "step": 4145152,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 8441.8,
+      "elapsed_s": 603
     },
     {
       "id": "p0m-fc200",
@@ -79,10 +79,10 @@
         "p0m-fc200"
       ],
       "pid": 4074533,
-      "step": null,
+      "step": 4128768,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 7386.6,
+      "elapsed_s": 603
     },
     {
       "id": "p0n-fc300x100",
@@ -92,10 +92,10 @@
         "p0n-fc300x100"
       ],
       "pid": 4074534,
-      "step": null,
+      "step": 4177920,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 10552.2,
+      "elapsed_s": 603
     },
     {
       "id": "p0o-g995",
@@ -105,10 +105,10 @@
         "p0o-g995"
       ],
       "pid": 4074535,
-      "step": null,
+      "step": 4177920,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 4748.5,
+      "elapsed_s": 603
     },
     {
       "id": "p0p-roll64",
@@ -118,10 +118,10 @@
         "p0p-roll64"
       ],
       "pid": 4074536,
-      "step": null,
+      "step": 2088960,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 3957.1,
+      "elapsed_s": 603
     },
     {
       "id": "p0q-ep8",
@@ -131,10 +131,10 @@
         "p0q-ep8"
       ],
       "pid": 4074537,
-      "step": null,
+      "step": 4128768,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 6331.3,
+      "elapsed_s": 603
     },
     {
       "id": "p0r-mb1024",
@@ -144,10 +144,10 @@
         "p0r-mb1024"
       ],
       "pid": 4074538,
-      "step": null,
+      "step": 3784704,
       "max_steps": 10000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 8969.3,
+      "elapsed_s": 603
     }
   ],
   "ledger": {
@@ -177,10 +177,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 48.9,
+  "disk_free_gb": 48.8,
   "load_avg": [
-    0.0,
-    0.0,
-    0.0
+    13.88330078125,
+    11.1083984375,
+    6.005859375
   ]
 }
