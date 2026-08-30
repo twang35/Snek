@@ -1,0 +1,19 @@
+{
+  "project": "snek3",
+  "id": "sse16",
+  "type": "eval",
+  "policies": [
+    "p2h-ep8-seed8"
+  ],
+  "eval_shards": 16,
+  "episodes": 100,
+  "eval_args": [
+    "--label",
+    "shardsweep16",
+    "--no-resume",
+    "--no-window"
+  ],
+  "priority": 32,
+  "label": "sweep s16: 16 stage-B shards on one arm",
+  "notes": "Desktop parallelism sweep, eval side. Identical work every wave \u2014 p2h's screen:97 set at 100 episodes \u2014 so wall clock is the shard-count comparison. Labelled and --no-resume so each config does the full set and none of them touches p2h's real stage-B file; the labelled outputs are throwaway. --no-window because a viewer costs a couple of percent of a core that would land in the number. SNEK_EVAL_WORKERS/SNEK_TORCH_THREADS cannot be set here: the daemon strips both from an eval wave (TRAINING_ONLY_KEYS), which is correct \u2014 they configure a training loop, not a measurement. 100 episodes not 500, to fit the hour."
+}

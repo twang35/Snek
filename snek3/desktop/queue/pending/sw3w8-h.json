@@ -1,0 +1,25 @@
+{
+  "project": "snek3",
+  "id": "sw3w8-h",
+  "type": "benchmark",
+  "policy": "bwh",
+  "max_steps": 258801664,
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_SEED": "8",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_PPO_EPOCHS": "8",
+    "SNEK_EVAL_QUEUE": "1",
+    "SNEK_EVAL_QUEUE_DEPTH": "16",
+    "SNEK_EVAL_INTERVAL": "1000",
+    "SNEK_TORCH_THREADS": "1",
+    "SNEK_MIN_CHECKPOINT_SCORE": "0",
+    "SNEK_EVAL_WORKERS": "8"
+  },
+  "priority": 22,
+  "label": "sweep w8: 8 stage-A workers, 8 arms, wave 3 of 6",
+  "notes": "Desktop parallelism sweep, training side. Every wave advances the same eight warm-started arms by 1196032 transitions, so wall clock per wave is the throughput comparison. **The worker order ascends and that is mandatory:** ensure_workers(target) iterates range(target) and never reaps a slot >= target, a worker only self-exits after 300s idle, and the gap between waves is one 30s poll -- so a wave after a higher-worker wave would inherit live extras that claim its queue work and measure more workers than its label. Waves 5 and 6 repeat at 12 to give wave-to-wave repeatability, which is what says whether a gap between neighbours is real. Arms resume from p2h-ep8-seed8 at 255213568 because a cold arm has short episodes, cheap stage A, and would understate the worker count needed."
+}
