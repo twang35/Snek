@@ -1,0 +1,22 @@
+{
+  "project": "snek3",
+  "id": "p0q-ep8-long",
+  "type": "train",
+  "policy": "p0q-ep8",
+  "max_steps": 470000000,
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_SEED": "1",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FC_LAYERS": "320",
+    "SNEK_DISCOUNT": "0.99",
+    "SNEK_PPO_LEARNING_RATE": "3e-4",
+    "SNEK_PPO_EPOCHS": "8",
+    "SNEK_EVAL_WORKERS": "6"
+  },
+  "label": "p0q-ep8 to 470M transitions: does a PPO arm keep improving past 10M?",
+  "notes": "**A RESUME, not a new arm.** `policy` is p0q-ep8, which already holds 12M transitions and\na resume.pt, so this continues that arm on the same seed and config -- the curve stays continuous and\n\"did longer help\" is readable straight off it against the 10M point. The id differs from the arm's\nbecause the ledger keys on id and p0q-ep8 is already `done`.\n\n**Why p0q-ep8.** It is the top arm of batch p0 on both metrics: best30 97.2 (1st of 15) and >=98%/500\ndensity 9.7% (21 of 217, also 1st). Its knob is 8 epochs per rollout rather than 4, which is the only\naxis p0 found that moved the result -- gradient steps per transition, worth 7.5 pp monotonically.\n\n**Why 470M.** Measured, not estimated: this arm alone on this box does 2M transitions in 122s = 16,400\ntransitions/s with a mature ~97% policy and stage A running, so 8 h = 472M, rounded to the nearest 10M.\nThe rate was measured on a mature policy deliberately, because stage A gets much more expensive as\nepisodes lengthen and a fresh-policy measurement would have overestimated by a wide margin.\n\n**Its twin is on the laptop**: p0k-fc200x100 (fc 200,100, best30 97.1, the sweep's best single\ncheckpoint at 99.2%/500) at the same 470M cap. Same question, different knob.\n\n**Disk:** ~28,700 checkpoints at ~48 KB = ~1.4 GB, against 46 GB free. **Stage B** will screen those at\n>=95 and could be ~8,600 checkpoints x 500 episodes = ~3.5 h on 16 shards. That is expected, not a\nsurprise -- but if the box is needed, stage B is the part to cancel, not the training."
+}
