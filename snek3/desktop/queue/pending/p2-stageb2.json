@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "p2-stageb2",
+  "type": "eval",
+  "policies": [
+    "p2a-ep8-seed1",
+    "p2b-ep8-seed2",
+    "p2c-ep8-seed3",
+    "p2d-ep8-seed4",
+    "p2e-ep8-seed5",
+    "p2f-ep8-seed6",
+    "p2g-ep8-seed7",
+    "p2h-ep8-seed8"
+  ],
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0"
+  },
+  "label": "p2 stage B, restarted onto the shared close-out (eight arms, 255-271M transitions)",
+  "notes": "The same pass as `p2-stageb`, restarted on 2026-08-30 08:20 so that it runs `tools/closeout.py` -- the close-out both boxes now share -- instead of the `sh -c` chain of one `evaluate.py` per arm that `desktop/runner/launch.py` used to build. **Nothing is lost by the restart:** every shard resumes from its own rows on disk, so this picks up where `p2-stageb` stopped, minus at most one in-flight row per shard.\n\nWhat it buys, beyond the two boxes running the same file: a stage-B window on the box's monitor, one panel per arm, redrawn off the shard files while the pass runs -- and the same behaviour on a failing arm as the laptop, which is that the arms behind it still run.\n\nNo selector, deliberately: the protocol's default decides, and that is `screen:97`. The reward env is carried so stage B's `avg_reward` column is on the objective the arms trained on."
+}
