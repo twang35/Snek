@@ -1,15 +1,13 @@
 {
-  "iso": "2026-08-30T09:31:52",
-  "ts": 1788107512.5817232,
+  "iso": "2026-08-30T09:39:03",
+  "ts": 1788107943.5541475,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "p2 \u2014 p2 stage B, restarted for the 99% chart guide (eight arms, 255-271M transitions) \u2014 eval (8 arms)"
     ],
     "queued": [],
-    "attention": [
-      "** p2-stageb2 failed and will NOT be retried automatically (rc=-15). Its arms count as measured; delete its ledger record to re-queue."
-    ]
+    "attention": []
   },
   "runtime": {
     "max_trainers": 8,
@@ -48,22 +46,22 @@
       "pid": 245682,
       "step": 271368192,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2983
+      "steps_per_sec": null,
+      "elapsed_s": 3414
     }
   ],
   "ledger": {
     "p2-stageb3": "running",
-    "p2-stageb2": "failed",
+    "p2-stageb2": "done",
     "p2-stageb": "done",
-    "p2h-ep8-seed8": "failed",
-    "p2g-ep8-seed7": "failed",
-    "p2f-ep8-seed6": "failed",
-    "p2e-ep8-seed5": "failed",
-    "p2d-ep8-seed4": "failed",
-    "p2c-ep8-seed3": "failed",
-    "p2b-ep8-seed2": "failed",
-    "p2a-ep8-seed1": "failed",
+    "p2h-ep8-seed8": "done",
+    "p2g-ep8-seed7": "done",
+    "p2f-ep8-seed6": "done",
+    "p2e-ep8-seed5": "done",
+    "p2d-ep8-seed4": "done",
+    "p2c-ep8-seed3": "done",
+    "p2b-ep8-seed2": "done",
+    "p2a-ep8-seed1": "done",
     "p0q-ep8-long": "failed",
     "p0r-stageb": "done",
     "p0q-stageb": "done",
@@ -91,10 +89,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 42.1,
+  "disk_free_gb": 42.0,
   "load_avg": [
-    16.39990234375,
-    16.544921875,
-    16.5146484375
+    16.36328125,
+    16.08837890625,
+    16.22509765625
   ]
 }
