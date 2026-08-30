@@ -560,7 +560,7 @@ class Trainer(object):
         # would draw epsilon dropping before the eval that dropped it. The unqueued spelling is kept
         # as it is so b1 and b2 stay reproducible.
         #
-        # **Nothing selects on this column**, which is why the shift is acceptable: `screen:95` reads
+        # **Nothing selects on this column**, which is why the shift is acceptable: `screen:97` reads
         # `perfect_percent`, and the measurement half of the row — score, reward, perfect rate and the
         # trailing mean — is bit-identical between the modes. `tests/test_train.py` pins both halves of
         # that sentence.

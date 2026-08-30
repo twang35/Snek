@@ -1,7 +1,7 @@
 """A measured checkpoint, as a result row.
 
 **Every row here is full length and directly comparable.** snek3's protocol is one stage — stage A
-is the trainer's own 100-episode self-eval, stage B measures every checkpoint that reached ≥95/100
+is the trainer's own 100-episode self-eval, stage B measures every checkpoint that reached ≥97/100
 at 500 episodes — so there is no screen/confirm split, no tiered selector and no min-achievable
 gate. snek2's files carried `selected_by`, `abandoned` and a nullable `min_achievable` for exactly
 those, and half of comparing two of its rows was working out whether they were comparable at all.
@@ -39,7 +39,7 @@ def build_row(step, held, stage_a_percent=None):
     """One result row from a checkpoint's accumulated episodes.
 
     `stage_a_percent` is the training self-eval that selected this checkpoint, carried through so
-    stage A can be checked against stage B on the same weights — a 100-episode screen at ≥95% and a
+    stage A can be checked against stage B on the same weights — a 100-episode screen at ≥97% and a
     500-episode measurement of the same checkpoint should agree within the interval, and a
     systematic gap between them would mean the two measurement paths differ.
     """

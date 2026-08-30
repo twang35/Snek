@@ -26,7 +26,7 @@ measurement protocol, unchanged. What has to go is four DQN-specific mechanisms,
 | **PER, target net, double-Q, n-step, prefill** | **go.** Replaced by a `(T, N)` rollout buffer and GAE |
 | **Network** | **two separate towers**, actor `30 -> 320 -> 3` — the same shape and the same initialisers as `QNet`, so the policy function class is identical — and critic `30 -> 320 -> 1`. §6 |
 | **Checkpoints** | `ckpt-<step>.pt` holds **the actor only**, so `arch.json` needs no new field and stage B measures the policy exactly as it does for DQN. The critic lives in `resume.pt`. §6 |
-| **Eval protocol** | **unchanged.** Stage A 100 episodes on every checkpoint, stage B 500 on every checkpoint at ≥95/100, `screen:95`, the same charts and reports |
+| **Eval protocol** | **unchanged.** Stage A 100 episodes on every checkpoint, stage B 500 on every checkpoint at ≥95/100, `screen:95`, the same charts and reports. **‡ The screen was raised to 97 on 2026-08-30** — a protocol change PPO's own results forced, not a PPO-specific one |
 | **Eval policy** | **argmax over the logits**, the analogue of DQN's greedy. Sampled evaluation is a later knob |
 | **Step unit** | **a PPO step is one transition = one game move.** Every row of both algorithms gains a `transitions` field. §4 |
 | **`train.py`** | **one entry point, one eval/checkpoint/report path**, with the algorithm behind a fourteen-member seam. **Landed 2026-08-29**, byte-identical for DQN. §5 |

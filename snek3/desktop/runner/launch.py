@@ -50,7 +50,7 @@ def build_command(job, host, runtime):
     **No episode count and no gate are set here.** snek2's daemon carried five protocol numbers as a
     second copy of what `eval_plan.py` defines, and they drifted. The rule is inverted instead: the
     daemon passes a selector and an episode count *only if the spec named them*, and otherwise lets
-    `evaluate.py`'s own defaults decide — which are the protocol, `screen:95` at 500 episodes. One
+    `evaluate.py`'s own defaults decide — which are the protocol, `screen:97` at 500 episodes. One
     definition, no import, nothing here to drift. The daemon cannot import the original anyway: it
     runs on base python so it can start before the conda env exists, and `eval_plan` needs numpy.
 

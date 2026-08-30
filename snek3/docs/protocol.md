@@ -5,7 +5,7 @@ Stage A arrives with the trainer in phase 3, so the columns below that name it a
 specification.
 
 ```
-PYTHONPATH=. python -u evaluate.py <policy>                     # screen:95, 500 episodes, 4 shards
+PYTHONPATH=. python -u evaluate.py <policy>                     # screen:97, 500 episodes, 4 shards
 PYTHONPATH=. python -u evaluate.py <policy> screen:98 --shards 8
 PYTHONPATH=. python -u evaluate.py <policy> one --episodes 1000 # a record re-measure, one process
 PYTHONPATH=. python -m tools.compare_results <file-a> <file-b>  # is the gap noise?
@@ -20,7 +20,7 @@ PYTHONPATH=. python -m tools.chart_window                       # the box's own 
 | stage | who | selection | episodes | writes |
 |---|---|---|---:|---|
 | **A** | the trainer, in-process, every 1,000 steps | every checkpoint | 100 | `runs/<policy>_evals.json`, `runs/<policy>.png` |
-| **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥95/100** in stage A | 500 | `runs/<policy>_checkpoint_evals[_<label>].json` |
+| **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥97/100** in stage A | 500 | `runs/<policy>_checkpoint_evals[_<label>].json` |
 
 **Stage B is the hall-of-fame measurement.** There is no third stage. snek2 ran three — a graph eval,
 a tiered close-out at 100 episodes, then a 500-episode re-measure of the close-out's ≥98% rows — and

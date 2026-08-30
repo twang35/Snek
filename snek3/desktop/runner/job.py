@@ -54,7 +54,7 @@ class Job(object):
         # runtime config says", which is the normal case.
         self.eval_shards = eval_shards
         # Which checkpoints, and how deeply. None on either means the protocol's default, which is
-        # `screen:95` at 500 episodes — see `evaluate.py`.
+        # `screen:97` at 500 episodes (95 until 2026-08-30) — see `evaluate.py`.
         self.selector = selector
         self.episodes = episodes
         self.eval_args = eval_args or []
@@ -134,7 +134,7 @@ def parse_job(text, source='<job>', project=PROJECT):
 
     selector = raw.get('selector')
     if selector is not None and not isinstance(selector, str):
-        raise JobError('{0}: selector must be a string, e.g. "screen:95"'.format(source))
+        raise JobError('{0}: selector must be a string, e.g. "screen:97"'.format(source))
     if selector is not None and job_type != 'eval':
         raise JobError('{0}: only eval jobs take "selector"'.format(source))
 

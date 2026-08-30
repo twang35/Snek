@@ -376,7 +376,7 @@ episodes on the vec engine — it re-measures the same checkpoints at the same d
 | stage | who | selection | episodes |
 |---|---|---|---:|
 | **A** | the trainer, in-process | every checkpoint | 100 |
-| **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥95/100** in stage A | **500** |
+| **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥95/100** in stage A — **raised to ≥97/100 on 2026-08-30**, see `tools/step_selectors.py` | **500** |
 
 That is the whole protocol. There is no third stage: **stage B *is* the HOF measurement**, so a
 promotion reads its file directly instead of chaining another job behind it.
@@ -416,6 +416,10 @@ gone: it was a desktop projection and the desktop has never run a snek3 wave.
 **Total measurement compute is roughly what snek2 already spends** — the win is that snek2's 322,200
 close-out episodes were duplicated work, and that a batch now has one eval wave to queue and wait for
 instead of two chained ones. The honest saving is ~25% of the compute and 50% of the pipeline.
+
+**‡ Revisited 2026-08-30 and raised to `≥97/100`**, for exactly the reason this section gives: PPO
+arms sit at best30 97-98%, so almost every checkpoint clears a 95 screen and a 400M-transition arm
+would put ~20,000 of them into stage B. The numbers behind the trade are in `tools/step_selectors.py`.
 
 **`≥95/100` is the cost knob, and it is where the design is worth revisiting first.** It is a
 threshold on a noisy estimator: a checkpoint whose true rate is 0.90 reads ≥95/100 about 4% of the

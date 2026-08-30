@@ -53,7 +53,7 @@ weights — and that costs nothing, because nothing in the measurement loop call
 ```
 cd snek3
 PYTHONPATH=. python -u train.py <policy>               # the name doubles as the checkpoint dir
-PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:95, 500 eps, 4 shards
+PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:97, 500 eps, 4 shards
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
@@ -101,7 +101,7 @@ every benchmark do.
 | stage | who | selection | episodes |
 |---|---|---|---:|
 | **A** | the trainer, every 1,000 steps — in-process, or `SNEK_EVAL_QUEUE=1` for shared workers | every checkpoint | 100 |
-| **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥95/100** in stage A | 500 |
+| **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥97/100** in stage A | 500 |
 
 **Stage B is the hall-of-fame measurement.** There is no third stage, no tiered selection, no
 screen/confirm split and no min-achievable gate — so **every row in every result file is full length

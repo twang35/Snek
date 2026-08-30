@@ -8,13 +8,35 @@ so a selector chooses *which* checkpoints and never *how deeply*.
 
 | selector | means | reads |
 |---|---|---|
-| `screen:<n>` | every checkpoint whose stage-A eval was ≥ n perfect. **The protocol's default**, n=95 | `runs/<name>_evals.json` |
+| `screen:<n>` | every checkpoint whose stage-A eval was ≥ n perfect. **The protocol's default**, n=97 | `runs/<name>_evals.json` |
 | `above:<n>[:<label>]` | every checkpoint above n in a *prior stage-B* pass — the record re-measure | `runs/<name>_checkpoint_evals[_<label>].json` |
 | `steps:<path>` | an explicit list, one step per line | that file |
 | `all` | every checkpoint present | the policy directory |
 
 `screen` is the one that matters and `all` is the one to be careful with: a 3M-step arm has ~3,000
 checkpoints, so `all` at 500 episodes is 1.5M episodes.
+
+**‡ The default was 95 until 2026-08-30 and is now 97**, at the user's request, because PPO arms
+changed what the number costs. `plans/pytorch-port.md` called `≥95/100` "the cost knob, and where the
+design is worth revisiting first", and batch p2/p3 is why: arms sitting at best30 97-98% have almost
+every checkpoint clear a 95 screen, so a 400M-transition arm would put ~20,000 checkpoints x 500
+episodes into stage B — tens of millions of episodes per arm.
+
+**The trade is cost against false negatives on a noisy estimator**, and it is worth stating in numbers
+rather than in principle. Screening 100 episodes at `>=97` instead of `>=95`:
+
+| a checkpoint's true rate | passes at 95 | passes at 97 |
+|---|---:|---:|
+| 0.99 | ~100% | ~99% |
+| 0.98 | ~99% | **~86%** |
+| 0.97 | ~93% | ~61% |
+| 0.96 | ~78% | ~30% |
+
+So a genuinely-98% checkpoint is missed ~14% of the time rather than ~1%. That is acceptable **only
+because these arms produce 100-230 candidates each**, so the chance of missing every good one is
+negligible — and it would not have been acceptable for b1, whose arms produced none at all. **A
+threshold raise is safe in proportion to how many candidates an arm has**; re-examine it for any arm
+that clears the screen only a handful of times.
 
 **Named `step_selectors`, not `selectors`, and that is not fussiness.** A module called `selectors.py`
 shadows the standard library's, and the standard library's is imported by `subprocess` — so running
@@ -29,7 +51,7 @@ import os
 from tools import checkpoints
 from tools import results
 
-DEFAULT_SCREEN = 95
+DEFAULT_SCREEN = 97
 
 
 class SelectorError(Exception):

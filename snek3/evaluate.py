@@ -2,7 +2,7 @@
 
     PYTHONPATH=. python -u evaluate.py <policy> [selector] [options]
 
-    PYTHONPATH=. python -u evaluate.py b1a-thing                    # stage B: screen:95, 500 eps
+    PYTHONPATH=. python -u evaluate.py b1a-thing                    # stage B: screen:97, 500 eps
     PYTHONPATH=. python -u evaluate.py b1a-thing screen:98 --shards 8
     PYTHONPATH=. python -u evaluate.py b44a-import one --episodes 3000
     PYTHONPATH=. python -u evaluate.py b45a-import steps:runs/ab.txt --episodes 100 --label ab
@@ -11,7 +11,7 @@ The selector decides which checkpoints; see [`tools/step_selectors.py`](tools/st
 `one` is the exception: it measures a single checkpoint in this process, which is what a spot check
 and a record re-measurement want.
 
-**The default is the protocol.** No selector means `screen:95` at 500 episodes — every checkpoint
+**The default is the protocol.** No selector means `screen:97` at 500 episodes — every checkpoint
 whose stage-A eval reached 95/100, measured at full length. There is no second stage behind it:
 stage B *is* the hall-of-fame measurement, so a promotion reads its file rather than queueing
 another job.

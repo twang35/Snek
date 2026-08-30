@@ -1,6 +1,6 @@
 """Runs a stage-B measurement across several shard processes.
 
-    PYTHONPATH=. python -u -m tools.eval_wave <policy> [--selector screen:95] [--shards 4]
+    PYTHONPATH=. python -u -m tools.eval_wave <policy> [--selector screen:97] [--shards 4]
 
 **Shards are independent processes with independent output files, and the wave is only a launcher
 and a progress readout.** There is no central row bookkeeping, which is the design's whole point:

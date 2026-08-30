@@ -27,7 +27,7 @@ def a_policy(tmp_path, steps):
 
 def test_the_known_selectors_parse():
     assert selectors.parse('all') == ('all', None)
-    assert selectors.parse('screen') == ('screen', 95.0)
+    assert selectors.parse('screen') == ('screen', 97.0)
     assert selectors.parse('screen:98') == ('screen', 98.0)
     assert selectors.parse('above:98') == ('above', (98.0, None))
     assert selectors.parse('above:98:hof') == ('above', (98.0, 'hof'))
@@ -35,9 +35,10 @@ def test_the_known_selectors_parse():
 
 
 def test_the_default_screen_is_the_protocol_threshold():
-    # 95/100 in stage A is what stage B selects on. A bare `screen` has to mean that, or a wave
+    # 97/100 in stage A is what stage B selects on (95 until 2026-08-30; see the module's note on
+    # what the raise costs). A bare `screen` has to mean that, or a wave
     # launched without arguments measures something other than the protocol.
-    assert selectors.parse('screen')[1] == float(selectors.DEFAULT_SCREEN) == 95.0
+    assert selectors.parse('screen')[1] == float(selectors.DEFAULT_SCREEN) == 97.0
 
 
 def test_a_retired_snek2_selector_is_refused_by_name():
