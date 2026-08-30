@@ -1,12 +1,19 @@
 {
-  "iso": "2026-08-29T22:56:47",
-  "ts": 1788069407.9212987,
+  "iso": "2026-08-29T22:57:34",
+  "ts": 1788069454.7465355,
   "project": "snek3",
   "at_a_glance": {
-    "running": [],
-    "queued": [
-      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume"
+    "running": [
+      "p2a \u2014 p2: p0's top config (8 epochs) at 400M, seed 1 of 8 \u2014 training (1 arm)",
+      "p2b \u2014 p2: p0's top config (8 epochs) at 400M, seed 2 of 8 \u2014 training (1 arm)",
+      "p2c \u2014 p2: p0's top config (8 epochs) at 400M, seed 3 of 8 \u2014 training (1 arm)",
+      "p2d \u2014 p2: p0's top config (8 epochs) at 400M, seed 4 of 8 \u2014 training (1 arm)",
+      "p2e \u2014 p2: p0's top config (8 epochs) at 400M, seed 5 of 8 \u2014 training (1 arm)",
+      "p2f \u2014 p2: p0's top config (8 epochs) at 400M, seed 6 of 8 \u2014 training (1 arm)",
+      "p2g \u2014 p2: p0's top config (8 epochs) at 400M, seed 7 of 8 \u2014 training (1 arm)",
+      "p2h \u2014 p2: p0's top config (8 epochs) at 400M, seed 8 of 8 \u2014 training (1 arm)"
     ],
+    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -18,18 +25,131 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": true,
+    "paused": false,
     "drain": false,
     "auto_stage_b": false,
     "viewer": true
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 8,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "p2a-ep8-seed1",
+      "type": "train",
+      "policy": "p2a-ep8-seed1",
+      "policies": [
+        "p2a-ep8-seed1"
+      ],
+      "pid": 4162358,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2b-ep8-seed2",
+      "type": "train",
+      "policy": "p2b-ep8-seed2",
+      "policies": [
+        "p2b-ep8-seed2"
+      ],
+      "pid": 4162359,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2c-ep8-seed3",
+      "type": "train",
+      "policy": "p2c-ep8-seed3",
+      "policies": [
+        "p2c-ep8-seed3"
+      ],
+      "pid": 4162360,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2d-ep8-seed4",
+      "type": "train",
+      "policy": "p2d-ep8-seed4",
+      "policies": [
+        "p2d-ep8-seed4"
+      ],
+      "pid": 4162361,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2e-ep8-seed5",
+      "type": "train",
+      "policy": "p2e-ep8-seed5",
+      "policies": [
+        "p2e-ep8-seed5"
+      ],
+      "pid": 4162362,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2f-ep8-seed6",
+      "type": "train",
+      "policy": "p2f-ep8-seed6",
+      "policies": [
+        "p2f-ep8-seed6"
+      ],
+      "pid": 4162363,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2g-ep8-seed7",
+      "type": "train",
+      "policy": "p2g-ep8-seed7",
+      "policies": [
+        "p2g-ep8-seed7"
+      ],
+      "pid": 4162364,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "p2h-ep8-seed8",
+      "type": "train",
+      "policy": "p2h-ep8-seed8",
+      "policies": [
+        "p2h-ep8-seed8"
+      ],
+      "pid": 4162365,
+      "step": null,
+      "max_steps": 400000000,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
+    "p2a-ep8-seed1": "running",
+    "p2b-ep8-seed2": "running",
+    "p2c-ep8-seed3": "running",
+    "p2d-ep8-seed4": "running",
+    "p2e-ep8-seed5": "running",
+    "p2f-ep8-seed6": "running",
+    "p2g-ep8-seed7": "running",
+    "p2h-ep8-seed8": "running",
     "p0q-ep8-long": "failed",
     "p0r-stageb": "done",
     "p0q-stageb": "done",
@@ -59,8 +179,8 @@
   },
   "disk_free_gb": 48.7,
   "load_avg": [
-    3.4814453125,
-    5.29248046875,
-    3.6943359375
+    1.79296875,
+    4.595703125,
+    3.53271484375
   ]
 }
