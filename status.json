@@ -1,6 +1,6 @@
 {
-  "iso": "2026-08-30T07:48:39",
-  "ts": 1788101319.2214353,
+  "iso": "2026-08-30T07:58:46",
+  "ts": 1788101926.3944817,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -46,8 +46,8 @@
       "pid": 219689,
       "step": 271368192,
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 0.0,
+      "elapsed_s": 607
     }
   ],
   "ledger": {
@@ -87,10 +87,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 42.4,
+  "disk_free_gb": 42.3,
   "load_avg": [
-    5.19873046875,
-    12.310546875,
-    14.2900390625
+    16.26220703125,
+    15.68798828125,
+    15.20166015625
   ]
 }
