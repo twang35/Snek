@@ -342,6 +342,60 @@ that cap enough there. And the seed spread — 42.1% to 81.9% peak, **39.8 pp** 
 ~10 pp this project already says n=4 cannot resolve, so at this horizon the four arms cannot rank two
 configs at all.
 
+### A config sweep read at a truncated cap did not merely mislead, it inverted
+
+Batch p0's PPO sweep ran seven configs to 3M transitions and then continued the same seven arms to
+10M. **The 3M ranking was not a noisy version of the 10M ranking — it was a different ranking.**
+
+| arm | knob off the reference | best30 @3M | best30 @10M |
+|---|---|---:|---:|
+| `p0g-ent003` | entropy coefficient 0.003 | 76.8 — **6th** | **96.9 — 1st** |
+| `p0e-lam95` | λ 0.95 | 75.7 — **7th** | **96.8 — 2nd** |
+| `p0a-lr3e4-g99` | none: the reference | **88.2 — 1st** | 96.6 — 3rd |
+| `p0j-lr5e4` | learning rate 5e-4 | 87.3 — 2nd | 96.5 — 4th |
+| `p0i-lr1e4` | learning rate 1e-4 | 70.5 — 8th | 95.0 — 5th |
+| `p0h-ent03` | entropy coefficient 0.03 | 70.2 — 9th | 90.6 |
+| `p0f-lam100` | λ 1.0 | 85.0 | 90.8, **still rising at the cap** |
+
+Two separate facts, and the second is the useful one.
+
+**The order changed.** The two arms that finished 1st and 2nd were 6th and 7th at 3M, and the arm that
+led at 3M finished 3rd. The mechanism is not mysterious — a smaller entropy bonus and a shorter GAE
+horizon both explore less early and neither plateaus lower — but it is invisible at 3M, and a sweep
+stopped there would have picked its two best configs *last*.
+
+**The spread collapsed.** Those top four span **11.4 pp at 3M and 0.4 pp at 10M** (96.9 / 96.8 / 96.6
+/ 96.5). In a domain where the same config has produced 62.5 and 18.0, four configs inside 0.4 pp at
+n=1 each is **one number, not a ranking** — so the sweep's honest output is a *set* of equivalent
+configs plus a list of losers (entropy 0.03, λ 1.0, lr 3e-3 at sd 18.4, γ 0.9975), not a winner.
+
+This generalises the b1 finding above from "a cap hides how good a config gets" to "**a cap can order
+configs wrongly**", which is worse, because a sweep's whole output is an order. The practical rule is
+in [`protocol.md`](protocol.md): rank on peak only after checking no arm was still climbing, and treat
+a sweep at a cap every arm was still rising through as having produced no ranking at all.
+
+### PPO reaches DQN's perfect-game rate on this task at a matched transition budget, ~13x cheaper
+
+Matched on transitions **and** on reward function (both on b2's `chase_safe c=0.1 gate=75`, no
+food-distance term, fc 320):
+
+| | best30 at 10M transitions | best stage-B checkpoint | stage-B measurements behind it |
+|---|---|---|---|
+| PPO, 7 configs, seed 1 | 90.6 – **96.9** | **98.6% / 500**, re-measured **96.6% / 3,000** [95.9, 97.2] | 153, one arm |
+| DQN b2, 4 seeds | 93.6 – **96.9** | 99.2% / 500 | 1,135, four arms |
+
+**The top of the two ranges is the same number.** DQN found the better single checkpoint, but out of
+7.4x more stage-B measurements across four seeds; PPO's 98.6% came from one arm's 153. Neither side
+supports a claim of superiority and this entry is not making one — what it rules out is the reading
+that phase 6b's gate arm suggested, that PPO is *behind* on this task. That arm was on snek3's
+unshaped defaults at 508k transitions, and the reward function was doing most of the work.
+
+**The cost difference is not marginal.** PPO's seven arms reached 10M transitions in **~20 minutes**
+sharing a 14-core laptop; b2's DQN arms took **~7-8 h each** for 18M on the 16-core desktop — about
+13x per transition, because PPO takes one gradient step per 256 samples per epoch against DQN's one
+per transition. The 3,000-episode re-measurement of a selected high fell **2.0 pp** from its 500-episode
+value, consistent with the 1.4 pp mean fall across snek2's four best hall-of-fame entries.
+
 ### The documented way to confirm an arm's config was blind to the shaping knobs
 
 `grep 'hyperparameter override:'` is what both instruction files name as the check that an arm got
