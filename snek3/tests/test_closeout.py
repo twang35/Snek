@@ -143,12 +143,17 @@ def test_windows_are_one_switch_and_not_two(monkeypatch):
     assert calls == []
 
 
-def test_a_window_that_will_not_open_is_not_an_error(monkeypatch, capsys):
-    """A box with no display must not fail a measurement over a chart."""
+def test_a_window_that_will_not_open_is_not_an_error(monkeypatch, capsys, tmp_path):
+    """A box with no display must not fail a measurement over a chart.
+
+    `runs_dir` is a tmp path deliberately: against the real registry this passed alone and failed in
+    the full suite, because a *live* stage-B window on the box holds the slot, `ensure` skips the
+    spawn it would obviously lose, and nothing reaches the failure path being tested.
+    """
     def refuse(*args, **kwargs):
         raise OSError('no display')
     monkeypatch.setattr(chart_window.subprocess, 'Popen', refuse)
-    assert eval_window.ensure(['runs/a.png'], env={}) is None
+    assert eval_window.ensure(['runs/a.png'], env={}, runs_dir=str(tmp_path)) is None
     assert 'stage-B window' in capsys.readouterr().err
 
 
