@@ -1,14 +1,10 @@
 {
-  "iso": "2026-08-30T13:01:39",
-  "ts": 1788120099.7026677,
+  "iso": "2026-08-30T13:11:56",
+  "ts": 1788120716.7278852,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "sse20 \u2014 sweep s20: 20 stage-B shards on one arm \u2014 eval (1 arm)"
-    ],
-    "queued": [
-      "sse24 eval \u2014 sweep s24: 24 stage-B shards on one arm \u2014 queued (1 arm)"
-    ],
+    "running": [],
+    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -28,26 +24,12 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "sse20",
-      "type": "eval",
-      "policy": "p2h-ep8-seed8",
-      "policies": [
-        "p2h-ep8-seed8"
-      ],
-      "pid": 428791,
-      "step": 255049728,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 123
-    }
-  ],
+  "running": [],
   "ledger": {
-    "sse24": "queued",
-    "sse20": "running",
+    "sse24": "done",
+    "sse20": "done",
     "sse16": "done",
     "sse12": "done",
     "sse8": "done",
@@ -137,10 +119,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 40.6,
+  "disk_free_gb": 40.4,
   "load_avg": [
-    19.03564453125,
-    14.7958984375,
-    13.3525390625
+    0.29052734375,
+    8.22314453125,
+    12.0107421875
   ]
 }
