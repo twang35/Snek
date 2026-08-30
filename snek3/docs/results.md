@@ -36,6 +36,77 @@ non-perfect games average **91.5 of 95**, so the arm is dying with three or four
 is the endgame this task has always been about.
 
 
+## Batch p0 — the PPO tuning sweep
+
+**15 arms, seed 1, 10M transitions each, all on b2's reward function**, each one knob off a reference
+of lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.
+Closed 2026-08-29. Seven ran on the laptop, eight on the desktop. **A tuning pass, not a gate** — no
+arm is seed-matched to anything, so no row here supports a between-config claim on its own.
+
+| arm | knob | best30 | sd30 | ≥95 evals | stage B: n | best | ≥98 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `p0q-ep8` | epochs 8 | **97.2** | 3.0 | 217 | pending | | |
+| `p0k-fc200x100` | fc 200,100 | **97.1** | 2.5 | 215 | pending | | |
+| `p0g-ent003` | entropy 0.003 | 96.9 | 2.8 | 153 | 153 | 98.6% | 2 |
+| `p0n-fc300x100` | fc 300,100 | 96.9 | 2.4 | **233** | pending | | |
+| `p0e-lam95` | λ 0.95 | 96.8 | 2.4 | 179 | 179 | 98.2% | **7** |
+| `p0o-g995` | γ 0.995 | 96.7 | **1.8** | 166 | pending | | |
+| `p0a-lr3e4-g99` | *the reference* | 96.6 | 2.2 | 108 | 108 | 98.4% | 6 |
+| `p0j-lr5e4` | lr 5e-4 | 96.5 | 3.6 | 160 | 160 | **99.0%** | **7** |
+| `p0m-fc200` | fc 200 | 96.4 | 2.0 | 131 | pending | | |
+| `p0i-lr1e4` | lr 1e-4 | 95.0 | 5.0 | 47 | 47 | 97.4% | 0 |
+| `p0l-fc500` | fc 500 | 94.7 | 3.2 | 93 | pending | | |
+| `p0p-roll64` | rollout 64 | 94.1 | 2.9 | 104 | pending | | |
+| `p0f-lam100` | λ 1.0 | 90.8 | 5.2 | 11 | 11 | 96.2% | 0 |
+| `p0h-ent03` | entropy 0.03 | 90.6 | 9.1 | 9 | 9 | 94.8% | 0 |
+| `p0r-mb1024` | minibatch 1024 | **89.7** | 4.4 | 16 | pending | | |
+| `p0b`, `p0c`, `p0d` | lr 1e-3, lr 3e-3, γ 0.9975 | 85.2, 69.9, 81.6 | 7.2, 18.4, 4.7 | 1, 3, 0 | 1, 3, — | 94.4%, 95.8% | 0 |
+
+`p0b`/`p0c`/`p0d` stopped at the 3M cap and are the arms the cap-inversion finding is measured
+against; the rest ran 3M and were then resumed to 10M.
+
+### What it establishes
+
+**No winner.** Nine arms inside **0.8 pp** on best30, and three metrics give three orderings of the top
+three (best30 → `p0q`; ≥98%/500 count → `p0e`/`p0j`; stage-B peak → `p0j`). At n=1 per config, that is
+one number. **p0 hands p1 the reference config unchanged.**
+
+**One axis moved, 7.5 pp, monotonically — gradient steps per transition.** minibatch 1024 (0.25x) 89.7
+· reference (1x) 96.6 · epochs 8 (2x) 97.2. **Rollout size is a second axis:** `p0p-roll64` holds the
+ratio fixed, halves the rollout, and loses ~2.5 pp.
+
+**Two narrow layers beat one wide one, and 320 is more width than this task needs.** `fc 200,100` 97.1,
+`fc 300,100` the most ≥95 checkpoints of any arm at 233, `fc 200` level with the 320 baseline, and
+**`fc 500` clearly worse at 94.7**.
+
+### Against DQN, at the same protocol
+
+| | transitions | stage-B measurements | best | ≥98%/500 | density | wall clock per arm |
+|---|---:|---:|---:|---:|---:|---:|
+| **PPO p0, 7 laptop arms pooled** | 10M | 658 | **99.0%** | **22** | **3.34%** | **~3 min** (7 sharing 14 cores) |
+| **DQN b2, 4 seeds pooled** | 18M | 1,135 | 99.2% | 5 | 0.44% | ~7-8 h (16 cores) |
+
+**PPO's record-region density is 7.6x DQN's**, which is the metric
+[`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison. DQN still holds the higher
+single checkpoint.
+
+**The honest depth, and it is the number to quote.** `p0j-lr5e4` @9,469,952 measured **99.0%/500** —
+equal to snek2's admitted hall-of-fame record at that depth — and re-measured on a fresh seed at 3,000
+episodes: **97.7% [97.1, 98.1]**, a 1.3 pp fall. `p0g-ent003` @8,159,232 fell 98.6% → **96.6%**
+[95.9, 97.2]. So:
+
+| policy | 3,000-episode measurement |
+|---|---:|
+| `b44a-import` @2739000 — snek2's champion, converted | **98.8%** [98.3, 99.1] |
+| `p0j-lr5e4` @9469952 — PPO's best | **97.7%** [97.1, 98.1] |
+
+**The champion is still ahead, by 1.1 pp and outside PPO's interval.** And it got there on **2.74M**
+transitions against PPO's 9.47M, so on sample efficiency to a champion checkpoint the snek2 DQN lineage
+is ~3.5x better. Neither number is a verdict on the algorithms — the champion is a selected best across
+snek2's whole history and `p0j` is one arm of a first tuning sweep — but quoting PPO's 99.0%/500 without
+this table would be quoting a selected high, which
+[`../CLAUDE.md`](../CLAUDE.md) explicitly warns against.
+
 ## The PPO gate arm
 
 **`ppo-smoke` — the phase-6b gate, not a batch arm.** 508k transitions at
