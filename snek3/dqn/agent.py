@@ -91,8 +91,12 @@ def shielded_choice(observations, guided, rng, num_actions):
     return np.argmax(keys, axis=1).astype(np.int64)
 
 
-def _build_adam(parameters, learning_rate, epsilon):
+def build_adam(parameters, learning_rate, epsilon):
     """Adam, fused where the device supports it. Same algorithm, one kernel instead of dozens.
+
+    **Public, and `ppo/agent.py` imports it rather than copying it.** Both halves of this docstring
+    are measured facts about *this* net shape, and the materialisation below is a trap that a second
+    copy would eventually walk into again — see the paragraph on the exhausted generator.
 
     **Bit-identical, and that is the reason it can be turned on without re-running anything.** The
     fused path is the same update arithmetic in a single kernel rather than ~40 ops over four tiny
@@ -142,8 +146,8 @@ class DdqnAgent(object):
         for parameter in self.target.parameters():
             parameter.requires_grad_(False)
 
-        self.optimizer = _build_adam(self.net.parameters(), float(learning_rate),
-                                     float(adam_epsilon))
+        self.optimizer = build_adam(self.net.parameters(), float(learning_rate),
+                                    float(adam_epsilon))
         self.target_update_period = int(target_update_period)
         self.target_update_tau = float(target_update_tau)
         self.gradient_clipping = float(gradient_clipping)

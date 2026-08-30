@@ -1,0 +1,25 @@
+{
+ "tests": [
+  "tests/test_train.py"
+ ],
+ "mutations": [
+  {
+   "desc": "shaping discount back to VecSnake's default of 1.0 (the b1/b2 bug)",
+   "file": "dqn/algo.py",
+   "from": "VecSnake(width, seed=config['seed'], shaping_discount=config['discount']),",
+   "to": "VecSnake(width, seed=config['seed']),"
+  },
+  {
+   "desc": "shaping discount hardcoded to 1.0 rather than read from the config",
+   "file": "dqn/algo.py",
+   "from": "shaping_discount=config['discount'])",
+   "to": "shaping_discount=1.0)"
+  },
+  {
+   "desc": "shaping discount reads the wrong knob",
+   "file": "dqn/algo.py",
+   "from": "shaping_discount=config['discount'])",
+   "to": "shaping_discount=config['target_update_tau'])"
+  }
+ ]
+}

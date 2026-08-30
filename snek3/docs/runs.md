@@ -103,13 +103,29 @@ has run and published 0 rows an arm, which is the honest measurement rather than
    b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
    precisely to have the yardstick.
 2. **Phase 6 — `ppo/`.** The reason snek3 exists. The design is
-   [`../plans/ppo.md`](../plans/ppo.md), **approved 2026-08-29**. Phase **6a is closed** — the
-   algorithm seam is in `train.py`, DQN sits behind `dqn/algo.py`, and three fixed-seed DQN arms are
-   byte-identical across it. **6b (`ppo/` itself) is next.**
+   [`../plans/ppo.md`](../plans/ppo.md), **approved 2026-08-29**. Phases **6a and 6b are closed** —
+   the algorithm seam is in `train.py` with three fixed-seed DQN arms byte-identical across it, and
+   `ppo/` is written, tested (122 fixtures, 14 of 14 mutants killed) and measured. **6c — batch p0,
+   the tuning pass — is next.**
+
+   **The 6b gate arm, `ppo-smoke`: avg score 79.5 and 1.2%/500 perfect at 508k transitions**, from a
+   greedy argmax policy restored through the ordinary `tools/restore.py` path. **At a matched ~510k
+   transitions b1's four DQN seeds read 85.6-91.9 score and 6-34% perfect**, so PPO learns this game
+   and is currently *behind* DQN rather than beside it. Its own diagnostics say where to push:
+   `explained_variance` 0.90 (the critic is fine), `approx_kl` 0.002 and `clip_fraction` 0.03 against
+   a clip of 0.2 (the update is barely constrained — the learning rate is **low**, not high), entropy
+   1.086 → 0.27 (committing fast, and whether that is premature is p0's question). Chart:
+   [`../runs/ppo-smoke.png`](../runs/ppo-smoke.png). It is a gate arm, not a p-series arm.
 
    **‡ Not deployed to the desktop yet, deliberately:** the seam is a change to the file every
    running arm's process was launched from, and the box's daemon can relaunch an arm. Deploy after
-   b2's stage-B wave publishes.
+   b2's stage-B wave publishes — one deploy carrying 6a and 6b together.
+
+3. **Batch p0 — the PPO tuning pass.** 2-4 arms at ~2M transitions, per
+   [`../plans/ppo.md`](../plans/ppo.md) §10. What the gate arm already narrows: **the learning rate is
+   the first knob** (`clip_fraction` 0.03 says the clip is not the binding constraint), γ 0.99 against
+   0.9975 is the pre-registered second, and the entropy coefficient — constant against a ramp to 0 —
+   is the third. Do not gate on defaults; that is what b1 did and it answered nothing.
 
 **The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
 is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
@@ -135,7 +151,7 @@ One line per idea, with a prior. A design that is settled enough to implement ge
 
 | idea | prior |
 |---|---|
-| **PPO** | [`../plans/ppo.md`](../plans/ppo.md) — **approved 2026-08-29, phase 6a closed.** The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
+| **PPO** | [`../plans/ppo.md`](../plans/ppo.md) — **phases 6a and 6b closed 2026-08-29; batch p0 is next.** No longer a backlog item. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
 | **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
 | **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
 | **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |

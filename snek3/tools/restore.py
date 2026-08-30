@@ -26,11 +26,20 @@ def _dqn():
     return network
 
 
+def _ppo():
+    # **A PPO checkpoint holds the actor and nothing else**, and `ppo/net.py`'s `build` returns that
+    # actor — the same `QNet` DQN trains, read as logits. So this line is all a PPO checkpoint needs
+    # to be watchable, recordable and measurable by every eval shard: an argmax over logits and an
+    # argmax over Q are the same operation.
+    from ppo import net as network
+    return network
+
+
 # `algo` from the sidecar decides both the network and how a greedy action is taken from it. A dict
 # rather than an `if`, so adding PPO is one line and an unrecognised value names itself in the error
 # instead of falling through to a default — which is how snek2 would have watched a c51 checkpoint
 # as a scalar one.
-ALGORITHMS = {'dqn': _dqn}
+ALGORITHMS = {'dqn': _dqn, 'ppo': _ppo}
 
 
 def _module_for(arch):

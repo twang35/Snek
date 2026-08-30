@@ -1,6 +1,6 @@
 # snek3 — PPO
 
-**Status: approved 2026-08-29. Phase 6a is closed; 6b is next.** Phase 6 of
+**Status: approved 2026-08-29. Phases 6a and 6b are closed; 6c — batch p0 — is next.** Phase 6 of
 [`pytorch-port.md`](pytorch-port.md), which calls it "the actual research".
 
 **Four decisions taken at approval**, which supersede §11's questions: γ is settled by the p0 tuning
@@ -297,9 +297,12 @@ with a named error** under `SNEK_ALGO=ppo`.
 | `SNEK_PPO_NORMALIZE_ADV` | 1 | per minibatch |
 | ~~`SNEK_PPO_ACTION_MASK`~~ | — | **not built.** Out of scope 2026-08-29; §2 |
 | `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse` |
-| `SNEK_PPO_INIT` | `snek2` | or `orthogonal` |
-| `SNEK_PPO_EVAL_ROLLOUTS` | 2 | evals (and checkpoints) every this many rollouts |
-| `SNEK_DISCOUNT` | 0.9975 for the comparison | shared with DQN. §8 |
+| ~~`SNEK_PPO_INIT`~~ | — | **not built.** The actor *is* `QNet`, initialisers included, which is what makes a champion warm-start possible; a second initialiser would break that for no measured gain |
+| ~~`SNEK_PPO_EVAL_ROLLOUTS`~~ | — | **not built, and better this way.** `train.py` rounds `SNEK_EVAL_INTERVAL` up to a whole algorithm step, so a 16,384-transition rollout evaluates every rollout with no PPO-specific knob and no second spelling of "how often" |
+| `SNEK_PPO_ENTROPY_COEF_FINAL` | unset (constant) | added: a linear ramp to this value over `SNEK_MAX_STEPS`, for the entropy-collapse row of §8 |
+| `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | added: global norm over both towers, 0 to disable |
+| `SNEK_PPO_ADAM_EPSILON` | 1e-7 | added: DQN's value, for the same reason `dqn/agent.py` gives |
+| `SNEK_DISCOUNT` | **0.99** built / 0.9975 for the comparison | shared with DQN. §8, and p0 tries both |
 
 ---
 
@@ -345,6 +348,23 @@ bootstrap only; `min` → `max` in the clipped surrogate; drop the sign on the e
 normalisation; `t+1` → `t` in the value lookup; γ and λ swapped; drop the `.detach()` on the stored
 log-prob. Ten, against phase 0's bar of twelve.
 
+**Landed as fourteen, in [`../tests/mut_ppo.json`](../tests/mut_ppo.json), all killed** — the ten
+above (the `.detach()` one respelled as an inverted ratio, since a rollout collected under `no_grad`
+has no `.detach()` to drop) plus four the writing turned up: `log(softmax(...))` where `log_softmax`
+belongs, the naive signed KL estimator, a stale rollout that reads as finished, and a bootstrap taken
+off the last *stored* value instead of the state after it. The other three specs are committed beside
+it — `mut_seam.json` (15), `mut_trans.json` (8), `mut_shaping.json` (3) — so the whole 40-mutant set
+is one command each and a later session can re-run rather than re-derive it.
+
+**‡ Two of the fourteen survived their first run, and both for the same reason: the fixture's subject
+was a copy of the line rather than the line.** The clipped-objective fixtures build the surrogate from
+the same three statements `ppo/agent.py` uses, which pins the *arithmetic* — and leaves `min` → `max`
+in the agent itself completely undetected. The bootstrap mutant survived because `ppo/collect.py` had
+no test file at all. The fixes are four fixtures that call `agent.update(rollout)` and read the actor's
+parameters, and `tests/test_ppo_collect.py`, which labels every stub observation with the step it came
+from. This is `snek3/CLAUDE.md`'s "a fixture whose subject cannot violate it is not a fixture" in its
+most ordinary costume: 24 passing PPO tests, and the load-bearing line was untested.
+
 ---
 
 ## 10. Phases and gates
@@ -352,7 +372,7 @@ log-prob. Ten, against phase 0's bar of twelve.
 | # | phase | gate |
 |---:|---|---|
 | **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | **Met 2026-08-29.** Three fixed-seed arms — the defaults, a `chase_safe` arm and a `free_space` arm at `n_step=3`, `collect_envs=2`, `ratio=0.5` — came out **byte-identical** across the refactor on every eval row, the final weights (SHA-256 of the whole `state_dict`), the step, the transition count, epsilon and the checkpoint set. 743 tests green, 26 of 26 mutants killed. **Not yet deployed to the desktop:** b2 is still training |
-| **6b** | `ppo/` plus the fixtures and the mutant spec | suite green, 10 of 10 mutants killed, and a `smoke` arm learns *something* — avg score above the ~4 an untrained policy gets |
+| **6b** | `ppo/` plus the fixtures and the mutant spec | **Met 2026-08-29.** 869 tests green, **14 of 14** mutants killed, and the gate arm reached avg score **79.5 with a 1.2%/500 perfect rate at 508k transitions**, against the **0.9** an untrained policy scores. See below |
 | **6c** | **batch p0 — tuning, 2-4 arms, 2M transitions each** | not a gate. Its output is a config: LR, entropy coef, λ, γ. Cheap enough (§4) to run more than four |
 | **6d** | **batch p1 — 4 seed-matched arms at b2's transition budget (12M)** | phase 3's bar, restated: **one arm reaches ≥90% perfect in a stage-A eval.** Plus a measured transitions/s and wall clock |
 | **6e** | stage B on p1, and the comparison | lead with the **≥98%/500 count** — the width of the record region — against b2's own close-out, and the sign test across the four seeds on `strong_eval_fraction` at a matched transition horizon |
@@ -367,6 +387,30 @@ log-prob. Ten, against phase 0's bar of twelve.
 
 The seam is what 6b writes against, and `tests/test_train.py` asserts it over every entry in
 `train.ALGOS` — so `ppo/algo.py` is covered by the contract fixtures the moment it is registered.
+
+### What 6b landed, and the one number worth arguing about
+
+`ppo/{net,rollout,collect,agent,schedules,algo}.py`, `train.ALGOS['ppo']`, `restore.ALGORITHMS['ppo']`,
+and **122 fixtures** across five files. The gate arm is `ppo-smoke` — 508k transitions at the untuned
+defaults of §7, which is deliberately *not* a batch arm and is not in the p-series.
+
+| | at ~510k transitions | the arm's own trajectory |
+|---|---|---|
+| **PPO, untuned defaults** | avg score **79.5**, perfect **1.2%/500** (independently re-measured) | 17.0 after one rollout, 45 at 33k, 60 at 197k, ~80 from 393k |
+| **DQN b1, four seeds** | avg score **85.6 - 91.9**, perfect **6 - 34%** | — |
+
+**So PPO learns this game, and at a matched sample budget it is behind DQN rather than beside it.**
+That is the honest reading of one untuned arm and it is exactly what 6c exists to move: the four
+diagnostics say where to push. `explained_variance` reached **0.90**, so the critic is not the
+problem. `approx_kl` settled at **0.002** and `clip_fraction` at **0.03** against a clip of 0.2 —
+the update is barely constrained, which says the learning rate is *low* rather than high. And entropy
+fell from 1.086 (ln 3 = 1.0986) to **0.27**, which is a policy committing fast; whether that is
+healthy or premature is the entropy-coefficient question p0 answers.
+
+**The counters that would have shown a broken port all read clean:** `step == transitions` exactly,
+25.7k transitions/s at fc 320 on the laptop with the stage-A queue on, and the greedy argmax policy
+restored from `ckpt-507904.pt` through the ordinary `tools/restore.py` path and measured 79.55/500
+with a max score of 95 — perfect games, so nothing about the terminal reward is unreachable.
 
 **6c exists because b1 was gated on untuned defaults and answered nothing.** `docs/runs.md` says it
 plainly: "b1 ran snek3's bare defaults and that was the wrong batch to gate on", and the five knobs b2

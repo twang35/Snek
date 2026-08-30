@@ -99,6 +99,45 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_FORK_MIN_LENGTH` | 85 | |
 | `SNEK_FORK_MAX_STEPS` | 60 | |
 
+### PPO — only under `SNEK_ALGO=ppo`
+
+Every knob above whose meaning is DQN-specific — `SNEK_FORK_*`, `SNEK_INITIAL_EPSILON`,
+`SNEK_MIN_EPSILON`, `SNEK_GUIDED_FRACTION`, `SNEK_REPLAY_*`, `SNEK_PRIORITY_EXPONENT`, `SNEK_IS_*`,
+`SNEK_TARGET_UPDATE_PERIOD`, `SNEK_N_STEP_UPDATE`, `SNEK_INITIAL_COLLECT_STEPS`, and the four
+optimiser knobs — is **refused by name** under `SNEK_ALGO=ppo`, with every offender listed in one
+error. The optimiser four are the ones that matter: `SNEK_LEARNING_RATE=1e-5` is DQN's tuned value,
+PPO takes ~64x fewer gradient steps per transition, and an arm that silently took it would report a
+flat curve and a conclusion about PPO. Hence `SNEK_PPO_LEARNING_RATE`, a separate name.
+
+`SNEK_COLLECT_ENVS`, `SNEK_DISCOUNT`, `SNEK_SEED`, `SNEK_MAX_STEPS`, `SNEK_FC_LAYERS` and every
+reward knob mean the same thing in both and are shared — which is what makes a seed-matched A/B
+launchable at all.
+
+| knob | default | notes |
+|---|---|---|
+| `SNEK_COLLECT_ENVS` | **128** for PPO | lanes. `envs × rollout` is the transitions per iteration, and the arm's step increment |
+| `SNEK_PPO_ROLLOUT` | 128 | T, the steps each lane takes before an update. 128 x 128 = **16,384 transitions** |
+| `SNEK_PPO_EPOCHS` | 4 | passes over each rollout. Every sample is seen exactly once per pass |
+| `SNEK_PPO_MINIBATCH` | 256 | **refused if larger than a whole rollout**, or "4 epochs" would silently mean 4 gradient steps |
+| `SNEK_PPO_CLIP` | 0.2 | must be in (0, 1) |
+| `SNEK_PPO_GAE_LAMBDA` | 0.98 | higher than the conventional 0.95. The advantage horizon is `1/(1 − γλ)` — **33.6** steps at γ=0.99, 44.5 at γ=0.9975 — and a perfect game is ~950 moves from the opening, so the +100 reaches the policy through the critic, not through GAE |
+| `SNEK_PPO_ENTROPY_COEF` | 0.01 | max entropy on 3 actions is ln 3 = 1.0986 |
+| `SNEK_PPO_ENTROPY_COEF_FINAL` | unset | set it and the coefficient ramps linearly to it over `SNEK_MAX_STEPS`, clamped at both ends. Unset is a constant |
+| `SNEK_PPO_VF_COEF` | 0.5 | near-inert: the towers are separate, so it only rescales the critic's own learning rate |
+| `SNEK_PPO_LEARNING_RATE` | 3e-4 | **not** DQN's 1e-5, and that is the point of the separate name |
+| `SNEK_PPO_ADAM_EPSILON` | 1e-7 | |
+| `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | global norm over both towers. 0 disables |
+| `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |
+| `SNEK_PPO_NORMALIZE_ADV` | 1 | zero-mean, unit-sd per minibatch. What makes the update invariant to the reward scale |
+| `SNEK_PPO_VALUE_LOSS` | `huber` | or `mse`. Huber for the reason `dqn/agent.py` gives: one +100 terminal would dominate a squared error over 256 samples |
+
+**A PPO step is one transition is one game move**, so `SNEK_MAX_STEPS` means game moves for a PPO arm
+and four-moves-per-step for a DQN arm at `fork_branches=4`. Read `transitions`, which both write.
+
+**`SNEK_EVAL_INTERVAL` is rounded up to a whole rollout** — 1,000 becomes 16,384 at the defaults — and
+the value used is what `runs/<policy>.md` reports. There is no PPO-specific interval knob: an eval at a
+step no checkpoint exists at is the one thing the protocol cannot tolerate.
+
 ### Rewards and shaping
 
 `SNEK_PERFECT_GAME_REWARD` (100), `SNEK_FOOD_DISTANCE_REWARD` (0.001),

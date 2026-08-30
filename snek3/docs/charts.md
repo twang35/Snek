@@ -62,6 +62,21 @@ One or two sentences: what the curve does, and what it means for the hypothesis.
 ![b1a-example](../runs/b1a-example.png)
 ```
 
+### ppo-smoke — the phase-6b PPO gate arm, untuned defaults
+
+Not a batch arm, and not seed-matched to anything: it exists to show `ppo/` learns. Read it against
+b1 at a *matched transition count* (b1's step x 6), not against b1's endpoint.
+
+step 508k transitions · trailing score 62.5 · avg score 79.55/500 eps · perfect 1.2%/500 · ev 0.90 ·
+entropy 1.086 → 0.27 · clip fraction 0.03
+
+Score climbs monotonically to ~80 and then flattens while the perfect rate sits near 1% — the shape
+[`../plans/ppo.md`](../plans/ppo.md) §8 predicted for a short GAE horizon against a win ~950 moves
+away, though at this budget it is equally just an untuned learning rate. `clip_fraction` 0.03 says the
+update is not being constrained, so the rate is the first thing p0 moves.
+
+![ppo-smoke](../runs/ppo-smoke.png)
+
 ### b1 — the DDQN baseline at every default, seeds 1-4
 
 The batch changes nothing but `SNEK_SEED`, so these four curves are this codebase's noise floor as

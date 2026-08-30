@@ -171,6 +171,23 @@ walked into in this repository, and all four are handled there:
 | the harness is killed | nothing | `finally` unwinds on an exception, **not on a signal** — the mutation in flight survives |
 | the mutant hangs | wait forever | an outer command timeout then kills the harness, which is hazard 3 |
 
+**Four specs are committed, so a later session re-runs rather than re-derives.** From `snek3/`:
+
+| spec | mutants | covers |
+|---|---:|---|
+| `tests/mut_ppo.json` | 14 | `ppo/` — GAE's episode gate, `min` vs `max`, the entropy sign, the ratio's direction, γ/λ order, the bootstrap's state |
+| `tests/mut_seam.json` | 15 | the `train.py` algorithm seam and `dqn/algo.py` |
+| `tests/mut_trans.json` | 8 | the `transitions` column, from the prefill to the summary block |
+| `tests/mut_shaping.json` | 3 | `shaping_discount` reaching the collect env |
+
+**‡ Two PPO mutants survived their first run, and both diagnose the same test-writing mistake: the
+fixture's subject was a copy of the line rather than the line.** The clipped-objective fixtures rebuild
+the surrogate from the same three statements the agent uses — which pins the arithmetic and leaves
+`min` → `max` *in the agent* undetected — and `ppo/collect.py` had no test file at all, so a bootstrap
+taken off the last stored value instead of the state after it passed 100 tests. The fix in both cases
+was a fixture that calls the production entry point. A hundred passing PPO tests, and the two
+load-bearing lines were untested.
+
 The last two are one chain and it fired twice in one session: dropping the decrement from a
 `while debt >= 1.0:` accumulator turns it into an infinite loop, the 2-minute command timeout killed
 the harness, and `train.py` was left holding the mutation — **detectable only because a suite that
@@ -235,6 +252,12 @@ And the training side, which is the other direction — from a knob to an arm:
 | `dqn/replay.py` | prioritised replay over a numpy sum tree, with importance weights |
 | `dqn/schedules.py` | epsilon and the shield fraction, as pure functions of the eval history |
 | `dqn/collect.py` | N lanes in lockstep, n-step windows, and forking. Owns its own loop |
+| `ppo/algo.py` | the same seam, PPO's side. A step **is** a transition, and `step_granularity` is a whole rollout — so `SNEK_EVAL_INTERVAL` rounds up to one. Refuses every DQN knob **by name** |
+| `ppo/net.py` | the actor **is** `dqn/net.py`'s `QNet`, weight for weight, so a champion's converted weights load into it; plus a 1-output critic on a derived seed, and the three categorical operations |
+| `ppo/rollout.py` | the `(T, N)` buffer and GAE. Pure numpy. The `(1 − done)` that gates both the bootstrap and the recursion lives here |
+| `ppo/collect.py` | one rollout: every lane steps T times, storing the value and log-prob the policy actually produced. No forking, no shield, no n-step |
+| `ppo/agent.py` | the clipped surrogate, the value loss, the entropy bonus, and the epoch loop |
+| `ppo/schedules.py` | the entropy coefficient, as a pure function of the step |
 
 **One `train.py` serves every algorithm, and that is a measurement rule rather than a tidiness one.**
 An arm's numbers are comparable across algorithms only if the same code screened its checkpoints, ran

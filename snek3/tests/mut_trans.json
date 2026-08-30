@@ -1,0 +1,56 @@
+{
+ "tests": [
+  "tests/test_train.py",
+  "tests/test_run_report.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the count is derived from the step instead of banked, dropping the prefill",
+   "file": "train.py",
+   "from": "'steps_per_second': float(steps_per_second),\n                'transitions': self.transitions,",
+   "to": "'steps_per_second': float(steps_per_second),\n                'transitions': self.step * 4,"
+  },
+  {
+   "desc": "the prefill's moves are not counted",
+   "file": "dqn/algo.py",
+   "from": "            banked += self.collector.step(1.0)",
+   "to": "            self.collector.step(1.0); banked += 0"
+  },
+  {
+   "desc": "the count advances by one per step rather than by the lane width",
+   "file": "train.py",
+   "from": "            self.transitions += int(transitions)",
+   "to": "            self.transitions += 1"
+  },
+  {
+   "desc": "an unknown count is reported as zero rather than omitted",
+   "file": "train.py",
+   "from": "        self.transitions = payload.get('transitions')\n",
+   "to": "        self.transitions = payload.get('transitions') or 0\n"
+  },
+  {
+   "desc": "the row is stamped at merge time rather than at its own step",
+   "file": "train.py",
+   "from": "                             reported, fields.get('transitions'))",
+   "to": "                             reported, self.transitions)"
+  },
+  {
+   "desc": "the resume does not carry the count",
+   "file": "train.py",
+   "from": "        payload = {'step': int(self.step), 'transitions': self.transitions,",
+   "to": "        payload = {'step': int(self.step), 'unused': self.transitions,"
+  },
+  {
+   "desc": "the summary does not surface the count",
+   "file": "tools/run_report.py",
+   "from": "        'transitions': last.get('transitions'),",
+   "to": "        'transitions': None,"
+  },
+  {
+   "desc": "the row keeps the field with a null rather than omitting it",
+   "file": "train.py",
+   "from": "    if transitions is not None:\n        row['transitions'] = int(transitions)",
+   "to": "    row['transitions'] = transitions"
+  }
+ ]
+}

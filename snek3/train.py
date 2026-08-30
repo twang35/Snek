@@ -44,6 +44,7 @@ import numpy as np
 import torch
 
 from dqn import algo as dqn_algo
+from ppo import algo as ppo_algo
 # For `trailing_mean` only, which is a plain windowed average over the eval rows and is not about
 # epsilon. It lives beside the epsilon schedule because that is its other caller; when `ppo/` lands
 # and needs the same trailing score, it moves somewhere both algorithms can reach without one
@@ -64,7 +65,7 @@ from vectorized import engine
 # **The algorithms this build knows, by their `SNEK_ALGO` value.** A dict rather than an `if`, for the
 # reason `tools/restore.py` gives for the same shape: adding PPO is one line, and an unrecognised
 # value names itself in the error instead of falling through to a default.
-ALGOS = {dqn_algo.NAME: dqn_algo}
+ALGOS = {dqn_algo.NAME: dqn_algo, ppo_algo.NAME: ppo_algo}
 
 # ---------------------------------------------------------------- config
 

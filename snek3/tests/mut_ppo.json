@@ -1,0 +1,95 @@
+{
+  "tests": [
+    "tests/test_ppo_rollout.py",
+    "tests/test_ppo_net.py",
+    "tests/test_ppo_collect.py",
+    "tests/test_ppo_agent.py",
+    "tests/test_ppo_algo.py"
+  ],
+  "mutations": [
+    {
+      "desc": "GAE flows across an episode boundary in the recursion",
+      "file": "ppo/rollout.py",
+      "from": "            advantage = delta + discount * gae_lambda * alive * advantage",
+      "to": "            advantage = delta + discount * gae_lambda * advantage"
+    },
+    {
+      "desc": "a terminal step bootstraps off the next episode's first value",
+      "file": "ppo/rollout.py",
+      "from": "            delta = self.rewards[t] + discount * alive * next_value - self.values[t]",
+      "to": "            delta = self.rewards[t] + discount * next_value - self.values[t]"
+    },
+    {
+      "desc": "the value lookup reads t instead of t+1",
+      "file": "ppo/rollout.py",
+      "from": "            next_value = last_values if t == self.steps - 1 else self.values[t + 1]",
+      "to": "            next_value = last_values if t == self.steps - 1 else self.values[t]"
+    },
+    {
+      "desc": "a stale rollout reads as finished after new samples are added",
+      "file": "ppo/rollout.py",
+      "from": "        self.dones[t] = dones\n        self._finished = False",
+      "to": "        self.dones[t] = dones"
+    },
+    {
+      "desc": "advantage normalisation divides by a zero standard deviation",
+      "file": "ppo/rollout.py",
+      "from": "    if spread < 1e-8:\n        return centred",
+      "to": "    if spread < 0.0:\n        return centred"
+    },
+    {
+      "desc": "max instead of min: an anti-trust region that rewards leaving it",
+      "file": "ppo/agent.py",
+      "from": "                policy_loss = -torch.min(unclipped, clipped).mean()",
+      "to": "                policy_loss = -torch.max(unclipped, clipped).mean()"
+    },
+    {
+      "desc": "the entropy bonus becomes an entropy penalty",
+      "file": "ppo/agent.py",
+      "from": "                        - self.entropy_coef * entropy_mean)",
+      "to": "                        + self.entropy_coef * entropy_mean)"
+    },
+    {
+      "desc": "the ratio is inverted: exp(old - new)",
+      "file": "ppo/agent.py",
+      "from": "                ratio = (log_probs - old_log_probs).exp()",
+      "to": "                ratio = (old_log_probs - log_probs).exp()"
+    },
+    {
+      "desc": "advantage normalisation is skipped",
+      "file": "ppo/agent.py",
+      "from": "                if self.normalise_advantages:\n                    advantages = normalise(advantages)",
+      "to": "                if False:\n                    advantages = normalise(advantages)"
+    },
+    {
+      "desc": "the naive signed KL estimator, which can read negative",
+      "file": "ppo/agent.py",
+      "from": "    return float((delta.exp() - 1.0 - delta).mean())",
+      "to": "    return float(delta.mean())"
+    },
+    {
+      "desc": "raw logits where a log-probability is needed",
+      "file": "ppo/net.py",
+      "from": "    logp = log_softmax(logits)\n    chosen = logp.gather(-1, actions.unsqueeze(-1)).squeeze(-1)",
+      "to": "    logp = logits\n    chosen = logp.gather(-1, actions.unsqueeze(-1)).squeeze(-1)"
+    },
+    {
+      "desc": "the discount and lambda are swapped at GAE's call site",
+      "file": "ppo/collect.py",
+      "from": "        self.rollout.finish(last_values, self.agent.discount, self.agent.gae_lambda)",
+      "to": "        self.rollout.finish(last_values, self.agent.gae_lambda, self.agent.discount)"
+    },
+    {
+      "desc": "the bootstrap value is taken before the last step rather than after it",
+      "file": "ppo/collect.py",
+      "from": "        last_values = self.agent.values(self.obs)",
+      "to": "        last_values = self.rollout.values[-1]"
+    },
+    {
+      "desc": "the log-probability of a collapsed action underflows to -inf",
+      "file": "ppo/net.py",
+      "from": "    return torch.log_softmax(logits, dim=-1)",
+      "to": "    return torch.log(torch.softmax(logits, dim=-1))"
+    }
+  ]
+}

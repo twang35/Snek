@@ -298,12 +298,19 @@ def test_the_default_algorithm_is_dqn():
 
 
 def test_an_unknown_algorithm_names_itself_rather_than_defaulting(monkeypatch):
-    """`SNEK_ALGO=ppo` on a build with no PPO must not quietly train DQN.
+    """A misspelled or not-yet-built `SNEK_ALGO` must not quietly train DQN.
 
-    The failure it prevents is a whole batch of arms launched as PPO, reported as PPO, and actually
-    DQN — which is the `arch.json` silent-default failure in a different costume.
+    The failure it prevents is a whole batch of arms launched as something else, reported as something
+    else, and actually DQN — which is the `arch.json` silent-default failure in a different costume.
+    **‡ This fixture used `ppo` as its unknown value and had to be repointed when PPO landed**, which
+    is the general shape of the trap: a fixture whose subject is "a name the registry lacks" must use
+    a name nothing intends to add.
     """
-    monkeypatch.setenv('SNEK_ALGO', 'ppo')
+    monkeypatch.setenv('SNEK_ALGO', 'sac')
+    with pytest.raises(ValueError, match='not an algorithm this build knows'):
+        train.build_config()
+    # And the lookup is exact rather than case-folded, so a near-miss is refused too.
+    monkeypatch.setenv('SNEK_ALGO', 'PPO')
     with pytest.raises(ValueError, match='not an algorithm this build knows'):
         train.build_config()
 

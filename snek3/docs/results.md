@@ -36,6 +36,36 @@ non-perfect games average **91.5 of 95**, so the arm is dying with three or four
 is the endgame this task has always been about.
 
 
+## The PPO gate arm
+
+**`ppo-smoke` — the phase-6b gate, not a batch arm.** 508k transitions at
+[`../plans/ppo.md`](../plans/ppo.md) §7's untuned defaults, on the laptop, 2026-08-29. Kept because it
+is the first PPO measurement in this project and the DQN comparison below is the reason 6c exists;
+it is deliberately outside the p-series and nothing should be seed-matched against it.
+
+| | transitions | avg score | perfect | notes |
+|---|---:|---:|---:|---|
+| `ppo-smoke`, stage A 100 eps | 508k | 77.6 | 1% | best single eval 3% at 442k |
+| `ppo-smoke`, re-measured 500 eps | 508k | **79.55** | **1.2%** [0.6, 2.6] | median 82, **max 95** — perfect games happen |
+| `b1a-d`, stage A 100 eps, matched | ~510k | 85.6 - 91.9 | 6 - 34% | b1's step 85,000 x 6 transitions |
+
+**PPO learns this game, and at a matched sample budget it is behind DQN rather than beside it.** One
+untuned arm against four tuned-by-nothing DQN seeds, so the gap is a starting point and not a verdict
+— but it is the honest headline, and the four diagnostics say where to push:
+
+| diagnostic | at 508k | reading |
+|---|---:|---|
+| `explained_variance` | **0.90** | the critic is not the problem, which is the risk §8 ranked highest |
+| `approx_kl` | 0.002 | tiny |
+| `clip_fraction` | 0.03 | **the clip is barely binding at 0.2, so the learning rate is *low*, not high.** The first knob for p0 |
+| `entropy` | 1.086 → **0.27** | committing fast against ln 3 = 1.0986. Whether that is premature is p0's second question |
+
+25.7k transitions/s at fc 320 on the laptop with the stage-A queue on, and `step == transitions`
+exactly, which is the whole point of PPO's step unit.
+
+![ppo-smoke](../runs/ppo-smoke.png)
+
+
 ## Imported policies
 
 Not arms: snek2 checkpoints converted to torch, kept as reference policies for A/B. They carry

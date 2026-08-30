@@ -1,0 +1,97 @@
+{
+ "tests": [
+  "tests/test_train.py"
+ ],
+ "mutations": [
+  {
+   "desc": "the crossing test fires on every step",
+   "file": "train.py",
+   "from": "        return self.step // interval > previous // interval",
+   "to": "        return self.step // interval >= previous // interval"
+  },
+  {
+   "desc": "the crossing test is the old exact modulo, which a jumping step steps over",
+   "file": "train.py",
+   "from": "        return self.step // interval > previous // interval",
+   "to": "        return self.step % interval == 0"
+  },
+  {
+   "desc": "an interval is rounded down instead of up",
+   "file": "train.py",
+   "from": "    whole = -(-int(target) // granularity)",
+   "to": "    whole = int(target) // granularity"
+  },
+  {
+   "desc": "an interval is not rounded to whole algorithm steps at all",
+   "file": "train.py",
+   "from": "    return granularity * max(1, whole)",
+   "to": "    return int(target)"
+  },
+  {
+   "desc": "the report keeps the interval the knob asked for, not the one the arm ran",
+   "file": "train.py",
+   "from": "        self.config['eval_interval'] = self.eval_interval",
+   "to": "        pass"
+  },
+  {
+   "desc": "a queued row reports the epsilon this eval just computed",
+   "file": "train.py",
+   "from": "        reported = dict(fields.get('algo') or {})\n        if not self.config['eval_queue']:\n            reported.update(computed)",
+   "to": "        reported = dict(fields.get('algo') or {})\n        reported.update(computed)"
+  },
+  {
+   "desc": "an unqueued row reports the epsilon the arm ran under",
+   "file": "train.py",
+   "from": "        reported = dict(fields.get('algo') or {})\n        if not self.config['eval_queue']:\n            reported.update(computed)",
+   "to": "        reported = dict(fields.get('algo') or {})"
+  },
+  {
+   "desc": "the schedule is never advanced",
+   "file": "train.py",
+   "from": "        computed = self.algo.on_eval(self.eval_rows, measured)",
+   "to": "        computed = {}"
+  },
+  {
+   "desc": "a pre-seam resume file is no longer readable",
+   "file": "train.py",
+   "from": "        self.algo.load_state_dict(payload.get('algo', payload))",
+   "to": "        self.algo.load_state_dict(payload['algo'])"
+  },
+  {
+   "desc": "advance reports one transition per step rather than the lane width",
+   "file": "dqn/algo.py",
+   "from": "        return 1, transitions",
+   "to": "        return 1, 1"
+  },
+  {
+   "desc": "the prefill reports no transitions",
+   "file": "dqn/algo.py",
+   "from": "            banked += self.collector.step(1.0)\n        return banked",
+   "to": "            self.collector.step(1.0)\n        return 0"
+  },
+  {
+   "desc": "DQN claims a step granularity of four",
+   "file": "dqn/algo.py",
+   "from": "    step_granularity = 1",
+   "to": "    step_granularity = 4"
+  },
+  {
+   "desc": "fields reports the schedule's new value rather than what the arm ran under",
+   "file": "dqn/algo.py",
+   "from": "        return {'epsilon': round(float(self.epsilon), 5),\n                'guided_fraction': round(float(self.collector.guided_fraction), 3),\n                'fork':",
+   "to": "        return {'epsilon': round(float(self.config['initial_epsilon']), 5),\n                'guided_fraction': round(float(self.collector.guided_fraction), 3),\n                'fork':"
+  },
+  {
+   "desc": "the shield fraction never reaches the collector",
+   "file": "dqn/algo.py",
+   "from": "        self.collector.set_guided_fraction(guided)\n        return {'epsilon':",
+   "to": "        return {'epsilon':"
+  },
+  {
+   "desc": "a row keeps an algorithm field that is None",
+   "file": "train.py",
+   "from": "    for key, value in (algo_fields or {}).items():\n        if value is not None:\n            row[key] = value",
+   "to": "    for key, value in (algo_fields or {}).items():\n        row[key] = value"
+  }
+ ]
+}
