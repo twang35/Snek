@@ -1,0 +1,20 @@
+{
+  "project": "snek3",
+  "id": "p0m-fc200",
+  "type": "train",
+  "policy": "p0m-fc200",
+  "max_steps": 10000000,
+  "env": {
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FC_LAYERS": "200",
+    "SNEK_SEED": "1",
+    "SNEK_DISCOUNT": "0.99",
+    "SNEK_PPO_LEARNING_RATE": "3e-4",
+    "SNEK_ALGO": "ppo"
+  },
+  "label": "p0 sweep: one narrower hidden layer",
+  "notes": "Batch p0, desktop half -- the PPO tuning sweep, one knob per arm off the p0a reference\n(lr 3e-4, gamma 0.99, lambda 0.98, entropy 0.01, fc 320, rollout 128x128, 4 epochs, minibatch 256).\n\n10M transitions, not 3M: every arm of p0's first wave was still rising at its 3M cap, so a best30 read\nat 3M is a read of the cap and not of the config.\n\nA PPO step IS a transition IS a game move, so 10M here is directly comparable to b2's 18M\n(3M counted steps x 6) and to any snek2 number. Do not multiply.\n\nJudged in this order, per the user 2026-08-29: (1) peak best30, (2) consistency -- how much the\ntrailing rate wobbles once it is up, (3) speed to get there, which matters least. All three are in\nruns/<policy>_evals.json.\n\nReward knobs are stated explicitly as well as via SNEK_REWARD_PRESET=b2, deliberately: the preset is\nnew code (122397b51) and a spec that relied on it alone would run UNSHAPED against any older\ncheckout, silently. The explicit knobs also make the spec readable on its own."
+}
