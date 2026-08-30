@@ -162,6 +162,42 @@ STARVE_REWARD = -0.5
 # `k` steps per meal, progress only raises value when `W > 1/(1 - gamma^k)`, which is 34-58 at
 # this game's numbers and gamma=0.9975. snek2 cut it to 10, missed by 3-6x, and the agents
 # correctly learned to avoid finishing.
+# ------------------------------------------------------- the reward preset
+#
+# **`SNEK_ALGO=ppo` shapes by default, and a DQN arm does not.** The three knobs below — the
+# chase-safe dose, its gate, and the food-distance term — are b2's, which is b29's, which is the
+# configuration snek2 set every one of its records with. PPO development happens on that reward
+# function (batch p0, 2026-08-29), so it is PPO's default rather than something every launch has to
+# restate. `SNEK_REWARD_PRESET` names it directly, and any individual knob still wins over the preset.
+#
+# **‡ The cost, stated plainly, because it is the exact failure `plans/ppo.md` is shaped to avoid: a
+# bare `SNEK_ALGO=dqn` arm and a bare `SNEK_ALGO=ppo` arm now optimise different objectives.** So an
+# algorithm A/B must name the reward knobs on *both* sides — p1-vs-b2 is matched because b2's spec
+# states them explicitly and p1 will too. The startup line `reward config:` prints the resolved
+# values on every entry point for this reason; read it, not the defaults in this file.
+#
+# Read here rather than in `train.py` so that every entry point agrees — the trainer, `evaluate.py`,
+# `tools/shard.py`, the eval workers, `watch.py`. It is the one place in `env/` that knows an
+# algorithm's name, and it knows nothing else about it: no import, no behaviour, just which number a
+# knob falls back to.
+REWARD_PRESETS = {
+    'snek3': {},
+    'b2': {'CHASE_SAFE_SHAPING': 0.1, 'CHASE_SAFE_GATE': 75, 'FOOD_DISTANCE_REWARD': 0.0},
+}
+DEFAULT_REWARD_PRESET_FOR = {'ppo': 'b2'}
+REWARD_PRESET = os.environ.get(
+    'SNEK_REWARD_PRESET',
+    DEFAULT_REWARD_PRESET_FOR.get(os.environ.get('SNEK_ALGO', 'dqn'), 'snek3'))
+if REWARD_PRESET not in REWARD_PRESETS:
+    raise ValueError('SNEK_REWARD_PRESET={0!r} is not one of {1}'.format(
+        REWARD_PRESET, sorted(REWARD_PRESETS)))
+
+
+def _reward_default(name, fallback):
+    """The preset's value for `name`, or the project-wide default. An explicit knob still wins."""
+    return REWARD_PRESETS[REWARD_PRESET].get(name, fallback)
+
+
 DEFAULT_PERFECT_GAME_REWARD = 100.0
 PERFECT_GAME_REWARD = _num('PERFECT_GAME_REWARD', DEFAULT_PERFECT_GAME_REWARD)
 
@@ -171,7 +207,8 @@ PERFECT_GAME_REWARD = _num('PERFECT_GAME_REWARD', DEFAULT_PERFECT_GAME_REWARD)
 # and the food stream are untouched. It does shift `avg_reward`, which the bootstrap epsilon phase
 # thresholds on.
 DEFAULT_FOOD_DISTANCE_REWARD = 0.001
-FOOD_DISTANCE_REWARD = _num('FOOD_DISTANCE_REWARD', DEFAULT_FOOD_DISTANCE_REWARD)
+FOOD_DISTANCE_REWARD = _num('FOOD_DISTANCE_REWARD', _reward_default(
+    'FOOD_DISTANCE_REWARD', DEFAULT_FOOD_DISTANCE_REWARD))
 
 # Potential-based shaping: the coefficient `c` in `F = c * (gamma * Phi(s') - Phi(s))`.
 #
@@ -185,8 +222,10 @@ FOOD_DISTANCE_REWARD = _num('FOOD_DISTANCE_REWARD', DEFAULT_FOOD_DISTANCE_REWARD
 # an opening board is below it.
 DEFAULT_CHASE_SAFE_SHAPING = 0.0
 DEFAULT_CHASE_SAFE_GATE = 85
-CHASE_SAFE_SHAPING = _num('CHASE_SAFE_SHAPING', DEFAULT_CHASE_SAFE_SHAPING)
-CHASE_SAFE_GATE = _num('CHASE_SAFE_GATE', DEFAULT_CHASE_SAFE_GATE, int)
+CHASE_SAFE_SHAPING = _num('CHASE_SAFE_SHAPING', _reward_default(
+    'CHASE_SAFE_SHAPING', DEFAULT_CHASE_SAFE_SHAPING))
+CHASE_SAFE_GATE = _num('CHASE_SAFE_GATE', _reward_default(
+    'CHASE_SAFE_GATE', DEFAULT_CHASE_SAFE_GATE), int)
 
 DEFAULT_FREE_SPACE_SHAPING = 0.0
 DEFAULT_FREE_SPACE_GATE = 85
