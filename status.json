@@ -1,17 +1,17 @@
 {
-  "iso": "2026-08-30T02:53:08",
-  "ts": 1788083588.4385438,
+  "iso": "2026-08-30T03:03:19",
+  "ts": 1788084199.568078,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p2a \u2014 p2: p0's top config (8 epochs) at 400M, seed 1 of 8 \u2014 training 30% (1 arm)",
-      "p2b \u2014 p2: p0's top config (8 epochs) at 400M, seed 2 of 8 \u2014 training 30% (1 arm)",
-      "p2c \u2014 p2: p0's top config (8 epochs) at 400M, seed 3 of 8 \u2014 training 30% (1 arm)",
-      "p2d \u2014 p2: p0's top config (8 epochs) at 400M, seed 4 of 8 \u2014 training 29% (1 arm)",
-      "p2e \u2014 p2: p0's top config (8 epochs) at 400M, seed 5 of 8 \u2014 training 29% (1 arm)",
-      "p2f \u2014 p2: p0's top config (8 epochs) at 400M, seed 6 of 8 \u2014 training 29% (1 arm)",
-      "p2g \u2014 p2: p0's top config (8 epochs) at 400M, seed 7 of 8 \u2014 training 29% (1 arm)",
-      "p2h \u2014 p2: p0's top config (8 epochs) at 400M, seed 8 of 8 \u2014 training 29% (1 arm)"
+      "p2a \u2014 p2: p0's top config (8 epochs) at 400M, seed 1 of 8 \u2014 training 32% (1 arm)",
+      "p2b \u2014 p2: p0's top config (8 epochs) at 400M, seed 2 of 8 \u2014 training 32% (1 arm)",
+      "p2c \u2014 p2: p0's top config (8 epochs) at 400M, seed 3 of 8 \u2014 training 31% (1 arm)",
+      "p2d \u2014 p2: p0's top config (8 epochs) at 400M, seed 4 of 8 \u2014 training 31% (1 arm)",
+      "p2e \u2014 p2: p0's top config (8 epochs) at 400M, seed 5 of 8 \u2014 training 30% (1 arm)",
+      "p2f \u2014 p2: p0's top config (8 epochs) at 400M, seed 6 of 8 \u2014 training 30% (1 arm)",
+      "p2g \u2014 p2: p0's top config (8 epochs) at 400M, seed 7 of 8 \u2014 training 30% (1 arm)",
+      "p2h \u2014 p2: p0's top config (8 epochs) at 400M, seed 8 of 8 \u2014 training 30% (1 arm)"
     ],
     "queued": [
       "p2a stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 1 of 8 \u2014 queued (1 arm)",
@@ -53,10 +53,10 @@
         "p2a-ep8-seed1"
       ],
       "pid": 4162358,
-      "step": 121225216,
+      "step": 126222336,
       "max_steps": 400000000,
-      "steps_per_sec": 9873.5,
-      "elapsed_s": 14134
+      "steps_per_sec": 5228.4,
+      "elapsed_s": 14745
     },
     {
       "id": "p2b-ep8-seed2",
@@ -66,10 +66,10 @@
         "p2b-ep8-seed2"
       ],
       "pid": 4162359,
-      "step": 121651200,
+      "step": 126730240,
       "max_steps": 400000000,
-      "steps_per_sec": 12991.0,
-      "elapsed_s": 14134
+      "steps_per_sec": 7319.6,
+      "elapsed_s": 14745
     },
     {
       "id": "p2c-ep8-seed3",
@@ -79,10 +79,10 @@
         "p2c-ep8-seed3"
       ],
       "pid": 4162360,
-      "step": 118194176,
+      "step": 123240448,
       "max_steps": 400000000,
-      "steps_per_sec": 9872.9,
-      "elapsed_s": 14134
+      "steps_per_sec": 7843.0,
+      "elapsed_s": 14745
     },
     {
       "id": "p2d-ep8-seed4",
@@ -92,10 +92,10 @@
         "p2d-ep8-seed4"
       ],
       "pid": 4162361,
-      "step": 117424128,
+      "step": 122421248,
       "max_steps": 400000000,
-      "steps_per_sec": 8833.9,
-      "elapsed_s": 14134
+      "steps_per_sec": 5751.3,
+      "elapsed_s": 14745
     },
     {
       "id": "p2e-ep8-seed5",
@@ -105,10 +105,10 @@
         "p2e-ep8-seed5"
       ],
       "pid": 4162362,
-      "step": 115048448,
+      "step": 120176640,
       "max_steps": 400000000,
-      "steps_per_sec": 9873.0,
-      "elapsed_s": 14134
+      "steps_per_sec": 7319.4,
+      "elapsed_s": 14745
     },
     {
       "id": "p2f-ep8-seed6",
@@ -118,10 +118,10 @@
         "p2f-ep8-seed6"
       ],
       "pid": 4162363,
-      "step": 115015680,
+      "step": 119865344,
       "max_steps": 400000000,
-      "steps_per_sec": 8314.0,
-      "elapsed_s": 14134
+      "steps_per_sec": 5228.0,
+      "elapsed_s": 14745
     },
     {
       "id": "p2g-ep8-seed7",
@@ -131,10 +131,10 @@
         "p2g-ep8-seed7"
       ],
       "pid": 4162364,
-      "step": 114900992,
+      "step": 119816192,
       "max_steps": 400000000,
-      "steps_per_sec": 6235.5,
-      "elapsed_s": 14134
+      "steps_per_sec": 5747.6,
+      "elapsed_s": 14745
     },
     {
       "id": "p2h-ep8-seed8",
@@ -144,10 +144,10 @@
         "p2h-ep8-seed8"
       ],
       "pid": 4162365,
-      "step": 114540544,
+      "step": 119439360,
       "max_steps": 400000000,
-      "steps_per_sec": 8832.9,
-      "elapsed_s": 14134
+      "steps_per_sec": 7310.8,
+      "elapsed_s": 14745
     }
   ],
   "ledger": {
@@ -194,10 +194,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 45.9,
+  "disk_free_gb": 45.8,
   "load_avg": [
-    14.20849609375,
-    14.48046875,
-    14.48486328125
+    15.35546875,
+    14.81787109375,
+    14.60205078125
   ]
 }
