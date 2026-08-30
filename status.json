@@ -1,14 +1,10 @@
 {
-  "iso": "2026-08-29T20:41:33",
-  "ts": 1788061293.30941,
+  "iso": "2026-08-29T20:51:40",
+  "ts": 1788061900.0399728,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "p0q \u2014 p0 sweep: eight passes over each rollout \u2014 stage B (1 arm)"
-    ],
-    "queued": [
-      "p0r stage B \u2014 p0 sweep: four times the minibatch, four times fewer gradient steps \u2014 queued (1 arm)"
-    ],
+    "running": [],
+    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -28,26 +24,12 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "p0q-stageb",
-      "type": "eval",
-      "policy": "p0q-ep8",
-      "policies": [
-        "p0q-ep8"
-      ],
-      "pid": 4099056,
-      "step": 10010624,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 92
-    }
-  ],
+  "running": [],
   "ledger": {
-    "p0r-stageb": "queued",
-    "p0q-stageb": "running",
+    "p0r-stageb": "done",
+    "p0q-stageb": "done",
     "p0p-stageb": "done",
     "p0o-stageb": "done",
     "p0n-stageb": "done",
@@ -74,8 +56,8 @@
   },
   "disk_free_gb": 48.5,
   "load_avg": [
-    14.70849609375,
-    12.62158203125,
-    11.15478515625
+    0.0,
+    1.9462890625,
+    6.14306640625
   ]
 }
