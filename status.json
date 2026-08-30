@@ -1,14 +1,12 @@
 {
-  "iso": "2026-08-30T12:20:46",
-  "ts": 1788117646.3190198,
+  "iso": "2026-08-30T12:30:58",
+  "ts": 1788118258.8672457,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p2 \u2014 p2 stage B, restarted for the 99% chart guide (eight arms, 255-271M transitions) \u2014 eval (8 arms)"
+      "sw2w6 \u2014 sweep w6: 6 stage-A workers, 8 arms, wave 2 of 6 \u2014 benchmark 100% (8 arms)"
     ],
     "queued": [
-      "sw1w4 benchmark \u2014 sweep w4: 4 stage-A workers, 8 arms, wave 1 of 6 \u2014 queued (8 arms)",
-      "sw2w6 benchmark \u2014 sweep w6: 6 stage-A workers, 8 arms, wave 2 of 6 \u2014 queued (8 arms)",
       "sw3w8 benchmark \u2014 sweep w8: 8 stage-A workers, 8 arms, wave 3 of 6 \u2014 queued (8 arms)",
       "sw4w10 benchmark \u2014 sweep w10: 10 stage-A workers, 8 arms, wave 4 of 6 \u2014 queued (8 arms)",
       "sw5w12 benchmark \u2014 sweep w12: 12 stage-A workers, 8 arms, wave 5 of 6 \u2014 queued (8 arms)",
@@ -37,48 +35,116 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "p2-stageb3",
-      "type": "eval",
-      "policy": "p2a-ep8-seed1",
+      "id": "sw2w6-a",
+      "type": "benchmark",
+      "policy": "bwa",
       "policies": [
-        "p2a-ep8-seed1",
-        "p2b-ep8-seed2",
-        "p2c-ep8-seed3",
-        "p2d-ep8-seed4",
-        "p2e-ep8-seed5",
-        "p2f-ep8-seed6",
-        "p2g-ep8-seed7",
-        "p2h-ep8-seed8"
+        "bwa"
       ],
-      "pid": 245682,
-      "step": 271368192,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 13117
+      "pid": 373801,
+      "step": 257605632,
+      "max_steps": 257605632,
+      "steps_per_sec": 9977.9,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-b",
+      "type": "benchmark",
+      "policy": "bwb",
+      "policies": [
+        "bwb"
+      ],
+      "pid": 373802,
+      "step": 257605632,
+      "max_steps": 257605632,
+      "steps_per_sec": 8402.5,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-c",
+      "type": "benchmark",
+      "policy": "bwc",
+      "policies": [
+        "bwc"
+      ],
+      "pid": 373803,
+      "step": 257605632,
+      "max_steps": 257605632,
+      "steps_per_sec": 11028.4,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-d",
+      "type": "benchmark",
+      "policy": "bwd",
+      "policies": [
+        "bwd"
+      ],
+      "pid": 373804,
+      "step": 257572864,
+      "max_steps": 257605632,
+      "steps_per_sec": 12603.9,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-e",
+      "type": "benchmark",
+      "policy": "bwe",
+      "policies": [
+        "bwe"
+      ],
+      "pid": 373805,
+      "step": 257589248,
+      "max_steps": 257605632,
+      "steps_per_sec": 13129.2,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-f",
+      "type": "benchmark",
+      "policy": "bwf",
+      "policies": [
+        "bwf"
+      ],
+      "pid": 373806,
+      "step": 257605632,
+      "max_steps": 257605632,
+      "steps_per_sec": 13129.3,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-g",
+      "type": "benchmark",
+      "policy": "bwg",
+      "policies": [
+        "bwg"
+      ],
+      "pid": 373807,
+      "step": 257572864,
+      "max_steps": 257605632,
+      "steps_per_sec": 12604.2,
+      "elapsed_s": 152
+    },
+    {
+      "id": "sw2w6-h",
+      "type": "benchmark",
+      "policy": "bwh",
+      "policies": [
+        "bwh"
+      ],
+      "pid": 373808,
+      "step": 257605632,
+      "max_steps": 257605632,
+      "steps_per_sec": 12604.3,
+      "elapsed_s": 152
     }
   ],
   "ledger": {
-    "sw1w4-a": "queued",
-    "sw1w4-b": "queued",
-    "sw1w4-c": "queued",
-    "sw1w4-d": "queued",
-    "sw1w4-e": "queued",
-    "sw1w4-f": "queued",
-    "sw1w4-g": "queued",
-    "sw1w4-h": "queued",
-    "sw2w6-a": "queued",
-    "sw2w6-b": "queued",
-    "sw2w6-c": "queued",
-    "sw2w6-d": "queued",
-    "sw2w6-e": "queued",
-    "sw2w6-f": "queued",
-    "sw2w6-g": "queued",
-    "sw2w6-h": "queued",
     "sw3w8-a": "queued",
     "sw3w8-b": "queued",
     "sw3w8-c": "queued",
@@ -116,7 +182,23 @@
     "sse16": "queued",
     "sse20": "queued",
     "sse24": "queued",
-    "p2-stageb3": "running",
+    "sw2w6-a": "running",
+    "sw2w6-b": "running",
+    "sw2w6-c": "running",
+    "sw2w6-d": "running",
+    "sw2w6-e": "running",
+    "sw2w6-f": "running",
+    "sw2w6-g": "running",
+    "sw2w6-h": "running",
+    "sw1w4-h": "done",
+    "sw1w4-g": "done",
+    "sw1w4-f": "done",
+    "sw1w4-e": "done",
+    "sw1w4-d": "done",
+    "sw1w4-c": "done",
+    "sw1w4-b": "done",
+    "sw1w4-a": "done",
+    "p2-stageb3": "done",
     "p2-stageb2": "done",
     "p2-stageb": "done",
     "p2h-ep8-seed8": "done",
@@ -154,10 +236,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 41.7,
+  "disk_free_gb": 41.0,
   "load_avg": [
-    16.1787109375,
-    16.166015625,
-    16.06591796875
+    12.4521484375,
+    11.8955078125,
+    13.8779296875
   ]
 }
