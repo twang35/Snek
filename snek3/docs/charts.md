@@ -62,6 +62,44 @@ One or two sentences: what the curve does, and what it means for the hypothesis.
 ![b1a-example](../runs/b1a-example.png)
 ```
 
+### p0 — the PPO tuning sweep, 15 arms, one knob each
+
+**Read these as a set, and read them at 10M rather than at 3M.** Every arm is seed 1 on b2's reward
+function, one knob off a reference of lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128
+rollout / 4 epochs / minibatch 256. Nine of the fifteen finished inside **0.8 pp** of each other, so
+the curves matter more than the ranking: what to look at is *where each one turns up*, not which one
+ends highest.
+
+**The two the batch exists for.** `p0a` is the reference and `p0g`/`p0e` are the two that were 6th and
+7th at 3M and 1st and 2nd at 10M — put those three side by side and the cap-inversion finding is
+visible as a shape rather than a table
+([`findings.md`](findings.md)).
+
+step 10.01M · best30 96.4 - 97.2 across nine arms · sd30 1.8 - 3.2 · best stage B **98.6% / 500**,
+re-measured **96.6% / 3,000**
+
+The laptop half — λ, entropy and the learning-rate bracket:
+
+![p0a-lr3e4-g99](../runs/p0a-lr3e4-g99.png)
+![p0g-ent003](../runs/p0g-ent003.png)
+![p0e-lam95](../runs/p0e-lam95.png)
+![p0j-lr5e4](../runs/p0j-lr5e4.png)
+![p0i-lr1e4](../runs/p0i-lr1e4.png)
+![p0f-lam100](../runs/p0f-lam100.png)
+![p0h-ent03](../runs/p0h-ent03.png)
+
+And the three arms that stopped at the 3M cap, kept because they are what the inversion is measured
+against — the learning-rate extremes and γ 0.9975:
+
+![p0b-lr1e3-g99](../runs/p0b-lr1e3-g99.png)
+![p0c-lr3e3-g99](../runs/p0c-lr3e3-g99.png)
+![p0d-lr3e4-g9975](../runs/p0d-lr3e4-g9975.png)
+
+**The desktop half's eight charts — the four fc shapes, γ 0.995, and the three update-shape knobs —
+arrive on the `results` branch at close-out**, and this section gets their `![]` lines in the same
+pass. They are the half that found the one axis that moved: `p0q-ep8` at 97.2 and `p0r-mb1024` at
+89.7 are the two ends of it.
+
 ### ppo-smoke — the phase-6b PPO gate arm, untuned defaults
 
 Not a batch arm, and not seed-matched to anything: it exists to show `ppo/` learns. Read it against
