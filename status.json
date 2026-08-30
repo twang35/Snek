@@ -1,29 +1,12 @@
 {
-  "iso": "2026-08-30T07:47:18",
-  "ts": 1788101238.3405151,
+  "iso": "2026-08-30T07:48:39",
+  "ts": 1788101319.2214353,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p2a \u2014 p2: p0's top config (8 epochs) at 400M, seed 1 of 8 \u2014 training 68% (1 arm)",
-      "p2b \u2014 p2: p0's top config (8 epochs) at 400M, seed 2 of 8 \u2014 training 68% (1 arm)",
-      "p2c \u2014 p2: p0's top config (8 epochs) at 400M, seed 3 of 8 \u2014 training 66% (1 arm)",
-      "p2d \u2014 p2: p0's top config (8 epochs) at 400M, seed 4 of 8 \u2014 training 66% (1 arm)",
-      "p2e \u2014 p2: p0's top config (8 epochs) at 400M, seed 5 of 8 \u2014 training 64% (1 arm)",
-      "p2f \u2014 p2: p0's top config (8 epochs) at 400M, seed 6 of 8 \u2014 training 64% (1 arm)",
-      "p2g \u2014 p2: p0's top config (8 epochs) at 400M, seed 7 of 8 \u2014 training 64% (1 arm)",
-      "p2h \u2014 p2: p0's top config (8 epochs) at 400M, seed 8 of 8 \u2014 training 64% (1 arm)"
+      "p2 \u2014 p2 stage B: eight arms stopped at 255-271M transitions \u2014 stage B (8 arms)"
     ],
-    "queued": [
-      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
-      "p2a stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 1 of 8 \u2014 queued (1 arm)",
-      "p2b stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 2 of 8 \u2014 queued (1 arm)",
-      "p2c stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 3 of 8 \u2014 queued (1 arm)",
-      "p2d stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 4 of 8 \u2014 queued (1 arm)",
-      "p2e stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 5 of 8 \u2014 queued (1 arm)",
-      "p2f stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 6 of 8 \u2014 queued (1 arm)",
-      "p2g stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 7 of 8 \u2014 queued (1 arm)",
-      "p2h stage B \u2014 p2: p0's top config (8 epochs) at 400M, seed 8 of 8 \u2014 queued (1 arm)"
-    ],
+    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -35,139 +18,48 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": true,
+    "paused": false,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "p2a-ep8-seed1",
-      "type": "train",
+      "id": "p2-stageb",
+      "type": "eval",
       "policy": "p2a-ep8-seed1",
       "policies": [
-        "p2a-ep8-seed1"
-      ],
-      "pid": 4162358,
-      "step": 271220736,
-      "max_steps": 400000000,
-      "steps_per_sec": 4434.4,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2b-ep8-seed2",
-      "type": "train",
-      "policy": "p2b-ep8-seed2",
-      "policies": [
-        "p2b-ep8-seed2"
-      ],
-      "pid": 4162359,
-      "step": 270958592,
-      "max_steps": 400000000,
-      "steps_per_sec": 6652.7,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2c-ep8-seed3",
-      "type": "train",
-      "policy": "p2c-ep8-seed3",
-      "policies": [
-        "p2c-ep8-seed3"
-      ],
-      "pid": 4162360,
-      "step": 264945664,
-      "max_steps": 400000000,
-      "steps_per_sec": 6652.3,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2d-ep8-seed4",
-      "type": "train",
-      "policy": "p2d-ep8-seed4",
-      "policies": [
-        "p2d-ep8-seed4"
-      ],
-      "pid": 4162361,
-      "step": 264093696,
-      "max_steps": 400000000,
-      "steps_per_sec": 6652.4,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2e-ep8-seed5",
-      "type": "train",
-      "policy": "p2e-ep8-seed5",
-      "policies": [
-        "p2e-ep8-seed5"
-      ],
-      "pid": 4162362,
-      "step": 257671168,
-      "max_steps": 400000000,
-      "steps_per_sec": 6652.6,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2f-ep8-seed6",
-      "type": "train",
-      "policy": "p2f-ep8-seed6",
-      "policies": [
-        "p2f-ep8-seed6"
-      ],
-      "pid": 4162363,
-      "step": 256294912,
-      "max_steps": 400000000,
-      "steps_per_sec": 3697.8,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2g-ep8-seed7",
-      "type": "train",
-      "policy": "p2g-ep8-seed7",
-      "policies": [
-        "p2g-ep8-seed7"
-      ],
-      "pid": 4162364,
-      "step": 256589824,
-      "max_steps": 400000000,
-      "steps_per_sec": 8135.9,
-      "elapsed_s": 31784
-    },
-    {
-      "id": "p2h-ep8-seed8",
-      "type": "train",
-      "policy": "p2h-ep8-seed8",
-      "policies": [
+        "p2a-ep8-seed1",
+        "p2b-ep8-seed2",
+        "p2c-ep8-seed3",
+        "p2d-ep8-seed4",
+        "p2e-ep8-seed5",
+        "p2f-ep8-seed6",
+        "p2g-ep8-seed7",
         "p2h-ep8-seed8"
       ],
-      "pid": 4162365,
-      "step": 254820352,
-      "max_steps": 400000000,
-      "steps_per_sec": 5177.2,
-      "elapsed_s": 31784
+      "pid": 219689,
+      "step": 271368192,
+      "max_steps": null,
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "p2a-stageb": "queued",
-    "p2b-stageb": "queued",
-    "p2c-stageb": "queued",
-    "p2d-stageb": "queued",
-    "p2e-stageb": "queued",
-    "p2f-stageb": "queued",
-    "p2g-stageb": "queued",
-    "p2h-stageb": "queued",
-    "p2a-ep8-seed1": "running",
-    "p2b-ep8-seed2": "running",
-    "p2c-ep8-seed3": "running",
-    "p2d-ep8-seed4": "running",
-    "p2e-ep8-seed5": "running",
-    "p2f-ep8-seed6": "running",
-    "p2g-ep8-seed7": "running",
-    "p2h-ep8-seed8": "running",
+    "p2-stageb": "running",
+    "p2h-ep8-seed8": "failed",
+    "p2g-ep8-seed7": "failed",
+    "p2f-ep8-seed6": "failed",
+    "p2e-ep8-seed5": "failed",
+    "p2d-ep8-seed4": "failed",
+    "p2c-ep8-seed3": "failed",
+    "p2b-ep8-seed2": "failed",
+    "p2a-ep8-seed1": "failed",
     "p0q-ep8-long": "failed",
     "p0r-stageb": "done",
     "p0q-stageb": "done",
@@ -197,8 +89,8 @@
   },
   "disk_free_gb": 42.4,
   "load_avg": [
-    15.3583984375,
-    15.29345703125,
-    15.32568359375
+    5.19873046875,
+    12.310546875,
+    14.2900390625
   ]
 }
