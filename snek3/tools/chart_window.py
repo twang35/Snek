@@ -68,8 +68,11 @@ def wanted(env=None):
     return env.get('SNEK_CHART_WINDOW', '1') not in ('0', '', 'false', 'False', 'no')
 
 
-def holder(runs_dir=None):
+def holder(runs_dir=None, slot=None):
     """The pid of the window that is up, or None if there is none. **Advisory.**
+
+    `slot` names which window — this box's training window by default; `tools/eval_window.py` passes
+    the eval window's slot and reads the answer the same way.
 
     A hint, not a gate. The viewer writes its own pid under the lock it holds, so a live pid here does
     mean a window is up — but the answer can be stale in the microseconds around a batch launch, and
@@ -80,7 +83,7 @@ def holder(runs_dir=None):
     trainer that opened it, and `os.kill(pid, 0)` calls a zombie alive — so for as long as that
     trainer had not reaped it, `python -m tools.chart_window` reported a window that was visibly gone.
     """
-    pid = live_runs.read(live_runs.window_lock_path(runs_dir))
+    pid = live_runs.read(live_runs.window_lock_path(runs_dir, slot))
     if pid is None or not live_runs.alive(pid) or live_runs.zombie(pid):
         return None
     return pid
@@ -96,8 +99,12 @@ def command(runs_dir=None, scale=None, python=None):
             '--title', 'snek3 — training']
 
 
-def spawn(runs_dir=None, env=None):
+def spawn(runs_dir=None, env=None, argv=None, label='chart window'):
     """Starts a window and returns its Popen, or None if it would not start.
+
+    `argv` overrides the training window's own command, which is how the eval window reuses this:
+    **the two windows differ only in what they are pointed at**, and everything below — the new
+    session, the closed stdin, the swallowed `OSError` — is the part that has to be the same in both.
 
     Starting one is not the same as getting one: the child takes the box's slot itself and exits
     quietly if another window holds it, so this returns a live Popen for a process that may be about
@@ -109,8 +116,9 @@ def spawn(runs_dir=None, env=None):
     the reason on stderr and returns None.
     """
     env = os.environ if env is None else env
-    scale = env.get('SNEK_CHART_WINDOW_SCALE')
-    argv = command(runs_dir, float(scale) if scale else None)
+    if argv is None:
+        scale = env.get('SNEK_CHART_WINDOW_SCALE')
+        argv = command(runs_dir, float(scale) if scale else None)
     try:
         # `start_new_session` is the load-bearing argument. It puts the window in its own session and
         # process group, so a Ctrl-C or a `kill` to a trainer's group leaves it alone, and killing the
@@ -121,11 +129,11 @@ def spawn(runs_dir=None, env=None):
                                 stdin=subprocess.DEVNULL,
                                 stdout=sys.stderr, stderr=subprocess.STDOUT)
     except OSError as error:
-        sys.stderr.write('chart window did not open ({0}); training continues\n'.format(error))
+        sys.stderr.write('{0} did not open ({1}); the run continues\n'.format(label, error))
         return None
 
 
-def ensure(runs_dir=None, env=None):
+def ensure(runs_dir=None, env=None, argv=None, slot=None, label='chart window'):
     """Asks for the box's window. Returns the Popen of the process started, or None.
 
     Safe to call from every arm of a wave at once — that is the point of the design, and the reason
@@ -134,9 +142,9 @@ def ensure(runs_dir=None, env=None):
     """
     if not wanted(env):
         return None
-    if holder(runs_dir):
+    if holder(runs_dir, slot):
         return None
-    return spawn(runs_dir, env)
+    return spawn(runs_dir, env, argv, label)
 
 
 def reap(process):

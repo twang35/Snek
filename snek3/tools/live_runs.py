@@ -45,14 +45,19 @@ def path_for(policy, runs_dir=None):
     return os.path.join(directory(runs_dir), str(policy))
 
 
-def window_lock_path(runs_dir=None):
-    """The file the box's one chart window holds an `flock` on, and records its pid in.
+def window_lock_path(runs_dir=None, name=None):
+    """The file a window holds an `flock` on, and records its pid in.
 
     Here rather than in `chart_window` because the *viewer* is what holds the lock and the launcher
     is what reads the pid, so neither of them owns the path. Inside the registry directory, where
     `live()` already skips it for starting with a dot.
+
+    `name` picks *which* window, and there are two: the training window on `WINDOW_LOCK_NAME`, and
+    the eval window on its own slot. They are separate locks rather than one because a box can hold
+    both at once — the wave barrier keeps trainings and evals apart on the desktop, but nothing does
+    on the laptop, and a stage-B pass must never be refused a window because a training window is up.
     """
-    return os.path.join(directory(runs_dir), WINDOW_LOCK_NAME)
+    return os.path.join(directory(runs_dir), name or WINDOW_LOCK_NAME)
 
 
 def alive(pid):

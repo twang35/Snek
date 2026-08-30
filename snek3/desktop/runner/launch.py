@@ -10,7 +10,6 @@ steps/s without the daemon knowing anything about the trainer.
 
 import json
 import os
-import shlex
 import subprocess
 import time
 
@@ -38,27 +37,30 @@ def build_command(job, host, runtime):
 
     ## The eval command
 
-    A batch stays **one job**: one ledger record, one `results` publish, one thing to look at. Inside
-    it the arms are measured **one `evaluate.py` at a time, in sequence**, because that script takes a
-    single policy — `evaluate.py <policy> [selector]`.
+    A batch stays **one job**: one ledger record, one `results` publish, one thing to look at. It is
+    also **one process** — `tools/closeout.py`, which takes the whole batch and measures it one arm at
+    a time. That is the same file the laptop's close-out runs, which is the point: before 2026-08-30
+    this function built a `sh -c` chain of one `evaluate.py` per arm and the laptop ran an agent's
+    scratch shell script, and the two sequencers behaved differently under exactly the conditions
+    nobody watches — a failed arm, a killed pass, buffered progress.
 
-    That costs some idle: each arm's lanes drain at its end with nothing to refill them, where one
-    process owning every arm could take whichever checkpoint was next. Keeping the batch together at
-    this layer is worth it (decision 2026-08-29); the compute is recoverable later and the complexity
-    would not be.
+    The arms still go one at a time, for the reason recorded on 2026-08-29: a wave measures a single
+    policy, so N arms are N waves. The lane drain at each arm's end is ~11 s against hours.
 
     **No episode count and no gate are set here.** snek2's daemon carried five protocol numbers as a
     second copy of what `eval_plan.py` defines, and they drifted. The rule is inverted instead: the
     daemon passes a selector and an episode count *only if the spec named them*, and otherwise lets
-    `evaluate.py`'s own defaults decide — which are the protocol, `screen:97` at 500 episodes. One
+    the close-out's own defaults decide — which are the protocol, `screen:97` at 500 episodes. One
     definition, no import, nothing here to drift. The daemon cannot import the original anyway: it
     runs on base python so it can start before the conda env exists, and `eval_plan` needs numpy.
 
     **That last constraint is why this interface drifted and went unnoticed.** It duplicated
     `evaluate.py`'s spelling by hand and got it wrong twice — several policies where one is taken, and
     `--selector` where the selector is positional — so every wave the box dispatched exited 2. A test
-    runs in the conda env even though the daemon does not, so
-    `tests/test_desktop_runner.py` now hands what this builds to `evaluate.build_parser()`.
+    runs in the conda env even though the daemon does not, so `tests/test_desktop_runner.py` hands
+    what this builds to `closeout.build_parser()`. **Note the one spelling difference it guards:** the
+    selector is a flag for the close-out and a positional for `evaluate.py`, because a batch's
+    policies take the `nargs='+'`.
     """
     python = host['PYTHON_BIN']
     env = dict(BASE_ENV)
@@ -77,11 +79,8 @@ def build_command(job, host, runtime):
     env.update(job.env)                      # per-job SNEK_* win over the runtime defaults
 
     if job.type == 'eval':
-        commands = eval_commands(job, host, runtime)
-        log_name = 'eval-{0}.log'.format(job.id)
-        if len(commands) == 1:
-            return commands[0], env, log_name, job.policy
-        return ['sh', '-c', sequential_script(commands)], env, log_name, job.policy
+        return (eval_command(job, host, runtime), env,
+                'eval-{0}.log'.format(job.id), job.policy)
 
     # train / smoke / benchmark all invoke the trainer.
     policy = job.policy
@@ -109,44 +108,28 @@ def build_command(job, host, runtime):
     return argv, env, '{0}-{1}.log'.format(job.type, job.id), policy
 
 
-def eval_commands(job, host, runtime):
-    """One argv per arm, in the order the wave measures them.
+def eval_command(job, host, runtime):
+    """The one argv that measures the batch — exactly what someone would type on the laptop.
 
-    Each is exactly what someone would type on the laptop, which is the property worth keeping: a
-    spec is a command a human could have run. Selector and episode count are omitted unless the spec
-    named them, so `evaluate.py`'s own defaults stay the single definition of the protocol.
+    That property is the one worth keeping: a spec is a command a human could have run, and now it is
+    the *same* command, because the sequencing over arms moved into `tools/closeout.py` where both
+    boxes reach it. No `sh -c`, so nothing here quotes anything and a policy name cannot be shell
+    syntax.
+
+    Selector and episode count are omitted unless the spec named them, so the close-out's own
+    defaults stay the single definition of the protocol.
     """
     shards = job.eval_shards or runtime.get('eval_shards', 0)
-    commands = []
-    for policy in job.policies:
-        # `policy` then the optional positional `selector`, then flags — argparse's order for
-        # `evaluate.py <policy> [selector]`.
-        argv = [host['PYTHON_BIN'], '-u', 'evaluate.py', str(policy)]
-        if job.selector:
-            argv.append(job.selector)
-        argv += list(job.eval_args)
-        if job.episodes:
-            argv += ['--episodes', str(job.episodes)]
-        if shards:
-            argv += ['--shards', str(shards)]
-        commands.append(argv)
-    return commands
-
-
-def sequential_script(commands):
-    """A `sh -c` body running each command in turn, exiting with the last failure's status.
-
-    **`;` and not `&&`.** One arm failing must not drop the arms behind it — a wave losing its whole
-    batch's measurement to a single bad arm is the snek2 incident this daemon already carries an
-    `attention` list for. Every command still runs, and the job reports `failed` if any did.
-
-    `shlex.quote` on every token, so a policy name is data and never shell syntax.
-    """
-    parts = ['status=0']
-    for argv in commands:
-        parts.append('{0} || status=$?'.format(' '.join(shlex.quote(token) for token in argv)))
-    parts.append('exit $status')
-    return '; '.join(parts)
+    argv = [host['PYTHON_BIN'], '-u', '-m', 'tools.closeout']
+    argv += [str(policy) for policy in job.policies]
+    if job.selector:
+        argv += ['--selector', job.selector]
+    argv += list(job.eval_args)
+    if job.episodes:
+        argv += ['--episodes', str(job.episodes)]
+    if shards:
+        argv += ['--shards', str(shards)]
+    return argv
 
 
 class RunningJob(object):

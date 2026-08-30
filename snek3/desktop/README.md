@@ -1,7 +1,7 @@
 # The desktop — `the-claw-den`
 
 A stdlib-only systemd daemon on a dedicated Linux box that runs trainings and evals unattended. It
-**imports nothing from this project** — it shells out to `train.py` and `evaluate.py` — and it talks
+**imports nothing from this project** — it shells out to `train.py` and `tools/closeout.py` — and it talks
 to the laptop only through three single-writer git branches. That decoupling is the design's best
 property: the bus works from anywhere, `ssh` is a convenience, and the daemon cannot be broken by a
 change to the trainer.
@@ -42,7 +42,7 @@ job — see the root [`CLAUDE.md`](../../CLAUDE.md).
 | `policies` | eval only | a **wave**: every arm of a batch in one process |
 | `max_steps` | no | `SNEK_MAX_STEPS`. Defaults per type for smoke/benchmark |
 | `env` | no | any `SNEK_*` knob; wins over the runtime defaults. See [`../docs/running.md`](../docs/running.md) |
-| `selector`, `episodes` | eval, no | **omit them.** Absent means `evaluate.py`'s own defaults, which *are* the protocol |
+| `selector`, `episodes` | eval, no | **omit them.** Absent means `tools/closeout.py`'s own defaults, which *are* the protocol |
 | `eval_shards` | no | shard processes for this wave; defaults to the runtime config's 16 |
 | `priority` | no | lower runs first. Default 100, auto-queued stage B is 10 |
 | `label` | no | one line for `at_a_glance` |

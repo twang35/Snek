@@ -1,6 +1,9 @@
 {
  "tests": [
-  "tests/test_chart_window.py"
+  "tests/test_chart_window.py",
+  "tests/test_chart_viewer.py",
+  "tests/test_closeout.py",
+  "tests/test_desktop_runner.py"
  ],
  "mutations": [
   {
@@ -36,26 +39,26 @@
   {
    "desc": "a window that lost the slot draws anyway",
    "file": "tools/chart_viewer.py",
-   "from": "        if take_window_slot(args.runs_dir) is None:",
+   "from": "        if take_window_slot(args.runs_dir, slot) is None:",
    "to": "        if False:"
   },
   {
    "desc": "the box slot is taken even for a hand-run --glob look at arbitrary charts",
    "file": "tools/chart_viewer.py",
-   "from": "    if args.runs_dir is not None:",
+   "from": "    if slot:",
    "to": "    if True:"
   },
   {
    "desc": "the launcher spawns even when a live window is recorded (the wasted-process detail)",
    "file": "tools/chart_window.py",
-   "from": "    if holder(runs_dir):\n        return None",
+   "from": "    if holder(runs_dir, slot):\n        return None",
    "to": "    if False:\n        return None"
   },
   {
    "desc": "the launcher refuses on a dead pid, so a box that closed its window never draws again",
    "file": "tools/chart_window.py",
-   "from": "    pid = live_runs.read(live_runs.window_lock_path(runs_dir))\n    if pid is None or not live_runs.alive(pid) or live_runs.zombie(pid):",
-   "to": "    pid = live_runs.read(live_runs.window_lock_path(runs_dir))\n    if pid is None:"
+   "from": "    pid = live_runs.read(live_runs.window_lock_path(runs_dir, slot))\n    if pid is None or not live_runs.alive(pid) or live_runs.zombie(pid):",
+   "to": "    pid = live_runs.read(live_runs.window_lock_path(runs_dir, slot))\n    if pid is None:"
   },
   {
    "desc": "the zombie check goes, and a killed window holds the slot until its opener reaps it",
@@ -68,6 +71,60 @@
    "file": "tools/live_runs.py",
    "from": "WINDOW_LOCK_NAME = '.window'",
    "to": "WINDOW_LOCK_NAME = 'window'"
+  },
+  {
+   "desc": "the eval window shares the training window's slot, so a stage-B pass is refused a window whenever a training window is up",
+   "file": "tools/eval_window.py",
+   "from": "SLOT_NAME = '.evalwindow'",
+   "to": "SLOT_NAME = '.window'"
+  },
+  {
+   "desc": "the slot name is dropped on the way to the lock path, which merges the two windows again",
+   "file": "tools/chart_viewer.py",
+   "from": "    path = live_runs.window_lock_path(runs_dir, slot)",
+   "to": "    path = live_runs.window_lock_path(runs_dir)"
+  },
+  {
+   "desc": "the close-out stops at the first failing arm (the `&&` version of the chain it replaced)",
+   "file": "tools/closeout.py",
+   "from": "        if code:\n            status = code",
+   "to": "        if code:\n            return code"
+  },
+  {
+   "desc": "an arm that raises takes the batch with it",
+   "file": "tools/closeout.py",
+   "from": "        except Exception as error:                    # noqa: BLE001 - see the class docstring",
+   "to": "        except ZeroDivisionError as error:"
+  },
+  {
+   "desc": "the window is asked for once per arm rather than once per batch",
+   "file": "tools/closeout.py",
+   "from": "    for index, policy in enumerate(policies, 1):",
+   "to": "    for index, policy in enumerate(policies, 1):\n        eval_window.ensure(eval_window.chart_paths(policies, label), watch_pids=[os.getpid()])"
+  },
+  {
+   "desc": "the window watches nothing, so it outlives the pass",
+   "file": "tools/closeout.py",
+   "from": "watch_pids=[os.getpid()])",
+   "to": "watch_pids=[])"
+  },
+  {
+   "desc": "the redraw thread is not a daemon, so a killed close-out leaves it running",
+   "file": "tools/closeout.py",
+   "from": "name='redraw', daemon=True)",
+   "to": "name='redraw', daemon=False)"
+  },
+  {
+   "desc": "no final redraw, so an arm's chart is the pooled shard files rather than the merged file",
+   "file": "tools/closeout.py",
+   "from": "        self.draw_once()\n        return False",
+   "to": "        return False"
+  },
+  {
+   "desc": "a redraw failure kills the pass",
+   "file": "tools/closeout.py",
+   "from": "        except Exception as error:                    # noqa: BLE001 - a readout, never the pass",
+   "to": "        except ZeroDivisionError as error:"
   }
  ]
 }

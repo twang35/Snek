@@ -397,8 +397,10 @@ def idle_close(arms, seen_arms, empty_since, now):
     return True, empty_since, now - empty_since >= IDLE_CLOSE_SECONDS
 
 
-def take_window_slot(runs_dir):
-    """Takes the box's one-window slot, or returns None if another window already holds it.
+def take_window_slot(runs_dir, slot=None):
+    """Takes a window slot, or returns None if another window already holds it.
+
+    `slot` names which one — the training window's by default, and the eval window passes its own.
 
     **This is the whole of the mutual exclusion, and the kernel is what enforces it.** An `flock` is
     held by one open file description at a time, is released by the kernel when its holder dies for
@@ -415,7 +417,7 @@ def take_window_slot(runs_dir):
     is a filesystem that cannot lock: a box that cannot take the slot still gets its window, which is
     the failure direction to prefer for something disposable.
     """
-    path = live_runs.window_lock_path(runs_dir)
+    path = live_runs.window_lock_path(runs_dir, slot)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
@@ -501,6 +503,9 @@ def main(argv=None):
     parser.add_argument('--interval', type=float, default=DEFAULT_INTERVAL)
     parser.add_argument('--max-panels', type=int, default=DEFAULT_MAX_PANELS)
     parser.add_argument('--title', default='snek3 charts')
+    parser.add_argument('--slot', default=None,
+                        help='claim this window slot, so a second one stands down rather than '
+                             'opening beside it. Implied by --runs-dir')
     parser.add_argument('--scale', type=float, default=DEFAULT_SCALE,
                         help='fraction of the screen to fill; 1.0 is as large as it goes')
     parser.add_argument('--dpi', type=int, default=None,
@@ -509,21 +514,26 @@ def main(argv=None):
     if not args.paths and not args.glob_pattern and args.runs_dir is None:
         parser.error('give PNG paths, --glob or --runs-dir')
     pids = [int(token) for token in args.watch_pid.split(',') if token.strip()]
-    # Only the box's window is a singleton. An agent looking at arbitrary charts with `--glob` or a
-    # path list is not the box window and must never be refused because one is up.
-    if args.runs_dir is not None:
-        if take_window_slot(args.runs_dir) is None:
-            # Every arm of a wave asks for the window, so this is the ordinary outcome for all but
-            # one of them and not a failure. Said out loud anyway: it lands in the log of the arm
-            # whose spawn lost, where the alternative is a viewer that vanished with no explanation.
-            print('a chart window is already up (pid {0}); nothing to do'.format(
-                live_runs.read(live_runs.window_lock_path(args.runs_dir))), flush=True)
+    # **Only a window that claims a slot is a singleton**, and there are exactly two kinds: the
+    # training window, which shows the box's live registry (`--runs-dir`), and a window that names a
+    # slot outright (`--slot`, which is how the eval window gets one of its own). An agent looking at
+    # arbitrary charts with `--glob` or a path list is neither, and must never be refused because a
+    # window is up.
+    slot = args.slot or (live_runs.WINDOW_LOCK_NAME if args.runs_dir is not None else None)
+    if slot:
+        if take_window_slot(args.runs_dir, slot) is None:
+            # Every arm of a wave asks for the training window, so this is the ordinary outcome for
+            # all but one of them and not a failure. Said out loud anyway: it lands in the log of the
+            # arm whose spawn lost, where the alternative is a viewer that vanished with no
+            # explanation.
+            print('a window is already up on slot {0} (pid {1}); nothing to do'.format(
+                slot, live_runs.read(live_runs.window_lock_path(args.runs_dir, slot))), flush=True)
             return 0
         # Printed here rather than by the launcher, because only the process holding the slot knows
         # that it is the window. It goes to the stdout of whoever spawned it, which is the log of the
         # arm that opened it.
-        print('chart window: pid {0}, showing every training on this box. Killing it does not '
-              'affect any run, and no run reopens it.'.format(os.getpid()), flush=True)
+        print('{0}: pid {1}. Killing it does not affect any run, and no run reopens '
+              'it.'.format(args.title, os.getpid()), flush=True)
     run(args.paths, args.glob_pattern, pids, args.interval, args.max_panels, args.title,
         args.scale, args.dpi, args.runs_dir)
     return 0

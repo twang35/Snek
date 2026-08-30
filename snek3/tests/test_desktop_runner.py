@@ -272,47 +272,42 @@ def test_a_training_invokes_train_py_with_its_policy():
     assert env['PYTHONPATH'] == '.', 'snek3 entry points need the project root on the path'
 
 
-def test_a_batch_is_one_job_measuring_its_arms_in_sequence():
-    """One ledger record and one publish per batch, one `evaluate.py` per arm inside it.
+def test_a_batch_is_one_job_and_one_process():
+    """One ledger record, one publish and one process per batch — `tools/closeout.py` owns the order.
 
-    `evaluate.py` takes a single policy, so the wave is sequential. That idles the lanes between arms
-    and is the accepted cost of keeping a batch together at this layer (2026-08-29).
+    The arms are still measured one at a time (2026-08-29): a wave takes a single policy, so N arms
+    are N waves. What changed on 2026-08-30 is *who* sequences them — this used to be a `sh -c` chain
+    built here, which the laptop's close-out did not share.
     """
     job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None))
     argv, _, log, _ = launch.build_command(job, HOST, runtime(eval_shards=16))
-    assert argv[:2] == ['sh', '-c']
-    script = argv[2]
-    assert script.count('evaluate.py') == 2, 'one invocation per arm'
-    assert script.index('b1a') < script.index('b1b'), 'in the order the spec named them'
-    assert '--shards 16' in script
+    assert argv[:4] == ['/py', '-u', '-m', 'tools.closeout']
+    assert argv[4:6] == ['b1a', 'b1b'], 'in the order the spec named them'
+    assert argv[argv.index('--shards') + 1] == '16'
     assert log == 'eval-b1a-thing.log'
 
 
-def test_one_arm_failing_does_not_drop_the_arms_behind_it():
-    """`;` and not `&&`. A wave losing a batch's whole measurement to one bad arm is the incident."""
+def test_no_shell_is_involved_at_all():
+    """No `sh -c`, so nothing here quotes anything — which is what retires the whole hazard below."""
     job = parse_job(spec(type='eval', policies=['b1a', 'b1b', 'b1c'], policy=None))
-    script = launch.build_command(job, HOST, runtime())[0][2]
-    assert '&&' not in script
-    assert script.count('|| status=$?') == 3
-    assert script.endswith('exit $status')
-
-
-def test_a_single_arm_eval_needs_no_shell():
-    job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
     argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert argv[:4] == ['/py', '-u', 'evaluate.py', 'b1a']
+    assert argv[0] == '/py' and '-c' not in argv
 
 
 def test_a_policy_name_is_data_not_shell_syntax():
+    """It reaches the close-out as one argv element, so shell metacharacters in it mean nothing.
+
+    Kept as a fixture after the `sh -c` chain went away, because the property is the point and the
+    next person to reintroduce a shell here should see it fail.
+    """
     job = parse_job(spec(type='eval', policies=['b1a; rm -rf /', 'b1b'], policy=None))
-    script = launch.build_command(job, HOST, runtime())[0][2]
-    assert 'rm -rf /' in script, 'the name is still passed through'
-    assert "'b1a; rm -rf /'" in script, 'but quoted, so the shell sees one argument'
-    assert script.count('evaluate.py') == 2, 'and it did not become a third command'
+    argv, _, _, _ = launch.build_command(job, HOST, runtime())
+    assert argv[4] == 'b1a; rm -rf /', 'the name is passed through whole'
+    assert parsed(argv).policies == ['b1a; rm -rf /', 'b1b']
 
 
 def test_no_episode_count_or_gate_is_passed_unless_the_spec_asked():
-    """The protocol lives in `evaluate.py`, not here.
+    """The protocol lives in `tools/closeout.py`'s defaults, not here.
 
     snek2's daemon carried five protocol numbers as a second copy of `eval_plan.py`'s and they
     drifted. So an unadorned eval job must pass neither, and inherit `screen:95` at 500 episodes.
@@ -324,29 +319,37 @@ def test_no_episode_count_or_gate_is_passed_unless_the_spec_asked():
 
 
 def test_a_spec_may_still_name_a_selector_and_a_depth():
-    """The selector is a POSITIONAL, following the policy — not a `--selector` flag."""
+    """The selector is a `--selector` FLAG for the close-out, where `evaluate.py` takes a positional.
+
+    It has to be: the close-out's policies are `nargs='+'`, so a positional behind them is ambiguous.
+    Getting this backwards is one of the two drifts that made every dispatched wave exit 2.
+    """
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None,
                          selector='screen:98', episodes=1000))
     argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert argv[3:5] == ['b1a', 'screen:98']
+    assert argv[4] == 'b1a'
+    assert argv[argv.index('--selector') + 1] == 'screen:98'
     assert argv[argv.index('--episodes') + 1] == '1000'
-    assert '--selector' not in argv
 
 
 # --- the command must parse, asked of the real parser ---------------------------------------------
 #
 # This is the one place these tests deliberately cross the stdlib-only line, and the reason is the
-# bug it exists for. The daemon runs on base python before the conda env exists, so it duplicates
-# `evaluate.py`'s command line by hand -- and got it wrong twice, several policies where one is taken
-# and `--selector` where the selector is positional, so every wave the box dispatched exited 2. Four
+# bug it exists for. The daemon runs on base python before the conda env exists, so it duplicates the
+# close-out's command line by hand -- and got it wrong twice, several policies where one is taken and
+# `--selector` where the selector is positional, so every wave the box dispatched exited 2. Four
 # green fixtures asserted the argv the daemon builds; none asked the parser to accept it. A test runs
 # in the env even though the daemon does not, so the constraint that forces the duplication does not
 # extend to the fixture that guards it.
 
 def parsed(argv):
-    """`evaluate.py`'s own parser applied to a command the daemon built. Raises if it would exit 2."""
-    import evaluate
-    return evaluate.build_parser().parse_args(argv[3:])       # drop python -u evaluate.py
+    """`tools.closeout`'s own parser applied to a command the daemon built. Raises if it would exit 2.
+
+    `argv[4:]` because the command is `python -u -m tools.closeout ...` -- one token longer than the
+    `python -u evaluate.py ...` it replaced on 2026-08-30.
+    """
+    from tools import closeout
+    return closeout.build_parser().parse_args(argv[4:])
 
 
 @pytest.mark.parametrize('overrides', [
@@ -358,21 +361,47 @@ def parsed(argv):
 ])
 def test_every_command_the_daemon_builds_parses(overrides):
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None, **overrides))
-    for argv in launch.eval_commands(job, HOST, runtime(eval_shards=16)):
-        parsed(argv)              # SystemExit here is the daemon being wrong, not the test
+    argv = launch.eval_command(job, HOST, runtime(eval_shards=16))
+    parsed(argv)                  # SystemExit here is the daemon being wrong, not the test
 
 
-def test_each_arm_of_a_wave_parses_and_names_its_own_policy():
+def test_a_whole_batch_is_one_command_naming_every_arm():
+    """The sequencing lives in `tools/closeout.py`, so the daemon builds one process, not a chain."""
     job = parse_job(spec(type='eval', policies=['b1a', 'b1b', 'b1c'], policy=None))
-    commands = launch.eval_commands(job, HOST, runtime())
-    assert [parsed(argv).policy for argv in commands] == ['b1a', 'b1b', 'b1c']
+    argv = launch.eval_command(job, HOST, runtime())
+    assert argv[:4] == [HOST['PYTHON_BIN'], '-u', '-m', 'tools.closeout']
+    assert parsed(argv).policies == ['b1a', 'b1b', 'b1c']
+    assert 'sh' not in argv[0:1] and not any(token == '-c' for token in argv)
 
 
-def test_an_unadorned_wave_inherits_the_protocol_from_evaluate_py():
-    """What the daemon leaves unsaid has to arrive as `screen:95` at 500 episodes."""
+def test_an_unadorned_wave_inherits_the_protocol_from_the_closeout():
+    """What the daemon leaves unsaid has to arrive as `screen:97` at 500 episodes."""
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
-    args = parsed(launch.eval_commands(job, HOST, runtime())[0])
+    args = parsed(launch.eval_command(job, HOST, runtime()))
     assert args.selector == 'screen' and args.episodes == 500
+
+
+def test_the_selector_reaches_the_closeout_as_a_flag():
+    """The one spelling difference from `evaluate.py`, where it is positional. See `eval_command`."""
+    job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None, selector='screen:98'))
+    argv = launch.eval_command(job, HOST, runtime())
+    assert argv[argv.index('--selector') + 1] == 'screen:98'
+    assert parsed(argv).selector == 'screen:98'
+
+
+def test_the_eval_job_still_forwards_the_display_so_its_window_can_open():
+    """The stage-B window is opened by the close-out, so it needs the same two variables a trainer
+    does -- and gets them because `build_command` forwards them for every job type."""
+    host = dict(HOST, DISPLAY=':0', XAUTHORITY='/home/x/.Xauthority')
+    _, env, _, _ = launch.build_command(
+        parse_job(spec(type='eval', policies=['b1a'], policy=None)), host, runtime())
+    assert env['DISPLAY'] == ':0' and env['XAUTHORITY'] == '/home/x/.Xauthority'
+
+
+def test_the_viewer_switch_reaches_an_eval_wave_too():
+    _, env, _, _ = launch.build_command(
+        parse_job(spec(type='eval', policies=['b1a'], policy=None)), HOST, runtime(viewer=False))
+    assert env['SNEK_CHART_WINDOW'] == '0'
 
 
 def test_the_thread_knobs_reach_the_subprocess():

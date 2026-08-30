@@ -62,11 +62,17 @@ state behind for the next window to misread. **Do not reintroduce a launcher-sid
 all four — three finished arms are most of what a glance is for. The accumulated set is dropped when
 the box goes quiet and a new arm appears, so the next batch does not draw its predecessor's charts.
 
+**A stage-B close-out gets the same treatment**, in a second window of its own: `tools/closeout.py`
+opens one panel per arm of the batch it is measuring and it closes when the pass ends. Same viewer,
+same launcher, its own slot — so a box can show a batch training and a batch being measured at once,
+and `SNEK_CHART_WINDOW=0` still silences both.
+
 The window is **disposable and the training is not**: it runs in its own session, no training reads
 from or waits on it, and no training reopens it. So killing it, closing it, or relaunching it with
 `cd snek3 && PYTHONPATH=. python -m tools.chart_window` cannot affect a run — which is what makes it
 safe to fix a window while four arms are training. `SNEK_CHART_WINDOW=0` in a training's environment
-turns it off; the mechanism is [`snek3/tools/chart_window.py`](snek3/tools/chart_window.py) and
+turns it off; the mechanism is [`snek3/tools/chart_window.py`](snek3/tools/chart_window.py),
+[`snek3/tools/eval_window.py`](snek3/tools/eval_window.py) and
 [`snek3/tools/live_runs.py`](snek3/tools/live_runs.py).
 
 ## Work as a collaborator

@@ -55,9 +55,11 @@ cd snek3
 PYTHONPATH=. python -u train.py <policy>               # the name doubles as the checkpoint dir
 PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:97, 500 eps, 4 shards
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
+PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 8   # a whole batch's stage B
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
 PYTHONPATH=. python -m tools.chart_window                # the box's chart window, if it is not up
+PYTHONPATH=. python -m tools.eval_window                 # the box's stage-B window, if it is not up
 ```
 
 **The snek2 champion converts in one command**, and is the reference policy for any A/B:
@@ -98,6 +100,14 @@ Nothing needs launching by hand, on this laptop or on the desktop. **The window 
 training is not** — its own session, never read from, never waited on, never reopened by a run — so
 killing or relaunching it while four arms train cannot touch them. `SNEK_CHART_WINDOW=0` turns it off, which is what the test suite and
 every benchmark do.
+
+**A stage-B pass opens the same window over its own charts.** `tools/closeout.py` asks for one panel
+per arm of the batch and the window closes when the pass ends, so a close-out is watched the way a
+batch of trainings is. It is the same viewer and the same launcher — only two things differ, the panels
+(a fixed list, because a close-out's arms are known when it starts) and the closing condition (the
+pass's pid, not an empty registry). It takes **its own slot**, so a box can hold both windows at once,
+and `SNEK_CHART_WINDOW=0` silences both because "no window on this box" is one decision. Relaunch by
+hand with `python -m tools.eval_window`.
 
 ## The eval protocol is one stage
 
@@ -231,6 +241,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/results.py` | where result files live and what they are called. The one place that builds those paths |
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
+| `tools/closeout.py` | **a batch's stage B: every arm in turn, one process.** What the desktop dispatches and what an agent types here |
 | `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
 | `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |
 | `tools/eval_plan.py` | a measured checkpoint as a result row, plus the Wilson interval |
@@ -239,7 +250,8 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/progress_chart.py` | `runs/<policy>.png` — one arm's stage-A history |
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
 | `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them, never writes and never trains |
-| `tools/chart_window.py` | the box's one window: who opens it, and why killing it is free |
+| `tools/chart_window.py` | the box's window launcher: who opens one, and why killing it is free |
+| `tools/eval_window.py` | the stage-B window — the same viewer and the same launcher, its own slot |
 | `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
 | `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |

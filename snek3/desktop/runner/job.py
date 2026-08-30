@@ -17,8 +17,9 @@ There is no default. A missing field is the exact case being guarded against, so
 
 ## An eval job carries `policies`, not one `policy`
 
-A stage-B pass is a **wave**: one `evaluate.py` process owning every arm of a batch, so the spec
-names them all and the daemon dispatches one job where it would otherwise dispatch four. `policy` is
+A stage-B pass is a **wave**: one `tools/closeout.py` process owning every arm of a batch, so the
+spec names them all and the daemon dispatches one job where it would otherwise dispatch four. That is
+the same process an agent runs on the laptop, which is why the sequencing is there and not here. `policy` is
 sugar for the single-policy case, and neither field is ever None where the other is set — whichever
 is given fills in the other, so a caller that knows only about `policy` still works.
 """
@@ -54,7 +55,7 @@ class Job(object):
         # runtime config says", which is the normal case.
         self.eval_shards = eval_shards
         # Which checkpoints, and how deeply. None on either means the protocol's default, which is
-        # `screen:97` at 500 episodes (95 until 2026-08-30) — see `evaluate.py`.
+        # `screen:97` at 500 episodes (95 until 2026-08-30) — see `tools/closeout.py`.
         self.selector = selector
         self.episodes = episodes
         self.eval_args = eval_args or []

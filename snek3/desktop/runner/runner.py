@@ -318,9 +318,9 @@ class Runner(object):
         so it survives a daemon restart — the `stage_b: pending` markers and each training's stored
         `env` both persist.
 
-        **One job per batch, not one per arm.** A batch's arms become a single `evaluate.py` job
-        carrying every policy, so its shards move to whichever arm still has checkpoints instead of a
-        finished arm's share of the box going idle. Grouping is safe because of the wave barrier:
+        **One job per batch, not one per arm.** A batch's arms become a single `tools/closeout.py`
+        job carrying every policy: one ledger record, one publish, one log, and one stage-B window
+        over the batch. Grouping is safe because of the wave barrier:
         `_dispatch` returns early while anything runs, so by the time this is read the set of markers
         is closed. That is also why grouping happens at dispatch rather than in `_scan_pending` — an
         id that shifted as more markers appeared would let a partly-finished wave relaunch under a
