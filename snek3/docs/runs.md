@@ -23,8 +23,50 @@ stage A** — see [`findings.md`](findings.md).
 
 ## Now
 
-**Batch b2 — b29's record config on the torch stack, seeds 1-4, 3M steps.** All four on the desktop,
-launched 2026-08-29 08:09. This is the phase-3 gate re-run on the configuration snek2 actually set
+**Batch p0 — the PPO tuning sweep. Training is done; stage B is finishing on both boxes.** 15 arms,
+seed 1, **10M transitions each**, all on b2's reward function, each one knob off a reference of
+lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.
+Seven on the laptop, eight on the desktop. Curves in [`charts.md`](charts.md), findings in
+[`findings.md`](findings.md), the full table in [`results.md`](results.md) once stage B lands.
+
+**Read it as three statements, in this order.**
+
+1. **There is no winner.** Nine of fifteen arms finished inside **0.8 pp** on `best_perfect30`
+   (96.4 - 97.2), and three metrics give three different orderings of the top three. At n=1 per config
+   in a domain that has produced 62.5 and 18.0 from one config, that is one number. **p0 hands p1 no
+   tuned config** — the reference is as good as anything found, which makes p1 a cleaner comparison
+   than the plan expected rather than a blocked one.
+2. **The 3M read was inverted, not noisy.** The arms that finished 1st and 2nd were **6th and 7th** at
+   3M. This is the batch's most transferable result and it is why the sweep went to 10M.
+3. **One axis moved: gradient steps per transition**, 7.5 pp monotonically — minibatch 1024 (0.25x)
+   89.7, the reference (1x) 96.6, epochs 8 (2x) 97.2. **Rollout size is a second, separate axis**:
+   `p0p-roll64` held the ratio fixed, halved the rollout and lost ~2.5 pp.
+
+**And the pre-registered PPO-vs-DQN metric favours PPO.** [`../plans/ppo.md`](../plans/ppo.md) §10
+names the **≥98%/500 count** — the width of the record region — as 6e's headline. PPO's `p0e` has 7 of
+179 stage-B measurements there and `p0a` 6 of 108; **b2's four DQN seeds have 5 of 1,135**, so PPO's
+record-region density is ~10x higher. b2 still holds the better single checkpoint at 99.2%/500 against
+PPO's 98.6%, and that 98.6% re-measured **96.6% over 3,000 episodes** on a fresh seed, a 2.0 pp fall
+that is normal for a selected high.
+
+**Cost, because it changes what is worth running:** 10M transitions is **~20 minutes** with seven arms
+sharing the 14-core laptop, against b2's ~7-8 h per arm for 18M on the 16-core desktop. A PPO sweep arm
+is minutes. Do not budget one like a DQN arm.
+
+### Next for PPO
+
+**The follow-up wave, designed and not yet launched** — push the axis that moved rather than resample
+the flat ones: epochs 12 and 16, minibatch 128, rollout 256, and `fc 200,100` + epochs 8 as the one
+interaction worth a slot. Two narrow layers beat one wide one in p0 (`fc 200,100` 97.1, `fc 300,100`
+233 checkpoints ≥95 — the most of any arm — against **`fc 500` at 94.7**), so depth is the other thread
+worth pulling; it belongs to a p2 "better agent" batch rather than to p1, which has to hold the
+network at 320 to stay seed-matched against b2.
+
+---
+
+**Batch b2 — b29's record config on the torch stack, seeds 1-4, 3M steps. Closed 2026-08-29**, all
+four arms and the stage-B wave `done`; results on the `results` branch, unread into
+[`results.md`](results.md). Launched on the desktop 2026-08-29 08:09. This is the phase-3 gate re-run on the configuration snek2 actually set
 records with; b1 ran snek3's bare defaults and that was the wrong batch to gate on.
 
 | knob | snek3 default | b2 = b29 |
@@ -102,30 +144,33 @@ has run and published 0 rows an arm, which is the honest measurement rather than
 1. **Read b2 against b1 and against b29/b41/b47.** A b2-vs-b29 difference smaller than the
    b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
    precisely to have the yardstick.
-2. **Phase 6 — `ppo/`.** The reason snek3 exists. The design is
-   [`../plans/ppo.md`](../plans/ppo.md), **approved 2026-08-29**. Phases **6a and 6b are closed** —
-   the algorithm seam is in `train.py` with three fixed-seed DQN arms byte-identical across it, and
-   `ppo/` is written, tested (122 fixtures, 14 of 14 mutants killed) and measured. **6c — batch p0,
-   the tuning pass — is next.**
+2. **Phase 6 — `ppo/`.** The reason snek3 exists, and the design is
+   [`../plans/ppo.md`](../plans/ppo.md). **Phases 6a, 6b and 6c are all closed** — the algorithm seam
+   is in `train.py` with three fixed-seed DQN arms byte-identical across it, `ppo/` is written and
+   tested (122 fixtures, 14 of 14 mutants killed), and batch p0 has run 15 arms. Deployed to the
+   desktop 2026-08-29 once b2's stage-B wave published. **6d — batch p1 — is next**, at **18M**
+   transitions to match b2 (3M counted steps x 6 transitions per step; the plan's 12M was wrong).
 
-   **The 6b gate arm, `ppo-smoke`: avg score 79.5 and 1.2%/500 perfect at 508k transitions**, from a
-   greedy argmax policy restored through the ordinary `tools/restore.py` path. **At a matched ~510k
-   transitions b1's four DQN seeds read 85.6-91.9 score and 6-34% perfect**, so PPO learns this game
-   and is currently *behind* DQN rather than beside it. Its own diagnostics say where to push:
-   `explained_variance` 0.90 (the critic is fine), `approx_kl` 0.002 and `clip_fraction` 0.03 against
-   a clip of 0.2 (the update is barely constrained — the learning rate is **low**, not high), entropy
-   1.086 → 0.27 (committing fast, and whether that is premature is p0's question). Chart:
-   [`../runs/ppo-smoke.png`](../runs/ppo-smoke.png). It is a gate arm, not a p-series arm.
+   **‡ Two claims made from the 6b gate arm are withdrawn, and both were withdrawn by p0.** The gate
+   arm was 508k transitions on snek3's *unshaped* defaults, and neither conclusion survived a shaped
+   arm at 20x the budget:
 
-   **‡ Not deployed to the desktop yet, deliberately:** the seam is a change to the file every
-   running arm's process was launched from, and the box's daemon can relaunch an arm. Deploy after
-   b2's stage-B wave publishes — one deploy carrying 6a and 6b together.
+   - **"PPO is behind DQN rather than beside it"** — withdrawn. Matched on transitions *and* on
+     reward function, the two ranges top out at the same number (96.9 best30), and on the ≥98%/500
+     count PPO is ~10x denser. The gate arm's gap was the reward function, not the algorithm.
+   - **"`clip_fraction` 0.03 says the learning rate is low"** — falsified outright. Raising it to
+     1e-3 and 3e-3 both made things *worse* (85.2 and 69.9 best30 at 3M, the latter at sd 18.4), and
+     1e-4 was worse than 1e-3. The learning rate is peaked at the default and a low clip fraction did
+     not mean what I read into it.
 
-3. **Batch p0 — the PPO tuning pass.** 2-4 arms at ~2M transitions, per
-   [`../plans/ppo.md`](../plans/ppo.md) §10. What the gate arm already narrows: **the learning rate is
-   the first knob** (`clip_fraction` 0.03 says the clip is not the binding constraint), γ 0.99 against
-   0.9975 is the pre-registered second, and the entropy coefficient — constant against a ramp to 0 —
-   is the third. Do not gate on defaults; that is what b1 did and it answered nothing.
+   The gate arm's chart stays at [`../runs/ppo-smoke.png`](../runs/ppo-smoke.png) as a record of
+   what an unshaped PPO arm does. It is a gate arm, not a p-series arm.
+
+3. **Batch p1 — the seed-matched gate batch.** 4 arms, seeds 1-4, **18M transitions**, b2's env
+   config, **fc 320 held fixed** so the comparison is seed-matched against b1, b2, b29, b41 and b47.
+   **p0 hands it the reference config unchanged**, because p0 found no winner — which makes p1 a
+   cleaner comparison than the plan expected rather than a blocked one. Phase 3's ≥90% bar is already
+   cleared by p0, so p1's job is the comparison, not the gate.
 
 **The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
 is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
