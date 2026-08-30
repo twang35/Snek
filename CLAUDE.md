@@ -75,6 +75,17 @@ turns it off; the mechanism is [`snek3/tools/chart_window.py`](snek3/tools/chart
 [`snek3/tools/eval_window.py`](snek3/tools/eval_window.py) and
 [`snek3/tools/live_runs.py`](snek3/tools/live_runs.py).
 
+## snek3's procedures are skills, not prose
+
+Launching a training, queueing a batch on the desktop, stopping an arm, deploying code, running a
+progress update: each is one skill in [`snek3/skills/`](snek3/skills/), invoked by name. Use the
+skill rather than reconstructing the steps — it carries the commands in order and the traps that
+break a run, and **a skill that fails is a bug in the skill**: fix the situation, then edit the skill
+so the next session does not hit it. [`snek3/skills/README.md`](snek3/skills/README.md) has the
+conventions.
+
+The files under `snek3/docs/` stay what they are: what is *true*, and the incidents behind each rule.
+
 ## Work as a collaborator
 
 **Ask questions when a request is ambiguous** in a way that changes the work — which arms to stop,

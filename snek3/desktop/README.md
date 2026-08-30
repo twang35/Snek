@@ -19,17 +19,16 @@ One writer per branch, so every push is `--force-with-lease` and nothing ever me
 
 ## Queue a job
 
-Three steps, and the third is what makes it start now rather than within ten minutes.
-
-```
-git checkout ops
-cp snek3/desktop/queue/examples/train.json snek3/desktop/queue/pending/b1b.json   # edit it
-git add snek3/desktop/queue/pending/b1b.json && git commit -m 'queue b1b' && git push origin ops
-ssh the-claw-den 'Snek/snek3/desktop/trigger'
-```
+The procedure — the `ops` worktree, validating a spec against `parse_job` before pushing, the push
+and the trigger — is [`../skills/desktop-batch`](../skills/desktop-batch/SKILL.md).
 
 **Pushing to `ops` starts real work on another machine**, so it needs the user's approval for *that*
-job — see the root [`CLAUDE.md`](../../CLAUDE.md).
+job — see the root [`CLAUDE.md`](../../CLAUDE.md). The trigger is what makes it start now rather than
+within ten minutes:
+
+```
+ssh the-claw-den 'Snek/snek3/desktop/trigger'
+```
 
 `queue/examples/` holds one worked spec per job type. The fields:
 

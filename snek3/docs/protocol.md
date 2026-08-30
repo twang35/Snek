@@ -140,10 +140,11 @@ candidates; it does not certify one.
 
 ## Stopping an arm
 
-**A trainer may not stop on SIGTERM — use `kill -9`, and verify.** Every durable file is written
-`.partial` then `os.replace`d and checkpoints land every 1,000 steps, so `kill -9` is safe. **Do not
-test liveness with `kill -0`** — it succeeds on a zombie; read `ps -o stat=`. On the desktop, **pause
-the queue before killing** or the freed slots refill within one poll.
+The procedure — with the pre-kill checks, the child processes each kind of job orphans, and the
+desktop's pause-first rule — is [`../skills/stop-run`](../skills/stop-run/SKILL.md). The two facts
+behind it: **a trainer may not stop on SIGTERM, and `kill -9` is safe** (every durable file is
+written `.partial` then `os.replace`d, checkpoints land every 1,000 steps), and **a killed wave loses
+nothing** (each shard resumes from its own file).
 
 **When arms are stopped, update [`charts.md`](charts.md) and [`results.md`](results.md) in the same
 pass**, and move the batch's rationale out of [`runs.md`](runs.md). Without the rationale a future

@@ -18,6 +18,11 @@ instrumentation that are properties of the problem rather than results.
 | [`results.md`](results.md) | every arm: config, final numbers, verdict |
 | [`charts.md`](charts.md) | one graph per arm |
 
+**Procedures are not docs.** How to launch, queue, stop or report on a run lives in
+[`../skills/`](../skills/), one skill each, so it costs nothing until it is used. These files carry
+what is *true* — the measurements, the incidents, the verdicts — and a skill links back here rather
+than restating them.
+
 **Keep the split clean.** `runs.md` is current state and forward plan only; results go to
 `results.md`, conclusions to `findings.md`, anything about *how to measure or judge* to
 `protocol.md`. snek2's equivalent grew to 950 lines of interleaved status and stopped being usable.

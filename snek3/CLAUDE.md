@@ -30,6 +30,7 @@ reason.
 | `dqn/`, `ppo/` | learning algorithms: the network, the replay, the agent, the collector | no | yes |
 | `tools/` | the tools and the libraries behind them: `arch`, `checkpoints`, `restore`, `eval_plan`, `run_report`, charts | no | yes, for checkpoint I/O |
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
+| `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
 | `docs/` | the investigation | | |
 | `plans/` | designs | | |
 | `tests/` | | | |
@@ -77,37 +78,24 @@ subprocess under `snek`, because snek3's env has no TensorFlow and snek2's has n
 safe to delete. Hyperparameters come from `SNEK_*` env vars, so variants run side by side without
 editing files.
 
-**Two greps confirm an arm got its config, and one of them is not optional.**
-`grep 'hyperparameter override:'` covers what `train.py` reads through `tuned()`.
-It is **silent on every knob `env/constants.py` reads at import** — the shaping doses and gates, the
-food-distance term, `SNEK_ZERO_OBS` — because those are read before the trainer's config exists. That
-is the set a shaping experiment is *about*: b2's `SNEK_CHASE_SAFE_SHAPING=0.1` had to be confirmed by
-reading `/proc/<pid>/environ` on the desktop. So also
-`grep 'reward config:'`, which `train.py` prints at startup from `vectorized/config.describe()`.
+**Two greps confirm an arm got its config, and one of them is not optional** —
+`grep -E 'hyperparameter override:|reward config:'`. The first covers what `train.py` reads through
+`tuned()` and is **silent on every knob `env/constants.py` reads at import** (the shaping doses and
+gates, the food-distance term, `SNEK_ZERO_OBS`), because those are read before the trainer's config
+exists — which is exactly the set a shaping experiment is about. b2's `SNEK_CHASE_SAFE_SHAPING=0.1`
+had to be confirmed by reading `/proc/<pid>/environ` on the desktop before `reward config:` existed.
+Launching is [`skills/laptop-run`](skills/laptop-run/SKILL.md).
 
 **Training never draws the game.** A display flip costs ~5.2 ms and the game flips once per step — a
 round trip to the window server, not our drawing code. `watch.py` and `record_gif.py` are the only
 ways to see a game, and they run in their own processes so they cost training nothing.
 
-**It does open a chart window, and there is exactly one per box.** Every training registers itself in
-`runs/.live/` and calls `chart_window.ensure()`; every arm of a wave spawns a viewer, the one whose
-viewer wins an `flock` on `runs/.live/.window` becomes the window and the rest exit in ~0.3 s having
-drawn nothing, later arms join the one already up, each arm's panel stays for the rest of the wave,
-and it closes itself a few minutes after the last one finishes. **The launcher holds no lock and must
-not start holding one** — `docs/findings.md` has the five-window incident that rule comes from.
-
-Nothing needs launching by hand, on this laptop or on the desktop. **The window is disposable and the
-training is not** — its own session, never read from, never waited on, never reopened by a run — so
-killing or relaunching it while four arms train cannot touch them. `SNEK_CHART_WINDOW=0` turns it off, which is what the test suite and
-every benchmark do.
-
-**A stage-B pass opens the same window over its own charts.** `tools/closeout.py` asks for one panel
-per arm of the batch and the window closes when the pass ends, so a close-out is watched the way a
-batch of trainings is. It is the same viewer and the same launcher — only two things differ, the panels
-(a fixed list, because a close-out's arms are known when it starts) and the closing condition (the
-pass's pid, not an empty registry). It takes **its own slot**, so a box can hold both windows at once,
-and `SNEK_CHART_WINDOW=0` silences both because "no window on this box" is one decision. Relaunch by
-hand with `python -m tools.eval_window`.
+**It does open a chart window, and there is exactly one per box** — the mechanism, the `flock` that
+makes "one" true, and why the launcher must hold no lock are in the root
+[`../CLAUDE.md`](../CLAUDE.md). What matters here: nothing needs launching by hand, the window is
+disposable and the training is not, and `SNEK_CHART_WINDOW=0` turns it off (which is what the test
+suite and every benchmark do). A stage-B pass takes its own slot, so a box can show a batch training
+and a batch being measured at once.
 
 ## The eval protocol is one stage
 
@@ -168,45 +156,11 @@ convention, a rule someone could "simplify" without seeing why it exists, or an 
 thinking to get right — if it needed reasoning, it needs a fixture, because the reasoning does not
 survive in the diff.
 
-**A passing suite is not coverage of the change you just made. Mutate the implementation and confirm
-a test fails.** snek2 took a third signature for its observation grouper and all 24 existing tests
-passed before and after, because every fixture was an open board where old and new answers agree.
-
-**Use `tools/mutate.py`; do not write the shell version.** Every hazard below is one an ad-hoc harness
-walked into in this repository, and all four are handled there:
-
-    PYTHONPATH=. python -m tools.mutate spec.json
-
-| hazard | what an ad-hoc harness does | why it is silent |
-|---|---|---|
-| a stale `.pyc` | `mv` the backup back, restoring an older mtime | bytecode is revalidated on mtime **and size**, and `3` to `1` changes neither |
-| a pattern that does not match | abort *after* checking, before writing a backup | the next restore puts the *previous* file's backup over the wrong module |
-| the harness is killed | nothing | `finally` unwinds on an exception, **not on a signal** — the mutation in flight survives |
-| the mutant hangs | wait forever | an outer command timeout then kills the harness, which is hazard 3 |
-
-**Four specs are committed, so a later session re-runs rather than re-derives.** From `snek3/`:
-
-| spec | mutants | covers |
-|---|---:|---|
-| `tests/mut_ppo.json` | 14 | `ppo/` — GAE's episode gate, `min` vs `max`, the entropy sign, the ratio's direction, γ/λ order, the bootstrap's state |
-| `tests/mut_seam.json` | 15 | the `train.py` algorithm seam and `dqn/algo.py` |
-| `tests/mut_trans.json` | 8 | the `transitions` column, from the prefill to the summary block |
-| `tests/mut_shaping.json` | 3 | `shaping_discount` reaching the collect env |
-
-**‡ Two PPO mutants survived their first run, and both diagnose the same test-writing mistake: the
-fixture's subject was a copy of the line rather than the line.** The clipped-objective fixtures rebuild
-the surrogate from the same three statements the agent uses — which pins the arithmetic and leaves
-`min` → `max` *in the agent* undetected — and `ppo/collect.py` had no test file at all, so a bootstrap
-taken off the last stored value instead of the state after it passed 100 tests. The fix in both cases
-was a fixture that calls the production entry point. A hundred passing PPO tests, and the two
-load-bearing lines were untested.
-
-The last two are one chain and it fired twice in one session: dropping the decrement from a
-`while debt >= 1.0:` accumulator turns it into an infinite loop, the 2-minute command timeout killed
-the harness, and `train.py` was left holding the mutation — **detectable only because a suite that
-still passes after a mutation is the definition of the thing you are looking for.** `mutate.py` now
-raises on `SIGTERM`/`SIGINT` so the restore runs, and gives each mutant 6x the baseline's own wall
-clock before calling it hung. A hung mutant counts as **killed**: the tests noticed.
+**A passing suite is not coverage of the change you just made. Mutate the implementation and
+confirm a test fails** — `skills/mutation-test`, which carries `tools/mutate.py`'s four hazards,
+the committed specs, and what a survivor tells you. snek2 took a third signature for its
+observation grouper and all 24 existing tests passed before and after, because every fixture was
+an open board where old and new answers agree.
 
 **Check the failure *type*.** Thirteen of snek2's tests were dead for two signature generations —
 they called a function with an argument it had stopped taking, so they raised `TypeError` rather than
@@ -219,6 +173,24 @@ which any cap satisfies, so it passed with the knob ignored.
 
 For refactors, also diff observations against a fixed-seed run — byte-identical output over a few
 thousand steps catches what assertions do not.
+
+## Skills
+
+**The procedures live in [`skills/`](skills/) and the facts live in the docs.** Before launching,
+queueing, stopping or reporting on anything, use the skill — it carries the commands in order and the
+traps that break a run, and it costs nothing until it is invoked.
+
+| skill | for |
+|---|---|
+| [`progress-update`](skills/progress-update/SKILL.md) | what is running on both boxes, then the doc refresh. Read-only on processes |
+| [`laptop-run`](skills/laptop-run/SKILL.md) | start a training, a batch or a stage-B close-out here |
+| [`desktop-batch`](skills/desktop-batch/SKILL.md) | queue work on `the-claw-den`, and pause/retune it |
+| [`stop-run`](skills/stop-run/SKILL.md) | kill an arm or a wave on either box, and clean up its children |
+| [`desktop-deploy`](skills/desktop-deploy/SKILL.md) | get the box on new code |
+| [`mutation-test`](skills/mutation-test/SKILL.md) | prove the tests cover a change |
+
+**A skill that fails is a bug in the skill.** Work out what happened, fix it, then edit the skill so
+the next session does not hit it — [`skills/README.md`](skills/README.md).
 
 ## Docs
 
@@ -310,15 +282,14 @@ until it closes" state.
 ## "Progress update" means look, don't touch
 
 A progress update is **read-only with respect to running processes**: analyse, update docs, report.
-**Do not kill, stop or restart any arm** — not even one that looks finished, is past its cap, or is
-clearly failing. Deciding a run is done is the user's call. If a run looks finished and no slot is
-needed, say so as a recommendation.
+**Do not kill, stop or restart any arm** — not even one past its cap, finished-looking, or clearly
+failing. Deciding a run is done is the user's call. The procedure is
+[`skills/progress-update`](skills/progress-update/SKILL.md).
 
-**Before killing or relaunching any arm, check its wall-clock runtime and step, and never call an arm
-"fresh" from a hunch.** Elapsed session time is not real time — an arm that feels seconds old to a
-session can have trained for hours. This nearly killed a 3.5-hour, near-record snek2 arm whose config
-change would have been reverted for the loss, because the launch "felt recent". Run
-`ps -o etime,lstart -p <pid>` and read `summary.step` from `runs/<policy>_evals.json` *first*.
+**Before killing or relaunching any arm, check its wall-clock runtime and step.** Elapsed session
+time is not real time — an arm that feels seconds old can have trained for hours. This nearly killed
+a 3.5-hour, near-record snek2 arm because the launch "felt recent". Stopping anything goes through
+[`skills/stop-run`](skills/stop-run/SKILL.md).
 
 ## Reading status
 
