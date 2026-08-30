@@ -23,6 +23,34 @@ stage A** — see [`findings.md`](findings.md).
 
 ## Now
 
+**Queued on the desktop 2026-08-30 09:57: the parallelism sweep, 11 waves behind p2's stage B.**
+The stage-A defaults are laptop numbers — `tools/eval_queue.py:141-145` says the desktop "has not been
+swept; the number is inherited rather than measured there" — and 8 arms x 6 workers is a 14-core
+shape on 8 physical cores / 16 SMT threads.
+
+| phase | waves | knob | values |
+|---|---:|---|---|
+| training | 6 | `SNEK_EVAL_WORKERS` at 8 arms | 4, 6, 8, 10, **12, 12** |
+| stage B | 5 | `eval_shards` on one arm | 8, 12, 16, 20, 24 |
+
+**Every wave does identical work, so ledger wall clock is the whole measurement** — each training wave
+advances the same eight warm-started arms by 1,196,032 transitions, each eval wave measures p2h's
+`screen:97` set at 100 episodes. Four things about it that are not obvious:
+
+- **The worker order must ascend** or a wave inherits the previous wave's extra workers — see
+  [`running.md`](running.md). Waves 5 and 6 repeat at 12 for wave-to-wave repeatability.
+- **The arms are warm-started from `p2h-ep8-seed8` at 255M transitions**, because a cold PPO arm has
+  short episodes, cheap stage A, and would put the optimum far below the real one. Config is therefore
+  p2's (fc 320, 8 epochs) — `arch.json` enforces the match.
+- **`type: benchmark`, not `train`**, so `wants_stage_b` cannot auto-queue 48 stage-B waves behind it;
+  `SNEK_EVAL_INTERVAL` is set explicitly because the benchmark launcher would otherwise switch off the
+  very thing being measured.
+- **Arm count is not swept.** `_dispatch` takes pending jobs in priority order up to `max_trainers`
+  regardless of priority value, so any group of 8+ trainer jobs launches as exactly 8. That axis needs
+  a `runtime.json` commit between waves and is the obvious follow-up. `HARD_MAX_EVAL_SHARDS` was
+  raised 16 -> 24 on the box so the shard bracket is two-sided.
+
+
 **Batch p0 — the PPO tuning sweep. Training is done; stage B is finishing on both boxes.** 15 arms,
 seed 1, **10M transitions each**, all on b2's reward function, each one knob off a reference of
 lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.

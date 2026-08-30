@@ -160,6 +160,17 @@ step no checkpoint exists at is the one thing the protocol cannot tolerate.
 | `SNEK_EVAL_QUEUE_DEPTH` | **16** | how many checkpoints may be **unmeasured**. **This is both the schedule's blind spot and the throughput lever**: at 16 the epsilon and shield schedules read a measurement up to 16,000 counted steps old. 16 is where an arm stops being eval-bound — all 19 swept configurations at depth 8 sat pinned against their cap with the trainer waiting, while at 16 the queue drains and the arm reaches 94% of its unblocked rate. 24 regresses, 12 gets 63% of the gain. **0 is the verification mode** — the trainer measures each checkpoint before resuming, which reproduces an unqueued arm bit for bit and recovers nothing |
 | `SNEK_EVAL_WORKERS` | **6** | worker processes **per box**, shared by every arm on it. **‡ 6 was tuned at four DQN trainers and is too low for eight PPO ones** — measured 2026-08-30, workers pinned at 100% with the trainers at half and a third of the box idle. For PPO the bound is also free to raise, because its only schedule is a function of the step rather than of the eval history; see [`findings.md`](findings.md). Unlike depth this turns over: at four arms the sweep measured 4.84 h (2w), 3.94 h (4w), **3.21 h (6w)**, 3.27 h (8w), 3.55 h (10w) — past six, workers starve the trainers, whose unblocked rate falls 380 -> 306 st/s, and the box reaches 4% idle to run *slower*. **Idle CPU is not the target**; the fastest configuration leaves ~20% of the box free. Starting none is safe — the arm measures its own and runs at today's speed |
 
+**‡ Sweeping this knob only works in ascending order, and a descending step is silently wrong.**
+`eval_queue.ensure_workers(target)` iterates `range(target)` and starts the slots that are not live —
+it **never reaps a worker in a slot ≥ target.** A worker self-exits only after
+`IDLE_EXIT_SECONDS = 300` of claiming nothing, and the desktop's gap between waves is one 30 s poll,
+so a wave that follows a *higher*-worker wave inherits the extras — and they are not idle, because the
+new wave's arms are producing checkpoints, so they claim its queue work and contribute. The wave then
+measures more workers than its label says. A first draft of the 2026-08-30 desktop sweep ordered
+8, 4, 6, 10, 12 and would have read "4 is surprisingly fine". The same leftovers during a *stage-B*
+phase are harmless: there is no stage-A work then, so they poll with sleeps at ~200 MB and near-zero
+CPU, and exit within five minutes.
+
 **Where the 1.67x comes from, and why it is not more.** The saving is the *streaming efficiency* —
 a checkpoint measured inside a sustained round costs ~1.1-1.9 s against ~4.2 s drained — plus whatever
 of the remainder overlaps with training. It is **not** free parallelism: total CPU work is roughly
