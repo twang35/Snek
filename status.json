@@ -1,15 +1,15 @@
 {
-  "iso": "2026-08-30T08:41:39",
-  "ts": 1788104499.5121133,
+  "iso": "2026-08-30T08:42:09",
+  "ts": 1788104529.4264567,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p2 \u2014 p2 stage B, restarted onto the shared close-out (eight arms, 255-271M transit... \u2014 eval (8 arms)"
+      "p2 \u2014 p2 stage B, restarted for the 99% chart guide (eight arms, 255-271M transitions) \u2014 eval (8 arms)"
     ],
-    "queued": [
-      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume"
-    ],
-    "attention": []
+    "queued": [],
+    "attention": [
+      "** p2-stageb2 failed and will NOT be retried automatically (rc=-15). Its arms count as measured; delete its ledger record to re-queue."
+    ]
   },
   "runtime": {
     "max_trainers": 8,
@@ -20,7 +20,7 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": true,
+    "paused": false,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
@@ -32,7 +32,7 @@
   },
   "running": [
     {
-      "id": "p2-stageb2",
+      "id": "p2-stageb3",
       "type": "eval",
       "policy": "p2a-ep8-seed1",
       "policies": [
@@ -45,15 +45,16 @@
         "p2g-ep8-seed7",
         "p2h-ep8-seed8"
       ],
-      "pid": 235364,
+      "pid": 245682,
       "step": 271368192,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1230
+      "steps_per_sec": null,
+      "elapsed_s": 0
     }
   ],
   "ledger": {
-    "p2-stageb2": "running",
+    "p2-stageb3": "running",
+    "p2-stageb2": "failed",
     "p2-stageb": "done",
     "p2h-ep8-seed8": "failed",
     "p2g-ep8-seed7": "failed",
@@ -92,8 +93,8 @@
   },
   "disk_free_gb": 42.1,
   "load_avg": [
-    16.68798828125,
-    16.45703125,
-    15.984375
+    12.03271484375,
+    15.421875,
+    15.65771484375
   ]
 }
