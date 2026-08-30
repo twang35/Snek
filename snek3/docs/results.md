@@ -45,21 +45,21 @@ arm is seed-matched to anything, so no row here supports a between-config claim 
 
 | arm | knob | best30 | sd30 | ≥95 evals | stage B: n | best | ≥98 |
 |---|---|---:|---:|---:|---:|---:|---:|
-| `p0q-ep8` | epochs 8 | **97.2** | 3.0 | 217 | pending | | |
-| `p0k-fc200x100` | fc 200,100 | **97.1** | 2.5 | 215 | pending | | |
+| `p0q-ep8` | epochs 8 | **97.2** | 3.0 | 217 | 217 | 98.8% | **21** |
+| `p0k-fc200x100` | fc 200,100 | **97.1** | 2.5 | 215 | 215 | **99.2%** | 17 |
 | `p0g-ent003` | entropy 0.003 | 96.9 | 2.8 | 153 | 153 | 98.6% | 2 |
-| `p0n-fc300x100` | fc 300,100 | 96.9 | 2.4 | **233** | pending | | |
+| `p0n-fc300x100` | fc 300,100 | 96.9 | 2.4 | **233** | 233 | 99.0% | **21** |
 | `p0e-lam95` | λ 0.95 | 96.8 | 2.4 | 179 | 179 | 98.2% | **7** |
-| `p0o-g995` | γ 0.995 | 96.7 | **1.8** | 166 | pending | | |
+| `p0o-g995` | γ 0.995 | 96.7 | **1.8** | 166 | 166 | 98.6% | 10 |
 | `p0a-lr3e4-g99` | *the reference* | 96.6 | 2.2 | 108 | 108 | 98.4% | 6 |
 | `p0j-lr5e4` | lr 5e-4 | 96.5 | 3.6 | 160 | 160 | **99.0%** | **7** |
-| `p0m-fc200` | fc 200 | 96.4 | 2.0 | 131 | pending | | |
+| `p0m-fc200` | fc 200 | 96.4 | 2.0 | 131 | 131 | 98.0% | 1 |
 | `p0i-lr1e4` | lr 1e-4 | 95.0 | 5.0 | 47 | 47 | 97.4% | 0 |
-| `p0l-fc500` | fc 500 | 94.7 | 3.2 | 93 | pending | | |
-| `p0p-roll64` | rollout 64 | 94.1 | 2.9 | 104 | pending | | |
+| `p0l-fc500` | fc 500 | 94.7 | 3.2 | 93 | 93 | 98.4% | 3 |
+| `p0p-roll64` | rollout 64 | 94.8 | 2.9 | 104 | 133 | 97.6% | 0 |
 | `p0f-lam100` | λ 1.0 | 90.8 | 5.2 | 11 | 11 | 96.2% | 0 |
 | `p0h-ent03` | entropy 0.03 | 90.6 | 9.1 | 9 | 9 | 94.8% | 0 |
-| `p0r-mb1024` | minibatch 1024 | **89.7** | 4.4 | 16 | pending | | |
+| `p0r-mb1024` | minibatch 1024 | **89.7** | 4.4 | 16 | 16 | 95.6% | 0 |
 | `p0b`, `p0c`, `p0d` | lr 1e-3, lr 3e-3, γ 0.9975 | 85.2, 69.9, 81.6 | 7.2, 18.4, 4.7 | 1, 3, 0 | 1, 3, — | 94.4%, 95.8% | 0 |
 
 `p0b`/`p0c`/`p0d` stopped at the 3M cap and are the arms the cap-inversion finding is measured
@@ -75,34 +75,51 @@ one number. **p0 hands p1 the reference config unchanged.**
 · reference (1x) 96.6 · epochs 8 (2x) 97.2. **Rollout size is a second axis:** `p0p-roll64` holds the
 ratio fixed, halves the rollout, and loses ~2.5 pp.
 
-**Two narrow layers beat one wide one, and 320 is more width than this task needs.** `fc 200,100` 97.1,
-`fc 300,100` the most ≥95 checkpoints of any arm at 233, `fc 200` level with the 320 baseline, and
-**`fc 500` clearly worse at 94.7**.
+**Two hidden layers beat every single-layer width tried, and the record region is where it shows.**
+Density of ≥98%/500 checkpoints, which is the statistic that matters for a champion hunt:
+
+| network | parameters | best30 | ≥98%/500 | density |
+|---|---:|---:|---:|---:|
+| `fc 300,100` | 39,703 | 96.9 | **21** of 233 | **9.0%** |
+| `fc 200,100` | 26,603 | **97.1** | 17 of 215 | 7.9% |
+| `fc 320` *(reference)* | 10,883 | 96.6 | 6 of 108 | 5.6% |
+| `fc 500` | 17,003 | 94.7 | 3 of 93 | 3.2% |
+| `fc 200` | 6,803 | 96.4 | 1 of 131 | 0.8% |
+
+**Depth is not simply capacity here:** `fc 500` has more parameters than `fc 200` and is worse on
+best30, and `fc 200,100` has more than `fc 500` and is much better — so width past 320 actively hurts
+while a second layer helps. The two-layer arms also carry the two highest single checkpoints in the
+whole sweep (99.2% and 99.0%). **This is the most promising thread p0 turned up**, and it belongs to a
+p2 "better agent" batch: p1 must hold the network at 320 to stay seed-matched against b2.
 
 ### Against DQN, at the same protocol
 
 | | transitions | stage-B measurements | best | ≥98%/500 | density | wall clock per arm |
 |---|---:|---:|---:|---:|---:|---:|
-| **PPO p0, 7 laptop arms pooled** | 10M | 658 | **99.0%** | **22** | **3.34%** | **~3 min** (7 sharing 14 cores) |
+| **PPO p0, all 15 arms pooled** | 10M | 1,862 | **99.2%** | **95** | **5.10%** | **~3 min** (7 sharing 14 cores) |
 | **DQN b2, 4 seeds pooled** | 18M | 1,135 | 99.2% | 5 | 0.44% | ~7-8 h (16 cores) |
 
-**PPO's record-region density is 7.6x DQN's**, which is the metric
-[`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison. DQN still holds the higher
-single checkpoint.
+**PPO's record-region density is 11.6x DQN's** — 95 checkpoints at ≥98%/500 against 5 — which is the
+metric [`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison. The best *single*
+checkpoint is a tie at 99.2%, and PPO's got there on **5.05M** transitions against b2's 18M.
 
 **The honest depth, and it is the number to quote.** `p0j-lr5e4` @9,469,952 measured **99.0%/500** —
 equal to snek2's admitted hall-of-fame record at that depth — and re-measured on a fresh seed at 3,000
 episodes: **97.7% [97.1, 98.1]**, a 1.3 pp fall. `p0g-ent003` @8,159,232 fell 98.6% → **96.6%**
 [95.9, 97.2]. So:
 
-| policy | 3,000-episode measurement |
-|---|---:|
-| `b44a-import` @2739000 — snek2's champion, converted | **98.8%** [98.3, 99.1] |
-| `p0j-lr5e4` @9469952 — PPO's best | **97.7%** [97.1, 98.1] |
+| policy | 3,000-episode measurement | its 500-episode figure | transitions |
+|---|---:|---:|---:|
+| `b44a-import` @2739000 — snek2's champion, converted | **98.8%** [98.3, 99.1] | — | 2.74M |
+| `p0k-fc200x100` @5046272 — PPO's best | **97.9%** [97.3, 98.3] | 99.2% | 5.05M |
+| `p0j-lr5e4` @9469952 | **97.7%** [97.1, 98.1] | 99.0% | 9.47M |
+| `p0g-ent003` @8159232 | **96.6%** [95.9, 97.2] | 98.6% | 8.16M |
 
-**The champion is still ahead, by 1.1 pp and outside PPO's interval.** And it got there on **2.74M**
-transitions against PPO's 9.47M, so on sample efficiency to a champion checkpoint the snek2 DQN lineage
-is ~3.5x better. Neither number is a verdict on the algorithms — the champion is a selected best across
+**The champion is still ahead — 98.8% against PPO's best 97.9%**, and the intervals only touch at
+98.3. It also got there on 2.74M transitions against 5.05M, so on sample efficiency to a *champion
+checkpoint* the snek2 DQN lineage remains ahead. **Every one of the three PPO highs fell on
+re-measurement**, by 1.3, 1.3 and 2.0 pp — which is the whole reason this table exists and the 500-episode
+column is the one not to quote. Neither number is a verdict on the algorithms — the champion is a selected best across
 snek2's whole history and `p0j` is one arm of a first tuning sweep — but quoting PPO's 99.0%/500 without
 this table would be quoting a selected high, which
 [`../CLAUDE.md`](../CLAUDE.md) explicitly warns against.

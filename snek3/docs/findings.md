@@ -379,22 +379,56 @@ a sweep at a cap every arm was still rising through as having produced no rankin
 Matched on transitions **and** on reward function (both on b2's `chase_safe c=0.1 gate=75`, no
 food-distance term, fc 320):
 
-| | best30 at 10M transitions | best stage-B checkpoint | stage-B measurements behind it |
-|---|---|---|---|
-| PPO, 7 configs, seed 1 | 90.6 – **96.9** | **98.6% / 500**, re-measured **96.6% / 3,000** [95.9, 97.2] | 153, one arm |
-| DQN b2, 4 seeds | 93.6 – **96.9** | 99.2% / 500 | 1,135, four arms |
+| | best30 at 10M transitions | best stage-B checkpoint | ≥98%/500 | measurements |
+|---|---|---|---:|---:|
+| PPO p0, 15 configs, seed 1 | 89.7 – **97.2** | **99.2% / 500**, re-measured **97.9% / 3,000** [97.3, 98.3] | **95** | 1,862 |
+| DQN b2, 4 seeds | 93.6 – **96.9** | 99.2% / 500 | 5 | 1,135 |
 
-**The top of the two ranges is the same number.** DQN found the better single checkpoint, but out of
-7.4x more stage-B measurements across four seeds; PPO's 98.6% came from one arm's 153. Neither side
-supports a claim of superiority and this entry is not making one — what it rules out is the reading
-that phase 6b's gate arm suggested, that PPO is *behind* on this task. That arm was on snek3's
-unshaped defaults at 508k transitions, and the reward function was doing most of the work.
+**The best single checkpoint is a tie at 99.2%, and PPO's got there on 5.05M transitions against b2's
+18M.** Where the two genuinely differ is the *density* of record-region checkpoints — the metric
+[`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison — where PPO is **11.6x**
+ahead: 95 checkpoints at ≥98%/500 against 5.
+
+That is not a claim that PPO is the better algorithm here, and the counter-evidence is in the same
+table: **snek2's champion still measures 98.8%/3,000 against PPO's best at 97.9%**, on 2.74M
+transitions against 5.05M. What this entry does rule out is the reading that phase 6b's gate arm
+suggested, that PPO is *behind* on this task. That arm was on snek3's unshaped defaults at 508k
+transitions, and the reward function was doing most of the work.
 
 **The cost difference is not marginal.** PPO's seven arms reached 10M transitions in **~20 minutes**
 sharing a 14-core laptop; b2's DQN arms took **~7-8 h each** for 18M on the 16-core desktop — about
 13x per transition, because PPO takes one gradient step per 256 samples per epoch against DQN's one
 per transition. The 3,000-episode re-measurement of a selected high fell **2.0 pp** from its 500-episode
 value, consistent with the 1.4 pp mean fall across snek2's four best hall-of-fame entries.
+
+### Two hidden layers beat every single-layer width, and width past 320 actively hurts
+
+From batch p0's fc sweep, at 10M transitions each on b2's reward function, ranked by the statistic a
+champion hunt actually cares about — how densely an arm produces ≥98%/500 checkpoints:
+
+| network | parameters | best30 | ≥98%/500 | density | best checkpoint |
+|---|---:|---:|---:|---:|---:|
+| `fc 300,100` | 39,703 | 96.9 | **21** of 233 | **9.0%** | 99.0% |
+| `fc 200,100` | 26,603 | **97.1** | 17 of 215 | 7.9% | **99.2%** |
+| `fc 320` — the reference, and snek2's shape | 10,883 | 96.6 | 6 of 108 | 5.6% | 98.4% |
+| `fc 500` | 17,003 | 94.7 | 3 of 93 | 3.2% | 98.4% |
+| `fc 200` | 6,803 | 96.4 | 1 of 131 | 0.8% | 98.0% |
+
+**It is not simply capacity.** `fc 500` has 2.5x the parameters of `fc 200` and a *lower* best30; `fc
+200,100` has 1.6x the parameters of `fc 500` and is far better. So the two effects are separate: **more
+width past 320 hurts, and a second layer helps.** The two-layer arms also hold the two highest single
+checkpoints in the entire sweep.
+
+**Why this matters beyond PPO.** `fc 320` is not a tuned snek3 choice — it is snek2's shape, carried
+across so a champion's weights convert, and every batch in both eras has used it. This is the first
+evidence in the project that it is the wrong shape, and it was found by a knob nobody had swept.
+`dqn/net.py` takes the same `fc_layers` config, so **the same test is available to DQN for the price of
+one arm** and has never been run.
+
+The caveat is the usual one: n=1 per shape, and the best30 column spans 2.4 pp across the three best
+shapes, which this project's noise cannot resolve. The **density** column is the load-bearing one
+because it pools 100-233 independent 500-episode measurements per arm rather than resting on a single
+peak.
 
 ### The documented way to confirm an arm's config was blind to the shaping knobs
 

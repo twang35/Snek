@@ -42,12 +42,15 @@ Seven on the laptop, eight on the desktop. Curves in [`charts.md`](charts.md), f
    89.7, the reference (1x) 96.6, epochs 8 (2x) 97.2. **Rollout size is a second, separate axis**:
    `p0p-roll64` held the ratio fixed, halved the rollout and lost ~2.5 pp.
 
-**And the pre-registered PPO-vs-DQN metric favours PPO.** [`../plans/ppo.md`](../plans/ppo.md) §10
-names the **≥98%/500 count** — the width of the record region — as 6e's headline. PPO's `p0e` has 7 of
-179 stage-B measurements there and `p0a` 6 of 108; **b2's four DQN seeds have 5 of 1,135**, so PPO's
-record-region density is ~10x higher. b2 still holds the better single checkpoint at 99.2%/500 against
-PPO's 98.6%, and that 98.6% re-measured **96.6% over 3,000 episodes** on a fresh seed, a 2.0 pp fall
-that is normal for a selected high.
+**And the pre-registered PPO-vs-DQN metric favours PPO by 11.6x.** [`../plans/ppo.md`](../plans/ppo.md)
+§10 names the **≥98%/500 count** — the width of the record region — as 6e's headline. Pooled over all 15
+arms PPO has **95 of 1,862** stage-B measurements there; **b2's four DQN seeds have 5 of 1,135**. The best
+single checkpoint is a **tie at 99.2%**, and PPO's reached it on **5.05M** transitions against b2's 18M.
+
+**But at the honest depth the champion still leads.** PPO's 99.2% re-measured **97.9% over 3,000
+episodes** [97.3, 98.3] on a fresh seed; snek2's converted champion measures **98.8%** [98.3, 99.1] on
+2.74M transitions. All three PPO highs fell 1.3-2.0 pp on re-measurement. **Quote the 3,000-episode
+column, not the 500.**
 
 **Cost, because it changes what is worth running:** 10M transitions is **~20 minutes** with seven arms
 sharing the 14-core laptop, against b2's ~7-8 h per arm for 18M on the 16-core desktop. A PPO sweep arm
@@ -55,12 +58,18 @@ is minutes. Do not budget one like a DQN arm.
 
 ### Next for PPO
 
+**The network shape is the most promising thread p0 turned up**, and it is not PPO-specific. Two hidden
+layers beat every single-layer width tried, on ≥98%/500 density: `fc 300,100` 9.0%, `fc 200,100` 7.9%,
+`fc 320` 5.6%, `fc 500` 3.2%, `fc 200` 0.8% — and it is not capacity, because `fc 500` has 2.5x the
+parameters of `fc 200` and a lower best30. **`fc 320` is snek2's shape, carried across so a champion's
+weights convert, and every batch in both eras has used it.** `dqn/net.py` takes the same `fc_layers`
+config, so **the same test is one arm away for DQN and has never been run** — see
+[`findings.md`](findings.md).
+
 **The follow-up wave, designed and not yet launched** — push the axis that moved rather than resample
 the flat ones: epochs 12 and 16, minibatch 128, rollout 256, and `fc 200,100` + epochs 8 as the one
-interaction worth a slot. Two narrow layers beat one wide one in p0 (`fc 200,100` 97.1, `fc 300,100`
-233 checkpoints ≥95 — the most of any arm — against **`fc 500` at 94.7**), so depth is the other thread
-worth pulling; it belongs to a p2 "better agent" batch rather than to p1, which has to hold the
-network at 320 to stay seed-matched against b2.
+interaction worth a slot. Depth belongs to a p2 "better agent" batch rather than to p1, which has to
+hold the network at 320 to stay seed-matched against b2.
 
 ---
 
