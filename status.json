@@ -1,10 +1,10 @@
 {
-  "iso": "2026-08-29T22:44:16",
-  "ts": 1788068656.2336137,
+  "iso": "2026-08-29T22:54:19",
+  "ts": 1788069259.2722747,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p0q \u2014 p0q-ep8 to 470M transitions: does a PPO arm keep improving past 10M? \u2014 training 3% (1 arm)"
+      "p0q \u2014 p0q-ep8 to 470M transitions: does a PPO arm keep improving past 10M? \u2014 training 5% (1 arm)"
     ],
     "queued": [],
     "attention": []
@@ -37,10 +37,10 @@
         "p0q-ep8"
       ],
       "pid": 4155693,
-      "step": 12009472,
+      "step": 22773760,
       "max_steps": 470000000,
-      "steps_per_sec": null,
-      "elapsed_s": 0
+      "steps_per_sec": 19487.4,
+      "elapsed_s": 603
     }
   ],
   "ledger": {
@@ -71,10 +71,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 48.8,
+  "disk_free_gb": 48.7,
   "load_avg": [
-    1.5888671875,
-    1.70361328125,
-    0.73681640625
+    6.62548828125,
+    5.9365234375,
+    3.5517578125
   ]
 }
