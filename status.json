@@ -1,12 +1,12 @@
 {
-  "iso": "2026-08-29T22:54:19",
-  "ts": 1788069259.2722747,
+  "iso": "2026-08-29T22:56:47",
+  "ts": 1788069407.9212987,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "p0q \u2014 p0q-ep8 to 470M transitions: does a PPO arm keep improving past 10M? \u2014 training 5% (1 arm)"
+    "running": [],
+    "queued": [
+      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume"
     ],
-    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -18,33 +18,19 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": false,
+    "paused": true,
     "drain": false,
-    "auto_stage_b": true,
+    "auto_stage_b": false,
     "viewer": true
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
+    "trainer": 0,
     "eval": 0
   },
-  "running": [
-    {
-      "id": "p0q-ep8-long",
-      "type": "train",
-      "policy": "p0q-ep8",
-      "policies": [
-        "p0q-ep8"
-      ],
-      "pid": 4155693,
-      "step": 22773760,
-      "max_steps": 470000000,
-      "steps_per_sec": 19487.4,
-      "elapsed_s": 603
-    }
-  ],
+  "running": [],
   "ledger": {
-    "p0q-ep8-long": "running",
+    "p0q-ep8-long": "failed",
     "p0r-stageb": "done",
     "p0q-stageb": "done",
     "p0p-stageb": "done",
@@ -73,8 +59,8 @@
   },
   "disk_free_gb": 48.7,
   "load_avg": [
-    6.62548828125,
-    5.9365234375,
-    3.5517578125
+    3.4814453125,
+    5.29248046875,
+    3.6943359375
   ]
 }
