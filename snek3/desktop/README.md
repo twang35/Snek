@@ -159,11 +159,17 @@ a batch should start *now*.
 ## The chart window
 
 **While anything is training, the box's monitor shows one window with every running arm in it** — and
-the daemon does not open it. Each trainer does, for the box: the first arm to start opens the window,
-later arms join the one already up, each arm's panel stays for the rest of the wave, and it closes
-itself a few minutes after the last arm finishes.
-The mechanism is `tools/chart_window.py` and the pid registry in `tools/live_runs.py`, and it is
-identical on the laptop, which is the point of moving it out of the daemon.
+the daemon does not open it. Every trainer asks for it: the arm whose viewer wins the slot becomes the
+window, later arms join the one already up, each arm's panel stays for the rest of the wave, and it
+closes itself a few minutes after the last arm finishes. The mechanism is `tools/chart_window.py`, the
+`flock` in `tools/chart_viewer.py` and the pid registry in `tools/live_runs.py`, and it is identical on
+the laptop, which is the point of moving it out of the daemon.
+
+**Eight arms starting together spawn eight viewers, and seven exit within a second.** Expected, not a
+fault: the viewer holds an exclusive `flock` on `runs/.live/.window` and the losers stand down before
+drawing. Seeing *more than one* survive is the fault — this box opened five on 2026-08-29, when the
+launcher still tried to decide for itself. Check with
+`ps -Ao pid=,command= | grep '[c]hart_viewer'`.
 
 **The daemon owed the window two things and it still owes exactly those two.** `DISPLAY` and
 `XAUTHORITY` from `host.env` are forwarded into every job's environment — without them a job cannot

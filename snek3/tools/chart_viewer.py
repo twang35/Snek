@@ -12,13 +12,13 @@ with one fatal XIO error.
 The window fills the display it opens on. `--scale` is a fraction of that, not a number of inches —
 see `fit_dims`.
 
-**A training opens this, and there is one per box** — `tools/chart_window.py`. snek2's version was
-1,010 lines and ~500 of them existed because four peer trainers each tried to open one shared window
-while knowing nothing about each other: a process registry, a grace period, an `O_EXCL` claim lock,
-`pgrep` corroboration, zombie detection and a dedupe, every line a dated scar. The requirement is the
-same here and the answer is ~140 lines, because the registry stores each arm's **pid** — so liveness
-is a question about a known process instead of a pattern, and none of the grace-period machinery has
-anything to do.
+**Every training asks for this, and there is one per box.** Asking is idempotent because *this*
+process takes an exclusive `flock` on the slot at startup and the losers exit before they draw — see
+`take_window_slot`, and `tools/chart_window.py` for the launcher side, which now owns no exclusion at
+all. snek2 spent ~500 lines on that problem (a process registry, a grace period, an `O_EXCL` claim
+lock, `pgrep` corroboration, zombie detection and a dedupe, every line a dated scar) and snek3's
+first attempt spent ~60 and opened five windows on the desktop on 2026-08-29. The kernel does it in
+one call that cannot be won twice and needs no cleanup.
 
 **The normal mode is `--runs-dir`**, which shows the trainings registered in `runs/.live/`. Panels
 appear as arms start and **stay for the rest of the wave** once they do, so a batch with one arm left
@@ -37,6 +37,7 @@ closes.
 """
 
 import argparse
+import fcntl
 import glob as globmod
 import os
 import signal
@@ -396,6 +397,48 @@ def idle_close(arms, seen_arms, empty_since, now):
     return True, empty_since, now - empty_since >= IDLE_CLOSE_SECONDS
 
 
+def take_window_slot(runs_dir):
+    """Takes the box's one-window slot, or returns None if another window already holds it.
+
+    **This is the whole of the mutual exclusion, and the kernel is what enforces it.** An `flock` is
+    held by one open file description at a time, is released by the kernel when its holder dies for
+    any reason, and leaves nothing behind that a later window has to recognise as stale. So the three
+    cases that broke the launcher-side claim protocol it replaced — a slot file created but not yet
+    written, a slot file holding a dead pid, and two launchers taking over the same dead slot in the
+    same microsecond — stop being cases at all.
+
+    Measured on 2026-08-29, before this existed: eight arms launched together opened a mean of 6.6
+    windows, and the desktop opened five. Eight racers against this open one, every time.
+
+    The pid is written *after* the lock is won, so it is always a real window's pid — that is what
+    `chart_window.holder` reads to skip a spawn it does not need. Losing is not a failure and neither
+    is a filesystem that cannot lock: a box that cannot take the slot still gets its window, which is
+    the failure direction to prefer for something disposable.
+    """
+    path = live_runs.window_lock_path(runs_dir)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError:
+        return True                       # cannot lock, so draw rather than refuse
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(descriptor)
+        return None
+    except (AttributeError, NameError):   # pragma: no cover - no flock on this platform
+        return True
+    try:
+        os.truncate(descriptor, 0)
+        os.write(descriptor, '{0}\n'.format(os.getpid()).encode('utf-8'))
+    except OSError:
+        pass
+    # The descriptor is deliberately never closed. The lock lives as long as it is open, which is as
+    # long as this process, and `Viewer.exit_now` leaves via `os._exit` — so there is no close path to
+    # get wrong and nothing to release by hand.
+    return descriptor
+
+
 def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
         max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None,
         runs_dir=None, now=time.time):
@@ -466,6 +509,21 @@ def main(argv=None):
     if not args.paths and not args.glob_pattern and args.runs_dir is None:
         parser.error('give PNG paths, --glob or --runs-dir')
     pids = [int(token) for token in args.watch_pid.split(',') if token.strip()]
+    # Only the box's window is a singleton. An agent looking at arbitrary charts with `--glob` or a
+    # path list is not the box window and must never be refused because one is up.
+    if args.runs_dir is not None:
+        if take_window_slot(args.runs_dir) is None:
+            # Every arm of a wave asks for the window, so this is the ordinary outcome for all but
+            # one of them and not a failure. Said out loud anyway: it lands in the log of the arm
+            # whose spawn lost, where the alternative is a viewer that vanished with no explanation.
+            print('a chart window is already up (pid {0}); nothing to do'.format(
+                live_runs.read(live_runs.window_lock_path(args.runs_dir))), flush=True)
+            return 0
+        # Printed here rather than by the launcher, because only the process holding the slot knows
+        # that it is the window. It goes to the stdout of whoever spawned it, which is the log of the
+        # arm that opened it.
+        print('chart window: pid {0}, showing every training on this box. Killing it does not '
+              'affect any run, and no run reopens it.'.format(os.getpid()), flush=True)
     run(args.paths, args.glob_pattern, pids, args.interval, args.max_panels, args.title,
         args.scale, args.dpi, args.runs_dir)
     return 0

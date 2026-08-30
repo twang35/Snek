@@ -45,9 +45,18 @@ snek3's investigation is [`snek3/docs/`](snek3/docs/).
 
 ## Every training opens a chart window, and no agent launches one by hand
 
-**One window per box, showing every training running on it**, on the laptop and the desktop alike. The
-first arm to start opens it, later arms join it, and it closes itself a few minutes after the last one
-finishes. Nothing has to be launched, and a `runs/*.png` glob is no longer the way to watch a batch.
+**One window per box, showing every training running on it**, on the laptop and the desktop alike.
+Every arm asks for it, the viewer settles which one becomes it, later arms join it, and it closes
+itself a few minutes after the last one finishes. Nothing has to be launched, and a `runs/*.png` glob
+is no longer the way to watch a batch.
+
+**The "one" is enforced by an `flock` the viewer holds, not by the arms agreeing.** Every arm of a
+wave spawns a viewer; the losers exit in ~0.3 s having drawn nothing. That is deliberate: a launcher
+that has to *decide* whether to spawn is a claim protocol, and this project has now had two of those
+go wrong — snek2's 500 lines of `pgrep` machinery, and snek3's own `O_EXCL`-plus-takeover, which
+opened **five windows on the desktop on 2026-08-29** and a mean of 6.6 per 8-arm batch when measured.
+A lock the kernel holds cannot be taken twice, is released however its holder dies, and leaves no
+state behind for the next window to misread. **Do not reintroduce a launcher-side claim.**
 
 **A panel stays for the rest of the wave once it appears**, so a batch with one arm left still shows
 all four — three finished arms are most of what a glance is for. The accumulated set is dropped when

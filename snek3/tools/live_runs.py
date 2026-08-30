@@ -28,6 +28,8 @@ import subprocess
 from env import constants
 
 DIR_NAME = '.live'
+# The chart window's slot, beside the arms it draws. A dot, so `live()` never reads it as an arm.
+WINDOW_LOCK_NAME = '.window'
 
 
 def directory(runs_dir=None):
@@ -41,6 +43,16 @@ def directory(runs_dir=None):
 
 def path_for(policy, runs_dir=None):
     return os.path.join(directory(runs_dir), str(policy))
+
+
+def window_lock_path(runs_dir=None):
+    """The file the box's one chart window holds an `flock` on, and records its pid in.
+
+    Here rather than in `chart_window` because the *viewer* is what holds the lock and the launcher
+    is what reads the pid, so neither of them owns the path. Inside the registry directory, where
+    `live()` already skips it for starting with a dot.
+    """
+    return os.path.join(directory(runs_dir), WINDOW_LOCK_NAME)
 
 
 def alive(pid):

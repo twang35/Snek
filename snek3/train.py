@@ -414,9 +414,11 @@ class Trainer(object):
         #
         # Registering first is what puts this arm in the window even when another arm opened it: the
         # window draws the registry, so a panel appears for every arm that got this far. `ensure` then
-        # opens the box's one window if no live one is up, which for every arm but the first is a
-        # no-op returning None. The trainer holds the handle solely to reap it — see
-        # `tools/chart_window.py` for why nothing in this loop may ever depend on it.
+        # asks for the box's one window, which every arm of a wave does and only one of them wins —
+        # the *viewer* holds the lock, so this call needs no coordination and makes no claim about
+        # having opened anything. The trainer holds the handle solely to reap it, which for a losing
+        # spawn happens at the first report. See `tools/chart_window.py` for why nothing in this loop
+        # may ever depend on it.
         live_runs.register(self.policy)
         self.chart_window = chart_window.ensure()
         if self.config['eval_queue']:

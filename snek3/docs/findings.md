@@ -523,9 +523,46 @@ reopen, at the cost of four overlapping windows on a box running four arms. Reje
 sight, which was right: the window is a thing to look at, not a thing to manage.
 
 **What works is one window per box that reads a registry of live arms.** Each trainer writes
-`runs/.live/<policy>` holding **its own pid** before its first step, then calls `ensure()`: the first
-arm opens the window, the rest get `None`, and panels appear as arms start without anything being
-reopened. It closes itself five minutes after the last arm goes.
+`runs/.live/<policy>` holding **its own pid** before its first step, then calls `ensure()`; panels
+appear as arms start, without anything being reopened. It closes itself five minutes after the last
+arm goes.
+
+**Version 3, 2026-08-30: the "one" moved out of the launcher and into the viewer, because version 2
+did not deliver it.** Every arm now spawns a viewer and the *viewer* takes an exclusive `flock` on
+`runs/.live/.window` as it starts; the losers exit in ~0.3 s having drawn nothing. Two things are
+worth separating here, because conflating them is what produced the bug:
+
+| question | answer | changed in v3? |
+|---|---|---|
+| does the viewer need restarting when the arm set changes? | no — it reads the registry | no, this was v2's real win |
+| who launches it? | every arm, and the daemon could too. It stops mattering | no |
+| how is "only one" enforced? | **the kernel, via `flock`** | **yes — v2 was wrong here** |
+
+**v2's claim protocol did not hold, and the way it failed is the general lesson.** It was an `O_EXCL`
+create with a "the slot's holder is dead, take it over" fallback, and the fallback had no exclusion of
+its own: it wrote a pid and read it back, which every racer can win. Two ways in, neither rare — the
+slot file exists but is not yet *written*, so it reads as unheld; or it holds a dead pid, which is the
+state at the start of every batch, because nothing deleted it. Measured over 20 trials of 8 concurrent
+arms: **a mean of 6.6 windows**, and the desktop opened **5** on 2026-08-29. Its own docstring
+anticipated two as the worst case.
+
+**It went unnoticed because the test named after the guarantee could not fail.**
+`test_only_one_arm_of_a_wave_opens_a_window` called `ensure()` four times *sequentially in one
+process*. A lock between processes has to be tested between processes — the fixture now starts eight
+real interpreters on a starting gun, and `tests/mut_window.json` kills 11 mutants including a
+`LOCK_EX` → `LOCK_SH` that reproduces the original bug exactly.
+
+**Why it surfaced on that batch and not earlier:** two changes landed the same day. Window ownership
+moved from the daemon to the trainers at 08:50, so this was the first desktop batch where arms raced
+at all; and `HARD_MAX_TRAINERS` went 4 → 8 at 13:45, so eight raced instead of four. The laptop had
+been hiding it all along, because arms there are launched by hand seconds apart and the second one
+finds a live holder.
+
+**The rule that comes out of it: prefer a primitive whose failure cases the kernel retires to a
+protocol that handles them.** An `flock` cannot be held twice, is released however its holder dies —
+`kill -9` included — and leaves nothing behind to be recognised as stale, so all three of v2's cases
+stop existing rather than needing a fourth branch. The cost is 7 processes × 0.3 s per batch, paid
+once, for a launcher with no protocol in it.
 
 **Panels are sticky within a wave**, added 2026-08-29 at the user's request and for the right reason:
 a batch is read as a batch, so with one arm left of four the other three are most of the answer. That

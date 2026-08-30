@@ -1,0 +1,73 @@
+{
+ "tests": [
+  "tests/test_chart_window.py"
+ ],
+ "mutations": [
+  {
+   "desc": "a shared lock instead of an exclusive one: every window gets it (the 5-window bug, exactly)",
+   "file": "tools/chart_viewer.py",
+   "from": "fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)",
+   "to": "fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)"
+  },
+  {
+   "desc": "a blocking lock: the losers queue up and open a window each as the holder dies",
+   "file": "tools/chart_viewer.py",
+   "from": "fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)",
+   "to": "fcntl.flock(descriptor, fcntl.LOCK_EX)"
+  },
+  {
+   "desc": "losing the slot is not reported as losing",
+   "file": "tools/chart_viewer.py",
+   "from": "        os.close(descriptor)\n        return None",
+   "to": "        os.close(descriptor)\n        return True"
+  },
+  {
+   "desc": "the descriptor is tidied away after locking, which releases the lock",
+   "file": "tools/chart_viewer.py",
+   "from": "    # The descriptor is deliberately never closed.",
+   "to": "    os.close(descriptor)\n    # The descriptor is deliberately never closed."
+  },
+  {
+   "desc": "the window never publishes its pid, so the advisory read can never skip a spawn",
+   "file": "tools/chart_viewer.py",
+   "from": "        os.write(descriptor, '{0}\\n'.format(os.getpid()).encode('utf-8'))",
+   "to": "        pass"
+  },
+  {
+   "desc": "a window that lost the slot draws anyway",
+   "file": "tools/chart_viewer.py",
+   "from": "        if take_window_slot(args.runs_dir) is None:",
+   "to": "        if False:"
+  },
+  {
+   "desc": "the box slot is taken even for a hand-run --glob look at arbitrary charts",
+   "file": "tools/chart_viewer.py",
+   "from": "    if args.runs_dir is not None:",
+   "to": "    if True:"
+  },
+  {
+   "desc": "the launcher spawns even when a live window is recorded (the wasted-process detail)",
+   "file": "tools/chart_window.py",
+   "from": "    if holder(runs_dir):\n        return None",
+   "to": "    if False:\n        return None"
+  },
+  {
+   "desc": "the launcher refuses on a dead pid, so a box that closed its window never draws again",
+   "file": "tools/chart_window.py",
+   "from": "    pid = live_runs.read(live_runs.window_lock_path(runs_dir))\n    if pid is None or not live_runs.alive(pid) or live_runs.zombie(pid):",
+   "to": "    pid = live_runs.read(live_runs.window_lock_path(runs_dir))\n    if pid is None:"
+  },
+  {
+   "desc": "the zombie check goes, and a killed window holds the slot until its opener reaps it",
+   "file": "tools/chart_window.py",
+   "from": "if pid is None or not live_runs.alive(pid) or live_runs.zombie(pid):",
+   "to": "if pid is None or not live_runs.alive(pid):"
+  },
+  {
+   "desc": "the slot loses its leading dot, so live() reads the lock file as a ninth arm",
+   "file": "tools/live_runs.py",
+   "from": "WINDOW_LOCK_NAME = '.window'",
+   "to": "WINDOW_LOCK_NAME = 'window'"
+  }
+ ]
+}

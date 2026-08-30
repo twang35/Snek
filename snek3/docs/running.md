@@ -19,7 +19,9 @@ python -m pytest -q                                     # the suite; conftest.py
 
 **A training opens the chart window itself** — one per box, every running arm in it, nothing to launch
 (`../CLAUDE.md`). The command above is only for putting it back after closing it; killing it, closing
-it and relaunching it are all free, because no training reads it, waits on it or reopens it.
+it and relaunching it are all free, because no training reads it, waits on it or reopens it. There is
+one window however many arms ask, because the *viewer* holds an `flock` on the slot — so the arms need
+no coordination, and a batch's log lines saying "a chart window is already up" are the normal case.
 
 **`conda run` buffers stdout**, even with `python -u` — a backgrounded run's log can stay empty for
 90+ seconds while the process is fine, and `kill -9` then discards the buffer permanently. Call the

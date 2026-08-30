@@ -88,12 +88,15 @@ round trip to the window server, not our drawing code. `watch.py` and `record_gi
 ways to see a game, and they run in their own processes so they cost training nothing.
 
 **It does open a chart window, and there is exactly one per box.** Every training registers itself in
-`runs/.live/` and calls `chart_window.ensure()`; the first arm opens the window, later arms join it,
-each arm's panel stays for the rest of the wave, and it closes itself a few minutes after the last one
-finishes. Nothing needs launching by hand, on
-this laptop or on the desktop. **The window is disposable and the training is not** — its own session,
-never read from, never waited on, never reopened by a run — so killing or relaunching it while four
-arms train cannot touch them. `SNEK_CHART_WINDOW=0` turns it off, which is what the test suite and
+`runs/.live/` and calls `chart_window.ensure()`; every arm of a wave spawns a viewer, the one whose
+viewer wins an `flock` on `runs/.live/.window` becomes the window and the rest exit in ~0.3 s having
+drawn nothing, later arms join the one already up, each arm's panel stays for the rest of the wave,
+and it closes itself a few minutes after the last one finishes. **The launcher holds no lock and must
+not start holding one** — `docs/findings.md` has the five-window incident that rule comes from.
+
+Nothing needs launching by hand, on this laptop or on the desktop. **The window is disposable and the
+training is not** — its own session, never read from, never waited on, never reopened by a run — so
+killing or relaunching it while four arms train cannot touch them. `SNEK_CHART_WINDOW=0` turns it off, which is what the test suite and
 every benchmark do.
 
 ## The eval protocol is one stage

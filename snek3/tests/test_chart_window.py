@@ -1,15 +1,21 @@
-"""Fixtures for the box's one chart window: the live-arm registry, the claim, and the argv.
+"""Fixtures for the box's one chart window: the live-arm registry, the slot, and the argv.
 
 Nothing here opens a window. What is pinned is the machinery that decides *whether* to open one and
 what it will show — plus the properties that make the window disposable, which are the reason this
 design replaced a per-arm window: a separate session, a `poll` rather than a `wait`, and no path by
 which a dead window can affect a run.
+
+**The one-window fixtures fork real processes, and that is not gold-plating.** The version of this
+file that shipped the five-window bug asserted the guarantee by calling `ensure()` four times in a
+row in one process, which cannot observe a race and passed against an implementation that opened a
+mean of 6.6 windows per 8-arm batch. A lock between processes has to be tested between processes.
 """
 
 import os
 import subprocess
 import sys
 import textwrap
+import time
 
 import pytest
 
@@ -32,6 +38,54 @@ def chart(tmp_path, policy):
     with open(path, 'wb') as handle:
         handle.write(b'not really a png')
     return path
+
+
+def record_window(tmp_path, pid):
+    """Writes `pid` into the slot file without holding the lock, as a dead window leaves it."""
+    path = live_runs.window_lock_path(runs(tmp_path))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as handle:
+        handle.write('{0}\n'.format(pid))
+    return path
+
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# One racer: block on stdin, take the slot when the parent fires, exit 0 for won and 1 for lost.
+RACER = """
+import sys, time
+sys.path.insert(0, {root!r})
+from tools import chart_viewer
+sys.stdin.read(1)
+won = chart_viewer.take_window_slot({runs!r}) is not None
+if won:
+    time.sleep({hold!r})
+sys.exit(0 if won else 1)
+"""
+
+
+def race_for_the_slot(runs_dir, racers=8, hold_seconds=0.5):
+    """Runs `racers` real processes at `take_window_slot` at once. Returns how many won.
+
+    Separate interpreters, not `os.fork` and not threads. An `flock` belongs to an **open file
+    description**, so two threads of one process share it and would both "win" against any
+    implementation; the test has to be as separate as the arms are. Fork was the first version and
+    Python 3.12 is right to warn about it — this suite imports torch and matplotlib, and forking a
+    multi-threaded process can deadlock the child on a lock some other thread held.
+
+    stdin is the starting gun. Without it the racers are created one at a time and the first would
+    win without ever contending, which is precisely the mistake the fixture exists to correct.
+    """
+    source = RACER.format(root=ROOT, runs=runs_dir, hold=hold_seconds)
+    started = [subprocess.Popen([sys.executable, '-c', source], stdin=subprocess.PIPE)
+               for _ in range(racers)]
+    for process in started:                     # every racer is now blocked on its own stdin
+        process.stdin.write(b'x')
+    for process in started:                     # ... and released as close to together as we can
+        process.stdin.close()
+    codes = [process.wait(timeout=60) for process in started]
+    assert set(codes) <= {0, 1}, 'a racer raised: {0}'.format(codes)
+    return codes.count(0)
 
 
 # --- the registry ---------------------------------------------------------------------------------
@@ -121,36 +175,101 @@ def test_the_window_can_be_switched_off(value):
     assert chart_window.wanted({'SNEK_CHART_WINDOW': value}) is False
 
 
-def test_the_first_arm_claims_the_slot_and_the_next_one_does_not(tmp_path):
-    assert chart_window.claim(runs(tmp_path)) is True
-    assert chart_window.claim(runs(tmp_path)) is False
+def test_exactly_one_of_eight_windows_launched_together_takes_the_slot(tmp_path):
+    """**The regression fixture for the desktop's five windows, 2026-08-29.**
+
+    Eight arms start in the same second and all eight ask for the window. The predecessor of this
+    design answered a mean of 6.6, because its takeover path wrote a pid and read it back — which
+    every racer can win. One, at eight-way contention, is the whole requirement.
+    """
+    assert race_for_the_slot(runs(tmp_path), racers=8) == 1
 
 
-def test_a_dead_windows_slot_is_claimable_again(tmp_path):
-    """Otherwise closing the window once would mean the box never drew another."""
-    chart_window.hold(runs(tmp_path), DEAD_PID)
-    assert chart_window.holder(runs(tmp_path)) is None
-    assert chart_window.claim(runs(tmp_path)) is True
+def test_the_slot_is_never_read_as_an_arm(tmp_path):
+    """It lives *inside* the registry directory, so it has to be invisible to `live()` — a slot named
+    without its leading dot gives the window a phantom panel named after its own lock file, and
+    snek2's registry drew eight panels for four arms by admitting things that were not arms."""
+    record_window(tmp_path, os.getpid())
+    live_runs.register('b3a-arm', runs_dir=runs(tmp_path))
+    assert live_runs.live(runs(tmp_path)) == [('b3a-arm', os.getpid())]
 
 
-def test_the_slot_records_the_window_and_not_the_trainer_that_opened_it(tmp_path, monkeypatch):
-    """A trainer that finishes while other arms run must not look like a window that died."""
-    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: FakeWindow(4242))
-    chart_window.ensure(runs(tmp_path), env={})
-    assert live_runs.read(chart_window.lock_path(runs(tmp_path))) == 4242
+def test_a_slot_file_left_by_a_dead_window_is_not_a_stale_lock(tmp_path):
+    """Nothing deletes the file, so **every batch after the first meets one** — and the pid in it is
+    dead. That was one of the two ways into the old race; here it is not a case at all, because the
+    lock is the kernel's and the file is only a place to publish a pid."""
+    record_window(tmp_path, DEAD_PID)
+    assert chart_viewer.take_window_slot(runs(tmp_path)) is not None
 
 
-def test_only_one_arm_of_a_wave_opens_a_window(tmp_path, monkeypatch):
-    opened = []
+def test_a_killed_window_releases_the_slot_at_once_and_the_next_one_gets_it(tmp_path):
+    """Three properties in one fixture, because they are the same property.
 
-    def spawn(*_args, **_kwargs):
-        opened.append(1)
-        return FakeWindow(os.getpid())
+    A live holder turns a second window away; the slot records the *window's* own pid rather than
+    that of the trainer that spawned it, so a finished trainer never looks like a dead window; and a
+    `kill -9` — no unwinding, no handler, no cleanup path — releases the slot immediately.
+    """
+    lock = live_runs.window_lock_path(runs(tmp_path))
+    source = RACER.format(root=ROOT, runs=runs(tmp_path), hold=30.0)
+    window = subprocess.Popen([sys.executable, '-c', source], stdin=subprocess.PIPE)
+    try:
+        window.stdin.write(b'x')
+        window.stdin.close()
+        deadline = time.time() + 10
+        while live_runs.read(lock) != window.pid and time.time() < deadline:
+            time.sleep(0.05)
+        assert live_runs.read(lock) == window.pid, 'the window did not publish its pid'
+        assert chart_viewer.take_window_slot(runs(tmp_path)) is None
+    finally:
+        window.kill()
+        window.wait(timeout=30)
+    assert chart_viewer.take_window_slot(runs(tmp_path)) is not None
 
-    monkeypatch.setattr(chart_window, 'spawn', spawn)
+
+def test_every_arm_of_a_wave_may_ask_for_the_window(tmp_path, monkeypatch):
+    """The launcher gates nothing, and that is the design rather than an oversight.
+
+    `ensure` is called by every arm and holds no lock, so four simultaneous arms may start four
+    viewers; the three that lose the slot exit in ~0.3 s having imported matplotlib and drawn
+    nothing. Paying that once per batch is what buys a launcher with no protocol in it — and the
+    protocol is what was broken.
+    """
+    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: FakeWindow(os.getpid()))
     handles = [chart_window.ensure(runs(tmp_path), env={}) for _ in range(4)]
-    assert len(opened) == 1
-    assert [handle is None for handle in handles] == [False, True, True, True]
+    assert [handle is None for handle in handles] == [False] * 4
+
+
+def test_a_wave_joining_a_live_window_starts_no_process_at_all(tmp_path, monkeypatch):
+    """The advisory read, which is the whole reason `holder` still exists: the ordinary case is an
+    arm joining a window that is already up, and it should cost a file read."""
+    record_window(tmp_path, os.getpid())                # a live pid: us
+    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: pytest.fail('spawned anyway'))
+    assert chart_window.ensure(runs(tmp_path), env={}) is None
+
+
+def test_a_dead_pid_in_the_slot_does_not_stop_the_box_drawing_again(tmp_path, monkeypatch):
+    """The other half of advisory: it must never refuse on state a dead window left behind."""
+    record_window(tmp_path, DEAD_PID)
+    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: FakeWindow(4242))
+    assert chart_window.ensure(runs(tmp_path), env={}) is not None
+
+
+def test_a_window_that_loses_the_slot_never_draws(tmp_path, monkeypatch):
+    """Standing down has to happen before the figure, or the losers would flash a window each."""
+    monkeypatch.setattr(chart_viewer, 'take_window_slot', lambda *a, **k: None)
+    monkeypatch.setattr(chart_viewer, 'run', lambda *a, **k: pytest.fail('drew anyway'))
+    assert chart_viewer.main(['--runs-dir', runs(tmp_path)]) == 0
+
+
+def test_looking_at_arbitrary_charts_is_not_gated_by_the_box_window(tmp_path, monkeypatch):
+    """`--glob` and a path list are somebody looking at charts by hand. Only `--runs-dir` is the
+    box's window, and refusing a hand-run look because a training has one open would be absurd."""
+    drew = []
+    monkeypatch.setattr(chart_viewer, 'take_window_slot',
+                        lambda *a, **k: pytest.fail('took the box slot'))
+    monkeypatch.setattr(chart_viewer, 'run', lambda *a, **k: drew.append(1))
+    assert chart_viewer.main(['--glob', str(tmp_path / '*.png')]) == 0
+    assert drew == [1]
 
 
 def test_switching_the_window_off_spawns_nothing(tmp_path, monkeypatch):
@@ -283,10 +402,9 @@ def test_a_killed_window_does_not_hold_the_slot_as_a_zombie(tmp_path, monkeypatc
     """The window is a trainer's child, and a trainer reaps on its report cadence. Between the kill
     and the reap the pid still answers `os.kill(pid, 0)`, so a hand relaunch was refused for a window
     that was visibly gone."""
-    chart_window.hold(runs(tmp_path), os.getpid())
+    record_window(tmp_path, os.getpid())
     monkeypatch.setattr(live_runs, 'zombie', lambda pid: True)
     assert chart_window.holder(runs(tmp_path)) is None
-    assert chart_window.claim(runs(tmp_path)) is True
 
 
 def test_an_arms_own_entry_does_not_pay_for_the_zombie_check(tmp_path, monkeypatch):
