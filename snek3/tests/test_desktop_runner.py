@@ -496,9 +496,25 @@ def test_the_agreed_env_drops_what_the_arms_disagree_about():
 
 # --- ids and phases -----------------------------------------------------------------------------
 
-def test_batch_of_reads_the_leading_b_number():
+def test_batch_of_reads_the_leading_batch_number():
     assert runner_module.batch_of('b12c-thing-seed3') == 'b12'
     assert runner_module.batch_of('smoke-1') == 'smoke'
+
+
+def test_batch_of_groups_the_p_series_too():
+    """The PPO series groups by batch exactly as the DQN one does.
+
+    `_BATCH_RE` matched only `b\\d+` until 2026-08-30, so every PPO arm fell through to the
+    `split('-')[0]` fallback and became its own batch. Nothing measured wrong, but both things that
+    group by batch degraded silently: `_auto_stage_b_jobs` promises "one job per batch, not one per
+    arm" and was synthesising one wave per arm, and `at_a_glance` listed eight lines for one batch.
+    """
+    for letter in 'abcdefgh':
+        assert runner_module.batch_of('p1{0}-fc200x100ep8-seed1'.format(letter)) == 'p1'
+    assert runner_module.batch_of('p2a-ep8-seed1') == 'p2'
+    assert runner_module.batch_of('p10a-thing-seed1') == 'p10'
+    # The synthesised stage-B id round-trips back to the same batch.
+    assert runner_module.batch_of('p1-stageb') == 'p1'
 
 
 def test_a_second_wave_of_a_batch_is_still_stage_b():
