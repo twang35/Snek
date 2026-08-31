@@ -1,28 +1,14 @@
 {
-  "iso": "2026-08-30T18:14:58",
-  "ts": 1788138898.0060852,
+  "iso": "2026-08-30T18:16:41",
+  "ts": 1788139001.3248892,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "p2 \u2014 p2 HOF re-measure: 873 checkpoints >=98.5%/500 at 5,000 episodes \u2014 eval (8 arms)"
     ],
     "queued": [
-      "p1a training \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (1 arm)",
-      "p1b training \u2014 p1: fc (200,100) + 8 epochs, seed 2 of 8 \u2014 queued (1 arm)",
-      "p1c training \u2014 p1: fc (200,100) + 8 epochs, seed 3 of 8 \u2014 queued (1 arm)",
-      "p1d training \u2014 p1: fc (200,100) + 8 epochs, seed 4 of 8 \u2014 queued (1 arm)",
-      "p1e training \u2014 p1: fc (200,100) + 8 epochs, seed 5 of 8 \u2014 queued (1 arm)",
-      "p1f training \u2014 p1: fc (200,100) + 8 epochs, seed 6 of 8 \u2014 queued (1 arm)",
-      "p1g training \u2014 p1: fc (200,100) + 8 epochs, seed 7 of 8 \u2014 queued (1 arm)",
-      "p1h training \u2014 p1: fc (200,100) + 8 epochs, seed 8 of 8 \u2014 queued (1 arm)",
-      "p1a stage B \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (1 arm)",
-      "p1b stage B \u2014 p1: fc (200,100) + 8 epochs, seed 2 of 8 \u2014 queued (1 arm)",
-      "p1c stage B \u2014 p1: fc (200,100) + 8 epochs, seed 3 of 8 \u2014 queued (1 arm)",
-      "p1d stage B \u2014 p1: fc (200,100) + 8 epochs, seed 4 of 8 \u2014 queued (1 arm)",
-      "p1e stage B \u2014 p1: fc (200,100) + 8 epochs, seed 5 of 8 \u2014 queued (1 arm)",
-      "p1f stage B \u2014 p1: fc (200,100) + 8 epochs, seed 6 of 8 \u2014 queued (1 arm)",
-      "p1g stage B \u2014 p1: fc (200,100) + 8 epochs, seed 7 of 8 \u2014 queued (1 arm)",
-      "p1h stage B \u2014 p1: fc (200,100) + 8 epochs, seed 8 of 8 \u2014 queued (1 arm)"
+      "p1 training \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (8 arms)",
+      "p1 stage B \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (8 arms)"
     ],
     "attention": []
   },
@@ -63,8 +49,8 @@
       "pid": 594697,
       "step": 271368192,
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 1244
+      "steps_per_sec": null,
+      "elapsed_s": 1348
     }
   ],
   "ledger": {
@@ -76,14 +62,7 @@
     "p1f-fc200x100ep8-seed6": "queued",
     "p1g-fc200x100ep8-seed7": "queued",
     "p1h-fc200x100ep8-seed8": "queued",
-    "p1a-stageb": "queued",
-    "p1b-stageb": "queued",
-    "p1c-stageb": "queued",
-    "p1d-stageb": "queued",
-    "p1e-stageb": "queued",
-    "p1f-stageb": "queued",
-    "p1g-stageb": "queued",
-    "p1h-stageb": "queued",
+    "p1-stageb": "queued",
     "p2-hof5000": "running",
     "sse24": "done",
     "sse20": "done",
@@ -176,10 +155,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 40.4,
+  "disk_free_gb": 40.3,
   "load_avg": [
-    16.12646484375,
-    15.06591796875,
-    11.3896484375
+    11.794921875,
+    14.1240234375,
+    11.44775390625
   ]
 }
