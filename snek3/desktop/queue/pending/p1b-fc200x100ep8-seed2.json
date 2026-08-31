@@ -1,0 +1,23 @@
+{
+  "project": "snek3",
+  "id": "p1b-fc200x100ep8-seed2",
+  "type": "train",
+  "policy": "p1b-fc200x100ep8-seed2",
+  "max_steps": 220004352,
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FC_LAYERS": "200,100",
+    "SNEK_PPO_EPOCHS": "8",
+    "SNEK_EVAL_QUEUE": "1",
+    "SNEK_EVAL_QUEUE_DEPTH": "16",
+    "SNEK_EVAL_WORKERS": "8",
+    "SNEK_SEED": "2"
+  },
+  "priority": 50,
+  "label": "p1: fc (200,100) + 8 epochs, seed 2 of 8",
+  "notes": "The clean network-shape test. p2 and p3 differed in TWO knobs -- fc (320,) + 8 epochs against fc (200,100) + 4 epochs -- so neither settled the two-hidden-layer thread p0 opened, and epochs is the one axis p0 found to move. p1 holds epochs at 8 and takes p3's network, which makes it a single-knob comparison against p2 (the network) and against p3 (the epochs) at the same time. Budget sits inside both comparators' ranges so the p3 comparison needs no truncation. Eight seeds because the p2/p3 attempt had eight and its sign test still came out 5 of 8."
+}

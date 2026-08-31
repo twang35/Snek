@@ -1,0 +1,25 @@
+{
+  "project": "snek3",
+  "id": "p2-hof5000",
+  "type": "eval",
+  "policies": [
+    "p2a-ep8-seed1",
+    "p2b-ep8-seed2",
+    "p2c-ep8-seed3",
+    "p2d-ep8-seed4",
+    "p2e-ep8-seed5",
+    "p2f-ep8-seed6",
+    "p2g-ep8-seed7",
+    "p2h-ep8-seed8"
+  ],
+  "selector": "above:98.5",
+  "episodes": 5000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--label",
+    "hof5000"
+  ],
+  "priority": 5,
+  "label": "p2 HOF re-measure: 873 checkpoints >=98.5%/500 at 5,000 episodes",
+  "notes": "Ten times the depth on every p2 checkpoint that cleared 98.5% in the 500-episode pass. `above:98.5` reads each arm's own prior stage-B file, so one wave covers all eight; `steps:<path>` could not, being a single file shared across the wave. Labelled so the 500-episode pass is untouched. **Ranks candidates, promotes nothing** \u2014 a hallOfFame/ copy is a separate deliberate step. Priority 5 so this drains before p1 starts."
+}
