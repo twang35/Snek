@@ -1,13 +1,12 @@
 {
-  "iso": "2026-08-30T18:39:13",
-  "ts": 1788140353.9177246,
+  "iso": "2026-08-30T18:49:21",
+  "ts": 1788140961.153522,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p2 \u2014 p2 HOF re-measure: 873 checkpoints >=98.5%/500 at 5,000 episodes \u2014 eval (8 arms)"
+      "p1 \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 training 0% (8 arms)"
     ],
     "queued": [
-      "p1 training \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (8 arms)",
       "p1 stage B \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (8 arms)"
     ],
     "attention": []
@@ -28,42 +27,126 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "p2-hof5000",
-      "type": "eval",
-      "policy": "p2a-ep8-seed1",
+      "id": "p1a-fc200x100ep8-seed1",
+      "type": "train",
+      "policy": "p1a-fc200x100ep8-seed1",
       "policies": [
-        "p2a-ep8-seed1",
-        "p2b-ep8-seed2",
-        "p2c-ep8-seed3",
-        "p2d-ep8-seed4",
-        "p2e-ep8-seed5",
-        "p2f-ep8-seed6",
-        "p2g-ep8-seed7",
-        "p2h-ep8-seed8"
+        "p1a-fc200x100ep8-seed1"
       ],
-      "pid": 594697,
-      "step": 271368192,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2700
+      "pid": 626483,
+      "step": 884736,
+      "max_steps": 199999488,
+      "steps_per_sec": 7322.5,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1b-fc200x100ep8-seed2",
+      "type": "train",
+      "policy": "p1b-fc200x100ep8-seed2",
+      "policies": [
+        "p1b-fc200x100ep8-seed2"
+      ],
+      "pid": 626484,
+      "step": 917504,
+      "max_steps": 199999488,
+      "steps_per_sec": 6276.4,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1c-fc200x100ep8-seed3",
+      "type": "train",
+      "policy": "p1c-fc200x100ep8-seed3",
+      "policies": [
+        "p1c-fc200x100ep8-seed3"
+      ],
+      "pid": 626485,
+      "step": 983040,
+      "max_steps": 199999488,
+      "steps_per_sec": 9414.6,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1d-fc200x100ep8-seed4",
+      "type": "train",
+      "policy": "p1d-fc200x100ep8-seed4",
+      "policies": [
+        "p1d-fc200x100ep8-seed4"
+      ],
+      "pid": 626486,
+      "step": 737280,
+      "max_steps": 199999488,
+      "steps_per_sec": 4707.3,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1e-fc200x100ep8-seed5",
+      "type": "train",
+      "policy": "p1e-fc200x100ep8-seed5",
+      "policies": [
+        "p1e-fc200x100ep8-seed5"
+      ],
+      "pid": 626487,
+      "step": 884736,
+      "max_steps": 199999488,
+      "steps_per_sec": 7322.4,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1f-fc200x100ep8-seed6",
+      "type": "train",
+      "policy": "p1f-fc200x100ep8-seed6",
+      "policies": [
+        "p1f-fc200x100ep8-seed6"
+      ],
+      "pid": 626488,
+      "step": 786432,
+      "max_steps": 199999488,
+      "steps_per_sec": 5230.3,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1g-fc200x100ep8-seed7",
+      "type": "train",
+      "policy": "p1g-fc200x100ep8-seed7",
+      "policies": [
+        "p1g-fc200x100ep8-seed7"
+      ],
+      "pid": 626489,
+      "step": 688128,
+      "max_steps": 199999488,
+      "steps_per_sec": 2615.2,
+      "elapsed_s": 182
+    },
+    {
+      "id": "p1h-fc200x100ep8-seed8",
+      "type": "train",
+      "policy": "p1h-fc200x100ep8-seed8",
+      "policies": [
+        "p1h-fc200x100ep8-seed8"
+      ],
+      "pid": 626490,
+      "step": 802816,
+      "max_steps": 199999488,
+      "steps_per_sec": 5753.3,
+      "elapsed_s": 182
     }
   ],
   "ledger": {
-    "p1a-fc200x100ep8-seed1": "queued",
-    "p1b-fc200x100ep8-seed2": "queued",
-    "p1c-fc200x100ep8-seed3": "queued",
-    "p1d-fc200x100ep8-seed4": "queued",
-    "p1e-fc200x100ep8-seed5": "queued",
-    "p1f-fc200x100ep8-seed6": "queued",
-    "p1g-fc200x100ep8-seed7": "queued",
-    "p1h-fc200x100ep8-seed8": "queued",
     "p1-stageb": "queued",
-    "p2-hof5000": "running",
+    "p1a-fc200x100ep8-seed1": "running",
+    "p1b-fc200x100ep8-seed2": "running",
+    "p1c-fc200x100ep8-seed3": "running",
+    "p1d-fc200x100ep8-seed4": "running",
+    "p1e-fc200x100ep8-seed5": "running",
+    "p1f-fc200x100ep8-seed6": "running",
+    "p1g-fc200x100ep8-seed7": "running",
+    "p1h-fc200x100ep8-seed8": "running",
+    "p2-hof5000": "done",
     "sse24": "done",
     "sse20": "done",
     "sse16": "done",
@@ -155,10 +238,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 40.3,
+  "disk_free_gb": 39.4,
   "load_avg": [
-    15.56201171875,
-    15.68359375,
-    14.70458984375
+    11.8916015625,
+    12.2919921875,
+    13.490234375
   ]
 }
