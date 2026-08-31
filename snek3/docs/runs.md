@@ -23,66 +23,32 @@ stage A** — see [`findings.md`](findings.md).
 
 ## Now
 
-**Queued on the desktop 2026-08-30 09:57: the parallelism sweep, 11 waves behind p2's stage B.**
-The stage-A defaults are laptop numbers — `tools/eval_queue.py:141-145` says the desktop "has not been
-swept; the number is inherited rather than measured there" — and 8 arms x 6 workers is a 14-core
-shape on 8 physical cores / 16 SMT threads.
+**The box and the laptop are both idle as of 2026-08-30 17:34.** Three things closed this afternoon.
 
-| phase | waves | knob | values |
-|---|---:|---|---|
-| training | 6 | `SNEK_EVAL_WORKERS` at 8 arms | 4, 6, 8, 10, **12, 12** |
-| stage B | 5 | `eval_shards` on one arm | 8, 12, 16, 20, 24 |
+| what | where | outcome |
+|---|---|---|
+| **batch p3** stage B, 8 arms | laptop | done in 226.1 min, status 0. Pooled **12.8%** of rows ≥98%/500 |
+| **batch p2** stage B, 8 arms | desktop | done in 222.6 min, status 0. Pooled **9.6%**; best row **100.0%/500** |
+| **the parallelism sweep**, 11 waves | desktop | all 53 jobs done. **The eval side answered; the training side did not** |
 
-**Every wave does identical work, so ledger wall clock is the whole measurement** — each training wave
-advances the same eight warm-started arms by 1,196,032 transitions, each eval wave measures p2h's
-`screen:97` set at 100 episodes. Four things about it that are not obvious:
+Full per-arm numbers and the p2/p3 comparison are in [`results.md`](results.md); the charts are in
+[`charts.md`](charts.md); the sweep is in [`findings.md`](findings.md).
 
-- **The worker order must ascend** or a wave inherits the previous wave's extra workers — see
-  [`running.md`](running.md). Waves 5 and 6 repeat at 12 for wave-to-wave repeatability.
-- **The arms are warm-started from `p2h-ep8-seed8` at 255M transitions**, because a cold PPO arm has
-  short episodes, cheap stage A, and would put the optimum far below the real one. Config is therefore
-  p2's (fc 320, 8 epochs) — `arch.json` enforces the match.
-- **`type: benchmark`, not `train`**, so `wants_stage_b` cannot auto-queue 48 stage-B waves behind it;
-  `SNEK_EVAL_INTERVAL` is set explicitly because the benchmark launcher would otherwise switch off the
-  very thing being measured.
-- **Arm count is not swept.** `_dispatch` takes pending jobs in priority order up to `max_trainers`
-  regardless of priority value, so any group of 8+ trainer jobs launches as exactly 8. That axis needs
-  a `runtime.json` commit between waves and is the obvious follow-up. `HARD_MAX_EVAL_SHARDS` was
-  raised 16 -> 24 on the box so the shard bracket is two-sided.
+**p3 leads p2 on the pooled headline but the sign test is a coin (5 of 8, p≈0.29→0.73), and rank 1 is
+a tie at 98.5 best30.** More importantly the two batches differ in **two** knobs — `fc (200,100)` + 4
+epochs against `fc (320,)` + 8 epochs — so this is not the network-shape test
+[`results.md`](results.md) and this file have both been calling for. That arm still has not been run.
 
+### Next, in the order the evidence argues for
 
-**Batch p0 — the PPO tuning sweep. Training is done; stage B is finishing on both boxes.** 15 arms,
-seed 1, **10M transitions each**, all on b2's reward function, each one knob off a reference of
-lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.
-Seven on the laptop, eight on the desktop. Curves in [`charts.md`](charts.md), findings in
-[`findings.md`](findings.md), the full table in [`results.md`](results.md) once stage B lands.
-
-**Read it as three statements, in this order.**
-
-1. **There is no winner.** Nine of fifteen arms finished inside **0.8 pp** on `best_perfect30`
-   (96.4 - 97.2), and three metrics give three different orderings of the top three. At n=1 per config
-   in a domain that has produced 62.5 and 18.0 from one config, that is one number. **p0 hands p1 no
-   tuned config** — the reference is as good as anything found, which makes p1 a cleaner comparison
-   than the plan expected rather than a blocked one.
-2. **The 3M read was inverted, not noisy.** The arms that finished 1st and 2nd were **6th and 7th** at
-   3M. This is the batch's most transferable result and it is why the sweep went to 10M.
-3. **One axis moved: gradient steps per transition**, 7.5 pp monotonically — minibatch 1024 (0.25x)
-   89.7, the reference (1x) 96.6, epochs 8 (2x) 97.2. **Rollout size is a second, separate axis**:
-   `p0p-roll64` held the ratio fixed, halved the rollout and lost ~2.5 pp.
-
-**And the pre-registered PPO-vs-DQN metric favours PPO by 11.6x.** [`../plans/ppo.md`](../plans/ppo.md)
-§10 names the **≥98%/500 count** — the width of the record region — as 6e's headline. Pooled over all 15
-arms PPO has **95 of 1,862** stage-B measurements there; **b2's four DQN seeds have 5 of 1,135**. The best
-single checkpoint is a **tie at 99.2%**, and PPO's reached it on **5.05M** transitions against b2's 18M.
-
-**But at the honest depth the champion still leads.** PPO's 99.2% re-measured **97.9% over 3,000
-episodes** [97.3, 98.3] on a fresh seed; snek2's converted champion measures **98.8%** [98.3, 99.1] on
-2.74M transitions. All three PPO highs fell 1.3-2.0 pp on re-measurement. **Quote the 3,000-episode
-column, not the 500.**
-
-**Cost, because it changes what is worth running:** 10M transitions is **~20 minutes** with seven arms
-sharing the 14-core laptop, against b2's ~7-8 h per arm for 18M on the 16-core desktop. A PPO sweep arm
-is minutes. Do not budget one like a DQN arm.
+1. **One batch varying only the network**, matched epochs and matched budget. It is the cheapest
+   unrun experiment that would settle the thread p0 opened, and `dqn/net.py` takes the same
+   `fc_layers` config so the DQN version is also one arm away.
+2. **Re-run the worker sweep with long waves.** 3.2-minute waves cannot resolve it — see
+   [`findings.md`](findings.md). ~30 min per wave is what the earlier hand-measurement used.
+3. **Sweep arm count**, which the queue cannot express: `_dispatch` takes pending jobs in priority
+   order up to `max_trainers` regardless of priority value, so any group of 8+ trainer jobs launches
+   as exactly 8. It needs a `runtime.json` commit between waves, or a real sweep job type.
 
 ### Next for PPO
 

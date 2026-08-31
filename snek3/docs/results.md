@@ -124,6 +124,74 @@ snek2's whole history and `p0j` is one arm of a first tuning sweep — but quoti
 this table would be quoting a selected high, which
 [`../CLAUDE.md`](../CLAUDE.md) explicitly warns against.
 
+## Batches p2 and p3 — eight seeds each, closed 2026-08-30
+
+Both closed the same afternoon: p2's stage B in 222.6 min on the desktop, p3's in 226.1 min on the
+laptop, both status 0. **The stage-B headline is the >=98%/500 count** — the width of the record
+region — per [`protocol.md`](protocol.md).
+
+### p3 — `fc (200,100)`, 4 epochs
+
+| arm | stage-B rows | >=98%/500 | best row | stage-A best30 | strong | transitions |
+|---|---:|---:|---:|---:|---:|---:|
+| `p3a-fc200x100-seed1` | 4499 | 13.5% | 99.6 | 98.4 | 97.0 | 231M |
+| `p3b-fc200x100-seed2` | 4503 | 13.0% | 99.6 | 98.4 | 95.5 | 230M |
+| `p3c-fc200x100-seed3` | 5812 | 17.4% | 99.8 | 98.5 | 97.5 | 221M |
+| `p3d-fc200x100-seed4` | 5151 | 15.0% | 99.6 | 98.3 | 97.3 | 220M |
+| `p3e-fc200x100-seed5` | 3882 | 9.6% | 99.6 | 97.9 | 96.1 | 218M |
+| `p3f-fc200x100-seed6` | 4042 | 8.9% | 99.6 | 97.9 | 95.9 | 215M |
+| `p3g-fc200x100-seed7` | 4279 | 10.7% | 99.4 | 98.0 | 96.3 | 216M |
+| `p3h-fc200x100-seed8` | 4104 | 12.0% | 99.8 | 97.9 | 95.5 | 215M |
+
+### p2 — `fc (320,)`, 8 epochs
+
+| arm | stage-B rows | >=98%/500 | best row | stage-A best30 | strong | transitions |
+|---|---:|---:|---:|---:|---:|---:|
+| `p2a-ep8-seed1` | 3836 | 7.2% | 99.8 | 97.9 | 97.3 | 271M |
+| `p2b-ep8-seed2` | 5552 | 13.3% | 100.0 | 98.4 | 98.3 | 271M |
+| `p2c-ep8-seed3` | 3494 | 6.2% | 99.6 | 97.8 | 96.3 | 265M |
+| `p2d-ep8-seed4` | 3433 | 7.2% | 99.4 | 97.8 | 95.2 | 264M |
+| `p2e-ep8-seed5` | 5312 | 11.2% | 99.8 | 98.1 | 98.0 | 258M |
+| `p2f-ep8-seed6` | 4861 | 9.5% | 99.8 | 97.9 | 97.0 | 257M |
+| `p2g-ep8-seed7` | 5054 | 10.4% | 99.6 | 97.9 | 98.3 | 257M |
+| `p2h-ep8-seed8` | 3039 | 8.8% | 99.8 | 98.5 | 96.9 | 255M |
+
+### ‡ These two batches differ in two knobs, so they are not a network-shape test
+
+[`runs.md`](runs.md) named the two-hidden-layer result as "the most promising thread p0 turned up".
+**p3 does not settle it.** p3 is `fc (200,100)` **and** 4 epochs; p2 is `fc (320,)` **and** 8 epochs —
+and p0's one moving axis was gradient steps per transition, which is exactly what the epoch count
+changes. The budgets differ too (p3 215-231M, p2 255-271M). So the comparison below confounds the
+network shape with the axis already known to matter.
+
+| seed | p2 >=98%/500 | p3 >=98%/500 | p3 − p2 |
+|---:|---:|---:|---:|
+| 1 | 7.2 | 13.5 | **+6.3** |
+| 2 | 13.3 | 13.0 | **-0.3** |
+| 3 | 6.2 | 17.4 | **+11.2** |
+| 4 | 7.2 | 15.0 | **+7.8** |
+| 5 | 11.2 | 9.6 | **-1.6** |
+| 6 | 9.5 | 8.9 | **-0.6** |
+| 7 | 10.4 | 10.7 | **+0.3** |
+| 8 | 8.8 | 12.0 | **+3.2** |
+
+**p3 leads on the pooled headline — 12.8% against 9.6%, mean +3.29 pp — and on ~50M fewer
+transitions per arm.** The wins are asymmetric: the three largest are +11.2, +7.8 and +6.3, while the
+three losses are −1.6, −0.6 and −0.3.
+
+**The sign test says nothing, and it is the test this project leads with.** 5 of 8 seeds favour p3,
+which is p≈0.73 two-tailed — a coin. The pooled gap is carried by three seeds. And **rank 1 of the
+ranking is a tie**: peak `best_perfect30` is 98.5 in both batches (p3c, p2h). p2 also holds the single
+best stage-B row in either batch, **100.0%/500** at p2b/184M.
+
+**What would settle it is one batch varying only the network**, at matched epochs and matched budget.
+That arm has still never been run — and since `dqn/net.py` takes the same `fc_layers` config, it is
+also one arm away for DQN.
+
+**Neither best row is a record claim.** Both are selected highs over thousands of rows; a record needs
+a fresh 1,000+ episode measurement of the single winner, and all three of p0's highs fell 1.3-2.0 pp
+on re-measurement.
+
 ## The PPO gate arm
 
 **`ppo-smoke` — the phase-6b gate, not a batch arm.** 508k transitions at

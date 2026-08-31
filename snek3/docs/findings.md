@@ -14,6 +14,57 @@ snek3.
 
 ## Established
 
+### 16 stage-B shards is right on the desktop, and snek2's "18 loses 6-10%" cliff does not reproduce
+
+**Measured 2026-08-30 on the desktop**, 5 waves, identical work each (p2h's `screen:97` set, 3,039
+checkpoints at 100 episodes), wall clock from the ledger:
+
+| shards | minutes |
+|---:|---:|
+| 8 | 5.02 |
+| 12 | 4.56 |
+| **16** | **4.06** |
+| 20 | 4.10 |
+| 24 | 4.07 |
+
+**The knee is at 16 and there is nothing above it** — 16, 20 and 24 sit inside 1% of each other, so
+the inherited default was right, but *not* for the reason the docs gave. `HARD_MAX_EVAL_SHARDS` was 16
+because snek2 measured 18 shards **losing 6-10%** on TensorFlow; on torch that cliff is absent and
+over-subscribing simply stops helping. The ceiling is worth keeping as a "no gain past here" bound
+rather than as protection from a regression.
+
+**‡ One caveat on the 8-shard row.** It was the first eval wave and ran while the training phase's 12
+stage-A workers were still idling out their 300 s, so it is the one row that could be penalised. The
+12→16 step is unconfounded, and it is the larger part of the gain.
+
+### The worker sweep did not resolve anything, because 3.2-minute waves are too short
+
+**Measured 2026-08-30 on the desktop**, 6 waves × 8 warm-started arms, each advancing 1,196,032
+transitions:
+
+| workers | minutes |
+|---:|---:|
+| 4 | 3.20 |
+| 6 | 3.24 |
+| 8 | 3.23 |
+| 10 | 3.73 |
+| 12 | 3.77 |
+| **12 (repeat)** | **3.23** |
+
+**The repeat disagrees with its own twin by 0.54 min (17%), while the whole 4/6/8 range spans 0.04 min
+(1.3%).** So the wave-to-wave repeatability is larger than every difference the sweep was built to
+detect, and **none of these rows supports a conclusion** — including the tempting one that 4 workers
+is as good as 8, which would contradict the +12% that 6→8 measured on this same box.
+
+The cause is the window, not the design. A wave is ~3.2 min including ~40 s of startup, and the
+stage-A queue has depth 16 — so a large fraction of each wave is the queue filling and draining rather
+than steady state. The earlier hand-measurement used **30-35 min** windows for exactly this reason.
+
+**What to keep from it:** the harness shape works — every wave does identical work, so ledger wall
+clock is the whole measurement, with no instrumentation to misread. Re-run it with ~10x the
+transitions per wave. **And the repeat pair is what caught this**; without it the 4/6/8 flatness would
+have read as a finding.
+
 ### Potential-based shaping was not policy-invariant: b1 and b2 shaped at γ=1.0 while discounting at 0.99 and 0.9975
 
 `train.py` built its collect env as `VecSnake(width, seed=...)` and never passed `shaping_discount`,

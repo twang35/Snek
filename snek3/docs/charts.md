@@ -1,15 +1,9 @@
 # Charts — one graph per arm
 
-**Batch b2 is running** — b29's record config, seeds 1-4, all four on the desktop, at 0.36-0.41M of
-3M as of 2026-08-29 09:13. Its charts arrive on the `results` branch at close-out; a live desktop
-arm's `runs/` files must not be committed from here, because the box rewrites those paths every eval
-and a committed copy aborts its next ff-merge. The interim numbers, including the seed-matched
-comparison against snek2's b47 at the same step count, are in [`runs.md`](runs.md) — **b2d is at 96.8%
-best30 and 52 evals ≥95/100, so the phase-3 gate is met**.
-
-**Batch b1 closed 2026-08-29.** All four charts are committed now that the arms have stopped — while
-a desktop arm is *live* its `runs/` files must not be committed from here, because the box rewrites
-those paths every eval and a committed copy makes its next `git merge --ff-only` abort.
+**Batches p2 and p3 closed 2026-08-30** — eight seeds each, stage B complete on both, charts below.
+**Batch b2 closed 2026-08-29.** A live desktop arm's `runs/` files must still never be committed from
+here: the box rewrites those paths every eval and a committed copy aborts its next ff-merge. p2's
+charts came across the `results` branch at close-out, which is what that branch is for.
 
 ## Watching them live
 
@@ -20,6 +14,51 @@ put it back
 after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closing it and relaunching
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).
+
+## Batch p3 — `fc (200,100)`, 4 epochs, seeds 1-8
+
+Closed 2026-08-30. Pooled **12.8%** of stage-B rows in the >=98%/500 record region; best rows
+99.4-99.8. Stage-A progress chart then stage-B pass, per arm. Numbers and the p2 comparison —
+including why the two batches are **not** a clean network-shape test — in [`results.md`](results.md).
+
+![p3a-fc200x100-seed1](../runs/p3a-fc200x100-seed1.png)
+![p3a stage B](../runs/p3a-fc200x100-seed1_checkpoint_evals.png)
+![p3b-fc200x100-seed2](../runs/p3b-fc200x100-seed2.png)
+![p3b stage B](../runs/p3b-fc200x100-seed2_checkpoint_evals.png)
+![p3c-fc200x100-seed3](../runs/p3c-fc200x100-seed3.png)
+![p3c stage B](../runs/p3c-fc200x100-seed3_checkpoint_evals.png)
+![p3d-fc200x100-seed4](../runs/p3d-fc200x100-seed4.png)
+![p3d stage B](../runs/p3d-fc200x100-seed4_checkpoint_evals.png)
+![p3e-fc200x100-seed5](../runs/p3e-fc200x100-seed5.png)
+![p3e stage B](../runs/p3e-fc200x100-seed5_checkpoint_evals.png)
+![p3f-fc200x100-seed6](../runs/p3f-fc200x100-seed6.png)
+![p3f stage B](../runs/p3f-fc200x100-seed6_checkpoint_evals.png)
+![p3g-fc200x100-seed7](../runs/p3g-fc200x100-seed7.png)
+![p3g stage B](../runs/p3g-fc200x100-seed7_checkpoint_evals.png)
+![p3h-fc200x100-seed8](../runs/p3h-fc200x100-seed8.png)
+![p3h stage B](../runs/p3h-fc200x100-seed8_checkpoint_evals.png)
+
+## Batch p2 — `fc (320,)`, 8 epochs, seeds 1-8
+
+Closed 2026-08-30. Pooled **9.6%** in the record region, and the single best row in either
+batch — **100.0%/500** at p2b/184M.
+
+![p2a-ep8-seed1](../runs/p2a-ep8-seed1.png)
+![p2a stage B](../runs/p2a-ep8-seed1_checkpoint_evals.png)
+![p2b-ep8-seed2](../runs/p2b-ep8-seed2.png)
+![p2b stage B](../runs/p2b-ep8-seed2_checkpoint_evals.png)
+![p2c-ep8-seed3](../runs/p2c-ep8-seed3.png)
+![p2c stage B](../runs/p2c-ep8-seed3_checkpoint_evals.png)
+![p2d-ep8-seed4](../runs/p2d-ep8-seed4.png)
+![p2d stage B](../runs/p2d-ep8-seed4_checkpoint_evals.png)
+![p2e-ep8-seed5](../runs/p2e-ep8-seed5.png)
+![p2e stage B](../runs/p2e-ep8-seed5_checkpoint_evals.png)
+![p2f-ep8-seed6](../runs/p2f-ep8-seed6.png)
+![p2f stage B](../runs/p2f-ep8-seed6_checkpoint_evals.png)
+![p2g-ep8-seed7](../runs/p2g-ep8-seed7.png)
+![p2g stage B](../runs/p2g-ep8-seed7_checkpoint_evals.png)
+![p2h-ep8-seed8](../runs/p2h-ep8-seed8.png)
+![p2h stage B](../runs/p2h-ep8-seed8_checkpoint_evals.png)
 
 ## Imported policies
 
