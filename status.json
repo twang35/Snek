@@ -1,13 +1,13 @@
 {
-  "iso": "2026-08-31T01:58:18",
-  "ts": 1788166698.4869905,
+  "iso": "2026-08-31T02:08:39",
+  "ts": 1788167319.968099,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "p1 \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 training 94% (8 arms)"
+      "p1 \u2014 p1: fc (200,100) + 8 epochs, seed 2 of 8 \u2014 training 95% (7 arms)"
     ],
     "queued": [
-      "p1 stage B \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 queued (8 arms)"
+      "p1 stage B \u2014 p1: fc (200,100) + 8 epochs, seed 2 of 8 \u2014 queued (1 arm)"
     ],
     "attention": []
   },
@@ -27,23 +27,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
+    "trainer": 7,
     "eval": 0
   },
   "running": [
-    {
-      "id": "p1a-fc200x100ep8-seed1",
-      "type": "train",
-      "policy": "p1a-fc200x100ep8-seed1",
-      "policies": [
-        "p1a-fc200x100ep8-seed1"
-      ],
-      "pid": 626483,
-      "step": 195919872,
-      "max_steps": 199999488,
-      "steps_per_sec": 8109.3,
-      "elapsed_s": 25920
-    },
     {
       "id": "p1b-fc200x100ep8-seed2",
       "type": "train",
@@ -52,10 +39,10 @@
         "p1b-fc200x100ep8-seed2"
       ],
       "pid": 626484,
-      "step": 195362816,
+      "step": 199999488,
       "max_steps": 199999488,
-      "steps_per_sec": 8125.6,
-      "elapsed_s": 25920
+      "steps_per_sec": 5695.1,
+      "elapsed_s": 26541
     },
     {
       "id": "p1c-fc200x100ep8-seed3",
@@ -65,10 +52,10 @@
         "p1c-fc200x100ep8-seed3"
       ],
       "pid": 626485,
-      "step": 186302464,
+      "step": 190824448,
       "max_steps": 199999488,
-      "steps_per_sec": 8649.3,
-      "elapsed_s": 25920
+      "steps_per_sec": 7766.9,
+      "elapsed_s": 26541
     },
     {
       "id": "p1d-fc200x100ep8-seed4",
@@ -78,10 +65,10 @@
         "p1d-fc200x100ep8-seed4"
       ],
       "pid": 626486,
-      "step": 188416000,
+      "step": 193003520,
       "max_steps": 199999488,
-      "steps_per_sec": 8664.6,
-      "elapsed_s": 25920
+      "steps_per_sec": 7249.3,
+      "elapsed_s": 26541
     },
     {
       "id": "p1e-fc200x100ep8-seed5",
@@ -91,10 +78,10 @@
         "p1e-fc200x100ep8-seed5"
       ],
       "pid": 626487,
-      "step": 186187776,
+      "step": 190742528,
       "max_steps": 199999488,
-      "steps_per_sec": 6123.3,
-      "elapsed_s": 25920
+      "steps_per_sec": 7250.4,
+      "elapsed_s": 26541
     },
     {
       "id": "p1f-fc200x100ep8-seed6",
@@ -104,10 +91,10 @@
         "p1f-fc200x100ep8-seed6"
       ],
       "pid": 626488,
-      "step": 183894016,
+      "step": 188416000,
       "max_steps": 199999488,
-      "steps_per_sec": 8163.8,
-      "elapsed_s": 25920
+      "steps_per_sec": 9323.0,
+      "elapsed_s": 26541
     },
     {
       "id": "p1g-fc200x100ep8-seed7",
@@ -117,10 +104,10 @@
         "p1g-fc200x100ep8-seed7"
       ],
       "pid": 626489,
-      "step": 182599680,
+      "step": 186925056,
       "max_steps": 199999488,
-      "steps_per_sec": 8163.9,
-      "elapsed_s": 25920
+      "steps_per_sec": 10360.9,
+      "elapsed_s": 26541
     },
     {
       "id": "p1h-fc200x100ep8-seed8",
@@ -130,15 +117,14 @@
         "p1h-fc200x100ep8-seed8"
       ],
       "pid": 626490,
-      "step": 182108160,
+      "step": 186515456,
       "max_steps": 199999488,
-      "steps_per_sec": 7660.7,
-      "elapsed_s": 25920
+      "steps_per_sec": 7771.7,
+      "elapsed_s": 26541
     }
   ],
   "ledger": {
     "p1-stageb": "queued",
-    "p1a-fc200x100ep8-seed1": "running",
     "p1b-fc200x100ep8-seed2": "running",
     "p1c-fc200x100ep8-seed3": "running",
     "p1d-fc200x100ep8-seed4": "running",
@@ -146,6 +132,7 @@
     "p1f-fc200x100ep8-seed6": "running",
     "p1g-fc200x100ep8-seed7": "running",
     "p1h-fc200x100ep8-seed8": "running",
+    "p1a-fc200x100ep8-seed1": "done",
     "p2-hof5000": "done",
     "sse24": "done",
     "sse20": "done",
@@ -238,10 +225,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 29.3,
+  "disk_free_gb": 29.0,
   "load_avg": [
-    15.8447265625,
-    15.5400390625,
-    15.4931640625
+    14.8603515625,
+    15.369140625,
+    15.44580078125
   ]
 }
