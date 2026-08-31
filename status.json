@@ -1,11 +1,9 @@
 {
-  "iso": "2026-08-31T04:31:50",
-  "ts": 1788175910.27979,
+  "iso": "2026-08-31T04:42:15",
+  "ts": 1788176535.5502841,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "p1 \u2014 p1: fc (200,100) + 8 epochs, seed 1 of 8 \u2014 stage B (8 arms)"
-    ],
+    "running": [],
     "queued": [],
     "attention": []
   },
@@ -26,32 +24,11 @@
   "config_notes": [],
   "counts": {
     "trainer": 0,
-    "eval": 1
+    "eval": 0
   },
-  "running": [
-    {
-      "id": "p1-stageb",
-      "type": "eval",
-      "policy": "p1a-fc200x100ep8-seed1",
-      "policies": [
-        "p1a-fc200x100ep8-seed1",
-        "p1b-fc200x100ep8-seed2",
-        "p1c-fc200x100ep8-seed3",
-        "p1d-fc200x100ep8-seed4",
-        "p1e-fc200x100ep8-seed5",
-        "p1f-fc200x100ep8-seed6",
-        "p1g-fc200x100ep8-seed7",
-        "p1h-fc200x100ep8-seed8"
-      ],
-      "pid": 901724,
-      "step": 199999488,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 7049
-    }
-  ],
+  "running": [],
   "ledger": {
-    "p1-stageb": "running",
+    "p1-stageb": "done",
     "p1h-fc200x100ep8-seed8": "done",
     "p1g-fc200x100ep8-seed7": "done",
     "p1f-fc200x100ep8-seed6": "done",
@@ -152,10 +129,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 28.4,
+  "disk_free_gb": 28.1,
   "load_avg": [
-    16.4384765625,
-    16.4052734375,
-    16.3720703125
+    0.05126953125,
+    3.27685546875,
+    9.71728515625
   ]
 }
