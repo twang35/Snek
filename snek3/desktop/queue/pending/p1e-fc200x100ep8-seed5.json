@@ -3,7 +3,7 @@
   "id": "p1e-fc200x100ep8-seed5",
   "type": "train",
   "policy": "p1e-fc200x100ep8-seed5",
-  "max_steps": 220004352,
+  "max_steps": 199999488,
   "env": {
     "SNEK_ALGO": "ppo",
     "SNEK_REWARD_PRESET": "b2",
@@ -19,5 +19,5 @@
   },
   "priority": 50,
   "label": "p1: fc (200,100) + 8 epochs, seed 5 of 8",
-  "notes": "The clean network-shape test. p2 and p3 differed in TWO knobs -- fc (320,) + 8 epochs against fc (200,100) + 4 epochs -- so neither settled the two-hidden-layer thread p0 opened, and epochs is the one axis p0 found to move. p1 holds epochs at 8 and takes p3's network, which makes it a single-knob comparison against p2 (the network) and against p3 (the epochs) at the same time. Budget sits inside both comparators' ranges so the p3 comparison needs no truncation. Eight seeds because the p2/p3 attempt had eight and its sign test still came out 5 of 8."
+  "notes": "The clean network-shape test. p2 and p3 differed in TWO knobs -- fc (320,) + 8 epochs against fc (200,100) + 4 epochs -- so neither settled the two-hidden-layer thread p0 opened, and epochs is the one axis p0 found to move. p1 holds epochs at 8 and takes p3's network, which makes it a single-knob comparison against p2 (the network) and against p3 (the epochs) at the same time. Budget is 200M (12,207 rollouts of 16,384). That is BELOW both comparators -- p3 reached 215-231M and p2 255-271M -- so **both** comparisons truncate to 200M rather than only p2. Cheap, since every row is already on disk, but it is a truncation on each side and not a like-for-like horizon on either. Eight seeds because the p2/p3 attempt had eight and its sign test still came out 5 of 8."
 }
