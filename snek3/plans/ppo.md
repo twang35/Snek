@@ -1,7 +1,15 @@
 # snek3 — PPO
 
-**Status: approved 2026-08-29. Phases 6a, 6b and 6c are closed; 6d — batch p1 — is next.** Phase 6 of
+**Status: phase 6 is closed as of 2026-08-30 — 6a through 6e all met.** Phase 6 of
 [`pytorch-port.md`](pytorch-port.md), which calls it "the actual research".
+
+**6d and 6e were met by batches p2 and p3, not by the p1 this plan specified.** p1 was designed as
+4 seed-matched arms at b2's 18M-transition budget; what actually ran was two 8-seed batches at
+215-271M — an order of magnitude past the gate, in the same env, screened and measured by the same
+protocol. The gate is met more strongly than it was written, so the plan is closed against the
+evidence rather than against the schedule. **The `p1` name has since been reused** for a different
+experiment — the clean network-shape test p2/p3 could not provide, queued 2026-08-30; see
+[`../docs/runs.md`](../docs/runs.md).
 
 **Four decisions taken at approval**, which supersede §11's questions: γ is settled by the p0 tuning
 pass and p1 uses the winner; **action masking is out of scope** for now, so `SNEK_PPO_ACTION_MASK`
@@ -374,8 +382,28 @@ most ordinary costume: 24 passing PPO tests, and the load-bearing line was untes
 | **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | **Met 2026-08-29.** Three fixed-seed arms — the defaults, a `chase_safe` arm and a `free_space` arm at `n_step=3`, `collect_envs=2`, `ratio=0.5` — came out **byte-identical** across the refactor on every eval row, the final weights (SHA-256 of the whole `state_dict`), the step, the transition count, epsilon and the checkpoint set. 743 tests green, 26 of 26 mutants killed. **Not yet deployed to the desktop:** b2 is still training |
 | **6b** | `ppo/` plus the fixtures and the mutant spec | **Met 2026-08-29.** 869 tests green, **14 of 14** mutants killed, and the gate arm reached avg score **79.5 with a 1.2%/500 perfect rate at 508k transitions**, against the **0.9** an untrained policy scores. See below |
 | **6c** | **batch p0 — tuning** | **Closed 2026-08-29 at 15 arms x 10M transitions, not 4 x 2M.** Output: **no winner and no lever among lr, λ, entropy, γ or width** — nine configs inside 0.8 pp. One axis did move: **gradient steps per transition**. See below |
-| **6d** | **batch p1 — 4 seed-matched arms at b2's transition budget** | **‡ the budget is 18M transitions, not the 12M this table first said** — b2 is 3M counted steps at a measured **6** transitions per step, not 4. Phase 3's bar, restated: **one arm reaches ≥90% perfect in a stage-A eval** — already cleared by p0, so p1's real job is the seed-matched comparison, not the gate |
-| **6e** | stage B on p1, and the comparison | lead with the **≥98%/500 count** — the width of the record region — against b2's own close-out, and the sign test across the four seeds on `strong_eval_fraction` at a matched transition horizon |
+| **6d** | **seed-matched arms at b2's budget or better** | **Met 2026-08-30 by p2 and p3** — 8 seeds each at 215-271M transitions, ~12-15x b2's 18M, on b2's reward function. The stated bar (one arm ≥90% perfect in a stage-A eval) is cleared by every one of the sixteen: stage-A `best_perfect30` is **97.8-98.5** across both batches. ‡ Not the 4-arm p1 this row specified — see the status note |
+| **6e** | stage B and the comparison | **Met 2026-08-30.** On the pre-registered metric — the ≥98%/500 count — **p3 is 4,661 of 36,272 rows (12.8%) and p2 is 3,329 of 34,581 (9.6%), against b2's four DQN seeds at 5 of 1,135 (0.44%)**: a 29x and 22x density. Both passes complete, status 0. ‡ Read the caveats below before quoting it |
+
+### ‡ What 6e's number does and does not say
+
+The 22-29x density gap is real and it is the metric this plan pre-registered, so it is the headline.
+Four limits belong beside it, none of which the number carries on its own.
+
+- **It is not a matched-budget comparison.** p2 and p3 ran 215-271M transitions against b2's 18M. The
+  honest statement is "PPO at ~14x the budget reaches ~25x the record-region density", not "PPO beats
+  DQN per transition". **A matched-budget comparison against b2 has still never been run**, and the
+  original 4-arm p1 was the thing that would have provided it.
+- **b2's denominator is small.** 5 of 1,135 rows; a handful either way moves the ratio a lot.
+- **At the honest depth the snek2 champion still leads.** Its converted weights measure **98.8%**
+  [98.3, 99.1] over 3,000 episodes at 2.74M transitions. Every PPO high re-measured lower — all three
+  of p0's fell 1.3-2.0 pp. **A 500-episode maximum is a selected high, not a record.**
+- **The 5,000-episode re-measure is what settles the record question**, and it is running: p2's 873
+  checkpoints ≥98.5%/500 on the desktop, p3's 1,299 on the laptop, both labelled `hof5000`. Until
+  those land, no p-series checkpoint should be described as a record or promoted to `hallOfFame/`.
+
+So: **phase 6 is met, and PPO is the better learner on this protocol at scale.** "PPO beats the
+champion" is a different claim and is not yet supported.
 
 ### What 6a actually landed
 
