@@ -698,3 +698,46 @@ def test_viewer_is_a_bool_knob():
     assert parsed is None and any('viewer' in note for note in notes)
     parsed, notes = config_module.parse_runtime_config('{"viewer": false}', HOST)
     assert parsed is not None and parsed['viewer'] is False
+
+
+# --- job text is ASCII, because status.json is read raw ---------------------------------------
+
+def test_an_em_dash_in_a_label_is_folded_to_ascii():
+    """`status.json` is published with json.dumps, so a non-ASCII character reaches the reader as a
+    `\\uXXXX` escape. b8's labels published as "b8 \\u2014 b8: kl02, seed 1 of 4 \\u2014 wave 2 of 2".
+    """
+    parsed = parse_job(spec(label='b8 — kl02, seed 1 of 4 — wave 2 of 2'))
+    assert parsed.label == 'b8 -- kl02, seed 1 of 4 -- wave 2 of 2'
+    assert parsed.label.isascii()
+
+
+def test_the_punctuation_an_agent_writes_has_an_ascii_spelling():
+    text = '“quoted” ≥ 98% × 4 → done… – and ± 0.1'
+    assert job_module.to_ascii(text) == '"quoted" >= 98% x 4 -> done... - and +/- 0.1'
+
+
+def test_an_unmapped_character_becomes_a_visible_question_mark():
+    # Not dropped: a silent deletion of a character nobody mapped is worse than an obvious `?`.
+    assert job_module.to_ascii('snowman ☃') == 'snowman ?'
+
+
+def test_notes_are_folded_too_and_plain_ascii_is_untouched():
+    plain = 'Batch b8 -- what fixes b4 collapse. 8 epochs, >=98%/500.'
+    assert job_module.to_ascii(plain) == plain
+    assert parse_job(spec(notes='a — b')).notes == 'a -- b'
+
+
+def test_folding_an_empty_or_missing_field_is_not_an_error():
+    assert job_module.to_ascii('') == ''
+    parsed = parse_job(spec())
+    assert parsed.label == '' and parsed.notes == ''
+
+
+def test_the_published_status_text_carries_no_ascii_escapes():
+    """The other half: a policy name is a path and is deliberately not folded, so the writer must
+    not escape it either. Asserted through `status_json`, which is what `_publish` calls."""
+    text = runner_module.status_json({'at_a_glance': {'running': ['b8 \u2014 kl02']},
+                                      'running': [{'policy': 'b8i-kl02-seed1'}]})
+    assert '\\u2014' not in text
+    assert '\u2014' in text, 'the character itself survives; only its escaping is the bug'
+    assert json.loads(text)['at_a_glance']['running'] == ['b8 \u2014 kl02'], 'still valid JSON'

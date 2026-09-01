@@ -15,6 +15,20 @@ dispatch is impossible and a future snek4 inherits the same guard.
 There is no default. A missing field is the exact case being guarded against, so defaulting it to
 `snek3` would defeat the guard on precisely the specs it exists for.
 
+## `label` and `notes` are folded to ASCII, and that is a display fix with one cause
+
+`status.json` is published with `json.dumps`, whose default `ensure_ascii=True` renders every
+non-ASCII character as a `\\uXXXX` escape **in the file a human reads**. An em dash in a label came
+back as `"b8 \\u2014 b8: kl02, seed 1 of 4 \\u2014 wave 2 of 2"`, which is correct JSON and unreadable
+prose. Rejecting the spec would stop real work over a cosmetic problem, so the text is folded here
+instead: the punctuation an agent reaches for has an ASCII spelling (`--`, `->`, `>=`, `"`), and
+anything without one becomes `?` rather than an escape.
+
+Folding at parse time rather than at publish time means the ledger, the logs and `at_a_glance` all
+carry the same string, and a spec already sitting on `ops` is fixed without rewriting the branch.
+`runner.py` also publishes with `ensure_ascii=False` now, so a non-ASCII *policy name* — which is not
+folded, because it is a path — reads as itself rather than as an escape.
+
 ## An eval job carries `policies`, not one `policy`
 
 A stage-B pass is a **wave**: one `tools/closeout.py` process owning every arm of a batch, so the
@@ -30,6 +44,24 @@ import re
 PROJECT = 'snek3'
 JOB_TYPES = ('train', 'smoke', 'benchmark', 'eval')
 _ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
+
+# The characters an agent writing prose actually reaches for, and their ASCII spellings. Anything
+# else non-ASCII falls through to `?`, which is visible rather than silent.
+_ASCII_FOLD = {
+    0x2014: '--', 0x2013: '-', 0x2212: '-',            # em dash, en dash, minus
+    0x2018: "'", 0x2019: "'", 0x201c: '"', 0x201d: '"',  # curly quotes
+    0x2026: '...', 0x00a0: ' ', 0x2009: ' ', 0x202f: ' ',  # ellipsis, the spaces
+    0x2265: '>=', 0x2264: '<=', 0x2260: '!=', 0x00d7: 'x', 0x00b1: '+/-',
+    0x2192: '->', 0x2190: '<-', 0x2021: '!', 0x2020: '+',
+}
+
+
+def to_ascii(text):
+    """`text` with its non-ASCII folded to ASCII. See the module docstring for why, not just what."""
+    if not text:
+        return text
+    folded = text.translate(_ASCII_FOLD)
+    return folded.encode('ascii', 'replace').decode('ascii')
 
 
 class JobError(Exception):
@@ -150,4 +182,5 @@ def parse_job(text, source='<job>', project=PROJECT):
     return Job(id=job_id, type=job_type, project=job_project, policy=policy, policies=policies,
                env=env, max_steps=max_steps, eval_shards=eval_shards, selector=selector,
                episodes=episodes, eval_args=eval_args, priority=priority,
-               notes=str(raw.get('notes', '')), label=str(raw.get('label', '')))
+               notes=to_ascii(str(raw.get('notes', ''))),
+               label=to_ascii(str(raw.get('label', ''))))

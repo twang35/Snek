@@ -668,7 +668,7 @@ class Runner(object):
             'load_avg': list(os.getloadavg()),
         }
         try:
-            if not gitbus.publish_status(self.host, json.dumps(status, indent=2)):
+            if not gitbus.publish_status(self.host, status_json(status)):
                 self._unpushed = sorted(set(self._unpushed) | {self.host['STATUS_BRANCH']})
             else:
                 self._unpushed = [branch for branch in self._unpushed
@@ -678,6 +678,20 @@ class Runner(object):
 
 
 # ---------------------------------------------------------------- pure helpers
+
+def status_json(status):
+    """`status` as the text published to `ops-status`.
+
+    **`ensure_ascii=False` because a human reads this file through `git show`.** The default escapes
+    every non-ASCII character, so an em dash in a job label published as a literal `\\u2014` and
+    `at_a_glance` read `"b8 \\u2014 b8: kl02, seed 1 of 4 \\u2014 wave 2 of 2"` — correct JSON,
+    unreadable prose. Job text is folded to ASCII in `job.py`; this covers what is deliberately not
+    folded, such as a policy name, which is a path.
+
+    A separate function rather than an inline `json.dumps` so the rule is testable without a live
+    daemon — the call site above needs a host, a ledger and a git worktree.
+    """
+    return json.dumps(status, indent=2, ensure_ascii=False)
 
 # **`b<number>` is the only batch prefix, in both eras and both algorithms.** A `p` series was tried
 # for PPO and renamed back on 2026-08-31 (`p0-p3` -> `b3-b6`) precisely so this pattern stays one
