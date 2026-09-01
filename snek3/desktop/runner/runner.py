@@ -29,7 +29,7 @@ import time
 from . import config as config_module
 from . import gitbus
 from . import launch
-from .job import parse_job, Job, JobError
+from .job import parse_job, to_ascii, Job, JobError
 
 TERMINAL = ('done', 'failed')
 
@@ -776,7 +776,11 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
         label = labels.get(batch)
         if not label:
             return ''
-        return ' — ' + (label if len(label) <= 80 else label[:77] + '...')
+        # Folded here as well as in `job.py`, because a label reaches this from three places and one
+        # of them is the **ledger**, which persists whatever was written when the job was first
+        # recorded. Folding only at parse time left b8's stored em dashes on display after the fix.
+        label = to_ascii(label)
+        return ' | ' + (label if len(label) <= 80 else label[:77] + '...')
 
     def arms(jobs):
         """"N arms", counted in **policies**, not in jobs.
@@ -793,7 +797,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
                     for job in jobs if job.get('step') and job.get('max_steps')]
         percent = (' {0}%'.format(int(round(sum(percents) / len(percents))))
                    if percents else '')
-        running_lines.append('{0}{1} — {2}{3} ({4})'.format(
+        running_lines.append('{0}{1} | {2}{3} ({4})'.format(
             batch, described(batch), phase, percent, arms(jobs)))
 
     queued_lines = []
@@ -801,7 +805,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
     if notice:
         queued_lines.append(notice)
     for batch, phase, jobs in group(queued_order):
-        queued_lines.append('{0} {1}{2} — queued ({3})'.format(
+        queued_lines.append('{0} {1}{2} | queued ({3})'.format(
             batch, phase, described(batch), arms(jobs)))
 
     return {'running': running_lines, 'queued': queued_lines, 'attention': list(attention)}

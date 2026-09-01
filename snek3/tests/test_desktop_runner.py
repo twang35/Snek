@@ -598,7 +598,7 @@ def test_a_wave_is_reported_in_arms_not_in_jobs():
     glance = runner_module.build_at_a_glance(
         [], [{'id': 'b1-stageb', 'type': 'eval', 'policy': 'b1a',
               'policies': ['b1a', 'b1b', 'b1c', 'b1d'], 'priority': 10}], {})
-    assert glance['queued'] == ['b1 stage B — queued (4 arms)']
+    assert glance['queued'] == ['b1 stage B | queued (4 arms)']
 
 
 def test_a_running_batch_shows_the_mean_percent_across_its_arms():
@@ -607,7 +607,7 @@ def test_a_running_batch_shows_the_mean_percent_across_its_arms():
                {'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x'],
                 'step': 2000000, 'max_steps': 3000000}]
     glance = runner_module.build_at_a_glance(running, [], {'b1': 'the seed-matched set'})
-    assert glance['running'] == ['b1 — the seed-matched set — training 50% (2 arms)']
+    assert glance['running'] == ['b1 | the seed-matched set | training 50% (2 arms)']
 
 
 def test_a_hold_notice_leads_the_queue_even_when_the_queue_is_empty():
@@ -741,3 +741,27 @@ def test_the_published_status_text_carries_no_ascii_escapes():
     assert '\\u2014' not in text
     assert '\u2014' in text, 'the character itself survives; only its escaping is the bug'
     assert json.loads(text)['at_a_glance']['running'] == ['b8 \u2014 kl02'], 'still valid JSON'
+
+
+def test_at_a_glance_folds_a_label_that_came_from_the_ledger():
+    """A label reaches the display from a queued spec, a running job, or the **ledger** -- and the
+    ledger persists what was written before any fold existed. b8's stored em dashes were still on
+    display after parse_job started folding, which is why this is done in both places.
+    """
+    running = [{'id': 'b8i-kl02-seed1', 'type': 'train', 'policy': 'b8i-kl02-seed1',
+                'step': 19, 'max_steps': 100}]
+    glance = runner_module.build_at_a_glance(
+        running, [], {'b8': 'b8: kl02, seed 1 of 4 — wave 2 of 2'})
+    line = glance['running'][0]
+    assert line.isascii(), line
+    assert '--' in line and '—' not in line
+
+
+def test_at_a_glance_uses_no_em_dash_of_its_own():
+    # The builder's own separators were em dashes, so an all-ASCII label still published two of them.
+    glance = runner_module.build_at_a_glance(
+        [{'id': 'b9a-thing', 'type': 'train', 'policy': 'b9a-thing', 'step': 1, 'max_steps': 2}],
+        [{'id': 'b9b-thing', 'type': 'train', 'policy': 'b9b-thing'}],
+        {'b9': 'plain ascii label'})
+    for line in glance['running'] + glance['queued']:
+        assert line.isascii(), line
