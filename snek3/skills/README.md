@@ -11,6 +11,7 @@ docs say *what is true*; a skill says *what to do, in order*.
 | [`stop-run`](stop-run/SKILL.md) | kill an arm or a wave on either box, and clean up its children |
 | [`desktop-deploy`](desktop-deploy/SKILL.md) | get the box on new code |
 | [`mutation-test`](mutation-test/SKILL.md) | prove the tests cover a change |
+| [`hof-promote`](hof-promote/SKILL.md) | put a checkpoint in `hallOfFame/`, on a confirmed fresh measurement |
 
 ## How they are discovered
 

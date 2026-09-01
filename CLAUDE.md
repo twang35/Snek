@@ -41,7 +41,8 @@ PYTHONPATH=. python -u record_gif.py <policy_name>
 
 Where the rest is written: snek2's investigation is [`snek2/hyperparamTuning/`](snek2/hyperparamTuning/)
 and its record checkpoints and recordings are [`snek2/hallOfFame/HOF.md`](snek2/hallOfFame/HOF.md);
-snek3's investigation is [`snek3/docs/`](snek3/docs/).
+snek3's investigation is [`snek3/docs/`](snek3/docs/) and its records are
+[`snek3/hallOfFame/HOF.md`](snek3/hallOfFame/HOF.md).
 
 ## Every training opens a chart window, and no agent launches one by hand
 
