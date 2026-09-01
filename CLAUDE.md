@@ -200,6 +200,23 @@ collision the copies always differ, so it comes back after every fix and blocks 
 hours the arm runs. Desktop artifacts arrive on the `results` branch at close-out; that is what it is
 for. A laptop arm's own files are fine.
 
+**A *finished* desktop batch's artifacts collide too — once — and that is worth expecting rather than
+being surprised by.** Importing a closed batch from the `results` branch and committing it is the
+right thing to do (it is how `charts.md` gets its links), but the box still holds its own untracked
+originals of those exact paths, so the next deploy aborts. Measured 2026-09-01 on b7: 96 files.
+**Resolve it by identity, not by deletion.** The box's copies came from the same close-out, so:
+
+```
+git ls-tree -r <commit> --format='%(objectname) %(path)' -- snek3/runs | grep <batch>   # laptop
+# on the box: compare each with `git hash-object <path>`, then, if every one matches,
+cut -d' ' -f2- /tmp/blobs.txt | tr '\n' '\0' | xargs -0 git add --
+git merge --ff-only origin/master
+```
+
+Staging them at the hash the incoming commit already carries leaves the merge nothing to overwrite,
+and the index comes out clean because the new `HEAD` holds those same blobs. If any file *differs*,
+that is the live-arm case above and the difference is the thing to look at before touching it.
+
 **One implementation for both boxes, wherever the behaviour wanted is the same.** The two hosts
 differ in what they *have* — cores, a monitor, a queue — and almost never in what the code should
 *do*, so a laptop path and a desktop path for the same job is two places to fix every bug and one of

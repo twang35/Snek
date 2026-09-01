@@ -23,8 +23,28 @@ failure mode that happens often:
 `runs/<policy>.{md,png}` and `runs/<policy>_evals.json` on every eval, so a committed copy of those
 paths collides forever and blocks every deploy for the hours the arm runs. The fix is at the source:
 **never commit a live desktop arm's run artifacts** from the laptop. Desktop artifacts arrive on the
-`results` branch at close-out; that is what it is for. To unblock now, remove the offending untracked
-files on the box — they are regenerated on the next eval.
+`results` branch at close-out; that is what it is for.
+
+**A closed batch imported from `results` and committed collides once**, because the box still holds
+its own untracked originals — 96 files on b7, 2026-09-01. Do not reach for `rm`: check identity, then
+stage them at the hash the incoming commit already carries, which leaves the merge nothing to
+overwrite and ends with a clean index.
+
+```
+# laptop: the blob hashes the commit carries
+git ls-tree -r <commit> --format='%(objectname) %(path)' -- snek3/runs | grep <batch> > blobs.txt
+scp blobs.txt the-claw-den:/tmp/blobs.txt
+# box: every one identical?
+ssh the-claw-den 'cd ~/Snek && while read -r h p; do [ "$(git hash-object "$p")" = "$h" ] \
+    || echo "DIFFERS: $p"; done < /tmp/blobs.txt'
+# box: if nothing differs, stage and merge
+ssh the-claw-den 'cd ~/Snek && cut -d" " -f2- /tmp/blobs.txt | tr "\n" "\0" | xargs -0 git add -- \
+    && git merge --ff-only origin/master'
+```
+
+A file that **differs** is the live-arm case above; look at the difference before touching it.
+Deleting the box's copies also works and is what this skill used to say, but it discards without
+checking, and for a finished batch nothing regenerates them.
 
 ## Restarting is safe with arms mid-run
 
