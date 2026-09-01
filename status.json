@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-01T15:15:58",
-  "ts": 1788300958.9158444,
+  "iso": "2026-09-01T15:26:18",
+  "ts": 1788301578.6382644,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b8 \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 training 99% (3 arms)"
+      "b8 \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 stage B (8 arms)"
     ],
     "queued": [
-      "b8 stage B \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 queued (5 arms)",
       "b8 training \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 queued (8 arms)"
     ],
     "attention": []
@@ -28,52 +27,32 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b8f-entanneal-seed2",
-      "type": "train",
-      "policy": "b8f-entanneal-seed2",
+      "id": "b8-stageb",
+      "type": "eval",
+      "policy": "b8a-ent003-seed1",
       "policies": [
-        "b8f-entanneal-seed2"
-      ],
-      "pid": 2126305,
-      "step": 99500032,
-      "max_steps": 100007936,
-      "steps_per_sec": 8870.1,
-      "elapsed_s": 14521
-    },
-    {
-      "id": "b8g-entanneal-seed3",
-      "type": "train",
-      "policy": "b8g-entanneal-seed3",
-      "policies": [
-        "b8g-entanneal-seed3"
-      ],
-      "pid": 2126306,
-      "step": 99172352,
-      "max_steps": 100007936,
-      "steps_per_sec": 8348.5,
-      "elapsed_s": 14521
-    },
-    {
-      "id": "b8h-entanneal-seed4",
-      "type": "train",
-      "policy": "b8h-entanneal-seed4",
-      "policies": [
+        "b8a-ent003-seed1",
+        "b8b-ent003-seed2",
+        "b8c-ent003-seed3",
+        "b8d-ent003-seed4",
+        "b8e-entanneal-seed1",
+        "b8f-entanneal-seed2",
+        "b8g-entanneal-seed3",
         "b8h-entanneal-seed4"
       ],
-      "pid": 2126307,
-      "step": 98631680,
-      "max_steps": 100007936,
-      "steps_per_sec": 12001.2,
-      "elapsed_s": 14521
+      "pid": 2296204,
+      "step": 100007936,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 492
     }
   ],
   "ledger": {
-    "b8-stageb": "queued",
     "b8i-kl02-seed1": "queued",
     "b8j-kl02-seed2": "queued",
     "b8k-kl02-seed3": "queued",
@@ -82,9 +61,10 @@
     "b8n-lam95-seed2": "queued",
     "b8o-lam95-seed3": "queued",
     "b8p-lam95-seed4": "queued",
-    "b8f-entanneal-seed2": "running",
-    "b8g-entanneal-seed3": "running",
-    "b8h-entanneal-seed4": "running",
+    "b8-stageb": "running",
+    "b8h-entanneal-seed4": "done",
+    "b8g-entanneal-seed3": "done",
+    "b8f-entanneal-seed2": "done",
     "b8e-entanneal-seed1": "done",
     "b8d-ent003-seed4": "done",
     "b8c-ent003-seed3": "done",
@@ -229,8 +209,8 @@
   },
   "disk_free_gb": 135.3,
   "load_avg": [
-    14.14794921875,
-    15.88427734375,
-    17.3828125
+    16.0087890625,
+    15.537109375,
+    16.2666015625
   ]
 }
