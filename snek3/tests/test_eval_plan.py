@@ -1,8 +1,8 @@
-"""Result rows: the interval, the summaries, and the round trip that makes a run resumable.
+"""Result rows: the interval, the summaries, and which per-episode data a row still carries.
 
 The row's job is to be *comparable*. Every one is full length under snek3's single-stage protocol,
-so the things that can still go wrong are arithmetic: an interval that runs past 100%, a median
-recomputed from summaries rather than from episodes, a resumed sample that loses its history.
+so the things that can still go wrong are arithmetic: an interval that runs past 100%, or a median
+recomputed from summaries rather than from episodes.
 """
 
 import pytest
@@ -100,20 +100,42 @@ def test_a_row_carries_no_comparability_caveats():
         assert field not in row, field
 
 
-# ------------------------------------------------------------------ the round trip
+# --------------------------------------------------- what the row carries per episode
 
-def test_a_row_rebuilds_the_sample_it_was_built_from():
-    original = held([95, 40, 95, 0], perfect=[True, False, True, False],
-                    rewards=[100.5, 33.25, 100.5, -5.0])
-    restored = eval_plan.held_from_row(eval_plan.build_row(3000, original))
-    assert restored['scores'] == original['scores']
-    assert restored['perfect'] == original['perfect']
-    assert restored['rewards'] == pytest.approx(original['rewards'])
+def test_only_the_scores_are_stored_per_episode():
+    """`episode_perfect` and `episode_rewards` went on 2026-09-01; they were 70% of a result file.
+
+    The two tests that used to be here pinned a round trip through `held_from_row`, which rebuilt a
+    `held` sample from all three arrays. It had no callers: `tools/shard.py` resumes by *step* and
+    writes a row only when its full sample completes, so no partial row ever existed to top up.
+    """
+    row = eval_plan.build_row(3000, held([95, 40, 95, 0]))
+    assert row['episode_scores'] == [95, 40, 95, 0]
+    assert 'episode_perfect' not in row
+    assert 'episode_rewards' not in row
+    assert not hasattr(eval_plan, 'held_from_row'), 'dead code, and it justified 0.96 GB of arrays'
 
 
-def test_a_rebuilt_sample_produces_an_identical_row():
-    # What resumability means: a topped-up row and a row measured in one pass are the same row.
-    first = eval_plan.build_row(10, held([95, 12, 95, 95, 3]))
-    second = eval_plan.build_row(10, eval_plan.held_from_row(first))
-    assert {k: v for k, v in second.items() if k != 'seconds'} == \
-           {k: v for k, v in first.items() if k != 'seconds'}
+def test_the_win_flags_are_recoverable_from_the_scores():
+    """The claim the removal rests on. If this fails, the arrays were not redundant.
+
+    `invariants.md` #1: a perfect game is identified by its score. So the flags are a function of
+    `episode_scores`, and the vectorised env decides them the same way.
+    """
+    original = held([95, 40, 95, 0])
+    row = eval_plan.build_row(3000, original)
+    assert eval_plan.perfect_flags(row) == original['perfect']
+    assert sum(eval_plan.perfect_flags(row)) == row['perfect_games']
+
+
+def test_a_row_written_before_the_change_still_reads_the_same():
+    # Files on disk keep the array for as long as they are not rewritten, so the reader takes either.
+    row = eval_plan.build_row(3000, held([95, 40, 95, 0]))
+    legacy = dict(row, episode_perfect=[1, 0, 1, 0])
+    assert eval_plan.perfect_flags(legacy) == eval_plan.perfect_flags(row)
+
+
+def test_the_averages_the_dropped_rewards_supported_are_still_there():
+    # `avg_reward` is the only reward figure anything reads, and it is computed before the drop.
+    row = eval_plan.build_row(3000, held([95, 40], rewards=[100.5, 33.25]))
+    assert row['avg_reward'] == pytest.approx(66.88, abs=0.01)

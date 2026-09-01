@@ -6,13 +6,30 @@ at 500 episodes — so there is no screen/confirm split, no tiered selector and 
 gate. snek2's files carried `selected_by`, `abandoned` and a nullable `min_achievable` for exactly
 those, and half of comparing two of its rows was working out whether they were comparable at all.
 
-The per-episode lists are stored, not just the summaries, and that is not redundancy: the summaries
-pool but **the median does not**, so a row rebuilt from two summaries carries a quietly wrong
-median. It is also what makes a killed run resumable — snek2 lost 192 rows and 7,534 episodes in one
-incident before it stored them.
+**`episode_scores` is stored, not just the summaries, and that is not redundancy:** the summaries
+pool but **the median does not**, so a row rebuilt from two summaries carries a quietly wrong median.
+
+**‡ The other two arrays were dropped 2026-09-01, and they were 70% of every result file.** A row
+used to carry `episode_perfect` and `episode_rewards` beside the scores, on the stated grounds that
+all three made a pass resumable. Neither claim held:
+
+- `episode_perfect` is `[is_perfect_score(s) for s in episode_scores]` and nothing else.
+  `invariants.md` #1 — "a perfect game is identified by its score, never by its reward" — makes it
+  redundant *by construction*. Verified against 2,249,500 stored episodes: zero disagreements.
+- `episode_rewards` had **no reader at all**, and `avg_reward` beside it is the only reward figure
+  anything uses.
+- Resumption is by **step**: `tools/shard.py` skips a step that already has a row, and a row is
+  written only when its full sample completes, so no partial row exists to top up. The
+  `held_from_row` that rebuilt one had zero callers. The 192-row snek2 incident was about writing
+  rows *incrementally* — which is `RowCache`/`WriteGate`, still here — not about the arrays.
+
+Measured before removing: 7,250 bytes a row, of which 4,933 were those two arrays. Across the
+laptop's 308 stage-B files that is 0.96 GB of 1.38 GB.
 """
 
 import numpy as np
+
+from env.observations import is_perfect_score
 
 
 def wilson_interval(successes, trials, z=1.96):
@@ -63,23 +80,25 @@ def build_row(step, held, stage_a_percent=None):
         # throughput. Strong policies play longer episodes and measure slower, so a fixed estimate
         # is wrong in both directions.
         'seconds': round(held['seconds'], 1),
+        # The one array kept, because a median does not pool. See the module docstring for the two
+        # that went and the measurement behind it.
         'episode_scores': [int(score) for score in scores],
-        'episode_perfect': [int(bool(flag)) for flag in held['perfect']],
-        'episode_rewards': [round(float(reward), 2) for reward in held['rewards']],
     }
 
 
-def held_from_row(row):
-    """A `held` sample rebuilt from a stored row — the inverse of the three `episode_*` fields.
+def perfect_flags(row):
+    """The per-episode win flags of a stored row, derived rather than stored.
 
-    What makes a killed measurement resumable: the shard tops the sample up to full length instead
-    of discarding it and starting again.
+    Replaces the `episode_perfect` array. `env.observations.is_perfect_score` is the single
+    definition of a win (`invariants.md` #1) and the vectorised env decides the flag with it, so the
+    flags are a function of `episode_scores` and storing them was storing the same fact twice. Rows
+    written before 2026-09-01 still carry the array; this reads either, so an old file and a new one
+    answer the same.
     """
-    return {'scores': list(row['episode_scores']),
-            'perfect': [bool(flag) for flag in row['episode_perfect']],
-            'rewards': list(row['episode_rewards']),
-            'seconds': row.get('seconds', 0.0),
-            'abandoned': False}
+    stored = row.get('episode_perfect')
+    if stored is not None:
+        return [bool(flag) for flag in stored]
+    return [bool(is_perfect_score(score)) for score in row['episode_scores']]
 
 
 def one_line(row, label=''):

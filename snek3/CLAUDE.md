@@ -226,6 +226,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/eval_window.py` | the stage-B window — the same viewer and the same launcher, its own slot |
 | `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
+| `tools/prune_runs.py` | reclaims disk from finished work: a merged pass's duplicate shard files, the two dead per-episode arrays, and a closed arm's checkpoints below a stage-B threshold. Dry run by default |
 | `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |
 
 And the training side, which is the other direction — from a knob to an arm:

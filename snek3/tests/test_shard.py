@@ -16,6 +16,7 @@ import pytest
 from dqn import net as network
 from tools import arch as arch_tools
 from tools import checkpoints
+from tools import eval_plan
 from tools import shard
 
 
@@ -43,10 +44,13 @@ def test_the_rows_are_full_length(tmp_path, policy):
     # sample whose rate is not comparable with its neighbours'.
     rows = shard.measure_slice(policy, [1000, 2000], 6, str(tmp_path / 'out.json'))
     for row in rows:
+        assert row['episodes'] == 6
         assert len(row['episode_scores']) == 6
-        assert len(row['episode_perfect']) == 6
-        assert len(row['episode_rewards']) == 6
         assert None not in row['episode_scores']
+        # The win flags are derived from the scores rather than stored beside them (2026-09-01);
+        # `episode_perfect` and `episode_rewards` were 70% of every result file.
+        assert 'episode_perfect' not in row and 'episode_rewards' not in row
+        assert len(eval_plan.perfect_flags(row)) == 6
 
 
 def test_a_second_run_skips_what_the_first_measured(tmp_path, policy, capsys):

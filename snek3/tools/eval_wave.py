@@ -146,8 +146,15 @@ def run(policy, selector='screen', episodes=500, shards=4, label=None, width=Non
         return 1
 
     if merge and shards > 1:
-        path, rows = results.merge(policy, label)
-        print('merged {0} row(s) into {1}'.format(len(rows), path))
+        # `delete_shards=True` because by here every shard has been checked for failure and the row
+        # count matches the selection, so the merged file provably covers every row at full length —
+        # the two `refusing to merge` guards above are what make that true. Without it the shards
+        # stay forever as exact duplicates: measured 2026-09-01, 224 files and 403 MB on
+        # the laptop and 1,200 files and 651 MB on the desktop. `stage_b_chart.load` prefers the
+        # merged file anyway, and falls back to the shards only while a wave is still in flight.
+        path, rows = results.merge(policy, label, delete_shards=True)
+        print('merged {0} row(s) into {1} and removed {2} shard file(s)'.format(
+            len(rows), path, shards))
     return 0
 
 

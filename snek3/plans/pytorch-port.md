@@ -458,10 +458,26 @@ the controller overtook its own lanes and `b43`'s HOF pass folded a backlog for 
 workers idle. Keep both, and keep the diagnostic: when `grep -c "episodes in"` runs ahead of
 `grep -cE "^\[ *[0-9]+/"`, the controller is the bottleneck, not the box.
 
-Keep the row schema whole, including `episode_scores` / `episode_perfect` / `episode_rewards`. Those
-three arrays at ~1.6 KB a row are what make a pass resumable and a median poolable; storing only
-summaries lost 192 rows and 7,534 episodes once. At 500 episodes a row is ~8 KB, so a 2,000-row file
-is ~16 MB — large enough to be worth knowing about, small enough to keep committing.
+Keep `episode_scores`. A median does not pool, so a row rebuilt from summaries carries a quietly
+wrong one.
+
+**‡ Retracted 2026-09-01: the other two arrays went.** This paragraph used to say "keep the row
+schema whole, including `episode_scores` / `episode_perfect` / `episode_rewards` … those three arrays
+are what make a pass resumable and a median poolable; storing only summaries lost 192 rows and 7,534
+episodes once". Two of the three claims were wrong:
+
+- **`episode_perfect` is `[is_perfect_score(s) for s in episode_scores]`.** Invariant #1 makes it
+  redundant by construction, and 2,249,500 stored episodes agree with zero exceptions.
+- **`episode_rewards` had no reader at all**, and `avg_reward` beside it is the only reward figure
+  anything uses.
+- **Resumption is by step, not by episode.** `tools/shard.py` skips a step that already has a row and
+  writes a row only when its full sample completes, so no partial row exists to top up; the
+  `held_from_row` this paragraph rested on had zero callers. The 192-row incident was about writing
+  rows *incrementally* — `RowCache`/`WriteGate`, still here — not about the arrays.
+
+A row was 7,250 bytes and 4,933 of them were those two, so the schema cost **70% of every result
+file**: 0.96 GB across the laptop's 308 stage-B files. Now ~2.3 KB a row. `tools/prune_runs.py`
+rewrites the files already written, and `eval_plan.perfect_flags` reads old and new alike.
 
 Keep three contracts from the engine that each have an incident behind them: episodes are banked at
 the slot they **started** in, not appended on completion (episode length correlates with outcome, so
