@@ -1,10 +1,15 @@
 {
-  "iso": "2026-09-01T00:00:54",
-  "ts": 1788246054.6940274,
+  "iso": "2026-09-01T00:01:27",
+  "ts": 1788246087.6309571,
   "project": "snek3",
   "at_a_glance": {
-    "running": [],
-    "queued": [],
+    "running": [
+      "b7 \u2014 b7: fc (320), seed 1 of 4 \u2014 wave 1 of 4 \u2014 training (8 arms)"
+    ],
+    "queued": [
+      "b7 stage B \u2014 b7: fc (320), seed 1 of 4 \u2014 wave 1 of 4 \u2014 queued (8 arms)",
+      "b7 training \u2014 b7: fc (320), seed 1 of 4 \u2014 wave 1 of 4 \u2014 queued (24 arms)"
+    ],
     "attention": []
   },
   "runtime": {
@@ -23,11 +28,149 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
+    "trainer": 8,
     "eval": 0
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b7aa-fc320-seed1",
+      "type": "train",
+      "policy": "b7aa-fc320-seed1",
+      "policies": [
+        "b7aa-fc320-seed1"
+      ],
+      "pid": 1650220,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7ab-fc320-seed2",
+      "type": "train",
+      "policy": "b7ab-fc320-seed2",
+      "policies": [
+        "b7ab-fc320-seed2"
+      ],
+      "pid": 1650221,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7ac-fc320-seed3",
+      "type": "train",
+      "policy": "b7ac-fc320-seed3",
+      "policies": [
+        "b7ac-fc320-seed3"
+      ],
+      "pid": 1650222,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7ad-fc320-seed4",
+      "type": "train",
+      "policy": "b7ad-fc320-seed4",
+      "policies": [
+        "b7ad-fc320-seed4"
+      ],
+      "pid": 1650223,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7ae-fc200x100-seed1",
+      "type": "train",
+      "policy": "b7ae-fc200x100-seed1",
+      "policies": [
+        "b7ae-fc200x100-seed1"
+      ],
+      "pid": 1650224,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7af-fc200x100-seed2",
+      "type": "train",
+      "policy": "b7af-fc200x100-seed2",
+      "policies": [
+        "b7af-fc200x100-seed2"
+      ],
+      "pid": 1650225,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7ag-fc200x100-seed3",
+      "type": "train",
+      "policy": "b7ag-fc200x100-seed3",
+      "policies": [
+        "b7ag-fc200x100-seed3"
+      ],
+      "pid": 1650226,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    },
+    {
+      "id": "b7ah-fc200x100-seed4",
+      "type": "train",
+      "policy": "b7ah-fc200x100-seed4",
+      "policies": [
+        "b7ah-fc200x100-seed4"
+      ],
+      "pid": 1650227,
+      "step": null,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 0
+    }
+  ],
   "ledger": {
+    "b7-stageb": "queued",
+    "b7ai-fc300x100-seed1": "queued",
+    "b7aj-fc300x100-seed2": "queued",
+    "b7ak-fc300x100-seed3": "queued",
+    "b7al-fc300x100-seed4": "queued",
+    "b7am-fc400x200-seed1": "queued",
+    "b7an-fc400x200-seed2": "queued",
+    "b7ao-fc400x200-seed3": "queued",
+    "b7ap-fc400x200-seed4": "queued",
+    "b7aq-fc160x160-seed1": "queued",
+    "b7ar-fc160x160-seed2": "queued",
+    "b7as-fc160x160-seed3": "queued",
+    "b7at-fc160x160-seed4": "queued",
+    "b7au-fc100x100-seed1": "queued",
+    "b7av-fc100x100-seed2": "queued",
+    "b7aw-fc100x100-seed3": "queued",
+    "b7ax-fc100x100-seed4": "queued",
+    "b7ay-fc100x200x100-seed1": "queued",
+    "b7az-fc100x200x100-seed2": "queued",
+    "b7ba-fc100x200x100-seed3": "queued",
+    "b7bb-fc100x200x100-seed4": "queued",
+    "b7bc-fc200x100x50-seed1": "queued",
+    "b7bd-fc200x100x50-seed2": "queued",
+    "b7be-fc200x100x50-seed3": "queued",
+    "b7bf-fc200x100x50-seed4": "queued",
+    "b7aa-fc320-seed1": "running",
+    "b7ab-fc320-seed2": "running",
+    "b7ac-fc320-seed3": "running",
+    "b7ad-fc320-seed4": "running",
+    "b7ae-fc200x100-seed1": "running",
+    "b7af-fc200x100-seed2": "running",
+    "b7ag-fc200x100-seed3": "running",
+    "b7ah-fc200x100-seed4": "running",
     "p1-stageb": "done",
     "p1h-fc200x100ep8-seed8": "done",
     "p1g-fc200x100ep8-seed7": "done",
@@ -131,8 +274,8 @@
   },
   "disk_free_gb": 28.1,
   "load_avg": [
-    0.0556640625,
-    0.0380859375,
-    0.0302734375
+    0.03271484375,
+    0.0322265625,
+    0.02734375
   ]
 }
