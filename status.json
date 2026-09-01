@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-01T16:55:12",
-  "ts": 1788306912.7351072,
+  "iso": "2026-09-01T16:55:19",
+  "ts": 1788306919.4667473,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -37,10 +37,10 @@
         "b8i-kl02-seed1"
       ],
       "pid": 2330597,
-      "step": 20037632,
+      "step": 20135936,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 14602.3,
+      "elapsed_s": 2800
     },
     {
       "id": "b8j-kl02-seed2",
@@ -50,10 +50,10 @@
         "b8j-kl02-seed2"
       ],
       "pid": 2330598,
-      "step": 19841024,
+      "step": 19922944,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 12167.8,
+      "elapsed_s": 2800
     },
     {
       "id": "b8k-kl02-seed3",
@@ -63,10 +63,10 @@
         "b8k-kl02-seed3"
       ],
       "pid": 2330599,
-      "step": 18907136,
+      "step": 19021824,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 17034.2,
+      "elapsed_s": 2800
     },
     {
       "id": "b8l-kl02-seed4",
@@ -76,10 +76,10 @@
         "b8l-kl02-seed4"
       ],
       "pid": 2330600,
-      "step": 18956288,
+      "step": 19021824,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 9733.9,
+      "elapsed_s": 2800
     },
     {
       "id": "b8m-lam95-seed1",
@@ -89,10 +89,10 @@
         "b8m-lam95-seed1"
       ],
       "pid": 2330601,
-      "step": 18513920,
+      "step": 18579456,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 9736.3,
+      "elapsed_s": 2800
     },
     {
       "id": "b8n-lam95-seed2",
@@ -102,10 +102,10 @@
         "b8n-lam95-seed2"
       ],
       "pid": 2330602,
-      "step": 18530304,
+      "step": 18595840,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 9736.6,
+      "elapsed_s": 2800
     },
     {
       "id": "b8o-lam95-seed3",
@@ -115,10 +115,10 @@
         "b8o-lam95-seed3"
       ],
       "pid": 2330603,
-      "step": 18317312,
+      "step": 18382848,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 9735.9,
+      "elapsed_s": 2800
     },
     {
       "id": "b8p-lam95-seed4",
@@ -128,10 +128,10 @@
         "b8p-lam95-seed4"
       ],
       "pid": 2330604,
-      "step": 17530880,
+      "step": 17678336,
       "max_steps": 100007936,
-      "steps_per_sec": null,
-      "elapsed_s": 2793
+      "steps_per_sec": 21904.9,
+      "elapsed_s": 2800
     }
   ],
   "ledger": {
@@ -291,8 +291,8 @@
   },
   "disk_free_gb": 171.9,
   "load_avg": [
-    14.96240234375,
-    14.66259765625,
-    14.58935546875
+    14.9658203125,
+    14.66845703125,
+    14.591796875
   ]
 }
