@@ -231,14 +231,38 @@ unreachable. The git bus works from anywhere; `ssh` is home-LAN only (mDNS, no T
 2026-08-13) — but "probably off-LAN" is a conclusion, not a starting assumption, and it has been
 wrong.
 
-**‡ A `pgrep` pattern matches the shell that runs it, and this is the default outcome, not an edge
-case.** `pgrep -f <pat>` scans full command lines and the invoking shell's own command line contains
-`<pat>` verbatim, so the check counts itself. It cost two immortal processes: wait-loops that never
-saw zero and spun for six hours. Three things follow. **Bracket every pattern in the command, not
-just one.** **Prefer `ps -Ao pid=,command= | grep <bracketed>`** over `pgrep -f`. And **a
-self-matching count is 1, not 0**, so it reads as "still running" — which fails safe for a liveness
-check and fails *open* for a wait-loop. Never write a wait-loop whose condition greps for a string
-its own command line contains.
+**‡ `pgrep -f` and `pkill -f` match the shell that runs them, and this is the default outcome, not an
+edge case.** `-f` scans full command lines, and the invoking shell's own command line contains the
+pattern verbatim, so the scan always includes itself.
+
+**The destructive half comes first, because it is the half that has cost work.** `pkill` *acts* on
+the match instead of counting it, so it SIGKILLs its own shell:
+
+| when | what was typed | what happened |
+|---|---|---|
+| 2026-08-25, abandoning `b46`'s first wave | `ssh the-claw-den 'kill -9 …; pkill -9 -f "snek2.py b46"; ps …'` | the remote shell's own command line contained `snek2.py b46`, so `pkill` matched it and killed the session: **exit 255, no output**. The kill had in fact worked — a follow-up `ps` showed 0 b46 processes and `free -m` was back to 11 GB. Read exit 255 here as "cannot confirm", never as "failed" |
+| 2026-09-01, relaunching the desktop chart window | the relaunch was piped through `tail -3`, then `pkill -f "tail -3"` | matched its own `ssh` command line, killed the pipeline, and gave the relaunched viewer SIGPIPE |
+
+So **never kill by pattern**: list first with `ps`, read the pids, then kill those pids explicitly —
+`PIDS=(<the pids>) ; kill -9 "${PIDS[@]}"`, an array because `kill $PIDS` is one argument in zsh.
+`pgrep -P <pid>` is by *parent* pid and cannot self-match, so it is the safe way to take a job's
+children with it. And put a verification in a **separate** ssh invocation from the kill.
+
+**The reading half costs time rather than work.** A self-matching count is **1, not 0**, so it reads
+as "still running" — which fails safe for a liveness check and fails *open* for a wait-loop: two
+wait-loops never saw zero and spun for six hours. Never write a wait-loop whose condition greps for a
+string its own command line contains. Two things follow: **bracket every pattern in the command, not
+just one**, and **prefer `ps -Ao pid=,command= | grep <bracketed>`** over the `-f` forms.
+
+**A hook now refuses both in command position**, because prose did not work — this rule was written
+in 66 places across 13 files and was still repeated twice. It is
+[`.claude/hooks/block_self_matching_pattern.py`](.claude/hooks/block_self_matching_pattern.py), wired
+as a `PreToolUse` hook on Bash in `.claude/settings.json`, with its cases in
+`test_block_self_matching_pattern.py` beside it. It denies only *invocations*: a commit message, a
+`grep` through these docs, a `pgrep -x` on a process name, and a heredoc that writes a paragraph
+about the trap all still run. **If it blocks something legitimate that is a bug in the regex** — fix
+the hook and add the case, rather than routing around it. (Both exemptions above were written after
+the hook blocked something real: this section's own edit was the second.)
 
 **And bracketing does not save you when the pattern sits inside an enclosing `zsh -c` string.**
 `[t]ools.shard` protects the `grep` process itself, but the tool runs commands through
