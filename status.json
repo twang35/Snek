@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-01T13:03:53",
-  "ts": 1788293033.405888,
+  "iso": "2026-09-01T13:14:14",
+  "ts": 1788293654.9675913,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b8 \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 training 45% (8 arms)"
+      "b8 \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 training 50% (8 arms)"
     ],
     "queued": [
       "b8 stage B \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 queued (8 arms)",
@@ -40,10 +40,10 @@
         "b8a-ent003-seed1"
       ],
       "pid": 2126300,
-      "step": 47562752,
+      "step": 52199424,
       "max_steps": 100007936,
-      "steps_per_sec": 4562.8,
-      "elapsed_s": 6595
+      "steps_per_sec": 8219.0,
+      "elapsed_s": 7217
     },
     {
       "id": "b8b-ent003-seed2",
@@ -53,10 +53,10 @@
         "b8b-ent003-seed2"
       ],
       "pid": 2126301,
-      "step": 47693824,
+      "step": 52297728,
       "max_steps": 100007936,
-      "steps_per_sec": 9126.6,
-      "elapsed_s": 6595
+      "steps_per_sec": 6167.4,
+      "elapsed_s": 7217
     },
     {
       "id": "b8c-ent003-seed3",
@@ -66,10 +66,10 @@
         "b8c-ent003-seed3"
       ],
       "pid": 2126302,
-      "step": 45645824,
+      "step": 50053120,
       "max_steps": 100007936,
-      "steps_per_sec": 7607.8,
-      "elapsed_s": 6595
+      "steps_per_sec": 10285.1,
+      "elapsed_s": 7217
     },
     {
       "id": "b8d-ent003-seed4",
@@ -79,10 +79,10 @@
         "b8d-ent003-seed4"
       ],
       "pid": 2126303,
-      "step": 45301760,
+      "step": 49790976,
       "max_steps": 100007936,
-      "steps_per_sec": 6593.4,
-      "elapsed_s": 6595
+      "steps_per_sec": 7718.7,
+      "elapsed_s": 7217
     },
     {
       "id": "b8e-entanneal-seed1",
@@ -92,10 +92,10 @@
         "b8e-entanneal-seed1"
       ],
       "pid": 2126304,
-      "step": 45006848,
+      "step": 49315840,
       "max_steps": 100007936,
-      "steps_per_sec": 8114.1,
-      "elapsed_s": 6595
+      "steps_per_sec": 7208.1,
+      "elapsed_s": 7217
     },
     {
       "id": "b8f-entanneal-seed2",
@@ -105,10 +105,10 @@
         "b8f-entanneal-seed2"
       ],
       "pid": 2126305,
-      "step": 43859968,
+      "step": 48021504,
       "max_steps": 100007936,
-      "steps_per_sec": 6085.4,
-      "elapsed_s": 6595
+      "steps_per_sec": 7726.9,
+      "elapsed_s": 7217
     },
     {
       "id": "b8g-entanneal-seed3",
@@ -118,10 +118,10 @@
         "b8g-entanneal-seed3"
       ],
       "pid": 2126306,
-      "step": 43352064,
+      "step": 47677440,
       "max_steps": 100007936,
-      "steps_per_sec": 6592.4,
-      "elapsed_s": 6595
+      "steps_per_sec": 10823.0,
+      "elapsed_s": 7217
     },
     {
       "id": "b8h-entanneal-seed4",
@@ -131,10 +131,10 @@
         "b8h-entanneal-seed4"
       ],
       "pid": 2126307,
-      "step": 43335680,
+      "step": 47677440,
       "max_steps": 100007936,
-      "steps_per_sec": 5578.3,
-      "elapsed_s": 6595
+      "steps_per_sec": 6187.7,
+      "elapsed_s": 7217
     }
   ],
   "ledger": {
@@ -292,10 +292,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 9.7,
+  "disk_free_gb": 9.5,
   "load_avg": [
-    18.0068359375,
-    18.3427734375,
-    18.45263671875
+    18.400390625,
+    18.5615234375,
+    18.49560546875
   ]
 }
