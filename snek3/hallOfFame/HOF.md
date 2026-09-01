@@ -37,8 +37,9 @@ snek2 champion's published figure was itself measured shallower and is itself a 
   cross-depth comparisons are not allowed to settle this question. Against the *published* 98.73% the
   same `b5h` measurement reads p = 0.26 and looks like a tie. Same weights, same afternoon; only the
   depth of the baseline differs.
-- **`record_gif.py`'s `HOF_RECORD` is still `None`**, so `record_gif.py hof` asks which entry you
-  mean. Setting it is a one-line code change and has not been made.
+- **`record_gif.py`'s `HOF_RECORD` names this entry**, so `record_gif.py hof` and
+  `record_gif.py --list` (which marks it `*`) resolve without arguments. This file stays the
+  authority; that constant is a shortcut, and `tests/test_hof_entries.py` fails if the two disagree.
 
 ## The admission rule
 
@@ -77,7 +78,8 @@ simply the top rows.
 - A second checkpoint from the same arm a few hundred thousand transitions from one already in.
   `b5h`'s basin holds ten rows at ≥99% /5000 and promoting them would imply a ranking the data cannot
   support — snek2 declined to promote four indistinguishable sweep candidates for the same reason.
-- Recordings. `gifs/` is empty; `record_gif.py hallOfFame/<entry>` fills it.
+- Recordings. `record_gif.py` writes to `snek3/gifs/`, not here; `hallOfFame/gifs/` is where a
+  recording is copied to be embedded in this file, and it is still empty.
 
 ## Running an entry
 

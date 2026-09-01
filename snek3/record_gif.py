@@ -83,13 +83,15 @@ from PIL import Image, ImageDraw, ImageFont
 from env import constants
 from env import render as R
 from env.constants import GIFS_DIR, HOF_DIR, POLICY_DIR
+from tools import arch as arch_tools
 from tools import checkpoints
 
 # The current record, so `record_gif.py hof` needs no arguments. **`hallOfFame/HOF.md` is the
 # authority on which entry that is** — this is a convenience shortcut, not a second source of
-# truth, and it is one line to move. None until snek3 has a record of its own, in which case `hof`
-# means "the only entry" and says so if there is more than one.
-HOF_RECORD = None
+# truth, and it is one line to move. Set 2026-09-01: 98.96% over 30,000 episodes, and the first
+# snek3 checkpoint to beat the snek2 champion on a matched-depth measurement (98.48% over the same
+# 30,000). Set back to None and `hof` falls back to "the only entry", saying so if there are more.
+HOF_RECORD = 'b5h-ep8-seed8-ckpt9027584'
 
 PERFECT_TEXT = 'PERFECT GAME!!!'
 
@@ -353,10 +355,21 @@ def write_animation(frames, out_path, delay_ms, fmt, colors=MAX_GIF_COLORS):
 # ----------------------------- checkpoint resolution ----------------------------- #
 
 def hof_entries():
+    """The loadable entries in `hallOfFame/`, which is not the same as its subdirectories.
+
+    **An entry is a directory with an `arch.json` in it**, tested positively rather than by
+    excluding the names that are not entries. `hallOfFame/gifs/` is a sibling of the entries, so
+    "every subdirectory" counted it as one: with no real entries at all that made `hof` resolve to
+    `gifs` and fail on a missing checkpoint, and with two it reported three. A blacklist would have
+    fixed today's directory and not the next one added beside it.
+
+    The same test is what `tools/restore.policy_dir` uses to accept a path outside
+    `savedPolicies/`, so an entry listed here is an entry that loads.
+    """
     if not os.path.isdir(HOF_DIR):
         return []
     return sorted(n for n in os.listdir(HOF_DIR)
-                  if os.path.isdir(os.path.join(HOF_DIR, n)))
+                  if os.path.exists(arch_tools.arch_path(os.path.join(HOF_DIR, n))))
 
 
 def resolve_policy(spec, step):
