@@ -42,8 +42,15 @@ of the three 8-seed batches ([`results.md`](results.md)).
 **Read these for the drawdowns, which is what makes b4 different.** The red trace repeatedly falls
 from ~95% to near zero, and it is the *greedy* policy doing it — stage A measures the argmax, not a
 sample. Past its competence onset b4 spends a median **9.1%** of its evals below 50% perfect, against
-0.7% for b6 and 0.0% for b5. It is a late-run effect: truncated to a matched 611-eval horizon the
-three batches are indistinguishable, so it develops over the 200M rather than being present early.
+0.7% for b6 and 0.0% for b5.
+
+**‡ Corrected 2026-09-01: it is not a "late-run" effect, it is an effect with an onset.** Truncated to
+a matched 611-eval horizon (~10M) the three batches are indistinguishable — but b4's rate is **8.5% in
+its first 100M and 9.0% in its second**, so it is fully developed well before the cap and the second
+half adds nothing to it. The earlier reading, that it "develops over the 200M", was drawn from the
+short-horizon comparison alone and did not check the halves. This is what sets [batch b8](runs.md)'s
+budget at 100M. Where the second 100M *does* matter is the record region: **65%** of b4's ≥98%/500
+rows land after 100M, so a density comparison against b4 must truncate b4 to the same cap.
 
 ![b4a-fc200x100ep8-seed1](../runs/b4a-fc200x100ep8-seed1.png)
 ![b4a stage B](../runs/b4a-fc200x100ep8-seed1_checkpoint_evals.png)

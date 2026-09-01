@@ -26,6 +26,29 @@ are held at 4 rather than 8, and that is b4's result rather than a default.** Bu
 did 200M in ~7.5 h with a 2 h stage B, so 50M x 4 waves is roughly half a day. 50M is a quarter of
 b4/b5/b6's horizon, so comparisons against those three truncate.
 
+**Batch b8 is queued behind it — "what fixes b4's collapse".** 4 stability knobs x 4 seeds at 100M,
+holding b4's config fixed (`fc (200,100)`, 8 epochs, b2's reward, seeds 1-4) so exactly one knob moves
+per group, with **b4 itself as the control** at 8 seeds — no control arms queued. Priorities 60/70 put
+both waves behind every b7 wave.
+
+| wave | knob | why it, and not something else |
+|---:|---|---|
+| **1** | entropy **0.003** | the only knob whose stability signal in b3 is monotone in both directions: the share of post-competence evals below 80% perfect ran 2.9% at 0.003, 12.2% at the 0.01 reference, **45.6%** at 0.03 |
+| **1** | entropy **0.01 → 0.001** | the anneal in `ppo/schedules.py`, **never used by an arm**. Explore early, commit late; it completes exactly at this cap |
+| 2 | **`target_KL` 0.02** | **never exercised** — `epochs_run` is 8 in all 97,656 of b4's recorded updates. 0.02 binds on the tail and not the body: b4's `approx_kl` is 0.0035 median and 0.0079 at p95, but **0.023 at p99 and 0.514 at worst**, 146x the median |
+| 2 | **λ 0.95** | b3's two λ arms had the best drawdown profile in the sweep — 0.0% below 50% *and* below 80%, mean 93.9 against the reference's 88.2 — at one seed each |
+
+**Why this and not a second fc sweep at a smaller learning rate.** `lr 1e-4` is the one knob b3
+measured as peaked, and it came out worse on the very axis the consistency argument is about: 14.5% of
+its post-competence evals below 80% against the reference's 12.2%, best30 95.0 against 96.6, **zero**
+≥98%/500 rows against 6, and the latest competence onset in the sweep. Smaller lr bought slower
+learning, not steadier learning. It is n=1, so it is not settled — but b7 is already resolving the
+network axis, and the collapse is the larger unexplained effect.
+
+**Both new knobs were smoke-tested before queueing**, because a silently-ignored knob costs four arms:
+the anneal reads 0.0091 at 10% of a 0.01→0.001 run, which is the linear value, and `target_KL` at a
+deliberate 0.001 stops the epoch loop after 1 of 8 epochs with `stopped_early=True`.
+
 **Batch b4 closed on the desktop 2026-08-31 and its numbers are now read** into
 [`results.md`](results.md) and [`findings.md`](findings.md): pooled **7.3%** of stage-B rows at
 ≥98%/500 against b6's 12.8% and b5's 9.6%, and best30 **97.0-97.9** against 97.8-98.5 for both.

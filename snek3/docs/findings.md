@@ -44,6 +44,15 @@ there; and a count of rows above a threshold is not a stable statistic even at f
 The **sign** is worth acting on and the size is not, which is what [batch b7](runs.md) holds epochs at
 4 for.
 
+**The mechanism is visible in the charts, and it is instability rather than a lower ceiling.** Past its
+competence onset b4 spends a median **9.1%** of its evals below 50% perfect, against 0.7% for b6 and
+0.0% for b5 — and stage A measures the **argmax**, so that is the deployed policy collapsing and
+recovering, not eval noise. An arm that spends a tenth of its life collapsed cannot bank record
+checkpoints, which is how one number explains the other. The rate is 8.5% in b4's first 100M and 9.0%
+in its second, so it is fully developed early and does not need the long tail — but it *is* invisible
+at a 10M horizon, where all three batches look alike. [Batch b8](runs.md) tests four candidate fixes
+against b4 as the control.
+
 ### 16 stage-B shards is right on the desktop, and snek2's "18 loses 6-10%" cliff does not reproduce
 
 **Measured 2026-08-30 on the desktop**, 5 waves, identical work each (b5h's `screen:97` set, 3,039
