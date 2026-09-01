@@ -46,10 +46,20 @@ FIGSIZE = (5.0, 2.4)
 REGION_LEVEL = 99.0
 POINT_COLOR = 'tab:red'
 REGION_COLOR = 'tab:green'
-TREND_COLOR = 'darkred'
-# Wide enough that the trend is not itself noise: a 100-episode row at p=0.973 has an sd of 1.6 pp,
-# so a 40-row mean has 0.26 pp — narrower than the quantisation of a single row.
-TREND_WINDOW = 40
+# **No trend line, removed 2026-09-01 (user's call).** There was one — a 40-row trailing mean in dark
+# red, drawn on any pass with 40+ rows — and it was justified by the noise in a *100-episode* row:
+# 1.6 pp of sampling sd at p=0.973, wider than the gap between neighbouring checkpoints, so only an
+# average showed the shape. **Every row on this chart is 500 or 5,000 episodes**, where that sd is
+# 0.72 and 0.23 pp, so the noise it was smoothing is not the noise these rows have.
+#
+# It was worse than merely redundant on a re-measure pass (`above:` selector, e.g. `hof5000`). Those
+# rows are a *selected* subset — 274 of ~14,000 checkpoints for b4, chosen for scoring highly and
+# separated by tens of millions of transitions — so a trailing mean over them joins points that are
+# not neighbours and averages a set picked for being high. It draws a trend in the selection and
+# reads as a trend in the policy. The 40-row gate is also why it appeared on one arm of a batch and
+# not the rest, which is what made it look like a fault: of b4's arms only b4c (64 rows) crossed it.
+#
+# The pooled line below is what actually summarises a pass, and it is unbiased.
 LABEL_SIZE = 7
 TICK_SIZE = 6
 TOP_N = 5
@@ -184,13 +194,6 @@ def build_figure(rows, name=None, level=REGION_LEVEL):
         axis.plot(steps[above], np.full(int(above.sum()), floor + 0.25), marker='|',
                   markersize=3, linestyle='none', color=REGION_COLOR, alpha=0.5)
     axis.axhline(level, color=REGION_COLOR, linestyle=(0, (4, 3)), linewidth=0.6)
-
-    # Without this the panel is a cloud. A single 100-episode row is quantised to whole percent and
-    # carries 1.6 pp of sampling noise, which is larger than any difference between two neighbouring
-    # checkpoints — so the *shape* of the arm is only visible as an average over rows.
-    if len(rows) >= TREND_WINDOW:
-        axis.plot(steps, progress_chart.trailing_average(percents.tolist(), TREND_WINDOW),
-                  color=TREND_COLOR, linewidth=0.8)
 
     pooled = 100.0 * sum(row['perfect_games'] for row in rows) / sum(row['episodes'] for row in rows)
     axis.axhline(pooled, color='gray', linestyle=(0, (1, 2)), linewidth=0.6)

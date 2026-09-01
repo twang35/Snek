@@ -52,8 +52,13 @@ def chart_paths(policies, label=None):
     return [stage_b_chart.chart_path(policy, label) for policy in policies]
 
 
-def command(paths=(), glob_pattern=None, watch_pids=(), scale=None, python=None):
-    """The argv for the stage-B window. Pure, so the spelling is testable without a display."""
+def command(paths=(), glob_pattern=None, watch_pids=(), scale=None, python=None,
+            max_width_px=None):
+    """The argv for the stage-B window. Pure, so the spelling is testable without a display.
+
+    The size flags come from `chart_window.size_argv`, not from here: the two windows differ in what
+    they point at and when they close, and **must not** differ in how they are sized.
+    """
     argv = [python or sys.executable, '-u', '-m', VIEWER_MODULE]
     argv += list(paths)
     if glob_pattern:
@@ -62,8 +67,7 @@ def command(paths=(), glob_pattern=None, watch_pids=(), scale=None, python=None)
         argv += ['--watch-pid', ','.join(str(pid) for pid in watch_pids)]
     return argv + ['--slot', SLOT_NAME,
                    '--interval', str(REFRESH_SECONDS),
-                   '--scale', str(chart_window.DEFAULT_SCALE if scale is None else scale),
-                   '--title', TITLE]
+                   '--title', TITLE] + chart_window.size_argv(scale, max_width_px)
 
 
 def holder(runs_dir=None):
@@ -71,17 +75,17 @@ def holder(runs_dir=None):
     return chart_window.holder(runs_dir, SLOT_NAME)
 
 
-def ensure(paths=(), glob_pattern=None, watch_pids=(), runs_dir=None, env=None, scale=None):
+def ensure(paths=(), glob_pattern=None, watch_pids=(), runs_dir=None, env=None, scale=None,
+           max_width_px=None):
     """Asks for the stage-B window. Returns the Popen of the process started, or None.
 
     None means nothing was started — windows are off (`SNEK_CHART_WINDOW=0`, the same switch as the
     training window, because "no window on this box" is one decision and not two), one is already up,
     or it would not start. A close-out must not care either way.
     """
-    if scale is None and env is not None:
-        scale = env.get('SNEK_CHART_WINDOW_SCALE')
-    argv = command(paths, glob_pattern, watch_pids,
-                   float(scale) if scale else None)
+    if scale is None and max_width_px is None:
+        scale, max_width_px = chart_window.sizing(env)
+    argv = command(paths, glob_pattern, watch_pids, scale, None, max_width_px)
     return chart_window.ensure(runs_dir, env, argv, SLOT_NAME, label='stage-B window')
 
 

@@ -93,6 +93,69 @@ def test_no_screen_falls_back_to_fixed_inches():
     assert 6.0 < height < 12.0
 
 
+def test_a_panel_is_never_drawn_wider_than_the_png_behind_it():
+    """The cap that makes the window shrink. One 1000px eval chart filled a 2858px panel here."""
+    screen = (15.04, 8.46)                       # this laptop, 3008x1692 at dpi 200
+    uncapped, _ = chart_viewer.fit_dims(1, 1, 2.083, 1.0, screen)
+    capped, _ = chart_viewer.fit_dims(1, 1, 2.083, 1.0, screen, panel_width=5.0)
+    assert uncapped > 14.0, 'without the cap the screen budget binds'
+    assert capped == pytest.approx(5.0), 'with it, the chart\'s own width binds'
+
+
+def test_the_natural_cap_scales_with_the_column_count():
+    # It caps the *panel*, not the window: four columns of a 5-inch chart may be 20 inches wide, and
+    # then the screen is what stops it.
+    screen = (38.4, 21.6)
+    width, _ = chart_viewer.fit_dims(2, 4, 2.083, 1.0, screen, panel_width=5.0)
+    assert width == pytest.approx(20.0)
+
+
+def test_the_screen_still_wins_when_the_charts_would_overflow_it():
+    width, height = chart_viewer.fit_dims(2, 4, 2.083, 1.0, (15.04, 8.46), panel_width=5.0)
+    assert width <= 15.04 * chart_viewer.SCREEN_WIDTH_FRACTION + 1e-9
+    assert height <= 8.46 * chart_viewer.SCREEN_HEIGHT_FRACTION + 1e-9
+
+
+def test_max_width_caps_growth_below_both_others():
+    screen = (38.4, 21.6)
+    width, _ = chart_viewer.fit_dims(2, 4, 2.083, 1.0, screen, panel_width=5.0, max_width=10.0)
+    assert width == pytest.approx(10.0)
+
+
+def test_max_width_never_grows_a_window():
+    """It is a ceiling, not a request. A generous cap must leave a small window small."""
+    width, _ = chart_viewer.fit_dims(1, 1, 2.083, 1.0, (15.04, 8.46),
+                                     panel_width=5.0, max_width=100.0)
+    assert width == pytest.approx(5.0)
+
+
+def test_the_caps_preserve_the_grid_aspect_so_panels_never_distort():
+    for panel_width, max_width in ((5.0, None), (None, 9.0), (5.0, 4.0), (None, None)):
+        width, height = chart_viewer.fit_dims(2, 3, 2.083, 1.0, (38.4, 21.6),
+                                              panel_width=panel_width, max_width=max_width)
+        assert width / height == pytest.approx((3 * 2.083) / 2, rel=1e-9)
+
+
+def test_a_failed_screen_probe_is_capped_too():
+    """A probe that raised is not a reason to upscale a small chart."""
+    width, _ = chart_viewer.fit_dims(1, 1, 2.083, 1.0, None, panel_width=2.0)
+    assert width == pytest.approx(2.0)
+    assert width < chart_viewer.FALLBACK_PANEL_WIDTH_IN
+
+
+def test_panel_pixels_reads_width_and_height(tmp_path):
+    import numpy as np
+    import imageio.v2 as imageio
+    path = os.path.join(str(tmp_path), 'chart.png')
+    imageio.imwrite(path, np.zeros((480, 1000, 3), dtype=np.uint8))
+    assert chart_viewer.panel_pixels(path) == (1000, 480)
+
+
+def test_panel_pixels_is_none_on_a_torn_read(tmp_path):
+    # The caller keeps its previous aspect and its previous cap rather than resizing to nonsense.
+    assert chart_viewer.panel_pixels(touch(tmp_path, 'half-written.png', 1_000_000)) is None
+
+
 def test_panel_aspect_is_read_from_the_image(tmp_path):
     import numpy as np
     import imageio.v2 as imageio

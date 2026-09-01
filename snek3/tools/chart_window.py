@@ -56,6 +56,43 @@ REFRESH_SECONDS = 15
 # The whole screen, because there is one window for the box. `SNEK_CHART_WINDOW_SCALE` overrides it.
 DEFAULT_SCALE = 1.0
 
+# **The size knobs, and both windows on both boxes read them through `sizing` below.** There is one
+# implementation because there is one behaviour wanted: the laptop and the desktop differ in the
+# monitor they probe, not in how they decide. Duplicating the env read once per window is how the two
+# drift apart, and it had already started — `chart_window` and `eval_window` each parsed the scale.
+SCALE_ENV = 'SNEK_CHART_WINDOW_SCALE'
+MAX_WIDTH_PX_ENV = 'SNEK_CHART_WINDOW_MAX_PX'
+
+
+def sizing(env=None):
+    """`(scale, max_width_px)` from the environment; either may be None, meaning "no override".
+
+    Pure apart from the read, so both windows' argv spelling is testable without a display.
+    A value that is not a number is ignored rather than fatal: a window is disposable and a typo in
+    an env var must not stop a training from starting.
+    """
+    env = os.environ if env is None else env
+
+    def number(name, cast):
+        raw = env.get(name)
+        if not raw:
+            return None
+        try:
+            return cast(raw)
+        except (TypeError, ValueError):
+            sys.stderr.write('{0}={1!r} is not a number; ignoring it\n'.format(name, raw))
+            return None
+
+    return number(SCALE_ENV, float), number(MAX_WIDTH_PX_ENV, int)
+
+
+def size_argv(scale=None, max_width_px=None):
+    """The size flags both windows pass to the viewer, so neither can grow its own dialect."""
+    argv = ['--scale', str(DEFAULT_SCALE if scale is None else scale)]
+    if max_width_px:
+        argv += ['--max-width-px', str(max_width_px)]
+    return argv
+
 
 def wanted(env=None):
     """Whether to open a window at all. `SNEK_CHART_WINDOW=0` says no.
@@ -89,14 +126,12 @@ def holder(runs_dir=None, slot=None):
     return pid
 
 
-def command(runs_dir=None, scale=None, python=None):
+def command(runs_dir=None, scale=None, python=None, max_width_px=None):
     """The argv for the box's window. Pure, so the spelling is testable without a display."""
-    scale = DEFAULT_SCALE if scale is None else scale
     return [python or sys.executable, '-u', '-m', VIEWER_MODULE,
             '--runs-dir', runs_dir or constants.RUNS_DIR,
             '--interval', str(REFRESH_SECONDS),
-            '--scale', str(scale),
-            '--title', 'snek3 — training']
+            '--title', 'snek3 — training'] + size_argv(scale, max_width_px)
 
 
 def spawn(runs_dir=None, env=None, argv=None, label='chart window'):
@@ -117,8 +152,7 @@ def spawn(runs_dir=None, env=None, argv=None, label='chart window'):
     """
     env = os.environ if env is None else env
     if argv is None:
-        scale = env.get('SNEK_CHART_WINDOW_SCALE')
-        argv = command(runs_dir, float(scale) if scale else None)
+        argv = command(runs_dir, *sizing(env))
     try:
         # `start_new_session` is the load-bearing argument. It puts the window in its own session and
         # process group, so a Ctrl-C or a `kill` to a trainer's group leaves it alone, and killing the

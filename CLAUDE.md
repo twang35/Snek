@@ -71,7 +71,15 @@ and `SNEK_CHART_WINDOW=0` still silences both.
 The window is **disposable and the training is not**: it runs in its own session, no training reads
 from or waits on it, and no training reopens it. So killing it, closing it, or relaunching it with
 `cd snek3 && PYTHONPATH=. python -m tools.chart_window` cannot affect a run — which is what makes it
-safe to fix a window while four arms are training. `SNEK_CHART_WINDOW=0` in a training's environment
+safe to fix a window while four arms are training.
+
+**The window is sized from the monitor, from the charts, and from an optional cap — smallest wins.**
+It probes the display it opens on, so the laptop and the desktop need no separate settings; it never
+draws a panel wider than the source PNG, so a window with one small chart in it opens small rather
+than upscaling to fill the screen; and `SNEK_CHART_WINDOW_MAX_PX` caps the width outright on either
+box. `SNEK_CHART_WINDOW_SCALE` still takes a fraction of the screen budget.
+
+`SNEK_CHART_WINDOW=0` in a training's environment
 turns it off; the mechanism is [`snek3/tools/chart_window.py`](snek3/tools/chart_window.py),
 [`snek3/tools/eval_window.py`](snek3/tools/eval_window.py) and
 [`snek3/tools/live_runs.py`](snek3/tools/live_runs.py).
@@ -191,6 +199,17 @@ rewrites those paths on every eval, so a committed copy makes its `git merge --f
 collision the copies always differ, so it comes back after every fix and blocks every deploy for the
 hours the arm runs. Desktop artifacts arrive on the `results` branch at close-out; that is what it is
 for. A laptop arm's own files are fine.
+
+**One implementation for both boxes, wherever the behaviour wanted is the same.** The two hosts
+differ in what they *have* — cores, a monitor, a queue — and almost never in what the code should
+*do*, so a laptop path and a desktop path for the same job is two places to fix every bug and one of
+them gets forgotten. Where a difference is real, read it at runtime (probe the display, count the
+cores) rather than branching on which box you are; where a knob is wanted, make it one knob both
+sides honour. `tools/chart_viewer.py` draws both boxes' windows and both windows on each box, and the
+sizing knobs live in `chart_window.sizing` for exactly this reason — the eval window had already
+drifted into parsing the environment for itself, and had stopped honouring one of the two knobs as a
+result. **When you fix something on one box, check whether the other has its own copy of it, and if
+it does, delete the copy rather than fixing it twice.**
 
 **Neither check sees the other host**, so **"N arms running" is meaningless without naming the box**,
 and any progress report has to check both.

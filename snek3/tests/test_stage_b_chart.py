@@ -162,3 +162,56 @@ def test_redraw_names_the_png_after_the_result_file(runs_dir):
 def test_redraw_writes_nothing_when_there_are_no_rows(runs_dir):
     path, rows = stage_b_chart.redraw('arm', 'ab3222')
     assert path is None and rows == []
+
+
+# --- no trend line --------------------------------------------------------------------------------
+
+def connected_series(axis):
+    """Lines that join the data. The two `axhline` guides are excluded by their 2 points.
+
+    A trend line spans the rows, so it has one point per row; the level guide and the pooled line
+    have exactly two and are meant to be there.
+    """
+    return [line for line in axis.get_lines()
+            if line.get_linestyle() not in ('none', 'None') and len(line.get_xdata()) > 2]
+
+
+def test_no_connecting_line_is_drawn_however_many_rows_there_are():
+    """There was one, gated at 40 rows, so it appeared on some arms of a batch and not others.
+
+    Removed 2026-09-01: it smoothed the sampling noise of a *100-episode* row (1.6 pp sd) and every
+    row on this chart is 500 or 5,000 episodes (0.72 and 0.23 pp). On a re-measure pass it was worse
+    than redundant — those rows are a selected subset, so a trailing mean over them tracks the
+    selection rather than the policy.
+
+    The gate is why 40 and 41 rows are the cases to test: 39 never had a line either.
+    """
+    for count in (5, 39, 40, 41, 200):
+        rows = [row(1000 * i, 495 - (i % 3), episodes=500) for i in range(1, count + 1)]
+        figure, axis = stage_b_chart.build_figure(rows, 'arm')
+        drawn = connected_series(axis)
+        assert drawn == [], (
+            '{0} rows drew {1} connected line(s); the chart is points and guides only'.format(
+                count, len(drawn)))
+
+
+def test_the_two_horizontal_guides_survive():
+    """The removal must not take the level guide or the pooled line with it."""
+    rows = [row(1000 * i, 495, episodes=500) for i in range(1, 60)]
+    figure, axis = stage_b_chart.build_figure(rows, 'arm')
+    guides = [line for line in axis.get_lines()
+              if line.get_linestyle() not in ('none', 'None') and len(line.get_xdata()) == 2]
+    assert len(guides) == 2, 'expected the level guide and the pooled line'
+
+
+def test_the_points_and_the_rug_are_still_drawn():
+    rows = [row(1000 * i, 495, episodes=500) for i in range(1, 60)]
+    figure, axis = stage_b_chart.build_figure(rows, 'arm')
+    markers = [line for line in axis.get_lines() if line.get_marker() not in ('', 'None', None)]
+    assert len(markers) == 2, 'expected the point cloud and the >=level rug'
+
+
+def test_the_trend_constants_are_gone_not_just_unused():
+    # Left behind, they read as a feature that is temporarily off and invite it back.
+    assert not hasattr(stage_b_chart, 'TREND_WINDOW')
+    assert not hasattr(stage_b_chart, 'TREND_COLOR')

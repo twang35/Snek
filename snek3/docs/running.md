@@ -56,7 +56,8 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_DEBUG` | 0 | verbose logging. For debugging, not status |
 | `SNEK_TORCH_THREADS` | 1 | **measured 1.4x faster than one-per-core**: a 30 -> 320 -> 3 net has no op large enough to amortise a fork-join. Compounds when four arms share the laptop |
 | `SNEK_CHART_WINDOW` | 1 | 0 opens no window. The test suite sets it (a suite that ran the loop opened real windows), the desktop sets it for benchmarks, and `runtime.json`'s `viewer: false` sets it for every job on the box |
-| `SNEK_CHART_WINDOW_SCALE` | 1.0 | fraction of the screen the window fills. There is one window per box, so the default is the whole screen |
+| `SNEK_CHART_WINDOW_SCALE` | 1.0 | fraction of the screen the window fills. There is one window per box, so the default is the whole screen, subject to the caps in the next row |
+| `SNEK_CHART_WINDOW_MAX_PX` | unset | hard ceiling on window width in logical pixels, on either box. Unset leaves the window bounded by the screen and by the charts — **a panel is never drawn wider than its source PNG** (730 px training, 1000 px eval), so a window with little in it opens small rather than upscaling to fill the display |
 
 ### Network and optimiser
 

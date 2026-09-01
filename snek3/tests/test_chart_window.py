@@ -544,3 +544,60 @@ def test_the_loop_starts_the_next_wave_from_nothing(tmp_path):
     """, idle=2)
     assert lines[-1].endswith("['armC.png']"), output
     assert "['armA.png', 'armB.png', 'armC.png']" not in output, output
+
+
+# --- sizing, shared by both windows ---------------------------------------------------------------
+#
+# The point of these is that there is *one* implementation. The laptop and the desktop differ in the
+# monitor they probe, not in how they decide, and the two windows differ in what they point at and
+# when they close — not in how they are sized.
+
+def test_sizing_reads_both_knobs():
+    assert chart_window.sizing({'SNEK_CHART_WINDOW_SCALE': '0.8',
+                                'SNEK_CHART_WINDOW_MAX_PX': '2400'}) == (0.8, 2400)
+
+
+def test_sizing_is_none_when_unset():
+    assert chart_window.sizing({}) == (None, None)
+
+
+def test_a_typo_in_a_size_knob_does_not_stop_a_training():
+    """A window is disposable; an unparseable env var must not raise into a trainer's startup."""
+    assert chart_window.sizing({'SNEK_CHART_WINDOW_MAX_PX': 'wide',
+                                'SNEK_CHART_WINDOW_SCALE': 'big'}) == (None, None)
+
+
+def test_max_width_is_omitted_from_argv_when_unset():
+    # Absent rather than an explicit "no cap" sentinel, so the viewer's own default is the one truth.
+    assert '--max-width-px' not in chart_window.size_argv(None, None)
+
+
+def test_both_windows_spell_the_size_flags_identically():
+    from tools import eval_window
+    training = chart_window.command('runs', 0.8, 'py', 2400)
+    stage_b = eval_window.command(['a.png'], None, (), 0.8, 'py', 2400)
+
+    def flags(argv):
+        return [argv[i:i + 2] for i, token in enumerate(argv)
+                if token in ('--scale', '--max-width-px')]
+
+    assert flags(training) == flags(stage_b) == [['--scale', '0.8'],
+                                                ['--max-width-px', '2400']]
+
+
+def test_the_stage_b_window_honours_the_env_knobs_too(monkeypatch):
+    """It did not: `ensure` read the env only when a caller passed one, and `closeout.py` does not.
+
+    So `SNEK_CHART_WINDOW_SCALE` silently applied to the training window and not to this one. This
+    goes through `ensure` rather than `command` because that asymmetry lived in `ensure`.
+    """
+    from tools import eval_window
+    captured = {}
+    monkeypatch.setattr(chart_window, 'ensure',
+                        lambda runs_dir, env, argv, slot, label=None: captured.setdefault('argv', argv))
+    monkeypatch.setenv('SNEK_CHART_WINDOW_MAX_PX', '1800')
+    monkeypatch.setenv('SNEK_CHART_WINDOW_SCALE', '0.7')
+    eval_window.ensure(['a.png'])
+    argv = captured['argv']
+    assert argv[argv.index('--max-width-px') + 1] == '1800'
+    assert argv[argv.index('--scale') + 1] == '0.7'
