@@ -198,3 +198,25 @@ def test_tracked_paths_returns_paths_that_exist(runs_dir):
     # root produces paths that match nothing — so the guard silently stops guarding.
     for path in prune_runs.tracked_paths():
         assert os.path.isabs(path)
+
+
+def test_apply_is_accepted_after_the_subcommand(runs_dir, capsys):
+    """`--apply` on the top-level parser made every documented invocation an argparse error.
+
+    argparse accepts an option only before the subcommand it was declared on, so this is the one
+    fixture that catches the difference between the CLI and the docstring that describes it.
+    """
+    write_pass('arm', None, [row(1000, 490)], shard=0, shards=1)
+    write_pass('arm', None, [row(1000, 490)])
+    assert prune_runs.main(['shards', '--apply']) == 0
+    assert results.shard_paths('arm', None) == []
+    assert 'DRY RUN' not in capsys.readouterr().out
+
+
+def test_without_apply_every_subcommand_is_a_dry_run(runs_dir, capsys):
+    make_arm('arm', [1000, 2000])
+    write_pass('arm', None, [row(1000, 400), row(2000, 495)])
+    for argv in (['shards'], ['arrays'], ['checkpoints', 'arm']):
+        assert prune_runs.main(argv) == 0
+        assert 'DRY RUN' in capsys.readouterr().out
+    assert len(os.listdir(os.path.join(constants.POLICY_DIR, 'arm'))) == 2

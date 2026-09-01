@@ -208,13 +208,20 @@ def prune_checkpoints(policies, keep_above, label=None, apply=False):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--apply', action='store_true', help='actually delete; default is a dry run')
+    # `--apply` belongs to each subcommand, not to the top level: argparse accepts an option only
+    # before the subcommand it is declared on, so a top-level flag makes `prune_runs shards --apply`
+    # an "unrecognized arguments" error — which is the form this module's own docstring documents and
+    # the form anyone would type. A parent parser puts it on all three.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument('--apply', action='store_true', help='actually delete; default is a dry run')
     sub = parser.add_subparsers(dest='what', required=True)
-    sub.add_parser('shards', help='merged passes\' duplicate shard files')
-    arrays = sub.add_parser('arrays', help='the two dead per-episode arrays in stored rows')
+    sub.add_parser('shards', parents=[common], help='merged passes\' duplicate shard files')
+    arrays = sub.add_parser('arrays', parents=[common],
+                            help='the two dead per-episode arrays in stored rows')
     arrays.add_argument('--include-tracked', action='store_true',
                         help='rewrite git-tracked files too; see tracked_paths() on the trade')
-    checkpoints = sub.add_parser('checkpoints', help='a closed arm\'s unwanted checkpoints')
+    checkpoints = sub.add_parser('checkpoints', parents=[common],
+                                 help='a closed arm\'s unwanted checkpoints')
     checkpoints.add_argument('policies', nargs='+')
     checkpoints.add_argument('--keep-above', type=float, default=97.5,
                              help='keep checkpoints whose stage-B row is >= this (default 97.5)')
