@@ -123,11 +123,28 @@ def tracked_paths():
             for name in listed.stdout.split('\0') if name}
 
 
+def in_flight(path):
+    """Whether `path` is a shard file of a pass that has not merged yet.
+
+    Rewriting one is a race with the shard process still writing it: `results.write` is atomic, so
+    the loser is silently discarded rather than the file corrupted — but the loser can be this pass's
+    rewrite *or* the shard's newest rows. The desktop runs evals unattended, so the tool cannot
+    assume a quiet box.
+    """
+    if not SHARD_SUFFIX.search(path):
+        return False
+    return not os.path.exists(SHARD_SUFFIX.sub('.json', path))
+
+
 def prune_arrays(apply=False, include_tracked=False):
     freed = skipped = 0
     tracked = set() if include_tracked else tracked_paths()
     for path in sorted(glob.glob(_runs('*_checkpoint_evals*.json'))):
         if path.endswith('.partial.json'):
+            continue
+        if in_flight(path):
+            print('  KEEP  {0:<64} (a shard of a pass that has not merged)'.format(
+                os.path.basename(path)))
             continue
         if os.path.realpath(path) in tracked:
             skipped += os.path.getsize(path)

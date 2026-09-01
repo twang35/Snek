@@ -220,3 +220,14 @@ def test_without_apply_every_subcommand_is_a_dry_run(runs_dir, capsys):
         assert prune_runs.main(argv) == 0
         assert 'DRY RUN' in capsys.readouterr().out
     assert len(os.listdir(os.path.join(constants.POLICY_DIR, 'arm'))) == 2
+
+
+def test_arrays_leaves_the_shards_of_an_unmerged_pass_alone(runs_dir):
+    """The race: a shard process is still writing this file, and `results.write` is atomic, so one
+    of the two writes is silently discarded. The desktop runs evals unattended."""
+    live = write_pass('arm', None, [row(1000, 490)], shard=0, shards=2)
+    done = write_pass('other', None, [row(1000, 490)], shard=0, shards=2)
+    write_pass('other', None, [row(1000, 490)])          # `other` merged; `arm` did not
+    prune_runs.prune_arrays(apply=True)
+    assert 'episode_rewards' in results.rows_of(results.read(live))[0], 'in flight, untouched'
+    assert 'episode_rewards' not in results.rows_of(results.read(done))[0], 'merged, pruned'
