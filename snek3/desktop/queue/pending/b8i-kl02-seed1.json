@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b8i-kl02-seed1",
+  "type": "train",
+  "policy": "b8i-kl02-seed1",
+  "max_steps": 100007936,
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FC_LAYERS": "200,100",
+    "SNEK_PPO_EPOCHS": "8",
+    "SNEK_EVAL_QUEUE": "1",
+    "SNEK_EVAL_QUEUE_DEPTH": "16",
+    "SNEK_EVAL_WORKERS": "8",
+    "SNEK_PPO_TARGET_KL": "0.02",
+    "SNEK_SEED": "1"
+  },
+  "priority": 70,
+  "label": "b8: kl02, seed 1 of 4 \u2014 wave 2 of 2",
+  "notes": "Batch b8 -- what fixes b4's collapse. Everything is held at b4's config: fc (200,100), 8 epochs, b2's reward function, PPO's defaults elsewhere, seeds 1-4 pinned to the arm letters. One knob moves per group of four. **b4 itself is the control** -- 8 seeds at this exact config -- so no control arms are queued; compare against b4 TRUNCATED TO 100M, since 65% of its >=98%/500 rows land after 100M and the full-run figure is not the right comparator. The effect being tested: past its competence onset b4 spends a median 9.1% of its evals below 50% perfect, against 0.7% for b6 (same network, 4 epochs) and 0.0% for b5 (fc 320, 8 epochs), and its >=98%/500 density is the worst of the three at 7.3%. 100M rather than b4's 200M because the drawdown rate is already 8.5% in the first 100M and 9.0% in the second -- the effect is fully developed by this cap, though it is invisible at 10M. Stop the epoch loop between epochs when approx_kl exceeds 0.02. Never exercised before: epochs_run is 8 in all 97,656 of b4's recorded updates. The threshold is chosen to bind on the tail rather than the body -- b4's approx_kl is 0.0035 at the median and 0.0079 at p95, but 0.023 at p99 and 0.514 at its worst, 146x the median. Those tail updates are the obvious candidate for a collapse, and 0.02 cuts the top ~1% while leaving the other 99% identical to b4. If it reads as a null, 0.01 (~the top 4%) is the next rung."
+}

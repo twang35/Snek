@@ -1,0 +1,24 @@
+{
+  "project": "snek3",
+  "id": "b8d-ent003-seed4",
+  "type": "train",
+  "policy": "b8d-ent003-seed4",
+  "max_steps": 100007936,
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FC_LAYERS": "200,100",
+    "SNEK_PPO_EPOCHS": "8",
+    "SNEK_EVAL_QUEUE": "1",
+    "SNEK_EVAL_QUEUE_DEPTH": "16",
+    "SNEK_EVAL_WORKERS": "8",
+    "SNEK_PPO_ENTROPY_COEF": "0.003",
+    "SNEK_SEED": "4"
+  },
+  "priority": 60,
+  "label": "b8: ent003, seed 4 of 4 \u2014 wave 1 of 2",
+  "notes": "Batch b8 -- what fixes b4's collapse. Everything is held at b4's config: fc (200,100), 8 epochs, b2's reward function, PPO's defaults elsewhere, seeds 1-4 pinned to the arm letters. One knob moves per group of four. **b4 itself is the control** -- 8 seeds at this exact config -- so no control arms are queued; compare against b4 TRUNCATED TO 100M, since 65% of its >=98%/500 rows land after 100M and the full-run figure is not the right comparator. The effect being tested: past its competence onset b4 spends a median 9.1% of its evals below 50% perfect, against 0.7% for b6 (same network, 4 epochs) and 0.0% for b5 (fc 320, 8 epochs), and its >=98%/500 density is the worst of the three at 7.3%. 100M rather than b4's 200M because the drawdown rate is already 8.5% in the first 100M and 9.0% in the second -- the effect is fully developed by this cap, though it is invisible at 10M. A lower constant entropy bonus. Entropy is the only knob in b3 with a clean monotone signal on stability in both directions: the share of post-competence evals below 80% perfect went 2.9% at 0.003, 12.2% at the 0.01 reference and 45.6% at 0.03. Stage A measures the argmax, so a constant bonus deforms the deployed policy rather than only adding exploration noise."
+}
