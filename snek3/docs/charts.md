@@ -1,5 +1,11 @@
 # Charts — one graph per arm
 
+**Batch b7 — the fc-layout sweep — is training on the desktop as of 2026-09-01**, wave 1 of 4. Its
+charts are not here yet and cannot be: a live desktop arm's `runs/` files must never be committed
+from the laptop, so b7's arrive on the `results` branch at each wave's close-out. The window to watch
+it live is below. **Batch b4's charts are also outstanding** — it closed 2026-08-31 and its numbers
+are in [`results.md`](results.md), but the PNGs are still on the `results` branch.
+
 **Batches b5 and b6 closed 2026-08-30** — eight seeds each, stage B complete on both, charts below.
 **Batch b2 closed 2026-08-29.** A live desktop arm's `runs/` files must still never be committed from
 here: the box rewrites those paths every eval and a committed copy aborts its next ff-merge. b5's
@@ -14,6 +20,18 @@ put it back
 after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closing it and relaunching
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).
+
+## Batch b7 — the fc-layout sweep, 8 layouts x 4 seeds, 50M each
+
+Training on the desktop since 2026-09-01 00:01, wave 1 of 4. One panel per arm appears in the box's
+chart window as each wave starts; the PNGs land here at close-out, per layout:
+
+| wave | layouts | arms |
+|---:|---|---|
+| 1 *(running)* | `fc 320`, `fc 200,100` | `b7aa`-`b7ad`, `b7ae`-`b7ah` |
+| 2 | `fc 300,100`, `fc 400,200` | `b7ai`-`b7al`, `b7am`-`b7ap` |
+| 3 | `fc 160,160`, `fc 100,100` | `b7aq`-`b7at`, `b7au`-`b7ax` |
+| 4 | `fc 100,200,100`, `fc 200,100,50` | `b7ay`-`b7bb`, `b7bc`-`b7bf` |
 
 ## Batch b6 — `fc (200,100)`, 4 epochs, seeds 1-8
 

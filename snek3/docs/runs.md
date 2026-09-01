@@ -6,13 +6,33 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
-**Batch b4 closed on the desktop 2026-08-31, and its numbers are not in these docs yet.** The
-daemon's ledger lists `b4a`-`b4h` and `b4-stageb` all `done`, with both boxes idle and nothing
-queued — read it with `git fetch origin ops-status && git show origin/ops-status:status.json`, and
-note that the fetch is the half that matters. **b4 is the network-shape test** the rest of this
-section calls unrun: 8 seeds at `fc (200,100)` + 8 epochs, 200M transitions. Its artifacts are on
-the `results` branch; [`../skills/progress-update`](../skills/progress-update/SKILL.md) is what
-turns them into a results table, a charts entry and a finding.
+**Batch b7 — the fc-layout sweep — is training on the desktop, wave 1 of 4 since 2026-09-01 00:01.**
+Eight networks x 4 seeds at 50M transitions each (3,052 rollouts of 16,384), two layouts per wave so
+every wave is a comparison that stands on its own if the sweep is stopped early. Priority orders the
+waves 20/30/40/50 and `auto_stage_b` measures each one before the next trains. **Nothing is running
+on the laptop.**
+
+| wave | layouts | the question |
+|---:|---|---|
+| **1** *(running)* | `fc 320`, `fc 200,100` | the control against the two-layer candidate at matched epochs. `fc 320` has never had a multi-seed run at 4 epochs — b5 was 8 — and `fc 200,100` matches b6's shape, so b6's eight seeds anchor it |
+| 2 | `fc 300,100`, `fc 400,200` | b3's density winner at n=1, and whether the two-layer win scales with width |
+| 3 | `fc 160,160`, `fc 100,100` | a two-layer shape with no taper, and one at ~14k parameters — fewer than `fc 500`'s 17k. Separates the second layer from the capacity |
+| 4 | `fc 100,200,100`, `fc 200,100,50` | three layers, which snek3 has never tried. The first is snek2's own fc-sweep shape |
+
+Every knob but the network is b3's reference, which is also PPO's default — lr 3e-4, γ 0.99, λ 0.98,
+entropy 0.01, 128x128 rollout, minibatch 256 — on b2's reward function, seeds 1-4 pinned to the seed
+in each arm name, so the layouts are seed-matched to each other and to b1/b2/b29/b41/b47. **Epochs
+are held at 4 rather than 8, and that is b4's result rather than a default.** Budget: b4's eight arms
+did 200M in ~7.5 h with a 2 h stage B, so 50M x 4 waves is roughly half a day. 50M is a quarter of
+b4/b5/b6's horizon, so comparisons against those three truncate.
+
+**Batch b4 closed on the desktop 2026-08-31 and its numbers are now read** into
+[`results.md`](results.md) and [`findings.md`](findings.md): pooled **7.3%** of stage-B rows at
+≥98%/500 against b6's 12.8% and b5's 9.6%, and best30 **97.0-97.9** against 97.8-98.5 for both.
+**The arm built from b3's two best single knobs is the weakest of the three 8-seed batches** — shape
+and epochs interact negatively, and a one-knob-at-a-time sweep licenses no stacking. That is the
+finding b7 is built on. **b4's charts are still to be imported** from the `results` branch into
+`../runs/`, which is the one thing this close-out still owes.
 
 **Before that — 2026-08-30 17:34 — three things closed and both boxes went idle.**
 
@@ -28,14 +48,15 @@ Full per-arm numbers and the b5/b6 comparison are in [`results.md`](results.md);
 **b6 leads b5 on the pooled headline but the sign test is a coin (5 of 8, p≈0.29→0.73), and rank 1 is
 a tie at 98.5 best30.** More importantly the two batches differ in **two** knobs — `fc (200,100)` + 4
 epochs against `fc (320,)` + 8 epochs — so this is not the network-shape test
-[`results.md`](results.md) and this file have both been calling for. **That test is b4, and it ran on
-2026-08-31** — see the top of this section.
+[`results.md`](results.md) and this file have both been calling for. **b4 ran that test on 2026-08-31
+and b7 is sweeping the axis outright** — see the top of this section.
 
 ### Next, in the order the evidence argues for
 
-1. **One batch varying only the network**, matched epochs and matched budget. It is the cheapest
-   unrun experiment that would settle the thread b3 opened, and `dqn/net.py` takes the same
-   `fc_layers` config so the DQN version is also one arm away.
+1. ~~**One batch varying only the network**, matched epochs and matched budget.~~ **Running as b7
+   since 2026-09-01** — 8 layouts x 4 seeds at matched epochs and matched budget. What is still unrun
+   is the **DQN** half: `dqn/net.py` takes the same `fc_layers` config, so the same sweep is one batch
+   away for DQN and would say whether the shape effect is PPO's or the task's.
 2. **Re-run the worker sweep with long waves.** 3.2-minute waves cannot resolve it — see
    [`findings.md`](findings.md). ~30 min per wave is what the earlier hand-measurement used.
 3. **Sweep arm count**, which the queue cannot express: `_dispatch` takes pending jobs in priority

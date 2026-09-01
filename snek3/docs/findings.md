@@ -17,6 +17,33 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Network shape and PPO epochs interact negatively, so b3's per-knob ranking does not compose
+
+**Measured 2026-08-31 across three 8-seed batches** on b2's reward function and one protocol, read
+off the `results` branch 2026-09-01. Ranked by the ≥98%/500 density a champion hunt cares about:
+
+| batch | network | epochs | transitions | best30 | pooled ≥98%/500 |
+|---|---|---:|---:|---:|---:|
+| b6 | `fc (200,100)` | **4** | 215-231M | 97.8-98.5 | **12.8%** (4,661 of 36,272) |
+| b5 | `fc (320,)` | 8 | 255-271M | 97.8-98.5 | 9.6% (3,329 of 34,581) |
+| b4 | `fc (200,100)` | 8 | 200M | 97.0-97.9 | 7.3% (1,079 of 14,733) |
+
+Batch b3 swept one knob at a time at 20M and ranked epochs 8 first (9.7%) and `fc (200,100)` second
+(7.9%), both above its `fc 320` reference (5.6%). **The arm carrying both is worse than either one
+alone** — and worse than the reference config it was built from. Each pairwise reading is a
+single-knob comparison: at `fc (200,100)`, 4 epochs beats 8 (12.8 vs 7.3); at 8 epochs, `fc 320`
+beats `fc (200,100)` (9.6 vs 7.3).
+
+**The general lesson is about the sweep, not the network.** A one-knob-at-a-time pass ranks knobs; it
+does not license stacking the winners, because it measures no interaction at all. b4 was queued as
+"the clean network-shape test" on exactly that reasoning — take b3's two best knobs and hold
+everything else — and the composition is what failed, not the test.
+
+Two caveats, both real. b4's 200M is the shortest of the three horizons, so every comparison truncates
+there; and a count of rows above a threshold is not a stable statistic even at fixed depth (below).
+The **sign** is worth acting on and the size is not, which is what [batch b7](runs.md) holds epochs at
+4 for.
+
 ### 16 stage-B shards is right on the desktop, and snek2's "18 loses 6-10%" cliff does not reproduce
 
 **Measured 2026-08-30 on the desktop**, 5 waves, identical work each (b5h's `screen:97` set, 3,039

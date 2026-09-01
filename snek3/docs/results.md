@@ -15,6 +15,47 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+## Batch b4 — `fc (200,100)` + 8 epochs, eight seeds, closed 2026-08-31
+
+**The clean network-shape test, and it came out against the shape.** 8 seeds, 200M transitions each
+(199,999,488 = 12,207 rollouts), b2's reward function, everything else at PPO's defaults. Run on the
+desktop 2026-08-30 18:46 -> 2026-08-31 02:34, stage B done 04:34. Numbers read off the `results`
+branch 2026-09-01; **its charts are still to be imported into `../runs/`.**
+
+| arm | seed | best30 | trailing | sef | stage B: rows | ≥98%/500 | density | best row |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `b4a-fc200x100ep8-seed1` | 1 | 97.4 | 81.28 | 76.8 | 1,466 | 98 | 6.7% | 99.6% |
+| `b4b-fc200x100ep8-seed2` | 2 | 97.5 | 93.45 | 80.8 | 1,575 | 84 | 5.3% | 99.4% |
+| `b4c-fc200x100ep8-seed3` | 3 | 97.6 | 94.34 | 83.4 | **2,513** | **260** | **10.3%** | 99.4% |
+| `b4d-fc200x100ep8-seed4` | 4 | **97.9** | 94.06 | 79.5 | 1,355 | 77 | 5.7% | 99.4% |
+| `b4e-fc200x100ep8-seed5` | 5 | 97.2 | 94.22 | 87.8 | 2,140 | 191 | 8.9% | 99.4% |
+| `b4f-fc200x100ep8-seed6` | 6 | 97.4 | 93.32 | 83.1 | 1,815 | 116 | 6.4% | 99.2% |
+| `b4g-fc200x100ep8-seed7` | 7 | 97.3 | 93.59 | 82.1 | 1,965 | 159 | 8.1% | 99.4% |
+| `b4h-fc200x100ep8-seed8` | 8 | 97.0 | 92.52 | 89.5 | 1,904 | 94 | 4.9% | 99.4% |
+| **pooled** | | | | | **14,733** | **1,079** | **7.3%** | **99.6%** |
+
+### ‡ b4 is the weakest of the three 8-seed batches, which retires b3's epochs ranking
+
+All three ran the same reward function and the same protocol, so the pre-registered ≥98%/500 density
+is directly comparable — with the caveat that b4's horizon is the shortest of the three:
+
+| batch | network | epochs | transitions | best30 | pooled ≥98%/500 |
+|---|---|---:|---:|---:|---:|
+| **b6** | `fc (200,100)` | **4** | 215-231M | 97.8-98.5 | **12.8%** |
+| **b5** | `fc (320,)` | 8 | 255-271M | 97.8-98.5 | 9.6% |
+| **b4** | `fc (200,100)` | 8 | 200M | **97.0-97.9** | **7.3%** |
+
+**The two knobs interact, and negatively.** Holding the network at `fc (200,100)`, 4 epochs beats 8
+by 12.8% to 7.3%. Holding epochs at 8, `fc 320` beats `fc (200,100)` by 9.6% to 7.3%. So the arm
+carrying *both* of b3's best single knobs is worse than either one alone, and b3's ranking of epochs
+8 first — from one arm at 20M — does not survive eight seeds at 200M. b4's best30 range sits **below**
+both comparators on every seed.
+
+**What it does not settle.** b4 is 200M against b6's 215-231M and b5's 255-271M, so every comparison
+truncates at b4's horizon; the density statistic is also known to be unstable at fixed depth
+([`findings.md`](findings.md)), and the three batches differ in run length as well as in knobs. The
+sign of the interaction is large enough to act on — [batch b7](runs.md) does — but the size is not.
+
 ## Batches b5 and b6 — eight seeds each, closed 2026-08-30
 
 Both closed the same afternoon: b5's stage B in 222.6 min on the desktop, b6's in 226.1 min on the

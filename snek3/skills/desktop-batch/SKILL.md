@@ -24,10 +24,15 @@ registration, none yet:
 cd /Users/tony_wang/Projects/Snek
 git fetch origin ops
 git worktree prune          # drop worktrees whose directory is gone
-OPS=$(git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/ops$/{print p}')
+OPS=$(git worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/ops$/{print p}')
 [ -n "$OPS" ] || { git worktree add /tmp/snek-ops-wt ops && OPS=/tmp/snek-ops-wt; }
 git -C "$OPS" merge --ff-only origin/ops && echo "ops worktree: $OPS"
 ```
+
+**`substr($0,10)` rather than `$2`, and that is not a style choice.** Invoking a skill with
+arguments substitutes `$1`, `$2`, ... inside its body, including inside fenced code — measured
+2026-09-01, when `/desktop-batch queue an fc-layout sweep` rendered this line as `p=fc-layout`
+and the worktree lookup returned nothing. **No snippet in any skill may contain a bare `$<digit>`.**
 
 Then write one JSON file per arm into `$OPS/snek3/desktop/queue/pending/<id>.json`.
 `queue/examples/` holds a worked spec per type.
