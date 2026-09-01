@@ -6,30 +6,61 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
-**Batch b7 — the fc-layout sweep — is training on the desktop, wave 1 of 4 since 2026-09-01 00:01.**
-Eight networks x 4 seeds at 50M transitions each (3,052 rollouts of 16,384), two layouts per wave so
-every wave is a comparison that stands on its own if the sweep is stopped early. Priority orders the
-waves 20/30/40/50 and `auto_stage_b` measures each one before the next trains. **Nothing is running
-on the laptop.**
+**Batch b8 — "what fixes b4's collapse" — is training on the desktop, wave 1 of 2, ~70% done at
+2026-09-01 14:03.** Eight arms at 100M transitions each: entropy **0.003** x seeds 1-4
+(`b8a`-`b8d`) and the **0.01 -> 0.001 anneal** x seeds 1-4 (`b8e`-`b8h`). 2 h 49 m in, ~7,000
+steps/s per arm, 69-75M done, so wave 1 lands around 15:15 and its stage B follows automatically.
+Wave 2 (`target_KL` 0.02, λ 0.95) and b8's stage B are queued behind it. **Nothing is running on the
+laptop.**
 
-| wave | layouts | the question |
-|---:|---|---|
-| **1** *(running)* | `fc 320`, `fc 200,100` | the control against the two-layer candidate at matched epochs. `fc 320` has never had a multi-seed run at 4 epochs — b5 was 8 — and `fc 200,100` matches b6's shape, so b6's eight seeds anchor it |
-| 2 | `fc 300,100`, `fc 400,200` | b3's density winner at n=1, and whether the two-layer win scales with width |
-| 3 | `fc 160,160`, `fc 100,100` | a two-layer shape with no taper, and one at ~14k parameters — fewer than `fc 500`'s 17k. Separates the second layer from the capacity |
-| 4 | `fc 100,200,100`, `fc 200,100,50` | three layers, which snek3 has never tried. The first is snek2's own fc-sweep shape |
+Read at b8's own horizon against b4's control truncated to the same 71M — **both treatments are
+marginally ahead and neither is resolved.** n=4 cannot resolve an effect below ~10 pp, and best30 is
+a peak statistic that is still rising in every arm:
 
-Every knob but the network is b3's reference, which is also PPO's default — lr 3e-4, γ 0.99, λ 0.98,
-entropy 0.01, 128x128 rollout, minibatch 256 — on b2's reward function, seeds 1-4 pinned to the seed
-in each arm name, so the layouts are seed-matched to each other and to b1/b2/b29/b41/b47. **Epochs
-are held at 4 rather than 8, and that is b4's result rather than a default.** Budget: b4's eight arms
-did 200M in ~7.5 h with a 2 h stage B, so 50M x 4 waves is roughly half a day. 50M is a quarter of
-b4/b5/b6's horizon, so comparisons against those three truncate.
+| group | n | best30 | range | sef |
+|---|---:|---:|---|---:|
+| b4 control, entropy 0.01, truncated to 71M | 8 | 96.69 | 95.8-97.3 | 85.8 |
+| b8 entropy 0.003 | 4 | 96.98 | 96.5-97.4 | 88.2 |
+| b8 entropy anneal 0.01 -> 0.001 | 4 | 96.93 | 95.9-98.0 | 87.1 |
 
-**Batch b8 is queued behind it — "what fixes b4's collapse".** 4 stability knobs x 4 seeds at 100M,
-holding b4's config fixed (`fc (200,100)`, 8 epochs, b2's reward, seeds 1-4) so exactly one knob moves
-per group, with **b4 itself as the control** at 8 seeds — no control arms queued. Priorities 60/70 put
-both waves behind every b7 wave.
+`b8g-entanneal-seed3` at best30 **98.0** is already above every b4 arm's final best30 at twice the
+budget, which is the single most encouraging number in the batch and also exactly the kind of
+maximum-over-8 that this project keeps having to retract. Wait for stage B.
+
+**‡ One caveat on b8's design, now that b7 has closed: it holds `fc (200,100)`, which b7 has just
+shown to be the *wrong* shape.** b8 is still the right experiment — it is asking what fixes b4's
+drawdowns, and b4 is `fc (200,100)`, so the control has to match — but a stability knob that helps
+here has to be re-confirmed on `fc (320,)` before it goes into a champion attempt.
+
+## Just closed: b7, the fc-layout sweep — `fc (320,)` wins
+
+**All four waves and all four stage-B passes closed 2026-09-01**, 32 arms in ~11 h on the desktop.
+Pooled 10.9% of 28,006 stage-B rows in the ≥98%/500 record region, and the spread across layouts is
+3.4x:
+
+| layout | ≥98%/500 | | layout | ≥98%/500 |
+|---|---:|---|---|---:|
+| **`fc (320,)`** | **17.3%** | | `fc (200,100,50)` | 10.8% |
+| `fc (200,100)` | 11.8% | | `fc (160,160)` | 8.3% |
+| `fc (100,200,100)` | 11.6% | | `fc (300,100)` | 6.8% |
+| `fc (100,100)` | 11.3% | | `fc (400,200)` | 5.1% |
+
+**Every `fc 320` seed beats every seed of five of the seven other layouts** (exact Mann-Whitney
+p=0.029, the floor at 4-vs-4). This **inverts b3's single-seed ranking**, which put `fc 300,100`
+first and `fc 320` last of those three and is what queued b4 and b7 in the first place. Per-arm
+numbers in [`results.md`](results.md), the reading and the two retractions in
+[`findings.md`](findings.md), 64 charts in [`charts.md`](charts.md).
+
+**It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
+layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
+right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
+
+## The b8 design, as queued
+
+**"What fixes b4's collapse".** 4 stability knobs x 4 seeds at 100M, holding b4's config fixed
+(`fc (200,100)`, 8 epochs, b2's reward, seeds 1-4) so exactly one knob moves per group, with **b4
+itself as the control** at 8 seeds — no control arms queued. Priorities 60/70 put both waves behind
+every b7 wave, which is why wave 1 only started once b7's fourth close-out was done.
 
 | wave | knob | why it, and not something else |
 |---:|---|---|
@@ -49,13 +80,15 @@ network axis, and the collapse is the larger unexplained effect.
 the anneal reads 0.0091 at 10% of a 0.01→0.001 run, which is the linear value, and `target_KL` at a
 deliberate 0.001 stops the epoch loop after 1 of 8 epochs with `stopped_early=True`.
 
-**Batch b4 closed on the desktop 2026-08-31 and its numbers are now read** into
-[`results.md`](results.md) and [`findings.md`](findings.md): pooled **7.3%** of stage-B rows at
-≥98%/500 against b6's 12.8% and b5's 9.6%, and best30 **97.0-97.9** against 97.8-98.5 for both.
-**The arm built from b3's two best single knobs is the weakest of the three 8-seed batches** — shape
-and epochs interact negatively, and a one-knob-at-a-time sweep licenses no stacking. That is the
-finding b7 is built on. **b4's charts are still to be imported** from the `results` branch into
-`../runs/`, which is the one thing this close-out still owes.
+**Batch b4 closed on the desktop 2026-08-31**: pooled **7.3%** of stage-B rows at ≥98%/500 against
+b6's 12.9% and b5's 9.6%, and best30 **97.0-97.9** against 97.8-98.5 for both. **The arm built from
+b3's two best single knobs is the weakest of the three 8-seed batches** — shape and epochs interact
+negatively, and a one-knob-at-a-time sweep licenses no stacking. That is the finding b7 was built on.
+Its charts were imported and redrawn 2026-09-01, and a laptop `hof5000` pass re-measured its 274
+≥98.5% candidates at 5,000 episodes: **one row clears the snek2 champion and none reaches 99%**
+([`results.md`](results.md)). **‡ The b5-vs-b6 half of that comparison did not survive the same
+re-measure** — the two are identical at 5,000 episodes and b5 is ahead on champion-level rows; see
+[`findings.md`](findings.md).
 
 **Before that — 2026-08-30 17:34 — three things closed and both boxes went idle.**
 
@@ -76,25 +109,31 @@ and b7 is sweeping the axis outright** — see the top of this section.
 
 ### Next, in the order the evidence argues for
 
-1. ~~**One batch varying only the network**, matched epochs and matched budget.~~ **Running as b7
-   since 2026-09-01** — 8 layouts x 4 seeds at matched epochs and matched budget. What is still unrun
-   is the **DQN** half: `dqn/net.py` takes the same `fc_layers` config, so the same sweep is one batch
-   away for DQN and would say whether the shape effect is PPO's or the task's.
-2. **Re-run the worker sweep with long waves.** 3.2-minute waves cannot resolve it — see
+1. ~~**One batch varying only the network**, matched epochs and matched budget.~~ **Done: b7, closed
+   2026-09-01.** `fc (320,)` won and b3's ranking inverted. What this opens, in order:
+   **a champion attempt at `fc (320,)` + 4 epochs**, which no batch has yet run at length — b5 was
+   `fc 320` at *8* epochs and b7 was 4 epochs at only 50M, and the two best cells of the grid have
+   never been in the same arm; and the **DQN** half of the same sweep, since `dqn/net.py` takes the
+   same `fc_layers` config, which would say whether the shape effect is PPO's or the task's.
+2. **Re-confirm whatever b8 finds on `fc (320,)`.** b8 holds b4's `fc (200,100)` because b4 is its
+   control, and b7 has since shown that shape to be the weaker one, so a stability knob that helps b8
+   is a candidate rather than a result until it is re-run on the winning shape.
+3. **Re-run the worker sweep with long waves.** 3.2-minute waves cannot resolve it — see
    [`findings.md`](findings.md). ~30 min per wave is what the earlier hand-measurement used.
-3. **Sweep arm count**, which the queue cannot express: `_dispatch` takes pending jobs in priority
+4. **Sweep arm count**, which the queue cannot express: `_dispatch` takes pending jobs in priority
    order up to `max_trainers` regardless of priority value, so any group of 8+ trainer jobs launches
    as exactly 8. It needs a `runtime.json` commit between waves, or a real sweep job type.
 
 ### Next for PPO
 
-**The network shape is the most promising thread b3 turned up**, and it is not PPO-specific. Two hidden
-layers beat every single-layer width tried, on ≥98%/500 density: `fc 300,100` 9.0%, `fc 200,100` 7.9%,
-`fc 320` 5.6%, `fc 500` 3.2%, `fc 200` 0.8% — and it is not capacity, because `fc 500` has 2.5x the
-parameters of `fc 200` and a lower best30. **`fc 320` is snek2's shape, carried across so a champion's
-weights convert, and every batch in both eras has used it.** `dqn/net.py` takes the same `fc_layers`
-config, so **the same test is one arm away for DQN and has never been run** — see
-[`findings.md`](findings.md).
+**‡ Rewritten 2026-09-01, because b7 refuted the paragraph that was here.** It read "two hidden
+layers beat every single-layer width tried", from b3's one-seed-each densities — `fc 300,100` 9.0%,
+`fc 200,100` 7.9%, `fc 320` 5.6%, `fc 500` 3.2%, `fc 200` 0.8%. At four seeds and 50M those three
+reverse: `fc 320` **17.3%**, `fc 200,100` 11.8%, `fc 300,100` 6.8%. What survives from the old
+paragraph is the capacity half — width past 320 hurts, and `fc (400,200)` is now last of eight — and
+the convenient fact that **`fc 320` is snek2's shape, carried across so a champion's weights convert,
+and every batch in both eras has used it.** `dqn/net.py` takes the same `fc_layers` config, so the
+same sweep is one batch away for DQN and has never been run — see [`findings.md`](findings.md).
 
 **The follow-up wave, designed and not yet launched** — push the axis that moved rather than resample
 the flat ones: epochs 12 and 16, minibatch 128, rollout 256, and `fc 200,100` + epochs 8 as the one

@@ -309,11 +309,19 @@ a 3.5-hour, near-record snek2 arm because the launch "felt recent". Stopping any
 Training runs quiet — one compact line per 10 evals. `SNEK_DEBUG=1` restores verbose output; use it
 for debugging, not status. Read status from `runs/<policy>_evals.json`'s precomputed `summary` block.
 
-**`strong_eval_fraction` is the primary metric** (share of an arm's evals at ≥80% perfect) — it has
-the lowest between-seed variance of the candidates. It is a fraction of each arm's own evals, so
-**compare only at a common step horizon.** And it is a *threshold-crossing* statistic, so it rewards
-noise: it is not comparable across a change in episodes per eval, where a *rate* is. snek3 runs 100
-episodes throughout, so this only bites when comparing against a snek2 number.
+**`strong_eval_fraction` is the primary metric for whether an arm is healthy** (share of an arm's
+evals at ≥80% perfect) — it has the lowest between-seed variance of the candidates. It is a fraction
+of each arm's own evals, so **compare only at a common step horizon.** And it is a
+*threshold-crossing* statistic, so it rewards noise: it is not comparable across a change in episodes
+per eval, where a *rate* is. snek3 runs 100 episodes throughout, so this only bites when comparing
+against a snek2 number.
+
+**‡ But it is the wrong metric for "which config produces record checkpoints", and it ranks them
+backwards.** Across batch b7's eight network layouts it correlates **−0.79** with ≥98%/500 density;
+its best layout was second-worst on records and its worst layout won. 80% perfect sits far below the
+region a champion hunt cares about, and the top of the distribution moves independently of it. For
+that question use the **stage-A share of evals ≥98%** (+0.80) or `best_perfect30` (+0.71), both free
+from the same eval history. `docs/findings.md` has the measurement.
 
 **Use `zero_since`, not `dead_since`, to ask whether an arm is dead now.** `dead_since` is the
 earliest sustained-zero stretch and is history; `zero_since` is the current unbroken stretch.

@@ -1,10 +1,12 @@
 # Charts — one graph per arm
 
-**Batch b7 — the fc-layout sweep — is training on the desktop as of 2026-09-01**, wave 1 of 4. Its
-charts are not here yet and cannot be: a live desktop arm's `runs/` files must never be committed
-from the laptop, so b7's arrive on the `results` branch at each wave's close-out. The window to watch
-it live is below. **Batch b4's charts are also outstanding** — it closed 2026-08-31 and its numbers
-are in [`results.md`](results.md), but the PNGs are still on the `results` branch.
+**Batch b8 — the stability knobs — is training on the desktop as of 2026-09-01**, wave 1 of 2. Its
+charts are not here yet and cannot be: a live desktop arm's `runs/` files must never be committed from
+the laptop, so b8's arrive on the `results` branch at close-out. The window to watch it live is below.
+
+**Batch b7 closed all four waves 2026-09-01** — 32 arms, 8 layouts x 4 seeds, charts imported from the
+`results` branch the same day and below. **Batch b4's charts are here too**, imported and redrawn
+2026-09-01.
 
 **Batches b5 and b6 closed 2026-08-30** — eight seeds each, stage B complete on both, charts below.
 **Batch b2 closed 2026-08-29.** A live desktop arm's `runs/` files must still never be committed from
@@ -23,15 +25,86 @@ it took three attempts to get there).
 
 ## Batch b7 — the fc-layout sweep, 8 layouts x 4 seeds, 50M each
 
-Training on the desktop since 2026-09-01 00:01, wave 1 of 4. One panel per arm appears in the box's
-chart window as each wave starts; the PNGs land here at close-out, per layout:
+Closed 2026-09-01, all four waves. Pooled **10.9%** of stage-B rows in the ≥98%/500 record region
+over 28,006 rows; the winner is `fc (320,)` at **17.3%** and the loser `fc (400,200)` at 5.1%. Numbers
+and the exact tests in [`results.md`](results.md), the reading in [`findings.md`](findings.md).
 
-| wave | layouts | arms |
-|---:|---|---|
-| 1 *(running)* | `fc 320`, `fc 200,100` | `b7aa`-`b7ad`, `b7ae`-`b7ah` |
-| 2 | `fc 300,100`, `fc 400,200` | `b7ai`-`b7al`, `b7am`-`b7ap` |
-| 3 | `fc 160,160`, `fc 100,100` | `b7aq`-`b7at`, `b7au`-`b7ax` |
-| 4 | `fc 100,200,100`, `fc 200,100,50` | `b7ay`-`b7bb`, `b7bc`-`b7bf` |
+| wave | layouts | arms | ≥98%/500 |
+|---:|---|---|---|
+| 1 | `fc 320`, `fc 200,100` | `b7aa`-`b7ad`, `b7ae`-`b7ah` | **17.3%**, 11.8% |
+| 2 | `fc 300,100`, `fc 400,200` | `b7ai`-`b7al`, `b7am`-`b7ap` | 6.8%, 5.1% |
+| 3 | `fc 160,160`, `fc 100,100` | `b7aq`-`b7at`, `b7au`-`b7ax` | 8.3%, 11.3% |
+| 4 | `fc 100,200,100`, `fc 200,100,50` | `b7ay`-`b7bb`, `b7bc`-`b7bf` | 11.6%, 10.8% |
+
+**What to look at, given 64 panels.** Compare wave 1's two layouts first — that is the whole result —
+then `fc (400,200)` in wave 2 for what too much width looks like: fewer screened checkpoints and a
+thinner record region, not a visibly worse curve. Stage-A progress chart then stage-B pass, per arm,
+in wave order.
+
+![b7ae-fc200x100-seed1](../runs/b7ae-fc200x100-seed1.png)
+![b7ae stage B](../runs/b7ae-fc200x100-seed1_checkpoint_evals.png)
+![b7af-fc200x100-seed2](../runs/b7af-fc200x100-seed2.png)
+![b7af stage B](../runs/b7af-fc200x100-seed2_checkpoint_evals.png)
+![b7ag-fc200x100-seed3](../runs/b7ag-fc200x100-seed3.png)
+![b7ag stage B](../runs/b7ag-fc200x100-seed3_checkpoint_evals.png)
+![b7ah-fc200x100-seed4](../runs/b7ah-fc200x100-seed4.png)
+![b7ah stage B](../runs/b7ah-fc200x100-seed4_checkpoint_evals.png)
+![b7aa-fc320-seed1](../runs/b7aa-fc320-seed1.png)
+![b7aa stage B](../runs/b7aa-fc320-seed1_checkpoint_evals.png)
+![b7ab-fc320-seed2](../runs/b7ab-fc320-seed2.png)
+![b7ab stage B](../runs/b7ab-fc320-seed2_checkpoint_evals.png)
+![b7ac-fc320-seed3](../runs/b7ac-fc320-seed3.png)
+![b7ac stage B](../runs/b7ac-fc320-seed3_checkpoint_evals.png)
+![b7ad-fc320-seed4](../runs/b7ad-fc320-seed4.png)
+![b7ad stage B](../runs/b7ad-fc320-seed4_checkpoint_evals.png)
+![b7ai-fc300x100-seed1](../runs/b7ai-fc300x100-seed1.png)
+![b7ai stage B](../runs/b7ai-fc300x100-seed1_checkpoint_evals.png)
+![b7aj-fc300x100-seed2](../runs/b7aj-fc300x100-seed2.png)
+![b7aj stage B](../runs/b7aj-fc300x100-seed2_checkpoint_evals.png)
+![b7ak-fc300x100-seed3](../runs/b7ak-fc300x100-seed3.png)
+![b7ak stage B](../runs/b7ak-fc300x100-seed3_checkpoint_evals.png)
+![b7al-fc300x100-seed4](../runs/b7al-fc300x100-seed4.png)
+![b7al stage B](../runs/b7al-fc300x100-seed4_checkpoint_evals.png)
+![b7am-fc400x200-seed1](../runs/b7am-fc400x200-seed1.png)
+![b7am stage B](../runs/b7am-fc400x200-seed1_checkpoint_evals.png)
+![b7an-fc400x200-seed2](../runs/b7an-fc400x200-seed2.png)
+![b7an stage B](../runs/b7an-fc400x200-seed2_checkpoint_evals.png)
+![b7ao-fc400x200-seed3](../runs/b7ao-fc400x200-seed3.png)
+![b7ao stage B](../runs/b7ao-fc400x200-seed3_checkpoint_evals.png)
+![b7ap-fc400x200-seed4](../runs/b7ap-fc400x200-seed4.png)
+![b7ap stage B](../runs/b7ap-fc400x200-seed4_checkpoint_evals.png)
+![b7au-fc100x100-seed1](../runs/b7au-fc100x100-seed1.png)
+![b7au stage B](../runs/b7au-fc100x100-seed1_checkpoint_evals.png)
+![b7av-fc100x100-seed2](../runs/b7av-fc100x100-seed2.png)
+![b7av stage B](../runs/b7av-fc100x100-seed2_checkpoint_evals.png)
+![b7aw-fc100x100-seed3](../runs/b7aw-fc100x100-seed3.png)
+![b7aw stage B](../runs/b7aw-fc100x100-seed3_checkpoint_evals.png)
+![b7ax-fc100x100-seed4](../runs/b7ax-fc100x100-seed4.png)
+![b7ax stage B](../runs/b7ax-fc100x100-seed4_checkpoint_evals.png)
+![b7aq-fc160x160-seed1](../runs/b7aq-fc160x160-seed1.png)
+![b7aq stage B](../runs/b7aq-fc160x160-seed1_checkpoint_evals.png)
+![b7ar-fc160x160-seed2](../runs/b7ar-fc160x160-seed2.png)
+![b7ar stage B](../runs/b7ar-fc160x160-seed2_checkpoint_evals.png)
+![b7as-fc160x160-seed3](../runs/b7as-fc160x160-seed3.png)
+![b7as stage B](../runs/b7as-fc160x160-seed3_checkpoint_evals.png)
+![b7at-fc160x160-seed4](../runs/b7at-fc160x160-seed4.png)
+![b7at stage B](../runs/b7at-fc160x160-seed4_checkpoint_evals.png)
+![b7ay-fc100x200x100-seed1](../runs/b7ay-fc100x200x100-seed1.png)
+![b7ay stage B](../runs/b7ay-fc100x200x100-seed1_checkpoint_evals.png)
+![b7az-fc100x200x100-seed2](../runs/b7az-fc100x200x100-seed2.png)
+![b7az stage B](../runs/b7az-fc100x200x100-seed2_checkpoint_evals.png)
+![b7ba-fc100x200x100-seed3](../runs/b7ba-fc100x200x100-seed3.png)
+![b7ba stage B](../runs/b7ba-fc100x200x100-seed3_checkpoint_evals.png)
+![b7bb-fc100x200x100-seed4](../runs/b7bb-fc100x200x100-seed4.png)
+![b7bb stage B](../runs/b7bb-fc100x200x100-seed4_checkpoint_evals.png)
+![b7bc-fc200x100x50-seed1](../runs/b7bc-fc200x100x50-seed1.png)
+![b7bc stage B](../runs/b7bc-fc200x100x50-seed1_checkpoint_evals.png)
+![b7bd-fc200x100x50-seed2](../runs/b7bd-fc200x100x50-seed2.png)
+![b7bd stage B](../runs/b7bd-fc200x100x50-seed2_checkpoint_evals.png)
+![b7be-fc200x100x50-seed3](../runs/b7be-fc200x100x50-seed3.png)
+![b7be stage B](../runs/b7be-fc200x100x50-seed3_checkpoint_evals.png)
+![b7bf-fc200x100x50-seed4](../runs/b7bf-fc200x100x50-seed4.png)
+![b7bf stage B](../runs/b7bf-fc200x100x50-seed4_checkpoint_evals.png)
 
 ## Batch b4 — `fc (200,100)` + 8 epochs, seeds 1-8
 

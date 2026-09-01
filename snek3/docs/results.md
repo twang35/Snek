@@ -7,6 +7,12 @@ lands. Config, final numbers, verdict.
 batch before it, so the newest numbers are the ones you land on. The reference sections —
 `Imported policies` and `Reading this table` — stay at the bottom.
 
+**The best single policy is not in this file.** An arm's row here is a *selected* maximum over
+hundreds of checkpoints; a record needs a fresh measurement at depth, and those live in
+[`../hallOfFame/HOF.md`](../hallOfFame/HOF.md) — two entries as of 2026-09-01, confirmed on 30,000
+episodes at a seed no selection pass used, the better of them **98.96%** and the first snek3 policy to
+beat the snek2 champion at matched depth.
+
 **‡ The PPO batches were renamed on 2026-08-31: `p0`-`p3` became `b3`-`b6`** — one prefix for
 every batch in both eras, because a second one had already cost the desktop's batch grouping a day.
 The map is a `+3` offset holding the old order: `p0`->`b3`, `p1`->`b4`, `p2`->`b5`, `p3`->`b6`, so
@@ -15,12 +21,87 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+## Batch b7 — the fc-layout sweep, 8 layouts x 4 seeds, closed 2026-09-01
+
+**The network-shape test this file had been calling for since b3, and it went to the single layer.**
+32 arms, 50M transitions each (3,052 rollouts of 16,384), four waves of two layouts, every wave a
+comparison that stands alone. Everything but `fc_layers` at PPO's reference — 4 epochs, lr 3e-4,
+γ 0.99, λ 0.98, entropy 0.01, 128x128 rollout, minibatch 256, b2's reward — seeds 1-4 pinned to the
+seed in each arm name. Desktop, 2026-09-01 00:01 -> ~11:14, with `auto_stage_b` measuring each wave
+before the next trained. **`fc (320,)` wins on the ≥98%/500 density, and every seed of it beats every
+seed of five of the seven other layouts.**
+
+| layout | wave | rows | ≥98%/500 | per-seed share | best30 (4 seeds) | sef | best row |
+|---|---:|---:|---:|---|---|---:|---:|
+| `fc (320,)` | 1 | 4,003 | **17.3%** | 18.5 19.0 16.5 15.1 | 97.8 97.8 97.7 97.7 | 90.9 | 99.6% |
+| `fc (200,100)` | 1 | 3,799 | **11.8%** | 11.2 12.3 10.6 13.3 | 97.3 97.8 97.7 98.2 | 94.7 | 99.8% |
+| `fc (100,200,100)` | 4 | 3,220 | **11.6%** | 9.9 15.5 6.1 14.8 | 97.4 97.9 97.0 97.9 | 93.3 | 99.4% |
+| `fc (100,100)` | 3 | 4,010 | **11.3%** | 4.6 16.8 13.7 10.0 | 97.2 98.1 97.8 98.0 | 94.2 | 99.8% |
+| `fc (200,100,50)` | 4 | 3,630 | **10.8%** | 10.3 8.9 12.8 11.2 | 97.8 97.8 98.2 98.0 | 94.4 | 99.6% |
+| `fc (160,160)` | 3 | 3,469 | **8.3%** | 7.0 7.2 8.6 10.4 | 96.9 97.4 98.1 97.5 | 94.9 | 99.8% |
+| `fc (300,100)` | 2 | 3,144 | **6.8%** | 6.6 4.9 6.8 9.0 | 97.3 96.9 97.2 97.9 | 95.0 | 99.4% |
+| `fc (400,200)` | 2 | 2,731 | **5.1%** | 3.7 8.3 5.4 2.9 | 96.8 97.3 97.2 96.8 | 94.8 | 99.2% |
+
+`vs fc 320` is an exact two-sided Mann-Whitney on the four per-seed shares. 0.029 is the floor at
+4-vs-4 and means complete separation. Full reading, including what the sweep does **not** settle, in
+[`findings.md`](findings.md); the charts are in [`charts.md`](charts.md).
+
+**Read the `sef` column against the density column.** They rank the layouts *backwards* — `fc 320`
+is last on `strong_eval_fraction` and first on record density, `fc (300,100)` the reverse. That is a
+protocol finding rather than a b7 one: the 80% threshold `strong_eval_fraction` uses sits far below
+the region a champion hunt cares about, and the stage-A ≥98% rate (r=+0.80) or `best_perfect30`
+(+0.71) is the screen to use instead. [`findings.md`](findings.md) has the numbers.
+
+### b7's arms
+
+| arm | best30 | trailing | sef | rows | ≥98%/500 | density | best row |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `b7aa-fc320-seed1` | 97.8 | 94.27 | 94.0 | 1,169 | 216 | 18.5% | 99.6% |
+| `b7ab-fc320-seed2` | 97.8 | 94.29 | 87.8 | 879 | 167 | 19.0% | 99.4% |
+| `b7ac-fc320-seed3` | 97.7 | 94.33 | 90.0 | 991 | 164 | 16.5% | 99.4% |
+| `b7ad-fc320-seed4` | 97.7 | 94.00 | 91.7 | 964 | 146 | 15.1% | 99.6% |
+| `b7ae-fc200x100-seed1` | 97.3 | 93.81 | 94.5 | 910 | 102 | 11.2% | 99.4% |
+| `b7af-fc200x100-seed2` | 97.8 | 93.53 | 93.7 | 847 | 104 | 12.3% | 99.8% |
+| `b7ag-fc200x100-seed3` | 97.7 | 93.31 | 95.1 | 1,017 | 108 | 10.6% | 99.4% |
+| `b7ah-fc200x100-seed4` | 98.2 | 94.09 | 95.4 | 1,025 | 136 | 13.3% | 99.8% |
+| `b7ai-fc300x100-seed1` | 97.3 | 94.13 | 95.7 | 726 | 48 | 6.6% | 99.2% |
+| `b7aj-fc300x100-seed2` | 96.9 | 94.12 | 95.1 | 710 | 35 | 4.9% | 99.2% |
+| `b7ak-fc300x100-seed3` | 97.2 | 93.41 | 94.1 | 822 | 56 | 6.8% | 99.2% |
+| `b7al-fc300x100-seed4` | 97.9 | 93.85 | 95.0 | 886 | 80 | 9.0% | 99.4% |
+| `b7am-fc400x200-seed1` | 96.8 | 93.68 | 95.5 | 641 | 24 | 3.7% | 99.2% |
+| `b7an-fc400x200-seed2` | 97.3 | 93.75 | 95.3 | 695 | 58 | 8.3% | 99.2% |
+| `b7ao-fc400x200-seed3` | 97.2 | 94.25 | 93.1 | 851 | 46 | 5.4% | 99.0% |
+| `b7ap-fc400x200-seed4` | 96.8 | 94.01 | 95.2 | 544 | 16 | 2.9% | 98.8% |
+| `b7aq-fc160x160-seed1` | 96.9 | 93.72 | 95.7 | 932 | 65 | 7.0% | 99.2% |
+| `b7ar-fc160x160-seed2` | 97.4 | 93.60 | 94.2 | 746 | 54 | 7.2% | 99.2% |
+| `b7as-fc160x160-seed3` | 98.1 | 93.78 | 94.6 | 893 | 77 | 8.6% | 99.4% |
+| `b7at-fc160x160-seed4` | 97.5 | 93.44 | 95.2 | 898 | 93 | 10.4% | 99.8% |
+| `b7au-fc100x100-seed1` | 97.2 | 94.03 | 91.7 | 790 | 36 | 4.6% | 99.4% |
+| `b7av-fc100x100-seed2` | 98.1 | 94.49 | 94.5 | 1,049 | 176 | 16.8% | 99.8% |
+| `b7aw-fc100x100-seed3` | 97.8 | 94.27 | 96.0 | 1,130 | 155 | 13.7% | 99.6% |
+| `b7ax-fc100x100-seed4` | 98.0 | 92.36 | 94.6 | 1,041 | 104 | 10.0% | 99.6% |
+| `b7ay-fc100x200x100-seed1` | 97.4 | 93.87 | 89.4 | 708 | 70 | 9.9% | 99.0% |
+| `b7az-fc100x200x100-seed2` | 97.9 | 94.18 | 96.0 | 974 | 151 | 15.5% | 99.4% |
+| `b7ba-fc100x200x100-seed3` | 97.0 | 91.97 | 93.5 | 705 | 43 | 6.1% | 99.4% |
+| `b7bb-fc100x200x100-seed4` | 97.9 | 93.64 | 94.2 | 833 | 123 | 14.8% | 99.2% |
+| `b7bc-fc200x100x50-seed1` | 97.8 | 93.55 | 93.2 | 838 | 86 | 10.3% | 99.2% |
+| `b7bd-fc200x100x50-seed2` | 97.8 | 93.95 | 95.3 | 935 | 83 | 8.9% | 99.4% |
+| `b7be-fc200x100x50-seed3` | 98.2 | 93.44 | 94.4 | 956 | 122 | 12.8% | 99.6% |
+| `b7bf-fc200x100x50-seed4` | 98.0 | 93.38 | 94.6 | 901 | 101 | 11.2% | 99.2% |
+| **pooled** | | | | **28,006** | **3,045** | **10.9%** | **99.8%** |
+
+**Where the raw rows are.** b7 ran on the desktop, so its `_checkpoint_evals.json` files are on the
+`results` branch under `results/b7-stageb{,-w2,-w3,-w4}/` — 8.3 MB an arm, 267 MB for the batch, which
+is why `runs/` carries the reports and the PNGs and not those. b5's `hof5000` rows are on the same
+branch under the **old** name, `results/p2-hof5000/`.
+
 ## Batch b4 — `fc (200,100)` + 8 epochs, eight seeds, closed 2026-08-31
 
 **The clean network-shape test, and it came out against the shape.** 8 seeds, 200M transitions each
 (199,999,488 = 12,207 rollouts), b2's reward function, everything else at PPO's defaults. Run on the
 desktop 2026-08-30 18:46 -> 2026-08-31 02:34, stage B done 04:34. Numbers read off the `results`
-branch 2026-09-01; **its charts are still to be imported into `../runs/`.**
+branch 2026-09-01, charts imported and redrawn the same day (the published PNGs carried the
+pre-rename `p1` titles).
 
 | arm | seed | best30 | trailing | sef | stage B: rows | ≥98%/500 | density | best row |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -33,6 +114,30 @@ branch 2026-09-01; **its charts are still to be imported into `../runs/`.**
 | `b4g-fc200x100ep8-seed7` | 7 | 97.3 | 93.59 | 82.1 | 1,965 | 159 | 8.1% | 99.4% |
 | `b4h-fc200x100ep8-seed8` | 8 | 97.0 | 92.52 | 89.5 | 1,904 | 94 | 4.9% | 99.4% |
 | **pooled** | | | | | **14,733** | **1,079** | **7.3%** | **99.6%** |
+
+### b4 at 5,000 episodes — the laptop `hof5000` pass, 2026-09-01
+
+Every b4 checkpoint at ≥98.5% on its 500-episode close-out (`above:98.5`), re-measured at 5,000
+episodes: **274 rows, 1.37M episodes, 25.8 min on the laptop, exit 0.**
+
+| arm | rows | mean | ≥98 | best |
+|---|---:|---:|---:|---:|
+| `b4a` | 37 | 97.74 | 45.9% | 98.70 |
+| `b4b` | 20 | 97.75 | 30.0% | **98.80** |
+| `b4c` | 64 | 97.76 | 37.5% | 98.60 |
+| `b4d` | 19 | 97.79 | 31.6% | 98.50 |
+| `b4e` | 49 | 97.68 | 30.6% | 98.40 |
+| `b4f` | 30 | 97.58 | 23.3% | 98.50 |
+| `b4g` | 38 | 97.70 | 34.2% | 98.70 |
+| `b4h` | 17 | 97.61 | 23.5% | 98.70 |
+| **pooled** | **274** | **97.71** | **33.6%** | **98.80** |
+
+**One row clears the snek2 champion's 98.73% and none reaches 99%**, against 29 and 20
+champion-level rows for b5 and b6. Candidate density says it from the other end: 18.6 `above:98.5`
+candidates per 1,000 stage-B rows against b6's 35.8. **b4 has no hall-of-fame candidate** — and
+[`findings.md`](findings.md) has why the b5-vs-b6 half of this comparison did *not* survive the same
+treatment while the b4 half did. The pass is the
+[`hof-remeasure`](../skills/hof-remeasure/SKILL.md) skill.
 
 ### ‡ b4 is the weakest of the three 8-seed batches, which retires b3's epochs ranking
 
@@ -89,6 +194,14 @@ region — per [`protocol.md`](protocol.md).
 | `b5h-ep8-seed8` | 3039 | 8.8% | 99.8 | 98.5 | 96.9 | 255M |
 
 ### ‡ These two batches differ in two knobs, so they are not a network-shape test
+
+**‡ And the headline below did not survive 5,000 episodes (2026-09-01).** Re-measured over every
+checkpoint at ≥98.5%/500, b5 and b6 have identical means (97.80 both), ≥98 rates within 0.1 pp, and
+b5 is *ahead* on champion-level rows (29 to 20) and on the top checkpoint (99.20 to 99.10). The
++3.29 pp pooled gap in the table below was selection, not policy quality — 500 episodes carries a
+0.72 pp sd against 5,000's 0.23. Read the table as what a 500-episode close-out reported, and
+[`findings.md`](findings.md) for what replaced it. The b7 sweep since settled the network axis
+outright, and it went to `fc (320,)`.
 
 [`runs.md`](runs.md) named the two-hidden-layer result as "the most promising thread b3 turned up".
 **b6 does not settle it.** b6 is `fc (200,100)` **and** 4 epochs; b5 is `fc (320,)` **and** 8 epochs —

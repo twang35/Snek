@@ -17,6 +17,134 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### `fc (320,)` is the best network shape on this task, and b3's single-seed layout ranking inverted
+
+**Measured by batch b7, 2026-09-01** — the fc-layout sweep, all four waves closed: 8 layouts x 4
+seeds, 50M transitions each, everything but `fc_layers` at PPO's reference (4 epochs, lr 3e-4,
+γ 0.99, λ 0.98, entropy 0.01, 128x128 rollout, minibatch 256, b2's reward), seeds 1-4 pinned to the
+seed in each arm name. 32 arms, 28,006 stage-B rows at 500 episodes. Ranked by ≥98%/500 density:
+
+| layout | ≥98%/500 | per-seed | vs `fc 320` |
+|---|---:|---|---|
+| **`fc (320,)`** | **17.3%** | 18.5 19.0 16.5 15.1 | — |
+| `fc (200,100)` | 11.8% | 11.2 12.3 10.6 13.3 | p=0.029 |
+| `fc (100,200,100)` | 11.6% | 9.9 15.5 6.1 14.8 | p=0.057 |
+| `fc (100,100)` | 11.3% | 4.6 16.8 13.7 10.0 | p=0.114 |
+| `fc (200,100,50)` | 10.8% | 10.3 8.9 12.8 11.2 | p=0.029 |
+| `fc (160,160)` | 8.3% | 7.0 7.2 8.6 10.4 | p=0.029 |
+| `fc (300,100)` | 6.8% | 6.6 4.9 6.8 9.0 | p=0.029 |
+| `fc (400,200)` | 5.1% | 3.7 8.3 5.4 2.9 | p=0.029 |
+
+p is an exact two-sided Mann-Whitney on the four per-seed shares; 0.029 is the floor at 4-vs-4 and
+means complete separation — **every** `fc 320` seed above **every** seed of that layout. `fc 320`
+clears five of the seven that way.
+
+**This inverts the ranking b3 measured at one seed each**, which had `fc 300,100` 9.0% > `fc 200,100`
+7.9% > `fc 320` 5.6% and was the reason b4 and b7 were queued at all. At four seeds the order of
+those three is exactly reversed. Retraction is at
+[Two hidden layers beat every single-layer width](#two-hidden-layers-beat-every-single-layer-width-and-width-past-320-actively-hurts).
+
+**Two secondary readings, both about capacity going the wrong way.** Width past 320 hurts, now at
+n=4: `fc (400,200)`, the largest network in the sweep, is last on density (5.1%) *and* last on
+candidate count (683 screened checkpoints per arm against `fc 320`'s 1,001) — a double loss, not a
+trade. And depth is not what mattered: the two three-layer shapes land mid-table, and `fc (100,100)`
+at ~14k parameters ties `fc (200,100)`, so the second layer buys nothing that the first layer's width
+does not already buy.
+
+**What it does not settle.** 50M is a quarter of b4/b5/b6's horizon, so a density read against those
+truncates. `fc 320` at 4 epochs and 50M scores 17.3% against b5's 9.6% at `fc 320` + 8 epochs and
+255-271M, which is consistent with 4 epochs beating 8 but confounds budget with epochs. And b7's
+`fc (200,100)` at 50M scores 11.8% against b6's 12.9% at the same shape and epochs with 4x the
+budget — **so the ≥98%/500 density is nearly flat in budget past 50M**, which is what makes the
+truncation tolerable and is worth knowing before buying another 4x.
+
+### Screen checkpoint-rich configs on the stage-A ≥98% rate, not on `strong_eval_fraction`
+
+**Measured across b7's 32 arms, 2026-09-01.** Both statistics come free from the same eval history,
+and they disagree about which layout to want:
+
+| predictor of a layout's ≥98%/500 density | across 32 arms | across the 8 layout means |
+|---|---:|---:|
+| stage-A share of evals ≥98% | **+0.80** | — |
+| `best_perfect30` | +0.71 | +0.61 |
+| `trailing_now` | +0.28 | — |
+| `strong_eval_fraction` (share ≥80%) | **−0.19** | **−0.79** |
+
+Pearson on the first row, Spearman on the rest. **`strong_eval_fraction` ranks the layouts backwards**
+— its best layout, `fc (300,100)` at 95.0, is second-worst on density, and its worst, `fc 320` at
+90.9, is the winner. The cause is the threshold: 80% perfect is far below the region a champion hunt
+cares about, and the top of the distribution moves independently of it. `fc 320` spends **21.1%** of
+its post-competence evals at ≥98% against `fc (400,200)`'s 12.4%, while spending *more* of them below
+80%.
+
+**This does not retire `strong_eval_fraction`** — it is still the lowest-variance summary of whether
+an arm is *competent*, which is what it was chosen for, and it is what tells you a run is broken. It
+is the wrong screen for **where the records are**, and those are different questions. Neither the
+post-competence sd (+0.09) nor the post-competence mean (+0.08) predicts density at all, so this is
+not "variance helps a max-hunt" — the ≥98 mass really is a distinct property of a config.
+
+### A 500-episode ranking of two close batches did not survive 5,000 episodes
+
+**Re-measured 2026-08-31 to 2026-09-01**, `hof5000` passes over every b4/b5/b6 checkpoint that
+scored ≥98.5% on its 500-episode close-out (`above:98.5`), at 5,000 episodes each:
+
+| batch | 500-ep headline | rows re-measured | 5,000-ep mean | rows ≥98 | ≥98.73 | best row |
+|---|---:|---:|---:|---:|---:|---:|
+| b6 | **12.9%** ≥98%/500 | 1,299 | 97.80 | 41.6% | 20 | 99.10 |
+| b5 | 9.6% | 873 | 97.80 | 41.5% | **29** | **99.20** |
+| b4 | 7.3% | 274 | 97.71 | 33.6% | 1 | 98.80 |
+
+**b6's lead over b5 dissolves**: identical means, ≥98 rates within 0.1 pp, and b5 ahead on the two
+things a champion hunt is for — more champion-level rows and the top checkpoint. b4 stays clearly
+last on all three, so that half of the earlier reading holds. The mechanism is the one
+[`../CLAUDE.md`](../CLAUDE.md) and `invariants.md` already state — a maximum over N measurements is
+upward-biased, and 500 episodes has a 0.72 pp sd against 5,000's 0.23 — but the size is the news:
+**a 3.3 pp gap in the pre-registered headline was entirely selection.** Read a two-batch ranking off
+the 500-episode density only when the gap is large; b4-vs-b6 (5.6 pp) survived and b5-vs-b6 (3.3 pp)
+did not.
+
+### Running b5 longer bought nothing; running b6 longer paid, modestly
+
+**Measured 2026-08-31, re-checked 2026-09-01** by placing every champion-level row (≥98.73% over
+5,000 episodes) in a decile of its own arm's run:
+
+| batch | champion rows | decile of the run | first half / second half | arms better in their second half |
+|---|---:|---|---:|---:|
+| b5 (`fc 320`, 8 ep, 255-271M) | 29 | **21 of 29 in decile 1** | 24 / 5 | 2 of 8, mean **−0.09 pp** |
+| b6 (`fc (200,100)`, 4 ep, 215-231M) | 20 | 12 of 20 in deciles 8-10 | 4 / **16** | 6 of 8, mean **+0.14 pp** |
+
+**b5 is front-loaded and b6 is back-loaded**, so the same extension was wasted on one batch and paid
+on the other. b5's top checkpoint — now snek3's record — is at 9.0M transitions, **3.5% of the way
+in**; the arm then ran another 246M.
+
+**Read the row-level split as indicative only.** Adjacent checkpoints are strongly correlated, so the
+binomial on halves (p=0.0005 for b5, p=0.0118 for b6) overstates its own confidence. The honest test
+is the per-arm sign test, and at 2-of-8 and 6-of-8 **neither batch is significant on its own**
+(p=0.29 either way). What survives is the pairing: the two batches point in opposite directions from
+the same protocol, and b6's +0.14 pp mean is a seventh of what its strongest single arm suggested
+(b6a, +0.42 pp) — the usual maximum-over-8 bias.
+
+**The practical rule stands on b5 alone: an arm's record region is not where its training curve
+peaks.** A cap chosen to "let the curve settle" would have kept b5h running for 246M transitions
+past the checkpoint that mattered.
+
+### snek3 has a champion, and it beats snek2's at matched depth
+
+**Admitted to [`../hallOfFame/HOF.md`](../hallOfFame/HOF.md) 2026-09-01**, on 30,000 fresh episodes
+at seed 7 — a seed no selection pass used:
+
+| entry | transitions | 30,000-episode rate |
+|---|---:|---:|
+| `b5h-ep8-seed8-ckpt9027584` | 9.0M | **98.96%** |
+| `b6b-fc200x100-seed2-ckpt133120000` | 133.1M | 98.73% |
+| snek2 champion `b44a-lowlr7-b29b-ckpt2739000`, re-measured | — | 98.48% |
+
+**The comparison must be at matched depth or it says the opposite.** Against the snek2 champion's
+*published* 98.73%/3,000 the new entry reads as a tie (p=0.26); re-measured on the same 30,000
+episodes the champion reads 98.48% and b5h wins by +0.47 pp (z=5.16, p<1e-6). The published number
+was itself a selected high. The admission rule and the basin tie-break are in the
+[`hof-promote`](../skills/hof-promote/SKILL.md) skill.
+
 ### Network shape and PPO epochs interact negatively, so b3's per-knob ranking does not compose
 
 **Measured 2026-08-31 across three 8-seed batches** on b2's reward function and one protocol, read
@@ -159,6 +287,8 @@ change and looked unaffected while the throughput moved 12%. Use `/proc/loadavg`
 anything instantaneous.
 
 ### Two hidden layers beat every single-layer width, and width past 320 actively hurts
+
+**‡ Superseded 2026-09-01 by batch b7**, which swept the same axis at 4 seeds and 50M and found the opposite: `fc (320,)` first at 17.3% and `fc (300,100)` second-last at 6.8%, with the three shapes below in exactly reversed order. Everything in this section is n=1 at 20M. Kept because the reasoning is what queued b4 and b7, and because *width past 320 hurts* did replicate — `fc (400,200)` is last of eight. See the top of this section.
 
 From batch b3's fc sweep, at 10M transitions each on b2's reward function, ranked by the statistic a
 champion hunt actually cares about — how densely an arm produces ≥98%/500 checkpoints:
@@ -735,7 +865,19 @@ assert is the transpose itself, against an independent numpy forward pass.
 
 ## Falsified
 
-*Nothing yet.*
+### Two hidden layers beat every single-layer width — n=1, reversed at n=4
+
+b3 ranked `fc 300,100` (9.0%) > `fc 200,100` (7.9%) > `fc 320` (5.6%) on ≥98%/500 density at one seed
+each. b7 ran the same axis at four seeds and 50M: `fc 320` **17.3%**, `fc 200,100` 11.8%,
+`fc 300,100` 6.8% — the order of all three reversed, and `fc 320` separates completely from five of
+the seven other layouts. What replaced it is at the top of `Established`.
+
+### b6 leads b5 on record density — a 500-episode reading that 5,000 episodes erased
+
+Published as "12.8% against 9.6%" in `results.md`, this file and `plans/ppo.md` §6e. Re-measured at
+5,000 episodes the two batches have identical means (97.80), ≥98 rates within 0.1 pp, and b5 ahead on
+champion-level rows (29 vs 20) and on the top checkpoint (99.20 vs 99.10). The b4 half of the same
+comparison survived. See `Established`.
 
 ---
 
