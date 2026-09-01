@@ -1,0 +1,23 @@
+{
+  "project": "snek3",
+  "id": "b7ag-fc200x100-seed3",
+  "type": "train",
+  "policy": "b7ag-fc200x100-seed3",
+  "max_steps": 50003968,
+  "env": {
+    "SNEK_ALGO": "ppo",
+    "SNEK_REWARD_PRESET": "b2",
+    "SNEK_CHASE_SAFE_SHAPING": "0.1",
+    "SNEK_CHASE_SAFE_GATE": "75",
+    "SNEK_FOOD_DISTANCE_REWARD": "0",
+    "SNEK_FC_LAYERS": "200,100",
+    "SNEK_PPO_EPOCHS": "4",
+    "SNEK_EVAL_QUEUE": "1",
+    "SNEK_EVAL_QUEUE_DEPTH": "16",
+    "SNEK_EVAL_WORKERS": "8",
+    "SNEK_SEED": "3"
+  },
+  "priority": 20,
+  "label": "b7: fc (200,100), seed 3 of 4 \u2014 wave 1 of 4",
+  "notes": "Batch b7, the fc-layout sweep: 8 layouts x 4 seeds at 50M transitions, two layouts per wave so each wave is a self-contained comparison. Every knob but the network is b3's reference, which is also PPO's default -- lr 3e-4, gamma 0.99, lambda 0.98, entropy 0.01, 128x128 rollout, minibatch 256, 4 epochs -- on b2's reward function, seeds 1-4 pinned so the layouts are seed-matched to each other and to b1/b2/b29/b41/b47. Epochs are 4, not 8: at 8 seeds fc (200,100) scored 12.8% of rows >=98%/500 at 4 epochs (b6) and 7.3% at 8 epochs (b4), while fc 320 at 8 epochs scored 9.6% (b5) -- so the two knobs interact negatively and 4 epochs is the setting the best result to date used. 50M is a quarter of b4/b5/b6's horizon, so a comparison against those three truncates. The two-layer candidate. Same shape and epochs as b6, which pooled 12.8% of stage-B rows at >=98%/500 over 8 seeds at 215-231M, so b6 is a direct anchor for this arm at a quarter of the horizon."
+}
