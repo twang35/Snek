@@ -13,8 +13,8 @@ confident and stochastic where it is not — so there is no deadlock to gate aga
 version would add a feedback loop through `perfect_percent`
 ([`../docs/invariants.md`](../docs/invariants.md) invariant 2) for no measured gain.
 
-So batch p1 runs a **constant** coefficient: `initial == final` is the default and the anneal is off.
-The linear ramp exists so p0 can ask whether a fixed coefficient is the binding constraint without a
+So batch b4 runs a **constant** coefficient: `initial == final` is the default and the anneal is off.
+The linear ramp exists so b3 can ask whether a fixed coefficient is the binding constraint without a
 code change, and an adaptive version is in the plan's backlog for if it is.
 """
 

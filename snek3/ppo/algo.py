@@ -98,7 +98,7 @@ def build_config(tuned):
         # the +100, which is why the critic carries it and the shaping terms matter more here.
         'ppo_gae_lambda': tuned('PPO_GAE_LAMBDA', 0.98),
         'ppo_entropy_coef': tuned('PPO_ENTROPY_COEF', 0.01),
-        # Absent means "no anneal", which is p1's setting. `tuned` needs a sentinel rather than None
+        # Absent means "no anneal", which is b4's setting. `tuned` needs a sentinel rather than None
         # because it casts, so an empty string is the spelling for absent.
         'ppo_entropy_coef_final': _optional_float(tuned('PPO_ENTROPY_COEF_FINAL', '', str)),
         'ppo_vf_coef': tuned('PPO_VF_COEF', 0.5),
@@ -211,7 +211,7 @@ class PpoAlgo(object):
         transitions = self.collector.collect()
         self.step += transitions
         # Read before the update rather than after, so the coefficient the epochs use is the one this
-        # rollout's step number implies. Constant at p1's settings, where `final` is absent.
+        # rollout's step number implies. Constant at b4's settings, where `final` is absent.
         self.agent.entropy_coef = schedules.entropy_coef_for(
             self.step, self.config['max_steps'], self.config['ppo_entropy_coef'],
             self.config['ppo_entropy_coef_final'])

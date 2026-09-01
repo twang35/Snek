@@ -33,7 +33,7 @@ orphans. **A detached parent and an orphaned child are indistinguishable by ppid
 read the full command line of each one, and pass that list.
 
 `ps -o pid=,command=` truncation hides which arm a pid belongs to. Print enough of the line to tell
-`p3b` from `p3c` before killing anything.
+`b6b` from `b6c` before killing anything.
 
 ### One arm
 

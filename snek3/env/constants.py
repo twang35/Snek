@@ -167,13 +167,13 @@ STARVE_REWARD = -0.5
 # **`SNEK_ALGO=ppo` shapes by default, and a DQN arm does not.** The three knobs below — the
 # chase-safe dose, its gate, and the food-distance term — are b2's, which is b29's, which is the
 # configuration snek2 set every one of its records with. PPO development happens on that reward
-# function (batch p0, 2026-08-29), so it is PPO's default rather than something every launch has to
+# function (batch b3, 2026-08-29), so it is PPO's default rather than something every launch has to
 # restate. `SNEK_REWARD_PRESET` names it directly, and any individual knob still wins over the preset.
 #
 # **‡ The cost, stated plainly, because it is the exact failure `plans/ppo.md` is shaped to avoid: a
 # bare `SNEK_ALGO=dqn` arm and a bare `SNEK_ALGO=ppo` arm now optimise different objectives.** So an
-# algorithm A/B must name the reward knobs on *both* sides — p1-vs-b2 is matched because b2's spec
-# states them explicitly and p1 will too. The startup line `reward config:` prints the resolved
+# algorithm A/B must name the reward knobs on *both* sides — b4-vs-b2 is matched because b2's spec
+# states them explicitly and b4 will too. The startup line `reward config:` prints the resolved
 # values on every entry point for this reason; read it, not the defaults in this file.
 #
 # Read here rather than in `train.py` so that every entry point agrees — the trainer, `evaluate.py`,

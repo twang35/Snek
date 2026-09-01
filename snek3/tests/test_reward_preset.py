@@ -102,7 +102,7 @@ def test_naming_the_preset_overrides_the_algorithms_default_in_both_directions(a
 def test_an_explicit_knob_beats_the_preset(knob, value, field):
     """Or a sweep over the shaping dose would silently be pinned at the preset's value.
 
-    Batch p0's arms all pass these explicitly; so will p1's. A preset that could not be overridden
+    Batch b3's arms all pass these explicitly; so will b4's. A preset that could not be overridden
     would make every shaping experiment a no-op that reports the dose it was asked for.
     """
     out = resolved(SNEK_ALGO='ppo', **{knob: value})

@@ -58,6 +58,12 @@ rebooted under the job; it is non-terminal and gets relaunched.
 `charts.md` links `../runs/<policy>.png` directly — no copy step. Keep the split clean; snek2's
 equivalent grew to 950 lines of interleaved status and stopped being usable.
 
+**Write new material at the top, never appended to the bottom.** A batch that closed goes above the
+batch before it in `results.md` and `charts.md`; a new finding goes directly under `## Established`
+in `findings.md`; `runs.md` keeps the order current state -> forward plan -> history, so a stale
+`Now` block is moved down rather than left in place above the new one. Reference sections
+(`Imported policies`, `Reading this table`) stay at the bottom.
+
 Markdown traps: `A.`/`a.` are not list markers (use `#### A. Thing`), and duplicate numbers in one
 list renumber silently. Cross-reference items by name.
 

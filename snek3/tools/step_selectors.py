@@ -18,7 +18,7 @@ checkpoints, so `all` at 500 episodes is 1.5M episodes.
 
 **‡ The default was 95 until 2026-08-30 and is now 97**, at the user's request, because PPO arms
 changed what the number costs. `plans/pytorch-port.md` called `≥95/100` "the cost knob, and where the
-design is worth revisiting first", and batch p2/p3 is why: arms sitting at best30 97-98% have almost
+design is worth revisiting first", and batch b5/b6 is why: arms sitting at best30 97-98% have almost
 every checkpoint clear a 95 screen, so a 400M-transition arm would put ~20,000 checkpoints x 500
 episodes into stage B — tens of millions of episodes per arm.
 

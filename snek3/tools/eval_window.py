@@ -18,7 +18,7 @@ It takes **its own slot**, so a box can hold a training window and this one at o
 hypothetical on the laptop, where nothing separates a training from an eval.
 
     PYTHONPATH=. python -m tools.eval_window                     # whatever stage-B charts are newest
-    PYTHONPATH=. python -m tools.eval_window p3a p3b --label ab  # a named batch
+    PYTHONPATH=. python -m tools.eval_window b6a b6b --label ab  # a named batch
 
 Killing it is free, exactly as for the training window: no pass reads it, waits on it, or reopens it.
 """

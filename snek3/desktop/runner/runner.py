@@ -679,12 +679,18 @@ class Runner(object):
 
 # ---------------------------------------------------------------- pure helpers
 
-# `b` for the DQN batches carried over from snek2, `p` for the PPO series. **The `p` was missing until
-# 2026-08-30**, so every PPO arm was its own batch: `p1a-...` fell through to the `split('-')[0]`
-# fallback and returned `p1a`. Nothing measured wrong, but the two things that group by batch both
-# degraded silently — `_auto_stage_b_jobs` synthesised one wave per arm instead of one per batch, and
-# `at_a_glance` listed eight separate lines where it should show one batch with eight arms.
-_BATCH_RE = re.compile(r'^([bp]\d+)')
+# **`b<number>` is the only batch prefix, in both eras and both algorithms.** A `p` series was tried
+# for PPO and renamed back on 2026-08-31 (`p0-p3` -> `b3-b6`) precisely so this pattern stays one
+# character wide: the prefix was missing from it for a day, and every PPO arm became its own batch —
+# `b4a-...` fell through to the `split('-')[0]` fallback and returned `b4a`. Nothing measured wrong,
+# but the two things that group by batch both degraded silently: `_auto_stage_b_jobs` synthesised one
+# wave per arm instead of one per batch, and `at_a_glance` listed eight separate lines where it should
+# show one batch with eight arms. **Do not add a second prefix — name the batch `b<n>`.**
+#
+# The box's ledger still holds the pre-rename ids (`p1a-...`, `p2-hof5000`), and those now take the
+# fallback and read as one batch per arm. That is cosmetic and confined to the ledger's display: every
+# one of those waves is `done`, and nothing re-groups a finished record.
+_BATCH_RE = re.compile(r'^(b\d+)')
 _STAGE_B_ID_RE = re.compile(r'-stageb(-w\d+)?$')
 
 

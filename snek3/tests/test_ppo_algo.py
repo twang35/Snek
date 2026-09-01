@@ -293,7 +293,7 @@ def test_a_checkpoint_holds_the_actor_and_not_the_critic(tmp_path, monkeypatch):
     `arch.json` field, and `arch.py`'s rule is that every field is required — so it would have
     invalidated every committed sidecar."""
     algo, config = built(monkeypatch)
-    policy_dir = str(tmp_path / 'p1')
+    policy_dir = str(tmp_path / 'b4')
     arch_tools.write_arch(policy_dir, arch_for(config))
     path = checkpoints.save(policy_dir, 32, algo.net)
     payload = torch.load(path, weights_only=True)
@@ -305,7 +305,7 @@ def test_a_ppo_checkpoint_restores_into_a_playable_policy(tmp_path, monkeypatch)
     """The one line in `tools/restore.py` that makes `watch.py`, `record_gif.py` and every eval shard
     work on a PPO checkpoint. Asserted end to end rather than by reading the registry."""
     algo, config = built(monkeypatch)
-    policy_dir = str(tmp_path / 'p2')
+    policy_dir = str(tmp_path / 'b5')
     arch_tools.write_arch(policy_dir, arch_for(config))
     checkpoints.save(policy_dir, 32, algo.net)
 
@@ -320,7 +320,7 @@ def test_a_ppo_checkpoint_restores_into_a_playable_policy(tmp_path, monkeypatch)
 
 
 def test_an_algo_the_restore_path_does_not_know_names_itself(tmp_path):
-    policy_dir = str(tmp_path / 'p3')
+    policy_dir = str(tmp_path / 'b6')
     arch = arch_tools.build_arch((16,), constants.NUM_ACTIONS, constants.OBS_LEN,
                                 constants.OBS_ERA, algo='sac')
     arch_tools.write_arch(policy_dir, arch)
@@ -359,7 +359,7 @@ def test_there_is_no_side_state_to_save(monkeypatch):
 # --- the entropy schedule ------------------------------------------------------------------------
 
 def test_the_entropy_coefficient_is_constant_when_no_final_value_is_set(monkeypatch):
-    """p1's setting. A constant is one fewer moving part than DQN's two-phase epsilon."""
+    """b4's setting. A constant is one fewer moving part than DQN's two-phase epsilon."""
     algo, _ = built(monkeypatch, ppo_entropy_coef=0.02, ppo_entropy_coef_final=None)
     seen = set()
     for _ in range(3):

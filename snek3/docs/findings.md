@@ -14,9 +14,12 @@ snek3.
 
 ## Established
 
+**Newest first.** A new finding goes directly under this heading, above the one before it, so the
+top of the section is the most recent thing learned. Same rule in `Falsified` below.
+
 ### 16 stage-B shards is right on the desktop, and snek2's "18 loses 6-10%" cliff does not reproduce
 
-**Measured 2026-08-30 on the desktop**, 5 waves, identical work each (p2h's `screen:97` set, 3,039
+**Measured 2026-08-30 on the desktop**, 5 waves, identical work each (b5h's `screen:97` set, 3,039
 checkpoints at 100 episodes), wall clock from the ledger:
 
 | shards | minutes |
@@ -65,6 +68,148 @@ clock is the whole measurement, with no instrumentation to misread. Re-run it wi
 transitions per wave. **And the repeat pair is what caught this**; without it the 4/6/8 flatness would
 have read as a finding.
 
+### Six eval workers is the wrong number for eight PPO trainers, and for PPO the bound is free to raise
+
+Measured 2026-08-30 with batches b5 (8 arms, desktop) and b6 (8 arms, laptop) both at ~25M
+transitions and best30 ~97%:
+
+| | eval workers | trainers | cores | box idle |
+|---|---|---|---|---|
+| desktop, 16 cores | **598 of 600%** — pinned | 492 of 800% | 16 | ~1/3 |
+| laptop, 14 cores | **576 of 600%** — pinned | 371 of 800% | 14 | ~1/3 |
+
+**Stage A is the binding constraint and the workers are saturated while the trainers idle at half
+capacity.** That stage A dominates is already established above; what is new is that the *worker count*
+is now the limit rather than lane drain. [`running.md`](running.md)'s 6-worker optimum was measured at
+**four DQN trainers**, and PPO trains ~14x faster per transition, so eight PPO arms demand far more
+eval throughput per unit time than that sweep ever saw. Per-arm rates at the time: 9,262 transitions/s
+on the desktop, 7,850 on the laptop.
+
+**And the reason the queue bound exists does not apply to PPO.** Queue depth is bounded because a
+lagging row delays DQN's epsilon *refinement* schedule, which reads `perfect_percent` back out of eval
+rows ([`invariants.md`](invariants.md) invariant 2). PPO's only schedule is the entropy coefficient and
+it is a pure function of the step, so **queue lag cannot change a PPO arm's trajectory, only its
+speed.** The second objection also does not apply: a queued worker's eval seed already mixes clock, pid
+and round number rather than deriving from the arm's seed — `eval_queue.py` states this as the queue's
+accepted cost — so extra workers introduce no new class of variation.
+
+**Measured 2026-08-30: eight workers beat six by ~12%, and eight is the ceiling on a 16-core box.**
+Two extra workers were attached to the *running* desktop batch at slots 6 and 7 — no restart needed,
+because trainers only manage slots `0..target-1` and work is claimed by rename, so
+`python -m tools.eval_worker --slot 6` joins the same queue untracked.
+
+| desktop b5, 8 arms | workers | per-arm rate | window |
+|---|---:|---:|---|
+| baseline | 6 | 8,262 transitions/s | 35 min |
+| after | **8** | **8,556 transitions/s** | 30 min |
+
+**Raw that is only +3.6%, and the honest number is +12%.** The laptop's b6 batch stayed at six workers
+and served as a control: over the same hour its rate decayed **7,850 → 7,250/s (−7.6%)** as its policies
+matured and episodes lengthened. So a six-worker desktop would have been at ~7,630/s, and holding
+8,556/s means the extra pair bought back the decay and more. **A before/after on a maturing arm
+understates a speed change by roughly the decay rate** — which is why the control matters more than the
+window length here.
+
+**Ten workers is past the edge, and this is where `running.md`'s DQN sweep does transfer.** At eight
+workers plus eight trainers the box reads **load 14.1 of 16, 91.4% user, 8.3% idle** — and that sweep's
+finding was that past the optimum the box "reaches 4% idle to run *slower*", because the fastest
+configuration leaves ~20% free. The PPO-specific argument (its trainers are the idle half) bought one
+pair, not two. **Eight is the number for eight PPO trainers on 16 cores**; the laptop's 14 cores
+should take fewer.
+
+**‡ `ps -o %cpu` is the wrong instrument for this and cost a wrong reading.** On Linux it is CPU time
+over the process's *whole lifetime*, so the trainers — two hours old — reported 492% → 503% across the
+change and looked unaffected while the throughput moved 12%. Use `/proc/loadavg` or `top -bn1` for
+anything instantaneous.
+
+### Two hidden layers beat every single-layer width, and width past 320 actively hurts
+
+From batch b3's fc sweep, at 10M transitions each on b2's reward function, ranked by the statistic a
+champion hunt actually cares about — how densely an arm produces ≥98%/500 checkpoints:
+
+| network | parameters | best30 | ≥98%/500 | density | best checkpoint |
+|---|---:|---:|---:|---:|---:|
+| `fc 300,100` | 39,703 | 96.9 | **21** of 233 | **9.0%** | 99.0% |
+| `fc 200,100` | 26,603 | **97.1** | 17 of 215 | 7.9% | **99.2%** |
+| `fc 320` — the reference, and snek2's shape | 10,883 | 96.6 | 6 of 108 | 5.6% | 98.4% |
+| `fc 500` | 17,003 | 94.7 | 3 of 93 | 3.2% | 98.4% |
+| `fc 200` | 6,803 | 96.4 | 1 of 131 | 0.8% | 98.0% |
+
+**It is not simply capacity.** `fc 500` has 2.5x the parameters of `fc 200` and a *lower* best30; `fc
+200,100` has 1.6x the parameters of `fc 500` and is far better. So the two effects are separate: **more
+width past 320 hurts, and a second layer helps.** The two-layer arms also hold the two highest single
+checkpoints in the entire sweep.
+
+**Why this matters beyond PPO.** `fc 320` is not a tuned snek3 choice — it is snek2's shape, carried
+across so a champion's weights convert, and every batch in both eras has used it. This is the first
+evidence in the project that it is the wrong shape, and it was found by a knob nobody had swept.
+`dqn/net.py` takes the same `fc_layers` config, so **the same test is available to DQN for the price of
+one arm** and has never been run.
+
+The caveat is the usual one: n=1 per shape, and the best30 column spans 2.4 pp across the three best
+shapes, which this project's noise cannot resolve. The **density** column is the load-bearing one
+because it pools 100-233 independent 500-episode measurements per arm rather than resting on a single
+peak.
+
+### A config sweep read at a truncated cap did not merely mislead, it inverted
+
+Batch b3's PPO sweep ran seven configs to 3M transitions and then continued the same seven arms to
+10M. **The 3M ranking was not a noisy version of the 10M ranking — it was a different ranking.**
+
+| arm | knob off the reference | best30 @3M | best30 @10M |
+|---|---|---:|---:|
+| `b3g-ent003` | entropy coefficient 0.003 | 76.8 — **6th** | **96.9 — 1st** |
+| `b3e-lam95` | λ 0.95 | 75.7 — **7th** | **96.8 — 2nd** |
+| `b3a-lr3e4-g99` | none: the reference | **88.2 — 1st** | 96.6 — 3rd |
+| `b3j-lr5e4` | learning rate 5e-4 | 87.3 — 2nd | 96.5 — 4th |
+| `b3i-lr1e4` | learning rate 1e-4 | 70.5 — 8th | 95.0 — 5th |
+| `b3h-ent03` | entropy coefficient 0.03 | 70.2 — 9th | 90.6 |
+| `b3f-lam100` | λ 1.0 | 85.0 | 90.8, **still rising at the cap** |
+
+Two separate facts, and the second is the useful one.
+
+**The order changed.** The two arms that finished 1st and 2nd were 6th and 7th at 3M, and the arm that
+led at 3M finished 3rd. The mechanism is not mysterious — a smaller entropy bonus and a shorter GAE
+horizon both explore less early and neither plateaus lower — but it is invisible at 3M, and a sweep
+stopped there would have picked its two best configs *last*.
+
+**The spread collapsed.** Those top four span **11.4 pp at 3M and 0.4 pp at 10M** (96.9 / 96.8 / 96.6
+/ 96.5). In a domain where the same config has produced 62.5 and 18.0, four configs inside 0.4 pp at
+n=1 each is **one number, not a ranking** — so the sweep's honest output is a *set* of equivalent
+configs plus a list of losers (entropy 0.03, λ 1.0, lr 3e-3 at sd 18.4, γ 0.9975), not a winner.
+
+This generalises the b1 finding above from "a cap hides how good a config gets" to "**a cap can order
+configs wrongly**", which is worse, because a sweep's whole output is an order. The practical rule is
+in [`protocol.md`](protocol.md): rank on peak only after checking no arm was still climbing, and treat
+a sweep at a cap every arm was still rising through as having produced no ranking at all.
+
+### PPO reaches DQN's perfect-game rate on this task at a matched transition budget, ~13x cheaper
+
+Matched on transitions **and** on reward function (both on b2's `chase_safe c=0.1 gate=75`, no
+food-distance term, fc 320):
+
+| | best30 at 10M transitions | best stage-B checkpoint | ≥98%/500 | measurements |
+|---|---|---|---:|---:|
+| PPO b3, 15 configs, seed 1 | 89.7 – **97.2** | **99.2% / 500**, re-measured **97.9% / 3,000** [97.3, 98.3] | **95** | 1,862 |
+| DQN b2, 4 seeds | 93.6 – **96.9** | 99.2% / 500 | 5 | 1,135 |
+
+**The best single checkpoint is a tie at 99.2%, and PPO's got there on 5.05M transitions against b2's
+18M.** Where the two genuinely differ is the *density* of record-region checkpoints — the metric
+[`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison — where PPO is **11.6x**
+ahead: 95 checkpoints at ≥98%/500 against 5.
+
+That is not a claim that PPO is the better algorithm here, and the counter-evidence is in the same
+table: **snek2's champion still measures 98.8%/3,000 against PPO's best at 97.9%**, on 2.74M
+transitions against 5.05M. What this entry does rule out is the reading that phase 6b's gate arm
+suggested, that PPO is *behind* on this task. That arm was on snek3's unshaped defaults at 508k
+transitions, and the reward function was doing most of the work.
+
+**The cost difference is not marginal.** PPO's seven arms reached 10M transitions in **~20 minutes**
+sharing a 14-core laptop; b2's DQN arms took **~7-8 h each** for 18M on the 16-core desktop — about
+13x per transition, because PPO takes one gradient step per 256 samples per epoch against DQN's one
+per transition. The 3,000-episode re-measurement of a selected high fell **2.0 pp** from its 500-episode
+value, consistent with the 1.4 pp mean fall across snek2's four best hall-of-fame entries.
+
 ### Potential-based shaping was not policy-invariant: b1 and b2 shaped at γ=1.0 while discounting at 0.99 and 0.9975
 
 `train.py` built its collect env as `VecSnake(width, seed=...)` and never passed `shaping_discount`,
@@ -100,49 +245,63 @@ gate to 5 — cleared by the first meal — is what made the check able to fail.
 [`../CLAUDE.md`](../CLAUDE.md)'s "a fixture whose subject cannot violate it is not a fixture", found
 in a verification harness rather than in a test.
 
-### The flat one-stage protocol reproduces snek2's tiered close-out, row for row
+### Queue depth, not worker count, is stage A's bottleneck — depth 16 makes an arm train-bound
 
-**3,222 checkpoints of `b45a-lowlr8-b29b`, 100 episodes each, measured independently by both stacks.**
-snek2's number is its own `_checkpoint_evals_vec.json`; snek3's is a four-shard stage-B wave over the
-same explicit step list. A second snek3 seed was added to answer a question the first one raised.
+**23 configurations, laptop (14 cores: 10P + 4E), arms warm-started from the b44a champion so stage A
+costs what it costs at 58-87% perfect. Each config settled until its queue filled, then its true
+training cursor sampled over a 120 s window; `iostat -c` idle over the same window.**
 
-| | ==100% | ≥99% | ≥98% | ≥95% | pooled |
-|---|---:|---:|---:|---:|---:|
-| snek3, seed 0 | 187 | 752 | 1,576 | 3,052 | 97.287% |
-| snek3, seed 1 | 222 | 809 | 1,584 | 3,055 | 97.318% |
-| snek2 | 239 | 797 | 1,568 | 3,026 | 97.291% |
+| arms | workers | depth | per-arm st/s | h to 3M | box st/s | evals/s | idle | bound by |
+|---|---|---|---|---|---|---|---|---|
+| 4 | — | queue off | 91.3 | 9.12 | 365 | 0.365 | 63.0% | stage A, in-loop |
+| 4 | 2 | 8 | 172.2 | 4.84 | 689 | 0.680 | 60.2% | eval |
+| 4 | 6 | 8 | 259.4 | 3.21 | 1038 | 1.062 | 27.0% | eval |
+| 4 | 10 | 8 | 235.1 | 3.55 | 940 | 0.973 | 4.1% | eval |
+| 4 | 4 | 16 | 321.7 | 2.59 | 1287 | 1.336 | 34.8% | **train** |
+| **4** | **6** | **16** | **350.0** | **2.38** | 1400 | 1.516 | 19.7% | **train** |
+| 4 | 6 | 24 | 342.1 | 2.44 | 1368 | 1.401 | 5.0% | **train** |
+| **8** | **6** | **16** | 226.9 | 3.67 | **1815** | 1.857 | 10.2% | eval |
+| 8 | 8 | 16 | 229.2 | 3.64 | 1833 | 2.032 | 0.2% | eval |
+| 12 | 6 | 8 | 126.7 | 6.58 | 1520 | 1.578 | 14.9% | eval |
 
-**The agreement is as close as sampling allows.** Mean per-row difference −0.004 pp against a standard
-error of 0.041 pp, so **0.09 SEs**; per-row spread 2.30 pp observed against 2.30 pp predicted by
-sampling alone, a ratio of **1.00**. Nothing is left over for an implementation difference to live in.
-Seed 1 gives +0.028 pp, 0.68 SEs.
+**A queued arm does nothing but wait for stage A, and the wait is exactly predictable:**
 
-Together with the exact-conversion finding below, phase 2's gate is met and **the flat protocol can be
-trusted to replace the tiered one it was designed to delete.**
+    per-arm st/s = evals/s x EVAL_INTERVAL / arms
 
-### A count of rows above a threshold is not a stable statistic, even at a fixed depth
+within 3% across every queued config. So arm count is a pure divisor of an eval pool, and the only
+question is what sizes that pool.
 
-Found while closing the A/B, and it nearly became a false alarm. Seed 0 produced **187** rows at
-exactly 100/100 against snek2's 239 — a McNemar z of **−2.59**, p≈0.01, the only one of four
-thresholds that was not flat. The mean rate could not explain it: making the 100/100 count fall by 24%
-takes a uniform rate drop of **−0.24 pp**, which is 6 standard errors from the −0.004 pp measured.
+**It is not worker count.** Workers turn over: at 4 arms the peak is 6, and 10 workers are *slower*
+than 6 while taking the box from 27% to 4.1% idle, because they starve the trainers — measured
+unblocked rate falls 380 -> 306 st/s. Eight workers at 4 arms match six exactly.
 
-Settling it took one more 16-minute wave. **Two seeds of the same code disagree almost as much**: seed
-0 against seed 1 is z = −1.81 (187 vs 222), and seed 1 against snek2 is z = −0.82. So the −2.59 was a
-food stream, not a stack.
+**It is outstanding checkpoints — `arms x depth` — because a deeper `measure_stream` round packs lanes
+better.** The same 4 workers deliver 0.513 evals/s at 2 arms and 1.071 at 8, a 2.09x spread from queue
+population alone. Which is why depth is the lever: at 4 arms it is the *only* way to raise the
+population without adding arms.
 
-Two rules follow, and the second is the one that matters.
+**Depth 16 is a phase change, not a trend.** Every one of the 19 depth-8 configs — 2 to 12 arms, 2 to
+10 workers — sat pinned against its cap with the trainer idle. At depth 16 the queue drains to 11-13
+and the arm runs at **94% of its unblocked rate**: the workers are finally ahead. Depth 24 regresses
+(2.44 h) because there is nothing left to win. Depth 12 captures only 63% of the gain and is still
+eval-bound.
 
-- **Never conclude from a tail count what the mean contradicts.** `P(100/100) = q¹⁰⁰`, so
-  `d ln P / d q = 100/q`: the count amplifies a rate difference ~100x, which makes it a *sensitive*
-  statistic and an *unstable* one at the same time. When the two disagree, the mean is the one with
-  the smaller variance.
-- **The same hazard applies to the widest ≥98% run**, which `tools/stage_b_chart.py` reports and
-  [`protocol.md`](protocol.md) asks a comparison to lead with. It is a run-length statistic over
-  threshold crossings, so it is depth-sensitive exactly as [`invariants.md`](invariants.md) invariant
-  8 describes. On `b45a` at 100 episodes the widest run is **9**, which says nothing about the arm; at
-  the 500 episodes stage B actually runs, the per-row sd is 0.7 pp instead of 1.6 and the number
-  begins to mean something. **Do not compare a region width across two different episode counts.**
+**Idle CPU is not the objective, and targeting it selects badly.** The fastest config runs at 19.7%
+idle; the two configs driven to ~0-4% idle (4a/10w, 8a/8w/d16) are slower or flat while their trainers
+lose 20-25% of their unblocked rate. Depth is the opposite trade — 4a/4w goes 3.94 h -> 2.59 h *and*
+47% -> 34.8% idle, because it makes the existing work cheaper rather than buying more of it.
+
+**Recommended invocations** (both are env knobs; no default changed):
+
+| goal | config | result |
+|---|---|---|
+| one arm to 3M fastest | `SNEK_EVAL_QUEUE=1 SNEK_EVAL_QUEUE_DEPTH=16 SNEK_EVAL_WORKERS=6`, 4 arms | 2.38 h/arm, **3.83x** |
+| most arms per day | same, 8 arms | 8 arms in 3.67 h, **4.97x** box throughput |
+
+**The cost is schedule lag, and it is the whole cost.** Depth is how many eval intervals the epsilon and
+guided schedules read behind; 16 doubles the 8 chosen for that reason. 16,000 counted steps is 0.5% of a
+3M arm but proportionally much more over the first tens of thousands of steps, where those schedules
+move fastest. Nothing here measures whether that harms learning — only what it buys in wall time.
 
 ### A snek3 step is four game moves and a snek2 step was one, so "3M steps" is not one budget
 
@@ -241,324 +400,6 @@ case), and `screen:92` on 25 episodes recovers **98.1%** of what `screen:95` on 
 admitting 1.03x as many. So the 100 is not load-bearing for the schedule. It is load-bearing for
 nothing else either — but it is also not where the time goes.
 
-### Stage A costs 5.3 h an arm, not 1.85 h, and the cause is lane drain rather than episode count
-
-**Measured, same arm, same 322,200 episodes, three ways.** Stage A's shape — one checkpoint, 100
-episodes, one process — runs at **16.9 episodes/s**. The identical work streamed through
-`engine.measure_stream`, which refills lanes from the *next* checkpoint, runs at **96 episodes/s per
-shard**.
-
-| how the same 3,222 x 100 episodes are measured | wall clock |
-|---|---:|
-| one checkpoint at a time, one process — **this is stage A** | **5.30 h** |
-| streamed, one process | 0.93 h |
-| streamed, 4 shards — this is a stage-B wave | 0.23 h |
-
-**A 5.7x tax, and it is structural.** A single checkpoint's measurement has nothing to refill lanes
-with: 100 episodes start together and the batch drains toward width 1 as they finish, so the last few
-episodes carry the full per-step numpy cost alone. `engine.measure` says so in a comment and is
-correct to — the drain is inherent to measuring one checkpoint, not a defect.
-
-**‡ The 5.3 h is confirmed and the "90% of wall clock" is not.** Measured on b2a from a single
-source, 2026-08-29: 533,000 counted steps in 5,192 s wall = 102.7 st/s, against the log's own
-training-only 299 st/s. That is 5.44 ms of stage A against 3.34 ms of training per step, so a 3M-step
-arm is **8.1 h — stage A 5.33 h (66%), training 2.79 h (34%)**. The 5.33 h independently reproduces
-the 5.30 h above; only the share was wrong, and it was wrong because the training half had never been
-measured on the same arm at the same time.
-
-**One trap in reading that.** The desktop's `status.json` `steps_per_sec` is a **wall-clock** rate — it
-is a step delta over a real-time delta, so it includes stage A — while `runs/<arm>_evals.json`'s
-`steps_per_second` excludes it. The two differ by 3x on a healthy arm and neither is labelled.
-
-**This corrects the plan and this file's own arithmetic.** [`../plans/pytorch-port.md`](../plans/pytorch-port.md)
-§6 estimated stage A at 1.85 h from snek2's ~45 episodes/s and concluded "an arm is ~2 h and stage A
-is ~90% of it". The 90% share was right and the total was not: stage A alone is ~5.3 h.
-
-**What follows is a design change, and the mechanism is not the one the backlog assumed.** The
-backlog's "asynchronous self-eval" is filed as an 8x from overlapping eval with training. The
-measurement says most of the win is from **keeping the lanes full**, which does not require asynchrony
-at all: holding K pending checkpoints and measuring them in one `measure_stream` call with
-`max_live=K` recovers ~5.7x on its own. Asynchrony then removes what remains. Either way the cost is
-the same and it is a real one — the epsilon refinement schedule reads `perfect_percent`
-([`invariants.md`](invariants.md) invariant 2), so its feedback would lag by up to K intervals. That
-is a change to the training, and it should be pre-registered rather than slipped in as a speed-up.
-
-### The training loop's throughput ceiling is 1,600 steps/s, and two of the plan's claims about it were wrong
-
-**Measured 2026-08-28 on the laptop, self-eval off, `fc_layer_params=(320,)`, batch 128, one torch
-thread.** Agent steps/s:
-
-| lanes (`SNEK_COLLECT_ENVS`) | ratio 1.0 | ratio 0.5 | ratio 0.25 |
-|---:|---:|---:|---:|
-| 1 | **809** | | |
-| 16 | **1,512** | | |
-| 64 | **1,587** | 2,280 | 3,703 |
-
-**‡ The table's unit is transitions/s, not counted steps/s.** At 64 lanes a counted step banks 64
-transitions, so 1,587 counted steps/s would be 101k gradient steps/s — 50x the measured ceiling. Read
-every row as transitions/s, and see "Raising `SNEK_COLLECT_ENVS`..." above for why the same numbers say
-the opposite about an arm's wall clock.
-
-**Retraction 1: raising `SNEK_COLLECT_ENVS` does not "buy nothing".** It buys 1.9x. The plan reasoned
-that the gradient work scales with the lane count so nothing is gained — true of the gradient half,
-but the *env* half does not scale: `VecSnake.step` costs **536 us at one lane and 950 us at 64**,
-because almost all of it is per-call numpy overhead rather than per-lane work. At one lane the env is
-0.5 ms of every agent step; at 64 lanes it is 0.015 ms. The curve flattens at ~1,600 because the
-gradient half then dominates, which is the half the plan's reasoning applied to.
-
-**Retraction 2: the ratio-1.0 ceiling is ~1,250/s, not ~4,000/s.** A whole learn step is **802 us**,
-against the 245 us an isolated `agent.update` benchmark predicted — `agent.update` 514 us,
-`buffer.update_priorities` 147 us, `buffer.sample` 71 us. At ratio 1.0 one agent step *is* one learn
-step, so the isolated gradient benchmark was measuring a third of the real cost.
-
-**Two optimisations that do not work here, recorded so they are not retried.** `torch.compile` is
-*slower* — 1,643/s against 2,001/s eager, because a 30 -> 320 -> 3 net has no kernel worth fusing and
-the guard overhead dominates. So is more than one torch thread: **950 gradient steps/s at 10 threads
-against 1,314 at one**, every op being far too small to amortise a fork-join. Hence
-`SNEK_TORCH_THREADS=1` as the default, which matters more on the laptop where four arms run at once.
-
-**And the conclusion that actually matters: none of this moves an arm's wall clock much.** Stage A is
-5.0 h of a 3M-step arm; training is 62 min at 809 steps/s and 32 min at 1,587. So a 2x throughput win
-takes an arm from ~6.0 h to ~5.5 h — **8%**. Training throughput is worth having because it makes
-smoke tests and short experiments fast, not because it shortens an arm. The hours are in the eval.
-
-### Deduplicating a sum tree's parents costs more than it saves
-
-**0.167 ms per batch-128 priority update with `np.unique` per level, 0.067 ms without — 2.5x, and it
-was 18% of a whole gradient step.** A batch of 128 leaves shares ancestors near the root, so
-deduplicating each level looks like the obvious saving. It is not: every duplicate entry reads the
-same two children and computes the same sum, so the repeated scatter writes are **idempotent** and
-uniqueness buys only a shorter array — while costing 17 `np.unique` sorts. The arrays are small enough
-that the sorts dominate.
-
-`tests/test_replay.py` pins the repair against a one-leaf-at-a-time walk to the root, because this is
-the rare case where a mutation test cannot help: deduplicating is *equivalent*, so no assertion can
-distinguish it, and the mutation correctly survives.
-
-### The port is faithful at the level of the policy, not just of the win rate
-
-**A snek2 checkpoint converted to torch computes the same function, to float32.** Over 12,864 states
-drawn from a seeded random rollout, the TF and torch networks' Q-values differ by at most **2.7e-5**
-on values of magnitude ~30.6 — a relative error of ~1e-6, which is accumulation order — and the
-**argmax is identical on all 12,864**. Measured 2026-08-28 on
-`b44a-lowlr7-b29b-ckpt2739000`.
-
-This matters more than the 98.8%/3,000 that followed it. A win rate is a noisy end-to-end number: at
-n=3,000 and ~99% perfect it can only bound a systematic difference to a few tenths of a point, so
-agreeing with snek2 there is consistent with a real divergence somewhere. Agreeing on every argmax
-is not — it means the observation vector, the network and the weight layout are all right, and
-therefore that **any future disagreement is in the environment or the RNG, not in the port.**
-
-Kept as a finding rather than a test because it needs both conda envs at once: TensorFlow lives in
-`snek` and torch in `snek3`, so nothing in `tests/` can assert it. What `tests/test_net.py` does
-assert is the transpose itself, against an independent numpy forward pass.
-
-### A test can pin the wrong contract, and 53 green fixtures did
-
-The desktop daemon built its stage-B command as `evaluate.py <arg…> <policy> <policy> <policy>
---selector screen:95 --episodes 500 --shards 16`. `evaluate.py`'s real signature is
-`evaluate.py <policy> [selector]` — **one** policy, and the selector **positional**. Every wave the
-box could ever dispatch was going to exit 2 with `unrecognized arguments`, and the first one did.
-
-`tests/test_desktop_runner.py` had four fixtures over `build_command`, all green. They asserted the
-argv I believed in. Nothing compared it to the parser that has to accept it, so the suite pinned my
-assumption and the mutation run confirmed the fixtures were sensitive to *changing* the assumption.
-This is the sibling of "a fixture whose subject cannot violate it": here the subject could violate
-it, but the fixture was pointed at the wrong subject.
-
-**The check that would have caught it is one line** — hand the built argv to the real parser and
-assert it parses:
-
-    argv, *_ = launch.build_command(job, HOST, runtime())
-    evaluate.build_parser().parse_args(argv[3:])      # raises SystemExit if the daemon is wrong
-
-The daemon cannot import `evaluate` at runtime — it runs on base python before the conda env exists —
-but a **test** runs in the env and can. The constraint that made the duplication necessary does not
-extend to the fixture that guards it.
-
-What kept this from costing the batch is the `attention` list, which is in the daemon for the snek2
-incident where a failed eval was never retried and never surfaced: `** b1-stageb failed and will NOT
-be retried automatically (rc=2)`. Built for one incident, caught a different one.
-
-### Every arm of batch b1 was still improving at its step cap
-
-All four seeds of the DDQN baseline ran 3M steps and **none plateaued** — b1a's trailing perfect rate
-went ~20% at 500k to ~40% at 3M, b1d's 0% to ~80%, monotonically, with b1d's best band in its final
-500k. So 3M steps measures how fast this config climbs, not what it converges to, and no verdict
-about the learning code can be read off it.
-
-Two things follow. A step cap is a *measurement choice* and has to be justified against the curve it
-truncates; snek2's records came from 2.00M-step arms **with chase-safe shaping**, which is what made
-that cap enough there. And the seed spread — 42.1% to 81.9% peak, **39.8 pp** — is far wider than the
-~10 pp this project already says n=4 cannot resolve, so at this horizon the four arms cannot rank two
-configs at all.
-
-### A config sweep read at a truncated cap did not merely mislead, it inverted
-
-Batch p0's PPO sweep ran seven configs to 3M transitions and then continued the same seven arms to
-10M. **The 3M ranking was not a noisy version of the 10M ranking — it was a different ranking.**
-
-| arm | knob off the reference | best30 @3M | best30 @10M |
-|---|---|---:|---:|
-| `p0g-ent003` | entropy coefficient 0.003 | 76.8 — **6th** | **96.9 — 1st** |
-| `p0e-lam95` | λ 0.95 | 75.7 — **7th** | **96.8 — 2nd** |
-| `p0a-lr3e4-g99` | none: the reference | **88.2 — 1st** | 96.6 — 3rd |
-| `p0j-lr5e4` | learning rate 5e-4 | 87.3 — 2nd | 96.5 — 4th |
-| `p0i-lr1e4` | learning rate 1e-4 | 70.5 — 8th | 95.0 — 5th |
-| `p0h-ent03` | entropy coefficient 0.03 | 70.2 — 9th | 90.6 |
-| `p0f-lam100` | λ 1.0 | 85.0 | 90.8, **still rising at the cap** |
-
-Two separate facts, and the second is the useful one.
-
-**The order changed.** The two arms that finished 1st and 2nd were 6th and 7th at 3M, and the arm that
-led at 3M finished 3rd. The mechanism is not mysterious — a smaller entropy bonus and a shorter GAE
-horizon both explore less early and neither plateaus lower — but it is invisible at 3M, and a sweep
-stopped there would have picked its two best configs *last*.
-
-**The spread collapsed.** Those top four span **11.4 pp at 3M and 0.4 pp at 10M** (96.9 / 96.8 / 96.6
-/ 96.5). In a domain where the same config has produced 62.5 and 18.0, four configs inside 0.4 pp at
-n=1 each is **one number, not a ranking** — so the sweep's honest output is a *set* of equivalent
-configs plus a list of losers (entropy 0.03, λ 1.0, lr 3e-3 at sd 18.4, γ 0.9975), not a winner.
-
-This generalises the b1 finding above from "a cap hides how good a config gets" to "**a cap can order
-configs wrongly**", which is worse, because a sweep's whole output is an order. The practical rule is
-in [`protocol.md`](protocol.md): rank on peak only after checking no arm was still climbing, and treat
-a sweep at a cap every arm was still rising through as having produced no ranking at all.
-
-### PPO reaches DQN's perfect-game rate on this task at a matched transition budget, ~13x cheaper
-
-Matched on transitions **and** on reward function (both on b2's `chase_safe c=0.1 gate=75`, no
-food-distance term, fc 320):
-
-| | best30 at 10M transitions | best stage-B checkpoint | ≥98%/500 | measurements |
-|---|---|---|---:|---:|
-| PPO p0, 15 configs, seed 1 | 89.7 – **97.2** | **99.2% / 500**, re-measured **97.9% / 3,000** [97.3, 98.3] | **95** | 1,862 |
-| DQN b2, 4 seeds | 93.6 – **96.9** | 99.2% / 500 | 5 | 1,135 |
-
-**The best single checkpoint is a tie at 99.2%, and PPO's got there on 5.05M transitions against b2's
-18M.** Where the two genuinely differ is the *density* of record-region checkpoints — the metric
-[`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison — where PPO is **11.6x**
-ahead: 95 checkpoints at ≥98%/500 against 5.
-
-That is not a claim that PPO is the better algorithm here, and the counter-evidence is in the same
-table: **snek2's champion still measures 98.8%/3,000 against PPO's best at 97.9%**, on 2.74M
-transitions against 5.05M. What this entry does rule out is the reading that phase 6b's gate arm
-suggested, that PPO is *behind* on this task. That arm was on snek3's unshaped defaults at 508k
-transitions, and the reward function was doing most of the work.
-
-**The cost difference is not marginal.** PPO's seven arms reached 10M transitions in **~20 minutes**
-sharing a 14-core laptop; b2's DQN arms took **~7-8 h each** for 18M on the 16-core desktop — about
-13x per transition, because PPO takes one gradient step per 256 samples per epoch against DQN's one
-per transition. The 3,000-episode re-measurement of a selected high fell **2.0 pp** from its 500-episode
-value, consistent with the 1.4 pp mean fall across snek2's four best hall-of-fame entries.
-
-### Six eval workers is the wrong number for eight PPO trainers, and for PPO the bound is free to raise
-
-Measured 2026-08-30 with batches p2 (8 arms, desktop) and p3 (8 arms, laptop) both at ~25M
-transitions and best30 ~97%:
-
-| | eval workers | trainers | cores | box idle |
-|---|---|---|---|---|
-| desktop, 16 cores | **598 of 600%** — pinned | 492 of 800% | 16 | ~1/3 |
-| laptop, 14 cores | **576 of 600%** — pinned | 371 of 800% | 14 | ~1/3 |
-
-**Stage A is the binding constraint and the workers are saturated while the trainers idle at half
-capacity.** That stage A dominates is already established above; what is new is that the *worker count*
-is now the limit rather than lane drain. [`running.md`](running.md)'s 6-worker optimum was measured at
-**four DQN trainers**, and PPO trains ~14x faster per transition, so eight PPO arms demand far more
-eval throughput per unit time than that sweep ever saw. Per-arm rates at the time: 9,262 transitions/s
-on the desktop, 7,850 on the laptop.
-
-**And the reason the queue bound exists does not apply to PPO.** Queue depth is bounded because a
-lagging row delays DQN's epsilon *refinement* schedule, which reads `perfect_percent` back out of eval
-rows ([`invariants.md`](invariants.md) invariant 2). PPO's only schedule is the entropy coefficient and
-it is a pure function of the step, so **queue lag cannot change a PPO arm's trajectory, only its
-speed.** The second objection also does not apply: a queued worker's eval seed already mixes clock, pid
-and round number rather than deriving from the arm's seed — `eval_queue.py` states this as the queue's
-accepted cost — so extra workers introduce no new class of variation.
-
-**Measured 2026-08-30: eight workers beat six by ~12%, and eight is the ceiling on a 16-core box.**
-Two extra workers were attached to the *running* desktop batch at slots 6 and 7 — no restart needed,
-because trainers only manage slots `0..target-1` and work is claimed by rename, so
-`python -m tools.eval_worker --slot 6` joins the same queue untracked.
-
-| desktop p2, 8 arms | workers | per-arm rate | window |
-|---|---:|---:|---|
-| baseline | 6 | 8,262 transitions/s | 35 min |
-| after | **8** | **8,556 transitions/s** | 30 min |
-
-**Raw that is only +3.6%, and the honest number is +12%.** The laptop's p3 batch stayed at six workers
-and served as a control: over the same hour its rate decayed **7,850 → 7,250/s (−7.6%)** as its policies
-matured and episodes lengthened. So a six-worker desktop would have been at ~7,630/s, and holding
-8,556/s means the extra pair bought back the decay and more. **A before/after on a maturing arm
-understates a speed change by roughly the decay rate** — which is why the control matters more than the
-window length here.
-
-**Ten workers is past the edge, and this is where `running.md`'s DQN sweep does transfer.** At eight
-workers plus eight trainers the box reads **load 14.1 of 16, 91.4% user, 8.3% idle** — and that sweep's
-finding was that past the optimum the box "reaches 4% idle to run *slower*", because the fastest
-configuration leaves ~20% free. The PPO-specific argument (its trainers are the idle half) bought one
-pair, not two. **Eight is the number for eight PPO trainers on 16 cores**; the laptop's 14 cores
-should take fewer.
-
-**‡ `ps -o %cpu` is the wrong instrument for this and cost a wrong reading.** On Linux it is CPU time
-over the process's *whole lifetime*, so the trainers — two hours old — reported 492% → 503% across the
-change and looked unaffected while the throughput moved 12%. Use `/proc/loadavg` or `top -bn1` for
-anything instantaneous.
-
-### Two hidden layers beat every single-layer width, and width past 320 actively hurts
-
-From batch p0's fc sweep, at 10M transitions each on b2's reward function, ranked by the statistic a
-champion hunt actually cares about — how densely an arm produces ≥98%/500 checkpoints:
-
-| network | parameters | best30 | ≥98%/500 | density | best checkpoint |
-|---|---:|---:|---:|---:|---:|
-| `fc 300,100` | 39,703 | 96.9 | **21** of 233 | **9.0%** | 99.0% |
-| `fc 200,100` | 26,603 | **97.1** | 17 of 215 | 7.9% | **99.2%** |
-| `fc 320` — the reference, and snek2's shape | 10,883 | 96.6 | 6 of 108 | 5.6% | 98.4% |
-| `fc 500` | 17,003 | 94.7 | 3 of 93 | 3.2% | 98.4% |
-| `fc 200` | 6,803 | 96.4 | 1 of 131 | 0.8% | 98.0% |
-
-**It is not simply capacity.** `fc 500` has 2.5x the parameters of `fc 200` and a *lower* best30; `fc
-200,100` has 1.6x the parameters of `fc 500` and is far better. So the two effects are separate: **more
-width past 320 hurts, and a second layer helps.** The two-layer arms also hold the two highest single
-checkpoints in the entire sweep.
-
-**Why this matters beyond PPO.** `fc 320` is not a tuned snek3 choice — it is snek2's shape, carried
-across so a champion's weights convert, and every batch in both eras has used it. This is the first
-evidence in the project that it is the wrong shape, and it was found by a knob nobody had swept.
-`dqn/net.py` takes the same `fc_layers` config, so **the same test is available to DQN for the price of
-one arm** and has never been run.
-
-The caveat is the usual one: n=1 per shape, and the best30 column spans 2.4 pp across the three best
-shapes, which this project's noise cannot resolve. The **density** column is the load-bearing one
-because it pools 100-233 independent 500-episode measurements per arm rather than resting on a single
-peak.
-
-### The documented way to confirm an arm's config was blind to the shaping knobs
-
-`grep 'hyperparameter override:'` is what both instruction files name as the check that an arm got
-its config, and it reports only what `train.py` reads through `tuned()`. The reward and shaping knobs
-are read by `env/constants.py` **at import** — before the trainer's config object exists — so they
-print nothing. The blind set is precisely `CHASE_SAFE_SHAPING`, `CHASE_SAFE_GATE`, `FREE_SPACE_*`,
-`FOOD_DISTANCE_REWARD`, `PERFECT_GAME_REWARD` and `ZERO_OBS`: the settings a shaping batch exists to
-test.
-
-Found while launching b2, whose whole purpose is `c=0.10` at gate 75. Its four logs listed seven
-overrides and **not one of the three shaping values**, so the only way to confirm the batch was
-running the config it was queued with was `sudo tr '\0' '\n' < /proc/<pid>/environ` on the box.
-
-`train.py` now prints `vectorized/config.describe()` at startup, which already existed for eval
-report headers and names every one of them:
-
-    reward config: grid 10x10, max score 95, food 1.0, death -5.0, starve -0.5, perfect 100.0,
-                   dist 0.0, chase_safe c=0.1 gate=75, free_space c=0.0 gate=85
-
-The fixture is parametrised over the knobs `env/constants.py` reads and asserts each one **changes
-the line**, rather than that its name appears in it — `describe()` prints `dist`, `perfect` and
-`gate=`, so a name match would have failed while the code was right, which is this project's
-own fixture trap.
-
 ### The thing that knows what is running should own the window, and a pid is what makes that cheap
 
 snek3's chart window was built twice, and the second version is a fifth of the size because of one
@@ -636,63 +477,225 @@ a run. That is what makes it safe to kill and relaunch one while four arms are t
 snek2 could not offer, having lost all four arms of a batch to one XIO error in the trainer's own
 canvas.
 
-### Queue depth, not worker count, is stage A's bottleneck — depth 16 makes an arm train-bound
+### The documented way to confirm an arm's config was blind to the shaping knobs
 
-**23 configurations, laptop (14 cores: 10P + 4E), arms warm-started from the b44a champion so stage A
-costs what it costs at 58-87% perfect. Each config settled until its queue filled, then its true
-training cursor sampled over a 120 s window; `iostat -c` idle over the same window.**
+`grep 'hyperparameter override:'` is what both instruction files name as the check that an arm got
+its config, and it reports only what `train.py` reads through `tuned()`. The reward and shaping knobs
+are read by `env/constants.py` **at import** — before the trainer's config object exists — so they
+print nothing. The blind set is precisely `CHASE_SAFE_SHAPING`, `CHASE_SAFE_GATE`, `FREE_SPACE_*`,
+`FOOD_DISTANCE_REWARD`, `PERFECT_GAME_REWARD` and `ZERO_OBS`: the settings a shaping batch exists to
+test.
 
-| arms | workers | depth | per-arm st/s | h to 3M | box st/s | evals/s | idle | bound by |
-|---|---|---|---|---|---|---|---|---|
-| 4 | — | queue off | 91.3 | 9.12 | 365 | 0.365 | 63.0% | stage A, in-loop |
-| 4 | 2 | 8 | 172.2 | 4.84 | 689 | 0.680 | 60.2% | eval |
-| 4 | 6 | 8 | 259.4 | 3.21 | 1038 | 1.062 | 27.0% | eval |
-| 4 | 10 | 8 | 235.1 | 3.55 | 940 | 0.973 | 4.1% | eval |
-| 4 | 4 | 16 | 321.7 | 2.59 | 1287 | 1.336 | 34.8% | **train** |
-| **4** | **6** | **16** | **350.0** | **2.38** | 1400 | 1.516 | 19.7% | **train** |
-| 4 | 6 | 24 | 342.1 | 2.44 | 1368 | 1.401 | 5.0% | **train** |
-| **8** | **6** | **16** | 226.9 | 3.67 | **1815** | 1.857 | 10.2% | eval |
-| 8 | 8 | 16 | 229.2 | 3.64 | 1833 | 2.032 | 0.2% | eval |
-| 12 | 6 | 8 | 126.7 | 6.58 | 1520 | 1.578 | 14.9% | eval |
+Found while launching b2, whose whole purpose is `c=0.10` at gate 75. Its four logs listed seven
+overrides and **not one of the three shaping values**, so the only way to confirm the batch was
+running the config it was queued with was `sudo tr '\0' '\n' < /proc/<pid>/environ` on the box.
 
-**A queued arm does nothing but wait for stage A, and the wait is exactly predictable:**
+`train.py` now prints `vectorized/config.describe()` at startup, which already existed for eval
+report headers and names every one of them:
 
-    per-arm st/s = evals/s x EVAL_INTERVAL / arms
+    reward config: grid 10x10, max score 95, food 1.0, death -5.0, starve -0.5, perfect 100.0,
+                   dist 0.0, chase_safe c=0.1 gate=75, free_space c=0.0 gate=85
 
-within 3% across every queued config. So arm count is a pure divisor of an eval pool, and the only
-question is what sizes that pool.
+The fixture is parametrised over the knobs `env/constants.py` reads and asserts each one **changes
+the line**, rather than that its name appears in it — `describe()` prints `dist`, `perfect` and
+`gate=`, so a name match would have failed while the code was right, which is this project's
+own fixture trap.
 
-**It is not worker count.** Workers turn over: at 4 arms the peak is 6, and 10 workers are *slower*
-than 6 while taking the box from 27% to 4.1% idle, because they starve the trainers — measured
-unblocked rate falls 380 -> 306 st/s. Eight workers at 4 arms match six exactly.
+### A test can pin the wrong contract, and 53 green fixtures did
 
-**It is outstanding checkpoints — `arms x depth` — because a deeper `measure_stream` round packs lanes
-better.** The same 4 workers deliver 0.513 evals/s at 2 arms and 1.071 at 8, a 2.09x spread from queue
-population alone. Which is why depth is the lever: at 4 arms it is the *only* way to raise the
-population without adding arms.
+The desktop daemon built its stage-B command as `evaluate.py <arg…> <policy> <policy> <policy>
+--selector screen:95 --episodes 500 --shards 16`. `evaluate.py`'s real signature is
+`evaluate.py <policy> [selector]` — **one** policy, and the selector **positional**. Every wave the
+box could ever dispatch was going to exit 2 with `unrecognized arguments`, and the first one did.
 
-**Depth 16 is a phase change, not a trend.** Every one of the 19 depth-8 configs — 2 to 12 arms, 2 to
-10 workers — sat pinned against its cap with the trainer idle. At depth 16 the queue drains to 11-13
-and the arm runs at **94% of its unblocked rate**: the workers are finally ahead. Depth 24 regresses
-(2.44 h) because there is nothing left to win. Depth 12 captures only 63% of the gain and is still
-eval-bound.
+`tests/test_desktop_runner.py` had four fixtures over `build_command`, all green. They asserted the
+argv I believed in. Nothing compared it to the parser that has to accept it, so the suite pinned my
+assumption and the mutation run confirmed the fixtures were sensitive to *changing* the assumption.
+This is the sibling of "a fixture whose subject cannot violate it": here the subject could violate
+it, but the fixture was pointed at the wrong subject.
 
-**Idle CPU is not the objective, and targeting it selects badly.** The fastest config runs at 19.7%
-idle; the two configs driven to ~0-4% idle (4a/10w, 8a/8w/d16) are slower or flat while their trainers
-lose 20-25% of their unblocked rate. Depth is the opposite trade — 4a/4w goes 3.94 h -> 2.59 h *and*
-47% -> 34.8% idle, because it makes the existing work cheaper rather than buying more of it.
+**The check that would have caught it is one line** — hand the built argv to the real parser and
+assert it parses:
 
-**Recommended invocations** (both are env knobs; no default changed):
+    argv, *_ = launch.build_command(job, HOST, runtime())
+    evaluate.build_parser().parse_args(argv[3:])      # raises SystemExit if the daemon is wrong
 
-| goal | config | result |
-|---|---|---|
-| one arm to 3M fastest | `SNEK_EVAL_QUEUE=1 SNEK_EVAL_QUEUE_DEPTH=16 SNEK_EVAL_WORKERS=6`, 4 arms | 2.38 h/arm, **3.83x** |
-| most arms per day | same, 8 arms | 8 arms in 3.67 h, **4.97x** box throughput |
+The daemon cannot import `evaluate` at runtime — it runs on base python before the conda env exists —
+but a **test** runs in the env and can. The constraint that made the duplication necessary does not
+extend to the fixture that guards it.
 
-**The cost is schedule lag, and it is the whole cost.** Depth is how many eval intervals the epsilon and
-guided schedules read behind; 16 doubles the 8 chosen for that reason. 16,000 counted steps is 0.5% of a
-3M arm but proportionally much more over the first tens of thousands of steps, where those schedules
-move fastest. Nothing here measures whether that harms learning — only what it buys in wall time.
+What kept this from costing the batch is the `attention` list, which is in the daemon for the snek2
+incident where a failed eval was never retried and never surfaced: `** b1-stageb failed and will NOT
+be retried automatically (rc=2)`. Built for one incident, caught a different one.
+
+### Every arm of batch b1 was still improving at its step cap
+
+All four seeds of the DDQN baseline ran 3M steps and **none plateaued** — b1a's trailing perfect rate
+went ~20% at 500k to ~40% at 3M, b1d's 0% to ~80%, monotonically, with b1d's best band in its final
+500k. So 3M steps measures how fast this config climbs, not what it converges to, and no verdict
+about the learning code can be read off it.
+
+Two things follow. A step cap is a *measurement choice* and has to be justified against the curve it
+truncates; snek2's records came from 2.00M-step arms **with chase-safe shaping**, which is what made
+that cap enough there. And the seed spread — 42.1% to 81.9% peak, **39.8 pp** — is far wider than the
+~10 pp this project already says n=4 cannot resolve, so at this horizon the four arms cannot rank two
+configs at all.
+
+### The training loop's throughput ceiling is 1,600 steps/s, and two of the plan's claims about it were wrong
+
+**Measured 2026-08-28 on the laptop, self-eval off, `fc_layer_params=(320,)`, batch 128, one torch
+thread.** Agent steps/s:
+
+| lanes (`SNEK_COLLECT_ENVS`) | ratio 1.0 | ratio 0.5 | ratio 0.25 |
+|---:|---:|---:|---:|
+| 1 | **809** | | |
+| 16 | **1,512** | | |
+| 64 | **1,587** | 2,280 | 3,703 |
+
+**‡ The table's unit is transitions/s, not counted steps/s.** At 64 lanes a counted step banks 64
+transitions, so 1,587 counted steps/s would be 101k gradient steps/s — 50x the measured ceiling. Read
+every row as transitions/s, and see "Raising `SNEK_COLLECT_ENVS`..." above for why the same numbers say
+the opposite about an arm's wall clock.
+
+**Retraction 1: raising `SNEK_COLLECT_ENVS` does not "buy nothing".** It buys 1.9x. The plan reasoned
+that the gradient work scales with the lane count so nothing is gained — true of the gradient half,
+but the *env* half does not scale: `VecSnake.step` costs **536 us at one lane and 950 us at 64**,
+because almost all of it is per-call numpy overhead rather than per-lane work. At one lane the env is
+0.5 ms of every agent step; at 64 lanes it is 0.015 ms. The curve flattens at ~1,600 because the
+gradient half then dominates, which is the half the plan's reasoning applied to.
+
+**Retraction 2: the ratio-1.0 ceiling is ~1,250/s, not ~4,000/s.** A whole learn step is **802 us**,
+against the 245 us an isolated `agent.update` benchmark predicted — `agent.update` 514 us,
+`buffer.update_priorities` 147 us, `buffer.sample` 71 us. At ratio 1.0 one agent step *is* one learn
+step, so the isolated gradient benchmark was measuring a third of the real cost.
+
+**Two optimisations that do not work here, recorded so they are not retried.** `torch.compile` is
+*slower* — 1,643/s against 2,001/s eager, because a 30 -> 320 -> 3 net has no kernel worth fusing and
+the guard overhead dominates. So is more than one torch thread: **950 gradient steps/s at 10 threads
+against 1,314 at one**, every op being far too small to amortise a fork-join. Hence
+`SNEK_TORCH_THREADS=1` as the default, which matters more on the laptop where four arms run at once.
+
+**And the conclusion that actually matters: none of this moves an arm's wall clock much.** Stage A is
+5.0 h of a 3M-step arm; training is 62 min at 809 steps/s and 32 min at 1,587. So a 2x throughput win
+takes an arm from ~6.0 h to ~5.5 h — **8%**. Training throughput is worth having because it makes
+smoke tests and short experiments fast, not because it shortens an arm. The hours are in the eval.
+
+### Deduplicating a sum tree's parents costs more than it saves
+
+**0.167 ms per batch-128 priority update with `np.unique` per level, 0.067 ms without — 2.5x, and it
+was 18% of a whole gradient step.** A batch of 128 leaves shares ancestors near the root, so
+deduplicating each level looks like the obvious saving. It is not: every duplicate entry reads the
+same two children and computes the same sum, so the repeated scatter writes are **idempotent** and
+uniqueness buys only a shorter array — while costing 17 `np.unique` sorts. The arrays are small enough
+that the sorts dominate.
+
+`tests/test_replay.py` pins the repair against a one-leaf-at-a-time walk to the root, because this is
+the rare case where a mutation test cannot help: deduplicating is *equivalent*, so no assertion can
+distinguish it, and the mutation correctly survives.
+
+### The flat one-stage protocol reproduces snek2's tiered close-out, row for row
+
+**3,222 checkpoints of `b45a-lowlr8-b29b`, 100 episodes each, measured independently by both stacks.**
+snek2's number is its own `_checkpoint_evals_vec.json`; snek3's is a four-shard stage-B wave over the
+same explicit step list. A second snek3 seed was added to answer a question the first one raised.
+
+| | ==100% | ≥99% | ≥98% | ≥95% | pooled |
+|---|---:|---:|---:|---:|---:|
+| snek3, seed 0 | 187 | 752 | 1,576 | 3,052 | 97.287% |
+| snek3, seed 1 | 222 | 809 | 1,584 | 3,055 | 97.318% |
+| snek2 | 239 | 797 | 1,568 | 3,026 | 97.291% |
+
+**The agreement is as close as sampling allows.** Mean per-row difference −0.004 pp against a standard
+error of 0.041 pp, so **0.09 SEs**; per-row spread 2.30 pp observed against 2.30 pp predicted by
+sampling alone, a ratio of **1.00**. Nothing is left over for an implementation difference to live in.
+Seed 1 gives +0.028 pp, 0.68 SEs.
+
+Together with the exact-conversion finding below, phase 2's gate is met and **the flat protocol can be
+trusted to replace the tiered one it was designed to delete.**
+
+### A count of rows above a threshold is not a stable statistic, even at a fixed depth
+
+Found while closing the A/B, and it nearly became a false alarm. Seed 0 produced **187** rows at
+exactly 100/100 against snek2's 239 — a McNemar z of **−2.59**, p≈0.01, the only one of four
+thresholds that was not flat. The mean rate could not explain it: making the 100/100 count fall by 24%
+takes a uniform rate drop of **−0.24 pp**, which is 6 standard errors from the −0.004 pp measured.
+
+Settling it took one more 16-minute wave. **Two seeds of the same code disagree almost as much**: seed
+0 against seed 1 is z = −1.81 (187 vs 222), and seed 1 against snek2 is z = −0.82. So the −2.59 was a
+food stream, not a stack.
+
+Two rules follow, and the second is the one that matters.
+
+- **Never conclude from a tail count what the mean contradicts.** `P(100/100) = q¹⁰⁰`, so
+  `d ln P / d q = 100/q`: the count amplifies a rate difference ~100x, which makes it a *sensitive*
+  statistic and an *unstable* one at the same time. When the two disagree, the mean is the one with
+  the smaller variance.
+- **The same hazard applies to the widest ≥98% run**, which `tools/stage_b_chart.py` reports and
+  [`protocol.md`](protocol.md) asks a comparison to lead with. It is a run-length statistic over
+  threshold crossings, so it is depth-sensitive exactly as [`invariants.md`](invariants.md) invariant
+  8 describes. On `b45a` at 100 episodes the widest run is **9**, which says nothing about the arm; at
+  the 500 episodes stage B actually runs, the per-row sd is 0.7 pp instead of 1.6 and the number
+  begins to mean something. **Do not compare a region width across two different episode counts.**
+
+### Stage A costs 5.3 h an arm, not 1.85 h, and the cause is lane drain rather than episode count
+
+**Measured, same arm, same 322,200 episodes, three ways.** Stage A's shape — one checkpoint, 100
+episodes, one process — runs at **16.9 episodes/s**. The identical work streamed through
+`engine.measure_stream`, which refills lanes from the *next* checkpoint, runs at **96 episodes/s per
+shard**.
+
+| how the same 3,222 x 100 episodes are measured | wall clock |
+|---|---:|
+| one checkpoint at a time, one process — **this is stage A** | **5.30 h** |
+| streamed, one process | 0.93 h |
+| streamed, 4 shards — this is a stage-B wave | 0.23 h |
+
+**A 5.7x tax, and it is structural.** A single checkpoint's measurement has nothing to refill lanes
+with: 100 episodes start together and the batch drains toward width 1 as they finish, so the last few
+episodes carry the full per-step numpy cost alone. `engine.measure` says so in a comment and is
+correct to — the drain is inherent to measuring one checkpoint, not a defect.
+
+**‡ The 5.3 h is confirmed and the "90% of wall clock" is not.** Measured on b2a from a single
+source, 2026-08-29: 533,000 counted steps in 5,192 s wall = 102.7 st/s, against the log's own
+training-only 299 st/s. That is 5.44 ms of stage A against 3.34 ms of training per step, so a 3M-step
+arm is **8.1 h — stage A 5.33 h (66%), training 2.79 h (34%)**. The 5.33 h independently reproduces
+the 5.30 h above; only the share was wrong, and it was wrong because the training half had never been
+measured on the same arm at the same time.
+
+**One trap in reading that.** The desktop's `status.json` `steps_per_sec` is a **wall-clock** rate — it
+is a step delta over a real-time delta, so it includes stage A — while `runs/<arm>_evals.json`'s
+`steps_per_second` excludes it. The two differ by 3x on a healthy arm and neither is labelled.
+
+**This corrects the plan and this file's own arithmetic.** [`../plans/pytorch-port.md`](../plans/pytorch-port.md)
+§6 estimated stage A at 1.85 h from snek2's ~45 episodes/s and concluded "an arm is ~2 h and stage A
+is ~90% of it". The 90% share was right and the total was not: stage A alone is ~5.3 h.
+
+**What follows is a design change, and the mechanism is not the one the backlog assumed.** The
+backlog's "asynchronous self-eval" is filed as an 8x from overlapping eval with training. The
+measurement says most of the win is from **keeping the lanes full**, which does not require asynchrony
+at all: holding K pending checkpoints and measuring them in one `measure_stream` call with
+`max_live=K` recovers ~5.7x on its own. Asynchrony then removes what remains. Either way the cost is
+the same and it is a real one — the epsilon refinement schedule reads `perfect_percent`
+([`invariants.md`](invariants.md) invariant 2), so its feedback would lag by up to K intervals. That
+is a change to the training, and it should be pre-registered rather than slipped in as a speed-up.
+
+### The port is faithful at the level of the policy, not just of the win rate
+
+**A snek2 checkpoint converted to torch computes the same function, to float32.** Over 12,864 states
+drawn from a seeded random rollout, the TF and torch networks' Q-values differ by at most **2.7e-5**
+on values of magnitude ~30.6 — a relative error of ~1e-6, which is accumulation order — and the
+**argmax is identical on all 12,864**. Measured 2026-08-28 on
+`b44a-lowlr7-b29b-ckpt2739000`.
+
+This matters more than the 98.8%/3,000 that followed it. A win rate is a noisy end-to-end number: at
+n=3,000 and ~99% perfect it can only bound a systematic difference to a few tenths of a point, so
+agreeing with snek2 there is consistent with a real divergence somewhere. Agreeing on every argmax
+is not — it means the observation vector, the network and the weight layout are all right, and
+therefore that **any future disagreement is in the environment or the RNG, not in the port.**
+
+Kept as a finding rather than a test because it needs both conda envs at once: TensorFlow lives in
+`snek` and torch in `snek3`, so nothing in `tests/` can assert it. What `tests/test_net.py` does
+assert is the transpose itself, against an independent numpy forward pass.
 
 ## Falsified
 

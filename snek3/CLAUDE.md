@@ -270,6 +270,19 @@ Keep the split clean: `runs.md` is current state and forward plan only, results 
 conclusions to `findings.md`, anything about *how to measure or judge* to `protocol.md`. snek2's
 equivalent grew to 950 lines of interleaved status and stopped being usable.
 
+**Newest at the top of every doc, and of every section inside one.** A batch that closes is written
+*above* the batch before it in `results.md` and `charts.md`, a new finding goes directly under
+`## Established` in `findings.md`, and `runs.md` runs current state -> forward plan -> history. The
+reason is the reader: these files only grow, and the thing worth reading is always the last thing
+learned — it should not be a scroll to the bottom to find it. Reference sections that are not
+chronological (`Imported policies`, `Reading this table`, `protocol.md`, `running.md`,
+`invariants.md`, `environment.md`) keep whatever order reads best and stay put.
+
+**A batch is `b<number>` and there is no second prefix.** A `p` series was tried for PPO and
+renamed back on 2026-08-31 (`p0`-`p3` -> `b3`-`b6`); the day it existed, the desktop's `_BATCH_RE`
+did not know about it and every arm became its own batch, which silently gave `_auto_stage_b_jobs`
+one wave per arm. Arms stay `b<n><letter>-<what-it-changes>[-seed<N>]`, seed N pinned to letter N.
+
 **`docs/charts.md` links `../runs/<policy>.png` directly.** There is no copy step and no separate
 chart directory to keep in sync — that duplication is what snek2 needed `refresh_charts.sh` and a
 completeness-check snippet for, and it still drifted to 12 undocumented arms. `charts/` holds only

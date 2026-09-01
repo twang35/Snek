@@ -1,8 +1,8 @@
 # Charts — one graph per arm
 
-**Batches p2 and p3 closed 2026-08-30** — eight seeds each, stage B complete on both, charts below.
+**Batches b5 and b6 closed 2026-08-30** — eight seeds each, stage B complete on both, charts below.
 **Batch b2 closed 2026-08-29.** A live desktop arm's `runs/` files must still never be committed from
-here: the box rewrites those paths every eval and a committed copy aborts its next ff-merge. p2's
+here: the box rewrites those paths every eval and a committed copy aborts its next ff-merge. b5's
 charts came across the `results` branch at close-out, which is what that branch is for.
 
 ## Watching them live
@@ -15,79 +15,56 @@ after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closi
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).
 
-## Batch p3 — `fc (200,100)`, 4 epochs, seeds 1-8
+## Batch b6 — `fc (200,100)`, 4 epochs, seeds 1-8
 
 Closed 2026-08-30. Pooled **12.8%** of stage-B rows in the >=98%/500 record region; best rows
-99.4-99.8. Stage-A progress chart then stage-B pass, per arm. Numbers and the p2 comparison —
+99.4-99.8. Stage-A progress chart then stage-B pass, per arm. Numbers and the b5 comparison —
 including why the two batches are **not** a clean network-shape test — in [`results.md`](results.md).
 
-![p3a-fc200x100-seed1](../runs/p3a-fc200x100-seed1.png)
-![p3a stage B](../runs/p3a-fc200x100-seed1_checkpoint_evals.png)
-![p3b-fc200x100-seed2](../runs/p3b-fc200x100-seed2.png)
-![p3b stage B](../runs/p3b-fc200x100-seed2_checkpoint_evals.png)
-![p3c-fc200x100-seed3](../runs/p3c-fc200x100-seed3.png)
-![p3c stage B](../runs/p3c-fc200x100-seed3_checkpoint_evals.png)
-![p3d-fc200x100-seed4](../runs/p3d-fc200x100-seed4.png)
-![p3d stage B](../runs/p3d-fc200x100-seed4_checkpoint_evals.png)
-![p3e-fc200x100-seed5](../runs/p3e-fc200x100-seed5.png)
-![p3e stage B](../runs/p3e-fc200x100-seed5_checkpoint_evals.png)
-![p3f-fc200x100-seed6](../runs/p3f-fc200x100-seed6.png)
-![p3f stage B](../runs/p3f-fc200x100-seed6_checkpoint_evals.png)
-![p3g-fc200x100-seed7](../runs/p3g-fc200x100-seed7.png)
-![p3g stage B](../runs/p3g-fc200x100-seed7_checkpoint_evals.png)
-![p3h-fc200x100-seed8](../runs/p3h-fc200x100-seed8.png)
-![p3h stage B](../runs/p3h-fc200x100-seed8_checkpoint_evals.png)
+![b6a-fc200x100-seed1](../runs/b6a-fc200x100-seed1.png)
+![b6a stage B](../runs/b6a-fc200x100-seed1_checkpoint_evals.png)
+![b6b-fc200x100-seed2](../runs/b6b-fc200x100-seed2.png)
+![b6b stage B](../runs/b6b-fc200x100-seed2_checkpoint_evals.png)
+![b6c-fc200x100-seed3](../runs/b6c-fc200x100-seed3.png)
+![b6c stage B](../runs/b6c-fc200x100-seed3_checkpoint_evals.png)
+![b6d-fc200x100-seed4](../runs/b6d-fc200x100-seed4.png)
+![b6d stage B](../runs/b6d-fc200x100-seed4_checkpoint_evals.png)
+![b6e-fc200x100-seed5](../runs/b6e-fc200x100-seed5.png)
+![b6e stage B](../runs/b6e-fc200x100-seed5_checkpoint_evals.png)
+![b6f-fc200x100-seed6](../runs/b6f-fc200x100-seed6.png)
+![b6f stage B](../runs/b6f-fc200x100-seed6_checkpoint_evals.png)
+![b6g-fc200x100-seed7](../runs/b6g-fc200x100-seed7.png)
+![b6g stage B](../runs/b6g-fc200x100-seed7_checkpoint_evals.png)
+![b6h-fc200x100-seed8](../runs/b6h-fc200x100-seed8.png)
+![b6h stage B](../runs/b6h-fc200x100-seed8_checkpoint_evals.png)
 
-## Batch p2 — `fc (320,)`, 8 epochs, seeds 1-8
+## Batch b5 — `fc (320,)`, 8 epochs, seeds 1-8
 
 Closed 2026-08-30. Pooled **9.6%** in the record region, and the single best row in either
-batch — **100.0%/500** at p2b/184M.
+batch — **100.0%/500** at b5b/184M.
 
-![p2a-ep8-seed1](../runs/p2a-ep8-seed1.png)
-![p2a stage B](../runs/p2a-ep8-seed1_checkpoint_evals.png)
-![p2b-ep8-seed2](../runs/p2b-ep8-seed2.png)
-![p2b stage B](../runs/p2b-ep8-seed2_checkpoint_evals.png)
-![p2c-ep8-seed3](../runs/p2c-ep8-seed3.png)
-![p2c stage B](../runs/p2c-ep8-seed3_checkpoint_evals.png)
-![p2d-ep8-seed4](../runs/p2d-ep8-seed4.png)
-![p2d stage B](../runs/p2d-ep8-seed4_checkpoint_evals.png)
-![p2e-ep8-seed5](../runs/p2e-ep8-seed5.png)
-![p2e stage B](../runs/p2e-ep8-seed5_checkpoint_evals.png)
-![p2f-ep8-seed6](../runs/p2f-ep8-seed6.png)
-![p2f stage B](../runs/p2f-ep8-seed6_checkpoint_evals.png)
-![p2g-ep8-seed7](../runs/p2g-ep8-seed7.png)
-![p2g stage B](../runs/p2g-ep8-seed7_checkpoint_evals.png)
-![p2h-ep8-seed8](../runs/p2h-ep8-seed8.png)
-![p2h stage B](../runs/p2h-ep8-seed8_checkpoint_evals.png)
-
-## Imported policies
-
-Not arms — snek2 checkpoints converted to torch and measured by snek3, so these charts describe
-**snek3's environment and measurement** rather than snek3 as a learner. See
-[`results.md`](results.md).
-
-### b45a-import — the phase-2 A/B, every checkpoint of snek2's `b45a-lowlr8-b29b`
-
-3,222 rows · 100 ep each · pooled 97.29% · 1,576 rows ≥98% · widest ≥98% run 9
-
-The arm's real shape only exists as the trailing mean: a single 100-episode row is quantised to whole
-percent and carries 1.6 pp of noise, which is why the points form bands. Read the dark line — `b45a`
-peaks near 98% between 1.8M and 2.4M and sags to ~96.5% near 3.9M. The green rug marks which
-checkpoints cleared 98%.
-
-![b45a-import seed 0](../runs/b45a-import_checkpoint_evals_ab3222.png)
-
-The second seed reproduces the **shape** — high through ~2.6M, lower after ~3.0M — and not the
-individual dips, which is exactly right: a 40-row trailing mean has 0.26 pp of noise, so a ±0.5 pp
-wiggle is two standard deviations and should not repeat. This pass is also how the 100/100-count
-discrepancy was settled ([`findings.md`](findings.md)).
-
-![b45a-import seed 1](../runs/b45a-import_checkpoint_evals_ab3222seed1.png)
+![b5a-ep8-seed1](../runs/b5a-ep8-seed1.png)
+![b5a stage B](../runs/b5a-ep8-seed1_checkpoint_evals.png)
+![b5b-ep8-seed2](../runs/b5b-ep8-seed2.png)
+![b5b stage B](../runs/b5b-ep8-seed2_checkpoint_evals.png)
+![b5c-ep8-seed3](../runs/b5c-ep8-seed3.png)
+![b5c stage B](../runs/b5c-ep8-seed3_checkpoint_evals.png)
+![b5d-ep8-seed4](../runs/b5d-ep8-seed4.png)
+![b5d stage B](../runs/b5d-ep8-seed4_checkpoint_evals.png)
+![b5e-ep8-seed5](../runs/b5e-ep8-seed5.png)
+![b5e stage B](../runs/b5e-ep8-seed5_checkpoint_evals.png)
+![b5f-ep8-seed6](../runs/b5f-ep8-seed6.png)
+![b5f stage B](../runs/b5f-ep8-seed6_checkpoint_evals.png)
+![b5g-ep8-seed7](../runs/b5g-ep8-seed7.png)
+![b5g stage B](../runs/b5g-ep8-seed7_checkpoint_evals.png)
+![b5h-ep8-seed8](../runs/b5h-ep8-seed8.png)
+![b5h stage B](../runs/b5h-ep8-seed8_checkpoint_evals.png)
 
 ## Arms
 
 Every arm gets a `### <policy> — <what it changes>` section with a stats line, a short reading, and
-its image. **Images are linked straight from `../runs/`** — there is no copy step and no separate
+its image. **Newest first, in this section and in the batch sections above it** — a new batch goes
+directly under `Watching them live`, and `Imported policies` stays at the bottom. **Images are linked straight from `../runs/`** — there is no copy step and no separate
 chart directory to keep in sync. That duplication is what snek2 needed a `refresh_charts.sh` and a
 completeness-check snippet for, and it still drifted to 12 undocumented arms.
 
@@ -101,7 +78,7 @@ One or two sentences: what the curve does, and what it means for the hypothesis.
 ![b1a-example](../runs/b1a-example.png)
 ```
 
-### p0 — the PPO tuning sweep, 15 arms, one knob each
+### b3 — the PPO tuning sweep, 15 arms, one knob each
 
 **Read these as a set, and read them at 10M rather than at 3M.** Every arm is seed 1 on b2's reward
 function, one knob off a reference of lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128
@@ -109,7 +86,7 @@ rollout / 4 epochs / minibatch 256. Nine of the fifteen finished inside **0.8 pp
 the curves matter more than the ranking: what to look at is *where each one turns up*, not which one
 ends highest.
 
-**The two the batch exists for.** `p0a` is the reference and `p0g`/`p0e` are the two that were 6th and
+**The two the batch exists for.** `b3a` is the reference and `b3g`/`b3e` are the two that were 6th and
 7th at 3M and 1st and 2nd at 10M — put those three side by side and the cap-inversion finding is
 visible as a shape rather than a table
 ([`findings.md`](findings.md)).
@@ -119,24 +96,24 @@ re-measured **96.6% / 3,000**
 
 The laptop half — λ, entropy and the learning-rate bracket:
 
-![p0a-lr3e4-g99](../runs/p0a-lr3e4-g99.png)
-![p0g-ent003](../runs/p0g-ent003.png)
-![p0e-lam95](../runs/p0e-lam95.png)
-![p0j-lr5e4](../runs/p0j-lr5e4.png)
-![p0i-lr1e4](../runs/p0i-lr1e4.png)
-![p0f-lam100](../runs/p0f-lam100.png)
-![p0h-ent03](../runs/p0h-ent03.png)
+![b3a-lr3e4-g99](../runs/b3a-lr3e4-g99.png)
+![b3g-ent003](../runs/b3g-ent003.png)
+![b3e-lam95](../runs/b3e-lam95.png)
+![b3j-lr5e4](../runs/b3j-lr5e4.png)
+![b3i-lr1e4](../runs/b3i-lr1e4.png)
+![b3f-lam100](../runs/b3f-lam100.png)
+![b3h-ent03](../runs/b3h-ent03.png)
 
 And the three arms that stopped at the 3M cap, kept because they are what the inversion is measured
 against — the learning-rate extremes and γ 0.9975:
 
-![p0b-lr1e3-g99](../runs/p0b-lr1e3-g99.png)
-![p0c-lr3e3-g99](../runs/p0c-lr3e3-g99.png)
-![p0d-lr3e4-g9975](../runs/p0d-lr3e4-g9975.png)
+![b3b-lr1e3-g99](../runs/b3b-lr1e3-g99.png)
+![b3c-lr3e3-g99](../runs/b3c-lr3e3-g99.png)
+![b3d-lr3e4-g9975](../runs/b3d-lr3e4-g9975.png)
 
 **The desktop half's eight charts — the four fc shapes, γ 0.995, and the three update-shape knobs —
 arrive on the `results` branch at close-out**, and this section gets their `![]` lines in the same
-pass. They are the half that found the one axis that moved: `p0q-ep8` at 97.2 and `p0r-mb1024` at
+pass. They are the half that found the one axis that moved: `b3q-ep8` at 97.2 and `b3r-mb1024` at
 89.7 are the two ends of it.
 
 ### ppo-smoke — the phase-6b PPO gate arm, untuned defaults
@@ -150,7 +127,7 @@ entropy 1.086 → 0.27 · clip fraction 0.03
 Score climbs monotonically to ~80 and then flattens while the perfect rate sits near 1% — the shape
 [`../plans/ppo.md`](../plans/ppo.md) §8 predicted for a short GAE horizon against a win ~950 moves
 away, though at this budget it is equally just an untuned learning rate. `clip_fraction` 0.03 says the
-update is not being constrained, so the rate is the first thing p0 moves.
+update is not being constrained, so the rate is the first thing b3 moves.
 
 ![ppo-smoke](../runs/ppo-smoke.png)
 
@@ -185,3 +162,27 @@ The middle two sit between them and add nothing a reader needs:
 have finished — a running batch with no chart entry is a bug, not a "wait until it closes" state.
 
 `../charts/` holds only the one-off diagnostic figures a finding refers to, never per-arm charts.
+
+## Imported policies
+
+Not arms — snek2 checkpoints converted to torch and measured by snek3, so these charts describe
+**snek3's environment and measurement** rather than snek3 as a learner. See
+[`results.md`](results.md).
+
+### b45a-import — the phase-2 A/B, every checkpoint of snek2's `b45a-lowlr8-b29b`
+
+3,222 rows · 100 ep each · pooled 97.29% · 1,576 rows ≥98% · widest ≥98% run 9
+
+The arm's real shape only exists as the trailing mean: a single 100-episode row is quantised to whole
+percent and carries 1.6 pp of noise, which is why the points form bands. Read the dark line — `b45a`
+peaks near 98% between 1.8M and 2.4M and sags to ~96.5% near 3.9M. The green rug marks which
+checkpoints cleared 98%.
+
+![b45a-import seed 0](../runs/b45a-import_checkpoint_evals_ab3222.png)
+
+The second seed reproduces the **shape** — high through ~2.6M, lower after ~3.0M — and not the
+individual dips, which is exactly right: a 40-row trailing mean has 0.26 pp of noise, so a ±0.5 pp
+wiggle is two standard deviations and should not repeat. This pass is also how the 100/100-count
+discrepancy was settled ([`findings.md`](findings.md)).
+
+![b45a-import seed 1](../runs/b45a-import_checkpoint_evals_ab3222seed1.png)

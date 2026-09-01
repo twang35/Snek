@@ -1,48 +1,40 @@
 # Runs — current state and forward plan
 
-**Phases 0-4 are closed and batch b1 has run.** `env/`, `vectorized/`, the measurement engine,
-checkpoint I/O, the eval wave, the charts, the viewers, `dqn/`, `train.py` and the desktop daemon are
-all in, and the box runs snek3 rather than snek2. **The phase-3 gate is still open** — see Now.
-
-**Phase 0 — the two env implementations agree.** 36,000 states × 30 observation indices, **0
-mismatches**, across a growth regime (24,000 states, 49 episodes, lengths to 60) and a coiled endgame
-regime (12,000 states, 280 episodes, 26 perfect games), with rewards, terminations, both shaping
-terms and the win path in parity too. **17 of 17 hand-made mutants killed.**
-
-**Phase 1 — the snek2 champion plays in torch.** `b44a-lowlr7-b29b-ckpt2739000` converted and
-measured **98.8% perfect over 3,000 episodes** against snek2's 98.73%, inside the ±0.6 pp gate. The
-conversion itself is exact rather than close: on 12,864 states the two networks' Q-values differ by
-at most 2.7e-5 on values of magnitude ~30.6, and the **argmax is identical on every state**, so the
-policies are the same function. `watch.py` plays it and `record_gif.py` records it.
-
-**Phase 2 — the flat protocol reproduces the tiered one.** All **3,222** checkpoints of
-`b45a-lowlr8-b29b` converted and measured, against snek2's own close-out: mean per-row difference
-**−0.004 pp** on a 0.041 pp standard error, and observed spread / predicted spread **1.00**. 14
-minutes on four shards. Three findings came out of it, including a **5.7x correction to the cost of
-stage A** — see [`findings.md`](findings.md).
+**Newest at the top, in every doc in this directory.** Current state first, then what is next,
+then how we got here. A batch that closes is written above the batch before it, and a new finding
+goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
-**The box and the laptop are both idle as of 2026-08-30 17:34.** Three things closed this afternoon.
+**Batch b4 closed on the desktop 2026-08-31, and its numbers are not in these docs yet.** The
+daemon's ledger lists `b4a`-`b4h` and `b4-stageb` all `done`, with both boxes idle and nothing
+queued — read it with `git fetch origin ops-status && git show origin/ops-status:status.json`, and
+note that the fetch is the half that matters. **b4 is the network-shape test** the rest of this
+section calls unrun: 8 seeds at `fc (200,100)` + 8 epochs, 200M transitions. Its artifacts are on
+the `results` branch; [`../skills/progress-update`](../skills/progress-update/SKILL.md) is what
+turns them into a results table, a charts entry and a finding.
+
+**Before that — 2026-08-30 17:34 — three things closed and both boxes went idle.**
 
 | what | where | outcome |
 |---|---|---|
-| **batch p3** stage B, 8 arms | laptop | done in 226.1 min, status 0. Pooled **12.8%** of rows ≥98%/500 |
-| **batch p2** stage B, 8 arms | desktop | done in 222.6 min, status 0. Pooled **9.6%**; best row **100.0%/500** |
+| **batch b6** stage B, 8 arms | laptop | done in 226.1 min, status 0. Pooled **12.8%** of rows ≥98%/500 |
+| **batch b5** stage B, 8 arms | desktop | done in 222.6 min, status 0. Pooled **9.6%**; best row **100.0%/500** |
 | **the parallelism sweep**, 11 waves | desktop | all 53 jobs done. **The eval side answered; the training side did not** |
 
-Full per-arm numbers and the p2/p3 comparison are in [`results.md`](results.md); the charts are in
+Full per-arm numbers and the b5/b6 comparison are in [`results.md`](results.md); the charts are in
 [`charts.md`](charts.md); the sweep is in [`findings.md`](findings.md).
 
-**p3 leads p2 on the pooled headline but the sign test is a coin (5 of 8, p≈0.29→0.73), and rank 1 is
+**b6 leads b5 on the pooled headline but the sign test is a coin (5 of 8, p≈0.29→0.73), and rank 1 is
 a tie at 98.5 best30.** More importantly the two batches differ in **two** knobs — `fc (200,100)` + 4
 epochs against `fc (320,)` + 8 epochs — so this is not the network-shape test
-[`results.md`](results.md) and this file have both been calling for. That arm still has not been run.
+[`results.md`](results.md) and this file have both been calling for. **That test is b4, and it ran on
+2026-08-31** — see the top of this section.
 
 ### Next, in the order the evidence argues for
 
 1. **One batch varying only the network**, matched epochs and matched budget. It is the cheapest
-   unrun experiment that would settle the thread p0 opened, and `dqn/net.py` takes the same
+   unrun experiment that would settle the thread b3 opened, and `dqn/net.py` takes the same
    `fc_layers` config so the DQN version is also one arm away.
 2. **Re-run the worker sweep with long waves.** 3.2-minute waves cannot resolve it — see
    [`findings.md`](findings.md). ~30 min per wave is what the earlier hand-measurement used.
@@ -52,7 +44,7 @@ epochs against `fc (320,)` + 8 epochs — so this is not the network-shape test
 
 ### Next for PPO
 
-**The network shape is the most promising thread p0 turned up**, and it is not PPO-specific. Two hidden
+**The network shape is the most promising thread b3 turned up**, and it is not PPO-specific. Two hidden
 layers beat every single-layer width tried, on ≥98%/500 density: `fc 300,100` 9.0%, `fc 200,100` 7.9%,
 `fc 320` 5.6%, `fc 500` 3.2%, `fc 200` 0.8% — and it is not capacity, because `fc 500` has 2.5x the
 parameters of `fc 200` and a lower best30. **`fc 320` is snek2's shape, carried across so a champion's
@@ -62,10 +54,81 @@ config, so **the same test is one arm away for DQN and has never been run** — 
 
 **The follow-up wave, designed and not yet launched** — push the axis that moved rather than resample
 the flat ones: epochs 12 and 16, minibatch 128, rollout 256, and `fc 200,100` + epochs 8 as the one
-interaction worth a slot. Depth belongs to a p2 "better agent" batch rather than to p1, which has to
-hold the network at 320 to stay seed-matched against b2.
+interaction worth a slot. Depth belongs to a "better agent" batch rather than to a seed-matched
+comparison, which has to hold the network at 320 to stay matched against b2.
 
----
+## The b2-era plan — superseded, kept for the reasoning
+
+**Written 2026-08-29, before b3, b5, b6 and b4 ran.** Item 3 below describes a 4-arm b4 holding
+`fc 320` fixed, which was never run: the `b4` name was reused on 2026-08-30 for the network-shape
+test, and *that* is the b4 that closed on 2026-08-31. What survives here is why each item was
+queued, which is worth more than the schedule was.
+
+1. **Read b2 against b1 and against b29/b41/b47.** A b2-vs-b29 difference smaller than the
+   b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
+   precisely to have the yardstick.
+2. **Phase 6 — `ppo/`.** The reason snek3 exists, and the design is
+   [`../plans/ppo.md`](../plans/ppo.md). **Phases 6a, 6b and 6c are all closed** — the algorithm seam
+   is in `train.py` with three fixed-seed DQN arms byte-identical across it, `ppo/` is written and
+   tested (122 fixtures, 14 of 14 mutants killed), and batch b3 has run 15 arms. Deployed to the
+   desktop 2026-08-29 once b2's stage-B wave published. **6d — batch b4 — is next**, at **18M**
+   transitions to match b2 (3M counted steps x 6 transitions per step; the plan's 12M was wrong).
+
+   **‡ Two claims made from the 6b gate arm are withdrawn, and both were withdrawn by b3.** The gate
+   arm was 508k transitions on snek3's *unshaped* defaults, and neither conclusion survived a shaped
+   arm at 20x the budget:
+
+   - **"PPO is behind DQN rather than beside it"** — withdrawn. Matched on transitions *and* on
+     reward function, the two ranges top out at the same number (96.9 best30), and on the ≥98%/500
+     count PPO is ~10x denser. The gate arm's gap was the reward function, not the algorithm.
+   - **"`clip_fraction` 0.03 says the learning rate is low"** — falsified outright. Raising it to
+     1e-3 and 3e-3 both made things *worse* (85.2 and 69.9 best30 at 3M, the latter at sd 18.4), and
+     1e-4 was worse than 1e-3. The learning rate is peaked at the default and a low clip fraction did
+     not mean what I read into it.
+
+   The gate arm's chart stays at [`../runs/ppo-smoke.png`](../runs/ppo-smoke.png) as a record of
+   what an unshaped PPO arm does. It is a gate arm, not a p-series arm.
+
+3. **Batch b4 — the seed-matched gate batch.** 4 arms, seeds 1-4, **18M transitions**, b2's env
+   config, **fc 320 held fixed** so the comparison is seed-matched against b1, b2, b29, b41 and b47.
+   **b3 hands it the reference config unchanged**, because b3 found no winner — which makes b4 a
+   cleaner comparison than the plan expected rather than a blocked one. Phase 3's ≥90% bar is already
+   cleared by b3, so b4's job is the comparison, not the gate.
+
+**The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
+is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
+[`findings.md`](findings.md). Cutting episodes does not work: 4x fewer buys 1.6x, because the cost is
+lane drain. Every way of recovering it makes the epsilon schedule's feedback lag
+([`invariants.md`](invariants.md) invariant 2), so the lag must be **bounded** rather than left to
+float. b1 is the baseline any such change is measured against.
+
+| an arm at 3M counted steps | training | stage A | total |
+|---|---:|---:|---:|
+| as b2 runs today | 2.79 h | 5.33 h | **8.1 h** |
+| + the two bit-exact fixes (landed) | 2.33 h | 5.33 h | 7.7 h |
+| + a bounded eval queue, 2 workers per 4 trainers | 2.33 h | ~0 | **2.3 h** |
+
+The queue's arithmetic closes: 4 trainers at 299 st/s demand 1.20 checkpoints/s, and one streamed
+worker supplies 0.54-0.89, so **two workers serve four trainers** — six processes on the desktop's 16
+cores.
+
+## Backlog
+
+One line per idea, with a prior. A design that is settled enough to implement gets a file in
+[`../plans/`](../plans/) and a row here.
+
+| idea | prior |
+|---|---|
+| **PPO** | [`../plans/ppo.md`](../plans/ppo.md) — **phases 6a and 6b closed 2026-08-29; batch b3 is next.** No longer a backlog item. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
+| **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
+| **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
+| **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |
+| **Munchausen-DQN, SAC-discrete** | the discrete off-policy actor-critic options, if PPO underperforms. **TD3 does not apply** — it is continuous-action and this task has three discrete actions |
+
+## How we got here — the closed phases
+
+History, kept because each phase gate is a claim someone may want to re-check. Nothing here is
+current state.
 
 **Batch b2 — b29's record config on the torch stack, seeds 1-4, 3M steps. Closed 2026-08-29**, all
 four arms and the stage-B wave `done`; results on the `results` branch, unread into
@@ -142,65 +205,23 @@ difference" stands.
 81.9%, **no checkpoint anywhere at 95/100**, every arm still climbing at its cap. Its stage-B wave
 has run and published 0 rows an arm, which is the honest measurement rather than a failure.
 
-## Next, in order
+**Phases 0-4 are closed and batch b1 has run.** `env/`, `vectorized/`, the measurement engine,
+checkpoint I/O, the eval wave, the charts, the viewers, `dqn/`, `train.py` and the desktop daemon are
+all in, and the box runs snek3 rather than snek2. **The phase-3 gate is still open** — see Now.
 
-1. **Read b2 against b1 and against b29/b41/b47.** A b2-vs-b29 difference smaller than the
-   b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
-   precisely to have the yardstick.
-2. **Phase 6 — `ppo/`.** The reason snek3 exists, and the design is
-   [`../plans/ppo.md`](../plans/ppo.md). **Phases 6a, 6b and 6c are all closed** — the algorithm seam
-   is in `train.py` with three fixed-seed DQN arms byte-identical across it, `ppo/` is written and
-   tested (122 fixtures, 14 of 14 mutants killed), and batch p0 has run 15 arms. Deployed to the
-   desktop 2026-08-29 once b2's stage-B wave published. **6d — batch p1 — is next**, at **18M**
-   transitions to match b2 (3M counted steps x 6 transitions per step; the plan's 12M was wrong).
+**Phase 0 — the two env implementations agree.** 36,000 states × 30 observation indices, **0
+mismatches**, across a growth regime (24,000 states, 49 episodes, lengths to 60) and a coiled endgame
+regime (12,000 states, 280 episodes, 26 perfect games), with rewards, terminations, both shaping
+terms and the win path in parity too. **17 of 17 hand-made mutants killed.**
 
-   **‡ Two claims made from the 6b gate arm are withdrawn, and both were withdrawn by p0.** The gate
-   arm was 508k transitions on snek3's *unshaped* defaults, and neither conclusion survived a shaped
-   arm at 20x the budget:
+**Phase 1 — the snek2 champion plays in torch.** `b44a-lowlr7-b29b-ckpt2739000` converted and
+measured **98.8% perfect over 3,000 episodes** against snek2's 98.73%, inside the ±0.6 pp gate. The
+conversion itself is exact rather than close: on 12,864 states the two networks' Q-values differ by
+at most 2.7e-5 on values of magnitude ~30.6, and the **argmax is identical on every state**, so the
+policies are the same function. `watch.py` plays it and `record_gif.py` records it.
 
-   - **"PPO is behind DQN rather than beside it"** — withdrawn. Matched on transitions *and* on
-     reward function, the two ranges top out at the same number (96.9 best30), and on the ≥98%/500
-     count PPO is ~10x denser. The gate arm's gap was the reward function, not the algorithm.
-   - **"`clip_fraction` 0.03 says the learning rate is low"** — falsified outright. Raising it to
-     1e-3 and 3e-3 both made things *worse* (85.2 and 69.9 best30 at 3M, the latter at sd 18.4), and
-     1e-4 was worse than 1e-3. The learning rate is peaked at the default and a low clip fraction did
-     not mean what I read into it.
-
-   The gate arm's chart stays at [`../runs/ppo-smoke.png`](../runs/ppo-smoke.png) as a record of
-   what an unshaped PPO arm does. It is a gate arm, not a p-series arm.
-
-3. **Batch p1 — the seed-matched gate batch.** 4 arms, seeds 1-4, **18M transitions**, b2's env
-   config, **fc 320 held fixed** so the comparison is seed-matched against b1, b2, b29, b41 and b47.
-   **p0 hands it the reference config unchanged**, because p0 found no winner — which makes p1 a
-   cleaner comparison than the plan expected rather than a blocked one. Phase 3's ≥90% bar is already
-   cleared by p0, so p1's job is the comparison, not the gate.
-
-**The stage-A queue is next after b2 and the numbers are now measured rather than projected.** Stage A
-is **66%** of an arm's 8.1 h (not 90%), and streaming recovers **3.3-3.4x** of it (not 5.7x) — see
-[`findings.md`](findings.md). Cutting episodes does not work: 4x fewer buys 1.6x, because the cost is
-lane drain. Every way of recovering it makes the epsilon schedule's feedback lag
-([`invariants.md`](invariants.md) invariant 2), so the lag must be **bounded** rather than left to
-float. b1 is the baseline any such change is measured against.
-
-| an arm at 3M counted steps | training | stage A | total |
-|---|---:|---:|---:|
-| as b2 runs today | 2.79 h | 5.33 h | **8.1 h** |
-| + the two bit-exact fixes (landed) | 2.33 h | 5.33 h | 7.7 h |
-| + a bounded eval queue, 2 workers per 4 trainers | 2.33 h | ~0 | **2.3 h** |
-
-The queue's arithmetic closes: 4 trainers at 299 st/s demand 1.20 checkpoints/s, and one streamed
-worker supplies 0.54-0.89, so **two workers serve four trainers** — six processes on the desktop's 16
-cores.
-
-## Backlog
-
-One line per idea, with a prior. A design that is settled enough to implement gets a file in
-[`../plans/`](../plans/) and a row here.
-
-| idea | prior |
-|---|---|
-| **PPO** | [`../plans/ppo.md`](../plans/ppo.md) — **phases 6a and 6b closed 2026-08-29; batch p0 is next.** No longer a backlog item. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
-| **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
-| **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
-| **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |
-| **Munchausen-DQN, SAC-discrete** | the discrete off-policy actor-critic options, if PPO underperforms. **TD3 does not apply** — it is continuous-action and this task has three discrete actions |
+**Phase 2 — the flat protocol reproduces the tiered one.** All **3,222** checkpoints of
+`b45a-lowlr8-b29b` converted and measured, against snek2's own close-out: mean per-row difference
+**−0.004 pp** on a 0.041 pp standard error, and observed spread / predicted spread **1.00**. 14
+minutes on four shards. Three findings came out of it, including a **5.7x correction to the cost of
+stage A** — see [`findings.md`](findings.md).

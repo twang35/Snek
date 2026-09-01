@@ -106,12 +106,12 @@ Three cautions:
 Two consequences worth holding on to.
 
 **An arm still rising at its cap has not reported its best30**, so a best30 read at a cap is a read of
-the budget. Batch p0's first wave hit this: all four arms were climbing at 3M transitions, which is why
+the budget. Batch b3's first wave hit this: all four arms were climbing at 3M transitions, which is why
 the sweep moved to 10M. **Raise the cap before ranking on rank 1.**
 
 **Speed being last inverts the usual reading of a sweep.** A knob that reaches 80% faster but tops out
 lower loses; the interesting arm is the slow one that is still climbing. This is why the crossing
-tables in the p0 write-ups are reported *under* the peak rather than beside it.
+tables in the b3 write-ups are reported *under* the peak rather than beside it.
 
 ## Judging a batch
 

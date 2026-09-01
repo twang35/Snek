@@ -3,16 +3,17 @@
 **Status: phase 6 is closed as of 2026-08-30 — 6a through 6e all met.** Phase 6 of
 [`pytorch-port.md`](pytorch-port.md), which calls it "the actual research".
 
-**6d and 6e were met by batches p2 and p3, not by the p1 this plan specified.** p1 was designed as
+**6d and 6e were met by batches b5 and b6, not by the b4 this plan specified.** b4 was designed as
 4 seed-matched arms at b2's 18M-transition budget; what actually ran was two 8-seed batches at
 215-271M — an order of magnitude past the gate, in the same env, screened and measured by the same
 protocol. The gate is met more strongly than it was written, so the plan is closed against the
-evidence rather than against the schedule. **The `p1` name has since been reused** for a different
-experiment — the clean network-shape test p2/p3 could not provide, queued 2026-08-30; see
+evidence rather than against the schedule. **The `b4` name has since been reused** for a different
+experiment — the clean network-shape test b5/b6 could not provide, queued 2026-08-30 and **closed
+on the desktop 2026-08-31** with its numbers not yet read into the docs; see
 [`../docs/runs.md`](../docs/runs.md).
 
-**Four decisions taken at approval**, which supersede §11's questions: γ is settled by the p0 tuning
-pass and p1 uses the winner; **action masking is out of scope** for now, so `SNEK_PPO_ACTION_MASK`
+**Four decisions taken at approval**, which supersede §11's questions: γ is settled by the b3 tuning
+pass and b4 uses the winner; **action masking is out of scope** for now, so `SNEK_PPO_ACTION_MASK`
 is not built; `transitions` was added to DQN rows and **not** back-filled onto b2, which was running;
 and the `train.py` refactor was taken, gated on byte-identical DQN output. The shaping-discount bug
 §1 found is fixed.
@@ -113,7 +114,7 @@ this is **two settings, not three**:
 
 A collect-only mask is not offered: it would train π_masked and measure π_unmasked.
 
-**‡ Out of scope as of 2026-08-29 — the knob is not built.** p1 runs unmasked, which is the `0` column,
+**‡ Out of scope as of 2026-08-29 — the knob is not built.** b4 runs unmasked, which is the `0` column,
 so nothing is lost by leaving the mask unwritten until there is a result to compare it against. It
 stays cheap to add whenever that happens: the mask is derived from the observation, so
 `greedy_policy_fn` stays a `(m, 30) -> (m,)` callable and the seam holds.
@@ -256,7 +257,7 @@ every committed sidecar.
 **snek3's initialisers, not orthogonal.** He-normal with Keras' truncation correction on the hidden
 layer and `uniform(-0.03, 0.03)` on the head, from `dqn/net.py`. On a 3-logit head that uniform range
 gives an almost exactly uniform softmax, which is what PPO's conventional `gain=0.01` head is *for*,
-so the convention is already satisfied. `SNEK_PPO_INIT=orthogonal` exists as a fallback if p0 shows
+so the convention is already satisfied. `SNEK_PPO_INIT=orthogonal` exists as a fallback if b3 shows
 the opening policy matters.
 
 **A dedicated seeded generator for the action sample**, and a second for the minibatch shuffle,
@@ -265,7 +266,7 @@ decisions would depend on how many food cells were rejected") applies unchanged.
 
 **Learning rate 3e-4, not DQN's 1e-5.** Reusing 1e-5 is a trap worth naming in the doc: PPO takes
 ~64x fewer gradient steps per transition, so the same LR is ~64x less total parameter movement over
-an arm. 3e-4 is the PPO convention and p0 sweeps it.
+an arm. 3e-4 is the PPO convention and b3 sweeps it.
 
 **Huber on the value loss, with `SNEK_PPO_VALUE_LOSS=mse` available.** Same argument `dqn/agent.py`
 gives for its TD loss: a perfect game pays +100 against a typical step's ~0.001, so one terminal
@@ -310,7 +311,7 @@ with a named error** under `SNEK_ALGO=ppo`.
 | `SNEK_PPO_ENTROPY_COEF_FINAL` | unset (constant) | added: a linear ramp to this value over `SNEK_MAX_STEPS`, for the entropy-collapse row of §8 |
 | `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | added: global norm over both towers, 0 to disable |
 | `SNEK_PPO_ADAM_EPSILON` | 1e-7 | added: DQN's value, for the same reason `dqn/agent.py` gives |
-| `SNEK_DISCOUNT` | **0.99** built / 0.9975 for the comparison | shared with DQN. §8, and p0 tries both |
+| `SNEK_DISCOUNT` | **0.99** built / 0.9975 for the comparison | shared with DQN. §8, and b3 tries both |
 
 ---
 
@@ -319,10 +320,10 @@ with a named error** under `SNEK_ALGO=ppo`.
 | risk | why | what it looks like in the row | mitigation |
 |---|---|---|---|
 | **the +100 terminal is invisible to GAE** | at γ=0.9975, λ=0.95 the advantage horizon is `1/(1−γλ)` ≈ **19 steps**; the win is ~950 moves from the opening | perfect % flat 0 while avg score climbs | λ 0.98-1.0, and the shaping terms. The critic is the carrier — as it is for 1-step DQN, which reached 98.7% |
-| **entropy collapse** | 3 actions, and nothing forces a floor once the bonus is outweighed | `entropy` falling toward 0 with perfect % stuck | the entropy coefficient, annealed rather than fixed if p0 shows it |
+| **entropy collapse** | 3 actions, and nothing forces a floor once the bonus is outweighed | `entropy` falling toward 0 with perfect % stuck | the entropy coefficient, annealed rather than fixed if b3 shows it |
 | **critic scale** | V is ~40 while a step reward is ~0.001 | `explained_variance` near 0 or negative | separate towers, huber, and `explained_variance` is the direct readout |
 | **the refactor** | 350 lines of shared measurement machinery move | a DQN arm that differs from b2 in any digit | the bit-exactness gate in §5 |
-| **γ, `PERFECT_GAME_REWARD` coupling** | invariant 6: finishing beats farming only when `W > 1/(1−γ^k)` — 40.5 at γ=0.9975 and k≈10, 10.4 at γ=0.99 | agents that farm and never finish | W=100 clears both, so **γ=0.99 is the safer end** on this axis and the riskier end on the one above. p0 tries both |
+| **γ, `PERFECT_GAME_REWARD` coupling** | invariant 6: finishing beats farming only when `W > 1/(1−γ^k)` — 40.5 at γ=0.9975 and k≈10, 10.4 at γ=0.99 | agents that farm and never finish | W=100 clears both, so **γ=0.99 is the safer end** on this axis and the riskier end on the one above. b3 tries both |
 
 The first row is the one to take seriously, and it is the reason the tuning pass exists. The others
 are all diagnosable from a single eval row, which is the point of putting the diagnostics there.
@@ -381,25 +382,25 @@ most ordinary costume: 24 passing PPO tests, and the load-bearing line was untes
 |---:|---|---|
 | **6a** | the `train.py` seam and `DqnAlgo`. No PPO code | **Met 2026-08-29.** Three fixed-seed arms — the defaults, a `chase_safe` arm and a `free_space` arm at `n_step=3`, `collect_envs=2`, `ratio=0.5` — came out **byte-identical** across the refactor on every eval row, the final weights (SHA-256 of the whole `state_dict`), the step, the transition count, epsilon and the checkpoint set. 743 tests green, 26 of 26 mutants killed. **Not yet deployed to the desktop:** b2 is still training |
 | **6b** | `ppo/` plus the fixtures and the mutant spec | **Met 2026-08-29.** 869 tests green, **14 of 14** mutants killed, and the gate arm reached avg score **79.5 with a 1.2%/500 perfect rate at 508k transitions**, against the **0.9** an untrained policy scores. See below |
-| **6c** | **batch p0 — tuning** | **Closed 2026-08-29 at 15 arms x 10M transitions, not 4 x 2M.** Output: **no winner and no lever among lr, λ, entropy, γ or width** — nine configs inside 0.8 pp. One axis did move: **gradient steps per transition**. See below |
-| **6d** | **seed-matched arms at b2's budget or better** | **Met 2026-08-30 by p2 and p3** — 8 seeds each at 215-271M transitions, ~12-15x b2's 18M, on b2's reward function. The stated bar (one arm ≥90% perfect in a stage-A eval) is cleared by every one of the sixteen: stage-A `best_perfect30` is **97.8-98.5** across both batches. ‡ Not the 4-arm p1 this row specified — see the status note |
-| **6e** | stage B and the comparison | **Met 2026-08-30.** On the pre-registered metric — the ≥98%/500 count — **p3 is 4,661 of 36,272 rows (12.8%) and p2 is 3,329 of 34,581 (9.6%), against b2's four DQN seeds at 5 of 1,135 (0.44%)**: a 29x and 22x density. Both passes complete, status 0. ‡ Read the caveats below before quoting it |
+| **6c** | **batch b3 — tuning** | **Closed 2026-08-29 at 15 arms x 10M transitions, not 4 x 2M.** Output: **no winner and no lever among lr, λ, entropy, γ or width** — nine configs inside 0.8 pp. One axis did move: **gradient steps per transition**. See below |
+| **6d** | **seed-matched arms at b2's budget or better** | **Met 2026-08-30 by b5 and b6** — 8 seeds each at 215-271M transitions, ~12-15x b2's 18M, on b2's reward function. The stated bar (one arm ≥90% perfect in a stage-A eval) is cleared by every one of the sixteen: stage-A `best_perfect30` is **97.8-98.5** across both batches. ‡ Not the 4-arm b4 this row specified — see the status note |
+| **6e** | stage B and the comparison | **Met 2026-08-30.** On the pre-registered metric — the ≥98%/500 count — **b6 is 4,661 of 36,272 rows (12.8%) and b5 is 3,329 of 34,581 (9.6%), against b2's four DQN seeds at 5 of 1,135 (0.44%)**: a 29x and 22x density. Both passes complete, status 0. ‡ Read the caveats below before quoting it |
 
 ### ‡ What 6e's number does and does not say
 
 The 22-29x density gap is real and it is the metric this plan pre-registered, so it is the headline.
 Four limits belong beside it, none of which the number carries on its own.
 
-- **It is not a matched-budget comparison.** p2 and p3 ran 215-271M transitions against b2's 18M. The
+- **It is not a matched-budget comparison.** b5 and b6 ran 215-271M transitions against b2's 18M. The
   honest statement is "PPO at ~14x the budget reaches ~25x the record-region density", not "PPO beats
   DQN per transition". **A matched-budget comparison against b2 has still never been run**, and the
-  original 4-arm p1 was the thing that would have provided it.
+  original 4-arm b4 was the thing that would have provided it.
 - **b2's denominator is small.** 5 of 1,135 rows; a handful either way moves the ratio a lot.
 - **At the honest depth the snek2 champion still leads.** Its converted weights measure **98.8%**
   [98.3, 99.1] over 3,000 episodes at 2.74M transitions. Every PPO high re-measured lower — all three
-  of p0's fell 1.3-2.0 pp. **A 500-episode maximum is a selected high, not a record.**
-- **The 5,000-episode re-measure is what settles the record question**, and it is running: p2's 873
-  checkpoints ≥98.5%/500 on the desktop, p3's 1,299 on the laptop, both labelled `hof5000`. Until
+  of b3's fell 1.3-2.0 pp. **A 500-episode maximum is a selected high, not a record.**
+- **The 5,000-episode re-measure is what settles the record question**, and it is running: b5's 873
+  checkpoints ≥98.5%/500 on the desktop, b6's 1,299 on the laptop, both labelled `hof5000`. Until
   those land, no p-series checkpoint should be described as a record or promoted to `hallOfFame/`.
 
 So: **phase 6 is met, and PPO is the better learner on this protocol at scale.** "PPO beats the
@@ -433,7 +434,7 @@ diagnostics say where to push. `explained_variance` reached **0.90**, so the cri
 problem. `approx_kl` settled at **0.002** and `clip_fraction` at **0.03** against a clip of 0.2 —
 the update is barely constrained, which says the learning rate is *low* rather than high. And entropy
 fell from 1.086 (ln 3 = 1.0986) to **0.27**, which is a policy committing fast; whether that is
-healthy or premature is the entropy-coefficient question p0 answers.
+healthy or premature is the entropy-coefficient question b3 answers.
 
 **The counters that would have shown a broken port all read clean:** `step == transitions` exactly,
 25.7k transitions/s at fc 320 on the laptop with the stage-A queue on, and the greedy argmax policy
@@ -454,7 +455,7 @@ Full table in [`../docs/results.md`](../docs/results.md); the two findings are i
 
 **Nine of the fifteen finished inside 0.8 pp of each other on `best_perfect30` (96.4 - 97.2).** At
 n=1 per config, in a domain where the same config has produced 62.5 and 18.0, that is one number. So
-**there is no tuned config to hand p1** — the reference is as good as anything the sweep found, and
+**there is no tuned config to hand b4** — the reference is as good as anything the sweep found, and
 the four knobs §7 flagged as the interesting ones are flat.
 
 **The one axis that moved is gradient steps per transition**, and it moved 7.5 pp monotonically:
@@ -465,25 +466,25 @@ the four knobs §7 flagged as the interesting ones are flat.
 | the reference | 1x | 96.6 |
 | epochs 8 | 2x | **97.2** — the best |
 
-**Rollout size is a second, separate axis.** `p0p-roll64` holds updates-per-transition fixed and
+**Rollout size is a second, separate axis.** `b3p-roll64` holds updates-per-transition fixed and
 halves the rollout, and it lost ~2.5 pp — noisier advantages and less diverse minibatches, not fewer
 updates. So the two must be swept separately, which the first pass did not know.
 
 **On the network:** two narrow layers beat one wide one. `fc 200,100` reached 97.1 and `fc 300,100`
 produced the most ≥95 checkpoints of any arm (233), while **`fc 500` was clearly worse (94.7)** and
-`fc 200` matched the 320 baseline. This task does not want width. p1 stays at **fc 320 anyway**,
+`fc 200` matched the 320 baseline. This task does not want width. b4 stays at **fc 320 anyway**,
 because a seed-matched comparison against b2 has to hold the network fixed — the depth result is a
-*better agent* question for a p2, exactly as §11 handles action masking.
+*better agent* question for a later batch, exactly as §11 handles action masking.
 
 **Three metrics gave three different orderings**, which is the cleanest statement that 6c found no
-winner: `best_perfect30` ranks `p0q` first, the ≥98%/500 count ranks `p0e` first, and stage-B peak
-ranks `p0g` first. Pick the metric before the arm, not after.
+winner: `best_perfect30` ranks `b3q` first, the ≥98%/500 count ranks `b3e` first, and stage-B peak
+ranks `b3g` first. Pick the metric before the arm, not after.
 
-**p1 runs b2's env config**, so the reward function is matched: `SNEK_CHASE_SAFE_SHAPING=0.1`,
+**b4 runs b2's env config**, so the reward function is matched: `SNEK_CHASE_SAFE_SHAPING=0.1`,
 `SNEK_CHASE_SAFE_GATE=75`, `SNEK_FOOD_DISTANCE_REWARD=0`, `SNEK_FC_LAYERS=320`, seed N pinned to arm
-letter N. That makes p1 seed-matched against b1, b2, b29, b41 and b47.
+letter N. That makes b4 seed-matched against b1, b2, b29, b41 and b47.
 
-**What a failure means, pre-registered.** If p1 misses ≥90% on every seed at 12M transitions,
+**What a failure means, pre-registered.** If b4 misses ≥90% on every seed at 12M transitions,
 the reading is not "PPO does not work here" — it is "PPO does not work here at DQN's sample budget",
 and the follow-up is a single long arm at 50-100M transitions, which §4 says costs hours rather than
 days. `docs/runs.md`'s backlog already names Munchausen-DQN and SAC-discrete as the fallbacks.
@@ -492,10 +493,11 @@ days. `docs/runs.md`'s backlog already names Munchausen-DQN and SAC-discrete as 
 
 ## 11. Open questions for the user
 
-1. **γ for p1: 0.9975 (matches b2) or 0.99 (snek3's default, and safer on invariant 6)?**
-   Recommendation: let p0 try both and let p1 use the winner, stating the γ beside every comparison.
-2. **Action masking: is the `1` setting in scope at all?** Recommendation: p1 runs unmasked for a
-   clean A/B, and a p2 runs masked as a candidate *better agent* rather than as a comparison.
+1. **γ for b4: 0.9975 (matches b2) or 0.99 (snek3's default, and safer on invariant 6)?**
+   Recommendation: let b3 try both and let b4 use the winner, stating the γ beside every comparison.
+2. **Action masking: is the `1` setting in scope at all?** Recommendation: b4 runs unmasked for a
+   clean A/B, and a later batch runs masked as a candidate *better agent* rather than as a
+   comparison.
 3. **The `train.py` refactor, or a separate `train_ppo.py`?** Recommendation: the refactor, gated on
    byte-identical DQN output. A forked measurement path is the failure mode this whole plan is
    shaped to avoid.
@@ -503,11 +505,11 @@ days. `docs/runs.md`'s backlog already names Munchausen-DQN and SAC-discrete as 
    `run_report` reads with `.get()`, so old rows stay readable — but it means new b2 rows carry a
    field its earlier rows do not. Recommendation: yes, after b2 closes.
 
-## Backlog, once p1 has run
+## Backlog, once b4 has run
 
 | idea | prior |
 |---|---|
 | **A PPO actor warm-started from the snek2 champion** | free: the champion's `30 -> 320 -> 3` weights load into `PolicyNet` unchanged, and Q-values of magnitude ~30 make a near-deterministic opening softmax. Answers "can PPO hold a policy DQN found" separately from "can PPO find one" |
 | **Sampled evaluation** | measure π rather than argmax π. A different question, and one line |
-| **Adaptive entropy on the eval history** | the `dqn/schedules.py` pattern applied to the entropy coefficient. Only if p0 shows a fixed coefficient is the binding constraint |
+| **Adaptive entropy on the eval history** | the `dqn/schedules.py` pattern applied to the entropy coefficient. Only if b3 shows a fixed coefficient is the binding constraint |
 | **Wide-and-shallow arms** | PPO's cost is the env, and the env is 196k transitions/s at 1,024 lanes. Nothing in DQN could spend that |

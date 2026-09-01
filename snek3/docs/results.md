@@ -3,9 +3,179 @@
 The canonical arm table. One row per arm, filled in when the arm stops and its stage-B measurement
 lands. Config, final numbers, verdict.
 
-**Batch b1 — the DDQN baseline at every default, seeds 1-4, 3M steps.** Closed 2026-08-29. No
-stage-B column: **no checkpoint in any of the four reached 95/100 in stage A**, so `screen:95`
-selects nothing and there is nothing to measure at 500 episodes. The stage-A numbers are the result.
+**Newest batch first.** A batch closes at the top of this file, under the intro and above the
+batch before it, so the newest numbers are the ones you land on. The reference sections —
+`Imported policies` and `Reading this table` — stay at the bottom.
+
+**‡ The PPO batches were renamed on 2026-08-31: `p0`-`p3` became `b3`-`b6`** — one prefix for
+every batch in both eras, because a second one had already cost the desktop's batch grouping a day.
+The map is a `+3` offset holding the old order: `p0`->`b3`, `p1`->`b4`, `p2`->`b5`, `p3`->`b6`, so
+the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in `runs/` and in
+`savedPolicies/`. **Two places still hold the old names and are meant to:** the `results` branch,
+whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
+waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
+
+## Batches b5 and b6 — eight seeds each, closed 2026-08-30
+
+Both closed the same afternoon: b5's stage B in 222.6 min on the desktop, b6's in 226.1 min on the
+laptop, both status 0. **The stage-B headline is the >=98%/500 count** — the width of the record
+region — per [`protocol.md`](protocol.md).
+
+### b6 — `fc (200,100)`, 4 epochs
+
+| arm | stage-B rows | >=98%/500 | best row | stage-A best30 | strong | transitions |
+|---|---:|---:|---:|---:|---:|---:|
+| `b6a-fc200x100-seed1` | 4499 | 13.5% | 99.6 | 98.4 | 97.0 | 231M |
+| `b6b-fc200x100-seed2` | 4503 | 13.0% | 99.6 | 98.4 | 95.5 | 230M |
+| `b6c-fc200x100-seed3` | 5812 | 17.4% | 99.8 | 98.5 | 97.5 | 221M |
+| `b6d-fc200x100-seed4` | 5151 | 15.0% | 99.6 | 98.3 | 97.3 | 220M |
+| `b6e-fc200x100-seed5` | 3882 | 9.6% | 99.6 | 97.9 | 96.1 | 218M |
+| `b6f-fc200x100-seed6` | 4042 | 8.9% | 99.6 | 97.9 | 95.9 | 215M |
+| `b6g-fc200x100-seed7` | 4279 | 10.7% | 99.4 | 98.0 | 96.3 | 216M |
+| `b6h-fc200x100-seed8` | 4104 | 12.0% | 99.8 | 97.9 | 95.5 | 215M |
+
+### b5 — `fc (320,)`, 8 epochs
+
+| arm | stage-B rows | >=98%/500 | best row | stage-A best30 | strong | transitions |
+|---|---:|---:|---:|---:|---:|---:|
+| `b5a-ep8-seed1` | 3836 | 7.2% | 99.8 | 97.9 | 97.3 | 271M |
+| `b5b-ep8-seed2` | 5552 | 13.3% | 100.0 | 98.4 | 98.3 | 271M |
+| `b5c-ep8-seed3` | 3494 | 6.2% | 99.6 | 97.8 | 96.3 | 265M |
+| `b5d-ep8-seed4` | 3433 | 7.2% | 99.4 | 97.8 | 95.2 | 264M |
+| `b5e-ep8-seed5` | 5312 | 11.2% | 99.8 | 98.1 | 98.0 | 258M |
+| `b5f-ep8-seed6` | 4861 | 9.5% | 99.8 | 97.9 | 97.0 | 257M |
+| `b5g-ep8-seed7` | 5054 | 10.4% | 99.6 | 97.9 | 98.3 | 257M |
+| `b5h-ep8-seed8` | 3039 | 8.8% | 99.8 | 98.5 | 96.9 | 255M |
+
+### ‡ These two batches differ in two knobs, so they are not a network-shape test
+
+[`runs.md`](runs.md) named the two-hidden-layer result as "the most promising thread b3 turned up".
+**b6 does not settle it.** b6 is `fc (200,100)` **and** 4 epochs; b5 is `fc (320,)` **and** 8 epochs —
+and b3's one moving axis was gradient steps per transition, which is exactly what the epoch count
+changes. The budgets differ too (b6 215-231M, b5 255-271M). So the comparison below confounds the
+network shape with the axis already known to matter.
+
+| seed | b5 >=98%/500 | b6 >=98%/500 | b6 − b5 |
+|---:|---:|---:|---:|
+| 1 | 7.2 | 13.5 | **+6.3** |
+| 2 | 13.3 | 13.0 | **-0.3** |
+| 3 | 6.2 | 17.4 | **+11.2** |
+| 4 | 7.2 | 15.0 | **+7.8** |
+| 5 | 11.2 | 9.6 | **-1.6** |
+| 6 | 9.5 | 8.9 | **-0.6** |
+| 7 | 10.4 | 10.7 | **+0.3** |
+| 8 | 8.8 | 12.0 | **+3.2** |
+
+**b6 leads on the pooled headline — 12.8% against 9.6%, mean +3.29 pp — and on ~50M fewer
+transitions per arm.** The wins are asymmetric: the three largest are +11.2, +7.8 and +6.3, while the
+three losses are −1.6, −0.6 and −0.3.
+
+**The sign test says nothing, and it is the test this project leads with.** 5 of 8 seeds favour b6,
+which is p≈0.73 two-tailed — a coin. The pooled gap is carried by three seeds. And **rank 1 of the
+ranking is a tie**: peak `best_perfect30` is 98.5 in both batches (b6c, b5h). b5 also holds the single
+best stage-B row in either batch, **100.0%/500** at b5b/184M.
+
+**What would settle it is one batch varying only the network**, at matched epochs and matched budget.
+That arm has still never been run — and since `dqn/net.py` takes the same `fc_layers` config, it is
+also one arm away for DQN.
+
+**Neither best row is a record claim.** Both are selected highs over thousands of rows; a record needs
+a fresh 1,000+ episode measurement of the single winner, and all three of b3's highs fell 1.3-2.0 pp
+on re-measurement.
+
+## Batch b3 — the PPO tuning sweep
+
+**15 arms, seed 1, 10M transitions each, all on b2's reward function**, each one knob off a reference
+of lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.
+Closed 2026-08-29. Seven ran on the laptop, eight on the desktop. **A tuning pass, not a gate** — no
+arm is seed-matched to anything, so no row here supports a between-config claim on its own.
+
+| arm | knob | best30 | sd30 | ≥95 evals | stage B: n | best | ≥98 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `b3q-ep8` | epochs 8 | **97.2** | 3.0 | 217 | 217 | 98.8% | **21** |
+| `b3k-fc200x100` | fc 200,100 | **97.1** | 2.5 | 215 | 215 | **99.2%** | 17 |
+| `b3g-ent003` | entropy 0.003 | 96.9 | 2.8 | 153 | 153 | 98.6% | 2 |
+| `b3n-fc300x100` | fc 300,100 | 96.9 | 2.4 | **233** | 233 | 99.0% | **21** |
+| `b3e-lam95` | λ 0.95 | 96.8 | 2.4 | 179 | 179 | 98.2% | **7** |
+| `b3o-g995` | γ 0.995 | 96.7 | **1.8** | 166 | 166 | 98.6% | 10 |
+| `b3a-lr3e4-g99` | *the reference* | 96.6 | 2.2 | 108 | 108 | 98.4% | 6 |
+| `b3j-lr5e4` | lr 5e-4 | 96.5 | 3.6 | 160 | 160 | **99.0%** | **7** |
+| `b3m-fc200` | fc 200 | 96.4 | 2.0 | 131 | 131 | 98.0% | 1 |
+| `b3i-lr1e4` | lr 1e-4 | 95.0 | 5.0 | 47 | 47 | 97.4% | 0 |
+| `b3l-fc500` | fc 500 | 94.7 | 3.2 | 93 | 93 | 98.4% | 3 |
+| `b3p-roll64` | rollout 64 | 94.8 | 2.9 | 104 | 133 | 97.6% | 0 |
+| `b3f-lam100` | λ 1.0 | 90.8 | 5.2 | 11 | 11 | 96.2% | 0 |
+| `b3h-ent03` | entropy 0.03 | 90.6 | 9.1 | 9 | 9 | 94.8% | 0 |
+| `b3r-mb1024` | minibatch 1024 | **89.7** | 4.4 | 16 | 16 | 95.6% | 0 |
+| `b3b`, `b3c`, `b3d` | lr 1e-3, lr 3e-3, γ 0.9975 | 85.2, 69.9, 81.6 | 7.2, 18.4, 4.7 | 1, 3, 0 | 1, 3, — | 94.4%, 95.8% | 0 |
+
+`b3b`/`b3c`/`b3d` stopped at the 3M cap and are the arms the cap-inversion finding is measured
+against; the rest ran 3M and were then resumed to 10M.
+
+### What it establishes
+
+**No winner.** Nine arms inside **0.8 pp** on best30, and three metrics give three orderings of the top
+three (best30 → `b3q`; ≥98%/500 count → `b3e`/`b3j`; stage-B peak → `b3j`). At n=1 per config, that is
+one number. **b3 hands b4 the reference config unchanged.**
+
+**One axis moved, 7.5 pp, monotonically — gradient steps per transition.** minibatch 1024 (0.25x) 89.7
+· reference (1x) 96.6 · epochs 8 (2x) 97.2. **Rollout size is a second axis:** `b3p-roll64` holds the
+ratio fixed, halves the rollout, and loses ~2.5 pp.
+
+**Two hidden layers beat every single-layer width tried, and the record region is where it shows.**
+Density of ≥98%/500 checkpoints, which is the statistic that matters for a champion hunt:
+
+| network | parameters | best30 | ≥98%/500 | density |
+|---|---:|---:|---:|---:|
+| `fc 300,100` | 39,703 | 96.9 | **21** of 233 | **9.0%** |
+| `fc 200,100` | 26,603 | **97.1** | 17 of 215 | 7.9% |
+| `fc 320` *(reference)* | 10,883 | 96.6 | 6 of 108 | 5.6% |
+| `fc 500` | 17,003 | 94.7 | 3 of 93 | 3.2% |
+| `fc 200` | 6,803 | 96.4 | 1 of 131 | 0.8% |
+
+**Depth is not simply capacity here:** `fc 500` has more parameters than `fc 200` and is worse on
+best30, and `fc 200,100` has more than `fc 500` and is much better — so width past 320 actively hurts
+while a second layer helps. The two-layer arms also carry the two highest single checkpoints in the
+whole sweep (99.2% and 99.0%). **This is the most promising thread b3 turned up**, and it belongs to a
+b5 "better agent" batch: b4 must hold the network at 320 to stay seed-matched against b2.
+
+### Against DQN, at the same protocol
+
+| | transitions | stage-B measurements | best | ≥98%/500 | density | wall clock per arm |
+|---|---:|---:|---:|---:|---:|---:|
+| **PPO b3, all 15 arms pooled** | 10M | 1,862 | **99.2%** | **95** | **5.10%** | **~3 min** (7 sharing 14 cores) |
+| **DQN b2, 4 seeds pooled** | 18M | 1,135 | 99.2% | 5 | 0.44% | ~7-8 h (16 cores) |
+
+**PPO's record-region density is 11.6x DQN's** — 95 checkpoints at ≥98%/500 against 5 — which is the
+metric [`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison. The best *single*
+checkpoint is a tie at 99.2%, and PPO's got there on **5.05M** transitions against b2's 18M.
+
+**The honest depth, and it is the number to quote.** `b3j-lr5e4` @9,469,952 measured **99.0%/500** —
+equal to snek2's admitted hall-of-fame record at that depth — and re-measured on a fresh seed at 3,000
+episodes: **97.7% [97.1, 98.1]**, a 1.3 pp fall. `b3g-ent003` @8,159,232 fell 98.6% → **96.6%**
+[95.9, 97.2]. So:
+
+| policy | 3,000-episode measurement | its 500-episode figure | transitions |
+|---|---:|---:|---:|
+| `b44a-import` @2739000 — snek2's champion, converted | **98.8%** [98.3, 99.1] | — | 2.74M |
+| `b3k-fc200x100` @5046272 — PPO's best | **97.9%** [97.3, 98.3] | 99.2% | 5.05M |
+| `b3j-lr5e4` @9469952 | **97.7%** [97.1, 98.1] | 99.0% | 9.47M |
+| `b3g-ent003` @8159232 | **96.6%** [95.9, 97.2] | 98.6% | 8.16M |
+
+**The champion is still ahead — 98.8% against PPO's best 97.9%**, and the intervals only touch at
+98.3. It also got there on 2.74M transitions against 5.05M, so on sample efficiency to a *champion
+checkpoint* the snek2 DQN lineage remains ahead. **Every one of the three PPO highs fell on
+re-measurement**, by 1.3, 1.3 and 2.0 pp — which is the whole reason this table exists and the 500-episode
+column is the one not to quote. Neither number is a verdict on the algorithms — the champion is a selected best across
+snek2's whole history and `b3j` is one arm of a first tuning sweep — but quoting PPO's 99.0%/500 without
+this table would be quoting a selected high, which
+[`../CLAUDE.md`](../CLAUDE.md) explicitly warns against.
+
+## Batch b1 — the DDQN baseline at every default, seeds 1-4, 3M steps
+
+Closed 2026-08-29. No stage-B column, because **no checkpoint in any of the four reached 95/100 in
+stage A**: `screen:95` selects nothing and there is nothing to measure at 500 episodes. The stage-A
+numbers are the result.
 
 | arm | config | steps | trailing score | peak best30 | best single eval | ≥95/100 | verdict |
 |---|---|---:|---:|---:|---:|---:|---|
@@ -35,163 +205,6 @@ The perfect-game counter is alive, which is worth confirming rather than assumin
 non-perfect games average **91.5 of 95**, so the arm is dying with three or four squares left, which
 is the endgame this task has always been about.
 
-
-## Batch p0 — the PPO tuning sweep
-
-**15 arms, seed 1, 10M transitions each, all on b2's reward function**, each one knob off a reference
-of lr 3e-4 / γ 0.99 / λ 0.98 / entropy 0.01 / fc 320 / 128x128 rollout / 4 epochs / minibatch 256.
-Closed 2026-08-29. Seven ran on the laptop, eight on the desktop. **A tuning pass, not a gate** — no
-arm is seed-matched to anything, so no row here supports a between-config claim on its own.
-
-| arm | knob | best30 | sd30 | ≥95 evals | stage B: n | best | ≥98 |
-|---|---|---:|---:|---:|---:|---:|---:|
-| `p0q-ep8` | epochs 8 | **97.2** | 3.0 | 217 | 217 | 98.8% | **21** |
-| `p0k-fc200x100` | fc 200,100 | **97.1** | 2.5 | 215 | 215 | **99.2%** | 17 |
-| `p0g-ent003` | entropy 0.003 | 96.9 | 2.8 | 153 | 153 | 98.6% | 2 |
-| `p0n-fc300x100` | fc 300,100 | 96.9 | 2.4 | **233** | 233 | 99.0% | **21** |
-| `p0e-lam95` | λ 0.95 | 96.8 | 2.4 | 179 | 179 | 98.2% | **7** |
-| `p0o-g995` | γ 0.995 | 96.7 | **1.8** | 166 | 166 | 98.6% | 10 |
-| `p0a-lr3e4-g99` | *the reference* | 96.6 | 2.2 | 108 | 108 | 98.4% | 6 |
-| `p0j-lr5e4` | lr 5e-4 | 96.5 | 3.6 | 160 | 160 | **99.0%** | **7** |
-| `p0m-fc200` | fc 200 | 96.4 | 2.0 | 131 | 131 | 98.0% | 1 |
-| `p0i-lr1e4` | lr 1e-4 | 95.0 | 5.0 | 47 | 47 | 97.4% | 0 |
-| `p0l-fc500` | fc 500 | 94.7 | 3.2 | 93 | 93 | 98.4% | 3 |
-| `p0p-roll64` | rollout 64 | 94.8 | 2.9 | 104 | 133 | 97.6% | 0 |
-| `p0f-lam100` | λ 1.0 | 90.8 | 5.2 | 11 | 11 | 96.2% | 0 |
-| `p0h-ent03` | entropy 0.03 | 90.6 | 9.1 | 9 | 9 | 94.8% | 0 |
-| `p0r-mb1024` | minibatch 1024 | **89.7** | 4.4 | 16 | 16 | 95.6% | 0 |
-| `p0b`, `p0c`, `p0d` | lr 1e-3, lr 3e-3, γ 0.9975 | 85.2, 69.9, 81.6 | 7.2, 18.4, 4.7 | 1, 3, 0 | 1, 3, — | 94.4%, 95.8% | 0 |
-
-`p0b`/`p0c`/`p0d` stopped at the 3M cap and are the arms the cap-inversion finding is measured
-against; the rest ran 3M and were then resumed to 10M.
-
-### What it establishes
-
-**No winner.** Nine arms inside **0.8 pp** on best30, and three metrics give three orderings of the top
-three (best30 → `p0q`; ≥98%/500 count → `p0e`/`p0j`; stage-B peak → `p0j`). At n=1 per config, that is
-one number. **p0 hands p1 the reference config unchanged.**
-
-**One axis moved, 7.5 pp, monotonically — gradient steps per transition.** minibatch 1024 (0.25x) 89.7
-· reference (1x) 96.6 · epochs 8 (2x) 97.2. **Rollout size is a second axis:** `p0p-roll64` holds the
-ratio fixed, halves the rollout, and loses ~2.5 pp.
-
-**Two hidden layers beat every single-layer width tried, and the record region is where it shows.**
-Density of ≥98%/500 checkpoints, which is the statistic that matters for a champion hunt:
-
-| network | parameters | best30 | ≥98%/500 | density |
-|---|---:|---:|---:|---:|
-| `fc 300,100` | 39,703 | 96.9 | **21** of 233 | **9.0%** |
-| `fc 200,100` | 26,603 | **97.1** | 17 of 215 | 7.9% |
-| `fc 320` *(reference)* | 10,883 | 96.6 | 6 of 108 | 5.6% |
-| `fc 500` | 17,003 | 94.7 | 3 of 93 | 3.2% |
-| `fc 200` | 6,803 | 96.4 | 1 of 131 | 0.8% |
-
-**Depth is not simply capacity here:** `fc 500` has more parameters than `fc 200` and is worse on
-best30, and `fc 200,100` has more than `fc 500` and is much better — so width past 320 actively hurts
-while a second layer helps. The two-layer arms also carry the two highest single checkpoints in the
-whole sweep (99.2% and 99.0%). **This is the most promising thread p0 turned up**, and it belongs to a
-p2 "better agent" batch: p1 must hold the network at 320 to stay seed-matched against b2.
-
-### Against DQN, at the same protocol
-
-| | transitions | stage-B measurements | best | ≥98%/500 | density | wall clock per arm |
-|---|---:|---:|---:|---:|---:|---:|
-| **PPO p0, all 15 arms pooled** | 10M | 1,862 | **99.2%** | **95** | **5.10%** | **~3 min** (7 sharing 14 cores) |
-| **DQN b2, 4 seeds pooled** | 18M | 1,135 | 99.2% | 5 | 0.44% | ~7-8 h (16 cores) |
-
-**PPO's record-region density is 11.6x DQN's** — 95 checkpoints at ≥98%/500 against 5 — which is the
-metric [`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison. The best *single*
-checkpoint is a tie at 99.2%, and PPO's got there on **5.05M** transitions against b2's 18M.
-
-**The honest depth, and it is the number to quote.** `p0j-lr5e4` @9,469,952 measured **99.0%/500** —
-equal to snek2's admitted hall-of-fame record at that depth — and re-measured on a fresh seed at 3,000
-episodes: **97.7% [97.1, 98.1]**, a 1.3 pp fall. `p0g-ent003` @8,159,232 fell 98.6% → **96.6%**
-[95.9, 97.2]. So:
-
-| policy | 3,000-episode measurement | its 500-episode figure | transitions |
-|---|---:|---:|---:|
-| `b44a-import` @2739000 — snek2's champion, converted | **98.8%** [98.3, 99.1] | — | 2.74M |
-| `p0k-fc200x100` @5046272 — PPO's best | **97.9%** [97.3, 98.3] | 99.2% | 5.05M |
-| `p0j-lr5e4` @9469952 | **97.7%** [97.1, 98.1] | 99.0% | 9.47M |
-| `p0g-ent003` @8159232 | **96.6%** [95.9, 97.2] | 98.6% | 8.16M |
-
-**The champion is still ahead — 98.8% against PPO's best 97.9%**, and the intervals only touch at
-98.3. It also got there on 2.74M transitions against 5.05M, so on sample efficiency to a *champion
-checkpoint* the snek2 DQN lineage remains ahead. **Every one of the three PPO highs fell on
-re-measurement**, by 1.3, 1.3 and 2.0 pp — which is the whole reason this table exists and the 500-episode
-column is the one not to quote. Neither number is a verdict on the algorithms — the champion is a selected best across
-snek2's whole history and `p0j` is one arm of a first tuning sweep — but quoting PPO's 99.0%/500 without
-this table would be quoting a selected high, which
-[`../CLAUDE.md`](../CLAUDE.md) explicitly warns against.
-
-## Batches p2 and p3 — eight seeds each, closed 2026-08-30
-
-Both closed the same afternoon: p2's stage B in 222.6 min on the desktop, p3's in 226.1 min on the
-laptop, both status 0. **The stage-B headline is the >=98%/500 count** — the width of the record
-region — per [`protocol.md`](protocol.md).
-
-### p3 — `fc (200,100)`, 4 epochs
-
-| arm | stage-B rows | >=98%/500 | best row | stage-A best30 | strong | transitions |
-|---|---:|---:|---:|---:|---:|---:|
-| `p3a-fc200x100-seed1` | 4499 | 13.5% | 99.6 | 98.4 | 97.0 | 231M |
-| `p3b-fc200x100-seed2` | 4503 | 13.0% | 99.6 | 98.4 | 95.5 | 230M |
-| `p3c-fc200x100-seed3` | 5812 | 17.4% | 99.8 | 98.5 | 97.5 | 221M |
-| `p3d-fc200x100-seed4` | 5151 | 15.0% | 99.6 | 98.3 | 97.3 | 220M |
-| `p3e-fc200x100-seed5` | 3882 | 9.6% | 99.6 | 97.9 | 96.1 | 218M |
-| `p3f-fc200x100-seed6` | 4042 | 8.9% | 99.6 | 97.9 | 95.9 | 215M |
-| `p3g-fc200x100-seed7` | 4279 | 10.7% | 99.4 | 98.0 | 96.3 | 216M |
-| `p3h-fc200x100-seed8` | 4104 | 12.0% | 99.8 | 97.9 | 95.5 | 215M |
-
-### p2 — `fc (320,)`, 8 epochs
-
-| arm | stage-B rows | >=98%/500 | best row | stage-A best30 | strong | transitions |
-|---|---:|---:|---:|---:|---:|---:|
-| `p2a-ep8-seed1` | 3836 | 7.2% | 99.8 | 97.9 | 97.3 | 271M |
-| `p2b-ep8-seed2` | 5552 | 13.3% | 100.0 | 98.4 | 98.3 | 271M |
-| `p2c-ep8-seed3` | 3494 | 6.2% | 99.6 | 97.8 | 96.3 | 265M |
-| `p2d-ep8-seed4` | 3433 | 7.2% | 99.4 | 97.8 | 95.2 | 264M |
-| `p2e-ep8-seed5` | 5312 | 11.2% | 99.8 | 98.1 | 98.0 | 258M |
-| `p2f-ep8-seed6` | 4861 | 9.5% | 99.8 | 97.9 | 97.0 | 257M |
-| `p2g-ep8-seed7` | 5054 | 10.4% | 99.6 | 97.9 | 98.3 | 257M |
-| `p2h-ep8-seed8` | 3039 | 8.8% | 99.8 | 98.5 | 96.9 | 255M |
-
-### ‡ These two batches differ in two knobs, so they are not a network-shape test
-
-[`runs.md`](runs.md) named the two-hidden-layer result as "the most promising thread p0 turned up".
-**p3 does not settle it.** p3 is `fc (200,100)` **and** 4 epochs; p2 is `fc (320,)` **and** 8 epochs —
-and p0's one moving axis was gradient steps per transition, which is exactly what the epoch count
-changes. The budgets differ too (p3 215-231M, p2 255-271M). So the comparison below confounds the
-network shape with the axis already known to matter.
-
-| seed | p2 >=98%/500 | p3 >=98%/500 | p3 − p2 |
-|---:|---:|---:|---:|
-| 1 | 7.2 | 13.5 | **+6.3** |
-| 2 | 13.3 | 13.0 | **-0.3** |
-| 3 | 6.2 | 17.4 | **+11.2** |
-| 4 | 7.2 | 15.0 | **+7.8** |
-| 5 | 11.2 | 9.6 | **-1.6** |
-| 6 | 9.5 | 8.9 | **-0.6** |
-| 7 | 10.4 | 10.7 | **+0.3** |
-| 8 | 8.8 | 12.0 | **+3.2** |
-
-**p3 leads on the pooled headline — 12.8% against 9.6%, mean +3.29 pp — and on ~50M fewer
-transitions per arm.** The wins are asymmetric: the three largest are +11.2, +7.8 and +6.3, while the
-three losses are −1.6, −0.6 and −0.3.
-
-**The sign test says nothing, and it is the test this project leads with.** 5 of 8 seeds favour p3,
-which is p≈0.73 two-tailed — a coin. The pooled gap is carried by three seeds. And **rank 1 of the
-ranking is a tie**: peak `best_perfect30` is 98.5 in both batches (p3c, p2h). p2 also holds the single
-best stage-B row in either batch, **100.0%/500** at p2b/184M.
-
-**What would settle it is one batch varying only the network**, at matched epochs and matched budget.
-That arm has still never been run — and since `dqn/net.py` takes the same `fc_layers` config, it is
-also one arm away for DQN.
-
-**Neither best row is a record claim.** Both are selected highs over thousands of rows; a record needs
-a fresh 1,000+ episode measurement of the single winner, and all three of p0's highs fell 1.3-2.0 pp
-on re-measurement.
-
 ## The PPO gate arm
 
 **`ppo-smoke` — the phase-6b gate, not a batch arm.** 508k transitions at
@@ -213,14 +226,13 @@ untuned arm against four tuned-by-nothing DQN seeds, so the gap is a starting po
 |---|---:|---|
 | `explained_variance` | **0.90** | the critic is not the problem, which is the risk §8 ranked highest |
 | `approx_kl` | 0.002 | tiny |
-| `clip_fraction` | 0.03 | **the clip is barely binding at 0.2, so the learning rate is *low*, not high.** The first knob for p0 |
-| `entropy` | 1.086 → **0.27** | committing fast against ln 3 = 1.0986. Whether that is premature is p0's second question |
+| `clip_fraction` | 0.03 | **the clip is barely binding at 0.2, so the learning rate is *low*, not high.** The first knob for b3 |
+| `entropy` | 1.086 → **0.27** | committing fast against ln 3 = 1.0986. Whether that is premature is b3's second question |
 
 25.7k transitions/s at fc 320 on the laptop with the stage-A queue on, and `step == transitions`
 exactly, which is the whole point of PPO's step unit.
 
 ![ppo-smoke](../runs/ppo-smoke.png)
-
 
 ## Imported policies
 
