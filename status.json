@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-01T04:50:42",
-  "ts": 1788263442.4444659,
+  "iso": "2026-09-01T05:01:00",
+  "ts": 1788264060.0403163,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b7 \u2014 b7: fc (160,160), seed 1 of 4 \u2014 wave 3 of 4 \u2014 training 100% (2 arms)"
+      "b7 \u2014 b7: fc (160,160), seed 1 of 4 \u2014 wave 3 of 4 \u2014 stage B (8 arms)"
     ],
     "queued": [
-      "b7 stage B \u2014 b7: fc (160,160), seed 1 of 4 \u2014 wave 3 of 4 \u2014 queued (6 arms)",
       "b7 training \u2014 b7: fc (160,160), seed 1 of 4 \u2014 wave 3 of 4 \u2014 queued (16 arms)",
       "b8 training \u2014 b8: ent003, seed 1 of 4 \u2014 wave 1 of 2 \u2014 queued (16 arms)",
       "b8 stage B \u2014 b8: ent003, seed 1 of 4 \u2014 wave 1 of 2 \u2014 queued (8 arms)"
@@ -30,39 +29,32 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b7ao-fc400x200-seed3",
-      "type": "train",
-      "policy": "b7ao-fc400x200-seed3",
+      "id": "b7-stageb-w2",
+      "type": "eval",
+      "policy": "b7ai-fc300x100-seed1",
       "policies": [
-        "b7ao-fc400x200-seed3"
-      ],
-      "pid": 1767317,
-      "step": 49594368,
-      "max_steps": 50003968,
-      "steps_per_sec": 12052.2,
-      "elapsed_s": 7399
-    },
-    {
-      "id": "b7ap-fc400x200-seed4",
-      "type": "train",
-      "policy": "b7ap-fc400x200-seed4",
-      "policies": [
+        "b7ai-fc300x100-seed1",
+        "b7aj-fc300x100-seed2",
+        "b7ak-fc300x100-seed3",
+        "b7al-fc300x100-seed4",
+        "b7am-fc400x200-seed1",
+        "b7an-fc400x200-seed2",
+        "b7ao-fc400x200-seed3",
         "b7ap-fc400x200-seed4"
       ],
-      "pid": 1767318,
+      "pid": 1856252,
       "step": 50003968,
-      "max_steps": 50003968,
-      "steps_per_sec": 12052.4,
-      "elapsed_s": 7399
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 552
     }
   ],
   "ledger": {
-    "b7-stageb-w2": "queued",
     "b7aq-fc160x160-seed1": "queued",
     "b7ar-fc160x160-seed2": "queued",
     "b7as-fc160x160-seed3": "queued",
@@ -96,8 +88,9 @@
     "b8n-lam95-seed2": "queued",
     "b8o-lam95-seed3": "queued",
     "b8p-lam95-seed4": "queued",
-    "b7ao-fc400x200-seed3": "running",
-    "b7ap-fc400x200-seed4": "running",
+    "b7-stageb-w2": "running",
+    "b7ao-fc400x200-seed3": "done",
+    "b7ap-fc400x200-seed4": "done",
     "b7an-fc400x200-seed2": "done",
     "b7am-fc400x200-seed1": "done",
     "b7al-fc300x100-seed4": "done",
@@ -214,10 +207,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 19.1,
+  "disk_free_gb": 19.0,
   "load_avg": [
-    11.67626953125,
-    13.68798828125,
-    15.38818359375
+    16.0615234375,
+    15.09033203125,
+    15.11767578125
   ]
 }
