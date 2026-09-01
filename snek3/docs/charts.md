@@ -33,6 +33,35 @@ chart window as each wave starts; the PNGs land here at close-out, per layout:
 | 3 | `fc 160,160`, `fc 100,100` | `b7aq`-`b7at`, `b7au`-`b7ax` |
 | 4 | `fc 100,200,100`, `fc 200,100,50` | `b7ay`-`b7bb`, `b7bc`-`b7bf` |
 
+## Batch b4 — `fc (200,100)` + 8 epochs, seeds 1-8
+
+Closed 2026-08-31, charts imported from the `results` branch 2026-09-01 and **redrawn**, because the
+published PNGs carried the pre-rename `p1` titles. Pooled **7.3%** in the record region, the weakest
+of the three 8-seed batches ([`results.md`](results.md)).
+
+**Read these for the drawdowns, which is what makes b4 different.** The red trace repeatedly falls
+from ~95% to near zero, and it is the *greedy* policy doing it — stage A measures the argmax, not a
+sample. Past its competence onset b4 spends a median **9.1%** of its evals below 50% perfect, against
+0.7% for b6 and 0.0% for b5. It is a late-run effect: truncated to a matched 611-eval horizon the
+three batches are indistinguishable, so it develops over the 200M rather than being present early.
+
+![b4a-fc200x100ep8-seed1](../runs/b4a-fc200x100ep8-seed1.png)
+![b4a stage B](../runs/b4a-fc200x100ep8-seed1_checkpoint_evals.png)
+![b4b-fc200x100ep8-seed2](../runs/b4b-fc200x100ep8-seed2.png)
+![b4b stage B](../runs/b4b-fc200x100ep8-seed2_checkpoint_evals.png)
+![b4c-fc200x100ep8-seed3](../runs/b4c-fc200x100ep8-seed3.png)
+![b4c stage B](../runs/b4c-fc200x100ep8-seed3_checkpoint_evals.png)
+![b4d-fc200x100ep8-seed4](../runs/b4d-fc200x100ep8-seed4.png)
+![b4d stage B](../runs/b4d-fc200x100ep8-seed4_checkpoint_evals.png)
+![b4e-fc200x100ep8-seed5](../runs/b4e-fc200x100ep8-seed5.png)
+![b4e stage B](../runs/b4e-fc200x100ep8-seed5_checkpoint_evals.png)
+![b4f-fc200x100ep8-seed6](../runs/b4f-fc200x100ep8-seed6.png)
+![b4f stage B](../runs/b4f-fc200x100ep8-seed6_checkpoint_evals.png)
+![b4g-fc200x100ep8-seed7](../runs/b4g-fc200x100ep8-seed7.png)
+![b4g stage B](../runs/b4g-fc200x100ep8-seed7_checkpoint_evals.png)
+![b4h-fc200x100ep8-seed8](../runs/b4h-fc200x100ep8-seed8.png)
+![b4h stage B](../runs/b4h-fc200x100ep8-seed8_checkpoint_evals.png)
+
 ## Batch b6 — `fc (200,100)`, 4 epochs, seeds 1-8
 
 Closed 2026-08-30. Pooled **12.8%** of stage-B rows in the >=98%/500 record region; best rows
