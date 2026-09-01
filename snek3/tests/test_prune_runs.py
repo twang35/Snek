@@ -231,3 +231,32 @@ def test_arrays_leaves_the_shards_of_an_unmerged_pass_alone(runs_dir):
     prune_runs.prune_arrays(apply=True)
     assert 'episode_rewards' in results.rows_of(results.read(live))[0], 'in flight, untouched'
     assert 'episode_rewards' not in results.rows_of(results.read(done))[0], 'merged, pruned'
+
+
+def test_the_skipped_figure_counts_droppable_bytes_not_file_sizes(runs_dir, monkeypatch, capsys):
+    """It reported a file's whole size, which read as "39.4 MB skipped" on a box where every tracked
+    file was already pruned and nothing at all was skippable."""
+    # 300 rows, because the two figures must differ by more than the 0.1 MB the report prints: a
+    # one-row file makes both of them "0.0 MB" and the fixture cannot fail for the right reason.
+    has_arrays = write_pass('arm', None, [row(1000 * i, 490) for i in range(1, 301)])
+    already_pruned = write_pass('other', None, [row(1000, 490, arrays=False)])
+    monkeypatch.setattr(prune_runs, 'tracked_paths',
+                        lambda: {os.path.realpath(has_arrays), os.path.realpath(already_pruned)})
+    size = os.path.getsize(has_arrays)
+    droppable = size - len(json.dumps(prune_runs._without_arrays(results.read(has_arrays))))
+    assert size / 1e6 - droppable / 1e6 > 0.15, 'the fixture must be able to tell them apart'
+
+    prune_runs.prune_arrays(apply=False)
+    reported = capsys.readouterr().out.strip().splitlines()[-1]
+    # The already-pruned file contributes nothing, and the other contributes its arrays rather than
+    # its whole size -- which is 3x smaller and is the number the trade is actually about.
+    assert 'skipped {0:.1f} MB'.format(droppable / 1e6) in reported
+    assert '{0:.1f} MB'.format(size / 1e6) not in reported
+
+
+def test_nothing_is_reported_as_skipped_when_no_tracked_file_has_arrays(runs_dir, monkeypatch,
+                                                                       capsys):
+    path = write_pass('arm', None, [row(1000, 490, arrays=False)])
+    monkeypatch.setattr(prune_runs, 'tracked_paths', lambda: {os.path.realpath(path)})
+    prune_runs.prune_arrays(apply=False)
+    assert 'skipped' not in capsys.readouterr().out

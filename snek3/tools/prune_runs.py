@@ -136,6 +136,14 @@ def in_flight(path):
     return not os.path.exists(SHARD_SUFFIX.sub('.json', path))
 
 
+def _without_arrays(payload):
+    """`payload` with the two dead arrays gone from every row. Mutates, and returns it."""
+    for row in results.rows_of(payload):
+        for key in DEAD_ARRAYS:
+            row.pop(key, None)
+    return payload
+
+
 def prune_arrays(apply=False, include_tracked=False):
     freed = skipped = 0
     tracked = set() if include_tracked else tracked_paths()
@@ -146,17 +154,17 @@ def prune_arrays(apply=False, include_tracked=False):
             print('  KEEP  {0:<64} (a shard of a pass that has not merged)'.format(
                 os.path.basename(path)))
             continue
-        if os.path.realpath(path) in tracked:
-            skipped += os.path.getsize(path)
-            continue
         payload = results.read(path)
         rows = results.rows_of(payload)
         if not any(key in row for row in rows for key in DEAD_ARRAYS):
             continue
         before = os.path.getsize(path)
-        for row in rows:
-            for key in DEAD_ARRAYS:
-                row.pop(key, None)
+        if os.path.realpath(path) in tracked:
+            # The droppable bytes, not the file's size — reporting the size overstated the trade by
+            # 46% on the laptop and read as "39.4 MB skipped" on a box where nothing was skippable.
+            skipped += before - len(json.dumps(_without_arrays(payload)))
+            continue
+        payload = _without_arrays(payload)
         if apply:
             results.write(path, payload)
             after = os.path.getsize(path)
@@ -167,7 +175,8 @@ def prune_arrays(apply=False, include_tracked=False):
             'REWROTE' if apply else '  would', os.path.basename(path), _mb(before), _mb(after)))
     print('arrays: {0} {1}{2}'.format(
         'freed' if apply else 'would free', _mb(freed),
-        '; skipped {0} in git-tracked files (--include-tracked takes them too)'.format(_mb(skipped))
+        '; skipped {0} of droppable bytes in git-tracked files '
+        '(--include-tracked takes them too)'.format(_mb(skipped))
         if skipped else ''))
     return freed
 
