@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-01T16:51:41",
-  "ts": 1788306701.156011,
+  "iso": "2026-09-01T16:55:12",
+  "ts": 1788306912.7351072,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b8 \u2014 b8: kl02, seed 1 of 4 \u2014 wave 2 of 2 \u2014 training 17% (8 arms)"
+      "b8 — b8: kl02, seed 1 of 4 — wave 2 of 2 — training 19% (8 arms)"
     ],
     "queued": [],
     "attention": []
@@ -37,10 +37,10 @@
         "b8i-kl02-seed1"
       ],
       "pid": 2330597,
-      "step": 18366464,
+      "step": 20037632,
       "max_steps": 100007936,
-      "steps_per_sec": 5226.6,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8j-kl02-seed2",
@@ -50,10 +50,10 @@
         "b8j-kl02-seed2"
       ],
       "pid": 2330598,
-      "step": 18235392,
+      "step": 19841024,
       "max_steps": 100007936,
-      "steps_per_sec": 7317.1,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8k-kl02-seed3",
@@ -63,10 +63,10 @@
         "b8k-kl02-seed3"
       ],
       "pid": 2330599,
-      "step": 17334272,
+      "step": 18907136,
       "max_steps": 100007936,
-      "steps_per_sec": 5749.1,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8l-kl02-seed4",
@@ -76,10 +76,10 @@
         "b8l-kl02-seed4"
       ],
       "pid": 2330600,
-      "step": 17432576,
+      "step": 18956288,
       "max_steps": 100007936,
-      "steps_per_sec": 5749.0,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8m-lam95-seed1",
@@ -89,10 +89,10 @@
         "b8m-lam95-seed1"
       ],
       "pid": 2330601,
-      "step": 16957440,
+      "step": 18513920,
       "max_steps": 100007936,
-      "steps_per_sec": 4703.6,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8n-lam95-seed2",
@@ -102,10 +102,10 @@
         "b8n-lam95-seed2"
       ],
       "pid": 2330602,
-      "step": 17022976,
+      "step": 18530304,
       "max_steps": 100007936,
-      "steps_per_sec": 8884.4,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8o-lam95-seed3",
@@ -115,10 +115,10 @@
         "b8o-lam95-seed3"
       ],
       "pid": 2330603,
-      "step": 16842752,
+      "step": 18317312,
       "max_steps": 100007936,
-      "steps_per_sec": 6271.3,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     },
     {
       "id": "b8p-lam95-seed4",
@@ -128,10 +128,10 @@
         "b8p-lam95-seed4"
       ],
       "pid": 2330604,
-      "step": 16105472,
+      "step": 17530880,
       "max_steps": 100007936,
-      "steps_per_sec": 5748.6,
-      "elapsed_s": 2581
+      "steps_per_sec": null,
+      "elapsed_s": 2793
     }
   ],
   "ledger": {
@@ -289,10 +289,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 172.0,
+  "disk_free_gb": 171.9,
   "load_avg": [
-    14.84912109375,
-    14.580078125,
-    14.5654296875
+    14.96240234375,
+    14.66259765625,
+    14.58935546875
   ]
 }
