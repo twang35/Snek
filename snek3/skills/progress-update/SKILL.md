@@ -76,3 +76,14 @@ thing waits for the user.
 **Never commit a live desktop arm's `runs/<policy>.{md,png}` or `runs/<policy>_evals.json`.** The box
 rewrites those paths every eval, so a committed copy makes its `git merge --ff-only` abort and blocks
 every deploy for hours. Desktop artifacts arrive on the `results` branch at close-out.
+
+**"Live" includes a batch whose stage B is still running**, and it bit on 2026-09-01: b8's charts
+commit swept `runs/b8*` in wholesale while the box was mid-pass, and the next deploy aborted on 64
+files, 8 of them changing under it. So `git add` a desktop batch's charts **by name**:
+
+```
+git add snek3/runs/b<n>*.png snek3/runs/b<n>*.md      # never the _evals.json or _checkpoint_evals.*
+```
+
+and add the `*_evals.json` / `*_checkpoint_evals.*` only once the batch's stage B reads `done` on the
+ledger. If it has already happened, the `desktop-deploy` skill says how to sort the collision out.
