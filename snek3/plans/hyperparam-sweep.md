@@ -470,9 +470,10 @@ cells with far fewer checkpoints (T 1024) shorter.
 **Order.** b9 and b10 first, as asked and because the advantage pair is the least explored; then the
 update-size quartet b11–b14, which is where the drawdown mechanism most likely lives; b15 and b16,
 which b8 will have partly previewed; b17 as soon as its code lands (it can land during b9); then the
-three added checks b18–b20; b21 last because it moves the reward. Queue two batches at a time with
-ascending priorities so the box never idles between them and there is always a decision point before
-the third — a batch that produces an unexpected cliff may change what the next one should hold fixed.
+three added checks b18–b20; b21 last because it moves the reward. **Six batches are queued at a time**
+(the user's call, 2026-09-01), with ascending priorities so the box runs them in order and never idles;
+b9–b14 went up first, and b15–b20 follow as b9–b14 drain, with b17 now unblocked by the anneal code.
+A batch that produces an unexpected cliff can still be pulled from the queue before it starts.
 
 **Cost of readout 6.** One `hof-remeasure` pass on a batch's `above:98.5` candidates: b4's 274 rows
 took 26 min on the laptop; a 64-arm batch with denser winners will have more. Budget an hour a batch
@@ -497,5 +498,7 @@ on the laptop, run while the desktop trains the next one.
   and pooled, with the Mann-Whitney against the b7 control and the curve drawn. Readout 6 follows for
   the winners. A batch whose slow cells did not reach competence records that and may resume them
   (never an annealed one); it does not rank them.
+- **Log of what went up.** 2026-09-01 20:30: b9, b10 (128 arms). 2026-09-01 ~21:00: b11–b14 (128 arms),
+  after the anneal knobs were committed (`fd2584011`) and the box fast-forwarded to `13def02e8`.
 - **The base does not change until b22.** A batch that shows a clear winner writes it in
   `findings.md` as a candidate for the factorial, not as a new default.
