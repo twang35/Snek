@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-02T12:35:21",
-  "ts": 1788377721.2223806,
+  "iso": "2026-09-02T12:45:24",
+  "ts": 1788378324.3981776,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b9 | b9: lam999, seed 1 of 4 -- wave 8 of 8 | training 94% (8 arms)"
+      "b9 | b9: lam999, seed 1 of 4 -- wave 8 of 8 | stage B (8 arms)"
     ],
     "queued": [
       "b9 training | b9: lam999, seed 1 of 4 -- wave 8 of 8 | queued (8 arms)",
@@ -37,113 +37,29 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b9bw-lam99-seed1",
-      "type": "train",
+      "id": "b9-stageb-w7",
+      "type": "eval",
       "policy": "b9bw-lam99-seed1",
       "policies": [
-        "b9bw-lam99-seed1"
-      ],
-      "pid": 3589680,
-      "step": 49053696,
-      "max_steps": 50003968,
-      "steps_per_sec": 11811.6,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9bx-lam99-seed2",
-      "type": "train",
-      "policy": "b9bx-lam99-seed2",
-      "policies": [
-        "b9bx-lam99-seed2"
-      ],
-      "pid": 3589681,
-      "step": 49233920,
-      "max_steps": 50003968,
-      "steps_per_sec": 11297.9,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9by-lam99-seed3",
-      "type": "train",
-      "policy": "b9by-lam99-seed3",
-      "policies": [
-        "b9by-lam99-seed3"
-      ],
-      "pid": 3589682,
-      "step": 47120384,
-      "max_steps": 50003968,
-      "steps_per_sec": 9757.0,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9bz-lam99-seed4",
-      "type": "train",
-      "policy": "b9bz-lam99-seed4",
-      "policies": [
-        "b9bz-lam99-seed4"
-      ],
-      "pid": 3589683,
-      "step": 46694400,
-      "max_steps": 50003968,
-      "steps_per_sec": 10783.9,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9ca-lam995-seed1",
-      "type": "train",
-      "policy": "b9ca-lam995-seed1",
-      "policies": [
-        "b9ca-lam995-seed1"
-      ],
-      "pid": 3589684,
-      "step": 46120960,
-      "max_steps": 50003968,
-      "steps_per_sec": 13352.7,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9cb-lam995-seed2",
-      "type": "train",
-      "policy": "b9cb-lam995-seed2",
-      "policies": [
-        "b9cb-lam995-seed2"
-      ],
-      "pid": 3589685,
-      "step": 45727744,
-      "max_steps": 50003968,
-      "steps_per_sec": 9757.8,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9cc-lam995-seed3",
-      "type": "train",
-      "policy": "b9cc-lam995-seed3",
-      "policies": [
-        "b9cc-lam995-seed3"
-      ],
-      "pid": 3589686,
-      "step": 45056000,
-      "max_steps": 50003968,
-      "steps_per_sec": 11298.4,
-      "elapsed_s": 5178
-    },
-    {
-      "id": "b9cd-lam995-seed4",
-      "type": "train",
-      "policy": "b9cd-lam995-seed4",
-      "policies": [
+        "b9bw-lam99-seed1",
+        "b9bx-lam99-seed2",
+        "b9by-lam99-seed3",
+        "b9bz-lam99-seed4",
+        "b9ca-lam995-seed1",
+        "b9cb-lam995-seed2",
+        "b9cc-lam995-seed3",
         "b9cd-lam995-seed4"
       ],
-      "pid": 3589687,
-      "step": 45940736,
-      "max_steps": 50003968,
-      "steps_per_sec": 9757.7,
-      "elapsed_s": 5178
+      "pid": 3702856,
+      "step": 50003968,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 188
     }
   ],
   "ledger": {
@@ -352,14 +268,15 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b9bw-lam99-seed1": "running",
-    "b9bx-lam99-seed2": "running",
-    "b9by-lam99-seed3": "running",
-    "b9bz-lam99-seed4": "running",
-    "b9ca-lam995-seed1": "running",
-    "b9cb-lam995-seed2": "running",
-    "b9cc-lam995-seed3": "running",
-    "b9cd-lam995-seed4": "running",
+    "b9-stageb-w7": "running",
+    "b9cc-lam995-seed3": "done",
+    "b9cd-lam995-seed4": "done",
+    "b9cb-lam995-seed2": "done",
+    "b9ca-lam995-seed1": "done",
+    "b9bz-lam99-seed4": "done",
+    "b9by-lam99-seed3": "done",
+    "b9bw-lam99-seed1": "done",
+    "b9bx-lam99-seed2": "done",
     "b9-stageb-w6": "done",
     "b9bv-lam97-seed4": "done",
     "b9bu-lam97-seed3": "done",
@@ -569,10 +486,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 158.6,
+  "disk_free_gb": 158.5,
   "load_avg": [
-    15.66455078125,
-    15.65966796875,
-    15.55712890625
+    15.9287109375,
+    14.59326171875,
+    14.95654296875
   ]
 }
