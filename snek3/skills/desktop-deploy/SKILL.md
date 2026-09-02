@@ -1,6 +1,7 @@
 ---
 name: desktop-deploy
 description: Deploy snek3 code to the desktop box the-claw-den and restart its daemon. Use for "deploy to the desktop", "get the box on the new code", "the box is running old code", or when a queued job needs a change that is only on the laptop.
+model: sonnet
 ---
 
 # Deploy code to the desktop

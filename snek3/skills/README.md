@@ -14,6 +14,13 @@ docs say *what is true*; a skill says *what to do, in order*.
 | [`hof-remeasure`](hof-remeasure/SKILL.md) | re-measure a batch's stage-B winners at 5,000 episodes — the `hof5000` pass |
 | [`hof-promote`](hof-promote/SKILL.md) | put a checkpoint in `hallOfFame/`, on a confirmed fresh measurement |
 
+## Which model runs a skill
+
+`desktop-deploy` and `progress-update` carry `model: sonnet` in their frontmatter (2026-09-02): both are
+procedures with the judgement already written down, so the cheaper model runs them for the turn and
+the session's own model resumes afterwards. Add the field to any skill that is a checklist rather than
+an investigation; leave it off the ones that weigh evidence (`hof-promote`, `hof-remeasure`).
+
 ## How they are discovered
 
 The files live here. `/.claude/skills/<name>` at the repository root is a **symlink** to each one, and

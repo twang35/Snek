@@ -1,6 +1,7 @@
 ---
 name: progress-update
 description: Report what is training or being measured on both boxes, then bring snek3's docs up to date. Use for "progress update", "status", "how are the arms doing", "what is running". Read-only with respect to processes — it never kills, stops or restarts anything.
+model: sonnet
 ---
 
 # Progress update
