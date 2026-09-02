@@ -134,6 +134,14 @@ class PpoAgent(object):
     def policy_fn(self):
         return network.greedy_policy_fn(self.actor, self.device)
 
+    def set_learning_rate(self, value):
+        """Adam's step size, on every parameter group — there is one optimiser over both towers."""
+        for group in self.optimizer.param_groups:
+            group['lr'] = float(value)
+
+    def learning_rate(self):
+        return float(self.optimizer.param_groups[0]['lr'])
+
     def _tensor(self, observations):
         return torch.as_tensor(np.asarray(observations, dtype=np.float32), device=self.device)
 

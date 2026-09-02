@@ -1,0 +1,312 @@
+{
+  "_about": "The PPO hyperparameter sweep, batches b9-b21. Design and predictions in hyperparam-sweep.md. Expand one batch into desktop specs with: PYTHONPATH=. python -m tools.sweep_specs b9 --out <ops worktree>/snek3/desktop/queue/pending. Write the laptop smoke script for a batch's never-exercised cells with --smoke <file.sh>. Every cell runs at every seed; the control is b7aa-b7ad and is never re-run.",
+  "version": 2,
+  "horizon": {
+    "max_steps": 50003968,
+    "why": "b7's cap: 3,052 rollouts of 16,384. The record-density statistic is still climbing at 30M (8.2% at 20M, 11.3% at 30M, 19.0% at 50M on b7aa) and the b7 fc-320 arms are a free 4-seed control at exactly this cap."
+  },
+  "seeds": [1, 2, 3, 4],
+  "wave_size": 8,
+  "smoke": {
+    "max_steps": 65536,
+    "why": "four rollouts on the laptop, enough for the override line, one eval and a read of any ramp at a known fraction of the cap. Policy name is always smoke so the output is disposable."
+  },
+  "control": {
+    "arms": ["b7aa-fc320-seed1", "b7ab-fc320-seed2", "b7ac-fc320-seed3", "b7ad-fc320-seed4"],
+    "results": "results branch, results/b7-stageb/; runs/b7a[a-d]-fc320-seed*_evals.json for stage A"
+  },
+  "base": {
+    "project": "snek3",
+    "type": "train",
+    "env": {
+      "SNEK_ALGO": "ppo",
+      "SNEK_REWARD_PRESET": "b2",
+      "SNEK_CHASE_SAFE_SHAPING": "0.1",
+      "SNEK_CHASE_SAFE_GATE": "75",
+      "SNEK_FOOD_DISTANCE_REWARD": "0",
+      "SNEK_FC_LAYERS": "320",
+      "SNEK_PPO_EPOCHS": "4",
+      "SNEK_PPO_MINIBATCH": "256",
+      "SNEK_PPO_ROLLOUT": "128",
+      "SNEK_COLLECT_ENVS": "128",
+      "SNEK_PPO_LEARNING_RATE": "3e-4",
+      "SNEK_DISCOUNT": "0.99",
+      "SNEK_PPO_GAE_LAMBDA": "0.98",
+      "SNEK_PPO_ENTROPY_COEF": "0.01",
+      "SNEK_PPO_CLIP": "0.2",
+      "SNEK_PPO_TARGET_KL": "0",
+      "SNEK_PPO_GRADIENT_CLIPPING": "0.5",
+      "SNEK_PPO_VF_COEF": "0.5",
+      "SNEK_PPO_ADAM_EPSILON": "1e-7",
+      "SNEK_PPO_NORMALIZE_ADV": "1",
+      "SNEK_PPO_VALUE_LOSS": "huber",
+      "SNEK_EVAL_QUEUE": "1",
+      "SNEK_EVAL_QUEUE_DEPTH": "16",
+      "SNEK_EVAL_WORKERS": "8"
+    },
+    "why": "b7's fc (320,) reference: PPO's defaults, b2's reward, 4 epochs. Every value is stated explicitly rather than left to a default so a later default change cannot move the base under the sweep."
+  },
+  "readouts": [
+    "1 stage-B >=98%/500 density, per seed and pooled, exact Mann-Whitney 4v4 against the control (0.029 = complete separation)",
+    "2 collapse share: post-competence stage-A evals below 50% perfect (and below 80%)",
+    "3 post-competence stage-A share >=98%",
+    "4 competence onset: first step at which trailing-30 >= 90%",
+    "5 best_perfect30, reported not ranked",
+    "6 hof-remeasure at 5,000 episodes over above:98.5 -- rows >=98.73 and >=99.0. Winners plus control only.",
+    "7 the curve: every readout plotted against the knob's value across the whole grid. A monotone trend across the grid is evidence a single 4v4 pair is not."
+  ],
+  "batches": [
+    {
+      "batch": "b9",
+      "knob": "GAE lambda",
+      "priority": 110,
+      "control_value": {"SNEK_PPO_GAE_LAMBDA": "0.98"},
+      "expected_optimum": "0.95-0.99, broad flat top",
+      "cells": [
+        {"slug": "lam0",   "env": {"SNEK_PPO_GAE_LAMBDA": "0.0"},   "smoke": true, "prediction": "one-step TD, critic-only advantage. Slowest onset in the sweep, possibly not competent by 50M; smooth if it arrives; may plateau below the base"},
+        {"slug": "lam50",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.5"},   "prediction": "2-step horizon. Between TD(0) and the plateau; says how fast the low end recovers"},
+        {"slug": "lam80",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.8"},   "prediction": "4.8-step horizon. Fine on onset, maybe fewer collapses, maybe a lower ceiling"},
+        {"slug": "lam85",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.85"},  "prediction": "6.3-step horizon"},
+        {"slug": "lam90",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.9"},   "prediction": "10-step horizon. The plateau's low edge"},
+        {"slug": "lam91",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.91"},  "prediction": "plateau"},
+        {"slug": "lam92",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.92"},  "prediction": "plateau"},
+        {"slug": "lam93",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.93"},  "prediction": "plateau"},
+        {"slug": "lam94",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.94"},  "prediction": "plateau"},
+        {"slug": "lam95",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.95"},  "prediction": "b3e at n=1 had 0.0% of post-competence evals below 80%. The stability candidate"},
+        {"slug": "lam96",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.96"},  "prediction": "plateau"},
+        {"slug": "lam97",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.97"},  "prediction": "within noise of the base"},
+        {"slug": "lam99",  "env": {"SNEK_PPO_GAE_LAMBDA": "0.99"},  "prediction": "within noise of the base; horizon 50 steps"},
+        {"slug": "lam995", "env": {"SNEK_PPO_GAE_LAMBDA": "0.995"}, "prediction": "horizon 67 steps; the first value expected to show MC-side noise"},
+        {"slug": "lam999", "env": {"SNEK_PPO_GAE_LAMBDA": "0.999"}, "prediction": "horizon 91 steps, nearly MC"},
+        {"slug": "lam100", "env": {"SNEK_PPO_GAE_LAMBDA": "1.0"},   "smoke": true, "prediction": "Monte Carlo. b3f: 90.8 at 10M still rising, worst lambda arm. Later onset, more drawdowns"}
+      ]
+    },
+    {
+      "batch": "b10",
+      "knob": "discount gamma",
+      "priority": 120,
+      "control_value": {"SNEK_DISCOUNT": "0.99"},
+      "expected_optimum": "0.99-0.995",
+      "notes": "SNEK_DISCOUNT also sets the shaping discount, so the dense reward moves slightly with it -- correctly. Invariant 6's win threshold is cleared at every value here.",
+      "cells": [
+        {"slug": "g70",   "env": {"SNEK_DISCOUNT": "0.7"},    "prediction": "3-step value horizon: the myopic end. Learns to eat, cannot plan the endgame"},
+        {"slug": "g80",   "env": {"SNEK_DISCOUNT": "0.8"},    "prediction": "5-step horizon. Fast early, then an endgame ceiling below perfect unless the shaping carries it. Most likely to surprise"},
+        {"slug": "g85",   "env": {"SNEK_DISCOUNT": "0.85"},   "prediction": "6.7-step horizon"},
+        {"slug": "g90",   "env": {"SNEK_DISCOUNT": "0.9"},    "prediction": "10-step horizon. Same shape as 0.8, milder"},
+        {"slug": "g91",   "env": {"SNEK_DISCOUNT": "0.91"},   "prediction": "11-step horizon"},
+        {"slug": "g92",   "env": {"SNEK_DISCOUNT": "0.92"},   "prediction": "12.5-step horizon"},
+        {"slug": "g93",   "env": {"SNEK_DISCOUNT": "0.93"},   "prediction": "14-step horizon"},
+        {"slug": "g94",   "env": {"SNEK_DISCOUNT": "0.94"},   "prediction": "17-step horizon"},
+        {"slug": "g95",   "env": {"SNEK_DISCOUNT": "0.95"},   "prediction": "20-step horizon. Probably competent; ceiling unknown"},
+        {"slug": "g96",   "env": {"SNEK_DISCOUNT": "0.96"},   "prediction": "25-step horizon"},
+        {"slug": "g97",   "env": {"SNEK_DISCOUNT": "0.97"},   "prediction": "33-step horizon"},
+        {"slug": "g98",   "env": {"SNEK_DISCOUNT": "0.98"},   "prediction": "50-step horizon. Within noise of the base"},
+        {"slug": "g995",  "env": {"SNEK_DISCOUNT": "0.995"},  "prediction": "b3o at n=1: 96.7 with the lowest sd30 in b3 (1.8). The stability candidate"},
+        {"slug": "g9975", "env": {"SNEK_DISCOUNT": "0.9975"}, "prediction": "snek2's record DQN gamma. b3d read 81.6 at a 3M cap. Slower onset; either smoothest or noisiest"},
+        {"slug": "g999",  "env": {"SNEK_DISCOUNT": "0.999"},  "prediction": "1000-step horizon, longer than a game. Critic targets approach whole-game sums; expect lower explained variance and later onset"},
+        {"slug": "g100",  "env": {"SNEK_DISCOUNT": "1.0"},    "smoke": true, "prediction": "undiscounted. Potential shaping telescopes exactly; the rollout-boundary bootstrap carries full weight. Latest onset of the high end"}
+      ]
+    },
+    {
+      "batch": "b11",
+      "knob": "Adam step size",
+      "priority": 130,
+      "control_value": {"SNEK_PPO_LEARNING_RATE": "3e-4"},
+      "expected_optimum": "2.5e-4 to 5e-4, i.e. the base",
+      "notes": "3e-3 is not in the grid: b3c diverged there (69.9, sd 18.4). 2e-3 is the highest value queued.",
+      "cells": [
+        {"slug": "lr4e5",   "env": {"SNEK_PPO_LEARNING_RATE": "4e-5"},   "prediction": "very late onset, possibly past 50M. b3 says a low lr did not buy stability; this is the test"},
+        {"slug": "lr1e4",   "env": {"SNEK_PPO_LEARNING_RATE": "1e-4"},   "prediction": "b3i at n=1: 95.0, later onset, MORE evals below 80% (14.5 vs 12.2), zero >=98/500 rows"},
+        {"slug": "lr1.5e4", "env": {"SNEK_PPO_LEARNING_RATE": "1.5e-4"}, "prediction": "between 1e-4 and the base"},
+        {"slug": "lr2.5e4", "env": {"SNEK_PPO_LEARNING_RATE": "2.5e-4"}, "prediction": "within noise of the base"},
+        {"slug": "lr5e4",   "env": {"SNEK_PPO_LEARNING_RATE": "5e-4"},   "prediction": "b3j at n=1 matched the base and held the best single row. Within noise"},
+        {"slug": "lr8e4",   "env": {"SNEK_PPO_LEARNING_RATE": "8e-4"},   "prediction": "earlier onset, visibly more collapses"},
+        {"slug": "lr1e3",   "env": {"SNEK_PPO_LEARNING_RATE": "1e-3"},   "prediction": "b3b: 85.2 sd 7.2 at 3M. Competent by 50M with a high collapse share"},
+        {"slug": "lr2e3",   "env": {"SNEK_PPO_LEARNING_RATE": "2e-3"},   "prediction": "between 1e-3 and the divergence at 3e-3; locates the cliff"}
+      ]
+    },
+    {
+      "batch": "b12",
+      "knob": "epochs",
+      "priority": 140,
+      "control_value": {"SNEK_PPO_EPOCHS": "4"},
+      "expected_optimum": "3-4",
+      "notes": "The axis that has moved most. Onset speed rises with epochs, stability falls; at n=8, 8 epochs lost to 4 at both shapes (b4 vs b6; b5 vs b7).",
+      "cells": [
+        {"slug": "ep1",  "env": {"SNEK_PPO_EPOCHS": "1"},  "prediction": "clip nearly inert. Very stable, slow; may not reach the record region by 50M"},
+        {"slug": "ep2",  "env": {"SNEK_PPO_EPOCHS": "2"},  "prediction": "stable, slower than base, probably competent. Says what stability costs in speed"},
+        {"slug": "ep3",  "env": {"SNEK_PPO_EPOCHS": "3"},  "prediction": "within noise of the base, maybe slightly fewer collapses"},
+        {"slug": "ep5",  "env": {"SNEK_PPO_EPOCHS": "5"},  "prediction": "within noise of the base"},
+        {"slug": "ep6",  "env": {"SNEK_PPO_EPOCHS": "6"},  "prediction": "between the base and 8: the first value expected to show b4's collapse pattern"},
+        {"slug": "ep7",  "env": {"SNEK_PPO_EPOCHS": "7"},  "prediction": "between 6 and 8"},
+        {"slug": "ep8",  "env": {"SNEK_PPO_EPOCHS": "8"},  "prediction": "never measured against 4 on fc 320 at a matched budget. b4's pattern: collapse share far above the base"},
+        {"slug": "ep10", "env": {"SNEK_PPO_EPOCHS": "10"}, "prediction": "worse than 8"},
+        {"slug": "ep12", "env": {"SNEK_PPO_EPOCHS": "12"}, "prediction": "approx_kl tails, clip saturating"},
+        {"slug": "ep16", "env": {"SNEK_PPO_EPOCHS": "16"}, "smoke": true, "prediction": "highest collapse share in the sweep short of entropy 0.03. The interaction cells 16xlr1e-4 and 16xclip0.1 belong to the factorial"}
+      ]
+    },
+    {
+      "batch": "b13",
+      "knob": "minibatch",
+      "priority": 150,
+      "control_value": {"SNEK_PPO_MINIBATCH": "256"},
+      "expected_optimum": "128-256",
+      "notes": "Moves gradient noise AND steps per epoch at once (32 -> 512 steps/epoch, 256 -> 64). Advantage normalisation is per minibatch. Read beside b12 to separate steps from reuse. 192 and 384 do not divide 16,384 evenly; the last minibatch of an epoch is short, which is fine.",
+      "cells": [
+        {"slug": "mb32",   "env": {"SNEK_PPO_MINIBATCH": "32"},   "smoke": true, "prediction": "fast onset, high collapse share, noisy advantage scale. If not worse than 16 epochs, reuse is the mechanism rather than step count"},
+        {"slug": "mb64",   "env": {"SNEK_PPO_MINIBATCH": "64"},   "prediction": "milder version of 32"},
+        {"slug": "mb128",  "env": {"SNEK_PPO_MINIBATCH": "128"},  "prediction": "the likeliest alternative default; within noise or slightly faster"},
+        {"slug": "mb192",  "env": {"SNEK_PPO_MINIBATCH": "192"},  "prediction": "within noise of the base"},
+        {"slug": "mb384",  "env": {"SNEK_PPO_MINIBATCH": "384"},  "prediction": "within noise of the base"},
+        {"slug": "mb512",  "env": {"SNEK_PPO_MINIBATCH": "512"},  "prediction": "slower, smoother"},
+        {"slug": "mb1024", "env": {"SNEK_PPO_MINIBATCH": "1024"}, "prediction": "b3r at n=1: 89.7, worst non-diverged arm. Slow; may not reach the record region by 50M"},
+        {"slug": "mb2048", "env": {"SNEK_PPO_MINIBATCH": "2048"}, "smoke": true, "prediction": "8 steps per epoch. Says whether the 1024 slope continues or the arm never arrives"}
+      ]
+    },
+    {
+      "batch": "b14",
+      "knob": "rollout horizon T",
+      "priority": 160,
+      "control_value": {"SNEK_PPO_ROLLOUT": "128"},
+      "expected_optimum": "128-256",
+      "notes": "Transitions per update = 128 x T; update rounds by 50M = 3052 at 128, 381 at 1024. Stage A's interval is one rollout, so T=1024 writes 8x fewer checkpoints: compare density shares, not counts. Caps that are not a multiple of the rollout run one rollout past 50,003,968.",
+      "cells": [
+        {"slug": "roll32",   "env": {"SNEK_PPO_ROLLOUT": "32"},   "smoke": true, "prediction": "4,096 transitions per update, 12,208 rounds. The short end: GAE truncated at 32 steps against a 33.6-step horizon; expect worse than 64"},
+        {"slug": "roll64",   "env": {"SNEK_PPO_ROLLOUT": "64"},   "prediction": "b3p at n=1: ~2.5 pp below the base. Slightly worse everywhere"},
+        {"slug": "roll192",  "env": {"SNEK_PPO_ROLLOUT": "192"},  "prediction": "within noise of the base"},
+        {"slug": "roll256",  "env": {"SNEK_PPO_ROLLOUT": "256"},  "prediction": "equal or slightly better stability, similar density, marginally later onset. The alternative default"},
+        {"slug": "roll512",  "env": {"SNEK_PPO_ROLLOUT": "512"},  "prediction": "later onset, good stability if it arrives"},
+        {"slug": "roll1024", "env": {"SNEK_PPO_ROLLOUT": "1024"}, "smoke": true, "prediction": "381 update rounds is probably too few by 50M; late onset"}
+      ]
+    },
+    {
+      "batch": "b15",
+      "knob": "entropy coefficient",
+      "priority": 170,
+      "control_value": {"SNEK_PPO_ENTROPY_COEF": "0.01"},
+      "expected_optimum": "0.001-0.005, or a short anneal",
+      "notes": "b3: post-competence evals below 80% ran 2.9% at 0.003, 12.2% at 0.01, 45.6% at 0.03. b8 tests 0.003 and 0.01->0.001 on fc (200,100); these cells are the re-run on the base. The anneal is linear over SNEK_MAX_STEPS and re-stretches if the arm is resumed to a higher cap.",
+      "cells": [
+        {"slug": "ent0",          "env": {"SNEK_PPO_ENTROPY_COEF": "0.0"},   "smoke": true, "prediction": "no bonus at all. Says whether the term matters on a 3-action task with dense shaping; risk is a policy that goes deterministic early and stalls"},
+        {"slug": "ent001",        "env": {"SNEK_PPO_ENTROPY_COEF": "0.001"}, "prediction": "fewest collapses, similar onset. If monotone down to here with no density loss, the default moves"},
+        {"slug": "ent003",        "env": {"SNEK_PPO_ENTROPY_COEF": "0.003"}, "prediction": "b3g's value and b8's. Fewer collapses than the base"},
+        {"slug": "ent005",        "env": {"SNEK_PPO_ENTROPY_COEF": "0.005"}, "prediction": "between 0.003 and the base"},
+        {"slug": "ent02",         "env": {"SNEK_PPO_ENTROPY_COEF": "0.02"},  "prediction": "more collapses; locates the cliff between 0.01 and 0.03"},
+        {"slug": "ent03",         "env": {"SNEK_PPO_ENTROPY_COEF": "0.03"},  "prediction": "b3h's catastrophe at n=4: 45.6% of evals below 80% at n=1"},
+        {"slug": "entanneal10",   "env": {"SNEK_PPO_ENTROPY_COEF": "0.1",  "SNEK_PPO_ENTROPY_COEF_FINAL": "0.001"}, "smoke": true, "prediction": "explore hard, commit late. Crosses 0.03 at 35M and 0.01 at 45M, so most of the run is above the known-bad value: late onset, possibly the best late stability"},
+        {"slug": "entanneal03",   "env": {"SNEK_PPO_ENTROPY_COEF": "0.03", "SNEK_PPO_ENTROPY_COEF_FINAL": "0.001"}, "prediction": "the milder anneal: crosses 0.01 at 34M"},
+        {"slug": "entanneal01",   "env": {"SNEK_PPO_ENTROPY_COEF": "0.01", "SNEK_PPO_ENTROPY_COEF_FINAL": "0.001"}, "prediction": "b8's anneal on this shape. Marginally ahead of its control at 71M on fc (200,100)"},
+        {"slug": "entanneal01to0", "env": {"SNEK_PPO_ENTROPY_COEF": "0.01", "SNEK_PPO_ENTROPY_COEF_FINAL": "0.0"}, "prediction": "the same ramp all the way to zero; the last 5M run with no bonus"}
+      ]
+    },
+    {
+      "batch": "b16",
+      "knob": "target_KL",
+      "priority": 180,
+      "control_value": {"SNEK_PPO_TARGET_KL": "0"},
+      "expected_optimum": "a small effect; 0.01 if any",
+      "notes": "Early-stops the epoch loop between epochs. b4's approx_kl per update: median 0.0035, p95 0.0079, p99 0.023, worst 0.514 -- so 0.02 fires on ~1% of updates, 0.01 on ~4%, 0.005 on ~25%, and >=0.03 almost never. At 4 epochs there are only three stopping points. 0.1 was dropped as unable to fire; 0.04 and 0.05 are kept as the null check.",
+      "cells": [
+        {"slug": "kl003", "env": {"SNEK_PPO_TARGET_KL": "0.003"}, "prediction": "below the median: fires on most updates, so ~1-2 epochs on average. The aggressive end"},
+        {"slug": "kl005", "env": {"SNEK_PPO_TARGET_KL": "0.005"}, "prediction": "fires on a quarter of updates; ~3 epochs on average with the tail removed. Best stability in the batch if the tail is the mechanism"},
+        {"slug": "kl008", "env": {"SNEK_PPO_TARGET_KL": "0.008"}, "prediction": "about p95: cuts the top 5%"},
+        {"slug": "kl01",  "env": {"SNEK_PPO_TARGET_KL": "0.01"},  "prediction": "cuts the top ~4%. The first value with a plausible effect"},
+        {"slug": "kl013", "env": {"SNEK_PPO_TARGET_KL": "0.013"}, "prediction": "top ~2%"},
+        {"slug": "kl015", "env": {"SNEK_PPO_TARGET_KL": "0.015"}, "prediction": "top ~1.5%"},
+        {"slug": "kl02",  "env": {"SNEK_PPO_TARGET_KL": "0.02"},  "prediction": "b8's value on this shape. Cuts the top 1%; near-null unless collapses come from rare huge updates"},
+        {"slug": "kl03",  "env": {"SNEK_PPO_TARGET_KL": "0.03"},  "prediction": "the control by another name"},
+        {"slug": "kl04",  "env": {"SNEK_PPO_TARGET_KL": "0.04"},  "prediction": "predicted identical to the control; the null check"},
+        {"slug": "kl05",  "env": {"SNEK_PPO_TARGET_KL": "0.05"},  "prediction": "predicted identical to the control; the null check"}
+      ]
+    },
+    {
+      "batch": "b17",
+      "knob": "clip, and the clip and lr anneals",
+      "priority": 190,
+      "control_value": {"SNEK_PPO_CLIP": "0.2"},
+      "expected_optimum": "the anneals win on collapse share; the question is what they cost on density",
+      "requires_code": ["SNEK_PPO_CLIP_FINAL", "SNEK_PPO_LEARNING_RATE_FINAL"],
+      "notes": "The anneal cells need two new knobs, each the same linear ramp over SNEK_MAX_STEPS as ppo/schedules.entropy_coef_for, applied in ppo/algo.advance(). Clip anneals to 0.02 not 0: ppo/algo.py refuses a clip outside (0, 1). Until the code lands the generator drops those cells.",
+      "cells": [
+        {"slug": "clip005",      "env": {"SNEK_PPO_CLIP": "0.05"}, "prediction": "very tight trust region: slow, steady, possibly never reaches the record region"},
+        {"slug": "clip01",       "env": {"SNEK_PPO_CLIP": "0.1"},  "prediction": "tighter: slower onset, fewer collapses"},
+        {"slug": "clip015",      "env": {"SNEK_PPO_CLIP": "0.15"}, "prediction": "within noise of the base"},
+        {"slug": "clip03",       "env": {"SNEK_PPO_CLIP": "0.3"},  "prediction": "looser: earlier onset, more collapses"},
+        {"slug": "clip04",       "env": {"SNEK_PPO_CLIP": "0.4"},  "prediction": "the clip barely binds; approaches unclipped policy gradient with 4 epochs. Collapses"},
+        {"slug": "clipanneal",   "env": {"SNEK_PPO_CLIP": "0.2", "SNEK_PPO_CLIP_FINAL": "0.02"}, "smoke": true, "requires_code": true, "prediction": "steady endgame, fewer late collapses, denser record region late in the run"},
+        {"slug": "clip01anneal", "env": {"SNEK_PPO_CLIP": "0.1", "SNEK_PPO_CLIP_FINAL": "0.02"}, "requires_code": true, "prediction": "the PPO paper's Atari start value"},
+        {"slug": "lranneal",     "env": {"SNEK_PPO_LEARNING_RATE": "3e-4", "SNEK_PPO_LEARNING_RATE_FINAL": "0"}, "smoke": true, "requires_code": true, "prediction": "same effect through the parameters; also cools the critic. Second half of the run is below 1.5e-4, so onset a little later"},
+        {"slug": "lranneal10",   "env": {"SNEK_PPO_LEARNING_RATE": "3e-4", "SNEK_PPO_LEARNING_RATE_FINAL": "3e-5"}, "requires_code": true, "prediction": "anneal to a tenth rather than to zero: keeps learning late, tests whether the last stretch at ~0 was doing anything"},
+        {"slug": "bothanneal",   "env": {"SNEK_PPO_CLIP": "0.2", "SNEK_PPO_CLIP_FINAL": "0.02", "SNEK_PPO_LEARNING_RATE": "3e-4", "SNEK_PPO_LEARNING_RATE_FINAL": "0"}, "requires_code": true, "prediction": "the Atari recipe. Best late stability of anything in the sweep; risk is a lower ceiling"}
+      ]
+    },
+    {
+      "batch": "b18",
+      "knob": "gradient-norm clipping",
+      "priority": 200,
+      "control_value": {"SNEK_PPO_GRADIENT_CLIPPING": "0.5"},
+      "expected_optimum": "0.5-1.0; the information is in 0 (off)",
+      "notes": "Global norm over both towers. Never swept. If b4's worst updates (approx_kl 0.514) are norm-limited, turning it off should make collapses worse and tightening it should make them rarer -- a direct test of the tail-update hypothesis that does not touch the epoch count.",
+      "cells": [
+        {"slug": "gc0",   "env": {"SNEK_PPO_GRADIENT_CLIPPING": "0"},   "smoke": true, "prediction": "off. If collapses come from rare huge gradients this is the worst arm in the batch; if they are policy-level, nothing changes"},
+        {"slug": "gc01",  "env": {"SNEK_PPO_GRADIENT_CLIPPING": "0.1"}, "prediction": "clips most updates: slower, steadier, acts like a lower lr on the big steps only"},
+        {"slug": "gc025", "env": {"SNEK_PPO_GRADIENT_CLIPPING": "0.25"}, "prediction": "between 0.1 and the base"},
+        {"slug": "gc1",   "env": {"SNEK_PPO_GRADIENT_CLIPPING": "1.0"}, "prediction": "within noise of the base"},
+        {"slug": "gc2",   "env": {"SNEK_PPO_GRADIENT_CLIPPING": "2.0"}, "prediction": "rarely binds; between 1.0 and off"},
+        {"slug": "gc5",   "env": {"SNEK_PPO_GRADIENT_CLIPPING": "5.0"}, "prediction": "effectively off"}
+      ]
+    },
+    {
+      "batch": "b19",
+      "knob": "the switches: advantage normalisation, value loss, Adam epsilon, vf_coef",
+      "priority": 210,
+      "control_value": {"SNEK_PPO_NORMALIZE_ADV": "1", "SNEK_PPO_VALUE_LOSS": "huber", "SNEK_PPO_ADAM_EPSILON": "1e-7", "SNEK_PPO_VF_COEF": "0.5"},
+      "expected_optimum": "the base; each cell is a check that a default is not silently costing something",
+      "notes": "Four knobs with two or three sensible values each, gathered into one batch because none has a curve to map. vf_coef is predicted near-inert: the towers share no parameters and Adam is scale-invariant per parameter, so it can only shift the critic's effective step by the tiny epsilon term. Included as the null check the prediction deserves.",
+      "cells": [
+        {"slug": "noadvnorm", "env": {"SNEK_PPO_NORMALIZE_ADV": "0"}, "smoke": true, "prediction": "the update now scales with the reward, and a +100 terminal in a minibatch dominates it. Expect more collapses and a policy that over-weights the win"},
+        {"slug": "mse",       "env": {"SNEK_PPO_VALUE_LOSS": "mse"},  "smoke": true, "prediction": "squared error lets one +100 terminal dominate 256 samples (why huber is the default). Noisier critic, lower explained variance, possibly more collapses"},
+        {"slug": "adameps1e5", "env": {"SNEK_PPO_ADAM_EPSILON": "1e-5"}, "prediction": "the PPO-paper value. Damps the step for parameters with tiny second moments; slightly steadier, possibly slightly slower"},
+        {"slug": "adameps1e8", "env": {"SNEK_PPO_ADAM_EPSILON": "1e-8"}, "prediction": "torch's default. Within noise of 1e-7"},
+        {"slug": "vf01",      "env": {"SNEK_PPO_VF_COEF": "0.1"}, "prediction": "predicted inert"},
+        {"slug": "vf10",      "env": {"SNEK_PPO_VF_COEF": "1.0"}, "prediction": "predicted inert"}
+      ]
+    },
+    {
+      "batch": "b20",
+      "knob": "collect lanes",
+      "priority": 220,
+      "control_value": {"SNEK_COLLECT_ENVS": "128"},
+      "expected_optimum": "128-256",
+      "notes": "The other half of the rollout: how many games run in lockstep. Transitions per update = lanes x T, so 256 lanes at T=128 is the same batch as 128 lanes at T=256 -- but from twice as many independent episodes with half the per-episode depth. Read beside b14. Rollout size changes the stage-A interval exactly as T does.",
+      "cells": [
+        {"slug": "lanes32",  "env": {"SNEK_COLLECT_ENVS": "32"},  "smoke": true, "prediction": "4,096 transitions per update from 32 games: correlated, small batches. Worse than T=32's equivalent because episode diversity is lower too"},
+        {"slug": "lanes64",  "env": {"SNEK_COLLECT_ENVS": "64"},  "prediction": "half the base's batch; slightly worse"},
+        {"slug": "lanes256", "env": {"SNEK_COLLECT_ENVS": "256"}, "prediction": "same batch as roll256; if it beats roll256, episode diversity matters more than depth"},
+        {"slug": "lanes512", "env": {"SNEK_COLLECT_ENVS": "512"}, "smoke": true, "prediction": "same batch as roll512; 763 update rounds by 50M"}
+      ]
+    },
+    {
+      "batch": "b21",
+      "knob": "chase-safe shaping coefficient and gate",
+      "priority": 230,
+      "control_value": {"SNEK_CHASE_SAFE_SHAPING": "0.1", "SNEK_CHASE_SAFE_GATE": "75"},
+      "expected_optimum": "unknown for PPO; snek2's finding was that the gate is the lever",
+      "notes": "A reward knob, not a PPO knob, and the one batch that changes what every other batch held fixed -- last for that reason. Stage B measures the perfect rate, which no reward term can move, so the comparison stands; the desktop keys eval waves on these two variables, so each value gets its own stage-B wave automatically. snek2's batches 28-29: c=0.10 at gate 75 set the records and the gate mattered more than c. b1 vs b2 on this stack: shaping off never reached 95/100 in 3M DQN steps.",
+      "cells": [
+        {"slug": "shape0",   "env": {"SNEK_CHASE_SAFE_SHAPING": "0.0"},  "prediction": "shaping off. PPO on the bare reward: the gate arm at 508k was 1% perfect. Expect a late onset and the question is whether it gets there at all by 50M"},
+        {"slug": "shape005", "env": {"SNEK_CHASE_SAFE_SHAPING": "0.05"}, "prediction": "half the base's dose; within noise if the gate is the lever"},
+        {"slug": "shape02",  "env": {"SNEK_CHASE_SAFE_SHAPING": "0.2"},  "prediction": "double dose; potential shaping is policy-invariant in the limit, so this is about learning speed, not the optimum"},
+        {"slug": "gate60",   "env": {"SNEK_CHASE_SAFE_GATE": "60"},  "prediction": "shaping starts 15 squares earlier: more of the game is shaped. snek2's direction of improvement"},
+        {"slug": "gate85",   "env": {"SNEK_CHASE_SAFE_GATE": "85"},  "prediction": "snek3's own default gate: only the last 10 squares shaped. Expect worse than 75"},
+        {"slug": "gate0",    "env": {"SNEK_CHASE_SAFE_GATE": "0"},   "smoke": true, "prediction": "shaped from the first move. Says whether the gate does anything for PPO or was a DQN-era artefact"}
+      ]
+    }
+  ],
+  "factorial": {
+    "batch": "b22",
+    "when": "after b9-b21 are read",
+    "design": "full factorial of the <=3 knobs with complete separation (p=0.029) on readout 1 or 2 AND a confirming readout-6 pass: base+A, +B, +AB, +C, +AC, +BC, +ABC, 4 seeds each at 50M, padded to 32 arms with the b12 interaction cells (epochs 16 x lr 1e-4, epochs 16 x clip 0.1) if b12 made them interesting.",
+    "then": "the best cell at 200M+, 8 seeds, hof5000 over above:98.5, and a 30,000-episode measurement of the single winner at a fresh seed"
+  }
+}

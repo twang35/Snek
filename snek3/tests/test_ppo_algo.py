@@ -415,3 +415,65 @@ def test_the_discount_and_lambda_reach_gae_in_that_order(monkeypatch):
     # Not the swapped spelling, which drops the bootstrap entirely.
     swapped = roll.rewards[0] + 0.0 * alive * roll.values[1] - roll.values[0]
     assert not np.allclose(roll.advantages[0], swapped, atol=1e-4), 'the fixture must discriminate'
+
+
+# --- the clip and learning-rate anneals ------------------------------------------------------------
+#
+# `SNEK_PPO_CLIP_FINAL` and `SNEK_PPO_LEARNING_RATE_FINAL` (2026-09-01): the PPO paper's Atari recipe,
+# both ramping linearly over `max_steps` exactly as the entropy coefficient does. Absent means
+# constant, which is every arm before batch b17.
+
+from ppo import schedules as ppo_schedules
+
+
+def test_absent_finals_leave_clip_and_learning_rate_constant(monkeypatch):
+    algo, config = built(monkeypatch)
+    assert config['ppo_clip_final'] is None and config['ppo_learning_rate_final'] is None
+    for _ in range(3):
+        algo.advance()
+    assert algo.agent.clip == config['ppo_clip']
+    assert algo.agent.learning_rate() == config['ppo_learning_rate']
+
+
+def test_the_clip_and_learning_rate_ramp_with_the_step(monkeypatch):
+    monkeypatch.setenv('SNEK_PPO_CLIP_FINAL', '0.02')
+    monkeypatch.setenv('SNEK_PPO_LEARNING_RATE_FINAL', '0')
+    algo, config = built(monkeypatch, max_steps=4 * 32)   # 4 lanes x 8 steps = 32 a rollout
+    assert config['ppo_clip_final'] == 0.02 and config['ppo_learning_rate_final'] == 0.0
+    seen = []
+    for _ in range(5):                                    # one rollout past the cap
+        algo.advance()
+        seen.append((algo.step, algo.agent.clip, algo.agent.learning_rate()))
+    for step, clip, lr in seen:
+        fraction = min(1.0, step / config['max_steps'])
+        assert clip == pytest.approx(0.2 + fraction * (0.02 - 0.2))
+        assert lr == pytest.approx(3e-4 * (1.0 - fraction))
+    # Past the cap both sit at their floors rather than overshooting — a resumed arm can be there.
+    assert seen[-1][1] == pytest.approx(0.02) and seen[-1][2] == 0.0
+    # And the ramped values reach the row, so an annealed arm's history says what it ran under.
+    row = algo.fields()['ppo']
+    assert row['clip'] == pytest.approx(0.02) and row['learning_rate'] == 0.0
+
+
+def test_the_ramp_is_one_function_for_all_three_schedules():
+    for f in (ppo_schedules.entropy_coef_for, ppo_schedules.clip_for,
+              ppo_schedules.learning_rate_for):
+        assert f(0, 100, 1.0, 0.0) == 1.0
+        assert f(50, 100, 1.0, 0.0) == 0.5
+        assert f(250, 100, 1.0, 0.0) == 0.0     # clamped past the cap
+        assert f(50, 100, 1.0) == 1.0           # no final, no ramp
+
+
+@pytest.mark.parametrize('value', ['0', '1', '-0.1', '1.5'])
+def test_a_clip_final_outside_the_open_interval_is_refused(value, monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'ppo')
+    monkeypatch.setenv('SNEK_PPO_CLIP_FINAL', value)
+    with pytest.raises(ValueError, match='SNEK_PPO_CLIP_FINAL'):
+        train.build_config()
+
+
+def test_a_negative_learning_rate_final_is_refused(monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'ppo')
+    monkeypatch.setenv('SNEK_PPO_LEARNING_RATE_FINAL', '-1e-5')
+    with pytest.raises(ValueError, match='SNEK_PPO_LEARNING_RATE_FINAL'):
+        train.build_config()

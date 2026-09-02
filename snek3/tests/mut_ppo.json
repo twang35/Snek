@@ -90,6 +90,24 @@
       "file": "ppo/net.py",
       "from": "    return torch.log_softmax(logits, dim=-1)",
       "to": "    return torch.log(torch.softmax(logits, dim=-1))"
+    },
+    {
+      "desc": "the clip anneal is never applied",
+      "file": "ppo/algo.py",
+      "from": "        self.agent.clip = schedules.clip_for(",
+      "to": "        _unused_clip = schedules.clip_for("
+    },
+    {
+      "desc": "the learning-rate anneal is never applied",
+      "file": "ppo/algo.py",
+      "from": "        self.agent.set_learning_rate(schedules.learning_rate_for(",
+      "to": "        (schedules.learning_rate_for("
+    },
+    {
+      "desc": "the ramp is not clamped past the cap",
+      "file": "ppo/schedules.py",
+      "from": "    fraction = min(1.0, max(0.0, float(step) / span))",
+      "to": "    fraction = max(0.0, float(step) / span)"
     }
   ]
 }

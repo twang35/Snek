@@ -123,11 +123,13 @@ launchable at all.
 | `SNEK_PPO_EPOCHS` | 4 | passes over each rollout. Every sample is seen exactly once per pass |
 | `SNEK_PPO_MINIBATCH` | 256 | **refused if larger than a whole rollout**, or "4 epochs" would silently mean 4 gradient steps |
 | `SNEK_PPO_CLIP` | 0.2 | must be in (0, 1) |
+| `SNEK_PPO_CLIP_FINAL` | unset | set it and the clip ramps linearly to it over `SNEK_MAX_STEPS`, clamped at both ends, like the entropy coefficient. **Must stay in (0, 1)** — a clip of 0 admits no update, so anneal to a floor such as 0.02. Batch b17 |
 | `SNEK_PPO_GAE_LAMBDA` | 0.98 | higher than the conventional 0.95. The advantage horizon is `1/(1 − γλ)` — **33.6** steps at γ=0.99, 44.5 at γ=0.9975 — and a perfect game is ~950 moves from the opening, so the +100 reaches the policy through the critic, not through GAE |
 | `SNEK_PPO_ENTROPY_COEF` | 0.01 | max entropy on 3 actions is ln 3 = 1.0986 |
 | `SNEK_PPO_ENTROPY_COEF_FINAL` | unset | set it and the coefficient ramps linearly to it over `SNEK_MAX_STEPS`, clamped at both ends. Unset is a constant |
 | `SNEK_PPO_VF_COEF` | 0.5 | near-inert: the towers are separate, so it only rescales the critic's own learning rate |
 | `SNEK_PPO_LEARNING_RATE` | 3e-4 | **not** DQN's 1e-5, and that is the point of the separate name |
+| `SNEK_PPO_LEARNING_RATE_FINAL` | unset | the same ramp for Adam's step size; 0 is allowed and means the tail of the run takes no gradient steps. Both ramps re-stretch if an arm is resumed to a higher cap, so an annealed arm is never resumed for comparison. Batch b17 |
 | `SNEK_PPO_ADAM_EPSILON` | 1e-7 | |
 | `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | global norm over both towers. 0 disables |
 | `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |

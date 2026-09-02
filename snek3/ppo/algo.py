@@ -93,6 +93,10 @@ def build_config(tuned):
         'ppo_epochs': int(tuned('PPO_EPOCHS', 4, int)),
         'ppo_minibatch': int(tuned('PPO_MINIBATCH', 256, int)),
         'ppo_clip': tuned('PPO_CLIP', 0.2),
+        # The clip's anneal, same spelling as the entropy one below: absent means constant. The PPO
+        # paper's Atari runs anneal clip and lr to 0 together; the clip cannot reach 0 here (see the
+        # check below), so its floor is a small positive number such as 0.02.
+        'ppo_clip_final': _optional_float(tuned('PPO_CLIP_FINAL', '', str)),
         # 0.98, not the conventional 0.95. `1/(1 - gamma*lambda)` is the steps an advantage sees: 19 at
         # 0.95 and gamma 0.9975, 44.5 at 0.98, 400 at 1.0. See `rollout.py`: none of them reaches
         # the +100, which is why the critic carries it and the shaping terms matter more here.
@@ -103,6 +107,8 @@ def build_config(tuned):
         'ppo_entropy_coef_final': _optional_float(tuned('PPO_ENTROPY_COEF_FINAL', '', str)),
         'ppo_vf_coef': tuned('PPO_VF_COEF', 0.5),
         'ppo_learning_rate': tuned('PPO_LEARNING_RATE', 3e-4),
+        # Its anneal. 0 is allowed: the tail of the run then learns nothing, which is the intent.
+        'ppo_learning_rate_final': _optional_float(tuned('PPO_LEARNING_RATE_FINAL', '', str)),
         'ppo_adam_epsilon': tuned('PPO_ADAM_EPSILON', 1e-7),
         'ppo_target_kl': tuned('PPO_TARGET_KL', 0.0),
         'ppo_gradient_clipping': tuned('PPO_GRADIENT_CLIPPING', 0.5),
@@ -123,6 +129,14 @@ def build_config(tuned):
         raise ValueError('SNEK_PPO_CLIP={0} is outside (0, 1). At 0 no update is ever allowed '
                          'through; at 1 or above the lower bound reaches a ratio of 0 and the clip '
                          'stops being a trust region.'.format(config['ppo_clip']))
+    final_clip = config['ppo_clip_final']
+    if final_clip is not None and not 0.0 < final_clip < 1.0:
+        raise ValueError('SNEK_PPO_CLIP_FINAL={0} is outside (0, 1). A clip annealed to 0 admits no '
+                         'update, so the ramp would end training early and silently; anneal to a '
+                         'small floor such as 0.02 instead.'.format(final_clip))
+    final_lr = config['ppo_learning_rate_final']
+    if final_lr is not None and final_lr < 0.0:
+        raise ValueError('SNEK_PPO_LEARNING_RATE_FINAL={0} is negative'.format(final_lr))
     if not 0.0 <= config['ppo_gae_lambda'] <= 1.0:
         raise ValueError('SNEK_PPO_GAE_LAMBDA={0} is not in [0, 1]'.format(
             config['ppo_gae_lambda']))
@@ -215,6 +229,15 @@ class PpoAlgo(object):
         self.agent.entropy_coef = schedules.entropy_coef_for(
             self.step, self.config['max_steps'], self.config['ppo_entropy_coef'],
             self.config['ppo_entropy_coef_final'])
+        # The clip and the learning rate ramp the same way, and are constant unless their `_FINAL`
+        # knob is set. Read here for the same reason the coefficient is: the update about to run uses
+        # the value this rollout's step implies.
+        self.agent.clip = schedules.clip_for(
+            self.step, self.config['max_steps'], self.config['ppo_clip'],
+            self.config['ppo_clip_final'])
+        self.agent.set_learning_rate(schedules.learning_rate_for(
+            self.step, self.config['max_steps'], self.config['ppo_learning_rate'],
+            self.config['ppo_learning_rate_final']))
         self.last_metrics = self.agent.update(self.rollout)
         return transitions, transitions
 
@@ -234,7 +257,10 @@ class PpoAlgo(object):
                  'policy_loss': _round(metrics.get('policy_loss'), 5),
                  'value_loss': _round(metrics.get('value_loss'), 4),
                  'epochs_run': metrics.get('epochs_run'),
-                 'stopped_early': metrics.get('stopped_early')}
+                 'stopped_early': metrics.get('stopped_early'),
+                 # The two ramped knobs, so an annealed arm's rows say what it ran under at that step.
+                 'clip': round(float(self.agent.clip), 5),
+                 'learning_rate': self.agent.learning_rate()}
         block.update(self.collector.snapshot())
         return {'entropy_coef': round(float(self.agent.entropy_coef), 6), 'ppo': block}
 

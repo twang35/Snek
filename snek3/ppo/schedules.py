@@ -19,8 +19,13 @@ code change, and an adaptive version is in the plan's backlog for if it is.
 """
 
 
-def entropy_coef_for(step, max_steps, initial, final=None):
-    """The coefficient at `step`, ramping linearly from `initial` to `final` across the cap.
+def ramped(step, max_steps, initial, final=None):
+    """A value at `step`, ramping linearly from `initial` to `final` across the cap.
+
+    The one ramp every PPO schedule uses — the entropy coefficient, and since 2026-09-01 the clip and
+    the learning rate (`SNEK_PPO_CLIP_FINAL`, `SNEK_PPO_LEARNING_RATE_FINAL`, the PPO paper's Atari
+    recipe). One function rather than three copies so they cannot drift, and so a test of the clamp
+    below covers all of them.
 
     `final is None` means "no anneal", which is not the same as `final == initial` only in intent —
     they compute the same number — but it is what lets `SNEK_PPO_ENTROPY_COEF_FINAL` be absent rather
@@ -39,3 +44,20 @@ def entropy_coef_for(step, max_steps, initial, final=None):
     span = max(1, int(max_steps))
     fraction = min(1.0, max(0.0, float(step) / span))
     return initial + fraction * (final - initial)
+
+
+def entropy_coef_for(step, max_steps, initial, final=None):
+    """The entropy coefficient at `step`. See `ramped`."""
+    return ramped(step, max_steps, initial, final)
+
+
+def clip_for(step, max_steps, initial, final=None):
+    """The PPO clip at `step`. `final` must stay inside (0, 1) — `algo.build_config` refuses otherwise,
+    because a clip of 0 admits no update at all and the ramp would silently end training early."""
+    return ramped(step, max_steps, initial, final)
+
+
+def learning_rate_for(step, max_steps, initial, final=None):
+    """Adam's step size at `step`. `final` may be 0: the last stretch then takes no gradient steps,
+    which is the Atari recipe's intent, and a resumed arm past its cap stays at the floor."""
+    return ramped(step, max_steps, initial, final)
