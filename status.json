@@ -1,12 +1,13 @@
 {
-  "iso": "2026-09-02T00:53:06",
-  "ts": 1788335586.6499116,
+  "iso": "2026-09-02T01:03:28",
+  "ts": 1788336208.4767392,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b9 | b9: lam90, seed 1 of 4 -- wave 3 of 8 | training 91% (8 arms)"
+      "b9 | b9: lam90, seed 1 of 4 -- wave 3 of 8 | training 100% (3 arms)"
     ],
     "queued": [
+      "b9 stage B | b9: lam90, seed 1 of 4 -- wave 3 of 8 | queued (5 arms)",
       "b9 training | b9: lam90, seed 1 of 4 -- wave 3 of 8 | queued (48 arms)",
       "b10 training | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (64 arms)",
       "b10 stage B | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
@@ -37,75 +38,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
+    "trainer": 3,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b9ai-lam80-seed1",
-      "type": "train",
-      "policy": "b9ai-lam80-seed1",
-      "policies": [
-        "b9ai-lam80-seed1"
-      ],
-      "pid": 2722007,
-      "step": 46825472,
-      "max_steps": 50003968,
-      "steps_per_sec": 8798.3,
-      "elapsed_s": 5847
-    },
-    {
-      "id": "b9aj-lam80-seed2",
-      "type": "train",
-      "policy": "b9aj-lam80-seed2",
-      "policies": [
-        "b9aj-lam80-seed2"
-      ],
-      "pid": 2722008,
-      "step": 46710784,
-      "max_steps": 50003968,
-      "steps_per_sec": 9833.4,
-      "elapsed_s": 5847
-    },
-    {
-      "id": "b9ak-lam80-seed3",
-      "type": "train",
-      "policy": "b9ak-lam80-seed3",
-      "policies": [
-        "b9ak-lam80-seed3"
-      ],
-      "pid": 2722009,
-      "step": 45596672,
-      "max_steps": 50003968,
-      "steps_per_sec": 7763.2,
-      "elapsed_s": 5847
-    },
-    {
-      "id": "b9al-lam80-seed4",
-      "type": "train",
-      "policy": "b9al-lam80-seed4",
-      "policies": [
-        "b9al-lam80-seed4"
-      ],
-      "pid": 2722010,
-      "step": 45301760,
-      "max_steps": 50003968,
-      "steps_per_sec": 7763.2,
-      "elapsed_s": 5847
-    },
-    {
-      "id": "b9am-lam85-seed1",
-      "type": "train",
-      "policy": "b9am-lam85-seed1",
-      "policies": [
-        "b9am-lam85-seed1"
-      ],
-      "pid": 2722011,
-      "step": 44728320,
-      "max_steps": 50003968,
-      "steps_per_sec": 7245.7,
-      "elapsed_s": 5847
-    },
     {
       "id": "b9an-lam85-seed2",
       "type": "train",
@@ -114,10 +50,10 @@
         "b9an-lam85-seed2"
       ],
       "pid": 2722012,
-      "step": 43909120,
+      "step": 49496064,
       "max_steps": 50003968,
-      "steps_per_sec": 8280.9,
-      "elapsed_s": 5847
+      "steps_per_sec": 14781.2,
+      "elapsed_s": 6469
     },
     {
       "id": "b9ao-lam85-seed3",
@@ -127,10 +63,10 @@
         "b9ao-lam85-seed3"
       ],
       "pid": 2722013,
-      "step": 44335104,
+      "step": 49856512,
       "max_steps": 50003968,
-      "steps_per_sec": 7245.9,
-      "elapsed_s": 5847
+      "steps_per_sec": 15274.2,
+      "elapsed_s": 6469
     },
     {
       "id": "b9ap-lam85-seed4",
@@ -140,13 +76,14 @@
         "b9ap-lam85-seed4"
       ],
       "pid": 2722014,
-      "step": 44662784,
+      "step": 49971200,
       "max_steps": 50003968,
-      "steps_per_sec": 8281.2,
-      "elapsed_s": 5847
+      "steps_per_sec": 11332.5,
+      "elapsed_s": 6469
     }
   ],
   "ledger": {
+    "b9-stageb-w2": "queued",
     "b9aq-lam90-seed1": "queued",
     "b9ar-lam90-seed2": "queued",
     "b9as-lam90-seed3": "queued",
@@ -392,14 +329,14 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b9ai-lam80-seed1": "running",
-    "b9aj-lam80-seed2": "running",
-    "b9ak-lam80-seed3": "running",
-    "b9al-lam80-seed4": "running",
-    "b9am-lam85-seed1": "running",
     "b9an-lam85-seed2": "running",
     "b9ao-lam85-seed3": "running",
     "b9ap-lam85-seed4": "running",
+    "b9am-lam85-seed1": "done",
+    "b9al-lam80-seed4": "done",
+    "b9ak-lam80-seed3": "done",
+    "b9aj-lam80-seed2": "done",
+    "b9ai-lam80-seed1": "done",
     "b9-stageb": "done",
     "b9ad-lam0-seed4": "done",
     "b9ac-lam0-seed3": "done",
@@ -564,10 +501,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 165.1,
+  "disk_free_gb": 165.0,
   "load_avg": [
-    12.0478515625,
-    12.56298828125,
-    12.7119140625
+    10.85546875,
+    12.095703125,
+    12.509765625
   ]
 }
