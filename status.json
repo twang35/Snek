@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-02T15:31:06",
-  "ts": 1788388266.5075166,
+  "iso": "2026-09-02T15:41:36",
+  "ts": 1788388896.5408092,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b9 | b9: lam100, seed 4 of 4 -- wave 8 of 8 | training 100% (1 arm)"
+      "b9 | b9: lam0, seed 1 of 4 -- wave 1 of 8 | stage B (8 arms)"
     ],
     "queued": [
-      "b9 stage B | b9: lam100, seed 4 of 4 -- wave 8 of 8 | queued (7 arms)",
       "b10 training | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (64 arms)",
       "b10 stage B | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
@@ -37,26 +36,32 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b9cl-lam100-seed4",
-      "type": "train",
-      "policy": "b9cl-lam100-seed4",
+      "id": "b9-stageb-w8",
+      "type": "eval",
+      "policy": "b9ce-lam999-seed1",
       "policies": [
+        "b9ce-lam999-seed1",
+        "b9cf-lam999-seed2",
+        "b9cg-lam999-seed3",
+        "b9ch-lam999-seed4",
+        "b9ci-lam100-seed1",
+        "b9cj-lam100-seed2",
+        "b9ck-lam100-seed3",
         "b9cl-lam100-seed4"
       ],
-      "pid": 3792072,
-      "step": 49807360,
-      "max_steps": 50003968,
-      "steps_per_sec": 21409.6,
-      "elapsed_s": 5533
+      "pid": 3906329,
+      "step": 50003968,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 596
     }
   ],
   "ledger": {
-    "b9-stageb-w8": "queued",
     "b10aa-g70-seed1": "queued",
     "b10ab-g70-seed2": "queued",
     "b10ac-g70-seed3": "queued",
@@ -254,7 +259,8 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b9cl-lam100-seed4": "running",
+    "b9-stageb-w8": "running",
+    "b9cl-lam100-seed4": "done",
     "b9ck-lam100-seed3": "done",
     "b9cj-lam100-seed2": "done",
     "b9ci-lam100-seed1": "done",
@@ -482,8 +488,8 @@
   },
   "disk_free_gb": 157.2,
   "load_avg": [
-    11.52392578125,
-    13.92578125,
-    14.89404296875
+    15.2255859375,
+    15.40185546875,
+    15.208984375
   ]
 }
