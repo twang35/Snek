@@ -1,14 +1,12 @@
 {
-  "iso": "2026-09-01T20:04:01",
-  "ts": 1788318241.0239184,
+  "iso": "2026-09-01T20:14:18",
+  "ts": 1788318858.373089,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b8 | b8: lam95, seed 4 of 4 -- wave 2 of 2 | training 100% (1 arm)"
+      "b8 | b8: ent003, seed 1 of 4 -- wave 1 of 2 | stage B (8 arms)"
     ],
-    "queued": [
-      "b8 stage B | b8: lam95, seed 4 of 4 -- wave 2 of 2 | queued (7 arms)"
-    ],
+    "queued": [],
     "attention": []
   },
   "runtime": {
@@ -27,27 +25,34 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 1,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b8p-lam95-seed4",
-      "type": "train",
-      "policy": "b8p-lam95-seed4",
+      "id": "b8-stageb-w2",
+      "type": "eval",
+      "policy": "b8i-kl02-seed1",
       "policies": [
+        "b8i-kl02-seed1",
+        "b8j-kl02-seed2",
+        "b8k-kl02-seed3",
+        "b8l-kl02-seed4",
+        "b8m-lam95-seed1",
+        "b8n-lam95-seed2",
+        "b8o-lam95-seed3",
         "b8p-lam95-seed4"
       ],
-      "pid": 2330604,
-      "step": 99532800,
-      "max_steps": 100007936,
-      "steps_per_sec": 14665.5,
-      "elapsed_s": 14121
+      "pid": 2497884,
+      "step": 100007936,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 554
     }
   ],
   "ledger": {
-    "b8-stageb-w2": "queued",
-    "b8p-lam95-seed4": "running",
+    "b8-stageb-w2": "running",
+    "b8p-lam95-seed4": "done",
     "b8o-lam95-seed3": "done",
     "b8n-lam95-seed2": "done",
     "b8m-lam95-seed1": "done",
@@ -203,8 +208,8 @@
   },
   "disk_free_gb": 167.5,
   "load_avg": [
-    8.67919921875,
-    11.21337890625,
-    13.09033203125
+    16.2275390625,
+    15.130859375,
+    14.11279296875
   ]
 }
