@@ -1,8 +1,8 @@
 # Charts — one graph per arm
 
-**Batch b8 — the stability knobs — finished training both waves on the desktop 2026-09-01**, and its
-charts are below, imported from the `results` branch. **Wave 2's stage-B pass is still running there**,
-so `b8i`-`b8p` have their stage-A charts only. The window to watch the box live is below.
+**Batch b8 — the stability knobs — closed both waves on the desktop 2026-09-01**, all sixteen arms
+with stage B complete, charts below and imported from the `results` branch. The box has since moved on
+to the b9-b14 sweep. The window to watch it live is below.
 
 **Batch b7 closed all four waves 2026-09-01** — 32 arms, 8 layouts x 4 seeds, charts imported from the
 `results` branch the same day and below. **Batch b4's charts are here too**, imported and redrawn
@@ -25,34 +25,31 @@ it took three attempts to get there).
 
 ## Batch b8 — the stability knobs, 4 knobs x 4 seeds, 100M each
 
-**Both waves finished training 2026-09-01.** Wave 1's stage B is complete and below; **wave 2's is
-running on the desktop**, so `b8i`-`b8p` are stage-A charts with no stage-B pass yet.
+**Both waves closed 2026-09-01**, stage A and stage B for all sixteen arms.
 
-The batch exists to fix b4's collapse, so **read these on the drawdown axis and not on the record
-region.** Share of post-competence stage-A evals below each threshold, median over the four seeds,
-against b4 as the control truncated to the same 100M cap:
+The batch exists to fix b4's collapse, so **read these on the drawdown axis** — and then read the
+right-hand column, which is why the batch failed anyway. Drawdown is the median share of
+post-competence stage-A evals below 50% perfect; density is the ≥98%/500 stage-B rate, both against b4
+as the control truncated to the same 100M cap:
 
-| arms | knob | < 50% perfect | < 80% perfect |
+| arms | knob | drawdown < 50% | ≥98%/500 |
 |---|---|---:|---:|
-| `b8m`-`b8p` | λ 0.95 | **2.2%** | **8.6%** |
-| `b8e`-`b8h` | entropy 0.01 → 0.001 | 3.5% | 10.7% |
-| `b8a`-`b8d` | entropy 0.003 | 3.7% | 11.6% |
-| `b8i`-`b8l` | `target_KL` 0.02 | 5.9% | 13.9% |
-| `b4a`-`b4h` | **control** | 8.4% | 15.1% |
+| `b8m`-`b8p` | λ 0.95 | **2.2%** | **2.3%** |
+| `b8e`-`b8h` | entropy 0.01 → 0.001 | 3.5% | 5.0% |
+| `b8a`-`b8d` | entropy 0.003 | 3.7% | 4.3% |
+| `b8i`-`b8l` | `target_KL` 0.02 | 5.9% | **6.0%** |
+| `b4a`-`b4h` | **control** | 8.4% | 5.7% |
 
-**All four knobs cut the drawdown rate and none of them removes it** — λ 0.95 by the most, to about a
-quarter of the control's below-50% rate. Stage A measures the argmax, so what these curves show falling
-is the deployed policy, not eval noise.
+**All four knobs cut the drawdown and not one of them beat the control on record density** — and the
+two columns run *opposite* to each other, λ 0.95 steadying the curve most while banking the fewest
+records. Stage A measures the argmax, so what these curves show falling is the deployed policy, not
+eval noise. The trade-off and its caveats are in [`findings.md`](findings.md); per-arm numbers and the
+5,000-episode re-measurement in [`results.md`](results.md).
 
 **Both of the never-exercised knobs did fire**, which is what their smoke tests were for.
 `target_KL` 0.02 stopped the epoch loop on **1.9-3.3%** of recorded updates per arm with `epochs_run`
 median still 8 — binding on the tail and not the body, which is what it was set for — and the anneal
 ran 0.0100 → 0.0010 and completed exactly at the cap.
-
-Wave 1's ≥98%/500 density is **4.3%** (entropy 0.003) and **5.0%** (the anneal) against the control's
-**5.7%** at a matched 100M, so neither entropy knob bought record checkpoints even while steadying the
-curve. That is a result rather than a caption, and it belongs in [`results.md`](results.md) once wave
-2's stage B lands.
 
 ![b8a-ent003-seed1](../runs/b8a-ent003-seed1.png)
 ![b8a stage B](../runs/b8a-ent003-seed1_checkpoint_evals.png)
@@ -71,16 +68,24 @@ curve. That is a result rather than a caption, and it belongs in [`results.md`](
 ![b8h-entanneal-seed4](../runs/b8h-entanneal-seed4.png)
 ![b8h stage B](../runs/b8h-entanneal-seed4_checkpoint_evals.png)
 
-**Wave 2 — stage A only, its stage-B pass is running on the desktop as this is written:**
+**Wave 2:**
 
 ![b8i-kl02-seed1](../runs/b8i-kl02-seed1.png)
+![b8i stage B](../runs/b8i-kl02-seed1_checkpoint_evals.png)
 ![b8j-kl02-seed2](../runs/b8j-kl02-seed2.png)
+![b8j stage B](../runs/b8j-kl02-seed2_checkpoint_evals.png)
 ![b8k-kl02-seed3](../runs/b8k-kl02-seed3.png)
+![b8k stage B](../runs/b8k-kl02-seed3_checkpoint_evals.png)
 ![b8l-kl02-seed4](../runs/b8l-kl02-seed4.png)
+![b8l stage B](../runs/b8l-kl02-seed4_checkpoint_evals.png)
 ![b8m-lam95-seed1](../runs/b8m-lam95-seed1.png)
+![b8m stage B](../runs/b8m-lam95-seed1_checkpoint_evals.png)
 ![b8n-lam95-seed2](../runs/b8n-lam95-seed2.png)
+![b8n stage B](../runs/b8n-lam95-seed2_checkpoint_evals.png)
 ![b8o-lam95-seed3](../runs/b8o-lam95-seed3.png)
+![b8o stage B](../runs/b8o-lam95-seed3_checkpoint_evals.png)
 ![b8p-lam95-seed4](../runs/b8p-lam95-seed4.png)
+![b8p stage B](../runs/b8p-lam95-seed4_checkpoint_evals.png)
 
 ## Batch b7 — the fc-layout sweep, 8 layouts x 4 seeds, 50M each
 

@@ -21,6 +21,52 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+## Batch b8 — the stability knobs, 4 knobs x 4 seeds, closed 2026-09-01
+
+Sixteen arms at 100M transitions on the desktop, holding b4's config fixed (`fc (200,100)`, 8 epochs,
+b2's reward) so exactly one knob moves per group, with **b4 itself as the control**. Every comparison
+truncates b4 to b8's 100M cap, because 65% of b4's record rows land after it.
+
+| group | arms | drawdown < 50% | ≥98%/500 | best row | best30 | sef |
+|---|---|---:|---:|---:|---:|---:|
+| `target_KL` 0.02 | `b8i`-`b8l` | 5.9% | **6.0%** | 99.6 | 97.03 (96.4-97.3) | 84.7 |
+| entropy 0.01 → 0.001 | `b8e`-`b8h` | 3.5% | 5.0% | 99.6 | 97.15 (96.8-98.0) | 87.0 |
+| entropy 0.003 | `b8a`-`b8d` | 3.7% | 4.3% | 99.6 | 97.20 (96.7-97.4) | 86.9 |
+| λ 0.95 | `b8m`-`b8p` | **2.2%** | 2.3% | 99.2 | 96.40 (96.0-96.9) | **89.8** |
+| **b4 control @100M** | `b4a`-`b4h` | 8.4% | 5.7% | 99.4 | 97.41 (97.0-97.9) | 85.8 |
+
+**Every knob cut the drawdown; none beat the control on record density.** Drawdown is the median share
+of post-competence stage-A evals below 50% perfect — b4's defining pathology, 8.4% at this cap — and
+all four treatments land between 2.2% and 5.9%. But the pre-registered ≥98%/500 density moves the other
+way: only `target_KL` clears the control at all, and λ 0.95, the best arm on stability, is less than
+half the control. **b8 fixed the thing it was aimed at and it did not help.**
+
+`sef` ranks the groups backwards here too (λ 0.95 top on `sef`, bottom on density), which is the
+[`findings.md`](findings.md) result about `strong_eval_fraction` reproducing on a second batch.
+
+**Both never-exercised knobs were confirmed live**, which is what the pre-queue smoke tests were for:
+`target_KL` 0.02 stopped the epoch loop on 1.9-3.3% of recorded updates per arm with `epochs_run`
+median still 8, and the anneal ran 0.0100 → 0.0010 and completed exactly at the cap. Contrast b4,
+where `epochs_run` was 8 in all 97,656 recorded updates.
+
+### b8 at 5,000 episodes — the laptop `hof5000` pass, 2026-09-01
+
+Every b8 checkpoint at ≥98.5% on its 500-episode close-out, re-measured at 5,000 episodes:
+**135 rows, 675k episodes, 3.0 + 9.9 min on the laptop in two waves, exit 0.** Merged rows equal the
+≥98.5%/500 count and the shard sum on all sixteen arms.
+
+| group | rows | mean | ≥98 | ≥98.73 | best | 500 → 5,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| `target_KL` 0.02 | 54 | 97.63 | 29.6% | **1** | **98.80** | −1.08 |
+| entropy anneal | 44 | 97.56 | 34.1% | 0 | 98.50 | −1.19 |
+| entropy 0.003 | 23 | 97.77 | 26.1% | 0 | 98.70 | −1.08 |
+| λ 0.95 | 14 | 97.44 | 14.3% | 0 | 98.10 | −1.33 |
+| **pooled** | **135** | **97.61** | **29.6%** | **1** | **98.80** | **−1.15** |
+
+**b8 has no hall-of-fame candidate.** One row of 135 clears the snek2 champion's 98.73%, against 29
+for b5 and 20 for b6, and nothing reaches 99%. `b8o-lam95-seed3` is the extreme case: its single
+candidate scored 98.6 at 500 episodes and **96.90** at 5,000, a −1.70 pp fall.
+
 ## Batch b7 — the fc-layout sweep, 8 layouts x 4 seeds, closed 2026-09-01
 
 **The network-shape test this file had been calling for since b3, and it went to the single layer.**
@@ -51,6 +97,34 @@ is last on `strong_eval_fraction` and first on record density, `fc (300,100)` th
 protocol finding rather than a b7 one: the 80% threshold `strong_eval_fraction` uses sits far below
 the region a champion hunt cares about, and the stage-A ≥98% rate (r=+0.80) or `best_perfect30`
 (+0.71) is the screen to use instead. [`findings.md`](findings.md) has the numbers.
+
+### b7 at 5,000 episodes — the laptop `hof5000` pass, 2026-09-01
+
+Every b7 checkpoint at ≥98.5% on its 500-episode close-out, re-measured at 5,000 episodes:
+**766 rows, 3.83M episodes, 84.5 min on the laptop, exit 0.** Merged rows equal the ≥98.5%/500 count
+and the shard sum on all thirty-two arms.
+
+| layout | rows | mean | ≥98 | ≥98.73 | best | 500 → 5,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| `fc (320,)` | 174 | **97.86** | **43.1%** | **2** | 98.90 | −0.94 |
+| `fc (100,100)` | 127 | 97.81 | 41.7% | 1 | **99.20** | −1.03 |
+| `fc (100,200,100)` | 103 | 97.80 | 40.8% | 1 | 98.80 | −0.99 |
+| `fc (200,100,50)` | 92 | 97.75 | 35.9% | 1 | 98.90 | −1.04 |
+| `fc (200,100)` | 109 | 97.71 | 34.9% | 0 | 98.70 | −1.13 |
+| `fc (160,160)` | 65 | 97.66 | 27.7% | 1 | 98.90 | −1.20 |
+| `fc (300,100)` | 65 | 97.54 | 30.8% | 0 | 98.40 | −1.25 |
+| `fc (400,200)` | 31 | 97.47 | 9.7% | 0 | 98.50 | −1.27 |
+| **pooled** | **766** | **97.75** | **36.8%** | **6** | **99.20** | **−1.05** |
+
+**`fc (320,)`'s stage-B win survives at depth, but as volume rather than quality.** It keeps the top
+pooled mean and the most champion-level rows, and `fc (400,200)` stays last on both — yet the whole
+mean spread is **0.39 pp** (97.47 to 97.86) against a candidate-count spread of 31 to 174. Layout
+buys more shots, not better ones.
+
+**One inversion worth noting: `fc (100,100)` was mid-pack at stage B (11.3%) and comes second here**,
+owning the only ≥99% row in all 766. That row — `b7av-fc100x100-seed2` @4.1M, 99.20% — does not
+survive its own basin: neighbours within ±1M average **98.19** and within ±3M **98.13**, so it is a
+selected high on an ~98.2 policy, and no b7 checkpoint threatens `b5h`'s confirmed 98.96%.
 
 ### b7's arms
 

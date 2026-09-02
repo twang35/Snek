@@ -17,6 +17,59 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Epochs and network shape fix b4's drawdown; all four stability knobs only dent it
+
+**Measured 2026-09-01** across five batches. Drawdown is the median over seeds of the share of an
+arm's post-competence stage-A evals (onset = first eval at ≥80% perfect) below 50% perfect. Stage A
+measures the argmax, so this is the deployed policy collapsing, not eval noise.
+
+| batch | network | epochs | drawdown < 50% | < 80% |
+|---|---|---:|---:|---:|
+| **b4** | `fc (200,100)` | **8** | **2.0%** | **10.0%** |
+| b5 | `fc (320,)` | 8 | 0.1% | 3.9% |
+| b6 | `fc (200,100)` | 4 | 0.0% | 2.4% |
+| b7 (32 arms, 8 layouts) | various | 4 | 0.1% | 2.6% |
+| b8 (16 arms, 4 knobs) | `fc (200,100)` | 8 | 2.3% | 9.5% |
+
+All rows truncated to a matched **50M** cap, b7's horizon. **Only the `fc (200,100)` + 8-epoch cell
+collapses**; the other three cells of the 2x2 sit near zero, and b7 puts 32 arms across eight layouts
+on the 4-epoch side of it at 0.1%. Every one of b7's layouts lands between 0.1% and 0.7%, including
+`fc (400,200)`, its *worst* layout on record density — so the drawdown does not track layout at all.
+
+**Against that, b8's four stability knobs are the weaker lever.** At b8's own 100M cap the control is
+8.4% and the knobs run 2.2% (λ 0.95), 3.5% (anneal), 3.7% (entropy 0.003) and 5.9% (`target_KL`) —
+real reductions, but dropping to 4 epochs takes the same config to 0.0-0.2%. b8 was the right
+experiment on the wrong knob set.
+
+**‡ What this does not settle.** b7 capped at 50M, where b4 has only reached 2.0% of its eventual
+9.0%; the effect has an onset and develops monotonically (b4: 0.2% at 10M, 0.7% at 25M, 2.0% at 50M,
+8.4% at 100M). b7's rate is *flat* across those same caps, which is why the reading is that it escapes
+rather than lags — but nobody has run b7's config past 50M, so "never develops it" is untested.
+
+### Steadying the training curve and banking record checkpoints trade off
+
+**b8's four knobs, measured 2026-09-01**, ranked by drawdown against their ≥98%/500 density:
+
+| knob | drawdown < 50% | ≥98%/500 | `hof5000` candidates | 5,000-ep mean |
+|---|---:|---:|---:|---:|
+| λ 0.95 | **2.2%** (best) | 2.3% (worst) | 14 | 97.44 |
+| entropy 0.01 → 0.001 | 3.5% | 5.0% | 44 | 97.56 |
+| entropy 0.003 | 3.7% | 4.3% | 23 | 97.77 |
+| `target_KL` 0.02 | 5.9% (worst) | **6.0%** (best) | **54** | 97.63 |
+| b4 control @100M | 8.4% | 5.7% | 274 (at 200M) | 97.71 |
+
+**The two columns run opposite**: Spearman −0.8 between drawdown rank and candidate-count rank across
+the four knobs. The knob that steadies the curve most produces the fewest record checkpoints, and the
+knob that steadies it least produces the most. Mechanically this is plausible — the excursions that
+make a curve ugly are also the excursions that occasionally land somewhere very good, and a
+checkpoint is banked from a moment, not from an average.
+
+**‡ Treat this as a hypothesis, not a result: n=4 knobs, so rs=−0.8 is p≈0.2.** It is stated here
+because it reframes what a stability knob is *for* — b8 was queued on the assumption that fixing the
+drawdown would raise the record rate, and across four knobs it did the reverse. Before another
+stability batch, decide which of the two metrics is the target. **What is not in doubt is the
+headline: no b8 group beat the control on density, and b8 produced one champion-level row in 135.**
+
 ### `fc (320,)` is the best network shape on this task, and b3's single-seed layout ranking inverted
 
 **Measured by batch b7, 2026-09-01** — the fc-layout sweep, all four waves closed: 8 layouts x 4
@@ -91,8 +144,17 @@ scored ≥98.5% on its 500-episode close-out (`above:98.5`), at 5,000 episodes e
 | batch | 500-ep headline | rows re-measured | 5,000-ep mean | rows ≥98 | ≥98.73 | best row |
 |---|---:|---:|---:|---:|---:|---:|
 | b6 | **12.9%** ≥98%/500 | 1,299 | 97.80 | 41.6% | 20 | 99.10 |
+| b7 | 10.9% | **766** | 97.75 | 36.8% | 6 | **99.20** |
 | b5 | 9.6% | 873 | 97.80 | 41.5% | **29** | **99.20** |
 | b4 | 7.3% | 274 | 97.71 | 33.6% | 1 | 98.80 |
+| b8 | 4.6% | 135 | 97.61 | 29.6% | 1 | 98.80 |
+
+**Extended 2026-09-01 with b7 and b8**, which add 901 rows and make the regression the best-measured
+quantity here: **−1.05 pp pooled over b7's 766 and −1.15 over b8's 135**, against b6's −0.94, and
+−0.94 to −1.33 across all twelve groups of the two batches. A 500-episode row discounted by about a
+point predicts its deep rate. The regression also scales with how thin the candidate pool is —
+b7's `fc (400,200)` (31 candidates) regresses −1.27 and b8's λ 0.95 (14) regresses −1.33, against
+−0.94 for `fc (320,)`'s 174 — which is the selection effect behaving exactly as it should.
 
 **b6's lead over b5 dissolves**: identical means, ≥98 rates within 0.1 pp, and b5 ahead on the two
 things a champion hunt is for — more champion-level rows and the top checkpoint. b4 stays clearly

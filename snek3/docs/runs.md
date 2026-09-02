@@ -6,6 +6,66 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**The b9-b14 sweep is running on the desktop; the laptop is idle.** b9 wave 1 of 8 (`b9aa`-`b9ah`,
+λ 0 and λ 0.50 x 4 seeds at 50M) is 78% done at 2026-09-01 22:50, ~5,100-9,700 steps/s per arm across
+8 arms, 1 h 43 m in. b9's remaining 56 training arms and its stage B are queued behind it, then b10
+(γ 0.70), b11 (lr 4e-5), b12 (1 epoch) and the rest — 8 waves for b9, 8 for b10, 4 for b11, 5 for
+b12. **Nothing is running on the laptop**: b7's and b8's `hof5000` passes finished there tonight.
+
+**Batch b8 closed 2026-09-01 and it did not find what it was looking for.** Details below; the short
+version is that all four stability knobs cut b4's drawdown and none of them beat the control on record
+density, and [`findings.md`](findings.md) now has the 2x2 showing that **epochs and network shape are
+the lever** — b7's 32 four-epoch arms sit at 0.1% drawdown against b8's 2.3% and b4's 2.0% at a
+matched cap.
+
+**‡ This bears on how the b9-b14 sweep should be read.** b9 sweeps λ, and λ 0.95 was b8's *best* knob
+on drawdown and its *worst* on density — the two metrics ran opposite across all four knobs
+([`findings.md`](findings.md)). So decide before b9's stage B which of the two its arms are being
+ranked on; ranking on `sef` or on drawdown would have picked b8's weakest group.
+
+## Just closed: b8 — every knob cut the drawdown, none produced a record
+
+**Both waves and both stage-B passes closed 2026-09-01**, 16 arms at 100M on the desktop, plus a
+135-row `hof5000` pass on the laptop. b4 is the control, truncated to b8's 100M cap:
+
+| group | arms | drawdown < 50% | ≥98%/500 | ≥98.73 /5,000 |
+|---|---|---:|---:|---:|
+| `target_KL` 0.02 | `b8i`-`b8l` | 5.9% | **6.0%** | 1 |
+| entropy 0.01 → 0.001 | `b8e`-`b8h` | 3.5% | 5.0% | 0 |
+| entropy 0.003 | `b8a`-`b8d` | 3.7% | 4.3% | 0 |
+| λ 0.95 | `b8m`-`b8p` | **2.2%** | 2.3% | 0 |
+| **b4 control @100M** | `b4a`-`b4h` | 8.4% | 5.7% | 1 (at 200M) |
+
+**One champion-level row in 135 deep measurements, and no hall-of-fame candidate.** Both
+never-exercised knobs did fire — `target_KL` stopped the epoch loop on 1.9-3.3% of updates, the anneal
+completed 0.0100 → 0.0010 at the cap — so this is a real measurement of both, not a silent no-op. Per-arm
+numbers in [`results.md`](results.md), 32 charts in [`charts.md`](charts.md).
+
+## Just closed: b7, the fc-layout sweep — `fc (320,)` wins
+
+**All four waves and all four stage-B passes closed 2026-09-01**, 32 arms in ~11 h on the desktop.
+Pooled 10.9% of 28,006 stage-B rows in the ≥98%/500 record region, and the spread across layouts is
+3.4x:
+
+| layout | ≥98%/500 | | layout | ≥98%/500 |
+|---|---:|---|---|---:|
+| **`fc (320,)`** | **17.3%** | | `fc (200,100,50)` | 10.8% |
+| `fc (200,100)` | 11.8% | | `fc (160,160)` | 8.3% |
+| `fc (100,200,100)` | 11.6% | | `fc (300,100)` | 6.8% |
+| `fc (100,100)` | 11.3% | | `fc (400,200)` | 5.1% |
+
+**Every `fc 320` seed beats every seed of five of the seven other layouts** (exact Mann-Whitney
+p=0.029, the floor at 4-vs-4). This **inverts b3's single-seed ranking**, which put `fc 300,100`
+first and `fc 320` last of those three and is what queued b4 and b7 in the first place. Per-arm
+numbers in [`results.md`](results.md), the reading and the two retractions in
+[`findings.md`](findings.md), 64 charts in [`charts.md`](charts.md).
+
+**It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
+layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
+right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
+
+## b8 mid-flight, as it read at wave 1's 71M (superseded)
+
 **Batch b8 — "what fixes b4's collapse" — is training on the desktop, wave 1 of 2, ~70% done at
 2026-09-01 14:03.** Eight arms at 100M transitions each: entropy **0.003** x seeds 1-4
 (`b8a`-`b8d`) and the **0.01 -> 0.001 anneal** x seeds 1-4 (`b8e`-`b8h`). 2 h 49 m in, ~7,000
@@ -31,29 +91,6 @@ maximum-over-8 that this project keeps having to retract. Wait for stage B.
 shown to be the *wrong* shape.** b8 is still the right experiment — it is asking what fixes b4's
 drawdowns, and b4 is `fc (200,100)`, so the control has to match — but a stability knob that helps
 here has to be re-confirmed on `fc (320,)` before it goes into a champion attempt.
-
-## Just closed: b7, the fc-layout sweep — `fc (320,)` wins
-
-**All four waves and all four stage-B passes closed 2026-09-01**, 32 arms in ~11 h on the desktop.
-Pooled 10.9% of 28,006 stage-B rows in the ≥98%/500 record region, and the spread across layouts is
-3.4x:
-
-| layout | ≥98%/500 | | layout | ≥98%/500 |
-|---|---:|---|---|---:|
-| **`fc (320,)`** | **17.3%** | | `fc (200,100,50)` | 10.8% |
-| `fc (200,100)` | 11.8% | | `fc (160,160)` | 8.3% |
-| `fc (100,200,100)` | 11.6% | | `fc (300,100)` | 6.8% |
-| `fc (100,100)` | 11.3% | | `fc (400,200)` | 5.1% |
-
-**Every `fc 320` seed beats every seed of five of the seven other layouts** (exact Mann-Whitney
-p=0.029, the floor at 4-vs-4). This **inverts b3's single-seed ranking**, which put `fc 300,100`
-first and `fc 320` last of those three and is what queued b4 and b7 in the first place. Per-arm
-numbers in [`results.md`](results.md), the reading and the two retractions in
-[`findings.md`](findings.md), 64 charts in [`charts.md`](charts.md).
-
-**It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
-layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
-right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
 
 ## The b8 design, as queued
 
