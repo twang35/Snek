@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-02T11:02:32",
-  "ts": 1788372152.7143865,
+  "iso": "2026-09-02T11:12:38",
+  "ts": 1788372758.1253312,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b9 | b9: lam99, seed 1 of 4 -- wave 7 of 8 | stage B (8 arms)"
+      "b9 | b9: lam999, seed 1 of 4 -- wave 8 of 8 | training 3% (8 arms)"
     ],
     "queued": [
-      "b9 training | b9: lam99, seed 1 of 4 -- wave 7 of 8 | queued (16 arms)",
+      "b9 training | b9: lam999, seed 1 of 4 -- wave 8 of 8 | queued (8 arms)",
       "b10 training | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (64 arms)",
       "b10 stage B | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
@@ -37,40 +37,116 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b9-stageb-w6",
-      "type": "eval",
-      "policy": "b9bo-lam96-seed1",
+      "id": "b9bw-lam99-seed1",
+      "type": "train",
+      "policy": "b9bw-lam99-seed1",
       "policies": [
-        "b9bo-lam96-seed1",
-        "b9bp-lam96-seed2",
-        "b9bq-lam96-seed3",
-        "b9br-lam96-seed4",
-        "b9bs-lam97-seed1",
-        "b9bt-lam97-seed2",
-        "b9bu-lam97-seed3",
-        "b9bv-lam97-seed4"
+        "b9bw-lam99-seed1"
       ],
-      "pid": 3527941,
-      "step": 50003968,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2790
+      "pid": 3589680,
+      "step": 1277952,
+      "max_steps": 50003968,
+      "steps_per_sec": 5183.1,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9bx-lam99-seed2",
+      "type": "train",
+      "policy": "b9bx-lam99-seed2",
+      "policies": [
+        "b9bx-lam99-seed2"
+      ],
+      "pid": 3589681,
+      "step": 1327104,
+      "max_steps": 50003968,
+      "steps_per_sec": 6219.7,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9by-lam99-seed3",
+      "type": "train",
+      "policy": "b9by-lam99-seed3",
+      "policies": [
+        "b9by-lam99-seed3"
+      ],
+      "pid": 3589682,
+      "step": 1294336,
+      "max_steps": 50003968,
+      "steps_per_sec": 6219.7,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9bz-lam99-seed4",
+      "type": "train",
+      "policy": "b9bz-lam99-seed4",
+      "policies": [
+        "b9bz-lam99-seed4"
+      ],
+      "pid": 3589683,
+      "step": 1310720,
+      "max_steps": 50003968,
+      "steps_per_sec": 6738.0,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9ca-lam995-seed1",
+      "type": "train",
+      "policy": "b9ca-lam995-seed1",
+      "policies": [
+        "b9ca-lam995-seed1"
+      ],
+      "pid": 3589684,
+      "step": 1376256,
+      "max_steps": 50003968,
+      "steps_per_sec": 7774.6,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9cb-lam995-seed2",
+      "type": "train",
+      "policy": "b9cb-lam995-seed2",
+      "policies": [
+        "b9cb-lam995-seed2"
+      ],
+      "pid": 3589685,
+      "step": 1163264,
+      "max_steps": 50003968,
+      "steps_per_sec": 6219.7,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9cc-lam995-seed3",
+      "type": "train",
+      "policy": "b9cc-lam995-seed3",
+      "policies": [
+        "b9cc-lam995-seed3"
+      ],
+      "pid": 3589686,
+      "step": 1376256,
+      "max_steps": 50003968,
+      "steps_per_sec": 7256.3,
+      "elapsed_s": 215
+    },
+    {
+      "id": "b9cd-lam995-seed4",
+      "type": "train",
+      "policy": "b9cd-lam995-seed4",
+      "policies": [
+        "b9cd-lam995-seed4"
+      ],
+      "pid": 3589687,
+      "step": 1212416,
+      "max_steps": 50003968,
+      "steps_per_sec": 6737.9,
+      "elapsed_s": 215
     }
   ],
   "ledger": {
-    "b9bw-lam99-seed1": "queued",
-    "b9bx-lam99-seed2": "queued",
-    "b9by-lam99-seed3": "queued",
-    "b9bz-lam99-seed4": "queued",
-    "b9ca-lam995-seed1": "queued",
-    "b9cb-lam995-seed2": "queued",
-    "b9cc-lam995-seed3": "queued",
-    "b9cd-lam995-seed4": "queued",
     "b9ce-lam999-seed1": "queued",
     "b9cf-lam999-seed2": "queued",
     "b9cg-lam999-seed3": "queued",
@@ -276,7 +352,15 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b9-stageb-w6": "running",
+    "b9bw-lam99-seed1": "running",
+    "b9bx-lam99-seed2": "running",
+    "b9by-lam99-seed3": "running",
+    "b9bz-lam99-seed4": "running",
+    "b9ca-lam995-seed1": "running",
+    "b9cb-lam995-seed2": "running",
+    "b9cc-lam995-seed3": "running",
+    "b9cd-lam995-seed4": "running",
+    "b9-stageb-w6": "done",
     "b9bv-lam97-seed4": "done",
     "b9bu-lam97-seed3": "done",
     "b9bt-lam97-seed2": "done",
@@ -485,10 +569,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 159.8,
+  "disk_free_gb": 159.7,
   "load_avg": [
-    15.916015625,
-    15.650390625,
-    15.6953125
+    13.58544921875,
+    13.76611328125,
+    14.830078125
   ]
 }
