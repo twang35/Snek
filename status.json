@@ -1,14 +1,14 @@
 {
-  "iso": "2026-09-01T20:47:38",
-  "ts": 1788320858.1289177,
+  "iso": "2026-09-01T20:57:48",
+  "ts": 1788321468.4634943,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b8 | b8: ent003, seed 1 of 4 -- wave 1 of 2 | stage B (8 arms)"
+      "b9 | b9: lam80, seed 1 of 4 -- wave 2 of 8 | training 0% (8 arms)"
     ],
     "queued": [
-      "b9 training | b9: lam0, seed 1 of 4 -- wave 1 of 8 | queued (64 arms)",
-      "b9 stage B | b9: lam0, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
+      "b9 stage B | b9: lam80, seed 1 of 4 -- wave 2 of 8 | queued (8 arms)",
+      "b9 training | b9: lam80, seed 1 of 4 -- wave 2 of 8 | queued (56 arms)",
       "b10 training | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (64 arms)",
       "b10 stage B | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
@@ -38,40 +38,116 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b8-stageb-w2",
-      "type": "eval",
-      "policy": "b8i-kl02-seed1",
+      "id": "b9aa-lam0-seed1",
+      "type": "train",
+      "policy": "b9aa-lam0-seed1",
       "policies": [
-        "b8i-kl02-seed1",
-        "b8j-kl02-seed2",
-        "b8k-kl02-seed3",
-        "b8l-kl02-seed4",
-        "b8m-lam95-seed1",
-        "b8n-lam95-seed2",
-        "b8o-lam95-seed3",
-        "b8p-lam95-seed4"
+        "b9aa-lam0-seed1"
       ],
-      "pid": 2497884,
-      "step": 100007936,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2553
+      "pid": 2548167,
+      "step": 229376,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9ab-lam0-seed2",
+      "type": "train",
+      "policy": "b9ab-lam0-seed2",
+      "policies": [
+        "b9ab-lam0-seed2"
+      ],
+      "pid": 2548168,
+      "step": 147456,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9ac-lam0-seed3",
+      "type": "train",
+      "policy": "b9ac-lam0-seed3",
+      "policies": [
+        "b9ac-lam0-seed3"
+      ],
+      "pid": 2548169,
+      "step": 180224,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9ad-lam0-seed4",
+      "type": "train",
+      "policy": "b9ad-lam0-seed4",
+      "policies": [
+        "b9ad-lam0-seed4"
+      ],
+      "pid": 2548170,
+      "step": 229376,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9ae-lam50-seed1",
+      "type": "train",
+      "policy": "b9ae-lam50-seed1",
+      "policies": [
+        "b9ae-lam50-seed1"
+      ],
+      "pid": 2548171,
+      "step": 147456,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9af-lam50-seed2",
+      "type": "train",
+      "policy": "b9af-lam50-seed2",
+      "policies": [
+        "b9af-lam50-seed2"
+      ],
+      "pid": 2548172,
+      "step": 114688,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9ag-lam50-seed3",
+      "type": "train",
+      "policy": "b9ag-lam50-seed3",
+      "policies": [
+        "b9ag-lam50-seed3"
+      ],
+      "pid": 2548173,
+      "step": 147456,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
+    },
+    {
+      "id": "b9ah-lam50-seed4",
+      "type": "train",
+      "policy": "b9ah-lam50-seed4",
+      "policies": [
+        "b9ah-lam50-seed4"
+      ],
+      "pid": 2548174,
+      "step": 147456,
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 33
     }
   ],
   "ledger": {
-    "b9aa-lam0-seed1": "queued",
-    "b9ab-lam0-seed2": "queued",
-    "b9ac-lam0-seed3": "queued",
-    "b9ad-lam0-seed4": "queued",
-    "b9ae-lam50-seed1": "queued",
-    "b9af-lam50-seed2": "queued",
-    "b9ag-lam50-seed3": "queued",
-    "b9ah-lam50-seed4": "queued",
     "b9-stageb": "queued",
     "b9ai-lam80-seed1": "queued",
     "b9aj-lam80-seed2": "queued",
@@ -326,7 +402,15 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b8-stageb-w2": "running",
+    "b9aa-lam0-seed1": "running",
+    "b9ab-lam0-seed2": "running",
+    "b9ac-lam0-seed3": "running",
+    "b9ad-lam0-seed4": "running",
+    "b9ae-lam50-seed1": "running",
+    "b9af-lam50-seed2": "running",
+    "b9ag-lam50-seed3": "running",
+    "b9ah-lam50-seed4": "running",
+    "b8-stageb-w2": "done",
     "b8p-lam95-seed4": "done",
     "b8o-lam95-seed3": "done",
     "b8n-lam95-seed2": "done",
@@ -481,10 +565,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 167.5,
+  "disk_free_gb": 167.4,
   "load_avg": [
-    16.6123046875,
-    16.0087890625,
-    15.77734375
+    12.17919921875,
+    14.22265625,
+    15.248046875
   ]
 }
