@@ -1,14 +1,21 @@
 # The PPO hyperparameter sweep — one knob per batch, four seeds per value
 
-**Written 2026-09-01, while b8 wave 2 was training.** This is the design for batches **b9 onward**:
-one knob per batch, every value at four seeds, all on one frozen base, all at one horizon, all
-judged on the same pre-registered numbers. The machine-readable half is
-[`hyperparam-sweep.json`](hyperparam-sweep.json); `tools/sweep_specs.py` expands one batch of it
-into desktop specs.
+**Written 2026-09-01, revised the same day after review.** This is the design for batches **b9–b21**:
+one knob per batch, every value at four seeds, all on one frozen base, all at one horizon, all judged
+on the same pre-registered numbers. The machine-readable half is
+[`hyperparam-sweep.json`](hyperparam-sweep.json); `tools/sweep_specs.py` expands one batch of it into
+desktop specs and writes the laptop smoke script for the batch's never-exercised values.
 
 **The goal is not a record.** It is to know what each knob *does* on this task — the shape of its
-curve, where it is flat, where it breaks — so that a default can be chosen on evidence, and so that
-the combination batch at the end can be designed rather than guessed. The record attempt comes after.
+curve, where it is flat, where it breaks — so that a default can be chosen on evidence and the
+combination batch at the end can be designed rather than guessed. The record attempt comes after.
+
+**Revision notes.** The first draft split every grid into a core tier and a fine tier; the review
+asked for the full grids, because the granularity is the point — a curve read across 16 values shows
+its shape even where no single neighbouring pair separates at n=4. So: **every value runs, four arms
+each, no tiers.** `target_KL` 0.1 is dropped as unable to fire; 0.04 and 0.05 stay as the null check.
+Five batches were added for knobs the paste did not name (section 5, b17–b21), and the smoke
+procedure is now generated rather than described.
 
 ## 1. What this project has learned about sweeps, and what it forces here
 
@@ -18,42 +25,46 @@ Three findings shape every rule below. Each is in [`../docs/findings.md`](../doc
 |---|---|
 | **b3's 3M ranking was not a noisy 10M ranking, it was a different ranking.** The two arms that finished 1st and 2nd were 6th and 7th at the cap | a cap every arm is still climbing through produces no ranking. The horizon must be past where the statistic settles, and "still rising at the cap" is a result to record, not a number to rank |
 | **b3's two best single knobs stacked into the worst 8-seed batch** (b4) | a one-at-a-time sweep ranks knobs; it does not license stacking winners. The combination phase is a small factorial, not one arm |
-| **b5-vs-b6's 3.3 pp gap at 500 episodes was entirely selection**; b4-vs-b6's 5.6 pp survived. And **n=4 cannot resolve an effect below ~10 pp** on the peak statistics | fine grids (λ 0.91, 0.92, 0.93 ...) cannot be told apart at n=4. Spend arms where the curve bends, and read density and stability, which pool hundreds of rows, over `best30`, which is one |
+| **b5-vs-b6's 3.3 pp gap at 500 episodes was entirely selection**; b4-vs-b6's 5.6 pp survived. And **n=4 cannot resolve an effect below ~10 pp** on the peak statistics | a single pair of neighbouring values will rarely separate. What the dense grids buy is the **curve**: a monotone trend across nine values is evidence that no one 4-vs-4 comparison is. Read the grid as a curve, and read density and collapse share, which pool hundreds of rows, over `best30`, which is one |
 
 And one from b7 that decides the metric: **`strong_eval_fraction` ranks configs backwards on record
-density** (Spearman −0.79). The primary readouts are the ≥98%/500 density and the stage-A ≥98% share.
+density** (Spearman −0.79). The primary readouts are the ≥98%/500 density and the collapse share.
 
 ## 2. The base config, frozen for the whole sweep
 
 **The base is b7's reference at `fc (320,)`, which is PPO's default everywhere else** — the best
 configuration this project has measured at n≥4, and the one b7 has already run four seeds of at
-exactly the horizon below. Those four arms, `b7aa`-`b7ad`, **are the control for every batch in this
+exactly the horizon below. Those four arms, `b7aa`–`b7ad`, **are the control for every batch in this
 sweep**, so no batch queues control arms.
 
 | knob | value | why this and not something else |
 |---|---|---|
 | algorithm, network | PPO, `fc (320,)` | b7: 17.3% record density, every seed above every seed of five other layouts |
-| reward | preset `b2` — chase-safe 0.1 at gate 75, no food-distance term | every PPO batch has used it; changing it re-opens every comparison |
-| epochs, minibatch, rollout | 4, 256, 128 lanes x 128 steps | 4 not 8: at both shapes 8 epochs lost (b4 vs b6, b5 vs b7) |
-| lr, γ, λ, entropy, clip | 3e-4, 0.99, 0.98, 0.01, 0.2 | b3's reference; every one of them is a knob this sweep tests |
+| reward | preset `b2` — chase-safe 0.1 at gate 75, no food-distance term | every PPO batch has used it; b21 is the one batch that varies it, and it runs last |
+| epochs, minibatch, rollout, lanes | 4, 256, 128 steps, 128 lanes | 4 not 8: at both shapes 8 epochs lost (b4 vs b6, b5 vs b7) |
+| lr, γ, λ, entropy, clip | 3e-4, 0.99, 0.98, 0.01, 0.2 | b3's reference; every one of them is a batch below |
+| grad-norm clip, vf_coef, Adam ε, adv-norm, value loss | 0.5, 0.5, 1e-7, on, huber | PPO's defaults; b18 and b19 check them |
 | `target_KL`, anneals | off | never exercised on this shape; b8 is testing two of them on `fc (200,100)` |
 | seeds | 1, 2, 3, 4, pinned to the arm letter | seed-matched to b7's control and to every batch since b1 |
 | stage A | queue on, depth 16, 8 workers | the desktop's measured optimum for eight PPO trainers |
 
+Every one of these is written explicitly into every spec, so a later change to a code default cannot
+move the base under a running sweep.
+
 **The base does not move mid-sweep**, even when a batch finds a clear winner. Folding a winner into
 the base halfway would give the later batches a different control from the earlier ones, and the
-whole point of the design is one control shared by all of them. Winners meet in the combination
-batch, section 6.
+whole point of the design is one control shared by all of them. Winners meet in the factorial,
+section 6.
 
 **b8 is not folded in either.** It runs on `fc (200,100)` at 8 epochs because b4 is its control; its
 two entropy treatments read "marginally ahead and unresolved" at 71M, and whatever it finds needs
-re-running on this base before it counts. Its entropy and `target_KL` cells appear again below on
-the right shape, which is that re-run.
+re-running on this base before it counts. Its entropy and `target_KL` cells appear again in b15 and
+b16 on the right shape, which is that re-run.
 
 ## 3. The horizon: 50M transitions, not 30M
 
-**Recommendation: 50,003,968 transitions an arm (3,052 rollouts), b7's cap.** The question was
-whether 30M would do, and the data says no, for three reasons in decreasing order of weight.
+**50,003,968 transitions an arm (3,052 rollouts), b7's cap.** The question was whether 30M would do,
+and the data says no, for three reasons in decreasing order of weight.
 
 **The record-density statistic is still climbing steeply at 30M.** Read off `b7aa-fc320-seed1`, the
 first control arm — competence (trailing-30 ≥ 90%) arrives at 9.45M, and the share of post-competence
@@ -66,25 +77,22 @@ stage-A evals at ≥98% is:
 | 50M | 1,138 | **19.0%** |
 
 The number nearly doubles between 30M and 50M. A 30M cap would rank configs on how fast they climb
-into the record region, which is the b3 failure exactly: the 3M→10M inversion happened because the
-cap sat on the climb. 50M is the shortest horizon at which this project has *measured* the statistic
-and found it usable — b7's finding that density is "nearly flat in budget past 50M" (b7's 11.8% at 50M
-against b6's 12.9% at 215M on the same shape) says 50M is roughly where it settles, and says nothing
-about 30M.
+into the record region, which is the b3 failure exactly. 50M is the shortest horizon at which this
+project has *measured* the statistic and found it usable — b7's finding that density is "nearly flat
+in budget past 50M" (b7's 11.8% at 50M against b6's 12.9% at 215M on the same shape) says 50M is
+roughly where it settles, and says nothing about 30M.
 
 **The drawdown statistic needs post-competence length.** The collapse rate this sweep is chasing —
 the share of post-competence evals below 50% perfect — was 9.1% in b4 and *invisible at 10M*. 50M
-gives the control ~40M of post-competence history, or ~2,400 evals per arm; 30M gives 20M.
+gives the control ~40M of post-competence history, or ~2,400 evals per arm.
 
 **The control is free at 50M.** b7's four `fc 320` arms ran to exactly this cap with exactly this
-base. At any other horizon the control would have to be re-run (4 arms, half a wave) or truncated,
-and truncation loses the last 20M where b7's density concentrates.
+base. At any other horizon the control would have to be re-run or truncated.
 
-**The cost.** b7 measured 8 arms at 50M as ~2.8 h a wave including its stage B, so a 32-arm batch is
-~11 h and the whole core sweep below is ~3.5 days of desktop. 30M would save ~1 h a wave and lose the
-ranking. A slow config (λ 0, γ 0.8, lr 4e-5, 1 epoch) may not reach competence by 50M; that is a
-result, recorded as "onset not reached at 50M", and because `SNEK_MAX_STEPS` is absolute the arm can
-be resumed to 100M with a second spec if the curve says it is worth it.
+**The cost.** b7 measured 8 arms at 50M as ~2.8 h a wave including its stage B. A slow config (λ 0,
+γ 0.7, lr 4e-5, 1 epoch, shaping off) may not reach competence by 50M; that is a result, recorded as
+"onset not reached at 50M", and because `SNEK_MAX_STEPS` is absolute the arm can be resumed to 100M
+with a second spec if the curve says it is worth it. Anneals re-stretch on resume — see b15.
 
 ## 4. The readouts, pre-registered
 
@@ -94,10 +102,11 @@ Read every batch on these, in this order, per seed and pooled. Nothing else is a
 |---:|---|---|---|
 | 1 | **≥98%/500 density** — share of stage-B rows at ≥98% | how often the config produces a record-region checkpoint | the batch's stage-B pass, automatic |
 | 2 | **collapse share** — post-competence stage-A evals below 50% perfect; also below 80% | the drawdowns. Stage A measures the argmax, so this is the deployed policy failing, not noise | `runs/<arm>_evals.json`, free |
-| 3 | **stage-A ≥98% share**, post-competence | the record region again, from the other instrument. Correlates +0.80 with readout 1 | same file |
+| 3 | **stage-A ≥98% share**, post-competence | the record region from the other instrument. Correlates +0.80 with readout 1 | same file |
 | 4 | **competence onset** — first step at which trailing-30 ≥ 90% | learning speed; also whether the arm got there at all | same file |
 | 5 | `best_perfect30` | the peak. Reported, not ranked on — it is one number per arm | summary block |
-| 6 | **5,000-episode rows ≥98.73% and ≥99.0%**, over `above:98.5` candidates | "truly over 99%". The only readout that measures what the user actually wants | a `hof-remeasure` pass, ~25 min a batch on the laptop |
+| 6 | **5,000-episode rows ≥98.73% and ≥99.0%**, over `above:98.5` candidates | "truly over 99%". The only readout that measures what the sweep is for | a `hof-remeasure` pass, ~25–60 min a batch on the laptop |
+| 7 | **the curve** — readouts 1–4 plotted against the knob across the whole grid | the shape: flat top, cliff, monotone slope. This is what the dense grids are for | computed from the above |
 
 **Readout 6 is the north star and it is expensive, so run it on every batch's winners rather than on
 every arm** — at minimum the best two values plus the control. No snek3 checkpoint has yet held 99% at
@@ -105,153 +114,163 @@ depth: the record is 98.96% on 30,000 episodes, and the best 5,000-episode rows 
 98.80/99.20/99.10. A config that moves readout 6 is the config; one that moves only readout 1 has
 moved the 500-episode selection.
 
-**The test is an exact Mann-Whitney on the four per-seed values, and 0.029 is the floor** — it means
-every seed of one value beat every seed of the other. Anything short of that at n=4 is a lean, and a
-lean is recorded as a lean. Post-competence statistics are computed from the arm's own onset (readout
-4), so a slow config is not penalised for its climb, only for what it did after arriving.
+**The pairwise test is an exact Mann-Whitney on the four per-seed values, and 0.029 is the floor** —
+it means every seed of one value beat every seed of the other. Anything short of that at n=4 is a
+lean, and a lean is recorded as a lean; the curve (readout 7) is what turns a run of leans into a
+finding. Post-competence statistics are computed from the arm's own onset, so a slow config is not
+penalised for its climb, only for what it did after arriving.
 
 ## 5. The knobs — what each controls, and what to expect
 
-Each batch is one knob. `ctrl` marks the base value, which is never re-run. **Core** is the grid to
-queue; **fine** is the extra resolution to add only if the core shows a gradient in that region,
-because n=4 cannot resolve neighbours 0.01 apart. Predictions are written down so they can be wrong.
+Each batch is one knob; `ctrl` marks the base value, which is never re-run. Predictions are written
+down so they can be wrong, and each arm's spec carries its cell's prediction in `notes`. Grids are
+padded to a multiple of 8 arms with informative values so no wave straddles two knobs.
 
-### b9 — GAE λ (`SNEK_PPO_GAE_LAMBDA`)
+### Values from the paste that were left out, and why
+
+| value | why not |
+|---|---|
+| lr 3e-3 | b3c diverged there (69.9, sd 18.4). 2e-3 is the top of the grid and locates the cliff |
+| `target_KL` 0.1 | cannot fire: b4's worst update in 97,656 was 0.514 and its p99 was 0.023, so 0.1 is the control with extra steps. 0.04 and 0.05 stay as the null check |
+| minibatch 4096 and rollout 2048 | not asked for and not added: 4 gradient steps an epoch, or 191 update rounds in the whole run, are outside what the base could recover from. 2048 and 1024 respectively are the far ends |
+
+Everything else in the paste is in a grid, including the deliberately far-off ends (λ 0, γ 0.7,
+entropy 0, shaping off). Those are cheap and each answers a question nothing nearer would.
+
+### b9 — GAE λ (`SNEK_PPO_GAE_LAMBDA`) — 16 values, 64 arms
 
 **What it controls.** How the advantage is estimated. λ=0 is one-step TD: `A = r + γV(s') − V(s)`,
 so the advantage is entirely the critic's opinion — low variance, biased by every critic error. λ=1
 is Monte Carlo: `A = Σγᵏr − V(s)`, unbiased and as noisy as the rest of the episode. In between, the
 advantage sees `1/(1 − γλ)` steps — 33.6 at the base, 100 at λ=1, 1 at λ=0. **The +100 for a
 perfect game reaches the policy through the critic at every λ below 1**, because a game is ~950
-moves and no λ<1 horizon comes close; λ only decides how much of the *local* signal is read from the
-rollout versus from the critic.
+moves; λ only decides how much of the *local* signal is read from the rollout versus from the critic.
 
 | end | prediction |
 |---|---|
-| **λ = 0.0** | slowest onset in the sweep — the terminal reward has to propagate one bootstrap step per update, DQN-style, but with PPO's ~256 updates per rollout rather than one per transition. Smooth once competent, if the critic is good (explained variance was 0.90 on the gate arm). The interesting question is whether it plateaus *below* the base: a critic-only advantage cannot express anything the critic has not learned. Expect onset >30M or not at all |
-| **λ = 1.0** | b3f: 90.8 best30 at 10M and still rising, worst of the λ arms, sd 5.2 — noisy advantages, slow. Expect more drawdowns than the base and a later onset; at γ=0.99 the effective horizon is the discount's own 100 steps |
-| **0.8 – 0.9** | horizon 4.8–10 steps. The local signal is short and the critic carries the rest. Probably fine on onset, possibly *better* on collapse (b3e at 0.95 had 0.0% of evals below 80%, n=1), possibly a lower ceiling |
-| **0.95 – 0.995** | the plateau. Expect these to be within noise of each other and of the base; the sweep's job is to show the plateau is real and where its edges are |
+| **0.0, 0.5** | slowest onset in the sweep — the terminal reward propagates one bootstrap step per update, DQN-style. Smooth once competent if the critic is good (explained variance 0.90 on the gate arm). May plateau *below* the base: a critic-only advantage cannot express what the critic has not learned. λ 0 possibly not competent by 50M |
+| **1.0, 0.999** | b3f at 1.0: 90.8 at 10M and still rising, worst λ arm, sd 5.2. Noisy advantages, later onset, more drawdowns; at γ=0.99 the horizon is the discount's own 100 steps |
+| **0.8 – 0.9** | horizon 4.8–10 steps. Fine on onset, possibly *better* on collapse (b3e at 0.95 had 0.0% below 80%, n=1), possibly a lower ceiling |
+| **0.91 – 0.995** | the plateau. The grid's job is to show it is flat and where its edges are |
 
-**Expected optimum: 0.95–0.99, with a broad flat top.** If the collapse share is lower at 0.9–0.95
-than at 0.98 with complete separation, that is the sweep's first real result.
+**Expected optimum: 0.95–0.99, broad flat top.** A lower collapse share at 0.9–0.95 than at 0.98 that
+holds across the neighbouring values is the sweep's first real result.
 
-Core: `0.0, 0.8, 0.9, 0.95, 0.97, 0.99, 0.995, 1.0` (8 values, 32 arms, 4 waves). Fine:
-`0.91, 0.92, 0.93, 0.94, 0.96` — added only if core shows a slope between 0.9 and 0.97.
+Grid: `0.0, 0.5, 0.8, 0.85, 0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.99, 0.995, 0.999, 1.0`.
+Smoked: 0.0 and 1.0 — both reach the trainer (GAE horizon reports 1 and 100 steps, 2026-09-01).
 
-### b10 — discount γ (`SNEK_DISCOUNT`)
+### b10 — discount γ (`SNEK_DISCOUNT`) — 16 values, 64 arms
 
-**What it controls.** How far ahead the value function looks: horizon `1/(1−γ)` — 5 steps at 0.8,
+**What it controls.** How far ahead the value function looks: horizon `1/(1−γ)` — 3 steps at 0.7,
 100 at 0.99, 400 at 0.9975, unbounded at 1.0. It also sets the shaping's discount (fixed 2026-08-29,
 so the potential-based term stays policy-invariant), so a γ change slightly changes the dense reward
 too — correctly, but worth knowing. And it interacts with λ through `1/(1−γλ)`: at γ=0.8 the GAE
 horizon is 4.6 steps whatever λ is.
 
 **Invariant 6 bounds it from below and it does not bite here.** A win of 100 raises value only when
-`100 > 1/(1−γᵏ)` for k steps a meal; at γ=0.8, k=10 that is 1.12, at 0.99 it is 10.4, at 0.9975 it
-is 34–58. So no value in the grid makes finishing unattractive. What low γ does instead is
-**myopia in the endgame**: a trap that kills 30 moves later is invisible to a 5-step value function.
+`100 > 1/(1−γᵏ)` for k steps a meal; at γ=0.7, k=10 that is 1.03, at 0.99 it is 10.4, at 0.9975 it
+is 34–58. No value in the grid makes finishing unattractive. What low γ does instead is **myopia in
+the endgame**: a trap that kills 30 moves later is invisible to a 5-step value function.
 
 | end | prediction |
 |---|---|
-| **γ = 0.8, 0.9** | fast early learning — food is 7–12 steps away and fully visible — then a ceiling below perfect, because the last 10–20 squares need planning beyond the horizon. The chase-safe shaping is a dense safety signal, so the ceiling may be higher than the theory says; this is the cell most likely to surprise |
-| **γ = 0.9975, 0.999, 1.0** | b3d at 0.9975 read 81.6 at 3M and was capped there; b3o at 0.995 read 96.7 with the *lowest* sd30 in b3 (1.8). Long horizons make the value target the sum of a whole game — ~95 food + 100 + shaping — so the critic's targets are larger and noisier and explained variance should drop. At exactly 1.0 the bootstrap at the rollout boundary carries full weight, and a truncated 128-step buffer is bootstrapping most of an episode. Expect slower onset, and *either* the smoothest arms in the sweep (b3o's hint) or the noisiest (b3d's) |
-| **0.95 – 0.995** | the plateau; 0.995 is the one value with an n=1 hint of being better than the base on stability |
+| **0.7, 0.8, 0.85** | fast early learning — food is 7–12 steps away and fully visible — then a ceiling below perfect, because the last 10–20 squares need planning beyond the horizon. The chase-safe shaping is a dense safety signal, so the ceiling may be higher than the theory says; the cells most likely to surprise |
+| **0.9975, 0.999, 1.0** | b3d at 0.9975 read 81.6 at a 3M cap; b3o at 0.995 read 96.7 with the *lowest* sd30 in b3 (1.8). Long horizons make the value target a whole-game sum — ~95 food + 100 + shaping — so critic targets are larger and explained variance should drop. At 1.0 the rollout-boundary bootstrap carries full weight. Slower onset; *either* the smoothest arms in the sweep or the noisiest |
+| **0.9 – 0.98** | the ramp up to the base, at 0.01 resolution: where does the endgame ceiling lift? |
+| **0.995** | the one value with an n=1 hint of beating the base on stability |
 
 **Expected optimum: 0.99–0.995.** snek2's record DQN config ran 0.9975; PPO has run it once for 3M.
 
-Core: `0.8, 0.9, 0.95, 0.98, 0.995, 0.9975, 0.999, 1.0` (8 values, 32 arms, 4 waves). Fine:
-`0.91–0.97 by 0.01`, only if core shows a slope in that region.
+Grid: `0.7, 0.8, 0.85, 0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.995, 0.9975, 0.999, 1.0`.
+Smoke: 1.0.
 
-### b11 — Adam step size (`SNEK_PPO_LEARNING_RATE`)
+### b11 — Adam step size (`SNEK_PPO_LEARNING_RATE`) — 8 values, 32 arms
 
 **What it controls.** The size of every parameter update. It is the crudest of the three "update
 size" knobs — clip bounds how far the *policy ratio* may move, `target_KL` bounds how far the
-*policy* may move per rollout, lr bounds how far the *parameters* move per gradient step — and it is
-the only one of the three that also scales the critic.
+*policy* may move per rollout, lr bounds how far the *parameters* move per gradient step — and the
+only one that also scales the critic.
 
 **b3's n=1 readings, which this batch tests at n=4:** peaked at 3e-4. 1e-3 read 85.2 (sd 7.2) and
 3e-3 read 69.9 (sd 18.4) at 3M; 5e-4 matched the base; 1e-4 read 95.0 with *more* post-competence
-evals below 80% (14.5% vs 12.2%), a later onset and zero ≥98%/500 rows. So the low end did not buy
-stability, which is the counter-intuitive reading worth confirming.
+evals below 80% (14.5% vs 12.2%), a later onset and zero ≥98%/500 rows. **The low end did not buy
+stability**, which is the counter-intuitive reading worth confirming.
 
 | end | prediction |
 |---|---|
-| **4e-5, 1e-4** | late onset (possibly >50M at 4e-5), no fewer collapses, lower density. If the collapse mechanism is a rare over-sized update, a smaller lr should shrink it in proportion; b3 says it did not, so the mechanism may be many moderate updates rather than a tail |
-| **8e-4, 1e-3** | more collapses, higher sd, earlier onset. 1e-3 should still be competent at 50M (b3b was 85 at 3M) but with visible drawdowns — this is the cell that shows what a drawdown *is* on this shape |
+| **4e-5, 1e-4, 1.5e-4** | late onset (possibly >50M at 4e-5), no fewer collapses, lower density. If the collapse mechanism were a rare over-sized update, a smaller lr should shrink it in proportion; b3 says it did not, so the mechanism may be many moderate updates |
+| **8e-4, 1e-3, 2e-3** | more collapses, higher sd, earlier onset. 2e-3 sits between 1e-3 and the divergence and should show where the cliff is |
 | **2.5e-4, 5e-4** | within noise of the base |
 
 **Expected optimum: 2.5e-4 – 5e-4, i.e. the base.** The information is in the two ends.
 
-Core: `4e-5, 1e-4, 2.5e-4, 5e-4, 8e-4, 1e-3` (6 values, 24 arms, 3 waves).
+Grid: `4e-5, 1e-4, 1.5e-4, 2.5e-4, 5e-4, 8e-4, 1e-3, 2e-3`.
 
-### b12 — epochs (`SNEK_PPO_EPOCHS`)
+### b12 — epochs (`SNEK_PPO_EPOCHS`) — 10 values, 40 arms
 
 **What it controls.** Passes over each rollout, so gradient steps per sample. Each pass moves the
-policy further from the one that collected the data: the ratio drifts, the clip binds more, `approx_kl`
-grows. 1 epoch never sees a sample twice and the clip is nearly inert; 16 epochs re-fits the same
+policy further from the one that collected the data: the ratio drifts, the clip binds more,
+`approx_kl` grows. 1 epoch never sees a sample twice and the clip is nearly inert; 16 re-fits the same
 16,384 samples sixteen times.
 
 **This is the axis that has moved most in this project.** b3: minibatch 1024 (0.25x steps) 89.7,
 base (1x) 96.6, epochs 8 (2x) 97.2 — monotone at n=1. Then at n=8, 8 epochs lost to 4 at both shapes,
 and b4's 8-epoch arms spent 9.1% of their post-competence evals collapsed against 0.7% for b6's
-4-epoch arms. So the current reading is: **onset speed rises with epochs and stability falls, and 4 is
-where the trade sits.**
+4-epoch arms. Current reading: **onset speed rises with epochs and stability falls, and 4 is where the
+trade sits.**
 
 | end | prediction |
 |---|---|
-| **1, 2** | very stable, slow. 1 epoch may not reach the record region by 50M; 2 probably does. Collapse share near zero — this is the cell that says how much stability costs in speed |
-| **12, 16** | b4's collapse pattern, worse: `approx_kl` tails, clip saturating, `clip_fraction` high. Expect the highest collapse shares in the sweep short of entropy 0.03 |
-| **3, 5, 6** | resolve the shape between 2 and 8 |
+| **1, 2** | very stable, slow. 1 epoch may not reach the record region by 50M; 2 probably does. Collapse share near zero — says what stability costs in speed |
+| **10, 12, 16** | b4's collapse pattern, worse: `approx_kl` tails, clip saturating. The highest collapse shares in the sweep short of entropy 0.03 |
+| **3, 5, 6, 7, 8** | the shape between 2 and 10 at unit resolution. 8 has never been measured against 4 on `fc 320` at a matched budget |
 
-**Expected optimum: 3–4.** The user's suggestion of pairing high epochs with a lower lr or clip is
-the right follow-up and belongs in the combination batch (section 6) as two interaction cells:
-16 epochs x lr 1e-4 asks whether it is the *number* of steps or their *total size* that breaks things.
+**Expected optimum: 3–4.** The suggestion of pairing high epochs with a lower lr or clip is the right
+follow-up and belongs in the factorial (section 6) as two interaction cells: 16 epochs x lr 1e-4 asks
+whether it is the *number* of steps or their *total size* that breaks things.
 
-Core: `1, 2, 3, 5, 6, 8, 12, 16` (8 values, 32 arms, 4 waves). 8 is re-run here on purpose: it has
-never been measured against 4 on `fc 320` at a matched budget (b5 was 255M+ vs b7's 50M).
+Grid: `1, 2, 3, 5, 6, 7, 8, 10, 12, 16`. Smoke: 16.
 
-### b13 — minibatch (`SNEK_PPO_MINIBATCH`)
+### b13 — minibatch (`SNEK_PPO_MINIBATCH`) — 8 values, 32 arms
 
 **What it controls.** Two things at once, which is why b3's one reading was ambiguous. Smaller
 minibatches mean *noisier gradients* (32 samples) **and** *more gradient steps per epoch* (512 at 32
-against 64 at 256) — so a minibatch of 32 at 4 epochs takes as many steps as a minibatch of 256 at 32
-epochs. Advantage normalisation is also per minibatch, so at 32 the advantage scale itself is noisy.
+against 64 at 256) — so minibatch 32 at 4 epochs takes as many steps as minibatch 256 at 32 epochs.
+Advantage normalisation is per minibatch, so at 32 the advantage scale itself is noisy.
 
 | end | prediction |
 |---|---|
-| **32, 64** | fast onset, high collapse share — the epochs-16 pattern by another route, plus gradient noise. If 32 is *not* worse than 16 epochs, the step count is not the mechanism and the reuse (seeing each sample many times) is |
-| **1024, 2048** | b3r at 1024: 89.7, the worst non-diverged arm. Few, smooth steps; slow. 2048 is added to see whether the slope continues or the arm simply never arrives |
-| **128, 512** | 128 is the value nearest the base on the fast side and the most likely alternative default |
+| **32, 64** | fast onset, high collapse share — the epochs-16 pattern by another route, plus gradient noise. If 32 is *not* worse than 16 epochs, step count is not the mechanism and reuse is |
+| **1024, 2048** | b3r at 1024: 89.7, the worst non-diverged arm. Few, smooth steps; slow. 2048 (8 steps an epoch) says whether the slope continues or the arm never arrives |
+| **128, 192, 384, 512** | the neighbourhood of the base. 128 is the likeliest alternative default. 192 and 384 leave a short last minibatch each epoch, which is harmless |
 
-**Expected optimum: 128–256.** Read this batch beside b12: the two together separate "steps" from
-"reuse".
+**Expected optimum: 128–256.** Read beside b12: together they separate "steps" from "reuse".
 
-Core: `32, 64, 128, 512, 1024, 2048` (6 values, 24 arms, 3 waves).
+Grid: `32, 64, 128, 192, 384, 512, 1024, 2048`. Smoke: 32, 2048.
 
-### b14 — rollout horizon T (`SNEK_PPO_ROLLOUT`)
+### b14 — rollout horizon T (`SNEK_PPO_ROLLOUT`) — 6 values, 24 arms
 
 **What it controls.** Steps each of the 128 lanes takes before an update, so transitions per update
-(`128 x T`) and, at a fixed cap, the number of update rounds (3,052 at T=128; 381 at 1,024; 6,104 at
-64). It also truncates GAE: an advantage near the end of the buffer is bootstrapped after fewer than T
-steps, which matters at λ→1 and not at the base's 33.6-step horizon.
+(`128 x T`) and, at a fixed cap, the number of update rounds (3,052 at 128; 12,208 at 32; 381 at
+1,024). It also truncates GAE: an advantage near the end of the buffer is bootstrapped after fewer than
+T steps, which matters at T=32 against the base's 33.6-step horizon and at λ→1.
 
 **Two side effects to hold in mind.** Stage A's interval is one rollout, so T=1,024 writes a
 checkpoint every 131k transitions — 8x fewer checkpoints and 8x fewer stage-B rows; the density
-*share* stays comparable, the *counts* do not, and the record region is sampled more coarsely. And a
-cap of 50,003,968 is not a multiple of 131,072, so the T=1,024 arms run 382 rollouts to 50,069,504.
+*share* stays comparable, the *counts* do not. And caps that are not a multiple of the rollout run one
+rollout past 50,003,968.
 
 | end | prediction |
 |---|---|
-| **64** | b3p: ~2.5 pp below the base at n=1. More, smaller updates from less data each; expect slightly worse everywhere |
-| **256, 512** | more data per update, fewer rounds — expect equal or slightly better stability, similar density, marginally later onset. 256 is the most likely alternative default |
-| **1,024** | 381 rounds by 50M is probably too few; expect late onset and a strong stability reading if it arrives |
+| **32, 64** | b3p at 64: ~2.5 pp below the base at n=1. More, smaller updates from less data each; 32 also truncates GAE below its horizon. Worse everywhere |
+| **1,024** | 381 rounds by 50M is probably too few; late onset, strong stability if it arrives |
+| **192, 256, 512** | more data per update, fewer rounds — equal or slightly better stability, similar density, marginally later onset. 256 is the likeliest alternative default |
 
-**Expected optimum: 128–256.**
+**Expected optimum: 128–256.** Read beside b20, which changes the same batch size the other way.
 
-Core: `64, 256, 512, 1024` (4 values, 16 arms, 2 waves).
+Grid: `32, 64, 192, 256, 512, 1024`. Smoke: 32, 1024.
 
-### b15 — entropy coefficient (`SNEK_PPO_ENTROPY_COEF`, `_FINAL`)
+### b15 — entropy coefficient (`SNEK_PPO_ENTROPY_COEF`, `_FINAL`) — 10 cells, 40 arms
 
 **What it controls.** A bonus for a stochastic policy — max entropy on 3 actions is ln 3 = 1.099,
 and the gate arm went from 1.086 to 0.27 in 500k transitions. High values keep the policy random; in
@@ -265,134 +284,218 @@ both were "marginally ahead" at 71M. This batch is their re-run on the base.
 
 | cell | prediction |
 |---|---|
-| **0.001, 0.003, 0.005** | fewer collapses than the base, similar onset. If monotone down to 0.001 with no loss of density, the default moves |
+| **0.0** | no bonus at all. Says whether the term matters on this task; the risk is an early-deterministic policy that stalls |
+| **0.001, 0.003, 0.005** | fewer collapses than the base, similar onset. If monotone down to 0.001 with no density loss, the default moves |
 | **0.02, 0.03** | 0.03 confirms the catastrophe at n=4; 0.02 says where the cliff is |
-| **anneal 0.1 → 0.001** | the user's proposal: explore hard, commit late. 0.1 early is 3x b3h's catastrophic constant, so the first ~15M will look broken; the question is whether the endgame that follows is *better* for it. The ramp is linear over `SNEK_MAX_STEPS`, so it crosses 0.03 at 35M and 0.01 at 45M — most of the run is spent above the known-bad value. Prediction: late onset, possibly the best late stability. A 0.03→0.001 anneal is included as the milder version |
-| **anneal 0.01 → 0.001** | b8's cell on this shape |
+| **anneal 0.1 → 0.001** | explore hard, commit late. 0.1 early is 3x the catastrophic constant, so the first ~15M will look broken; the question is whether the endgame that follows is *better* for it. The ramp is linear over `SNEK_MAX_STEPS`, crossing 0.03 at 35M and 0.01 at 45M. Late onset, possibly the best late stability. 0.03→0.001 is the milder version |
+| **anneal 0.01 → 0.001, 0.01 → 0** | b8's cell on this shape, and the same ramp taken all the way to zero |
 
-**Expected optimum: 0.001–0.005, or a short anneal.** Note the ramp is a function of the cap: an arm
-resumed to a higher cap re-stretches its schedule.
+**Expected optimum: 0.001–0.005, or a short anneal.** The ramp is a function of the cap: an arm
+resumed to a higher cap re-stretches its schedule, so an annealed arm is never resumed for comparison.
 
-Core: `0.001, 0.003, 0.005, 0.02, 0.03, anneal 0.1→0.001, anneal 0.03→0.001, anneal 0.01→0.001`
-(8 cells, 32 arms, 4 waves).
+Grid: `0.0, 0.001, 0.003, 0.005, 0.02, 0.03, 0.1→0.001, 0.03→0.001, 0.01→0.001, 0.01→0`.
+Smoke: 0.0, the 0.1 anneal.
 
-### b16 — `target_KL` (`SNEK_PPO_TARGET_KL`)
+### b16 — `target_KL` (`SNEK_PPO_TARGET_KL`) — 10 values, 40 arms
 
 **What it controls.** An early stop on the epoch loop: after each epoch, if the epoch's mean
 `approx_kl` exceeds the threshold, the remaining epochs are skipped. **It removes only the tail of
 large updates and leaves every other update identical to the control**, and at 4 epochs it has
-exactly three places to stop, so its effect is bounded — it can at most turn a 4-epoch update into a
-1-epoch one.
+exactly three places to stop, so its effect is bounded.
 
 **Where it binds is known.** b4's `approx_kl` per update: median 0.0035, p95 0.0079, p99 0.023, worst
-0.514. So 0.02 fires on ~1% of updates, 0.01 on ~4%, 0.005 on ~25%, and **0.03 and above almost
-never fire and would be arms identical to the control.** Values 0.013 and 0.015 differ by which
-handful of updates they catch and cannot be told apart at n=4. b8 is testing 0.02 on `fc (200,100)`.
+0.514. So 0.003 fires on most updates, 0.005 on ~25%, 0.01 on ~4%, 0.02 on ~1%, and **0.03 and above
+almost never** — those cells are predicted identical to the control and are in the grid as the null
+check the prediction deserves. Neighbouring thresholds differ by which handful of updates they catch;
+the curve across them is what will show whether anything happens at all.
 
 | cell | prediction |
 |---|---|
-| **0.02** | near-null: cuts the top 1%. If collapses are caused by the rare huge update, this is enough and the collapse share drops; if by many moderate ones, nothing happens |
-| **0.01** | cuts the top ~4% — the first value with a plausible effect |
-| **0.005** | fires on a quarter of updates; effectively ~3 epochs on average with the tail removed. Expect slightly later onset and the best stability in the batch if the mechanism is the tail |
-| **0.03** | the control by another name; included as the null check |
+| **0.003, 0.005** | the aggressive end: ~1–3 epochs on average. Best stability in the batch if the tail is the mechanism; slightly later onset |
+| **0.008 – 0.015** | cuts the top 1.5–5%. The first values with a plausible effect |
+| **0.02** | b8's value on this shape. Near-null unless collapses come from rare huge updates |
+| **0.03, 0.04, 0.05** | the control by another name |
 
-**Expected outcome: a small effect, monotone in the threshold, with 0.01 the useful value if any is.**
-This is the knob most likely to produce a clean null, which is also worth knowing.
+**Expected outcome: a small effect, monotone in the threshold, with ~0.01 the useful value if any is.**
+The knob most likely to produce a clean null, which is also worth knowing.
 
-Core: `0.005, 0.01, 0.02, 0.03` (4 values, 16 arms, 2 waves). Fine: `0.008, 0.013, 0.015` only if
-0.005 and 0.01 separate.
+Grid: `0.003, 0.005, 0.008, 0.01, 0.013, 0.015, 0.02, 0.03, 0.04, 0.05`.
 
-### b17 — clip, and the two anneals (`SNEK_PPO_CLIP`; **needs code**)
+### b17 — clip, and the clip and lr anneals (`SNEK_PPO_CLIP`; **anneals need code**) — 10 cells, 40 arms
 
 **What clip controls.** The trust region on the probability ratio per sample; 0.2 lets an action's
 probability move 20% per update. Never swept in this project. Smaller is a tighter region — slower,
-steadier; larger lets one update move the policy further.
+steadier; larger lets one update move the policy further, and at 0.4 with 4 epochs it barely binds.
 
 **What annealing does.** The PPO paper's Atari recipe anneals clip 0.1→0 *and* lr 2.5e-4→0 over
 training: the policy is allowed big moves while it is bad and ever smaller ones as it gets good, so
 late training cannot undo what it has learned. **This is the textbook lever for late-training
-drawdowns and it is the cell in this whole sweep with the strongest prior of helping.** The cost is
-that a mistake learned late cannot be unlearned late either, and the schedule is tied to the cap.
+drawdowns and the cell in this whole sweep with the strongest prior of helping.** The cost is that a
+mistake learned late cannot be unlearned late either, and the schedule is tied to the cap.
 
 | cell | prediction |
 |---|---|
-| **clip 0.1, 0.3 (static)** | 0.1: slower onset, fewer collapses; 0.3: the reverse. Sets the reference for the anneals |
-| **clip 0.2 → 0.02** | steady endgame, fewer late collapses; the record region should be *denser* late in the run if b6's back-loading is general. Not to exactly 0 — `ppo/algo.py` refuses a clip outside (0, 1), and a clip of 0 admits no update at all |
-| **lr 3e-4 → 0** | same shape of effect through the parameters instead of the ratio; also cools the critic. The second half of the run is at <1.5e-4, so expect the b3i penalty on onset — competence later, but not much |
+| **clip 0.05, 0.1, 0.15** | tighter: slower onset, fewer collapses; 0.05 possibly never reaches the record region |
+| **clip 0.3, 0.4** | looser: earlier onset, more collapses; 0.4 approaches unclipped policy gradient |
+| **clip 0.2 → 0.02** | steady endgame, fewer late collapses; the record region should be *denser* late in the run. Not to exactly 0 — `ppo/algo.py` refuses a clip outside (0, 1), and a clip of 0 admits no update |
+| **clip 0.1 → 0.02** | the paper's start value |
+| **lr 3e-4 → 0**, **→ 3e-5** | the same shape of effect through the parameters; also cools the critic. Half the run is below 1.5e-4, so expect b3i's onset penalty, mildly. The 3e-5 floor tests whether the last stretch near zero was doing anything |
 | **both** | the Atari recipe. Predicted best late stability of anything in the sweep; the risk is a lower ceiling |
-| **clip 0.1 → 0.02** | the paper's start value, for completeness |
 
 **Expected: the anneals win on collapse share, and the question is what they cost on density.**
 
 **Code needed first**: `SNEK_PPO_CLIP_FINAL` and `SNEK_PPO_LEARNING_RATE_FINAL`, both the same linear
 ramp over `SNEK_MAX_STEPS` that `ppo/schedules.entropy_coef_for` already implements, applied in
 `ppo/algo.advance()` beside the entropy coefficient — the clip as `agent.clip`, the lr by setting
-`param_group['lr']` on the one optimiser. Two ramps, a test each, a mutation check, and a smoke run
-that greps the value at 10% of a short cap, as b8's knobs were smoked. Until it lands, b17 is queued
-without the three anneal cells or not at all.
+`param_group['lr']` on the one optimiser. Two ramps, a test each, a mutation check, and the smoke
+runs. Until it lands the generator drops the five anneal cells, and **b17 should wait for them rather
+than run its five static cells as a short batch** — the code is a morning's work and can land during
+b9.
 
-Core: `clip 0.1, clip 0.3, clip 0.2→0.02, lr→0, both, clip 0.1→0.02` (6 cells, 24 arms, 3 waves).
+Grid: `clip 0.05, 0.1, 0.15, 0.3, 0.4; 0.2→0.02; 0.1→0.02; lr→0; lr→3e-5; both`.
+Smoke: clip anneal, lr anneal.
 
-## 6. The combination batch, and why it is not one arm
+### b18 — gradient-norm clipping (`SNEK_PPO_GRADIENT_CLIPPING`) — 6 values, 24 arms — *added*
 
-**b18, designed after b9–b17 are read.** Take every knob whose winning value separated from the base
-completely (p=0.029 on readout 1 or 2) and whose readout-6 pass confirmed it. Call them A, B, C —
-expect two or three, not eight. Then run the **full factorial** of those, 4 seeds each, at 50M:
-base+A, base+B, base+AB, base+C, base+AC, base+BC, base+ABC — 7 cells, 28 arms, padded to 32 with
-the two epochs-interaction cells (16 epochs x lr 1e-4, 16 epochs x clip 0.1) if b12 made them
+**What it controls.** A ceiling on the global gradient norm over both towers before each Adam step;
+0.5 by default, 0 turns it off. Never swept. It is the one knob that acts on the *size of a single
+gradient* rather than on the policy or the ratio, which makes it **a direct test of the tail-update
+hypothesis** — if b4's worst updates (`approx_kl` 0.514) are carried by a few huge gradients, turning
+the clip off should make collapses worse and tightening it should make them rarer, without touching
+the epoch count.
+
+| cell | prediction |
+|---|---|
+| **0 (off)** | if collapses come from rare huge gradients, the worst arm in the batch; if they are policy-level drift, nothing changes. Either answer is useful |
+| **0.1, 0.25** | clips most updates: slower, steadier — like a lower lr applied only to the big steps |
+| **1.0, 2.0, 5.0** | binds less and less; 5.0 is effectively off |
+
+**Expected optimum: 0.5–1.0; the information is in 0.**
+
+Grid: `0, 0.1, 0.25, 1.0, 2.0, 5.0`. Smoke: 0.
+
+### b19 — the switches: advantage normalisation, value loss, Adam ε, vf_coef — 6 cells, 24 arms — *added*
+
+Four knobs with two or three sensible values each, gathered into one batch because none has a curve
+to map; each cell checks that a default is not silently costing something.
+
+| cell | what it changes | prediction |
+|---|---|---|
+| **adv-norm off** | the update now scales with the reward; a +100 terminal in a minibatch dominates it | more collapses, a policy that over-weights the win. The base's normalisation is what makes the update reward-scale invariant |
+| **value loss `mse`** | squared error instead of Huber | one +100 terminal dominates 256 samples — the reason Huber is the default. Noisier critic, lower explained variance, possibly more collapses |
+| **Adam ε 1e-5** | the PPO paper's value, 100x the base | damps the step for parameters with tiny second moments: slightly steadier, possibly slightly slower |
+| **Adam ε 1e-8** | torch's default | within noise of 1e-7 |
+| **vf_coef 0.1, 1.0** | the critic loss weight | **predicted inert**: the towers share no parameters and Adam is scale-invariant per parameter, so it can only shift the critic's effective step through the ε term. Two arms buy the null the prediction deserves |
+
+Grid: `adv-norm 0; mse; ε 1e-5; ε 1e-8; vf 0.1; vf 1.0`. Smoke: adv-norm off, mse.
+
+### b20 — collect lanes (`SNEK_COLLECT_ENVS`) — 4 values, 16 arms — *added*
+
+**What it controls.** How many games run in lockstep — the other half of the rollout. Transitions
+per update are `lanes x T`, so 256 lanes at T=128 is the same batch as 128 lanes at T=256, **but from
+twice as many independent episodes with half the per-episode depth.** Read beside b14: if `lanes256`
+beats `roll256`, episode diversity matters more than depth. Rollout size changes the stage-A interval
+exactly as T does.
+
+| cell | prediction |
+|---|---|
+| **32, 64** | small, correlated batches from few games; worse than the matching T cells because diversity is lower too |
+| **256, 512** | same batch as `roll256` and `roll512`; 763 update rounds by 50M at 512 |
+
+Grid: `32, 64, 256, 512`. Smoke: 32, 512.
+
+### b21 — chase-safe shaping coefficient and gate (`SNEK_CHASE_SAFE_SHAPING`, `_GATE`) — 6 cells, 24 arms — *added*
+
+**A reward knob, not a PPO knob, and the one batch that changes what every other batch held fixed** —
+so it runs last. Stage B measures the perfect rate, which no reward term can move, so the comparison
+stands; the desktop keys eval waves on these two variables, so each value gets its own stage-B wave
+automatically.
+
+**What it controls.** The dense safety signal: a potential-based bonus for keeping the free space
+reachable, paid at coefficient `c` once the score passes the gate. snek2's batches 28–29 found the
+gate to be the lever and `c=0.10` at gate 75 set the records; on this stack, b1 (shaping off) never
+reached 95/100 in 3M DQN steps while b2 (b29's config) did. PPO has only ever run b2's setting.
+
+| cell | prediction |
+|---|---|
+| **c = 0** | shaping off. The 508k gate arm on the bare reward was 1% perfect; the question is whether PPO gets there at all by 50M without it |
+| **c = 0.05, 0.2** | potential shaping is policy-invariant, so `c` should change learning speed and not the optimum; expect both within noise once competent, 0.2 faster to onset |
+| **gate 60, 85** | 60 shapes 15 more squares of the game (snek2's direction of improvement); 85 is snek3's own default and shapes only the last 10 — expect worse than 75 |
+| **gate 0** | shaped from the first move. Says whether the gate does anything for PPO or was a DQN-era artefact |
+
+Grid: `c 0.0, 0.05, 0.2; gate 0, 60, 85`. Smoke: gate 0.
+
+## 6. The factorial, and why it is not one arm
+
+**b22, designed after b9–b21 are read.** Take every knob whose winning value separated from the base
+completely (p=0.029 on readout 1 or 2), whose curve (readout 7) is coherent around it, and whose
+readout-6 pass confirmed it. Call them A, B, C — expect two or three, not thirteen. Run the **full
+factorial**, 4 seeds each, at 50M: base+A, +B, +AB, +C, +AC, +BC, +ABC — 7 cells, 28 arms, padded to
+32 with the two epochs-interaction cells (16 epochs x lr 1e-4, 16 epochs x clip 0.1) if b12 made them
 interesting. Every cell is compared to the base *and* to its own sub-cells, so an interaction like
 b4's shows up as a cell below its parts rather than as a surprise.
 
 **Only then the champion attempt**: the best factorial cell at 200M+ with 8 seeds, the `hof5000` pass
 on everything above 98.5, and a 30,000-episode measurement of the single winner at a fresh seed.
 
-If b8 has closed by then with a winner on `fc (200,100)`, its knob enters the factorial only through
-its b15/b16 re-run on the base, never directly.
+If b8 has closed with a winner on `fc (200,100)`, its knob enters the factorial only through its
+b15/b16 re-run on the base, never directly.
 
 ## 7. Budget and order
 
-| batch | knob | cells | arms | waves | ~hours | needs code |
+| batch | knob | cells | arms | waves | ~hours | code first |
 |---|---|---:|---:|---:|---:|---|
-| b9 | λ | 8 | 32 | 4 | 11 | |
-| b10 | γ | 8 | 32 | 4 | 11 | |
-| b11 | lr | 6 | 24 | 3 | 8.5 | |
-| b12 | epochs | 8 | 32 | 4 | 11 | |
-| b13 | minibatch | 6 | 24 | 3 | 8.5 | |
-| b14 | rollout T | 4 | 16 | 2 | 5.5 | |
-| b15 | entropy | 8 | 32 | 4 | 11 | |
-| b16 | target_KL | 4 | 16 | 2 | 5.5 | |
-| b17 | clip + anneals | 6 | 24 | 3 | 8.5 | **yes** |
-| **core total** | | **58** | **232** | **29** | **~81 h** | |
-| b18 | factorial | ~8 | 32 | 4 | 11 | |
+| b9 | λ | 16 | 64 | 8 | 22 | |
+| b10 | γ | 16 | 64 | 8 | 22 | |
+| b11 | lr | 8 | 32 | 4 | 11 | |
+| b12 | epochs | 10 | 40 | 5 | 14 | |
+| b13 | minibatch | 8 | 32 | 4 | 11 | |
+| b14 | rollout T | 6 | 24 | 3 | 8.5 | |
+| b15 | entropy | 10 | 40 | 5 | 14 | |
+| b16 | target_KL | 10 | 40 | 5 | 14 | |
+| b17 | clip + anneals | 10 | 40 | 5 | 14 | **yes** |
+| b18 | grad-norm clip | 6 | 24 | 3 | 8.5 | |
+| b19 | switches | 6 | 24 | 3 | 8.5 | |
+| b20 | lanes | 4 | 16 | 2 | 5.5 | |
+| b21 | shaping | 6 | 24 | 3 | 8.5 | |
+| **total** | | **116** | **464** | **58** | **~162 h** | |
+| b22 | factorial | ~8 | 32 | 4 | 11 | |
 
-The user's full grid as pasted is ~285 arms; the difference is the fine tiers, which are in the
-manifest and are queued only where the core shows a slope. **~3.5 days of desktop for the core**, at
-b7's measured 2.8 h per 8-arm wave including stage B, with the box otherwise idle. Every batch is a
-multiple of 8 arms so no wave straddles two knobs and every auto-queued stage B measures one batch.
+**About a week of desktop** at b7's measured 2.8 h per 8-arm wave including stage B, with the box
+otherwise idle. Every batch is a multiple of 8 arms so no wave straddles two knobs and every
+auto-queued stage B measures one batch. The wave time is dominated by stage A and stage B, not by the
+gradient steps, so cells with many more updates (epochs 16, minibatch 32) will run somewhat longer and
+cells with far fewer checkpoints (T 1024) shorter.
 
-**Order.** b9 and b10 first, as the user asked and because the advantage pair is the least explored;
-then the update-size quartet b11–b14, which is where the drawdown mechanism most likely lives; then
-the stability pair b15–b16, which b8 will have partly previewed by then; b17 as soon as its code
-lands, which can be during b9. Queue two batches at a time with ascending priorities so the box never
-idles between them and there is always a decision point before the third.
+**Order.** b9 and b10 first, as asked and because the advantage pair is the least explored; then the
+update-size quartet b11–b14, which is where the drawdown mechanism most likely lives; b15 and b16,
+which b8 will have partly previewed; b17 as soon as its code lands (it can land during b9); then the
+three added checks b18–b20; b21 last because it moves the reward. Queue two batches at a time with
+ascending priorities so the box never idles between them and there is always a decision point before
+the third — a batch that produces an unexpected cliff may change what the next one should hold fixed.
 
-**Cost of readout 6.** One `hof-remeasure` pass on a 32-arm batch's `above:98.5` candidates: b4's 274
-rows took 26 min on the laptop; a batch with denser winners will have more. Budget an hour a batch
+**Cost of readout 6.** One `hof-remeasure` pass on a batch's `above:98.5` candidates: b4's 274 rows
+took 26 min on the laptop; a 64-arm batch with denser winners will have more. Budget an hour a batch
 on the laptop, run while the desktop trains the next one.
 
 ## 8. Rules for running it
 
-- **Smoke every never-exercised value before its batch is queued** — λ 0.0, γ 1.0, T 1024, minibatch
-  32 and 2048, every anneal — with a short cap on the laptop and `grep 'hyperparameter override:'`
-  plus a read of the value in the log at 10% of the cap. b8 did this and it is why its two knobs are
-  known to be live. A silently ignored knob costs four arms.
-- **Specs come from the manifest, not by hand.** `tools/sweep_specs.py <batch> --tier core` writes
-  them into the `ops` worktree and validates each against `parse_job`; the `desktop-batch` skill
-  does the push. A manifest edit is a design change and is made in the JSON so the specs follow.
+- **Smoke every never-exercised value before its batch is pushed.** `tools/sweep_specs.py <batch>
+  --smoke <file.sh>` writes a zsh script that runs each cell marked `smoke` in the manifest for
+  65,536 transitions on the laptop under the policy name `smoke`, printing the
+  `hyperparameter override:` lines, the config line and the reward line, and cleaning up after
+  itself. Read the value back — the GAE horizon for λ, the rollout size for T and lanes, the ramp
+  value at a known fraction for an anneal. b8 did this by hand and it is why its two knobs are known
+  to be live; a silently ignored knob costs four arms. b9's two smokes ran 2026-09-01 and both
+  reached the trainer.
+- **Specs come from the manifest, not by hand.** `tools/sweep_specs.py <batch> --out <dir>` writes
+  them into the `ops` worktree and validates each against `parse_job`; the `desktop-batch` skill does
+  the push. A design change is made in the JSON so the specs follow.
 - **Every arm's `notes` field carries the prediction for its cell**, copied from the manifest, so the
   reader of the spec knows what the arm was expected to do without opening this file.
-- **A batch closes when its stage B has landed and readouts 1–5 are in `results.md`**, per seed and
-  pooled, with the Mann-Whitney against the b7 control. Readout 6 follows for the winners. A batch
-  whose slow cells did not reach competence records that and may resume them; it does not rank them.
-- **The base does not change until b18.** A batch that shows a clear winner writes it in
+- **A batch closes when its stage B has landed and readouts 1–5 and 7 are in `results.md`**, per seed
+  and pooled, with the Mann-Whitney against the b7 control and the curve drawn. Readout 6 follows for
+  the winners. A batch whose slow cells did not reach competence records that and may resume them
+  (never an annealed one); it does not rank them.
+- **The base does not change until b22.** A batch that shows a clear winner writes it in
   `findings.md` as a candidate for the factorial, not as a new default.

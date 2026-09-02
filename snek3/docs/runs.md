@@ -110,7 +110,7 @@ and b7 is sweeping the axis outright** — see the top of this section.
 ### Next, in the order the evidence argues for
 
 **The sweep after b8 is designed: [`../plans/hyperparam-sweep.md`](../plans/hyperparam-sweep.md)**
-(2026-09-01) -- batches b9-b17, one knob each at four seeds on b7's `fc (320,)` base at 50M, with
+(2026-09-01, revised) -- batches b9-b21, one knob each at four seeds on b7's `fc (320,)` base at 50M, with
 b7aa-b7ad as the shared control; the machine-readable grid is `plans/hyperparam-sweep.json` and
 `tools/sweep_specs.py` expands a batch into specs. Nothing from it is queued yet.
 
