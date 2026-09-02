@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-01T23:00:42",
-  "ts": 1788328842.4228861,
+  "iso": "2026-09-01T23:11:12",
+  "ts": 1788329472.7568977,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b9 | b9: lam80, seed 1 of 4 -- wave 2 of 8 | training 95% (8 arms)"
+      "b9 | b9: lam80, seed 1 of 4 -- wave 2 of 8 | stage B (8 arms)"
     ],
     "queued": [
-      "b9 stage B | b9: lam80, seed 1 of 4 -- wave 2 of 8 | queued (8 arms)",
       "b9 training | b9: lam80, seed 1 of 4 -- wave 2 of 8 | queued (56 arms)",
       "b10 training | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (64 arms)",
       "b10 stage B | b10: g70, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
@@ -38,117 +37,32 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b9aa-lam0-seed1",
-      "type": "train",
+      "id": "b9-stageb",
+      "type": "eval",
       "policy": "b9aa-lam0-seed1",
       "policies": [
-        "b9aa-lam0-seed1"
-      ],
-      "pid": 2548167,
-      "step": 47300608,
-      "max_steps": 50003968,
-      "steps_per_sec": 5169.5,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9ab-lam0-seed2",
-      "type": "train",
-      "policy": "b9ab-lam0-seed2",
-      "policies": [
-        "b9ab-lam0-seed2"
-      ],
-      "pid": 2548168,
-      "step": 48250880,
-      "max_steps": 50003968,
-      "steps_per_sec": 7754.0,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9ac-lam0-seed3",
-      "type": "train",
-      "policy": "b9ac-lam0-seed3",
-      "policies": [
-        "b9ac-lam0-seed3"
-      ],
-      "pid": 2548169,
-      "step": 46104576,
-      "max_steps": 50003968,
-      "steps_per_sec": 7236.9,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9ad-lam0-seed4",
-      "type": "train",
-      "policy": "b9ad-lam0-seed4",
-      "policies": [
-        "b9ad-lam0-seed4"
-      ],
-      "pid": 2548170,
-      "step": 45989888,
-      "max_steps": 50003968,
-      "steps_per_sec": 4652.2,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9ae-lam50-seed1",
-      "type": "train",
-      "policy": "b9ae-lam50-seed1",
-      "policies": [
-        "b9ae-lam50-seed1"
-      ],
-      "pid": 2548171,
-      "step": 48185344,
-      "max_steps": 50003968,
-      "steps_per_sec": 5686.0,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9af-lam50-seed2",
-      "type": "train",
-      "policy": "b9af-lam50-seed2",
-      "policies": [
-        "b9af-lam50-seed2"
-      ],
-      "pid": 2548172,
-      "step": 47808512,
-      "max_steps": 50003968,
-      "steps_per_sec": 5169.0,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9ag-lam50-seed3",
-      "type": "train",
-      "policy": "b9ag-lam50-seed3",
-      "policies": [
-        "b9ag-lam50-seed3"
-      ],
-      "pid": 2548173,
-      "step": 47562752,
-      "max_steps": 50003968,
-      "steps_per_sec": 5168.9,
-      "elapsed_s": 7407
-    },
-    {
-      "id": "b9ah-lam50-seed4",
-      "type": "train",
-      "policy": "b9ah-lam50-seed4",
-      "policies": [
+        "b9aa-lam0-seed1",
+        "b9ab-lam0-seed2",
+        "b9ac-lam0-seed3",
+        "b9ad-lam0-seed4",
+        "b9ae-lam50-seed1",
+        "b9af-lam50-seed2",
+        "b9ag-lam50-seed3",
         "b9ah-lam50-seed4"
       ],
-      "pid": 2548174,
-      "step": 48398336,
-      "max_steps": 50003968,
-      "steps_per_sec": 7753.2,
-      "elapsed_s": 7407
+      "pid": 2713429,
+      "step": 50003968,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 156
     }
   ],
   "ledger": {
-    "b9-stageb": "queued",
     "b9ai-lam80-seed1": "queued",
     "b9aj-lam80-seed2": "queued",
     "b9ak-lam80-seed3": "queued",
@@ -402,14 +316,15 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b9aa-lam0-seed1": "running",
-    "b9ab-lam0-seed2": "running",
-    "b9ac-lam0-seed3": "running",
-    "b9ad-lam0-seed4": "running",
-    "b9ae-lam50-seed1": "running",
-    "b9af-lam50-seed2": "running",
-    "b9ag-lam50-seed3": "running",
-    "b9ah-lam50-seed4": "running",
+    "b9-stageb": "running",
+    "b9ad-lam0-seed4": "done",
+    "b9ac-lam0-seed3": "done",
+    "b9aa-lam0-seed1": "done",
+    "b9ah-lam50-seed4": "done",
+    "b9ag-lam50-seed3": "done",
+    "b9af-lam50-seed2": "done",
+    "b9ae-lam50-seed1": "done",
+    "b9ab-lam0-seed2": "done",
     "b8-stageb-w2": "done",
     "b8p-lam95-seed4": "done",
     "b8o-lam95-seed3": "done",
@@ -565,10 +480,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 166.3,
+  "disk_free_gb": 166.2,
   "load_avg": [
-    14.236328125,
-    14.29931640625,
-    14.2578125
+    12.4375,
+    11.46484375,
+    12.978515625
   ]
 }
