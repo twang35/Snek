@@ -112,7 +112,11 @@ and b7 is sweeping the axis outright** — see the top of this section.
 **The sweep after b8 is designed: [`../plans/hyperparam-sweep.md`](../plans/hyperparam-sweep.md)**
 (2026-09-01, revised) -- batches b9-b21, one knob each at four seeds on b7's `fc (320,)` base at 50M, with
 b7aa-b7ad as the shared control; the machine-readable grid is `plans/hyperparam-sweep.json` and
-`tools/sweep_specs.py` expands a batch into specs. Nothing from it is queued yet.
+`tools/sweep_specs.py` expands a batch into specs. **b9 (λ, 16 values) and b10 (γ, 16 values) were
+queued on the desktop 2026-09-01 20:30, 128 arms behind b8's stage B**, every never-exercised value of
+b9-b21 smoke-tested on the laptop first. The clip and learning-rate anneal knobs for b17 are
+implemented and tested in the working tree (17 of 17 mutants killed) and wait for review before
+they can be deployed to the box.
 
 1. ~~**One batch varying only the network**, matched epochs and matched budget.~~ **Done: b7, closed
    2026-09-01.** `fc (320,)` won and b3's ranking inverted. What this opens, in order:
