@@ -6,11 +6,22 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
-**The b9-b14 sweep is running on the desktop; the laptop is idle.** b9 wave 1 of 8 (`b9aa`-`b9ah`,
-λ 0 and λ 0.50 x 4 seeds at 50M) is 78% done at 2026-09-01 22:50, ~5,100-9,700 steps/s per arm across
-8 arms, 1 h 43 m in. b9's remaining 56 training arms and its stage B are queued behind it, then b10
-(γ 0.70), b11 (lr 4e-5), b12 (1 epoch) and the rest — 8 waves for b9, 8 for b10, 4 for b11, 5 for
-b12. **Nothing is running on the laptop**: b7's and b8's `hof5000` passes finished there tonight.
+**The b9-b14 sweep is running on the desktop; the laptop is idle.** b9 is on wave 6 of 8 —
+λ 0.94 and λ 0.95 x 4 seeds (`b9bg`-`b9bn`, 50M each) — 64% done at 2026-09-02 07:22, 4,600-8,300
+steps/s per arm, 1 h 03 m in. Waves 1-4 (λ 0, 0.50, 0.80, 0.85, 0.90, 0.91, 0.92, 0.93 x 4 seeds, 32
+arms) have finished both stages; two more waves and b9's stage B are queued behind the current one,
+then b10 (γ, 64+8 arms), b11 (lr, 32+8), b12 (epochs, 40+8), b13 (minibatch, 32+8) and b14 (rollout
+length, 24+8), each with `auto_stage_b`. **Nothing is running on the laptop.**
+
+**b9's finished waves already answer part of the question the ‡ note below raised, and it's the
+opposite of the worry.** Pulling the 32 finished arms' stage-B rows off the `results` branch, the
+≥98%/500 density climbs monotonically with λ at this 50M cap: 0% at λ 0 and λ 0.50, 0.8% at λ
+0.80-0.85, then 3.9/4.3/4.8/5.4% across λ 0.90-0.93 — closing in on the 5-6% region b4 and b8's
+controls showed at their own caps, not falling away from it. So far, higher λ is not costing record
+density the way b8's λ 0.95 did at 100M; whether that holds, turns over, or is just b9 not yet having
+reached b8's regime is what the currently-training λ 0.94/0.95 pair and the waves above 0.95 will
+say. Not yet checked against drawdown — that reading waits for stage A's post-competence share, same
+as b8's.
 
 **Batch b8 closed 2026-09-01 and it did not find what it was looking for.** Details below; the short
 version is that all four stability knobs cut b4's drawdown and none of them beat the control on record
@@ -18,10 +29,12 @@ density, and [`findings.md`](findings.md) now has the 2x2 showing that **epochs 
 the lever** — b7's 32 four-epoch arms sit at 0.1% drawdown against b8's 2.3% and b4's 2.0% at a
 matched cap.
 
-**‡ This bears on how the b9-b14 sweep should be read.** b9 sweeps λ, and λ 0.95 was b8's *best* knob
-on drawdown and its *worst* on density — the two metrics ran opposite across all four knobs
-([`findings.md`](findings.md)). So decide before b9's stage B which of the two its arms are being
-ranked on; ranking on `sef` or on drawdown would have picked b8's weakest group.
+**‡ This is why the b9-b14 sweep needs care in how it's read.** b9 sweeps λ, and λ 0.95 was b8's
+*best* knob on drawdown and its *worst* on density at b8's 100M cap — the two metrics ran opposite
+across all four knobs ([`findings.md`](findings.md)). Decide before b9's stage B closes which of the
+two its arms are being ranked on; ranking on `sef` or on drawdown would have picked b8's weakest
+group there. b9's own density trend above is a first read, not the final one — it is at 50M, not
+b8's 100M, and the drawdown side is still unread.
 
 ## Just closed: b8 — every knob cut the drawdown, none produced a record
 
