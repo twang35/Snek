@@ -1,8 +1,9 @@
 # Charts — one graph per arm
 
-**Batch b8 — the stability knobs — closed both waves on the desktop 2026-09-01**, all sixteen arms
-with stage B complete, charts below and imported from the `results` branch. The box has since moved on
-to the b9-b14 sweep. The window to watch it live is below.
+**Batch b9 — the λ sweep — is on the desktop, 40 of 64 arms trained as of 2026-09-02 08:38.** Its
+stage-A charts are below; stage-B panels follow at close-out, because the box is still writing that
+path for wave 5. **Batch b8 closed 2026-09-01**, all sixteen arms with stage B complete, charts below.
+The window to watch the box live is below.
 
 **Batch b7 closed all four waves 2026-09-01** — 32 arms, 8 layouts x 4 seeds, charts imported from the
 `results` branch the same day and below. **Batch b4's charts are here too**, imported and redrawn
@@ -23,6 +24,101 @@ after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closi
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).
 
+## Batch b9 — the λ sweep off b7's `fc (320,)`, 4 seeds each, 50M
+
+**In flight**: 40 arms trained, stage B closed on waves 1-4, wave 5's running, waves 6-8 queued.
+b9 changes **only** `ppo_gae_lambda` off b7's winning cell — `fc (320,)`, 4 epochs, entropy 0.01,
+lr 3e-4, γ 0.99, clip 0.2, same 50M cap — so **b7aa-b7ad above are this sweep's λ 0.98 arms**, and
+`fc (320,)`'s panels there are the reference to read these against.
+
+| λ | GAE horizon | best30 | ≥98%/500 |
+|---:|---:|---:|---:|
+| 0.00 | 1.0 | 88.28 | 0.0% |
+| 0.50 | 2.0 | 94.25 | 0.0% |
+| 0.80 | 4.8 | 96.12 | 0.8% |
+| 0.85 | 6.3 | 95.90 | 0.8% |
+| 0.90 | 9.2 | 96.75 | 3.9% |
+| 0.91 | 10.1 | 96.88 | 4.3% |
+| 0.92 | 11.2 | 96.92 | 4.8% |
+| 0.93 | 12.6 | 97.17 | 5.4% |
+| 0.94 | 14.4 | 96.80 | stage B pending |
+| 0.95 | 16.8 | 96.97 | stage B pending |
+| **0.98** (b7) | **33.6** | **97.75** | **17.3%** |
+
+**What to look at.** Put λ 0.00 next to λ 0.98 first — the whole dynamic range of the knob is in
+those two panels, best30 88.28 against 97.75. Then walk 0.90 → 0.93 → 0.98 for the shape of a
+curve that is still improving at the top of the measured range. `b9ab-lam0-seed2` has no stage-B
+panel and never will: it screened **zero** checkpoints, which is the finding rather than a gap.
+
+**λ 0.00** — `b9aa`-`b9ad`:
+
+![b9aa-lam0-seed1](../runs/b9aa-lam0-seed1.png)
+![b9ab-lam0-seed2](../runs/b9ab-lam0-seed2.png)
+![b9ac-lam0-seed3](../runs/b9ac-lam0-seed3.png)
+![b9ad-lam0-seed4](../runs/b9ad-lam0-seed4.png)
+
+**λ 0.50** — `b9ae`-`b9ah`:
+
+![b9ae-lam50-seed1](../runs/b9ae-lam50-seed1.png)
+![b9af-lam50-seed2](../runs/b9af-lam50-seed2.png)
+![b9ag-lam50-seed3](../runs/b9ag-lam50-seed3.png)
+![b9ah-lam50-seed4](../runs/b9ah-lam50-seed4.png)
+
+**λ 0.80** — `b9ai`-`b9al`:
+
+![b9ai-lam80-seed1](../runs/b9ai-lam80-seed1.png)
+![b9aj-lam80-seed2](../runs/b9aj-lam80-seed2.png)
+![b9ak-lam80-seed3](../runs/b9ak-lam80-seed3.png)
+![b9al-lam80-seed4](../runs/b9al-lam80-seed4.png)
+
+**λ 0.85** — `b9am`-`b9ap`:
+
+![b9am-lam85-seed1](../runs/b9am-lam85-seed1.png)
+![b9an-lam85-seed2](../runs/b9an-lam85-seed2.png)
+![b9ao-lam85-seed3](../runs/b9ao-lam85-seed3.png)
+![b9ap-lam85-seed4](../runs/b9ap-lam85-seed4.png)
+
+**λ 0.90** — `b9aq`-`b9at`:
+
+![b9aq-lam90-seed1](../runs/b9aq-lam90-seed1.png)
+![b9ar-lam90-seed2](../runs/b9ar-lam90-seed2.png)
+![b9as-lam90-seed3](../runs/b9as-lam90-seed3.png)
+![b9at-lam90-seed4](../runs/b9at-lam90-seed4.png)
+
+**λ 0.91** — `b9au`-`b9ax`:
+
+![b9au-lam91-seed1](../runs/b9au-lam91-seed1.png)
+![b9av-lam91-seed2](../runs/b9av-lam91-seed2.png)
+![b9aw-lam91-seed3](../runs/b9aw-lam91-seed3.png)
+![b9ax-lam91-seed4](../runs/b9ax-lam91-seed4.png)
+
+**λ 0.92** — `b9ay`-`b9bb`:
+
+![b9ay-lam92-seed1](../runs/b9ay-lam92-seed1.png)
+![b9az-lam92-seed2](../runs/b9az-lam92-seed2.png)
+![b9ba-lam92-seed3](../runs/b9ba-lam92-seed3.png)
+![b9bb-lam92-seed4](../runs/b9bb-lam92-seed4.png)
+
+**λ 0.93** — `b9bc`-`b9bf`:
+
+![b9bc-lam93-seed1](../runs/b9bc-lam93-seed1.png)
+![b9bd-lam93-seed2](../runs/b9bd-lam93-seed2.png)
+![b9be-lam93-seed3](../runs/b9be-lam93-seed3.png)
+![b9bf-lam93-seed4](../runs/b9bf-lam93-seed4.png)
+
+**λ 0.94** — `b9bg`-`b9bj`:
+
+![b9bg-lam94-seed1](../runs/b9bg-lam94-seed1.png)
+![b9bh-lam94-seed2](../runs/b9bh-lam94-seed2.png)
+![b9bi-lam94-seed3](../runs/b9bi-lam94-seed3.png)
+![b9bj-lam94-seed4](../runs/b9bj-lam94-seed4.png)
+
+**λ 0.95** — `b9bk`-`b9bn`:
+
+![b9bk-lam95-seed1](../runs/b9bk-lam95-seed1.png)
+![b9bl-lam95-seed2](../runs/b9bl-lam95-seed2.png)
+![b9bm-lam95-seed3](../runs/b9bm-lam95-seed3.png)
+![b9bn-lam95-seed4](../runs/b9bn-lam95-seed4.png)
 ## Batch b8 — the stability knobs, 4 knobs x 4 seeds, 100M each
 
 **Both waves closed 2026-09-01**, stage A and stage B for all sixteen arms.

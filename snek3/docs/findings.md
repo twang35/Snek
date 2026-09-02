@@ -136,6 +136,13 @@ is the wrong screen for **where the records are**, and those are different quest
 post-competence sd (+0.09) nor the post-competence mean (+0.08) predicts density at all, so this is
 not "variance helps a max-hunt" — the ≥98 mass really is a distinct property of a config.
 
+**‡ Reproduced on b9, a second batch and a different knob, 2026-09-02.** Across b9's λ sweep `sef`
+rises monotonically to **92.3 at λ 0.95** and then *falls* to 90.9 at λ 0.98 — while density goes
+5.4% at λ 0.93 to **17.3%** at λ 0.98. So `sef` picks λ 0.95 and density picks λ 0.98, a 3.2x
+difference in the thing being hunted. Two batches, two knobs, same failure mode: **do not rank a
+config sweep on `sef`.** It was worth predicting in advance — this was flagged in
+[`runs.md`](runs.md) when b8 closed, before b9's numbers existed.
+
 ### A 500-episode ranking of two close batches did not survive 5,000 episodes
 
 **Re-measured 2026-08-31 to 2026-09-01**, `hof5000` passes over every b4/b5/b6 checkpoint that
