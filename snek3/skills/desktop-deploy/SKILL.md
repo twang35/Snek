@@ -25,28 +25,46 @@ paths collides forever and blocks every deploy for the hours the arm runs. The f
 **never commit a live desktop arm's run artifacts** from the laptop. Desktop artifacts arrive on the
 `results` branch at close-out; that is what it is for.
 
-**A closed batch imported from `results` and committed collides once**, because the box still holds
-its own untracked originals — 96 files on b7, 2026-09-01. Do not reach for `rm`: check identity, then
-stage them at the hash the incoming commit already carries, which leaves the merge nothing to
-overwrite and ends with a clean index.
+**Sort the colliding files by identity, not by name.** Get the hashes the incoming commit carries,
+compare each with the box's own copy, and let the comparison decide:
 
 ```
 # laptop: the blob hashes the commit carries
-git ls-tree -r <commit> --format='%(objectname) %(path)' -- snek3/runs | grep <batch> > blobs.txt
+git ls-tree -r origin/master --format='%(objectname) %(path)' -- snek3/runs | grep <batch> > blobs.txt
 scp blobs.txt the-claw-den:/tmp/blobs.txt
-# box: every one identical?
+# box: which ones differ?
 ssh the-claw-den 'cd ~/Snek && while read -r h p; do [ "$(git hash-object "$p")" = "$h" ] \
-    || echo "DIFFERS: $p"; done < /tmp/blobs.txt'
-# box: if nothing differs, stage and merge
-ssh the-claw-den 'cd ~/Snek && cut -d" " -f2- /tmp/blobs.txt | tr "\n" "\0" | xargs -0 git add -- \
-    && git merge --ff-only origin/master'
+    || echo "DIFFERS: $p"; done < /tmp/blobs.txt; echo checked'
 ```
 
-A file that **differs** is the live-arm case above; look at the difference before touching it.
-Deleting the box's copies also works and is what this skill used to say, but it discards without
-checking, and for a finished batch nothing regenerates them.
+| the box's copy | what it means | what to do |
+|---|---|---|
+| **identical** | a closed batch imported from `results` and committed — the box holds the same bytes as untracked originals. 96 files on b7, 56 on b8 | stage them on the box at that hash; the merge then has nothing to overwrite and the index ends clean |
+| **differs, and the arm or its stage B is still running** | a live arm's `_evals.json` or `_checkpoint_evals.json` got committed — usually by a progress update that swept `runs/` into a charts commit. b8, 2026-09-01: 8 stage-B files mid-pass | **untrack them on master**: `git rm --cached` those paths in their own commit, push, then merge. The laptop keeps its copies as untracked files, and the box's live copies are never touched. Do not wait for the pass to finish — the next eval changes them again |
+| **differs, and the batch is closed** | the two copies really are different measurements | stop and look at the difference before touching either; this has not happened yet |
 
-## Restarting is safe with arms mid-run
+```
+# box: stage the identical ones and merge. The grep drops whatever DIFFERS listed.
+ssh the-claw-den 'cd ~/Snek && grep -v -e <differing-name-1> -e <differing-name-2> /tmp/blobs.txt \
+    | cut -d" " -f2- | tr "\n" "\0" | xargs -0 git add -- && git merge --ff-only origin/master'
+```
+
+Both branches of that table follow from one rule in the root `CLAUDE.md`: **a live desktop arm's
+artifacts are never committed from the laptop**; they arrive on `results` at close-out. A charts
+commit made while a batch's stage B is running is where this goes wrong, so a progress update that
+commits `runs/` should `git add` the `.png` and `.md` by name and leave every `*_evals.json` and
+`*_checkpoint_evals.*` of a batch the box is still measuring. Deleting the box's copies also works and
+is what this skill used to say, but it discards without checking, and for a finished batch nothing
+regenerates them.
+
+## Restart only when the daemon's own code changed
+
+Jobs are fresh processes — the daemon shells out to `train.py` and `tools/closeout.py` — so a change
+under `snek3/ppo/`, `snek3/tools/`, `snek3/train.py` or anything else the *jobs* run is live for the
+next job as soon as the merge lands, with no restart. Restart when `snek3/desktop/runner/*` or the
+unit file changed. It needs `sudo`, which ssh alone does not carry, so skip it when it is not needed.
+
+## Restarting is safe with arms mid-run, when it is needed
 
 `KillMode=process`, and jobs are launched detached with `setsid`. They self-terminate at
 `SNEK_MAX_STEPS` and the daemon re-adopts them by pid on the next poll. So a restart does not stop
