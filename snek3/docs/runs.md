@@ -13,7 +13,7 @@ around 02:40 and its stage B follows automatically; waves 5-8 (γ 0.95, 0.96, 0.
 2026-09-03. Ledger: 252 done, 164 queued, 8 running, `attention` empty, 153 GB free, load 14. The
 laptop's only process is the stage-B chart window left from b9's `hof5000` pass, which is free to close.
 
-**Queued on the desktop 2026-09-03 09:44: `b9-hof30k`** — b9's **33 checkpoints at ≥99 /5,000** from 15
+**Queued on the desktop 2026-09-03 09:44: `b9-hof30k`** — b9's **33 checkpoints at ≥99 /5,000** from 9
 arms, at **30,000 episodes on seed 7**, the seed no selecting pass used, 16 shards, label `hof30k`,
 priority 5 so it takes the next wave boundary ahead of b10's last training wave. ~1M episodes, ~10 min.
 (A first version of the spec said ≥90, which is all 727 rows and ~4 h; corrected before it started.) A
