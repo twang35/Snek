@@ -1,14 +1,13 @@
 {
-  "iso": "2026-09-02T18:50:34",
-  "ts": 1788400234.5779448,
+  "iso": "2026-09-02T19:00:38",
+  "ts": 1788400838.0356417,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g85, seed 1 of 4 -- wave 2 of 8 | training 96% (4 arms)"
+      "b10 | b10: g91, seed 1 of 4 -- wave 3 of 8 | training 2% (8 arms)"
     ],
     "queued": [
-      "b10 stage B | b10: g85, seed 1 of 4 -- wave 2 of 8 | queued (4 arms)",
-      "b10 training | b10: g85, seed 1 of 4 -- wave 2 of 8 | queued (56 arms)",
+      "b10 training | b10: g91, seed 1 of 4 -- wave 3 of 8 | queued (48 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
@@ -36,73 +35,116 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
+    "trainer": 8,
     "eval": 0
   },
   "running": [
     {
-      "id": "b10ae-g80-seed1",
+      "id": "b10ai-g85-seed1",
       "type": "train",
-      "policy": "b10ae-g80-seed1",
+      "policy": "b10ai-g85-seed1",
       "policies": [
-        "b10ae-g80-seed1"
+        "b10ai-g85-seed1"
       ],
-      "pid": 3995368,
-      "step": 48103424,
+      "pid": 4153625,
+      "step": 983040,
       "max_steps": 50003968,
-      "steps_per_sec": 7313.0,
-      "elapsed_s": 7343
+      "steps_per_sec": 6233.9,
+      "elapsed_s": 185
     },
     {
-      "id": "b10af-g80-seed2",
+      "id": "b10aj-g85-seed2",
       "type": "train",
-      "policy": "b10af-g80-seed2",
+      "policy": "b10aj-g85-seed2",
       "policies": [
-        "b10af-g80-seed2"
+        "b10aj-g85-seed2"
       ],
-      "pid": 3995369,
-      "step": 49381376,
+      "pid": 4153626,
+      "step": 901120,
       "max_steps": 50003968,
-      "steps_per_sec": 7975.6,
-      "elapsed_s": 7343
+      "steps_per_sec": 6751.9,
+      "elapsed_s": 185
     },
     {
-      "id": "b10ag-g80-seed3",
+      "id": "b10ak-g85-seed3",
       "type": "train",
-      "policy": "b10ag-g80-seed3",
+      "policy": "b10ak-g85-seed3",
       "policies": [
-        "b10ag-g80-seed3"
+        "b10ak-g85-seed3"
       ],
-      "pid": 3995370,
-      "step": 47611904,
+      "pid": 4153627,
+      "step": 966656,
       "max_steps": 50003968,
-      "steps_per_sec": 5315.5,
-      "elapsed_s": 7343
+      "steps_per_sec": 5713.1,
+      "elapsed_s": 185
     },
     {
-      "id": "b10ah-g80-seed4",
+      "id": "b10al-g85-seed4",
       "type": "train",
-      "policy": "b10ah-g80-seed4",
+      "policy": "b10al-g85-seed4",
       "policies": [
-        "b10ah-g80-seed4"
+        "b10al-g85-seed4"
       ],
-      "pid": 3995371,
-      "step": 47136768,
+      "pid": 4153628,
+      "step": 851968,
       "max_steps": 50003968,
-      "steps_per_sec": 5315.4,
-      "elapsed_s": 7343
+      "steps_per_sec": 5193.7,
+      "elapsed_s": 185
+    },
+    {
+      "id": "b10am-g90-seed1",
+      "type": "train",
+      "policy": "b10am-g90-seed1",
+      "policies": [
+        "b10am-g90-seed1"
+      ],
+      "pid": 4153629,
+      "step": 933888,
+      "max_steps": 50003968,
+      "steps_per_sec": 4155.0,
+      "elapsed_s": 185
+    },
+    {
+      "id": "b10an-g90-seed2",
+      "type": "train",
+      "policy": "b10an-g90-seed2",
+      "policies": [
+        "b10an-g90-seed2"
+      ],
+      "pid": 4153630,
+      "step": 917504,
+      "max_steps": 50003968,
+      "steps_per_sec": 6232.4,
+      "elapsed_s": 185
+    },
+    {
+      "id": "b10ao-g90-seed3",
+      "type": "train",
+      "policy": "b10ao-g90-seed3",
+      "policies": [
+        "b10ao-g90-seed3"
+      ],
+      "pid": 4153631,
+      "step": 933888,
+      "max_steps": 50003968,
+      "steps_per_sec": 5713.1,
+      "elapsed_s": 185
+    },
+    {
+      "id": "b10ap-g90-seed4",
+      "type": "train",
+      "policy": "b10ap-g90-seed4",
+      "policies": [
+        "b10ap-g90-seed4"
+      ],
+      "pid": 4153632,
+      "step": 933888,
+      "max_steps": 50003968,
+      "steps_per_sec": 6232.4,
+      "elapsed_s": 185
     }
   ],
   "ledger": {
-    "b10-stageb": "queued",
-    "b10ai-g85-seed1": "queued",
-    "b10aj-g85-seed2": "queued",
-    "b10ak-g85-seed3": "queued",
-    "b10al-g85-seed4": "queued",
-    "b10am-g90-seed1": "queued",
-    "b10an-g90-seed2": "queued",
-    "b10ao-g90-seed3": "queued",
-    "b10ap-g90-seed4": "queued",
     "b10aq-g91-seed1": "queued",
     "b10ar-g91-seed2": "queued",
     "b10as-g91-seed3": "queued",
@@ -283,10 +325,19 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b10ae-g80-seed1": "running",
-    "b10af-g80-seed2": "running",
-    "b10ag-g80-seed3": "running",
-    "b10ah-g80-seed4": "running",
+    "b10ai-g85-seed1": "running",
+    "b10aj-g85-seed2": "running",
+    "b10ak-g85-seed3": "running",
+    "b10al-g85-seed4": "running",
+    "b10am-g90-seed1": "running",
+    "b10an-g90-seed2": "running",
+    "b10ao-g90-seed3": "running",
+    "b10ap-g90-seed4": "running",
+    "b10-stageb": "done",
+    "b10ah-g80-seed4": "done",
+    "b10ag-g80-seed3": "done",
+    "b10ae-g80-seed1": "done",
+    "b10af-g80-seed2": "done",
     "b10ad-g70-seed4": "done",
     "b10ab-g70-seed2": "done",
     "b10ac-g70-seed3": "done",
@@ -518,10 +569,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 156.1,
+  "disk_free_gb": 156.0,
   "load_avg": [
-    12.6044921875,
-    13.11279296875,
-    13.97021484375
+    13.0107421875,
+    10.77197265625,
+    12.1396484375
   ]
 }
