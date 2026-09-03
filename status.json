@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-03T13:44:26",
-  "ts": 1788468266.2397501,
+  "iso": "2026-09-03T13:54:41",
+  "ts": 1788468881.432265,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g100, seed 1 of 4 -- wave 8 of 8 | training 83% (3 arms)"
+      "b10 | b10: g100, seed 1 of 4 -- wave 8 of 8 | training 79% (2 arms)"
     ],
     "queued": [
-      "b10 stage B | b10: g100, seed 1 of 4 -- wave 8 of 8 | queued (5 arms)",
+      "b10 stage B | b10: g100, seed 1 of 4 -- wave 8 of 8 | queued (6 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
@@ -35,7 +35,7 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 3,
+    "trainer": 2,
     "eval": 0
   },
   "running": [
@@ -47,23 +47,10 @@
         "b10ci-g100-seed1"
       ],
       "pid": 1133374,
-      "step": 38109184,
+      "step": 40108032,
       "max_steps": 50003968,
-      "steps_per_sec": 2071.6,
-      "elapsed_s": 10329
-    },
-    {
-      "id": "b10cj-g100-seed2",
-      "type": "train",
-      "policy": "b10cj-g100-seed2",
-      "policies": [
-        "b10cj-g100-seed2"
-      ],
-      "pid": 1133375,
-      "step": 49152000,
-      "max_steps": 50003968,
-      "steps_per_sec": 517.9,
-      "elapsed_s": 10329
+      "steps_per_sec": 8850.9,
+      "elapsed_s": 10944
     },
     {
       "id": "b10ck-g100-seed3",
@@ -73,10 +60,10 @@
         "b10ck-g100-seed3"
       ],
       "pid": 1133376,
-      "step": 37486592,
+      "step": 38633472,
       "max_steps": 50003968,
       "steps_per_sec": 0.0,
-      "elapsed_s": 10329
+      "elapsed_s": 10944
     }
   ],
   "ledger": {
@@ -214,8 +201,8 @@
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
     "b10ci-g100-seed1": "running",
-    "b10cj-g100-seed2": "running",
     "b10ck-g100-seed3": "running",
+    "b10cj-g100-seed2": "done",
     "b10cl-g100-seed4": "done",
     "b10ch-g999-seed4": "done",
     "b10cg-g999-seed3": "done",
@@ -514,8 +501,8 @@
   },
   "disk_free_gb": 147.2,
   "load_avg": [
-    12.01123046875,
-    12.01318359375,
-    12.21728515625
+    11.560546875,
+    11.67724609375,
+    11.94140625
   ]
 }
