@@ -30,6 +30,10 @@ PYTHONPATH=. python -u evaluate.py <policy> one --step <step> \
 - **30,000 episodes at `--width 1000` takes ~5 min** and gives a ±0.12 pp interval. `one` is
   single-process (sharding splits by checkpoint, not by episodes), so run several candidates as
   parallel processes rather than reaching for `--shards`.
+- **A desktop `hof30k` wave is this step done in bulk** — an eval spec with `"episodes": 30000`,
+  `"eval_args": ["--label", "hof30k", "--seed", "7"]` and `above:99:hof5000`, as b9's was on
+  2026-09-03. Same episodes, same seed, same eval path; its rows are confirmed rates and go straight
+  to step 1.
 - **The number that goes in `HOF.md` is this one.** Never a stage-A /100, never a graph point, never
   the close-out /500 the candidate was picked by.
 

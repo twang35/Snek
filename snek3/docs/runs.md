@@ -13,12 +13,12 @@ around 02:40 and its stage B follows automatically; waves 5-8 (γ 0.95, 0.96, 0.
 2026-09-03. Ledger: 252 done, 164 queued, 8 running, `attention` empty, 153 GB free, load 14. The
 laptop's only process is the stage-B chart window left from b9's `hof5000` pass, which is free to close.
 
-**Queued on the desktop 2026-09-03 09:44: `b9-hof30k`** — b9's **33 checkpoints at ≥99 /5,000** from 9
-arms, at **30,000 episodes on seed 7**, the seed no selecting pass used, 16 shards, label `hof30k`,
-priority 5 so it takes the next wave boundary ahead of b10's last training wave. ~1M episodes, ~10 min.
-(A first version of the spec said ≥90, which is all 727 rows and ~4 h; corrected before it started.) A
-row here is a confirmed rate, not a selected high — the hall-of-fame measurement for the whole top of
-the plateau at once. The record to beat is `b5h` at 98.96.
+**New record, 2026-09-03: `b9ch-lam999-seed4` @47251456 at 99.30% /30,000 on seed 7**, promoted to
+[`hallOfFame/HOF.md`](../hallOfFame/HOF.md). The desktop `hof30k` pass re-measured b9's 33 checkpoints at
+≥99 /5,000 at 30,000 episodes, 10:21-10:55, exit 0: **18 beat `b5h`'s 98.96**, the mean 5,000 → 30,000
+drop was −0.14 pp, and the winner's four neighbours read 99.20. Six plateau arms hold a checkpoint above
+the old record; one is promoted. `record_gif.py`'s `HOF_RECORD` constant still names `b5h` — its
+one-line change is written and waits for approval as code.
 
 **b9's `hof5000` pass is closed and documented** (below, and in [`results.md`](results.md)): 727 rows,
 exit 0, **77 at ≥98.73 and 33 at ≥99**, and `b9ch-lam999-seed4 @47251456` at **99.40 /5,000** with a

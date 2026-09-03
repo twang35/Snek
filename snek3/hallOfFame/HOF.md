@@ -10,19 +10,40 @@ nothing.
 
 ## The entries
 
-Both admitted **2026-09-01**, on 30,000 fresh episodes at **seed 7** — a seed the selecting pass never
-used. Add one with the [`hof-promote`](../skills/hof-promote/SKILL.md) skill.
+All admitted on 30,000 fresh episodes at **seed 7** — a seed the selecting pass never used; `b5h` and
+`b6b` on 2026-09-01, `b9ch` on 2026-09-03. Add one with the [`hof-promote`](../skills/hof-promote/SKILL.md)
+skill.
 
 | entry | algo / net | confirmed **/30,000** | 95% CI | selected at | drop |
 |---|---|---|---|---|---|
-| **`b5h-ep8-seed8-ckpt9027584`** | PPO, `fc 320`, 8 epochs | **98.96%** (29687) | [98.84, 99.07] | 99.20 /5000 | −0.24 pp |
+| **`b9ch-lam999-seed4-ckpt47251456`** | PPO, `fc 320`, 4 epochs, **λ 0.999** | **99.30%** (29790) | [99.2, 99.4] | 99.40 /5000 | −0.10 pp |
+| `b5h-ep8-seed8-ckpt9027584` | PPO, `fc 320`, 8 epochs | **98.96%** (29687) | [98.84, 99.07] | 99.20 /5000 | −0.24 pp |
 | `b6b-fc200x100-seed2-ckpt133120000` | PPO, `fc 200,100`, 4 epochs | **98.73%** (29619) | [98.60, 98.85] | 99.10 /5000 | −0.37 pp |
 
-`b5h` leads `b6b` by 0.23 pp (z = 2.60, p = 0.0094), so the ordering is real rather than a coin.
+`b9ch` leads `b5h` by 0.34 pp (z = 4.5, p < 1e-5) and `b5h` leads `b6b` by 0.23 pp (z = 2.60,
+p = 0.0094), so the ordering is real rather than a coin.
 
-## ‡ The record, and the first time this project has beaten snek2 on a matched measurement
+## ‡ The record: `b9ch` @47251456, 99.30% over 30,000 episodes — 2026-09-03
 
-**`b5h` @9027584 is the record at 98.96% over 30,000 episodes.** The comparison that establishes it
+**The first entry above 99% at depth, and the first to come out of a hyperparameter sweep rather than
+a seed batch.** b9 swept GAE λ off b7's `fc 320` / 4-epoch cell; λ 0.999 seed 4 is the arm. It was
+found by the protocol working end to end: 1,258 checkpoints screened at 500 episodes, 80 of them
+re-measured at 5,000 (`hof5000`), the 16 at ≥99 /5,000 re-measured at 30,000 on seed 7 (`hof30k`, on
+the desktop). Its neighbours confirm it is a region and not a pixel: @47267840, @47235072, @47218688
+and @47611904 all read **99.20** /30,000 and the arm's 27 `hof5000` neighbours within ±1M average
+98.70, against 98.54 for `b5h`'s basin. The 5,000 → 30,000 drop across all 33 confirmed rows was
+**−0.14 pp** (the smallest yet; `b5h` dropped −0.24 and snek2's entries −1.45), and 18 of the 33 beat
+`b5h`'s 98.96 — six arms of the λ ≥ 0.99 plateau hold a checkpoint above the old record. Only the one
+is promoted, per the rule below. The same wave measured `b9cl-lam100-seed4` @19316736 at 99.10 and
+`b9cc-lam995-seed3` @18350080 at 99.10; they are not indistinguishable from `b9ch` (z ≈ 2.9) and are
+not promoted, because a second λ-plateau entry adds nothing the table does not already say.
+
+**`record_gif.py`'s `HOF_RECORD` still names `b5h`** until its one-line change is approved; until then
+`record_gif.py hof` records the previous record.
+
+## ‡ The previous record, and the first time this project beat snek2 on a matched measurement
+
+**`b5h` @9027584 was the record at 98.96% over 30,000 episodes, 2026-09-01 to 2026-09-03.** The comparison that established it
 was run the same day, same depth, same seed, same env and same eval path — which matters, because the
 snek2 champion's published figure was itself measured shallower and is itself a selected high:
 
@@ -51,8 +72,9 @@ reaches this folder as the maximum of a selection, so it is biased upward.
 | snek2's top four entries (2026-08-20) | 98.0-99.0 /500 | 95.9-97.5 /1000 | mean **−1.45 pp** |
 | `b5h` first look (2026-09-01) | 99.20 /5000 | 98.8 /2000 | −0.4 pp |
 | `b5h` and `b6b` as admitted | 99.20, 99.10 /5000 | 98.96, 98.73 /30000 | −0.24, −0.37 |
+| `b9ch` as admitted (2026-09-03) | 99.40 /5000 | 99.30 /30000 | **−0.10** |
 
-Both entries held up far better than snek2's did. That is the *result*, not the process working as
+All three entries held up far better than snek2's did. That is the *result*, not the process working as
 usual — and the likely reason is the next section.
 
 ## Why these two, out of 2,172 candidates

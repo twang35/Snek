@@ -132,6 +132,28 @@ cut, is below the arm table.
 | `b9cl-lam100-seed4` | 1.00 | 1,285 | 30.8% | 141 | 99.6 | 98.3 @33.6M | 88.2 | 2.1% |
 
 
+### b9 at 30,000 episodes — the desktop `hof30k` pass, 2026-09-03: a new record
+
+Every b9 checkpoint at **≥99 /5,000** — 33 from 9 arms — re-measured at **30,000 episodes on seed 7**,
+the seed no selecting pass used, so each row is a confirmed rate. 16 shards on the desktop, 10:21 →
+~10:55, exit 0, 990k episodes. **18 of the 33 beat `b5h`'s 98.96, the standing record; the drop from
+5,000 was −0.14 pp on average**, against −0.24 for `b5h` and −1.45 for snek2's entries.
+
+| checkpoint | λ | /30,000 | 95% CI | /5,000 |
+|---|---:|---:|---|---:|
+| **`b9ch-lam999-seed4` @47251456** | 0.999 | **99.30** | [99.2, 99.4] | 99.4 |
+| `b9ch-lam999-seed4` @47267840, @47235072, @47218688, @47611904 | 0.999 | 99.20 | [99.1, 99.3] | 99.0-99.3 |
+| `b9cl-lam100-seed4` @19316736, @19251200 | 1.00 | 99.10 | [99.0, 99.2] | 99.0-99.2 |
+| `b9cc-lam995-seed3` @18350080, @17350656, @17334272 | 0.995 | 99.10 | [99.0, 99.2] | 99.1 |
+| `b9ch-lam999-seed4` @47284224, @47349760 | 0.999 | 99.10 | [98.9, 99.2] | 99.0-99.3 |
+| 6 more rows | 0.995-1.00 | 99.00 | | 99.0-99.2 |
+| 15 more rows | 0.99-1.00 | 98.40-98.90 | | 99.0-99.2 |
+
+**`b9ch-lam999-seed4` @47251456 is promoted** — [`../hallOfFame/HOF.md`](../hallOfFame/HOF.md) — the
+first entry above 99% at depth. Its four neighbours at 99.20 make it a region rather than a pixel. Six
+arms of the λ ≥ 0.99 plateau hold a checkpoint above the old record; one is promoted, per the rule.
+
+
 ### b9 at 5,000 episodes — the laptop `hof5000` pass, 2026-09-02
 
 Every b9 checkpoint at **≥99%** on its 500-episode close-out (the cut was raised from 98.5 the same day),
