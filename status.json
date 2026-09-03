@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-02T18:34:41",
-  "ts": 1788399281.7932057,
+  "iso": "2026-09-02T18:45:04",
+  "ts": 1788399904.0159378,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g85, seed 1 of 4 -- wave 2 of 8 | training 88% (8 arms)"
+      "b10 | b10: g85, seed 1 of 4 -- wave 2 of 8 | training 90% (4 arms)"
     ],
     "queued": [
-      "b10 stage B | b10: g85, seed 1 of 4 -- wave 2 of 8 | queued (8 arms)",
+      "b10 stage B | b10: g85, seed 1 of 4 -- wave 2 of 8 | queued (4 arms)",
       "b10 training | b10: g85, seed 1 of 4 -- wave 2 of 8 | queued (56 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
@@ -36,62 +36,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
+    "trainer": 4,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b10aa-g70-seed1",
-      "type": "train",
-      "policy": "b10aa-g70-seed1",
-      "policies": [
-        "b10aa-g70-seed1"
-      ],
-      "pid": 3995364,
-      "step": 48070656,
-      "max_steps": 50003968,
-      "steps_per_sec": 8848.5,
-      "elapsed_s": 6390
-    },
-    {
-      "id": "b10ab-g70-seed2",
-      "type": "train",
-      "policy": "b10ab-g70-seed2",
-      "policies": [
-        "b10ab-g70-seed2"
-      ],
-      "pid": 3995365,
-      "step": 46891008,
-      "max_steps": 50003968,
-      "steps_per_sec": 8353.2,
-      "elapsed_s": 6390
-    },
-    {
-      "id": "b10ac-g70-seed3",
-      "type": "train",
-      "policy": "b10ac-g70-seed3",
-      "policies": [
-        "b10ac-g70-seed3"
-      ],
-      "pid": 3995366,
-      "step": 47104000,
-      "max_steps": 50003968,
-      "steps_per_sec": 9333.8,
-      "elapsed_s": 6390
-    },
-    {
-      "id": "b10ad-g70-seed4",
-      "type": "train",
-      "policy": "b10ad-g70-seed4",
-      "policies": [
-        "b10ad-g70-seed4"
-      ],
-      "pid": 3995367,
-      "step": 46661632,
-      "max_steps": 50003968,
-      "steps_per_sec": 7368.0,
-      "elapsed_s": 6390
-    },
     {
       "id": "b10ae-g80-seed1",
       "type": "train",
@@ -100,10 +48,10 @@
         "b10ae-g80-seed1"
       ],
       "pid": 3995368,
-      "step": 40255488,
+      "step": 45203456,
       "max_steps": 50003968,
-      "steps_per_sec": 6876.7,
-      "elapsed_s": 6390
+      "steps_per_sec": 8298.1,
+      "elapsed_s": 7013
     },
     {
       "id": "b10af-g80-seed2",
@@ -113,10 +61,10 @@
         "b10af-g80-seed2"
       ],
       "pid": 3995369,
-      "step": 41402368,
+      "step": 46366720,
       "max_steps": 50003968,
-      "steps_per_sec": 7367.9,
-      "elapsed_s": 6390
+      "steps_per_sec": 9335.3,
+      "elapsed_s": 7013
     },
     {
       "id": "b10ag-g80-seed3",
@@ -126,10 +74,10 @@
         "b10ag-g80-seed3"
       ],
       "pid": 3995370,
-      "step": 40042496,
+      "step": 44728320,
       "max_steps": 50003968,
-      "steps_per_sec": 8841.4,
-      "elapsed_s": 6390
+      "steps_per_sec": 9335.2,
+      "elapsed_s": 7013
     },
     {
       "id": "b10ah-g80-seed4",
@@ -139,10 +87,10 @@
         "b10ah-g80-seed4"
       ],
       "pid": 3995371,
-      "step": 39862272,
+      "step": 44367872,
       "max_steps": 50003968,
-      "steps_per_sec": 8841.3,
-      "elapsed_s": 6390
+      "steps_per_sec": 8816.4,
+      "elapsed_s": 7013
     }
   ],
   "ledger": {
@@ -335,14 +283,14 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b10aa-g70-seed1": "running",
-    "b10ab-g70-seed2": "running",
-    "b10ac-g70-seed3": "running",
-    "b10ad-g70-seed4": "running",
     "b10ae-g80-seed1": "running",
     "b10af-g80-seed2": "running",
     "b10ag-g80-seed3": "running",
     "b10ah-g80-seed4": "running",
+    "b10ad-g70-seed4": "done",
+    "b10ab-g70-seed2": "done",
+    "b10ac-g70-seed3": "done",
+    "b10aa-g70-seed1": "done",
     "b9-stageb-w8": "done",
     "b9cl-lam100-seed4": "done",
     "b9ck-lam100-seed3": "done",
@@ -570,10 +518,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 156.2,
+  "disk_free_gb": 156.1,
   "load_avg": [
-    15.32470703125,
-    15.01220703125,
-    14.83984375
+    13.07666015625,
+    13.92529296875,
+    14.51416015625
   ]
 }
