@@ -24,9 +24,10 @@
   .group-start { box-shadow: inset 3px 0 0 var(--hi); }
   .help { color:var(--dim); padding:0 .8em .8em; }
   kbd { background:#222; border:1px solid #444; border-radius:3px; padding:0 .3em; font:inherit; }
-  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; z-index:5; cursor:zoom-out; }
-  #lightbox img { max-width:96vw; max-height:92vh; background:#fff; }
-  #lightbox .cap { position:absolute; bottom:1em; left:0; right:0; text-align:center; color:#fff; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; flex-direction:column; align-items:center; justify-content:center; gap:.6em; padding:1vh 1vw; box-sizing:border-box; z-index:5; cursor:zoom-out; }
+  /* fill the window either way: object-fit scales the PNG up past its native size, keeping its aspect ratio */
+  #lightbox img { width:98vw; height:calc(98vh - 2.4em); object-fit:contain; background:transparent; }
+  #lightbox .cap { flex:none; text-align:center; color:#fff; font-size:1.1em; }
   @media (max-width: 1100px) { .grid { grid-template-columns:repeat(2, 1fr); } }
 </style>
 </head>
@@ -77,6 +78,7 @@
     h.split('&').forEach(function (kv) {
       var p = kv.split('='); if (p.length !== 2) return;
       if (p[0] === 'start') state.start = parseInt(p[1], 10) || 0;
+      else if (p[0] === 'zoom') state.zoom = decodeURIComponent(p[1]);   // open the lightbox on load; not written back
       else if (p[0] in state) state[p[0]] = decodeURIComponent(p[1]);
     });
   }
@@ -195,6 +197,7 @@
   window.addEventListener('hashchange', function () { readHash(); render(); });
 
   readHash(); render();
+  if (state.zoom) { var z = current.filter(function (a) { return a.policy === state.zoom; })[0]; if (z) zoom(z); }
 })();
 </script>
 </body>
