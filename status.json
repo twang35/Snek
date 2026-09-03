@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-02T21:33:49",
-  "ts": 1788410029.340898,
+  "iso": "2026-09-02T21:43:59",
+  "ts": 1788410639.9261224,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g91, seed 1 of 4 -- wave 3 of 8 | training 97% (8 arms)"
+      "b10 | b10: g93, seed 1 of 4 -- wave 4 of 8 | training 1% (8 arms)"
     ],
     "queued": [
-      "b10 training | b10: g91, seed 1 of 4 -- wave 3 of 8 | queued (48 arms)",
+      "b10 training | b10: g93, seed 1 of 4 -- wave 4 of 8 | queued (40 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
@@ -40,119 +40,111 @@
   },
   "running": [
     {
-      "id": "b10ai-g85-seed1",
+      "id": "b10aq-g91-seed1",
       "type": "train",
-      "policy": "b10ai-g85-seed1",
+      "policy": "b10aq-g91-seed1",
       "policies": [
-        "b10ai-g85-seed1"
+        "b10aq-g91-seed1"
       ],
-      "pid": 4153625,
-      "step": 49332224,
+      "pid": 164707,
+      "step": 524288,
       "max_steps": 50003968,
-      "steps_per_sec": 5179.4,
-      "elapsed_s": 9376
+      "steps_per_sec": 5155.8,
+      "elapsed_s": 93
     },
     {
-      "id": "b10aj-g85-seed2",
+      "id": "b10ar-g91-seed2",
       "type": "train",
-      "policy": "b10aj-g85-seed2",
+      "policy": "b10ar-g91-seed2",
       "policies": [
-        "b10aj-g85-seed2"
+        "b10ar-g91-seed2"
       ],
-      "pid": 4153626,
-      "step": 49954816,
+      "pid": 164708,
+      "step": 475136,
       "max_steps": 50003968,
-      "steps_per_sec": 7769.4,
-      "elapsed_s": 9376
+      "steps_per_sec": 9280.5,
+      "elapsed_s": 93
     },
     {
-      "id": "b10ak-g85-seed3",
+      "id": "b10as-g91-seed3",
       "type": "train",
-      "policy": "b10ak-g85-seed3",
+      "policy": "b10as-g91-seed3",
       "policies": [
-        "b10ak-g85-seed3"
+        "b10as-g91-seed3"
       ],
-      "pid": 4153627,
-      "step": 48529408,
+      "pid": 164709,
+      "step": 475136,
       "max_steps": 50003968,
-      "steps_per_sec": 6215.6,
-      "elapsed_s": 9376
+      "steps_per_sec": 1546.7,
+      "elapsed_s": 93
     },
     {
-      "id": "b10al-g85-seed4",
+      "id": "b10at-g91-seed4",
       "type": "train",
-      "policy": "b10al-g85-seed4",
+      "policy": "b10at-g91-seed4",
       "policies": [
-        "b10al-g85-seed4"
+        "b10at-g91-seed4"
       ],
-      "pid": 4153628,
-      "step": 47415296,
+      "pid": 164710,
+      "step": 475136,
       "max_steps": 50003968,
-      "steps_per_sec": 4661.8,
-      "elapsed_s": 9376
+      "steps_per_sec": 4124.6,
+      "elapsed_s": 93
     },
     {
-      "id": "b10am-g90-seed1",
+      "id": "b10au-g92-seed1",
       "type": "train",
-      "policy": "b10am-g90-seed1",
+      "policy": "b10au-g92-seed1",
       "policies": [
-        "b10am-g90-seed1"
+        "b10au-g92-seed1"
       ],
-      "pid": 4153629,
-      "step": 47661056,
+      "pid": 164711,
+      "step": 507904,
       "max_steps": 50003968,
-      "steps_per_sec": 5697.8,
-      "elapsed_s": 9376
+      "steps_per_sec": 4124.6,
+      "elapsed_s": 93
     },
     {
-      "id": "b10an-g90-seed2",
+      "id": "b10av-g92-seed2",
       "type": "train",
-      "policy": "b10an-g90-seed2",
+      "policy": "b10av-g92-seed2",
       "policies": [
-        "b10an-g90-seed2"
+        "b10av-g92-seed2"
       ],
-      "pid": 4153630,
-      "step": 47562752,
+      "pid": 164712,
+      "step": 475136,
       "max_steps": 50003968,
-      "steps_per_sec": 2071.2,
-      "elapsed_s": 9376
+      "steps_per_sec": 2577.9,
+      "elapsed_s": 93
     },
     {
-      "id": "b10ao-g90-seed3",
+      "id": "b10aw-g92-seed3",
       "type": "train",
-      "policy": "b10ao-g90-seed3",
+      "policy": "b10aw-g92-seed3",
       "policies": [
-        "b10ao-g90-seed3"
+        "b10aw-g92-seed3"
       ],
-      "pid": 4153631,
-      "step": 48185344,
+      "pid": 164713,
+      "step": 475136,
       "max_steps": 50003968,
-      "steps_per_sec": 5178.1,
-      "elapsed_s": 9376
+      "steps_per_sec": 2062.3,
+      "elapsed_s": 93
     },
     {
-      "id": "b10ap-g90-seed4",
+      "id": "b10ax-g92-seed4",
       "type": "train",
-      "policy": "b10ap-g90-seed4",
+      "policy": "b10ax-g92-seed4",
       "policies": [
-        "b10ap-g90-seed4"
+        "b10ax-g92-seed4"
       ],
-      "pid": 4153632,
-      "step": 47448064,
+      "pid": 164714,
+      "step": 540672,
       "max_steps": 50003968,
-      "steps_per_sec": 5178.1,
-      "elapsed_s": 9376
+      "steps_per_sec": 4640.2,
+      "elapsed_s": 93
     }
   ],
   "ledger": {
-    "b10aq-g91-seed1": "queued",
-    "b10ar-g91-seed2": "queued",
-    "b10as-g91-seed3": "queued",
-    "b10at-g91-seed4": "queued",
-    "b10au-g92-seed1": "queued",
-    "b10av-g92-seed2": "queued",
-    "b10aw-g92-seed3": "queued",
-    "b10ax-g92-seed4": "queued",
     "b10ay-g93-seed1": "queued",
     "b10az-g93-seed2": "queued",
     "b10ba-g93-seed3": "queued",
@@ -325,14 +317,23 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b10ai-g85-seed1": "running",
-    "b10aj-g85-seed2": "running",
-    "b10ak-g85-seed3": "running",
-    "b10al-g85-seed4": "running",
-    "b10am-g90-seed1": "running",
-    "b10an-g90-seed2": "running",
-    "b10ao-g90-seed3": "running",
-    "b10ap-g90-seed4": "running",
+    "b10aq-g91-seed1": "running",
+    "b10ar-g91-seed2": "running",
+    "b10as-g91-seed3": "running",
+    "b10at-g91-seed4": "running",
+    "b10au-g92-seed1": "running",
+    "b10av-g92-seed2": "running",
+    "b10aw-g92-seed3": "running",
+    "b10ax-g92-seed4": "running",
+    "b10-stageb-w2": "done",
+    "b10al-g85-seed4": "done",
+    "b10ap-g90-seed4": "done",
+    "b10an-g90-seed2": "done",
+    "b10am-g90-seed1": "done",
+    "b10ao-g90-seed3": "done",
+    "b10ak-g85-seed3": "done",
+    "b10ai-g85-seed1": "done",
+    "b10aj-g85-seed2": "done",
     "b10-stageb": "done",
     "b10ah-g80-seed4": "done",
     "b10ag-g80-seed3": "done",
@@ -569,10 +570,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 154.9,
+  "disk_free_gb": 154.8,
   "load_avg": [
-    13.5,
-    13.7802734375,
-    13.82177734375
+    10.43798828125,
+    9.421875,
+    11.72265625
   ]
 }
