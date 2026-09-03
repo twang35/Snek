@@ -36,18 +36,14 @@ modified tracked files on the box, which is expected and harmless — the daemon
 worktrees, and the next `deploy` handles them the same way. `--dry-run` prints the plan without doing
 it.
 
-**Until `desktop/deploy` is on the box, the first deploy that carries it is done by hand** — the same
-three moves, typed:
+**`desktop/deploy` has been on the box since 2026-09-02 18:50** (first run: HEAD `13def02e8` ->
+`602f48b21`, 215 pictures kept, 64 identical b9 JSON staged, exit 0), so there is no by-hand path any
+more. If the script itself is ever broken on the box, run the *incoming* copy from the fetched tree
+rather than reconstructing its moves:
 
 ```
-ssh the-claw-den 'cd ~/Snek && git fetch origin master && git ls-files --others --exclude-standard -- snek3/runs \
-  | while read f; do git cat-file -e origin/master:"$f" 2>/dev/null && case "$f" in *.png|*.md) rm -- "$f";; esac; done; \
-  git merge --ff-only origin/master && git rev-parse --short HEAD'
+ssh the-claw-den 'cd ~/Snek && git fetch -q origin master && git show origin/master:snek3/desktop/runner/deploy.py > /tmp/snek_deploy.py && python3 /tmp/snek_deploy.py --no-fetch'
 ```
-
-If that still aborts, the leftover collisions are JSON: compare each with `git hash-object` against
-`git ls-tree -r origin/master`, `git add` the identical ones on the box, and treat any that differ as
-the exit-3 case above.
 
 ## Restart only when the daemon's own code changed
 
