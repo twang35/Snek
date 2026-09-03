@@ -102,11 +102,24 @@ controller **one** policy named `a b c` (zsh does not word-split a parameter), a
 0.0 min having opened a window for a nonexistent arm. Type the names, or use `$(cat list.txt)` — an
 unquoted command substitution *is* split. Cost one relaunch on b9, 2026-09-02.
 
-## 4. Watch it
+## 4. Watch it — and make sure the window is actually up
 
-The controller prints `[done/total] N shard(s) alive` per arm and opens its own eval-chart window
-(second slot, so a training's window is untouched). Per-shard truth is
-`logs/<arm>_checkpoint_evals_hof5000-s<i>of<n>.log`.
+The controller prints `[done/total] N shard(s) alive` per arm and asks for the stage-B chart window
+(second slot, so a training's window is untouched). **Asking is not having: always confirm the window
+opened, and open it yourself if it did not:**
+
+```
+ps -Ao pid=,etime=,command= | grep '[c]hart_viewer' | grep -v 'zsh -c'      # expect one line titled stage B
+PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.eval_window <arm...> --label hof5000 \
+    > logs/<batch>-hof5000-window.log 2>&1 &                                  # only if the ps shows none
+```
+
+The window is one per box by an `flock`, so a pass launched while a *stale* window holds the lock draws
+nothing, and killing the stale one afterwards leaves the pass with no window at all — which is exactly
+what happened on b9 (the mislaunch above had opened one). Opening it by hand is free: nothing reads it
+or waits on it, and `--label` must match the pass's label or it watches the wrong files.
+
+Per-shard truth is `logs/<arm>_checkpoint_evals_hof5000-s<i>of<n>.log`.
 
 **A killed pass loses nothing.** Each shard rewrites its own file after every completed measurement,
 and the identical command resumes every shard where it stopped.
