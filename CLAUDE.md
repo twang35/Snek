@@ -63,6 +63,18 @@ state behind for the next window to misread. **Do not reintroduce a launcher-sid
 all four — three finished arms are most of what a glance is for. The accumulated set is dropped when
 the box goes quiet and a new arm appears, so the next batch does not draw its predecessor's charts.
 
+**A window that never got a chart could outlive its close-out and hold the slot** — found 2026-09-03.
+b10's first stage-B wave screened zero checkpoints and closed in 1.3 min; its window sat in "nothing to
+show yet" for 15 hours, because that branch of the viewer's loop did not check the watched pids, and it
+held the eval slot's `flock` the whole time, so six later stage-B waves and the b9 `hof30k` pass opened
+no window and nothing said so. The viewer now checks its watched pids in that branch too (fix in
+`tools/chart_viewer.py`, with a test). **The symptom to recognise is "the eval is running but there is no
+window": `cat runs/.live/.evalwindow` on the box names the holder, `ps -p` it, and if it belongs to a
+finished pass, `kill <pid>` it and reopen with `python -m tools.eval_window <arms> --label <label>`** —
+`DISPLAY=:0 XAUTHORITY=/run/user/1000/gdm/Xauthority` on the desktop, `setsid` so it outlives the ssh.
+A close-out asks for its window once, at start, so one that started while the stale holder was alive
+gets no second chance without that hand relaunch.
+
 **A stage-B close-out gets the same treatment**, in a second window of its own: `tools/closeout.py`
 opens one panel per arm of the batch it is measuring and it closes when the pass ends. Same viewer,
 same launcher, its own slot — so a box can show a batch training and a batch being measured at once,
