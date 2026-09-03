@@ -43,11 +43,13 @@
     <option value="drawdown">drawdown &lt; 50%</option>
     <option value="sef">sef</option>
     <option value="hof">best /5,000 (hof5000)</option>
+    <option value="hof30k">best /30,000 (hof30k)</option>
   </select></label>
   <label>show <select id="mode">
     <option value="a">stage A (training)</option>
     <option value="b">stage B (checkpoints)</option>
     <option value="h">hof5000 (5,000-episode re-measure)</option>
+    <option value="k">hof30k (30,000 episodes, seed 7)</option>
   </select></label>
   <label>per page <select id="per">
     <option value="8">8 (4 x 2)</option>
@@ -63,7 +65,7 @@
   </div>
 </header>
 <div class="grid" id="grid"></div>
-<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by one arm · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd> stage A, stage B or hof5000 · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
+<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by one arm · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd>/<kbd>k</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
 <div id="lightbox"><img alt=""><div class="cap"></div></div>
 
 <script src="manifest.js"></script>
@@ -72,7 +74,7 @@
   var M = window.SNEK_MANIFEST || { generated: '', arms: [] };
   var PAGE = 8;                    // reset from state.per on every render
   var RUNS = '../runs/';
-  var SORTS = ['arm', 'density', 'best30', 'drawdown', 'sef', 'hof'];
+  var SORTS = ['arm', 'density', 'best30', 'drawdown', 'sef', 'hof', 'hof30k'];
   var $ = function (id) { return document.getElementById(id); };
 
   // ---- state lives in the URL hash so a view is a link
@@ -109,7 +111,7 @@
   function sorted(arms) {
     var s = state.sort, out = arms.slice();
     if (s === 'arm') return out;                    // manifest order is name order is knob order
-    var key = { density: 'density98', best30: 'best30', drawdown: 'drawdown50', sef: 'sef', hof: 'hof_best' }[s];
+    var key = { density: 'density98', best30: 'best30', drawdown: 'drawdown50', sef: 'sef', hof: 'hof_best', hof30k: 'hof30k_best' }[s];
     var asc = (s === 'drawdown');
     out.sort(function (a, b) {
       var x = num(a[key]), y = num(b[key]);
@@ -126,6 +128,13 @@
   }
   function cap(a) {
     var parts = ['<b>' + a.policy + '</b>'];
+    if (state.mode === 'k') {
+      parts.push('<span>rows <em>' + fmt(a.hof30k_rows) + '</em></span>');
+      parts.push('<span>mean /30k <em>' + fmt(a.hof30k_mean) + '</em></span>');
+      parts.push('<span>best /30k <em>' + fmt(a.hof30k_best) + '</em>' + (a.hof30k_best_step ? ' @' + (a.hof30k_best_step / 1e6).toFixed(2) + 'M' : '') + '</span>');
+      parts.push('<span>best /5000 <em>' + fmt(a.hof_best) + '</em></span>');
+      return parts.join('');
+    }
     if (state.mode === 'h') {
       parts.push('<span>hof rows <em>' + fmt(a.hof_rows) + '</em></span>');
       parts.push('<span>mean /5000 <em>' + fmt(a.hof_mean) + '</em></span>');
@@ -144,7 +153,8 @@
   }
   function src(a) {
     var stem = state.mode === 'b' ? a.policy + '_checkpoint_evals'
-             : state.mode === 'h' ? a.policy + '_checkpoint_evals_hof5000' : a.policy;
+             : state.mode === 'h' ? a.policy + '_checkpoint_evals_hof5000'
+             : state.mode === 'k' ? a.policy + '_checkpoint_evals_hof30k' : a.policy;
     return RUNS + stem + '.png?v=' + encodeURIComponent(M.generated);
   }
 
@@ -165,6 +175,9 @@
       if (state.mode === 'b' && !a.stage_b_png) {
         cell.className += ' missing';
         cell.innerHTML = '<div>' + a.policy + '<br>no stage-B panel' + (a.rows === 0 ? ' — screened zero checkpoints' : '') + '</div>';
+      } else if (state.mode === 'k' && !a.hof30k_png) {
+        cell.className += ' missing';
+        cell.innerHTML = '<div>' + a.policy + '<br>no hof30k panel' + (a.hof_rows ? ' — nothing at ≥99 /5,000' : '') + '</div>';
       } else if (state.mode === 'h' && !a.hof_png) {
         cell.className += ' missing';
         cell.innerHTML = '<div>' + a.policy + '<br>no hof5000 panel' + (a.rows ? ' — no checkpoint made the cut' : '') + '</div>';
@@ -187,7 +200,7 @@
   function move(d) { state.start = Math.max(0, Math.min(state.start + d, Math.max(0, current.length - PAGE))); render(); }
   function zoom(a) {
     var lb = $('lightbox'); lb.querySelector('img').src = src(a);
-    lb.querySelector('.cap').textContent = a.policy + (state.mode === 'b' ? ' — stage B' : state.mode === 'h' ? ' — hof5000' : ' — stage A'); lb.style.display = 'flex';
+    lb.querySelector('.cap').textContent = a.policy + (state.mode === 'b' ? ' — stage B' : state.mode === 'h' ? ' — hof5000' : state.mode === 'k' ? ' — hof30k' : ' — stage A'); lb.style.display = 'flex';
   }
   function unzoom() { $('lightbox').style.display = 'none'; }
 
@@ -208,7 +221,7 @@
     else if (e.key === 'ArrowLeft') { move(e.shiftKey ? -1 : -PAGE); e.preventDefault(); }
     else if (e.key === 'Home') { state.start = 0; render(); }
     else if (e.key === 'End') { state.start = Math.max(0, current.length - PAGE); render(); }
-    else if (e.key === 'a' || e.key === 'b' || e.key === 'h') { state.mode = e.key; render(); }
+    else if (e.key === 'a' || e.key === 'b' || e.key === 'h' || e.key === 'k') { state.mode = e.key; render(); }
     else if (e.key === 'c') { state.per = state.per === '4' ? '8' : '4'; render(); }
     else if (e.key === 's') { state.sort = SORTS[(SORTS.indexOf(state.sort) + 1) % SORTS.length]; state.start = 0; render(); }
   });

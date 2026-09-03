@@ -12,7 +12,7 @@ def _write(path, payload):
         json.dump(payload, handle)
 
 
-def _arm(runs, policy, evals=None, rows=None, stage_b_png=False, hof=None):
+def _arm(runs, policy, evals=None, rows=None, stage_b_png=False, hof=None, hof30k=None):
     open(os.path.join(runs, policy + '.png'), 'wb').close()
     if evals is not None:
         best = max(evals, default=0)
@@ -30,6 +30,10 @@ def _arm(runs, policy, evals=None, rows=None, stage_b_png=False, hof=None):
         _write(os.path.join(runs, policy + '_checkpoint_evals_hof5000.json'),
                {'policy': policy, 'rows': [{'step': i, 'perfect_percent': p} for i, p in enumerate(hof)]})
         open(os.path.join(runs, policy + '_checkpoint_evals_hof5000.png'), 'wb').close()
+    if hof30k is not None:
+        _write(os.path.join(runs, policy + '_checkpoint_evals_hof30k.json'),
+               {'policy': policy, 'rows': [{'step': 10 * i, 'perfect_percent': p} for i, p in enumerate(hof30k)]})
+        open(os.path.join(runs, policy + '_checkpoint_evals_hof30k.png'), 'wb').close()
 
 
 def test_names_split_into_batch_knob_and_seed():
@@ -52,7 +56,7 @@ def test_drawdown_is_the_post_onset_share_below_the_threshold():
 def test_build_reduces_each_arm_to_the_docs_numbers(tmp_path):
     runs = str(tmp_path)
     _arm(runs, 'b9ce-lam999-seed1', evals=[0, 85, 40, 99], rows=[97.0, 98.0, 98.6, 99.2], stage_b_png=True,
-         hof=[98.2, 98.8, 99.4])
+         hof=[98.2, 98.8, 99.4], hof30k=[98.9, 99.3])
     _arm(runs, 'b9cf-lam999-seed2', evals=[0, 90])                # trained, no stage B yet
     _arm(runs, 'b9cg-lam999-seed3')                               # a chart and nothing else
     open(os.path.join(runs, 'b9ce-lam999-seed1_checkpoint_evals_hof5000.png'), 'wb').close()  # derived, not an arm
@@ -64,9 +68,10 @@ def test_build_reduces_each_arm_to_the_docs_numbers(tmp_path):
     assert (a['rows'], a['density98'], a['cands99'], a['best_row']) == (4, 75.0, 1, 99.2)
     assert (a['best30'], a['drawdown50'], a['stage_b_png']) == (99, 33.33, True)
     assert (a['hof_png'], a['hof_rows'], a['hof_mean'], a['hof_best'], a['hof_9873']) == (True, 3, 98.8, 99.4, 2)
+    assert (a['hof30k_png'], a['hof30k_rows'], a['hof30k_mean'], a['hof30k_best'], a['hof30k_best_step']) == (True, 2, 99.1, 99.3, 10)
     b = by['b9cf-lam999-seed2']
     assert b['rows'] is None and b['density98'] is None and b['best30'] == 90
-    assert b['hof_png'] is False and b['hof_rows'] is None
+    assert b['hof_png'] is False and b['hof_rows'] is None and b['hof30k_png'] is False and b['hof30k_rows'] is None
     c = by['b9cg-lam999-seed3']
     assert c['best30'] is None and c['rows'] is None and c['batch'] == 'b9'
 

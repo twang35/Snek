@@ -15,6 +15,7 @@ the page and the tables cannot disagree:
 | `rows`, `density98`, `cands99`, `best_row` | stage-B row count, share at >=98/500, `hof5000` candidates at >=99, max |
 | `drawdown50`, `drawdown80` | share of post-competence stage-A evals (onset = first >=80%) below 50 / 80 |
 | `hof_rows`, `hof_mean`, `hof_best`, `hof_9873` | the `hof5000` pass: rows, mean, max, count at >=98.73 (the snek2 champion) |
+| `hof30k_rows`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step` | the `hof30k` pass (30,000 episodes, seed 7): rows, mean, max and where it is |
 
 The output is JavaScript rather than JSON — `window.SNEK_MANIFEST = {...}` — because a `<script src>`
 loads from `file://` and `fetch()` does not, and the page has to work opened from disk as well as from
@@ -75,7 +76,8 @@ def arm_record(policy, runs_dir):
     record = {'policy': policy, 'batch': batch_of(policy), 'knob': knob_of(policy),
               'seed': seed_of(policy),
               'stage_b_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals.png')),
-              'hof_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.png'))}
+              'hof_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.png')),
+              'hof30k_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.png'))}
     stage_a = _read(os.path.join(runs_dir, policy + '_evals.json')) or {}
     summary = stage_a.get('summary') or {}
     best30 = summary.get('best_perfect30') or {}
@@ -103,6 +105,15 @@ def arm_record(policy, runs_dir):
         'hof_mean': round(sum(hof_scores) / len(hof_scores), 2) if hof_scores else None,
         'hof_best': max(hof_scores) if hof_scores else None,
         'hof_9873': sum(s >= 98.73 for s in hof_scores) if hof_scores else None,
+    })
+    h30 = _read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.json'))
+    h30_rows = (h30 or {}).get('rows') or []
+    best = max(h30_rows, key=lambda r: r.get('perfect_percent', 0)) if h30_rows else None
+    record.update({
+        'hof30k_rows': len(h30_rows) if h30 is not None else None,
+        'hof30k_mean': round(sum(r.get('perfect_percent', 0) for r in h30_rows) / len(h30_rows), 2) if h30_rows else None,
+        'hof30k_best': best.get('perfect_percent') if best else None,
+        'hof30k_best_step': best.get('step') if best else None,
     })
     return record
 
