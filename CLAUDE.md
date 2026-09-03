@@ -209,13 +209,14 @@ report are rebuilt from across restarts; the stage-B file is a pass in progress.
 `results` branch at close-out, and only then are they committed here. A laptop arm's own files are fine.
 
 **The box's deploy expects the collision this creates and settles it by what each file is.** A
-committed chart the box also holds untracked would abort `git merge --ff-only` as "untracked working
-tree files would be overwritten", so `snek3/desktop/deploy` runs on the box before the merge: it
-deletes its own copies of colliding `.png`/`.md` (the next eval redraws them), stages any other
-colliding file whose bytes match the incoming blob (a closed batch imported from `results`), and
-**stops with exit 3, touching nothing, if any JSON differs** — that is a live arm's file committed by
-mistake, and the fix is `git rm --cached` on master, never overwriting the box. The `desktop-deploy`
-skill has the procedure.
+committed chart the box also holds would abort `git merge --ff-only` as "untracked working tree files
+would be overwritten", so `snek3/desktop/deploy` runs on the box instead of a bare merge: it **keeps
+the box's own pictures** (saves the bytes, merges, writes them back — the box drew every chart the
+laptop ever committed, so the committed copy is always the older snapshot and a finished arm's final
+chart is never replaced by a mid-training one), stages any other colliding file whose bytes match the
+incoming blob (a closed batch imported from `results`), and **stops with exit 3, touching nothing, if
+any JSON differs** — that is a live arm's file committed by mistake, and the fix is `git rm --cached`
+on master, never overwriting the box. The `desktop-deploy` skill has the procedure.
 
 **One implementation for both boxes, wherever the behaviour wanted is the same.** The two hosts
 differ in what they *have* — cores, a monitor, a queue — and almost never in what the code should

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snek charts</title>
+<style>
+  :root { --bg:#111; --fg:#ddd; --dim:#888; --line:#333; --hi:#4c9; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.4 -apple-system, system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:.6em 1.2em; align-items:center; padding:.5em .8em; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:2; }
+  header label { color:var(--dim); }
+  select, button { background:#222; color:var(--fg); border:1px solid #444; border-radius:4px; padding:.2em .5em; font:inherit; }
+  button:hover { border-color:var(--hi); cursor:pointer; }
+  .pager { margin-left:auto; display:flex; gap:.5em; align-items:center; }
+  .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:.5em; padding:.5em; }
+  .grid.two { grid-template-columns:repeat(2, 1fr); }
+  .cell { background:#181818; border:1px solid var(--line); border-radius:4px; overflow:hidden; display:flex; flex-direction:column; }
+  .cell img { width:100%; height:auto; display:block; background:#fff; cursor:zoom-in; }
+  .cell .cap { padding:.3em .5em; display:flex; flex-wrap:wrap; gap:.2em .8em; }
+  .cell .cap b { color:#fff; }
+  .cell .cap span { color:var(--dim); white-space:nowrap; }
+  .cell .cap span em { color:var(--fg); font-style:normal; }
+  .cell.missing { align-items:center; justify-content:center; color:var(--dim); min-height:12em; }
+  .group-start { box-shadow: inset 3px 0 0 var(--hi); }
+  .help { color:var(--dim); padding:0 .8em .8em; }
+  kbd { background:#222; border:1px solid #444; border-radius:3px; padding:0 .3em; font:inherit; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; align-items:center; justify-content:center; z-index:5; cursor:zoom-out; }
+  #lightbox img { max-width:96vw; max-height:92vh; background:#fff; }
+  #lightbox .cap { position:absolute; bottom:1em; left:0; right:0; text-align:center; color:#fff; }
+  @media (max-width: 1100px) { .grid { grid-template-columns:repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <label>batch <select id="batch"></select></label>
+  <label>sort <select id="sort">
+    <option value="arm">arm order</option>
+    <option value="density">≥98%/500 density</option>
+    <option value="best30">best30</option>
+    <option value="drawdown">drawdown &lt; 50%</option>
+    <option value="sef">sef</option>
+  </select></label>
+  <label>show <select id="mode">
+    <option value="a">stage A (training)</option>
+    <option value="b">stage B (checkpoints)</option>
+  </select></label>
+  <label>columns <select id="cols">
+    <option value="4">4 (8 per screen)</option>
+    <option value="2">2 (bigger, scroll)</option>
+  </select></label>
+  <span id="summary" style="color:var(--dim)"></span>
+  <div class="pager">
+    <button id="first" title="Home">⇤</button>
+    <button id="prev" title="←">←</button>
+    <span id="where"></span>
+    <button id="next" title="→">→</button>
+    <button id="last" title="End">⇥</button>
+  </div>
+</header>
+<div class="grid" id="grid"></div>
+<p class="help"><kbd>←</kbd> <kbd>→</kbd> page by 8 · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by one arm · <kbd>a</kbd>/<kbd>b</kbd> stage A or B · <kbd>c</kbd> 4 or 2 columns · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
+<div id="lightbox"><img alt=""><div class="cap"></div></div>
+
+<script src="manifest.js"></script>
+<script>
+(function () {
+  var M = window.SNEK_MANIFEST || { generated: '', arms: [] };
+  var PAGE = 8;
+  var RUNS = '../runs/';
+  var SORTS = ['arm', 'density', 'best30', 'drawdown', 'sef'];
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- state lives in the URL hash so a view is a link
+  var state = { batch: null, sort: 'arm', mode: 'a', cols: '4', start: 0 };
+  function readHash() {
+    var h = location.hash.replace(/^#/, '');
+    h.split('&').forEach(function (kv) {
+      var p = kv.split('='); if (p.length !== 2) return;
+      if (p[0] === 'start') state.start = parseInt(p[1], 10) || 0;
+      else if (p[0] in state) state[p[0]] = decodeURIComponent(p[1]);
+    });
+  }
+  function writeHash() {
+    var h = 'batch=' + state.batch + '&sort=' + state.sort + '&mode=' + state.mode + '&cols=' + state.cols + '&start=' + state.start;
+    if (location.hash.replace(/^#/, '') !== h) history.replaceState(null, '', '#' + h);
+  }
+
+  // ---- batches: newest first in the picker, b9 default when present
+  var batches = {};
+  M.arms.forEach(function (a) { (batches[a.batch] = batches[a.batch] || []).push(a); });
+  var names = Object.keys(batches).sort(function (x, y) {
+    var nx = parseInt(x.replace(/\D/g, ''), 10), ny = parseInt(y.replace(/\D/g, ''), 10);
+    if (isNaN(nx) || isNaN(ny)) return x < y ? -1 : 1;
+    return ny - nx;
+  });
+  names.forEach(function (n) {
+    var o = document.createElement('option'); o.value = n;
+    o.textContent = n + ' (' + batches[n].length + ')'; $('batch').appendChild(o);
+  });
+
+  function num(v) { return (v === null || v === undefined) ? null : v; }
+  function sorted(arms) {
+    var s = state.sort, out = arms.slice();
+    if (s === 'arm') return out;                    // manifest order is name order is knob order
+    var key = { density: 'density98', best30: 'best30', drawdown: 'drawdown50', sef: 'sef' }[s];
+    var asc = (s === 'drawdown');
+    out.sort(function (a, b) {
+      var x = num(a[key]), y = num(b[key]);
+      if (x === null && y === null) return 0;
+      if (x === null) return 1; if (y === null) return -1;
+      return asc ? x - y : y - x;
+    });
+    return out;
+  }
+
+  function fmt(v, suffix, digits) {
+    if (v === null || v === undefined) return '–';
+    return (digits === undefined ? v : Number(v).toFixed(digits)) + (suffix || '');
+  }
+  function cap(a) {
+    var parts = ['<b>' + a.policy + '</b>'];
+    parts.push('<span>best30 <em>' + fmt(a.best30) + '</em></span>');
+    parts.push('<span>≥98/500 <em>' + fmt(a.density98, '%') + '</em>' + (a.rows !== null && a.rows !== undefined ? ' of ' + a.rows : '') + '</span>');
+    parts.push('<span>best row <em>' + fmt(a.best_row) + '</em></span>');
+    parts.push('<span>dd&lt;50 <em>' + fmt(a.drawdown50, '%') + '</em></span>');
+    parts.push('<span>sef <em>' + fmt(a.sef) + '</em></span>');
+    if (a.step) parts.push('<span>' + (a.step / 1e6).toFixed(1) + 'M</span>');
+    return parts.join('');
+  }
+  function src(a) {
+    var stem = state.mode === 'b' ? a.policy + '_checkpoint_evals' : a.policy;
+    return RUNS + stem + '.png?v=' + encodeURIComponent(M.generated);
+  }
+
+  var current = [];
+  function render() {
+    if (!(state.batch in batches)) state.batch = names.indexOf('b9') >= 0 ? 'b9' : names[0];
+    current = sorted(batches[state.batch] || []);
+    var n = current.length;
+    state.start = Math.max(0, Math.min(state.start, Math.max(0, n - 1)));
+    $('batch').value = state.batch; $('sort').value = state.sort; $('mode').value = state.mode; $('cols').value = state.cols;
+    var grid = $('grid'); grid.innerHTML = ''; grid.className = 'grid' + (state.cols === '2' ? ' two' : '');
+    var page = current.slice(state.start, state.start + PAGE);
+    page.forEach(function (a, i) {
+      var cell = document.createElement('div'); cell.className = 'cell';
+      var prev = current[state.start + i - 1];
+      if (state.sort === 'arm' && (!prev || prev.knob !== a.knob)) cell.className += ' group-start';
+      if (state.mode === 'b' && !a.stage_b_png) {
+        cell.className += ' missing';
+        cell.innerHTML = '<div>' + a.policy + '<br>no stage-B panel' + (a.rows === 0 ? ' — screened zero checkpoints' : '') + '</div>';
+      } else {
+        var img = document.createElement('img'); img.src = src(a); img.alt = a.policy; img.loading = 'lazy';
+        img.addEventListener('click', function () { zoom(a); });
+        cell.appendChild(img);
+        var c = document.createElement('div'); c.className = 'cap'; c.innerHTML = cap(a); cell.appendChild(c);
+      }
+      grid.appendChild(cell);
+    });
+    var lo = n ? state.start + 1 : 0, hi = Math.min(n, state.start + PAGE);
+    $('where').textContent = lo + '–' + hi + ' of ' + n;
+    $('summary').textContent = 'manifest ' + (M.generated || '?').replace('T', ' ');
+    $('prev').disabled = $('first').disabled = state.start === 0;
+    $('next').disabled = $('last').disabled = state.start + PAGE >= n;
+    writeHash();
+  }
+
+  function move(d) { state.start = Math.max(0, Math.min(state.start + d, Math.max(0, current.length - PAGE))); render(); }
+  function zoom(a) {
+    var lb = $('lightbox'); lb.querySelector('img').src = src(a);
+    lb.querySelector('.cap').textContent = a.policy + (state.mode === 'b' ? ' — stage B' : ' — stage A'); lb.style.display = 'flex';
+  }
+  function unzoom() { $('lightbox').style.display = 'none'; }
+
+  $('batch').addEventListener('change', function () { state.batch = this.value; state.start = 0; render(); });
+  $('sort').addEventListener('change', function () { state.sort = this.value; state.start = 0; render(); });
+  $('mode').addEventListener('change', function () { state.mode = this.value; render(); });
+  $('cols').addEventListener('change', function () { state.cols = this.value; render(); });
+  $('prev').addEventListener('click', function () { move(-PAGE); });
+  $('next').addEventListener('click', function () { move(PAGE); });
+  $('first').addEventListener('click', function () { state.start = 0; render(); });
+  $('last').addEventListener('click', function () { state.start = Math.max(0, current.length - PAGE); render(); });
+  $('lightbox').addEventListener('click', unzoom);
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'SELECT') return;
+    if (e.key === 'Escape') return unzoom();
+    if ($('lightbox').style.display === 'flex') return;
+    if (e.key === 'ArrowRight') { move(e.shiftKey ? 1 : PAGE); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { move(e.shiftKey ? -1 : -PAGE); e.preventDefault(); }
+    else if (e.key === 'Home') { state.start = 0; render(); }
+    else if (e.key === 'End') { state.start = Math.max(0, current.length - PAGE); render(); }
+    else if (e.key === 'a' || e.key === 'b') { state.mode = e.key; render(); }
+    else if (e.key === 'c') { state.cols = state.cols === '4' ? '2' : '4'; render(); }
+    else if (e.key === 's') { state.sort = SORTS[(SORTS.indexOf(state.sort) + 1) % SORTS.length]; state.start = 0; render(); }
+  });
+  window.addEventListener('hashchange', function () { readHash(); render(); });
+
+  readHash(); render();
+})();
+</script>
+</body>
+</html>

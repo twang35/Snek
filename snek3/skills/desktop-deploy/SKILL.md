@@ -26,11 +26,15 @@ script prints every colliding file with what it did to it, then `HEAD <old> -> <
 
 **Why collisions are the normal case, not a mistake.** Since 2026-09-02 every progress update commits
 the charts of every arm, including the ones the box is still training, so the box always holds
-untracked `runs/*.png` and `.md` that master also carries, and a bare `git merge --ff-only` would abort
-on every one of them. `deploy` settles each colliding file by what it is: pictures are deleted (the
-next eval redraws them, and a finished arm's committed copy is the same picture), any other file whose
-bytes match the incoming blob is staged at that hash (a closed batch imported from `results`), and a
-differing JSON stops the run. `--dry-run` prints the plan without doing it.
+`runs/*.png` and `.md` that master also carries, and a bare `git merge --ff-only` would abort on every
+one of them. `deploy` settles each colliding file by what it is: **the box's pictures are kept** —
+saved, merged over, written back — because the box drew every chart the laptop has ever committed, so
+the committed copy is always the older snapshot and a finished arm's final chart must not be replaced
+by a mid-training one; any other file whose bytes match the incoming blob is staged at that hash (a
+closed batch imported from `results`); a differing JSON stops the run. The kept pictures then show as
+modified tracked files on the box, which is expected and harmless — the daemon publishes from its own
+worktrees, and the next `deploy` handles them the same way. `--dry-run` prints the plan without doing
+it.
 
 **Until `desktop/deploy` is on the box, the first deploy that carries it is done by hand** — the same
 three moves, typed:

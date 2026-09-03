@@ -92,5 +92,5 @@ entry.
 **Never commit a live desktop arm's `*_evals.json` or `*_checkpoint_evals.*`.** `_evals.json` is the
 trainer's own history, read on resume; the stage-B file is a pass in progress. Add them only once the
 batch's stage B reads `done` on the ledger, when they have arrived on the `results` branch. The box's
-`desktop/deploy` deletes and redraws colliding pictures but refuses to merge over a differing JSON, so
-committing one blocks every deploy until it is `git rm --cached` on master.
+`desktop/deploy` keeps its own copy of every colliding picture but refuses to merge over a differing
+JSON, so committing one blocks every deploy until it is `git rm --cached` on master.
