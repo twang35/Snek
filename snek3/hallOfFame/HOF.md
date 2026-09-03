@@ -38,8 +38,8 @@ is promoted, per the rule below. The same wave measured `b9cl-lam100-seed4` @193
 `b9cc-lam995-seed3` @18350080 at 99.10; they are not indistinguishable from `b9ch` (z ≈ 2.9) and are
 not promoted, because a second λ-plateau entry adds nothing the table does not already say.
 
-**`record_gif.py`'s `HOF_RECORD` still names `b5h`** until its one-line change is approved; until then
-`record_gif.py hof` records the previous record.
+**`record_gif.py`'s `HOF_RECORD` names this entry** (commit of 2026-09-03), so `record_gif.py hof` records it and
+`record_gif.py --list` marks it `*`.
 
 ## ‡ The previous record, and the first time this project beat snek2 on a matched measurement
 
