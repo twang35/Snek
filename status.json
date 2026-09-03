@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-03T14:35:34",
-  "ts": 1788471334.264082,
+  "iso": "2026-09-03T14:45:47",
+  "ts": 1788471947.1563597,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g100, seed 3 of 4 -- wave 8 of 8 | training 88% (1 arm)"
+      "b10 | b10: g100, seed 3 of 4 -- wave 8 of 8 | training 95% (1 arm)"
     ],
     "queued": [
       "b10 stage B | b10: g100, seed 3 of 4 -- wave 8 of 8 | queued (7 arms)",
@@ -47,10 +47,10 @@
         "b10ck-g100-seed3"
       ],
       "pid": 1133376,
-      "step": 44171264,
+      "step": 47529984,
       "max_steps": 50003968,
-      "steps_per_sec": 6248.8,
-      "elapsed_s": 13397
+      "steps_per_sec": 6217.3,
+      "elapsed_s": 14010
     }
   ],
   "ledger": {
@@ -488,8 +488,8 @@
   },
   "disk_free_gb": 147.2,
   "load_avg": [
-    11.30810546875,
-    11.18603515625,
-    11.3388671875
+    11.20947265625,
+    11.2724609375,
+    11.33349609375
   ]
 }
