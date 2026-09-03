@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-03T09:49:18",
-  "ts": 1788454158.3218174,
+  "iso": "2026-09-03T09:49:24",
+  "ts": 1788454164.4417267,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "b10 | b10: g999, seed 1 of 4 -- wave 8 of 8 | stage B (8 arms)"
     ],
     "queued": [
-      "b9 eval | b9 HOF confirm: 727 checkpoints >=90/5,000 at 30,000 episodes, seed 7 | queued (36 arms)",
+      "b9 eval | b9 HOF confirm: 33 checkpoints >=99/5,000 at 30,000 episodes, seed 7 | queued (9 arms)",
       "b10 training | b10: g999, seed 1 of 4 -- wave 8 of 8 | queued (8 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
@@ -58,7 +58,7 @@
       "step": 50003968,
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2922
+      "elapsed_s": 2928
     }
   ],
   "ledger": {
@@ -495,8 +495,8 @@
   },
   "disk_free_gb": 148.4,
   "load_avg": [
-    15.03662109375,
-    15.64990234375,
-    15.67529296875
+    15.11376953125,
+    15.65576171875,
+    15.67724609375
   ]
 }
