@@ -247,3 +247,54 @@ def test_a_zombie_does_not_count_as_alive(monkeypatch):
 def test_a_negative_answer_has_to_repeat_before_it_is_believed():
     # One negative is a race with a launcher that has not spawned yet, or a lost `ps`.
     assert chart_viewer.NEGATIVE_CHECKS > 1
+
+
+def test_watch_step_counts_negatives_and_resets_on_anything_else(monkeypatch):
+    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: False)
+    n, close = chart_viewer.watch_step([1], 0)
+    assert (n, close) == (1, False)
+    n, close = chart_viewer.watch_step([1], chart_viewer.NEGATIVE_CHECKS - 1)
+    assert (n, close) == (chart_viewer.NEGATIVE_CHECKS, True)
+    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: None)     # could not tell
+    assert chart_viewer.watch_step([1], 2) == (0, False)
+    assert chart_viewer.watch_step([], 2) == (2, False)                     # nothing to watch
+
+
+class _NoFigureViewer(object):
+    """A viewer that never gets a chart to draw — the b10 wave-1 shape."""
+    def __init__(self, *args, **kwargs):
+        self.figure = None
+        self.exited = None
+
+    def refresh(self, paths):
+        return False
+
+    def exit_now(self, status):
+        self.exited = status
+        raise SystemExit(status)
+
+    def sleep(self):
+        pass
+
+
+def test_a_window_that_never_gets_a_chart_still_closes_when_its_closeout_is_gone(monkeypatch):
+    """b10-stageb, 2026-09-02: zero checkpoints screened, no PNG ever written, the window lived 15 h
+    holding the eval slot's lock and six later waves drew nothing. The wait-for-a-chart branch has to
+    watch the pids too."""
+    monkeypatch.setattr(chart_viewer, 'Viewer', _NoFigureViewer)
+    monkeypatch.setattr(chart_viewer.plt, 'ion', lambda: None)
+    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: False)
+    monkeypatch.setattr(chart_viewer.time, 'sleep', lambda s: None)
+    loops = {'n': 0}
+    real_panels = chart_viewer.panels
+
+    def counting_panels(*args, **kwargs):
+        loops['n'] += 1
+        if loops['n'] > 50:
+            raise AssertionError('the window never closed')
+        return real_panels(*args, **kwargs)
+    monkeypatch.setattr(chart_viewer, 'panels', counting_panels)
+    with pytest.raises(SystemExit) as info:
+        chart_viewer.run(['/nonexistent/never-drawn.png'], watch_pids=[999999], interval=0)
+    assert info.value.code == 0
+    assert loops['n'] == chart_viewer.NEGATIVE_CHECKS

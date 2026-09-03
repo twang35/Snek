@@ -492,6 +492,21 @@ def take_window_slot(runs_dir, slot=None):
     return descriptor
 
 
+def watch_step(watch_pids, negatives):
+    """One check of the watched pids. Returns `(negatives, close)`.
+
+    A single negative is a race with a launcher that has not spawned yet, or a lost `ps`, so it has
+    to repeat `NEGATIVE_CHECKS` times before it is believed; anything but a negative resets the count.
+    Pulled out of `run` so that **both** of its branches call it — see below.
+    """
+    if not watch_pids:
+        return negatives, False
+    if pids_alive(watch_pids) is False:
+        negatives += 1
+        return negatives, negatives >= NEGATIVE_CHECKS
+    return 0, False
+
+
 def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
         max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None,
         runs_dir=None, now=time.time, max_width_px=DEFAULT_MAX_WIDTH_PX):
@@ -520,19 +535,23 @@ def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
 
         if not viewer.refresh(panels(found, glob_pattern, max_panels)):
             if viewer.figure is None:
+                # **The watched pids are checked here too.** Until 2026-09-03 this branch `continue`d
+                # straight past the check below, so a close-out that produced no chart at all — b10's
+                # first stage-B wave screened zero checkpoints and finished in 1.3 min — left its window
+                # waiting for a PNG forever, holding the eval slot's lock, and every later stage-B window
+                # on the box lost that lock and drew nothing. 15 hours and six waves without a window.
+                negatives, close = watch_step(watch_pids, negatives)
+                if close:
+                    print('watched pids gone before anything appeared; closing')
+                    viewer.exit_now(0)
                 print('nothing to show yet: {0}'.format(glob_pattern or runs_dir or paths))
                 time.sleep(interval)
                 continue
 
-        if watch_pids:
-            alive = pids_alive(watch_pids)
-            if alive is False:
-                negatives += 1
-                if negatives >= NEGATIVE_CHECKS:
-                    print('watched pids gone after {0} checks; closing'.format(negatives))
-                    viewer.exit_now(0)
-            else:
-                negatives = 0
+        negatives, close = watch_step(watch_pids, negatives)
+        if close:
+            print('watched pids gone after {0} checks; closing'.format(negatives))
+            viewer.exit_now(0)
 
         if not plt.get_fignums():
             # The user closed the window. That is an instruction, not a failure.
