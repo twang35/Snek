@@ -14,6 +14,8 @@
   .pager { margin-left:auto; display:flex; gap:.5em; align-items:center; }
   .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:.5em; padding:.5em; }
   .grid.two { grid-template-columns:repeat(2, 1fr); }
+  /* two rows must fit the window without scrolling: cap each chart at half the height minus header and caption */
+  .grid.two .cell img { max-height:calc(50vh - 5em); object-fit:contain; }
   .cell { background:#181818; border:1px solid var(--line); border-radius:4px; overflow:hidden; display:flex; flex-direction:column; }
   .cell img { width:100%; height:auto; display:block; background:#fff; cursor:zoom-in; }
   .cell .cap { padding:.3em .5em; display:flex; flex-wrap:wrap; gap:.2em .8em; }
@@ -45,9 +47,9 @@
     <option value="a">stage A (training)</option>
     <option value="b">stage B (checkpoints)</option>
   </select></label>
-  <label>columns <select id="cols">
-    <option value="4">4 (8 per screen)</option>
-    <option value="2">2 (bigger, scroll)</option>
+  <label>per page <select id="per">
+    <option value="8">8 (4 x 2)</option>
+    <option value="4">4 (2 x 2, bigger)</option>
   </select></label>
   <span id="summary" style="color:var(--dim)"></span>
   <div class="pager">
@@ -59,31 +61,32 @@
   </div>
 </header>
 <div class="grid" id="grid"></div>
-<p class="help"><kbd>←</kbd> <kbd>→</kbd> page by 8 · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by one arm · <kbd>a</kbd>/<kbd>b</kbd> stage A or B · <kbd>c</kbd> 4 or 2 columns · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
+<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by one arm · <kbd>a</kbd>/<kbd>b</kbd> stage A or B · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
 <div id="lightbox"><img alt=""><div class="cap"></div></div>
 
 <script src="manifest.js"></script>
 <script>
 (function () {
   var M = window.SNEK_MANIFEST || { generated: '', arms: [] };
-  var PAGE = 8;
+  var PAGE = 8;                    // reset from state.per on every render
   var RUNS = '../runs/';
   var SORTS = ['arm', 'density', 'best30', 'drawdown', 'sef'];
   var $ = function (id) { return document.getElementById(id); };
 
   // ---- state lives in the URL hash so a view is a link
-  var state = { batch: null, sort: 'arm', mode: 'a', cols: '4', start: 0 };
+  var state = { batch: null, sort: 'arm', mode: 'a', per: '8', start: 0 };
   function readHash() {
     var h = location.hash.replace(/^#/, '');
     h.split('&').forEach(function (kv) {
       var p = kv.split('='); if (p.length !== 2) return;
       if (p[0] === 'start') state.start = parseInt(p[1], 10) || 0;
       else if (p[0] === 'zoom') state.zoom = decodeURIComponent(p[1]);   // open the lightbox on load; not written back
+      else if (p[0] === 'cols') state.per = p[1] === '2' ? '4' : '8';       // the old name for this knob
       else if (p[0] in state) state[p[0]] = decodeURIComponent(p[1]);
     });
   }
   function writeHash() {
-    var h = 'batch=' + state.batch + '&sort=' + state.sort + '&mode=' + state.mode + '&cols=' + state.cols + '&start=' + state.start;
+    var h = 'batch=' + state.batch + '&sort=' + state.sort + '&mode=' + state.mode + '&per=' + state.per + '&start=' + state.start;
     if (location.hash.replace(/^#/, '') !== h) history.replaceState(null, '', '#' + h);
   }
 
@@ -140,8 +143,9 @@
     current = sorted(batches[state.batch] || []);
     var n = current.length;
     state.start = Math.max(0, Math.min(state.start, Math.max(0, n - 1)));
-    $('batch').value = state.batch; $('sort').value = state.sort; $('mode').value = state.mode; $('cols').value = state.cols;
-    var grid = $('grid'); grid.innerHTML = ''; grid.className = 'grid' + (state.cols === '2' ? ' two' : '');
+    PAGE = state.per === '4' ? 4 : 8;
+    $('batch').value = state.batch; $('sort').value = state.sort; $('mode').value = state.mode; $('per').value = String(PAGE);
+    var grid = $('grid'); grid.innerHTML = ''; grid.className = 'grid' + (PAGE === 4 ? ' two' : '');
     var page = current.slice(state.start, state.start + PAGE);
     page.forEach(function (a, i) {
       var cell = document.createElement('div'); cell.className = 'cell';
@@ -176,7 +180,7 @@
   $('batch').addEventListener('change', function () { state.batch = this.value; state.start = 0; render(); });
   $('sort').addEventListener('change', function () { state.sort = this.value; state.start = 0; render(); });
   $('mode').addEventListener('change', function () { state.mode = this.value; render(); });
-  $('cols').addEventListener('change', function () { state.cols = this.value; render(); });
+  $('per').addEventListener('change', function () { state.per = this.value; render(); });
   $('prev').addEventListener('click', function () { move(-PAGE); });
   $('next').addEventListener('click', function () { move(PAGE); });
   $('first').addEventListener('click', function () { state.start = 0; render(); });
@@ -191,7 +195,7 @@
     else if (e.key === 'Home') { state.start = 0; render(); }
     else if (e.key === 'End') { state.start = Math.max(0, current.length - PAGE); render(); }
     else if (e.key === 'a' || e.key === 'b') { state.mode = e.key; render(); }
-    else if (e.key === 'c') { state.cols = state.cols === '4' ? '2' : '4'; render(); }
+    else if (e.key === 'c') { state.per = state.per === '4' ? '8' : '4'; render(); }
     else if (e.key === 's') { state.sort = SORTS[(SORTS.indexOf(state.sort) + 1) % SORTS.length]; state.start = 0; render(); }
   });
   window.addEventListener('hashchange', function () { readHash(); render(); });
