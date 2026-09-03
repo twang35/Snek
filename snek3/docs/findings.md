@@ -53,11 +53,16 @@ truncated cap; at four seeds and 50M it has the highest density in the batch. An
 best stability knob" was true and irrelevant: λ 0.95 sits at 5.3% density, the same 5-6% band as λ
 0.90-0.94, and the stability it buys over 0.98 is 0.27 pp of drawdown.
 
-**‡ What is not settled.** Everything here is at 500 episodes and 50M. Three rows scored 100/500 —
-two adjacent `b9ch-lam999-seed4` checkpoints and one of `b9bw-lam99-seed1` — and the usual 500 → 5,000
-regression is −1 pp, so whether b9 holds a record is the `hof5000` pass's question. Whether λ 1.00's
-drawdown keeps developing past 50M the way b4's did (2.0% → 8.4% from 50M to 100M) needs a longer arm
-and is the risk in building on the plateau's top.
+**‡ Confirmed at 5,000 episodes the same evening.** The `hof5000` pass over b9's 727 checkpoints at
+≥99/500 keeps the plateau's lead: the four groups from 0.99 up average 98.21-98.27 at depth against
+97.86 for b7's λ 0.98 and 97.9 for λ 0.96-0.97, and hold **76 rows at ≥98.73 and 33 at ≥99** where all
+of b7 had 6 and 0. The regression is the usual −0.9 pp, so this is not a flatter selection. The three
+100/500 rows came back 99.2, 98.6 and 98.4; the best row at depth is `b9ch-lam999-seed4 @47251456` at
+99.40 [99.1, 99.5], basin 98.70 — promotion pending a 30,000-episode confirm.
+
+**‡ What is not settled.** Whether λ 1.00's drawdown keeps developing past 50M the way b4's did (2.0%
+→ 8.4% from 50M to 100M) needs a longer arm and is the risk in building on the plateau's top; 0.99 was
+chosen as the default partly for that reason.
 
 ### Epochs and network shape fix b4's drawdown; all four stability knobs only dent it
 

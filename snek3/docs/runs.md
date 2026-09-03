@@ -24,10 +24,12 @@ measured. Full table and reading under *Just closed: b9* below.
 
 **Both decisions were taken the same evening (user, 2026-09-02 ~19:00):**
 
-1. **The `hof5000` pass on b9 is running on the laptop** — 36 arms, the 727 checkpoints at ≥99/500
-   (the cut was raised from 98.5 to 99 in the same decision; at b9's density 98.5 would have been 2,289),
-   8 shards, `logs/b9-hof5000.log`, ~3.6M episodes so roughly an hour. The three 100/500 rows are in it.
-   Expect the usual −1 pp from 500 to 5,000; the record to beat is `b5h` at 98.96 /30,000.
+1. **The `hof5000` pass on b9 ran on the laptop, 19:12-20:29** — 36 arms, the 727 checkpoints at
+   ≥99/500 (the cut was raised from 98.5 to 99 in the same decision), 8 shards, exit 0. **77 rows at
+   ≥98.73 and 33 at ≥99, against 6 and 0 for all of b7.** `b9ch-lam999-seed4 @47251456` measures
+   **99.40 [99.1, 99.5]** with a 27-neighbour basin at 98.70 — a stronger candidate on both numbers
+   than `b5h` was when it was promoted (99.20 own, 98.54 basin, confirmed 98.96 /30,000). **Next:
+   `hof-promote` on it**, a 30,000-episode confirm at seed 7. Table in [`results.md`](results.md).
 2. **λ 0.99 is the new default** (`ppo/algo.py`, commit `6b5f8390e`, deployed to the box) **and b11-b14's
    128 specs were re-based to it on `ops`** before any of them started. b10 runs at 0.98 as queued: γ and
    λ set the GAE horizon together (1/(1−γλ)), so it stays a clean one-knob sweep off b7's cell, and its

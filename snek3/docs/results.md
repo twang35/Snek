@@ -30,7 +30,7 @@ desktop, eight waves of two λ values, `auto_stage_b` measuring each wave before
 **`b7aa`-`b7ad` are the λ 0.98 row.** Drawdown is the median share of post-competence stage-A evals
 (onset = first eval ≥80% perfect) below the threshold, as defined for b8.
 
-| λ | GAE horizon | rows | ≥98%/500 | per-seed share | ≥98.5 (`hof5000` cands) | best row | best30 (4 seeds) | sef | drawdown < 50% | < 80% |
+| λ | GAE horizon | rows | ≥98%/500 | per-seed share | ≥98.5 | best row | best30 (4 seeds) | sef | drawdown < 50% | < 80% |
 |---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
 | 0.00 | 1.0 | 8 | 0.0% | 0 0 0 0 | 0 | 94.0 | 88.7 85.1 90.8 88.5 | 24.1 | 11.29% | 68.6% |
 | 0.50 | 2.0 | 392 | 0.0% | 0 0 0 0 | 0 | 96.6 | 94.2 94.2 94.9 93.7 | 81.8 | 0.05% | 11.1% |
@@ -56,12 +56,12 @@ and the four groups from 0.99 up are indistinguishable at four seeds. Three rows
 `b9ch-lam999-seed4` at 47,235,072 and 47,316,992 and `b9bw-lam99-seed1` at 48,414,720 — the first in
 this project. `sef` peaks at λ 0.97 and falls thereafter, ranking the sweep backwards for the third
 time; the stage-A ≥98% share (20.4 → 28.9 → 30.5% at 0.98, 0.99, 1.00) tracks density. Reading in
-[`findings.md`](findings.md), charts in [`charts.md`](charts.md). No `hof5000` pass yet — 2,289
-candidates at ≥98.5/500, ~660 at ≥99/500.
+[`findings.md`](findings.md), charts in [`charts.md`](charts.md). The `hof5000` pass, at the new ≥99/500
+cut, is below the arm table.
 
 ### Every arm
 
-`rows` is the stage-B checkpoint count, `≥98.5` the `hof5000` candidates, `best30 @step` the peak
+`rows` is the stage-B checkpoint count, `≥98.5` the count at that 500-episode score, `best30 @step` the peak
 30-eval trailing perfect rate and where it landed. `b9ab-lam0-seed2` screened zero checkpoints.
 
 | arm | λ | rows | ≥98%/500 | ≥98.5 | best row | best30 @step | sef | drawdown < 50% |
@@ -130,6 +130,38 @@ candidates at ≥98.5/500, ~660 at ≥99/500.
 | `b9cj-lam100-seed2` | 1.00 | 1,293 | 32.7% | 161 | 99.8 | 98.5 @42.7M | 87.8 | 2.1% |
 | `b9ck-lam100-seed3` | 1.00 | 1,453 | 29.6% | 171 | 99.6 | 98.4 @24.8M | 89.3 | 1.3% |
 | `b9cl-lam100-seed4` | 1.00 | 1,285 | 30.8% | 141 | 99.6 | 98.3 @33.6M | 88.2 | 2.1% |
+
+
+### b9 at 5,000 episodes — the laptop `hof5000` pass, 2026-09-02
+
+Every b9 checkpoint at **≥99%** on its 500-episode close-out (the cut was raised from 98.5 the same day),
+re-measured at 5,000 episodes: **727 rows from 36 arms, 3.64M episodes, 76.5 min on the laptop, 8
+shards, exit 0.** Merged rows equal the ≥99/500 count on every arm. Groups below λ 0.90 had no
+candidate; b7's `fc 320` pass (λ 0.98, 174 rows at the old 98.5 cut) is the reference row:
+
+| λ | rows | mean | ≥98 | ≥98.73 | ≥99 | best | 500 → 5,000 |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.90-0.95 | 20 | 97.68 | 35.0% | 1 | 0 | 98.90 | −1.44 |
+| 0.96 | 17 | 97.91 | 52.9% | 0 | 0 | 98.60 | −1.21 |
+| 0.97 | 36 | 97.92 | 55.6% | 0 | 0 | 98.60 | −1.21 |
+| 0.98 (b7, cut 98.5) | 174 | 97.86 | 43.1% | 2 | 0 | 98.90 | −0.94 |
+| **0.99** | 138 | 98.21 | **80.4%** | 10 | 3 | 99.10 | −0.93 |
+| 0.995 | 153 | 98.24 | 76.5% | 18 | 7 | 99.20 | −0.94 |
+| **0.999** | 176 | **98.27** | 72.7% | **31** | **16** | **99.40** | −0.90 |
+| 1.00 | 187 | 98.23 | 72.2% | 17 | 7 | 99.20 | −0.93 |
+| **pooled** | **727** | **98.20** | **72.5%** | **77** | **33** | **99.40** | **−0.96** |
+
+**The plateau holds at depth, and this is the first batch with a real hall-of-fame candidate.** b7's
+whole pass produced 6 rows at or above the snek2 champion's 98.73; b9's four plateau groups produce
+**76**, and 33 rows are at ≥99 where b7 and b8 had none. The 500 → 5,000 regression is the usual
+−0.9 pp, so the 500-episode numbers were not flattering these arms more than earlier batches.
+
+**`b9ch-lam999-seed4` is the candidate.** Its checkpoints at 47.25M, 47.27M and 47.35M measure
+**99.40 [99.1, 99.5]**, 99.30 and 99.30 at 5,000, and the arm's 27 measured neighbours within ±1M
+average **98.70** — against 99.20 own and 98.54 basin for `b5h @9027584`, the current record at
+98.96 /30,000. The three 100/500 rows came back 99.2, 98.6 and 98.4, which is what a selected high
+does. Promotion is [`hof-promote`](../skills/hof-promote/SKILL.md): a fresh 30,000-episode
+measurement at seed 7, not yet run.
 
 ## Batch b8 — the stability knobs, 4 knobs x 4 seeds, closed 2026-09-01
 
