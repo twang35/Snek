@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-02T17:45:35",
-  "ts": 1788396335.0888574,
+  "iso": "2026-09-02T17:53:30",
+  "ts": 1788396810.393141,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g85, seed 1 of 4 -- wave 2 of 8 | training 45% (8 arms)"
+      "b10 | b10: g85, seed 1 of 4 -- wave 2 of 8 | training 52% (8 arms)"
     ],
     "queued": [
       "b10 stage B | b10: g85, seed 1 of 4 -- wave 2 of 8 | queued (8 arms)",
@@ -48,10 +48,10 @@
         "b10aa-g70-seed1"
       ],
       "pid": 3995364,
-      "step": 25083904,
+      "step": 28934144,
       "max_steps": 50003968,
-      "steps_per_sec": 6222.7,
-      "elapsed_s": 3444
+      "steps_per_sec": 4797.6,
+      "elapsed_s": 3919
     },
     {
       "id": "b10ab-g70-seed2",
@@ -61,10 +61,10 @@
         "b10ab-g70-seed2"
       ],
       "pid": 3995365,
-      "step": 24461312,
+      "step": 27951104,
       "max_steps": 50003968,
-      "steps_per_sec": 6741.3,
-      "elapsed_s": 3444
+      "steps_per_sec": 4797.3,
+      "elapsed_s": 3919
     },
     {
       "id": "b10ac-g70-seed3",
@@ -74,10 +74,10 @@
         "b10ac-g70-seed3"
       ],
       "pid": 3995366,
-      "step": 23822336,
+      "step": 27410432,
       "max_steps": 50003968,
-      "steps_per_sec": 7778.2,
-      "elapsed_s": 3444
+      "steps_per_sec": 1199.2,
+      "elapsed_s": 3919
     },
     {
       "id": "b10ad-g70-seed4",
@@ -87,10 +87,10 @@
         "b10ad-g70-seed4"
       ],
       "pid": 3995367,
-      "step": 24084480,
+      "step": 27590656,
       "max_steps": 50003968,
-      "steps_per_sec": 5704.0,
-      "elapsed_s": 3444
+      "steps_per_sec": 2398.2,
+      "elapsed_s": 3919
     },
     {
       "id": "b10ae-g80-seed1",
@@ -100,10 +100,10 @@
         "b10ae-g80-seed1"
       ],
       "pid": 3995368,
-      "step": 20791296,
+      "step": 23805952,
       "max_steps": 50003968,
-      "steps_per_sec": 5185.3,
-      "elapsed_s": 3444
+      "steps_per_sec": 1199.0,
+      "elapsed_s": 3919
     },
     {
       "id": "b10af-g80-seed2",
@@ -113,10 +113,10 @@
         "b10af-g80-seed2"
       ],
       "pid": 3995369,
-      "step": 21331968,
+      "step": 24428544,
       "max_steps": 50003968,
-      "steps_per_sec": 6222.4,
-      "elapsed_s": 3444
+      "steps_per_sec": 2397.8,
+      "elapsed_s": 3919
     },
     {
       "id": "b10ag-g80-seed3",
@@ -126,10 +126,10 @@
         "b10ag-g80-seed3"
       ],
       "pid": 3995370,
-      "step": 20807680,
+      "step": 23756800,
       "max_steps": 50003968,
-      "steps_per_sec": 5185.2,
-      "elapsed_s": 3444
+      "steps_per_sec": 7192.9,
+      "elapsed_s": 3919
     },
     {
       "id": "b10ah-g80-seed4",
@@ -139,10 +139,10 @@
         "b10ah-g80-seed4"
       ],
       "pid": 3995371,
-      "step": 20758528,
+      "step": 23724032,
       "max_steps": 50003968,
-      "steps_per_sec": 4666.6,
-      "elapsed_s": 3444
+      "steps_per_sec": 5993.6,
+      "elapsed_s": 3919
     }
   ],
   "ledger": {
@@ -572,8 +572,8 @@
   },
   "disk_free_gb": 156.6,
   "load_avg": [
-    14.12109375,
-    14.3916015625,
-    14.35205078125
+    13.98095703125,
+    14.39111328125,
+    14.412109375
   ]
 }
