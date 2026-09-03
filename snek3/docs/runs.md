@@ -6,40 +6,42 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
-**b9 closed on the desktop at 2026-09-02 16:48 — all 64 arms trained and all eight stage-B waves
-done — and b10, the γ sweep, is on wave 1 of 8.** At 17:53 its eight arms (γ 0.70 and γ 0.80 x seeds
-1-4, `b10aa`-`b10ah`) were 47-58% through 50M, 65 min in, so wave 1 lands about 18:45 and its stage B
-follows automatically. b9's eight waves took ~19 h end to end, so b10 closes around midday
-2026-09-03. Behind it: b11 (lr 4e-5, 32+8), b12 (1 epoch, 40+8), b13 (minibatch 32, 32+8), b14
-(rollout 32, 24+8). Ledger: 225 done, 189 queued, 8 running, `attention` empty, 157 GB free, load 14.
-**Nothing is running on the laptop.**
+**b10 — the γ sweep — is on the desktop, wave 4 of 8, and the laptop is idle.** At 2026-09-03 01:20
+the eight γ 0.93 and γ 0.94 arms (`b10ay`-`b10bf`) were 39-44% through 50M, 59 min in, so wave 4 lands
+around 02:40 and its stage B follows automatically; waves 5-8 (γ 0.95, 0.96, 0.97, 0.98, 0.995, 0.9975,
+0.999, 1.00) are queued behind it, then b11-b14 at their re-based λ 0.99. b10 should close mid-afternoon
+2026-09-03. Ledger: 252 done, 164 queued, 8 running, `attention` empty, 153 GB free, load 14. The
+laptop's only process is the stage-B chart window left from b9's `hof5000` pass, which is free to close.
 
-**b9's answer: PPO's λ 0.98 default was not the top of the curve.** Record density (≥98%/500 stage-B
-rows) climbs monotonically through the whole sweep, **17.3% at λ 0.98 → 27.3% at λ 0.99**, then sits
-on a plateau — 27.3, 27.3, 25.6, 29.5% across 0.99, 0.995, 0.999 and 1.00, indistinguishable at four
-seeds. Every seed of λ 0.99 beats every seed of λ 0.98 (24.1-31.4 against 15.1-19.0, Mann-Whitney
-p=0.029, the floor). Three stage-B rows scored **100/500** — two adjacent `b9ch-lam999-seed4`
-checkpoints at 47.2-47.3M and `b9bw-lam99-seed1` at 48.4M — the first perfect 500s this project has
-measured. Full table and reading under *Just closed: b9* below.
+**b9's `hof5000` pass is closed and documented** (below, and in [`results.md`](results.md)): 727 rows,
+exit 0, **77 at ≥98.73 and 33 at ≥99**, and `b9ch-lam999-seed4 @47251456` at **99.40 /5,000** with a
+98.70 basin is the promotion candidate — [`hof-promote`](../skills/hof-promote/SKILL.md) is the next
+step and has not been run.
 
-**Both decisions were taken the same evening (user, 2026-09-02 ~19:00):**
+**b10's first three waves say the discount is not a knob with a broad top — below ~0.95 the endgame
+is out of reach at 50M.** Six γ values, 24 arms, stage B closed on all of them, and **not one
+checkpoint passed the stage-A screen**: zero stage-B rows across the whole set. b7aa-b7ad (γ 0.99) are
+the reference:
 
-1. **The `hof5000` pass on b9 ran on the laptop, 19:12-20:29** — 36 arms, the 727 checkpoints at
-   ≥99/500 (the cut was raised from 98.5 to 99 in the same decision), 8 shards, exit 0. **77 rows at
-   ≥98.73 and 33 at ≥99, against 6 and 0 for all of b7.** `b9ch-lam999-seed4 @47251456` measures
-   **99.40 [99.1, 99.5]** with a 27-neighbour basin at 98.70 — a stronger candidate on both numbers
-   than `b5h` was when it was promoted (99.20 own, 98.54 basin, confirmed 98.96 /30,000). **Next:
-   `hof-promote` on it**, a 30,000-episode confirm at seed 7. Table in [`results.md`](results.md).
-2. **λ 0.99 is the new default** (`ppo/algo.py`, commit `6b5f8390e`, deployed to the box) **and b11-b14's
-   128 specs were re-based to it on `ops`** before any of them started. b10 runs at 0.98 as queued: γ and
-   λ set the GAE horizon together (1/(1−γλ)), so it stays a clean one-knob sweep off b7's cell, and its
-   winner is read against b7aa-b7ad. Rationale for 0.99 over 1.00: the plateau's density within noise,
-   the tightest seed spread of any group (98.3-98.4), a third of λ 1.0's drawdown.
+| γ | value horizon 1/(1−γ) | best30 | range | sef | drawdown < 50% | stage-B rows |
+|---:|---:|---:|---|---:|---:|---:|
+| 0.70 | 3.3 | 3.95 | 2.7-5.2 | 0.0 | never competent | 0 |
+| 0.80 | 5 | 40.27 | 24.4-49.7 | 0.0 | never competent | 0 |
+| 0.85 | 6.7 | 66.47 | 64.1-68.0 | 0.0 | 54.4% (2 of 4 reached 80%) | 0 |
+| 0.90 | 10 | 79.55 | 75.8-81.6 | 3.6 | 38.7% | 0 |
+| 0.91 | 11.1 | 81.90 | 77.5-85.5 | 5.8 | 26.5% | 0 |
+| 0.92 | 12.5 | 84.75 | 83.1-86.6 | 12.1 | 18.4% | 0 |
+| 0.93 / 0.94 (live, 21M) | 14.3 / 16.7 | 81.2-87.7 / 85.5-88.7 | | 4-27 | | — |
+| **0.99** (b7) | 100 | **97.75** | 97.7-97.8 | 90.9 | 0.29% | 4,003 |
 
-**‡ Two things to know about the daemon's read.** The glance line labels the running b10 wave
-"g85, wave 2 of 8" while the ledger's eight running arms are the g70/g80 cell, wave 1 — a labelling
-quirk, not a dispatch problem. And `p0q-ep8-long` still reads `failed` from the retired `p`-prefix
-era; `attention` is empty.
+**‡ γ and λ are not interchangeable, even at the same GAE horizon.** b9's λ 0.90 at γ 0.99 has an
+advantage horizon 1/(1−γλ) of 9.2 steps and reached best30 96.75 with 3.9% record density; b10's
+γ 0.92 at λ 0.98 has a horizon of 10.2 and reaches 84.75 with none. The advantage estimator's horizon
+is not what a short γ costs — the *value target* is discounted too, and a critic that cannot see the
++100 ten steps ahead cannot value the endgame. The spec's prediction for γ 0.80 ("fast early, then an
+endgame ceiling below perfect") is right; "same shape as 0.8, milder" for γ 0.90 understated it — the
+ceiling is still 20 points below perfect at 10 steps. Where the curve reaches the base is what waves
+5-8 measure; the queued γ 0.995-1.00 cells are the ones that could beat it.
 
 ## Just closed: b9 — λ 0.99+ doubles the record density, and the top is a plateau
 
@@ -138,6 +140,43 @@ numbers in [`results.md`](results.md), the reading and the two retractions in
 **It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
 layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
 right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
+
+## b9 just closed, as it read at 2026-09-02 17:53 (superseded)
+
+**b9 closed on the desktop at 2026-09-02 16:48 — all 64 arms trained and all eight stage-B waves
+done — and b10, the γ sweep, is on wave 1 of 8.** At 17:53 its eight arms (γ 0.70 and γ 0.80 x seeds
+1-4, `b10aa`-`b10ah`) were 47-58% through 50M, 65 min in, so wave 1 lands about 18:45 and its stage B
+follows automatically. b9's eight waves took ~19 h end to end, so b10 closes around midday
+2026-09-03. Behind it: b11 (lr 4e-5, 32+8), b12 (1 epoch, 40+8), b13 (minibatch 32, 32+8), b14
+(rollout 32, 24+8). Ledger: 225 done, 189 queued, 8 running, `attention` empty, 157 GB free, load 14.
+**Nothing is running on the laptop.**
+
+**b9's answer: PPO's λ 0.98 default was not the top of the curve.** Record density (≥98%/500 stage-B
+rows) climbs monotonically through the whole sweep, **17.3% at λ 0.98 → 27.3% at λ 0.99**, then sits
+on a plateau — 27.3, 27.3, 25.6, 29.5% across 0.99, 0.995, 0.999 and 1.00, indistinguishable at four
+seeds. Every seed of λ 0.99 beats every seed of λ 0.98 (24.1-31.4 against 15.1-19.0, Mann-Whitney
+p=0.029, the floor). Three stage-B rows scored **100/500** — two adjacent `b9ch-lam999-seed4`
+checkpoints at 47.2-47.3M and `b9bw-lam99-seed1` at 48.4M — the first perfect 500s this project has
+measured. Full table and reading under *Just closed: b9* below.
+
+**Both decisions were taken the same evening (user, 2026-09-02 ~19:00):**
+
+1. **The `hof5000` pass on b9 ran on the laptop, 19:12-20:29** — 36 arms, the 727 checkpoints at
+   ≥99/500 (the cut was raised from 98.5 to 99 in the same decision), 8 shards, exit 0. **77 rows at
+   ≥98.73 and 33 at ≥99, against 6 and 0 for all of b7.** `b9ch-lam999-seed4 @47251456` measures
+   **99.40 [99.1, 99.5]** with a 27-neighbour basin at 98.70 — a stronger candidate on both numbers
+   than `b5h` was when it was promoted (99.20 own, 98.54 basin, confirmed 98.96 /30,000). **Next:
+   `hof-promote` on it**, a 30,000-episode confirm at seed 7. Table in [`results.md`](results.md).
+2. **λ 0.99 is the new default** (`ppo/algo.py`, commit `6b5f8390e`, deployed to the box) **and b11-b14's
+   128 specs were re-based to it on `ops`** before any of them started. b10 runs at 0.98 as queued: γ and
+   λ set the GAE horizon together (1/(1−γλ)), so it stays a clean one-knob sweep off b7's cell, and its
+   winner is read against b7aa-b7ad. Rationale for 0.99 over 1.00: the plateau's density within noise,
+   the tightest seed spread of any group (98.3-98.4), a third of λ 1.0's drawdown.
+
+**‡ Two things to know about the daemon's read.** The glance line labels the running b10 wave
+"g85, wave 2 of 8" while the ledger's eight running arms are the g70/g80 cell, wave 1 — a labelling
+quirk, not a dispatch problem. And `p0q-ep8-long` still reads `failed` from the retired `p`-prefix
+era; `attention` is empty.
 
 ## b9 at wave 5, as it read at 2026-09-02 08:38 (superseded)
 

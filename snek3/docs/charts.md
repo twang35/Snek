@@ -1,8 +1,9 @@
 # Charts — one graph per arm
 
-**Batch b9 — the λ sweep — closed on the desktop 2026-09-02**, all 64 arms with stage B complete, 127
-panels below. **Batch b10, the γ sweep, is training there now**; its charts arrive at close-out.
-**Batch b8 closed 2026-09-01**, all sixteen arms with stage B complete, charts below.
+**Batch b10 — the γ sweep — is on the desktop, wave 4 of 8 at 2026-09-03 01:20**; its 32 charts so far
+are below, the live wave's pulled from the box. **Batch b9 — the λ sweep — closed 2026-09-02**, all 64
+arms with stage B complete, 127 panels below. **Batch b8 closed 2026-09-01**, all sixteen arms with
+stage B complete, charts below.
 The window to watch the box live is below.
 
 **Batch b7 closed all four waves 2026-09-01** — 32 arms, 8 layouts x 4 seeds, charts imported from the
@@ -24,6 +25,82 @@ put it back
 after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closing it and relaunching
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).
+
+## Batch b10 — the γ sweep off b7's `fc (320,)`, 4 seeds each, 50M
+
+**In flight**: waves 1-3 (γ 0.70, 0.80, 0.85, 0.90, 0.91, 0.92) trained and stage B closed, wave 4
+(γ 0.93, 0.94) training, waves 5-8 queued. b10 changes **only** `discount` off b7's winning cell — λ
+stays at 0.98, so **b7aa-b7ad below are this sweep's γ 0.99 arms.** No γ ≤ 0.92 produced a single
+stage-B row: nothing passed the stage-A screen, so those groups have no stage-B panel and never will.
+
+| γ | best30 | sef | stage-B rows | | γ | best30 | sef | stage-B rows |
+|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 0.70 | 3.95 | 0.0 | 0 | | 0.91 | 81.90 | 5.8 | 0 |
+| 0.80 | 40.27 | 0.0 | 0 | | 0.92 | 84.75 | 12.1 | 0 |
+| 0.85 | 66.47 | 0.0 | 0 | | 0.93, 0.94 | live | | |
+| 0.90 | 79.55 | 3.6 | 0 | | **0.99** (b7) | **97.75** | 90.9 | 4,003 |
+
+**What to look at.** Walk γ 0.70 → 0.80 → 0.85 → 0.90 in order: the average-score trace (blue) climbs
+in steps while the perfect-game trace (red) stays on the floor until 0.85 and then starts a noisy climb
+that never reaches the screen. Then put γ 0.92 next to b7's γ 0.99: same λ, same network, 13 points of
+best30 apart. The live γ 0.93/0.94 panels are snapshots from the box at ~21M.
+
+
+**γ 0.70** — `b10aa`-`b10ad`:
+
+![b10aa-g70-seed1](../runs/b10aa-g70-seed1.png)
+![b10ab-g70-seed2](../runs/b10ab-g70-seed2.png)
+![b10ac-g70-seed3](../runs/b10ac-g70-seed3.png)
+![b10ad-g70-seed4](../runs/b10ad-g70-seed4.png)
+
+**γ 0.80** — `b10ae`-`b10ah`:
+
+![b10ae-g80-seed1](../runs/b10ae-g80-seed1.png)
+![b10af-g80-seed2](../runs/b10af-g80-seed2.png)
+![b10ag-g80-seed3](../runs/b10ag-g80-seed3.png)
+![b10ah-g80-seed4](../runs/b10ah-g80-seed4.png)
+
+**γ 0.85** — `b10ai`-`b10al`:
+
+![b10ai-g85-seed1](../runs/b10ai-g85-seed1.png)
+![b10aj-g85-seed2](../runs/b10aj-g85-seed2.png)
+![b10ak-g85-seed3](../runs/b10ak-g85-seed3.png)
+![b10al-g85-seed4](../runs/b10al-g85-seed4.png)
+
+**γ 0.90** — `b10am`-`b10ap`:
+
+![b10am-g90-seed1](../runs/b10am-g90-seed1.png)
+![b10an-g90-seed2](../runs/b10an-g90-seed2.png)
+![b10ao-g90-seed3](../runs/b10ao-g90-seed3.png)
+![b10ap-g90-seed4](../runs/b10ap-g90-seed4.png)
+
+**γ 0.91** — `b10aq`-`b10at`:
+
+![b10aq-g91-seed1](../runs/b10aq-g91-seed1.png)
+![b10ar-g91-seed2](../runs/b10ar-g91-seed2.png)
+![b10as-g91-seed3](../runs/b10as-g91-seed3.png)
+![b10at-g91-seed4](../runs/b10at-g91-seed4.png)
+
+**γ 0.92** — `b10au`-`b10ax`:
+
+![b10au-g92-seed1](../runs/b10au-g92-seed1.png)
+![b10av-g92-seed2](../runs/b10av-g92-seed2.png)
+![b10aw-g92-seed3](../runs/b10aw-g92-seed3.png)
+![b10ax-g92-seed4](../runs/b10ax-g92-seed4.png)
+
+**γ 0.93** — `b10ay`-`b10bb`:
+
+![b10ay-g93-seed1](../runs/b10ay-g93-seed1.png)
+![b10az-g93-seed2](../runs/b10az-g93-seed2.png)
+![b10ba-g93-seed3](../runs/b10ba-g93-seed3.png)
+![b10bb-g93-seed4](../runs/b10bb-g93-seed4.png)
+
+**γ 0.94** — `b10bc`-`b10bf`:
+
+![b10bc-g94-seed1](../runs/b10bc-g94-seed1.png)
+![b10bd-g94-seed2](../runs/b10bd-g94-seed2.png)
+![b10be-g94-seed3](../runs/b10be-g94-seed3.png)
+![b10bf-g94-seed4](../runs/b10bf-g94-seed4.png)
 
 ## Batch b9 — the λ sweep off b7's `fc (320,)`, 4 seeds each, 50M
 
