@@ -193,29 +193,29 @@ of 2026-08-28**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.m
 | queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
 
-**Never commit a *live* desktop arm's `runs/<policy>.{md,png}` or `runs/<policy>_evals.json`.** The box
-rewrites those paths on every eval, so a committed copy makes its `git merge --ff-only` abort as
-"untracked working tree files would be overwritten" — and unlike the harmless version of that
-collision the copies always differ, so it comes back after every fix and blocks every deploy for the
-hours the arm runs. Desktop artifacts arrive on the `results` branch at close-out; that is what it is
-for. A laptop arm's own files are fine.
-
-**A *finished* desktop batch's artifacts collide too — once — and that is worth expecting rather than
-being surprised by.** Importing a closed batch from the `results` branch and committing it is the
-right thing to do (it is how `charts.md` gets its links), but the box still holds its own untracked
-originals of those exact paths, so the next deploy aborts. Measured 2026-09-01 on b7: 96 files.
-**Resolve it by identity, not by deletion.** The box's copies came from the same close-out, so:
+**Every progress update commits every arm's `runs/<policy>.png` and `.md`, live desktop arms included**
+(rule changed 2026-09-02; before that live arms' charts were never committed). Those two files are
+pictures of the JSON, redrawn on every eval, so a committed copy is simply a snapshot that the next
+update overwrites — and it is what the GitHub-Pages chart viewer at `snek3/viewer/` shows, so a live
+batch is visible there between close-outs. A live desktop arm's charts are pulled from the box first:
 
 ```
-git ls-tree -r <commit> --format='%(objectname) %(path)' -- snek3/runs | grep <batch>   # laptop
-# on the box: compare each with `git hash-object <path>`, then, if every one matches,
-cut -d' ' -f2- /tmp/blobs.txt | tr '\n' '\0' | xargs -0 git add --
-git merge --ff-only origin/master
+rsync -a --include='<batch>*.png' --include='<batch>*.md' --exclude='*' the-claw-den:Snek/snek3/runs/ snek3/runs/
 ```
 
-Staging them at the hash the incoming commit already carries leaves the merge nothing to overwrite,
-and the index comes out clean because the new `HEAD` holds those same blobs. If any file *differs*,
-that is the live-arm case above and the difference is the thing to look at before touching it.
+**The JSON is the opposite: never commit a *live* desktop arm's `runs/<policy>_evals.json` or
+`_checkpoint_evals.*`.** `_evals.json` is single-writer (the trainer) and is what the arm's chart and
+report are rebuilt from across restarts; the stage-B file is a pass in progress. They arrive on the
+`results` branch at close-out, and only then are they committed here. A laptop arm's own files are fine.
+
+**The box's deploy expects the collision this creates and settles it by what each file is.** A
+committed chart the box also holds untracked would abort `git merge --ff-only` as "untracked working
+tree files would be overwritten", so `snek3/desktop/deploy` runs on the box before the merge: it
+deletes its own copies of colliding `.png`/`.md` (the next eval redraws them), stages any other
+colliding file whose bytes match the incoming blob (a closed batch imported from `results`), and
+**stops with exit 3, touching nothing, if any JSON differs** — that is a live arm's file committed by
+mistake, and the fix is `git rm --cached` on master, never overwriting the box. The `desktop-deploy`
+skill has the procedure.
 
 **One implementation for both boxes, wherever the behaviour wanted is the same.** The two hosts
 differ in what they *have* — cores, a monitor, a queue — and almost never in what the code should

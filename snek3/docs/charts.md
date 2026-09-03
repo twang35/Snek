@@ -10,9 +10,10 @@ The window to watch the box live is below.
 2026-09-01.
 
 **Batches b5 and b6 closed 2026-08-30** — eight seeds each, stage B complete on both, charts below.
-**Batch b2 closed 2026-08-29.** A live desktop arm's `runs/` files must still never be committed from
-here: the box rewrites those paths every eval and a committed copy aborts its next ff-merge. b5's
-charts came across the `results` branch at close-out, which is what that branch is for.
+**Batch b2 closed 2026-08-29.** Every arm's chart is committed here on every progress update, live
+desktop arms included (rule changed 2026-09-02; the box's `desktop/deploy` redraws over them), and the
+same PNGs are what the GitHub-Pages viewer at [`../viewer/index.html`](../viewer/index.html) pages
+through, 8 at a time. Only a live arm's JSON waits for the `results` branch at close-out.
 
 ## Watching them live
 

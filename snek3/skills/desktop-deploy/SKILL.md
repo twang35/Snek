@@ -11,52 +11,39 @@ The box runs from `~/Snek` on `master`. ssh to it needs no separate approval.
 ## The deploy
 
 ```
-ssh the-claw-den 'cd ~/Snek && git fetch origin && git merge --ff-only origin/master'
-ssh the-claw-den 'sudo systemctl restart snek3-runner'
+ssh the-claw-den 'Snek/snek3/desktop/deploy'            # fetch, settle runs/ collisions, ff-merge
+ssh the-claw-den 'sudo systemctl restart snek3-runner'   # only if desktop/runner/* changed — see below
 ```
 
-**Read the merge output in full. Never pipe it to `tail`** — that hides the failure, and there is one
-failure mode that happens often:
+**Read the output in full. Never pipe it to `tail`** — that hides the failure and its exit code. The
+script prints every colliding file with what it did to it, then `HEAD <old> -> <new>`. Exit codes:
 
-> `error: Untracked working tree files would be overwritten by merge`
+| exit | meaning | what to do |
+|---:|---|---|
+| 0 | merged; HEAD moved | done, restart if the daemon's code changed |
+| 3 | **a colliding JSON differs from the commit; nothing was touched** | a live arm's `_evals.json` or `_checkpoint_evals.*` got committed from the laptop. `git rm --cached` those paths on master in their own commit, push, run `deploy` again. Never overwrite the box's copy |
+| 4 | the fast-forward itself failed | local commits on the box, or a diverged master — read the git output |
 
-**Untracked run artifacts on the box abort the fast-forward.** A live arm rewrites
-`runs/<policy>.{md,png}` and `runs/<policy>_evals.json` on every eval, so a committed copy of those
-paths collides forever and blocks every deploy for the hours the arm runs. The fix is at the source:
-**never commit a live desktop arm's run artifacts** from the laptop. Desktop artifacts arrive on the
-`results` branch at close-out; that is what it is for.
+**Why collisions are the normal case, not a mistake.** Since 2026-09-02 every progress update commits
+the charts of every arm, including the ones the box is still training, so the box always holds
+untracked `runs/*.png` and `.md` that master also carries, and a bare `git merge --ff-only` would abort
+on every one of them. `deploy` settles each colliding file by what it is: pictures are deleted (the
+next eval redraws them, and a finished arm's committed copy is the same picture), any other file whose
+bytes match the incoming blob is staged at that hash (a closed batch imported from `results`), and a
+differing JSON stops the run. `--dry-run` prints the plan without doing it.
 
-**Sort the colliding files by identity, not by name.** Get the hashes the incoming commit carries,
-compare each with the box's own copy, and let the comparison decide:
-
-```
-# laptop: the blob hashes the commit carries
-git ls-tree -r origin/master --format='%(objectname) %(path)' -- snek3/runs | grep <batch> > blobs.txt
-scp blobs.txt the-claw-den:/tmp/blobs.txt
-# box: which ones differ?
-ssh the-claw-den 'cd ~/Snek && while read -r h p; do [ "$(git hash-object "$p")" = "$h" ] \
-    || echo "DIFFERS: $p"; done < /tmp/blobs.txt; echo checked'
-```
-
-| the box's copy | what it means | what to do |
-|---|---|---|
-| **identical** | a closed batch imported from `results` and committed — the box holds the same bytes as untracked originals. 96 files on b7, 56 on b8 | stage them on the box at that hash; the merge then has nothing to overwrite and the index ends clean |
-| **differs, and the arm or its stage B is still running** | a live arm's `_evals.json` or `_checkpoint_evals.json` got committed — usually by a progress update that swept `runs/` into a charts commit. b8, 2026-09-01: 8 stage-B files mid-pass | **untrack them on master**: `git rm --cached` those paths in their own commit, push, then merge. The laptop keeps its copies as untracked files, and the box's live copies are never touched. Do not wait for the pass to finish — the next eval changes them again |
-| **differs, and the batch is closed** | the two copies really are different measurements | stop and look at the difference before touching either; this has not happened yet |
+**Until `desktop/deploy` is on the box, the first deploy that carries it is done by hand** — the same
+three moves, typed:
 
 ```
-# box: stage the identical ones and merge. The grep drops whatever DIFFERS listed.
-ssh the-claw-den 'cd ~/Snek && grep -v -e <differing-name-1> -e <differing-name-2> /tmp/blobs.txt \
-    | cut -d" " -f2- | tr "\n" "\0" | xargs -0 git add -- && git merge --ff-only origin/master'
+ssh the-claw-den 'cd ~/Snek && git fetch origin master && git ls-files --others --exclude-standard -- snek3/runs \
+  | while read f; do git cat-file -e origin/master:"$f" 2>/dev/null && case "$f" in *.png|*.md) rm -- "$f";; esac; done; \
+  git merge --ff-only origin/master && git rev-parse --short HEAD'
 ```
 
-Both branches of that table follow from one rule in the root `CLAUDE.md`: **a live desktop arm's
-artifacts are never committed from the laptop**; they arrive on `results` at close-out. A charts
-commit made while a batch's stage B is running is where this goes wrong, so a progress update that
-commits `runs/` should `git add` the `.png` and `.md` by name and leave every `*_evals.json` and
-`*_checkpoint_evals.*` of a batch the box is still measuring. Deleting the box's copies also works and
-is what this skill used to say, but it discards without checking, and for a finished batch nothing
-regenerates them.
+If that still aborts, the leftover collisions are JSON: compare each with `git hash-object` against
+`git ls-tree -r origin/master`, `git add` the identical ones on the box, and treat any that differ as
+the exit-3 case above.
 
 ## Restart only when the daemon's own code changed
 

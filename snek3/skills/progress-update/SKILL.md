@@ -74,17 +74,23 @@ A **docs-only** change (Markdown, plus any chart PNGs riding along) is committed
 confirmation — standing authorization. The moment the same change touches code or config, the whole
 thing waits for the user.
 
-**Never commit a live desktop arm's `runs/<policy>.{md,png}` or `runs/<policy>_evals.json`.** The box
-rewrites those paths every eval, so a committed copy makes its `git merge --ff-only` abort and blocks
-every deploy for hours. Desktop artifacts arrive on the `results` branch at close-out.
-
-**"Live" includes a batch whose stage B is still running**, and it bit on 2026-09-01: b8's charts
-commit swept `runs/b8*` in wholesale while the box was mid-pass, and the next deploy aborted on 64
-files, 8 of them changing under it. So `git add` a desktop batch's charts **by name**:
+**Commit every arm's charts, live desktop arms included** (rule changed 2026-09-02). A live desktop
+batch's `.png`/`.md` exist only on the box until close-out, so pull them first, then refresh the
+viewer's manifest, then add the pictures by name:
 
 ```
-git add snek3/runs/b<n>*.png snek3/runs/b<n>*.md      # never the _evals.json or _checkpoint_evals.*
+rsync -a --include='b<n>*.png' --include='b<n>*.md' --exclude='*' the-claw-den:Snek/snek3/runs/ snek3/runs/
+cd snek3 && PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.viewer_manifest && cd ..
+git add snek3/runs/b<n>*.png snek3/runs/b<n>*.md snek3/viewer/manifest.js
 ```
 
-and add the `*_evals.json` / `*_checkpoint_evals.*` only once the batch's stage B reads `done` on the
-ledger. If it has already happened, the `desktop-deploy` skill says how to sort the collision out.
+`rsync` is home-LAN only; off-LAN, say the live charts were not refreshed and commit the rest. The
+GitHub-Pages viewer (`snek3/viewer/index.html`) reads `manifest.js` and the committed PNGs, so this
+step is what refreshes it — a batch with no manifest row is as much a bug as one with no `charts.md`
+entry.
+
+**Never commit a live desktop arm's `*_evals.json` or `*_checkpoint_evals.*`.** `_evals.json` is the
+trainer's own history, read on resume; the stage-B file is a pass in progress. Add them only once the
+batch's stage B reads `done` on the ledger, when they have arrived on the `results` branch. The box's
+`desktop/deploy` deletes and redraws colliding pictures but refuses to merge over a differing JSON, so
+committing one blocks every deploy until it is `git rm --cached` on master.

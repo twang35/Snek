@@ -32,6 +32,7 @@ reason.
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
 | `docs/` | the investigation | | |
+| `viewer/` | the static chart viewer GitHub Pages serves from the repo — `index.html` plus the `manifest.js` that `tools/viewer_manifest.py` writes. No server, no build | | |
 | `plans/` | designs | | |
 | `tests/` | | | |
 
@@ -222,6 +223,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/progress_chart.py` | `runs/<policy>.png` — one arm's stage-A history |
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
 | `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them, never writes and never trains |
+| `tools/viewer_manifest.py` | `viewer/manifest.js`: every arm reduced to the docs tables' numbers, for the web viewer. Re-run at every progress update |
 | `tools/chart_window.py` | the box's window launcher: who opens one, and why killing it is free |
 | `tools/eval_window.py` | the stage-B window — the same viewer and the same launcher, its own slot |
 | `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm |
