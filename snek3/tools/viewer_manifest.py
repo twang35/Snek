@@ -14,6 +14,7 @@ the page and the tables cannot disagree:
 | `sef` | `summary.strong_eval_fraction`, share of stage-A evals at >=80% perfect |
 | `rows`, `density98`, `cands99`, `best_row` | stage-B row count, share at >=98/500, `hof5000` candidates at >=99, max |
 | `drawdown50`, `drawdown80` | share of post-competence stage-A evals (onset = first >=80%) below 50 / 80 |
+| `hof_rows`, `hof_mean`, `hof_best`, `hof_9873` | the `hof5000` pass: rows, mean, max, count at >=98.73 (the snek2 champion) |
 
 The output is JavaScript rather than JSON — `window.SNEK_MANIFEST = {...}` — because a `<script src>`
 loads from `file://` and `fetch()` does not, and the page has to work opened from disk as well as from
@@ -73,7 +74,8 @@ def arm_record(policy, runs_dir):
         return None
     record = {'policy': policy, 'batch': batch_of(policy), 'knob': knob_of(policy),
               'seed': seed_of(policy),
-              'stage_b_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals.png'))}
+              'stage_b_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals.png')),
+              'hof_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.png'))}
     stage_a = _read(os.path.join(runs_dir, policy + '_evals.json')) or {}
     summary = stage_a.get('summary') or {}
     best30 = summary.get('best_perfect30') or {}
@@ -93,6 +95,14 @@ def arm_record(policy, runs_dir):
         'density98': round(100.0 * sum(s >= 98 for s in scores) / len(scores), 1) if scores else None,
         'cands99': sum(s >= 99 for s in scores) if scores else None,
         'best_row': max(scores) if scores else None,
+    })
+    hof = _read(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.json'))
+    hof_scores = [r.get('perfect_percent', 0) for r in ((hof or {}).get('rows') or [])]
+    record.update({
+        'hof_rows': len(hof_scores) if hof is not None else None,
+        'hof_mean': round(sum(hof_scores) / len(hof_scores), 2) if hof_scores else None,
+        'hof_best': max(hof_scores) if hof_scores else None,
+        'hof_9873': sum(s >= 98.73 for s in hof_scores) if hof_scores else None,
     })
     return record
 
