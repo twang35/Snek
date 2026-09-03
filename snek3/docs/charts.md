@@ -1,8 +1,8 @@
 # Charts — one graph per arm
 
-**Batch b9 — the λ sweep — is on the desktop, 40 of 64 arms trained as of 2026-09-02 08:38.** Its
-stage-A charts are below; stage-B panels follow at close-out, because the box is still writing that
-path for wave 5. **Batch b8 closed 2026-09-01**, all sixteen arms with stage B complete, charts below.
+**Batch b9 — the λ sweep — closed on the desktop 2026-09-02**, all 64 arms with stage B complete, 127
+panels below. **Batch b10, the γ sweep, is training there now**; its charts arrive at close-out.
+**Batch b8 closed 2026-09-01**, all sixteen arms with stage B complete, charts below.
 The window to watch the box live is below.
 
 **Batch b7 closed all four waves 2026-09-01** — 32 arms, 8 layouts x 4 seeds, charts imported from the
@@ -26,99 +26,206 @@ it took three attempts to get there).
 
 ## Batch b9 — the λ sweep off b7's `fc (320,)`, 4 seeds each, 50M
 
-**In flight**: 40 arms trained, stage B closed on waves 1-4, wave 5's running, waves 6-8 queued.
-b9 changes **only** `ppo_gae_lambda` off b7's winning cell — `fc (320,)`, 4 epochs, entropy 0.01,
-lr 3e-4, γ 0.99, clip 0.2, same 50M cap — so **b7aa-b7ad above are this sweep's λ 0.98 arms**, and
-`fc (320,)`'s panels there are the reference to read these against.
+**All eight waves closed 2026-09-02**, stage A and stage B for all 64 arms; stage-B panels follow each
+arm's chart. b9 changes **only** `ppo_gae_lambda` off b7's winning cell — `fc (320,)`, 4 epochs,
+entropy 0.01, lr 3e-4, γ 0.99, clip 0.2, same 50M cap — so **b7aa-b7ad below are this sweep's λ 0.98
+arms**, and `fc (320,)`'s panels there are the reference to read these against.
 
-| λ | GAE horizon | best30 | ≥98%/500 |
-|---:|---:|---:|---:|
-| 0.00 | 1.0 | 88.28 | 0.0% |
-| 0.50 | 2.0 | 94.25 | 0.0% |
-| 0.80 | 4.8 | 96.12 | 0.8% |
-| 0.85 | 6.3 | 95.90 | 0.8% |
-| 0.90 | 9.2 | 96.75 | 3.9% |
-| 0.91 | 10.1 | 96.88 | 4.3% |
-| 0.92 | 11.2 | 96.92 | 4.8% |
-| 0.93 | 12.6 | 97.17 | 5.4% |
-| 0.94 | 14.4 | 96.80 | stage B pending |
-| 0.95 | 16.8 | 96.97 | stage B pending |
-| **0.98** (b7) | **33.6** | **97.75** | **17.3%** |
+| λ | ≥98%/500 | best30 | drawdown < 50% | | λ | ≥98%/500 | best30 | drawdown < 50% |
+|---:|---:|---:|---:|---|---:|---:|---:|---:|
+| 0.00 | 0.0% | 88.28 | 11.29% | | 0.94 | 4.6% | 96.80 | 0.00% |
+| 0.50 | 0.0% | 94.25 | 0.05% | | 0.95 | 5.3% | 96.97 | 0.02% |
+| 0.80 | 0.8% | 96.12 | 0.02% | | 0.96 | 8.3% | 97.30 | 0.03% |
+| 0.85 | 0.8% | 95.90 | 0.00% | | 0.97 | 11.7% | 97.88 | 0.03% |
+| 0.90 | 3.9% | 96.75 | 0.07% | | 0.98 (b7) | 17.3% | 97.75 | 0.29% |
+| 0.91 | 4.3% | 96.88 | 0.02% | | **0.99** | **27.3%** | 98.33 | 0.77% |
+| 0.92 | 4.8% | 96.92 | 0.02% | | 0.995 | 27.3% | 98.40 | 1.03% |
+| 0.93 | 5.4% | 97.17 | 0.02% | | 0.999 | 25.6% | 98.45 | 1.26% |
+| | | | | | **1.00** | **29.5%** | 98.40 | 2.10% |
 
-**What to look at.** Put λ 0.00 next to λ 0.98 first — the whole dynamic range of the knob is in
-those two panels, best30 88.28 against 97.75. Then walk 0.90 → 0.93 → 0.98 for the shape of a
-curve that is still improving at the top of the measured range. `b9ab-lam0-seed2` has no stage-B
-panel and never will: it screened **zero** checkpoints, which is the finding rather than a gap.
+**What to look at.** λ 0.00 next to λ 1.00 first — the whole dynamic range of the knob, best30 88.28
+against 98.40. Then λ 0.98 against λ 0.99: the density jump that changes the base every later batch
+should be built on, and, in the stage-A traces, the first visible drawdown — the top four groups get
+noisier as they get richer, λ 1.00 most of all. The stage-B panels for λ 0.99-1.00 are where the
+100/500 rows are: `b9ch-lam999-seed4` at 47.2-47.3M and `b9bw-lam99-seed1` at 48.4M. `b9ab-lam0-seed2`
+has no stage-B panel and never will: it screened **zero** checkpoints, which is the finding rather
+than a gap.
 
 **λ 0.00** — `b9aa`-`b9ad`:
 
 ![b9aa-lam0-seed1](../runs/b9aa-lam0-seed1.png)
+![b9aa-lam0-seed1 stage B](../runs/b9aa-lam0-seed1_checkpoint_evals.png)
 ![b9ab-lam0-seed2](../runs/b9ab-lam0-seed2.png)
 ![b9ac-lam0-seed3](../runs/b9ac-lam0-seed3.png)
+![b9ac-lam0-seed3 stage B](../runs/b9ac-lam0-seed3_checkpoint_evals.png)
 ![b9ad-lam0-seed4](../runs/b9ad-lam0-seed4.png)
+![b9ad-lam0-seed4 stage B](../runs/b9ad-lam0-seed4_checkpoint_evals.png)
 
 **λ 0.50** — `b9ae`-`b9ah`:
 
 ![b9ae-lam50-seed1](../runs/b9ae-lam50-seed1.png)
+![b9ae-lam50-seed1 stage B](../runs/b9ae-lam50-seed1_checkpoint_evals.png)
 ![b9af-lam50-seed2](../runs/b9af-lam50-seed2.png)
+![b9af-lam50-seed2 stage B](../runs/b9af-lam50-seed2_checkpoint_evals.png)
 ![b9ag-lam50-seed3](../runs/b9ag-lam50-seed3.png)
+![b9ag-lam50-seed3 stage B](../runs/b9ag-lam50-seed3_checkpoint_evals.png)
 ![b9ah-lam50-seed4](../runs/b9ah-lam50-seed4.png)
+![b9ah-lam50-seed4 stage B](../runs/b9ah-lam50-seed4_checkpoint_evals.png)
 
-**λ 0.80** — `b9ai`-`b9al`:
+**λ 0.8** — `b9ai`-`b9al`:
 
 ![b9ai-lam80-seed1](../runs/b9ai-lam80-seed1.png)
+![b9ai-lam80-seed1 stage B](../runs/b9ai-lam80-seed1_checkpoint_evals.png)
 ![b9aj-lam80-seed2](../runs/b9aj-lam80-seed2.png)
+![b9aj-lam80-seed2 stage B](../runs/b9aj-lam80-seed2_checkpoint_evals.png)
 ![b9ak-lam80-seed3](../runs/b9ak-lam80-seed3.png)
+![b9ak-lam80-seed3 stage B](../runs/b9ak-lam80-seed3_checkpoint_evals.png)
 ![b9al-lam80-seed4](../runs/b9al-lam80-seed4.png)
+![b9al-lam80-seed4 stage B](../runs/b9al-lam80-seed4_checkpoint_evals.png)
 
 **λ 0.85** — `b9am`-`b9ap`:
 
 ![b9am-lam85-seed1](../runs/b9am-lam85-seed1.png)
+![b9am-lam85-seed1 stage B](../runs/b9am-lam85-seed1_checkpoint_evals.png)
 ![b9an-lam85-seed2](../runs/b9an-lam85-seed2.png)
+![b9an-lam85-seed2 stage B](../runs/b9an-lam85-seed2_checkpoint_evals.png)
 ![b9ao-lam85-seed3](../runs/b9ao-lam85-seed3.png)
+![b9ao-lam85-seed3 stage B](../runs/b9ao-lam85-seed3_checkpoint_evals.png)
 ![b9ap-lam85-seed4](../runs/b9ap-lam85-seed4.png)
+![b9ap-lam85-seed4 stage B](../runs/b9ap-lam85-seed4_checkpoint_evals.png)
 
-**λ 0.90** — `b9aq`-`b9at`:
+**λ 0.9** — `b9aq`-`b9at`:
 
 ![b9aq-lam90-seed1](../runs/b9aq-lam90-seed1.png)
+![b9aq-lam90-seed1 stage B](../runs/b9aq-lam90-seed1_checkpoint_evals.png)
 ![b9ar-lam90-seed2](../runs/b9ar-lam90-seed2.png)
+![b9ar-lam90-seed2 stage B](../runs/b9ar-lam90-seed2_checkpoint_evals.png)
 ![b9as-lam90-seed3](../runs/b9as-lam90-seed3.png)
+![b9as-lam90-seed3 stage B](../runs/b9as-lam90-seed3_checkpoint_evals.png)
 ![b9at-lam90-seed4](../runs/b9at-lam90-seed4.png)
+![b9at-lam90-seed4 stage B](../runs/b9at-lam90-seed4_checkpoint_evals.png)
 
 **λ 0.91** — `b9au`-`b9ax`:
 
 ![b9au-lam91-seed1](../runs/b9au-lam91-seed1.png)
+![b9au-lam91-seed1 stage B](../runs/b9au-lam91-seed1_checkpoint_evals.png)
 ![b9av-lam91-seed2](../runs/b9av-lam91-seed2.png)
+![b9av-lam91-seed2 stage B](../runs/b9av-lam91-seed2_checkpoint_evals.png)
 ![b9aw-lam91-seed3](../runs/b9aw-lam91-seed3.png)
+![b9aw-lam91-seed3 stage B](../runs/b9aw-lam91-seed3_checkpoint_evals.png)
 ![b9ax-lam91-seed4](../runs/b9ax-lam91-seed4.png)
+![b9ax-lam91-seed4 stage B](../runs/b9ax-lam91-seed4_checkpoint_evals.png)
 
 **λ 0.92** — `b9ay`-`b9bb`:
 
 ![b9ay-lam92-seed1](../runs/b9ay-lam92-seed1.png)
+![b9ay-lam92-seed1 stage B](../runs/b9ay-lam92-seed1_checkpoint_evals.png)
 ![b9az-lam92-seed2](../runs/b9az-lam92-seed2.png)
+![b9az-lam92-seed2 stage B](../runs/b9az-lam92-seed2_checkpoint_evals.png)
 ![b9ba-lam92-seed3](../runs/b9ba-lam92-seed3.png)
+![b9ba-lam92-seed3 stage B](../runs/b9ba-lam92-seed3_checkpoint_evals.png)
 ![b9bb-lam92-seed4](../runs/b9bb-lam92-seed4.png)
+![b9bb-lam92-seed4 stage B](../runs/b9bb-lam92-seed4_checkpoint_evals.png)
 
 **λ 0.93** — `b9bc`-`b9bf`:
 
 ![b9bc-lam93-seed1](../runs/b9bc-lam93-seed1.png)
+![b9bc-lam93-seed1 stage B](../runs/b9bc-lam93-seed1_checkpoint_evals.png)
 ![b9bd-lam93-seed2](../runs/b9bd-lam93-seed2.png)
+![b9bd-lam93-seed2 stage B](../runs/b9bd-lam93-seed2_checkpoint_evals.png)
 ![b9be-lam93-seed3](../runs/b9be-lam93-seed3.png)
+![b9be-lam93-seed3 stage B](../runs/b9be-lam93-seed3_checkpoint_evals.png)
 ![b9bf-lam93-seed4](../runs/b9bf-lam93-seed4.png)
+![b9bf-lam93-seed4 stage B](../runs/b9bf-lam93-seed4_checkpoint_evals.png)
 
 **λ 0.94** — `b9bg`-`b9bj`:
 
 ![b9bg-lam94-seed1](../runs/b9bg-lam94-seed1.png)
+![b9bg-lam94-seed1 stage B](../runs/b9bg-lam94-seed1_checkpoint_evals.png)
 ![b9bh-lam94-seed2](../runs/b9bh-lam94-seed2.png)
+![b9bh-lam94-seed2 stage B](../runs/b9bh-lam94-seed2_checkpoint_evals.png)
 ![b9bi-lam94-seed3](../runs/b9bi-lam94-seed3.png)
+![b9bi-lam94-seed3 stage B](../runs/b9bi-lam94-seed3_checkpoint_evals.png)
 ![b9bj-lam94-seed4](../runs/b9bj-lam94-seed4.png)
+![b9bj-lam94-seed4 stage B](../runs/b9bj-lam94-seed4_checkpoint_evals.png)
 
 **λ 0.95** — `b9bk`-`b9bn`:
 
 ![b9bk-lam95-seed1](../runs/b9bk-lam95-seed1.png)
+![b9bk-lam95-seed1 stage B](../runs/b9bk-lam95-seed1_checkpoint_evals.png)
 ![b9bl-lam95-seed2](../runs/b9bl-lam95-seed2.png)
+![b9bl-lam95-seed2 stage B](../runs/b9bl-lam95-seed2_checkpoint_evals.png)
 ![b9bm-lam95-seed3](../runs/b9bm-lam95-seed3.png)
+![b9bm-lam95-seed3 stage B](../runs/b9bm-lam95-seed3_checkpoint_evals.png)
 ![b9bn-lam95-seed4](../runs/b9bn-lam95-seed4.png)
+![b9bn-lam95-seed4 stage B](../runs/b9bn-lam95-seed4_checkpoint_evals.png)
+
+**λ 0.96** — `b9bo`-`b9br`:
+
+![b9bo-lam96-seed1](../runs/b9bo-lam96-seed1.png)
+![b9bo-lam96-seed1 stage B](../runs/b9bo-lam96-seed1_checkpoint_evals.png)
+![b9bp-lam96-seed2](../runs/b9bp-lam96-seed2.png)
+![b9bp-lam96-seed2 stage B](../runs/b9bp-lam96-seed2_checkpoint_evals.png)
+![b9bq-lam96-seed3](../runs/b9bq-lam96-seed3.png)
+![b9bq-lam96-seed3 stage B](../runs/b9bq-lam96-seed3_checkpoint_evals.png)
+![b9br-lam96-seed4](../runs/b9br-lam96-seed4.png)
+![b9br-lam96-seed4 stage B](../runs/b9br-lam96-seed4_checkpoint_evals.png)
+
+**λ 0.97** — `b9bs`-`b9bv`:
+
+![b9bs-lam97-seed1](../runs/b9bs-lam97-seed1.png)
+![b9bs-lam97-seed1 stage B](../runs/b9bs-lam97-seed1_checkpoint_evals.png)
+![b9bt-lam97-seed2](../runs/b9bt-lam97-seed2.png)
+![b9bt-lam97-seed2 stage B](../runs/b9bt-lam97-seed2_checkpoint_evals.png)
+![b9bu-lam97-seed3](../runs/b9bu-lam97-seed3.png)
+![b9bu-lam97-seed3 stage B](../runs/b9bu-lam97-seed3_checkpoint_evals.png)
+![b9bv-lam97-seed4](../runs/b9bv-lam97-seed4.png)
+![b9bv-lam97-seed4 stage B](../runs/b9bv-lam97-seed4_checkpoint_evals.png)
+
+**λ 0.99** — `b9bw`-`b9bz`:
+
+![b9bw-lam99-seed1](../runs/b9bw-lam99-seed1.png)
+![b9bw-lam99-seed1 stage B](../runs/b9bw-lam99-seed1_checkpoint_evals.png)
+![b9bx-lam99-seed2](../runs/b9bx-lam99-seed2.png)
+![b9bx-lam99-seed2 stage B](../runs/b9bx-lam99-seed2_checkpoint_evals.png)
+![b9by-lam99-seed3](../runs/b9by-lam99-seed3.png)
+![b9by-lam99-seed3 stage B](../runs/b9by-lam99-seed3_checkpoint_evals.png)
+![b9bz-lam99-seed4](../runs/b9bz-lam99-seed4.png)
+![b9bz-lam99-seed4 stage B](../runs/b9bz-lam99-seed4_checkpoint_evals.png)
+
+**λ 0.995** — `b9ca`-`b9cd`:
+
+![b9ca-lam995-seed1](../runs/b9ca-lam995-seed1.png)
+![b9ca-lam995-seed1 stage B](../runs/b9ca-lam995-seed1_checkpoint_evals.png)
+![b9cb-lam995-seed2](../runs/b9cb-lam995-seed2.png)
+![b9cb-lam995-seed2 stage B](../runs/b9cb-lam995-seed2_checkpoint_evals.png)
+![b9cc-lam995-seed3](../runs/b9cc-lam995-seed3.png)
+![b9cc-lam995-seed3 stage B](../runs/b9cc-lam995-seed3_checkpoint_evals.png)
+![b9cd-lam995-seed4](../runs/b9cd-lam995-seed4.png)
+![b9cd-lam995-seed4 stage B](../runs/b9cd-lam995-seed4_checkpoint_evals.png)
+
+**λ 0.999** — `b9ce`-`b9ch`:
+
+![b9ce-lam999-seed1](../runs/b9ce-lam999-seed1.png)
+![b9ce-lam999-seed1 stage B](../runs/b9ce-lam999-seed1_checkpoint_evals.png)
+![b9cf-lam999-seed2](../runs/b9cf-lam999-seed2.png)
+![b9cf-lam999-seed2 stage B](../runs/b9cf-lam999-seed2_checkpoint_evals.png)
+![b9cg-lam999-seed3](../runs/b9cg-lam999-seed3.png)
+![b9cg-lam999-seed3 stage B](../runs/b9cg-lam999-seed3_checkpoint_evals.png)
+![b9ch-lam999-seed4](../runs/b9ch-lam999-seed4.png)
+![b9ch-lam999-seed4 stage B](../runs/b9ch-lam999-seed4_checkpoint_evals.png)
+
+**λ 1.00** — `b9ci`-`b9cl`:
+
+![b9ci-lam100-seed1](../runs/b9ci-lam100-seed1.png)
+![b9ci-lam100-seed1 stage B](../runs/b9ci-lam100-seed1_checkpoint_evals.png)
+![b9cj-lam100-seed2](../runs/b9cj-lam100-seed2.png)
+![b9cj-lam100-seed2 stage B](../runs/b9cj-lam100-seed2_checkpoint_evals.png)
+![b9ck-lam100-seed3](../runs/b9ck-lam100-seed3.png)
+![b9ck-lam100-seed3 stage B](../runs/b9ck-lam100-seed3_checkpoint_evals.png)
+![b9cl-lam100-seed4](../runs/b9cl-lam100-seed4.png)
+![b9cl-lam100-seed4 stage B](../runs/b9cl-lam100-seed4_checkpoint_evals.png)
+
 ## Batch b8 — the stability knobs, 4 knobs x 4 seeds, 100M each
 
 **Both waves closed 2026-09-01**, stage A and stage B for all sixteen arms.

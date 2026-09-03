@@ -6,6 +6,142 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b9 closed on the desktop at 2026-09-02 16:48 — all 64 arms trained and all eight stage-B waves
+done — and b10, the γ sweep, is on wave 1 of 8.** At 17:53 its eight arms (γ 0.70 and γ 0.80 x seeds
+1-4, `b10aa`-`b10ah`) were 47-58% through 50M, 65 min in, so wave 1 lands about 18:45 and its stage B
+follows automatically. b9's eight waves took ~19 h end to end, so b10 closes around midday
+2026-09-03. Behind it: b11 (lr 4e-5, 32+8), b12 (1 epoch, 40+8), b13 (minibatch 32, 32+8), b14
+(rollout 32, 24+8). Ledger: 225 done, 189 queued, 8 running, `attention` empty, 157 GB free, load 14.
+**Nothing is running on the laptop.**
+
+**b9's answer: PPO's λ 0.98 default was not the top of the curve.** Record density (≥98%/500 stage-B
+rows) climbs monotonically through the whole sweep, **17.3% at λ 0.98 → 27.3% at λ 0.99**, then sits
+on a plateau — 27.3, 27.3, 25.6, 29.5% across 0.99, 0.995, 0.999 and 1.00, indistinguishable at four
+seeds. Every seed of λ 0.99 beats every seed of λ 0.98 (24.1-31.4 against 15.1-19.0, Mann-Whitney
+p=0.029, the floor). Three stage-B rows scored **100/500** — two adjacent `b9ch-lam999-seed4`
+checkpoints at 47.2-47.3M and `b9bw-lam99-seed1` at 48.4M — the first perfect 500s this project has
+measured. Full table and reading under *Just closed: b9* below.
+
+**Two decisions this puts in front of us:**
+
+1. **Re-measure b9's top end at depth — the `hof5000` pass, and this time it may find a record.**
+   λ 0.99-1.00 hold 1,974 checkpoints at ≥98.5/500 (2,289 across the batch), against 174 for b7's
+   `fc 320` — 4.2 h on the idle laptop at b7's rate. The ≥99/500 cut is ~660 rows, ~75 min, and the
+   three 100/500 rows are in it. Expect the usual −1 pp from 500 to 5,000; the record to beat is
+   `b5h` at 98.96 /30,000. **Recommendation: run the ≥99 cut on the laptop now.**
+2. **b11-b14 are queued at λ 0.98, a base now known to leave 1.6x on the table.** They will not start
+   for ~19 h. Re-basing them to **λ 0.99** is a spec edit on `ops`: 0.99 has the plateau's density
+   within noise, the tightest seed spread of any group (98.3-98.4) and a third of λ 1.0's drawdown.
+   The case for leaving them is one shared base across b7-b14; the cost is re-running every winner at
+   0.99 afterwards. **Recommendation: re-base b11-b14 before b10 finishes**, and leave b10 as it is —
+   γ and λ set the GAE horizon together (1/(1−γλ)), so b10 at λ 0.98 is still a clean one-knob sweep
+   off b7, just not off the best cell.
+
+**‡ Two things to know about the daemon's read.** The glance line labels the running b10 wave
+"g85, wave 2 of 8" while the ledger's eight running arms are the g70/g80 cell, wave 1 — a labelling
+quirk, not a dispatch problem. And `p0q-ep8-long` still reads `failed` from the retired `p`-prefix
+era; `attention` is empty.
+
+## Just closed: b9 — λ 0.99+ doubles the record density, and the top is a plateau
+
+**All eight waves and all eight stage-B passes closed 2026-09-02 16:48**, 64 arms at 50M on the
+desktop, 43,969 stage-B rows. b9 changes only `ppo_gae_lambda` off b7's winning cell — `fc (320,)`,
+4 epochs, entropy 0.01, lr 3e-4, γ 0.99, clip 0.2 — so **b7aa-b7ad are its λ 0.98 arms** and the
+sweep is one curve. Drawdown is the median share of post-competence stage-A evals below 50% (and 80%)
+perfect, as in b8:
+
+| λ | GAE horizon | rows | ≥98%/500 | per-seed share | ≥98.5 (`hof5000` cands) | best row | best30 (4 seeds) | sef | drawdown < 50% | < 80% |
+|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
+| 0.00 | 1.0 | 8 | 0.0% | 0 0 0 0 | 0 | 94.0 | 88.7 85.1 90.8 88.5 | 24.1 | 11.29% | 68.6% |
+| 0.50 | 2.0 | 392 | 0.0% | 0 0 0 0 | 0 | 96.6 | 94.2 94.2 94.9 93.7 | 81.8 | 0.05% | 11.1% |
+| 0.80 | 4.8 | 1,133 | 0.8% | 0.4 1.7 0.4 0.7 | 3 | 98.6 | 96.6 95.6 96.1 96.2 | 85.9 | 0.02% | 9.3% |
+| 0.85 | 6.3 | 1,279 | 0.8% | 0.3 1.1 1.7 0.0 | 1 | 98.8 | 95.2 96.3 96.1 96.0 | 87.3 | 0.00% | 8.8% |
+| 0.90 | 9.2 | 2,130 | 3.9% | 3.7 5.3 5.1 1.1 | 16 | 99.2 | 96.5 97.1 96.9 96.5 | 89.4 | 0.07% | 6.5% |
+| 0.91 | 10.1 | 2,168 | 4.3% | 2.3 7.8 3.6 3.7 | 14 | 99.2 | 96.5 97.4 96.9 96.7 | 89.4 | 0.02% | 6.7% |
+| 0.92 | 11.2 | 2,363 | 4.8% | 2.0 6.9 3.8 5.7 | 18 | 99.2 | 96.5 97.6 96.8 96.8 | 89.6 | 0.02% | 6.1% |
+| 0.93 | 12.6 | 2,545 | 5.4% | 4.1 9.9 3.3 4.2 | 22 | 99.2 | 96.9 97.5 97.1 97.2 | 90.6 | 0.02% | 4.9% |
+| 0.94 | 14.4 | 2,359 | 4.6% | 4.5 5.6 2.8 5.2 | 21 | 99.2 | 97.0 96.6 96.7 96.9 | 90.8 | 0.00% | 5.6% |
+| 0.95 | 16.8 | 2,665 | 5.3% | 3.7 9.0 4.6 3.4 | 23 | 99.6 | 97.1 97.0 96.9 96.9 | 92.3 | 0.02% | 3.9% |
+| 0.96 | 20.2 | 2,882 | 8.3% | 4.6 12.7 8.1 7.0 | 67 | 99.6 | 96.8 97.8 97.2 97.4 | 92.0 | 0.03% | 5.0% |
+| 0.97 | 25.2 | 3,613 | 11.7% | 9.0 17.4 9.2 10.8 | 130 | 99.6 | 98.1 98.0 97.6 97.8 | **93.0** | 0.03% | **4.1%** |
+| 0.98 (b7) | 33.6 | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 174 | 99.6 | 97.8 97.8 97.7 97.7 | 90.9 | 0.29% | 6.2% |
+| **0.99** | 50.3 | 5,173 | **27.3%** | 27.2 24.1 31.4 26.0 | 451 | **100.0** | 98.3 98.3 98.4 98.3 | 90.6 | 0.77% | 6.4% |
+| 0.995 | 66.9 | 4,998 | 27.3% | 24.8 27.4 34.3 22.3 | 496 | 99.8 | 98.2 98.5 98.8 98.1 | 89.1 | 1.03% | 7.7% |
+| 0.999 | 91.0 | 4,897 | 25.6% | 27.8 17.4 24.2 31.3 | 453 | **100.0** | 98.5 98.2 98.1 **99.0** | 87.9 | 1.26% | 8.1% |
+| **1.00** | 100 | 5,364 | **29.5%** | 25.2 32.7 29.6 30.8 | **574** | 99.8 | 98.4 98.5 98.4 98.3 | 88.4 | 2.10% | 8.7% |
+
+**Three readings, in order of weight:**
+
+- **Density is monotone in λ up to 0.99 and flat above it.** 0.00 → 0.50 → 0.80-0.85 → 0.90-0.95 →
+  0.96 → 0.97 → 0.98 → 0.99 reads 0, 0, 0.8, 4-5, 8.3, 11.7, 17.3, 27.3%; then 27.3, 25.6, 29.5.
+  The per-seed ranges of the four plateau groups all overlap (λ 0.99 24-31, λ 1.00 25-33), so n=4
+  cannot order them. In record-region checkpoints per four arms that is **693 at λ 0.98 against
+  1,412 at 0.99 and 1,582 at 1.00** — the row count rises too (4,003 → 5,173 → 5,364), so this is more
+  strong checkpoints, not a thinner gate. best30 moves with it: 97.75 → 98.33-98.45, and every
+  plateau seed is ≥98.1.
+- **Stability moves the other way, exactly as b8's trade-off said it would.** Drawdown below 50% is
+  ≤0.07% for every λ from 0.50 to 0.97, 0.29% at 0.98, then 0.77 → 1.03 → 1.26 → **2.10%** at λ 1.00;
+  the sub-80% share bottoms at 3.9-4.1% (λ 0.95-0.97) and rises to 8.7%. b8 found that the knobs which
+  steady the curve bank the fewest records; b9 finds the converse from the same knob — the λ that banks
+  the most records has the noisiest deployed policy. λ 1.00 at 50M matches b4's 2.0% at 50M, the
+  collapse b8 was built to fix. **This is why 0.99 rather than 1.00 is the recommendation above.**
+- **`sef` ranks the sweep backwards for the third time.** It peaks at **93.0 at λ 0.97** and falls to
+  88.4 at λ 1.00, so ranking on it picks the 11.7% end of the curve over the 29.5% end, a 2.5x miss.
+  The stage-A ≥98% share (20.4% at 0.98, 28.9% at 0.99, 30.5% at 1.00) tracks density, as
+  [`findings.md`](findings.md) said it would.
+
+**What it does not settle.** All of this is at 50M and 500 episodes: the plateau's ordering, whether
+any 100/500 row is a real record, and whether λ 1.00's drawdown keeps growing past 50M the way b4's
+did. The `hof5000` pass answers the second; the third would need a longer arm. **b3's single-seed
+call that λ 1.0 was a loser is inverted** — same pattern as the fc-layout ranking b7 overturned.
+
+**λ 0 is the floor**: 8 stage-B rows from four arms, `b9ab-lam0-seed2` screened none, onset of
+competence at 5-10M against 1.3-2.8M for every λ ≥ 0.80. Per-arm numbers in
+[`results.md`](results.md), 127 panels in [`charts.md`](charts.md).
+
+## Just closed: b8 — every knob cut the drawdown, none produced a record
+
+**Both waves and both stage-B passes closed 2026-09-01**, 16 arms at 100M on the desktop, plus a
+135-row `hof5000` pass on the laptop. b4 is the control, truncated to b8's 100M cap:
+
+| group | arms | drawdown < 50% | ≥98%/500 | ≥98.73 /5,000 |
+|---|---|---:|---:|---:|
+| `target_KL` 0.02 | `b8i`-`b8l` | 5.9% | **6.0%** | 1 |
+| entropy 0.01 → 0.001 | `b8e`-`b8h` | 3.5% | 5.0% | 0 |
+| entropy 0.003 | `b8a`-`b8d` | 3.7% | 4.3% | 0 |
+| λ 0.95 | `b8m`-`b8p` | **2.2%** | 2.3% | 0 |
+| **b4 control @100M** | `b4a`-`b4h` | 8.4% | 5.7% | 1 (at 200M) |
+
+**One champion-level row in 135 deep measurements, and no hall-of-fame candidate.** Both
+never-exercised knobs did fire — `target_KL` stopped the epoch loop on 1.9-3.3% of updates, the anneal
+completed 0.0100 → 0.0010 at the cap — so this is a real measurement of both, not a silent no-op. Per-arm
+numbers in [`results.md`](results.md), 32 charts in [`charts.md`](charts.md).
+
+## Just closed: b7, the fc-layout sweep — `fc (320,)` wins
+
+**All four waves and all four stage-B passes closed 2026-09-01**, 32 arms in ~11 h on the desktop.
+Pooled 10.9% of 28,006 stage-B rows in the ≥98%/500 record region, and the spread across layouts is
+3.4x:
+
+| layout | ≥98%/500 | | layout | ≥98%/500 |
+|---|---:|---|---|---:|
+| **`fc (320,)`** | **17.3%** | | `fc (200,100,50)` | 10.8% |
+| `fc (200,100)` | 11.8% | | `fc (160,160)` | 8.3% |
+| `fc (100,200,100)` | 11.6% | | `fc (300,100)` | 6.8% |
+| `fc (100,100)` | 11.3% | | `fc (400,200)` | 5.1% |
+
+**Every `fc 320` seed beats every seed of five of the seven other layouts** (exact Mann-Whitney
+p=0.029, the floor at 4-vs-4). This **inverts b3's single-seed ranking**, which put `fc 300,100`
+first and `fc 320` last of those three and is what queued b4 and b7 in the first place. Per-arm
+numbers in [`results.md`](results.md), the reading and the two retractions in
+[`findings.md`](findings.md), 64 charts in [`charts.md`](charts.md).
+
+**It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
+layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
+right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
+
+## b9 at wave 5, as it read at 2026-09-02 08:38 (superseded)
+
 **Batch b9 — the λ sweep — is on the desktop and nothing is on the laptop.** 40 of 64 arms trained at
 2026-09-02 08:38; `b9-stageb-w5` is the only job running (41 m in, no trainers), stage B is closed on
 waves 1-4, and waves 6-8 are queued as 24 arms covering **λ 0.96, 0.97, 0.99, 0.995, 0.999 and 1.00**.
@@ -49,47 +185,6 @@ falls to 90.9 at λ 0.98, so ranking on it would take the 5.4%-and-below end of 
 possibly not high enough" — which makes b10-b14 sweeps *off a λ that may still move*. If λ 0.99 or
 0.995 beats 0.98, every batch queued behind b9 is holding a superseded λ. Worth deciding whether to
 let b10-b14 run as queued or re-base them once b9's top end lands.
-
-## Just closed: b8 — every knob cut the drawdown, none produced a record
-
-**Both waves and both stage-B passes closed 2026-09-01**, 16 arms at 100M on the desktop, plus a
-135-row `hof5000` pass on the laptop. b4 is the control, truncated to b8's 100M cap:
-
-| group | arms | drawdown < 50% | ≥98%/500 | ≥98.73 /5,000 |
-|---|---|---:|---:|---:|
-| `target_KL` 0.02 | `b8i`-`b8l` | 5.9% | **6.0%** | 1 |
-| entropy 0.01 → 0.001 | `b8e`-`b8h` | 3.5% | 5.0% | 0 |
-| entropy 0.003 | `b8a`-`b8d` | 3.7% | 4.3% | 0 |
-| λ 0.95 | `b8m`-`b8p` | **2.2%** | 2.3% | 0 |
-| **b4 control @100M** | `b4a`-`b4h` | 8.4% | 5.7% | 1 (at 200M) |
-
-**One champion-level row in 135 deep measurements, and no hall-of-fame candidate.** Both
-never-exercised knobs did fire — `target_KL` stopped the epoch loop on 1.9-3.3% of updates, the anneal
-completed 0.0100 → 0.0010 at the cap — so this is a real measurement of both, not a silent no-op. Per-arm
-numbers in [`results.md`](results.md), 32 charts in [`charts.md`](charts.md).
-
-## Just closed: b7, the fc-layout sweep — `fc (320,)` wins
-
-**All four waves and all four stage-B passes closed 2026-09-01**, 32 arms in ~11 h on the desktop.
-Pooled 10.9% of 28,006 stage-B rows in the ≥98%/500 record region, and the spread across layouts is
-3.4x:
-
-| layout | ≥98%/500 | | layout | ≥98%/500 |
-|---|---:|---|---|---:|
-| **`fc (320,)`** | **17.3%** | | `fc (200,100,50)` | 10.8% |
-| `fc (200,100)` | 11.8% | | `fc (160,160)` | 8.3% |
-| `fc (100,200,100)` | 11.6% | | `fc (300,100)` | 6.8% |
-| `fc (100,100)` | 11.3% | | `fc (400,200)` | 5.1% |
-
-**Every `fc 320` seed beats every seed of five of the seven other layouts** (exact Mann-Whitney
-p=0.029, the floor at 4-vs-4). This **inverts b3's single-seed ranking**, which put `fc 300,100`
-first and `fc 320` last of those three and is what queued b4 and b7 in the first place. Per-arm
-numbers in [`results.md`](results.md), the reading and the two retractions in
-[`findings.md`](findings.md), 64 charts in [`charts.md`](charts.md).
-
-**It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
-layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
-right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
 
 ## b9's first wave, as it read at 2026-09-01 22:50 (superseded)
 

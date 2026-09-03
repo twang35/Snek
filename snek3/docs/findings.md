@@ -17,6 +17,48 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### GAE λ: record density doubles from PPO's 0.98 default to 0.99, then plateaus to 1.00
+
+**Measured 2026-09-02 on b9's 64 arms** — 16 values of `ppo_gae_lambda` x 4 seeds at 50M, everything
+else b7's `fc (320,)` cell, 43,969 stage-B rows. Density is the ≥98%/500 stage-B rate; drawdown is the
+median share of post-competence stage-A evals below 50% perfect:
+
+| λ | 0.00 | 0.50 | 0.80 | 0.90 | 0.93 | 0.95 | 0.97 | **0.98** (b7) | **0.99** | 0.995 | 0.999 | **1.00** |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 | 0.0% | 0.0% | 0.8% | 3.9% | 5.4% | 5.3% | 11.7% | 17.3% | **27.3%** | 27.3% | 25.6% | **29.5%** |
+| best30 | 88.3 | 94.3 | 96.1 | 96.8 | 97.2 | 97.0 | 97.9 | 97.8 | 98.3 | 98.4 | 98.5 | 98.4 |
+| drawdown < 50% | 11.3% | 0.05% | 0.02% | 0.07% | 0.02% | 0.02% | 0.03% | 0.29% | 0.77% | 1.03% | 1.26% | **2.10%** |
+| `sef` | 24.1 | 81.8 | 85.9 | 89.4 | 90.6 | 92.3 | **93.0** | 90.9 | 90.6 | 89.1 | 87.9 | 88.4 |
+
+**Three things this establishes.**
+
+1. **The default was not the peak.** Density is monotone in λ across every value up to 0.99 and the
+   biggest single step is 0.98 → 0.99: 17.3% → 27.3%, complete seed separation (per-seed 15.1-19.0
+   against 24.1-31.4, Mann-Whitney p=0.029). The row count rises with it (4,003 → 5,173), so it is
+   more strong checkpoints, not a narrower gate; best30 rises 97.75 → 98.33 with all four seeds within
+   0.1. Above 0.99 the four groups' per-seed ranges overlap and n=4 cannot order them.
+2. **The stability/record trade-off holds from this side too.** b8 found that the knobs which steady
+   the curve bank the fewest records. b9 varies one of those knobs the other way and finds the
+   converse: drawdown is ≤0.07% for every λ from 0.50 to 0.97, then rises monotonically through the
+   plateau to 2.10% at λ 1.00 — b4's level at 50M, the collapse b8 targeted. λ 0.99 takes most of the
+   density gain (27.3 of 29.5%) for a third of λ 1.00's drawdown, which is why it is the base to build
+   on rather than 1.00.
+3. **`strong_eval_fraction` ranks a sweep backwards, third batch, second knob.** It peaks at λ 0.97
+   and falls through the plateau, so it would pick the 11.7% end of the curve over the 29.5% end.
+   The stage-A ≥98% share (20.4 → 28.9 → 30.5% at 0.98, 0.99, 1.00) tracks density as the finding
+   below predicted.
+
+**Two inversions of earlier single-seed readings.** b3 listed λ 1.0 among its losers on one seed at a
+truncated cap; at four seeds and 50M it has the highest density in the batch. And b8's "λ 0.95 is the
+best stability knob" was true and irrelevant: λ 0.95 sits at 5.3% density, the same 5-6% band as λ
+0.90-0.94, and the stability it buys over 0.98 is 0.27 pp of drawdown.
+
+**‡ What is not settled.** Everything here is at 500 episodes and 50M. Three rows scored 100/500 —
+two adjacent `b9ch-lam999-seed4` checkpoints and one of `b9bw-lam99-seed1` — and the usual 500 → 5,000
+regression is −1 pp, so whether b9 holds a record is the `hof5000` pass's question. Whether λ 1.00's
+drawdown keeps developing past 50M the way b4's did (2.0% → 8.4% from 50M to 100M) needs a longer arm
+and is the risk in building on the plateau's top.
+
 ### Epochs and network shape fix b4's drawdown; all four stability knobs only dent it
 
 **Measured 2026-09-01** across five batches. Drawdown is the median over seeds of the share of an
@@ -136,12 +178,14 @@ is the wrong screen for **where the records are**, and those are different quest
 post-competence sd (+0.09) nor the post-competence mean (+0.08) predicts density at all, so this is
 not "variance helps a max-hunt" — the ≥98 mass really is a distinct property of a config.
 
-**‡ Reproduced on b9, a second batch and a different knob, 2026-09-02.** Across b9's λ sweep `sef`
-rises monotonically to **92.3 at λ 0.95** and then *falls* to 90.9 at λ 0.98 — while density goes
-5.4% at λ 0.93 to **17.3%** at λ 0.98. So `sef` picks λ 0.95 and density picks λ 0.98, a 3.2x
-difference in the thing being hunted. Two batches, two knobs, same failure mode: **do not rank a
-config sweep on `sef`.** It was worth predicting in advance — this was flagged in
-[`runs.md`](runs.md) when b8 closed, before b9's numbers existed.
+**‡ Reproduced on b9, a second batch and a different knob, and confirmed at the batch's close
+2026-09-02.** Across b9's full λ sweep `sef` rises to **93.0 at λ 0.97** and then *falls* through
+the top of the curve to 88.4 at λ 1.00 — while density goes 11.7% at λ 0.97 to 17.3% at 0.98 and
+**27.3-29.5%** from 0.99 up. So `sef` picks λ 0.97 and density picks λ 0.99-1.00, a 2.5x difference
+in the thing being hunted; the stage-A ≥98% share (17.7 → 20.4 → 28.9 → 30.5%) tracks density. Three
+batches, two knobs, same failure mode: **do not rank a config sweep on `sef`.** It was worth
+predicting in advance — this was flagged in [`runs.md`](runs.md) when b8 closed, before b9's numbers
+existed.
 
 ### A 500-episode ranking of two close batches did not survive 5,000 episodes
 
