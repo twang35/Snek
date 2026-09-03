@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-03T16:08:58",
-  "ts": 1788476938.0987866,
+  "iso": "2026-09-03T16:19:10",
+  "ts": 1788477550.7042902,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | training 1% (8 arms)"
+      "b11 | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | training 9% (8 arms)"
     ],
     "queued": [
       "b11 stage B | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | queued (8 arms)",
@@ -46,10 +46,10 @@
         "b11aa-lr4e5-seed1"
       ],
       "pid": 1519644,
-      "step": 344064,
+      "step": 4587520,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 9877.7,
+      "elapsed_s": 644
     },
     {
       "id": "b11ab-lr4e5-seed2",
@@ -59,10 +59,10 @@
         "b11ab-lr4e5-seed2"
       ],
       "pid": 1519645,
-      "step": 311296,
+      "step": 4521984,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 8837.9,
+      "elapsed_s": 644
     },
     {
       "id": "b11ac-lr4e5-seed3",
@@ -72,10 +72,10 @@
         "b11ac-lr4e5-seed3"
       ],
       "pid": 1519646,
-      "step": 311296,
+      "step": 4390912,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 6758.4,
+      "elapsed_s": 644
     },
     {
       "id": "b11ad-lr4e5-seed4",
@@ -85,10 +85,10 @@
         "b11ad-lr4e5-seed4"
       ],
       "pid": 1519647,
-      "step": 360448,
+      "step": 4177920,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 6238.5,
+      "elapsed_s": 644
     },
     {
       "id": "b11ae-lr1e4-seed1",
@@ -98,10 +98,10 @@
         "b11ae-lr1e4-seed1"
       ],
       "pid": 1519648,
-      "step": 262144,
+      "step": 4800512,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 7278.2,
+      "elapsed_s": 644
     },
     {
       "id": "b11af-lr1e4-seed2",
@@ -111,10 +111,10 @@
         "b11af-lr1e4-seed2"
       ],
       "pid": 1519649,
-      "step": 262144,
+      "step": 4390912,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 6758.3,
+      "elapsed_s": 644
     },
     {
       "id": "b11ag-lr1e4-seed3",
@@ -124,10 +124,10 @@
         "b11ag-lr1e4-seed3"
       ],
       "pid": 1519650,
-      "step": 262144,
+      "step": 4374528,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 8837.8,
+      "elapsed_s": 644
     },
     {
       "id": "b11ah-lr1e4-seed4",
@@ -137,10 +137,10 @@
         "b11ah-lr1e4-seed4"
       ],
       "pid": 1519651,
-      "step": 245760,
+      "step": 4423680,
       "max_steps": 50003968,
-      "steps_per_sec": null,
-      "elapsed_s": 31
+      "steps_per_sec": 7278.1,
+      "elapsed_s": 644
     }
   ],
   "ledger": {
@@ -576,10 +576,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 147.1,
+  "disk_free_gb": 147.0,
   "load_avg": [
-    11.30029296875,
-    13.7958984375,
-    14.85107421875
+    12.33154296875,
+    12.26611328125,
+    13.40283203125
   ]
 }
