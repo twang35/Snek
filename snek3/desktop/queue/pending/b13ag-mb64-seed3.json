@@ -17,7 +17,7 @@
     "SNEK_COLLECT_ENVS": "128",
     "SNEK_PPO_LEARNING_RATE": "3e-4",
     "SNEK_DISCOUNT": "0.99",
-    "SNEK_PPO_GAE_LAMBDA": "0.98",
+    "SNEK_PPO_GAE_LAMBDA": "0.99",
     "SNEK_PPO_ENTROPY_COEF": "0.01",
     "SNEK_PPO_CLIP": "0.2",
     "SNEK_PPO_TARGET_KL": "0",
@@ -33,5 +33,5 @@
   },
   "priority": 150,
   "label": "b13: mb64, seed 3 of 4 -- wave 1 of 4",
-  "notes": "Batch b13: the minibatch sweep, one knob off the frozen base (b7's fc (320,) reference: PPO defaults, b2 reward, 4 epochs), seeds 1-4 pinned to the arm letter, at b7's 50M cap so b7aa-b7ad are the control. Design: plans/hyperparam-sweep.md. This cell: mb64 -> {\"SNEK_PPO_MINIBATCH\": \"64\"}. Prediction: milder version of 32 Batch note: Moves gradient noise AND steps per epoch at once (32 -> 512 steps/epoch, 256 -> 64). Advantage normalisation is per minibatch. Read beside b12 to separate steps from reuse. 192 and 384 do not divide 16,384 evenly; the last minibatch of an epoch is short, which is fine."
+  "notes": "Batch b13: the minibatch sweep, one knob off the frozen base (b7's fc (320,) reference: PPO defaults, b2 reward, 4 epochs), seeds 1-4 pinned to the arm letter, at b7's 50M cap so b7aa-b7ad are the control. Design: plans/hyperparam-sweep.md. This cell: mb64 -> {\"SNEK_PPO_MINIBATCH\": \"64\"}. Prediction: milder version of 32 Batch note: Moves gradient noise AND steps per epoch at once (32 -> 512 steps/epoch, 256 -> 64). Advantage normalisation is per minibatch. Read beside b12 to separate steps from reuse. 192 and 384 do not divide 16,384 evenly; the last minibatch of an epoch is short, which is fine. Re-based 2026-09-02 from lambda 0.98 to 0.99 after b9 closed: density 17.3% -> 27.3% at 0.99 with complete seed separation, a third of lambda 1.0's drawdown. b10 stays at 0.98 as queued (gamma and lambda set the GAE horizon together)."
 }
