@@ -17,6 +17,30 @@ each, no tiers.** `target_KL` 0.1 is dropped as unable to fire; 0.04 and 0.05 st
 Five batches were added for knobs the paste did not name (section 5, b17–b21), and the smoke
 procedure is now generated rather than described.
 
+## 0. Batch order, at a glance
+
+Run order (section 7), each batch one knob, four seeds per value.
+
+| order | batch | knob | what it is | waves |
+|---:|---|---|---|---:|
+| 1 | b9 | GAE λ | how far the advantage reads from the rollout vs. the critic | 8 |
+| 2 | b10 | discount γ | how far ahead the value function looks | 8 |
+| 3 | b11 | learning rate | Adam step size | 4 |
+| 4 | b12 | epochs | passes over each rollout | 5 |
+| 5 | b13 | minibatch | gradient batch size, and steps per epoch | 4 |
+| 6 | b14 | rollout T | steps per lane before an update | 3 |
+| 7 | b15 | entropy coef | bonus for a stochastic policy, plus two anneals | 5 |
+| 8 | b16 | target_KL | early-stops the epoch loop after a big update | 5 |
+| 9 | b17 | clip + anneals | trust region on the policy ratio; anneal clip and lr to ~0 (**code needed first**) | 5 |
+| 10 | b18 | grad-norm clip | ceiling on the global gradient norm before each step | 3 |
+| 11 | b19 | switches | adv-norm, value loss (mse/huber), Adam ε, vf_coef | 3 |
+| 12 | b20 | collect lanes | parallel games vs. per-episode depth, same batch size as b14 | 2 |
+| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 |
+| — | b22 | factorial | combine whichever knobs above won cleanly | 4 |
+
+**58 waves, 464 arms, ~162 h of desktop, across b9–b21**; b22 adds ~4 waves once it is designed. Full
+budget and the queueing order is section 7.
+
 ## 1. What this project has learned about sweeps, and what it forces here
 
 Three findings shape every rule below. Each is in [`../docs/findings.md`](../docs/findings.md).
