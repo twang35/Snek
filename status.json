@@ -1,14 +1,13 @@
 {
-  "iso": "2026-09-03T02:42:09",
-  "ts": 1788428529.932667,
+  "iso": "2026-09-03T02:52:16",
+  "ts": 1788429136.3069713,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g95, seed 1 of 4 -- wave 5 of 8 | training 97% (6 arms)"
+      "b10 | b10: g97, seed 1 of 4 -- wave 6 of 8 | training 2% (8 arms)"
     ],
     "queued": [
-      "b10 stage B | b10: g95, seed 1 of 4 -- wave 5 of 8 | queued (2 arms)",
-      "b10 training | b10: g95, seed 1 of 4 -- wave 5 of 8 | queued (32 arms)",
+      "b10 training | b10: g97, seed 1 of 4 -- wave 6 of 8 | queued (24 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
@@ -36,99 +35,116 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 6,
+    "trainer": 8,
     "eval": 0
   },
   "running": [
     {
-      "id": "b10ba-g93-seed3",
+      "id": "b10bg-g95-seed1",
       "type": "train",
-      "policy": "b10ba-g93-seed3",
+      "policy": "b10bg-g95-seed1",
       "policies": [
-        "b10ba-g93-seed3"
+        "b10bg-g95-seed1"
       ],
-      "pid": 359193,
-      "step": 49201152,
+      "pid": 545689,
+      "step": 868352,
       "max_steps": 50003968,
-      "steps_per_sec": 5188.6,
-      "elapsed_s": 8555
+      "steps_per_sec": 5752.4,
+      "elapsed_s": 154
     },
     {
-      "id": "b10bb-g93-seed4",
+      "id": "b10bh-g95-seed2",
       "type": "train",
-      "policy": "b10bb-g93-seed4",
+      "policy": "b10bh-g95-seed2",
       "policies": [
-        "b10bb-g93-seed4"
+        "b10bh-g95-seed2"
       ],
-      "pid": 359194,
-      "step": 47595520,
+      "pid": 545690,
+      "step": 819200,
       "max_steps": 50003968,
-      "steps_per_sec": 3632.0,
-      "elapsed_s": 8555
+      "steps_per_sec": 5752.4,
+      "elapsed_s": 154
     },
     {
-      "id": "b10bc-g94-seed1",
+      "id": "b10bi-g95-seed3",
       "type": "train",
-      "policy": "b10bc-g94-seed1",
+      "policy": "b10bi-g95-seed3",
       "policies": [
-        "b10bc-g94-seed1"
+        "b10bi-g95-seed3"
       ],
-      "pid": 359195,
-      "step": 48922624,
+      "pid": 545691,
+      "step": 786432,
       "max_steps": 50003968,
-      "steps_per_sec": 6745.0,
-      "elapsed_s": 8555
+      "steps_per_sec": 3660.6,
+      "elapsed_s": 154
     },
     {
-      "id": "b10bd-g94-seed2",
+      "id": "b10bj-g95-seed4",
       "type": "train",
-      "policy": "b10bd-g94-seed2",
+      "policy": "b10bj-g95-seed4",
       "policies": [
-        "b10bd-g94-seed2"
+        "b10bj-g95-seed4"
       ],
-      "pid": 359196,
-      "step": 48365568,
+      "pid": 545692,
+      "step": 753664,
       "max_steps": 50003968,
-      "steps_per_sec": 8820.4,
-      "elapsed_s": 8555
+      "steps_per_sec": 3660.6,
+      "elapsed_s": 154
     },
     {
-      "id": "b10be-g94-seed3",
+      "id": "b10bk-g96-seed1",
       "type": "train",
-      "policy": "b10be-g94-seed3",
+      "policy": "b10bk-g96-seed1",
       "policies": [
-        "b10be-g94-seed3"
+        "b10bk-g96-seed1"
       ],
-      "pid": 359197,
-      "step": 48398336,
+      "pid": 545693,
+      "step": 770048,
       "max_steps": 50003968,
-      "steps_per_sec": 10377.3,
-      "elapsed_s": 8555
+      "steps_per_sec": 4183.5,
+      "elapsed_s": 154
     },
     {
-      "id": "b10bf-g94-seed4",
+      "id": "b10bl-g96-seed2",
       "type": "train",
-      "policy": "b10bf-g94-seed4",
+      "policy": "b10bl-g96-seed2",
       "policies": [
-        "b10bf-g94-seed4"
+        "b10bl-g96-seed2"
       ],
-      "pid": 359198,
-      "step": 48332800,
+      "pid": 545694,
+      "step": 802816,
       "max_steps": 50003968,
-      "steps_per_sec": 7783.2,
-      "elapsed_s": 8555
+      "steps_per_sec": 5229.4,
+      "elapsed_s": 154
+    },
+    {
+      "id": "b10bm-g96-seed3",
+      "type": "train",
+      "policy": "b10bm-g96-seed3",
+      "policies": [
+        "b10bm-g96-seed3"
+      ],
+      "pid": 545695,
+      "step": 737280,
+      "max_steps": 50003968,
+      "steps_per_sec": 3660.6,
+      "elapsed_s": 154
+    },
+    {
+      "id": "b10bn-g96-seed4",
+      "type": "train",
+      "policy": "b10bn-g96-seed4",
+      "policies": [
+        "b10bn-g96-seed4"
+      ],
+      "pid": 545696,
+      "step": 720896,
+      "max_steps": 50003968,
+      "steps_per_sec": 2091.8,
+      "elapsed_s": 154
     }
   ],
   "ledger": {
-    "b10-stageb-w4": "queued",
-    "b10bg-g95-seed1": "queued",
-    "b10bh-g95-seed2": "queued",
-    "b10bi-g95-seed3": "queued",
-    "b10bj-g95-seed4": "queued",
-    "b10bk-g96-seed1": "queued",
-    "b10bl-g96-seed2": "queued",
-    "b10bm-g96-seed3": "queued",
-    "b10bn-g96-seed4": "queued",
     "b10bo-g97-seed1": "queued",
     "b10bp-g97-seed2": "queued",
     "b10bq-g97-seed3": "queued",
@@ -285,12 +301,21 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b10ba-g93-seed3": "running",
-    "b10bb-g93-seed4": "running",
-    "b10bc-g94-seed1": "running",
-    "b10bd-g94-seed2": "running",
-    "b10be-g94-seed3": "running",
-    "b10bf-g94-seed4": "running",
+    "b10bg-g95-seed1": "running",
+    "b10bh-g95-seed2": "running",
+    "b10bi-g95-seed3": "running",
+    "b10bj-g95-seed4": "running",
+    "b10bk-g96-seed1": "running",
+    "b10bl-g96-seed2": "running",
+    "b10bm-g96-seed3": "running",
+    "b10bn-g96-seed4": "running",
+    "b10-stageb-w4": "done",
+    "b10bb-g93-seed4": "done",
+    "b10bf-g94-seed4": "done",
+    "b10be-g94-seed3": "done",
+    "b10bd-g94-seed2": "done",
+    "b10bc-g94-seed1": "done",
+    "b10ba-g93-seed3": "done",
     "b10az-g93-seed2": "done",
     "b10ay-g93-seed1": "done",
     "b10-stageb-w3": "done",
@@ -547,10 +572,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 152.3,
+  "disk_free_gb": 152.2,
   "load_avg": [
-    13.3740234375,
-    13.81591796875,
-    13.8876953125
+    12.95703125,
+    10.1298828125,
+    11.74951171875
   ]
 }
