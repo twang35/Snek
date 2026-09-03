@@ -22,20 +22,17 @@ p=0.029, the floor). Three stage-B rows scored **100/500** — two adjacent `b9c
 checkpoints at 47.2-47.3M and `b9bw-lam99-seed1` at 48.4M — the first perfect 500s this project has
 measured. Full table and reading under *Just closed: b9* below.
 
-**Two decisions this puts in front of us:**
+**Both decisions were taken the same evening (user, 2026-09-02 ~19:00):**
 
-1. **Re-measure b9's top end at depth — the `hof5000` pass, and this time it may find a record.**
-   λ 0.99-1.00 hold 1,974 checkpoints at ≥98.5/500 (2,289 across the batch), against 174 for b7's
-   `fc 320` — 4.2 h on the idle laptop at b7's rate. The ≥99/500 cut is ~660 rows, ~75 min, and the
-   three 100/500 rows are in it. Expect the usual −1 pp from 500 to 5,000; the record to beat is
-   `b5h` at 98.96 /30,000. **Recommendation: run the ≥99 cut on the laptop now.**
-2. **b11-b14 are queued at λ 0.98, a base now known to leave 1.6x on the table.** They will not start
-   for ~19 h. Re-basing them to **λ 0.99** is a spec edit on `ops`: 0.99 has the plateau's density
-   within noise, the tightest seed spread of any group (98.3-98.4) and a third of λ 1.0's drawdown.
-   The case for leaving them is one shared base across b7-b14; the cost is re-running every winner at
-   0.99 afterwards. **Recommendation: re-base b11-b14 before b10 finishes**, and leave b10 as it is —
-   γ and λ set the GAE horizon together (1/(1−γλ)), so b10 at λ 0.98 is still a clean one-knob sweep
-   off b7, just not off the best cell.
+1. **The `hof5000` pass on b9 is running on the laptop** — 36 arms, the 727 checkpoints at ≥99/500
+   (the cut was raised from 98.5 to 99 in the same decision; at b9's density 98.5 would have been 2,289),
+   8 shards, `logs/b9-hof5000.log`, ~3.6M episodes so roughly an hour. The three 100/500 rows are in it.
+   Expect the usual −1 pp from 500 to 5,000; the record to beat is `b5h` at 98.96 /30,000.
+2. **λ 0.99 is the new default** (`ppo/algo.py`, commit `6b5f8390e`, deployed to the box) **and b11-b14's
+   128 specs were re-based to it on `ops`** before any of them started. b10 runs at 0.98 as queued: γ and
+   λ set the GAE horizon together (1/(1−γλ)), so it stays a clean one-knob sweep off b7's cell, and its
+   winner is read against b7aa-b7ad. Rationale for 0.99 over 1.00: the plateau's density within noise,
+   the tightest seed spread of any group (98.3-98.4), a third of λ 1.0's drawdown.
 
 **‡ Two things to know about the daemon's read.** The glance line labels the running b10 wave
 "g85, wave 2 of 8" while the ledger's eight running arms are the g70/g80 cell, wave 1 — a labelling
