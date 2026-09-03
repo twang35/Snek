@@ -97,10 +97,13 @@ def build_config(tuned):
         # paper's Atari runs anneal clip and lr to 0 together; the clip cannot reach 0 here (see the
         # check below), so its floor is a small positive number such as 0.02.
         'ppo_clip_final': _optional_float(tuned('PPO_CLIP_FINAL', '', str)),
-        # 0.98, not the conventional 0.95. `1/(1 - gamma*lambda)` is the steps an advantage sees: 19 at
-        # 0.95 and gamma 0.9975, 44.5 at 0.98, 400 at 1.0. See `rollout.py`: none of them reaches
-        # the +100, which is why the critic carries it and the shaping terms matter more here.
-        'ppo_gae_lambda': tuned('PPO_GAE_LAMBDA', 0.98),
+        # 0.99 since 2026-09-02, from b9's 16-value sweep at 4 seeds: the >=98%/500 record density
+        # climbs monotonically to 0.99 (17.3% at the old 0.98 default -> 27.3%, complete seed
+        # separation) and is flat from there to 1.0, while the deployed policy's drawdown keeps rising
+        # (0.29% -> 0.77% -> 2.10% at 1.0). `1/(1 - gamma*lambda)` is the steps an advantage sees: 19
+        # at 0.95 and gamma 0.9975, 33.6 at 0.98 and gamma 0.99, 50 at 0.99, 100 at 1.0. See
+        # `rollout.py`: none of them reaches the +100, which is why the critic carries it.
+        'ppo_gae_lambda': tuned('PPO_GAE_LAMBDA', 0.99),
         'ppo_entropy_coef': tuned('PPO_ENTROPY_COEF', 0.01),
         # Absent means "no anneal", which is b4's setting. `tuned` needs a sentinel rather than None
         # because it casts, so an empty string is the spelling for absent.

@@ -222,7 +222,7 @@ def test_the_defaults_are_the_ones_the_plan_and_the_docs_state(monkeypatch):
     """
     monkeypatch.setenv('SNEK_ALGO', 'ppo')
     documented = {'collect_envs': 128, 'ppo_rollout': 128, 'ppo_epochs': 4, 'ppo_minibatch': 256,
-                  'ppo_clip': 0.2, 'ppo_gae_lambda': 0.98, 'ppo_entropy_coef': 0.01,
+                  'ppo_clip': 0.2, 'ppo_gae_lambda': 0.99, 'ppo_entropy_coef': 0.01,
                   'ppo_entropy_coef_final': None, 'ppo_vf_coef': 0.5,
                   'ppo_learning_rate': 3e-4, 'ppo_target_kl': 0.0, 'ppo_normalize_adv': True,
                   'ppo_value_loss': 'huber', 'discount': 0.99}
@@ -235,7 +235,7 @@ def test_the_report_states_the_horizon_and_the_rollout_size(monkeypatch):
     config = ppo_config(monkeypatch)
     out = train.reportable(config)
     assert out['ppo_transitions_per_rollout'] == 32
-    assert out['ppo_horizon'] == pytest.approx(33.6, abs=0.2)
+    assert out['ppo_horizon'] == pytest.approx(50.3, abs=0.2)
     for value in out.values():
         assert isinstance(value, (int, float, str, tuple, bool, type(None))), value
 

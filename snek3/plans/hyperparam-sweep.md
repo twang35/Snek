@@ -66,7 +66,7 @@ sweep**, so no batch queues control arms.
 | algorithm, network | PPO, `fc (320,)` | b7: 17.3% record density, every seed above every seed of five other layouts |
 | reward | preset `b2` — chase-safe 0.1 at gate 75, no food-distance term | every PPO batch has used it; b21 is the one batch that varies it, and it runs last |
 | epochs, minibatch, rollout, lanes | 4, 256, 128 steps, 128 lanes | 4 not 8: at both shapes 8 epochs lost (b4 vs b6, b5 vs b7) |
-| lr, γ, λ, entropy, clip | 3e-4, 0.99, 0.98, 0.01, 0.2 | b3's reference; every one of them is a batch below |
+| lr, γ, λ, entropy, clip | 3e-4, 0.99, **0.99** (0.98 until b9 closed 2026-09-02), 0.01, 0.2 | b3's reference; every one of them is a batch below. b11-b14 were re-based to λ 0.99 before they started; b10 runs at 0.98 as queued |
 | grad-norm clip, vf_coef, Adam ε, adv-norm, value loss | 0.5, 0.5, 1e-7, on, huber | PPO's defaults; b18 and b19 check them |
 | `target_KL`, anneals | off | never exercised on this shape; b8 is testing two of them on `fc (200,100)` |
 | seeds | 1, 2, 3, 4, pinned to the arm letter | seed-matched to b7's control and to every batch since b1 |

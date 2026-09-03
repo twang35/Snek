@@ -9,6 +9,10 @@ Stage B measures every screened checkpoint at 500 episodes. **A 500-episode maxi
 high, not a rate** — pooled over b6, the ≥98.5 %/500 rows averaged 98.80 there and **97.86** at
 5,000, a −0.94 pp regression. This pass buys back most of that.
 
+**The candidate cut is ≥99 %/500** (raised from 98.5 on 2026-09-02, user's decision). At b9's
+density a 98.5 cut was 2,289 candidates against 727 at 99, and with the usual −1 pp regression a
+98.5/500 row almost never reaches the 98.73 record region at 5,000 — b7's 766 candidates yielded 6.
+
 It **feeds** [`hof-promote`](../hof-promote/SKILL.md); it does not replace its confirm step. The
 episodes here are genuinely different from the selecting 500 — verified on 40 b6a checkpoints, **0
 reused the same episode sequence** — but the *selection* is still the 500-ep number, so this pass's
@@ -22,7 +26,7 @@ import json, glob, os
 tot = 0
 for f in sorted(glob.glob('runs/<batch>?-*_checkpoint_evals.json')):
     arm = os.path.basename(f).split('_checkpoint')[0]
-    n = sum(1 for r in json.load(open(f))['rows'] if r['perfect_percent'] >= 98.5)
+    n = sum(1 for r in json.load(open(f))['rows'] if r['perfect_percent'] >= 99)
     tot += n; print(arm, n)
 print('total', tot, '=', tot * 5000, 'episodes')
 EOF
@@ -47,7 +51,7 @@ for f in sorted(glob.glob('runs/<batch>?-*_checkpoint_evals.json')):
     rows = json.load(open(f))['rows']
     with open('/tmp/files-%s.txt' % arm, 'w') as out:
         out.write('arch.json\n')
-        for s in sorted({r['step'] for r in rows if r['perfect_percent'] >= 98.5}):
+        for s in sorted({r['step'] for r in rows if r["perfect_percent"] >= 99}):
             out.write('ckpt-%d.pt\n' % s)
 EOF
 
@@ -72,7 +76,7 @@ import glob, os
 from tools import step_selectors as sel
 for f in sorted(glob.glob('runs/<batch>?-*_checkpoint_evals.json')):
     arm = os.path.basename(f).split('_checkpoint')[0]
-    steps, desc = sel.resolve(os.path.join('savedPolicies', arm), 'above:98.5', arm)
+    steps, desc = sel.resolve(os.path.join('savedPolicies', arm), 'above:99', arm)
     print(arm, len(steps), desc)"
 ```
 
@@ -82,16 +86,21 @@ Its signature is `resolve(policy_dir, token, policy)` — three arguments, `poli
 
 ```
 PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -u -m tools.closeout <arm...> \
-    --selector above:98.5 --episodes 5000 --label hof5000 --shards 8 \
+    --selector above:99 --episodes 5000 --label hof5000 --shards 8 \
     > logs/<batch>-hof5000.log 2>&1 &
 ```
 
 **‡ `--label hof5000` is not cosmetic and omitting it destroys the input.** The output path is
 `runs/<arm>_checkpoint_evals[_<label>].json`, so with no label this pass overwrites the 500-episode
-close-out — which is the file `above:98.5` reads. You would lose the selection, the comparison
+close-out — which is the file `above:99` reads. You would lose the selection, the comparison
 baseline and any chance of repeating the pass, and the wreckage looks like a normal short result file.
 
 Call the env python directly, never `conda run` — it buffers a backgrounded log for 90+ seconds.
+
+**‡ Do not pass the arm list through a zsh variable.** `ARMS="a b c"; ... closeout $ARMS` hands the
+controller **one** policy named `a b c` (zsh does not word-split a parameter), and it exits status 1 in
+0.0 min having opened a window for a nonexistent arm. Type the names, or use `$(cat list.txt)` — an
+unquoted command substitution *is* split. Cost one relaunch on b9, 2026-09-02.
 
 ## 4. Watch it
 
@@ -113,7 +122,7 @@ print('n', len(r), 'best', r[0]['perfect_percent'], '@', r[0]['step'], r[0]['per
 print('mean', round(st.mean(x['perfect_percent'] for x in r), 2))"
 ```
 
-Sanity check the merge: **merged rows must equal the shard sum and equal the ≥98.5 %/500 count.** All
+Sanity check the merge: **merged rows must equal the shard sum and equal the ≥99 %/500 count.** All
 sixteen b5/b6 arms satisfied both, which is what made those passes trustworthy.
 
 Then judge a candidate by its **basin**, not its peak — the mean of its neighbours within ±1M

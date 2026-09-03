@@ -56,7 +56,7 @@ def test_build_reduces_each_arm_to_the_docs_numbers(tmp_path):
     by = {a['policy']: a for a in manifest['arms']}
     assert list(by) == ['b9ce-lam999-seed1', 'b9cf-lam999-seed2', 'b9cg-lam999-seed3']
     a = by['b9ce-lam999-seed1']
-    assert (a['rows'], a['density98'], a['cands985'], a['best_row']) == (4, 75.0, 2, 99.2)
+    assert (a['rows'], a['density98'], a['cands99'], a['best_row']) == (4, 75.0, 1, 99.2)
     assert (a['best30'], a['drawdown50'], a['stage_b_png']) == (99, 33.33, True)
     b = by['b9cf-lam999-seed2']
     assert b['rows'] is None and b['density98'] is None and b['best30'] == 90

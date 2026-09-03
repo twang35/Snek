@@ -12,7 +12,7 @@ the page and the tables cannot disagree:
 |---|---|
 | `best30` | `summary.best_perfect30`, the peak 30-eval trailing perfect rate |
 | `sef` | `summary.strong_eval_fraction`, share of stage-A evals at >=80% perfect |
-| `rows`, `density98`, `cands985`, `best_row` | stage-B row count, share at >=98/500, count at >=98.5, max |
+| `rows`, `density98`, `cands99`, `best_row` | stage-B row count, share at >=98/500, `hof5000` candidates at >=99, max |
 | `drawdown50`, `drawdown80` | share of post-competence stage-A evals (onset = first >=80%) below 50 / 80 |
 
 The output is JavaScript rather than JSON — `window.SNEK_MANIFEST = {...}` — because a `<script src>`
@@ -91,7 +91,7 @@ def arm_record(policy, runs_dir):
     record.update({
         'rows': len(rows) if stage_b is not None else None,
         'density98': round(100.0 * sum(s >= 98 for s in scores) / len(scores), 1) if scores else None,
-        'cands985': sum(s >= 98.5 for s in scores) if scores else None,
+        'cands99': sum(s >= 99 for s in scores) if scores else None,
         'best_row': max(scores) if scores else None,
     })
     return record
