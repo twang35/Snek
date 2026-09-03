@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-03T14:04:54",
-  "ts": 1788469494.222641,
+  "iso": "2026-09-03T14:15:08",
+  "ts": 1788470108.7760851,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b10 | b10: g100, seed 1 of 4 -- wave 8 of 8 | training 86% (2 arms)"
+      "b10 | b10: g100, seed 3 of 4 -- wave 8 of 8 | training 82% (1 arm)"
     ],
     "queued": [
-      "b10 stage B | b10: g100, seed 1 of 4 -- wave 8 of 8 | queued (6 arms)",
+      "b10 stage B | b10: g100, seed 3 of 4 -- wave 8 of 8 | queued (7 arms)",
       "b11 training | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
       "b11 stage B | b11: lr4e5, seed 1 of 4 -- wave 1 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
@@ -35,23 +35,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 2,
+    "trainer": 1,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b10ci-g100-seed1",
-      "type": "train",
-      "policy": "b10ci-g100-seed1",
-      "policies": [
-        "b10ci-g100-seed1"
-      ],
-      "pid": 1133374,
-      "step": 46006272,
-      "max_steps": 50003968,
-      "steps_per_sec": 8843.3,
-      "elapsed_s": 11557
-    },
     {
       "id": "b10ck-g100-seed3",
       "type": "train",
@@ -60,10 +47,10 @@
         "b10ck-g100-seed3"
       ],
       "pid": 1133376,
-      "step": 39976960,
+      "step": 41156608,
       "max_steps": 50003968,
-      "steps_per_sec": 8322.4,
-      "elapsed_s": 11557
+      "steps_per_sec": 3645.0,
+      "elapsed_s": 12172
     }
   ],
   "ledger": {
@@ -200,8 +187,8 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b10ci-g100-seed1": "running",
     "b10ck-g100-seed3": "running",
+    "b10ci-g100-seed1": "done",
     "b10cj-g100-seed2": "done",
     "b10cl-g100-seed4": "done",
     "b10ch-g999-seed4": "done",
@@ -501,8 +488,8 @@
   },
   "disk_free_gb": 147.2,
   "load_avg": [
-    12.66943359375,
-    12.0849609375,
-    11.9814453125
+    11.212890625,
+    11.57568359375,
+    11.810546875
   ]
 }
