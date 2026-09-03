@@ -91,7 +91,7 @@ from tools import checkpoints
 # truth, and it is one line to move. Set 2026-09-01: 98.96% over 30,000 episodes, and the first
 # snek3 checkpoint to beat the snek2 champion on a matched-depth measurement (98.48% over the same
 # 30,000). Set back to None and `hof` falls back to "the only entry", saying so if there are more.
-HOF_RECORD = 'b5h-ep8-seed8-ckpt9027584'
+HOF_RECORD = 'b9ch-lam999-seed4-ckpt47251456'
 
 PERFECT_TEXT = 'PERFECT GAME!!!'
 
