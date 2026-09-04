@@ -67,7 +67,7 @@
   </div>
 </header>
 <div class="grid" id="grid"></div>
-<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by one arm · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd>/<kbd>k</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
+<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by four arms · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd>/<kbd>k</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
 <div id="lightbox"><img alt=""><div class="cap"></div></div>
 
 <script src="manifest.js"></script>
@@ -241,8 +241,8 @@
     if (e.target.tagName === 'SELECT') return;
     if (e.key === 'Escape') return unzoom();
     if ($('lightbox').style.display === 'flex') return;
-    if (e.key === 'ArrowRight') { move(e.shiftKey ? 1 : PAGE); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft') { move(e.shiftKey ? -1 : -PAGE); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { move(e.shiftKey ? 4 : PAGE); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { move(e.shiftKey ? -4 : -PAGE); e.preventDefault(); }
     else if (e.key === 'Home') { state.start = 0; render(); }
     else if (e.key === 'End') { state.start = Math.max(0, current.length - PAGE); render(); }
     else if (e.key === 'a' || e.key === 'b' || e.key === 'h' || e.key === 'k') { state.mode = e.key; render(); }
