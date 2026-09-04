@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-04T06:17:21",
-  "ts": 1788527841.5850556,
+  "iso": "2026-09-04T06:27:34",
+  "ts": 1788528454.889718,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b12 | ep5 -- wave 2 of 5 | training 98% (4 arms)"
+      "b12 | ep3, ep5 | stage B (8 arms)"
     ],
     "queued": [
-      "b12 stage B | ep3 | queued (4 arms)",
       "b12 training | ep6, ep7, ep8, ep10, ep12, ep16 -- waves 3-5 of 5 | queued (24 arms)",
       "b14 training | roll32, roll64, roll192, roll256, roll512, roll1024 -- waves 1-3 of 3 | queued (24 arms)",
       "b14 stage B | roll32, roll64 | queued (8 arms)",
@@ -44,69 +43,33 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 4,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b12am-ep5-seed1",
-      "type": "train",
-      "policy": "b12am-ep5-seed1",
+      "id": "b12-stageb-w2",
+      "type": "eval",
+      "policy": "b12ai-ep3-seed1",
       "policies": [
-        "b12am-ep5-seed1"
-      ],
-      "pid": 2690038,
-      "step": 49283072,
-      "label": "b12: ep5, seed 1 of 4 -- wave 2 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 13484.8,
-      "elapsed_s": 5537
-    },
-    {
-      "id": "b12an-ep5-seed2",
-      "type": "train",
-      "policy": "b12an-ep5-seed2",
-      "policies": [
-        "b12an-ep5-seed2"
-      ],
-      "pid": 2690039,
-      "step": 49610752,
-      "label": "b12: ep5, seed 2 of 4 -- wave 2 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 13019.5,
-      "elapsed_s": 5537
-    },
-    {
-      "id": "b12ao-ep5-seed3",
-      "type": "train",
-      "policy": "b12ao-ep5-seed3",
-      "policies": [
-        "b12ao-ep5-seed3"
-      ],
-      "pid": 2690040,
-      "step": 48758784,
-      "label": "b12: ep5, seed 3 of 4 -- wave 2 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 12089.4,
-      "elapsed_s": 5537
-    },
-    {
-      "id": "b12ap-ep5-seed4",
-      "type": "train",
-      "policy": "b12ap-ep5-seed4",
-      "policies": [
+        "b12ai-ep3-seed1",
+        "b12aj-ep3-seed2",
+        "b12ak-ep3-seed3",
+        "b12al-ep3-seed4",
+        "b12am-ep5-seed1",
+        "b12an-ep5-seed2",
+        "b12ao-ep5-seed3",
         "b12ap-ep5-seed4"
       ],
-      "pid": 2690041,
-      "step": 48545792,
-      "label": "b12: ep5, seed 4 of 4 -- wave 2 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 11161.0,
-      "elapsed_s": 5537
+      "pid": 2839200,
+      "step": 50003968,
+      "label": "",
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 513
     }
   ],
   "ledger": {
-    "b12-stageb-w2": "queued",
     "b12aq-ep6-seed1": "queued",
     "b12ar-ep6-seed2": "queued",
     "b12as-ep6-seed3": "queued",
@@ -395,10 +358,11 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b12am-ep5-seed1": "running",
-    "b12an-ep5-seed2": "running",
-    "b12ao-ep5-seed3": "running",
-    "b12ap-ep5-seed4": "running",
+    "b12-stageb-w2": "running",
+    "b12ap-ep5-seed4": "done",
+    "b12ao-ep5-seed3": "done",
+    "b12an-ep5-seed2": "done",
+    "b12am-ep5-seed1": "done",
     "b12al-ep3-seed4": "done",
     "b12ak-ep3-seed3": "done",
     "b12ai-ep3-seed1": "done",
@@ -747,10 +711,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 138.9,
+  "disk_free_gb": 138.8,
   "load_avg": [
-    14.7705078125,
-    15.2119140625,
-    15.3388671875
+    16.283203125,
+    15.9462890625,
+    15.5439453125
   ]
 }
