@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-03T18:30:42",
-  "ts": 1788485442.9203687,
+  "iso": "2026-09-03T18:33:09",
+  "ts": 1788485589.3978384,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11: lr5e4, seed 1 of 4 -- wave 3 of 4 | training 2% (8 arms)"
+      "b11 | b11: lr5e4, seed 1 of 4 -- wave 3 of 4 | training 4% (8 arms)"
     ],
     "queued": [
       "b11 training | b11: lr5e4, seed 1 of 4 -- wave 3 of 4 | queued (16 arms)",
@@ -18,16 +18,16 @@
       "b15 stage B | b15: ent0, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
       "b16 training | b16: kl003, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
       "b16 stage B | b16: kl003, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
-      "b17 training | b17: clip005, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
-      "b17 stage B | b17: clip005, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
+      "b17 training | b17: clip005, seed 1 of 4 -- wave 1 of 8 | queued (60 arms)",
+      "b17 stage B | b17: clip005, seed 1 of 4 -- wave 1 of 8 | queued (8 arms)",
       "b18 training | b18: gc0, seed 1 of 4 -- wave 1 of 3 | queued (24 arms)",
-      "b18 stage B | b18: gc0, seed 1 of 4 -- wave 1 of 3 | queued (8 arms)",
+      "b18 stage B | b18: gc0, seed 1 of 4 -- wave 1 of 3 | queued (4 arms)",
       "b19 training | b19: noadvnorm, seed 1 of 4 -- wave 1 of 3 | queued (24 arms)",
-      "b19 stage B | b19: noadvnorm, seed 1 of 4 -- wave 1 of 3 | queued (8 arms)",
+      "b19 stage B | b19: noadvnorm, seed 1 of 4 -- wave 1 of 3 | queued (4 arms)",
       "b20 training | b20: lanes32, seed 1 of 4 -- wave 1 of 2 | queued (16 arms)",
-      "b20 stage B | b20: lanes32, seed 1 of 4 -- wave 1 of 2 | queued (8 arms)",
+      "b20 stage B | b20: lanes32, seed 1 of 4 -- wave 1 of 2 | queued (4 arms)",
       "b21 training | b21: shape0, seed 1 of 4 -- wave 1 of 3 | queued (24 arms)",
-      "b21 stage B | b21: shape0, seed 1 of 4 -- wave 1 of 3 | queued (8 arms)"
+      "b21 stage B | b21: shape0, seed 1 of 4 -- wave 1 of 3 | queued (4 arms)"
     ],
     "attention": []
   },
@@ -59,10 +59,10 @@
         "b11ai-lr1.5e4-seed1"
       ],
       "pid": 1697181,
-      "step": 917504,
+      "step": 1802240,
       "max_steps": 50003968,
-      "steps_per_sec": 5697.2,
-      "elapsed_s": 155
+      "steps_per_sec": 2953.9,
+      "elapsed_s": 302
     },
     {
       "id": "b11aj-lr1.5e4-seed2",
@@ -72,10 +72,10 @@
         "b11aj-lr1.5e4-seed2"
       ],
       "pid": 1697182,
-      "step": 933888,
+      "step": 1835008,
       "max_steps": 50003968,
-      "steps_per_sec": 6215.1,
-      "elapsed_s": 155
+      "steps_per_sec": 5169.4,
+      "elapsed_s": 302
     },
     {
       "id": "b11ak-lr1.5e4-seed3",
@@ -85,10 +85,10 @@
         "b11ak-lr1.5e4-seed3"
       ],
       "pid": 1697183,
-      "step": 983040,
+      "step": 1867776,
       "max_steps": 50003968,
-      "steps_per_sec": 6733.0,
-      "elapsed_s": 155
+      "steps_per_sec": 3692.4,
+      "elapsed_s": 302
     },
     {
       "id": "b11al-lr1.5e4-seed4",
@@ -98,10 +98,10 @@
         "b11al-lr1.5e4-seed4"
       ],
       "pid": 1697184,
-      "step": 884736,
+      "step": 1884160,
       "max_steps": 50003968,
-      "steps_per_sec": 3625.5,
-      "elapsed_s": 155
+      "steps_per_sec": 11815.7,
+      "elapsed_s": 302
     },
     {
       "id": "b11am-lr2.5e4-seed1",
@@ -111,10 +111,10 @@
         "b11am-lr2.5e4-seed1"
       ],
       "pid": 1697185,
-      "step": 901120,
+      "step": 1753088,
       "max_steps": 50003968,
-      "steps_per_sec": 6215.1,
-      "elapsed_s": 155
+      "steps_per_sec": 3692.4,
+      "elapsed_s": 302
     },
     {
       "id": "b11an-lr2.5e4-seed2",
@@ -124,10 +124,10 @@
         "b11an-lr2.5e4-seed2"
       ],
       "pid": 1697186,
-      "step": 917504,
+      "step": 1769472,
       "max_steps": 50003968,
-      "steps_per_sec": 6215.1,
-      "elapsed_s": 155
+      "steps_per_sec": 2953.9,
+      "elapsed_s": 302
     },
     {
       "id": "b11ao-lr2.5e4-seed3",
@@ -137,10 +137,10 @@
         "b11ao-lr2.5e4-seed3"
       ],
       "pid": 1697187,
-      "step": 917504,
+      "step": 1916928,
       "max_steps": 50003968,
-      "steps_per_sec": 5697.2,
-      "elapsed_s": 155
+      "steps_per_sec": 9600.2,
+      "elapsed_s": 302
     },
     {
       "id": "b11ap-lr2.5e4-seed4",
@@ -150,10 +150,10 @@
         "b11ap-lr2.5e4-seed4"
       ],
       "pid": 1697188,
-      "step": 999424,
+      "step": 1966080,
       "max_steps": 50003968,
-      "steps_per_sec": 6733.0,
-      "elapsed_s": 155
+      "steps_per_sec": 8861.7,
+      "elapsed_s": 302
     }
   ],
   "ledger": {
@@ -395,15 +395,35 @@
     "b17bl-bothanneal-seed2": "queued",
     "b17bm-bothanneal-seed3": "queued",
     "b17bn-bothanneal-seed4": "queued",
+    "b17bo-clipanneal2to1-seed1": "queued",
+    "b17bp-clipanneal2to1-seed2": "queued",
+    "b17bq-clipanneal2to1-seed3": "queued",
+    "b17br-clipanneal2to1-seed4": "queued",
+    "b17bs-clip04anneal-seed1": "queued",
+    "b17bt-clip04anneal-seed2": "queued",
+    "b17bu-clip04anneal-seed3": "queued",
+    "b17bv-clip04anneal-seed4": "queued",
+    "b17bw-clip04anneal2to1-seed1": "queued",
+    "b17bx-clip04anneal2to1-seed2": "queued",
+    "b17by-clip04anneal2to1-seed3": "queued",
+    "b17bz-clip04anneal2to1-seed4": "queued",
+    "b17ca-clipanneal001-seed1": "queued",
+    "b17cb-clipanneal001-seed2": "queued",
+    "b17cc-clipanneal001-seed3": "queued",
+    "b17cd-clipanneal001-seed4": "queued",
+    "b17ce-clipanneal005-seed1": "queued",
+    "b17cf-clipanneal005-seed2": "queued",
+    "b17cg-clipanneal005-seed3": "queued",
+    "b17ch-clipanneal005-seed4": "queued",
     "b18a-gc0-seed1": "queued",
     "b18b-gc0-seed2": "queued",
     "b18c-gc0-seed3": "queued",
     "b18d-gc0-seed4": "queued",
+    "b18-stageb": "queued",
     "b18e-gc01-seed1": "queued",
     "b18f-gc01-seed2": "queued",
     "b18g-gc01-seed3": "queued",
     "b18h-gc01-seed4": "queued",
-    "b18-stageb": "queued",
     "b18i-gc025-seed1": "queued",
     "b18j-gc025-seed2": "queued",
     "b18k-gc025-seed3": "queued",
@@ -424,11 +444,11 @@
     "b19b-noadvnorm-seed2": "queued",
     "b19c-noadvnorm-seed3": "queued",
     "b19d-noadvnorm-seed4": "queued",
+    "b19-stageb": "queued",
     "b19e-mse-seed1": "queued",
     "b19f-mse-seed2": "queued",
     "b19g-mse-seed3": "queued",
     "b19h-mse-seed4": "queued",
-    "b19-stageb": "queued",
     "b19i-adameps1e5-seed1": "queued",
     "b19j-adameps1e5-seed2": "queued",
     "b19k-adameps1e5-seed3": "queued",
@@ -449,11 +469,11 @@
     "b20b-lanes32-seed2": "queued",
     "b20c-lanes32-seed3": "queued",
     "b20d-lanes32-seed4": "queued",
+    "b20-stageb": "queued",
     "b20e-lanes64-seed1": "queued",
     "b20f-lanes64-seed2": "queued",
     "b20g-lanes64-seed3": "queued",
     "b20h-lanes64-seed4": "queued",
-    "b20-stageb": "queued",
     "b20i-lanes256-seed1": "queued",
     "b20j-lanes256-seed2": "queued",
     "b20k-lanes256-seed3": "queued",
@@ -466,11 +486,11 @@
     "b21b-shape0-seed2": "queued",
     "b21c-shape0-seed3": "queued",
     "b21d-shape0-seed4": "queued",
+    "b21-stageb": "queued",
     "b21e-shape005-seed1": "queued",
     "b21f-shape005-seed2": "queued",
     "b21g-shape005-seed3": "queued",
     "b21h-shape005-seed4": "queued",
-    "b21-stageb": "queued",
     "b21i-shape02-seed1": "queued",
     "b21j-shape02-seed2": "queued",
     "b21k-shape02-seed3": "queued",
@@ -806,8 +826,8 @@
   },
   "disk_free_gb": 145.8,
   "load_avg": [
-    14.0830078125,
-    14.70166015625,
-    15.40234375
+    14.8388671875,
+    14.80712890625,
+    15.33935546875
   ]
 }
