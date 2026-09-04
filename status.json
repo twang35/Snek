@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-04T09:01:22",
-  "ts": 1788537682.9522805,
+  "iso": "2026-09-04T09:11:31",
+  "ts": 1788538291.4514463,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b12 | ep6, ep7 -- wave 3 of 5 | training 93% (8 arms)"
+      "b12 | ep6, ep7 | stage B (8 arms)"
     ],
     "queued": [
       "b12 training | ep8, ep10, ep12, ep16 -- waves 4-5 of 5 | queued (16 arms)",
@@ -43,121 +43,30 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b12aq-ep6-seed1",
-      "type": "train",
+      "id": "b12-stageb-w3",
+      "type": "eval",
       "policy": "b12aq-ep6-seed1",
       "policies": [
-        "b12aq-ep6-seed1"
-      ],
-      "pid": 2951053,
-      "step": 48660480,
-      "label": "b12: ep6, seed 1 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9248.5,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12ar-ep6-seed2",
-      "type": "train",
-      "policy": "b12ar-ep6-seed2",
-      "policies": [
-        "b12ar-ep6-seed2"
-      ],
-      "pid": 2951054,
-      "step": 48840704,
-      "label": "b12: ep6, seed 2 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9762.1,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12as-ep6-seed3",
-      "type": "train",
-      "policy": "b12as-ep6-seed3",
-      "policies": [
-        "b12as-ep6-seed3"
-      ],
-      "pid": 2951055,
-      "step": 46923776,
-      "label": "b12: ep6, seed 3 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 7193.1,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12at-ep6-seed4",
-      "type": "train",
-      "policy": "b12at-ep6-seed4",
-      "policies": [
-        "b12at-ep6-seed4"
-      ],
-      "pid": 2951056,
-      "step": 46383104,
-      "label": "b12: ep6, seed 4 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 11303.7,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12au-ep7-seed1",
-      "type": "train",
-      "policy": "b12au-ep7-seed1",
-      "policies": [
-        "b12au-ep7-seed1"
-      ],
-      "pid": 2951057,
-      "step": 45137920,
-      "label": "b12: ep7, seed 1 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9248.8,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12av-ep7-seed2",
-      "type": "train",
-      "policy": "b12av-ep7-seed2",
-      "policies": [
-        "b12av-ep7-seed2"
-      ],
-      "pid": 2951058,
-      "step": 45219840,
-      "label": "b12: ep7, seed 2 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 10276.5,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12aw-ep7-seed3",
-      "type": "train",
-      "policy": "b12aw-ep7-seed3",
-      "policies": [
-        "b12aw-ep7-seed3"
-      ],
-      "pid": 2951059,
-      "step": 45023232,
-      "label": "b12: ep7, seed 3 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 8735.1,
-      "elapsed_s": 5346
-    },
-    {
-      "id": "b12ax-ep7-seed4",
-      "type": "train",
-      "policy": "b12ax-ep7-seed4",
-      "policies": [
+        "b12aq-ep6-seed1",
+        "b12ar-ep6-seed2",
+        "b12as-ep6-seed3",
+        "b12at-ep6-seed4",
+        "b12au-ep7-seed1",
+        "b12av-ep7-seed2",
+        "b12aw-ep7-seed3",
         "b12ax-ep7-seed4"
       ],
-      "pid": 2951060,
-      "step": 44892160,
-      "label": "b12: ep7, seed 4 of 4 -- wave 3 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 10276.7,
-      "elapsed_s": 5346
+      "pid": 3106011,
+      "step": 50003968,
+      "label": "",
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 128
     }
   ],
   "ledger": {
@@ -441,14 +350,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b12aq-ep6-seed1": "running",
-    "b12ar-ep6-seed2": "running",
-    "b12as-ep6-seed3": "running",
-    "b12at-ep6-seed4": "running",
-    "b12au-ep7-seed1": "running",
-    "b12av-ep7-seed2": "running",
-    "b12aw-ep7-seed3": "running",
-    "b12ax-ep7-seed4": "running",
+    "b12-stageb-w3": "running",
+    "b12ax-ep7-seed4": "done",
+    "b12aw-ep7-seed3": "done",
+    "b12au-ep7-seed1": "done",
+    "b12av-ep7-seed2": "done",
+    "b12at-ep6-seed4": "done",
+    "b12as-ep6-seed3": "done",
+    "b12aq-ep6-seed1": "done",
+    "b12ar-ep6-seed2": "done",
     "b12-stageb-w2": "done",
     "b12ap-ep5-seed4": "done",
     "b12ao-ep5-seed3": "done",
@@ -802,10 +712,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 137.7,
+  "disk_free_gb": 137.6,
   "load_avg": [
-    13.96728515625,
-    13.95166015625,
-    13.822265625
+    15.28173828125,
+    13.31494140625,
+    13.43798828125
   ]
 }
