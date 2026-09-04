@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-03T18:20:27",
-  "ts": 1788484827.3588033,
+  "iso": "2026-09-03T18:30:42",
+  "ts": 1788485442.9203687,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | stage B (8 arms)"
+      "b11 | b11: lr5e4, seed 1 of 4 -- wave 3 of 4 | training 2% (8 arms)"
     ],
     "queued": [
-      "b11 training | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | queued (24 arms)",
+      "b11 training | b11: lr5e4, seed 1 of 4 -- wave 3 of 4 | queued (16 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
       "b12 stage B | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
       "b13 training | b13: mb32, seed 1 of 4 -- wave 1 of 4 | queued (32 arms)",
@@ -47,40 +47,116 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b11-stageb",
-      "type": "eval",
-      "policy": "b11aa-lr4e5-seed1",
+      "id": "b11ai-lr1.5e4-seed1",
+      "type": "train",
+      "policy": "b11ai-lr1.5e4-seed1",
       "policies": [
-        "b11aa-lr4e5-seed1",
-        "b11ab-lr4e5-seed2",
-        "b11ac-lr4e5-seed3",
-        "b11ad-lr4e5-seed4",
-        "b11ae-lr1e4-seed1",
-        "b11af-lr1e4-seed2",
-        "b11ag-lr1e4-seed3",
-        "b11ah-lr1e4-seed4"
+        "b11ai-lr1.5e4-seed1"
       ],
-      "pid": 1636161,
-      "step": 50003968,
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2285
+      "pid": 1697181,
+      "step": 917504,
+      "max_steps": 50003968,
+      "steps_per_sec": 5697.2,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11aj-lr1.5e4-seed2",
+      "type": "train",
+      "policy": "b11aj-lr1.5e4-seed2",
+      "policies": [
+        "b11aj-lr1.5e4-seed2"
+      ],
+      "pid": 1697182,
+      "step": 933888,
+      "max_steps": 50003968,
+      "steps_per_sec": 6215.1,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11ak-lr1.5e4-seed3",
+      "type": "train",
+      "policy": "b11ak-lr1.5e4-seed3",
+      "policies": [
+        "b11ak-lr1.5e4-seed3"
+      ],
+      "pid": 1697183,
+      "step": 983040,
+      "max_steps": 50003968,
+      "steps_per_sec": 6733.0,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11al-lr1.5e4-seed4",
+      "type": "train",
+      "policy": "b11al-lr1.5e4-seed4",
+      "policies": [
+        "b11al-lr1.5e4-seed4"
+      ],
+      "pid": 1697184,
+      "step": 884736,
+      "max_steps": 50003968,
+      "steps_per_sec": 3625.5,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11am-lr2.5e4-seed1",
+      "type": "train",
+      "policy": "b11am-lr2.5e4-seed1",
+      "policies": [
+        "b11am-lr2.5e4-seed1"
+      ],
+      "pid": 1697185,
+      "step": 901120,
+      "max_steps": 50003968,
+      "steps_per_sec": 6215.1,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11an-lr2.5e4-seed2",
+      "type": "train",
+      "policy": "b11an-lr2.5e4-seed2",
+      "policies": [
+        "b11an-lr2.5e4-seed2"
+      ],
+      "pid": 1697186,
+      "step": 917504,
+      "max_steps": 50003968,
+      "steps_per_sec": 6215.1,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11ao-lr2.5e4-seed3",
+      "type": "train",
+      "policy": "b11ao-lr2.5e4-seed3",
+      "policies": [
+        "b11ao-lr2.5e4-seed3"
+      ],
+      "pid": 1697187,
+      "step": 917504,
+      "max_steps": 50003968,
+      "steps_per_sec": 5697.2,
+      "elapsed_s": 155
+    },
+    {
+      "id": "b11ap-lr2.5e4-seed4",
+      "type": "train",
+      "policy": "b11ap-lr2.5e4-seed4",
+      "policies": [
+        "b11ap-lr2.5e4-seed4"
+      ],
+      "pid": 1697188,
+      "step": 999424,
+      "max_steps": 50003968,
+      "steps_per_sec": 6733.0,
+      "elapsed_s": 155
     }
   ],
   "ledger": {
-    "b11ai-lr1.5e4-seed1": "queued",
-    "b11aj-lr1.5e4-seed2": "queued",
-    "b11ak-lr1.5e4-seed3": "queued",
-    "b11al-lr1.5e4-seed4": "queued",
-    "b11am-lr2.5e4-seed1": "queued",
-    "b11an-lr2.5e4-seed2": "queued",
-    "b11ao-lr2.5e4-seed3": "queued",
-    "b11ap-lr2.5e4-seed4": "queued",
     "b11aq-lr5e4-seed1": "queued",
     "b11ar-lr5e4-seed2": "queued",
     "b11as-lr5e4-seed3": "queued",
@@ -411,7 +487,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b11-stageb": "running",
+    "b11ai-lr1.5e4-seed1": "running",
+    "b11aj-lr1.5e4-seed2": "running",
+    "b11ak-lr1.5e4-seed3": "running",
+    "b11al-lr1.5e4-seed4": "running",
+    "b11am-lr2.5e4-seed1": "running",
+    "b11an-lr2.5e4-seed2": "running",
+    "b11ao-lr2.5e4-seed3": "running",
+    "b11ap-lr2.5e4-seed4": "running",
+    "b11-stageb": "done",
     "b11ah-lr1e4-seed4": "done",
     "b11ag-lr1e4-seed3": "done",
     "b11ad-lr4e5-seed4": "done",
@@ -722,8 +806,8 @@
   },
   "disk_free_gb": 145.8,
   "load_avg": [
-    16.3974609375,
-    16.505859375,
-    15.93994140625
+    14.0830078125,
+    14.70166015625,
+    15.40234375
   ]
 }
