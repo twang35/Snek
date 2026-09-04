@@ -1,12 +1,13 @@
 {
-  "iso": "2026-09-03T20:21:22",
-  "ts": 1788492082.4272048,
+  "iso": "2026-09-03T20:28:29",
+  "ts": 1788492509.09671,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | training 7% (8 arms)"
+      "b11 | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | training 14% (8 arms)"
     ],
     "queued": [
+      "b11 stage B | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | queued (8 arms)",
       "b11 training | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
       "b12 stage B | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
@@ -29,9 +30,7 @@
       "b21 training | b21: shape0, seed 1 of 4 -- wave 1 of 3 | queued (24 arms)",
       "b21 stage B | b21: shape0, seed 1 of 4 -- wave 1 of 3 | queued (8 arms)"
     ],
-    "attention": [
-      "** b11-stageb-w2 failed and will NOT be retried automatically (rc=1). Its arms count as measured; delete its ledger record to re-queue."
-    ]
+    "attention": []
   },
   "runtime": {
     "max_trainers": 8,
@@ -61,10 +60,10 @@
         "b11aq-lr5e4-seed1"
       ],
       "pid": 1874153,
-      "step": 3637248,
+      "step": 7307264,
       "max_steps": 50003968,
-      "steps_per_sec": 8686.4,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11ar-lr5e4-seed2",
@@ -74,10 +73,10 @@
         "b11ar-lr5e4-seed2"
       ],
       "pid": 1874154,
-      "step": 3653632,
+      "step": 7356416,
       "max_steps": 50003968,
-      "steps_per_sec": 7664.4,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11as-lr5e4-seed3",
@@ -87,10 +86,10 @@
         "b11as-lr5e4-seed3"
       ],
       "pid": 1874155,
-      "step": 3489792,
+      "step": 7012352,
       "max_steps": 50003968,
-      "steps_per_sec": 8686.4,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11at-lr5e4-seed4",
@@ -100,10 +99,10 @@
         "b11at-lr5e4-seed4"
       ],
       "pid": 1874156,
-      "step": 3440640,
+      "step": 6995968,
       "max_steps": 50003968,
-      "steps_per_sec": 7664.5,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11au-lr8e4-seed1",
@@ -113,10 +112,10 @@
         "b11au-lr8e4-seed1"
       ],
       "pid": 1874157,
-      "step": 3358720,
+      "step": 6602752,
       "max_steps": 50003968,
-      "steps_per_sec": 8686.4,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11av-lr8e4-seed2",
@@ -126,10 +125,10 @@
         "b11av-lr8e4-seed2"
       ],
       "pid": 1874158,
-      "step": 3194880,
+      "step": 6619136,
       "max_steps": 50003968,
-      "steps_per_sec": 7153.5,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11aw-lr8e4-seed3",
@@ -139,10 +138,10 @@
         "b11aw-lr8e4-seed3"
       ],
       "pid": 1874159,
-      "step": 2916352,
+      "step": 6209536,
       "max_steps": 50003968,
-      "steps_per_sec": 7153.5,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     },
     {
       "id": "b11ax-lr8e4-seed4",
@@ -152,13 +151,14 @@
         "b11ax-lr8e4-seed4"
       ],
       "pid": 1874160,
-      "step": 3342336,
+      "step": 6914048,
       "max_steps": 50003968,
-      "steps_per_sec": 7664.4,
-      "elapsed_s": 528
+      "steps_per_sec": null,
+      "elapsed_s": 954
     }
   ],
   "ledger": {
+    "b11-stageb-w2": "queued",
     "b11ay-lr1e3-seed1": "queued",
     "b11az-lr1e3-seed2": "queued",
     "b11ba-lr1e3-seed3": "queued",
@@ -513,7 +513,6 @@
     "b11av-lr8e4-seed2": "running",
     "b11aw-lr8e4-seed3": "running",
     "b11ax-lr8e4-seed4": "running",
-    "b11-stageb-w2": "failed",
     "b11ap-lr2.5e4-seed4": "done",
     "b11ao-lr2.5e4-seed3": "done",
     "b11an-lr2.5e4-seed2": "done",
@@ -833,8 +832,8 @@
   },
   "disk_free_gb": 143.9,
   "load_avg": [
-    14.9267578125,
-    12.32470703125,
-    11.45703125
+    15.08984375,
+    14.3564453125,
+    12.74951171875
   ]
 }
