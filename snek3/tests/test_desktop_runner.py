@@ -824,3 +824,18 @@ def test_throughput_is_read_from_the_desktop_runs_dir(tmp_path):
     running = launch.RunningJob(parse_job(spec()), 'b7a-x', 1, str(tmp_path / 'log'))
     launch.update_throughput(running, host)
     assert running.current_step == 4096
+
+
+def test_a_whole_queued_batch_reads_as_a_wave_range_and_a_capped_cell_list():
+    # b12's ten cells over five waves printed "wave 1 of 5, wave 2 of..." past the 80-char cut on 2026-09-03.
+    def arm(i, cell, wave):
+        return {'id': 'b12{0}-{1}-seed1'.format(chr(97 + i), cell), 'type': 'train', 'policy': 'b12x', 'policies': [],
+                'label': 'b12: {0}, seed 1 of 4 -- wave {1} of 5'.format(cell, wave), 'priority': 120}
+    cells = ['ep1', 'ep2', 'ep3', 'ep5', 'ep6', 'ep7', 'ep8', 'ep10', 'ep12', 'ep16']
+    queued = [arm(i, c, i // 2 + 1) for i, c in enumerate(cells)]
+    assert runner_module.describe_jobs(queued) == \
+        'ep1, ep2, ep3, ep5, ep6, ep7, ep8, ep10, +2 more -- waves 1-5 of 5'
+    # a gap in the waves is shown, not papered over
+    assert runner_module.compress_waves(['wave 1 of 4', 'wave 3 of 4', 'wave 4 of 4']) == \
+        ['wave 1 of 4', 'waves 3-4 of 4']
+    assert runner_module.compress_waves(['wave 2 of 2', 'final pass']) == ['wave 2 of 2', 'final pass']

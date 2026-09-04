@@ -757,6 +757,42 @@ _BATCH_PREFIX_RE = re.compile(r'^b\d+:\s*')
 _KNOB_TOKEN_RE = re.compile(r'^b\d+[a-z]+-(.+?)(?:-seed\d+)?$')
 
 
+_WAVE_RE = re.compile(r'^wave (\d+) of (\d+)$')
+MAX_CELLS_SHOWN = 8
+
+
+def compress_waves(tails):
+    """`['wave 1 of 5', 'wave 2 of 5', 'wave 3 of 5']` -> `['waves 1-3 of 5']`; anything else passes through.
+
+    A whole queued batch is one group, and listing its five waves one by one ran the caption past the
+    80-character cut on the first day (b12: "wave 1 of 5, wave 2 of..."). Consecutive runs only, so a
+    gap -- wave 2 pulled from the queue -- still shows as two ranges rather than being papered over.
+    """
+    out, run = [], []
+
+    def flush():
+        if not run:
+            return
+        total = run[0][1]
+        first, last = run[0][0], run[-1][0]
+        out.append('wave {0} of {1}'.format(first, total) if first == last
+                   else 'waves {0}-{1} of {2}'.format(first, last, total))
+        del run[:]
+
+    for tail in tails:
+        match = _WAVE_RE.match(tail)
+        if not match:
+            flush()
+            out.append(tail)
+            continue
+        wave, total = int(match.group(1)), int(match.group(2))
+        if run and (run[-1][1] != total or wave != run[-1][0] + 1):
+            flush()
+        run.append((wave, total))
+    flush()
+    return out
+
+
 def describe_jobs(jobs):
     """One caption for a group of jobs, from the jobs themselves.
 
@@ -782,7 +818,9 @@ def describe_jobs(jobs):
         if tail and tail not in tails:
             tails.append(tail)
     if heads or tails:
-        return ', '.join(heads) + (' -- ' + ', '.join(tails) if tails else '')
+        if len(heads) > MAX_CELLS_SHOWN:
+            heads = heads[:MAX_CELLS_SHOWN] + ['+{0} more'.format(len(heads) - MAX_CELLS_SHOWN)]
+        return ', '.join(heads) + (' -- ' + ', '.join(compress_waves(tails)) if tails else '')
     tokens = []
     for job in jobs:
         for policy in (job.get('policies') or [job.get('policy')]):
