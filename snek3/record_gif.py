@@ -86,11 +86,11 @@ from env.constants import GIFS_DIR, HOF_DIR, POLICY_DIR
 from tools import arch as arch_tools
 from tools import checkpoints
 
-# The current record, so `record_gif.py hof` needs no arguments. **`hallOfFame/HOF.md` is the
-# authority on which entry that is** — this is a convenience shortcut, not a second source of
-# truth, and it is one line to move. Set 2026-09-01: 98.96% over 30,000 episodes, and the first
-# snek3 checkpoint to beat the snek2 champion on a matched-depth measurement (98.48% over the same
-# 30,000). Set back to None and `hof` falls back to "the only entry", saying so if there are more.
+# The entry `record_gif.py hof` records with no arguments. **`hallOfFame/HOF.md` is the authority
+# on which entry is the record, and this constant is not kept in step with it** (user's decision
+# 2026-09-03: pinned at `b9ch`, 99.30% over 30,000 episodes, and left there). It is a convenience
+# shortcut, not a second source of truth; to record another entry, name its hallOfFame/ directory.
+# Set back to None and `hof` falls back to "the only entry", saying so if there are more.
 HOF_RECORD = 'b9ch-lam999-seed4-ckpt47251456'
 
 PERFECT_TEXT = 'PERFECT GAME!!!'

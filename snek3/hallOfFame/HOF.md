@@ -46,8 +46,8 @@ the pair does not already say and they are not promoted.
 
 Each copy was verified from `hallOfFame/` at 500 episodes on seed 11: 499/500 and 500/500.
 
-**`record_gif.py`'s `HOF_RECORD` names `b10ck-g100-seed3-ckpt30523392`**, so `record_gif.py hof` records
-it and `record_gif.py --list` marks it `*`.
+**`record_gif.py`'s `HOF_RECORD` stays at `b9ch`** (user's decision, 2026-09-03: the constant is not
+moved with the record). To record this entry, name it: `record_gif.py hallOfFame/b10ck-g100-seed3-ckpt30523392`.
 
 ## ‡ The previous record: `b9ch` @47251456, 99.30% over 30,000 episodes — 2026-09-03
 
@@ -64,7 +64,8 @@ is promoted, per the rule below. The same wave measured `b9cl-lam100-seed4` @193
 `b9cc-lam995-seed3` @18350080 at 99.10; they are not indistinguishable from `b9ch` (z ≈ 2.9) and are
 not promoted, because a second λ-plateau entry adds nothing the table does not already say.
 
-`HOF_RECORD` named this entry from the commit of 2026-09-03 until `b10ck` took it the same day.
+**`record_gif.py`'s `HOF_RECORD` names this entry and is pinned here**, so `record_gif.py hof` records it
+and `record_gif.py --list` marks it `*`; the `*` means "the shortcut", not "the record".
 
 ## ‡ The previous record, and the first time this project beat snek2 on a matched measurement
 
@@ -83,9 +84,9 @@ snek2 champion's published figure was itself measured shallower and is itself a 
   cross-depth comparisons are not allowed to settle this question. Against the *published* 98.73% the
   same `b5h` measurement reads p = 0.26 and looks like a tie. Same weights, same afternoon; only the
   depth of the baseline differs.
-- **`record_gif.py`'s `HOF_RECORD` names this entry**, so `record_gif.py hof` and
-  `record_gif.py --list` (which marks it `*`) resolve without arguments. This file stays the
-  authority; that constant is a shortcut, and `tests/test_hof_entries.py` fails if the two disagree.
+- `record_gif.py`'s `HOF_RECORD` named this entry until 2026-09-03, when it moved to `b9ch` and was
+  pinned there. This file stays the authority on what the record is; the constant is a shortcut for
+  `record_gif.py hof`, and `tests/test_hof_entries.py` fails only if it names an entry that does not exist.
 
 ## The admission rule
 
