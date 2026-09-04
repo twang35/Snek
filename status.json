@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-03T17:40:38",
-  "ts": 1788482438.3422594,
+  "iso": "2026-09-03T17:50:43",
+  "ts": 1788483043.6509607,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | training 98% (6 arms)"
+      "b11 | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | stage B (8 arms)"
     ],
     "queued": [
-      "b11 stage B | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | queued (2 arms)",
       "b11 training | b11: lr1.5e4, seed 1 of 4 -- wave 2 of 4 | queued (24 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
       "b12 stage B | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
@@ -34,91 +33,32 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 6,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b11ac-lr4e5-seed3",
-      "type": "train",
-      "policy": "b11ac-lr4e5-seed3",
+      "id": "b11-stageb",
+      "type": "eval",
+      "policy": "b11aa-lr4e5-seed1",
       "policies": [
-        "b11ac-lr4e5-seed3"
-      ],
-      "pid": 1519646,
-      "step": 49168384,
-      "max_steps": 50003968,
-      "steps_per_sec": 10813.2,
-      "elapsed_s": 5532
-    },
-    {
-      "id": "b11ad-lr4e5-seed4",
-      "type": "train",
-      "policy": "b11ad-lr4e5-seed4",
-      "policies": [
-        "b11ad-lr4e5-seed4"
-      ],
-      "pid": 1519647,
-      "step": 48463872,
-      "max_steps": 50003968,
-      "steps_per_sec": 11304.1,
-      "elapsed_s": 5532
-    },
-    {
-      "id": "b11ae-lr1e4-seed1",
-      "type": "train",
-      "policy": "b11ae-lr1e4-seed1",
-      "policies": [
-        "b11ae-lr1e4-seed1"
-      ],
-      "pid": 1519648,
-      "step": 49561600,
-      "max_steps": 50003968,
-      "steps_per_sec": 9829.2,
-      "elapsed_s": 5532
-    },
-    {
-      "id": "b11af-lr1e4-seed2",
-      "type": "train",
-      "policy": "b11af-lr1e4-seed2",
-      "policies": [
-        "b11af-lr1e4-seed2"
-      ],
-      "pid": 1519649,
-      "step": 49725440,
-      "max_steps": 50003968,
-      "steps_per_sec": 11794.6,
-      "elapsed_s": 5532
-    },
-    {
-      "id": "b11ag-lr1e4-seed3",
-      "type": "train",
-      "policy": "b11ag-lr1e4-seed3",
-      "policies": [
-        "b11ag-lr1e4-seed3"
-      ],
-      "pid": 1519650,
-      "step": 49020928,
-      "max_steps": 50003968,
-      "steps_per_sec": 9828.4,
-      "elapsed_s": 5532
-    },
-    {
-      "id": "b11ah-lr1e4-seed4",
-      "type": "train",
-      "policy": "b11ah-lr1e4-seed4",
-      "policies": [
+        "b11aa-lr4e5-seed1",
+        "b11ab-lr4e5-seed2",
+        "b11ac-lr4e5-seed3",
+        "b11ad-lr4e5-seed4",
+        "b11ae-lr1e4-seed1",
+        "b11af-lr1e4-seed2",
+        "b11ag-lr1e4-seed3",
         "b11ah-lr1e4-seed4"
       ],
-      "pid": 1519651,
-      "step": 48939008,
-      "max_steps": 50003968,
-      "steps_per_sec": 9828.1,
-      "elapsed_s": 5532
+      "pid": 1636161,
+      "step": 50003968,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 501
     }
   ],
   "ledger": {
-    "b11-stageb": "queued",
     "b11ai-lr1.5e4-seed1": "queued",
     "b11aj-lr1.5e4-seed2": "queued",
     "b11ak-lr1.5e4-seed3": "queued",
@@ -242,12 +182,13 @@
     "b14v-roll1024-seed2": "queued",
     "b14w-roll1024-seed3": "queued",
     "b14x-roll1024-seed4": "queued",
-    "b11ac-lr4e5-seed3": "running",
-    "b11ad-lr4e5-seed4": "running",
-    "b11ae-lr1e4-seed1": "running",
-    "b11af-lr1e4-seed2": "running",
-    "b11ag-lr1e4-seed3": "running",
-    "b11ah-lr1e4-seed4": "running",
+    "b11-stageb": "running",
+    "b11ah-lr1e4-seed4": "done",
+    "b11ag-lr1e4-seed3": "done",
+    "b11ad-lr4e5-seed4": "done",
+    "b11ae-lr1e4-seed1": "done",
+    "b11ac-lr4e5-seed3": "done",
+    "b11af-lr1e4-seed2": "done",
     "b11aa-lr4e5-seed1": "done",
     "b11ab-lr4e5-seed2": "done",
     "b10-stageb-w8": "done",
@@ -552,8 +493,8 @@
   },
   "disk_free_gb": 145.9,
   "load_avg": [
-    12.9619140625,
-    13.07275390625,
-    13.21533203125
+    13.7578125,
+    14.5673828125,
+    13.8701171875
   ]
 }
