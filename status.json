@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-04T09:51:50",
-  "ts": 1788540710.673075,
+  "iso": "2026-09-04T09:56:09",
+  "ts": 1788540969.832551,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -8,8 +8,6 @@
     ],
     "queued": [
       "b12 training | ep8, ep10, ep12, ep16 -- waves 4-5 of 5 | queued (16 arms)",
-      "b14 training | roll32, roll64, roll192, roll256, roll512, roll1024 -- waves 1-3 of 3 | queued (24 arms)",
-      "b14 stage B | roll32, roll64 | queued (8 arms)",
       "b15 training | ent0, ent001, ent003, ent005, ent02, ent03, entanneal10, entanneal03, +2 more... | queued (40 arms)",
       "b15 stage B | ent0, ent001 | queued (8 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
@@ -66,7 +64,7 @@
       "label": "",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2547
+      "elapsed_s": 2806
     }
   ],
   "ledger": {
@@ -86,31 +84,6 @@
     "b12bl-ep16-seed2": "queued",
     "b12bm-ep16-seed3": "queued",
     "b12bn-ep16-seed4": "queued",
-    "b14a-roll32-seed1": "queued",
-    "b14b-roll32-seed2": "queued",
-    "b14c-roll32-seed3": "queued",
-    "b14d-roll32-seed4": "queued",
-    "b14e-roll64-seed1": "queued",
-    "b14f-roll64-seed2": "queued",
-    "b14g-roll64-seed3": "queued",
-    "b14h-roll64-seed4": "queued",
-    "b14-stageb": "queued",
-    "b14i-roll192-seed1": "queued",
-    "b14j-roll192-seed2": "queued",
-    "b14k-roll192-seed3": "queued",
-    "b14l-roll192-seed4": "queued",
-    "b14m-roll256-seed1": "queued",
-    "b14n-roll256-seed2": "queued",
-    "b14o-roll256-seed3": "queued",
-    "b14p-roll256-seed4": "queued",
-    "b14q-roll512-seed1": "queued",
-    "b14r-roll512-seed2": "queued",
-    "b14s-roll512-seed3": "queued",
-    "b14t-roll512-seed4": "queued",
-    "b14u-roll1024-seed1": "queued",
-    "b14v-roll1024-seed2": "queued",
-    "b14w-roll1024-seed3": "queued",
-    "b14x-roll1024-seed4": "queued",
     "b15aa-ent0-seed1": "queued",
     "b15ab-ent0-seed2": "queued",
     "b15ac-ent0-seed3": "queued",
@@ -714,8 +687,8 @@
   },
   "disk_free_gb": 137.5,
   "load_avg": [
-    13.65283203125,
-    15.25244140625,
-    15.6123046875
+    16.287109375,
+    15.8623046875,
+    15.78759765625
   ]
 }
