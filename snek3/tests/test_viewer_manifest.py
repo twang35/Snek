@@ -79,4 +79,5 @@ def test_build_reduces_each_arm_to_the_docs_numbers(tmp_path):
 def test_render_is_a_script_that_defines_the_global():
     text = vm.render({'generated': 'now', 'arms': []})
     assert text.startswith('window.SNEK_MANIFEST = {') and text.rstrip().endswith('};')
-    assert json.loads(text[len('window.SNEK_MANIFEST = '):].rstrip().rstrip(';')) == {'generated': 'now', 'arms': []}
+    assert json.loads(text[len('window.SNEK_MANIFEST = '):].rstrip().rstrip(';')) == {'generated': 'now', 'arms': [], 'charts_dir': '../runs/'}
+    assert '"charts_dir":"charts/"' in vm.render({'generated': 'now', 'arms': []}, charts_dir='charts/')

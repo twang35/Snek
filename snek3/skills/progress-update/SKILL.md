@@ -32,6 +32,26 @@ fetch-plus-parse. Off-LAN it exits 1 and the git bus is the only route.
 Start from `status.json`'s `at_a_glance` and its `attention` list. Ledger `interrupted` means the box
 rebooted under the job; it is non-terminal and gets relaunched.
 
+## 1b. Refresh the charts and publish the site **before** any reading or writing
+
+The GitHub-Pages viewer is served from `master`'s top-level `docs/`, and Pages goes live about a
+minute after a push — so publish first, and by the time the update's summary is written the site
+already shows what it describes. In order, before opening a single results file:
+
+```
+git fetch origin results                                        # closed waves' artifacts
+# import any batch/wave whose stage B reads `done` on the ledger and is not yet in snek3/runs/:
+#   for f in $(git ls-tree -r --name-only origin/results | grep 'results/<job-id>/'); do git show origin/results:$f > snek3/runs/$(basename $f); done
+rsync -a --include='b<n>*.png' --include='b<n>*.md' --exclude='*' the-claw-den:Snek/snek3/runs/ snek3/runs/   # live arms' charts
+cd snek3 && PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.publish_pages && cd ..           # manifest + docs/
+git add docs snek3/viewer/manifest.js snek3/runs/b<n>*.png snek3/runs/b<n>*.md                          # plus the imported closed-wave JSON
+git commit -m 'Charts: <what changed>' && git push origin master
+```
+
+`tools.publish_pages` rewrites `docs/` completely — the page, a manifest pointing at `charts/`, exactly
+the PNGs the manifest refers to — so `docs/` is **never edited by hand**. `rsync` is home-LAN only; off-LAN,
+publish without the live charts and say so. The rest of the update's doc edits go up in a second commit.
+
 ## 2. Read each arm from its summary block, never from a log
 
 `runs/<policy>_evals.json` → `summary`: `step`, `transitions`, `evals`, `trailing_now`,
@@ -74,20 +94,9 @@ A **docs-only** change (Markdown, plus any chart PNGs riding along) is committed
 confirmation — standing authorization. The moment the same change touches code or config, the whole
 thing waits for the user.
 
-**Commit every arm's charts, live desktop arms included** (rule changed 2026-09-02). A live desktop
-batch's `.png`/`.md` exist only on the box until close-out, so pull them first, then refresh the
-viewer's manifest, then add the pictures by name:
-
-```
-rsync -a --include='b<n>*.png' --include='b<n>*.md' --exclude='*' the-claw-den:Snek/snek3/runs/ snek3/runs/
-cd snek3 && PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.viewer_manifest && cd ..
-git add snek3/runs/b<n>*.png snek3/runs/b<n>*.md snek3/viewer/manifest.js
-```
-
-`rsync` is home-LAN only; off-LAN, say the live charts were not refreshed and commit the rest. The
-GitHub-Pages viewer (`snek3/viewer/index.html`) reads `manifest.js` and the committed PNGs, so this
-step is what refreshes it — a batch with no manifest row is as much a bug as one with no `charts.md`
-entry.
+**Every arm's charts, live desktop arms included, were committed in step 1b** (rule changed 2026-09-02).
+If step 1b was skipped, do it now rather than adding pictures here by hand — the published site and the
+committed manifest must come from the same `publish_pages` run.
 
 **Never commit a live desktop arm's `*_evals.json` or `*_checkpoint_evals.*`.** `_evals.json` is the
 trainer's own history, read on resume; the stage-B file is a pass in progress. Add them only once the

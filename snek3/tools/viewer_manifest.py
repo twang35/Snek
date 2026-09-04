@@ -128,8 +128,11 @@ def build(runs_dir=None):
     return {'generated': datetime.datetime.now().isoformat(timespec='seconds'), 'arms': arms}
 
 
-def render(manifest):
-    return 'window.SNEK_MANIFEST = ' + json.dumps(manifest, separators=(',', ':')) + ';\n'
+def render(manifest, charts_dir='../runs/'):
+    """The manifest as a script. `charts_dir` is where the page finds the PNGs relative to itself:
+    `../runs/` beside the source viewer, `charts/` on the published site (`tools/publish_pages.py`)."""
+    payload = dict(manifest, charts_dir=charts_dir)
+    return 'window.SNEK_MANIFEST = ' + json.dumps(payload, separators=(',', ':')) + ';\n'
 
 
 def main(argv=None):

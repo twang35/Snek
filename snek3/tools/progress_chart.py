@@ -21,6 +21,7 @@ import os
 import sys
 
 import imageio.v2 as imageio
+import matplotlib
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
@@ -42,6 +43,18 @@ SCORE_COLOR = 'tab:blue'
 PERCENT_COLOR = 'tab:red'
 TREND_COLOR = 'darkred'
 TREND_WINDOW = 10
+# The smoothed trace is drawn deliberately thin. Without anti-aliasing a stroke this narrow paints only
+# the pixels it mostly covers, so it reads as a light, continuous dark-red line through the raw trace
+# rather than a second bold one. Chosen by eye against 0.4, 0.3, 0.2, 0.15 and 0.05 on 2026-09-03:
+# 0.05 breaks into dashes on steep sections, 0.1 does not.
+TREND_LINEWIDTH = 0.1
+
+# Lines and patches are drawn **without anti-aliasing**, text with it. Anti-aliased traces at these
+# widths produced ~4,000 distinct colours per chart and a 65-70 KB PNG; aliased ones produce a few
+# hundred and ~30 KB, and the traces read the same at the viewer's magnification (compared side by
+# side 2026-09-03). Text stays smooth because 6-point aliased labels are jagged. Applied in `render`
+# as an rc context, so nothing else that imports matplotlib in this process is affected.
+RENDER_RC = {'lines.antialiased': False, 'patch.antialiased': False, 'text.antialiased': True}
 
 # The perfect-score guide only appears once an arm has been within this fraction of it. Before that
 # the line sits far above every point and its only effect is to stretch the y axis and squash the
@@ -125,7 +138,7 @@ def build_figure(eval_rows, name=None, resume_steps=()):
     # average still wiggles at this density, and a bold line just reprints the noise heavier.
     if percents:
         percent_axis.plot(steps, trailing_average(percents, TREND_WINDOW), color=TREND_COLOR,
-                          linewidth=0.4, alpha=0.9, zorder=3)
+                          linewidth=TREND_LINEWIDTH, alpha=0.9, zorder=3)
 
     # What a perfect game scores, so the score trace answers "how much is actually left". On the
     # score axis, so it reads against the left-hand ticks.
@@ -143,9 +156,10 @@ def build_figure(eval_rows, name=None, resume_steps=()):
 
 def render(eval_rows, path, name=None, resume_steps=()):
     """Draws the arm and writes the PNG. Returns the pixels."""
-    figure, _, _ = build_figure(eval_rows, name=name, resume_steps=resume_steps)
-    figure.canvas.draw()
-    image = np.asarray(figure.canvas.buffer_rgba())[:, :, :3]
+    with matplotlib.rc_context(RENDER_RC):
+        figure, _, _ = build_figure(eval_rows, name=name, resume_steps=resume_steps)
+        figure.canvas.draw()
+        image = np.asarray(figure.canvas.buffer_rgba())[:, :, :3]
 
     if path:
         # Written beside the target and renamed, so anything reading it mid-eval never sees a

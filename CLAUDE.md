@@ -13,6 +13,14 @@ instructions; **this file is only what is true of the whole repository.**
 deliberate. If a rule you need is missing from `snek3/CLAUDE.md`, it may be in `snek2/CLAUDE.md`
 describing snek2's version of the same thing; carry it across rather than editing snek2.
 
+**`docs/` at the repository root is the GitHub-Pages site, and it is generated.** Pages serves `master`'s
+`/docs` (switched from the branch root 2026-09-03: the whole tree is 0.98 GB against the 1 GB cap, the
+site needs ~25 MB). `snek3/tools/publish_pages.py` rewrites it from `snek3/viewer/` and `snek3/runs/`
+— the chart viewer, its manifest, and every chart the manifest refers to — and the progress-update skill
+runs it first and commits the result, so the site is current a minute after the update's first push.
+Never edit anything under `docs/` by hand; edit `snek3/viewer/index.html` and republish. The live page
+is https://twang35.github.io/Snek/ .
+
 **`README.md` is for humans and stays barebones** — the eras, a sentence each, a gif each. Anything
 an agent needs belongs here or in an era's own manual, not there. Details that were moved out of it
 on 2026-08-29 are the two sections below.

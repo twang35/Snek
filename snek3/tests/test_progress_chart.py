@@ -156,3 +156,22 @@ def test_an_arm_with_one_eval_renders(tmp_path):
 def test_redraw_reports_nothing_rather_than_raising_for_an_untrained_policy(monkeypatch, tmp_path):
     monkeypatch.setattr(constants, 'RUNS_DIR', str(tmp_path))
     assert progress_chart.redraw('never-trained') is None
+
+
+def test_lines_are_drawn_without_anti_aliasing_and_text_with_it(tmp_path):
+    """A 65-70 KB, ~4,000-colour chart became ~30 KB and a few hundred colours on 2026-09-03 by turning
+    anti-aliasing off for lines and patches only. Pinned relatively: the same chart drawn with
+    anti-aliasing on must have more colours, and the shipped one must stay in the low hundreds."""
+    import matplotlib
+    import numpy as np
+    rows = evals(300)
+    shipped = progress_chart.render(rows, str(tmp_path / 'a.png'), 'a')
+    with matplotlib.rc_context({'lines.antialiased': True, 'patch.antialiased': True}):
+        figure, _, _ = progress_chart.build_figure(rows, name='a')
+        figure.canvas.draw()
+        smooth = np.asarray(figure.canvas.buffer_rgba())[:, :, :3]
+    colours = lambda img: len(np.unique(img.reshape(-1, 3), axis=0))
+    assert colours(shipped) < colours(smooth)
+    assert colours(shipped) < 1000
+    assert progress_chart.RENDER_RC['text.antialiased'] is True
+    assert progress_chart.TREND_LINEWIDTH == 0.1
