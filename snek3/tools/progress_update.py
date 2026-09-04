@@ -398,7 +398,7 @@ def insert_results_skeleton(text, table, title, facts):
     """Adds the skeleton above the first batch section if the batch has none. Returns (text, added)."""
     if re.search(r'^## Batch {0}\b'.format(re.escape(table['batch'])), text, re.M):
         return text, False
-    first = re.search(r'^## Batch ', text, re.M)
+    first = re.search(r'^(## Batch |<!-- progress_update: batch )', text, re.M)   # above the first section's own marker, not between it and its heading (2026-09-04)
     i = first.start() if first else len(text)
     return text[:i] + results_skeleton(table, title, facts) + '\n' + text[i:], True
 

@@ -133,6 +133,9 @@ def test_results_skeleton_is_inserted_once_above_the_first_batch():
     assert '### Every arm' in out and '| `b20aa-k1-seed1` | 0.5 |' in out and pu.READING in out
     again, added = pu.insert_results_skeleton(out, _table(), 'Batch b20 — closed', 'facts')
     assert not added and again == out
+    # a second closed batch goes above the first one's start marker, not between that marker and its heading
+    more, added = pu.insert_results_skeleton(out, dict(_table(), batch='b21'), 'Batch b21 — closed', 'facts')
+    assert added and more.index(pu.END_MARK.format('b21')) < more.index(pu.MARK.format('b20'))
 
 
 STATUS = {'ledger': {'b20aa-k1-seed1': 'done', 'b20ab-k1-seed2': 'done', 'b20ac-k2-seed1': 'running',
