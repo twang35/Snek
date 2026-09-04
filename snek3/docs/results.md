@@ -21,6 +21,159 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+<!-- progress_update: batch b13 -->
+## Batch b13 — the `minibatch` sweep, 8 values x 4 seeds, 50M, closed 2026-09-04
+
+Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell (`b9bw-lam99-seed1, b9bx-lam99-seed2, b9by-lam99-seed3, b9bz-lam99-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| minibatch | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 32 | 1,740 | 6.8% | 2.6 6.7 6.9 9.6 | 5 | 99.4 | 96.78 (95.9-97.2) | 83.4 | 0.97% | 15.07% | 7.8% |
+| 64 | 3,308 | 13.3% | 16.5 14.5 12.7 9.4 | 42 | 99.8 | 97.60 (97.3-97.9) | 91.9 | 0.34% | 3.72% | 16.1% |
+| 128 | 4,566 | 19.1% | 16.5 17.6 20.5 21.4 | 83 | 99.6 | 98.12 (97.8-98.3) | 92.4 | 0.32% | 4.68% | 23.9% |
+| 192 | 4,271 | 16.8% | 14.6 8.8 21.3 20.2 | 54 | 99.6 | 97.95 (97.6-98.2) | 91.8 | 0.47% | 4.36% | 21.4% |
+| **256** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
+| 384 | 4,934 | 26.9% | 24.7 20.5 15.9 41.0 | 166 | 99.6 | 98.28 (98.1-98.5) | 90.6 | 1.08% | 6.81% | 27.2% |
+| 512 | 5,062 | 28.2% | 22.5 25.8 23.7 37.8 | 188 | 100.0 | 98.47 (98.3-98.8) | 88.9 | 0.93% | 8.02% | 28.5% |
+| 1024 | 4,239 | 19.2% | 19.9 21.4 17.4 18.1 | 75 | 99.6 | 98.05 (97.9-98.2) | 84.3 | 1.42% | 12.07% | 22.4% |
+| 2048 | 3,215 | 18.3% | 6.4 7.5 40.1 11.8 | 67 | 99.8 | 98.03 (97.6-99.0) | 78.7 | 1.6% | 14.32% | 16.8% |
+
+<!-- reading -->
+**Verdict: minibatch is a plateau at 256-512 with a soft low end and a noisy high end; the base stays
+256.** Run on the laptop (dequeued from the desktop 2026-09-03). Density 6.8 → 13.3 → 19.1 → 16.8% at 32-192,
+**27.3% at 256** (the reference), 26.9% at 384, **28.2% at 512** (the batch's 100/500 row, 188 candidates,
+best30 98.47), 19.2% at 1024, 18.3% at 2048 (one seed at 40%, three at 6-12%). Stability is U-shaped the
+other way: below-80% share 15% at 32, **3.7-4.7% at 64-192**, 6.4-8.0% at 256-512, 12-14% at 1024-2048;
+`sef` 92 at 64-128 falling to 79 at 2048. In updates per epoch (16,384 / minibatch) the density maximum is
+at 32-64 updates and stability rises with the update count until the minibatch is too small to estimate
+the advantage scale. Predictions: **32** fast-onset-high-collapse confirmed, and it is not worse than 16
+epochs, so reuse is the mechanism. **64** milder 32, confirmed. **128** "likeliest alternative default"
+falsified — 8 pp below on all four seeds. **192** "within noise" falsified. **384** within noise confirmed.
+**512** "slower, smoother" — equal-or-better and *less* smooth. **1024** "may not reach the record region"
+falsified (19.2%, 75 candidates). **2048** arrives, on one seed. Not settled: 512 vs 256 (0.9 pp at n=4);
+512 goes into the corner grid as a second value.
+<!-- /reading -->
+
+### Every arm
+
+| arm | minibatch | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b13aa-mb32-seed1` | 32 | 384 | 2.6% | 0 | 98.6 | 95.9 @5.4M | 82.5 | 5.65% |
+| `b13ab-mb32-seed2` | 32 | 328 | 6.7% | 1 | 99.0 | 96.9 @17.5M | 81.2 | 1.0% |
+| `b13ac-mb32-seed3` | 32 | 432 | 6.9% | 1 | 99.0 | 97.2 @12.2M | 82.7 | 0.94% |
+| `b13ad-mb32-seed4` | 32 | 596 | 9.6% | 3 | 99.4 | 97.1 @7.9M | 87.1 | 0.44% |
+| `b13ae-mb64-seed1` | 64 | 788 | 16.5% | 15 | 99.6 | 97.9 @34.6M | 91.0 | 0.97% |
+| `b13af-mb64-seed2` | 64 | 958 | 14.5% | 13 | 99.8 | 97.6 @44.9M | 91.3 | 0.24% |
+| `b13ag-mb64-seed3` | 64 | 722 | 12.7% | 4 | 99.4 | 97.3 @20.5M | 94.3 | 0.44% |
+| `b13ah-mb64-seed4` | 64 | 840 | 9.4% | 10 | 99.8 | 97.6 @5.3M | 91.1 | 0.07% |
+| `b13ai-mb128-seed1` | 128 | 1089 | 16.5% | 10 | 99.4 | 97.8 @38.5M | 90.2 | 0.37% |
+| `b13aj-mb128-seed2` | 128 | 1059 | 17.6% | 17 | 99.4 | 98.1 @16.9M | 93.0 | 0.3% |
+| `b13ak-mb128-seed3` | 128 | 1164 | 20.5% | 24 | 99.4 | 98.3 @19.1M | 91.8 | 0.34% |
+| `b13al-mb128-seed4` | 128 | 1254 | 21.4% | 32 | 99.6 | 98.3 @29.3M | 94.5 | 0.07% |
+| `b13am-mb192-seed1` | 192 | 1065 | 14.6% | 13 | 99.6 | 98.1 @33.7M | 92.8 | 0.61% |
+| `b13an-mb192-seed2` | 192 | 857 | 8.8% | 5 | 99.2 | 97.6 @40.3M | 92.5 | 0.23% |
+| `b13ao-mb192-seed3` | 192 | 1161 | 21.3% | 16 | 99.4 | 98.2 @16.2M | 91.8 | 0.34% |
+| `b13ap-mb192-seed4` | 192 | 1188 | 20.2% | 20 | 99.6 | 97.9 @18.1M | 90.2 | 0.66% |
+| `b13aq-mb384-seed1` | 384 | 1224 | 24.7% | 32 | 99.6 | 98.4 @22.5M | 90.0 | 1.52% |
+| `b13ar-mb384-seed2` | 384 | 1145 | 20.5% | 22 | 99.6 | 98.1 @33.9M | 91.5 | 0.47% |
+| `b13as-mb384-seed3` | 384 | 1036 | 15.9% | 16 | 99.4 | 98.1 @48.3M | 91.7 | 0.64% |
+| `b13at-mb384-seed4` | 384 | 1529 | 41.0% | 96 | 99.6 | 98.5 @25.8M | 89.2 | 2.4% |
+| `b13au-mb512-seed1` | 512 | 1198 | 22.5% | 27 | 99.8 | 98.3 @40.7M | 87.6 | 2.26% |
+| `b13av-mb512-seed2` | 512 | 1223 | 25.8% | 40 | 99.6 | 98.5 @34.3M | 89.1 | 0.27% |
+| `b13aw-mb512-seed3` | 512 | 1121 | 23.7% | 36 | 100.0 | 98.3 @31.6M | 88.5 | 0.27% |
+| `b13ax-mb512-seed4` | 512 | 1520 | 37.8% | 85 | 99.8 | 98.8 @48.6M | 90.4 | 1.59% |
+| `b13ay-mb1024-seed1` | 1024 | 1154 | 19.9% | 32 | 99.6 | 98.2 @24.6M | 83.9 | 1.42% |
+| `b13az-mb1024-seed2` | 1024 | 1038 | 21.4% | 17 | 99.6 | 98.1 @48.6M | 82.7 | 1.21% |
+| `b13ba-mb1024-seed3` | 1024 | 1061 | 17.4% | 14 | 99.4 | 98.0 @36.7M | 86.5 | 1.42% |
+| `b13bb-mb1024-seed4` | 1024 | 986 | 18.1% | 12 | 99.4 | 97.9 @28.7M | 84.0 | 1.52% |
+| `b13bc-mb2048-seed1` | 2048 | 780 | 6.4% | 0 | 98.8 | 97.7 @49.1M | 70.5 | 4.09% |
+| `b13bd-mb2048-seed2` | 2048 | 657 | 7.5% | 2 | 99.4 | 97.6 @48.0M | 82.7 | 0.67% |
+| `b13be-mb2048-seed3` | 2048 | 982 | 40.1% | 62 | 99.8 | 99.0 @46.3M | 79.7 | 2.02% |
+| `b13bf-mb2048-seed4` | 2048 | 796 | 11.8% | 3 | 99.2 | 97.8 @46.0M | 81.7 | 1.18% |
+
+<!-- /progress_update: batch b13 -->
+
+<!-- progress_update: batch b12 -->
+## Batch b12 — the `epochs` sweep, 10 values x 4 seeds, 50M, closed 2026-09-04
+
+Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell (`b9bw-lam99-seed1, b9bx-lam99-seed2, b9by-lam99-seed3, b9bz-lam99-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| epochs | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 1 | 2,425 | 10.8% | 7.4 4.2 9.4 20.8 | 15 | 99.4 | 97.78 (97.5-98.3) | 73.8 | 4.2% | 19.31% | 11.9% |
+| 2 | 4,171 | 15.7% | 13.3 8.4 21.8 17.8 | 35 | 99.4 | 98.07 (98.0-98.1) | 84.3 | 2.58% | 11.04% | 21.1% |
+| 3 | 4,890 | 26.5% | 27.9 23.2 32.0 22.4 | 165 | 99.8 | 98.30 (97.9-98.6) | 89.5 | 0.66% | 6.56% | 26.5% |
+| **4** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
+| 5 | 4,707 | 24.6% | 23.9 14.1 23.5 33.2 | 139 | 99.8 | 98.22 (97.5-98.8) | 90.5 | 0.49% | 6.18% | 25.4% |
+| 6 | 4,598 | 23.1% | 17.1 28.4 22.2 23.0 | 136 | 99.8 | 98.22 (97.8-98.5) | 91.0 | 0.54% | 4.48% | 24.3% |
+| 7 | 4,439 | 19.3% | 10.7 25.5 22.0 16.7 | 92 | 99.8 | 98.20 (97.6-98.6) | 92.2 | 0.51% | 4.27% | 23.3% |
+| 8 | 3,344 | 14.7% | 8.0 19.7 16.6 10.1 | 43 | 100.0 | 97.78 (97.5-98.2) | 92.4 | 0.17% | 4.99% | 16.5% |
+| 10 | 2,323 | 8.7% | 10.1 6.2 9.3 8.5 | 15 | 99.2 | 97.53 (96.6-97.9) | 91.2 | 0.27% | 6.61% | 10.4% |
+| 12 | 1,485 | 6.9% | 7.9 7.8 7.2 4.4 | 10 | 99.4 | 97.10 (96.4-97.7) | 83.8 | 1.31% | 12.93% | 6.5% |
+| 16 | 419 | 6.0% | 1.6 7.6 7.8 4.8 | 2 | 99.6 | 96.25 (95.0-97.9) | 56.7 | 11.88% | 42.28% | 1.7% |
+
+<!-- reading -->
+**Verdict: 3-4 epochs is the top; density falls monotonically past 4 and stability breaks at 12-16. Base
+stays 4.** Density 26.5% at 3 and 27.3% at 4 (the reference), then 24.6 → 23.1 → 19.3 → 14.7 → 8.7 → 6.9 →
+6.0% at 5 through 16; best30 holds ~98.2 through 7 and slides to 96.25 at 16. Stability improves with epochs
+until it breaks: below-80% share 19.3% at 1, 11.0% at 2, 6.2-6.6% at 3-5, **4.3-5.0% at 6-8** (8 has the
+lowest drawdown in the batch, 0.17%, and the one 100/500 row, `b12ay` @8.3M), then 6.6% at 10, 12.9% at 12,
+**42% at 16** with `sef` 57. Cell by cell: **1** predicted "very stable, slow" — slow yes, stable no: the
+least stable cell short of 16. **2** stable-but-slower, as predicted, at a real cost (15.7%). **3, 5** within
+noise of the base. **6, 7** slightly below on density, best on stability so far — the "first sign of b4's
+collapse pattern" did not appear. **8** predicted to collapse far above the base; it is instead the most
+stable cell — b4's collapses at 8 epochs were its `fc (200,100)` net's. **10, 12** the slide: density 8.7%
+and 6.9%, collapses visible at 12. **16** the cliff, as predicted. Not settled: whether 3 is *better* than 4
+on stability (6.6% vs 6.4% is nothing at n=4). The 16 × lr 1e-4 and 16 × clip 0.1 cells stay in the factorial.
+<!-- /reading -->
+
+### Every arm
+
+| arm | epochs | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b12aa-ep1-seed1` | 1 | 618 | 7.4% | 2 | 99.4 | 97.5 @46.3M | 71.8 | 5.15% |
+| `b12ab-ep1-seed2` | 1 | 613 | 4.2% | 1 | 99.2 | 97.6 @35.9M | 74.9 | 4.04% |
+| `b12ac-ep1-seed3` | 1 | 510 | 9.4% | 5 | 99.0 | 97.7 @48.9M | 73.1 | 3.09% |
+| `b12ad-ep1-seed4` | 1 | 684 | 20.8% | 7 | 99.2 | 98.3 @44.2M | 75.5 | 4.36% |
+| `b12ae-ep2-seed1` | 2 | 1087 | 13.3% | 12 | 99.4 | 98.1 @27.0M | 87.0 | 1.37% |
+| `b12af-ep2-seed2` | 2 | 850 | 8.4% | 3 | 99.2 | 98.0 @32.7M | 83.1 | 3.11% |
+| `b12ag-ep2-seed3` | 2 | 1067 | 21.8% | 12 | 99.4 | 98.1 @48.6M | 80.4 | 2.59% |
+| `b12ah-ep2-seed4` | 2 | 1167 | 17.8% | 8 | 99.4 | 98.1 @31.1M | 86.7 | 2.56% |
+| `b12ai-ep3-seed1` | 3 | 1332 | 27.9% | 50 | 99.8 | 98.4 @48.4M | 89.0 | 0.51% |
+| `b12aj-ep3-seed2` | 3 | 1149 | 23.2% | 36 | 99.6 | 97.9 @41.7M | 90.7 | 0.81% |
+| `b12ak-ep3-seed3` | 3 | 1226 | 32.0% | 59 | 99.8 | 98.6 @33.4M | 89.3 | 1.27% |
+| `b12al-ep3-seed4` | 3 | 1183 | 22.4% | 20 | 99.6 | 98.3 @48.4M | 89.0 | 0.31% |
+| `b12am-ep5-seed1` | 5 | 1013 | 23.9% | 27 | 99.4 | 98.3 @36.0M | 88.0 | 0.45% |
+| `b12an-ep5-seed2` | 5 | 978 | 14.1% | 11 | 99.6 | 97.5 @14.8M | 92.8 | 0.54% |
+| `b12ao-ep5-seed3` | 5 | 1257 | 23.5% | 27 | 99.8 | 98.3 @47.3M | 89.6 | 1.28% |
+| `b12ap-ep5-seed4` | 5 | 1459 | 33.2% | 74 | 99.6 | 98.8 @48.7M | 91.8 | 0.41% |
+| `b12aq-ep6-seed1` | 6 | 924 | 17.1% | 14 | 99.6 | 97.8 @47.8M | 89.3 | 0.57% |
+| `b12ar-ep6-seed2` | 6 | 1282 | 28.4% | 56 | 99.8 | 98.2 @8.8M | 93.0 | 0.64% |
+| `b12as-ep6-seed3` | 6 | 1237 | 22.2% | 32 | 99.8 | 98.4 @31.3M | 90.1 | 0.52% |
+| `b12at-ep6-seed4` | 6 | 1155 | 23.0% | 34 | 99.6 | 98.5 @35.7M | 91.6 | 0.21% |
+| `b12au-ep7-seed1` | 7 | 897 | 10.7% | 6 | 99.4 | 97.6 @36.7M | 92.4 | 0.64% |
+| `b12av-ep7-seed2` | 7 | 1180 | 25.5% | 38 | 99.8 | 98.6 @32.3M | 92.1 | 0.14% |
+| `b12aw-ep7-seed3` | 7 | 1256 | 22.0% | 30 | 99.6 | 98.5 @45.4M | 93.7 | 0.37% |
+| `b12ax-ep7-seed4` | 7 | 1106 | 16.7% | 18 | 99.6 | 98.1 @35.2M | 90.8 | 0.84% |
+| `b12ay-ep8-seed1` | 8 | 614 | 8.0% | 3 | 100.0 | 97.8 @23.4M | 91.5 | 1.58% |
+| `b12az-ep8-seed2` | 8 | 1132 | 19.7% | 17 | 99.6 | 98.2 @39.5M | 94.0 | 0.17% |
+| `b12ba-ep8-seed3` | 8 | 913 | 16.6% | 20 | 99.6 | 97.6 @30.6M | 92.8 | 0.17% |
+| `b12bb-ep8-seed4` | 8 | 685 | 10.1% | 3 | 99.8 | 97.5 @12.0M | 91.3 | 0.1% |
+| `b12bc-ep10-seed1` | 10 | 586 | 10.1% | 5 | 99.2 | 97.8 @11.8M | 88.8 | 0.44% |
+| `b12bd-ep10-seed2` | 10 | 486 | 6.2% | 2 | 99.2 | 96.6 @22.9M | 90.8 | 1.01% |
+| `b12be-ep10-seed3` | 10 | 701 | 9.3% | 3 | 99.2 | 97.9 @5.7M | 93.4 | 0.1% |
+| `b12bf-ep10-seed4` | 10 | 550 | 8.5% | 5 | 99.2 | 97.8 @13.3M | 91.8 | 0.07% |
+| `b12bg-ep12-seed1` | 12 | 228 | 7.9% | 1 | 99.0 | 97.1 @4.7M | 74.5 | 2.47% |
+| `b12bh-ep12-seed2` | 12 | 501 | 7.8% | 5 | 99.2 | 97.2 @5.7M | 90.0 | 0.34% |
+| `b12bi-ep12-seed3` | 12 | 416 | 7.2% | 1 | 99.0 | 97.7 @10.2M | 89.9 | 0.77% |
+| `b12bj-ep12-seed4` | 12 | 340 | 4.4% | 3 | 99.4 | 96.4 @7.1M | 80.9 | 1.85% |
+| `b12bk-ep16-seed1` | 16 | 61 | 1.6% | 0 | 98.0 | 95.6 @9.1M | 49.8 | 15.14% |
+| `b12bl-ep16-seed2` | 16 | 79 | 7.6% | 0 | 98.4 | 96.5 @3.9M | 50.2 | 12.49% |
+| `b12bm-ep16-seed3` | 16 | 153 | 7.8% | 2 | 99.6 | 97.9 @3.6M | 63.1 | 7.25% |
+| `b12bn-ep16-seed4` | 16 | 126 | 4.8% | 0 | 98.8 | 95.0 @7.2M | 63.8 | 11.28% |
+
+<!-- /progress_update: batch b12 -->
+
 <!-- progress_update: batch b11 -->
 ## Batch b11 — the `learning_rate` sweep, 8 values x 4 seeds, 50M, closed 2026-09-04
 

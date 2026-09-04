@@ -40,7 +40,15 @@ it took three attempts to get there).
 | **128** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
 
 <!-- reading -->
-
+**Wave 1 (rollout 32, 64) trained on the laptop 10:32-16:14 and its stage B started 16:14; rollout
+192/256 and 512/1024 follow in two more waves.** Stage A only so far, read against the bold reference at
+128: rollout 64 matches its best30 (98.30 vs 98.33) and its stability (6.6% of evals below 80% vs 6.4%) but
+reaches ≥98 on 18.6% of evals against 28.9%; rollout 32 is below on every column (best30 97.9, `sef` 79,
+17% below 80%, 8.9% of evals ≥98) — GAE truncated at 32 steps against a 34-step horizon, as the spec
+predicted. Note that stage A's interval is one rollout, so T=32 writes four times the checkpoints of the
+reference and T=1024 an eighth; the shares are rates and compare, the row counts will not. The stage-B rows
+for 32 and 64 land within the hour; the two remaining waves say whether 256 is the "alternative default" the
+spec has it as.
 <!-- /reading -->
 
 **rollout 32** — `b14a`-`b14d`:
@@ -83,7 +91,14 @@ it took three attempts to get there).
 | **0.01** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
 
 <!-- reading -->
-
+**Wave 1 of 5 (entropy 0 and 0.001) at ~80% of 50M on the desktop, 70 min in; 0.003, 0.005, 0.02, 0.03
+and four annealing schedules follow, ~05:00 tomorrow.** Stage A only, against the bold reference at 0.01:
+both cells are the most *stable* arms this project has trained — 1.9-2.0% of evals below 80% against 6.4%,
+drawdown below 50% at 0.02-0.27% against 0.77%, `sef` 94 — and both sit below the reference at the top so
+far (best30 97.6 and 97.9 against 98.3; 18-21% of evals ≥98 against 28.9%). That is the trade the knob was
+expected to expose: less exploration noise, a calmer plateau, a lower ceiling. Whether the ceiling recovers
+by 50M, and whether the stage-B density follows the stage-A share down, is what this wave's close-out says;
+the annealing cells are the attempt to have both.
 <!-- /reading -->
 
 **entropy_coef 0.0** — `b15aa`-`b15ad`:
@@ -131,17 +146,20 @@ it took three attempts to get there).
 | 2048 | 3,215 | 18.3% | 6.4 7.5 40.1 11.8 | 67 | 99.8 | 98.03 (97.6-99.0) | 78.7 | 1.6% | 14.32% | 16.8% |
 
 <!-- reading -->
-**Trained on the laptop (dequeued from the desktop 2026-09-03), 32 of 32 arms at cap; the last
-close-out — minibatch 1024 and 2048 — is measuring now, 6 arms without a stage-B file.** Read against the
-bold reference at 256 (27.3%): density rises through the small end, 6.8% → 13.3% → 19.1% → 16.8% from 32 to
-192, sits on a plateau with the reference at 256-512 (26.9% at 384, 28.2% at 512, which also has the batch's
-one 100/500 row and its 188 candidates), and drops on the two seeds in so far at 1024 (20.6%). Stability is
-U-shaped in the other direction: the share of evals below 80% is 15% at 32, 3.7-4.7% at 64-192, 6.8-8% at
-384-512, and 12-14% at 1024-2048, with `sef` falling from 92 at 64-192 to 79 at 2048 — many small updates
-per epoch hold the plateau but cap the top; few large ones reach the top and wobble. The stage-A traces for
-2048 show late onset on three seeds and one (`b13be`) at best30 99.0, the highest single stage-A value in the
-batch, so its stage B is the row to watch. Provisional verdict: 256-512 is the right band and 512 is the
-only cell that might edge the reference, within n=4 noise; the table is final when the close-out lands.
+**Closed 2026-09-04 on the laptop: minibatch is a plateau at 256-512 with a soft low end, and nothing
+beats the base.** Read against the bold reference at 256 (27.3%): 384 and 512 sit with it (26.9%, 28.2%;
+512 holds the batch's one 100/500 row and its 188 candidates, best30 98.47), everything smaller is below
+it — 19.1% at 128, 16.8% at 192, 13.3% at 64, 6.8% at 32 — and both larger cells fall to 18-19%, 2048
+carried by one seed (`b13be`, 40.1% against 6-12% on the other three, and the batch's second-best row at
+99.8). Stability is a U in the other direction: the share of evals below 80% is 15% at 32, 3.7-4.7% at
+64-192, 6.4-8.0% at 256-512 and 12-14% at 1024-2048, with `sef` falling from 92 at 64-128 to 79 at 2048.
+Read as updates per epoch (16,384 transitions / minibatch): many small updates hold the plateau and cap the
+top, few large ones reach the top and wobble, and the density maximum is at 32-64 updates. Predictions:
+128 "the likeliest alternative default, within noise or slightly faster" is falsified — 8 pp below on all
+four seeds; 192 "within noise" falsified the same way; 384 within noise confirmed; 512 "slower, smoother"
+half right — equal or better, not smoother; 1024 "may not reach the record region" falsified at 19.2% and
+75 candidates. Base stays at 256; 512 is the only cell worth a second look, in the corner grid rather than
+as a replacement.
 <!-- /reading -->
 
 **minibatch 32** — `b13aa`-`b13ad`:
@@ -265,17 +283,19 @@ only cell that might edge the reference, within n=4 noise; the table is final wh
 | 16 | 419 | 6.0% | 1.6 7.6 7.8 4.8 | 2 | 99.6 | 96.25 (95.0-97.9) | 56.7 | 11.88% | 42.28% | 1.7% |
 
 <!-- reading -->
-**Waves 1-3 in (epochs 1-7), stage B for wave 3 running; 8, 10, 12 and 16 still to train, ~15:25.**
-Read the rows against the bold reference at 4 epochs (27.3%): density climbs 10.8% → 15.7% → 26.5% from 1 to
-3 epochs and then sits at 23-27% through 5 and 6, so the top of the sweep is a plateau from 3 to 6 and the
-low end is the only place the knob bites hard. The spec's prediction for 1 epoch — "clip nearly inert, very
-stable, slow" — is falsified on the stability half: 1 epoch is the *least* stable cell in the batch, with
-4.2% of post-competence evals below 50% and 19.3% below 80%, five times the reference's drawdown, and its
-stage-A traces show repeated collapses rather than a slow smooth climb. Stability improves monotonically with
-epochs so far (below-80% share 19.3 → 11.0 → 6.6 → 6.4 → 6.2 → 4.5%, and 7 epochs' stage A at 4.3%), which
-is the reverse of what b4's 8-epoch collapses led the spec to expect at 6. Whether that reverses at 8-16, and
-whether the density plateau holds or falls there, is what the last two waves decide; nothing in 1-7 argues
-for moving the base off 4.
+**Closed 2026-09-04: epochs peak at 3-4 and every epoch past 4 costs density; the cliff is at 16, not 8.**
+Read against the bold reference at 4 (27.3%): 3 epochs is indistinguishable (26.5%), then density falls
+monotonically — 24.6, 23.1, 19.3, 14.7, 8.7, 6.9, 6.0% at 5, 6, 7, 8, 10, 12, 16 — while best30 holds near
+98.2 through 7 and slides to 96.25 at 16. Stability runs the other way until it breaks: the share of evals
+below 80% falls from 19.3% at 1 epoch to 4.3-5.0% at 6-8 (8 has the batch's lowest drawdown, 0.17%, and its
+one 100/500 row, `b12ay` at 8.3M), then climbs — 6.6% at 10, 12.9% at 12, and 42% at 16 with `sef` 57 and
+11.9% of evals below 50%. Two predictions fell in opposite directions: 1 epoch was to be "very stable, slow"
+and is the least stable cell short of 16 (4.2% drawdown below 50%), and 8 was to reproduce b4's collapse
+pattern and is the most stable cell in the batch — b4's collapses at 8 epochs belonged to its `fc (200,100)`
+net, not to the epoch count. The stage-A traces at 12 and 16 show what the table compresses: repeated
+falls from the 90s to the 50s that the arm recovers from each time, the approx-KL-tail behaviour the spec
+expected, one step later than it expected it. Base stays at 4; 3 is the equal alternative; the 16 × lr 1e-4
+and 16 × clip 0.1 interaction cells stay in the factorial.
 <!-- /reading -->
 
 **epochs 1** — `b12aa`-`b12ad`:

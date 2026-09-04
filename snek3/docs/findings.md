@@ -17,6 +17,40 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Minibatch: a plateau at 256-512, density lost on both sides, stability best at 64-192
+
+**Measured 2026-09-04 on b13's 32 arms (laptop)** — 8 values of `minibatch` x 4 seeds at 50M, everything
+else b9's λ 0.99 cell (the reference at 256), 32,500 stage-B rows:
+
+| minibatch | 32 | 64 | 128 | 192 | **256** (ref) | 384 | 512 | 1024 | 2048 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| updates / epoch | 512 | 256 | 128 | 85 | 64 | 43 | 32 | 16 | 8 |
+| ≥98%/500 | 6.8% | 13.3% | 19.1% | 16.8% | 27.3% | 26.9% | **28.2%** | 19.2% | 18.3% |
+| best30 | 96.8 | 97.6 | 98.1 | 98.0 | 98.3 | 98.3 | **98.5** | 98.05 | 98.0 |
+| <80% | 15.1% | **3.7%** | 4.7% | 4.4% | 6.4% | 6.8% | 8.0% | 12.1% | 14.3% |
+
+The record metric peaks at 32-64 updates per epoch and the stability metric at 128-256; they disagree, as
+in b7 and b11. 128 — the spec's "likeliest alternative default" — is 8 pp below the base on all four seeds,
+so it is not. 1024 and 2048 arrive (the spec doubted they would) but noisily: 2048's density is one seed's.
+Base stays 256; 512 rides into the corner grid as a second value.
+
+### Epochs: 3-4 is the top, every epoch past 4 costs density, and the collapse cliff is at 12-16, not 8
+
+**Measured 2026-09-04 on b12's 40 arms** — 10 values of `epochs` x 4 seeds at 50M, b9's λ 0.99 cell (the
+reference at 4), 33,000 stage-B rows:
+
+| epochs | 1 | 2 | 3 | **4** (ref) | 5 | 6 | 7 | 8 | 10 | 12 | 16 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 | 10.8% | 15.7% | 26.5% | **27.3%** | 24.6% | 23.1% | 19.3% | 14.7% | 8.7% | 6.9% | 6.0% |
+| best30 | 97.8 | 98.1 | 98.3 | 98.3 | 98.2 | 98.2 | 98.2 | 97.8 | 97.5 | 97.1 | 96.25 |
+| <80% | 19.3% | 11.0% | 6.6% | 6.4% | 6.2% | 4.5% | **4.3%** | 5.0% | 6.6% | 12.9% | 42% |
+| drawdown <50% | 4.2% | 2.6% | 0.7% | 0.8% | 0.5% | 0.5% | 0.5% | **0.17%** | 0.3% | 1.3% | 11.9% |
+
+Two priors died. **8 epochs does not collapse on `fc (320,)`** — it is the most stable cell in the batch,
+so b4's collapses at 8 epochs were its `fc (200,100)` net's, not the epoch count's. **1 epoch is not
+"stable and slow"** — it is slow and the least stable cell short of 16. The collapse regime starts at 12
+and is a cliff at 16. Base stays 4; 3 is equal.
+
 ### Learning rate: a plateau from 1e-4 to 5e-4, a cliff at both ends, and stability that rises with lr while density does not
 
 **Measured 2026-09-04 on b11's 32 arms** — 8 values of `learning_rate` x 4 seeds at 50M, everything else

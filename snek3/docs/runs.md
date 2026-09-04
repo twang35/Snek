@@ -6,6 +6,40 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b12 (epochs) and b13 (minibatch) closed; b14 (rollout) is on the laptop with wave 1 in stage B; b15
+(entropy) is on the desktop at wave 1 of 5.** As of 2026-09-04 16:30:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b12 (epochs, 40 arms) | **closed** — reading in [`results.md`](results.md), finding in [`findings.md`](findings.md) | — |
+| laptop | b13 (minibatch, 32 arms) | **closed** — same | — |
+| laptop | b14 (rollout, 24 arms, dequeued from the desktop) | wave 1 (32, 64) trained 10:32-16:14, `b14-stageb` 17 min in; waves 2-3 (192/256, 512/1024) to train | ~midday 2026-09-05 at wave 1's cadence; faster with the box to itself |
+| desktop | b15 (entropy coef, 40 arms) | wave 1 (0, 0.001) at ~80% of 50M, 70 min in; 4 waves queued (0.003, 0.005, 0.02, 0.03, four anneal schedules) | ~05:00 2026-09-05 |
+
+Behind b15 on the desktop: b16-b21 (target-KL, clip, gradient clip, advantage normalisation, lanes,
+shaping), every one at λ 0.99 against **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%).
+`attention` is empty. The laptop's Wi‑Fi was stable through the afternoon after the morning's toggle;
+the plan for it is [`../plans/laptop-wifi.md`](../plans/laptop-wifi.md).
+
+**Two more knobs are plateaus, and both killed a prior.** b12: 3-4 epochs is the top, every epoch past 4
+costs 2-5 pp of density, stability is *best* at 6-8 (8 was predicted to collapse — b4's 8-epoch collapses
+were its `fc (200,100)` net's) and breaks at 12-16 (42% of evals below 80% at 16). b13: minibatch 256-512 is
+the plateau (512 holds the batch's 100/500 row), 128 — predicted as the alternative default — is 8 pp below
+on every seed, 1024-2048 arrive but noisily. Neither moves the base; 512 and 3 epochs are the only cells
+that might ride along.
+
+**Early stage A on the two live batches.** b14 rollout 64 matches the reference on best30 and stability but
+reaches ≥98 on 18.6% of evals against 28.9%; rollout 32 is below on everything, as predicted. b15 entropy 0
+and 0.001 are the most stable arms trained so far (1.9-2.0% of evals below 80%, a third of the reference)
+with a lower top so far (best30 97.6-97.9 against 98.3).
+
+**Standing decisions**, unchanged: `hof5000` on b10 **on hold**; the γ × λ corner grid — γ {0.99, 0.9975,
+0.999} × λ {0.98, 0.99, 0.999}, with lr {3e-4, 2.5e-4} and now minibatch {256, 512} as candidate extra
+axes — runs **after b14 closes**. Every one-knob sweep since b9 has come back "plateau, base stays": the
+corner grid is where the next gain is, if there is one.
+
+## b11 closed, b12 and b13 in flight, as it read at 2026-09-04 09:45 (superseded)
+
 **b11 closed on the desktop; b12 is on its stage B for wave 3 with two waves to train; b13 finished
 training on the laptop and its last close-out is measuring.** As of 2026-09-04 09:45:
 
