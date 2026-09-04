@@ -464,6 +464,42 @@ def test_the_ramp_is_one_function_for_all_three_schedules():
         assert f(50, 100, 1.0) == 1.0           # no final, no ramp
 
 
+def test_the_anneal_fraction_reaches_the_floor_early_and_holds_it(monkeypatch):
+    # b17's hold cells (2026-09-03): the ramp lands at 80% of the cap and the last 20% trains at the floor.
+    monkeypatch.setenv('SNEK_PPO_CLIP_FINAL', '0.02')
+    monkeypatch.setenv('SNEK_PPO_ANNEAL_FRACTION', '0.5')
+    algo, config = built(monkeypatch, max_steps=8 * 32)   # 8 rollouts of 32
+    assert config['ppo_anneal_fraction'] == 0.5
+    seen = []
+    for _ in range(8):
+        algo.advance()
+        seen.append((algo.step, algo.agent.clip))
+    for step, clip in seen:
+        fraction = min(1.0, step / (0.5 * config['max_steps']))
+        assert clip == pytest.approx(0.2 + fraction * (0.02 - 0.2))
+    assert seen[3][1] == pytest.approx(0.02)             # at the floor by half way
+    assert all(clip == pytest.approx(0.02) for _, clip in seen[3:])   # and held there
+    # The knob without a _FINAL changes nothing: constant is constant however short the ramp.
+    assert algo.agent.learning_rate() == config['ppo_learning_rate']
+
+
+def test_the_anneal_fraction_applies_to_all_three_ramps():
+    for f in (ppo_schedules.entropy_coef_for, ppo_schedules.clip_for,
+              ppo_schedules.learning_rate_for):
+        assert f(40, 100, 1.0, 0.0, 0.8) == 0.5
+        assert f(80, 100, 1.0, 0.0, 0.8) == 0.0
+        assert f(90, 100, 1.0, 0.0, 0.8) == 0.0    # held, not overshot
+        assert f(50, 100, 1.0, 0.0) == 0.5          # default: the whole cap, as before
+
+
+@pytest.mark.parametrize('value', ['0', '-0.5', '1.2'])
+def test_an_anneal_fraction_outside_the_half_open_interval_is_refused(value, monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'ppo')
+    monkeypatch.setenv('SNEK_PPO_ANNEAL_FRACTION', value)
+    with pytest.raises(ValueError, match='SNEK_PPO_ANNEAL_FRACTION'):
+        train.build_config()
+
+
 @pytest.mark.parametrize('value', ['0', '1', '-0.1', '1.5'])
 def test_a_clip_final_outside_the_open_interval_is_refused(value, monkeypatch):
     monkeypatch.setenv('SNEK_ALGO', 'ppo')

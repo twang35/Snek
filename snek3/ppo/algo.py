@@ -112,6 +112,9 @@ def build_config(tuned):
         'ppo_learning_rate': tuned('PPO_LEARNING_RATE', 3e-4),
         # Its anneal. 0 is allowed: the tail of the run then learns nothing, which is the intent.
         'ppo_learning_rate_final': _optional_float(tuned('PPO_LEARNING_RATE_FINAL', '', str)),
+        # How much of the cap the three ramps span. 1.0 is the whole run (every anneal before
+        # 2026-09-03); 0.8 reaches every `_FINAL` at 80% of SNEK_MAX_STEPS and holds it to the end.
+        'ppo_anneal_fraction': tuned('PPO_ANNEAL_FRACTION', 1.0),
         'ppo_adam_epsilon': tuned('PPO_ADAM_EPSILON', 1e-7),
         'ppo_target_kl': tuned('PPO_TARGET_KL', 0.0),
         'ppo_gradient_clipping': tuned('PPO_GRADIENT_CLIPPING', 0.5),
@@ -140,6 +143,10 @@ def build_config(tuned):
     final_lr = config['ppo_learning_rate_final']
     if final_lr is not None and final_lr < 0.0:
         raise ValueError('SNEK_PPO_LEARNING_RATE_FINAL={0} is negative'.format(final_lr))
+    if not 0.0 < config['ppo_anneal_fraction'] <= 1.0:
+        raise ValueError('SNEK_PPO_ANNEAL_FRACTION={0} is outside (0, 1]. It is the share of '
+                         'SNEK_MAX_STEPS the ramps take to reach their _FINAL values; 1 is the whole '
+                         'run.'.format(config['ppo_anneal_fraction']))
     if not 0.0 <= config['ppo_gae_lambda'] <= 1.0:
         raise ValueError('SNEK_PPO_GAE_LAMBDA={0} is not in [0, 1]'.format(
             config['ppo_gae_lambda']))
@@ -229,18 +236,19 @@ class PpoAlgo(object):
         self.step += transitions
         # Read before the update rather than after, so the coefficient the epochs use is the one this
         # rollout's step number implies. Constant at b4's settings, where `final` is absent.
+        fraction = self.config['ppo_anneal_fraction']
         self.agent.entropy_coef = schedules.entropy_coef_for(
             self.step, self.config['max_steps'], self.config['ppo_entropy_coef'],
-            self.config['ppo_entropy_coef_final'])
+            self.config['ppo_entropy_coef_final'], fraction)
         # The clip and the learning rate ramp the same way, and are constant unless their `_FINAL`
         # knob is set. Read here for the same reason the coefficient is: the update about to run uses
         # the value this rollout's step implies.
         self.agent.clip = schedules.clip_for(
             self.step, self.config['max_steps'], self.config['ppo_clip'],
-            self.config['ppo_clip_final'])
+            self.config['ppo_clip_final'], fraction)
         self.agent.set_learning_rate(schedules.learning_rate_for(
             self.step, self.config['max_steps'], self.config['ppo_learning_rate'],
-            self.config['ppo_learning_rate_final']))
+            self.config['ppo_learning_rate_final'], fraction))
         self.last_metrics = self.agent.update(self.rollout)
         return transitions, transitions
 

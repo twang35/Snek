@@ -19,8 +19,13 @@ code change, and an adaptive version is in the plan's backlog for if it is.
 """
 
 
-def ramped(step, max_steps, initial, final=None):
-    """A value at `step`, ramping linearly from `initial` to `final` across the cap.
+def ramped(step, max_steps, initial, final=None, fraction=1.0):
+    """A value at `step`, ramping linearly from `initial` to `final` across the first `fraction` of the cap.
+
+    `fraction` is `SNEK_PPO_ANNEAL_FRACTION` (2026-09-03, for b17's hold cells): 1.0 ramps over the
+    whole cap; 0.8 reaches `final` at 80% of `SNEK_MAX_STEPS` and holds it for the last 20%, so the
+    endgame is trained at the floor rather than still descending toward it. One knob for all three
+    ramps, because a cell that anneals two of them wants them to land together.
 
     The one ramp every PPO schedule uses — the entropy coefficient, and since 2026-09-01 the clip and
     the learning rate (`SNEK_PPO_CLIP_FINAL`, `SNEK_PPO_LEARNING_RATE_FINAL`, the PPO paper's Atari
@@ -41,23 +46,23 @@ def ramped(step, max_steps, initial, final=None):
     if final is None:
         return initial
     final = float(final)
-    span = max(1, int(max_steps))
+    span = max(1, int(int(max_steps) * float(fraction)))
     fraction = min(1.0, max(0.0, float(step) / span))
     return initial + fraction * (final - initial)
 
 
-def entropy_coef_for(step, max_steps, initial, final=None):
+def entropy_coef_for(step, max_steps, initial, final=None, fraction=1.0):
     """The entropy coefficient at `step`. See `ramped`."""
-    return ramped(step, max_steps, initial, final)
+    return ramped(step, max_steps, initial, final, fraction)
 
 
-def clip_for(step, max_steps, initial, final=None):
+def clip_for(step, max_steps, initial, final=None, fraction=1.0):
     """The PPO clip at `step`. `final` must stay inside (0, 1) — `algo.build_config` refuses otherwise,
     because a clip of 0 admits no update at all and the ramp would silently end training early."""
-    return ramped(step, max_steps, initial, final)
+    return ramped(step, max_steps, initial, final, fraction)
 
 
-def learning_rate_for(step, max_steps, initial, final=None):
+def learning_rate_for(step, max_steps, initial, final=None, fraction=1.0):
     """Adam's step size at `step`. `final` may be 0: the last stretch then takes no gradient steps,
     which is the Atari recipe's intent, and a resumed arm past its cap stays at the floor."""
-    return ramped(step, max_steps, initial, final)
+    return ramped(step, max_steps, initial, final, fraction)

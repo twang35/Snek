@@ -130,6 +130,7 @@ launchable at all.
 | `SNEK_PPO_VF_COEF` | 0.5 | near-inert: the towers are separate, so it only rescales the critic's own learning rate |
 | `SNEK_PPO_LEARNING_RATE` | 3e-4 | **not** DQN's 1e-5, and that is the point of the separate name |
 | `SNEK_PPO_LEARNING_RATE_FINAL` | unset | the same ramp for Adam's step size; 0 is allowed and means the tail of the run takes no gradient steps. Both ramps re-stretch if an arm is resumed to a higher cap, so an annealed arm is never resumed for comparison. Batch b17 |
+| `SNEK_PPO_ANNEAL_FRACTION` | 1.0 | the share of `SNEK_MAX_STEPS` all three ramps take to reach their `_FINAL` value; 0.8 lands at 80% of the cap and holds the floor for the last 20%. Must be in (0, 1]. Batch b17 (2026-09-03) |
 | `SNEK_PPO_ADAM_EPSILON` | 1e-7 | |
 | `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | global norm over both towers. 0 disables |
 | `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |

@@ -345,7 +345,7 @@ The knob most likely to produce a clean null, which is also worth knowing.
 
 Grid: `0.003, 0.005, 0.008, 0.01, 0.013, 0.015, 0.02, 0.03, 0.04, 0.05`.
 
-### b17 — clip, and the clip and lr anneals (`SNEK_PPO_CLIP`; **anneals need code**) — 10 cells, 40 arms
+### b17 — clip, and the clip and lr anneals (`SNEK_PPO_CLIP`; **anneals need code**) — 16 cells, 64 arms
 
 **What clip controls.** The trust region on the probability ratio per sample; 0.2 lets an action's
 probability move 20% per update. Never swept in this project. Smaller is a tighter region — slower,
@@ -365,6 +365,9 @@ mistake learned late cannot be unlearned late either, and the schedule is tied t
 | **clip 0.1 → 0.02** | the paper's start value |
 | **lr 3e-4 → 0**, **→ 3e-5** | the same shape of effect through the parameters; also cools the critic. Half the run is below 1.5e-4, so expect b3i's onset penalty, mildly. The 3e-5 floor tests whether the last stretch near zero was doing anything |
 | **both** | the Atari recipe. Predicted best late stability of anything in the sweep; the risk is a lower ceiling |
+| **clip 0.2 → 0.1**, **0.4 → 0.02** (*added 2026-09-03*) | 0.2→0.1 is "annealing at all" without ending tight; 0.4→0.02 is the widest ramp, loose start and tight end |
+| **clip 0.2 → 0.005**, **→ 0.001** (*added 2026-09-03*) | floors below 0.02, which the code allows (any value in (0, 1)). At 0.001 the tail can barely move the policy: is 0.02 still too loose late, or does a floor this low cost the endgame? |
+| **clip 0.2 → 0.02** and **0.2 → 0.001, held from 80%** (*added 2026-09-03*) | `SNEK_PPO_ANNEAL_FRACTION=0.8`: reaches the floor at 40M and trains the last 10M there, so the endgame is measured under the tight region rather than still descending; the 0.001 hold asks whether a near-frozen endgame keeps what it had or stalls. Need the fraction knob deployed on the box; the generator drops both cells until then |
 
 **Expected: the anneals win on collapse share, and the question is what they cost on density.**
 
@@ -376,8 +379,8 @@ runs. Until it lands the generator drops the five anneal cells, and **b17 should
 than run its five static cells as a short batch** — the code is a morning's work and can land during
 b9.
 
-Grid: `clip 0.05, 0.1, 0.15, 0.3, 0.4; 0.2→0.02; 0.1→0.02; lr→0; lr→3e-5; both`.
-Smoke: clip anneal, lr anneal.
+Grid: `clip 0.05, 0.1, 0.15, 0.3, 0.4; 0.2→0.02; 0.1→0.02; lr→0; lr→3e-5; both; 0.2→0.1; 0.4→0.02; 0.2→0.001; 0.2→0.005; 0.2→0.02 held from 80%; 0.2→0.001 held from 80%`.
+Smoke: clip anneal, lr anneal, the 80% hold (smoked 2026-09-03: clip read 0.03125 at 75% of the cap and 0.02 at the cap, lr untouched).
 
 ### b18 — gradient-norm clipping (`SNEK_PPO_GRADIENT_CLIPPING`) — 6 values, 24 arms — *added*
 
@@ -477,7 +480,7 @@ b15/b16 re-run on the base, never directly.
 | b14 | rollout T | 6 | 24 | 3 | 8.5 | |
 | b15 | entropy | 10 | 40 | 5 | 14 | |
 | b16 | target_KL | 10 | 40 | 5 | 14 | |
-| b17 | clip + anneals | 10 | 40 | 5 | 14 | **yes** |
+| b17 | clip + anneals | 16 | 64 | 8 | 22 | **yes** |
 | b18 | grad-norm clip | 6 | 24 | 3 | 8.5 | |
 | b19 | switches | 6 | 24 | 3 | 8.5 | |
 | b20 | lanes | 4 | 16 | 2 | 5.5 | |
