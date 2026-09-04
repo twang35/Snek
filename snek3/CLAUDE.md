@@ -215,6 +215,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
 | `tools/closeout.py` | **a batch's stage B: every arm in turn, one process.** What the desktop dispatches and what an agent types here |
+| `tools/laptop_batch.py` | **a batch of desktop specs, run here the way the daemon would**: waves of 8, each followed by its stage B as `<batch>-stageb`, `-w2`, ... Resumable; adopts a live arm rather than relaunching it; never a ninth trainer. `skills/laptop-run` has the command |
 | `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
 | `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |
 | `tools/eval_plan.py` | a measured checkpoint as a result row, plus the Wilson interval |
