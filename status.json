@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-04T16:36:19",
-  "ts": 1788564979.5706954,
+  "iso": "2026-09-04T16:46:26",
+  "ts": 1788565586.0872037,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | ent0, ent001 -- wave 1 of 5 | training 90% (8 arms)"
+      "b15 | ent0, ent001 | stage B (8 arms)"
     ],
     "queued": [
-      "b15 stage B | ent0, ent001 | queued (8 arms)",
       "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b16 stage B | kl003, kl005 | queued (8 arms)",
@@ -40,125 +39,33 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b15aa-ent0-seed1",
-      "type": "train",
+      "id": "b15-stageb",
+      "type": "eval",
       "policy": "b15aa-ent0-seed1",
       "policies": [
-        "b15aa-ent0-seed1"
-      ],
-      "pid": 3653902,
-      "step": 46923776,
-      "label": "b15: ent0, seed 1 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 8618.2,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15ab-ent0-seed2",
-      "type": "train",
-      "policy": "b15ab-ent0-seed2",
-      "policies": [
-        "b15ab-ent0-seed2"
-      ],
-      "pid": 3653903,
-      "step": 47038464,
-      "label": "b15: ent0, seed 2 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9125.0,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15ac-ent0-seed3",
-      "type": "train",
-      "policy": "b15ac-ent0-seed3",
-      "policies": [
-        "b15ac-ent0-seed3"
-      ],
-      "pid": 3653904,
-      "step": 45580288,
-      "label": "b15: ent0, seed 3 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 8618.0,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15ad-ent0-seed4",
-      "type": "train",
-      "policy": "b15ad-ent0-seed4",
-      "policies": [
-        "b15ad-ent0-seed4"
-      ],
-      "pid": 3653905,
-      "step": 45121536,
-      "label": "b15: ent0, seed 4 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 7604.0,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15ae-ent001-seed1",
-      "type": "train",
-      "policy": "b15ae-ent001-seed1",
-      "policies": [
-        "b15ae-ent001-seed1"
-      ],
-      "pid": 3653906,
-      "step": 44466176,
-      "label": "b15: ent001, seed 1 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9125.1,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15af-ent001-seed2",
-      "type": "train",
-      "policy": "b15af-ent001-seed2",
-      "policies": [
-        "b15af-ent001-seed2"
-      ],
-      "pid": 3653907,
-      "step": 44023808,
-      "label": "b15: ent001, seed 2 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 7097.4,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15ag-ent001-seed3",
-      "type": "train",
-      "policy": "b15ag-ent001-seed3",
-      "policies": [
-        "b15ag-ent001-seed3"
-      ],
-      "pid": 3653908,
-      "step": 44138496,
-      "label": "b15: ent001, seed 3 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 6590.7,
-      "elapsed_s": 4836
-    },
-    {
-      "id": "b15ah-ent001-seed4",
-      "type": "train",
-      "policy": "b15ah-ent001-seed4",
-      "policies": [
+        "b15aa-ent0-seed1",
+        "b15ab-ent0-seed2",
+        "b15ac-ent0-seed3",
+        "b15ad-ent0-seed4",
+        "b15ae-ent001-seed1",
+        "b15af-ent001-seed2",
+        "b15ag-ent001-seed3",
         "b15ah-ent001-seed4"
       ],
-      "pid": 3653909,
-      "step": 44498944,
-      "label": "b15: ent001, seed 4 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 8111.7,
-      "elapsed_s": 4836
+      "pid": 3794650,
+      "step": 50003968,
+      "label": "",
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 66
     }
   ],
   "ledger": {
-    "b15-stageb": "queued",
     "b15ai-ent003-seed1": "queued",
     "b15aj-ent003-seed2": "queued",
     "b15ak-ent003-seed3": "queued",
@@ -389,14 +296,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b15aa-ent0-seed1": "running",
-    "b15ab-ent0-seed2": "running",
-    "b15ac-ent0-seed3": "running",
-    "b15ad-ent0-seed4": "running",
-    "b15ae-ent001-seed1": "running",
-    "b15af-ent001-seed2": "running",
-    "b15ag-ent001-seed3": "running",
-    "b15ah-ent001-seed4": "running",
+    "b15-stageb": "running",
+    "b15ah-ent001-seed4": "done",
+    "b15ag-ent001-seed3": "done",
+    "b15af-ent001-seed2": "done",
+    "b15ae-ent001-seed1": "done",
+    "b15ad-ent0-seed4": "done",
+    "b15ac-ent0-seed3": "done",
+    "b15ab-ent0-seed2": "done",
+    "b15aa-ent0-seed1": "done",
     "b12-stageb-w5": "done",
     "b12bn-ep16-seed4": "done",
     "b12bm-ep16-seed3": "done",
@@ -777,10 +685,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 133.3,
+  "disk_free_gb": 133.2,
   "load_avg": [
-    13.17822265625,
-    13.0556640625,
-    13.095703125
+    14.03564453125,
+    12.86962890625,
+    12.9482421875
   ]
 }
