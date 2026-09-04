@@ -135,7 +135,8 @@ def build(runs_dir=None, references_path=None):
                       if '_' not in os.path.basename(p))
     arms = [rec for rec in (arm_record(p, runs_dir) for p in policies) if rec]
     known = {a['policy'] for a in arms}
-    refs = {batch: {'arms': [a for a in ref.get('arms', []) if a in known], 'label': ref.get('label', '')}
+    refs = {batch: {'arms': [a for a in ref.get('arms', []) if a in known], 'label': ref.get('label', ''),
+                    'after': ref.get('after')}
             for batch, ref in references(references_path).items()}
     return {'generated': datetime.datetime.now().isoformat(timespec='seconds'), 'arms': arms,
             'references': refs}

@@ -87,9 +87,9 @@ def test_references_attach_only_arms_that_exist(tmp_path):
     runs = str(tmp_path / 'runs'); os.makedirs(runs)
     _arm(runs, 'b7aa-fc320-seed1'); _arm(runs, 'b9ce-lam999-seed1')
     refs = tmp_path / 'references.json'
-    refs.write_text(json.dumps({'_comment': 'x', 'b9': {'arms': ['b7aa-fc320-seed1', 'b7zz-missing-seed9'], 'label': 'ref'},
+    refs.write_text(json.dumps({'_comment': 'x', 'b9': {'arms': ['b7aa-fc320-seed1', 'b7zz-missing-seed9'], 'label': 'ref', 'after': 'lam97'},
                                 'b10': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref too'}}))
     m = vm.build(runs, str(refs))
-    assert m['references'] == {'b9': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref'},
-                               'b10': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref too'}}
+    assert m['references'] == {'b9': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref', 'after': 'lam97'},
+                               'b10': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref too', 'after': None}}
     assert vm.build(runs, str(tmp_path / 'absent.json'))['references'] == {}

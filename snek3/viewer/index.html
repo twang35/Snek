@@ -105,11 +105,18 @@
   var refLabel = {};
   Object.keys(M.references || {}).forEach(function (batch) {
     var ref = M.references[batch]; if (!batches[batch]) return;
+    var copies = [];
     ref.arms.forEach(function (p) {
       var a = byPolicy[p]; if (!a) return;
-      var copy = Object.assign({}, a, { reference: true, knob: 'reference' });
-      batches[batch].push(copy);
+      copies.push(Object.assign({}, a, { reference: true, knob: 'reference' }));
     });
+    // Slot the reference where its knob value belongs in the sweep: right after the batch's own group
+    // named by `after`. With no `after`, or none matching, it goes at the end.
+    var at = batches[batch].length;
+    if (ref.after) {
+      for (var i = 0; i < batches[batch].length; i++) if (batches[batch][i].knob === ref.after) at = i + 1;
+    }
+    batches[batch].splice.apply(batches[batch], [at, 0].concat(copies));
     refLabel[batch] = ref.label;
   });
   var names = Object.keys(batches).sort(function (x, y) {
