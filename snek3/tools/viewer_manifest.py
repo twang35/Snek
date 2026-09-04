@@ -31,6 +31,8 @@ import re
 from env import constants
 
 MANIFEST_PATH = os.path.join(os.path.dirname(constants.RUNS_DIR), 'viewer', 'manifest.js')
+# Which earlier arms are a batch's control cell, so the page can show them beside the batch's own.
+REFERENCES_PATH = os.path.join(os.path.dirname(constants.RUNS_DIR), 'viewer', 'references.json')
 _BATCH_RE = re.compile(r'^([a-z]+\d+)')
 _SEED_RE = re.compile(r'-seed(\d+)$')
 
@@ -118,14 +120,25 @@ def arm_record(policy, runs_dir):
     return record
 
 
-def build(runs_dir=None):
+def references(path=None):
+    """`{batch: {'arms': [...], 'label': str}}` from `viewer/references.json`, or {} if absent."""
+    path = path or REFERENCES_PATH
+    data = _read(path) or {}
+    return {k: v for k, v in data.items() if not k.startswith('_')}
+
+
+def build(runs_dir=None, references_path=None):
     runs_dir = runs_dir or constants.RUNS_DIR
     # A policy name has hyphens and never an underscore; every derived chart (`_checkpoint_evals`,
     # `_checkpoint_evals_hof5000`, `_eval_progress`) has one. So the stem decides.
     policies = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(runs_dir, '*.png'))
                       if '_' not in os.path.basename(p))
     arms = [rec for rec in (arm_record(p, runs_dir) for p in policies) if rec]
-    return {'generated': datetime.datetime.now().isoformat(timespec='seconds'), 'arms': arms}
+    known = {a['policy'] for a in arms}
+    refs = {batch: {'arms': [a for a in ref.get('arms', []) if a in known], 'label': ref.get('label', '')}
+            for batch, ref in references(references_path).items()}
+    return {'generated': datetime.datetime.now().isoformat(timespec='seconds'), 'arms': arms,
+            'references': refs}
 
 
 def render(manifest, charts_dir='../runs/'):

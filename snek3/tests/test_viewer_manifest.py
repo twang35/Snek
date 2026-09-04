@@ -81,3 +81,15 @@ def test_render_is_a_script_that_defines_the_global():
     assert text.startswith('window.SNEK_MANIFEST = {') and text.rstrip().endswith('};')
     assert json.loads(text[len('window.SNEK_MANIFEST = '):].rstrip().rstrip(';')) == {'generated': 'now', 'arms': [], 'charts_dir': '../runs/'}
     assert '"charts_dir":"charts/"' in vm.render({'generated': 'now', 'arms': []}, charts_dir='charts/')
+
+
+def test_references_attach_only_arms_that_exist(tmp_path):
+    runs = str(tmp_path / 'runs'); os.makedirs(runs)
+    _arm(runs, 'b7aa-fc320-seed1'); _arm(runs, 'b9ce-lam999-seed1')
+    refs = tmp_path / 'references.json'
+    refs.write_text(json.dumps({'_comment': 'x', 'b9': {'arms': ['b7aa-fc320-seed1', 'b7zz-missing-seed9'], 'label': 'ref'},
+                                'b10': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref too'}}))
+    m = vm.build(runs, str(refs))
+    assert m['references'] == {'b9': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref'},
+                               'b10': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref too'}}
+    assert vm.build(runs, str(tmp_path / 'absent.json'))['references'] == {}

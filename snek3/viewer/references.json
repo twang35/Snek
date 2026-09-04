@@ -1,0 +1,10 @@
+{
+  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. Edit when a batch is queued (desktop-batch skill). Keys are batch ids; each entry names the arms and says what they are.",
+  "b8":  {"arms": ["b4a-fc200x100ep8-seed1", "b4b-fc200x100ep8-seed2", "b4c-fc200x100ep8-seed3", "b4d-fc200x100ep8-seed4", "b4e-fc200x100ep8-seed5", "b4f-fc200x100ep8-seed6", "b4g-fc200x100ep8-seed7", "b4h-fc200x100ep8-seed8"], "label": "control: b4, fc (200,100) x 8 epochs, at 100M"},
+  "b9":  {"arms": ["b7aa-fc320-seed1", "b7ab-fc320-seed2", "b7ac-fc320-seed3", "b7ad-fc320-seed4"], "label": "reference: b7 fc (320,) cell, lambda 0.98"},
+  "b10": {"arms": ["b7aa-fc320-seed1", "b7ab-fc320-seed2", "b7ac-fc320-seed3", "b7ad-fc320-seed4"], "label": "reference: b7 fc (320,) cell, gamma 0.99"},
+  "b11": {"arms": ["b9bw-lam99-seed1", "b9bx-lam99-seed2", "b9by-lam99-seed3", "b9bz-lam99-seed4"], "label": "reference: b9 lambda 0.99 cell, lr 3e-4"},
+  "b12": {"arms": ["b9bw-lam99-seed1", "b9bx-lam99-seed2", "b9by-lam99-seed3", "b9bz-lam99-seed4"], "label": "reference: b9 lambda 0.99 cell, 4 epochs"},
+  "b13": {"arms": ["b9bw-lam99-seed1", "b9bx-lam99-seed2", "b9by-lam99-seed3", "b9bz-lam99-seed4"], "label": "reference: b9 lambda 0.99 cell, minibatch 256"},
+  "b14": {"arms": ["b9bw-lam99-seed1", "b9bx-lam99-seed2", "b9by-lam99-seed3", "b9bz-lam99-seed4"], "label": "reference: b9 lambda 0.99 cell, rollout 128"}
+}

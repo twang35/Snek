@@ -24,6 +24,8 @@
   .cell .cap span em { color:var(--fg); font-style:normal; }
   .cell.missing { align-items:center; justify-content:center; color:var(--dim); min-height:12em; }
   .group-start { box-shadow: inset 3px 0 0 var(--hi); }
+  .reference { box-shadow: inset 3px 0 0 #e6b422; }
+  .reference .cap b::after { content: ' · reference'; color:#e6b422; font-weight:normal; }
   .help { color:var(--dim); padding:0 .8em .8em; }
   kbd { background:#222; border:1px solid #444; border-radius:3px; padding:0 .3em; font:inherit; }
   #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; flex-direction:column; align-items:center; justify-content:center; gap:.6em; padding:1vh 1vw; box-sizing:border-box; z-index:5; cursor:zoom-out; }
@@ -97,6 +99,19 @@
   // ---- batches: newest first in the picker, b9 default when present
   var batches = {};
   M.arms.forEach(function (a) { (batches[a.batch] = batches[a.batch] || []).push(a); });
+  // A batch's control cell from an earlier batch rides along at the end of its list, marked, so the
+  // comparison the batch exists for is on the page with it.
+  var byPolicy = {}; M.arms.forEach(function (a) { byPolicy[a.policy] = a; });
+  var refLabel = {};
+  Object.keys(M.references || {}).forEach(function (batch) {
+    var ref = M.references[batch]; if (!batches[batch]) return;
+    ref.arms.forEach(function (p) {
+      var a = byPolicy[p]; if (!a) return;
+      var copy = Object.assign({}, a, { reference: true, knob: 'reference' });
+      batches[batch].push(copy);
+    });
+    refLabel[batch] = ref.label;
+  });
   var names = Object.keys(batches).sort(function (x, y) {
     var nx = parseInt(x.replace(/\D/g, ''), 10), ny = parseInt(y.replace(/\D/g, ''), 10);
     if (isNaN(nx) || isNaN(ny)) return x < y ? -1 : 1;
@@ -104,7 +119,8 @@
   });
   names.forEach(function (n) {
     var o = document.createElement('option'); o.value = n;
-    o.textContent = n + ' (' + batches[n].length + ')'; $('batch').appendChild(o);
+    var own = batches[n].filter(function (a) { return !a.reference; }).length;
+    o.textContent = n + ' (' + own + (batches[n].length > own ? ' + ' + (batches[n].length - own) + ' ref' : '') + ')'; $('batch').appendChild(o);
   });
 
   function num(v) { return (v === null || v === undefined) ? null : v; }
@@ -172,6 +188,7 @@
       var cell = document.createElement('div'); cell.className = 'cell';
       var prev = current[state.start + i - 1];
       if (state.sort === 'arm' && (!prev || prev.knob !== a.knob)) cell.className += ' group-start';
+      if (a.reference) cell.className += ' reference';
       if (state.mode === 'b' && !a.stage_b_png) {
         cell.className += ' missing';
         cell.innerHTML = '<div>' + a.policy + '<br>no stage-B panel' + (a.rows === 0 ? ' — screened zero checkpoints' : '') + '</div>';
@@ -191,7 +208,7 @@
     });
     var lo = n ? state.start + 1 : 0, hi = Math.min(n, state.start + PAGE);
     $('where').textContent = lo + '–' + hi + ' of ' + n;
-    $('summary').textContent = 'manifest ' + (M.generated || '?').replace('T', ' ');
+    $('summary').textContent = 'manifest ' + (M.generated || '?').replace('T', ' ') + (refLabel[state.batch] ? ' · gold edge = ' + refLabel[state.batch] : '');
     $('prev').disabled = $('first').disabled = state.start === 0;
     $('next').disabled = $('last').disabled = state.start + PAGE >= n;
     writeHash();

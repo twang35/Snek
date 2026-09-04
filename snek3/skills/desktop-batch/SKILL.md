@@ -79,6 +79,14 @@ for p in sorted(glob.glob('$OPS/snek3/desktop/queue/pending/*.json')):
 "
 ```
 
+## 1c. Name the batch's reference cell for the chart viewer
+
+Every one-knob batch is read against an earlier cell — b9 and b10 against `b7aa`-`b7ad`, b11-b14 against
+`b9bw`-`b9bz` — and the GitHub-Pages viewer shows that cell at the end of the batch's own arms, marked
+with a gold edge, **only if it is listed**. Add the batch to `snek3/viewer/references.json` (arm names
+plus a one-line label saying what the cell is and which knob value it holds) in the same change as the
+specs. A batch with no entry shows only itself, and the comparison it exists for is off the page.
+
 ## 2. Push, then trigger
 
 The trigger is what makes it start now rather than within ten minutes.
