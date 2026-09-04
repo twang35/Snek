@@ -6,6 +6,29 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b11 — the learning-rate sweep — has wave 1 trained and its stage B running; nothing is on the laptop.**
+As of 2026-09-03 18:01 the box's ledger reads 8 b11 arms done (lr 4e-5 and 1e-4, seeds 1-4), the
+`b11-stageb` wave 19 min in, and 24 b11 arms queued behind it in three waves (lr 1.5e-4, 2.5e-4, 5e-4,
+8e-4, 1e-3, 2e-3). At b10's cadence of ~2.5 h a wave, b11 closes around **01:40 on 2026-09-04**. The queue
+behind it now runs **b12 through b21** — epochs, minibatch, rollout, entropy, target-KL, clip, gradient
+clip, advantage normalisation, lanes, shaping — every one at the re-based λ 0.99, every one read against
+**b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%). `attention` is empty.
+
+**b11 wave 1 at its cap, from the pulled reports:** lr 4e-5 best30 97.0-97.6, `sef` 65-79, still rising —
+the slow end the spec predicted; lr 1e-4 best30 97.8-98.6, `sef` 85, at the reference's ceiling on two
+seeds. No stage-B row yet; the table in [`charts.md`](charts.md) fills in when the wave's results land.
+
+**The update itself is now a tool.** `tools/progress_update.py` fetches, imports closed waves, pulls live
+charts, publishes the site, regenerates the batch tables and `charts.md` sections, and prints a digest;
+the skill runs it and writes only the readings, on Sonnet. This is the first update written that way —
+compare its readings against the tables before trusting the split.
+
+**Standing decisions** (from the b10 close, unchanged): `hof5000` on b10 is **on hold**; the γ × λ corner
+grid — γ {0.99, 0.9975, 0.999} × λ {0.98, 0.99, 0.999}, 4 seeds — runs **after b14 closes**.
+
+## b10 closed and b11 on wave 1, as it read at 2026-09-03 17:10 (superseded)
+
+
 **b10 — the γ sweep — closed on the desktop 2026-09-03 16:08, and b11 — the learning-rate sweep — is
 on wave 1 of 4.** At 17:10 b11's eight arms (lr 4e-5 and 1e-4 x seeds 1-4, `b11aa`-`b11ah`) were ~65%
 through 50M, 52 min in; wave 1 lands about 17:40 and its stage B follows. Waves 2-4 (lr 1.5e-4, 2.5e-4,
