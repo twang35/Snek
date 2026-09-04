@@ -18,6 +18,11 @@ process did not start, say a previous driver that was killed -- is waited for ra
 closeout resumes its own shard files. Rerunning the same command after a kill or a reboot is the whole
 recovery procedure.
 
+**`--after <pid>` sequences batches.** The driver starts nothing until that process has exited, so a
+second batch queued behind a running one -- b14 behind b13's last stage B on 2026-09-04 -- waits for
+the whole of it, stage B included, rather than launching eight trainers into a closeout. The trainer
+cap alone cannot do that: a closeout is not a trainer, and a driver of its own has no cap check.
+
 **Never more than `--max-trainers` (8) trainers on the box, counting anything else running here.**
 Before each launch the driver waits until the box's live trainer count is below the cap, so a batch
 started beside a user's own arm shares the box rather than exceeding it.
@@ -202,7 +207,15 @@ class Driver(object):
         _log('wave {0}: stage B exited {1}'.format(number, code))
         return code
 
-    def run(self):
+    def wait_for(self, pid):
+        if pid is None:
+            return
+        if live_runs.alive(pid) and not live_runs.zombie(pid):
+            _log('waiting for pid {0} to exit before starting'.format(pid))
+        self._wait_pid(pid)
+
+    def run(self, after=None):
+        self.wait_for(after)
         plan = waves(self.specs, self.wave)
         _log('{0}: {1} arms in {2} wave(s) of {3}, stage B {4}'.format(
             self.batch, len(self.specs), len(plan), self.wave, 'on' if self.stage_b else 'off'))
@@ -222,12 +235,14 @@ def main(argv=None):
     parser.add_argument('--max-trainers', type=int, default=DEFAULT_MAX_TRAINERS,
                         help='never more trainers than this on the box, counting others')
     parser.add_argument('--no-stage-b', action='store_true', help='train only')
+    parser.add_argument('--after', type=int, default=None, metavar='PID',
+                        help='start only once this process (another driver, a closeout) has exited')
     args = parser.parse_args(argv)
     specs = load_specs(args.specs)
     if not specs:
         parser.error('no training specs found')
     return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
-                  max_trainers=args.max_trainers).run()
+                  max_trainers=args.max_trainers).run(after=args.after)
 
 
 if __name__ == '__main__':

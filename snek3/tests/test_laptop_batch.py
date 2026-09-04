@@ -153,3 +153,23 @@ def test_no_launch_while_the_box_is_at_the_trainer_cap(box, monkeypatch):
 def test_a_wave_wider_than_the_cap_is_refused():
     with pytest.raises(ValueError):
         laptop_batch.Driver([spec('b13aa-mb32-seed1')], wave=9, max_trainers=8)
+
+
+def test_after_holds_the_whole_batch_until_that_process_has_exited(box, monkeypatch):
+    """b14 behind b13's last stage B: nothing launches while the other driver is alive."""
+    ticks = {'n': 0}
+
+    def alive(pid):
+        if pid == 4242:
+            ticks['n'] += 1
+            return ticks['n'] < 4
+        return False
+
+    monkeypatch.setattr(live_runs, 'alive', alive)
+    slept, calls = [], Calls()
+    d = laptop_batch.Driver([spec('b14a-roll32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'],
+                            popen=calls.popen, call=calls.call, sleep=slept.append, python='py',
+                            wave=1, stage_b=False)
+    d.run(after=4242)
+    assert slept == [laptop_batch.POLL_SECONDS] * 2      # one check logs the wait, two more poll it
+    assert [e[0] for e in calls.events] == ['train']

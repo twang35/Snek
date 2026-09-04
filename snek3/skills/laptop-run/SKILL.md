@@ -62,7 +62,9 @@ PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batc
     > logs/<batch>-batch.log 2>&1 &
 ```
 
-Rerunning the same command after a kill or a reboot is the recovery procedure. Then check the config
+Rerunning the same command after a kill or a reboot is the recovery procedure. To queue a batch
+behind one already running here, add `--after <pid of the running driver>`: it starts when that
+process exits, stage B included, rather than launching trainers into the closeout. Then check the config
 of one arm per wave with the two greps above, as for any launch.
 
 ## Stage B
