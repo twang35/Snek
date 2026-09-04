@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-04T04:35:19",
-  "ts": 1788521719.6040354,
+  "iso": "2026-09-04T04:45:36",
+  "ts": 1788522336.2727938,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b12 | ep1, ep2 | stage B (8 arms)"
+      "b12 | ep3, ep5 -- wave 2 of 5 | training 0% (8 arms)"
     ],
     "queued": [
-      "b12 training | ep3, ep5, ep6, ep7, ep8, ep10, ep12, ep16 -- waves 2-5 of 5 | queued (32 arms)",
+      "b12 training | ep6, ep7, ep8, ep10, ep12, ep16 -- waves 3-5 of 5 | queued (24 arms)",
       "b14 training | roll32, roll64, roll192, roll256, roll512, roll1024 -- waves 1-3 of 3 | queued (24 arms)",
       "b14 stage B | roll32, roll64 | queued (8 arms)",
       "b15 training | ent0, ent001, ent003, ent005, ent02, ent03, entanneal10, entanneal03, +2 more... | queued (40 arms)",
@@ -43,41 +43,124 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b12-stageb",
-      "type": "eval",
-      "policy": "b12aa-ep1-seed1",
+      "id": "b12ai-ep3-seed1",
+      "type": "train",
+      "policy": "b12ai-ep3-seed1",
       "policies": [
-        "b12aa-ep1-seed1",
-        "b12ab-ep1-seed2",
-        "b12ac-ep1-seed3",
-        "b12ad-ep1-seed4",
-        "b12ae-ep2-seed1",
-        "b12af-ep2-seed2",
-        "b12ag-ep2-seed3",
-        "b12ah-ep2-seed4"
+        "b12ai-ep3-seed1"
       ],
-      "pid": 2612476,
-      "step": 50003968,
-      "label": "",
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2451
+      "pid": 2690034,
+      "step": 163840,
+      "label": "b12: ep3, seed 1 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12aj-ep3-seed2",
+      "type": "train",
+      "policy": "b12aj-ep3-seed2",
+      "policies": [
+        "b12aj-ep3-seed2"
+      ],
+      "pid": 2690035,
+      "step": 180224,
+      "label": "b12: ep3, seed 2 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12ak-ep3-seed3",
+      "type": "train",
+      "policy": "b12ak-ep3-seed3",
+      "policies": [
+        "b12ak-ep3-seed3"
+      ],
+      "pid": 2690036,
+      "step": 180224,
+      "label": "b12: ep3, seed 3 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12al-ep3-seed4",
+      "type": "train",
+      "policy": "b12al-ep3-seed4",
+      "policies": [
+        "b12al-ep3-seed4"
+      ],
+      "pid": 2690037,
+      "step": 147456,
+      "label": "b12: ep3, seed 4 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12am-ep5-seed1",
+      "type": "train",
+      "policy": "b12am-ep5-seed1",
+      "policies": [
+        "b12am-ep5-seed1"
+      ],
+      "pid": 2690038,
+      "step": 114688,
+      "label": "b12: ep5, seed 1 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12an-ep5-seed2",
+      "type": "train",
+      "policy": "b12an-ep5-seed2",
+      "policies": [
+        "b12an-ep5-seed2"
+      ],
+      "pid": 2690039,
+      "step": 147456,
+      "label": "b12: ep5, seed 2 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12ao-ep5-seed3",
+      "type": "train",
+      "policy": "b12ao-ep5-seed3",
+      "policies": [
+        "b12ao-ep5-seed3"
+      ],
+      "pid": 2690040,
+      "step": 131072,
+      "label": "b12: ep5, seed 3 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
+    },
+    {
+      "id": "b12ap-ep5-seed4",
+      "type": "train",
+      "policy": "b12ap-ep5-seed4",
+      "policies": [
+        "b12ap-ep5-seed4"
+      ],
+      "pid": 2690041,
+      "step": 131072,
+      "label": "b12: ep5, seed 4 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": null,
+      "elapsed_s": 32
     }
   ],
   "ledger": {
-    "b12ai-ep3-seed1": "queued",
-    "b12aj-ep3-seed2": "queued",
-    "b12ak-ep3-seed3": "queued",
-    "b12al-ep3-seed4": "queued",
-    "b12am-ep5-seed1": "queued",
-    "b12an-ep5-seed2": "queued",
-    "b12ao-ep5-seed3": "queued",
-    "b12ap-ep5-seed4": "queued",
     "b12aq-ep6-seed1": "queued",
     "b12ar-ep6-seed2": "queued",
     "b12as-ep6-seed3": "queued",
@@ -366,7 +449,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b12-stageb": "running",
+    "b12ai-ep3-seed1": "running",
+    "b12aj-ep3-seed2": "running",
+    "b12ak-ep3-seed3": "running",
+    "b12al-ep3-seed4": "running",
+    "b12am-ep5-seed1": "running",
+    "b12an-ep5-seed2": "running",
+    "b12ao-ep5-seed3": "running",
+    "b12ap-ep5-seed4": "running",
+    "b12-stageb": "done",
     "b12ad-ep1-seed4": "done",
     "b12ah-ep2-seed4": "done",
     "b12ag-ep2-seed3": "done",
@@ -712,8 +803,8 @@
   },
   "disk_free_gb": 140.1,
   "load_avg": [
-    16.18408203125,
-    16.04345703125,
-    15.84130859375
+    12.111328125,
+    14.55126953125,
+    15.3408203125
   ]
 }
