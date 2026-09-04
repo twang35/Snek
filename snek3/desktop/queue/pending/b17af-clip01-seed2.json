@@ -32,6 +32,6 @@
     "SNEK_SEED": "2"
   },
   "priority": 190,
-  "label": "b17: clip01, seed 2 of 4 -- wave 1 of 8",
+  "label": "b17: clip01, seed 2 of 4 -- wave 1 of 7",
   "notes": "Batch b17: the clip, and the clip and lr anneals sweep, one knob off the frozen base (b7's fc (320,) reference: PPO defaults, b2 reward, 4 epochs), seeds 1-4 pinned to the arm letter, at b7's 50M cap so b7aa-b7ad are the control. Design: plans/hyperparam-sweep.md. This cell: clip01 -> {\"SNEK_PPO_CLIP\": \"0.1\"}. Prediction: tighter: slower onset, fewer collapses Batch note: Anneal floors below 0.02 are allowed (any value in (0, 1)). The hold cell needs SNEK_PPO_ANNEAL_FRACTION (the share of the cap the ramps span, then hold), written 2026-09-03; until it is deployed on the box the generator drops that cell."
 }
