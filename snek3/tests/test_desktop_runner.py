@@ -607,7 +607,39 @@ def test_a_running_batch_shows_the_mean_percent_across_its_arms():
                {'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x'],
                 'step': 2000000, 'max_steps': 3000000}]
     glance = runner_module.build_at_a_glance(running, [], {'b1': 'the seed-matched set'})
-    assert glance['running'] == ['b1 | the seed-matched set | training 50% (2 arms)']
+    assert glance['running'] == ['b1 | x | training 50% (2 arms)']   # the arms' own knob token, not the batch label
+
+
+def test_a_running_wave_is_captioned_by_its_own_arms_not_by_the_next_queued_spec():
+    # 2026-09-03: the caption was one label per batch, first found, and the first found was the queued
+    # spec's -- so wave 3 (lr5e4, lr8e4) read "lr1e3, seed 1 of 4 -- wave 4 of 4" for two hours.
+    def arm(letter, cell, seed, wave, **extra):
+        job = {'id': 'b11{0}-{1}-seed{2}'.format(letter, cell, seed), 'type': 'train',
+               'policy': 'b11{0}-{1}-seed{2}'.format(letter, cell, seed), 'policies': [],
+               'label': 'b11: {0}, seed {1} of 4 -- wave {2} of 4'.format(cell, seed, wave), 'priority': 112}
+        job.update(extra)
+        return job
+    running = [arm('aq', 'lr5e4', 1, 3, step=50, max_steps=100), arm('ar', 'lr5e4', 2, 3, step=50, max_steps=100),
+               arm('au', 'lr8e4', 1, 3, step=50, max_steps=100)]
+    queued = [arm('ay', 'lr1e3', 1, 4), arm('az', 'lr1e3', 2, 4), arm('bc', 'lr2e3', 1, 4)]
+    labels = {'b11': queued[0]['label']}          # what _batch_labels would have handed over
+    glance = runner_module.build_at_a_glance(running, queued, labels)
+    assert glance['running'] == ['b11 | lr5e4, lr8e4 -- wave 3 of 4 | training 50% (3 arms)']
+    assert glance['queued'] == ['b11 training | lr1e3, lr2e3 -- wave 4 of 4 | queued (3 arms)']
+
+
+def test_an_unlabelled_stage_b_is_captioned_by_the_cells_it_measures():
+    stage_b = [{'id': 'b11-stageb-w2', 'type': 'eval', 'policy': 'b11ai-lr1.5e4-seed1', 'label': '',
+                'policies': ['b11ai-lr1.5e4-seed1', 'b11aj-lr1.5e4-seed2', 'b11am-lr2.5e4-seed1'],
+                'priority': 10}]
+    glance = runner_module.build_at_a_glance(stage_b, [], {'b11': 'b11: lr1e3, seed 1 of 4 -- wave 4 of 4'})
+    assert glance['running'] == ['b11 | lr1.5e4, lr2.5e4 | stage B (3 arms)']
+
+
+def test_the_batch_label_is_only_a_fallback_when_the_jobs_say_nothing():
+    jobs = [{'id': 'smoke-1', 'type': 'smoke', 'policy': 'smoke', 'policies': [], 'priority': 1}]
+    glance = runner_module.build_at_a_glance(jobs, [], {'smoke': 'a smoke run'})
+    assert glance['running'] == ['smoke | a smoke run | smoke (1 arm)']
 
 
 def test_a_hold_notice_leads_the_queue_even_when_the_queue_is_empty():
@@ -749,12 +781,16 @@ def test_at_a_glance_folds_a_label_that_came_from_the_ledger():
     display after parse_job started folding, which is why this is done in both places.
     """
     running = [{'id': 'b8i-kl02-seed1', 'type': 'train', 'policy': 'b8i-kl02-seed1',
-                'step': 19, 'max_steps': 100}]
-    glance = runner_module.build_at_a_glance(
-        running, [], {'b8': 'b8: kl02, seed 1 of 4 — wave 2 of 2'})
+                'label': 'b8: kl02, seed 1 of 4 — wave 2 of 2', 'step': 19, 'max_steps': 100}]
+    glance = runner_module.build_at_a_glance(running, [], {})
     line = glance['running'][0]
     assert line.isascii(), line
     assert '--' in line and '—' not in line
+    # and the batch-label fallback folds too, for a job that carries no label of its own
+    fallback = runner_module.build_at_a_glance(
+        [{'id': 'smoke-1', 'type': 'smoke', 'policy': 'smoke', 'policies': []}], [],
+        {'smoke': 'a run — with a dash'})['running'][0]
+    assert fallback.isascii() and '--' in fallback, fallback
 
 
 def test_at_a_glance_uses_no_em_dash_of_its_own():

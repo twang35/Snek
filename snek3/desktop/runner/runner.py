@@ -560,10 +560,12 @@ class Runner(object):
         limits = {'trainer': self.runtime['max_trainers'], 'eval': 1}
         auto = self.runtime.get('auto_stage_b', True)
         queued = [{'id': job.id, 'type': job.type, 'policy': job.policy,
-                   'policies': list(job.policies), 'priority': job.priority}
+                   'policies': list(job.policies), 'priority': job.priority,
+                   'label': getattr(job, 'label', '')}
                   for job in self._queued if job.id not in self.running]
         running = [{'id': job_id, 'type': running_job.job.type, 'policy': running_job.policy,
-                    'policies': list(running_job.job.policies)}
+                    'policies': list(running_job.job.policies),
+                    'label': getattr(running_job.job, 'label', '')}
                    for job_id, running_job in self.running.items()]
         existing = set(self.ledger) | set(self.running) | {job['id'] for job in queued}
         return anticipated_queue(queued, running, limits, auto, existing)
@@ -644,6 +646,7 @@ class Runner(object):
                     'policy': running_job.policy,
                     'policies': list(running_job.job.policies),
                     'pid': running_job.pid, 'step': running_job.current_step,
+                    'label': getattr(running_job.job, 'label', ''),
                     'max_steps': getattr(running_job.job, 'max_steps', None),
                     'steps_per_sec': running_job.steps_per_sec,
                     'elapsed_s': round(time.time() - running_job.started)}
@@ -749,6 +752,46 @@ def hold_notice(held_by):
         ' and '.join('"{0}": false'.format(flag) for flag in held))
 
 
+_SEED_PIECE_RE = re.compile(r'^seed \d+ of \d+$')
+_BATCH_PREFIX_RE = re.compile(r'^b\d+:\s*')
+_KNOB_TOKEN_RE = re.compile(r'^b\d+[a-z]+-(.+?)(?:-seed\d+)?$')
+
+
+def describe_jobs(jobs):
+    """One caption for a group of jobs, from the jobs themselves.
+
+    From their labels when they have them: `tools/sweep_specs.py` writes
+    `b11: lr5e4, seed 1 of 4 -- wave 3 of 4` per arm, so the batch prefix and the per-arm seed piece
+    are dropped and what the arms differ in is kept, in first-seen order --
+    `lr5e4, lr8e4 -- wave 3 of 4` for a wave holding two cells. From their policy ids otherwise: an
+    auto-queued stage B carries no label, and its arms' knob tokens (`b11ai-lr1.5e4-seed1` ->
+    `lr1.5e4`) say what it is measuring. Empty when neither yields anything, so the caller can fall
+    back to whatever it has.
+    """
+    heads, tails = [], []
+    for job in jobs:
+        label = to_ascii(str(job.get('label') or ''))
+        if not label:
+            continue
+        head, _, tail = _BATCH_PREFIX_RE.sub('', label).partition(' -- ')
+        for piece in head.split(', '):
+            piece = piece.strip()
+            if piece and not _SEED_PIECE_RE.match(piece) and piece not in heads:
+                heads.append(piece)
+        tail = tail.strip()
+        if tail and tail not in tails:
+            tails.append(tail)
+    if heads or tails:
+        return ', '.join(heads) + (' -- ' + ', '.join(tails) if tails else '')
+    tokens = []
+    for job in jobs:
+        for policy in (job.get('policies') or [job.get('policy')]):
+            match = _KNOB_TOKEN_RE.match(str(policy or ''))
+            if match and match.group(1) not in tokens:
+                tokens.append(match.group(1))
+    return ', '.join(tokens)
+
+
 def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
     """The `at_a_glance` block: `{'running': [str], 'queued': [str], 'attention': [str]}`.
 
@@ -772,8 +815,13 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
             groups[index[key]][2].append(job)
         return groups
 
-    def described(batch):
-        label = labels.get(batch)
+    def described(batch, jobs):
+        # The text after the batch id describes THESE jobs, never the batch as a whole. Until
+        # 2026-09-03 it was one label per batch, the first found, and the first found was a queued
+        # spec's -- so a running b11 wave 3 was captioned "lr1e3, seed 1 of 4 -- wave 4 of 4" from
+        # the arm that would run next, and a stage B was captioned by a trainer. Read the ledger to
+        # learn which arms were live, which is what the caption exists to save.
+        label = describe_jobs(jobs) or labels.get(batch) or ''
         if not label:
             return ''
         # Folded here as well as in `job.py`, because a label reaches this from three places and one
@@ -798,7 +846,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
         percent = (' {0}%'.format(int(round(sum(percents) / len(percents))))
                    if percents else '')
         running_lines.append('{0}{1} | {2}{3} ({4})'.format(
-            batch, described(batch), phase, percent, arms(jobs)))
+            batch, described(batch, jobs), phase, percent, arms(jobs)))
 
     queued_lines = []
     notice = hold_notice(held_by)
@@ -806,7 +854,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
         queued_lines.append(notice)
     for batch, phase, jobs in group(queued_order):
         queued_lines.append('{0} {1}{2} | queued ({3})'.format(
-            batch, phase, described(batch), arms(jobs)))
+            batch, phase, described(batch, jobs), arms(jobs)))
 
     return {'running': running_lines, 'queued': queued_lines, 'attention': list(attention)}
 
