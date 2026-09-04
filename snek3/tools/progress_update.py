@@ -24,6 +24,7 @@ Definitions are `tools/viewer_manifest.py`'s, so the page and the docs cannot di
 import argparse
 import collections
 import datetime
+import glob
 import json
 import os
 import re
@@ -32,6 +33,7 @@ import subprocess
 import sys
 
 from env import constants
+from tools import live_runs
 from tools import publish_pages
 from tools import viewer_manifest
 
@@ -120,8 +122,12 @@ def pull_live_charts(batches, runs_dir=None):
         argv = ['rsync', '-a']
         for batch in batches:
             argv += ['--include={0}*{1}'.format(batch, suffix) for suffix in suffixes]
-        argv += ['--exclude=*', '{0}:{1}'.format(BOX, BOX_RUNS), target + '/']
-        result = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        argv += ['--exclude=*', '-e', 'ssh -o ConnectTimeout=15 -o BatchMode=yes',
+                 '{0}:{1}'.format(BOX, BOX_RUNS), target + '/']
+        try:
+            result = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            return False, 'rsync timed out after 120 s: live charts and measurements NOT refreshed — off-LAN?'
         if result.returncode != 0:
             return False, 'rsync failed ({0}): live charts and measurements NOT refreshed — off-LAN?'.format(
                 result.returncode)
@@ -141,30 +147,41 @@ def drop_superseded_snapshots(runs_dir=None):
     return dropped
 
 
+LOCAL_SPECS = os.path.join(SNEK3, 'logs')     # laptop_batch runs `logs/<batch>specs/*.json`, dequeued from ops
+
+
+def read_spec(policy):
+    """The arm's spec: from `ops` pending, else from a local `logs/*/<policy>.json` (a batch `laptop_batch`
+    ran after it was dequeued from the desktop — b13, 2026-09-03). None when neither has it."""
+    result = subprocess.run(['git', 'show', 'origin/ops:{0}{1}.json'.format(PENDING, policy)],
+                            cwd=REPO, capture_output=True, text=True)
+    text = result.stdout if result.returncode == 0 else None
+    if text is None:
+        for path in sorted(glob.glob(os.path.join(LOCAL_SPECS, '*', policy + '.json'))):
+            with open(path) as handle:
+                text = handle.read()
+            break
+    if text is None:
+        return None
+    try:
+        return json.loads(text)
+    except ValueError:
+        return None
+
+
 def spec_envs(policies):
-    """`{policy: env}` from each arm's spec on `ops`; arms without a spec are absent."""
+    """`{policy: env}` from each arm's spec (`ops`, else local); arms without a spec are absent."""
     out = {}
     for policy in policies:
-        result = subprocess.run(['git', 'show', 'origin/ops:{0}{1}.json'.format(PENDING, policy)],
-                                cwd=REPO, capture_output=True, text=True)
-        if result.returncode == 0:
-            try:
-                spec = json.loads(result.stdout)
-            except ValueError:
-                continue
+        spec = read_spec(policy)
+        if spec is not None:
             out[policy] = dict(spec.get('env', {}), _max_steps=spec.get('max_steps'))
     return out
 
 
 def spec_notes(policy):
-    result = subprocess.run(['git', 'show', 'origin/ops:{0}{1}.json'.format(PENDING, policy)],
-                            cwd=REPO, capture_output=True, text=True)
-    if result.returncode != 0:
-        return ''
-    try:
-        return json.loads(result.stdout).get('notes', '')
-    except ValueError:
-        return ''
+    spec = read_spec(policy)
+    return spec.get('notes', '') if spec else ''
 
 
 # ------------------------------------------------------------------------------------------ tables
@@ -361,7 +378,10 @@ def update_charts_md(text, table, title, status_line, adopt=False, runs_dir=None
         j = header.end() + after.start() if after else len(text)
         section = charts_section(table, title, status_line, _adopted_reading(text[i:j]), runs_dir)
         return text[:i] + section + '\n' + text[j:]
-    first = re.search(r'^## Batch ', text, re.M)
+    # Above the first batch section — which begins at its own start marker when it is a generated one, and
+    # at its heading when hand-written. Inserting at the heading alone landed b13 *inside* b11's marker
+    # pair on 2026-09-04, stacking three start markers at the top and displacing two sections' readings.
+    first = re.search(r'^(## Batch |<!-- progress_update: batch )', text, re.M)
     i = first.start() if first else len(text)
     section = charts_section(table, title, status_line, _reading(''), runs_dir)
     return text[:i] + section + '\n' + text[i:]
@@ -423,7 +443,7 @@ def state_line(status, batch):
     arms, waves = batch_state(status, batch)
     total = sum(arms.values())
     if not total:
-        return 'Not on the desktop ledger'
+        return laptop_state_line(batch)
     if not (arms['running'] or arms['queued']):
         return 'Closed: all {0} arms trained, stage B {1}'.format(
             total, 'done for every wave' if not (waves['running'] or waves['queued']) else
@@ -432,6 +452,34 @@ def state_line(status, batch):
     return ('In flight: {0} of {1} arms trained, {2} running, {3} queued; stage B {4} wave(s) done; '
             '{5} training wave(s) left at ~{6:.1f} h each -> ~{7:%Y-%m-%d %H:%M}').format(
                 arms['done'], total, arms['running'], arms['queued'], waves['done'], remaining, per_wave / 3600, finish)
+
+
+def laptop_state_line(batch, runs_dir=None):
+    """A batch the desktop ledger does not know: read its state off `runs/` and the live pid files.
+    Closed when every arm at its cap has a stage-B file; in flight while an arm trains or a close-out
+    still owes a file."""
+    runs_dir = runs_dir or constants.RUNS_DIR
+    arms = sorted(re.sub(r'_evals\.json$', '', os.path.basename(p))
+                  for p in glob.glob(os.path.join(runs_dir, batch + '*_evals.json'))
+                  if viewer_manifest.batch_of(os.path.basename(p)) == batch and '_checkpoint_evals' not in p)
+    if not arms:
+        return 'Not on the desktop ledger, and no arm of it in runs/'
+    envs = spec_envs(arms)
+    live = {policy for policy, _pid in live_runs.live(runs_dir, prune=False)}
+    at_cap = measured = 0
+    for arm in arms:
+        with open(os.path.join(runs_dir, arm + '_evals.json')) as handle:
+            step = (json.load(handle).get('summary') or {}).get('step') or 0
+        cap = envs.get(arm, {}).get('_max_steps')
+        if arm not in live and (cap is None or step >= cap):
+            at_cap += 1
+        if os.path.exists(os.path.join(runs_dir, arm + '_checkpoint_evals.json')):
+            measured += 1
+    running = len([a for a in arms if a in live])
+    if at_cap == len(arms) and measured == len(arms):
+        return 'Closed: all {0} arms trained on the laptop, stage B done for every wave'.format(len(arms))
+    return ('In flight on the laptop: {0} of {1} arms trained, {2} running; {3} of {1} have their stage-B file'
+            .format(at_cap, len(arms), running, measured))
 
 
 def running_arms(status):
@@ -514,7 +562,8 @@ def main(argv=None):
                 max((g['n'] for g in table['groups'] if not g['reference']), default=0), cap)
             if status and not closed:
                 arm_states = batch_state(status, batch)[0]
-                title += ' ({0} of {1} arms in)'.format(arm_states['done'], sum(arm_states.values()))
+                if sum(arm_states.values()):        # a laptop batch is not on the ledger; its line says where it is
+                    title += ' ({0} of {1} arms in)'.format(arm_states['done'], sum(arm_states.values()))
             status_line = ('**{0}** as of {1}. Reference group marked. Regenerated by `tools/progress_update.py`; '
                            'only the reading block is hand-written.').format(
                                where, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))

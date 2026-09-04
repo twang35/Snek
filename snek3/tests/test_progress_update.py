@@ -118,6 +118,12 @@ def test_new_batch_goes_above_the_first_batch_section():
     out = pu.update_charts_md(text, _table(), 'Batch b20 — t', 'status')
     assert out.index(pu.MARK.format('b20')) < out.index('## Batch b21')
     assert out.index('## Watching them live') < out.index(pu.MARK.format('b20'))
+    # and above the existing section's own start marker, not between that marker and its heading
+    # (which is where b13 landed on 2026-09-04, stacking the markers and displacing two readings)
+    if pu.MARK.format('b21') in text:
+        assert out.index(pu.END_MARK.format('b20')) < out.index(pu.MARK.format('b21'))
+    generated = pu.update_charts_md(out, dict(_table(), batch='b22'), 'Batch b22 — t', 'status')
+    assert generated.index(pu.END_MARK.format('b22')) < generated.index(pu.MARK.format('b20'))
 
 
 def test_results_skeleton_is_inserted_once_above_the_first_batch():
@@ -154,7 +160,7 @@ def test_live_batches_are_those_with_an_arm_running_or_queued():
 
 def test_state_line_reads_closed_or_in_flight():
     assert pu.state_line(STATUS, 'b19').startswith('Closed: all 1 arms')
-    assert pu.state_line({'ledger': {}}, 'b20') == 'Not on the desktop ledger'
+    assert pu.state_line({'ledger': {}}, 'b20').startswith('Not on the desktop ledger')
 
 
 def test_import_skips_shard_files_and_existing_ones(tmp_path, monkeypatch):
@@ -177,3 +183,29 @@ def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp
     (tmp_path / 'a_evals.json').write_text('{}')
     assert pu.drop_superseded_snapshots(str(tmp_path)) == 1
     assert not (live / 'a_evals.json').exists() and (live / 'b_evals.json').exists()
+
+
+def test_read_spec_falls_back_to_a_local_laptop_batch_spec(tmp_path, monkeypatch):
+    # b13 was dequeued from ops and run by laptop_batch from logs/b13specs/; the tool must still find its knob.
+    monkeypatch.setattr(pu, 'LOCAL_SPECS', str(tmp_path))
+    monkeypatch.setattr(pu.subprocess, 'run', lambda argv, **kw: type('R', (), {'returncode': 128, 'stdout': ''})())
+    assert pu.read_spec('b13aa-mb32-seed1') is None
+    (tmp_path / 'b13specs').mkdir()
+    (tmp_path / 'b13specs' / 'b13aa-mb32-seed1.json').write_text(json.dumps(
+        {'env': {'SNEK_PPO_MINIBATCH': '32'}, 'max_steps': 100, 'notes': 'Prediction: slow'}))
+    assert pu.spec_envs(['b13aa-mb32-seed1']) == {'b13aa-mb32-seed1': {'SNEK_PPO_MINIBATCH': '32', '_max_steps': 100}}
+    assert pu.spec_notes('b13aa-mb32-seed1') == 'Prediction: slow'
+
+
+def test_laptop_state_line_closes_only_when_every_arm_is_at_cap_and_measured(tmp_path, monkeypatch):
+    monkeypatch.setattr(pu, 'spec_envs', lambda arms: {a: {'_max_steps': 100} for a in arms})
+    monkeypatch.setattr(pu.live_runs, 'live', lambda runs_dir, prune: [])
+    for arm, step in (('b13aa-mb32-seed1', 100), ('b13ab-mb32-seed2', 100)):
+        (tmp_path / (arm + '_evals.json')).write_text(json.dumps({'summary': {'step': step}}))
+    (tmp_path / 'b13aa-mb32-seed1_checkpoint_evals.json').write_text('{}')
+    assert pu.laptop_state_line('b13', str(tmp_path)).startswith('In flight on the laptop: 2 of 2 arms trained, 0 running; 1 of 2')
+    (tmp_path / 'b13ab-mb32-seed2_checkpoint_evals.json').write_text('{}')
+    assert pu.laptop_state_line('b13', str(tmp_path)).startswith('Closed: all 2 arms trained on the laptop')
+    monkeypatch.setattr(pu.live_runs, 'live', lambda runs_dir, prune: [('b13ab-mb32-seed2', 1)])
+    assert '1 running' in pu.laptop_state_line('b13', str(tmp_path))
+    assert pu.laptop_state_line('b99', str(tmp_path)).startswith('Not on the desktop ledger')
