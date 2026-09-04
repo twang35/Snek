@@ -46,6 +46,25 @@ set** — `SNEK_CHASE_SAFE_*`, `SNEK_FREE_SPACE_*`, `SNEK_FOOD_DISTANCE_REWARD`,
 before the trainer's config exists. That is exactly the set a shaping experiment is about.
 `reward config:` is the line that covers them.
 
+## A whole batch of desktop specs
+
+To run a batch here that was written for the desktop -- dequeued from `ops` to shorten the box's
+queue, as b13 was on 2026-09-03 -- do not launch the arms by hand. `tools.laptop_batch` takes the
+daemon's own `queue/pending/*.json` specs and runs them the way the daemon would: waves of 8, each
+arm with the spec's `env` and `max_steps`, each wave followed by its own `tools.closeout` named
+`<batch>-stageb`, `-w2`, ... It skips an arm already at its cap, waits for an arm already live here
+instead of relaunching it, and never puts a ninth trainer on the box.
+
+```
+mkdir -p logs/<batch>specs && for f in $(git ls-tree --name-only origin/ops snek3/desktop/queue/pending/ | grep '/<batch>[a-z]'); do
+    git show "origin/ops:$f" > logs/<batch>specs/$(basename $f); done
+PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batch logs/<batch>specs/ \
+    > logs/<batch>-batch.log 2>&1 &
+```
+
+Rerunning the same command after a kill or a reboot is the recovery procedure. Then check the config
+of one arm per wave with the two greps above, as for any launch.
+
 ## Stage B
 
 One process per batch, in arm order, with its own chart window:
