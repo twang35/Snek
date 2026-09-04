@@ -10,96 +10,88 @@ Run from `snek3/`. **Read-only with respect to running processes.** Do not kill,
 arm — not even one past its cap, finished-looking, or clearly failing. Deciding a run is done is the
 user's call. If a slot looks free, say so as a recommendation.
 
-## 1. Both boxes, and name which is which
+**The busy work is one command; the reading is yours.** `tools/progress_update.py` syncs, publishes,
+computes every table and regenerates the mechanical parts of the docs, then prints a digest. Do not
+redo any of that by hand — if a number you need is missing from the digest, add it to the tool.
 
-"N arms running" is meaningless without the box. Neither check sees the other.
-
-```
-ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   # laptop
-git fetch origin ops-status && git show origin/ops-status:status.json          # desktop
-```
-
-**`git fetch` is mandatory.** `git show origin/ops-status:…` reads a local tracking ref, so without
-the fetch you get an arbitrarily old snapshot with a timestamp in it that reads like a dead daemon.
-That has caused three false alarms. Before calling the box down, in order: fetch and re-read;
-`ssh the-claw-den 'Snek/snek3/desktop/trigger'`; `ssh the-claw-den -o ConnectTimeout=8 -o BatchMode=yes`.
-A `status.json` up to 10 minutes old is healthy (`git_seconds` is 600).
-
-On the home LAN, `trigger` is the better first read: it makes the daemon publish *now* and prints
-`counts`, the running batches and `attention` straight back, so it is one round trip instead of
-fetch-plus-parse. Off-LAN it exits 1 and the git bus is the only route.
-
-Start from `status.json`'s `at_a_glance` and its `attention` list. Ledger `interrupted` means the box
-rebooted under the job; it is non-terminal and gets relaunched.
-
-## 1b. Refresh the charts and publish the site **before** any reading or writing
-
-The GitHub-Pages viewer is served from `master`'s top-level `docs/`, and Pages goes live about a
-minute after a push — so publish first, and by the time the update's summary is written the site
-already shows what it describes. In order, before opening a single results file:
+## 1. Run the tool, and the laptop check
 
 ```
-git fetch origin results                                        # closed waves' artifacts
-# import any batch/wave whose stage B reads `done` on the ledger and is not yet in snek3/runs/:
-#   for f in $(git ls-tree -r --name-only origin/results | grep 'results/<job-id>/'); do git show origin/results:$f > snek3/runs/$(basename $f); done
-rsync -a --include='b<n>*.png' --include='b<n>*.md' --exclude='*' the-claw-den:Snek/snek3/runs/ snek3/runs/   # live arms' charts
-cd snek3 && PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.publish_pages && cd ..           # manifest + docs/
-git add docs snek3/viewer/manifest.js snek3/runs/b<n>*.png snek3/runs/b<n>*.md                          # plus the imported closed-wave JSON
-git commit -m 'Charts: <what changed>' && git push origin master
+PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.progress_update
+ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   # laptop: the tool does not see it
 ```
 
-`tools.publish_pages` rewrites `docs/` completely — the page, a manifest pointing at `charts/`, exactly
-the PNGs the manifest refers to — so `docs/` is **never edited by hand**. `rsync` is home-LAN only; off-LAN,
-publish without the live charts and say so. The rest of the update's doc edits go up in a second commit.
+The tool, in order: fetches `results`, `ops-status` and `ops`; imports any closed stage-B wave's files
+that `runs/` lacks; `rsync`s the live batches' charts off the box (off-LAN this fails and the digest
+says so — carry on, and say so in the summary); runs `tools.publish_pages`; regenerates the
+`charts.md` sections it owns; inserts a `results.md` skeleton for a batch that just closed; prints
+the digest. Read the digest top to bottom:
 
-## 2. Read each arm from its summary block, never from a log
+| digest line | what it is |
+|---|---|
+| `sync:` / `publish:` | what moved. A nonzero "imported" means a wave closed since the last update |
+| `desktop <iso>:` | `at_a_glance` from a **fresh** fetch, plus each running job's step and % |
+| `=== bN:` … `In flight`/`Closed` | the batch's ledger state, with an ETA from its own wave cadence while it trains |
+| the table | the canonical per-batch table — knob value from the spec, rows, density, per-seed share, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98%, and the **reference cell's row in bold at its knob value** |
+| `top rows:` | the five best stage-B rows in the batch |
+| `prediction for <value>:` | what the spec said would happen, for every cell with rows — read each against its row |
+| `results.md: skeleton inserted` | a batch closed: its reading is now owed (step 3) |
 
-`runs/<policy>_evals.json` → `summary`: `step`, `transitions`, `evals`, `trailing_now`,
-`peak_trailing`, `best_perfect30`, `strong_eval_fraction`, `recent_perfect30`, `max_single_eval`,
-`zero_since`, `dead_since`, `epsilon`.
+Every generated table shares its definitions with the Pages viewer (`tools/viewer_manifest.py`), so
+quote the digest's numbers rather than recomputing them.
 
-- **`strong_eval_fraction` is the primary metric** (share of evals at ≥80% perfect). It is a fraction
-  of each arm's own evals, so compare only at a common step horizon.
-- **`zero_since` answers "is it dead now"**; `dead_since` is history. Neither is a verdict — a snek2
-  arm came back from 1.2M steps near zero.
-- **Rank a comparison: peak `best_perfect30` > consistency > speed.** An arm still rising at its cap
-  has not reported its best30 yet.
-- **Read `transitions`, not `step`,** across any change in `SNEK_COLLECT_ENVS`, `SNEK_FORK_BRANCHES`
-  or algorithm. A DQN counted step is four game moves at the default `fork_branches=4`.
+## 2. Commit the pictures and the site first
 
-## 3. Update the docs in the same pass
+Pages goes live about a minute after a push, so this commit goes up before any writing:
+
+```
+cd .. && git add docs snek3/viewer/manifest.js snek3/docs/charts.md snek3/runs/b<n>*.png snek3/runs/b<n>*.md && git commit -m 'Charts: <what changed>' && git push origin master && cd snek3
+```
+
+Also `git add` the closed-wave files the tool imported (`_evals.json`, `_checkpoint_evals.*`) — they
+belong on master once their wave is `done`. **Never add a live batch's `*_evals.json` or
+`*_checkpoint_evals.*`**: the trainer rewrites the first on resume and the second is a pass in
+progress, and the box's `desktop/deploy` refuses to merge over a differing JSON.
+
+## 3. Write the readings — the only hand-written part
+
+Every `charts.md` section the tool owns sits between `<!-- progress_update: batch bN -->` markers and
+carries one `<!-- reading -->` … `<!-- /reading -->` block. **Edit only inside that block**; everything
+outside it is rewritten on the next run. A `results.md` skeleton has the same block with a placeholder
+sentence in it.
+
+What a reading is: the paragraph a person needs *after* seeing the table — which group to look at
+first and against which reference, where the sweep turns, which prediction the row confirmed or
+falsified, what the stage-A traces show that the table cannot (drawdowns, late onset, a seed that never
+arrived). Not a restatement of the numbers. Three to eight sentences.
 
 | file | takes |
 |---|---|
-| `docs/runs.md` | current state and forward plan **only** |
-| `docs/results.md` | every arm: config, final numbers, verdict |
-| `docs/findings.md` | conclusions — established and falsified |
-| `docs/charts.md` | **always refresh, finished or not.** A running batch with no entry is a bug |
+| `docs/runs.md` | current state and forward plan **only** — move the stale `Now` block down, do not append |
+| `docs/results.md` | a closed batch's reading, in the skeleton's block; the verdict on each cell |
+| `docs/findings.md` | a conclusion, established or falsified, directly under `## Established` |
+| `docs/charts.md` | the reading block of every live or just-closed batch |
 
-`charts.md` links `../runs/<policy>.png` directly — no copy step. Keep the split clean; snek2's
-equivalent grew to 950 lines of interleaved status and stopped being usable.
+**Write new material at the top, never at the bottom.** Reference sections (`Imported policies`,
+`Reading this table`) stay at the bottom. Markdown traps: `A.`/`a.` are not list markers (use
+`#### A. Thing`), and duplicate numbers in one list renumber silently.
 
-**Write new material at the top, never appended to the bottom.** A batch that closed goes above the
-batch before it in `results.md` and `charts.md`; a new finding goes directly under `## Established`
-in `findings.md`; `runs.md` keeps the order current state -> forward plan -> history, so a stale
-`Now` block is moved down rather than left in place above the new one. Reference sections
-(`Imported policies`, `Reading this table`) stay at the bottom.
+Then the second commit — docs only, standing authorization:
 
-Markdown traps: `A.`/`a.` are not list markers (use `#### A. Thing`), and duplicate numbers in one
-list renumber silently. Cross-reference items by name.
+```
+cd .. && git add snek3/docs && git commit -m 'Progress update: <headline>' && git push origin master && cd snek3
+```
 
-## 4. Commit
+## 4. The summary to the user
 
-A **docs-only** change (Markdown, plus any chart PNGs riding along) is committed and pushed with no
-confirmation — standing authorization. The moment the same change touches code or config, the whole
-thing waits for the user.
+Both boxes by name, what closed and what is live with an ETA, the one or two rows that matter, and
+whether anything undercuts the plan. The tables are on the page and in the docs — link, do not paste.
 
-**Every arm's charts, live desktop arms included, were committed in step 1b** (rule changed 2026-09-02).
-If step 1b was skipped, do it now rather than adding pictures here by hand — the published site and the
-committed manifest must come from the same `publish_pages` run.
+## When the tool is wrong
 
-**Never commit a live desktop arm's `*_evals.json` or `*_checkpoint_evals.*`.** `_evals.json` is the
-trainer's own history, read on resume; the stage-B file is a pass in progress. Add them only once the
-batch's stage B reads `done` on the ledger, when they have arrived on the `results` branch. The box's
-`desktop/deploy` keeps its own copy of every colliding picture but refuses to merge over a differing
-JSON, so committing one blocks every deploy until it is `git rm --cached` on master.
+A skill that fails is a bug in the skill, and here the skill is mostly the tool. A batch whose knob
+comes out `None` has more than one env var varying — pass its table by hand and add a rule to
+`knob_key`. A reference row at the wrong place needs `value` set in `viewer/references.json`. A
+hand-written `charts.md` section that should become generated: `--adopt bN`, which moves every prose
+paragraph into the reading block and drops the rest. `--no-sync` works offline; `--no-docs` prints
+tables without touching a file. Tests: `tests/test_progress_update.py`.

@@ -54,6 +54,21 @@ def seed_of(policy):
     return int(match.group(1)) if match else None
 
 
+def onset(evals):
+    """The step of the first stage-A eval at >=80% perfect, or None."""
+    for e in evals:
+        if e.get('perfect_percent', 0) >= 80:
+            return e.get('step')
+    return None
+
+
+def stage_a_share(evals, at_least):
+    """Share (%) of all stage-A evals at or above `at_least` percent perfect; None with no evals."""
+    if not evals:
+        return None
+    return round(100.0 * sum(e.get('perfect_percent', 0) >= at_least for e in evals) / len(evals), 1)
+
+
 def drawdown(evals, below):
     """Share (%) of stage-A evals after the first >=80% one that fall below `below`; None before onset."""
     onset = next((i for i, e in enumerate(evals) if e.get('perfect_percent', 0) >= 80), None)
@@ -90,6 +105,8 @@ def arm_record(policy, runs_dir):
         'evals': summary.get('evals'),
         'drawdown50': drawdown(stage_a.get('evals') or [], 50),
         'drawdown80': drawdown(stage_a.get('evals') or [], 80),
+        'stage_a_98': stage_a_share(stage_a.get('evals') or [], 98),
+        'onset_step': onset(stage_a.get('evals') or []),
     })
     stage_b = _read(os.path.join(runs_dir, policy + '_checkpoint_evals.json'))
     rows = (stage_b or {}).get('rows') or []

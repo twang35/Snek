@@ -1,5 +1,5 @@
 {
-  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (desktop-batch skill).",
+  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (desktop-batch skill). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it.",
   "b8": {
     "arms": [
       "b4a-fc200x100ep8-seed1",
@@ -21,7 +21,8 @@
       "b7ad-fc320-seed4"
     ],
     "label": "reference: b7 fc (320,) cell, lambda 0.98",
-    "after": "lam97"
+    "after": "lam97",
+    "value": "0.98"
   },
   "b10": {
     "arms": [
@@ -31,7 +32,8 @@
       "b7ad-fc320-seed4"
     ],
     "label": "reference: b7 fc (320,) cell, gamma 0.99",
-    "after": "g98"
+    "after": "g98",
+    "value": "0.99"
   },
   "b11": {
     "arms": [
@@ -41,7 +43,8 @@
       "b9bz-lam99-seed4"
     ],
     "label": "reference: b9 lambda 0.99 cell, lr 3e-4",
-    "after": "lr2.5e4"
+    "after": "lr2.5e4",
+    "value": "3e-4"
   },
   "b12": {
     "arms": [
@@ -51,7 +54,8 @@
       "b9bz-lam99-seed4"
     ],
     "label": "reference: b9 lambda 0.99 cell, 4 epochs",
-    "after": "ep3"
+    "after": "ep3",
+    "value": "4"
   },
   "b13": {
     "arms": [
@@ -61,7 +65,8 @@
       "b9bz-lam99-seed4"
     ],
     "label": "reference: b9 lambda 0.99 cell, minibatch 256",
-    "after": "mb192"
+    "after": "mb192",
+    "value": "256"
   },
   "b14": {
     "arms": [
@@ -71,6 +76,7 @@
       "b9bz-lam99-seed4"
     ],
     "label": "reference: b9 lambda 0.99 cell, rollout 128",
-    "after": "roll64"
+    "after": "roll64",
+    "value": "128"
   }
 }
