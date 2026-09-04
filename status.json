@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-03T21:40:21",
-  "ts": 1788496821.5780962,
+  "iso": "2026-09-03T21:50:34",
+  "ts": 1788497434.9699469,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | training 94% (8 arms)"
+      "b11 | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | stage B (16 arms)"
     ],
     "queued": [
-      "b11 stage B | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | queued (8 arms)",
       "b11 training | b11: lr1e3, seed 1 of 4 -- wave 4 of 4 | queued (8 arms)",
       "b12 training | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (40 arms)",
       "b12 stage B | b12: ep1, seed 1 of 4 -- wave 1 of 5 | queued (8 arms)",
@@ -48,117 +47,40 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b11aq-lr5e4-seed1",
-      "type": "train",
-      "policy": "b11aq-lr5e4-seed1",
+      "id": "b11-stageb-w2",
+      "type": "eval",
+      "policy": "b11ai-lr1.5e4-seed1",
       "policies": [
-        "b11aq-lr5e4-seed1"
-      ],
-      "pid": 1874153,
-      "step": 49676288,
-      "max_steps": 50003968,
-      "steps_per_sec": 9922.3,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11ar-lr5e4-seed2",
-      "type": "train",
-      "policy": "b11ar-lr5e4-seed2",
-      "policies": [
-        "b11ar-lr5e4-seed2"
-      ],
-      "pid": 1874154,
-      "step": 48873472,
-      "max_steps": 50003968,
-      "steps_per_sec": 9922.5,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11as-lr5e4-seed3",
-      "type": "train",
-      "policy": "b11as-lr5e4-seed3",
-      "policies": [
-        "b11as-lr5e4-seed3"
-      ],
-      "pid": 1874155,
-      "step": 47579136,
-      "max_steps": 50003968,
-      "steps_per_sec": 10419.2,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11at-lr5e4-seed4",
-      "type": "train",
-      "policy": "b11at-lr5e4-seed4",
-      "policies": [
-        "b11at-lr5e4-seed4"
-      ],
-      "pid": 1874156,
-      "step": 47300608,
-      "max_steps": 50003968,
-      "steps_per_sec": 9923.6,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11au-lr8e4-seed1",
-      "type": "train",
-      "policy": "b11au-lr8e4-seed1",
-      "policies": [
-        "b11au-lr8e4-seed1"
-      ],
-      "pid": 1874157,
-      "step": 46170112,
-      "max_steps": 50003968,
-      "steps_per_sec": 8931.5,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11av-lr8e4-seed2",
-      "type": "train",
-      "policy": "b11av-lr8e4-seed2",
-      "policies": [
-        "b11av-lr8e4-seed2"
-      ],
-      "pid": 1874158,
-      "step": 46235648,
-      "max_steps": 50003968,
-      "steps_per_sec": 10916.6,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11aw-lr8e4-seed3",
-      "type": "train",
-      "policy": "b11aw-lr8e4-seed3",
-      "policies": [
-        "b11aw-lr8e4-seed3"
-      ],
-      "pid": 1874159,
-      "step": 45826048,
-      "max_steps": 50003968,
-      "steps_per_sec": 11413.2,
-      "elapsed_s": 5267
-    },
-    {
-      "id": "b11ax-lr8e4-seed4",
-      "type": "train",
-      "policy": "b11ax-lr8e4-seed4",
-      "policies": [
+        "b11ai-lr1.5e4-seed1",
+        "b11aj-lr1.5e4-seed2",
+        "b11ak-lr1.5e4-seed3",
+        "b11al-lr1.5e4-seed4",
+        "b11am-lr2.5e4-seed1",
+        "b11an-lr2.5e4-seed2",
+        "b11ao-lr2.5e4-seed3",
+        "b11ap-lr2.5e4-seed4",
+        "b11aq-lr5e4-seed1",
+        "b11ar-lr5e4-seed2",
+        "b11as-lr5e4-seed3",
+        "b11at-lr5e4-seed4",
+        "b11au-lr8e4-seed1",
+        "b11av-lr8e4-seed2",
+        "b11aw-lr8e4-seed3",
         "b11ax-lr8e4-seed4"
       ],
-      "pid": 1874160,
-      "step": 46055424,
-      "max_steps": 50003968,
-      "steps_per_sec": 10917.4,
-      "elapsed_s": 5267
+      "pid": 2030131,
+      "step": 50003968,
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 225
     }
   ],
   "ledger": {
-    "b11-stageb-w2": "queued",
     "b11ay-lr1e3-seed1": "queued",
     "b11az-lr1e3-seed2": "queued",
     "b11ba-lr1e3-seed3": "queued",
@@ -505,14 +427,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b11aq-lr5e4-seed1": "running",
-    "b11ar-lr5e4-seed2": "running",
-    "b11as-lr5e4-seed3": "running",
-    "b11at-lr5e4-seed4": "running",
-    "b11au-lr8e4-seed1": "running",
-    "b11av-lr8e4-seed2": "running",
-    "b11aw-lr8e4-seed3": "running",
-    "b11ax-lr8e4-seed4": "running",
+    "b11-stageb-w2": "running",
+    "b11aw-lr8e4-seed3": "done",
+    "b11ax-lr8e4-seed4": "done",
+    "b11av-lr8e4-seed2": "done",
+    "b11au-lr8e4-seed1": "done",
+    "b11at-lr5e4-seed4": "done",
+    "b11as-lr5e4-seed3": "done",
+    "b11ar-lr5e4-seed2": "done",
+    "b11aq-lr5e4-seed1": "done",
     "b11ap-lr2.5e4-seed4": "done",
     "b11ao-lr2.5e4-seed3": "done",
     "b11an-lr2.5e4-seed2": "done",
@@ -830,10 +753,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 142.9,
+  "disk_free_gb": 142.8,
   "load_avg": [
-    15.71435546875,
-    15.4580078125,
-    15.4228515625
+    15.91552734375,
+    14.51904296875,
+    14.79443359375
   ]
 }
