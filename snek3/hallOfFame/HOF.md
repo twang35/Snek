@@ -129,8 +129,28 @@ simply the top rows.
   support — snek2 declined to promote four indistinguishable sweep candidates for the same reason.
   **The `b10ck` pair is the one exception**, admitted together on the user's call with the table saying
   in so many words that the two are indistinguishable; it is not a precedent for ranking neighbours.
-- Recordings. `record_gif.py` writes to `snek3/gifs/`, not here; `hallOfFame/gifs/` is where a
-  recording is copied to be embedded in this file, and it is still empty.
+- Anything a recording shows. Three games settle nothing about a rate; the numbers are the tables'.
+
+## Recordings — every entry, three complete games each
+
+Captured with [`record_gif.py`](../record_gif.py) straight off the offscreen surface, one frame per
+game step at 50 fps, snek2's settings (`--tile 20 --colors 32`, game seeds 1, 2, 3), so the two eras'
+folders read alike. **The number under each is its confirmed rate from the table above, not anything
+the recording shows** — three games settle nothing about a rate. 200x247, 73-202 s, 1.8-5.3 MB
+(**16 MB for the section**), reproducible: the policy is greedy and food placement is the only
+randomness, so the same command gives the same bytes.
+
+```
+PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --tile 20 --colors 32 --out hallOfFame/gifs/<entry>.gif
+```
+
+| recording | what to watch for |
+|:--|:--|
+| ![b10ck @30523392](gifs/b10ck-g100-seed3-ckpt30523392.gif)<br>**`b10ck-g100-seed3`** @30523392<br>**99.65% /30,000** — the record | **The undiscounted policy is slow.** Its three perfect games run 2,774-3,727 steps against 1,081-1,329 for the three discounted entries: with γ 1.00 a reward later is worth exactly a reward now, so the critic has no reason to prefer the short way to the food, and the policy settles into long safe circuits. It also holds the record — the safety that costs it speed is the same thing that wins it games. `avg_steps` is not in the eval tables; it should be. |
+| ![b10ck @30539776](gifs/b10ck-g100-seed3-ckpt30539776.gif)<br>**`b10ck-g100-seed3`** @30539776<br>**99.55% /30,000** | The same arm 16,384 transitions later, indistinguishable at depth (z = 1.8). Same long circuits (3,155-3,318 steps). Watch both and the two look like one policy, which is the claim the table makes. |
+| ![b9ch](gifs/b9ch-lam999-seed4-ckpt47251456.gif)<br>**`b9ch-lam999-seed4`** @47251456<br>**99.30% /30,000** | The λ 0.999 record it displaced, from the same `fc 320` / 4-epoch / λ-and-γ family. Direct routes to the food, 1,081-1,177 steps a game — a third of `b10ck`'s length at 0.35 pp lower rate. |
+| ![b5h](gifs/b5h-ep8-seed8-ckpt9027584.gif)<br>**`b5h-ep8-seed8`** @9027584<br>**98.96% /30,000** | The first snek3 entry to beat snek2's champion on a matched measurement, and the earliest peak in the folder: 9M transitions, 3.5% of its arm's budget. 8 epochs where every later entry uses 4. |
+| ![b6b](gifs/b6b-fc200x100-seed2-ckpt133120000.gif)<br>**`b6b-fc200x100-seed2`** @133120000<br>**98.73% /30,000** | The only two-layer network here (`fc 200,100`, snek2's shape widened) and the latest peak, at 58% of a 230M budget. It ties snek2's published champion figure exactly, on 30,000 episodes where that figure was 3,000. |
 
 ## Running an entry
 
