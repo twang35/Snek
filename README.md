@@ -22,4 +22,6 @@ Improvements on TheSchlong coded with Claude Code. ~99% perfect game rate.
 
 ## Snek3
 
-PyTorch implementation of Snek2 and currently a work in progress. 
+PyTorch implementation of Snek2 and currently a work in progress.
+
+Every arm's training and evaluation charts, paged eight at a time: [twang35.github.io/Snek](https://twang35.github.io/Snek/). 
