@@ -24,7 +24,35 @@ script prints every colliding file with what it did to it, then `HEAD <old> -> <
 | 3 | **a colliding JSON differs from the commit; nothing was touched** | a live arm's `_evals.json` or `_checkpoint_evals.*` got committed from the laptop. `git rm --cached` those paths on master in their own commit, push, run `deploy` again. Never overwrite the box's copy |
 | 4 | the fast-forward itself failed | local commits on the box, or a diverged master — read the git output |
 
-**Why collisions are the normal case, not a mistake.** Since 2026-09-02 every progress update commits
+**Since 2026-09-03 the box writes under `snek3/desktop/runs/` (gitignored), so collisions are history.**
+Every job gets `SNEK_RUNS_DIR=<SNEK_DIR>/desktop/runs` from the daemon and nothing new lands in
+`snek3/runs/` on the box. The settling below still runs, for whatever was there before the move.
+
+**The one-time move, done on the first deploy that carries this change.** The daemon must be idle
+(`paused: true` in `runtime.json`, then wait for the running wave and its stage B to publish), because
+a live trainer keeps writing to the path it opened with, and a wave whose trainer files sit in one
+directory and whose stage-B files land in the other publishes half of itself. Then, on the box:
+
+```
+cd ~/Snek/snek3 && mkdir -p desktop/runs
+git ls-files --others --exclude-standard runs/ | xargs -I{} mv {} desktop/{}   # untracked only: live arms, .live/, .evalq/
+mv runs/.live runs/.evalq desktop/runs/ 2>/dev/null; true
+# tracked pictures the box redrew since they were committed: keep the bytes, then make the tree clean
+cd ~/Snek && git diff --name-only | xargs -I{} cp {} snek3/desktop/runs/ && git checkout -- snek3/runs snek2/runs snek2/evals
+git status --porcelain | grep -v "^?? snek2/\|host.env"     # must print nothing
+```
+
+The tracked files in `runs/` stay: they are master's archive, and after the checkout they are
+byte-identical to it, with no writer left on the box to change them. Then `deploy`, restart (this
+change is under `desktop/runner/`), unpause, `trigger`.
+
+**What is left that could still refuse a fast-forward, and why it will not recur.** Only snek2's
+untracked leftovers on the box (183 files on 2026-09-03: `snek2/runs/`, `snek2/evals/`, from the frozen
+era's own daemon). They collide only if the laptop commits those exact paths, as the stragglers commit
+did once; snek2 is frozen and its daemon stopped, so nothing adds to them, and `deploy.py` now settles
+snek2 paths the same way as snek3's if it happens again.
+
+**Why collisions were the normal case before that, not a mistake.** Since 2026-09-02 every progress update commits
 the charts of every arm, including the ones the box is still training, so the box always holds
 `runs/*.png` and `.md` that master also carries, and a bare `git merge --ff-only` would abort on every
 one of them. `deploy` settles each colliding file by what it is: **the box's pictures are kept** —

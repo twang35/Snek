@@ -29,7 +29,10 @@ import os
 import subprocess
 import sys
 
-RUNS_PREFIX = 'snek3/runs/'
+# Every directory a measurement or chart can land in on both boxes. snek2's two were added 2026-09-03,
+# when the frozen era's stragglers were committed on the laptop and the box held untracked copies of
+# them: the fast-forward refused on 75 files this script had not looked at, exit 4.
+RUNS_PREFIXES = ('snek3/runs/', 'snek2/runs/', 'snek2/evals/')
 PICTURES = ('.png', '.md')
 EXIT_DIFFERS = 3
 EXIT_MERGE_FAILED = 4
@@ -48,7 +51,7 @@ def repo_root(start=None):
 
 def incoming_blobs(repo, ref):
     """`{path: blob hash}` for every `runs/` file the incoming commit carries."""
-    out = git(repo, 'ls-tree', '-r', ref, '--format=%(objectname) %(path)', '--', RUNS_PREFIX)
+    out = git(repo, 'ls-tree', '-r', ref, '--format=%(objectname) %(path)', '--', *RUNS_PREFIXES)
     blobs = {}
     for line in out.splitlines():
         sha, _, path = line.partition(' ')
@@ -57,13 +60,13 @@ def incoming_blobs(repo, ref):
 
 
 def untracked(repo):
-    out = git(repo, 'ls-files', '--others', '--exclude-standard', '--', RUNS_PREFIX)
+    out = git(repo, 'ls-files', '--others', '--exclude-standard', '--', *RUNS_PREFIXES)
     return [line for line in out.splitlines() if line]
 
 
 def modified_pictures(repo):
     """Tracked `runs/` pictures the box has changed since they were committed — kept on an earlier deploy."""
-    out = git(repo, 'diff', '--name-only', 'HEAD', '--', RUNS_PREFIX)
+    out = git(repo, 'diff', '--name-only', 'HEAD', '--', *RUNS_PREFIXES)
     return [line for line in out.splitlines() if line.endswith(PICTURES)]
 
 
@@ -103,7 +106,7 @@ def apply(repo, decision, ref='origin/master', dry_run=False, out=sys.stdout):
                       len(decision['differs']), ref))
         return EXIT_DIFFERS
     saved = {}
-    tracked = set(git(repo, 'ls-files', '--', RUNS_PREFIX).splitlines())
+    tracked = set(git(repo, 'ls-files', '--', *RUNS_PREFIXES).splitlines())
     for path in decision['keep']:
         out.write('keep     {0}\n'.format(path))
         if dry_run:

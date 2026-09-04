@@ -765,3 +765,26 @@ def test_at_a_glance_uses_no_em_dash_of_its_own():
         {'b9': 'plain ascii label'})
     for line in glance['running'] + glance['queued']:
         assert line.isascii(), line
+
+
+# --- the box's run directory ----------------------------------------------------------------------
+#
+# 2026-09-03: every job writes under `<SNEK_DIR>/desktop/runs`, gitignored, so the box's checkout holds
+# nothing under a path master tracks and the deploy's fast-forward cannot collide with a committed chart.
+
+def test_every_job_is_pointed_at_the_desktop_runs_dir():
+    for job in (parse_job(spec()), parse_job(spec(type='eval', policies=['b7a-x', 'b7b-y']))):
+        _, env, _, _ = launch.build_command(job, HOST, runtime())
+        assert env['SNEK_RUNS_DIR'] == '/repo/snek3/desktop/runs'
+    assert launch.runs_dir(HOST) == '/repo/snek3/desktop/runs'
+
+
+def test_throughput_is_read_from_the_desktop_runs_dir(tmp_path):
+    host = dict(HOST, SNEK_DIR=str(tmp_path))
+    runs = launch.runs_dir(host)
+    os.makedirs(runs)
+    with open(os.path.join(runs, 'b7a-x_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 4096}}, handle)
+    running = launch.RunningJob(parse_job(spec()), 'b7a-x', 1, str(tmp_path / 'log'))
+    launch.update_throughput(running, host)
+    assert running.current_step == 4096

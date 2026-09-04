@@ -52,6 +52,13 @@ __pycache__/
 # runs and never afterwards.
 /snek3/logs/
 
+# The desktop daemon's run directory (2026-09-03). Every job on the box writes its graph, report,
+# _evals.json and stage-B files here via SNEK_RUNS_DIR, never into snek3/runs/, so the box's checkout
+# of master holds nothing under a path master tracks and `git merge --ff-only` cannot collide with a
+# chart the laptop committed. The laptop's snek3/runs/ stays the tracked archive; a desktop arm's
+# files reach it by rsync (charts, any time) or from the `results` branch (JSON, at close-out).
+/snek3/desktop/runs/
+
 # Which trainings are running on THIS box, one file per arm holding its pid, plus
 # the chart window's own pid (tools/live_runs.py). Machine-local by definition:
 # committing a laptop's pids would tell the desktop that four arms it has never

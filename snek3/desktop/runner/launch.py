@@ -24,6 +24,19 @@ BASE_ENV = {'PYTHONPATH': '.'}
 # variables and the switch in `build_command`.
 DISPLAY_ENV_KEYS = ('DISPLAY', 'XAUTHORITY')
 
+# Where every job on the box writes its run artifacts, and where the daemon reads them back: one constant
+# directory under the checkout, gitignored, rather than `runs/`. Before 2026-09-03 the box wrote into
+# `snek3/runs/`, the same path master tracks, so every chart the laptop committed collided with the
+# box's untracked copy and `git merge --ff-only` refused; `deploy.py` settled those per file and the
+# rule tore each time a new directory joined the pattern (37 JSONs and 75 snek2 files on 2026-09-03).
+# With the box writing here, its checkout holds nothing under a tracked path and the merge is clean.
+RUNS_SUBDIR = os.path.join('desktop', 'runs')
+
+
+def runs_dir(host):
+    """The box's run directory: `<SNEK_DIR>/desktop/runs`, the value of `SNEK_RUNS_DIR` for every job."""
+    return os.path.join(host['SNEK_DIR'], RUNS_SUBDIR)
+
 
 def build_command(job, host, runtime):
     """`(argv, env_overrides, log_name, resolved_policy)`. `env_overrides` merges over `os.environ`.
@@ -64,6 +77,7 @@ def build_command(job, host, runtime):
     """
     python = host['PYTHON_BIN']
     env = dict(BASE_ENV)
+    env['SNEK_RUNS_DIR'] = runs_dir(host)
     if runtime.get('torch_threads', 0) > 0:
         env['SNEK_TORCH_THREADS'] = str(runtime['torch_threads'])
     if runtime.get('omp_num_threads', 0) > 0:
@@ -199,7 +213,7 @@ def update_throughput(running_job, host):
     rather than approximate: the field exists to show a *training's* progress, and a wave has no
     single step to report.
     """
-    path = os.path.join(host['SNEK_DIR'], 'runs', str(running_job.policy) + '_evals.json')
+    path = os.path.join(runs_dir(host), str(running_job.policy) + '_evals.json')
     try:
         with open(path) as handle:
             step = json.load(handle).get('summary', {}).get('step')

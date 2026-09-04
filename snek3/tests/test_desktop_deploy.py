@@ -114,3 +114,22 @@ def test_dry_run_changes_nothing(repos):
     assert deploy.apply(box, deploy.plan(box), dry_run=True, out=out) == 0
     assert 'would merge' in out.getvalue()
     assert open(os.path.join(box, 'snek3/runs/b10aa-g70-seed1.png')).read() == 'b'
+
+
+def test_snek2_stragglers_are_settled_like_snek3_runs(repos):
+    # 2026-09-03: the frozen era's runs/ and evals/ leftovers were committed on the laptop while the box
+    # held untracked copies; the merge refused on 75 files the script had not looked at (exit 4).
+    laptop, box = repos
+    _box_writes(box, {'snek2/runs/b46a-c51batch512seed1_evals.json': '{"same": 1}',
+                      'snek2/runs/b46a-c51batch512seed1.png': 'box', 'snek2/evals/b45a_eval_progress.png': 'box'})
+    _laptop_commits(laptop, {'snek2/runs/b46a-c51batch512seed1_evals.json': '{"same": 1}',
+                             'snek2/runs/b46a-c51batch512seed1.png': 'laptop', 'snek2/evals/b45a_eval_progress.png': 'laptop',
+                             'snek3/train.py': 'v2\n'})
+    _git(box, 'fetch', '-q', 'origin', 'master')
+    decision = deploy.plan(box)
+    assert decision['stage'] == ['snek2/runs/b46a-c51batch512seed1_evals.json']
+    assert sorted(decision['keep']) == ['snek2/evals/b45a_eval_progress.png', 'snek2/runs/b46a-c51batch512seed1.png']
+    assert deploy.apply(box, decision, out=io.StringIO()) == 0
+    assert open(os.path.join(box, 'snek3/train.py')).read() == 'v2\n'
+    assert open(os.path.join(box, 'snek2/runs/b46a-c51batch512seed1.png')).read() == 'box'
+    assert _git(box, 'status', '--porcelain', '--', 'snek2/runs/b46a-c51batch512seed1_evals.json') == ''

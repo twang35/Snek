@@ -228,8 +228,16 @@ The daemon runs on **base** python, not the conda env, so it can start before `s
 can restart the daemon with four arms mid-run — jobs are launched detached with `setsid`, they
 self-terminate at `SNEK_MAX_STEPS`, and the daemon re-adopts them by pid on the next poll.
 
-Deploying new code is the same `ff-only` merge plus `sudo systemctl restart snek3-runner`. **Untracked
-run artifacts on the box abort the fast-forward**, and piping the merge to `tail` hides the failure.
+**Every job on the box writes under `snek3/desktop/runs/`, gitignored, never `snek3/runs/`** (2026-09-03).
+`launch.runs_dir(host)` is the one place the path is defined; it goes to every job as `SNEK_RUNS_DIR`,
+and the daemon reads throughput and collects a finished job's artifacts for `results` from the same
+place. So the box's checkout of master holds nothing under a path master tracks, and the laptop is free
+to commit every chart. A tool run by hand on the box (`tools.eval_window`, `tools.closeout`) needs
+`SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs` exported or it looks in the empty `runs/`.
+
+Deploying new code is `snek3/desktop/deploy` (a fast-forward that settles any leftover from before the
+move) plus `sudo systemctl restart snek3-runner` when `desktop/runner/*` changed. Piping it to `tail`
+hides the failure and its exit code.
 
 ## What the port changed, and why each one is an incident
 

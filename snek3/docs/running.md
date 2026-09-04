@@ -49,6 +49,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 
 | knob | default | notes |
 |---|---|---|
+| `SNEK_RUNS_DIR` | `runs/` | where every run artifact goes -- graph, report, `_evals.json`, stage-B files, `.live/`, `.evalq/`. **The desktop daemon sets it to the gitignored `desktop/runs/` for every job** (2026-09-03), so the box's checkout never holds an untracked file under a path master tracks and its deploy cannot collide with a committed chart; the laptop leaves it unset, and its `runs/` is the archive master tracks. A tool spawned by a job inherits it; a tool run by hand on the box needs it exported |
 | `SNEK_ALGO` | `dqn` | which algorithm to train. An unknown value is **refused by name** rather than defaulting, so an arm launched as something this build has no code for cannot quietly train DQN and be reported as the other thing |
 | `SNEK_SEED` | 1 | seeds the network initialisation, the exploration coins, the replay sampler, the env's food and every eval. Recorded in `runs/<policy>.md`, so two arms of the same config are the same arm |
 | `SNEK_MAX_STEPS` | 10,000,000 | **absolute**, not "run this many more" — `global_step` is restored on resume. An arm at its cap prints so and exits after its opening eval. **Counted steps, not game moves**: at the default `fork_branches=4` a DQN step is four moves, and every eval row carries `transitions` for that reason |

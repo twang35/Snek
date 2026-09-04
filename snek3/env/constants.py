@@ -244,7 +244,14 @@ MIN_CHECKPOINT_SCORE = _num('MIN_CHECKPOINT_SCORE', 40.0)
 
 # ----------------------------------------------------------------- paths
 POLICY_DIR = os.path.join(_ROOT, 'savedPolicies')
-RUNS_DIR = os.path.join(_ROOT, 'runs')
+# `SNEK_RUNS_DIR` (2026-09-03) moves every run artifact -- graph, report, `_evals.json`, stage-B files,
+# `.live/` and `.evalq/` -- somewhere other than `runs/`. The desktop daemon sets it to the gitignored
+# `desktop/runs/` for every job, so the box's checkout of master never holds an untracked file under a
+# path master tracks and its fast-forward can no longer collide with a chart the laptop committed.
+# Unset on the laptop, whose `runs/` IS the archive master tracks. Every tool reads this constant, and
+# a tool spawned by a job inherits the variable, so the chart window and the eval window on the box
+# glob the same directory the arms write.
+RUNS_DIR = os.path.abspath(os.environ.get('SNEK_RUNS_DIR') or os.path.join(_ROOT, 'runs'))
 EVALS_DIR = os.path.join(_ROOT, 'evals')
 HOF_DIR = os.path.join(_ROOT, 'hallOfFame')
 GIFS_DIR = os.path.join(_ROOT, 'gifs')

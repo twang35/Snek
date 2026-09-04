@@ -531,7 +531,7 @@ class Runner(object):
         carries it on the next network cycle, and until it does the branch is listed under
         `attention` in `status.json` rather than being reported as published.
         """
-        runs = os.path.join(self.host['SNEK_DIR'], 'runs')
+        runs = launch.runs_dir(self.host)
         names = sorted(os.listdir(runs)) if os.path.isdir(runs) else []
         policies = [str(name) for name in
                     (running_job.job.policies or [running_job.policy]) if name]

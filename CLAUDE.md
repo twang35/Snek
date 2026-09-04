@@ -77,9 +77,10 @@ show yet" for 15 hours, because that branch of the viewer's loop did not check t
 held the eval slot's `flock` the whole time, so six later stage-B waves and the b9 `hof30k` pass opened
 no window and nothing said so. The viewer now checks its watched pids in that branch too (fix in
 `tools/chart_viewer.py`, with a test). **The symptom to recognise is "the eval is running but there is no
-window": `cat runs/.live/.evalwindow` on the box names the holder, `ps -p` it, and if it belongs to a
+window": `cat desktop/runs/.live/.evalwindow` on the box names the holder, `ps -p` it, and if it belongs to a
 finished pass, `kill <pid>` it and reopen with `python -m tools.eval_window <arms> --label <label>`** —
-`DISPLAY=:0 XAUTHORITY=/run/user/1000/gdm/Xauthority` on the desktop, `setsid` so it outlives the ssh.
+`SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs DISPLAY=:0 XAUTHORITY=/run/user/1000/gdm/Xauthority` on the desktop
+(the box's arms write under `desktop/runs/`, not `runs/`), `setsid` so it outlives the ssh.
 A close-out asks for its window once, at start, so one that started while the stale holder was alive
 gets no second chance without that hand relaunch.
 
@@ -220,7 +221,7 @@ update overwrites — and it is what the GitHub-Pages chart viewer at `snek3/vie
 batch is visible there between close-outs. A live desktop arm's charts are pulled from the box first:
 
 ```
-rsync -a --include='<batch>*.png' --include='<batch>*.md' --exclude='*' the-claw-den:Snek/snek3/runs/ snek3/runs/
+rsync -a --include='<batch>*.png' --include='<batch>*.md' --exclude='*' the-claw-den:Snek/snek3/desktop/runs/ snek3/runs/
 ```
 
 **The JSON is the opposite: never commit a *live* desktop arm's `runs/<policy>_evals.json` or
@@ -228,15 +229,18 @@ rsync -a --include='<batch>*.png' --include='<batch>*.md' --exclude='*' the-claw
 report are rebuilt from across restarts; the stage-B file is a pass in progress. They arrive on the
 `results` branch at close-out, and only then are they committed here. A laptop arm's own files are fine.
 
-**The box's deploy expects the collision this creates and settles it by what each file is.** A
-committed chart the box also holds would abort `git merge --ff-only` as "untracked working tree files
-would be overwritten", so `snek3/desktop/deploy` runs on the box instead of a bare merge: it **keeps
-the box's own pictures** (saves the bytes, merges, writes them back — the box drew every chart the
-laptop ever committed, so the committed copy is always the older snapshot and a finished arm's final
-chart is never replaced by a mid-training one), stages any other colliding file whose bytes match the
-incoming blob (a closed batch imported from `results`), and **stops with exit 3, touching nothing, if
-any JSON differs** — that is a live arm's file committed by mistake, and the fix is `git rm --cached`
-on master, never overwriting the box. The `desktop-deploy` skill has the procedure.
+**The box writes to `snek3/desktop/runs/`, which is gitignored, and never to `snek3/runs/`** (2026-09-03).
+The daemon sets `SNEK_RUNS_DIR` to that one constant directory for every job, and every tool reads the
+same constant, so the chart window and the eval window on the box glob the directory the arms write
+without any per-run setting. What this buys is that the box's checkout of master holds nothing under a
+path master tracks: the laptop can commit every chart and every closed batch's JSON and `git merge
+--ff-only` on the box cannot refuse. Before this the box wrote into `snek3/runs/` and every committed
+chart collided with its untracked copy; `snek3/desktop/deploy` settled those per file, and on
+2026-09-03 alone that rule tore twice (37 snek3 JSONs, then 75 snek2 files it had never looked at).
+`deploy` still runs the merge and still settles anything left over from before the move, and still
+**stops with exit 3, touching nothing, if any JSON differs** — but with nothing new landing in
+`snek3/runs/` on the box, that is now history rather than the normal case. The `desktop-deploy` skill
+has the procedure, including the one-time move of the box's pre-existing files.
 
 **One implementation for both boxes, wherever the behaviour wanted is the same.** The two hosts
 differ in what they *have* — cores, a monitor, a queue — and almost never in what the code should
