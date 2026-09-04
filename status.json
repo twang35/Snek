@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-03T23:02:36",
-  "ts": 1788501756.7998018,
+  "iso": "2026-09-03T23:06:19",
+  "ts": 1788501979.7748232,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -8,25 +8,25 @@
     ],
     "queued": [
       "b11 training | lr1e3, lr2e3 -- wave 4 of 4 | queued (8 arms)",
-      "b12 training | ep1, ep2, ep3, ep5, ep6, ep7, ep8, ep10, ep12, ep16 -- wave 1 of 5, wave 2 of... | queued (40 arms)",
+      "b12 training | ep1, ep2, ep3, ep5, ep6, ep7, ep8, ep10, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b12 stage B | ep1, ep2 | queued (8 arms)",
-      "b13 training | mb32, mb64, mb128, mb192, mb384, mb512, mb1024, mb2048 -- wave 1 of 4, wave 2... | queued (32 arms)",
+      "b13 training | mb32, mb64, mb128, mb192, mb384, mb512, mb1024, mb2048 -- waves 1-4 of 4 | queued (32 arms)",
       "b13 stage B | mb32, mb64 | queued (8 arms)",
-      "b14 training | roll32, roll64, roll192, roll256, roll512, roll1024 -- wave 1 of 3, wave 2 of... | queued (24 arms)",
+      "b14 training | roll32, roll64, roll192, roll256, roll512, roll1024 -- waves 1-3 of 3 | queued (24 arms)",
       "b14 stage B | roll32, roll64 | queued (8 arms)",
-      "b15 training | ent0, ent001, ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanne... | queued (40 arms)",
+      "b15 training | ent0, ent001, ent003, ent005, ent02, ent03, entanneal10, entanneal03, +2 more... | queued (40 arms)",
       "b15 stage B | ent0, ent001 | queued (8 arms)",
-      "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 -- wave 1 of ... | queued (40 arms)",
+      "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b16 stage B | kl003, kl005 | queued (8 arms)",
       "b17 training | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
       "b17 stage B | clip005, clip01 | queued (8 arms)",
-      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- wave 1 of 3, wave 2 of 3, wave 3 of 3 | queued (24 arms)",
+      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 | queued (24 arms)",
       "b18 stage B | gc0, gc01 | queued (8 arms)",
-      "b19 training | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 -- wave 1 of 3, wave 2 of ... | queued (24 arms)",
+      "b19 training | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 -- waves 1-3 of 3 | queued (24 arms)",
       "b19 stage B | noadvnorm, mse | queued (8 arms)",
-      "b20 training | lanes32, lanes64, lanes256, lanes512 -- wave 1 of 2, wave 2 of 2 | queued (16 arms)",
+      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 stage B | lanes32, lanes64 | queued (8 arms)",
-      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- wave 1 of 3, wave 2 of 3,... | queued (24 arms)",
+      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 | queued (24 arms)",
       "b21 stage B | shape0, shape005 | queued (8 arms)"
     ],
     "attention": []
@@ -77,8 +77,8 @@
       "step": 50003968,
       "label": "",
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 4547
+      "steps_per_sec": null,
+      "elapsed_s": 4770
     }
   ],
   "ledger": {
@@ -756,8 +756,8 @@
   },
   "disk_free_gb": 142.7,
   "load_avg": [
-    16.1875,
-    16.01513671875,
-    16.01171875
+    16.41796875,
+    16.1650390625,
+    16.05859375
   ]
 }
