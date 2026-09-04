@@ -523,6 +523,6 @@ on the laptop, run while the desktop trains the next one.
   the winners. A batch whose slow cells did not reach competence records that and may resume them
   (never an annealed one); it does not rank them.
 - **Log of what went up.** 2026-09-01 20:30: b9, b10 (128 arms). 2026-09-01 ~21:00: b11–b14 (128 arms),
-  after the anneal knobs were committed (`fd2584011`) and the box fast-forwarded to `13def02e8`.
+  after the anneal knobs were committed (`fd2584011`) and the box fast-forwarded to `13def02e8`. 2026-09-03 18:10: b15-b21 (208 arms, priorities 170-232), the whole rest of the sweep behind b11-b14, so the queue holds eleven batches at once; b22 is designed once all of them are read.
 - **The base does not change until b22.** A batch that shows a clear winner writes it in
   `findings.md` as a candidate for the factorial, not as a new default.
