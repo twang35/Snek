@@ -114,11 +114,11 @@ def tracked_paths():
         # those to the repo root silently produces paths that match nothing.
         listed = subprocess.run(['git', 'ls-files', '-z', '--full-name', constants.RUNS_DIR],
                                 capture_output=True, text=True, timeout=30,
-                                cwd=os.path.dirname(constants.RUNS_DIR))
+                                cwd=constants.ROOT)
     except (OSError, subprocess.SubprocessError):
         return set()
     root = subprocess.run(['git', 'rev-parse', '--show-toplevel'], capture_output=True, text=True,
-                          cwd=os.path.dirname(constants.RUNS_DIR)).stdout.strip()
+                          cwd=constants.ROOT).stdout.strip()
     return {os.path.realpath(os.path.join(root, name))
             for name in listed.stdout.split('\0') if name}
 

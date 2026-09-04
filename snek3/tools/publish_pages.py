@@ -26,8 +26,8 @@ import sys
 from env import constants
 from tools import viewer_manifest
 
-REPO_ROOT = os.path.dirname(os.path.dirname(constants.RUNS_DIR))
-VIEWER_DIR = os.path.join(os.path.dirname(constants.RUNS_DIR), 'viewer')
+REPO_ROOT = os.path.dirname(constants.ROOT)
+VIEWER_DIR = os.path.join(constants.ROOT, 'viewer')
 DOCS_DIR = os.path.join(REPO_ROOT, 'docs')
 CHARTS_SUBDIR = 'charts'
 

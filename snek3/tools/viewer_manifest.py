@@ -30,9 +30,9 @@ import re
 
 from env import constants
 
-MANIFEST_PATH = os.path.join(os.path.dirname(constants.RUNS_DIR), 'viewer', 'manifest.js')
+MANIFEST_PATH = os.path.join(constants.ROOT, 'viewer', 'manifest.js')
 # Which earlier arms are a batch's control cell, so the page can show them beside the batch's own.
-REFERENCES_PATH = os.path.join(os.path.dirname(constants.RUNS_DIR), 'viewer', 'references.json')
+REFERENCES_PATH = os.path.join(constants.ROOT, 'viewer', 'references.json')
 _BATCH_RE = re.compile(r'^([a-z]+\d+)')
 _SEED_RE = re.compile(r'-seed(\d+)$')
 

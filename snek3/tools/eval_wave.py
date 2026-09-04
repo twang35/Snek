@@ -36,7 +36,7 @@ from tools import restore
 from tools import results
 from tools import step_selectors as selectors
 
-LOG_DIR = os.path.join(os.path.dirname(constants.RUNS_DIR), 'logs')
+LOG_DIR = os.path.join(constants.ROOT, 'logs')
 
 # How often the wave counts rows. A 500-episode row takes ~10 s of one shard's time, so anything
 # under a few seconds is polling for nothing.
@@ -95,7 +95,7 @@ def run(policy, selector='screen', episodes=500, shards=4, label=None, width=Non
         logs.append((log_path, handle))
         processes.append(subprocess.Popen(
             shard_command(policy, selector, episodes, label, shard, shards, width, seed, resume),
-            stdout=handle, stderr=subprocess.STDOUT, cwd=os.path.dirname(constants.RUNS_DIR)))
+            stdout=handle, stderr=subprocess.STDOUT, cwd=constants.ROOT))
     print('logs: {0}'.format(os.path.join(LOG_DIR, '')))
 
     started = time.time()

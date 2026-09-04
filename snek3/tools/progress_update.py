@@ -35,11 +35,13 @@ from env import constants
 from tools import publish_pages
 from tools import viewer_manifest
 
-SNEK3 = os.path.dirname(constants.RUNS_DIR)
+SNEK3 = constants.ROOT
 REPO = os.path.dirname(SNEK3)
 DOCS = os.path.join(SNEK3, 'docs')
 BOX = 'the-claw-den'
-BOX_RUNS = 'Snek/snek3/runs/'
+# The box's arms write under desktop/runs/ (SNEK_RUNS_DIR, 2026-09-03), not runs/, which on the box is
+# the static archive master tracks. Pulling from runs/ there would fetch nothing newer than the last commit.
+BOX_RUNS = 'Snek/snek3/desktop/runs/'
 PENDING = 'snek3/desktop/queue/pending/'
 WAVE_ARMS = 8
 DEFAULT_WAVE_SECONDS = 2.5 * 3600      # b10's measured cadence: training ~1 h 50 m + stage B ~40 m

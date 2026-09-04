@@ -12,6 +12,11 @@ reaches them where an assignment into this module would not.
 import os
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# The snek3 directory itself, for the tools that need it (`tools/`, `viewer/`, `logs/`). Public since
+# 2026-09-03: seven tools used to take `os.path.dirname(RUNS_DIR)` for this, which stopped being true the
+# moment `SNEK_RUNS_DIR` moved the runs -- on the box every eval shard then started in `desktop/` and
+# could not import `tools`. Never derive a code path from a data path.
+ROOT = _ROOT
 
 
 def _flag(name, default='0'):
