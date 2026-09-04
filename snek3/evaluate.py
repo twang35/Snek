@@ -12,7 +12,7 @@ The selector decides which checkpoints; see [`tools/step_selectors.py`](tools/st
 and a record re-measurement want.
 
 **The default is the protocol.** No selector means `screen:97` at 500 episodes — every checkpoint
-whose stage-A eval reached 95/100, measured at full length. There is no second stage behind it:
+whose stage-A eval reached 97/100, measured at full length. There is no second stage behind it:
 stage B *is* the hall-of-fame measurement, so a promotion reads its file rather than queueing
 another job.
 """
