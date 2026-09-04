@@ -48,7 +48,17 @@ it took three attempts to get there).
 | 2048 | 0 | – | – – – – | 0 | – | 98.03 (97.6-99.0) | 78.7 | 1.6% | 14.32% | 16.8% |
 
 <!-- reading -->
-
+**Trained on the laptop (dequeued from the desktop 2026-09-03), 32 of 32 arms at cap; the last
+close-out — minibatch 1024 and 2048 — is measuring now, 6 arms without a stage-B file.** Read against the
+bold reference at 256 (27.3%): density rises through the small end, 6.8% → 13.3% → 19.1% → 16.8% from 32 to
+192, sits on a plateau with the reference at 256-512 (26.9% at 384, 28.2% at 512, which also has the batch's
+one 100/500 row and its 188 candidates), and drops on the two seeds in so far at 1024 (20.6%). Stability is
+U-shaped in the other direction: the share of evals below 80% is 15% at 32, 3.7-4.7% at 64-192, 6.8-8% at
+384-512, and 12-14% at 1024-2048, with `sef` falling from 92 at 64-192 to 79 at 2048 — many small updates
+per epoch hold the plateau but cap the top; few large ones reach the top and wobble. The stage-A traces for
+2048 show late onset on three seeds and one (`b13be`) at best30 99.0, the highest single stage-A value in the
+batch, so its stage B is the row to watch. Provisional verdict: 256-512 is the right band and 512 is the
+only cell that might edge the reference, within n=4 noise; the table is final when the close-out lands.
 <!-- /reading -->
 
 **minibatch 32** — `b13aa`-`b13ad`:

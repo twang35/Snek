@@ -6,6 +6,45 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b11 closed on the desktop; b12 is on its stage B for wave 3 with two waves to train; b13 finished
+training on the laptop and its last close-out is measuring.** As of 2026-09-04 09:45:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b11 (lr) | **closed**, every wave measured — reading in [`results.md`](results.md) | — |
+| desktop | b12 (epochs) | 24 of 40 trained (epochs 1-7 in, `b12-stageb-w3` 32 min in); epochs 8, 10, 12, 16 queued in two waves | ~15:25 today |
+| laptop | b13 (minibatch) | 32 of 32 trained; `b13-stageb-w4` (mb 1024, 2048) 20 min in, 26 of 32 arms measured | ~10:30 today |
+
+Behind b12 on the desktop: b14 (rollout) through b21, every one at λ 0.99 against **b9's λ 0.99 arms
+`b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%). `attention` is empty.
+
+**b11's answer: the learning rate is a plateau, not a lever.** 1e-4 through 5e-4 sit at 21-31% density
+within seed noise of the reference's 27.3%; 4e-5 is the slow end (2.2%) and 2e-3 the cliff (6.7%). The
+surprise is the sign of the stability effect — 8e-4 and 1e-3 were predicted to collapse and are the two most
+stable cells (4.6-4.9% of evals below 80%), with a lower ceiling. Base stays 3e-4; 2.5e-4 (30.9%, the best
+cell) goes into the corner grid as a second value. Full reading in [`results.md`](results.md), finding in
+[`findings.md`](findings.md).
+
+**b12 so far (epochs 1-7):** density climbs 10.8 → 15.7 → 26.5% from 1 to 3 epochs and plateaus at 23-27%
+through 6; 1 epoch is the *least* stable cell (4.2% drawdown below 50%), the reverse of its prediction, and
+stability keeps improving through 7. **b13 so far (minibatch 32-1024):** monotone rise to a plateau at
+256-512 (26.9-28.2%, 512 holds the batch's 100/500 row), 1024 falling to 20.6% on two seeds; stability
+U-shaped with the small end noisiest. Both readings in [`charts.md`](charts.md).
+
+**Standing decisions**, unchanged: `hof5000` on b10 is **on hold**; the γ × λ corner grid — γ {0.99, 0.9975,
+0.999} × λ {0.98, 0.99, 0.999}, now with lr {3e-4, 2.5e-4} as a candidate third axis — runs **after b14
+closes**.
+
+**Tooling notes from this update.** `tools/progress_update.py` now (a) survives an rsync to the box that
+hangs rather than aborting the whole update, (b) reads a laptop-run batch's specs from `logs/<batch>specs/`
+when `ops` no longer has them, and (c) states such a batch's state from `runs/` and the live pid files —
+without which b13 was invisible to the digest. Code change, awaiting review. Separately, the laptop's Wi‑Fi
+was found in a stuck association during this update (25-55% loss to the router at ‑55 dBm, cleared by a
+Wi‑Fi toggle, the desktop on the same router clean throughout); a hung `git fetch` or `rsync` is that
+before it is "off-LAN".
+
+## b11 on wave 1, as it read at 2026-09-03 18:01 (superseded)
+
 **b11 — the learning-rate sweep — has wave 1 trained and its stage B running; nothing is on the laptop.**
 As of 2026-09-03 18:01 the box's ledger reads 8 b11 arms done (lr 4e-5 and 1e-4, seeds 1-4), the
 `b11-stageb` wave 19 min in, and 24 b11 arms queued behind it in three waves (lr 1.5e-4, 2.5e-4, 5e-4,

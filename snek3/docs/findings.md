@@ -17,6 +17,27 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Learning rate: a plateau from 1e-4 to 5e-4, a cliff at both ends, and stability that rises with lr while density does not
+
+**Measured 2026-09-04 on b11's 32 arms** — 8 values of `learning_rate` x 4 seeds at 50M, everything else
+b9's λ 0.99 cell (the reference, at 3e-4), 31,000 stage-B rows. Density is the ≥98%/500 stage-B rate;
+"<80%" the median share of post-competence stage-A evals below 80% perfect:
+
+| lr | 4e-5 | 1e-4 | 1.5e-4 | 2.5e-4 | **3e-4** (ref) | 5e-4 | 8e-4 | 1e-3 | 2e-3 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 | 2.2% | 24.8% | 20.8% | **30.9%** | 27.3% | 21.6% | 16.3% | 15.8% | 6.7% |
+| best30 | 97.2 | 98.2 | 98.2 | **98.45** | 98.3 | 98.15 | 98.1 | 97.7 | 96.6 |
+| `sef` | 73 | 85 | 87 | 89 | 91 | 91.5 | 90 | **92** | 88 |
+| <80% | 14.3% | 9.5% | 7.3% | 6.3% | 6.4% | 5.4% | **4.6%** | 4.9% | 10.0% |
+
+Three things follow. **The knob is flat where it matters**: the five cells from 1e-4 to 5e-4 are within
+n=4 noise of each other (per-seed shares inside 1e-4 alone span 13-44%), so the base stays at 3e-4 and
+2.5e-4 rides along as a second value in the corner grid rather than replacing it. **Stability and
+density rank the sweep differently**, again: `sef` and the <80% share improve monotonically with lr up to
+1e-3 while density peaks in the middle, so the "more collapses at high lr" prediction (8e-4, 1e-3) was
+wrong in sign — a higher rate arrives sooner and holds the plateau, with a lower top. **The cliff is at
+2e-3**, not 3e-3: density 6.7% with the batch's worst drawdown, one step below b3's divergence.
+
 ### Discount γ: no endgame below 0.94, density monotone to 0.999, and undiscounted is a cliff
 
 **Measured 2026-09-03 on b10's 64 arms** — 16 values of `discount` x 4 seeds at 50M, everything else

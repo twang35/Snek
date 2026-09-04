@@ -21,6 +21,76 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+<!-- progress_update: batch b11 -->
+## Batch b11 — the `learning_rate` sweep, 8 values x 4 seeds, 50M, closed 2026-09-04
+
+Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell (`b9bw-lam99-seed1, b9bx-lam99-seed2, b9by-lam99-seed3, b9bz-lam99-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| learning_rate | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 4e-5 | 1,411 | 2.2% | 3.4 1.9 2.8 1.3 | 0 | 98.6 | 97.17 (97.0-97.6) | 73.4 | 0.83% | 14.28% | 5.8% |
+| 1e-4 | 4,496 | 24.8% | 17.5 13.0 43.7 17.6 | 135 | 100.0 | 98.17 (97.8-98.6) | 85.1 | 1.41% | 9.49% | 24.8% |
+| 1.5e-4 | 4,836 | 20.8% | 15.1 19.0 21.8 26.5 | 81 | 99.8 | 98.22 (98.0-98.4) | 87.4 | 0.53% | 7.34% | 25.9% |
+| 2.5e-4 | 4,964 | 30.9% | 34.8 27.8 28.8 32.0 | 210 | 100.0 | 98.45 (98.2-98.7) | 89.4 | 0.71% | 6.29% | 27.9% |
+| **3e-4** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
+| 5e-4 | 4,636 | 21.6% | 20.5 23.2 21.7 21.0 | 96 | 99.8 | 98.15 (98.0-98.4) | 91.5 | 0.59% | 5.41% | 24.6% |
+| 8e-4 | 4,031 | 16.3% | 13.3 7.7 26.6 14.8 | 73 | 99.6 | 98.08 (97.8-98.2) | 90.2 | 0.45% | 4.56% | 20.6% |
+| 1e-3 | 3,653 | 15.8% | 8.9 9.4 24.6 16.1 | 61 | 99.6 | 97.70 (97.1-98.2) | 92.2 | 0.25% | 4.91% | 18.6% |
+| 2e-3 | 2,298 | 6.7% | 8.1 3.6 7.4 6.7 | 5 | 99.4 | 96.62 (95.9-97.2) | 88.1 | 1.68% | 9.97% | 10.2% |
+
+<!-- reading -->
+**Verdict: the learning rate is a plateau from 1e-4 to 5e-4 and a cliff on both sides; the base stays at
+3e-4.** Density 21-31% and best30 98.15-98.45 across the five middle cells, with per-seed spread inside a cell
+(13-44% at 1e-4) wider than the differences between cells. 2.5e-4 is the best cell (30.9%, 210 ≥99 rows,
+two 100/500 rows) but n=4 cannot separate it from the reference's 27.3%. Cell by cell: **4e-5** slow onset
+as predicted, still climbing at 50M, zero ≥99 rows. **1e-4** falsified its prediction of "zero ≥98 rows" with
+24.8% and 135 candidates, though it does spend more evals below 80% (9.5% vs 6.4%). **1.5e-4, 2.5e-4, 5e-4**
+within noise of the base. **8e-4 and 1e-3** were predicted to collapse visibly and are instead the two most
+stable cells (4.6-4.9% below 80%, `sef` 90-92) with a lower ceiling (16% density, best30 97.7-98.1).
+**2e-3** locates the cliff: 6.7%, best30 96.6, drawdown 1.68%. `sef` rises monotonically with lr (73 → 92)
+while density peaks in the middle — the two metrics rank the sweep differently, as b7 found. Not settled:
+whether 2.5e-4 is a real 3-pp gain; it goes into the γ × λ corner grid as a second lr value.
+<!-- /reading -->
+
+### Every arm
+
+| arm | learning_rate | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b11aa-lr4e5-seed1` | 4e-5 | 264 | 3.4% | 0 | 98.6 | 97.0 @49.6M | 65.2 | 5.26% |
+| `b11ab-lr4e5-seed2` | 4e-5 | 419 | 1.9% | 0 | 98.4 | 97.6 @48.1M | 78.9 | 0.11% |
+| `b11ac-lr4e5-seed3` | 4e-5 | 351 | 2.8% | 0 | 98.6 | 97.1 @47.3M | 74.1 | 1.26% |
+| `b11ad-lr4e5-seed4` | 4e-5 | 377 | 1.3% | 0 | 98.4 | 97.0 @42.5M | 75.5 | 0.41% |
+| `b11ae-lr1e4-seed1` | 1e-4 | 989 | 17.5% | 12 | 99.2 | 98.2 @38.2M | 81.9 | 2.3% |
+| `b11af-lr1e4-seed2` | 1e-4 | 953 | 13.0% | 4 | 99.0 | 97.8 @46.6M | 87.3 | 0.52% |
+| `b11ag-lr1e4-seed3` | 1e-4 | 1419 | 43.7% | 106 | 100.0 | 98.6 @22.0M | 87.7 | 0.45% |
+| `b11ah-lr1e4-seed4` | 1e-4 | 1135 | 17.6% | 13 | 99.2 | 98.1 @36.7M | 83.4 | 2.54% |
+| `b11ai-lr1.5e4-seed1` | 1.5e-4 | 1143 | 15.1% | 11 | 99.4 | 98.0 @39.2M | 83.4 | 0.48% |
+| `b11aj-lr1.5e4-seed2` | 1.5e-4 | 1180 | 19.0% | 15 | 99.6 | 98.1 @26.7M | 90.2 | 0.41% |
+| `b11ak-lr1.5e4-seed3` | 1.5e-4 | 1186 | 21.8% | 25 | 99.8 | 98.4 @42.0M | 88.3 | 0.59% |
+| `b11al-lr1.5e4-seed4` | 1.5e-4 | 1327 | 26.5% | 30 | 99.6 | 98.4 @31.4M | 87.7 | 1.77% |
+| `b11am-lr2.5e4-seed1` | 2.5e-4 | 1265 | 34.8% | 81 | 99.8 | 98.7 @48.1M | 88.4 | 0.78% |
+| `b11an-lr2.5e4-seed2` | 2.5e-4 | 1336 | 27.8% | 45 | 100.0 | 98.6 @19.2M | 87.9 | 0.63% |
+| `b11ao-lr2.5e4-seed3` | 2.5e-4 | 1067 | 28.8% | 39 | 99.8 | 98.3 @33.0M | 90.8 | 0.98% |
+| `b11ap-lr2.5e4-seed4` | 2.5e-4 | 1296 | 32.0% | 45 | 100.0 | 98.2 @12.5M | 90.5 | 0.1% |
+| `b11aq-lr5e4-seed1` | 5e-4 | 1154 | 20.5% | 18 | 99.2 | 98.0 @39.9M | 91.8 | 0.68% |
+| `b11ar-lr5e4-seed2` | 5e-4 | 1139 | 23.2% | 23 | 99.6 | 98.1 @22.4M | 91.5 | 0.74% |
+| `b11as-lr5e4-seed3` | 5e-4 | 1141 | 21.7% | 31 | 99.8 | 98.1 @48.6M | 92.2 | 0.51% |
+| `b11at-lr5e4-seed4` | 5e-4 | 1202 | 21.0% | 24 | 99.4 | 98.4 @27.6M | 90.4 | 0.34% |
+| `b11au-lr8e4-seed1` | 8e-4 | 1012 | 13.3% | 18 | 99.4 | 98.1 @24.4M | 87.5 | 0.27% |
+| `b11av-lr8e4-seed2` | 8e-4 | 805 | 7.7% | 0 | 98.8 | 97.8 @27.9M | 91.5 | 1.29% |
+| `b11aw-lr8e4-seed3` | 8e-4 | 1138 | 26.6% | 41 | 99.6 | 98.2 @9.0M | 87.7 | 0.36% |
+| `b11ax-lr8e4-seed4` | 8e-4 | 1076 | 14.8% | 14 | 99.4 | 98.2 @48.5M | 94.3 | 0.54% |
+| `b11ay-lr1e3-seed1` | 1e-3 | 754 | 8.9% | 4 | 99.0 | 97.6 @13.2M | 90.4 | 0.95% |
+| `b11az-lr1e3-seed2` | 1e-3 | 709 | 9.4% | 3 | 99.4 | 97.1 @25.7M | 92.0 | 0.27% |
+| `b11ba-lr1e3-seed3` | 1e-3 | 1088 | 24.6% | 34 | 99.6 | 97.9 @14.5M | 91.8 | 0.21% |
+| `b11bb-lr1e3-seed4` | 1e-3 | 1102 | 16.1% | 20 | 99.6 | 98.2 @7.9M | 94.5 | 0.23% |
+| `b11bc-lr2e3-seed1` | 2e-3 | 683 | 8.1% | 3 | 99.4 | 97.1 @28.5M | 85.7 | 2.04% |
+| `b11bd-lr2e3-seed2` | 2e-3 | 442 | 3.6% | 2 | 99.0 | 95.9 @9.5M | 87.5 | 2.48% |
+| `b11be-lr2e3-seed3` | 2e-3 | 528 | 7.4% | 0 | 98.8 | 96.3 @14.4M | 87.2 | 1.31% |
+| `b11bf-lr2e3-seed4` | 2e-3 | 645 | 6.7% | 0 | 98.8 | 97.2 @43.5M | 91.9 | 0.7% |
+
+<!-- /progress_update: batch b11 -->
+
 ## Batch b10 — the discount γ sweep, 16 values x 4 seeds, closed 2026-09-03
 
 **One knob off b7's winning cell, and again the default sat mid-ramp.** 64 arms at 50M transitions on the
