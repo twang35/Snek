@@ -17,6 +17,47 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### Discount γ: no endgame below 0.94, density monotone to 0.999, and undiscounted is a cliff
+
+**Measured 2026-09-03 on b10's 64 arms** — 16 values of `discount` x 4 seeds at 50M, everything else
+b7's `fc (320,)` cell at λ 0.98, 22,741 stage-B rows. Density is the ≥98%/500 stage-B rate; drawdown the
+median share of post-competence stage-A evals below 50%:
+
+| γ | ≤0.93 | 0.94 | 0.95 | 0.96 | 0.97 | 0.98 | **0.99** (b7) | 0.995 | 0.9975 | **0.999** | 1.00 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| stage-B rows | **0** | 11 | 95 | 319 | 756 | 2,540 | 4,003 | 5,027 | 5,844 | **6,614** | 1,535 |
+| ≥98%/500 | – | 0% | 0% | 0.9% | 3.6% | 10.4% | 17.3% | 19.6% | 25.6% | **30.7%** | 38.6% |
+| best30 | 4-88 | 89.9 | 92.9 | 94.7 | 95.5 | 97.3 | 97.8 | 98.1 | **98.6** | 98.6 | 98.2 |
+| drawdown < 50% | 14-54% | 4.9% | 3.4% | 2.6% | 0.28% | 0.14% | 0.29% | 0.78% | 1.30% | 1.55% | **44.4%** |
+| `sef` | 0-21 | 34.5 | 51.5 | 63.9 | 75.6 | 86.5 | 90.9 | 92.5 | **92.6** | 91.7 | 39.2 |
+
+**Four things this establishes.**
+
+1. **A discount below ~0.94 cannot learn the endgame at 50M, and it is the value target's horizon, not
+   the advantage's.** Seven values, 28 arms, not one screened checkpoint; best30 rises 4 → 88 with γ but
+   never reaches the screen. The control for "is it just the GAE horizon" is b9: λ 0.90 at γ 0.99 has the
+   same 1/(1−γλ) ≈ 9-10 as γ 0.92 at λ 0.98, and reached 96.75 with 3.9% density against 84.75 and none.
+   The +100 for a perfect game arrives after the last of ~95 foods; a critic discounting at 0.92 sees it
+   at 0.92^k of its value k steps out and cannot rank the moves that reach it.
+2. **From 0.96 to 0.999 density is monotone and the base sits mid-ramp** — 17.3% at 0.99 against 30.7% at
+   0.999, a factor of 1.8, exactly the shape b9 found for λ (17.3% at 0.98 → 27.3% at 0.99). Two knobs,
+   two defaults left a factor of ~1.7 short of their own curve's top. best30 peaks at 0.9975-0.999 with
+   every seed ≥98.2; γ 0.999 yields the most stage-B rows (6,614) and `hof5000` candidates (277) of any
+   cell measured.
+3. **The stability/record trade-off holds for a third knob.** Drawdown is ≤0.3% from γ 0.97 to 0.99 and
+   then climbs 0.78 → 1.30 → 1.55% up the plateau, as λ's did (0.29 → 2.10% across b9's). Every knob that
+   raises record density so far has raised the deployed policy's drawdown with it.
+4. **γ 1.00 is a different regime, not the end of the curve.** Median drawdown 44.4%, `sef` 39.2, a quarter
+   of the neighbouring cells' rows screened — yet 38.6% of those rows are ≥98, two are 100/500, 178 are
+   `hof5000` candidates. Undiscounted, the critic's target is the whole-game return and the rollout
+   boundary's bootstrap carries full weight; the policy alternates between a near-perfect regime and a
+   broken one. **Not a base; the sweeps' new default stays γ 0.99 until the γ × λ corner is measured.**
+
+**‡ What this does not settle.** Whether γ 0.999's gain and λ 0.99's gain add — they were each measured
+with the other knob at its old default, and both act through the same 1/(1−γλ) horizon at the top (b10's
+γ 0.999 / λ 0.98 ≈ 48 steps, b9's γ 0.99 / λ 0.99 ≈ 50, and they land at 30.7% and 27.3%). A γ × λ grid at
+the corner is the experiment. And none of b10's rows has been measured past 500 episodes yet.
+
 ### GAE λ: record density doubles from PPO's 0.98 default to 0.99, then plateaus to 1.00
 
 **Measured 2026-09-02 on b9's 64 arms** — 16 values of `ppo_gae_lambda` x 4 seeds at 50M, everything

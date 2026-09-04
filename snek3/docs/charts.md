@@ -1,8 +1,10 @@
 # Charts — one graph per arm
 
-**Batch b10 — the γ sweep — is on the desktop, wave 4 of 8 at 2026-09-03 01:20**; its 32 charts so far
-are below, the live wave's pulled from the box. **Batch b9 — the λ sweep — closed 2026-09-02**, all 64
-arms with stage B complete, 127 panels below. **Batch b8 closed 2026-09-01**, all sixteen arms with
+**Batch b11 — the learning-rate sweep — is on the desktop, wave 1 of 4 at 2026-09-03 17:10**, its eight
+live charts below, pulled from the box. **Batch b10 — the γ sweep — closed 2026-09-03**, all 64 arms with
+stage B complete, 121 panels below. **Batch b9 — the λ sweep — closed 2026-09-02**, all 64 arms with
+stage B complete, 127 panels below. The same charts, paged 8 at a time with their numbers, are at
+https://twang35.github.io/Snek/ . **Batch b8 closed 2026-09-01**, all sixteen arms with
 stage B complete, charts below.
 The window to watch the box live is below.
 
@@ -26,24 +28,52 @@ after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closi
 it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
 it took three attempts to get there).
 
+## Batch b11 — the learning-rate sweep off the λ 0.99 base, 4 seeds each, 50M
+
+**In flight**: wave 1 (lr 4e-5, 1e-4) training at ~65% as of 2026-09-03 17:10, snapshots pulled from the
+box; waves 2-4 (lr 1.5e-4, 2.5e-4, 5e-4, 8e-4, 1e-3, 2e-3) queued. b11 changes only `ppo_learning_rate`
+off b7's cell **re-based to λ 0.99**, so its reference is **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30
+98.3-98.4, 27.3% density), not b7. At 33M: lr 4e-5 best30 93.4-96.4, lr 1e-4 97.8-98.6.
+
+
+**lr 4e-5** — `b11aa`-`b11ad`:
+
+![b11aa-lr4e5-seed1](../runs/b11aa-lr4e5-seed1.png)
+![b11ab-lr4e5-seed2](../runs/b11ab-lr4e5-seed2.png)
+![b11ac-lr4e5-seed3](../runs/b11ac-lr4e5-seed3.png)
+![b11ad-lr4e5-seed4](../runs/b11ad-lr4e5-seed4.png)
+
+**lr 1e-4** — `b11ae`-`b11ah`:
+
+![b11ae-lr1e4-seed1](../runs/b11ae-lr1e4-seed1.png)
+![b11af-lr1e4-seed2](../runs/b11af-lr1e4-seed2.png)
+![b11ag-lr1e4-seed3](../runs/b11ag-lr1e4-seed3.png)
+![b11ah-lr1e4-seed4](../runs/b11ah-lr1e4-seed4.png)
+
 ## Batch b10 — the γ sweep off b7's `fc (320,)`, 4 seeds each, 50M
 
-**In flight**: waves 1-3 (γ 0.70, 0.80, 0.85, 0.90, 0.91, 0.92) trained and stage B closed, wave 4
-(γ 0.93, 0.94) training, waves 5-8 queued. b10 changes **only** `discount` off b7's winning cell — λ
-stays at 0.98, so **b7aa-b7ad below are this sweep's γ 0.99 arms.** No γ ≤ 0.92 produced a single
-stage-B row: nothing passed the stage-A screen, so those groups have no stage-B panel and never will.
+**All eight waves closed 2026-09-03**, stage A and stage B for all 64 arms; stage-B panels follow each
+arm's chart where one exists. b10 changes **only** `discount` off b7's winning cell — λ stays at 0.98, so
+**b7aa-b7ad below are this sweep's γ 0.99 arms.** No γ ≤ 0.93 produced a stage-B row: nothing passed the
+stage-A screen, so those 28 arms have no stage-B panel and never will.
 
-| γ | best30 | sef | stage-B rows | | γ | best30 | sef | stage-B rows |
+| γ | ≥98%/500 | best30 | drawdown < 50% | | γ | ≥98%/500 | best30 | drawdown < 50% |
 |---:|---:|---:|---:|---|---:|---:|---:|---:|
-| 0.70 | 3.95 | 0.0 | 0 | | 0.91 | 81.90 | 5.8 | 0 |
-| 0.80 | 40.27 | 0.0 | 0 | | 0.92 | 84.75 | 12.1 | 0 |
-| 0.85 | 66.47 | 0.0 | 0 | | 0.93, 0.94 | live | | |
-| 0.90 | 79.55 | 3.6 | 0 | | **0.99** (b7) | **97.75** | 90.9 | 4,003 |
+| 0.70 | – | 3.95 | – | | 0.95 | 0.0% | 92.85 | 3.35% |
+| 0.80 | – | 40.27 | – | | 0.96 | 0.9% | 94.65 | 2.60% |
+| 0.85 | – | 66.47 | 54.4% | | 0.97 | 3.6% | 95.53 | 0.28% |
+| 0.90 | – | 79.55 | 38.7% | | 0.98 | 10.4% | 97.30 | 0.14% |
+| 0.91 | – | 81.90 | 26.5% | | 0.99 (b7) | 17.3% | 97.75 | 0.29% |
+| 0.92 | – | 84.75 | 18.4% | | 0.995 | 19.6% | 98.10 | 0.78% |
+| 0.93 | – | 87.55 | 13.9% | | **0.9975** | 25.6% | **98.60** | 1.30% |
+| 0.94 | 0.0% | 89.85 | 4.85% | | **0.999** | **30.7%** | 98.55 | 1.55% |
+| | | | | | 1.00 | 38.6% | 98.17 | **44.4%** |
 
-**What to look at.** Walk γ 0.70 → 0.80 → 0.85 → 0.90 in order: the average-score trace (blue) climbs
-in steps while the perfect-game trace (red) stays on the floor until 0.85 and then starts a noisy climb
-that never reaches the screen. Then put γ 0.92 next to b7's γ 0.99: same λ, same network, 13 points of
-best30 apart. The live γ 0.93/0.94 panels are snapshots from the box at ~21M.
+**What to look at.** Walk γ 0.70 → 0.93 for a red trace that climbs in steps and never reaches the
+screen. Then γ 0.98 → 0.99 → 0.9975 → 0.999 for the ramp the default sits in the middle of, watching the
+stage-A traces get noisier as the stage-B panels get denser. Then **γ 1.00**: the four stage-A traces
+that fall to the floor and climb back for 50M — the undiscounted cliff — next to stage-B panels that hold
+two 100/500 rows.
 
 
 **γ 0.70** — `b10aa`-`b10ad`:
@@ -98,9 +128,101 @@ best30 apart. The live γ 0.93/0.94 panels are snapshots from the box at ~21M.
 **γ 0.94** — `b10bc`-`b10bf`:
 
 ![b10bc-g94-seed1](../runs/b10bc-g94-seed1.png)
+![b10bc-g94-seed1 stage B](../runs/b10bc-g94-seed1_checkpoint_evals.png)
 ![b10bd-g94-seed2](../runs/b10bd-g94-seed2.png)
+![b10bd-g94-seed2 stage B](../runs/b10bd-g94-seed2_checkpoint_evals.png)
 ![b10be-g94-seed3](../runs/b10be-g94-seed3.png)
+![b10be-g94-seed3 stage B](../runs/b10be-g94-seed3_checkpoint_evals.png)
 ![b10bf-g94-seed4](../runs/b10bf-g94-seed4.png)
+![b10bf-g94-seed4 stage B](../runs/b10bf-g94-seed4_checkpoint_evals.png)
+
+**γ 0.95** — `b10bg`-`b10bj`:
+
+![b10bg-g95-seed1](../runs/b10bg-g95-seed1.png)
+![b10bg-g95-seed1 stage B](../runs/b10bg-g95-seed1_checkpoint_evals.png)
+![b10bh-g95-seed2](../runs/b10bh-g95-seed2.png)
+![b10bh-g95-seed2 stage B](../runs/b10bh-g95-seed2_checkpoint_evals.png)
+![b10bi-g95-seed3](../runs/b10bi-g95-seed3.png)
+![b10bi-g95-seed3 stage B](../runs/b10bi-g95-seed3_checkpoint_evals.png)
+![b10bj-g95-seed4](../runs/b10bj-g95-seed4.png)
+![b10bj-g95-seed4 stage B](../runs/b10bj-g95-seed4_checkpoint_evals.png)
+
+**γ 0.96** — `b10bk`-`b10bn`:
+
+![b10bk-g96-seed1](../runs/b10bk-g96-seed1.png)
+![b10bk-g96-seed1 stage B](../runs/b10bk-g96-seed1_checkpoint_evals.png)
+![b10bl-g96-seed2](../runs/b10bl-g96-seed2.png)
+![b10bl-g96-seed2 stage B](../runs/b10bl-g96-seed2_checkpoint_evals.png)
+![b10bm-g96-seed3](../runs/b10bm-g96-seed3.png)
+![b10bm-g96-seed3 stage B](../runs/b10bm-g96-seed3_checkpoint_evals.png)
+![b10bn-g96-seed4](../runs/b10bn-g96-seed4.png)
+![b10bn-g96-seed4 stage B](../runs/b10bn-g96-seed4_checkpoint_evals.png)
+
+**γ 0.97** — `b10bo`-`b10br`:
+
+![b10bo-g97-seed1](../runs/b10bo-g97-seed1.png)
+![b10bo-g97-seed1 stage B](../runs/b10bo-g97-seed1_checkpoint_evals.png)
+![b10bp-g97-seed2](../runs/b10bp-g97-seed2.png)
+![b10bp-g97-seed2 stage B](../runs/b10bp-g97-seed2_checkpoint_evals.png)
+![b10bq-g97-seed3](../runs/b10bq-g97-seed3.png)
+![b10bq-g97-seed3 stage B](../runs/b10bq-g97-seed3_checkpoint_evals.png)
+![b10br-g97-seed4](../runs/b10br-g97-seed4.png)
+![b10br-g97-seed4 stage B](../runs/b10br-g97-seed4_checkpoint_evals.png)
+
+**γ 0.98** — `b10bs`-`b10bv`:
+
+![b10bs-g98-seed1](../runs/b10bs-g98-seed1.png)
+![b10bs-g98-seed1 stage B](../runs/b10bs-g98-seed1_checkpoint_evals.png)
+![b10bt-g98-seed2](../runs/b10bt-g98-seed2.png)
+![b10bt-g98-seed2 stage B](../runs/b10bt-g98-seed2_checkpoint_evals.png)
+![b10bu-g98-seed3](../runs/b10bu-g98-seed3.png)
+![b10bu-g98-seed3 stage B](../runs/b10bu-g98-seed3_checkpoint_evals.png)
+![b10bv-g98-seed4](../runs/b10bv-g98-seed4.png)
+![b10bv-g98-seed4 stage B](../runs/b10bv-g98-seed4_checkpoint_evals.png)
+
+**γ 0.995** — `b10bw`-`b10bz`:
+
+![b10bw-g995-seed1](../runs/b10bw-g995-seed1.png)
+![b10bw-g995-seed1 stage B](../runs/b10bw-g995-seed1_checkpoint_evals.png)
+![b10bx-g995-seed2](../runs/b10bx-g995-seed2.png)
+![b10bx-g995-seed2 stage B](../runs/b10bx-g995-seed2_checkpoint_evals.png)
+![b10by-g995-seed3](../runs/b10by-g995-seed3.png)
+![b10by-g995-seed3 stage B](../runs/b10by-g995-seed3_checkpoint_evals.png)
+![b10bz-g995-seed4](../runs/b10bz-g995-seed4.png)
+![b10bz-g995-seed4 stage B](../runs/b10bz-g995-seed4_checkpoint_evals.png)
+
+**γ 0.9975** — `b10ca`-`b10cd`:
+
+![b10ca-g9975-seed1](../runs/b10ca-g9975-seed1.png)
+![b10ca-g9975-seed1 stage B](../runs/b10ca-g9975-seed1_checkpoint_evals.png)
+![b10cb-g9975-seed2](../runs/b10cb-g9975-seed2.png)
+![b10cb-g9975-seed2 stage B](../runs/b10cb-g9975-seed2_checkpoint_evals.png)
+![b10cc-g9975-seed3](../runs/b10cc-g9975-seed3.png)
+![b10cc-g9975-seed3 stage B](../runs/b10cc-g9975-seed3_checkpoint_evals.png)
+![b10cd-g9975-seed4](../runs/b10cd-g9975-seed4.png)
+![b10cd-g9975-seed4 stage B](../runs/b10cd-g9975-seed4_checkpoint_evals.png)
+
+**γ 0.999** — `b10ce`-`b10ch`:
+
+![b10ce-g999-seed1](../runs/b10ce-g999-seed1.png)
+![b10ce-g999-seed1 stage B](../runs/b10ce-g999-seed1_checkpoint_evals.png)
+![b10cf-g999-seed2](../runs/b10cf-g999-seed2.png)
+![b10cf-g999-seed2 stage B](../runs/b10cf-g999-seed2_checkpoint_evals.png)
+![b10cg-g999-seed3](../runs/b10cg-g999-seed3.png)
+![b10cg-g999-seed3 stage B](../runs/b10cg-g999-seed3_checkpoint_evals.png)
+![b10ch-g999-seed4](../runs/b10ch-g999-seed4.png)
+![b10ch-g999-seed4 stage B](../runs/b10ch-g999-seed4_checkpoint_evals.png)
+
+**γ 1.00** — `b10ci`-`b10cl`:
+
+![b10ci-g100-seed1](../runs/b10ci-g100-seed1.png)
+![b10ci-g100-seed1 stage B](../runs/b10ci-g100-seed1_checkpoint_evals.png)
+![b10cj-g100-seed2](../runs/b10cj-g100-seed2.png)
+![b10cj-g100-seed2 stage B](../runs/b10cj-g100-seed2_checkpoint_evals.png)
+![b10ck-g100-seed3](../runs/b10ck-g100-seed3.png)
+![b10ck-g100-seed3 stage B](../runs/b10ck-g100-seed3_checkpoint_evals.png)
+![b10cl-g100-seed4](../runs/b10cl-g100-seed4.png)
+![b10cl-g100-seed4 stage B](../runs/b10cl-g100-seed4_checkpoint_evals.png)
 
 ## Batch b9 — the λ sweep off b7's `fc (320,)`, 4 seeds each, 50M
 

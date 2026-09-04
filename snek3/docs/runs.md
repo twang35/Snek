@@ -6,48 +6,92 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
-**b10 — the γ sweep — is on the desktop, wave 4 of 8, and the laptop is idle.** At 2026-09-03 01:20
-the eight γ 0.93 and γ 0.94 arms (`b10ay`-`b10bf`) were 39-44% through 50M, 59 min in, so wave 4 lands
-around 02:40 and its stage B follows automatically; waves 5-8 (γ 0.95, 0.96, 0.97, 0.98, 0.995, 0.9975,
-0.999, 1.00) are queued behind it, then b11-b14 at their re-based λ 0.99. b10 should close mid-afternoon
-2026-09-03. Ledger: 252 done, 164 queued, 8 running, `attention` empty, 153 GB free, load 14. The
-laptop's only process is the stage-B chart window left from b9's `hof5000` pass, which is free to close.
+**b10 — the γ sweep — closed on the desktop 2026-09-03 16:08, and b11 — the learning-rate sweep — is
+on wave 1 of 4.** At 17:10 b11's eight arms (lr 4e-5 and 1e-4 x seeds 1-4, `b11aa`-`b11ah`) were ~65%
+through 50M, 52 min in; wave 1 lands about 17:40 and its stage B follows. Waves 2-4 (lr 1.5e-4, 2.5e-4,
+5e-4, 8e-4, 1e-3, 2e-3) and then b12 (epochs), b13 (minibatch), b14 (rollout) are queued, **all at the
+re-based λ 0.99** — so b11-b14's reference cell is **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4,
+density 27.3%), not b7. Ledger: 298 done, 124 queued, 8 running, `attention` empty, 146 GB free, load 13.
+**Nothing is running on the laptop.** The site republished at 17:11 with b10 complete and b11 live.
 
-**New record, 2026-09-03: `b9ch-lam999-seed4` @47251456 at 99.30% /30,000 on seed 7**, promoted to
-[`hallOfFame/HOF.md`](../hallOfFame/HOF.md). The desktop `hof30k` pass re-measured b9's 33 checkpoints at
-≥99 /5,000 at 30,000 episodes, 10:21-10:55, exit 0: **18 beat `b5h`'s 98.96**, the mean 5,000 → 30,000
-drop was −0.14 pp, and the winner's four neighbours read 99.20. Six plateau arms hold a checkpoint above
-the old record; one is promoted. `record_gif.py`'s `HOF_RECORD` now names it.
+**b11's first wave at 33M, read against b9's λ 0.99 seeds at their cap:** lr 4e-5 is the slow end as
+predicted — best30 93.4-96.4, `sef` 47-68, still climbing; lr 1e-4 is already at best30 97.8-98.6 with
+`sef` 72-81, on course for the reference. Neither has a stage-B row yet; wave 1's stage B says more.
 
-**b9's `hof5000` pass is closed and documented** (below, and in [`results.md`](results.md)): 727 rows,
-exit 0, **77 at ≥98.73 and 33 at ≥99**, and `b9ch-lam999-seed4 @47251456` at **99.40 /5,000** with a
-98.70 basin is the promotion candidate — [`hof-promote`](../skills/hof-promote/SKILL.md) is the next
-step and has not been run.
+**b10's answer: the discount behaves like λ did — monotone to the top of the grid, with the same
+stability cost, and the undiscounted end is a cliff.** Record density is zero for every γ ≤ 0.93 (not one
+checkpoint of 28 arms passed the stage-A screen), appears at 0.96, then climbs through every value:
+0.9% → 3.6% → 10.4% → 17.3% (b7's 0.99) → 19.6% → 25.6% → **30.7% at γ 0.999**, where the batch's best30
+(98.55-98.60 at 0.9975-0.999) and its 277 `hof5000` candidates also sit. Drawdown climbs with it, 0.29% at
+0.99 → 1.55% at 0.999, as λ's did across b9's plateau. **γ 1.00 is different in kind**: its surviving
+checkpoints are the richest in the batch (38.6% of 1,535 rows, two 100/500 rows) but the deployed policy
+spends **44% of its post-competence evals below 50% perfect** — the undiscounted critic's targets are
+whole-game sums, and the arm collapses and recovers for its entire run. Full table under *Just closed*.
 
-**b10's first three waves say the discount is not a knob with a broad top — below ~0.95 the endgame
-is out of reach at 50M.** Six γ values, 24 arms, stage B closed on all of them, and **not one
-checkpoint passed the stage-A screen**: zero stage-B rows across the whole set. b7aa-b7ad (γ 0.99) are
-the reference:
+**Decisions this puts in front of us:**
 
-| γ | value horizon 1/(1−γ) | best30 | range | sef | drawdown < 50% | stage-B rows |
-|---:|---:|---:|---|---:|---:|---:|
-| 0.70 | 3.3 | 3.95 | 2.7-5.2 | 0.0 | never competent | 0 |
-| 0.80 | 5 | 40.27 | 24.4-49.7 | 0.0 | never competent | 0 |
-| 0.85 | 6.7 | 66.47 | 64.1-68.0 | 0.0 | 54.4% (2 of 4 reached 80%) | 0 |
-| 0.90 | 10 | 79.55 | 75.8-81.6 | 3.6 | 38.7% | 0 |
-| 0.91 | 11.1 | 81.90 | 77.5-85.5 | 5.8 | 26.5% | 0 |
-| 0.92 | 12.5 | 84.75 | 83.1-86.6 | 12.1 | 18.4% | 0 |
-| 0.93 / 0.94 (live, 21M) | 14.3 / 16.7 | 81.2-87.7 / 85.5-88.7 | | 4-27 | | — |
-| **0.99** (b7) | 100 | **97.75** | 97.7-97.8 | 90.9 | 0.29% | 4,003 |
+1. **Run `hof5000` on b10 on the idle laptop** — its ≥99/500 rows number 726 (277 at γ 0.999, 178 at 1.00,
+   164 at 0.9975, 85 at 0.995), the same size as b9's pass (~76 min), and γ 0.999 has 4,003 → 6,614 stage-B
+   rows over b7's cell. Whether a γ 0.999 checkpoint matches `b9ch`'s 99.30 at depth is the question.
+   **Recommendation: run it**, ≥99 cut, then `hof30k` on the desktop for whatever clears 99 /5,000.
+2. **A γ × λ corner is now the obvious next batch.** b9 found λ 0.99-1.00 at γ 0.99 (27-30%); b10 finds
+   γ 0.999 at λ 0.98 (30.7%). Both are one knob off the same cell and neither was run with the other's
+   winner. A 3x3 grid — γ {0.99, 0.9975, 0.999} x λ {0.98, 0.99, 0.999} at 4 seeds, 36 arms, ~9 h —
+   would say whether the two add, and where the drawdown becomes b4's. It would go behind b14, or ahead of
+   b12-b14 if we would rather know this than the epochs/minibatch/rollout answers first.
 
-**‡ γ and λ are not interchangeable, even at the same GAE horizon.** b9's λ 0.90 at γ 0.99 has an
-advantage horizon 1/(1−γλ) of 9.2 steps and reached best30 96.75 with 3.9% record density; b10's
-γ 0.92 at λ 0.98 has a horizon of 10.2 and reaches 84.75 with none. The advantage estimator's horizon
-is not what a short γ costs — the *value target* is discounted too, and a critic that cannot see the
-+100 ten steps ahead cannot value the endgame. The spec's prediction for γ 0.80 ("fast early, then an
-endgame ceiling below perfect") is right; "same shape as 0.8, milder" for γ 0.90 understated it — the
-ceiling is still 20 points below perfect at 10 steps. Where the curve reaches the base is what waves
-5-8 measure; the queued γ 0.995-1.00 cells are the ones that could beat it.
+## Just closed: b10 — density is monotone in γ to 0.999, and γ 1.00 is a cliff
+
+**All eight waves and all eight stage-B passes closed 2026-09-03 16:08**, 64 arms at 50M on the desktop,
+22,741 stage-B rows, ~21 h end to end (the `hof30k` wave took ~35 min of it). b10 changes only `discount`
+off b7's cell — `fc (320,)`, 4 epochs, **λ 0.98**, lr 3e-4, entropy 0.01 — so **b7aa-b7ad are its γ 0.99
+arms**. Drawdown as in b8/b9: median share of post-competence stage-A evals below 50% (and 80%).
+
+| γ | value horizon 1/(1−γ) | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (4 seeds) | sef | drawdown < 50% | < 80% |
+|---:|---:|---:|---:|---|---:|---:|---|---:|---:|---:|
+| 0.70 | 3.3 | 0 | – | never screened | 0 | – | 2.7 5.2 5.1 2.8 | 0.0 | never competent | |
+| 0.80 | 5 | 0 | – | never screened | 0 | – | 49.7 24.4 41.8 45.2 | 0.0 | never competent | |
+| 0.85 | 6.7 | 0 | – | never screened | 0 | – | 67.2 64.1 66.6 68.0 | 0.0 | 54.4% (2 of 4 reached 80%) | 99.7% |
+| 0.90 | 10 | 0 | – | never screened | 0 | – | 81.6 75.8 79.4 81.4 | 3.6 | 38.7% | 95.5% |
+| 0.91 | 11.1 | 0 | – | never screened | 0 | – | 85.5 79.9 77.5 84.7 | 5.8 | 26.5% | 92.6% |
+| 0.92 | 12.5 | 0 | – | never screened | 0 | – | 85.1 86.6 84.2 83.1 | 12.1 | 18.4% | 85.3% |
+| 0.93 | 14.3 | 0 | – | never screened | 0 | – | 86.9 88.5 87.1 87.7 | 21.0 | 13.9% | 74.0% |
+| 0.94 | 16.7 | 11 | 0.0% | 0 0 0 0 | 0 | 93.2 | 90.4 89.0 90.2 89.8 | 34.5 | 4.85% | 56.8% |
+| 0.95 | 20 | 95 | 0.0% | 0 0 0 0 | 0 | 97.8 | 93.6 91.6 93.2 93.0 | 51.5 | 3.35% | 44.7% |
+| 0.96 | 25 | 319 | 0.9% | 4.3 0 0 0 | 0 | 98.4 | 95.6 93.4 94.9 94.7 | 63.9 | 2.60% | 30.0% |
+| 0.97 | 33 | 756 | 3.6% | 0.8 5.1 2.0 7.1 | 2 | 99.4 | 96.4 94.7 95.4 95.6 | 75.6 | 0.28% | 19.8% |
+| 0.98 | 50 | 2,540 | 10.4% | 6.0 14.1 8.1 13.1 | 20 | 99.6 | 97.5 97.1 97.3 97.3 | 86.5 | 0.14% | 8.3% |
+| 0.99 (b7) | 100 | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.8 97.8 97.7 97.7 | 90.9 | 0.29% | 6.2% |
+| 0.995 | 200 | 5,027 | 19.6% | 19.0 17.8 20.5 20.7 | 85 | **100.0** | 98.1 97.7 98.5 98.1 | 92.5 | 0.78% | **4.5%** |
+| **0.9975** | 400 | 5,844 | 25.6% | 24.3 29.0 20.3 28.5 | 164 | 99.8 | **98.6 98.4 98.7 98.7** | **92.6** | 1.30% | 4.7% |
+| **0.999** | 1,000 | **6,614** | **30.7%** | 21.7 22.9 39.2 35.4 | **277** | 99.8 | 98.5 98.2 98.7 98.6 | 91.7 | 1.55% | 4.9% |
+| 1.00 | ∞ | 1,535 | 38.6% | 36.4 45.8 39.4 33.9 | 178 | **100.0** | 98.4 97.3 98.7 98.3 | **39.2** | **44.4%** | 63.6% |
+
+**Four readings:**
+
+- **Below γ 0.94 the endgame is unreachable at 50M, and it is γ itself, not the GAE horizon.** 28 arms
+  across seven values produced no screened checkpoint at all; best30 climbs 4 → 40 → 66 → 80 → 82 → 85 →
+  88. b9's λ 0.90 at γ 0.99 sits at the same *advantage* horizon as b10's γ 0.92 at λ 0.98 (9-10 steps)
+  and reached 96.75 with 3.9% density against 84.75 and none: a discounted value target that cannot see
+  the +100 ten steps out cannot value the endgame, whatever λ does to the advantage.
+- **From 0.96 to 0.999 density is monotone**, 0.9% → 30.7%, with the base at 0.99 in the middle of the
+  ramp rather than at a peak — the same shape b9 found for λ, and the second time the default has been
+  left with a factor of 1.8 on the table. best30 peaks at 0.9975-0.999 (98.60, 98.55) with every seed
+  ≥98.2. γ 0.999 also produces the most stage-B rows of any cell yet (6,614) and the most `hof5000`
+  candidates (277 at ≥99/500).
+- **Stability moves the other way, again.** Drawdown below 50% is ≤0.3% from 0.97 to 0.99, then 0.78 →
+  1.30 → 1.55% up the plateau; the sub-80% share bottoms at 4.5-4.9% for 0.995-0.999. Same trade-off as
+  b8 and b9, now on a third knob.
+- **γ 1.00 collapses half the time and holds records the other half.** Median drawdown **44.4%**, `sef`
+  39.2, only 1,535 rows screened — and 38.6% of those are ≥98, two are 100/500, and 178 are `hof5000`
+  candidates. Undiscounted, the critic's target is the whole-game return and the rollout-boundary
+  bootstrap carries full weight (the spec predicted both); the policy oscillates between a near-perfect
+  regime and a broken one for its whole run. Not a base to build on; possibly a source of checkpoints.
+
+**Two more things.** `sef` ranks the top of this sweep backwards too (92.6 at 0.9975 vs 91.7 at 0.999,
+and 39.2 at the densest cell) — fourth reproduction. And b3's single-seed call on γ 0.9975 ("the
+stability candidate") was the right cell for the wrong reason: it is the batch's best30 and *not* its
+most stable. Per-arm numbers in [`results.md`](results.md), 121 panels in [`charts.md`](charts.md).
 
 ## Just closed: b9 — λ 0.99+ doubles the record density, and the top is a plateau
 
@@ -146,6 +190,51 @@ numbers in [`results.md`](results.md), the reading and the two retractions in
 **It also changes the primary metric for this kind of question.** `strong_eval_fraction` ranks b7's
 layouts *backwards* (Spearman −0.79 across the eight layout means); the stage-A ≥98% rate ranks them
 right (+0.80). Both are free from the same eval history — see [`findings.md`](findings.md).
+
+## b10 mid-flight, as it read at 2026-09-03 01:20 (superseded)
+
+**b10 — the γ sweep — is on the desktop, wave 4 of 8, and the laptop is idle.** At 2026-09-03 01:20
+the eight γ 0.93 and γ 0.94 arms (`b10ay`-`b10bf`) were 39-44% through 50M, 59 min in, so wave 4 lands
+around 02:40 and its stage B follows automatically; waves 5-8 (γ 0.95, 0.96, 0.97, 0.98, 0.995, 0.9975,
+0.999, 1.00) are queued behind it, then b11-b14 at their re-based λ 0.99. b10 should close mid-afternoon
+2026-09-03. Ledger: 252 done, 164 queued, 8 running, `attention` empty, 153 GB free, load 14. The
+laptop's only process is the stage-B chart window left from b9's `hof5000` pass, which is free to close.
+
+**New record, 2026-09-03: `b9ch-lam999-seed4` @47251456 at 99.30% /30,000 on seed 7**, promoted to
+[`hallOfFame/HOF.md`](../hallOfFame/HOF.md). The desktop `hof30k` pass re-measured b9's 33 checkpoints at
+≥99 /5,000 at 30,000 episodes, 10:21-10:55, exit 0: **18 beat `b5h`'s 98.96**, the mean 5,000 → 30,000
+drop was −0.14 pp, and the winner's four neighbours read 99.20. Six plateau arms hold a checkpoint above
+the old record; one is promoted. `record_gif.py`'s `HOF_RECORD` now names it.
+
+**b9's `hof5000` pass is closed and documented** (below, and in [`results.md`](results.md)): 727 rows,
+exit 0, **77 at ≥98.73 and 33 at ≥99**, and `b9ch-lam999-seed4 @47251456` at **99.40 /5,000** with a
+98.70 basin is the promotion candidate — [`hof-promote`](../skills/hof-promote/SKILL.md) is the next
+step and has not been run.
+
+**b10's first three waves say the discount is not a knob with a broad top — below ~0.95 the endgame
+is out of reach at 50M.** Six γ values, 24 arms, stage B closed on all of them, and **not one
+checkpoint passed the stage-A screen**: zero stage-B rows across the whole set. b7aa-b7ad (γ 0.99) are
+the reference:
+
+| γ | value horizon 1/(1−γ) | best30 | range | sef | drawdown < 50% | stage-B rows |
+|---:|---:|---:|---|---:|---:|---:|
+| 0.70 | 3.3 | 3.95 | 2.7-5.2 | 0.0 | never competent | 0 |
+| 0.80 | 5 | 40.27 | 24.4-49.7 | 0.0 | never competent | 0 |
+| 0.85 | 6.7 | 66.47 | 64.1-68.0 | 0.0 | 54.4% (2 of 4 reached 80%) | 0 |
+| 0.90 | 10 | 79.55 | 75.8-81.6 | 3.6 | 38.7% | 0 |
+| 0.91 | 11.1 | 81.90 | 77.5-85.5 | 5.8 | 26.5% | 0 |
+| 0.92 | 12.5 | 84.75 | 83.1-86.6 | 12.1 | 18.4% | 0 |
+| 0.93 / 0.94 (live, 21M) | 14.3 / 16.7 | 81.2-87.7 / 85.5-88.7 | | 4-27 | | — |
+| **0.99** (b7) | 100 | **97.75** | 97.7-97.8 | 90.9 | 0.29% | 4,003 |
+
+**‡ γ and λ are not interchangeable, even at the same GAE horizon.** b9's λ 0.90 at γ 0.99 has an
+advantage horizon 1/(1−γλ) of 9.2 steps and reached best30 96.75 with 3.9% record density; b10's
+γ 0.92 at λ 0.98 has a horizon of 10.2 and reaches 84.75 with none. The advantage estimator's horizon
+is not what a short γ costs — the *value target* is discounted too, and a critic that cannot see the
++100 ten steps ahead cannot value the endgame. The spec's prediction for γ 0.80 ("fast early, then an
+endgame ceiling below perfect") is right; "same shape as 0.8, milder" for γ 0.90 understated it — the
+ceiling is still 20 points below perfect at 10 steps. Where the curve reaches the base is what waves
+5-8 measure; the queued γ 0.995-1.00 cells are the ones that could beat it.
 
 ## b9 just closed, as it read at 2026-09-02 17:53 (superseded)
 
