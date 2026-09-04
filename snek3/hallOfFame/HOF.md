@@ -11,21 +11,47 @@ nothing.
 ## The entries
 
 All admitted on 30,000 fresh episodes at **seed 7** — a seed the selecting pass never used; `b5h` and
-`b6b` on 2026-09-01, `b9ch` on 2026-09-03. Add one with the [`hof-promote`](../skills/hof-promote/SKILL.md)
-skill.
+`b6b` on 2026-09-01, `b9ch` and the two `b10ck` checkpoints on 2026-09-03. Add one with the
+[`hof-promote`](../skills/hof-promote/SKILL.md) skill.
 
 | entry | algo / net | confirmed **/30,000** | 95% CI | selected at | drop |
 |---|---|---|---|---|---|
+| **`b10ck-g100-seed3-ckpt30523392`** | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.65%** (29894) | [99.6, 99.7] | 99.5 /5000 | +0.15 pp |
+| `b10ck-g100-seed3-ckpt30539776` | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.55%** (29866) | [99.5, 99.6] | 99.3 /5000 | +0.25 pp |
 | **`b9ch-lam999-seed4-ckpt47251456`** | PPO, `fc 320`, 4 epochs, **λ 0.999** | **99.30%** (29790) | [99.2, 99.4] | 99.40 /5000 | −0.10 pp |
 | `b5h-ep8-seed8-ckpt9027584` | PPO, `fc 320`, 8 epochs | **98.96%** (29687) | [98.84, 99.07] | 99.20 /5000 | −0.24 pp |
 | `b6b-fc200x100-seed2-ckpt133120000` | PPO, `fc 200,100`, 4 epochs | **98.73%** (29619) | [98.60, 98.85] | 99.10 /5000 | −0.37 pp |
 
-`b9ch` leads `b5h` by 0.34 pp (z = 4.5, p < 1e-5) and `b5h` leads `b6b` by 0.23 pp (z = 2.60,
-p = 0.0094), so the ordering is real rather than a coin.
+`b10ck` @30523392 leads `b9ch` by 0.35 pp (z = 5.9, p < 1e-8); the two `b10ck` entries are 16,384
+transitions apart and **not distinguishable from each other** (z = 1.8, p = 0.07) — they are one
+region admitted as a pair, not a first and a second place. `b9ch` leads `b5h` by 0.34 pp (z = 4.5,
+p < 1e-5) and `b5h` leads `b6b` by 0.23 pp (z = 2.60, p = 0.0094), so the rest of the ordering is real.
 
-## ‡ The record: `b9ch` @47251456, 99.30% over 30,000 episodes — 2026-09-03
+## ‡ The record: `b10ck` @30523392 and @30539776, 99.6% over 30,000 episodes — 2026-09-03
 
-**The first entry above 99% at depth, and the first to come out of a hyperparameter sweep rather than
+**The undiscounted arm holds the record.** b10 swept the discount γ off b7's `fc 320` / 4-epoch /
+λ 0.98 cell, and γ 1.00 seed 3 is the arm — the cell the batch's own read calls a cliff, because the
+deployed policy collapses and recovers for its entire run (44% of its post-competence evals below 50%
+perfect). Its *surviving* checkpoints are another matter: γ 1.00's 178 `hof5000` rows average 98.8
+against 98.3 for γ 0.999 and 60 of the batch's 71 rows at ≥99 /5,000 are its. The protocol found it
+end to end: 142 `b10ck` checkpoints screened at 500 episodes, 12 re-measured at 5,000 (`hof5000`, laptop),
+the 9 at ≥99 /5,000 re-measured at 30,000 on seed 7 (`hof30k`, laptop, 71 rows across 7 arms). The
+region is real: the arm's nine `hof30k` rows between 28.9M and 30.8M read 99.1-99.6 with a mean of 99.32,
+itself equal to the old record, and its eight `hof5000` neighbours within ±1M average 99.17 (against
+98.70 for `b9ch`'s basin). Across all 71 confirmed rows the 5,000 → 30,000 drop was **−0.07 pp**; 60 of
+the 71 beat `b5h`'s 98.96 and 12 beat `b9ch`'s 99.30. Both 99.6 rows are admitted, at the user's
+decision: they are statistically one checkpoint and the table says so. The same wave measured
+`b10cl-g100-seed4` @32849920 and `b10cj-g100-seed2` @39682048 at 99.5; a third γ 1.00 arm adds nothing
+the pair does not already say and they are not promoted.
+
+Each copy was verified from `hallOfFame/` at 500 episodes on seed 11: 499/500 and 500/500.
+
+**`record_gif.py`'s `HOF_RECORD` names `b10ck-g100-seed3-ckpt30523392`**, so `record_gif.py hof` records
+it and `record_gif.py --list` marks it `*`.
+
+## ‡ The previous record: `b9ch` @47251456, 99.30% over 30,000 episodes — 2026-09-03
+
+**`b9ch` was the record for most of 2026-09-03, superseded the same evening.** The first entry above 99% at depth, and the first to come out of a hyperparameter sweep rather than
 a seed batch.** b9 swept GAE λ off b7's `fc 320` / 4-epoch cell; λ 0.999 seed 4 is the arm. It was
 found by the protocol working end to end: 1,258 checkpoints screened at 500 episodes, 80 of them
 re-measured at 5,000 (`hof5000`), the 16 at ≥99 /5,000 re-measured at 30,000 on seed 7 (`hof30k`, on
@@ -38,8 +64,7 @@ is promoted, per the rule below. The same wave measured `b9cl-lam100-seed4` @193
 `b9cc-lam995-seed3` @18350080 at 99.10; they are not indistinguishable from `b9ch` (z ≈ 2.9) and are
 not promoted, because a second λ-plateau entry adds nothing the table does not already say.
 
-**`record_gif.py`'s `HOF_RECORD` names this entry** (commit of 2026-09-03), so `record_gif.py hof` records it and
-`record_gif.py --list` marks it `*`.
+`HOF_RECORD` named this entry from the commit of 2026-09-03 until `b10ck` took it the same day.
 
 ## ‡ The previous record, and the first time this project beat snek2 on a matched measurement
 
@@ -73,8 +98,10 @@ reaches this folder as the maximum of a selection, so it is biased upward.
 | `b5h` first look (2026-09-01) | 99.20 /5000 | 98.8 /2000 | −0.4 pp |
 | `b5h` and `b6b` as admitted | 99.20, 99.10 /5000 | 98.96, 98.73 /30000 | −0.24, −0.37 |
 | `b9ch` as admitted (2026-09-03) | 99.40 /5000 | 99.30 /30000 | **−0.10** |
+| `b10ck` pair as admitted (2026-09-03) | 99.5, 99.3 /5000 | 99.65, 99.55 /30000 | **+0.15, +0.25** |
 
-All three entries held up far better than snek2's did. That is the *result*, not the process working as
+Every entry held up far better than snek2's did, and the `b10ck` pair *rose*, which is what a wide basin
+looks like when the selecting number was an under-draw rather than an over-draw. That is the *result*, not the process working as
 usual — and the likely reason is the next section.
 
 ## Why these two, out of 2,172 candidates
@@ -100,6 +127,8 @@ simply the top rows.
 - A second checkpoint from the same arm a few hundred thousand transitions from one already in.
   `b5h`'s basin holds ten rows at ≥99% /5000 and promoting them would imply a ranking the data cannot
   support — snek2 declined to promote four indistinguishable sweep candidates for the same reason.
+  **The `b10ck` pair is the one exception**, admitted together on the user's call with the table saying
+  in so many words that the two are indistinguishable; it is not a precedent for ranking neighbours.
 - Recordings. `record_gif.py` writes to `snek3/gifs/`, not here; `hallOfFame/gifs/` is where a
   recording is copied to be embedded in this file, and it is still empty.
 
@@ -116,4 +145,4 @@ beside the checkpoint, so nothing has to be staged under `savedPolicies/` to be 
 
 `arch.json` sits beside every checkpoint and is **required** — width and observation era cannot be
 recovered from weights, so a copy without it does not load at all rather than loading wrongly
-(`tools/arch.py`). Both entries here are observation era `b09c616`, 30 values, 3 actions.
+(`tools/arch.py`). Every entry here is observation era `b09c616`, 30 values, 3 actions.
