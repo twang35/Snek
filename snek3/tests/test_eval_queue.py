@@ -8,6 +8,7 @@ asked for).
 
 import json
 import os
+import time
 
 import pytest
 
@@ -293,3 +294,28 @@ def test_a_round_skips_a_checkpoint_whose_file_has_gone(tmp_path, monkeypatch):
     assert worker.run_round() == 1
     assert eval_queue.landed('arm', 1000, queue) is not None
     assert eval_queue.landed('arm', 2000, queue) is None
+
+
+def test_a_slot_is_never_empty_between_creation_and_pid(queue):
+    """Regression for 2026-09-03: eight arms launched in the same instant gave seven slot-0 workers.
+
+    The file used to be created with `O_EXCL` and written a moment later; a rival reading it in that
+    moment saw no pid, took the slot for stale, and claimed it. Now the file is born holding the pid,
+    so the first read of a freshly claimed slot is the claimer.
+    """
+    assert eval_queue.take_slot(0, queue) is True
+    assert eval_queue.live_runs.read(eval_queue.worker_slot(0, queue)) == os.getpid()
+    assert not [n for n in os.listdir(eval_queue.workers_directory(queue)) if 'claim' in n]
+
+
+def test_an_empty_fresh_slot_is_a_claim_in_progress_not_a_stale_one(queue):
+    """An older process, or a crash mid-write, can still leave an empty slot; young means in progress."""
+    os.makedirs(eval_queue.workers_directory(queue), exist_ok=True)
+    path = eval_queue.worker_slot(0, queue)
+    open(path, 'w').close()
+    assert eval_queue.take_slot(0, queue) is False
+    assert eval_queue.live_runs.read(path) is None
+    stale = time.time() - eval_queue.SLOT_CLAIM_GRACE_SECONDS - 1
+    os.utime(path, (stale, stale))
+    assert eval_queue.take_slot(0, queue) is True
+    assert eval_queue.live_runs.read(path) == os.getpid()

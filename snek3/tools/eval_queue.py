@@ -89,12 +89,14 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 from env import constants
 from tools import live_runs
 
 DIR_NAME = '.evalq'
 WORKERS_DIR = 'workers'
+SLOT_CLAIM_GRACE_SECONDS = 30      # an empty slot younger than this is a claim mid-write, not a stale one
 WORKER_MODULE = 'tools.eval_worker'
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -504,25 +506,48 @@ def live_workers(runs_dir=None):
 def take_slot(index, runs_dir=None):
     """Claims worker slot `index` for this process, or False if a live worker already holds it.
 
-    `O_EXCL` settles the common case — four arms launched in the same second, two workers — without a
-    lock protocol, because creating the file *is* the claim. The `FileExistsError` branch handles a
-    worker that exited and left its pid behind, which has to be re-claimable or a box that ran one
-    batch would never start a worker again.
+    Creating the file *is* the claim, and the file is born holding the claimer's pid: the pid is
+    written to a private temp file and `os.link`ed to the slot path, which fails with
+    `FileExistsError` if the slot exists at all. Before 2026-09-03 the file was created with `O_EXCL`
+    and the pid written a moment later, and in that moment the slot was *empty*: a rival arm reading
+    it saw no pid, took the slot for stale, and claimed it too. Eight arms launched in the same
+    instant on the laptop produced **seven slot-0 workers**, fourteen workers for eight slots, all at
+    70% CPU. The `FileExistsError` branch handles a worker that exited and left its pid behind, which
+    has to be re-claimable or a box that ran one batch would never start a worker again -- and an
+    empty slot younger than `SLOT_CLAIM_GRACE_SECONDS` is a claim in progress by an older process,
+    not a stale one.
     """
     path = worker_slot(index, runs_dir)
+    temp = '{0}.claim.{1}'.format(path, os.getpid())
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except FileExistsError:
-        pid = live_runs.read(path)
-        if pid is not None and live_runs.alive(pid) and not live_runs.zombie(pid):
-            return False
-        return _write_slot(path, os.getpid())
+        with open(temp, 'w') as handle:
+            handle.write('{0}\n'.format(os.getpid()))
+        try:
+            os.link(temp, path)
+            return True
+        except FileExistsError:
+            pass
+        finally:
+            try:
+                os.remove(temp)
+            except OSError:
+                pass
     except OSError:
         return False
-    with os.fdopen(descriptor, 'w') as handle:
-        handle.write('{0}\n'.format(os.getpid()))
-    return True
+    pid = live_runs.read(path)
+    if pid is not None and live_runs.alive(pid) and not live_runs.zombie(pid):
+        return False
+    if pid is None and _slot_age(path) < SLOT_CLAIM_GRACE_SECONDS:
+        return False
+    return _write_slot(path, os.getpid())
+
+
+def _slot_age(path):
+    try:
+        return time.time() - os.stat(path).st_mtime
+    except OSError:
+        return float('inf')
 
 
 def _write_slot(path, pid):
