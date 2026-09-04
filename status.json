@@ -1,14 +1,14 @@
 {
-  "iso": "2026-09-04T15:13:53",
-  "ts": 1788560033.4149914,
+  "iso": "2026-09-04T15:23:57",
+  "ts": 1788560637.0147853,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b12 | ep12, ep16 | stage B (8 arms)"
+      "b15 | ent0, ent001 -- wave 1 of 5 | training 7% (8 arms)"
     ],
     "queued": [
-      "b15 training | ent0, ent001, ent003, ent005, ent02, ent03, entanneal10, entanneal03, +2 more... | queued (40 arms)",
       "b15 stage B | ent0, ent001 | queued (8 arms)",
+      "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b16 stage B | kl003, kl005 | queued (8 arms)",
       "b17 training | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
@@ -40,41 +40,124 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b12-stageb-w5",
-      "type": "eval",
-      "policy": "b12bg-ep12-seed1",
+      "id": "b15aa-ent0-seed1",
+      "type": "train",
+      "policy": "b15aa-ent0-seed1",
       "policies": [
-        "b12bg-ep12-seed1",
-        "b12bh-ep12-seed2",
-        "b12bi-ep12-seed3",
-        "b12bj-ep12-seed4",
-        "b12bk-ep16-seed1",
-        "b12bl-ep16-seed2",
-        "b12bm-ep16-seed3",
-        "b12bn-ep16-seed4"
+        "b15aa-ent0-seed1"
       ],
-      "pid": 3628837,
-      "step": 50003968,
-      "label": "",
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 891
+      "pid": 3653902,
+      "step": 3588096,
+      "label": "b15: ent0, seed 1 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 11341.5,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15ab-ent0-seed2",
+      "type": "train",
+      "policy": "b15ab-ent0-seed2",
+      "policies": [
+        "b15ab-ent0-seed2"
+      ],
+      "pid": 3653903,
+      "step": 3653632,
+      "label": "b15: ent0, seed 2 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 12372.6,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15ac-ent0-seed3",
+      "type": "train",
+      "policy": "b15ac-ent0-seed3",
+      "policies": [
+        "b15ac-ent0-seed3"
+      ],
+      "pid": 3653904,
+      "step": 3424256,
+      "label": "b15: ent0, seed 3 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 9794.9,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15ad-ent0-seed4",
+      "type": "train",
+      "policy": "b15ad-ent0-seed4",
+      "policies": [
+        "b15ad-ent0-seed4"
+      ],
+      "pid": 3653905,
+      "step": 3620864,
+      "label": "b15: ent0, seed 4 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 10310.4,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15ae-ent001-seed1",
+      "type": "train",
+      "policy": "b15ae-ent001-seed1",
+      "policies": [
+        "b15ae-ent001-seed1"
+      ],
+      "pid": 3653906,
+      "step": 3637248,
+      "label": "b15: ent001, seed 1 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 10310.4,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15af-ent001-seed2",
+      "type": "train",
+      "policy": "b15af-ent001-seed2",
+      "policies": [
+        "b15af-ent001-seed2"
+      ],
+      "pid": 3653907,
+      "step": 3620864,
+      "label": "b15: ent001, seed 2 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 10310.3,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15ag-ent001-seed3",
+      "type": "train",
+      "policy": "b15ag-ent001-seed3",
+      "policies": [
+        "b15ag-ent001-seed3"
+      ],
+      "pid": 3653908,
+      "step": 3571712,
+      "label": "b15: ent001, seed 3 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 9279.3,
+      "elapsed_s": 493
+    },
+    {
+      "id": "b15ah-ent001-seed4",
+      "type": "train",
+      "policy": "b15ah-ent001-seed4",
+      "policies": [
+        "b15ah-ent001-seed4"
+      ],
+      "pid": 3653909,
+      "step": 3555328,
+      "label": "b15: ent001, seed 4 of 4 -- wave 1 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 10310.3,
+      "elapsed_s": 493
     }
   ],
   "ledger": {
-    "b15aa-ent0-seed1": "queued",
-    "b15ab-ent0-seed2": "queued",
-    "b15ac-ent0-seed3": "queued",
-    "b15ad-ent0-seed4": "queued",
-    "b15ae-ent001-seed1": "queued",
-    "b15af-ent001-seed2": "queued",
-    "b15ag-ent001-seed3": "queued",
-    "b15ah-ent001-seed4": "queued",
     "b15-stageb": "queued",
     "b15ai-ent003-seed1": "queued",
     "b15aj-ent003-seed2": "queued",
@@ -306,7 +389,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b12-stageb-w5": "running",
+    "b15aa-ent0-seed1": "running",
+    "b15ab-ent0-seed2": "running",
+    "b15ac-ent0-seed3": "running",
+    "b15ad-ent0-seed4": "running",
+    "b15ae-ent001-seed1": "running",
+    "b15af-ent001-seed2": "running",
+    "b15ag-ent001-seed3": "running",
+    "b15ah-ent001-seed4": "running",
+    "b12-stageb-w5": "done",
     "b12bn-ep16-seed4": "done",
     "b12bm-ep16-seed3": "done",
     "b12bl-ep16-seed2": "done",
@@ -686,10 +777,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 134.7,
+  "disk_free_gb": 134.6,
   "load_avg": [
-    15.67138671875,
-    15.39111328125,
-    15.53369140625
+    12.94970703125,
+    12.724609375,
+    13.90380859375
   ]
 }
