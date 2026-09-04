@@ -167,3 +167,13 @@ def test_import_skips_shard_files_and_existing_ones(tmp_path, monkeypatch):
     copied = pu.import_closed_waves({'ledger': {'b20-stageb-w1': 'done', 'other-job': 'done'}}, tree, str(tmp_path))
     assert copied == 1 and (tmp_path / 'b20aa-k1-seed1_checkpoint_evals.json').exists()
     assert not (tmp_path / 'b20aa-k1-seed1_checkpoint_evals-s1of4.json').exists()
+
+
+def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp_path):
+    live = tmp_path / '.live' / 'desktop'
+    live.mkdir(parents=True)
+    (live / 'a_evals.json').write_text('{}')
+    (live / 'b_evals.json').write_text('{}')
+    (tmp_path / 'a_evals.json').write_text('{}')
+    assert pu.drop_superseded_snapshots(str(tmp_path)) == 1
+    assert not (live / 'a_evals.json').exists() and (live / 'b_evals.json').exists()

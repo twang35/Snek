@@ -93,3 +93,20 @@ def test_references_attach_only_arms_that_exist(tmp_path):
     assert m['references'] == {'b9': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref', 'after': 'lam97'},
                                'b10': {'arms': ['b7aa-fc320-seed1'], 'label': 'ref too', 'after': None}}
     assert vm.build(runs, str(tmp_path / 'absent.json'))['references'] == {}
+
+
+def test_live_desktop_snapshot_stands_in_until_the_close_out_file_exists(tmp_path):
+    (tmp_path / 'b30aa-x-seed1.png').write_bytes(b'')
+    live = tmp_path / '.live' / 'desktop'
+    live.mkdir(parents=True)
+    evals = [{'step': 1000 * i, 'perfect_percent': 90} for i in range(10)]
+    (live / 'b30aa-x-seed1_evals.json').write_text(json.dumps(
+        {'summary': {'step': 9000, 'best_perfect30': {'value': 97.0, 'step': 8000}, 'strong_eval_fraction': 65.2},
+         'evals': evals}))
+    (live / 'b30aa-x-seed1_checkpoint_evals.json').write_text(json.dumps({'rows': [{'perfect_percent': 98.2, 'step': 1}]}))
+    record = vm.arm_record('b30aa-x-seed1', str(tmp_path))
+    assert record['best30'] == 97.0 and record['sef'] == 65.2 and record['drawdown50'] == 0.0
+    assert record['rows'] == 1 and record['density98'] == 100.0
+    (tmp_path / 'b30aa-x-seed1_evals.json').write_text(json.dumps(
+        {'summary': {'step': 50000, 'best_perfect30': {'value': 98.5, 'step': 40000}}, 'evals': evals}))
+    assert vm.arm_record('b30aa-x-seed1', str(tmp_path))['best30'] == 98.5     # the real file wins

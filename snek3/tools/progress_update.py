@@ -9,7 +9,7 @@ different each time:
 
 | step | what |
 |---|---|
-| sync | `git fetch` `results` and `ops-status`; import every closed stage-B wave's files that `runs/` lacks; `rsync` the live batches' charts off the box |
+| sync | `git fetch` `results` and `ops-status`; import every closed stage-B wave's files that `runs/` lacks; `rsync` the live batches' charts into `runs/` and their live JSON into the gitignored `runs/.live/desktop/` |
 | publish | `tools.publish_pages` — manifest and the Pages site |
 | tables | one canonical per-batch table: knob value **read from the spec's env on `ops`**, rows, density, per-seed shares, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98 share, onset, plus the reference cell's row |
 | charts.md | regenerates the sections it owns (marked) — table, reading slot, every panel including the reference group — and can adopt a hand-written one |
@@ -99,17 +99,44 @@ def live_batches(status):
 
 
 def pull_live_charts(batches, runs_dir=None):
-    """rsync the live batches' `.png`/`.md` off the box. Returns (ok, message); off-LAN is not an error."""
+    """rsync the live batches' pictures into `runs/` and their measurements into `runs/.live/desktop/`.
+    Returns (ok, message); off-LAN is not an error.
+
+    The pictures land in `runs/` because they are committed on every update. The JSON is kept out of
+    `runs/`: a live arm's `_evals.json` and `_checkpoint_evals.json` must never be committed (the box's
+    deploy refuses to merge over a differing JSON), and an untracked copy in `runs/` is one `git add`
+    away from that — so it goes to the gitignored side directory, where `viewer_manifest` reads it only
+    when `runs/` has no close-out file for the arm."""
     if not batches:
         return True, 'no live batch'
-    argv = ['rsync', '-a']
-    for batch in batches:
-        argv += ['--include={0}*.png'.format(batch), '--include={0}*.md'.format(batch)]
-    argv += ['--exclude=*', '{0}:{1}'.format(BOX, BOX_RUNS), (runs_dir or constants.RUNS_DIR) + '/']
-    result = subprocess.run(argv, capture_output=True, text=True, timeout=120)
-    if result.returncode != 0:
-        return False, 'rsync failed ({0}): live charts NOT refreshed — off-LAN?'.format(result.returncode)
-    return True, 'live charts pulled for ' + ', '.join(batches)
+    runs_dir = runs_dir or constants.RUNS_DIR
+    live_dir = os.path.join(runs_dir, viewer_manifest.LIVE_SUBDIR)
+    os.makedirs(live_dir, exist_ok=True)
+    jobs = [(['.png', '.md'], runs_dir), (['_evals.json', '_checkpoint_evals.json'], live_dir)]
+    pulled = 0
+    for suffixes, target in jobs:
+        argv = ['rsync', '-a']
+        for batch in batches:
+            argv += ['--include={0}*{1}'.format(batch, suffix) for suffix in suffixes]
+        argv += ['--exclude=*', '{0}:{1}'.format(BOX, BOX_RUNS), target + '/']
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            return False, 'rsync failed ({0}): live charts and measurements NOT refreshed — off-LAN?'.format(
+                result.returncode)
+        pulled += 1
+    return True, 'live charts and measurements pulled for ' + ', '.join(batches)
+
+
+def drop_superseded_snapshots(runs_dir=None):
+    """Removes every live snapshot whose close-out file has since been imported into `runs/`."""
+    runs_dir = runs_dir or constants.RUNS_DIR
+    live_dir = os.path.join(runs_dir, viewer_manifest.LIVE_SUBDIR)
+    dropped = 0
+    for name in os.listdir(live_dir) if os.path.isdir(live_dir) else []:
+        if os.path.exists(os.path.join(runs_dir, name)):
+            os.remove(os.path.join(live_dir, name))
+            dropped += 1
+    return dropped
 
 
 def spec_envs(policies):
@@ -428,7 +455,8 @@ def main(argv=None):
         copied = import_closed_waves(status, results_tree())
         live = live_batches(status)
         ok, msg = pull_live_charts(live)
-        say('sync: {0} closed-wave files imported; {1}'.format(copied, msg))
+        dropped = drop_superseded_snapshots()
+        say('sync: {0} closed-wave files imported, {1} live snapshots superseded; {2}'.format(copied, dropped, msg))
     if not args.no_publish:
         manifest = viewer_manifest.build()
         with open(viewer_manifest.MANIFEST_PATH, 'w') as handle:

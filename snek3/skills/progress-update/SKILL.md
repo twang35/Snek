@@ -22,8 +22,9 @@ ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   
 ```
 
 The tool, in order: fetches `results`, `ops-status` and `ops`; imports any closed stage-B wave's files
-that `runs/` lacks; `rsync`s the live batches' charts off the box (off-LAN this fails and the digest
-says so — carry on, and say so in the summary); runs `tools.publish_pages`; regenerates the
+that `runs/` lacks; `rsync`s the live batches' charts into `runs/` and their live `_evals.json` and
+`_checkpoint_evals.json` into the gitignored `runs/.live/desktop/`, which the tables read only for an arm
+with no close-out file yet (off-LAN this fails and the digest says so — carry on, and say so in the summary); runs `tools.publish_pages`; regenerates the
 `charts.md` sections it owns; inserts a `results.md` skeleton for a batch that just closed; prints
 the digest. Read the digest top to bottom:
 

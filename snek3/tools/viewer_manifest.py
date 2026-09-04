@@ -78,6 +78,20 @@ def drawdown(evals, below):
     return round(100.0 * sum(e.get('perfect_percent', 0) < below for e in post) / len(post), 2)
 
 
+LIVE_SUBDIR = os.path.join('.live', 'desktop')
+
+
+def _measurement(runs_dir, name):
+    """`runs/<name>` if it exists, else the live desktop snapshot `runs/.live/desktop/<name>` that
+    `tools/progress_update.py` pulls for an arm still training on the box. `runs/` itself never holds a
+    live desktop arm's JSON (it would be committed by accident and block the box's deploy), and the
+    close-out's file, once imported, takes precedence over any snapshot."""
+    path = os.path.join(runs_dir, name)
+    if os.path.exists(path):
+        return path
+    return os.path.join(runs_dir, LIVE_SUBDIR, name)
+
+
 def _read(path):
     if not os.path.exists(path):
         return None
@@ -95,7 +109,7 @@ def arm_record(policy, runs_dir):
               'stage_b_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals.png')),
               'hof_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.png')),
               'hof30k_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.png'))}
-    stage_a = _read(os.path.join(runs_dir, policy + '_evals.json')) or {}
+    stage_a = _read(_measurement(runs_dir, policy + '_evals.json')) or {}
     summary = stage_a.get('summary') or {}
     best30 = summary.get('best_perfect30') or {}
     record.update({
@@ -108,7 +122,7 @@ def arm_record(policy, runs_dir):
         'stage_a_98': stage_a_share(stage_a.get('evals') or [], 98),
         'onset_step': onset(stage_a.get('evals') or []),
     })
-    stage_b = _read(os.path.join(runs_dir, policy + '_checkpoint_evals.json'))
+    stage_b = _read(_measurement(runs_dir, policy + '_checkpoint_evals.json'))
     rows = (stage_b or {}).get('rows') or []
     scores = [r.get('perfect_percent', 0) for r in rows]
     record.update({
