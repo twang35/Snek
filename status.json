@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-04T03:44:54",
-  "ts": 1788518694.251775,
+  "iso": "2026-09-04T03:55:02",
+  "ts": 1788519302.0142891,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b12 | ep1, ep2 -- wave 1 of 5 | training 90% (8 arms)"
+      "b12 | ep1, ep2 | stage B (8 arms)"
     ],
     "queued": [
-      "b12 stage B | ep1, ep2 | queued (8 arms)",
       "b12 training | ep3, ep5, ep6, ep7, ep8, ep10, ep12, ep16 -- waves 2-5 of 5 | queued (32 arms)",
       "b14 training | roll32, roll64, roll192, roll256, roll512, roll1024 -- waves 1-3 of 3 | queued (24 arms)",
       "b14 stage B | roll32, roll64 | queued (8 arms)",
@@ -44,125 +43,33 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
-    "eval": 0
+    "trainer": 0,
+    "eval": 1
   },
   "running": [
     {
-      "id": "b12aa-ep1-seed1",
-      "type": "train",
+      "id": "b12-stageb",
+      "type": "eval",
       "policy": "b12aa-ep1-seed1",
       "policies": [
-        "b12aa-ep1-seed1"
-      ],
-      "pid": 2469147,
-      "step": 46891008,
-      "label": "b12: ep1, seed 1 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 10322.1,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12ab-ep1-seed2",
-      "type": "train",
-      "policy": "b12ab-ep1-seed2",
-      "policies": [
-        "b12ab-ep1-seed2"
-      ],
-      "pid": 2469148,
-      "step": 46874624,
-      "label": "b12: ep1, seed 2 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 11796.5,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12ac-ep1-seed3",
-      "type": "train",
-      "policy": "b12ac-ep1-seed3",
-      "policies": [
-        "b12ac-ep1-seed3"
-      ],
-      "pid": 2469149,
-      "step": 45154304,
-      "label": "b12: ep1, seed 3 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 10813.5,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12ad-ep1-seed4",
-      "type": "train",
-      "policy": "b12ad-ep1-seed4",
-      "policies": [
-        "b12ad-ep1-seed4"
-      ],
-      "pid": 2469150,
-      "step": 43466752,
-      "label": "b12: ep1, seed 4 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 10813.4,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12ae-ep2-seed1",
-      "type": "train",
-      "policy": "b12ae-ep2-seed1",
-      "policies": [
-        "b12ae-ep2-seed1"
-      ],
-      "pid": 2469151,
-      "step": 44761088,
-      "label": "b12: ep2, seed 1 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9338.8,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12af-ep2-seed2",
-      "type": "train",
-      "policy": "b12af-ep2-seed2",
-      "policies": [
-        "b12af-ep2-seed2"
-      ],
-      "pid": 2469152,
-      "step": 44777472,
-      "label": "b12: ep2, seed 2 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 8847.3,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12ag-ep2-seed3",
-      "type": "train",
-      "policy": "b12ag-ep2-seed3",
-      "policies": [
-        "b12ag-ep2-seed3"
-      ],
-      "pid": 2469153,
-      "step": 44089344,
-      "label": "b12: ep2, seed 3 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 8355.6,
-      "elapsed_s": 4819
-    },
-    {
-      "id": "b12ah-ep2-seed4",
-      "type": "train",
-      "policy": "b12ah-ep2-seed4",
-      "policies": [
+        "b12aa-ep1-seed1",
+        "b12ab-ep1-seed2",
+        "b12ac-ep1-seed3",
+        "b12ad-ep1-seed4",
+        "b12ae-ep2-seed1",
+        "b12af-ep2-seed2",
+        "b12ag-ep2-seed3",
         "b12ah-ep2-seed4"
       ],
-      "pid": 2469154,
-      "step": 44253184,
-      "label": "b12: ep2, seed 4 of 4 -- wave 1 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 10813.1,
-      "elapsed_s": 4819
+      "pid": 2612476,
+      "step": 50003968,
+      "label": "",
+      "max_steps": null,
+      "steps_per_sec": 0.0,
+      "elapsed_s": 33
     }
   ],
   "ledger": {
-    "b12-stageb": "queued",
     "b12ai-ep3-seed1": "queued",
     "b12aj-ep3-seed2": "queued",
     "b12ak-ep3-seed3": "queued",
@@ -459,14 +366,15 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b12aa-ep1-seed1": "running",
-    "b12ab-ep1-seed2": "running",
-    "b12ac-ep1-seed3": "running",
-    "b12ad-ep1-seed4": "running",
-    "b12ae-ep2-seed1": "running",
-    "b12af-ep2-seed2": "running",
-    "b12ag-ep2-seed3": "running",
-    "b12ah-ep2-seed4": "running",
+    "b12-stageb": "running",
+    "b12ad-ep1-seed4": "done",
+    "b12ah-ep2-seed4": "done",
+    "b12ag-ep2-seed3": "done",
+    "b12af-ep2-seed2": "done",
+    "b12ae-ep2-seed1": "done",
+    "b12ac-ep1-seed3": "done",
+    "b12ab-ep1-seed2": "done",
+    "b12aa-ep1-seed1": "done",
     "b11-stageb-w3": "done",
     "b11bf-lr2e3-seed4": "done",
     "b11be-lr2e3-seed3": "done",
@@ -802,10 +710,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 140.3,
+  "disk_free_gb": 140.1,
   "load_avg": [
-    14.51513671875,
-    14.48779296875,
-    14.619140625
+    10.46044921875,
+    12.68896484375,
+    13.91064453125
   ]
 }
