@@ -5,6 +5,7 @@ that have historically been wrong, panel selection and the exit condition.
 """
 
 import os
+import sys
 
 import pytest
 
@@ -246,3 +247,19 @@ def test_the_window_binds_no_keyboard_shortcuts():
         assert bound == {}
     # rc_context restored the defaults for the rest of the session.
     assert matplotlib.rcParams['keymap.save']
+
+
+def test_the_services_menu_is_darwin_and_macosx_only():
+    """Off darwin or off the macosx backend there is no NSApplication to hang a menu on."""
+    assert chart_viewer.install_services_menu(platform='linux', backend='macosx') is False
+    assert chart_viewer.install_services_menu(platform='darwin', backend='TkAgg') is False
+
+
+@pytest.mark.skipif(sys.platform != 'darwin', reason='needs the macosx backend')
+def test_the_window_has_a_services_menu_so_a_shortcuts_app_key_equivalent_fires():
+    """A Shortcuts-app keyboard shortcut is a Services key equivalent, dispatched through the
+    front app's Services menu; matplotlib's macosx NSApplication has no menu bar at all."""
+    import matplotlib
+    if matplotlib.get_backend().lower() != 'macosx':
+        pytest.skip('not the macosx backend')
+    assert chart_viewer.install_services_menu() is True

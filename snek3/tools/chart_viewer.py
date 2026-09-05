@@ -257,6 +257,7 @@ class Viewer(object):
         self.shown = []
         self.mtimes = {}
         self.title = title
+        self.services_menu = False
 
     def _build(self, count):
         """Makes the window, then resizes it to the display.
@@ -287,6 +288,10 @@ class Viewer(object):
         handler_id = getattr(self.figure.canvas.manager, 'key_press_handler_id', None)
         if handler_id is not None:
             self.figure.canvas.mpl_disconnect(handler_id)
+        # And a Services menu, so a Shortcuts-app key equivalent still fires with this window in
+        # front. Only after subplots(): that is what creates the NSApplication the menu hangs off.
+        if not self.services_menu:
+            self.services_menu = install_services_menu()
         self.figure.set_size_inches(
             *fit_dims(rows, columns, self.aspect, self.scale, screen_inches(self.figure),
                       panel_width=panel_in, max_width=max_in))
@@ -360,6 +365,72 @@ class Viewer(object):
         while time.time() < deadline:
             self.figure.canvas.flush_events()
             time.sleep(FLUSH_SLICE)
+
+
+def install_services_menu(platform=sys.platform, backend=None):
+    """Gives the window a menu bar with a Services submenu, on the macosx backend only.
+
+    matplotlib's macosx backend makes an NSApplication with **no main menu at all**. That is what
+    broke the user's monitor-input shortcut (2026-09-05): a keyboard shortcut assigned in the Shortcuts
+    app is a macOS *Services* key equivalent, and AppKit dispatches those through the front app's
+    Services menu -- so with this window in front the keystroke matched nothing and was dropped,
+    while Terminal, Chrome and IntelliJ, which all have the menu, ran it. (matplotlib's own key
+    bindings were the first suspect; they are off too, see `disable_keyboard_shortcuts`, but they
+    were never the cause: they act on a key, they do not stop the system seeing it.)
+
+    The menu is the bare minimum AppKit needs to route a Services shortcut -- an app menu holding an
+    empty "Services" submenu registered with `setServicesMenu:`, which AppKit fills itself -- built
+    through the Objective-C runtime with ctypes so the env needs no PyObjC. SDL does the same for its
+    windows. Returns True when the menu was installed; False, having done nothing, off darwin, off the
+    macosx backend, or if the runtime call failed (the window works without it, minus the shortcut).
+    """
+    if platform != 'darwin' or (backend or matplotlib.get_backend()).lower() != 'macosx':
+        return False
+    try:
+        import ctypes
+        objc = ctypes.cdll.LoadLibrary('/usr/lib/libobjc.dylib')
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.objc_getClass.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        send = objc.objc_msgSend
+        send.restype = ctypes.c_void_p
+
+        def cls(name):
+            return objc.objc_getClass(name.encode())
+
+        def sel(name):
+            return objc.sel_registerName(name.encode())
+
+        def msg(receiver, selector, *args):
+            # Every argument here is pointer-sized (an id or a SEL), so one argtypes shape fits.
+            send.argtypes = [ctypes.c_void_p, ctypes.c_void_p] + [ctypes.c_void_p] * len(args)
+            return send(receiver, sel(selector), *args)
+
+        def nsstring(text):
+            send.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p]
+            return send(cls('NSString'), sel('stringWithUTF8String:'), text.encode())
+
+        def menu(title):
+            return msg(msg(cls('NSMenu'), 'alloc'), 'initWithTitle:', nsstring(title))
+
+        def item(title):
+            return msg(msg(cls('NSMenuItem'), 'alloc'), 'initWithTitle:action:keyEquivalent:',
+                       nsstring(title), None, nsstring(''))
+
+        app = msg(cls('NSApplication'), 'sharedApplication')
+        main_menu, app_menu, services = menu(''), menu(''), menu('Services')
+        app_item, services_item = item(''), item('Services')
+        msg(services_item, 'setSubmenu:', services)
+        msg(app_menu, 'addItem:', services_item)
+        msg(app_item, 'setSubmenu:', app_menu)
+        msg(main_menu, 'addItem:', app_item)
+        msg(app, 'setMainMenu:', main_menu)
+        msg(app, 'setServicesMenu:', services)
+        return bool(msg(app, 'servicesMenu'))
+    except Exception as error:  # a missing selector, a changed runtime: the window still works
+        print('services menu not installed: {0!r}'.format(error), flush=True)
+        return False
 
 
 def disable_keyboard_shortcuts(rcparams=matplotlib.rcParams):
