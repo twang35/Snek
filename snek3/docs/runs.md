@@ -19,8 +19,8 @@ desktop and b19 (switches) on wave 2 of 3 on the laptop.** As of 2026-09-05 15:3
 the tables read them against b9's λ 0.99 cell (27.3% density), which made every b15-b17 cell look 8-14 pp short —
 b16's null-check cells included, which were predicted identical to the control. `viewer/references.json` now points
 b15-b21 at `b7aa-b7ad` (17.3%, best30 97.75, 6.2% of evals below 80%), and every reading below is against that.
-**The user's call: leave b18, b20 and b21 queued at 0.98** — consistent with b15-b19, comparable among themselves and
-with b7 — **or regenerate them at 0.99 before they start.** What 0.98 loses is the direct comparison with b11-b14.
+**Decision (user, 2026-09-05): b18, b20 and b21 stay queued at 0.98**, so b15-b21 are one comparable set against b7's
+cell. What 0.98 loses is the direct comparison with b11-b14; the corner grid is where the two sets meet.
 
 **What closed.** b14: density rises with rollout to 512 (38.3%) and stability with it to 1024; 512 joins the corner
 grid. b15: the entropy coefficient trades density for stability monotonically, the anneals average their endpoints,
