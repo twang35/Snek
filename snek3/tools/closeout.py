@@ -1,4 +1,4 @@
-"""A batch's stage-B pass: every arm of a wave, measured in sequence, with a window over it.
+"""A batch's stage-B pass: every arm of a wave, its shards pooled, each arm merged as it ends.
 
     PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --shards 12                  # stage B
     PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --pass hof5000 --shards 12   # its follow-on
@@ -26,8 +26,10 @@ raises — no checkpoints, no upstream file — is reported and skipped the same
 
 **Progress is visible three ways**, and none of them is this file doing work per episode: the wave's
 own `[ 2167/3222] 4 shard(s) alive, 9m elapsed  eta 5m` line, each arm's stage-B PNG — redrawn here
-off the shard files while the wave runs — and the window over those PNGs
-([`eval_window.py`](eval_window.py)), which closes itself when this process ends.
+off the shard files while the wave runs — and the box's chart window, which the **scheduler** points at
+those PNGs while this pass runs (2026-09-05; this file opened its own window before that, and
+`tools/window.py` says why it no longer does). A close-out typed by hand gets no window; queue it as an
+eval spec instead.
 """
 
 import argparse
@@ -37,7 +39,6 @@ import threading
 import time
 
 from tools import eval_wave
-from tools import eval_window
 from tools import stage_b_chart
 
 # How often an arm's PNG is rebuilt from its shard files. A shard writes a row every ~10 s and the
@@ -54,7 +55,7 @@ REDRAW_SECONDS = 20
 #
 # `--pass <name>` is how both boxes ask for one: the desktop daemon dispatches
 # `tools.closeout <arms> --pass hof5000` and carries none of these numbers (see
-# `desktop/runner/launch.py` for why it must not), and `tools/laptop_batch.py` runs the same command.
+# `desktop/runner/launch.py` for why it must not), and `tools/scheduler.py` runs the same command.
 # `stageb` is the close-out's own defaults, so a command that names no pass is unchanged.
 PASSES = {
     'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0},
@@ -148,16 +149,12 @@ def measure_one(policy, episodes=500, width=None, seed=0):
 
 
 def run(policies, selector='screen', episodes=500, shards=4, label=None, width=None, seed=0,
-        resume=True, merge=True, window=True, redraw_interval=REDRAW_SECONDS):
+        resume=True, merge=True, redraw_interval=REDRAW_SECONDS):
     """Measures every arm, shards pooled across them. Returns the last failing arm's status, or 0.
 
     The keyword defaults are `evaluate.py`'s, which are the protocol — `screen:97` at 500 episodes.
     Nothing here has an opinion about them; a caller that wants the protocol passes nothing.
     """
-    # No window for `one`: it writes no pass and there is nothing to draw.
-    if window and selector != 'one':
-        eval_window.ensure(eval_window.chart_paths(policies, label), watch_pids=[os.getpid()])
-
     started = time.time()
     print('=== close-out: {0} arm(s), selector {1}, {2} episodes, {3} shard(s) pooled'.format(
         len(policies), selector, episodes, shards), flush=True)
@@ -301,7 +298,6 @@ def build_parser():
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--no-resume', action='store_true')
     parser.add_argument('--no-merge', action='store_true')
-    parser.add_argument('--no-window', action='store_true')
     return parser
 
 
@@ -309,7 +305,7 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     pass_ = pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed)
     return run(args.policies, pass_['selector'], pass_['episodes'], args.shards, pass_['label'],
-               args.width, pass_['seed'], not args.no_resume, not args.no_merge, not args.no_window)
+               args.width, pass_['seed'], not args.no_resume, not args.no_merge)
 
 
 if __name__ == '__main__':

@@ -4,44 +4,31 @@ Its own process, so if it dies — a Tk error, an OOM kill — nothing it was wa
 separation is the whole design: snek2's in-process cv2 window took down all four desktop arms at once
 with one fatal XIO error.
 
-    PYTHONPATH=. python -m tools.chart_viewer --runs-dir runs        # every training on this box
-    PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/b48*.png' --watch-pid 8123,8124,8125
+    PYTHONPATH=. python -m tools.chart_viewer --follow runs/.live/.status.json   # what the scheduler opens
     PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/*_checkpoint_evals_*.png' --interval 5
-    PYTHONPATH=. python -m tools.chart_viewer runs/b1*.png --scale 0.6   # a smaller window
+    PYTHONPATH=. python -m tools.chart_viewer runs/b1*.png --scale 0.6            # a smaller window
+
+**`--follow` is the box's window, and the scheduler is the only thing that opens it** (2026-09-05).
+The viewer re-reads that JSON file every refresh and draws its `panels` — the PNG paths the scheduler
+says are running — so the panels change as the box moves from a training wave to a stage-B pass with
+no restart and no rule of this file's own about what is live. It exits when the scheduler that
+started it is gone (the parent pid changes), or when the scheduler ends it, or when the user closes
+it. That replaces an `flock` slot, a live-arm registry, a pid watch with three negative checks and a
+stand-by loop, each of which was a rule this process had to get right about processes it could not
+see; `tools/window.py` says what went wrong with each.
+
+Explicit paths and `--glob` remain for looking at arbitrary charts. Neither claims anything, so an
+agent looking at old charts is never refused because a window is up.
 
 The window fills the display it opens on. `--scale` is a fraction of that, not a number of inches —
 see `fit_dims`.
-
-**Every training asks for this, and there is one per box.** Asking is idempotent because *this*
-process takes an exclusive `flock` on the slot at startup and the losers exit before they draw — see
-`take_window_slot`, and `tools/chart_window.py` for the launcher side, which now owns no exclusion at
-all. snek2 spent ~500 lines on that problem (a process registry, a grace period, an `O_EXCL` claim
-lock, `pgrep` corroboration, zombie detection and a dedupe, every line a dated scar) and snek3's
-first attempt spent ~60 and opened five windows on the desktop on 2026-08-29. The kernel does it in
-one call that cannot be won twice and needs no cleanup.
-
-**The normal mode is `--runs-dir`**, which shows the trainings registered in `runs/.live/`. Panels
-appear as arms start and **stay for the rest of the wave** once they do, so a batch with one arm left
-still shows all four; the window closes itself, panels and all, once the box has been idle for
-`IDLE_CLOSE_SECONDS`. `tools/chart_window.py` is what starts it that way. Explicit paths and
-`--glob` remain for looking at arbitrary charts.
-
-`--watch-pid` is the same idea applied to the exit condition. snek2 asked `pgrep -f <pattern>`
-whether training was still running, which is unsafe twice over: the invoking shell's own command line
-contains the pattern, and `pgrep` exits 0 on a match, 1 on no match and **>=2 on an error** while all
-three print nothing — so a *failed* check read as the strongest possible "nothing is running" and
-closed a live window with five hours left. Here the launcher passes the pids it started. `ps -p` on a
-known set needs no pattern, cannot match itself, and an error is distinguishable from an empty
-answer; on top of that a negative answer must repeat `NEGATIVE_CHECKS` times before the window
-closes.
 """
 
 import argparse
-import fcntl
 import glob as globmod
+import json
 import os
 import signal
-import subprocess
 import sys
 import time
 
@@ -52,18 +39,8 @@ import matplotlib
 # Figure/FigureCanvasAgg object API instead, because pyplot's global manager keeps artists alive.
 import matplotlib.pyplot as plt
 
-from tools import live_runs
-
 DEFAULT_INTERVAL = 2.0
 DEFAULT_MAX_PANELS = 8
-# A negative liveness answer has to repeat before it is believed. One is a race against a launcher
-# that has not spawned its trainers yet, or a `ps` that lost.
-NEGATIVE_CHECKS = 3
-# How long the window stays up after the last training on the box finishes. It is not zero, because a
-# batch's next wave starts seconds to minutes after the previous one drains and closing the window in
-# that gap would mean reopening it — and it is not never, because a box that has stopped training
-# should not be holding a window open on a chart that stopped moving.
-IDLE_CLOSE_SECONDS = 300
 # Never `plt.pause`: it runs a nested event loop and re-enters the draw, which on the Tk backend
 # deadlocks against a resize. `flush_events` plus a plain sleep does the same job.
 FLUSH_SLICE = 0.05
@@ -125,6 +102,28 @@ def panels(paths, glob_pattern, max_panels):
     return sorted(chosen)
 
 
+def follow_panels(status_path):
+    """The `panels` the scheduler's status file names, or None if the file cannot be read right now.
+
+    None rather than an empty list, so a file caught mid-write (the scheduler replaces it atomically,
+    but a reader on an unrelated clock can still miss) keeps the previous panels up instead of
+    blanking the window for one refresh. A file that *says* no panels is an empty list.
+    """
+    try:
+        with open(status_path) as handle:
+            status = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(status, dict):
+        return None
+    return [str(path) for path in (status.get('panels') or [])]
+
+
+def parent_gone(original_ppid):
+    """Whether the process that started this window has exited. The parent pid changes on reparenting."""
+    return os.getppid() != original_ppid
+
+
 def grid_shape(count):
     """Rows and columns for `count` panels, wide rather than tall — charts are wide."""
     if count <= 1:
@@ -136,37 +135,6 @@ def grid_shape(count):
     if count <= 6:
         return 2, 3
     return 3, 3
-
-
-def pids_alive(pids):
-    """Whether any of `pids` is still running: True, False, or None for "could not tell".
-
-    Three outcomes, not two. A `ps` that failed prints nothing on stdout, exactly like a `ps` that
-    found nothing, and treating the first as the second is what closed a live window in snek2.
-
-    **A full `ps -A` scan, not `ps -p <list>`.** macOS `ps -p` rejects the entire request if any one
-    pid in the list is invalid — `ps -p 999991,<live pid>` exits 1 with no output — so a wave whose
-    first shard had finished would have read as "all four are gone" and closed the window on the
-    three still running. One scan of every pid has no such edge, and it costs the same.
-
-    A zombie does not count as alive. `os.kill(pid, 0)` would have been shorter and would have said
-    it was: an unreaped child answers signal 0 for as long as its parent ignores it.
-    """
-    if not pids:
-        return None
-    wanted = {str(int(pid)) for pid in pids}
-    try:
-        result = subprocess.run(['ps', '-Ao', 'pid=,stat='],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    except OSError:
-        return None
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.decode('utf-8', 'replace').splitlines():
-        fields = line.split()
-        if len(fields) >= 2 and fields[0] in wanted and not fields[1].startswith('Z'):
-            return True
-    return False
 
 
 def viewer_dpi(platform, override=None):
@@ -390,199 +358,28 @@ class Viewer(object):
             time.sleep(FLUSH_SLICE)
 
 
-def live_panels(runs_dir, prune=True):
-    """`(arms, chart_paths)` for the trainings registered in `runs_dir`.
-
-    Two values because they answer different questions and the difference matters: the **arms** are
-    what decides whether the window should still be up, and the **paths** are what it draws. An arm
-    that has just started is in the first and not yet in the second, which is why the exit condition
-    is never "no panels" — that would close the window on a wave whose trainers were still importing
-    torch.
-    """
-    arms = live_runs.live(runs_dir, prune)
-    paths = []
-    for policy, _ in arms:
-        path = os.path.join(runs_dir, policy + '.png')
-        if os.path.exists(path):
-            paths.append(path)
-    return arms, paths
-
-
-def wave_panels(known, live_paths, new_wave):
-    """The panels to show: the live arms **plus the ones that already finished**.
-
-    Sticky on purpose. A batch is read as a batch — with one arm left of four, a glance should still
-    show all four, because what the three finished ones did is most of the answer. So a panel is
-    added when an arm appears and never removed while the wave lasts.
-
-    `new_wave` is what stops that from accumulating forever: when the registry has been empty and an
-    arm appears again, the previous wave's panels go. Without it a batch launched inside the idle
-    grace would draw its predecessor's charts beside its own — which is how snek2 came to open a
-    window with **eight panels for four arms**, by a different route (a 12 h TTL) but the same
-    mistake of never deciding when one wave ends.
-
-    The order is append order and does not matter: `panels` sorts by path, because ordering the panel
-    list by anything that moves is what made the window flash.
-    """
-    known = [] if new_wave else list(known)
-    for path in live_paths:
-        if path not in known:
-            known.append(path)
-    return known
-
-
-def idle_close(arms, seen_arms, empty_since, now):
-    """`(seen_arms, empty_since, close)` for one refresh of a `--runs-dir` window.
-
-    The state machine is three lines and one of them is the whole point: **`close` is never True
-    before an arm has been seen.** A window opened by hand a minute before a batch launches, or one
-    whose first trainer is still importing torch, has an empty registry for reasons that have nothing
-    to do with the box being idle — and closing for that would make the window useless exactly when
-    someone is watching for a run to start.
-    """
-    if arms:
-        return True, None, False
-    if not seen_arms:
-        return False, None, False
-    empty_since = now if empty_since is None else empty_since
-    return True, empty_since, now - empty_since >= IDLE_CLOSE_SECONDS
-
-
-def take_window_slot(runs_dir, slot=None):
-    """Takes a window slot, or returns None if another window already holds it.
-
-    `slot` names which one — the training window's by default, and the eval window passes its own.
-
-    **This is the whole of the mutual exclusion, and the kernel is what enforces it.** An `flock` is
-    held by one open file description at a time, is released by the kernel when its holder dies for
-    any reason, and leaves nothing behind that a later window has to recognise as stale. So the three
-    cases that broke the launcher-side claim protocol it replaced — a slot file created but not yet
-    written, a slot file holding a dead pid, and two launchers taking over the same dead slot in the
-    same microsecond — stop being cases at all.
-
-    Measured on 2026-08-29, before this existed: eight arms launched together opened a mean of 6.6
-    windows, and the desktop opened five. Eight racers against this open one, every time.
-
-    The pid is written *after* the lock is won, so it is always a real window's pid — that is what
-    `chart_window.holder` reads to skip a spawn it does not need. Losing is not a failure and neither
-    is a filesystem that cannot lock: a box that cannot take the slot still gets its window, which is
-    the failure direction to prefer for something disposable.
-    """
-    path = live_runs.window_lock_path(runs_dir, slot)
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
-    except OSError:
-        return True                       # cannot lock, so draw rather than refuse
-    try:
-        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        os.close(descriptor)
-        return None
-    except (AttributeError, NameError):   # pragma: no cover - no flock on this platform
-        return True
-    try:
-        os.truncate(descriptor, 0)
-        os.write(descriptor, '{0}\n'.format(os.getpid()).encode('utf-8'))
-    except OSError:
-        pass
-    # The descriptor is deliberately never closed. The lock lives as long as it is open, which is as
-    # long as this process, and `Viewer.exit_now` leaves via `os._exit` — so there is no close path to
-    # get wrong and nothing to release by hand.
-    return descriptor
-
-
-STANDBY_POLL_SECONDS = 1.0
-
-
-def stand_by_for_slot(runs_dir, slot, watch_pids, poll=STANDBY_POLL_SECONDS, sleep=time.sleep):
-    """Keeps asking for a slot another window holds, until it is free or this pass is over.
-
-    Returns what `take_window_slot` returns once it wins, or None once the watched pids are gone.
-
-    **This exists because the previous window outlives the pass it was opened for.** A stage-B window
-    closes `NEGATIVE_CHECKS` refreshes after its close-out exits — up to a minute — and the desktop's
-    daemon dispatches the next pass within its 30 s poll, so the next close-out's window almost always
-    arrives while the last one is still up. Found 2026-09-04: b15's stage-B window closed at 17:50:52,
-    b11's hof5000 pass started at 17:50:48, asked once, was told a window was up, and ran its first
-    hour with no window at all. Lingering here costs one idle process for under a minute, and when
-    the holder leaves — however it leaves, since the lock is the kernel's — the next `LOCK_NB` wins.
-
-    Only a window with pids to watch stands by, because those are what bound the wait: the pass it
-    was opened for. A training window (`--runs-dir`) has no such pids and no such need — the one
-    window shows every arm on the box, so a loser there has nothing to wait for.
-    """
-    negatives = 0
-    while True:
-        negatives, gone = watch_step(watch_pids, negatives)
-        if gone:
-            return None
-        descriptor = take_window_slot(runs_dir, slot)
-        if descriptor is not None:
-            return descriptor
-        sleep(poll)
-
-
-def watch_step(watch_pids, negatives):
-    """One check of the watched pids. Returns `(negatives, close)`.
-
-    A single negative is a race with a launcher that has not spawned yet, or a lost `ps`, so it has
-    to repeat `NEGATIVE_CHECKS` times before it is believed; anything but a negative resets the count.
-    Pulled out of `run` so that **both** of its branches call it — see below.
-    """
-    if not watch_pids:
-        return negatives, False
-    if pids_alive(watch_pids) is False:
-        negatives += 1
-        return negatives, negatives >= NEGATIVE_CHECKS
-    return 0, False
-
-
-def run(paths, glob_pattern=None, watch_pids=(), interval=DEFAULT_INTERVAL,
+def run(paths, glob_pattern=None, follow=None, interval=DEFAULT_INTERVAL,
         max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None,
-        runs_dir=None, now=time.time, max_width_px=DEFAULT_MAX_WIDTH_PX):
+        max_width_px=DEFAULT_MAX_WIDTH_PX):
     viewer = Viewer(title, interval, max_panels, scale, dpi, max_width_px)
     plt.ion()
-    negatives = 0
-    seen_arms = False
-    empty_since = None
-    known = []
-    # Whether the registry was empty last time round, which is how a *new* wave is told from an arm
-    # joining the one already running.
-    was_idle = False
+    parent = os.getppid()
+    followed = []
     while True:
-        found = list(paths)
-        if runs_dir is not None:
-            arms, live_paths = live_panels(runs_dir)
-            known = wave_panels(known, live_paths, new_wave=bool(arms) and was_idle)
-            was_idle = not arms
-            # The finished arms stay up, including through the idle grace before the window closes:
-            # the last thing a batch shows is all of its arms, not none of them.
-            found.extend(known)
-            seen_arms, empty_since, close = idle_close(arms, seen_arms, empty_since, now())
-            if close:
-                print('no training running for {0:.0f}s; closing'.format(now() - empty_since))
+        if follow is not None:
+            if parent_gone(parent):
+                print('the scheduler that opened this window is gone; closing', flush=True)
                 viewer.exit_now(0)
+            fresh = follow_panels(follow)
+            if fresh is not None:
+                followed = fresh
+        found = list(paths) + list(followed)
 
         if not viewer.refresh(panels(found, glob_pattern, max_panels)):
             if viewer.figure is None:
-                # **The watched pids are checked here too.** Until 2026-09-03 this branch `continue`d
-                # straight past the check below, so a close-out that produced no chart at all — b10's
-                # first stage-B wave screened zero checkpoints and finished in 1.3 min — left its window
-                # waiting for a PNG forever, holding the eval slot's lock, and every later stage-B window
-                # on the box lost that lock and drew nothing. 15 hours and six waves without a window.
-                negatives, close = watch_step(watch_pids, negatives)
-                if close:
-                    print('watched pids gone before anything appeared; closing')
-                    viewer.exit_now(0)
-                print('nothing to show yet: {0}'.format(glob_pattern or runs_dir or paths))
+                print('nothing to show yet: {0}'.format(glob_pattern or follow or paths), flush=True)
                 time.sleep(interval)
                 continue
-
-        negatives, close = watch_step(watch_pids, negatives)
-        if close:
-            print('watched pids gone after {0} checks; closing'.format(negatives))
-            viewer.exit_now(0)
 
         if not plt.get_fignums():
             # The user closed the window. That is an instruction, not a failure.
@@ -595,18 +392,12 @@ def main(argv=None):
     parser.add_argument('paths', nargs='*', help='PNG paths to show')
     parser.add_argument('--glob', dest='glob_pattern', default=None,
                         help='pattern re-expanded every refresh, so new charts appear')
-    parser.add_argument('--runs-dir', default=None,
-                        help='show the trainings registered in this runs directory: a panel appears '
-                             'when an arm starts and stays for the rest of the wave, and the window '
-                             'closes once none has been running for a while')
-    parser.add_argument('--watch-pid', default='',
-                        help='comma-separated pids; the window closes once none of them is alive')
+    parser.add_argument('--follow', default=None, metavar='STATUS_JSON',
+                        help="draw the `panels` this file names, re-read every refresh; exit when the "
+                             'process that opened this window is gone. What the scheduler passes')
     parser.add_argument('--interval', type=float, default=DEFAULT_INTERVAL)
     parser.add_argument('--max-panels', type=int, default=DEFAULT_MAX_PANELS)
     parser.add_argument('--title', default='snek3 charts')
-    parser.add_argument('--slot', default=None,
-                        help='claim this window slot, so a second one stands down rather than '
-                             'opening beside it. Implied by --runs-dir')
     parser.add_argument('--scale', type=float, default=DEFAULT_SCALE,
                         help='fraction of the screen to fill; 1.0 is as large as it goes')
     parser.add_argument('--dpi', type=int, default=None,
@@ -616,44 +407,14 @@ def main(argv=None):
                              'window is already capped at the source charts own width, so this is '
                              'for holding it smaller than that')
     args = parser.parse_args(argv)
-    if not args.paths and not args.glob_pattern and args.runs_dir is None:
-        parser.error('give PNG paths, --glob or --runs-dir')
-    pids = [int(token) for token in args.watch_pid.split(',') if token.strip()]
-    # **Only a window that claims a slot is a singleton**, and there are exactly two kinds: the
-    # training window, which shows the box's live registry (`--runs-dir`), and a window that names a
-    # slot outright (`--slot`, which is how the eval window gets one of its own). An agent looking at
-    # arbitrary charts with `--glob` or a path list is neither, and must never be refused because a
-    # window is up.
-    slot = args.slot or (live_runs.WINDOW_LOCK_NAME if args.runs_dir is not None else None)
-    if slot:
-        descriptor = take_window_slot(args.runs_dir, slot)
-        if descriptor is None and pids:
-            # A window opened for a pass waits for the slot rather than giving it up: the holder is
-            # most often the previous pass's window in its closing grace. See `stand_by_for_slot`.
-            print('a window is already up on slot {0} (pid {1}); standing by until it closes or '
-                  'pid(s) {2} end'.format(
-                      slot, live_runs.read(live_runs.window_lock_path(args.runs_dir, slot)),
-                      args.watch_pid), flush=True)
-            descriptor = stand_by_for_slot(args.runs_dir, slot, pids)
-            if descriptor is None:
-                print('pid(s) {0} ended before the slot came free; nothing to do'.format(
-                    args.watch_pid), flush=True)
-                return 0
-        if descriptor is None:
-            # Every arm of a wave asks for the training window, so this is the ordinary outcome for
-            # all but one of them and not a failure. Said out loud anyway: it lands in the log of the
-            # arm whose spawn lost, where the alternative is a viewer that vanished with no
-            # explanation.
-            print('a window is already up on slot {0} (pid {1}); nothing to do'.format(
-                slot, live_runs.read(live_runs.window_lock_path(args.runs_dir, slot))), flush=True)
-            return 0
-        # Printed here rather than by the launcher, because only the process holding the slot knows
-        # that it is the window. It goes to the stdout of whoever spawned it, which is the log of the
-        # arm that opened it.
-        print('{0}: pid {1}. Killing it does not affect any run, and no run reopens '
-              'it.'.format(args.title, os.getpid()), flush=True)
-    run(args.paths, args.glob_pattern, pids, args.interval, args.max_panels, args.title,
-        args.scale, args.dpi, args.runs_dir, max_width_px=args.max_width_px)
+    if not args.paths and not args.glob_pattern and args.follow is None:
+        parser.error('give PNG paths, --glob or --follow')
+    if args.follow is not None:
+        print('{0}: pid {1}, following {2}. Killing it does not affect any run; the scheduler '
+              'reopens it at its next launch, or now with `tools.scheduler --reopen-window`.'.format(
+                  args.title, os.getpid(), args.follow), flush=True)
+    run(args.paths, args.glob_pattern, args.follow, args.interval, args.max_panels, args.title,
+        args.scale, args.dpi, max_width_px=args.max_width_px)
     return 0
 
 

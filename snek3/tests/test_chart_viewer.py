@@ -1,11 +1,10 @@
-"""Fixtures for the chart viewer's decision logic — which panels, and when to close.
+"""Fixtures for the chart viewer's decision logic — which panels, and what it follows.
 
 Nothing here opens a window: the drawing is matplotlib's and the parts worth pinning are the two
-that have historically been wrong, panel selection and the liveness answer.
+that have historically been wrong, panel selection and the exit condition.
 """
 
 import os
-import subprocess
 
 import pytest
 
@@ -203,98 +202,35 @@ def test_grid_shape_stays_wide_and_always_has_room(tmp_path):
         assert columns >= rows, 'charts are wide, so the grid should be too'
 
 
-def test_a_live_pid_reads_as_alive():
-    assert chart_viewer.pids_alive([os.getpid()]) is True
+def test_follow_panels_reads_what_the_scheduler_wrote(tmp_path):
+    import json
+    status = str(tmp_path / '.status.json')
+    with open(status, 'w') as handle:
+        json.dump({'panels': ['runs/a.png', 'runs/b.png']}, handle)
+    assert chart_viewer.follow_panels(status) == ['runs/a.png', 'runs/b.png']
+    with open(status, 'w') as handle:
+        json.dump({'panels': []}, handle)
+    assert chart_viewer.follow_panels(status) == [], 'a file that says nothing is running says so'
 
 
-def test_no_live_pid_reads_as_not_alive():
-    assert chart_viewer.pids_alive([999_991, 999_992]) is False
+def test_follow_panels_is_none_on_a_torn_or_missing_read_so_the_last_panels_stay(tmp_path):
+    status = str(tmp_path / '.status.json')
+    assert chart_viewer.follow_panels(status) is None
+    with open(status, 'w') as handle:
+        handle.write('{"panels": [')
+    assert chart_viewer.follow_panels(status) is None
 
 
-def test_one_live_pid_among_dead_ones_still_reads_as_alive():
-    # The bug this pins: macOS `ps -p 999991,<live>` rejects the whole list and prints nothing, so
-    # asking that way closed the window on three running shards as soon as the first finished.
-    assert chart_viewer.pids_alive([999_991, os.getpid()]) is True
+def test_parent_gone_is_the_exit_condition_for_a_followed_window():
+    assert chart_viewer.parent_gone(os.getppid()) is False
+    assert chart_viewer.parent_gone(-1) is True
 
 
-def test_no_pids_to_watch_is_unanswerable_not_negative():
-    assert chart_viewer.pids_alive([]) is None
-
-
-def test_a_failed_scan_is_unanswerable_not_negative(monkeypatch):
-    # `ps` printing nothing because it failed must never read the same as `ps` finding nothing.
-    def failed(*args, **kwargs):
-        return subprocess.CompletedProcess(args, returncode=2, stdout=b'')
-    monkeypatch.setattr(chart_viewer.subprocess, 'run', failed)
-    assert chart_viewer.pids_alive([os.getpid()]) is None
-
-
-def test_a_ps_that_cannot_be_launched_is_unanswerable(monkeypatch):
-    def raises(*args, **kwargs):
-        raise OSError('no ps')
-    monkeypatch.setattr(chart_viewer.subprocess, 'run', raises)
-    assert chart_viewer.pids_alive([1]) is None
-
-
-def test_a_zombie_does_not_count_as_alive(monkeypatch):
-    def scanned(*args, **kwargs):
-        return subprocess.CompletedProcess(args, returncode=0, stdout=b'  4242 Z+\n     1 Ss\n')
-    monkeypatch.setattr(chart_viewer.subprocess, 'run', scanned)
-    assert chart_viewer.pids_alive([4242]) is False
-    assert chart_viewer.pids_alive([1]) is True
-
-
-def test_a_negative_answer_has_to_repeat_before_it_is_believed():
-    # One negative is a race with a launcher that has not spawned yet, or a lost `ps`.
-    assert chart_viewer.NEGATIVE_CHECKS > 1
-
-
-def test_watch_step_counts_negatives_and_resets_on_anything_else(monkeypatch):
-    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: False)
-    n, close = chart_viewer.watch_step([1], 0)
-    assert (n, close) == (1, False)
-    n, close = chart_viewer.watch_step([1], chart_viewer.NEGATIVE_CHECKS - 1)
-    assert (n, close) == (chart_viewer.NEGATIVE_CHECKS, True)
-    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: None)     # could not tell
-    assert chart_viewer.watch_step([1], 2) == (0, False)
-    assert chart_viewer.watch_step([], 2) == (2, False)                     # nothing to watch
-
-
-class _NoFigureViewer(object):
-    """A viewer that never gets a chart to draw — the b10 wave-1 shape."""
-    def __init__(self, *args, **kwargs):
-        self.figure = None
-        self.exited = None
-
-    def refresh(self, paths):
-        return False
-
-    def exit_now(self, status):
-        self.exited = status
-        raise SystemExit(status)
-
-    def sleep(self):
-        pass
-
-
-def test_a_window_that_never_gets_a_chart_still_closes_when_its_closeout_is_gone(monkeypatch):
-    """b10-stageb, 2026-09-02: zero checkpoints screened, no PNG ever written, the window lived 15 h
-    holding the eval slot's lock and six later waves drew nothing. The wait-for-a-chart branch has to
-    watch the pids too."""
-    monkeypatch.setattr(chart_viewer, 'Viewer', _NoFigureViewer)
-    monkeypatch.setattr(chart_viewer.plt, 'ion', lambda: None)
-    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: False)
-    monkeypatch.setattr(chart_viewer.time, 'sleep', lambda s: None)
-    loops = {'n': 0}
-    real_panels = chart_viewer.panels
-
-    def counting_panels(*args, **kwargs):
-        loops['n'] += 1
-        if loops['n'] > 50:
-            raise AssertionError('the window never closed')
-        return real_panels(*args, **kwargs)
-    monkeypatch.setattr(chart_viewer, 'panels', counting_panels)
-    with pytest.raises(SystemExit) as info:
-        chart_viewer.run(['/nonexistent/never-drawn.png'], watch_pids=[999999], interval=0)
-    assert info.value.code == 0
-    assert loops['n'] == chart_viewer.NEGATIVE_CHECKS
+def test_the_viewer_claims_no_slot_and_watches_no_pids():
+    """What was deleted on 2026-09-05, pinned absent: the viewer draws what it is told and exits when
+    its owner is gone. Every lifecycle rule it used to hold about other processes is the scheduler's."""
+    import inspect
+    source = inspect.getsource(chart_viewer)
+    for gone in ('fcntl', 'take_window_slot', 'stand_by_for_slot', 'watch_pids', 'NEGATIVE_CHECKS',
+                 'from tools import live_runs'):
+        assert gone not in source, gone

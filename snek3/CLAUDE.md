@@ -61,9 +61,8 @@ PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 12  # a whole batc
 PYTHONPATH=. python -u -m tools.closeout <policy...> --pass hof5000 --shards 12  # its hof5000 re-measure; --pass hof30k after that
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
-PYTHONPATH=. python -m tools.chart_window                # the box's chart window, if it is not up
-PYTHONPATH=. python -m tools.eval_window --watch-pid <close-out pid>   # the box's stage-B window, if it is
-                                                         # not up; without the pid it never closes itself
+PYTHONPATH=. python -m tools.scheduler --queue logs/laptop-queue/   # the box's queue: waves, passes, window
+PYTHONPATH=. python -m tools.scheduler --reopen-window   # a fresh chart window from the running scheduler
 ```
 
 **The snek2 champion converts in one command**, and is the reference policy for any A/B:
@@ -93,12 +92,11 @@ Launching is [`skills/laptop-run`](skills/laptop-run/SKILL.md).
 round trip to the window server, not our drawing code. `watch.py` and `record_gif.py` are the only
 ways to see a game, and they run in their own processes so they cost training nothing.
 
-**It does open a chart window, and there is exactly one per box** — the mechanism, the `flock` that
-makes "one" true, and why the launcher must hold no lock are in the root
-[`../CLAUDE.md`](../CLAUDE.md). What matters here: nothing needs launching by hand, the window is
-disposable and the training is not, and `SNEK_CHART_WINDOW=0` turns it off (which is what the test
-suite and every benchmark do). A stage-B pass takes its own slot, so a box can show a batch training
-and a batch being measured at once.
+**It opens no window.** The box's one chart window is the **scheduler's** (`tools/scheduler.py`, via
+`tools/window.py`): opened when it launches a wave or a pass, pointed at the wave's charts and then the
+pass's through the scheduler's own status file, closed when it exits. Why the arms must not open one
+again is in the root [`../CLAUDE.md`](../CLAUDE.md) and [`plans/scheduler.md`](plans/scheduler.md).
+`SNEK_CHART_WINDOW=0` turns it off (which is what the test suite and every benchmark do).
 
 ## The eval protocol is one stage
 
@@ -114,7 +112,7 @@ is absent, not null with a number to check. What follows stage B is not a stage:
 takes every row at ≥99/500 to 5,000 episodes, and `hof30k` takes every hof5000 row at ≥99/5,000 to
 30,000 on seed 7, a seed no selecting pass used — each a separately labelled file beside the
 stage-B one, never in place of it. **Every batch gets all three automatically** (2026-09-04): the
-desktop daemon and `tools/laptop_batch.py` both run `tools.closeout <arms> --pass hof5000` then
+desktop daemon and `tools/scheduler.py` both run `tools.closeout <arms> --pass hof5000` then
 `--pass hof30k` after a wave's stage B, and the presets are `closeout.PASSES`.
 
 Four consequences worth holding on to:
@@ -222,7 +220,8 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
 | `tools/closeout.py` | **a batch's pass, one process: every arm's shards pooled under `--shards`**, each arm merged as it ends. `--pass hof5000` / `hof30k` for the two re-measures. What the desktop dispatches and what an agent types here |
-| `tools/laptop_batch.py` | **a batch of desktop specs, run here the way the daemon would**: waves of 8, each followed by its stage B, hof5000 and hof30k as `<batch>-stageb`, `<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ... `--queue logs/laptop-queue/` runs every batch directory under it in name order, rescanning between batches, and exits when none has work — the laptop's queue without a daemon. Resumable; skips a pass every arm already has the file for; adopts a live arm rather than relaunching it; never a ninth trainer. **Publishes what it is doing to the `laptop-status` branch** (`tools/laptop_status.py`) on every event and every ten minutes; the desktop daemon folds that into `ops-status` as `at_a_glance.laptop_running` / `laptop_queued` / `laptop_iso`, so one `status.json` shows both boxes. `skills/laptop-run` has the commands |
+| `tools/scheduler.py` | **the scheduler, both boxes**: batches of desktop specs in waves of 8, each followed by its stage B, hof5000 and hof30k as `<batch>-stageb`, `<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...; an `eval` spec in a batch directory runs once after the waves. `--queue <dir>` runs every batch directory under it in name order, rescanning between batches, and exits when none has work. State is the filesystem: resumable, skips a pass every arm already has the file for, adopts a live arm rather than relaunching it, never a ninth trainer, marks a failed pass `.failed-<id>` beside its specs. **Owns the box's chart window and starts the wave's eval workers.** Publishes its status to `runs/.live/.status.json` and (laptop) the `laptop-status` branch; the desktop daemon folds that into `ops-status` as `at_a_glance.laptop_*`. `skills/laptop-run` has the commands |
+| `tools/window.py` | the scheduler's window: open on a launch, close on exit, reopen on request, kill a stale predecessor. The only opener |
 | `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
 | `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |
 | `tools/eval_plan.py` | a measured checkpoint as a result row, plus the Wilson interval |
@@ -230,12 +229,10 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/run_report.py` | stage-A history, its summary block, and `runs/<policy>.md` |
 | `tools/progress_chart.py` | `runs/<policy>.png` — one arm's stage-A history |
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
-| `tools/chart_viewer.py` | a live grid of chart PNGs. Reads them, never writes and never trains |
+| `tools/chart_viewer.py` | a live grid of chart PNGs; `--follow` draws what the scheduler's status file names. Reads, never writes, never trains |
 | `tools/viewer_manifest.py` | `viewer/manifest.js`: every arm reduced to the docs tables' numbers, for the web viewer |
 | `tools/publish_pages.py` | rebuilds the repository's top-level `docs/` — the GitHub-Pages site — from `viewer/` and `runs/`. First step of every progress update |
-| `tools/chart_window.py` | the box's window launcher: who opens one, and why killing it is free |
-| `tools/eval_window.py` | the stage-B window — the same viewer and the same launcher, its own slot |
-| `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm |
+| `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm; beside them the scheduler's `.status.json` and `.reopen-window` |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
 | `tools/prune_runs.py` | reclaims disk from finished work: a merged pass's duplicate shard files, the two dead per-episode arrays, and a closed arm's checkpoints below a stage-B threshold. Dry run by default |
 | `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |

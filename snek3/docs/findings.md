@@ -861,6 +861,17 @@ pass ends (`chart_viewer.stand_by_for_slot`). The wait is bounded by the watched
 else, so there is no grace constant to tune against the daemon's poll. The training window is
 unchanged: its losers have no pass of their own and still exit in 0.3 s.
 
+**Version 4, 2026-09-05: the scheduler owns it, and versions 1-3 were all answers to the wrong
+question.** Version 1 was rejected because the daemon "is not what knows a training is happening" — but
+by 2026-09-05 every arm on both boxes was launched by a scheduler (the daemon, or the laptop's queue
+driver), so the scheduler *is* what knows. With the arms opening the window, every lifecycle question
+was settled between peers, and each gap grew a rule: the flock (v3), the pid watch, the "no chart yet"
+branch that forgot to watch (15 h on the eval slot, 2026-09-03), the stand-by loop (2026-09-04), the
+zombie check. Now the scheduler spawns one viewer, holds its `Popen`, writes the panels into its own
+status file, and closes it on exit; the viewer follows that file and exits if its parent is gone. The
+flock, the registry read, the pid watch and the stand-by loop are deleted, and so is the second slot:
+one window shows a wave's charts and then the pass's. Design and decisions: `plans/scheduler.md`.
+
 **Panels are sticky within a wave**, added 2026-08-29 at the user's request and for the right reason:
 a batch is read as a batch, so with one arm left of four the other three are most of the answer. That
 needs a rule for when a wave *ends*, or the set grows forever — here, the registry going empty and an

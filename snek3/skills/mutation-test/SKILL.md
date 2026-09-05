@@ -37,7 +37,6 @@ mutant counts as killed** — the tests noticed.
 |---|---:|---|
 | `tests/mut_ppo.json` | 14 | `ppo/` — GAE's episode gate, `min` vs `max`, the entropy sign, the ratio's direction, γ/λ order, the bootstrap's state |
 | `tests/mut_seam.json` | 15 | the `train.py` algorithm seam and `dqn/algo.py` |
-| `tests/mut_window.json` | 20 | the chart window's `flock`, the viewer, `closeout.py`, the desktop runner |
 | `tests/mut_trans.json` | 8 | the `transitions` column, prefill to summary block |
 | `tests/mut_shaping.json` | 3 | `shaping_discount` reaching the collect env |
 

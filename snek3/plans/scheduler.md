@@ -1,6 +1,6 @@
 # One scheduler, and it owns the window — design proposal (2026-09-05)
 
-Status: **proposal, for discussion.** Nothing here is built. Section 0 is the argument, 1–3 are the
+Status: **approved 2026-09-05; phase 1 and phase 3 built the same day (laptop), phase 2 in progress (desktop).** Section 0 is the argument, 1–3 are the
 design, 4 is the phasing, 5 is what is deliberately left alone, 6 is the open questions.
 
 ## 0. What is wrong, in one sentence each

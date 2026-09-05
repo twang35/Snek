@@ -61,8 +61,9 @@ kill -9 $(pgrep -P "$PID") "$PID"
 
 | you killed | it orphans | what to do |
 |---|---|---|
-| a **trainer** | its 6 `tools.eval_worker` processes and its chart viewer (measured: all 7 reparented to pid 1) | they **exit after 300 s idle** on their own. Kill them only to free the cores now, and only by pid |
-| a **close-out or eval wave** | its `tools.shard` processes — 16 orphans held ~3.7 GB once — and its chart viewer | kill them by pid; nothing merges their files without the controller |
+| a **trainer** | nothing of its own under the scheduler (the workers and the viewer are the scheduler's); a bare `train.py` orphans its `tools.eval_worker` processes | workers **exit after 300 s idle** on their own. Kill them only to free the cores now, and only by pid |
+| a **close-out or eval wave** | its `tools.shard` processes — 16 orphans held ~3.7 GB once | kill them by pid; nothing merges their files without the controller |
+| the **scheduler** (`tools.scheduler`) | nothing: its arms and its close-out run in their own sessions and finish; its viewer exits by itself once its parent is gone | rerun the same command to resume; it adopts live arms |
 
 **Nothing is lost either way.** Each shard rewrites its own output file after every completed
 measurement, and rerunning the identical command resumes every shard where it stopped. So the repair
@@ -70,7 +71,8 @@ for a close-out killed by mistake is: let its shards finish the arm they are on 
 `eta`), then relaunch the same command.
 
 The chart window is disposable — its own session, never read from or waited on. Killing it cannot
-touch a run. `PYTHONPATH=. python -m tools.chart_window` puts it back.
+touch a run. The scheduler reopens it at its next launch; `PYTHONPATH=. python -m tools.scheduler
+--reopen-window` does it now.
 
 ## 2. Desktop `the-claw-den`
 

@@ -52,69 +52,48 @@ and its record checkpoints and recordings are [`snek2/hallOfFame/HOF.md`](snek2/
 snek3's investigation is [`snek3/docs/`](snek3/docs/) and its records are
 [`snek3/hallOfFame/HOF.md`](snek3/hallOfFame/HOF.md).
 
-## Every training opens a chart window, and no agent launches one by hand
+## The scheduler owns the one chart window per box, and nothing else opens one
 
-**One window per box, showing every training running on it**, on the laptop and the desktop alike.
-Every arm asks for it, the viewer settles which one becomes it, later arms join it, and it closes
-itself a few minutes after the last one finishes. Nothing has to be launched, and a `runs/*.png` glob
-is no longer the way to watch a batch.
+**Every training and every eval runs under the scheduler (`snek3/tools/scheduler.py`), and the
+scheduler opens the box's one chart window, tells it what to draw, and closes it** (2026-09-05). On the
+laptop the scheduler is what the `laptop-run` skill starts over `logs/laptop-queue/`; on the desktop the
+daemon starts it over the specs it materialises from `ops`. The window is `tools/chart_viewer.py`
+following the scheduler's own `runs/.live/.status.json`, whose `panels` list is every arm of the wave
+while it trains (finished arms included, so a batch with one arm left still shows all of them) and every
+arm's stage-B chart while a pass runs. One window, both kinds of panel, no slot to claim.
 
-**The "one" is enforced by an `flock` the viewer holds, not by the arms agreeing.** Every arm of a
-wave spawns a viewer; the losers exit in ~0.3 s having drawn nothing. That is deliberate: a launcher
-that has to *decide* whether to spawn is a claim protocol, and this project has now had two of those
-go wrong — snek2's 500 lines of `pgrep` machinery, and snek3's own `O_EXCL`-plus-takeover, which
-opened **five windows on the desktop on 2026-08-29** and a mean of 6.6 per 8-arm batch when measured.
-A lock the kernel holds cannot be taken twice, is released however its holder dies, and leaves no
-state behind for the next window to misread. **Do not reintroduce a launcher-side claim.**
+The rules, all of them, and each is the scheduler's alone:
 
-**A panel stays for the rest of the wave once it appears**, so a batch with one arm left still shows
-all four — three finished arms are most of what a glance is for. The accumulated set is dropped when
-the box goes quiet and a new arm appears, so the next batch does not draw its predecessor's charts.
+| | |
+|---|---|
+| opened | when the scheduler launches a wave or a pass, if its viewer is not up. `popen.poll()` is the whole "is it up" |
+| shows | whatever `.status.json` says; the scheduler rewrites that on every event |
+| closed | by the scheduler when it exits; the viewer also exits by itself if the scheduler that started it is gone |
+| closed by hand | stays closed until the scheduler's next launch |
+| reopen now | `PYTHONPATH=. python -m tools.scheduler --reopen-window` drops a trigger file; the scheduler replaces its viewer at its next poll |
+| a stale window from a previous scheduler | killed at start, by the pid the previous scheduler wrote into `.status.json`, after checking that pid is still a `tools.chart_viewer` |
+| off | `SNEK_CHART_WINDOW=0` in the scheduler's environment; the daemon sets it from `runtime.json`'s `viewer` |
 
-**A window that never got a chart could outlive its close-out and hold the slot** — found 2026-09-03.
-b10's first stage-B wave screened zero checkpoints and closed in 1.3 min; its window sat in "nothing to
-show yet" for 15 hours, because that branch of the viewer's loop did not check the watched pids, and it
-held the eval slot's `flock` the whole time, so six later stage-B waves and the b9 `hof30k` pass opened
-no window and nothing said so. The viewer now checks its watched pids in that branch too (fix in
-`tools/chart_viewer.py`, with a test). **The symptom to recognise is "the eval is running but there is no
-window": `cat desktop/runs/.live/.evalwindow` on the box names the holder, `ps -p` it, and if it belongs to a
-finished pass, `kill <pid>` it and reopen with `python -m tools.eval_window <arms> --label <label> --watch-pid <close-out pid>`** (the pid is
-what closes it when the pass ends; without it the window stays until closed by hand) —
-`SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs DISPLAY=:0 XAUTHORITY=/run/user/1000/gdm/Xauthority` on the desktop
-(the box's arms write under `desktop/runs/`, not `runs/`), `setsid` so it outlives the ssh.
-A close-out asks for its window once, at start, so one that started while the stale holder was alive
-gets no second chance without that hand relaunch.
+**Why this and not what came before.** Until 2026-09-05 the window was opened by the *work*: every
+`train.py` and every `closeout.py` spawned a viewer and an `flock` in the viewer picked the survivor.
+The flock did stop the five-windows-at-once race of 2026-08-29, and it left every *lifecycle* question
+to N processes that each knew only about themselves — so each gap grew a rule: a pid watch with three
+negative checks, a "no chart yet" branch that forgot to watch (a window held the eval slot for 15 h,
+2026-09-03), a stand-by loop for a predecessor's closing grace (a pass ran an hour with no window,
+2026-09-04), a zombie check so a hand relaunch was not refused, a hand-relaunched window with no pid to
+watch that never closed. The process that knows what is running is the scheduler; the window is now
+its. The design and the incident list are [`snek3/plans/scheduler.md`](snek3/plans/scheduler.md);
+the mechanism is [`snek3/tools/window.py`](snek3/tools/window.py). **Do not give the window back to
+the arms, and do not add a second opener.**
 
-**The same symptom with a *healthy* predecessor, and it was the normal case** — found 2026-09-04. A
-stage-B window closes three refreshes (up to 60 s) after its pass exits, and the desktop dispatches the
-next pass within its 30 s poll, so the next close-out nearly always asked while the last window was still
-up: b15's window closed at 17:50:52, b11's `hof5000` pass started at 17:50:48, was told a window was up,
-and ran an hour with none. Now the eval side always spawns its viewer, and a viewer that loses the slot
-**stands by** — retrying the `flock` each second until the holder leaves or the pass it watches ends
-(`chart_viewer.stand_by_for_slot`). Training-window losers still exit at once; they have no pass to wait
-for. If the symptom recurs, the hand relaunch above is still the remedy, and the lock file still names
-the holder.
+**The scheduler also starts the box's shared stage-A eval workers before each wave**, for the same
+reason: eight arms racing `ensure_workers` for six slots once produced seven slot-0 workers
+(2026-09-03). The trainers still ask, and find the slots held.
 
-**A stage-B close-out gets the same treatment**, in a second window of its own: `tools/closeout.py`
-opens one panel per arm of the batch it is measuring and it closes when the pass ends. Same viewer,
-same launcher, its own slot — so a box can show a batch training and a batch being measured at once,
-and `SNEK_CHART_WINDOW=0` still silences both.
-
-The window is **disposable and the training is not**: it runs in its own session, no training reads
-from or waits on it, and no training reopens it. So killing it, closing it, or relaunching it with
-`cd snek3 && PYTHONPATH=. python -m tools.chart_window` cannot affect a run — which is what makes it
-safe to fix a window while four arms are training.
-
-**The window is sized from the monitor, from the charts, and from an optional cap — smallest wins.**
-It probes the display it opens on, so the laptop and the desktop need no separate settings; it never
-draws a panel wider than the source PNG, so a window with one small chart in it opens small rather
-than upscaling to fill the screen; and `SNEK_CHART_WINDOW_MAX_PX` caps the width outright on either
-box. `SNEK_CHART_WINDOW_SCALE` still takes a fraction of the screen budget.
-
-`SNEK_CHART_WINDOW=0` in a training's environment
-turns it off; the mechanism is [`snek3/tools/chart_window.py`](snek3/tools/chart_window.py),
-[`snek3/tools/eval_window.py`](snek3/tools/eval_window.py) and
-[`snek3/tools/live_runs.py`](snek3/tools/live_runs.py).
+The window is **disposable and the training is not**: its own session, no training reads from or
+waits on it, and killing it cannot affect a run. **The window is sized from the monitor, from the
+charts, and from an optional cap — smallest wins**; `SNEK_CHART_WINDOW_MAX_PX` caps the width and
+`SNEK_CHART_WINDOW_SCALE` takes a fraction of the screen budget, read once by `tools/window.py`.
 
 ## snek3's procedures are skills, not prose
 
@@ -227,8 +206,8 @@ of 2026-08-28**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.m
 | | laptop | desktop `the-claw-den` |
 |---|---|---|
 | limit | **8 trainers** | `max_trainers` (8; no host ceiling), `eval_shards` ≤ 16 |
-| check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop queue driver to `laptop-status`, folded in by the daemon since 2026-09-05); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
-| queue work | drop the specs in `snek3/logs/laptop-queue/<batch>/` and start the queue driver (`laptop-run` skill) — agents launch arms this way, not by hand, so the launch is published | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
+| check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop's scheduler to `laptop-status`, folded in by the daemon since 2026-09-05); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
+| queue work | drop the specs in `snek3/logs/laptop-queue/<batch>/` and start the scheduler (`laptop-run` skill) — agents launch arms this way, not by hand, so the launch is published | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
 
 **Every progress update commits every arm's `runs/<policy>.png` and `.md`, live desktop arms included**
@@ -248,7 +227,7 @@ report are rebuilt from across restarts; the stage-B file is a pass in progress.
 
 **The box writes to `snek3/desktop/runs/`, which is gitignored, and never to `snek3/runs/`** (2026-09-03).
 The daemon sets `SNEK_RUNS_DIR` to that one constant directory for every job, and every tool reads the
-same constant, so the chart window and the eval window on the box glob the directory the arms write
+same constant, so the scheduler and its chart window on the box read the directory the arms write
 without any per-run setting. What this buys is that the box's checkout of master holds nothing under a
 path master tracks: the laptop can commit every chart and every closed batch's JSON and `git merge
 --ff-only` on the box cannot refuse. Before this the box wrote into `snek3/runs/` and every committed
@@ -264,10 +243,10 @@ differ in what they *have* — cores, a monitor, a queue — and almost never in
 *do*, so a laptop path and a desktop path for the same job is two places to fix every bug and one of
 them gets forgotten. Where a difference is real, read it at runtime (probe the display, count the
 cores) rather than branching on which box you are; where a knob is wanted, make it one knob both
-sides honour. `tools/chart_viewer.py` draws both boxes' windows and both windows on each box, and the
-sizing knobs live in `chart_window.sizing` for exactly this reason — the eval window had already
-drifted into parsing the environment for itself, and had stopped honouring one of the two knobs as a
-result. **When you fix something on one box, check whether the other has its own copy of it, and if
+sides honour. `tools/scheduler.py` runs both boxes' batches and `tools/window.py` opens both boxes' windows, and the
+sizing knobs are read in one place for exactly this reason — before that the eval window had drifted
+into parsing the environment for itself, and had stopped honouring one of the two knobs as a result.
+**When you fix something on one box, check whether the other has its own copy of it, and if
 it does, delete the copy rather than fixing it twice.**
 
 **Neither check sees the other host**, so **"N arms running" is meaningless without naming the box**,

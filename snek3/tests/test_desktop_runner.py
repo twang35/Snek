@@ -675,14 +675,14 @@ def test_pass_ids_count_past_spent_waves_and_stop_at_a_queued_spec():
 
 
 def test_the_laptop_driver_spells_pass_ids_the_way_the_daemon_mints_them():
-    """Two boxes, one naming: `tools/laptop_batch.py` cannot be imported by the daemon, so the two
+    """Two boxes, one naming: `tools/scheduler.py` cannot be imported by the daemon, so the two
     spellings are pinned equal here, where both are on the path."""
-    from tools import laptop_batch
+    from tools import scheduler
     for pass_name in runner_module.PASS_ORDER:
-        assert laptop_batch.pass_label('b13', pass_name, 1) == runner_module.mint_pass_id('b13', pass_name)
-        assert laptop_batch.pass_label('b13', pass_name, 3) == runner_module.mint_pass_id(
+        assert scheduler.pass_label('b13', pass_name, 1) == runner_module.mint_pass_id('b13', pass_name)
+        assert scheduler.pass_label('b13', pass_name, 3) == runner_module.mint_pass_id(
             'b13', pass_name, used={'b13-' + pass_name, 'b13-' + pass_name + '-w2'})
-        assert runner_module.pass_of(laptop_batch.pass_label('b13', pass_name, 2)) == pass_name
+        assert runner_module.pass_of(scheduler.pass_label('b13', pass_name, 2)) == pass_name
 
 
 def _runner(tmp_path, ledger):

@@ -1,8 +1,8 @@
 """Suite-wide defaults.
 
-One thing, and it is about a side effect rather than a value: a test that runs the training loop
-would otherwise open a real chart window on the developer's screen, twice, because a training opens
-one without being asked. `SNEK_CHART_WINDOW=0` is the switch the daemon uses for the same reason.
+One thing, and it is about a side effect rather than a value: a test that runs the scheduler would
+otherwise open a real chart window on the developer's screen. `SNEK_CHART_WINDOW=0` is the switch
+`tools/window.py` reads, the same one a benchmark and a headless box use.
 """
 
 import pytest

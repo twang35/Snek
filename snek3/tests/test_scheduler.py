@@ -1,5 +1,5 @@
-"""The laptop batch driver: desktop specs, run here in waves, each followed by its stage B and the
-two hof passes.
+"""The scheduler: desktop specs, run here in waves, each followed by its stage B and the two hof passes,
+with the window and the eval workers owned by it.
 
 Every process call is a stand-in, so a test runs a 32-arm batch in milliseconds and asserts on what
 would have been launched: the wave barrier, the pass naming the desktop uses, the chain stopping at
@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from tools import laptop_batch
+from tools import scheduler
 from tools import live_runs
 
 
@@ -76,41 +76,55 @@ def box(tmp_path):
     return {'runs': str(runs), 'logs': str(logs)}
 
 
+def no_workers(count, runs_dir=None):
+    """Stands in for `eval_queue.ensure_workers`: a unit test must never start a real worker."""
+    return []
+
+
 def driver(specs, box, calls, **kwargs):
-    return laptop_batch.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=calls.popen,
-                               call=calls.call, sleep=lambda s: None, python='py', **kwargs)
+    kwargs.setdefault('ensure_workers', no_workers)
+    return scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=calls.popen,
+                            call=calls.call, sleep=lambda s: None, python='py', **kwargs)
 
 
 # ---------------------------------------------------------------- specs
 
-def test_specs_load_in_id_order_from_files_and_directories_and_skip_evals(tmp_path):
+def test_specs_load_in_id_order_from_files_and_directories_evals_included(tmp_path):
     d = str(tmp_path / 'specs')
     write_specs(d, ['b13ab-mb32-seed2', 'b13aa-mb32-seed1'])
-    with open(os.path.join(d, 'b13-stageb.json'), 'w') as handle:
-        json.dump({'id': 'b13-stageb', 'type': 'eval', 'policies': ['b13aa-mb32-seed1']}, handle)
+    with open(os.path.join(d, 'b13-hof5000.json'), 'w') as handle:
+        json.dump({'id': 'b13-hof5000', 'type': 'eval', 'policies': ['b13aa-mb32-seed1'],
+                   'eval_args': ['--pass', 'hof5000']}, handle)
+    with open(os.path.join(d, 'deploy-1.json'), 'w') as handle:
+        json.dump({'id': 'deploy-1', 'type': 'deploy'}, handle)
     loose = str(tmp_path / 'b13ac-mb32-seed3.json')
     with open(loose, 'w') as handle:
         json.dump(spec('b13ac-mb32-seed3'), handle)
-    specs = laptop_batch.load_specs([d, loose])
-    assert [s['id'] for s in specs] == ['b13aa-mb32-seed1', 'b13ab-mb32-seed2', 'b13ac-mb32-seed3']
+    specs = scheduler.load_specs([d, loose])
+    assert [s['id'] for s in specs] == ['b13-hof5000', 'b13aa-mb32-seed1', 'b13ab-mb32-seed2',
+                                        'b13ac-mb32-seed3']
+    assert [s['id'] for s in scheduler.train_specs(specs)] == ['b13aa-mb32-seed1', 'b13ab-mb32-seed2',
+                                                               'b13ac-mb32-seed3']
+    assert [s['id'] for s in scheduler.eval_specs(specs)] == ['b13-hof5000']
+    assert specs[1]['_dir'] == d and specs[-1]['_dir'] == str(tmp_path)
 
 
 def test_batch_id_and_stage_b_labels_match_the_daemon():
     specs = [spec('b13aa-mb32-seed1'), spec('b13bf-mb2048-seed4')]
-    assert laptop_batch.batch_id(specs) == 'b13'
-    assert laptop_batch.stage_b_label('b13', 1) == 'b13-stageb'
-    assert laptop_batch.stage_b_label('b13', 3) == 'b13-stageb-w3'
-    assert laptop_batch.pass_label('b13', 'hof5000', 1) == 'b13-hof5000'
-    assert laptop_batch.pass_label('b13', 'hof30k', 2) == 'b13-hof30k-w2'
-    assert laptop_batch.batch_id([spec('b13aa-x-seed1'), spec('b14a-y-seed1')]) == 'batch'
+    assert scheduler.batch_id(specs) == 'b13'
+    assert scheduler.stage_b_label('b13', 1) == 'b13-stageb'
+    assert scheduler.stage_b_label('b13', 3) == 'b13-stageb-w3'
+    assert scheduler.pass_label('b13', 'hof5000', 1) == 'b13-hof5000'
+    assert scheduler.pass_label('b13', 'hof30k', 2) == 'b13-hof30k-w2'
+    assert scheduler.batch_id([spec('b13aa-x-seed1'), spec('b14a-y-seed1')]) == 'batch'
 
 
 def test_training_env_is_the_spec_over_ours_plus_the_absolute_cap():
-    env = laptop_batch.training_env(spec('b13aa-mb32-seed1'), base={'HOME': '/h', 'SNEK_PPO_MINIBATCH': '256'})
+    env = scheduler.training_env(spec('b13aa-mb32-seed1'), base={'HOME': '/h', 'SNEK_PPO_MINIBATCH': '256'})
     assert env['SNEK_PPO_MINIBATCH'] == '32'
     assert env['SNEK_MAX_STEPS'] == '50003968'
     assert env['HOME'] == '/h'
-    assert env['PYTHONPATH'] == laptop_batch.ROOT
+    assert env['PYTHONPATH'] == scheduler.ROOT
 
 
 # ---------------------------------------------------------------- the waves
@@ -124,7 +138,7 @@ def test_a_batch_runs_in_waves_each_followed_by_its_own_stage_b(box):
     assert kinds == (['train'] * 8 + PASSES) * 4
     first_stage_b, first_hof, first_30k = calls.events[8:11]
     assert first_stage_b[1] == first_hof[1] == first_30k[1] == tuple(s['policy'] for s in specs[:8])
-    assert first_stage_b[2] == str(laptop_batch.DEFAULT_SHARDS)   # 12 since 2026-09-04
+    assert first_stage_b[2] == str(scheduler.DEFAULT_SHARDS)   # 12 since 2026-09-04
     assert len(os.listdir(box['logs'])) == 32 + 4 * 3      # one log per arm, one per pass per wave
     assert os.path.exists(os.path.join(box['logs'], 'b13-stageb-w4.log'))
     assert os.path.exists(os.path.join(box['logs'], 'b13-hof30k-w4.log'))
@@ -158,8 +172,8 @@ def test_the_pass_reaches_the_close_out_as_pass_and_never_as_numbers(box):
     def call(argv, **kwargs):
         argvs.append(argv)
         return 0
-    laptop_batch.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=Calls().popen,
-                        call=call, sleep=lambda s: None, python='py', wave=1).run()
+    scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=Calls().popen,
+                        call=call, sleep=lambda s: None, python='py', ensure_workers=no_workers, wave=1).run()
     assert [a[a.index('tools.closeout') + 1:] for a in argvs] == [
         ['b13aa-mb32-seed1', '--shards', '12'],
         ['b13aa-mb32-seed1', '--pass', 'hof5000', '--shards', '12'],
@@ -197,20 +211,20 @@ def test_an_arm_already_live_on_the_box_is_waited_for_not_relaunched(box, monkey
 
 def test_no_launch_while_the_box_is_at_the_trainer_cap(box, monkeypatch):
     counts = iter([8, 8, 7])
-    monkeypatch.setattr(laptop_batch, 'trainer_count', lambda runs_dir=None: next(counts))
+    monkeypatch.setattr(scheduler, 'trainer_count', lambda runs_dir=None: next(counts))
     slept = []
     calls = Calls()
-    d = laptop_batch.Driver([spec('b13aa-mb32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'],
-                            popen=calls.popen, call=calls.call, sleep=slept.append, python='py',
+    d = scheduler.Driver([spec('b13aa-mb32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'],
+                            popen=calls.popen, call=calls.call, sleep=slept.append, python='py', ensure_workers=no_workers,
                             wave=1, stage_b=False)
     d.run()
-    assert slept == [laptop_batch.POLL_SECONDS] * 2
+    assert slept == [scheduler.POLL_SECONDS] * 2
     assert [e[0] for e in calls.events] == ['train']
 
 
 def test_a_wave_wider_than_the_cap_is_refused():
     with pytest.raises(ValueError):
-        laptop_batch.Driver([spec('b13aa-mb32-seed1')], wave=9, max_trainers=8)
+        scheduler.Driver([spec('b13aa-mb32-seed1')], wave=9, max_trainers=8)
 
 
 def test_after_holds_the_whole_batch_until_that_process_has_exited(box, monkeypatch):
@@ -225,11 +239,11 @@ def test_after_holds_the_whole_batch_until_that_process_has_exited(box, monkeypa
 
     monkeypatch.setattr(live_runs, 'alive', alive)
     slept, calls = [], Calls()
-    d = laptop_batch.Driver([spec('b14a-roll32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'],
-                            popen=calls.popen, call=calls.call, sleep=slept.append, python='py',
+    d = scheduler.Driver([spec('b14a-roll32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'],
+                            popen=calls.popen, call=calls.call, sleep=slept.append, python='py', ensure_workers=no_workers,
                             wave=1, stage_b=False)
     d.run(after=4242)
-    assert slept == [laptop_batch.POLL_SECONDS] * 2      # one check logs the wait, two more poll it
+    assert slept == [scheduler.POLL_SECONDS] * 2      # one check logs the wait, two more poll it
     assert [e[0] for e in calls.events] == ['train']
 
 
@@ -238,7 +252,7 @@ def test_after_holds_the_whole_batch_until_that_process_has_exited(box, monkeypa
 def _pass_files(runs, policies, *pass_names):
     for policy in policies:
         for pass_name in pass_names:
-            open(laptop_batch.pass_file(policy, pass_name, runs), 'w').write('{"rows": []}')
+            open(scheduler.pass_file(policy, pass_name, runs), 'w').write('{"rows": []}')
 
 
 def test_a_pass_every_arm_already_has_is_skipped_and_the_chain_continues(box):
@@ -308,7 +322,7 @@ def test_the_queue_runs_batches_in_name_order_and_exits_when_none_has_work(tmp_p
         _pass_files(box['runs'], calls.events[-1][1], pass_name)
         return code
     calls.call = call
-    assert laptop_batch.run_queue(q, make) == 0
+    assert scheduler.run_queue(q, make) == 0
     trained = [e[1] for e in calls.events if e[0] == 'train']
     assert trained == ['b14a-roll-seed1', 'b14b-roll-seed2', 'b16a-kl-seed1'], 'b14 before b16, by name'
     assert [e[0] for e in calls.events] == ['train', 'train'] + PASSES + ['train'] + PASSES
@@ -337,7 +351,7 @@ def test_a_batch_dropped_in_while_another_runs_is_picked_up_next(tmp_path, box):
         _pass_files(box['runs'], arms, pass_name)
         return 0
     calls.popen, calls.call = popen, call
-    laptop_batch.run_queue(q, lambda specs: driver(specs, box, calls, wave=8))
+    scheduler.run_queue(q, lambda specs: driver(specs, box, calls, wave=8))
     assert [e[1] for e in calls.events if e[0] == 'train'] == ['b14a-roll-seed1', 'b16a-kl-seed1']
 
 
@@ -350,7 +364,7 @@ def test_a_batch_that_still_has_work_after_running_is_not_looped_on(tmp_path, bo
     def make(specs):
         runs.append([s['policy'] for s in specs])
         return driver(specs, box, calls, wave=8)
-    assert laptop_batch.run_queue(q, make) == 1
+    assert scheduler.run_queue(q, make) == 1
     assert [e[0] for e in calls.events] == ['train', 'stageb'], 'ran once, then left alone'
 
 
@@ -360,13 +374,13 @@ def test_a_finished_batch_left_in_the_queue_costs_nothing(tmp_path, box):
         json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
     _pass_files(box['runs'], ['b13a-mb-seed1'], *PASSES)
     calls = Calls()
-    assert laptop_batch.run_queue(q, lambda specs: driver(specs, box, calls, wave=8)) == 0
+    assert scheduler.run_queue(q, lambda specs: driver(specs, box, calls, wave=8)) == 0
     assert calls.events == []
 
 
 def test_queue_and_specs_are_exclusive_on_the_command_line(tmp_path):
     with pytest.raises(SystemExit):
-        laptop_batch.main(['--queue', str(tmp_path), 'somefile.json'])
+        scheduler.main(['--queue', str(tmp_path), 'somefile.json'])
 
 
 # ---------------------------------------------------------------- laptop-status
@@ -403,7 +417,7 @@ class FinishingCalls(Calls):
         code = Calls.call(self, argv, **kwargs)
         pass_name, arms, _ = self.events[-1]
         for policy in arms:
-            open(laptop_batch.pass_file(policy, pass_name, self.runs), 'w').close()
+            open(scheduler.pass_file(policy, pass_name, self.runs), 'w').close()
         return code
 
 
@@ -424,9 +438,9 @@ def test_the_queue_publishes_both_boxes_shape_on_every_event_and_empty_when_it_e
     calls = FinishingCalls(box['runs'])
     published = Published()
     make = lambda specs: driver(specs, box, calls, wave=2)
-    reporter = laptop_batch.Reporter(published, queue_dir=str(queue), make_driver=make)
+    reporter = scheduler.Reporter(published, queue_dir=str(queue), make_driver=make)
 
-    laptop_batch.run_queue(str(queue), make, reporter=reporter)
+    scheduler.run_queue(str(queue), make, reporter=reporter)
 
     first = published.glance(0)
     assert first['running'] == ['b1 | x -- wave 1 of 1 | training 100% (2 arms)']
@@ -453,9 +467,9 @@ def test_a_waiting_driver_republishes_every_ten_minutes_so_the_percent_moves(box
     slow = FakeProcess(1, polls=3)
     calls.popen = lambda argv, **kwargs: slow
     published = Published()
-    d = laptop_batch.Driver([_spec('b1a-x-seed1', 'b1: x')], runs_dir=box['runs'], logs_dir=box['logs'],
-                            popen=calls.popen, call=calls.call, sleep=sleep, python='py', stage_b=False,
-                            reporter=laptop_batch.Reporter(published), clock=lambda: clock['now'])
+    d = scheduler.Driver([_spec('b1a-x-seed1', 'b1: x')], runs_dir=box['runs'], logs_dir=box['logs'],
+                            popen=calls.popen, call=calls.call, sleep=sleep, python='py', ensure_workers=no_workers, stage_b=False,
+                            reporter=scheduler.Reporter(published), clock=lambda: clock['now'])
     d.run()
     # at launch (t=0); at the poll that crosses 600 s (t=800); at the arm's exit
     assert len(published.statuses) == 3
@@ -473,6 +487,140 @@ def test_a_publisher_that_fails_never_stops_the_driver(box):
     assert 'publish failed' in logged[0]
     calls = Calls()
     d = driver([_spec('b1a-x-seed1', 'b1: x')], box, calls, stage_b=False,
-               reporter=laptop_batch.Reporter(publisher))
+               reporter=scheduler.Reporter(publisher))
     assert d.run() == 0
     assert [event[0] for event in calls.events] == ['train']
+
+
+# ---------------------------------------------------------------- the window and the workers
+
+class FakeWindow(object):
+    def __init__(self):
+        self.opens, self.polls, self.closed = 0, 0, False
+        self._up = False
+
+    def open(self):
+        self.opens += 1
+        was_up, self._up = self._up, True
+        return not was_up
+
+    def poll(self):
+        self.polls += 1
+        return False
+
+    def pid(self):
+        return 4242 if self._up else None
+
+    def close(self):
+        self.closed, self._up = True, False
+
+
+def test_the_window_is_opened_at_each_launch_and_pointed_at_the_wave_then_the_pass(box):
+    """The scheduler owns the window: it asks for it when it launches something and tells it, through
+    the status file, which PNGs to draw -- the whole wave while training, the pass's charts after."""
+    specs = [spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')]
+    calls = FinishingCalls(box['runs'])
+    fake = FakeWindow()
+    published = Published()
+    d = scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=calls.popen,
+                         call=calls.call, sleep=lambda s: None, python='py', ensure_workers=no_workers, wave=2, window=fake,
+                         reporter=scheduler.Reporter(published, window=fake, runs_dir=box['runs']))
+    assert d.run() == 0
+    assert fake.opens == 4, 'the wave, then each of the three passes asked; the first ask opened it'
+    panels = [status['panels'] for status in published.statuses]
+    assert panels[0] == [os.path.join(box['runs'], 'b13aa-mb32-seed1.png'),
+                         os.path.join(box['runs'], 'b13ab-mb32-seed2.png')]
+    stage_b = [p for p in panels if p and p[0].endswith('b13aa-mb32-seed1_checkpoint_evals.png')]
+    hof = [p for p in panels if p and p[0].endswith('b13aa-mb32-seed1_checkpoint_evals_hof5000.png')]
+    assert stage_b and hof
+    assert all(status['window_pid'] == 4242 for status in published.statuses[:-1])
+    with open(live_runs.status_path(box['runs'])) as handle:
+        local = json.load(handle)
+    assert local['panels'][0].endswith('_checkpoint_evals_hof30k.png'), 'between launches the last panels stay'
+    d.reporter.publish(None)                       # what the queue does as it exits
+    with open(live_runs.status_path(box['runs'])) as handle:
+        local = json.load(handle)
+    assert local['panels'] == [] and local['at_a_glance']['running'] == [], 'the exit write is idle'
+
+
+def test_the_workers_are_started_before_the_wave_with_the_count_its_specs_name(box):
+    asked = []
+    specs = [spec('b13aa-mb32-seed1', SNEK_EVAL_WORKERS='8'), spec('b13ab-mb32-seed2', SNEK_EVAL_WORKERS='8')]
+    calls = Calls()
+    d = driver(specs, box, calls, wave=2, stage_b=False,
+               ensure_workers=lambda n, runs_dir=None: asked.append((n, runs_dir)) or [])
+    d.run()
+    assert asked == [(8, box['runs'])], 'once, before the arms, with the specs\' number'
+    assert calls.events[0][0] == 'train'
+
+
+def test_the_worker_count_is_the_default_when_the_specs_disagree_or_say_nothing_and_zero_when_the_queue_is_off():
+    from tools import eval_queue
+    assert scheduler.wave_workers([spec('a'), spec('b')]) == eval_queue.DEFAULT_WORKERS
+    assert scheduler.wave_workers([spec('a', SNEK_EVAL_WORKERS='8'), spec('b', SNEK_EVAL_WORKERS='6')]) == eval_queue.DEFAULT_WORKERS
+    assert scheduler.wave_workers([spec('a', SNEK_EVAL_WORKERS='4'), spec('b', SNEK_EVAL_WORKERS='4')]) == 4
+    assert scheduler.wave_workers([spec('a', SNEK_EVAL_QUEUE='0'), spec('b', SNEK_EVAL_QUEUE='0')]) == 0
+
+
+def test_no_workers_are_started_when_every_arm_of_the_wave_is_already_done_or_live(box):
+    asked = []
+    specs = [spec('b13aa-mb32-seed1')]
+    with open(os.path.join(box['runs'], 'b13aa-mb32-seed1_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
+    driver(specs, box, Calls(), wave=1, stage_b=False,
+           ensure_workers=lambda n, runs_dir=None: asked.append(n) or []).run()
+    assert asked == []
+
+
+# ---------------------------------------------------------------- markers: failed passes, eval specs
+
+def test_a_failed_pass_is_marked_and_a_rerun_skips_it_instead_of_looping(tmp_path, box):
+    q = _queue(tmp_path, {'b14': ['b14a-roll-seed1']})
+    calls = FinishingCalls(box['runs'], codes={'stageb': 1})
+    make = lambda specs: driver(specs, box, calls, wave=8)
+    assert scheduler.run_queue(q, make) == 1
+    assert os.path.exists(os.path.join(q, 'b14', '.failed-b14-stageb'))
+    assert [e[0] for e in calls.events] == ['train', 'stageb']
+    # a second scheduler over the same queue: the arm is done, the pass is marked -- nothing to do
+    assert scheduler.run_queue(q, make) == 0
+    assert [e[0] for e in calls.events] == ['train', 'stageb'], 'not retried'
+    _, specs = scheduler.queue_batches(q)[0]
+    assert not make(specs).pending()
+    assert 'b14-stageb failed' in make(specs).attention()[0]
+    os.remove(os.path.join(q, 'b14', '.failed-b14-stageb'))
+    assert make(specs).pending(), 'deleting the marker is the retry'
+
+
+def test_an_eval_spec_runs_once_after_the_waves_as_the_command_it_spells(tmp_path, box):
+    q = _queue(tmp_path, {'b14': ['b14a-roll-seed1']})
+    with open(os.path.join(q, 'b14', 'b14-one.json'), 'w') as handle:
+        json.dump({'id': 'b14-one', 'type': 'eval', 'policies': ['b14a-roll-seed1', 'b14b-roll-seed2'],
+                   'selector': 'one', 'episodes': 3000, 'eval_args': ['--label', 'hof'],
+                   'eval_shards': 3}, handle)
+    argvs = []
+    calls = FinishingCalls(box['runs'])
+    real_call = calls.call
+
+    def call(argv, **kwargs):
+        argvs.append(argv)
+        if '--label' in argv:
+            return 0
+        return real_call(argv, **kwargs)
+    calls.call = call
+    make = lambda specs: driver(specs, box, calls, wave=8)
+    assert scheduler.run_queue(q, make) == 0
+    assert argvs[-1][argvs[-1].index('tools.closeout') + 1:] == [
+        'b14a-roll-seed1', 'b14b-roll-seed2', '--selector', 'one', '--label', 'hof',
+        '--episodes', '3000', '--shards', '3']
+    assert os.path.exists(os.path.join(q, 'b14', '.done-b14-one'))
+    before = len(argvs)
+    assert scheduler.run_queue(q, make) == 0
+    assert len(argvs) == before, 'an eval spec runs once'
+
+
+def test_eval_label_reads_the_pass_or_the_label_for_the_panels():
+    assert scheduler.eval_label({'eval_args': ['--pass', 'hof5000']}) == 'hof5000'
+    assert scheduler.eval_label({'eval_args': ['--label', 'ab']}) == 'ab'
+    assert scheduler.eval_label({'eval_args': []}) is None
+    assert scheduler.pass_panels(['b1a'], 'ab', '/r') == ['/r/b1a_checkpoint_evals_ab.png']
+    assert scheduler.pass_panels(['b1a'], None, '/r') == ['/r/b1a_checkpoint_evals.png']

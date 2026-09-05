@@ -165,11 +165,11 @@ def drop_superseded_snapshots(runs_dir=None):
     return dropped
 
 
-LOCAL_SPECS = os.path.join(SNEK3, 'logs')     # laptop_batch runs `logs/<batch>specs/*.json`, dequeued from ops
+LOCAL_SPECS = os.path.join(SNEK3, 'logs')     # scheduler runs `logs/<batch>specs/*.json`, dequeued from ops
 
 
 def read_spec(policy):
-    """The arm's spec: from `ops` pending, else from a local `logs/*/<policy>.json` (a batch `laptop_batch`
+    """The arm's spec: from `ops` pending, else from a local `logs/*/<policy>.json` (a batch `scheduler`
     ran after it was dequeued from the desktop — b13, 2026-09-03). None when neither has it."""
     result = subprocess.run(['git', 'show', 'origin/ops:{0}{1}.json'.format(PENDING, policy)],
                             cwd=REPO, capture_output=True, text=True)

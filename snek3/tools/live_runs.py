@@ -1,8 +1,10 @@
-"""Which trainings are running on this box, stated by the trainings themselves.
+"""Which trainings are running on this box, stated by the trainings themselves — and the scheduler's
+own two files beside them.
 
 One file per arm in `runs/.live/`, named for the policy and holding the trainer's pid. A trainer
 writes it before its first step and removes it on the way out; `live()` reads the directory and drops
-any entry whose pid is gone.
+any entry whose pid is gone. The scheduler reads it to adopt an arm a killed predecessor left running
+and to count a hand-launched trainer against the cap.
 
 **A registry rather than a process scan**, and snek2 paid for both halves of that lesson. Its viewer
 asked `ps` which arms were running, which loses a wave launched inside one second — an arm is not
@@ -17,8 +19,13 @@ which the entry exists and the process does not, and no grace period to tune. `o
 pid we were handed cannot match the wrong thing the way a `pgrep` pattern can, and a dead entry is
 self-evidently dead rather than merely old.
 
-Best-effort throughout: this directory is a convenience for a window, and **no failure here is worth
-a training run**.
+**The chart window no longer reads this directory** (2026-09-05). It follows `.status.json` here, which
+the scheduler writes — see `tools/window.py` for why the owner of the window is the scheduler and not
+the arms. The two dot-files, `.status.json` and `.reopen-window`, are the scheduler's; `live()` skips
+anything starting with a dot.
+
+Best-effort throughout: this directory is a convenience, and **no failure here is worth a training
+run**.
 """
 
 import errno
@@ -28,8 +35,10 @@ import subprocess
 from env import constants
 
 DIR_NAME = '.live'
-# The chart window's slot, beside the arms it draws. A dot, so `live()` never reads it as an arm.
-WINDOW_LOCK_NAME = '.window'
+# The scheduler's status, single-writer, and what the chart window follows.
+STATUS_NAME = '.status.json'
+# Dropped by `tools.scheduler --reopen-window`; the scheduler unlinks it and replaces its viewer.
+REOPEN_NAME = '.reopen-window'
 
 
 def directory(runs_dir=None):
@@ -45,19 +54,12 @@ def path_for(policy, runs_dir=None):
     return os.path.join(directory(runs_dir), str(policy))
 
 
-def window_lock_path(runs_dir=None, name=None):
-    """The file a window holds an `flock` on, and records its pid in.
+def status_path(runs_dir=None):
+    return os.path.join(directory(runs_dir), STATUS_NAME)
 
-    Here rather than in `chart_window` because the *viewer* is what holds the lock and the launcher
-    is what reads the pid, so neither of them owns the path. Inside the registry directory, where
-    `live()` already skips it for starting with a dot.
 
-    `name` picks *which* window, and there are two: the training window on `WINDOW_LOCK_NAME`, and
-    the eval window on its own slot. They are separate locks rather than one because a box can hold
-    both at once — the wave barrier keeps trainings and evals apart on the desktop, but nothing does
-    on the laptop, and a stage-B pass must never be refused a window because a training window is up.
-    """
-    return os.path.join(directory(runs_dir), name or WINDOW_LOCK_NAME)
+def reopen_path(runs_dir=None):
+    return os.path.join(directory(runs_dir), REOPEN_NAME)
 
 
 def alive(pid):
@@ -65,8 +67,7 @@ def alive(pid):
 
     `os.kill(pid, 0)` and not a `ps` scan: the pid came from the process itself, so there is no
     pattern to match and nothing to mis-match. The one thing it gets wrong is a **zombie**, which
-    answers yes for as long as its parent has not waited on it — see `zombie()`, which the window
-    slot needs and an arm does not.
+    answers yes for as long as its parent has not waited on it — see `zombie()`.
     """
     if pid <= 0:
         return False
@@ -84,17 +85,13 @@ def alive(pid):
 def zombie(pid):
     """Whether `pid` is an exited process nobody has waited on yet. Unanswerable counts as no.
 
-    **The chart window needs this and it cost a wasted verification to find out.** Killing the window
-    leaves a zombie child of the trainer that opened it, and a trainer only reaps on its report
-    cadence — so for minutes afterwards `alive()` says the window is up, and a hand relaunch is
-    refused with "a chart window is already up" for a window that is visibly gone.
-
-    An arm's own entry does not need it: a trainer's parent is a shell or the daemon, neither of which
-    leaves it unreaped for long, and a zombie trainer is finished either way.
+    The eval-worker slots need this: a worker that exited under a trainer that has not reaped it yet
+    answers `alive()` for minutes, and a slot held by a zombie would read as a live worker while
+    nothing drained the queue.
 
     `ps -p` with a **single** pid, which is safe — the rule about `ps -p` rejecting a whole list on one
     bad pid is about lists. A `ps` that cannot answer returns False rather than True, so the failure
-    mode is "refuse to open a second window", never "open one on top of a live one".
+    mode is "treat it as live", never "treat a live one as dead".
     """
     try:
         result = subprocess.run(['ps', '-o', 'stat=', '-p', str(int(pid))],
@@ -107,11 +104,7 @@ def zombie(pid):
 
 
 def register(policy, pid=None, runs_dir=None):
-    """Records `policy` as running under `pid` (default: this process). Returns the path, or None.
-
-    Called before the first step, so the window a launcher opens a moment later already has this
-    arm's panel in it.
-    """
+    """Records `policy` as running under `pid` (default: this process). Returns the path, or None."""
     pid = os.getpid() if pid is None else pid
     path = path_for(policy, runs_dir)
     try:
@@ -169,18 +162,3 @@ def live(runs_dir=None, prune=True):
             except OSError:
                 pass
     return found
-
-
-def chart_paths(runs_dir=None, prune=True):
-    """`runs/<policy>.png` for every live arm that has written its chart yet.
-
-    An arm that has not reached its first report has no PNG, so it contributes no panel until it
-    does. That is the only reason a live arm can be missing from the window, and it lasts one report
-    interval.
-    """
-    paths = []
-    for policy, _ in live(runs_dir, prune):
-        path = os.path.join(runs_dir or constants.RUNS_DIR, policy + '.png')
-        if os.path.exists(path):
-            paths.append(path)
-    return paths

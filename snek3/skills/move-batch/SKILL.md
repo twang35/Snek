@@ -6,7 +6,7 @@ description: Move a queued snek3 batch between the desktop box the-claw-den and 
 # Move a batch between the boxes
 
 Both boxes run the same `queue/pending/*.json` specs: the desktop's daemon reads them from the `ops`
-branch, the laptop's `tools.laptop_batch --queue` reads them from `snek3/logs/laptop-queue/<batch>/`.
+branch, the laptop's `tools.scheduler --queue` reads them from `snek3/logs/laptop-queue/<batch>/`.
 Moving a batch is moving its spec files from one place to the other. **Move whole batches that have
 not started.** A batch with a wave trained already has checkpoints on the box it started on, and
 neither side can resume the other's; let it finish where it is (`stop-run` if it must not).

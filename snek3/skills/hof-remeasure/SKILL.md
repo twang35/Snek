@@ -6,7 +6,7 @@ description: Re-measure a batch's stage-B winners at 5,000 episodes — the hof5
 # The `hof5000` pass — 5,000 episodes on the close-out's winners
 
 **Since 2026-09-04 this pass and the `hof30k` after it run by themselves**, on both boxes, after every
-wave's stage B — the desktop daemon and `tools.laptop_batch` chain `tools.closeout <arms> --pass
+wave's stage B — the desktop daemon and `tools.scheduler` chain `tools.closeout <arms> --pass
 hof5000` then `--pass hof30k`, and a batch that finished under the chain needs nothing from this skill.
 Use it for a batch measured before that date, a driver started before it, or a re-run; `--pass hof5000`
 is the shorthand for the `--selector above:99 --episodes 5000 --label hof5000` below and the
@@ -110,23 +110,22 @@ controller **one** policy named `a b c` (zsh does not word-split a parameter), a
 0.0 min having opened a window for a nonexistent arm. Type the names, or use `$(cat list.txt)` — an
 unquoted command substitution *is* split. Cost one relaunch on b9, 2026-09-02.
 
-## 4. Watch it — and make sure the window is actually up
+## 4. Watch it
 
-The controller prints `[done/total] N shard(s) alive` per arm and asks for the stage-B chart window
-(second slot, so a training's window is untouched). **Asking is not having: always confirm the window
-opened, and open it yourself if it did not:**
+The controller prints `[done/total] N shard(s) alive` per arm. **A hand-typed close-out has no chart
+window** (2026-09-05): the scheduler owns the box's window and points it at a pass only when the
+scheduler runs the pass. To get the window, queue the pass as an eval spec instead of typing it:
 
 ```
-ps -Ao pid=,etime=,command= | grep '[c]hart_viewer' | grep -v 'zsh -c'      # expect one line titled stage B
-PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.eval_window <arm...> --label hof5000 \
-    --watch-pid <close-out pid> > logs/<batch>-hof5000-window.log 2>&1 &   # only if the ps shows none;
-                                                    # without --watch-pid the window never closes itself
+mkdir -p logs/laptop-queue/<batch> && cat > logs/laptop-queue/<batch>/<batch>-hof5000.json <<'SPEC'
+{"project": "snek3", "id": "<batch>-hof5000", "type": "eval", "policies": ["<arm>", "<arm>"],
+ "eval_args": ["--pass", "hof5000"]}
+SPEC
+PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.scheduler --queue logs/laptop-queue/ \
+    > logs/laptop-queue.log 2>&1 &            # only if no scheduler is up; a running one picks the spec up next
 ```
 
-The window is one per box by an `flock`, so a pass launched while a *stale* window holds the lock draws
-nothing, and killing the stale one afterwards leaves the pass with no window at all — which is exactly
-what happened on b9 (the mislaunch above had opened one). Opening it by hand is free: nothing reads it
-or waits on it, and `--label` must match the pass's label or it watches the wrong files.
+The scheduler runs it once (marked `.done-<id>` beside the spec), with the window on its charts.
 
 Per-shard truth is `logs/<arm>_checkpoint_evals_hof5000-s<i>of<n>.log`.
 

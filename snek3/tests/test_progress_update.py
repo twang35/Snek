@@ -201,8 +201,8 @@ def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp
     assert not (live / 'a_evals.json').exists() and (live / 'b_evals.json').exists()
 
 
-def test_read_spec_falls_back_to_a_local_laptop_batch_spec(tmp_path, monkeypatch):
-    # b13 was dequeued from ops and run by laptop_batch from logs/b13specs/; the tool must still find its knob.
+def test_read_spec_falls_back_to_a_local_scheduler_spec(tmp_path, monkeypatch):
+    # b13 was dequeued from ops and run by scheduler from logs/b13specs/; the tool must still find its knob.
     monkeypatch.setattr(pu, 'LOCAL_SPECS', str(tmp_path))
     monkeypatch.setattr(pu.subprocess, 'run', lambda argv, **kw: type('R', (), {'returncode': 128, 'stdout': ''})())
     assert pu.read_spec('b13aa-mb32-seed1') is None

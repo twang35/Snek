@@ -52,7 +52,6 @@ from ppo import algo as ppo_algo
 from dqn import schedules
 from env import constants
 from tools import arch as arch_tools
-from tools import chart_window
 from tools import checkpoints
 from tools import eval_queue
 from tools import live_runs
@@ -322,7 +321,6 @@ class Trainer(object):
         self.transitions = 0
         self.eval_rows = []
         self.resume_steps = []
-        self.chart_window = None        # set by `run`; None unless this arm opened the box's window
         # Steps offered to the queue and not yet merged, oldest first. In-memory because it is only a
         # cursor — every field a row needs lives in the queue's own files, so a resume rebuilds this
         # from the directory rather than from a checkpointed list.
@@ -408,19 +406,13 @@ class Trainer(object):
         # exactly the settings a shaping experiment is about. b2's `SNEK_CHASE_SAFE_SHAPING` had to be
         # confirmed by reading `/proc/<pid>/environ`, which is not a thing anyone should have to do.
         print('reward config: ' + reward_config.describe(), flush=True)
-        # Two steps, in this order, and both here rather than in `main` so they only happen for a run
-        # that is actually going to train — and after the config lines, so those stay the first thing
-        # in the log.
-        #
-        # Registering first is what puts this arm in the window even when another arm opened it: the
-        # window draws the registry, so a panel appears for every arm that got this far. `ensure` then
-        # asks for the box's one window, which every arm of a wave does and only one of them wins —
-        # the *viewer* holds the lock, so this call needs no coordination and makes no claim about
-        # having opened anything. The trainer holds the handle solely to reap it, which for a losing
-        # spawn happens at the first report. See `tools/chart_window.py` for why nothing in this loop
-        # may ever depend on it.
+        # Registered before the first step, so the scheduler -- which reads this registry to adopt an
+        # arm a killed predecessor left running, and to count trainers against the cap -- sees this arm
+        # at once. **The trainer opens no window** (2026-09-05): the box's one chart window is the
+        # scheduler's, and it follows the scheduler's own status file; see `tools/window.py` for why
+        # the arms racing for it was the cause of every window incident. Nothing in this loop may ever
+        # depend on a window.
         live_runs.register(self.policy)
-        self.chart_window = chart_window.ensure()
         if self.config['eval_queue']:
             # Shared across every arm on this box, and idempotent: the slot claim means four arms
             # launched in the same second produce `eval_workers` workers rather than four times as
@@ -454,11 +446,8 @@ class Trainer(object):
                 self._save_resume()
             if self._crossed(previous, self.report_interval):
                 self._write_report()
-                # A window that has exited stays a zombie until someone waits on it, and this parent
-                # lives for hours. `reap` polls; it never blocks on the window.
-                chart_window.reap(self.chart_window)
-                # Same reason, same non-blocking poll: a worker this arm started is its child, and a
-                # batch outlives several worker generations at five minutes of idle each.
+                # A worker this arm started is its child, and a batch outlives several worker
+                # generations at five minutes of idle each. `reap` polls; it never blocks on a worker.
                 self.eval_workers = eval_queue.reap(self.eval_workers)
         self._save_resume()
         # Before the report, so the close-out reads a complete history. An arm that stopped with its
@@ -473,7 +462,7 @@ class Trainer(object):
         self._write_report()
         # Not in a `finally`, and not worth one: `live_runs.live` drops an entry whose pid is gone, so
         # a `kill -9`, a crash and a Ctrl-C all clean up on the next read. This call is only so the
-        # window loses the panel the moment the arm finishes rather than at the next scan.
+        # scheduler sees the arm gone the moment it finishes rather than at the next scan.
         live_runs.unregister(self.policy)
         print('done at step {0:,}'.format(self.step), flush=True)
 

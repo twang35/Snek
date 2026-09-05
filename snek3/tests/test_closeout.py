@@ -1,19 +1,16 @@
-"""The close-out: one process per batch, both boxes, and the window over it.
+"""The close-out: one process per batch, both boxes.
 
 `tools/closeout.py` is what the desktop daemon dispatches and what an agent types on the laptop, so
 these fixtures are about the parts that only show up when something goes wrong — a failing arm, a
-raising arm, a window that cannot open — which is exactly where the two hand-written sequencers it
-replaced differed from each other.
+raising arm — which is exactly where the two hand-written sequencers it replaced differed from each
+other. The window is the scheduler's now (`tools/window.py`), so nothing here is about one.
 """
 
 import os
 
 import pytest
 
-from tools import chart_window
 from tools import closeout
-from tools import eval_window
-from tools import live_runs
 
 
 class Waves(object):
@@ -112,16 +109,7 @@ def waves(monkeypatch):
     return install
 
 
-@pytest.fixture
-def windows(monkeypatch):
-    """Records what `eval_window.ensure` was asked for, without opening anything."""
-    asked = []
-    monkeypatch.setattr(closeout.eval_window, 'ensure',
-                        lambda *args, **kwargs: asked.append((args, kwargs)))
-    return asked
-
-
-def test_every_arm_is_measured_in_the_order_the_batch_named_them(waves, windows):
+def test_every_arm_is_measured_in_the_order_the_batch_named_them(waves):
     stub = waves()
     assert closeout.run(['b1a', 'b1b', 'b1c'], shards=8) == 0
     assert stub.calls == ['b1a', 'b1b', 'b1c'], 'resolved in order'
@@ -129,14 +117,14 @@ def test_every_arm_is_measured_in_the_order_the_batch_named_them(waves, windows)
     assert sorted(stub.finished) == ['b1a', 'b1b', 'b1c']
 
 
-def test_one_arm_failing_does_not_drop_the_arms_behind_it(waves, windows):
+def test_one_arm_failing_does_not_drop_the_arms_behind_it(waves):
     """The `;`-not-`&&` rule of the shell chain this replaced. The incident is snek2's."""
     stub = waves({'b1a': 1})
     assert closeout.run(['b1a', 'b1b', 'b1c']) == 1
     assert stub.calls == ['b1a', 'b1b', 'b1c'], 'a bad first arm must not end the batch'
 
 
-def test_an_arm_that_raises_does_not_drop_the_arms_behind_it_either(waves, windows):
+def test_an_arm_that_raises_does_not_drop_the_arms_behind_it_either(waves):
     """A restore failure is one bad arm, not a bad batch — and it used to kill the whole pass."""
     stub = waves({'b1b': RuntimeError('no arch.json')})
     assert closeout.run(['b1a', 'b1b', 'b1c']) == 1
@@ -144,12 +132,12 @@ def test_an_arm_that_raises_does_not_drop_the_arms_behind_it_either(waves, windo
     assert stub.started == ['b1a', 'b1c']
 
 
-def test_the_status_is_a_failure_even_when_the_last_arm_succeeds(waves, windows):
+def test_the_status_is_a_failure_even_when_the_last_arm_succeeds(waves):
     waves({'b1a': 2})
     assert closeout.run(['b1a', 'b1b']) != 0
 
 
-def test_the_protocol_defaults_are_the_close_outs_own(waves, windows):
+def test_the_protocol_defaults_are_the_close_outs_own(waves):
     """The daemon passes a selector and an episode count only if a spec named them."""
     stub = waves()
     closeout.run(['b1a'])
@@ -159,7 +147,7 @@ def test_the_protocol_defaults_are_the_close_outs_own(waves, windows):
 
 # --- the pool --------------------------------------------------------------------------------------
 
-def test_arms_with_few_candidates_run_side_by_side_under_one_shard_budget(waves, windows):
+def test_arms_with_few_candidates_run_side_by_side_under_one_shard_budget(waves):
     """The hof30k case: eight arms with one candidate each used to be eight sequential single-shard
     waves. Pooled, all eight run at once and the wave takes one checkpoint's time."""
     arms = ['b14{0}'.format(letter) for letter in 'abcdefgh']
@@ -169,7 +157,7 @@ def test_arms_with_few_candidates_run_side_by_side_under_one_shard_budget(waves,
     assert stub.started == arms
 
 
-def test_the_pool_is_never_exceeded(waves, windows):
+def test_the_pool_is_never_exceeded(waves):
     arms = ['b14{0}'.format(letter) for letter in 'abcdefgh']
     stub = waves(candidates={arm: 5 for arm in arms}, ticks=2)
     closeout.run(arms, shards=12)
@@ -177,14 +165,14 @@ def test_the_pool_is_never_exceeded(waves, windows):
     assert stub.peak == 12, 'and it is kept full'
 
 
-def test_an_arm_gets_no_more_shards_than_it_has_candidates(waves, windows):
+def test_an_arm_gets_no_more_shards_than_it_has_candidates(waves):
     stub = waves(candidates={'b1a': 3, 'b1b': 40})
     closeout.run(['b1a', 'b1b'], shards=12)
     arms = {arm.policy: arm for arm in _ARMS}
     assert (len(arms['b1a'].running), len(arms['b1b'].running)) == (3, 12)
 
 
-def test_an_arm_with_no_candidates_is_closed_at_once_and_is_not_a_failure(waves, windows):
+def test_an_arm_with_no_candidates_is_closed_at_once_and_is_not_a_failure(waves):
     """Its empty pass file is what the next pass selects from."""
     stub = waves(candidates={'b1a': 0})
     assert closeout.run(['b1a', 'b1b']) == 0
@@ -192,7 +180,7 @@ def test_an_arm_with_no_candidates_is_closed_at_once_and_is_not_a_failure(waves,
     assert stub.started == ['b1b']
 
 
-def test_the_next_arm_starts_as_soon_as_a_slot_frees_not_when_the_arm_ends(waves, windows):
+def test_the_next_arm_starts_as_soon_as_a_slot_frees_not_when_the_arm_ends(waves):
     """Pool 4, first arm 6 candidates: its last two shards launch as the first four finish, and the
     second arm's shards fill whatever is free alongside them."""
     stub = waves(candidates={'b1a': 6, 'b1b': 6}, ticks=2)
@@ -201,75 +189,19 @@ def test_the_next_arm_starts_as_soon_as_a_slot_frees_not_when_the_arm_ends(waves
     assert stub.started == ['b1a', 'b1b']
 
 
-# --- the window ------------------------------------------------------------------------------------
-
-def test_the_window_is_asked_for_once_with_a_panel_per_arm(waves, windows):
-    closeout.run(['b1a', 'b1b'], label='ab')
-    assert len(windows) == 1, 'one window for the batch, not one per arm'
-    (paths,), kwargs = windows[0]
-    assert paths == eval_window.chart_paths(['b1a', 'b1b'], 'ab')
-    assert kwargs['watch_pids'] == [os.getpid()], 'so it closes when the pass ends'
-
-
-def test_no_window_is_asked_for_when_the_caller_says_not_to(waves, windows):
-    closeout.run(['b1a'], window=False)
-    assert windows == []
-
-
-def test_a_single_checkpoint_asks_for_no_window(waves, windows, monkeypatch):
-    """`one` writes no pass, so there would be nothing to draw."""
-    monkeypatch.setattr(closeout, 'measure_one', lambda *a, **k: None)
-    closeout.run(['b1a'], selector='one')
-    assert windows == []
-
-
-def test_a_single_checkpoint_runs_no_wave(waves, windows, monkeypatch):
+def test_a_single_checkpoint_runs_no_wave(waves, monkeypatch):
     stub = waves()
     monkeypatch.setattr(closeout, 'measure_one', lambda *a, **k: None)
     assert closeout.run(['b1a'], selector='one', episodes=3000) == 0
     assert stub.calls == [], 'the `one` selector is measured in this process, not by a wave'
 
 
-def test_the_eval_window_takes_a_different_slot_from_the_training_window():
-    """A box can hold both at once — nothing separates a training from an eval on the laptop."""
-    assert eval_window.SLOT_NAME != live_runs.WINDOW_LOCK_NAME
-    assert (live_runs.window_lock_path(None, eval_window.SLOT_NAME)
-            != live_runs.window_lock_path(None))
-
-
-def test_the_window_command_names_its_slot_its_panels_and_the_pid_it_watches():
-    argv = eval_window.command(['runs/a.png', 'runs/b.png'], watch_pids=[41, 42])
-    assert argv[argv.index('--slot') + 1] == eval_window.SLOT_NAME
-    assert argv[argv.index('--watch-pid') + 1] == '41,42'
-    assert argv[3] == 'tools.chart_viewer', 'the same viewer draws both windows'
-    assert 'runs/a.png' in argv and 'runs/b.png' in argv
-
-
-def test_a_chart_path_is_where_the_stage_b_pass_is_drawn():
-    from tools import stage_b_chart
-    assert eval_window.chart_paths(['b1a'], 'ab') == [stage_b_chart.chart_path('b1a', 'ab')]
-
-
-def test_windows_are_one_switch_and_not_two(monkeypatch):
-    """`SNEK_CHART_WINDOW=0` means "no window on this box", which is one decision."""
-    calls = []
-    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: calls.append(a))
-    assert eval_window.ensure(['runs/a.png'], env={'SNEK_CHART_WINDOW': '0'}) is None
-    assert calls == []
-
-
-def test_a_window_that_will_not_open_is_not_an_error(monkeypatch, capsys, tmp_path):
-    """A box with no display must not fail a measurement over a chart.
-
-    `runs_dir` is a tmp path deliberately: against the real registry this passed alone and failed in
-    the full suite, because a *live* stage-B window on the box holds the slot, `ensure` skips the
-    spawn it would obviously lose, and nothing reaches the failure path being tested.
-    """
-    def refuse(*args, **kwargs):
-        raise OSError('no display')
-    monkeypatch.setattr(chart_window.subprocess, 'Popen', refuse)
-    assert eval_window.ensure(['runs/a.png'], env={}, runs_dir=str(tmp_path)) is None
-    assert 'stage-B window' in capsys.readouterr().err
+def test_the_close_out_opens_no_window_of_its_own():
+    """Since 2026-09-05 the scheduler owns the box's window and points it at the pass's charts; a
+    close-out that opened one beside it was the two-windows-and-a-stand-by-loop design."""
+    import inspect
+    source = inspect.getsource(closeout)
+    assert 'eval_window' not in source and 'chart_window' not in source
 
 
 # --- the redraw ------------------------------------------------------------------------------------
@@ -306,66 +238,13 @@ def test_a_redraw_failure_is_swallowed(monkeypatch, capsys):
     assert 'chart redraw failed for b1a' in capsys.readouterr().err
 
 
-def test_a_redraw_failure_does_not_fail_the_arm(monkeypatch, waves, windows):
+def test_a_redraw_failure_does_not_fail_the_arm(monkeypatch, waves):
     def explode(*args, **kwargs):
         raise IOError('disk full')
     stub = waves()
     monkeypatch.setattr(closeout.stage_b_chart, 'redraw', explode)
     assert closeout.run(['b1a', 'b1b']) == 0
     assert stub.calls == ['b1a', 'b1b']
-
-
-def test_the_two_slots_do_not_exclude_each_other(tmp_path):
-    """The kernel enforces it, so this asks the kernel.
-
-    Two `flock`s on two different files coexist; two on the same one do not, even from one process,
-    because the lock belongs to the open file description. That pair is the whole property: a
-    stage-B window opens beside a training window, and a *second* stage-B window does not.
-    """
-    from tools import chart_viewer
-    runs = str(tmp_path)
-    assert chart_viewer.take_window_slot(runs) is not None, 'the training slot was free'
-    assert chart_viewer.take_window_slot(runs, eval_window.SLOT_NAME) is not None, \
-        'and the eval slot is a different lock'
-    assert chart_viewer.take_window_slot(runs, eval_window.SLOT_NAME) is None, \
-        'but only one window per slot'
-
-
-def test_the_close_out_starts_its_viewer_even_while_a_stage_b_window_is_up(monkeypatch, tmp_path):
-    """The 2026-09-04 case: b15's window was still in its closing grace when b11's pass asked.
-
-    `chart_window.ensure` would skip the spawn on the advisory pid and the pass would never ask again.
-    The eval side always spawns, and the viewer waits for the slot (`chart_viewer.stand_by_for_slot`).
-    """
-    runs_dir = str(tmp_path / 'runs')
-    lock = live_runs.window_lock_path(runs_dir, eval_window.SLOT_NAME)
-    os.makedirs(os.path.dirname(lock), exist_ok=True)
-    with open(lock, 'w') as handle:
-        handle.write('{0}\n'.format(os.getpid()))          # a live pid: us
-    assert eval_window.holder(runs_dir) == os.getpid(), 'the fixture reads as a live window'
-    spawned = []
-    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: spawned.append(a) or object())
-    assert eval_window.ensure(['runs/a.png'], watch_pids=[1], env={}, runs_dir=runs_dir) is not None
-    assert len(spawned) == 1
-
-
-def test_a_hand_relaunched_window_watches_the_pid_it_is_given(monkeypatch, tmp_path, capsys):
-    """`python -m tools.eval_window --watch-pid <close-out>` closes with the pass, like the window
-    the close-out would have opened. Before 2026-09-04 the relaunch had no such flag and never closed."""
-    monkeypatch.setattr(eval_window, 'holder', lambda *a, **k: None)
-    spawned = {}
-    monkeypatch.setattr(chart_window, 'spawn', lambda argv, label: spawned.setdefault('argv', argv))
-    assert eval_window.main(['b1a', '--label', 'ab', '--watch-pid', '41,42']) == 0
-    argv = spawned['argv']
-    assert argv[argv.index('--watch-pid') + 1] == '41,42'
-    assert 'stay up' not in capsys.readouterr().out
-
-
-def test_a_hand_relaunched_window_without_a_pid_says_it_will_not_close(monkeypatch, capsys):
-    monkeypatch.setattr(eval_window, 'holder', lambda *a, **k: None)
-    monkeypatch.setattr(chart_window, 'spawn', lambda argv, label: object())
-    assert eval_window.main([]) == 0
-    assert 'stay up until it is closed by hand' in capsys.readouterr().out
 
 
 # --- the passes, by name ---------------------------------------------------------------------------
@@ -406,7 +285,7 @@ def test_an_explicit_flag_wins_over_the_preset_but_none_never_unsets_it():
 def test_main_hands_the_pass_to_run(monkeypatch):
     seen = {}
 
-    def run(policies, selector, episodes, shards, label, width, seed, resume, merge, window):
+    def run(policies, selector, episodes, shards, label, width, seed, resume, merge):
         seen.update(policies=policies, selector=selector, episodes=episodes, shards=shards,
                     label=label, seed=seed)
         return 0

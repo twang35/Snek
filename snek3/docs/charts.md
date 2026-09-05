@@ -20,13 +20,12 @@ through, 8 at a time. Only a live arm's JSON waits for the `results` branch at c
 
 ## Watching them live
 
-**One window per box, opened by the trainings themselves**, showing every arm running there. Nothing
-launches it; the first arm to start opens it and the last one to finish takes it away — and a panel
-stays for the rest of the wave once it appears, so a batch with one arm left still shows all four. To
-put it back
-after closing it: `PYTHONPATH=. python -m tools.chart_window`. Killing it, closing it and relaunching
-it are all free — no training reads it, waits on it, or reopens it ([`findings.md`](findings.md) on why
-it took three attempts to get there).
+**One window per box, opened by the scheduler** (`tools/scheduler.py`, since 2026-09-05), showing
+every arm of the wave it is training and, during a pass, every arm's stage-B chart. Nothing launches it
+by hand and no training opens one: the scheduler opens it at a launch and closes it when it exits. To
+replace it now: `PYTHONPATH=. python -m tools.scheduler --reopen-window`. Killing it or closing it is
+free — no training reads it, waits on it, or reopens it ([`../plans/scheduler.md`](../plans/scheduler.md)
+on why the arms stopped opening it, and [`findings.md`](findings.md) on the three attempts before that).
 
 <!-- progress_update: batch b14 -->
 ## Batch b14 — the `rollout` sweep, 4 values x 4 seeds, 50M
