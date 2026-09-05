@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-04T20:10:50",
-  "ts": 1788577850.384583,
+  "iso": "2026-09-04T20:21:02",
+  "ts": 1788578462.370461,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -92,7 +92,7 @@
       "label": "hof eval: 652 checkpoints >=99/500 from 37 arms, at 5,000 then 30,000 (seed 7)",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 857
+      "elapsed_s": 1469
     }
   ],
   "ledger": {
@@ -740,8 +740,8 @@
   },
   "disk_free_gb": 132.1,
   "load_avg": [
-    4.103515625,
-    3.20849609375,
-    4.8359375
+    2.03857421875,
+    2.3720703125,
+    3.56884765625
   ]
 }
