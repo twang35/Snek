@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T14:32:14",
-  "ts": 1788643934.1995342,
+  "iso": "2026-09-05T14:42:18",
+  "ts": 1788644538.1857984,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip04, clipanneal | stage B (8 arms) | ~55m left"
+      "b17 | clip04, clipanneal | stage B (8 arms) | ~45m left"
     ],
     "queued": [
       "b17 evals | clip04, clipanneal (8 arms) | ~9m",
@@ -14,9 +14,9 @@
       "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 (24 arms) | ~3.2h"
     ],
     "attention": [],
-    "remaining": "~20h of work: 55m running + 19h queued; clear ~Sun 10:44",
+    "remaining": "~20h of work: 45m running + 19h queued; clear ~Sun 10:44",
     "laptop_running": [
-      "b19 | noadvnorm, mse | stage B (8 arms) | ~35m left"
+      "b19 | noadvnorm, mse | stage B (8 arms) | ~25m left"
     ],
     "laptop_queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~14m",
@@ -27,8 +27,8 @@
       "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 (24 arms) | ~4.4h",
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
     ],
-    "laptop_remaining": "~19h of work: 35m running + 18h queued; clear ~Sun 09:31",
-    "laptop_iso": "2026-09-05T14:28:51"
+    "laptop_remaining": "~19h of work: 25m running + 18h queued; clear ~Sun 09:31",
+    "laptop_iso": "2026-09-05T14:38:57"
   },
   "scheduler": {
     "alive": true,
@@ -36,7 +36,7 @@
     "spawned": 1788641970.9263482,
     "last_exit": null,
     "log": "/home/claw/.snek3-daemon/logs/scheduler-20260905-135930.log",
-    "status_iso": "2026-09-05T14:31:26"
+    "status_iso": "2026-09-05T14:41:28"
   },
   "runtime": {
     "max_trainers": 8,
@@ -70,7 +70,7 @@
       ],
       "step": null,
       "max_steps": null,
-      "eta_seconds": 3299.7905271053314
+      "eta_seconds": 2698.9455132484436
     }
   ],
   "ledger": {
@@ -652,8 +652,8 @@
   "disk_free_gb": 122.3,
   "head": "b3a99bd4acb7",
   "load_avg": [
-    12.2587890625,
-    12.6123046875,
-    13.33154296875
+    16.67626953125,
+    15.72998046875,
+    14.69140625
   ]
 }
