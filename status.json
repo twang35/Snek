@@ -1,12 +1,11 @@
 {
-  "iso": "2026-09-05T00:22:29",
-  "ts": 1788592949.559598,
+  "iso": "2026-09-05T01:02:14",
+  "ts": 1788595334.66062,
   "box": "laptop",
   "project": "snek3",
+  "pid": 26287,
   "at_a_glance": {
-    "running": [
-      "b16 | kl003, kl005 -- wave 1 of 5 | training 66% (8 arms)"
-    ],
+    "running": [],
     "queued": [
       "b16 evals | kl003, kl005 | queued (8 arms)",
       "b16 training | kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 -- waves 2-5 of 5 | queued (32 arms)",
@@ -18,88 +17,7 @@
     ],
     "attention": []
   },
-  "running": [
-    {
-      "id": "b16aa-kl003-seed1",
-      "type": "train",
-      "policy": "b16aa-kl003-seed1",
-      "policies": [
-        "b16aa-kl003-seed1"
-      ],
-      "step": 33505280,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16ab-kl003-seed2",
-      "type": "train",
-      "policy": "b16ab-kl003-seed2",
-      "policies": [
-        "b16ab-kl003-seed2"
-      ],
-      "step": 34045952,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16ac-kl003-seed3",
-      "type": "train",
-      "policy": "b16ac-kl003-seed3",
-      "policies": [
-        "b16ac-kl003-seed3"
-      ],
-      "step": 32276480,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16ad-kl003-seed4",
-      "type": "train",
-      "policy": "b16ad-kl003-seed4",
-      "policies": [
-        "b16ad-kl003-seed4"
-      ],
-      "step": 33259520,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16ae-kl005-seed1",
-      "type": "train",
-      "policy": "b16ae-kl005-seed1",
-      "policies": [
-        "b16ae-kl005-seed1"
-      ],
-      "step": 32030720,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16af-kl005-seed2",
-      "type": "train",
-      "policy": "b16af-kl005-seed2",
-      "policies": [
-        "b16af-kl005-seed2"
-      ],
-      "step": 32407552,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16ag-kl005-seed3",
-      "type": "train",
-      "policy": "b16ag-kl005-seed3",
-      "policies": [
-        "b16ag-kl005-seed3"
-      ],
-      "step": 32260096,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b16ah-kl005-seed4",
-      "type": "train",
-      "policy": "b16ah-kl005-seed4",
-      "policies": [
-        "b16ah-kl005-seed4"
-      ],
-      "step": 32391168,
-      "max_steps": 50003968
-    }
-  ],
+  "running": [],
   "queued_ids": [
     "b16-stageb",
     "b16-hof5000",
@@ -203,5 +121,7 @@
     "b20-stageb-w2",
     "b20-hof5000-w2",
     "b20-hof30k-w2"
-  ]
+  ],
+  "panels": [],
+  "window_pid": null
 }
