@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-04T21:42:35",
-  "ts": 1788583355.0035772,
+  "iso": "2026-09-04T21:52:43",
+  "ts": 1788583963.6916351,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b13 | hof eval: 680 checkpoints >=99/500 from 30 arms, at 5,000 then 30,000 (seed 7) | hof30k (30 arms)"
+      "b15 | hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7) | hof5000 (8 arms)"
     ],
     "queued": [
       "b15 evals | hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7) | queued (8 arms)",
@@ -44,51 +44,28 @@
   },
   "running": [
     {
-      "id": "b13-hof30k",
+      "id": "b15-hof5000",
       "type": "eval",
-      "policy": "b13ab-mb32-seed2",
+      "policy": "b15aa-ent0-seed1",
       "policies": [
-        "b13ab-mb32-seed2",
-        "b13ac-mb32-seed3",
-        "b13ad-mb32-seed4",
-        "b13ae-mb64-seed1",
-        "b13af-mb64-seed2",
-        "b13ag-mb64-seed3",
-        "b13ah-mb64-seed4",
-        "b13ai-mb128-seed1",
-        "b13aj-mb128-seed2",
-        "b13ak-mb128-seed3",
-        "b13al-mb128-seed4",
-        "b13am-mb192-seed1",
-        "b13an-mb192-seed2",
-        "b13ao-mb192-seed3",
-        "b13ap-mb192-seed4",
-        "b13aq-mb384-seed1",
-        "b13ar-mb384-seed2",
-        "b13as-mb384-seed3",
-        "b13at-mb384-seed4",
-        "b13au-mb512-seed1",
-        "b13av-mb512-seed2",
-        "b13aw-mb512-seed3",
-        "b13ax-mb512-seed4",
-        "b13ay-mb1024-seed1",
-        "b13az-mb1024-seed2",
-        "b13ba-mb1024-seed3",
-        "b13bb-mb1024-seed4",
-        "b13bd-mb2048-seed2",
-        "b13be-mb2048-seed3",
-        "b13bf-mb2048-seed4"
+        "b15aa-ent0-seed1",
+        "b15ab-ent0-seed2",
+        "b15ac-ent0-seed3",
+        "b15ad-ent0-seed4",
+        "b15ae-ent001-seed1",
+        "b15af-ent001-seed2",
+        "b15ag-ent001-seed3",
+        "b15ah-ent001-seed4"
       ],
-      "pid": 14574,
+      "pid": 66527,
       "step": 50003968,
-      "label": "hof eval: 680 checkpoints >=99/500 from 30 arms, at 5,000 then 30,000 (seed 7)",
+      "label": "hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7)",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 1622
+      "elapsed_s": 155
     }
   ],
   "ledger": {
-    "b15-hof5000": "queued",
     "b15-hof30k": "queued",
     "b15ai-ent003-seed1": "queued",
     "b15aj-ent003-seed2": "queued",
@@ -99,6 +76,7 @@
     "b15ao-ent005-seed3": "queued",
     "b15ap-ent005-seed4": "queued",
     "b15-stageb-w2": "queued",
+    "b15-hof5000-w2": "queued",
     "b15aq-ent02-seed1": "queued",
     "b15ar-ent02-seed2": "queued",
     "b15as-ent02-seed3": "queued",
@@ -108,6 +86,7 @@
     "b15aw-ent03-seed3": "queued",
     "b15ax-ent03-seed4": "queued",
     "b15-stageb-w3": "queued",
+    "b15-hof5000-w3": "queued",
     "b15ay-entanneal10-seed1": "queued",
     "b15az-entanneal10-seed2": "queued",
     "b15ba-entanneal10-seed3": "queued",
@@ -117,6 +96,7 @@
     "b15be-entanneal03-seed3": "queued",
     "b15bf-entanneal03-seed4": "queued",
     "b15-stageb-w4": "queued",
+    "b15-hof5000-w4": "queued",
     "b15bg-entanneal01-seed1": "queued",
     "b15bh-entanneal01-seed2": "queued",
     "b15bi-entanneal01-seed3": "queued",
@@ -126,6 +106,7 @@
     "b15bm-entanneal01to0-seed3": "queued",
     "b15bn-entanneal01to0-seed4": "queued",
     "b15-stageb-w5": "queued",
+    "b15-hof5000-w5": "queued",
     "b17aa-clip005-seed1": "queued",
     "b17ab-clip005-seed2": "queued",
     "b17ac-clip005-seed3": "queued",
@@ -335,7 +316,8 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b13-hof30k": "running",
+    "b15-hof5000": "running",
+    "b13-hof30k": "done",
     "b13-hof5000": "done",
     "b12-hof30k": "done",
     "b12-hof5000": "done",
@@ -730,10 +712,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 131.7,
+  "disk_free_gb": 131.6,
   "load_avg": [
-    3.0732421875,
-    3.0595703125,
-    4.32568359375
+    7.41259765625,
+    4.12158203125,
+    4.08544921875
   ]
 }
