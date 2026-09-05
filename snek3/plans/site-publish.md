@@ -56,9 +56,29 @@ person's branch, which is the mistake the whole git bus exists to avoid.
 |---|---|---|
 | 1 | `tools/scheduler.py` (+ `gitbus`) | **the laptop publishes finished work** the way the daemon does: at a wave's stage B, `hof5000` and `hof30k` ends, copy the wave's `.md`, `.png`, JSON and stage-B files to `laptop-results/<job-id>/` on a `laptop-results` branch through a worktree under `~/.snek3-laptop/results`. Same layout as `results`, so the progress update's importer reads both with one path. The publish is best-effort like `laptop-status`: a failure is logged and the next event retries |
 | 2 | `desktop/daemon/` | **the daemon builds the site**: a `site` worktree (`~/snek-bus/site`); on a network cycle where the head of `results` or `laptop-results` changed, stage `desktop/runs/` + every file under both feeds into a build directory, `viewer_manifest.build(build_dir)`, `publish_pages.publish(...)` into the worktree, one commit, `--force-with-lease`. The desktop's `status.json` is local, so pass states on the page are right; the laptop's come from `laptop-status` as they do today |
-| 3 | repo settings | Pages source → branch `site`, path `/`. Then `docs/` leaves `master` (`git rm -r docs`; `.gitignore` it) and `publish_pages` writes only to the worktree; a progress update stops committing charts and the manifest to `master` |
-| 4 | `tools/progress_update.py` | import closed waves from both feeds; drop the site publish and the chart commit from step 2 of the skill; keep committing a closed batch's JSON to `master` as the archive |
+| 3 | repo settings | Pages source → branch `site`, path `/`. Then `docs/` leaves `master` (`git rm -r docs`; `.gitignore` it) and `publish_pages` writes only to the worktree; a progress update stops committing charts and the manifest to `master`; `runs/*.png` leave master too (redrawable, see below) |
+| 4 | `tools/progress_update.py` | import closed waves from both feeds; drop the site publish and the chart commit from step 2 of the skill; keep committing a closed batch's JSON and `.md` to `master` as the archive; add `queue_action site` and the unconditional rebuild on `trigger` |
 | 5 | later, both feeds | make `results` and `laptop-results` snapshots too, or publish an arm's `_evals.json` once at its cap rather than with every pass: today each pass re-publishes it (1.7 MB x 3 passes x 8 arms per wave), and the `results` pack is 372 MB |
+
+## Two answers (user's questions, 2026-09-05)
+
+**Build on demand, not only on the ten-minute cycle.** The daemon's network cycle is `git_seconds` (600) but
+`ssh the-claw-den 'Snek/snek3/desktop/trigger'` already forces a cycle *now*, so the build hangs off that
+same cycle and the existing trigger is the button: it fetches both feeds, rebuilds if either moved, and
+**a triggered cycle rebuilds unconditionally**, so the desktop's live charts refresh even when no wave has
+closed. For the no-ssh path, `queue_action site` is a third named action beside `deploy` and `restart`,
+taken on the poll that sees it. The laptop's half is not a problem: its finished waves are pushed at the
+moment they finish, so a trigger never finds the laptop's feed behind by more than a push that failed
+(logged, retried on the next event).
+
+**Master keeps the JSON and the `.md`, not the pictures.** Every chart is a function of a JSON file the
+archive already holds: `tools.progress_chart <policy>` redraws `runs/<name>.png` from `_evals.json`, and
+`tools.stage_b_chart` redraws the stage-B, `hof5000` and `hof30k` pictures from their `_checkpoint_evals*`
+files — the docstrings say so and the trainer and close-out write the pictures through those two modules
+and nowhere else. The one thing *not* recoverable from JSON is the `.md`'s config table (the trainer passes
+the config in; `arch.json` holds only the architecture), and it is 2 KB. So at a batch's close-out master
+commits `_evals.json`, `_checkpoint_evals*.json` and `.md`; `.png` files leave master along with `docs/`,
+and the `site` branch is the only place pictures live. A picture anyone wants back is one command.
 
 **What stays manual:** the reading. The tables regenerate themselves; the sentences under them are the
 progress update, and that is the part worth a person's time.
