@@ -849,6 +849,18 @@ protocol that handles them.** An `flock` cannot be held twice, is released howev
 stop existing rather than needing a fourth branch. The cost is 7 processes × 0.3 s per batch, paid
 once, for a launcher with no protocol in it.
 
+**The stage-B window needed one more thing: a loser that waits (2026-09-04).** A close-out asks for
+its window once, at start, and the previous pass's window lingers `NEGATIVE_CHECKS` refreshes — up to
+60 s — after that pass exits, while the desktop dispatches the next job within its 30 s poll. So the
+new pass's ask met a live holder as the rule rather than the exception: b15's stage-B window closed at
+17:50:52, b11's `hof5000` pass started at 17:50:48 and drew nothing for its first hour. Two changes,
+both tested: `eval_window.ensure` no longer skips the spawn on the advisory pid (that skip is right for
+a wave of arms joining one window and wrong for a pass following a pass), and a viewer with pids to
+watch that loses the `flock` stands by — one `LOCK_NB` a second until the holder leaves, or its own
+pass ends (`chart_viewer.stand_by_for_slot`). The wait is bounded by the watched pids and by nothing
+else, so there is no grace constant to tune against the daemon's poll. The training window is
+unchanged: its losers have no pass of their own and still exit in 0.3 s.
+
 **Panels are sticky within a wave**, added 2026-08-29 at the user's request and for the right reason:
 a batch is read as a batch, so with one arm left of four the other three are most of the answer. That
 needs a rule for when a wave *ends*, or the set grows forever — here, the registry going empty and an

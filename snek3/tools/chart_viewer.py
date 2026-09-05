@@ -492,6 +492,37 @@ def take_window_slot(runs_dir, slot=None):
     return descriptor
 
 
+STANDBY_POLL_SECONDS = 1.0
+
+
+def stand_by_for_slot(runs_dir, slot, watch_pids, poll=STANDBY_POLL_SECONDS, sleep=time.sleep):
+    """Keeps asking for a slot another window holds, until it is free or this pass is over.
+
+    Returns what `take_window_slot` returns once it wins, or None once the watched pids are gone.
+
+    **This exists because the previous window outlives the pass it was opened for.** A stage-B window
+    closes `NEGATIVE_CHECKS` refreshes after its close-out exits — up to a minute — and the desktop's
+    daemon dispatches the next pass within its 30 s poll, so the next close-out's window almost always
+    arrives while the last one is still up. Found 2026-09-04: b15's stage-B window closed at 17:50:52,
+    b11's hof5000 pass started at 17:50:48, asked once, was told a window was up, and ran its first
+    hour with no window at all. Lingering here costs one idle process for under a minute, and when
+    the holder leaves — however it leaves, since the lock is the kernel's — the next `LOCK_NB` wins.
+
+    Only a window with pids to watch stands by, because those are what bound the wait: the pass it
+    was opened for. A training window (`--runs-dir`) has no such pids and no such need — the one
+    window shows every arm on the box, so a loser there has nothing to wait for.
+    """
+    negatives = 0
+    while True:
+        negatives, gone = watch_step(watch_pids, negatives)
+        if gone:
+            return None
+        descriptor = take_window_slot(runs_dir, slot)
+        if descriptor is not None:
+            return descriptor
+        sleep(poll)
+
+
 def watch_step(watch_pids, negatives):
     """One check of the watched pids. Returns `(negatives, close)`.
 
@@ -595,7 +626,20 @@ def main(argv=None):
     # window is up.
     slot = args.slot or (live_runs.WINDOW_LOCK_NAME if args.runs_dir is not None else None)
     if slot:
-        if take_window_slot(args.runs_dir, slot) is None:
+        descriptor = take_window_slot(args.runs_dir, slot)
+        if descriptor is None and pids:
+            # A window opened for a pass waits for the slot rather than giving it up: the holder is
+            # most often the previous pass's window in its closing grace. See `stand_by_for_slot`.
+            print('a window is already up on slot {0} (pid {1}); standing by until it closes or '
+                  'pid(s) {2} end'.format(
+                      slot, live_runs.read(live_runs.window_lock_path(args.runs_dir, slot)),
+                      args.watch_pid), flush=True)
+            descriptor = stand_by_for_slot(args.runs_dir, slot, pids)
+            if descriptor is None:
+                print('pid(s) {0} ended before the slot came free; nothing to do'.format(
+                    args.watch_pid), flush=True)
+                return 0
+        if descriptor is None:
             # Every arm of a wave asks for the training window, so this is the ordinary outcome for
             # all but one of them and not a failure. Said out loud anyway: it lands in the log of the
             # arm whose spawn lost, where the alternative is a viewer that vanished with no

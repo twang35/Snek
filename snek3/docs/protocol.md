@@ -14,7 +14,8 @@ PYTHONPATH=. python -m tools.progress_chart <policy>            # redraw runs/<p
 PYTHONPATH=. python -m tools.stage_b_chart <policy> --label L   # the pass, drawn and summarised
 PYTHONPATH=. python -m tools.chart_viewer --glob 'runs/b48*.png'  # a window over arbitrary PNGs
 PYTHONPATH=. python -m tools.chart_window                       # the box's own window, if it is down
-PYTHONPATH=. python -m tools.eval_window                        # the stage-B window, if it is down
+PYTHONPATH=. python -m tools.eval_window --watch-pid <close-out>  # the stage-B window, if it is down;
+                                                                # without the pid it stays until closed by hand
 ```
 
 ## Two stages, and only two

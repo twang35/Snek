@@ -78,11 +78,22 @@ held the eval slot's `flock` the whole time, so six later stage-B waves and the 
 no window and nothing said so. The viewer now checks its watched pids in that branch too (fix in
 `tools/chart_viewer.py`, with a test). **The symptom to recognise is "the eval is running but there is no
 window": `cat desktop/runs/.live/.evalwindow` on the box names the holder, `ps -p` it, and if it belongs to a
-finished pass, `kill <pid>` it and reopen with `python -m tools.eval_window <arms> --label <label>`** —
+finished pass, `kill <pid>` it and reopen with `python -m tools.eval_window <arms> --label <label> --watch-pid <close-out pid>`** (the pid is
+what closes it when the pass ends; without it the window stays until closed by hand) —
 `SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs DISPLAY=:0 XAUTHORITY=/run/user/1000/gdm/Xauthority` on the desktop
 (the box's arms write under `desktop/runs/`, not `runs/`), `setsid` so it outlives the ssh.
 A close-out asks for its window once, at start, so one that started while the stale holder was alive
 gets no second chance without that hand relaunch.
+
+**The same symptom with a *healthy* predecessor, and it was the normal case** — found 2026-09-04. A
+stage-B window closes three refreshes (up to 60 s) after its pass exits, and the desktop dispatches the
+next pass within its 30 s poll, so the next close-out nearly always asked while the last window was still
+up: b15's window closed at 17:50:52, b11's `hof5000` pass started at 17:50:48, was told a window was up,
+and ran an hour with none. Now the eval side always spawns its viewer, and a viewer that loses the slot
+**stands by** — retrying the `flock` each second until the holder leaves or the pass it watches ends
+(`chart_viewer.stand_by_for_slot`). Training-window losers still exit at once; they have no pass to wait
+for. If the symptom recurs, the hand relaunch above is still the remedy, and the lock file still names
+the holder.
 
 **A stage-B close-out gets the same treatment**, in a second window of its own: `tools/closeout.py`
 opens one panel per arm of the batch it is measuring and it closes when the pass ends. Same viewer,

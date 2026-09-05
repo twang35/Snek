@@ -61,7 +61,8 @@ PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 12  # a whole batc
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
 PYTHONPATH=. python -m tools.chart_window                # the box's chart window, if it is not up
-PYTHONPATH=. python -m tools.eval_window                 # the box's stage-B window, if it is not up
+PYTHONPATH=. python -m tools.eval_window --watch-pid <close-out pid>   # the box's stage-B window, if it is
+                                                         # not up; without the pid it never closes itself
 ```
 
 **The snek2 champion converts in one command**, and is the reference policy for any A/B:

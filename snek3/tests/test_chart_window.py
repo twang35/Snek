@@ -593,11 +593,99 @@ def test_the_stage_b_window_honours_the_env_knobs_too(monkeypatch):
     """
     from tools import eval_window
     captured = {}
-    monkeypatch.setattr(chart_window, 'ensure',
-                        lambda runs_dir, env, argv, slot, label=None: captured.setdefault('argv', argv))
+    monkeypatch.setattr(chart_window, 'spawn',
+                        lambda runs_dir, env, argv, label=None: captured.setdefault('argv', argv))
     monkeypatch.setenv('SNEK_CHART_WINDOW_MAX_PX', '1800')
     monkeypatch.setenv('SNEK_CHART_WINDOW_SCALE', '0.7')
+    monkeypatch.delenv('SNEK_CHART_WINDOW', raising=False)   # a shell that has windows off would skip the spawn
     eval_window.ensure(['a.png'])
     argv = captured['argv']
     assert argv[argv.index('--max-width-px') + 1] == '1800'
     assert argv[argv.index('--scale') + 1] == '0.7'
+
+
+# --- the standby: the stage-B window and its predecessor's closing grace ---------------------------
+#
+# A stage-B window closes NEGATIVE_CHECKS refreshes (up to a minute) after its close-out exits, and the
+# desktop dispatches the next pass within 30 s — so the next pass's window almost always arrives while
+# the last is still up. 2026-09-04: b11's hof5000 pass ran an hour with no window for exactly this.
+
+def hold_the_slot(tmp_path, seconds):
+    """A real process holding the training slot for `seconds`. Returns its Popen, already holding."""
+    lock = live_runs.window_lock_path(runs(tmp_path))
+    source = RACER.format(root=ROOT, runs=runs(tmp_path), hold=seconds)
+    holder = subprocess.Popen([sys.executable, '-c', source], stdin=subprocess.PIPE)
+    holder.stdin.write(b'x')
+    holder.stdin.close()
+    deadline = time.time() + 10
+    while live_runs.read(lock) != holder.pid and time.time() < deadline:
+        time.sleep(0.05)
+    assert live_runs.read(lock) == holder.pid, 'the holder did not take the slot'
+    return holder
+
+
+def test_a_window_with_a_pass_to_watch_stands_by_and_takes_the_slot_when_the_holder_leaves(tmp_path):
+    holder = hold_the_slot(tmp_path, seconds=1.5)
+    try:
+        assert chart_viewer.take_window_slot(runs(tmp_path)) is None, 'the holder has it'
+        started = time.time()
+        won = chart_viewer.stand_by_for_slot(runs(tmp_path), None, [os.getpid()], poll=0.1)
+        assert won is not None, 'the standby never got the slot'
+        assert time.time() - started < 10
+        assert live_runs.read(live_runs.window_lock_path(runs(tmp_path))) == os.getpid()
+    finally:
+        holder.kill()
+        holder.wait(timeout=30)
+
+
+def test_a_standby_gives_up_once_the_pass_it_was_opened_for_has_ended(tmp_path):
+    """The wait is bounded by the watched pids and by nothing else — no deadline to tune."""
+    holder = hold_the_slot(tmp_path, seconds=30.0)
+    try:
+        started = time.time()
+        assert chart_viewer.stand_by_for_slot(runs(tmp_path), None, [DEAD_PID], poll=0.05) is None
+        assert time.time() - started < 10
+    finally:
+        holder.kill()
+        holder.wait(timeout=30)
+
+
+def test_a_standby_does_not_believe_one_negative_check(tmp_path, monkeypatch):
+    """The same `NEGATIVE_CHECKS` rule as the window's own close: one lost `ps` is not the pass ending."""
+    answers = iter([False, True, False, False, False])
+    monkeypatch.setattr(chart_viewer, 'pids_alive', lambda pids: next(answers))
+    taken = []
+    monkeypatch.setattr(chart_viewer, 'take_window_slot', lambda *a: taken.append(1) and None)
+    assert chart_viewer.stand_by_for_slot(runs(tmp_path), None, [1], poll=0, sleep=lambda s: None) is None
+    # One ask per check that did not end it: after the lone negative, after the True that reset the
+    # count, and after the first two of the three negatives in a row. The third ends it before asking.
+    assert len(taken) == 4, 'it kept asking after the single negative, and stopped after three in a row'
+
+
+def test_a_stage_b_window_that_loses_the_slot_stands_by_rather_than_standing_down(tmp_path, monkeypatch):
+    monkeypatch.setattr(chart_viewer, 'take_window_slot', lambda *a, **k: None)
+    stood_by, drew = [], []
+    monkeypatch.setattr(chart_viewer, 'stand_by_for_slot',
+                        lambda runs_dir, slot, pids, **k: stood_by.append((slot, pids)) or 7)
+    monkeypatch.setattr(chart_viewer, 'run', lambda *a, **k: drew.append(1))
+    assert chart_viewer.main([chart(tmp_path, 'b1a'), '--slot', 'evalwindow',
+                              '--watch-pid', '41,42']) == 0
+    assert stood_by == [('evalwindow', [41, 42])]
+    assert drew == [1], 'having won the slot from standby, it is the window'
+
+
+def test_a_stage_b_window_whose_pass_ends_while_standing_by_never_draws(tmp_path, monkeypatch):
+    monkeypatch.setattr(chart_viewer, 'take_window_slot', lambda *a, **k: None)
+    monkeypatch.setattr(chart_viewer, 'stand_by_for_slot', lambda *a, **k: None)
+    monkeypatch.setattr(chart_viewer, 'run', lambda *a, **k: pytest.fail('drew anyway'))
+    assert chart_viewer.main([chart(tmp_path, 'b1a'), '--slot', 'evalwindow',
+                              '--watch-pid', '41']) == 0
+
+
+def test_a_training_window_that_loses_the_slot_still_stands_down_at_once(tmp_path, monkeypatch):
+    """Seven of eight arms lose, and they must keep exiting in ~0.3 s: no pids, no standby."""
+    monkeypatch.setattr(chart_viewer, 'take_window_slot', lambda *a, **k: None)
+    monkeypatch.setattr(chart_viewer, 'stand_by_for_slot',
+                        lambda *a, **k: pytest.fail('a training window stood by'))
+    monkeypatch.setattr(chart_viewer, 'run', lambda *a, **k: pytest.fail('drew anyway'))
+    assert chart_viewer.main(['--runs-dir', runs(tmp_path)]) == 0

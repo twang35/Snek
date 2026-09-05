@@ -80,13 +80,21 @@ def ensure(paths=(), glob_pattern=None, watch_pids=(), runs_dir=None, env=None, 
     """Asks for the stage-B window. Returns the Popen of the process started, or None.
 
     None means nothing was started — windows are off (`SNEK_CHART_WINDOW=0`, the same switch as the
-    training window, because "no window on this box" is one decision and not two), one is already up,
-    or it would not start. A close-out must not care either way.
+    training window, because "no window on this box" is one decision and not two) or it would not
+    start. A close-out must not care either way.
+
+    **Unlike the training window, a holder does not stop the spawn.** `chart_window.ensure` skips a
+    spawn when the slot's pid is alive, which is right for a wave of arms joining one window and
+    wrong here: the live holder is usually the *previous* pass's window in its closing grace, and a
+    close-out asks exactly once. So the viewer is always started, and it is the viewer that waits for
+    the slot and takes it when the holder leaves (`chart_viewer.stand_by_for_slot`). 2026-09-04.
     """
+    if not chart_window.wanted(env):
+        return None
     if scale is None and max_width_px is None:
         scale, max_width_px = chart_window.sizing(env)
     argv = command(paths, glob_pattern, watch_pids, scale, None, max_width_px)
-    return chart_window.ensure(runs_dir, env, argv, SLOT_NAME, label='stage-B window')
+    return chart_window.spawn(runs_dir, env, argv, label='stage-B window')
 
 
 reap = chart_window.reap
@@ -97,11 +105,21 @@ def main(argv=None):
 
     With no policies it shows whatever stage-B charts are newest, which is what a window relaunched
     mid-pass wants and saves typing eight arm names.
+
+    **Give it the close-out's pid with `--watch-pid`**, and it closes when the pass does, exactly like
+    the window the close-out would have opened. Without one it has no way to know when the pass ends
+    — the viewer only closes on watched pids or on the training registry — so it stays up until
+    closed by hand, and says so. Until 2026-09-04 it said nothing, and a relaunched window sat on the
+    slot after its pass, which is the very thing the relaunch was fixing.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('policies', nargs='*', help='the batch; default is the newest charts')
     parser.add_argument('--label', default=None, help='names the pass, as passed to the close-out')
+    parser.add_argument('--watch-pid', default='',
+                        help="the close-out's pid (comma-separated for several); the window closes "
+                             'once none is alive. Without it the window stays until closed by hand')
     args = parser.parse_args(argv)
+    watch_pids = [int(token) for token in args.watch_pid.split(',') if token.strip()]
 
     current = holder()
     if current:
@@ -109,8 +127,10 @@ def main(argv=None):
         return 0
     paths = chart_paths(args.policies, args.label) if args.policies else ()
     glob_pattern = None if args.policies else os.path.join(constants.RUNS_DIR, GLOB)
+    if not watch_pids:
+        print('no --watch-pid: this window will stay up until it is closed by hand', flush=True)
     # The child says whether it got the slot, on this terminal. Nothing to add.
-    return 0 if chart_window.spawn(argv=command(paths, glob_pattern),
+    return 0 if chart_window.spawn(argv=command(paths, glob_pattern, watch_pids),
                                    label='stage-B window') is not None else 1
 
 

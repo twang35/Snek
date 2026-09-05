@@ -214,3 +214,40 @@ def test_the_two_slots_do_not_exclude_each_other(tmp_path):
         'and the eval slot is a different lock'
     assert chart_viewer.take_window_slot(runs, eval_window.SLOT_NAME) is None, \
         'but only one window per slot'
+
+
+def test_the_close_out_starts_its_viewer_even_while_a_stage_b_window_is_up(monkeypatch, tmp_path):
+    """The 2026-09-04 case: b15's window was still in its closing grace when b11's pass asked.
+
+    `chart_window.ensure` would skip the spawn on the advisory pid and the pass would never ask again.
+    The eval side always spawns, and the viewer waits for the slot (`chart_viewer.stand_by_for_slot`).
+    """
+    runs_dir = str(tmp_path / 'runs')
+    lock = live_runs.window_lock_path(runs_dir, eval_window.SLOT_NAME)
+    os.makedirs(os.path.dirname(lock), exist_ok=True)
+    with open(lock, 'w') as handle:
+        handle.write('{0}\n'.format(os.getpid()))          # a live pid: us
+    assert eval_window.holder(runs_dir) == os.getpid(), 'the fixture reads as a live window'
+    spawned = []
+    monkeypatch.setattr(chart_window, 'spawn', lambda *a, **k: spawned.append(a) or object())
+    assert eval_window.ensure(['runs/a.png'], watch_pids=[1], env={}, runs_dir=runs_dir) is not None
+    assert len(spawned) == 1
+
+
+def test_a_hand_relaunched_window_watches_the_pid_it_is_given(monkeypatch, tmp_path, capsys):
+    """`python -m tools.eval_window --watch-pid <close-out>` closes with the pass, like the window
+    the close-out would have opened. Before 2026-09-04 the relaunch had no such flag and never closed."""
+    monkeypatch.setattr(eval_window, 'holder', lambda *a, **k: None)
+    spawned = {}
+    monkeypatch.setattr(chart_window, 'spawn', lambda argv, label: spawned.setdefault('argv', argv))
+    assert eval_window.main(['b1a', '--label', 'ab', '--watch-pid', '41,42']) == 0
+    argv = spawned['argv']
+    assert argv[argv.index('--watch-pid') + 1] == '41,42'
+    assert 'stay up' not in capsys.readouterr().out
+
+
+def test_a_hand_relaunched_window_without_a_pid_says_it_will_not_close(monkeypatch, capsys):
+    monkeypatch.setattr(eval_window, 'holder', lambda *a, **k: None)
+    monkeypatch.setattr(chart_window, 'spawn', lambda argv, label: object())
+    assert eval_window.main([]) == 0
+    assert 'stay up until it is closed by hand' in capsys.readouterr().out

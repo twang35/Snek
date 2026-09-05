@@ -112,7 +112,8 @@ opened, and open it yourself if it did not:**
 ```
 ps -Ao pid=,etime=,command= | grep '[c]hart_viewer' | grep -v 'zsh -c'      # expect one line titled stage B
 PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.eval_window <arm...> --label hof5000 \
-    > logs/<batch>-hof5000-window.log 2>&1 &                                  # only if the ps shows none
+    --watch-pid <close-out pid> > logs/<batch>-hof5000-window.log 2>&1 &   # only if the ps shows none;
+                                                    # without --watch-pid the window never closes itself
 ```
 
 The window is one per box by an `flock`, so a pass launched while a *stale* window holds the lock draws
