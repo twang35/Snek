@@ -18,7 +18,7 @@ redo any of that by hand — if a number you need is missing from the digest, ad
 
 ```
 PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.progress_update
-ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   # laptop: the tool does not see it
+ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   # laptop cross-check; status.json's laptop_running / laptop_queued (from the queue driver, as of laptop_iso) is the first read
 ```
 
 The tool, in order: fetches `results`, `ops-status` and `ops`; imports any closed stage-B wave's files

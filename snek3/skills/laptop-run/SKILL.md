@@ -20,7 +20,17 @@ Run from `snek3/`.
 - **Verification runs use the policy name `smoke`**, so output lands in `savedPolicies/smoke/` and is
   safe to delete.
 
-## Train
+## Launch through the queue, not by hand
+
+**Arms are launched by dropping their specs into `logs/laptop-queue/<batch>/` and starting the queue
+driver** ("Queueing batches here" below) — for a batch dequeued from the desktop *and* for arms written
+for the laptop: write the specs (`queue/examples/` on `ops` has the shape; `tools.sweep_specs` writes a
+batch's) and queue them. The driver is what publishes the laptop's state to the `laptop-status` branch,
+which the desktop folds into `ops-status` as `laptop_running` / `laptop_queued`, so an arm started with
+a bare `train.py` is invisible to every status read (user, 2026-09-04). The bare command below is for a
+smoke or a one-off check, not for an arm anyone will read about later.
+
+## Train (one-off only)
 
 Hyperparameters are `SNEK_*` env vars, so variants run side by side with no file edits.
 `docs/running.md` is the knob list.
@@ -85,7 +95,11 @@ PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batc
     > logs/laptop-queue.log 2>&1 &                                       # only if none is
 ```
 
-Each subdirectory of `logs/laptop-queue/` is a batch. The driver runs them in name order, one at a
+Each subdirectory of `logs/laptop-queue/` is a batch. The driver publishes what it is doing to the
+`laptop-status` branch on every launch, exit and pass, every ten minutes while it waits, and once more,
+empty, as it exits (`--no-status` turns that off, for a smoke); read it with the desktop's
+`git fetch origin ops-status && git show origin/ops-status:status.json` under `laptop_running` /
+`laptop_queued`. The driver runs the batches in name order, one at a
 time with waves and all three passes, **rescans the directory between batches** so a batch dropped in
 while another runs is picked up next, and exits when nothing there has work left. So queueing a batch
 while the driver is up is just the first two lines; while it is down, all four. It is not a daemon:

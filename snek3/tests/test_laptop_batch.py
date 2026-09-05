@@ -28,10 +28,21 @@ def write_specs(directory, policies):
 
 
 class FakeProcess(object):
-    def __init__(self, pid):
-        self.pid = pid
+    """Exits on the first poll unless told to take `polls` polls first (the driver polls, it does not
+    block in `wait`, so it can republish its status while an arm runs)."""
+
+    def __init__(self, pid, polls=0):
+        self.pid, self.polls, self.returncode = pid, polls, None
+
+    def poll(self):
+        if self.polls > 0:
+            self.polls -= 1
+            return None
+        self.returncode = 0
+        return 0
 
     def wait(self):
+        self.returncode = 0
         return 0
 
 
@@ -356,3 +367,112 @@ def test_a_finished_batch_left_in_the_queue_costs_nothing(tmp_path, box):
 def test_queue_and_specs_are_exclusive_on_the_command_line(tmp_path):
     with pytest.raises(SystemExit):
         laptop_batch.main(['--queue', str(tmp_path), 'somefile.json'])
+
+
+# ---------------------------------------------------------------- laptop-status
+
+class Published(object):
+    """Stands in for `laptop_status.Publisher`: keeps every status dict handed to it."""
+
+    def __init__(self):
+        self.statuses = []
+
+    def publish(self, status):
+        self.statuses.append(status)
+        return True
+
+    def glance(self, index):
+        return self.statuses[index]['at_a_glance']
+
+
+class FinishingCalls(Calls):
+    """Launches write the arm's finished `_evals.json` and passes write their merged file, so the
+    driver's view of what is owed moves the way a real wave's does."""
+
+    def __init__(self, runs, codes=None):
+        Calls.__init__(self, codes)
+        self.runs = runs
+
+    def popen(self, argv, **kwargs):
+        policy = argv[-1]
+        with open(os.path.join(self.runs, policy + '_evals.json'), 'w') as handle:
+            json.dump({'summary': {'step': int(kwargs['env']['SNEK_MAX_STEPS'])}}, handle)
+        return Calls.popen(self, argv, **kwargs)
+
+    def call(self, argv, **kwargs):
+        code = Calls.call(self, argv, **kwargs)
+        pass_name, arms, _ = self.events[-1]
+        for policy in arms:
+            open(laptop_batch.pass_file(policy, pass_name, self.runs), 'w').close()
+        return code
+
+
+def _spec(policy, label):
+    return {'id': policy, 'policy': policy, 'max_steps': 100, 'env': {}, 'label': label}
+
+
+def test_the_queue_publishes_both_boxes_shape_on_every_event_and_empty_when_it_exits(tmp_path, box):
+    """The desktop's own `build_at_a_glance` draws the lines, so a running laptop wave reads exactly
+    as a desktop one does, and the other batch waiting in the queue directory is listed as owed."""
+    queue = tmp_path / 'queue'
+    for name, specs in (('b1', [_spec('b1a-x-seed1', 'b1: x, seed 1 of 2 -- wave 1 of 1'),
+                                _spec('b1b-x-seed2', 'b1: x, seed 2 of 2 -- wave 1 of 1')]),
+                        ('b2', [_spec('b2a-y-seed1', 'b2: y, seed 1 of 1 -- wave 1 of 1')])):
+        (queue / name).mkdir(parents=True)
+        for spec in specs:
+            (queue / name / (spec['id'] + '.json')).write_text(json.dumps(spec))
+    calls = FinishingCalls(box['runs'])
+    published = Published()
+    make = lambda specs: driver(specs, box, calls, wave=2)
+    reporter = laptop_batch.Reporter(published, queue_dir=str(queue), make_driver=make)
+
+    laptop_batch.run_queue(str(queue), make, reporter=reporter)
+
+    first = published.glance(0)
+    assert first['running'] == ['b1 | x -- wave 1 of 1 | training 100% (2 arms)']
+    assert first['queued'] == ['b1 evals | x | queued (2 arms)',
+                               'b2 training | y -- wave 1 of 1 | queued (1 arm)',
+                               'b2 evals | y | queued (1 arm)']
+    running_lines = [line for status in published.statuses for line in status['at_a_glance']['running']]
+    assert 'b1 | x | stage B (2 arms)' in running_lines
+    assert 'b1 | x | hof5000 (2 arms)' in running_lines
+    assert 'b1 | x | hof30k (2 arms)' in running_lines
+    assert 'b2 | y -- wave 1 of 1 | training 100% (1 arm)' in running_lines
+    last = published.statuses[-1]
+    assert last['at_a_glance'] == {'running': [], 'queued': [], 'attention': []}
+    assert last['box'] == 'laptop' and last['iso'] and last['running'] == []
+
+
+def test_a_waiting_driver_republishes_every_ten_minutes_so_the_percent_moves(box):
+    clock = {'now': 0.0}
+
+    def sleep(seconds):
+        clock['now'] += 400.0
+
+    calls = Calls()
+    slow = FakeProcess(1, polls=3)
+    calls.popen = lambda argv, **kwargs: slow
+    published = Published()
+    d = laptop_batch.Driver([_spec('b1a-x-seed1', 'b1: x')], runs_dir=box['runs'], logs_dir=box['logs'],
+                            popen=calls.popen, call=calls.call, sleep=sleep, python='py', stage_b=False,
+                            reporter=laptop_batch.Reporter(published), clock=lambda: clock['now'])
+    d.run()
+    # at launch (t=0); at the poll that crosses 600 s (t=800); at the arm's exit
+    assert len(published.statuses) == 3
+    assert published.glance(0)['running'] == ['b1 | x | training (1 arm)']
+    assert published.glance(-1)['running'] == []
+
+
+def test_a_publisher_that_fails_never_stops_the_driver(box):
+    from tools import laptop_status
+    logged = []
+    publisher = laptop_status.Publisher(host_config={'STATUS_BRANCH': 'x'},
+                                        publish_status=lambda host, text: 1 / 0,
+                                        ensure=lambda host: None, log=logged.append)
+    assert publisher.publish(laptop_status.build([], [])) is False
+    assert 'publish failed' in logged[0]
+    calls = Calls()
+    d = driver([_spec('b1a-x-seed1', 'b1: x')], box, calls, stage_b=False,
+               reporter=laptop_batch.Reporter(publisher))
+    assert d.run() == 0
+    assert [event[0] for event in calls.events] == ['train']

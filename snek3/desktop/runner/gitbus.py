@@ -1,10 +1,11 @@
-"""All git interaction, over three single-writer branches.
+"""All git interaction, over four single-writer branches.
 
 | branch | writer | read here | payload |
 |---|---|---|---|
 | `ops` | laptop | yes, read-only | `queue/pending/*.json` specs, `config/runtime.json` |
 | `ops-status` | **desktop** | no | `status.json` |
 | `results` | **desktop** | no | `results/<job-id>/*` artifacts |
+| `laptop-status` | laptop (`tools/laptop_status.py`) | yes, read-only | the laptop's `status.json`, folded into ours as `at_a_glance.laptop_*` |
 
 `ops` is read straight from the fetched ref with `git show` / `git ls-tree`, so it is never checked
 out and never risks a working-tree conflict. The two written branches go through dedicated
@@ -101,6 +102,24 @@ def _ops_ref(host):
 def fetch(host):
     _git(['fetch', host['GIT_REMOTE'], host['OPS_BRANCH'],
           host['STATUS_BRANCH'], host['RESULTS_BRANCH']], cwd=host['REPO_PATH'])
+
+
+def laptop_status_branch(host):
+    """`LAPTOP_STATUS_BRANCH` from `host.env`, defaulting rather than required: a new required key
+    would crash `load_host_config` on the box the moment the deploy landed (see `trigger_path`)."""
+    return host.get('LAPTOP_STATUS_BRANCH') or 'laptop-status'
+
+
+def fetch_laptop_status(host):
+    """Fetches the laptop's status branch on its own, so its absence -- before the laptop has ever
+    published -- cannot fail the fetch of the three branches the box needs."""
+    _git(['fetch', host['GIT_REMOTE'], laptop_status_branch(host)], cwd=host['REPO_PATH'])
+
+
+def read_laptop_status(host):
+    """The laptop's `status.json` as text from the fetched ref, or `''` when there is none yet."""
+    return _git(['show', '{0}/{1}:status.json'.format(host['GIT_REMOTE'], laptop_status_branch(host))],
+                cwd=host['REPO_PATH'])
 
 
 def read_pending_jobs(host):

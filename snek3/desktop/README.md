@@ -2,7 +2,7 @@
 
 A stdlib-only systemd daemon on a dedicated Linux box that runs trainings and evals unattended. It
 **imports nothing from this project** — it shells out to `train.py` and `tools/closeout.py` — and it talks
-to the laptop only through three single-writer git branches. That decoupling is the design's best
+to the laptop only through four single-writer git branches. That decoupling is the design's best
 property: the bus works from anywhere, `ssh` is a convenience, and the daemon cannot be broken by a
 change to the trainer.
 
@@ -14,8 +14,11 @@ branch, which is why every spec carries a required `project` field.
 | `ops` | **laptop** | `snek3/desktop/queue/pending/*.json` specs, `snek3/desktop/config/runtime.json` |
 | `ops-status` | **desktop** | `status.json` — heartbeat, running jobs, ledger, `at_a_glance` |
 | `results` | **desktop** | `results/<job-id>/*` artifacts |
+| `laptop-status` | **laptop** (`tools/laptop_status.py`, from the queue driver) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |
 
-One writer per branch, so every push is `--force-with-lease` and nothing ever merges.
+One writer per branch, so every push is `--force-with-lease` and nothing ever merges. The laptop's queue
+reaches `ops-status` *through* the daemon rather than by the laptop writing there, for exactly that reason
+(2026-09-05).
 
 ## Queue a job
 
@@ -50,11 +53,18 @@ ssh the-claw-den 'Snek/snek3/desktop/trigger'
 A malformed spec is **recorded against its filename and skipped**, never raised into the loop, so one
 bad commit cannot stop the box.
 
-## Read the box
+## Read the box — and the laptop
 
 ```
 git fetch origin ops-status && git show origin/ops-status:status.json
 ```
+
+`at_a_glance.running` / `queued` / `attention` are the box; `laptop_running` / `laptop_queued` are the
+laptop's queue driver, as of `laptop_iso` (the laptop's own clock). The driver's last publish before it
+exits is **empty**, so empty lists mean an idle laptop, and lines under a `laptop_iso` hours old mean the
+driver died — the two are meant to read differently. `python -m tools.laptop_status` on the laptop
+publishes an empty status by hand after a killed driver. The laptop's lines are as fresh as the box's last
+network cycle: `trigger` refreshes both now.
 
 **`git fetch` is not optional, and leaving it out is the single most repeated mistake in this
 project's history with the desktop.** `git show origin/ops-status:…` reads a local remote-tracking

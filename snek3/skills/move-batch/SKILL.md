@@ -49,7 +49,8 @@ when a training finishes, so they vanish with the specs and nothing else needs r
 
 Then make sure a laptop driver is up, and start one if not — the `laptop-run` skill, "Queueing
 batches here". A running driver rescans `logs/laptop-queue/` between batches and picks the new
-directory up in name order; nothing else to do. It runs the batch as the daemon would: waves of 8,
+directory up in name order; nothing else to do, and the batch shows under `laptop_queued` in
+`status.json` once the driver next publishes (its next event, or ten minutes). It runs the batch as the daemon would: waves of 8,
 stage B, hof5000, hof30k after each wave.
 
 ## Laptop -> desktop

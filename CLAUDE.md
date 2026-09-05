@@ -227,8 +227,8 @@ of 2026-08-28**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.m
 | | laptop | desktop `the-claw-den` |
 |---|---|---|
 | limit | **8 trainers** | `max_trainers` (8; no host ceiling), `eval_shards` ≤ 16 |
-| check | `ps -Ao pid=,command= \| grep '[t]rain.py'` | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
-| queue work | launch by hand | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
+| check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop queue driver to `laptop-status`, folded in by the daemon since 2026-09-05); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
+| queue work | drop the specs in `snek3/logs/laptop-queue/<batch>/` and start the queue driver (`laptop-run` skill) — agents launch arms this way, not by hand, so the launch is published | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
 
 **Every progress update commits every arm's `runs/<policy>.png` and `.md`, live desktop arms included**

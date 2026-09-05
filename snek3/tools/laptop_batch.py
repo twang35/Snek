@@ -46,6 +46,13 @@ cap alone cannot do that: a closeout is not a trainer, and a driver of its own h
 Before each launch the driver waits until the box's live trainer count is below the cap, so a batch
 started beside a user's own arm shares the box rather than exceeding it.
 
+**What it is doing is published to the `laptop-status` branch** (`tools/laptop_status.py`): the daemon's
+own `at_a_glance` shape -- one `running` line per batch with its percent, one `queued` line per
+batch-phase -- rebuilt on every launch, exit, pass start and end, every ten minutes while waiting, and
+once more, empty, when the driver exits. The desktop daemon folds it into `ops-status` as
+`laptop_running` / `laptop_queued` / `laptop_iso`, so one `status.json` shows both boxes. `--no-status`
+turns it off, for smokes.
+
 This is the laptop half of the "one implementation for both boxes" rule, not a second scheduler: the
 desktop has a daemon because it has a git bus and a queue; the laptop has this because it has a
 shell. What is shared -- the spec format, the wave barrier, the stage-B naming -- is read from the
@@ -63,6 +70,7 @@ import time
 
 from env import constants
 from tools import closeout
+from tools import laptop_status
 from tools import live_runs
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -160,13 +168,33 @@ def pass_done(arms, pass_name, runs_dir=None):
     return all(os.path.exists(pass_file(spec['policy'], pass_name, runs_dir)) for spec in arms)
 
 
-def finished(spec, runs_dir=None):
+def current_step(spec, runs_dir=None):
+    """The arm's last evaluated step from its `_evals.json`, or None before its first eval."""
     path = os.path.join(runs_dir or constants.RUNS_DIR, '{0}_evals.json'.format(spec['policy']))
     try:
         with open(path) as handle:
-            return json.load(handle)['summary']['step'] >= int(spec['max_steps'])
+            return int(json.load(handle)['summary']['step'])
     except (OSError, KeyError, TypeError, ValueError):
-        return False
+        return None
+
+
+def finished(spec, runs_dir=None):
+    step = current_step(spec, runs_dir)
+    return step is not None and step >= int(spec['max_steps'])
+
+
+def arm_job(spec, runs_dir=None):
+    """A spec as the job dict the daemon's `build_at_a_glance` reads for a trainer."""
+    return {'id': spec['id'], 'type': 'train', 'policy': spec['policy'], 'policies': [spec['policy']],
+            'label': spec.get('label', ''), 'max_steps': int(spec['max_steps']),
+            'step': current_step(spec, runs_dir)}
+
+
+def pass_job(batch, pass_name, number, arms):
+    """A pass over a wave as the daemon's job dict: its minted id, type eval, the wave's arms."""
+    return {'id': pass_label(batch, pass_name, number), 'type': 'eval',
+            'policy': arms[0]['policy'] if arms else None,
+            'policies': [spec['policy'] for spec in arms]}
 
 
 def live_pid(spec, runs_dir=None):
@@ -198,7 +226,7 @@ class Driver(object):
     def __init__(self, specs, wave=DEFAULT_WAVE, shards=DEFAULT_SHARDS, stage_b=True,
                  max_trainers=DEFAULT_MAX_TRAINERS, python=sys.executable, runs_dir=None,
                  logs_dir=None, popen=subprocess.Popen, call=subprocess.call, sleep=time.sleep,
-                 passes=closeout.CHAIN):
+                 passes=closeout.CHAIN, reporter=None, clock=time.time):
         if wave > max_trainers:
             raise ValueError('a wave of {0} exceeds the {1}-trainer cap'.format(wave, max_trainers))
         self.specs, self.wave, self.shards, self.stage_b = specs, int(wave), int(shards), stage_b
@@ -209,6 +237,53 @@ class Driver(object):
         self.logs_dir = logs_dir or os.path.join(ROOT, 'logs')
         self.popen, self.call, self.sleep = popen, call, sleep
         self.batch = batch_id(specs)
+        # What the box is doing, for `laptop-status`: the arms live under this driver (spec, pid) and
+        # the pass in flight (pass_name, number, arms). `reporter` is a `Reporter`, or None to publish
+        # nothing; `clock` is injectable so a test can drive the ten-minute republish.
+        self.reporter, self.clock = reporter, clock
+        self.live, self.active_pass = [], None
+        self._last_report = 0.0
+
+    # ---- what is running and what is owed, in the daemon's job-dict shape
+
+    def jobs(self):
+        """`(running, queued)` for this batch: live arms and the pass in flight; then every arm short
+        of its cap that is not live, and every pass not yet filed, wave by wave. The same job dicts
+        the daemon's `build_at_a_glance` reads, so the two boxes' lines are built by one function."""
+        running = [dict(arm_job(spec, self.runs_dir), pid=pid) for spec, pid in self.live]
+        if self.active_pass is not None:
+            running.append(pass_job(self.batch, *self.active_pass))
+        live_policies = {spec['policy'] for spec, _ in self.live}
+        queued = []
+        for number, arms in enumerate(waves(self.specs, self.wave), start=1):
+            for spec in arms:
+                if spec['policy'] not in live_policies and not finished(spec, self.runs_dir):
+                    queued.append(arm_job(spec, self.runs_dir))
+            if not self.stage_b:
+                continue
+            for pass_name in self.passes:
+                if pass_done(arms, pass_name, self.runs_dir):
+                    continue
+                if self.active_pass is not None and self.active_pass[:2] == (pass_name, number):
+                    continue
+                queued.append(pass_job(self.batch, pass_name, number, arms))
+        return running, queued
+
+    def _report(self):
+        if self.reporter is not None:
+            self.reporter.publish(self)
+            self._last_report = self.clock()
+
+    def _tick(self):
+        """Called once per wait poll: republishes every `REPUBLISH_SECONDS` so percentages move."""
+        if self.reporter is not None and self.clock() - self._last_report >= laptop_status.REPUBLISH_SECONDS:
+            self._report()
+
+    def _wait_process(self, process):
+        while process.poll() is None:
+            self.sleep(POLL_SECONDS)
+            self._tick()
+        return process.returncode
 
     def _wait_for_slot(self):
         waited = False
@@ -231,6 +306,7 @@ class Driver(object):
     def _wait_pid(self, pid):
         while live_runs.alive(pid) and not live_runs.zombie(pid):
             self.sleep(POLL_SECONDS)
+            self._tick()
 
     def run_wave(self, number, arms):
         started, adopted = [], []
@@ -244,12 +320,18 @@ class Driver(object):
                 adopted.append((spec, pid))
                 continue
             started.append((spec, self._launch(spec)))
+        self.live = [(spec, process.pid) for spec, process in started] + list(adopted)
+        self._report()
         for spec, process in started:
-            code = process.wait()
+            code = self._wait_process(process)
             _log('{0} exited {1}'.format(spec['policy'], code))
+            self.live = [item for item in self.live if item[0]['policy'] != spec['policy']]
+            self._report()
         for spec, pid in adopted:
             self._wait_pid(pid)
             _log('{0} (pid {1}) finished'.format(spec['policy'], pid))
+            self.live = [item for item in self.live if item[0]['policy'] != spec['policy']]
+            self._report()
         if not self.stage_b:
             return 0
         code = 0
@@ -276,10 +358,14 @@ class Driver(object):
         if pass_name != 'stageb':
             argv += ['--pass', pass_name]
         argv += ['--shards', str(self.shards)]
+        self.active_pass = (pass_name, number, list(arms))
+        self._report()
         with open(os.path.join(self.logs_dir, '{0}.log'.format(label)), 'a') as out:
             code = self.call(argv, cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
                              stdout=out, stderr=subprocess.STDOUT)
+        self.active_pass = None
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
+        self._report()
         return code
 
     def pending(self):
@@ -316,6 +402,33 @@ class Driver(object):
         return worst
 
 
+# ---------------------------------------------------------------- the status
+
+class Reporter(object):
+    """Publishes the box's state -- this driver's jobs plus every other batch waiting in the queue
+    directory -- through a `laptop_status.Publisher`. `publish(None)` is the empty status a driver
+    leaves when it exits with nothing to do."""
+
+    def __init__(self, publisher, queue_dir=None, make_driver=None):
+        self.publisher, self.queue_dir, self.make_driver = publisher, queue_dir, make_driver
+
+    def jobs(self, driver):
+        running, queued = ([], []) if driver is None else driver.jobs()
+        if self.queue_dir and self.make_driver:
+            current = None if driver is None else driver.batch
+            for name, specs in queue_batches(self.queue_dir):
+                other = self.make_driver(specs)
+                if other.batch == current:
+                    continue
+                _, owed = other.jobs()
+                queued.extend(owed)
+        return running, queued
+
+    def publish(self, driver):
+        running, queued = self.jobs(driver)
+        return self.publisher.publish(laptop_status.build(running, queued))
+
+
 # ---------------------------------------------------------------- the queue
 
 def queue_batches(queue_dir):
@@ -338,16 +451,30 @@ def queue_batches(queue_dir):
     return batches
 
 
-def run_queue(queue_dir, make_driver, after=None):
+def run_queue(queue_dir, make_driver, after=None, reporter=None):
     """Runs every batch under `queue_dir` that has work left, rescanning between batches.
 
     `make_driver(specs)` builds the `Driver` for one batch, so the queue carries no launch settings of
     its own. Returns the worst exit status of the batches it ran. Exits -- returns -- when a scan
     finds nothing pending, which is what makes this a queue and not a daemon: it lives exactly as
     long as there is work.
+
+    `reporter` publishes the queue's state to `laptop-status`; its last publish, as the queue exits,
+    is the empty status that says the laptop is idle.
     """
     worst = 0
     ran = set()
+
+    def driver_for(specs):
+        made = make_driver(specs)
+        made.reporter = reporter
+        return made
+
+    def exit_with(code):
+        if reporter is not None:
+            reporter.publish(None)
+        return code
+
     if after is not None:
         make_driver([]).wait_for(after)
     while True:
@@ -355,7 +482,7 @@ def run_queue(queue_dir, make_driver, after=None):
                    if make_driver(specs).pending()]
         if not pending:
             _log('queue {0}: nothing pending; exiting'.format(queue_dir))
-            return worst
+            return exit_with(worst)
         name, specs = pending[0]
         if name in ran:
             # Ran it and it still reports work: a pass that failed, an arm that will not reach its
@@ -364,12 +491,12 @@ def run_queue(queue_dir, make_driver, after=None):
             if not rest:
                 _log('queue {0}: every pending batch has already run once and still has work left '
                      '({1}); exiting'.format(queue_dir, ', '.join(sorted(ran))))
-                return worst or 1
+                return exit_with(worst or 1)
             name, specs = rest[0]
         _log('queue {0}: {1} of {2} pending, starting {3}'.format(
             queue_dir, len(pending), len(queue_batches(queue_dir)), name))
         ran.add(name)
-        worst = max(worst, make_driver(specs).run() or 0)
+        worst = max(worst, driver_for(specs).run() or 0)
 
 
 def main(argv=None):
@@ -387,6 +514,8 @@ def main(argv=None):
                         help='stage B only after each wave; no hof5000 or hof30k')
     parser.add_argument('--after', type=int, default=None, metavar='PID',
                         help='start only once this process (another driver, a closeout) has exited')
+    parser.add_argument('--no-status', action='store_true',
+                        help='do not publish what is running to the laptop-status branch')
     args = parser.parse_args(argv)
     passes = closeout.CHAIN[:1] if args.no_hof else closeout.CHAIN
 
@@ -394,14 +523,23 @@ def main(argv=None):
         return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
                       max_trainers=args.max_trainers, passes=passes)
 
+    reporter = None
+    if not args.no_status:
+        reporter = Reporter(laptop_status.Publisher(log=_log), queue_dir=args.queue,
+                            make_driver=make_driver)
     if args.queue:
         if args.specs:
             parser.error('--queue takes the queue directory only; put the batches under it')
-        return run_queue(args.queue, make_driver, after=args.after)
+        return run_queue(args.queue, make_driver, after=args.after, reporter=reporter)
     specs = load_specs(args.specs)
     if not specs:
         parser.error('no training specs found')
-    return make_driver(specs).run(after=args.after)
+    single = make_driver(specs)
+    single.reporter = reporter
+    code = single.run(after=args.after)
+    if reporter is not None:
+        reporter.publish(None)
+    return code
 
 
 if __name__ == '__main__':

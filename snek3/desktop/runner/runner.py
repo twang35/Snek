@@ -347,6 +347,7 @@ class Runner(object):
             # `poll_seconds`, which would put the traffic straight back where it was.
             self._last_git = time.time()
             gitbus.fetch(self.host)
+            gitbus.fetch_laptop_status(self.host)
             self._unpushed = gitbus.push_unpushed(self.host)
         self._apply_runtime()
         self._reap()
@@ -722,10 +723,12 @@ class Runner(object):
             # A human summary at the top: one line per running batch with a percentage, one per
             # queued batch-phase, and anything needing a human under `attention` — so the box's
             # state reads at a glance without parsing the ledger.
-            'at_a_glance': build_at_a_glance(
-                running, order, self._batch_labels(),
-                [flag for flag in HOLD_FLAGS if self.runtime.get(flag)],
-                self._attention()),
+            'at_a_glance': with_laptop(
+                build_at_a_glance(
+                    running, order, self._batch_labels(),
+                    [flag for flag in HOLD_FLAGS if self.runtime.get(flag)],
+                    self._attention()),
+                gitbus.read_laptop_status(self.host)),
             'runtime': self.runtime,
             'config_notes': self.config_notes,
             'counts': self._counts(),
@@ -996,6 +999,34 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
             batch, phase, described(batch, jobs), arms(jobs)))
 
     return {'running': running_lines, 'queued': queued_lines, 'attention': list(attention)}
+
+
+LAPTOP_KEYS = ('laptop_running', 'laptop_queued', 'laptop_iso')
+
+
+def with_laptop(glance, laptop_status_text):
+    """`glance` plus the laptop's lines: `laptop_running`, `laptop_queued` and `laptop_iso`.
+
+    The laptop's driver publishes its own `status.json` to the `laptop-status` branch
+    (`tools/laptop_status.py`), in this same `at_a_glance` shape; folding it in here is what lets one
+    `git show origin/ops-status:status.json` show both boxes. **`laptop_iso` is the laptop's own
+    timestamp, and it is the staleness signal**: the driver's last publish before exiting is empty, so
+    empty lists mean idle, while a running line under an hours-old `laptop_iso` means the driver died
+    (user, 2026-09-04). Unparseable or absent text -- nothing published yet -- gives empty lists and a
+    null `laptop_iso`, and never an error: the box's own status must publish regardless.
+    """
+    out = dict(glance)
+    try:
+        status = json.loads(laptop_status_text or '')
+    except ValueError:
+        status = {}
+    if not isinstance(status, dict):
+        status = {}
+    laptop = status.get('at_a_glance') or {}
+    out['laptop_running'] = [str(line) for line in (laptop.get('running') or [])]
+    out['laptop_queued'] = [str(line) for line in (laptop.get('queued') or [])]
+    out['laptop_iso'] = status.get('iso')
+    return out
 
 
 def anticipated_queue(queued, running, limits, auto_stage_b, existing_ids):

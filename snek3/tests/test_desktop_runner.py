@@ -1034,3 +1034,46 @@ def test_a_whole_queued_batch_reads_as_a_wave_range_and_a_capped_cell_list():
     assert runner_module.compress_waves(['wave 1 of 4', 'wave 3 of 4', 'wave 4 of 4']) == \
         ['wave 1 of 4', 'waves 3-4 of 4']
     assert runner_module.compress_waves(['wave 2 of 2', 'final pass']) == ['wave 2 of 2', 'final pass']
+
+
+# --- the laptop's lines, folded in from laptop-status -----------------------------------------------
+
+def test_the_laptops_status_is_folded_in_with_its_own_timestamp():
+    """`tools/laptop_status.py` publishes the same at_a_glance shape to `laptop-status`; the box adds it
+    as laptop_running / laptop_queued, and `laptop_iso` is the laptop's own clock -- the driver's last
+    publish is empty, so lines under an old `laptop_iso` mean a dead driver, not a slow one."""
+    text = json.dumps({'iso': '2026-09-04T23:14:09', 'box': 'laptop',
+                       'at_a_glance': {'running': ['b16 | kl003, kl005 -- wave 1 of 5 | training 12% (8 arms)'],
+                                       'queued': ['b16 evals | kl003, kl005 | queued (8 arms)',
+                                                  'b19 training | noadvnorm, mse | queued (24 arms)'],
+                                       'attention': []}})
+    glance = runner_module.with_laptop({'running': ['b15 | ent003 | stage B (8 arms)'], 'queued': [],
+                                        'attention': []}, text)
+    assert glance['running'] == ['b15 | ent003 | stage B (8 arms)']          # the box's own, untouched
+    assert glance['laptop_running'] == ['b16 | kl003, kl005 -- wave 1 of 5 | training 12% (8 arms)']
+    assert glance['laptop_queued'] == ['b16 evals | kl003, kl005 | queued (8 arms)',
+                                       'b19 training | noadvnorm, mse | queued (24 arms)']
+    assert glance['laptop_iso'] == '2026-09-04T23:14:09'
+
+
+def test_no_laptop_status_yet_gives_empty_lines_and_a_null_timestamp_never_an_error():
+    for text in ('', 'not json', '[]', '{"at_a_glance": null}'):
+        glance = runner_module.with_laptop({'running': [], 'queued': [], 'attention': []}, text)
+        assert glance['laptop_running'] == [] and glance['laptop_queued'] == []
+        assert glance['laptop_iso'] is None
+
+
+def test_the_laptop_status_branch_is_fetched_apart_from_the_three_the_box_needs(monkeypatch):
+    """One `git fetch a b c laptop-status` fails whole when laptop-status does not exist yet, which
+    would have stopped the box reading `ops` until the laptop first published. So it is its own fetch,
+    and the branch name defaults rather than being a required host.env key."""
+    from runner import gitbus
+    fetched = []
+    monkeypatch.setattr(gitbus, '_git', lambda args, cwd, check=False: fetched.append(args) or '')
+    host = {'GIT_REMOTE': 'origin', 'OPS_BRANCH': 'ops', 'STATUS_BRANCH': 'ops-status',
+            'RESULTS_BRANCH': 'results', 'REPO_PATH': '/r'}
+    gitbus.fetch(host)
+    gitbus.fetch_laptop_status(host)
+    assert fetched == [['fetch', 'origin', 'ops', 'ops-status', 'results'],
+                       ['fetch', 'origin', 'laptop-status']]
+    assert gitbus.laptop_status_branch(dict(host, LAPTOP_STATUS_BRANCH='lap')) == 'lap'
