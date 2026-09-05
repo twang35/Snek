@@ -824,6 +824,14 @@ def _scheduler_status(runner, running=(), queued_ids=(), attention=(), glance=No
         json.dump(payload, handle)
 
 
+def _finished_arm(runner, policy, step=10):
+    """The arm's `_evals.json` at its cap (`_train_spec`'s max_steps is 10)."""
+    runs = runner.runs_dir()
+    os.makedirs(runs, exist_ok=True)
+    with open(os.path.join(runs, policy + '_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': step}}, handle)
+
+
 def test_the_ops_queue_is_mirrored_into_the_schedulers_queue_by_batch(tmp_path, monkeypatch):
     runner, bus = _box(tmp_path, monkeypatch, [
         _train_spec('b1a-x'), _train_spec('b1b-x'), _train_spec('b2a-y'),
@@ -877,6 +885,7 @@ def test_the_scheduler_is_started_once_per_queue_change_and_adopted_meanwhile(tm
     runner.poll_once(git=True)
     runner.poll_once(git=False)
     assert len(runner.spawn.calls) == 1, 'alive: never a second one'
+    _finished_arm(runner, 'b1a-x')
     runner.scheduler.returncode = 0             # it finished the queue and exited
     runner.poll_once(git=True)
     assert len(runner.spawn.calls) == 1, 'same queue, nothing new to do: not restarted'
@@ -939,9 +948,9 @@ def test_a_job_the_scheduler_finished_is_published_with_its_arms_files(tmp_path,
     runner.poll_once(git=True)
     runs = runner.runs_dir()
     os.makedirs(runs)
-    for name in ('b1a-x.png', 'b1a-x.md', 'b1a-x_evals.json', 'b1a-x_checkpoint_evals.json',
-                 'b1b-x.png', 'b1ab-other.png'):
+    for name in ('b1a-x.png', 'b1a-x.md', 'b1a-x_checkpoint_evals.json', 'b1b-x.png', 'b1ab-other.png'):
         open(os.path.join(runs, name), 'w').close()
+    _finished_arm(runner, 'b1a-x')
     _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']},
                                        {'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x']}])
     runner.poll_once(git=False)
@@ -958,6 +967,7 @@ def test_a_job_the_scheduler_finished_is_published_with_its_arms_files(tmp_path,
                                         'b1-hof5000': 'queued'}
     assert bus.status[-1]['running'][1]['id'] == 'b1-stageb'
     # a pass that finishes publishes every arm's files under its own id, as the old daemon did
+    _finished_arm(runner, 'b1b-x')
     _scheduler_status(runner, running=[], queued_ids=[])
     runner.poll_once(git=False)
     assert [job_id for job_id, _ in bus.results] == ['b1a-x', 'b1b-x', 'b1-stageb']
@@ -970,6 +980,7 @@ def test_a_job_seen_running_before_a_restart_is_still_published_after_it(tmp_pat
     runner.poll_once(git=True)
     _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
     runner.poll_once(git=False)
+    _finished_arm(runner, 'b1a-x')
     monkeypatch.setattr(launch, 'pid_alive', lambda pid: False)     # scheduler and daemon both gone
     again = runner_module.Runner(runner.host)
     again.spawn = Spawns()
@@ -1091,3 +1102,80 @@ def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated
     again.spawn = Spawns()
     again.poll_once(git=True)
     assert not again.stop and again.restart_requested is None
+
+
+def test_a_dead_schedulers_unfinished_arm_is_not_published_and_its_batch_is_resumed(tmp_path, monkeypatch):
+    """2026-09-05: a scheduler death mid-arm published the arm as a result, every id of its batch was
+    then "published", the batch left the mirrored queue for good and no scheduler was started."""
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    _finished_arm(runner, 'b1a-x', step=3)                       # 3 of 10: mid-training
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
+    runner.poll_once(git=False)
+    runner.scheduler.returncode = -9                               # OOM, kill -9, a reboot
+    runner.poll_once(git=True)
+    assert bus.results == [], 'an arm short of its cap is not a result'
+    assert 'b1a-x' not in runner.state['running'], 'forgotten until the next scheduler shows it running'
+    runner.poll_once(git=True)
+    assert 'b1a-x' in runner.state['specs'], 'the batch stays in the queue'
+    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x | queued (1 arm)']
+    assert len(runner.spawn.calls) == 1, 'inside the backoff, not yet'
+    runner.state['spawned'] -= runner_module.RESPAWN_BACKOFF_SECONDS
+    runner.poll_once(git=False)
+    assert len(runner.spawn.calls) == 2, 'work pending and nothing running it: a scheduler is started'
+    # the same for a crashed arm under a live scheduler: not a result, resumed by the next scheduler
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
+    runner.poll_once(git=False)
+    _scheduler_status(runner, running=[])
+    runner.poll_once(git=False)
+    assert bus.results == []
+    _finished_arm(runner, 'b1a-x')
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
+    runner.poll_once(git=False)
+    _scheduler_status(runner, running=[])
+    runner.poll_once(git=False)
+    assert [job_id for job_id, _ in bus.results] == ['b1a-x'], 'at its cap it is'
+
+
+def test_a_pass_is_a_result_only_with_every_arms_merged_file(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x'), _train_spec('b1b-x')])
+    runner.poll_once(git=True)
+    runs = runner.runs_dir()
+    os.makedirs(runs, exist_ok=True)
+    pass_job = {'id': 'b1-hof5000', 'type': 'eval', 'policies': ['b1a-x', 'b1b-x']}
+    _scheduler_status(runner, running=[pass_job])
+    runner.poll_once(git=False)
+    open(os.path.join(runs, 'b1a-x_checkpoint_evals_hof5000.json'), 'w').close()
+    _scheduler_status(runner, running=[])
+    runner.poll_once(git=False)
+    assert bus.results == [], 'one arm\'s file is a pass in progress'
+    _scheduler_status(runner, running=[pass_job])
+    runner.poll_once(git=False)
+    open(os.path.join(runs, 'b1b-x_checkpoint_evals_hof5000.json'), 'w').close()
+    _scheduler_status(runner, running=[])
+    runner.poll_once(git=False)
+    assert [job_id for job_id, _ in bus.results] == ['b1-hof5000']
+
+
+def test_a_live_schedulers_stale_status_is_no_information(tmp_path, monkeypatch):
+    """A new scheduler that has not written yet leaves the previous one's file: nothing is published
+    off it, and nothing is forgotten either."""
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    _finished_arm(runner, 'b1a-x')
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
+    runner.poll_once(git=False)
+    path = os.path.join(runner.runs_dir(), runner_module.STATUS_RELATIVE)
+    with open(path) as handle:
+        stale = json.load(handle)
+    stale['pid'], stale['running'] = 1, []
+    with open(path, 'w') as handle:
+        json.dump(stale, handle)
+    runner.poll_once(git=False)
+    assert bus.results == [] and 'b1a-x' in runner.state['running']
+
+
+def test_the_pass_file_labels_are_the_close_outs():
+    from tools import closeout
+    assert runner_module.PASS_FILE_LABELS == {name: closeout.PASSES[name]['label'] for name in runner_module.PASS_FILE_LABELS}
+    assert set(runner_module.PASS_FILE_LABELS) == set(closeout.CHAIN)

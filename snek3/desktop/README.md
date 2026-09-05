@@ -96,7 +96,12 @@ the hold notice, and the laptop's lines. Underneath:
 when its `_evals.json` has reached the cap, a pass when its merged file exists, a failed pass leaves a
 `.failed-<id>` marker beside its spec (`tools/scheduler.py`). The daemon keeps one small `state.json`
 beside the ledger: the scheduler's pid and boot id, the queue it was started on, the ids it saw running
-and the ids it has published. A reboot is detected by the boot id: the scheduler is gone, so the next
+and the ids it has published. **An id that leaves the scheduler's `running` list is published only if the
+files say it finished** — an arm at its cap in `_evals.json`, a pass with every arm's merged file, an eval
+spec with its `.done-`/`.failed-` marker (2026-09-05; before that, a scheduler dying mid-wave published its
+half-trained arms as results and their batch, every id now "published", left the queue for good). An
+unfinished one is forgotten and seen running again when the next scheduler resumes it. A reboot is
+detected by the boot id: the scheduler is gone, so the next
 poll starts a fresh one and every arm resumes from its checkpoint, every pass from its shard files. Old
 `interrupted` records and the boot-id check per job are gone with the per-job ledger.
 
@@ -123,9 +128,14 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | `viewer` | true | the chart window; off reaches the scheduler as `SNEK_CHART_WINDOW=0` |
 
 **Every knob but `paused`/`drain` applies when the scheduler is next started**, because they reach it
-as flags and environment at spawn. A scheduler is started when the mirrored queue changes, when a hold
-is lifted, or when `trigger` asks and none is running; a change of `max_trainers` alone does not
-restart a running one — pause, wait for the wave, unpause, and the next scheduler has the new value.
+as flags and environment at spawn. A scheduler is started, when none is alive, on any of: the mirrored
+queue changed, a hold was lifted, `trigger` asked, or work is pending with nothing running it (an arm
+short of its cap, or a scheduler that exited non-zero — backed off 10 minutes, so a scheduler that cannot
+progress costs one start per backoff, never a loop; added 2026-09-05 after a dead scheduler left its
+batch idle). A change of `max_trainers` alone does not restart a running one, **and neither does a
+pause**: a paused scheduler waits inside its loop and lifting the hold starts a new one only if none is
+alive. To put a running scheduler on a new value or new code: pause, wait until `running` is empty,
+`kill` the pid `status.json`'s `scheduler.pid` names, unpause — `skills/desktop-deploy` has the steps.
 
 
 ### The automatic chain: training → stage B → hof5000 → hof30k

@@ -9,8 +9,9 @@ and owns the box's chart window and its shared eval workers. One implementation 
 directory is one batch -- desktop-format specs, `git show`n in from `ops` on the laptop, materialised
 from `ops` by the daemon on the desktop -- and the scheduler runs the batches in name order, one at a
 time, each with its waves and its three passes. **Between batches it rescans the directory**, so a
-batch dropped in while another runs is picked up next, and when nothing in the directory has
-unfinished work it exits. Nothing polls while there is no work; queueing a batch is making a
+batch dropped in while another runs is picked up next -- and so is work dropped into a batch that has
+already run (a hand eval spec, an added arm): a batch runs again when it owes an id it did not owe
+before, never for the same work left over. When nothing in the directory has unfinished work it exits. Nothing polls while there is no work; queueing a batch is making a
 directory. Rerunning the same command is still the whole recovery.
 
 **State is the filesystem.** An arm is finished when its `runs/<arm>_evals.json` reports `max_steps`;
@@ -410,8 +411,8 @@ class Driver(object):
     def _tick(self):
         """Called once per wait poll: republishes every `REPUBLISH_SECONDS` so percentages move, honours
         a window reopen request, and reaps exited workers so none stays a zombie."""
-        if self.window is not None:
-            self.window.poll()
+        if self.window is not None and self.window.poll():
+            self._report()          # a fresh window reads its panels from the file; write it now
         self.workers = eval_queue.reap(self.workers)
         if self.reporter is not None and self.clock() - self._last_report >= laptop_status.REPUBLISH_SECONDS:
             self._report()
@@ -696,7 +697,11 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None):
     that says the box is idle.
     """
     worst = 0
-    ran = set()
+    # batch name -> the set of job ids it still owed when it last ran. A batch is run again only if
+    # it now owes an id it did not owe then: work queued into it while it ran (a hand eval spec, an
+    # added arm), picked up at this boundary like a new batch would be. The same set, or a smaller
+    # one, is an arm that will not reach its cap, and looping on it would spin.
+    ran = {}
 
     def driver_for(specs):
         made = make_driver(specs)
@@ -711,25 +716,34 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None):
     if after is not None:
         make_driver([]).wait_for(after)
     while True:
-        pending = [(name, specs) for name, specs in queue_batches(queue_dir)
-                   if make_driver(specs).pending()]
+        pending = []
+        for name, specs in queue_batches(queue_dir):
+            made = make_driver(specs)
+            if made.pending():
+                pending.append((name, specs, owed_ids(made)))
         if not pending:
             _log('queue {0}: nothing pending; exiting'.format(queue_dir))
             return exit_with(worst)
-        name, specs = pending[0]
+        fresh = [item for item in pending if item[2] - ran.get(item[0], frozenset())]
+        if not fresh:
+            _log('queue {0}: every pending batch has already run once with the same work left '
+                 '({1}); exiting'.format(queue_dir, ', '.join(sorted(ran))))
+            return exit_with(worst or 1)
+        name, specs, owed = fresh[0]
         if name in ran:
-            # Ran it and it still reports work: an arm that will not reach its cap. Looping on it
-            # would spin; leave it for a human and move on to what is behind it.
-            rest = [item for item in pending if item[0] not in ran]
-            if not rest:
-                _log('queue {0}: every pending batch has already run once and still has work left '
-                     '({1}); exiting'.format(queue_dir, ', '.join(sorted(ran))))
-                return exit_with(worst or 1)
-            name, specs = rest[0]
+            _log('queue {0}: {1} has new work since it ran ({2}); running it again'.format(
+                queue_dir, name, ', '.join(sorted(owed - ran[name]))))
         _log('queue {0}: {1} of {2} pending, starting {3}'.format(
             queue_dir, len(pending), len(queue_batches(queue_dir)), name))
-        ran.add(name)
+        ran[name] = owed
         worst = max(worst, driver_for(specs).run() or 0)
+
+
+def owed_ids(driver):
+    """The ids of everything a fresh driver still has to do: arms short of their cap, passes without
+    every arm's file, eval specs without a marker. What `run_queue` compares between scans."""
+    _, queued = driver.jobs()
+    return frozenset(job['id'] for job in queued)
 
 
 def build_parser():
@@ -761,13 +775,30 @@ def main(argv=None):
         path = window_module.request_reopen()
         print('reopen requested ({0}); the scheduler replaces its window at its next poll'.format(path))
         return 0
+    # Everything the arguments can refuse is refused here, before a single side effect: nothing below
+    # this line may run for an invocation that is going to exit on its arguments.
+    if args.queue and args.specs:
+        parser.error('--queue takes the queue directory only; put the batches under it')
+    specs = None
+    if not args.queue:
+        specs = load_specs(args.specs)
+        if not specs:
+            parser.error('no specs found')
     passes = closeout.CHAIN[:1] if args.no_hof else closeout.CHAIN
 
-    # The window is the scheduler's, one for the whole run: a previous scheduler's window is killed
-    # (never adopted -- one code path, one flicker per restart), and this one's is closed on the way out.
+    # One scheduler per box. The last status written here names the scheduler that wrote it; if that
+    # process is still alive this one must not start beside it -- two schedulers would launch the same
+    # waves and each would kill the other's window (2026-09-05: a stray `main()` did just that to a
+    # live wave). If it is gone, its window is killed (never adopted -- one code path, one flicker per
+    # restart) and this one's is closed on the way out.
     window = window_module.Window(log=_log)
     previous = laptop_status.read_local() or {}
-    window.kill_stale(previous.get('window_pid'))
+    if previous_scheduler_alive(previous):
+        _log('a scheduler is already running here (pid {0}, status {1}); not starting a second one'.format(
+            previous.get('pid'), live_runs.status_path()))
+        return 2
+    if window_module.wanted():
+        window.kill_stale(previous.get('window_pid'))
 
     def make_driver(specs):
         return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
@@ -782,12 +813,7 @@ def main(argv=None):
 
     try:
         if args.queue:
-            if args.specs:
-                parser.error('--queue takes the queue directory only; put the batches under it')
             return run_queue(args.queue, make_driver, after=args.after, reporter=reporter)
-        specs = load_specs(args.specs)
-        if not specs:
-            parser.error('no specs found')
         single = make_driver(specs)
         single.reporter = reporter
         code = single.run(after=args.after)
@@ -795,6 +821,16 @@ def main(argv=None):
         return code
     finally:
         window.close()
+
+
+def previous_scheduler_alive(previous):
+    """Whether the scheduler that wrote `previous` (a status dict) is still running. Its own pid, read
+    from the file it wrote -- no pattern. This process, a missing pid and a dead pid all count as no."""
+    try:
+        pid = int(previous.get('pid') or 0)
+    except (TypeError, ValueError):
+        return False
+    return pid > 0 and pid != os.getpid() and live_runs.alive(pid) and not live_runs.zombie(pid)
 
 
 if __name__ == '__main__':

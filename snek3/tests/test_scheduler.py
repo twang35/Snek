@@ -648,3 +648,101 @@ def test_eval_label_reads_the_pass_or_the_label_for_the_panels():
     assert scheduler.eval_label({'eval_args': []}) is None
     assert scheduler.pass_panels(['b1a'], 'ab', '/r') == ['/r/b1a_checkpoint_evals_ab.png']
     assert scheduler.pass_panels(['b1a'], None, '/r') == ['/r/b1a_checkpoint_evals.png']
+
+
+# ---------------------------------------------------------------- main(): no side effect before its arguments are accepted
+
+def _stub_window(monkeypatch):
+    """`Window` with every process call recorded and none made."""
+    killed, opened = [], []
+    monkeypatch.setattr(scheduler.window_module.Window, 'kill_stale', lambda self, pid: killed.append(pid))
+    monkeypatch.setattr(scheduler.window_module.Window, 'open', lambda self: opened.append(1) or False)
+    monkeypatch.setattr(scheduler.window_module.Window, 'close', lambda self: None)
+    return killed, opened
+
+
+def test_main_refused_on_its_arguments_touches_neither_the_window_nor_the_status(tmp_path, monkeypatch):
+    """2026-09-05: a test called `main()` for its argument check while b16's wave 5 trained; `main()` had
+    already read the live status and killed the live window before `parser.error` ran."""
+    killed, _ = _stub_window(monkeypatch)
+    monkeypatch.setenv('SNEK_CHART_WINDOW', '1')
+    scheduler.laptop_status.write_local(scheduler.laptop_status.build([], [], window_pid=4242))
+    before = open(live_runs.status_path()).read()
+    with pytest.raises(SystemExit):
+        scheduler.main(['--queue', str(tmp_path), 'somefile.json'])
+    with pytest.raises(SystemExit):
+        scheduler.main([str(tmp_path)])                          # a directory with no specs
+    assert killed == [] and open(live_runs.status_path()).read() == before
+
+
+def test_main_does_not_start_beside_a_live_scheduler_and_never_kills_its_window(tmp_path, monkeypatch):
+    killed, _ = _stub_window(monkeypatch)
+    monkeypatch.setenv('SNEK_CHART_WINDOW', '1')
+    write_specs(str(tmp_path / 'b1'), ['b1a-x-seed1'])
+    # the last status names this very process as its writer, so its scheduler is trivially alive
+    status = scheduler.laptop_status.build([], [], window_pid=4242)
+    status['pid'] = os.getppid()
+    scheduler.laptop_status.write_local(status)
+    assert scheduler.main(['--queue', str(tmp_path), '--no-status']) == 2
+    assert killed == [], 'a live scheduler keeps its window'
+    assert scheduler.previous_scheduler_alive({'pid': os.getpid()}) is False, 'this process is not a predecessor'
+    assert scheduler.previous_scheduler_alive({}) is False and scheduler.previous_scheduler_alive({'pid': 'x'}) is False
+
+
+def test_a_dead_predecessors_window_is_killed_only_when_windows_are_wanted(tmp_path, monkeypatch, isolated_runs_dir):
+    killed, _ = _stub_window(monkeypatch)
+    status = scheduler.laptop_status.build([], [], window_pid=4242)
+    status['pid'] = 2 ** 22 + 7                                   # no such process
+    scheduler.laptop_status.write_local(status)
+    write_specs(str(tmp_path / 'b1'), ['b1a-x-seed1'])
+    with open(os.path.join(isolated_runs_dir, 'b1a-x-seed1_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}}, handle)      # nothing pending: main() returns at once
+    scheduler.main(['--queue', str(tmp_path), '--no-status', '--no-stage-b'])
+    assert killed == [], 'SNEK_CHART_WINDOW=0 (the suite default): no window, so nothing to kill'
+    monkeypatch.setenv('SNEK_CHART_WINDOW', '1')
+    scheduler.laptop_status.write_local(status)
+    scheduler.main(['--queue', str(tmp_path), '--no-status', '--no-stage-b'])
+    assert killed == [4242]
+
+
+def test_a_reopen_writes_the_status_so_the_fresh_window_has_its_panels_at_once(box):
+    class Reopening(FakeWindow):
+        def poll(self):
+            self.polls += 1
+            return self.polls == 1                                # the first tick finds a reopen request
+    fake = Reopening()
+    published = Published()
+    calls = Calls()
+    real_popen = calls.popen
+    calls.popen = lambda argv, **kw: FakeProcess(1, polls=2) if real_popen(argv, **kw) else None
+    d = driver([spec('b13aa-mb32-seed1')], box, calls, wave=1, stage_b=False, window=fake,
+               reporter=scheduler.Reporter(published, window=fake, runs_dir=box['runs']))
+    d.run()
+    assert len(published.statuses) == 3, 'launch, the reopen tick, exit -- not launch and exit alone'
+
+
+def test_work_queued_into_the_running_batch_runs_at_the_next_boundary(tmp_path, box):
+    """2026-09-05: the queue skipped a batch it had run once whatever it now owed, so a hand hof spec
+    dropped into the running batch's directory never ran and the scheduler exited 1. The set of owed
+    ids is what decides now: the same set is a stuck arm, a different set is new work."""
+    q = _queue(tmp_path, {'b16': ['b16a-kl-seed1'], 'b19': ['b19a-x-seed1']})
+    calls = FinishingCalls(box['runs'])
+    argvs, real_call, real_popen = [], calls.call, calls.popen
+
+    def call(argv, **kwargs):
+        argvs.append(argv)
+        return 0 if '--label' in argv else real_call(argv, **kwargs)
+
+    def popen(argv, **kwargs):
+        if argv[-1] == 'b16a-kl-seed1':                          # a hand hof spec lands mid-b16
+            with open(os.path.join(q, 'b16', 'b16-one.json'), 'w') as handle:
+                json.dump({'id': 'b16-one', 'type': 'eval', 'policies': ['b16a-kl-seed1'],
+                           'eval_args': ['--label', 'hof']}, handle)
+        return real_popen(argv, **kwargs)
+    calls.call, calls.popen = call, popen
+    assert scheduler.run_queue(q, lambda specs: driver(specs, box, calls, wave=8)) == 0
+    trained = [e[1] for e in calls.events if e[0] == 'train']
+    assert trained == ['b16a-kl-seed1', 'b19a-x-seed1'], 'each arm once: the rerun of b16 is the eval alone'
+    assert os.path.exists(os.path.join(q, 'b16', '.done-b16-one'))
+    evals = [i for i, argv in enumerate(argvs) if '--label' in argv]
+    assert len(evals) == 1 and evals[0] == 3, 'after b16\'s three passes, before b19 (name order), once'

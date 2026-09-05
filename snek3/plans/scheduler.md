@@ -162,6 +162,21 @@ arm, four results publishes (arm, stage B, hof5000, hof30k), derived ledger corr
 | a gitignored local copy of the desktop's specs as batch directories | **fine** |
 | wait for a boundary, or pause and restart | **either box takes a restart at any point**: arms run in their own session and the registry lets the new scheduler adopt them; shards resume on rerun; results publish from files. No pause needed. A **wave** boundary is still the tidy moment, because arms started by the old `train.py` hold the old flock window until they finish, and a scheduler started mid-wave would open its window beside it. A batch boundary is not required |
 
+## 7. Review, 2026-09-05 evening
+
+A second read of the built implementation found four defects, all fixed the same day, each with a test:
+
+| found | fix |
+|---|---|
+| the test suite reached the live `runs/.live/`: `scheduler.main()` killed the live window before checking its arguments, and a `Reporter` with no `runs_dir` overwrote the live status. It happened, during b16 wave 5 | `tests/conftest.py` points `constants.RUNS_DIR` at a scratch directory for every test; `main()` validates before any side effect, refuses to start beside a live scheduler (the status file's own pid) instead of killing its window, and kills a dead predecessor's window only when windows are wanted |
+| the daemon took "left the scheduler's `running` list" as "finished": a scheduler death mid-wave published half-trained arms to `results`, and their batch, every id now published, left the mirrored queue for good with nothing respawned | publish only what the files say is finished (arm at cap, pass with every merged file, eval spec with its marker); start a scheduler whenever work is pending and none is alive, under the existing 10-minute backoff; trust the status file only when its pid is the scheduler's |
+| `run_queue` skipped a batch it had run once whatever it now owed, so a spec dropped into the running batch never ran and the scheduler exited 1 — on both boxes, contrary to the `hof-remeasure` skill | the ran-once set remembers the owed ids; a batch runs again when it owes an id it did not owe before, and never for the same leftover |
+| the deploy skill said a pause restarts the scheduler; it does not (it waits inside its loop, and the unpause spawns only if none is alive) | pause, wait for `running` empty, kill the pid `status.json` names, unpause — in the skill and the README |
+
+Still deliberate, and worth knowing: a `SIGTERM`ed scheduler leaves its last status standing with running
+lines (the staleness signal the user asked for), and a reopen request rewrites the status at once so the
+new window has its panels.
+
 **Build hazard.** The laptop driver launches every arm from the working tree, so phase 1 is developed
 in a separate git worktree and merged at the switch; a running batch must never see a half-edited
 `train.py` or `closeout.py`. The desktop's `deploy` is a fast-forward, so the same holds there by

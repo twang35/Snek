@@ -43,6 +43,9 @@ PHASE_NAMES = {'stageb': 'stage B', 'hof5000': 'hof5000', 'hof30k': 'hof30k'}
 # path; the daemon cannot import it (base python) and pins it here.
 STATUS_RELATIVE = os.path.join('.live', '.status.json')
 HOLD_RELATIVE = os.path.join('.live', '.paused')
+# The merged file each pass of the chain writes per arm, `<policy>_checkpoint_evals[_<label>].json`:
+# `tools/closeout.py`'s `PASSES[...]['label']`, pinned equal by a test. What says a pass is finished.
+PASS_FILE_LABELS = {'stageb': None, 'hof5000': 'hof5000', 'hof30k': 'hof30k'}
 # A scheduler that exits with work pending is not relaunched sooner than this unless a trigger asks.
 RESPAWN_BACKOFF_SECONDS = 600
 
@@ -196,9 +199,16 @@ class Runner(object):
         changed = signature != self.state.get('spawn_signature')
         lifted = self.state.get('was_held') and not self._held()
         self.state['was_held'] = False
-        recently_failed = (self.state.get('last_exit') not in (None, 0)
-                           and time.time() - (self.state.get('spawned') or 0) < RESPAWN_BACKOFF_SECONDS)
-        if not (changed or lifted or forced) or (recently_failed and not forced):
+        since_spawn = time.time() - (self.state.get('spawned') or 0)
+        recently_failed = self.state.get('last_exit') not in (None, 0) and since_spawn < RESPAWN_BACKOFF_SECONDS
+        # Work left and nothing running it -- an arm short of its cap in the mirrored queue, or a scheduler
+        # that exited non-zero -- is a reason to start one too, not only a changed queue: before 2026-09-05
+        # a scheduler that died (crash, OOM, a kill) left its batch idle until a trigger or a new spec.
+        # Backed off like a failed exit, so a scheduler that cannot make progress costs one start per
+        # `RESPAWN_BACKOFF_SECONDS`, never a loop.
+        needed = ((bool(self._idle_queue()) or self.state.get('last_exit') not in (None, 0))
+                  and since_spawn >= RESPAWN_BACKOFF_SECONDS)
+        if not (changed or lifted or forced or needed) or (recently_failed and not forced):
             return False
         try:
             process, log_path = self.spawn(self.host, self.runtime)
@@ -428,6 +438,8 @@ class Runner(object):
         """
         status = self._scheduler_status()
         alive = self.scheduler_alive()
+        if alive and status.get('pid') != self.state.get('scheduler_pid'):
+            return                  # a live scheduler that has not written its status yet: no information
         now_running = {}
         if alive:
             for job in status.get('running') or []:
@@ -437,9 +449,39 @@ class Runner(object):
         for job_id, policies in list(self.state['running'].items()):
             if job_id in now_running or job_id in queued:
                 continue
-            self._publish_job(job_id, policies)
+            # Left the running list. That is a result only if the files say the job finished: an arm
+            # at its cap, a pass with every arm's merged file, an eval spec with its marker. A dead
+            # scheduler's arms (2026-09-05: published mid-training, and their batch, every id now
+            # "published", dropped from the queue for good) and a crashed arm are forgotten here and
+            # seen running again when the next scheduler resumes them.
+            if self._finished(job_id, policies):
+                self._publish_job(job_id, policies)
+            else:
+                sys.stderr.write('{0} left the scheduler unfinished; not published, will be resumed\n'.format(job_id))
             del self.state['running'][job_id]
         self.state['running'].update(now_running)
+
+    def _finished(self, job_id, policies):
+        """Whether the files say `job_id` is done. Unknown -- a spec no longer on ops, an id of no
+        known shape -- counts as done, which is the pre-2026-09-05 rule and publishes what there is."""
+        runs = self.runs_dir()
+        pass_name = pass_of(job_id)
+        if pass_name:
+            label = PASS_FILE_LABELS[pass_name]
+            return all(os.path.exists(os.path.join(
+                runs, '{0}_checkpoint_evals{1}.json'.format(policy, '_' + label if label else '')))
+                for policy in policies)
+        spec = self.state.get('specs', {}).get(job_id)
+        if spec is None:
+            return True
+        if spec['type'] == 'eval':
+            folder = os.path.join(launch.queue_dir(self.host), batch_of(job_id))
+            return any(os.path.exists(os.path.join(folder, prefix + job_id)) for prefix in ('.done-', '.failed-'))
+        try:
+            with open(os.path.join(runs, spec['policy'] + '_evals.json')) as handle:
+                return int(json.load(handle)['summary']['step']) >= int(spec['max_steps'])
+        except (OSError, KeyError, TypeError, ValueError):
+            return False
 
     def _publish_job(self, job_id, policies):
         runs = self.runs_dir()
