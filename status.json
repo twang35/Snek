@@ -1,12 +1,13 @@
 {
-  "iso": "2026-09-05T10:54:40",
-  "ts": 1788630880.3915875,
+  "iso": "2026-09-05T10:56:10",
+  "ts": 1788630970.362154,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "b17 | clip015, clip03 -- wave 2 of 8 | training 11% (8 arms)"
     ],
     "queued": [
+      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
       "b17 evals | clip015, clip03 | queued (8 arms)",
       "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
       "b17 evals | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
@@ -17,7 +18,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl04, kl05 -- wave 5 of 5 | training 69% (8 arms)"
+      "b16 | kl04, kl05 -- wave 5 of 5 | training 71% (8 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl04, kl05 | queued (8 arms)",
@@ -26,7 +27,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T10:54:18"
+    "laptop_iso": "2026-09-05T10:55:35"
   },
   "scheduler": {
     "alive": true,
@@ -45,7 +46,7 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": false,
+    "paused": true,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
@@ -732,11 +733,11 @@
     "b17ao-clip03-seed3": "running",
     "b17ap-clip03-seed4": "running"
   },
-  "disk_free_gb": 124.7,
+  "disk_free_gb": 124.6,
   "head": "1ba444bd1f08",
   "load_avg": [
-    13.63525390625,
-    13.57177734375,
-    13.9248046875
+    13.708984375,
+    13.58740234375,
+    13.8974609375
   ]
 }
