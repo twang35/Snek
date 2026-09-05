@@ -2,7 +2,10 @@
 
 **Status: done 2026-09-05.** Laptop commit 1140b1e94; the box swapped units at 13:06 with the running
 scheduler (pid 1375916) and its b17 hof5000 pass untouched, re-adopted by the new daemon on its first poll.
-The box script ran once and was then deleted from the tree, as planned.
+The box script ran once and was then deleted from the tree, as planned. The last two wrapper mentions went in
+b3a99bd4a and were deployed over the bus; at 13:59 the pre-rename scheduler (pid 1375916, still logging to the old
+`~/.snek3-runner/` path in status) was killed by pid and the daemon started pid 1459379 on the new code, which
+adopted b17 wave 3's eight arms mid-training. The laptop's scheduler started 13:16, after the rename, and needed nothing.
 
 ## Why
 
