@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T14:05:44",
-  "ts": 1788642344.9666529,
+  "iso": "2026-09-05T14:05:51",
+  "ts": 1788642351.988665,
   "box": "laptop",
   "project": "snek3",
   "pid": 64756,
   "at_a_glance": {
     "running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training 97% (7 arms) | ~4m left"
+      "b19 | noadvnorm, mse -- wave 1 of 3 | training 97% (6 arms) | ~4m left"
     ],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
@@ -22,26 +22,15 @@
   },
   "running": [
     {
-      "id": "b19b-noadvnorm-seed2",
-      "type": "train",
-      "policy": "b19b-noadvnorm-seed2",
-      "policies": [
-        "b19b-noadvnorm-seed2"
-      ],
-      "step": 50003968,
-      "max_steps": 50003968,
-      "eta_seconds": 0.0
-    },
-    {
       "id": "b19c-noadvnorm-seed3",
       "type": "train",
       "policy": "b19c-noadvnorm-seed3",
       "policies": [
         "b19c-noadvnorm-seed3"
       ],
-      "step": 48332800,
+      "step": 48414720,
       "max_steps": 50003968,
-      "eta_seconds": 171.52424156681553
+      "eta_seconds": 164.71513357858737
     },
     {
       "id": "b19d-noadvnorm-seed4",
@@ -50,9 +39,9 @@
       "policies": [
         "b19d-noadvnorm-seed4"
       ],
-      "step": 48283648,
+      "step": 48381952,
       "max_steps": 50003968,
-      "eta_seconds": 169.33142925705346
+      "eta_seconds": 170.40862413845713
     },
     {
       "id": "b19e-mse-seed1",
@@ -61,9 +50,9 @@
       "policies": [
         "b19e-mse-seed1"
       ],
-      "step": 48332800,
+      "step": 48365568,
       "max_steps": 50003968,
-      "eta_seconds": 180.92742679090244
+      "eta_seconds": 172.85641894413703
     },
     {
       "id": "b19f-mse-seed2",
@@ -72,9 +61,9 @@
       "policies": [
         "b19f-mse-seed2"
       ],
-      "step": 48152576,
+      "step": 48300032,
       "max_steps": 50003968,
-      "eta_seconds": 195.3550471965014
+      "eta_seconds": 183.86417140076276
     },
     {
       "id": "b19g-mse-seed3",
@@ -83,9 +72,9 @@
       "policies": [
         "b19g-mse-seed3"
       ],
-      "step": 48447488,
+      "step": 48594944,
       "max_steps": 50003968,
-      "eta_seconds": 166.2161377006043
+      "eta_seconds": 146.64127881010643
     },
     {
       "id": "b19h-mse-seed4",
@@ -94,9 +83,9 @@
       "policies": [
         "b19h-mse-seed4"
       ],
-      "step": 47824896,
+      "step": 47988736,
       "max_steps": 50003968,
-      "eta_seconds": 221.81807016433692
+      "eta_seconds": 216.65599134300064
     }
   ],
   "queued_ids": [
