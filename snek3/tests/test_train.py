@@ -1276,3 +1276,24 @@ def test_a_workers_result_that_lands_during_the_reclaim_wins_with_its_fields(tmp
     trainer._reclaim_oldest()
     assert trainer.eval_rows[0]['steps_per_second'] == _fields(0.4)['steps_per_second']
     assert eval_queue.outstanding('qs') == [], 'retired after the merge'
+
+
+def test_a_fresh_eval_at_a_step_the_previous_life_left_queued_supersedes_it(tmp_path, monkeypatch):
+    """The actual cause of b17ai's crash loop (2026-09-05): a resumed arm re-trains through steps its
+    previous life had already queued, appended the step a second time, and merging the old result
+    retired every file for the step -- the fresh request too -- leaving an entry with nothing on disk."""
+    trainer = make_trainer(tmp_path, policy='qt', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=99, eval_workers=0)
+    # what a resume adopts: the previous life's result for step 10, landed but never merged
+    checkpoints.save(trainer.policy_dir, 10, trainer.algo.net)
+    eval_queue._write_json(eval_queue.done_path('qt', 10),
+                           {'step': 10, 'held': {'scores': [1.0], 'perfect': [0], 'rewards': [1.0]},
+                            'fields': _fields(0.9)})
+    trainer.pending_evals = [10]
+    trainer.step = 10
+    trainer._evaluate(5.0)                                   # this life reaches step 10 itself
+    assert trainer.pending_evals.count(10) == 1, 'offered once, not twice'
+    names = sorted(os.listdir(eval_queue.policy_directory('qt')))
+    assert names == ['10.req'] or names == [], 'the old .done is gone; the fresh request stands (or was drained)'
+    if trainer.eval_rows:
+        assert trainer.eval_rows[-1]['steps_per_second'] == 5.0, 'the fresh measurement, not the stale one'

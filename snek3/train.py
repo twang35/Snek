@@ -518,6 +518,17 @@ class Trainer(object):
         # restoring it. That inverts the gate rather than removing it: `_settle_checkpoint` prunes the
         # file when the row lands below the bar, so the set left on disk is the same one.
         checkpoints.save(self.policy_dir, self.step, self.algo.net)
+        if self.step in self.pending_evals:
+            # A resumed arm re-trains the steps between its `resume.pt` and where the previous life
+            # was killed, and the previous life had already queued those steps. This life's checkpoint
+            # for the step has just replaced the old one on disk, so its measurement is the one to
+            # keep: the old request, claim or result is dropped and the step is offered once, fresh.
+            # Before 2026-09-05 the step was appended a second time; merging the old result then
+            # removed one entry and every file for the step -- the fresh request too -- and the
+            # orphaned entry was reclaimed with no fields on disk, which killed b17ai on a KeyError
+            # three relaunches running.
+            eval_queue.retire(self.policy, self.step)
+            self.pending_evals = [step for step in self.pending_evals if step != self.step]
         eval_queue.enqueue(self.policy, self.step, fields, EVAL_EPISODES)
         self.pending_evals.append(self.step)
         self._drain()
