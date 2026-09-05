@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T00:07:42",
-  "ts": 1788592062.6318521,
+  "iso": "2026-09-05T00:08:08",
+  "ts": 1788592088.5427024,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -71,7 +71,7 @@
       "label": "",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2361
+      "elapsed_s": 2387
     }
   ],
   "ledger": {
@@ -265,6 +265,7 @@
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
     "b15-stageb-w2": "running",
+    "restart-20260905T070759Z": "done",
     "b15ap-ent005-seed4": "done",
     "b15ao-ent005-seed3": "done",
     "b15an-ent005-seed2": "done",
@@ -673,8 +674,8 @@
   "disk_free_gb": 130.2,
   "head": "99f6a418bf1f",
   "load_avg": [
-    14.3642578125,
-    15.775390625,
-    15.67333984375
+    15.0703125,
+    15.8271484375,
+    15.69384765625
   ]
 }
