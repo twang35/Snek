@@ -1,0 +1,7 @@
+{
+  "project": "snek3",
+  "id": "restart-20260905T070759Z",
+  "type": "restart",
+  "label": "restart requested from the laptop at master 99f6a418b",
+  "notes": "Named action queued by snek3/desktop/queue_action; the daemon runs it on the poll that sees it."
+}
