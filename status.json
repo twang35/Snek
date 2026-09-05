@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T06:12:36",
-  "ts": 1788613956.4610078,
+  "iso": "2026-09-05T06:12:59",
+  "ts": 1788613979.956585,
   "box": "laptop",
   "project": "snek3",
   "pid": 26287,
   "at_a_glance": {
     "running": [
-      "b16 | kl015 -- wave 3 of 5 | training 100% (2 arms)"
+      "b16 | kl015 -- wave 3 of 5 | training 100% (1 arm)"
     ],
     "queued": [
       "b16 evals | kl013, kl015 | queued (8 arms)",
@@ -21,23 +21,13 @@
   },
   "running": [
     {
-      "id": "b16aw-kl015-seed3",
-      "type": "train",
-      "policy": "b16aw-kl015-seed3",
-      "policies": [
-        "b16aw-kl015-seed3"
-      ],
-      "step": 49741824,
-      "max_steps": 50003968
-    },
-    {
       "id": "b16ax-kl015-seed4",
       "type": "train",
       "policy": "b16ax-kl015-seed4",
       "policies": [
         "b16ax-kl015-seed4"
       ],
-      "step": 49922048,
+      "step": 50003968,
       "max_steps": 50003968
     }
   ],
