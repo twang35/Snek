@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Queue a named action -- `deploy` or `restart` -- for the desktop daemon, and wait for it.
 
-    snek3/desktop/queue_action deploy               # box fetches + ff-merges master; restarts if the runner changed
+    snek3/desktop/queue_action deploy               # box fetches + ff-merges master; restarts if the daemon changed
     snek3/desktop/queue_action deploy --restart     # ...and restarts regardless
     snek3/desktop/queue_action restart              # just restart the daemon
     snek3/desktop/queue_action deploy --no-wait     # queue and return
@@ -64,7 +64,7 @@ def read_status():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('action', choices=('deploy', 'restart'))
-    parser.add_argument('--restart', action='store_true', help='deploy: restart even if the runner did not change')
+    parser.add_argument('--restart', action='store_true', help='deploy: restart even if the daemon did not change')
     parser.add_argument('--no-wait', action='store_true', help='queue it and return')
     parser.add_argument('--timeout', type=float, default=900, help='seconds to wait for the ledger')
     args = parser.parse_args(argv)
