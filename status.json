@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T03:34:49",
-  "ts": 1788604489.904366,
+  "iso": "2026-09-05T03:35:53",
+  "ts": 1788604553.875891,
   "box": "laptop",
   "project": "snek3",
   "pid": 26287,
   "at_a_glance": {
     "running": [
-      "b16 | kl008, kl01 -- wave 2 of 5 | training 95% (8 arms)"
+      "b16 | kl008, kl01 -- wave 2 of 5 | training 96% (7 arms)"
     ],
     "queued": [
       "b16 evals | kl008, kl01 | queued (8 arms)",
@@ -21,23 +21,13 @@
   },
   "running": [
     {
-      "id": "b16ai-kl008-seed1",
-      "type": "train",
-      "policy": "b16ai-kl008-seed1",
-      "policies": [
-        "b16ai-kl008-seed1"
-      ],
-      "step": 49381376,
-      "max_steps": 50003968
-    },
-    {
       "id": "b16aj-kl008-seed2",
       "type": "train",
       "policy": "b16aj-kl008-seed2",
       "policies": [
         "b16aj-kl008-seed2"
       ],
-      "step": 49954816,
+      "step": 50003968,
       "max_steps": 50003968
     },
     {
@@ -47,7 +37,7 @@
       "policies": [
         "b16ak-kl008-seed3"
       ],
-      "step": 47661056,
+      "step": 48300032,
       "max_steps": 50003968
     },
     {
@@ -57,7 +47,7 @@
       "policies": [
         "b16al-kl008-seed4"
       ],
-      "step": 47333376,
+      "step": 47972352,
       "max_steps": 50003968
     },
     {
@@ -67,7 +57,7 @@
       "policies": [
         "b16am-kl01-seed1"
       ],
-      "step": 47497216,
+      "step": 48087040,
       "max_steps": 50003968
     },
     {
@@ -77,7 +67,7 @@
       "policies": [
         "b16an-kl01-seed2"
       ],
-      "step": 47349760,
+      "step": 48005120,
       "max_steps": 50003968
     },
     {
@@ -87,7 +77,7 @@
       "policies": [
         "b16ao-kl01-seed3"
       ],
-      "step": 46252032,
+      "step": 46841856,
       "max_steps": 50003968
     },
     {
@@ -97,7 +87,7 @@
       "policies": [
         "b16ap-kl01-seed4"
       ],
-      "step": 46202880,
+      "step": 46792704,
       "max_steps": 50003968
     }
   ],
