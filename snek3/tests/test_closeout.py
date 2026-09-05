@@ -17,25 +17,97 @@ from tools import live_runs
 
 
 class Waves(object):
-    """Stands in for `eval_wave.run`, recording the calls and returning canned statuses."""
+    """Stands in for `eval_wave.ArmWave`: records the arms in the order they were resolved and
+    started, returns canned finish statuses, and can raise at construction (a bad arm).
 
-    def __init__(self, codes=None):
-        self.codes, self.calls = codes or {}, []
+    `candidates` is each arm's step count, 1 by default; `ticks` is how many polls a launched shard
+    stays alive, 1 by default, so pooling is observable through `peak` -- the most shards alive at
+    once -- without any real process."""
 
-    def __call__(self, policy, *args, **kwargs):
+    def __init__(self, codes=None, candidates=None, ticks=1):
+        self.codes, self.candidates, self.ticks = codes or {}, candidates or {}, ticks
+        self.calls, self.started, self.finished, self.settings = [], [], [], {}
+        self.alive_now, self.peak = 0, 0
+
+    def __call__(self, policy, selector='screen', episodes=500, shards=4, label=None, width=None,
+                 seed=0, resume=True, merge=True):
         self.calls.append(policy)
+        self.settings[policy] = {'selector': selector, 'episodes': episodes, 'shards': shards,
+                                 'label': label, 'seed': seed}
         code = self.codes.get(policy, 0)
         if isinstance(code, Exception):
             raise code
-        return code
+        return _FakeArm(self, policy, self.candidates.get(policy, 1), shards, code)
+
+
+class _FakeArm(object):
+    def __init__(self, waves, policy, candidates, pool, code):
+        self.waves, self.policy, self.code = waves, policy, code
+        self.steps = list(range(candidates))
+        self.shards = min(pool, candidates)
+        self.pending = list(range(self.shards))
+        self.running = []          # remaining ticks per launched shard
+
+    def announce(self, requested=None):
+        pass
+
+    def start_shard(self):
+        if not self.pending:
+            return False
+        self.pending.pop(0)
+        self.running.append(self.waves.ticks)
+        if self.policy not in self.waves.started:
+            self.waves.started.append(self.policy)
+        self.waves.alive_now = sum(1 for arm in _live_arms(self.waves) for t in arm.running if t > 0)
+        self.waves.peak = max(self.waves.peak, self.waves.alive_now)
+        return True
+
+    def exhausted(self):
+        return not self.pending
+
+    def alive(self):
+        return sum(1 for t in self.running if t > 0)
+
+    def finished(self):
+        return self.exhausted() and self.alive() == 0
+
+    def tick(self):
+        self.running = [t - 1 for t in self.running]
+
+    def counts(self):
+        return [1 for t in self.running if t <= 0]
+
+    def terminate(self):
+        self.running = [0 for _ in self.running]
+
+    def finish(self):
+        self.waves.finished.append(self.policy)
+        return self.code
+
+
+_ARMS = []
+
+
+def _live_arms(waves):
+    return [arm for arm in _ARMS if arm.waves is waves]
 
 
 @pytest.fixture
 def waves(monkeypatch):
-    def install(codes=None):
-        stub = Waves(codes)
-        monkeypatch.setattr(closeout.eval_wave, 'run', stub)
+    def install(codes=None, candidates=None, ticks=1):
+        stub = Waves(codes, candidates, ticks)
+        real_call = stub.__call__
+
+        def make(*args, **kwargs):
+            arm = real_call(*args, **kwargs)
+            _ARMS.append(arm)
+            return arm
+        monkeypatch.setattr(closeout.eval_wave, 'ArmWave', make)
         monkeypatch.setattr(closeout.stage_b_chart, 'redraw', lambda *a, **k: (None, []))
+        # a poll is a tick: every launched shard ages by one, no real sleeping
+        monkeypatch.setattr(closeout.time, 'sleep', lambda s: [arm.tick() for arm in _live_arms(stub)])
+        monkeypatch.setattr(closeout.eval_wave, 'POLL_S', 0)
+        del _ARMS[:]
         return stub
     return install
 
@@ -52,7 +124,9 @@ def windows(monkeypatch):
 def test_every_arm_is_measured_in_the_order_the_batch_named_them(waves, windows):
     stub = waves()
     assert closeout.run(['b1a', 'b1b', 'b1c'], shards=8) == 0
-    assert stub.calls == ['b1a', 'b1b', 'b1c']
+    assert stub.calls == ['b1a', 'b1b', 'b1c'], 'resolved in order'
+    assert stub.started == ['b1a', 'b1b', 'b1c'], 'started in order'
+    assert sorted(stub.finished) == ['b1a', 'b1b', 'b1c']
 
 
 def test_one_arm_failing_does_not_drop_the_arms_behind_it(waves, windows):
@@ -67,6 +141,7 @@ def test_an_arm_that_raises_does_not_drop_the_arms_behind_it_either(waves, windo
     stub = waves({'b1b': RuntimeError('no arch.json')})
     assert closeout.run(['b1a', 'b1b', 'b1c']) == 1
     assert stub.calls == ['b1a', 'b1b', 'b1c']
+    assert stub.started == ['b1a', 'b1c']
 
 
 def test_the_status_is_a_failure_even_when_the_last_arm_succeeds(waves, windows):
@@ -76,14 +151,54 @@ def test_the_status_is_a_failure_even_when_the_last_arm_succeeds(waves, windows)
 
 def test_the_protocol_defaults_are_the_close_outs_own(waves, windows):
     """The daemon passes a selector and an episode count only if a spec named them."""
-    seen = {}
-    def record(policy, selector, episodes, shards, *args, **kwargs):
-        seen.update(selector=selector, episodes=episodes, shards=shards)
-        return 0
-    waves()
-    closeout.eval_wave.run = record
+    stub = waves()
     closeout.run(['b1a'])
-    assert seen == {'selector': 'screen', 'episodes': 500, 'shards': 4}
+    assert stub.settings['b1a'] == {'selector': 'screen', 'episodes': 500, 'shards': 4,
+                                    'label': None, 'seed': 0}
+
+
+# --- the pool --------------------------------------------------------------------------------------
+
+def test_arms_with_few_candidates_run_side_by_side_under_one_shard_budget(waves, windows):
+    """The hof30k case: eight arms with one candidate each used to be eight sequential single-shard
+    waves. Pooled, all eight run at once and the wave takes one checkpoint's time."""
+    arms = ['b14{0}'.format(letter) for letter in 'abcdefgh']
+    stub = waves(ticks=3)
+    assert closeout.run(arms, shards=12) == 0
+    assert stub.peak == 8, 'every arm\'s single shard alive at once'
+    assert stub.started == arms
+
+
+def test_the_pool_is_never_exceeded(waves, windows):
+    arms = ['b14{0}'.format(letter) for letter in 'abcdefgh']
+    stub = waves(candidates={arm: 5 for arm in arms}, ticks=2)
+    closeout.run(arms, shards=12)
+    assert stub.peak <= 12
+    assert stub.peak == 12, 'and it is kept full'
+
+
+def test_an_arm_gets_no_more_shards_than_it_has_candidates(waves, windows):
+    stub = waves(candidates={'b1a': 3, 'b1b': 40})
+    closeout.run(['b1a', 'b1b'], shards=12)
+    arms = {arm.policy: arm for arm in _ARMS}
+    assert (len(arms['b1a'].running), len(arms['b1b'].running)) == (3, 12)
+
+
+def test_an_arm_with_no_candidates_is_closed_at_once_and_is_not_a_failure(waves, windows):
+    """Its empty pass file is what the next pass selects from."""
+    stub = waves(candidates={'b1a': 0})
+    assert closeout.run(['b1a', 'b1b']) == 0
+    assert stub.finished[0] == 'b1a', 'closed before any shard is launched'
+    assert stub.started == ['b1b']
+
+
+def test_the_next_arm_starts_as_soon_as_a_slot_frees_not_when_the_arm_ends(waves, windows):
+    """Pool 4, first arm 6 candidates: its last two shards launch as the first four finish, and the
+    second arm's shards fill whatever is free alongside them."""
+    stub = waves(candidates={'b1a': 6, 'b1b': 6}, ticks=2)
+    closeout.run(['b1a', 'b1b'], shards=4)
+    assert stub.peak == 4
+    assert stub.started == ['b1a', 'b1b']
 
 
 # --- the window ------------------------------------------------------------------------------------

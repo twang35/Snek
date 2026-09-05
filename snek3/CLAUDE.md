@@ -221,7 +221,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/results.py` | where result files live and what they are called. The one place that builds those paths |
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
-| `tools/closeout.py` | **a batch's stage B: every arm in turn, one process.** What the desktop dispatches and what an agent types here |
+| `tools/closeout.py` | **a batch's pass, one process: every arm's shards pooled under `--shards`**, each arm merged as it ends. `--pass hof5000` / `hof30k` for the two re-measures. What the desktop dispatches and what an agent types here |
 | `tools/laptop_batch.py` | **a batch of desktop specs, run here the way the daemon would**: waves of 8, each followed by its stage B, hof5000 and hof30k as `<batch>-stageb`, `<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ... `--queue logs/laptop-queue/` runs every batch directory under it in name order, rescanning between batches, and exits when none has work — the laptop's queue without a daemon. Resumable; skips a pass every arm already has the file for; adopts a live arm rather than relaunching it; never a ninth trainer. `skills/laptop-run` has the commands |
 | `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
 | `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |

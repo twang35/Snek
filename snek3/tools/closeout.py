@@ -9,14 +9,20 @@ job per batch and that job is this command; on the laptop the same command is ty
 used whatever an agent had written that day — two sequencers, one of which was a scratch shell script
 whose `| tail` swallowed the wave's progress lines. There is one now.
 
-**The arms go one at a time**, which is the 2026-08-29 decision this inherits rather than revisits:
-`tools/eval_wave.py` measures a single policy, so N arms are N waves. It costs a lane drain at each
-arm's end — ~11 s, against hours for the batch — and what it buys is that a batch is one process, one
-log and one thing to look at.
+**The shards are pooled across the arms** (2026-09-04; before that the arms went one at a time, the
+2026-08-29 decision, each arm a full-width wave). `--shards` is the pool: every arm's candidates are
+resolved up front, each arm gets `min(candidates, pool)` shards, and the close-out keeps the pool full
+in arm order — when an arm's shards start draining, the next arm's start. Per-arm waves were fine for
+stage B, hundreds of candidates per arm, and cost only an ~11 s lane drain per arm; they were the
+bottleneck for the hof passes, where an arm has 0-30 candidates: a hof30k wave was one busy core and
+eleven shards exiting at once, arm after arm, ~40 min for eight arms that pooled take ~6. Each arm is
+still merged on its own, under the same refusals, and an arm's shard count depends on its candidates
+alone, so a rerun resumes every shard from its own file.
 
 **A failing arm never drops the arms behind it.** Every arm runs; the exit status is the last
 failure's. That is the `;`-not-`&&` rule of the shell version it replaces, and the snek2 incident
-behind it is a wave that lost a whole batch's measurement to one bad arm.
+behind it is a wave that lost a whole batch's measurement to one bad arm. An arm whose selector
+raises — no checkpoints, no upstream file — is reported and skipped the same way.
 
 **Progress is visible three ways**, and none of them is this file doing work per episode: the wave's
 own `[ 2167/3222] 4 shard(s) alive, 9m elapsed  eta 5m` line, each arm's stage-B PNG — redrawn here
@@ -105,18 +111,24 @@ class Drawer(object):
         while not self.stop.wait(self.interval):
             self.draw_once()
 
-    def __enter__(self):
+    def start(self):
         self.thread = threading.Thread(target=self._loop, name='redraw', daemon=True)
         self.thread.start()
         return self
 
-    def __exit__(self, *exc_info):
+    def finish(self):
         self.stop.set()
         if self.thread is not None:
             self.thread.join(timeout=5.0)
         # The last word on the arm is drawn from the merged file the wave has just written, not from
         # the shard files a mid-pass redraw pooled.
         self.draw_once()
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, *exc_info):
+        self.finish()
         return False
 
 
@@ -137,7 +149,7 @@ def measure_one(policy, episodes=500, width=None, seed=0):
 
 def run(policies, selector='screen', episodes=500, shards=4, label=None, width=None, seed=0,
         resume=True, merge=True, window=True, redraw_interval=REDRAW_SECONDS):
-    """Measures every arm in turn. Returns the last failing arm's status, or 0.
+    """Measures every arm, shards pooled across them. Returns the last failing arm's status, or 0.
 
     The keyword defaults are `evaluate.py`'s, which are the protocol — `screen:97` at 500 episodes.
     Nothing here has an opinion about them; a caller that wants the protocol passes nothing.
@@ -146,30 +158,120 @@ def run(policies, selector='screen', episodes=500, shards=4, label=None, width=N
     if window and selector != 'one':
         eval_window.ensure(eval_window.chart_paths(policies, label), watch_pids=[os.getpid()])
 
-    status = 0
     started = time.time()
-    print('=== close-out: {0} arm(s), selector {1}, {2} episodes, {3} shard(s)'.format(
+    print('=== close-out: {0} arm(s), selector {1}, {2} episodes, {3} shard(s) pooled'.format(
         len(policies), selector, episodes, shards), flush=True)
-    for index, policy in enumerate(policies, 1):
-        print('\n--- [{0}/{1}] {2}  {3}'.format(
-            index, len(policies), policy, time.strftime('%H:%M:%S')), flush=True)
-        try:
-            if selector == 'one':
+    if selector == 'one':
+        status = 0
+        for index, policy in enumerate(policies, 1):
+            print('\n--- [{0}/{1}] {2}  {3}'.format(
+                index, len(policies), policy, time.strftime('%H:%M:%S')), flush=True)
+            try:
                 measure_one(policy, episodes, width, seed)
-                code = 0
-            else:
-                with Drawer(policy, label, redraw_interval):
-                    code = eval_wave.run(policy, selector, episodes, shards, label, width, seed,
-                                         resume, merge)
-        except Exception as error:                    # noqa: BLE001 - see the class docstring
-            code = 1
-            print('--- {0} raised {1}: {2}'.format(policy, type(error).__name__, error), flush=True)
-        if code:
-            status = code
-            print('--- {0} exited {1}; the arms behind it still run'.format(policy, code),
-                  flush=True)
+            except Exception as error:                # noqa: BLE001 - see the class docstring
+                status = 1
+                print('--- {0} raised {1}: {2}'.format(policy, type(error).__name__, error), flush=True)
+    else:
+        status = run_pool(policies, selector, episodes, shards, label, width, seed, resume, merge,
+                          redraw_interval)
     print('\n=== close-out done in {0:.1f}m, status {1}'.format(
         (time.time() - started) / 60.0, status), flush=True)
+    return status
+
+
+def run_pool(policies, selector, episodes, pool, label, width, seed, resume, merge,
+             redraw_interval=REDRAW_SECONDS, poll=None):
+    """Keeps up to `pool` shards running across the arms, in arm order, merging each arm as it ends.
+
+    Every arm is resolved first, so a bad arm is reported at the top rather than an hour in, and the
+    total is known for the progress line. Then the loop: fill the free slots from the first arm that
+    still has shards to launch, sleep, finish the arms whose shards have all exited, print one line.
+    An arm's chart is redrawn from its shard files while any of them run (`Drawer`), and once more
+    from the merged file when it is finished.
+    """
+    poll = eval_wave.POLL_S if poll is None else poll
+    status = 0
+    waves = []
+    for index, policy in enumerate(policies, 1):
+        try:
+            wave = eval_wave.ArmWave(policy, selector, episodes, pool, label, width, seed, resume,
+                                     merge)
+        except Exception as error:                    # noqa: BLE001 - one bad arm, not a bad batch
+            status = 1
+            print('--- [{0}/{1}] {2} raised {3}: {4}; the arms behind it still run'.format(
+                index, len(policies), policy, type(error).__name__, error), flush=True)
+            continue
+        print('--- [{0}/{1}] '.format(index, len(policies)), end='')
+        wave.announce(requested=pool)
+        waves.append(wave)
+    total = sum(len(wave.steps) for wave in waves)
+    print('{0} step(s) across {1} arm(s), {2} shard(s) pooled\n'.format(total, len(waves), pool),
+          flush=True)
+
+    queue = list(waves)          # arms with shards still to launch, in order
+    active = []                  # arms with shards launched and not yet finished
+    drawers = {}
+    started = time.time()
+    baseline = sum(sum(wave.counts()) for wave in waves)
+    banked = [0]        # rows of finished arms: the merge deletes the shard files they were read from
+
+    def close(wave):
+        banked[0] += sum(wave.counts())
+        try:
+            code = wave.finish()
+        except Exception as error:                    # noqa: BLE001 - see the class docstring
+            code = 1
+            print('--- {0} raised {1}: {2}'.format(wave.policy, type(error).__name__, error),
+                  flush=True)
+        if wave in drawers:
+            drawers.pop(wave).finish()
+        if code:
+            print('--- {0} exited {1}; the arms behind it still run'.format(wave.policy, code),
+                  flush=True)
+        return code
+
+    # Arms with nothing to measure are closed at once: their empty file is what the next pass reads.
+    for wave in [wave for wave in queue if not wave.shards]:
+        queue.remove(wave)
+        status = close(wave) or status
+
+    try:
+        while queue or active:
+            free = pool - sum(wave.alive() for wave in active)
+            while free > 0 and queue:
+                wave = queue[0]
+                if wave not in active:
+                    active.append(wave)
+                    drawers[wave] = Drawer(wave.policy, label, redraw_interval).start()
+                    print('--- {0} starts  {1}'.format(wave.policy, time.strftime('%H:%M:%S')),
+                          flush=True)
+                wave.start_shard()
+                free -= 1
+                if wave.exhausted():
+                    queue.pop(0)
+            if not active:
+                break
+            time.sleep(poll)
+            for wave in [wave for wave in active if wave.finished()]:
+                active.remove(wave)
+                status = close(wave) or status
+            done = banked[0] + sum(sum(wave.counts()) for wave in active)
+            elapsed = time.time() - started
+            fresh = done - baseline
+            eta = ''
+            if fresh >= eval_wave.ETA_MIN_ROWS and elapsed > 0:
+                eta = '  eta {0:.0f}m'.format((total - done) / (fresh / elapsed) / 60.0)
+            print('[{0:>5}/{1}] {2} shard(s) alive on {3} arm(s), {4} arm(s) waiting, {5:.0f}m '
+                  'elapsed{6}'.format(done, total, sum(wave.alive() for wave in active),
+                                      len(active), len(queue), elapsed / 60.0, eta), flush=True)
+    except KeyboardInterrupt:
+        print('\nstopping shards; their rows are already on disk and a rerun resumes them',
+              flush=True)
+        for wave in active:
+            wave.terminate()
+        for drawer in drawers.values():
+            drawer.finish()
+        raise
     return status
 
 

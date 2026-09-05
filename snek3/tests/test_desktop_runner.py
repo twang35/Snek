@@ -275,9 +275,9 @@ def test_a_training_invokes_train_py_with_its_policy():
 def test_a_batch_is_one_job_and_one_process():
     """One ledger record, one publish and one process per batch — `tools/closeout.py` owns the order.
 
-    The arms are still measured one at a time (2026-08-29): a wave takes a single policy, so N arms
-    are N waves. What changed on 2026-08-30 is *who* sequences them — this used to be a `sh -c` chain
-    built here, which the laptop's close-out did not share.
+    The close-out sequences the arms (pooled across `--shards` since 2026-09-04, one full-width wave
+    each before that). What changed on 2026-08-30 is *who* sequences them — this used to be a `sh -c`
+    chain built here, which the laptop's close-out did not share.
     """
     job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None))
     argv, _, log, _ = launch.build_command(job, HOST, runtime(eval_shards=16))

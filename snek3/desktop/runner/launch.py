@@ -57,8 +57,9 @@ def build_command(job, host, runtime):
     scratch shell script, and the two sequencers behaved differently under exactly the conditions
     nobody watches — a failed arm, a killed pass, buffered progress.
 
-    The arms still go one at a time, for the reason recorded on 2026-08-29: a wave measures a single
-    policy, so N arms are N waves. The lane drain at each arm's end is ~11 s against hours.
+    Since 2026-09-04 the close-out pools its shards across the arms — `--shards` is the pool, each arm
+    gets as many as it has candidates — so a hof30k wave of one-candidate arms no longer runs them
+    one at a time on one core each. The daemon passes the pool size and nothing else changes here.
 
     **No episode count and no gate are set here.** snek2's daemon carried five protocol numbers as a
     second copy of what `eval_plan.py` defines, and they drifted. The rule is inverted instead: the
