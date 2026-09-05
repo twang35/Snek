@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T12:42:44",
-  "ts": 1788637364.1970303,
+  "iso": "2026-09-05T12:42:59",
+  "ts": 1788637379.5843885,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -26,6 +26,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
+    "laptop_remaining": null,
     "laptop_iso": "2026-09-05T12:40:56"
   },
   "scheduler": {
@@ -678,8 +679,8 @@
   "disk_free_gb": 123.6,
   "head": "d7ec421714e6",
   "load_avg": [
-    16.443359375,
-    16.109375,
-    14.830078125
+    16.42529296875,
+    16.12060546875,
+    14.8544921875
   ]
 }
