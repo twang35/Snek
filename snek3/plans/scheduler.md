@@ -144,17 +144,18 @@ so nothing about queueing from the laptop changes.
 - `deploy`, `trigger`, the `deploy`/`restart` actions
 - `progress_update`, `publish_pages`, the viewer site
 
-## 6. Open questions
+## 6. Decisions (user, 2026-09-05)
 
-1. **One window per box**, panels switching between training charts and stage-B charts as the box
-   moves between a wave and a pass — or keep two windows? Recommendation: one.
-2. **On a scheduler restart, kill and respawn the window** (one flicker per deploy) rather than
-   adopt it by pid? Recommendation: kill and respawn.
-3. **Closed by hand stays closed until the next launch**, as today — confirm.
-4. **The `ledger` block in `status.json`** — the per-id state history. Is it read? `at_a_glance` and
-   `running` carry what progress updates use. Recommendation: drop it; `attention` keeps failures.
-5. **Desktop queue layout**: the daemon materialises `ops` specs into `desktop/queue-local/<batch>/`
-   (gitignored) so the scheduler sees the same shape on both boxes. Any objection to a second copy of
-   the specs on the box?
-6. **Timing**: phase 1 at the laptop's next batch boundary; phase 2 with a drain on the desktop. Which
-   batch boundary is acceptable for each?
+| question | decision |
+|---|---|
+| one window per box, or two | **one**, panels switching between training and stage-B charts |
+| window on a scheduler restart | **kill and respawn**; one flicker per deploy |
+| window closed by hand | **stays closed** until the next launch |
+| the `ledger` block in `status.json` | **dropped.** Not read; the docs record what has run, and where it ran does not matter |
+| a gitignored local copy of the desktop's specs as batch directories | **fine** |
+| wait for a boundary, or pause and restart | **either box takes a restart at any point**: arms run in their own session and the registry lets the new scheduler adopt them; shards resume on rerun; results publish from files. No pause needed. A **wave** boundary is still the tidy moment, because arms started by the old `train.py` hold the old flock window until they finish, and a scheduler started mid-wave would open its window beside it. A batch boundary is not required |
+
+**Build hazard.** The laptop driver launches every arm from the working tree, so phase 1 is developed
+in a separate git worktree and merged at the switch; a running batch must never see a half-edited
+`train.py` or `closeout.py`. The desktop's `deploy` is a fast-forward, so the same holds there by
+construction.
