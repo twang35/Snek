@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T13:16:16",
-  "ts": 1788639376.2197506,
+  "iso": "2026-09-05T13:17:07",
+  "ts": 1788639427.21971,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -16,7 +16,7 @@
     "attention": [],
     "remaining": "~21h of work: 1.3h running + 20h queued; clear ~Sun 10:30",
     "laptop_running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training 28% (8 arms) | ~1.2h left"
+      "b19 | noadvnorm, mse -- wave 1 of 3 | training 38% (8 arms) | ~1.0h left"
     ],
     "laptop_queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
@@ -27,8 +27,8 @@
       "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 (24 arms) | ~4.6h",
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
     ],
-    "laptop_remaining": "~21h of work: 1.2h running + 20h queued; clear ~Sun 10:14",
-    "laptop_iso": "2026-09-05T13:07:05"
+    "laptop_remaining": "~21h of work: 1.0h running + 20h queued; clear ~Sun 10:21",
+    "laptop_iso": "2026-09-05T13:16:25"
   },
   "scheduler": {
     "alive": true,
@@ -721,8 +721,8 @@
   "disk_free_gb": 123.4,
   "head": "9d027787cb76",
   "load_avg": [
-    13.107421875,
-    13.0771484375,
-    14.22998046875
+    14.26171875,
+    13.41552734375,
+    14.28076171875
   ]
 }
