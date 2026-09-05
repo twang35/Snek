@@ -29,17 +29,17 @@ def write_specs(directory, policies):
 
 class FakeProcess(object):
     """Exits on the first poll unless told to take `polls` polls first (the driver polls, it does not
-    block in `wait`, so it can republish its status while an arm runs)."""
+    block in `wait`, so it can republish its status while an arm runs). `code` is its exit status."""
 
-    def __init__(self, pid, polls=0):
-        self.pid, self.polls, self.returncode = pid, polls, None
+    def __init__(self, pid, polls=0, code=0):
+        self.pid, self.polls, self.returncode, self.code = pid, polls, None, code
 
     def poll(self):
         if self.polls > 0:
             self.polls -= 1
             return None
-        self.returncode = 0
-        return 0
+        self.returncode = self.code
+        return self.code
 
     def wait(self):
         self.returncode = 0
@@ -164,10 +164,10 @@ def test_a_failed_pass_stops_the_chain_for_that_wave(box):
     specs = [spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')]
     calls = Calls(codes={'stageb': 1})
     assert driver(specs, box, calls, wave=2).run() == 1
-    assert [e[0] for e in calls.events] == ['train', 'train', 'stageb']
+    assert [e[0] for e in calls.events] == ['train', 'train'] + ['stageb'] * 3, 'tried three times, then marked'
     calls = Calls(codes={'hof5000': 2})
     assert driver(specs, box, calls, wave=2).run() == 2
-    assert [e[0] for e in calls.events] == ['stageb', 'hof5000'], 'the arms are at their cap from the first run'
+    assert [e[0] for e in calls.events] == ['stageb'] + ['hof5000'] * 3, 'the arms are at their cap from the first run'
 
 
 def test_a_hold_marker_delays_every_launch_and_lifting_it_resumes(box):
@@ -406,7 +406,7 @@ def test_a_batch_that_still_has_work_after_running_is_not_looped_on(tmp_path, bo
         runs.append([s['policy'] for s in specs])
         return driver(specs, box, calls, wave=8)
     assert scheduler.run_queue(q, make) == 1
-    assert [e[0] for e in calls.events] == ['train', 'stageb'], 'ran once, then left alone'
+    assert [e[0] for e in calls.events] == ['train'] + ['stageb'] * 3, 'ran once (three tries of the pass), then left alone'
 
 
 def test_a_finished_batch_left_in_the_queue_costs_nothing(tmp_path, box):
@@ -629,10 +629,10 @@ def test_a_failed_pass_is_marked_and_a_rerun_skips_it_instead_of_looping(tmp_pat
     make = lambda specs: driver(specs, box, calls, wave=8)
     assert scheduler.run_queue(q, make) == 1
     assert os.path.exists(os.path.join(q, 'b14', '.failed-b14-stageb'))
-    assert [e[0] for e in calls.events] == ['train', 'stageb']
+    assert [e[0] for e in calls.events] == ['train'] + ['stageb'] * 3
     # a second scheduler over the same queue: the arm is done, the pass is marked -- nothing to do
     assert scheduler.run_queue(q, make) == 0
-    assert [e[0] for e in calls.events] == ['train', 'stageb'], 'not retried'
+    assert [e[0] for e in calls.events] == ['train'] + ['stageb'] * 3, 'not retried'
     _, specs = scheduler.queue_batches(q)[0]
     assert not make(specs).pending()
     assert 'b14-stageb failed' in make(specs).attention()[0]
@@ -921,3 +921,113 @@ def test_a_relaunch_waits_out_a_pause_so_kill_deploy_unpause_resumes_the_arms(bo
     assert d.run() == 0
     assert launched_while_held == [False, False], 'the relaunch waited for the hold to lift'
     assert state['sleeps'] >= 3
+
+
+# ---------------------------------------------------------------- a close-out that dies
+
+def _finished_arm_file(box, policy):
+    with open(os.path.join(box['runs'], policy + '_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}}, handle)
+
+
+def test_a_close_out_that_dies_is_relaunched_after_its_shard_group_is_ended(box):
+    """A killed controller leaves its shards running in its process group; the relaunch first ends the
+    group, then the new shards resume from the rows on disk. Only after two relaunches is it failed."""
+    import subprocess
+    _finished_arm_file(box, 'b13aa-mb32-seed1')
+    launches, groups, clock = [], [], {'now': 0.0}
+    alive_groups = set()
+
+    def popen(argv, **kwargs):
+        label = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
+        launches.append(label)
+        pid = 5000 + len(launches)
+        if label == 'stageb' and launches.count('stageb') == 1:      # the first stage B is killed
+            alive_groups.add(pid)
+            return FakeProcess(pid, code=-9)
+        for policy in ['b13aa-mb32-seed1']:
+            open(scheduler.pass_file(policy, label, box['runs']), 'w').close()
+        return FakeProcess(pid)
+
+    def killpg(pgid, signum):
+        groups.append((pgid, signum))
+        if pgid not in alive_groups:
+            raise ProcessLookupError()
+        if signum != 0:
+            alive_groups.discard(pgid)          # the shards go on the first signal
+
+    d = scheduler.Driver([spec('b13aa-mb32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'],
+                         popen=popen, call=subprocess.call, sleep=lambda s: clock.__setitem__('now', clock['now'] + s),
+                         python='py', ensure_workers=no_workers, wave=1, killpg=killpg, clock=lambda: clock['now'])
+    assert d.run() == 0
+    assert launches == ['stageb', 'stageb', 'hof5000', 'hof30k'], 'relaunched once, then the chain went on'
+    assert groups[0] == (5001, 15) and groups[1] == (5001, 0), 'SIGTERM to the group, then a liveness probe'
+    assert d.attention() == []
+
+
+def test_a_close_out_that_keeps_dying_is_marked_failed_after_two_relaunches(box, tmp_path):
+    import subprocess
+    q = _queue(tmp_path, {'b13': ['b13aa-mb32-seed1']})
+    _finished_arm_file(box, 'b13aa-mb32-seed1')
+    launches = []
+
+    def popen(argv, **kwargs):
+        launches.append(1)
+        return FakeProcess(6000 + len(launches), code=1)
+    make = lambda specs: scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=popen,
+                                          call=subprocess.call, sleep=lambda s: None, python='py',
+                                          ensure_workers=no_workers, wave=1,
+                                          killpg=lambda pgid, signum: (_ for _ in ()).throw(ProcessLookupError()))
+    assert scheduler.run_queue(q, make) == 1
+    assert len(launches) == 1 + scheduler.MAX_PASS_RELAUNCHES
+    assert os.path.exists(os.path.join(q, 'b13', '.failed-b13-stageb'))
+
+
+def test_an_adopted_close_out_that_dies_without_its_files_is_relaunched_too(box, monkeypatch):
+    import subprocess
+    _finished_arm_file(box, 'b13aa-mb32-seed1')
+    live_runs.register(live_runs.pass_entry('b13-stageb'), 777, box['runs'])
+    monkeypatch.setattr(scheduler.live_runs, 'alive', lambda pid: False if pid == 777 else True)
+    launches, groups = [], []
+
+    def popen(argv, **kwargs):
+        label = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
+        launches.append(label)
+        open(scheduler.pass_file('b13aa-mb32-seed1', label, box['runs']), 'w').close()
+        return FakeProcess(7000 + len(launches))
+    # 777 is dead when first read, so the entry is stale and the pass is launched outright; make it
+    # alive for exactly one poll instead, so it is adopted and then found gone with no file
+    polls = {'n': 0}
+
+    def alive(pid):
+        if pid != 777:
+            return True
+        polls['n'] += 1
+        return polls['n'] <= 2
+    monkeypatch.setattr(scheduler.live_runs, 'alive', alive)
+
+    def killpg(pgid, signum):
+        groups.append((pgid, signum))
+        raise ProcessLookupError()
+    d = scheduler.Driver([spec('b13aa-mb32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'], popen=popen,
+                         call=subprocess.call, sleep=lambda s: None, python='py', ensure_workers=no_workers,
+                         wave=1, killpg=killpg)
+    assert d.run() == 0
+    assert launches == ['stageb', 'hof5000', 'hof30k']
+    assert groups == [(777, 15)], 'the dead predecessor\'s group was probed once and was already empty'
+
+
+def test_a_scheduler_killed_mid_pass_leaves_the_pass_entry_for_its_successor(box):
+    import subprocess
+    _finished_arm_file(box, 'b13aa-mb32-seed1')
+
+    def popen(argv, **kwargs):
+        return FakeProcess(8001, polls=5)
+
+    def sleep(seconds):
+        raise SystemExit(143)                         # SIGTERM lands while waiting on the pass
+    d = scheduler.Driver([spec('b13aa-mb32-seed1')], runs_dir=box['runs'], logs_dir=box['logs'], popen=popen,
+                         call=subprocess.call, sleep=sleep, python='py', ensure_workers=no_workers, wave=1)
+    with pytest.raises(SystemExit):
+        d.run()
+    assert live_runs.read(live_runs.path_for(live_runs.pass_entry('b13-stageb'), box['runs'])) == 8001

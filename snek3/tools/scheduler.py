@@ -18,7 +18,9 @@ directory. Rerunning the same command is still the whole recovery.
 a pass is done when its merged `runs/<arm>_checkpoint_evals[_<label>].json` exists for every arm of
 the wave; an arm that exits short of its cap is relaunched inside its wave (it resumes from its own
 `resume.pt`), three times at most; an arm already live on this box (`runs/.live/`, written by the
-trainer) is waited for rather than relaunched, and so is a pass a previous scheduler left running (`runs/.live/.pass-<label>`, written
+trainer) is waited for rather than relaunched; a pass whose close-out dies is relaunched twice at most
+(its orphaned shards ended first, and the new ones resume from their files) before it is marked failed;
+and a pass a previous scheduler left running is waited for too a previous scheduler left running (`runs/.live/.pass-<label>`, written
 by that scheduler); a pass that failed is marked `.failed-<label>` in the batch directory so the queue
 does not loop on it (delete the marker to retry). Nothing else is remembered, which is why a kill, a
 reboot or a deploy costs nothing but a rerun.
@@ -89,6 +91,11 @@ POLL_SECONDS = 20
 # this many times before the wave gives up on it and says so. Bounded, so a trainer that dies on
 # start (a bad knob, a missing file) costs three launches and an attention line, never a loop.
 MAX_ARM_RELAUNCHES = 3
+# A pass whose close-out exits non-zero -- killed, OOM, a shard crash -- is relaunched this many times
+# before it is marked failed. Its shards resume from their own files, so a relaunch costs only the rows
+# in flight; a pass that is genuinely broken fails fast three times and is then marked, as before.
+MAX_PASS_RELAUNCHES = 2
+GROUP_EXIT_GRACE_SECONDS = 30
 
 
 def _log(message):
@@ -334,7 +341,7 @@ class Driver(object):
                  max_trainers=DEFAULT_MAX_TRAINERS, python=sys.executable, runs_dir=None,
                  logs_dir=None, popen=subprocess.Popen, call=subprocess.call, sleep=time.sleep,
                  passes=closeout.CHAIN, reporter=None, clock=time.time, window=None,
-                 ensure_workers=eval_queue.ensure_workers):
+                 ensure_workers=eval_queue.ensure_workers, killpg=os.killpg):
         if wave > max_trainers:
             raise ValueError('a wave of {0} exceeds the {1}-trainer cap'.format(wave, max_trainers))
         self.specs, self.evals = train_specs(specs), eval_specs(specs)
@@ -360,6 +367,7 @@ class Driver(object):
         self.window = window
         self.ensure_workers = ensure_workers
         self.workers = []
+        self.killpg = killpg
 
     # ---- what is running and what is owed, in the daemon's job-dict shape
 
@@ -608,12 +616,29 @@ class Driver(object):
         """
         os.makedirs(self.logs_dir, exist_ok=True)
         self._report()
+        attempts = 0
+        while True:
+            code, pid = self._run_closeout_once(argv, label, expected)
+            if code == 0 or attempts >= MAX_PASS_RELAUNCHES:
+                return code
+            attempts += 1
+            # The close-out is gone but its shards may not be: they share its process group (it was
+            # started as a session leader and they were not), so one signal to the group clears
+            # them before the relaunch, and the relaunched shards resume from the rows on disk.
+            self._end_group(pid, label)
+            _log('{0} exited {1}; relaunching (attempt {2} of {3}); its shards resume from their files'.format(
+                label, code, attempts, MAX_PASS_RELAUNCHES))
+            self._wait_while_held('relaunch of {0}'.format(label))
+
+    def _run_closeout_once(self, argv, label, expected):
+        """One run or adoption. Returns `(exit code, pid or None)`; an adopted pass has no exit code,
+        so its success is `expected`: every file it was to write exists."""
         pid = live_pass_pid(label, self.runs_dir)
         if pid is not None:
             _log('{0} already running here (pid {1}); waiting for it'.format(label, pid))
             self._wait_pid(pid)
             live_runs.unregister(live_runs.pass_entry(label), self.runs_dir)
-            return 0 if expected is None or all(os.path.exists(path) for path in expected) else 1
+            return (0 if expected is None or all(os.path.exists(path) for path in expected) else 1), pid
         with open(os.path.join(self.logs_dir, '{0}.log'.format(label)), 'a') as out:
             # `call` blocks, so the window's reopen request and the republish are checked from a
             # polling `popen` instead when the injected `call` is the real one.
@@ -621,12 +646,33 @@ class Driver(object):
                 process = self.popen(argv, cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
                                      stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
                 live_runs.register(live_runs.pass_entry(label), process.pid, self.runs_dir)
-                try:
-                    return self._wait_process(process)
-                finally:
-                    live_runs.unregister(live_runs.pass_entry(label), self.runs_dir)
+                # Cleared only when the pass has exited. Not in a `finally`: a scheduler killed here
+                # must leave the entry, or the next scheduler cannot adopt the pass and starts a second.
+                code = self._wait_process(process)
+                live_runs.unregister(live_runs.pass_entry(label), self.runs_dir)
+                return code, process.pid
             return self.call(argv, cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
-                             stdout=out, stderr=subprocess.STDOUT)
+                             stdout=out, stderr=subprocess.STDOUT), None
+
+    def _end_group(self, pid, label):
+        """Ends whatever is left of a dead close-out's process group -- its orphaned shards -- and
+        waits for them to go, SIGTERM then SIGKILL. `pid` is the group id because the close-out was a
+        session leader. Best effort: a group already empty is the normal case for a clean exit."""
+        if not pid:
+            return
+        for signum, wait in ((signal.SIGTERM, GROUP_EXIT_GRACE_SECONDS), (signal.SIGKILL, 5)):
+            try:
+                self.killpg(int(pid), signum)
+            except (ProcessLookupError, PermissionError, OSError):
+                return
+            _log('{0}: ended its process group {1} (orphaned shards) with signal {2}'.format(label, pid, signum))
+            deadline = self.clock() + wait
+            while self.clock() < deadline:
+                try:
+                    self.killpg(int(pid), 0)
+                except (ProcessLookupError, PermissionError, OSError):
+                    return
+                self.sleep(1)
 
     def run_evals(self):
         """The batch's eval specs, each once, after its waves. Returns the worst exit status."""

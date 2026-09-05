@@ -60,6 +60,16 @@ def shard_command(policy, selector, episodes, label, shard, shards, width, seed,
     return command
 
 
+def merged_steps(policy, label):
+    """The steps already in the arm's merged pass file, or an empty set if there is none or it is
+    unreadable (a torn file is not a reason to skip the measurement)."""
+    try:
+        payload = results.read(results.stage_b_path(policy, label))
+    except (OSError, ValueError):
+        return set()
+    return {int(row['step']) for row in results.rows_of(payload) if 'step' in row}
+
+
 def rows_done(policy, label, shards):
     """Rows on disk per shard, as a list. A shard that has not written yet contributes 0."""
     counts = []
@@ -92,7 +102,14 @@ class ArmWave(object):
         self.label, self.width, self.seed, self.resume, self.merge = label, width, seed, resume, merge
         directory = restore.policy_dir(policy)
         self.steps, self.description = selectors.resolve(directory, selector, policy=policy)
-        self.shards = min(int(shards), len(self.steps))
+        # An arm already merged is done: a rerun of the pass (a killed close-out relaunched, a
+        # scheduler restart) must not measure it again -- the merge deleted its shard files, so
+        # there is nothing to resume from and it would start over (2026-09-05: two finished arms of
+        # b16's wave 5 were re-measured for want of this). Every selected step must be in the file;
+        # `--no-resume` measures afresh regardless.
+        self.already_merged = bool(resume and merge and self.steps
+                                   and set(self.steps) <= merged_steps(policy, label))
+        self.shards = 0 if self.already_merged else min(int(shards), len(self.steps))
         self.pending = list(range(self.shards))
         self.processes, self.logs = [], []
         self.started = None
@@ -103,6 +120,10 @@ class ArmWave(object):
         return results.run_name(self.policy)
 
     def announce(self, requested=None):
+        if self.already_merged:
+            print('{0}: {1} step(s) already in {2}; kept, not measured again'.format(
+                self.name, len(self.steps), results.stage_b_path(self.policy, self.label)))
+            return
         if requested is not None and requested > self.shards:
             print('note: {0} shards for {1} step(s); {2} will run'.format(
                 requested, len(self.steps), self.shards))
@@ -153,6 +174,8 @@ class ArmWave(object):
         for _, handle in self.logs:
             handle.close()
         elapsed = (time.time() - self.started) / 60.0 if self.started else 0.0
+        if self.already_merged:
+            return 0                # the merged file is the result; nothing to write, nothing to delete
         if not self.shards:
             if self.merge:
                 path, _ = results.merge(self.policy, self.label)
