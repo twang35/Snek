@@ -1,45 +1,24 @@
 {
-  "iso": "2026-09-05T15:09:14",
-  "ts": 1788646154.36048,
+  "iso": "2026-09-05T15:16:20",
+  "ts": 1788646580.088463,
   "box": "laptop",
   "project": "snek3",
   "pid": 64756,
   "at_a_glance": {
-    "running": [
-      "b19 | noadvnorm, mse | stage B (8 arms) | ~1m left"
-    ],
+    "running": [],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~14m",
       "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~2.9h",
-      "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.3h",
+      "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.7h",
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms)",
-      "b20 evals | lanes32, lanes64, lanes256, lanes512 (16 arms) | ~2.3h",
+      "b20 evals | lanes32, lanes64, lanes256, lanes512 (16 arms) | ~2.7h",
       "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 (24 arms)",
-      "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
+      "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~4.1h"
     ],
     "attention": [],
-    "remaining": "~11h of work: 1m running + 11h queued; clear ~Sun 02:21"
+    "remaining": "~13h of work: 13h queued; clear ~Sun 03:56"
   },
-  "running": [
-    {
-      "id": "b19-stageb",
-      "type": "eval",
-      "policy": "b19a-noadvnorm-seed1",
-      "policies": [
-        "b19a-noadvnorm-seed1",
-        "b19b-noadvnorm-seed2",
-        "b19c-noadvnorm-seed3",
-        "b19d-noadvnorm-seed4",
-        "b19e-mse-seed1",
-        "b19f-mse-seed2",
-        "b19g-mse-seed3",
-        "b19h-mse-seed4"
-      ],
-      "step": null,
-      "max_steps": null,
-      "eta_seconds": 60.0
-    }
-  ],
+  "running": [],
   "queued_ids": [
     "b19-hof5000",
     "b19-hof30k",
