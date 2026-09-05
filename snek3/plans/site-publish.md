@@ -50,35 +50,43 @@ but it fetches a third of a gigabyte to copy a megabyte and moves the one hard-t
 we can ssh to. C is what we do by hand today made unattended, and it puts an automated writer on the
 person's branch, which is the mistake the whole git bus exists to avoid.
 
-## The plan for A
+## The plan for A — one code path, both boxes
+
+**Publishing finished work moves into the scheduler**, which already knows the moment a wave's stage B or a
+pass ends on either box; the daemon's `publish_results` goes away. **The site build is one module,
+`tools/site_build.py`**, that the daemon runs as a subprocess on every network cycle and that a person runs
+by hand with the same command — the daemon stays stdlib-only and imports nothing from the project, as it does
+for the scheduler. No new job type, no new action: a function on the tick, and `trigger` forces the tick.
 
 | step | where | what |
 |---|---|---|
-| 1 | `tools/scheduler.py` (+ `gitbus`) | **the laptop publishes finished work** the way the daemon does: at a wave's stage B, `hof5000` and `hof30k` ends, copy the wave's `.md`, `.png`, JSON and stage-B files to `laptop-results/<job-id>/` on a `laptop-results` branch through a worktree under `~/.snek3-laptop/results`. Same layout as `results`, so the progress update's importer reads both with one path. The publish is best-effort like `laptop-status`: a failure is logged and the next event retries |
-| 2 | `desktop/daemon/` | **the daemon builds the site**: a `site` worktree (`~/snek-bus/site`); on a network cycle where the head of `results` or `laptop-results` changed, stage `desktop/runs/` + every file under both feeds into a build directory, `viewer_manifest.build(build_dir)`, `publish_pages.publish(...)` into the worktree, one commit, `--force-with-lease`. The desktop's `status.json` is local, so pass states on the page are right; the laptop's come from `laptop-status` as they do today |
-| 3 | repo settings | Pages source → branch `site`, path `/`. Then `docs/` leaves `master` (`git rm -r docs`; `.gitignore` it) and `publish_pages` writes only to the worktree; a progress update stops committing charts and the manifest to `master`; `runs/*.png` leave master too (redrawable, see below) |
-| 4 | `tools/progress_update.py` | import closed waves from both feeds; drop the site publish and the chart commit from step 2 of the skill; keep committing a closed batch's JSON and `.md` to `master` as the archive; add `queue_action site` and the unconditional rebuild on `trigger` |
-| 5 | later, both feeds | make `results` and `laptop-results` snapshots too, or publish an arm's `_evals.json` once at its cap rather than with every pass: today each pass re-publishes it (1.7 MB x 3 passes x 8 arms per wave), and the `results` pack is 372 MB |
+| 1 | `tools/scheduler.py` + `gitbus` | **the scheduler publishes its finished work**, on both boxes: at a wave's stage B, `hof5000` and `hof30k` end, copy the wave's `.md`, `.png`, JSON and stage-B files to `<branch>/<job-id>/` through a worktree outside the checkout. The branch is the box's: `results` (desktop, from `host.env`) and `laptop-results` (laptop). Best-effort like `laptop-status`: a failure is logged and retried at the next event, and `tools.scheduler --publish-results <batch>` re-publishes by hand. The daemon's own `publish_results` and its "an id left `running`" logic are deleted |
+| 2 | `tools/site_build.py` | **the build**: fetch both feeds; stage `desktop/runs/` (this box's live pictures) plus every file under both feeds into a build directory; `viewer_manifest.build(build_dir)`; `publish_pages.publish(...)` into a `site` worktree (`~/snek-bus/site`); one snapshot commit; `--force-with-lease`. Skips when neither feed's head moved and `--force` is not given |
+| 3 | `desktop/daemon/daemon.py` | the network cycle runs `PYTHON_BIN -m tools.site_build` after its fetches; a triggered cycle passes `--force`, so `ssh the-claw-den 'Snek/snek3/desktop/trigger'` is the "rebuild now" button, live desktop charts included. A build failure is a line in `status.json`'s `attention`, never a stopped daemon |
+| 4 | repo settings | Pages source → branch `site`, path `/`. `docs/` and `runs/*.png` leave `master` (`.gitignore` both) |
+| 5 | `tools/progress_update.py` | import closed waves from both feeds; the sync, publish and chart-commit steps go; a closed batch's JSON and `.md` still go to `master` as the archive |
+| 6 | later, both feeds | snapshots instead of histories, or an arm's `_evals.json` published once at its cap rather than with every pass: each pass re-publishes it today (1.7 MB x 3 passes x 8 arms per wave) and the `results` pack is 372 MB |
 
-## Two answers (user's questions, 2026-09-05)
+**Why the site does not stay in `master`'s `docs/`** (user's question). It could: a detached worktree on the
+box tracking `origin/master`, commit `docs/`, push `HEAD:master`, retry on a rejected push. Disjoint paths
+mean no merge conflicts — agents never edit `docs/` by hand as it is. Two things rule it out. **History:** a
+wave's pictures are 1-2 MB and there are ~10 waves a day, so `master` would carry ~20 MB a day of superseded
+PNGs forever; a snapshot branch is rewritten and stays the ~51 MB the page needs. **Two writers on the
+person's branch:** every push from the laptop would be rejected whenever the box pushed in the last ten
+minutes, so every agent push grows a `pull --rebase` (which refuses on a dirty tree) — friction on every
+approved code change, to save one Pages setting.
 
-**Build on demand, not only on the ten-minute cycle.** The daemon's network cycle is `git_seconds` (600) but
-`ssh the-claw-den 'Snek/snek3/desktop/trigger'` already forces a cycle *now*, so the build hangs off that
-same cycle and the existing trigger is the button: it fetches both feeds, rebuilds if either moved, and
-**a triggered cycle rebuilds unconditionally**, so the desktop's live charts refresh even when no wave has
-closed. For the no-ssh path, `queue_action site` is a third named action beside `deploy` and `restart`,
-taken on the poll that sees it. The laptop's half is not a problem: its finished waves are pushed at the
-moment they finish, so a trigger never finds the laptop's feed behind by more than a push that failed
-(logged, retried on the next event).
+**Who writes `site`, and what a person does when a publish fails.** The box, and only the box: the daemon's
+cycle, or the same `tools.site_build --force` typed over ssh, which is the same writer with the same worktree
+and lease. An agent on the laptop never pushes to `site`. If the laptop's feed is behind, `tools.scheduler
+--publish-results <batch>` then `trigger`; if the build itself is broken, fix `site_build` and deploy — the
+page is stale meanwhile, and that is accepted (user, 2026-09-05). Two builds racing (a hand run during a
+cycle) is settled by `--force-with-lease`: one loses, the next cycle rebuilds from the same inputs.
 
-**Master keeps the JSON and the `.md`, not the pictures.** Every chart is a function of a JSON file the
-archive already holds: `tools.progress_chart <policy>` redraws `runs/<name>.png` from `_evals.json`, and
-`tools.stage_b_chart` redraws the stage-B, `hof5000` and `hof30k` pictures from their `_checkpoint_evals*`
-files — the docstrings say so and the trainer and close-out write the pictures through those two modules
-and nowhere else. The one thing *not* recoverable from JSON is the `.md`'s config table (the trainer passes
-the config in; `arch.json` holds only the architecture), and it is 2 KB. So at a batch's close-out master
-commits `_evals.json`, `_checkpoint_evals*.json` and `.md`; `.png` files leave master along with `docs/`,
-and the `site` branch is the only place pictures live. A picture anyone wants back is one command.
+**The name.** `scheduler.py` would now also publish what it finished. Recommended: keep the name — it still
+schedules the waves and passes, publishing them is the last step of scheduling them, and the runner→daemon
+rename cost a ~280-mention sweep for a word that had stopped being true, which "scheduler" has not. If the
+name is to change, `conductor.py` is fine and goes in the same cut as step 1, one rename with no shim.
 
 **What stays manual:** the reading. The tables regenerate themselves; the sentences under them are the
 progress update, and that is the part worth a person's time.
