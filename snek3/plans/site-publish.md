@@ -1,6 +1,6 @@
 # The chart viewer keeps itself current
 
-**Status: proposed 2026-09-05, for discussion.** The question: can both boxes publish their charts as each
+**Status: implemented 2026-09-05** (steps 1-5; step 6, the feeds' de-duplication, is partly done -- an arm's `_evals.json` is published once, with the arm -- and the snapshot form of the feeds is still open). Below is the plan as approved. The question: can both boxes publish their charts as each
 wave finishes, so the [Pages viewer](https://twang35.github.io/Snek/) is current without a progress update,
 and without bringing back the merge failures the box's `snek3/runs/` collisions caused?
 

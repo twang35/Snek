@@ -1112,3 +1112,48 @@ def test_a_republish_request_publishes_at_the_next_poll_and_is_consumed(box, tmp
     assert len(published.statuses) == 3, 'launch, the republish tick, exit -- one publish per request'
     assert not os.path.exists(live_runs.republish_path(box['runs'])), 'consumed'
     assert scheduler.build_parser().parse_args(['--republish']).republish
+
+
+# ---------------------------------------------------------------- the results feed
+
+class FakeFeed(object):
+    def __init__(self):
+        self.published = []
+
+    def publish(self, job_id, paths):
+        self.published.append((job_id, sorted(os.path.basename(p) for p in paths)))
+        return True
+
+
+def test_the_driver_publishes_an_arm_at_its_cap_and_each_pass_its_merged_files(tmp_path, box):
+    specs = [spec('b14a-roll32-seed1'), spec('b14b-roll32-seed2')]
+    feed, calls = FakeFeed(), Calls()
+    for s in specs:
+        open(os.path.join(box['runs'], s['policy'] + '.png'), 'w').close()
+
+    def call(argv, **kwargs):          # the close-out writes each arm's merged file and picture
+        code = calls.call(argv, **kwargs)
+        pass_name = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
+        for s in specs:
+            open(scheduler.pass_file(s['policy'], pass_name, box['runs']), 'w').close()
+            open(scheduler.pass_file(s['policy'], pass_name, box['runs'])[:-5] + '.png', 'w').close()
+        return code
+    d = driver(specs, box, calls, wave=2, results=feed)
+    d.call = call
+    assert d.run() == 0
+    assert feed.published[:2] == [('b14a-roll32-seed1', ['b14a-roll32-seed1.png', 'b14a-roll32-seed1_evals.json']),
+                                  ('b14b-roll32-seed2', ['b14b-roll32-seed2.png', 'b14b-roll32-seed2_evals.json'])]
+    assert [job for job, _ in feed.published[2:]] == ['b14-stageb', 'b14-hof5000', 'b14-hof30k']
+    assert feed.published[2][1] == ['b14a-roll32-seed1_checkpoint_evals.json', 'b14a-roll32-seed1_checkpoint_evals.png',
+                                    'b14b-roll32-seed2_checkpoint_evals.json', 'b14b-roll32-seed2_checkpoint_evals.png']
+    assert feed.published[3][1][0] == 'b14a-roll32-seed1_checkpoint_evals_hof5000.json', 'a pass publishes only its own files'
+    # a feed that fails never stops the driver, and a driver without one publishes nothing
+    d2 = driver(specs, box, Calls(), wave=2)
+    assert d2.results is None and d2.run() == 0
+
+
+def test_a_failed_pass_publishes_nothing(box):
+    specs = [spec('b14a-roll32-seed1')]
+    feed = FakeFeed()
+    assert driver(specs, box, Calls(codes={'stageb': 1}), wave=1, results=feed).run() == 1
+    assert [job for job, _ in feed.published] == ['b14a-roll32-seed1']

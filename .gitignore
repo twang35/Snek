@@ -77,3 +77,7 @@ __pycache__/
 # record. It also MUST stay ignored for the desktop's sake: an untracked file under a live arm's
 # runs/ path is exactly what makes `git merge --ff-only` abort a deploy.
 /snek3/runs/.evalq/
+
+# the Pages site is the `site` branch, built by the desktop (snek3/tools/site_build.py); a local build lands here
+/docs/
+/snek3/viewer/manifest.js

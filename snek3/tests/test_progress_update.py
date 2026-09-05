@@ -98,10 +98,10 @@ def test_adoption_keeps_every_prose_paragraph_and_drops_tables_panels_and_group_
     assert '| 0.5 | 97 |' not in reading and '![' not in reading and '**k1** —' not in reading
     assert out.count('## Batch b20') == 1 and '## Batch b19 — older\n\nuntouched' in out
     assert pu.MARK.format('b20') in out and pu.END_MARK.format('b20') in out
-    assert '![b20ac-k2-seed1](../runs/b20ac-k2-seed1.png)' in out
-    assert '![b20ac-k2-seed1 stage B](../runs/b20ac-k2-seed1_checkpoint_evals.png)' in out
+    assert '![b20ac-k2-seed1](https://twang35.github.io/Snek/charts/b20ac-k2-seed1.png)' in out
+    assert '![b20ac-k2-seed1 stage B](https://twang35.github.io/Snek/charts/b20ac-k2-seed1_checkpoint_evals.png)' in out
     assert '![b20ad-k2-seed2 stage B]' not in out                  # no stage-B panel without rows
-    assert '**knob 0.7** — reference: b19:' in out and '![b19zz-ref-seed1](../runs/b19zz-ref-seed1.png)' in out
+    assert '**knob 0.7** — reference: b19:' in out and '![b19zz-ref-seed1](https://twang35.github.io/Snek/charts/b19zz-ref-seed1.png)' in out
 
 
 def test_regeneration_preserves_the_reading_verbatim_and_replaces_everything_else():
@@ -172,9 +172,13 @@ def test_import_skips_shard_files_and_existing_ones(tmp_path, monkeypatch):
         'R', (), {'stdout': b'{}', 'returncode': 0})())
     (tmp_path / 'b20aa-k1-seed1.png').write_bytes(b'x')
     tree = ['results/b20-stageb-w1/b20aa-k1-seed1.png', 'results/b20-stageb-w1/b20aa-k1-seed1_checkpoint_evals.json',
-            'results/b20-stageb-w1/b20aa-k1-seed1_checkpoint_evals-s1of4.json', 'results/other-job/x.json']
-    copied = pu.import_closed_waves({'ledger': {'b20-stageb-w1': 'done', 'other-job': 'done'}}, tree, str(tmp_path))
-    assert copied == 1 and (tmp_path / 'b20aa-k1-seed1_checkpoint_evals.json').exists()
+            'results/b20-stageb-w1/b20aa-k1-seed1_checkpoint_evals-s1of4.json',
+            'results/b20aa-k1-seed1/b20aa-k1-seed1_evals.json',          # the arm's own job: imported too
+            'results/b20ab-k1-seed2/b20ab-k1-seed2_evals.json']          # still running: not
+    ledger = {'b20-stageb-w1': 'done', 'b20aa-k1-seed1': 'done', 'b20ab-k1-seed2': 'running'}
+    copied = pu.import_closed_waves({'ledger': ledger}, tree, str(tmp_path))
+    assert copied == 2 and (tmp_path / 'b20aa-k1-seed1_checkpoint_evals.json').exists()
+    assert (tmp_path / 'b20aa-k1-seed1_evals.json').exists() and not (tmp_path / 'b20ab-k1-seed2_evals.json').exists()
     assert not (tmp_path / 'b20aa-k1-seed1_checkpoint_evals-s1of4.json').exists()
 
 

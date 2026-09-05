@@ -49,6 +49,9 @@ PASS_FILE_LABELS = {'stageb': None, 'hof5000': 'hof5000', 'hof30k': 'hof30k'}
 # A scheduler that exits with work pending is not relaunched sooner than this unless a trigger asks.
 RESPAWN_BACKOFF_SECONDS = 600
 
+# A site build is a manifest walk and a megabyte of copies; well past this it is stuck, not slow.
+SITE_BUILD_TIMEOUT = 900
+
 
 def trigger_path(host):
     """The file that makes the daemon do a network cycle now, rather than at its next `git_seconds`.
@@ -84,6 +87,7 @@ class Daemon(object):
         self.stop = False
         self.restart_requested = None
         self.run_command = subprocess.run      # injectable for tests: how an action's command is run
+        self.site = None                       # the last site build: iso, ok, seconds, note
         self.spawn = launch.spawn_scheduler    # injectable for tests
         self.scheduler = None                  # Popen, or None when adopted by pid / not running
         self._reattach()
@@ -339,10 +343,11 @@ class Daemon(object):
         if self.stop:
             return
         self._relay_hold()
-        self._track_and_publish_results()
+        self._track_finished()
         self._maybe_spawn(self._queue_signature(specs), forced=forced)
         self._save_state()
         if git:
+            self._build_site(forced=forced)
             self._publish()
 
     # ---- actions: deploy and restart, run by the daemon itself
@@ -426,15 +431,17 @@ class Daemon(object):
 
     # ------------------------------------------------------------- results
 
-    def _track_and_publish_results(self):
-        """Publishes every job the scheduler has finished since the last poll, one push per job.
+    def _track_finished(self):
+        """Records every job the scheduler has finished since the last poll; the scheduler itself
+        published its files (`tools/results_feed.py`), so this is bookkeeping only.
 
         A job is finished when it was in the scheduler's `running` list and no longer is (and is not
-        queued). Its policies were recorded while it ran, so the artifacts to copy are known without
-        the scheduler's help: every `runs/` file of every arm the job owned, into `results/<job id>/`.
-        Per job rather than per poll, because the box's DNS for github flaps and a wave concentrates
-        arms behind one push; a push that does not land leaves the commit local, `push_unpushed`
-        carries it, and the branch is listed under `attention` until it does.
+        queued) **and the files say it finished** -- an arm at its cap, a pass with every arm's merged
+        file, an eval spec with its marker. A dead scheduler's arms (2026-09-05: recorded mid-training,
+        and their batch, every id now "done", dropped from the queue for good) and a crashed arm are
+        forgotten here and seen running again when the next scheduler resumes them. What is recorded
+        under `state['published']` is what keeps a finished batch out of the mirrored queue and shows
+        as `done` in the ledger.
         """
         status = self._scheduler_status()
         alive = self.scheduler_alive()
@@ -449,15 +456,10 @@ class Daemon(object):
         for job_id, policies in list(self.state['running'].items()):
             if job_id in now_running or job_id in queued:
                 continue
-            # Left the running list. That is a result only if the files say the job finished: an arm
-            # at its cap, a pass with every arm's merged file, an eval spec with its marker. A dead
-            # scheduler's arms (2026-09-05: published mid-training, and their batch, every id now
-            # "published", dropped from the queue for good) and a crashed arm are forgotten here and
-            # seen running again when the next scheduler resumes them.
             if self._finished(job_id, policies):
-                self._publish_job(job_id, policies)
+                self.state['published'][job_id] = time.time()
             else:
-                sys.stderr.write('{0} left the scheduler unfinished; not published, will be resumed\n'.format(job_id))
+                sys.stderr.write('{0} left the scheduler unfinished; not recorded, will be resumed\n'.format(job_id))
             del self.state['running'][job_id]
         self.state['running'].update(now_running)
 
@@ -483,23 +485,29 @@ class Daemon(object):
         except (OSError, KeyError, TypeError, ValueError):
             return False
 
-    def _publish_job(self, job_id, policies):
-        runs = self.runs_dir()
-        names = sorted(os.listdir(runs)) if os.path.isdir(runs) else []
-        artifacts = []
-        for policy in policies:
-            artifacts += [os.path.join(runs, name) for name in names
-                          if name == policy + '.md' or name.startswith(policy + '.')
-                          or name.startswith(policy + '_')]
+    def _build_site(self, forced=False):
+        """Rebuilds the GitHub Pages viewer from both boxes' results feeds and this box's live charts
+        (`tools/site_build.py`, on the env python, as the scheduler is run) and snapshot-pushes the
+        `site` branch. Once per network cycle; a trigger forces a rebuild even when nothing moved. A
+        failure is a line under `attention`, never a stopped daemon."""
+        argv = [self.host['PYTHON_BIN'], '-m', 'tools.site_build'] + (['--force'] if forced else [])
+        env = dict(os.environ, **launch.scheduler_env(self.host, self.runtime))
+        env['PYTHONPATH'] = self.host['SNEK_DIR']
+        env['SNEK_SITE_BRANCH'] = self.host.get('SITE_BRANCH') or 'site'
+        env['SNEK_SITE_WORKTREE'] = self.host.get('SITE_WORKTREE') or os.path.join(
+            os.path.dirname(self.host['STATUS_WORKTREE']), 'site')      # beside status and results
+        started = time.time()
         try:
-            if not gitbus.publish_results(self.host, _Named(job_id), artifacts):
-                self._unpushed = sorted(set(self._unpushed) | {self.host['RESULTS_BRANCH']})
-        except Exception as error:   # best-effort, but say so in the journal, not silently
-            sys.stderr.write('publish_results({0}) failed: {1}\n'.format(job_id, error))
-            return
-        self.state['published'][job_id] = time.time()
-
-    # ------------------------------------------------------------------ status
+            result = self.run_command(argv, cwd=self.host['SNEK_DIR'], env=env, text=True,
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=SITE_BUILD_TIMEOUT)
+            rc, out = result.returncode, (result.stdout or '').strip()
+        except (OSError, subprocess.SubprocessError) as error:
+            rc, out = -1, str(error)
+        last = out.splitlines()[-1] if out else ''
+        self.site = {'iso': time.strftime('%Y-%m-%dT%H:%M:%S'), 'ok': rc == 0, 'seconds': round(time.time() - started, 1),
+                     'note': last[:300], 'forced': bool(forced)}
+        if rc != 0:
+            sys.stderr.write('site build failed (rc {0}): {1}\n'.format(rc, out[-2000:]))
 
     def _failed_ids(self, status):
         """Ids the scheduler's attention lines name as failed passes."""
@@ -569,6 +577,9 @@ class Daemon(object):
             elif record.get('state') == 'failed' and record.get('type') == 'unknown':
                 lines.append('** spec {0} is malformed and is not run: {1}'.format(
                     job_id, record.get('error')))
+        if self.site and not self.site.get('ok'):
+            lines.append('** the site build failed at {0}: {1}. The Pages viewer is stale; retried every '
+                         'network cycle, now on trigger.'.format(self.site.get('iso'), self.site.get('note')))
         if not self.scheduler_alive() and self.state.get('last_exit') not in (None, 0):
             lines.append('** the scheduler exited {0} (log {1}); it is restarted when the queue changes '
                          'or a trigger asks'.format(self.state.get('last_exit'), self.state.get('scheduler_log')))
@@ -605,6 +616,7 @@ class Daemon(object):
             'ledger': self._ledger_view(status, alive),
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
             'head': self._head(),
+            'site': self.site,
             'load_avg': list(os.getloadavg()),
         }
         try:
@@ -615,13 +627,6 @@ class Daemon(object):
                                   if branch != self.host['STATUS_BRANCH']]
         except Exception as error:
             sys.stderr.write('publish_status failed: {0}\n'.format(error))
-
-
-class _Named(object):
-    """What `gitbus.publish_results` needs of a job: its id."""
-
-    def __init__(self, job_id):
-        self.id = job_id
 
 
 # ---------------------------------------------------------------- pure helpers

@@ -1,11 +1,13 @@
-"""All git interaction, over four single-writer branches.
+"""All git interaction, over the single-writer branches of the bus.
 
 | branch | writer | read here | payload |
 |---|---|---|---|
 | `ops` | laptop | yes, read-only | `queue/pending/*.json` specs, `config/runtime.json` |
-| `ops-status` | **desktop** | no | `status.json` |
-| `results` | **desktop** | no | `results/<job-id>/*` artifacts |
-| `laptop-status` | laptop (`tools/laptop_status.py`) | yes, read-only | the laptop's `status.json`, folded into ours as `at_a_glance.laptop_*` |
+| `ops-status` | **desktop daemon** | no | `status.json` |
+| `results` | **desktop scheduler** (`tools/results_feed.py`) | no | `results/<job-id>/*` -- each finished arm's and pass's files |
+| `laptop-results` | laptop scheduler (`tools/results_feed.py`) | by `tools/site_build.py` | the same, for the laptop's work |
+| `laptop-status` | laptop scheduler (`tools/laptop_status.py`) | yes, read-only | the laptop's `status.json`, folded into ours as `at_a_glance.laptop_*` |
+| `site` | **desktop daemon** (`tools/site_build.py`) | no | the GitHub Pages viewer: a snapshot, one commit rewritten per build |
 
 `ops` is read straight from the fetched ref with `git show` / `git ls-tree`, so it is never checked
 out and never risks a working-tree conflict. The two written branches go through dedicated
@@ -102,6 +104,37 @@ def _ops_ref(host):
 def fetch(host):
     _git(['fetch', host['GIT_REMOTE'], host['OPS_BRANCH'],
           host['STATUS_BRANCH'], host['RESULTS_BRANCH']], cwd=host['REPO_PATH'])
+
+
+def fetch_branch(repo, remote, branch):
+    """Fetches one branch on its own; False when it does not exist yet (a feed nobody has written)."""
+    return subprocess.run(['git', 'fetch', remote, branch], cwd=repo, text=True,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0
+
+
+def ensure_worktree(repo, worktree, branch, remote):
+    """Makes sure `branch` exists and is checked out in `worktree`, outside the main checkout.
+
+    Idempotent. The branch starts from the remote when it is already there, else from an empty root
+    commit, so the worktree never holds a copy of the source tree. Every writer of the bus -- the
+    laptop's status and results, the desktop's site -- gets its worktree this way; the desktop's own
+    status and results worktrees predate it and are made by hand in `desktop/README.md`.
+    """
+    if os.path.exists(os.path.join(worktree, '.git')):
+        return worktree
+    fetch_branch(repo, remote, branch)                                   # may fail: not there yet
+    if _git(['rev-parse', '--verify', '--quiet', 'refs/heads/' + branch], cwd=repo).strip() == '':
+        remote_ref = '{0}/{1}'.format(remote, branch)
+        if _git(['rev-parse', '--verify', '--quiet', remote_ref], cwd=repo).strip():
+            start = remote_ref
+        else:
+            tree = _git(['hash-object', '-t', 'tree', os.devnull], cwd=repo).strip()
+            start = _git(['commit-tree', tree, '-m', '{0}: empty root'.format(branch)], cwd=repo).strip()
+        _git(['branch', branch, start], cwd=repo, check=True)
+    os.makedirs(os.path.dirname(worktree), exist_ok=True)
+    _git(['worktree', 'prune'], cwd=repo)
+    _git(['worktree', 'add', worktree, branch], cwd=repo, check=True)
+    return worktree
 
 
 def laptop_status_branch(host):
@@ -217,7 +250,7 @@ def push_unpushed(host):
     """
     stuck = []
     for worktree, branch in unpushed_branches(host):
-        if not _push(worktree, branch, host):
+        if not push(worktree, branch, host):
             stuck.append(branch)
         else:
             sys.stderr.write('pushed a local-only commit on {0}\n'.format(branch))
@@ -232,10 +265,10 @@ def _commit_and_push(worktree, branch, host, message):
     """
     if _git(['status', '--porcelain'], cwd=worktree).strip():
         _git(['commit', '-q', '-m', message], cwd=worktree, check=True)
-    return _push(worktree, branch, host)
+    return push(worktree, branch, host)
 
 
-def _push(worktree, branch, host):
+def push(worktree, branch, host):
     """`--force-with-lease` because there is exactly one writer. Returns True on success."""
     for attempt in range(PUSH_ATTEMPTS):
         result = subprocess.run(

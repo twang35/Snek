@@ -1,24 +1,18 @@
-"""Builds the GitHub Pages site into the repository's top-level `docs/`, from `viewer/` and `runs/`.
-
-    PYTHONPATH=. python -m tools.publish_pages          # -> ../docs/: index.html, manifest.js, charts/*.png
-
-GitHub Pages serves `master`'s `/docs` folder (source switched from the branch root on 2026-09-03: the
-whole tree is 0.98 GB against Pages' 1 GB cap, and the site needs only the viewer and ~24 MB of charts).
-`docs/` is therefore **generated output, never edited by hand**: this rewrites it completely from its
-sources on every run and the progress-update skill commits it. What goes in:
-
-| in `docs/` | from |
+"""Builds the GitHub Pages site -- `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` -- from `viewer/` and a runs directory.
+    PYTHONPATH=. python -m tools.publish_pages          # -> ../docs/ (gitignored), a local build from runs/
+Pages serves the **`site` branch**, which `tools/site_build.py` builds on the desktop from both boxes'
+results feeds and pushes as a snapshot; `publish(runs_dir, viewer_dir, docs_dir, manifest)` is the one
+function both use. Until 2026-09-05 the site was `master`'s `/docs`, committed by the progress update.
+| in the site | from |
 |---|---|
 | `index.html` | `viewer/index.html`, byte for byte |
 | `manifest.js` | the same manifest `viewer/manifest.js` gets, with `charts_dir` set to `charts/` |
-| `charts/<policy>*.png` | every chart the manifest refers to — stage A, stage B, hof5000, hof30k |
+| `charts/<policy>*.png` | every chart the manifest refers to -- stage A, stage B, hof5000, hof30k |
 | `.nojekyll` | so Pages serves the files as they are |
-
 Files under `charts/` that no arm refers to any more are removed, so the folder never grows past what
 the page can show. A copy happens only when size or mtime differ, so a run with nothing new changes
-nothing and `git status` stays quiet.
+nothing.
 """
-
 import os
 import shutil
 import sys
@@ -30,6 +24,8 @@ REPO_ROOT = os.path.dirname(constants.ROOT)
 VIEWER_DIR = os.path.join(constants.ROOT, 'viewer')
 DOCS_DIR = os.path.join(REPO_ROOT, 'docs')
 CHARTS_SUBDIR = 'charts'
+SITE_URL = 'https://twang35.github.io/Snek/'
+SITE_CHARTS_URL = SITE_URL + CHARTS_SUBDIR + '/'      # where the docs link a picture: the site, not master
 
 SUFFIXES = {'stage_b_png': '_checkpoint_evals.png', 'hof_png': '_checkpoint_evals_hof5000.png',
             'hof30k_png': '_checkpoint_evals_hof30k.png'}

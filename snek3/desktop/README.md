@@ -14,7 +14,9 @@ The design and its decisions are [`../plans/scheduler.md`](../plans/scheduler.md
 |---|---|---|
 | `ops` | **laptop** | `snek3/desktop/queue/pending/*.json` specs, `snek3/desktop/config/runtime.json` |
 | `ops-status` | **desktop** | `status.json` — heartbeat, running jobs, ledger, `at_a_glance` |
-| `results` | **desktop** | `results/<job-id>/*` artifacts |
+| `results` | **desktop's scheduler** (`tools/results_feed.py`) | `results/<job-id>/*`: a finished arm's `.md`, `.png`, `_evals.json`; a finished pass's merged files and pictures |
+| `laptop-results` | **laptop's scheduler** (the same module) | the same, for the laptop's work |
+| `site` | **desktop daemon** (`tools/site_build.py`, every network cycle) | the GitHub Pages viewer, built from both feeds and the box's live charts; one snapshot commit, rewritten each build |
 | `laptop-status` | **laptop** (`tools/laptop_status.py`, from the queue driver) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |
 
 One writer per branch, so every push is `--force-with-lease` and nothing ever merges. The laptop's queue
@@ -87,7 +89,8 @@ the hold notice, and the laptop's lines. Underneath:
 |---|---|
 | `scheduler` | `alive`, `pid`, `spawned`, `last_exit`, `log`, and `status_iso` — the scheduler's own timestamp |
 | `running` | the scheduler's running jobs: `id`, `type`, `policies`, `step`/`max_steps` for an arm |
-| `ledger` | `{job id: queued / running / done / failed}`, derived for the tools that read one (`tools/progress_update.py`, `tools/viewer_manifest.py`); `done` means published to `results` |
+| `ledger` | `{job id: queued / running / done / failed}`, derived for the tools that read one (`tools/progress_update.py`, `tools/viewer_manifest.py`); `done` means the files say it finished (the scheduler published them to `results` as it did) |
+| `site` | the last site build: `iso`, `ok`, `seconds`, `note` (the build's last line), `forced`. A failed build is also a line under `attention` |
 | `runtime`, `config_notes`, `disk_free_gb`, `head`, `load_avg` | the box |
 
 **The scheduler's state is the filesystem, and so is the daemon's memory of it.** An arm is finished
@@ -221,13 +224,33 @@ scheduler's environment — the daemon runs outside the graphical session — an
 screen it opens on — 3086x1951 on this box's 3840x2160 panel. `SNEK_CHART_WINDOW_SCALE` is a fraction of
 that budget and `SNEK_CHART_WINDOW_MAX_PX` caps the width, in the scheduler's environment.
 
+## The site
+
+**The Pages viewer is the `site` branch, and this box builds it.** On every network cycle (`git_seconds`,
+600) the daemon runs `tools.site_build` on the env python: it fetches `results`, `laptop-results` and
+`ops-status`, flattens both feeds into `~/snek-bus/site-build/` (incrementally, by `git diff` since the
+commit last flattened), copies this box's own `desktop/runs/` files over them where newer, builds the
+manifest and the charts into the `~/snek-bus/site` worktree, amends the branch's one commit and pushes
+`--force-with-lease`. A build with nothing moved is skipped; a trigger forces one, so
+`ssh the-claw-den 'Snek/snek3/desktop/trigger'` is the "rebuild now" button. By hand, the same writer:
+
+```
+ssh the-claw-den 'cd Snek/snek3 && SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs SNEK_SITE_WORKTREE=~/snek-bus/site PYTHONPATH=. ~/miniconda3/envs/snek3/bin/python -m tools.site_build --force'
+```
+
+Nobody else pushes to `site`. If the laptop's feed is behind (a push failed there), republish from the
+laptop with `tools.results_feed <job-id> <files>` and trigger; if the build is broken, fix `site_build`,
+deploy and trigger -- the page is stale meanwhile, by design. `SITE_BRANCH` and `SITE_WORKTREE` in
+`host.env` override the defaults (`site`, beside `STATUS_WORKTREE`). Design: `plans/site-publish.md`.
+
 ## Set the box up
 
 ```
 ssh the-claw-den
 cd ~/Snek && git fetch origin && git merge --ff-only origin/master
 
-# the two worktrees the daemon writes its branches through, outside the main checkout
+# the worktrees the box writes its branches through, outside the main checkout (the scheduler's
+# results feed and the site are made by `gitbus.ensure_worktree` on first use, beside these)
 git worktree add /home/claw/snek-bus/status  ops-status
 git worktree add /home/claw/snek-bus/results results
 
@@ -249,8 +272,8 @@ detached with `setsid`, it carries on, and the daemon re-adopts it by pid on the
 
 **Every job on the box writes under `snek3/desktop/runs/`, gitignored, never `snek3/runs/`.**
 `launch.runs_dir(host)` is the one place the path is defined; it goes to the scheduler as
-`SNEK_RUNS_DIR` and from there to every arm and pass, and the daemon collects a finished job's artifacts
-for `results` from the same place. The mirrored queue is beside it, `snek3/desktop/queue-local/`, also
+`SNEK_RUNS_DIR` and from there to every arm and pass, and the scheduler publishes a finished job's files
+to `results` from the same place. The mirrored queue is beside it, `snek3/desktop/queue-local/`, also
 gitignored. So the box's checkout of master holds nothing under a path master tracks, and the laptop is
 free to commit every chart. A tool run by hand on the box (`tools.scheduler --reopen-window`,
 `tools.closeout`) needs `SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs` exported or it looks in the empty

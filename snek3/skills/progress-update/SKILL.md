@@ -21,16 +21,18 @@ PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.progress_update
 ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   # laptop cross-check; status.json's laptop_running / laptop_queued (from the queue driver, as of laptop_iso) is the first read
 ```
 
-The tool, in order: fetches `results`, `ops-status` and `ops`; imports any closed stage-B wave's files
-that `runs/` lacks; `rsync`s the live batches' charts into `runs/` and their live `_evals.json` and
-`_checkpoint_evals.json` into the gitignored `runs/.live/desktop/`, which the tables read only for an arm
-with no close-out file yet (off-LAN this fails and the digest says so — carry on, and say so in the summary); runs `tools.publish_pages`; regenerates the
-`charts.md` sections it owns; inserts a `results.md` skeleton for a batch that just closed; prints
-the digest. Read the digest top to bottom:
+The tool, in order: fetches `results`, `ops-status` and `ops`; imports every finished job's files
+that `runs/` lacks (an arm at its cap, a pass's merged files); `rsync`s the live batches' charts into
+`runs/` and their live `_evals.json` and `_checkpoint_evals.json` into the gitignored `runs/.live/desktop/`,
+which the tables read only for an arm with no close-out file yet (off-LAN this fails and the digest says
+so — carry on, and say so in the summary); regenerates the `charts.md` sections it owns; inserts a
+`results.md` skeleton for a batch that just closed; prints the digest. **The site is not built here**:
+the desktop rebuilds the `site` branch from both boxes' results feeds every network cycle, and
+`ssh the-claw-den 'Snek/snek3/desktop/trigger'` rebuilds it now. Read the digest top to bottom:
 
 | digest line | what it is |
 |---|---|
-| `sync:` / `publish:` | what moved. A nonzero "imported" means a wave closed since the last update |
+| `sync:` | what moved. A nonzero "imported" means an arm or a wave finished since the last update |
 | `desktop <iso>:` | `at_a_glance` from a **fresh** fetch, plus each running job's step and % |
 | `=== bN:` … `In flight`/`Closed` | the batch's ledger state, with an ETA from its own wave cadence while it trains |
 | the table | the canonical per-batch table — knob value from the spec, rows, density, per-seed share, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98%, and the **reference cell's row in bold at its knob value** |
@@ -41,18 +43,17 @@ the digest. Read the digest top to bottom:
 Every generated table shares its definitions with the Pages viewer (`tools/viewer_manifest.py`), so
 quote the digest's numbers rather than recomputing them.
 
-## 2. Commit the pictures and the site first
-
-Pages goes live about a minute after a push, so this commit goes up before any writing:
+## 2. Commit a closed batch's files; the site takes care of itself
 
 ```
-cd .. && git add docs snek3/viewer/manifest.js snek3/docs/charts.md snek3/runs/b<n>*.png snek3/runs/b<n>*.md && git commit -m 'Charts: <what changed>' && git push origin master && cd snek3
+ssh the-claw-den 'Snek/snek3/desktop/trigger'      # the box rebuilds the site now, both boxes' latest included
+cd .. && git add snek3/docs/charts.md snek3/runs/b<closed>* && git commit -m 'Runs: b<n> closed' && git push origin master && cd snek3
 ```
 
-Also `git add` the closed-wave files the tool imported (`_evals.json`, `_checkpoint_evals.*`) — they
-belong on master once their wave is `done`. **Never add a live batch's `*_evals.json` or
-`*_checkpoint_evals.*`**: the trainer rewrites the first on resume and the second is a pass in
-progress, and the box's `desktop/deploy` refuses to merge over a differing JSON.
+A **closed** batch's `runs/` files — its `_evals.json`, `_checkpoint_evals*.json`, `.md` and `.png` — go
+to master as the archive once the tool has imported them. **Never add a live batch's `*_evals.json` or
+`*_checkpoint_evals.*`**: the trainer rewrites the first on resume and the second is a pass in progress.
+A live batch's pictures are on the site, not on master; `charts.md` links them there.
 
 ## 3. Write the readings — the only hand-written part
 

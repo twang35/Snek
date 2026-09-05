@@ -27,7 +27,6 @@ and a local-only commit is pushed by the next successful publish's `--force-with
 
 import json
 import os
-import subprocess
 import sys
 import time
 
@@ -103,40 +102,10 @@ def read_local(runs_dir=None):
     return status if isinstance(status, dict) else None
 
 
-def _git(args, cwd):
-    result = subprocess.run(['git'] + args, cwd=cwd, text=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return result.returncode, result.stdout.strip()
-
-
 def ensure_worktree(host_config):
-    """Makes sure the status branch exists and is checked out in the status worktree.
-
-    Idempotent. The branch starts from the remote when it is already there, else from an empty root
-    commit, so the worktree never holds a copy of the source tree. Returns the worktree path.
-    """
-    repo, worktree = host_config['REPO_PATH'], host_config['STATUS_WORKTREE']
-    branch, remote = host_config['STATUS_BRANCH'], host_config['GIT_REMOTE']
-    if os.path.exists(os.path.join(worktree, '.git')):
-        return worktree
-    _git(['fetch', remote, branch], repo)                     # may fail: the branch may not exist yet
-    code, _ = _git(['rev-parse', '--verify', '--quiet', 'refs/heads/' + branch], repo)
-    if code != 0:
-        remote_code, _ = _git(['rev-parse', '--verify', '--quiet', '{0}/{1}'.format(remote, branch)], repo)
-        if remote_code == 0:
-            start = '{0}/{1}'.format(remote, branch)
-        else:
-            _, tree = _git(['hash-object', '-t', 'tree', os.devnull], repo)
-            _, start = _git(['commit-tree', tree, '-m', '{0}: empty root'.format(branch)], repo)
-        code, out = _git(['branch', branch, start], repo)
-        if code != 0:
-            raise RuntimeError('could not create branch {0}: {1}'.format(branch, out))
-    os.makedirs(os.path.dirname(worktree), exist_ok=True)
-    _git(['worktree', 'prune'], repo)
-    code, out = _git(['worktree', 'add', worktree, branch], repo)
-    if code != 0:
-        raise RuntimeError('could not add worktree {0}: {1}'.format(worktree, out))
-    return worktree
+    """The status branch checked out in its worktree; `gitbus.ensure_worktree` with this box's keys."""
+    return gitbus.ensure_worktree(host_config['REPO_PATH'], host_config['STATUS_WORKTREE'],
+                                  host_config['STATUS_BRANCH'], host_config['GIT_REMOTE'])
 
 
 class Publisher(object):

@@ -110,6 +110,9 @@ def scheduler_env(host, runtime):
     """The environment overrides the scheduler runs under, inherited by every arm and pass it starts."""
     env = dict(BASE_ENV)
     env['SNEK_RUNS_DIR'] = runs_dir(host)
+    # The scheduler publishes what it finishes to this box's results branch (`tools/results_feed.py`).
+    env['SNEK_RESULTS_BRANCH'] = host['RESULTS_BRANCH']
+    env['SNEK_RESULTS_WORKTREE'] = host['RESULTS_WORKTREE']
     if runtime.get('torch_threads', 0) > 0:
         env['SNEK_TORCH_THREADS'] = str(runtime['torch_threads'])
     if runtime.get('omp_num_threads', 0) > 0:

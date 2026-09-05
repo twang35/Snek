@@ -1,6 +1,6 @@
 """The mechanical half of a progress update, in one run.
 
-    PYTHONPATH=. python -m tools.progress_update                 # sync, publish, tables, docs skeletons, digest
+    PYTHONPATH=. python -m tools.progress_update                 # sync, tables, docs skeletons, digest
     PYTHONPATH=. python -m tools.progress_update --no-sync       # offline: tables and docs from what runs/ holds
     PYTHONPATH=. python -m tools.progress_update --adopt b10     # replace a hand-written charts.md section
 
@@ -10,7 +10,7 @@ different each time:
 | step | what |
 |---|---|
 | sync | `git fetch` `results` and `ops-status`; save the ledger to `runs/.live/desktop/status.json` for the viewer's pass states; import every closed stage-B wave's files that `runs/` lacks; `rsync` the live batches' charts into `runs/` and their live JSON into the gitignored `runs/.live/desktop/` |
-| publish | `tools.publish_pages` — manifest and the Pages site |
+| the site | not here: the desktop daemon builds the `site` branch from both boxes' results feeds on every network cycle (`tools/site_build.py`); `ssh the-claw-den 'Snek/snek3/desktop/trigger'` builds it now |
 | tables | one canonical per-batch table: knob value **read from the spec's env on `ops`**, rows, density, per-seed shares, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98 share, onset, plus the reference cell's row |
 | charts.md | regenerates the sections it owns (marked) — table, reading slot, every panel including the reference group — and can adopt a hand-written one |
 | results.md | inserts a skeleton for a batch that just closed and has no section: tables and a reading slot |
@@ -73,15 +73,13 @@ def results_tree():
 
 
 def import_closed_waves(status, tree, runs_dir=None):
-    """Copies every done stage-B wave's and hof pass's files that `runs/` does not have yet. Returns the count.
-
-    A hof pass (`bN-hof5000`, `bN-hof30k`) is a measurement like a stage-B wave and its files belong on
-    master once the job is done; until 2026-09-04 only `stageb` jobs were imported, and b11's finished
-    passes sat on `results` unread."""
+    """Copies every done job's files that `runs/` does not have yet -- an arm's at its cap, a pass's merged
+    files, an eval spec's -- from the desktop's `results` feed. Returns the count. Since 2026-09-05 the
+    scheduler publishes an arm's `_evals.json` with the arm rather than with each pass, so arm jobs are
+    imported too; a hof pass is a measurement like a stage-B wave."""
     runs_dir = runs_dir or constants.RUNS_DIR
     # Pre-rename jobs (`p2-hof5000` is b5's) stay on `results` by design — results.md, "Where the raw rows are".
-    done = {job for job, state in status['ledger'].items()
-            if state == 'done' and ('stageb' in job or 'hof' in job) and not re.match(r'p\d+-', job)}
+    done = {job for job, state in status['ledger'].items() if state == 'done' and not re.match(r'p\d+-', job)}
     copied = 0
     for path in tree:
         parts = path.split('/')
@@ -392,9 +390,9 @@ def charts_section(table, title, status_line, reading, runs_dir=None):
                                                    g['arms'][-1]['policy'].split('-')[0]))
         out += ['', head, '']
         for a in g['arms']:
-            out.append('![{0}](../runs/{0}.png)'.format(a['policy']))
+            out.append('![{0}]({1}{0}.png)'.format(a['policy'], publish_pages.SITE_CHARTS_URL))
             if a['stage_b_png']:
-                out.append('![{0} stage B](../runs/{0}_checkpoint_evals.png)'.format(a['policy']))
+                out.append('![{0} stage B]({1}{0}_checkpoint_evals.png)'.format(a['policy'], publish_pages.SITE_CHARTS_URL))
     out += ['', END_MARK.format(table['batch']), '']
     return '\n'.join(out)
 
@@ -534,7 +532,6 @@ def running_arms(status):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--no-sync', action='store_true', help='no git fetch, import, rsync')
-    parser.add_argument('--no-publish', action='store_true')
     parser.add_argument('--batches', default='', help='comma-separated batches to table (default: from references.json plus live)')
     parser.add_argument('--adopt', default='', help='comma-separated batches whose hand-written charts.md section to replace')
     parser.add_argument('--no-docs', action='store_true', help='print tables, touch no doc')
@@ -551,14 +548,9 @@ def main(argv=None):
         ok, msg = pull_live_charts(live)
         dropped = drop_superseded_snapshots()
         say('sync: {0} closed-wave files imported, {1} live snapshots superseded; {2}'.format(copied, dropped, msg))
-    if not args.no_publish:
-        manifest = viewer_manifest.build()
-        with open(viewer_manifest.MANIFEST_PATH, 'w') as handle:
-            handle.write(viewer_manifest.render(manifest))
-        c, r, t = publish_pages.publish(manifest=manifest)
-        say('publish: {0} arms, {1} charts ({2} copied, {3} removed) -> docs/'.format(len(manifest['arms']), t, c, r))
-    else:
-        manifest = viewer_manifest.build()
+    # The site is not built here: the desktop daemon builds the `site` branch from both boxes' results
+    # feeds on every network cycle (`tools/site_build.py`); `desktop/trigger` builds it now.
+    manifest = viewer_manifest.build()
 
     refs = viewer_manifest.references()
     charts_path, results_path = os.path.join(DOCS, 'charts.md'), os.path.join(DOCS, 'results.md')

@@ -76,6 +76,7 @@ from tools import closeout
 from tools import eta
 from tools import eval_queue
 from tools import laptop_status
+from tools import results_feed
 from tools import live_runs
 from tools import results
 from tools import window as window_module
@@ -353,7 +354,7 @@ class Driver(object):
                  max_trainers=DEFAULT_MAX_TRAINERS, python=sys.executable, runs_dir=None,
                  logs_dir=None, popen=subprocess.Popen, call=subprocess.call, sleep=time.sleep,
                  passes=closeout.CHAIN, reporter=None, clock=time.time, window=None,
-                 ensure_workers=eval_queue.ensure_workers, killpg=os.killpg):
+                 ensure_workers=eval_queue.ensure_workers, killpg=os.killpg, results=None):
         if wave > max_trainers:
             raise ValueError('a wave of {0} exceeds the {1}-trainer cap'.format(wave, max_trainers))
         self.specs, self.evals = train_specs(specs), eval_specs(specs)
@@ -378,6 +379,9 @@ class Driver(object):
         # `window_module.Window` or None (tests, `SNEK_CHART_WINDOW=0` is handled inside it).
         self.window = window
         self.ensure_workers = ensure_workers
+        # This box's results feed (`results_feed.Publisher`), or None to publish nothing: an arm at its
+        # cap, a pass's merged files and a finished eval spec are pushed the moment they are final.
+        self.results = results
         self.workers = []
         self.killpg = killpg
         # For the time estimates (`tools/eta.py`): when the pass or eval in flight started, so its
@@ -629,7 +633,17 @@ class Driver(object):
                 spec['policy'], MAX_ARM_RELAUNCHES))
             self.unfinished.append(spec['policy'])
         self.live = [item for item in self.live if item[0]['policy'] != spec['policy']]
+        if finished(spec, self.runs_dir):
+            self._publish(spec['policy'], results_feed.arm_files(spec['policy'], self._runs_dir()))
         self._report()
+
+    def _runs_dir(self):
+        return self.runs_dir or constants.RUNS_DIR
+
+    def _publish(self, job_id, paths):
+        """Pushes a finished job's files to this box's results feed, if there is one. Never raises."""
+        if self.results is not None:
+            self.results.publish(job_id, paths)
 
     def run_pass(self, pass_name, number, arms):
         """One pass of the chain over a wave's arms, as one `tools.closeout` -- the daemon's command."""
@@ -653,6 +667,8 @@ class Driver(object):
         if code == 0 and seconds is not None and seconds > 0:
             live_runs.record_duration(pass_name, seconds, self.runs_dir, arms=len(arms), label=label)
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
+        if code == 0:
+            self._publish(label, results_feed.pass_files([spec['policy'] for spec in arms], pass_name, self._runs_dir()))
         self._report()
         return code
 
@@ -742,6 +758,8 @@ class Driver(object):
             _log('eval {0} exited {1}'.format(spec['id'], code))
             if spec.get('_dir'):
                 mark(spec['_dir'], ('done-' if code == 0 else 'failed-') + spec['id'], 'exit {0}'.format(code))
+            if code == 0:
+                self._publish(spec['id'], results_feed.every_file(spec['policies'], self._runs_dir()))
             self._report()
             worst = max(worst, code or 0)
         return worst
@@ -926,6 +944,9 @@ def build_parser():
                         help='start only once this process (another scheduler, a closeout) has exited')
     parser.add_argument('--no-status', action='store_true',
                         help='do not publish what is running to the laptop-status branch')
+    parser.add_argument('--no-results', action='store_true',
+                        help='do not publish finished arms and passes to this box\'s results branch '
+                             '(SNEK_RESULTS_BRANCH, default laptop-results)')
     parser.add_argument('--reopen-window', action='store_true',
                         help='ask the running scheduler for a fresh chart window, then exit')
     parser.add_argument('--republish', action='store_true',
@@ -969,9 +990,11 @@ def main(argv=None):
     if window_module.wanted():
         window.kill_stale(previous.get('window_pid'))
 
+    results = None if args.no_results else results_feed.Publisher(log=_log)
+
     def make_driver(specs):
         return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
-                      max_trainers=args.max_trainers, passes=passes, window=window)
+                      max_trainers=args.max_trainers, passes=passes, window=window, results=results)
 
     publisher = None if args.no_status else laptop_status.Publisher(log=_log)
     reporter = Reporter(publisher, queue_dir=args.queue, make_driver=make_driver, window=window)

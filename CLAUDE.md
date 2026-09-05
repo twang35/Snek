@@ -13,12 +13,16 @@ instructions; **this file is only what is true of the whole repository.**
 deliberate. If a rule you need is missing from `snek3/CLAUDE.md`, it may be in `snek2/CLAUDE.md`
 describing snek2's version of the same thing; carry it across rather than editing snek2.
 
-**`docs/` at the repository root is the GitHub-Pages site, and it is generated.** Pages serves `master`'s
-`/docs` (so the site is the ~25 MB it needs rather than the whole checkout). `snek3/tools/publish_pages.py` rewrites it from `snek3/viewer/` and `snek3/runs/`
-— the chart viewer, its manifest, and every chart the manifest refers to — and the progress-update skill
-runs it first and commits the result, so the site is current a minute after the update's first push.
-Never edit anything under `docs/` by hand; edit `snek3/viewer/index.html` and republish. The live page
-is https://twang35.github.io/Snek/ .
+**The GitHub-Pages chart viewer is the `site` branch, and the desktop builds it.** Each box's scheduler
+publishes every finished arm and pass to its own results branch (`results`, `laptop-results`;
+`snek3/tools/results_feed.py`), and the desktop daemon rebuilds the site from both feeds plus its own
+live charts on every network cycle (`snek3/tools/site_build.py`), pushing one snapshot commit to `site`
+— so the page is current within ten minutes of a wave closing on either box, and
+`ssh the-claw-den 'Snek/snek3/desktop/trigger'` rebuilds it now. `docs/` at the repository root is a
+local build, gitignored; nothing under it is committed, and the pictures live only on `site` (every one
+redraws from the JSON master keeps). Edit `snek3/viewer/index.html` and deploy; the next build carries
+it. The live page is https://twang35.github.io/Snek/ ; the design is
+[`snek3/plans/site-publish.md`](snek3/plans/site-publish.md).
 
 **`README.md` is for humans and stays barebones** — the eras, a sentence each, a gif each. Anything
 an agent needs belongs here or in an era's own manual, not there. The two sections below are what an
@@ -156,9 +160,8 @@ change reverts to the code rule above and waits for approval. Chart images that 
 edit ride along with the docs commit.
 
 **The chart viewer: commit and push without waiting** (standing authorization, 2026-09-04). A change
-to `snek3/viewer/index.html` is committed as soon as it is made, together with the `docs/` republish
-that `tools.publish_pages` produces from it, so the live page shows the fix a minute later. The
-only-if rule below still applies: a viewer edit that rides along with a trainer or tool change waits
+to `snek3/viewer/index.html` is committed as soon as it is made; the desktop's next site build (a
+deploy, then `trigger`) puts it on the live page. The only-if rule below still applies: a viewer edit that rides along with a trainer or tool change waits
 with that change.
 
 **Tests: commit and push without waiting** (standing authorization, 2026-08-14, for the stated
@@ -204,20 +207,13 @@ commit a job spec, it runs it, it pushes results back. **snek3's daemon owns the
 | queue work | drop the specs in `snek3/logs/laptop-queue/<batch>/` and start the scheduler (`laptop-run` skill) — agents launch arms this way, not by hand, so the launch is published | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
 
-**Every progress update commits every arm's `runs/<policy>.png` and `.md`, live desktop arms included**
-Those two files are
-pictures of the JSON, redrawn on every eval, so a committed copy is simply a snapshot that the next
-update overwrites — and it is what the GitHub-Pages chart viewer at `snek3/viewer/` shows, so a live
-batch is visible there between close-outs. A live desktop arm's charts are pulled from the box first:
-
-```
-rsync -a --include='<batch>*.png' --include='<batch>*.md' --exclude='*' the-claw-den:Snek/snek3/desktop/runs/ snek3/runs/
-```
-
-**The JSON is the opposite: never commit a *live* desktop arm's `runs/<policy>_evals.json` or
-`_checkpoint_evals.*`.** `_evals.json` is single-writer (the trainer) and is what the arm's chart and
-report are rebuilt from across restarts; the stage-B file is a pass in progress. They arrive on the
-`results` branch at close-out, and only then are they committed here. A laptop arm's own files are fine.
+**A progress update commits a closed batch's `runs/` files — JSON, `.md` and `.png` — and nothing for a
+live one.** The pictures of a live arm are on the `site` branch, rebuilt by the desktop from both boxes'
+results feeds; the docs link them there (`https://twang35.github.io/Snek/charts/<name>.png`). **Never
+commit a *live* desktop arm's `runs/<policy>_evals.json` or `_checkpoint_evals.*`:** `_evals.json` is
+single-writer (the trainer) and is what the arm's chart and report are rebuilt from across restarts;
+the stage-B file is a pass in progress. They arrive on the `results` feed when the arm or the pass
+finishes, the progress update imports them, and only then are they committed here.
 
 **The box writes to `snek3/desktop/runs/`, which is gitignored, and never to `snek3/runs/`.**
 The daemon sets `SNEK_RUNS_DIR` to that one constant directory for every job, and every tool reads the

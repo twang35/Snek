@@ -32,7 +32,7 @@ reason.
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
 | `docs/` | the investigation | | |
-| `viewer/` | the chart viewer's source: `index.html` plus a local `manifest.js`. `tools/publish_pages.py` copies it into the repository's top-level `docs/`, which is what GitHub Pages serves. No server | | |
+| `viewer/` | the chart viewer's source, `index.html` (`manifest.js` beside it is a local build, gitignored). The desktop builds the GitHub Pages `site` branch from it and both boxes' results feeds (`tools/site_build.py`). No server | | |
 | `plans/` | designs | | |
 | `tests/` | | | |
 
@@ -231,7 +231,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
 | `tools/chart_viewer.py` | a live grid of chart PNGs; `--follow` draws what the scheduler's status file names. Reads, never writes, never trains |
 | `tools/viewer_manifest.py` | `viewer/manifest.js`: every arm reduced to the docs tables' numbers, for the web viewer |
-| `tools/publish_pages.py` | rebuilds the repository's top-level `docs/` — the GitHub-Pages site — from `viewer/` and `runs/`. First step of every progress update |
+| `tools/publish_pages.py` | writes a site — `index.html`, `manifest.js`, `charts/` — from `viewer/` and a runs directory; `tools/site_build.py` calls it on the desktop to build the `site` branch from both boxes' results feeds, every network cycle. `tools/results_feed.py` is what the scheduler publishes each finished arm and pass through, to `results` (desktop) or `laptop-results` |
 | `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm; beside them the scheduler's `.status.json`, `.reopen-window` and `.durations.json` (how long each pass took here) |
 | `tools/eta.py` | the time estimates on `status.json`'s lines and its `remaining` total: a queued arm at the batch's finished arms' wall rate, a running arm at its recent rate plus its overhead, a pass at the box's median for that pass |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
