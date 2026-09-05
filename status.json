@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T12:17:02",
-  "ts": 1788635822.321432,
+  "iso": "2026-09-05T12:25:07",
+  "ts": 1788636307.4691699,
   "box": "laptop",
   "project": "snek3",
   "pid": 78292,
@@ -105,5 +105,5 @@
     "/Users/tony_wang/Projects/Snek/snek3/runs/b16bm-kl05-seed3_checkpoint_evals.png",
     "/Users/tony_wang/Projects/Snek/snek3/runs/b16bn-kl05-seed4_checkpoint_evals.png"
   ],
-  "window_pid": 99302
+  "window_pid": 6008
 }
