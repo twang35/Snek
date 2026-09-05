@@ -1,5 +1,5 @@
 {
-  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (desktop-batch skill). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it.",
+  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (desktop-batch skill). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it. `knob: \"name\"` says the batch has no single knob (b19's switches): each arm's name token is its cell.",
   "b8": {
     "arms": [
       "b4a-fc200x100ep8-seed1",
@@ -81,75 +81,77 @@
   },
   "b15": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, entropy 0.01 fixed",
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, entropy 0.01 fixed -- the base b15-b21 were generated from",
     "after": "ent005",
     "value": "0.01"
   },
   "b16": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, target_KL off (0)",
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, target_KL off (0) -- the base b15-b21 were generated from",
     "value": "0"
   },
   "b17": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, clip 0.2, no anneal",
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, clip 0.2, no anneal -- the base b15-b21 were generated from",
     "after": "clip015",
     "value": "0.2"
   },
   "b18": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, grad-norm clip 0.5",
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, grad-norm clip 0.5 -- the base b15-b21 were generated from",
     "after": "gc025",
     "value": "0.5"
   },
   "b19": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, all switches at the base: adv-norm on, huber, Adam eps 1e-7, vf 0.5"
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, all switches at the base: adv-norm on, huber, Adam eps 1e-7, vf 0.5 -- the base b15-b21 were generated from",
+    "value": "base",
+    "knob": "name"
   },
   "b20": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, 128 lanes",
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, 128 lanes -- the base b15-b21 were generated from",
     "after": "lanes64",
     "value": "128"
   },
   "b21": {
     "arms": [
-      "b9bw-lam99-seed1",
-      "b9bx-lam99-seed2",
-      "b9by-lam99-seed3",
-      "b9bz-lam99-seed4"
+      "b7aa-fc320-seed1",
+      "b7ab-fc320-seed2",
+      "b7ac-fc320-seed3",
+      "b7ad-fc320-seed4"
     ],
-    "label": "reference: b9 lambda 0.99 cell, shaping 0.1, gate 75",
+    "label": "reference: b7 fc (320,) cell, lambda 0.98, shaping 0.1, gate 75 -- the base b15-b21 were generated from",
     "after": "shape005",
     "value": "0.1"
   }

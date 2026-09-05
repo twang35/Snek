@@ -165,7 +165,7 @@ def drop_superseded_snapshots(runs_dir=None):
     return dropped
 
 
-LOCAL_SPECS = os.path.join(SNEK3, 'logs')     # scheduler runs `logs/<batch>specs/*.json`, dequeued from ops
+LOCAL_SPECS = os.path.join(SNEK3, 'logs')     # `logs/<batch>specs/*.json`, or `logs/laptop-queue/<batch>/*.json`
 
 
 def read_spec(policy):
@@ -175,7 +175,8 @@ def read_spec(policy):
                             cwd=REPO, capture_output=True, text=True)
     text = result.stdout if result.returncode == 0 else None
     if text is None:
-        for path in sorted(glob.glob(os.path.join(LOCAL_SPECS, '*', policy + '.json'))):
+        for path in sorted(glob.glob(os.path.join(LOCAL_SPECS, '*', policy + '.json'))
+                           + glob.glob(os.path.join(LOCAL_SPECS, '*', '*', policy + '.json'))):
             with open(path) as handle:
                 text = handle.read()
             break
@@ -210,7 +211,11 @@ def knob_key(envs):
         for key, value in env.items():
             varying[key].add(value)
     keys = [k for k, v in varying.items() if len(v) > 1 and k != 'SNEK_SEED' and not k.startswith('_')]
-    return sorted(keys, key=lambda k: -len(varying[k]))[0] if keys else None
+    if not keys:
+        return None
+    if len(keys) > 1 and all(len(varying[k]) <= 2 for k in keys):
+        return None        # a switches batch (b19: adv-norm, huber/mse, eps, vf): the name token is the cell
+    return sorted(keys, key=lambda k: -len(varying[k]))[0]
 
 
 def knob_value(env, key, policy):
@@ -227,16 +232,29 @@ def _num(text):
         return None
 
 
+def _off_knob(envs, key):
+    """`{key: mode}` for every env key that varies across the batch besides the knob and the seed — an
+    anneal's `_FINAL`, say. An arm off the mode on one of these is its own cell, named by its name token,
+    rather than folded into the knob value it starts from (b15's `entanneal01` is not the fixed 0.01)."""
+    keys = {k for env in envs.values() for k in env}
+    seen = {k: [env.get(k) for env in envs.values()] for k in keys}        # absent counts as a value
+    return {k: collections.Counter(v).most_common(1)[0][0] for k, v in seen.items()
+            if k not in (key, 'SNEK_SEED') and not k.startswith('_') and len(set(v)) > 1}
+
+
 def group_arms(arms, envs, key):
-    """`[(value, [arm records])]` in knob order — numeric where every value parses, else name order."""
+    """`[(value, [arm records])]` in knob order — numeric values first, in order, then the named cells."""
+    off = _off_knob(envs, key) if key else {}
     groups = collections.OrderedDict()
     for arm in arms:
-        value = knob_value(envs.get(arm['policy']), key, arm['policy'])
+        env = envs.get(arm['policy'])
+        value = knob_value(env, key, arm['policy'])
+        if env is not None and any(env.get(k) != mode for k, mode in off.items()):
+            value = viewer_manifest.knob_of(arm['policy'])
         groups.setdefault(value, []).append(arm)
     values = list(groups)
-    if all(_num(v) is not None for v in values):
-        values.sort(key=_num)
-    return [(v, groups[v]) for v in values]
+    numeric = sorted([v for v in values if _num(v) is not None], key=_num)
+    return [(v, groups[v]) for v in numeric + [v for v in values if _num(v) is None]]
 
 
 def _median(values):
@@ -273,7 +291,10 @@ def batch_table(batch, manifest, envs, reference=None, ref_envs=None):
     """The canonical table for one batch: a group row per knob value, the reference cell's row slotted
     in at its value, and the flat arm list."""
     arms = [a for a in manifest['arms'] if a['batch'] == batch]
-    key = knob_key({p: e for p, e in envs.items() if p in {a['policy'] for a in arms}})
+    if (reference or {}).get('knob') == 'name':        # a switches batch (b19): the name token is the cell
+        key = None
+    else:
+        key = knob_key({p: e for p, e in envs.items() if p in {a['policy'] for a in arms}})
     groups = [group_row(v, g) for v, g in group_arms(arms, envs, key)]
     if reference and reference.get('arms'):
         by = {a['policy']: a for a in manifest['arms']}
@@ -286,8 +307,8 @@ def batch_table(batch, manifest, envs, reference=None, ref_envs=None):
             row = group_row(value, ref_arms, reference=True)
             row['label'] = reference.get('label', '')
             values = [g['value'] for g in groups]
-            if _num(value) is not None and all(_num(v) is not None for v in values):
-                at = sum(1 for v in values if _num(v) < _num(value))
+            if _num(value) is not None:        # among the numeric cells; the named cells (anneals) follow them
+                at = sum(1 for v in values if _num(v) is not None and _num(v) < _num(value))
             else:
                 at = len(groups)
             groups.insert(at, row)
@@ -461,6 +482,10 @@ def state_line(status, batch):
     arms, waves = batch_state(status, batch)
     total = sum(arms.values())
     if not total:
+        glance = (status or {}).get('at_a_glance') or {}
+        for line in list(glance.get('laptop_running') or []) + list(glance.get('laptop_queued') or []):
+            if line.split(' | ')[0].strip() == batch:      # the laptop's scheduler still has it
+                return 'In flight on the laptop: ' + line
         return laptop_state_line(batch)
     if not (arms['running'] or arms['queued']):
         return 'Closed: all {0} arms trained, stage B {1}'.format(
@@ -541,8 +566,9 @@ def main(argv=None):
     results = open(results_path).read()
     owned = set(re.findall(r'<!-- progress_update: batch (\S+) -->', charts))
     adopt = set(a for a in args.adopt.split(',') if a)
+    hand_written = set(re.findall(r'^## Batch (\S+) ', charts, re.M)) - owned      # b8: prose, not a table
     batches = [b for b in args.batches.split(',') if b] or sorted(
-        owned | adopt | (set(live_batches(status)) if status else set()),
+        owned | adopt | (set(refs) - hand_written) | (set(live_batches(status)) if status else set()),
         key=lambda b: int(re.sub(r'\D', '', b) or 0))
     batches = [b for b in batches if any(a['batch'] == b for a in manifest['arms'])]
 

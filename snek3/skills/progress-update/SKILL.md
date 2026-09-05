@@ -90,9 +90,9 @@ whether anything undercuts the plan. The tables are on the page and in the docs 
 
 ## When the tool is wrong
 
-A skill that fails is a bug in the skill, and here the skill is mostly the tool. A batch whose knob
-comes out `None` has more than one env var varying — pass its table by hand and add a rule to
-`knob_key`. A reference row at the wrong place needs `value` set in `viewer/references.json`. A
+A skill that fails is a bug in the skill, and here the skill is mostly the tool. A switches batch with no single
+knob (b19) gets `"knob": "name"` in `viewer/references.json`, and each arm's name token is its cell; an anneal
+cell that shares its start value with a fixed cell is separated by its `_FINAL` key automatically. A reference row at the wrong place needs `value` set in `viewer/references.json`. A
 hand-written `charts.md` section that should become generated: `--adopt bN`, which moves every prose
 paragraph into the reading block and drops the rest. `--no-sync` works offline; `--no-docs` prints
 tables without touching a file. Tests: `tests/test_progress_update.py`.

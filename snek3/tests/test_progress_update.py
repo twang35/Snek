@@ -236,3 +236,21 @@ def test_save_desktop_status_lands_where_the_manifest_reads_it(tmp_path):
     assert ledger['iso'] == 'now' and ledger['jobs'] == {'b9-hof30k': 'queued'}
     # nothing in runs/ shares its name, so the superseded-snapshot sweep leaves it alone
     assert progress_update.drop_superseded_snapshots(str(tmp_path)) == 0 and os.path.exists(path)
+
+
+def test_knob_key_is_none_for_a_switches_batch_and_anneal_cells_are_their_own_group():
+    from tools import progress_update as pu
+    # b19: four on/off switches, no key with more than two values -> the name token is the cell
+    switches = {'b19a-noadvnorm-seed1': {'SNEK_PPO_NORMALIZE_ADV': '0', 'SNEK_SEED': '1'},
+                'b19e-mse-seed1': {'SNEK_PPO_VALUE_LOSS': 'mse', 'SNEK_SEED': '1'},
+                'b19i-vf01-seed1': {'SNEK_PPO_VF_COEF': '0.1', 'SNEK_SEED': '1'}}
+    assert pu.knob_key(switches) is None
+    # b15: the knob is the entropy coefficient; an anneal cell shares its start value with a fixed cell but
+    # carries a `_FINAL` the fixed cells lack, so it is grouped by name, after the numeric values
+    envs = {'b15ai-ent003-seed1': {'SNEK_PPO_ENTROPY_COEF': '0.003', 'SNEK_SEED': '1'},
+            'b15aq-ent02-seed1': {'SNEK_PPO_ENTROPY_COEF': '0.02', 'SNEK_SEED': '1'},
+            'b15bg-entanneal01-seed1': {'SNEK_PPO_ENTROPY_COEF': '0.01', 'SNEK_PPO_ENTROPY_COEF_FINAL': '0.001', 'SNEK_SEED': '1'},
+            'b15bk-entanneal01to0-seed1': {'SNEK_PPO_ENTROPY_COEF': '0.01', 'SNEK_PPO_ENTROPY_COEF_FINAL': '0.0', 'SNEK_SEED': '1'}}
+    assert pu.knob_key(envs) == 'SNEK_PPO_ENTROPY_COEF'
+    arms = [{'policy': p} for p in envs]
+    assert [v for v, _ in pu.group_arms(arms, envs, 'SNEK_PPO_ENTROPY_COEF')] == ['0.003', '0.02', 'entanneal01', 'entanneal01to0']
