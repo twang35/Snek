@@ -646,7 +646,8 @@ class Reporter(object):
                 _, owed = other.jobs()
                 queued.extend(owed)
                 attention.extend(other.attention())
-        return running, queued, attention
+        # Every driver names the box's hold; the box has one. Order kept, duplicates dropped.
+        return running, queued, list(dict.fromkeys(attention))
 
     def status(self, driver):
         running, queued, attention = self.jobs(driver)

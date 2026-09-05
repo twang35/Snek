@@ -746,3 +746,13 @@ def test_work_queued_into_the_running_batch_runs_at_the_next_boundary(tmp_path, 
     assert os.path.exists(os.path.join(q, 'b16', '.done-b16-one'))
     evals = [i for i, argv in enumerate(argvs) if '--label' in argv]
     assert len(evals) == 1 and evals[0] == 3, 'after b16\'s three passes, before b19 (name order), once'
+
+
+def test_the_pause_is_reported_once_however_many_batches_wait(tmp_path, box):
+    q = _queue(tmp_path, {'b16': ['b16a-kl-seed1'], 'b19': ['b19a-x-seed1'], 'b20': ['b20a-y-seed1']})
+    os.makedirs(live_runs.directory(box['runs']), exist_ok=True)
+    open(live_runs.hold_path(box['runs']), 'w').close()
+    make = lambda specs: driver(specs, box, Calls(), wave=8)
+    reporter = scheduler.Reporter(Published(), queue_dir=q, make_driver=make, runs_dir=box['runs'])
+    _, _, attention = reporter.jobs(make(scheduler.queue_batches(q)[0][1]))
+    assert len(attention) == 1 and attention[0].startswith('** paused')
