@@ -920,12 +920,25 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
         # queue shows what is owed, and a batch owed its stage B is owed its hof passes too — three
         # rows per batch said the same thing three times (user, 2026-09-04). A *running* job is one
         # pass, so the running line still names it.
+        #
+        # Folded into at most **two** `evals` groups per batch, split by whether the batch's own
+        # training has been passed in the order: passes for arms already trained (a hand spec for a
+        # finished wave) sit where they run, ahead of the training; passes that follow a queued
+        # training wave are shown after it. Folding all of them into the first-seen slot put b15's
+        # 32 not-yet-trained arms' evals above b15's training on 2026-09-04, which read as the box
+        # measuring arms before training them. The trainings of a batch stay one line, as before.
         groups, index = [], {}
+        trained_seen = set()
         for job in jobs:
+            batch = batch_of(job['id'])
             phase = phase_of(job['id'], job.get('type'))
+            after_training = False
             if collapse_passes and pass_of(job['id']):
                 phase = 'evals'
-            key = (batch_of(job['id']), phase)
+                after_training = batch in trained_seen
+            elif phase == 'training':
+                trained_seen.add(batch)
+            key = (batch, phase, after_training)
             if key not in index:
                 index[key] = len(groups)
                 groups.append((key[0], key[1], []))

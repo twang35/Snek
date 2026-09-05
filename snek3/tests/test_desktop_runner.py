@@ -764,6 +764,30 @@ def test_a_batchs_three_queued_passes_take_one_line_not_three():
                                 'b17 training | clip005 | queued (1 arm)']
 
 
+def test_passes_owed_after_a_queued_training_are_shown_after_it():
+    """b15, 2026-09-04: wave 1's hand-queued hof passes run now, the other four waves' passes run
+    after each wave trains. One `evals` line for the batch put all 40 arms above the training and
+    read as measuring arms that had not trained. Two lines, split at the training, is the truth."""
+    def arm(letter):
+        return 'b15{0}-ent-seed1'.format(letter)
+    wave1 = [arm(l) for l in 'ab']
+    wave2 = [arm(l) for l in 'cd']
+    order = [{'id': 'b15-hof5000', 'type': 'eval', 'policies': wave1, 'priority': 11},
+             {'id': 'b15-hof30k', 'type': 'eval', 'policies': wave1, 'priority': 12}]
+    order += [{'id': p, 'type': 'train', 'policy': p, 'policies': [p], 'priority': 100} for p in wave2]
+    order += [{'id': 'b15-{0}-w2'.format(name), 'type': 'eval', 'policies': wave2, 'priority': pr}
+              for name, pr in (('stageb', 10), ('hof5000', 11), ('hof30k', 12))]
+    order += [{'id': 'b16a-kl-seed1', 'type': 'train', 'policy': 'b16a-kl-seed1',
+               'policies': ['b16a-kl-seed1'], 'priority': 100},
+              {'id': 'b16-stageb', 'type': 'eval', 'policies': ['b16a-kl-seed1'], 'priority': 10}]
+    glance = runner_module.build_at_a_glance([], order, {})
+    assert glance['queued'] == ['b15 evals | ent | queued (2 arms)',
+                                'b15 training | ent | queued (2 arms)',
+                                'b15 evals | ent | queued (2 arms)',
+                                'b16 training | kl | queued (1 arm)',
+                                'b16 evals | kl | queued (1 arm)']
+
+
 def test_a_running_pass_is_named_because_only_one_runs_at_a_time():
     running = [{'id': 'b11-hof5000', 'type': 'eval', 'policy': 'b11ae-lr1e4-seed1',
                 'policies': ['b11ae-lr1e4-seed1', 'b11af-lr1e4-seed2']}]
