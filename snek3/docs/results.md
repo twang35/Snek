@@ -21,6 +21,230 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+<!-- progress_update: batch b16 -->
+## Batch b16 — the `target_kl` sweep, 10 values x 4 seeds, 50M, closed 2026-09-05
+
+Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| target_kl | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| **0** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+| 0.003 | 3,923 | 16.1% | 14.7 15.2 18.7 15.7 | 46 | 99.6 | 97.90 (97.6-98.2) | 90.0 | 0.68% | 6.86% | 19.9% |
+| 0.005 | 4,403 | 20.3% | 13.9 11.2 28.9 23.0 | 85 | 99.6 | 98.08 (97.7-98.5) | 91.3 | 0.29% | 6.5% | 23.4% |
+| 0.008 | 4,017 | 13.6% | 11.4 13.1 17.0 12.1 | 42 | 99.6 | 97.72 (97.3-98.1) | 90.6 | 0.15% | 4.8% | 20.3% |
+| 0.01 | 4,209 | 18.2% | 16.8 18.9 14.1 23.1 | 70 | 99.6 | 98.00 (97.9-98.1) | 91.7 | 0.07% | 4.63% | 22.1% |
+| 0.013 | 4,008 | 14.9% | 11.7 18.0 14.1 15.6 | 49 | 99.6 | 97.83 (97.5-98.1) | 91.8 | 0.24% | 5.64% | 20.8% |
+| 0.015 | 4,317 | 16.8% | 13.2 15.0 20.6 18.4 | 48 | 100.0 | 97.97 (97.6-98.3) | 92.1 | 0.15% | 4.37% | 22.4% |
+| 0.02 | 3,889 | 13.9% | 10.8 17.0 12.4 14.6 | 39 | 99.8 | 97.78 (97.6-97.9) | 92.0 | 0.14% | 5.13% | 19.7% |
+| 0.03 | 4,617 | 19.0% | 18.3 20.0 19.0 18.7 | 70 | 99.8 | 98.03 (97.9-98.2) | 92.3 | 0.39% | 3.89% | 24.5% |
+| 0.04 | 4,170 | 16.9% | 17.8 11.2 15.4 21.5 | 54 | 99.8 | 98.00 (97.9-98.2) | 91.8 | 0.24% | 4.71% | 21.2% |
+| 0.05 | 4,039 | 17.2% | 18.4 10.7 17.7 20.3 | 70 | 99.8 | 97.75 (97.1-98.1) | 91.8 | 0.22% | 4.99% | 20.8% |
+
+<!-- reading -->
+**Verdict: target KL does nothing at 4 epochs — every value from 0.003 to 0.05 is within noise of the base on every
+column, and the base stays off.** Run on the laptop. Read against the bold reference — **b7's λ 0.98 cell `b7aa`-`b7ad`, not b9's λ 0.99 arms**: b15-b21 were generated from b7's base (every arm's config table says `ppo_gae_lambda 0.98`, and the spec notes name `b7aa-b7ad` as the control), and until 2026-09-05 15:30 this table was read against the λ 0.99 cell, which made every cell look 8-14 pp short. The reference row is 17.3% density, best30 97.75, 6.2% of evals below 80%. Density 13.6-20.3% against 17.3% with no trend along the
+sweep (16.1, 20.3, 13.6, 18.2, 14.9, 16.8, 13.9, 19.0, 16.9, 17.2); best30 97.7-98.1 against 97.75; the share of evals
+below 80% 3.9-6.9% against 6.2%, with the upper half of the sweep at 3.9-5.6% — a hint at n=4, not a result. The
+null-check cells 0.03-0.05 read 16.9-19.0%, the reference's 17.3%: the prediction "identical to the control" holds
+statistically but not literally, since same-seed arms at 0.03, 0.04 and 0.05 diverge from one another at 2.9-4.5M
+steps — the stop fired during onset in every cell, where approx_kl is large, and it did not matter. 0.005, predicted
+the stability candidate, is the densest cell (20.3%, one seed at 28.9%) and no more stable than the base. `hof30k`
+gave four rows at 99.3 /30,000 (`b16ac` at 0.003 @13.1M; the seed-1 arms of 0.03, 0.04 and 0.05, each @10.7M), none
+above the HOF's third place. Nothing to carry into the corner grid.
+<!-- /reading -->
+
+### Every arm
+
+| arm | target_kl | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b16aa-kl003-seed1` | 0.003 | 1106 | 14.7% | 8 | 99.4 | 98.0 @31.0M | 91.7 | 0.41% |
+| `b16ab-kl003-seed2` | 0.003 | 791 | 15.2% | 7 | 99.2 | 97.6 @41.7M | 89.1 | 0.71% |
+| `b16ac-kl003-seed3` | 0.003 | 1031 | 18.7% | 19 | 99.6 | 98.2 @40.9M | 89.1 | 1.29% |
+| `b16ad-kl003-seed4` | 0.003 | 995 | 15.7% | 12 | 99.4 | 97.8 @24.6M | 90.3 | 0.65% |
+| `b16ae-kl005-seed1` | 0.005 | 1028 | 13.9% | 10 | 99.2 | 97.7 @13.1M | 93.6 | 0.17% |
+| `b16af-kl005-seed2` | 0.005 | 859 | 11.2% | 9 | 99.6 | 97.7 @45.4M | 91.2 | 0.17% |
+| `b16ag-kl005-seed3` | 0.005 | 1263 | 28.9% | 40 | 99.6 | 98.5 @36.7M | 89.8 | 0.4% |
+| `b16ah-kl005-seed4` | 0.005 | 1253 | 23.0% | 26 | 99.6 | 98.4 @37.4M | 90.8 | 0.94% |
+| `b16ai-kl008-seed1` | 0.008 | 923 | 11.4% | 5 | 99.2 | 97.3 @28.1M | 90.0 | 0.24% |
+| `b16aj-kl008-seed2` | 0.008 | 992 | 13.1% | 11 | 99.6 | 97.4 @24.6M | 91.0 | 0.2% |
+| `b16ak-kl008-seed3` | 0.008 | 1135 | 17.0% | 17 | 99.4 | 98.1 @34.6M | 90.2 | 0.1% |
+| `b16al-kl008-seed4` | 0.008 | 967 | 12.1% | 9 | 99.4 | 98.1 @13.2M | 91.3 | 0.0% |
+| `b16am-kl01-seed1` | 0.01 | 1039 | 16.8% | 12 | 99.4 | 98.1 @30.5M | 92.1 | 0.1% |
+| `b16an-kl01-seed2` | 0.01 | 1101 | 18.9% | 16 | 99.6 | 98.0 @18.6M | 92.3 | 0.0% |
+| `b16ao-kl01-seed3` | 0.01 | 1039 | 14.1% | 11 | 99.4 | 97.9 @22.7M | 92.9 | 0.03% |
+| `b16ap-kl01-seed4` | 0.01 | 1030 | 23.1% | 31 | 99.6 | 98.0 @36.0M | 89.3 | 0.14% |
+| `b16aq-kl013-seed1` | 0.013 | 980 | 11.7% | 8 | 99.2 | 97.7 @44.6M | 91.6 | 0.44% |
+| `b16ar-kl013-seed2` | 0.013 | 990 | 18.0% | 18 | 99.4 | 98.1 @22.2M | 92.7 | 0.34% |
+| `b16as-kl013-seed3` | 0.013 | 981 | 14.1% | 10 | 99.6 | 97.5 @22.9M | 90.8 | 0.14% |
+| `b16at-kl013-seed4` | 0.013 | 1057 | 15.6% | 13 | 99.4 | 98.0 @38.6M | 92.0 | 0.1% |
+| `b16au-kl015-seed1` | 0.015 | 1104 | 13.2% | 8 | 99.6 | 97.6 @16.1M | 93.9 | 0.34% |
+| `b16av-kl015-seed2` | 0.015 | 1070 | 15.0% | 5 | 99.4 | 98.0 @44.9M | 90.0 | 0.1% |
+| `b16aw-kl015-seed3` | 0.015 | 1098 | 20.6% | 24 | 99.4 | 98.3 @10.7M | 91.5 | 0.1% |
+| `b16ax-kl015-seed4` | 0.015 | 1045 | 18.4% | 11 | 100.0 | 98.0 @17.9M | 93.0 | 0.2% |
+| `b16ay-kl02-seed1` | 0.02 | 931 | 10.8% | 6 | 99.8 | 97.9 @49.8M | 91.9 | 0.37% |
+| `b16az-kl02-seed2` | 0.02 | 1107 | 17.0% | 12 | 99.4 | 97.8 @32.0M | 94.6 | 0.1% |
+| `b16ba-kl02-seed3` | 0.02 | 878 | 12.4% | 7 | 99.4 | 97.6 @49.2M | 90.9 | 0.17% |
+| `b16bb-kl02-seed4` | 0.02 | 973 | 14.6% | 14 | 99.6 | 97.8 @17.2M | 90.6 | 0.0% |
+| `b16bc-kl03-seed1` | 0.03 | 1194 | 18.3% | 19 | 99.4 | 98.2 @11.1M | 93.6 | 0.57% |
+| `b16bd-kl03-seed2` | 0.03 | 1037 | 20.0% | 15 | 99.4 | 98.0 @29.9M | 88.6 | 0.27% |
+| `b16be-kl03-seed3` | 0.03 | 1251 | 19.0% | 17 | 99.4 | 98.0 @21.0M | 94.0 | 0.5% |
+| `b16bf-kl03-seed4` | 0.03 | 1135 | 18.7% | 19 | 99.8 | 97.9 @38.2M | 92.9 | 0.0% |
+| `b16bg-kl04-seed1` | 0.04 | 1170 | 17.8% | 13 | 99.6 | 98.0 @16.6M | 93.1 | 0.61% |
+| `b16bh-kl04-seed2` | 0.04 | 863 | 11.2% | 6 | 99.8 | 97.9 @15.5M | 92.6 | 0.4% |
+| `b16bi-kl04-seed3` | 0.04 | 981 | 15.4% | 13 | 99.6 | 97.9 @18.8M | 91.2 | 0.07% |
+| `b16bj-kl04-seed4` | 0.04 | 1156 | 21.5% | 22 | 99.6 | 98.2 @23.4M | 90.3 | 0.07% |
+| `b16bk-kl05-seed1` | 0.05 | 1187 | 18.4% | 29 | 99.6 | 97.9 @17.0M | 93.7 | 0.57% |
+| `b16bl-kl05-seed2` | 0.05 | 844 | 10.7% | 8 | 99.8 | 97.1 @15.3M | 92.7 | 0.34% |
+| `b16bm-kl05-seed3` | 0.05 | 888 | 17.7% | 14 | 99.6 | 97.9 @18.8M | 91.0 | 0.1% |
+| `b16bn-kl05-seed4` | 0.05 | 1120 | 20.3% | 19 | 99.6 | 98.1 @42.1M | 90.0 | 0.0% |
+
+<!-- /progress_update: batch b16 -->
+
+<!-- progress_update: batch b15 -->
+## Batch b15 — the `entropy_coef` sweep, 10 values x 4 seeds, 50M, closed 2026-09-05
+
+Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| entropy_coef | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 0.0 | 4,626 | 11.7% | 11.9 7.7 8.5 17.7 | 35 | 99.6 | 97.75 (97.5-98.0) | 94.8 | 0.22% | 1.67% | 22.4% |
+| 0.001 | 3,869 | 8.7% | 8.9 7.2 10.8 7.5 | 18 | 99.4 | 97.90 (97.7-98.2) | 94.8 | 0.01% | 1.9% | 18.5% |
+| 0.003 | 4,109 | 8.7% | 6.7 9.3 9.9 8.6 | 15 | 99.4 | 97.65 (97.5-97.9) | 95.0 | 0.0% | 1.5% | 19.2% |
+| 0.005 | 4,041 | 11.8% | 10.3 15.0 9.7 12.2 | 24 | 99.8 | 97.50 (97.4-97.7) | 94.2 | 0.22% | 2.7% | 19.9% |
+| **0.01** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+| 0.02 | 3,121 | 13.9% | 11.2 15.5 12.9 16.0 | 42 | 99.6 | 97.58 (97.3-97.8) | 86.9 | 0.79% | 9.46% | 15.6% |
+| 0.03 | 2,815 | 24.1% | 18.1 16.5 34.5 19.8 | 122 | 99.6 | 97.88 (97.3-98.3) | 82.5 | 0.74% | 14.22% | 15.2% |
+| entanneal10 | 2,034 | 16.5% | 22.6 12.3 15.6 15.4 | 36 | 99.6 | 97.55 (97.2-97.9) | 70.5 | 2.65% | 23.8% | 10.3% |
+| entanneal03 | 3,185 | 12.3% | 8.7 11.3 10.2 17.7 | 35 | 99.6 | 97.50 (97.4-97.7) | 85.8 | 0.95% | 12.29% | 15.4% |
+| entanneal01 | 3,883 | 13.0% | 10.5 14.5 13.5 13.2 | 39 | 99.6 | 97.78 (97.5-98.2) | 91.4 | 0.18% | 4.39% | 18.9% |
+| entanneal01to0 | 4,023 | 10.8% | 12.7 12.3 7.6 10.3 | 27 | 99.6 | 97.55 (97.5-97.6) | 92.6 | 0.23% | 4.21% | 19.5% |
+
+<!-- reading -->
+**Verdict: the entropy coefficient trades density for stability monotonically, an annealed coefficient lands between
+its two endpoints rather than combining them, and the base stays 0.01.** Read against the bold reference — **b7's λ 0.98 cell `b7aa`-`b7ad`, not b9's λ 0.99 arms**: b15-b21 were generated from b7's base (every arm's config table says `ppo_gae_lambda 0.98`, and the spec notes name `b7aa-b7ad` as the control), and until 2026-09-05 15:30 this table was read against the λ 0.99 cell, which made every cell look 8-14 pp short. The reference row is 17.3% density, best30 97.75, 6.2% of evals below 80%. Density 8.7-11.8% at 0-0.005, 13.9% at
+0.02, **24.1% at 0.03** (one seed at 34.5%; 122 candidates from 2,815 rows, the richest top in the batch), 16.5% for
+0.1→0.001, 12.3% for 0.03→0.001, 13.0% for 0.01→0.001, 10.8% for 0.01→0. Stability runs the other way without an
+exception: 1.5-2.7% of evals below 80% at 0-0.005 (sef 94-95), 6.2% at the reference, 9.5% at 0.02, 14.2% at 0.03,
+**23.8% for the anneal from 0.1** (sef 70). The two anneals from 0.01 sit between fixed 0.01 and fixed 0.001 on both
+columns: the average of the endpoints, not the top of one with the tail of the other. Predictions: **0** "may go
+deterministic early and stall" — no; best row 99.6, onset on time. **0.001** "fewest collapses; the default moves if
+there is no density loss" — fewest collapses, half the density; the default stays. **0.003** fewer collapses — confirmed.
+**0.02** "locates the cliff" — it is a slope. **0.03** "b3h's catastrophe" — not here: the worst stability of the fixed
+cells and the best density. **0.1 anneal** "possibly the best late stability" — the worst in the batch. Not settled:
+0.03 at n=4 with one seed carrying the density, and whether its richer top (three 99.3 /30,000 rows in `b15aw`, and
+the batch's `hof30k` best, 99.4 in `b15ay` at 0.1→0.001) is worth 14% of evals below 80%.
+<!-- /reading -->
+
+### Every arm
+
+| arm | entropy_coef | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b15aa-ent0-seed1` | 0.0 | 1208 | 11.9% | 10 | 99.4 | 98.0 @46.0M | 96.1 | 0.6% |
+| `b15ab-ent0-seed2` | 0.0 | 1104 | 7.7% | 3 | 99.4 | 97.5 @39.3M | 95.0 | 0.03% |
+| `b15ac-ent0-seed3` | 0.0 | 1053 | 8.5% | 2 | 99.4 | 97.6 @18.0M | 94.5 | 0.21% |
+| `b15ad-ent0-seed4` | 0.0 | 1261 | 17.7% | 20 | 99.6 | 97.9 @33.8M | 93.4 | 0.24% |
+| `b15ae-ent001-seed1` | 0.001 | 986 | 8.9% | 5 | 99.2 | 97.9 @22.2M | 95.3 | 0.03% |
+| `b15af-ent001-seed2` | 0.001 | 907 | 7.2% | 2 | 99.0 | 97.7 @9.3M | 94.8 | 0.0% |
+| `b15ag-ent001-seed3` | 0.001 | 1051 | 10.8% | 9 | 99.4 | 98.2 @6.3M | 94.1 | 0.03% |
+| `b15ah-ent001-seed4` | 0.001 | 925 | 7.5% | 2 | 99.2 | 97.8 @36.7M | 94.9 | 0.0% |
+| `b15ai-ent003-seed1` | 0.003 | 955 | 6.7% | 1 | 99.2 | 97.5 @30.5M | 94.6 | 0.0% |
+| `b15aj-ent003-seed2` | 0.003 | 1059 | 9.3% | 5 | 99.4 | 97.6 @33.6M | 95.8 | 0.0% |
+| `b15ak-ent003-seed3` | 0.003 | 1071 | 9.9% | 4 | 99.2 | 97.9 @27.5M | 94.4 | 0.13% |
+| `b15al-ent003-seed4` | 0.003 | 1024 | 8.6% | 5 | 99.4 | 97.6 @44.3M | 95.1 | 0.0% |
+| `b15am-ent005-seed1` | 0.005 | 1026 | 10.3% | 2 | 99.4 | 97.7 @43.8M | 95.0 | 0.14% |
+| `b15an-ent005-seed2` | 0.005 | 1029 | 15.0% | 10 | 99.6 | 97.4 @45.4M | 94.6 | 0.34% |
+| `b15ao-ent005-seed3` | 0.005 | 1024 | 9.7% | 6 | 99.8 | 97.5 @32.9M | 94.3 | 0.24% |
+| `b15ap-ent005-seed4` | 0.005 | 962 | 12.2% | 6 | 99.6 | 97.4 @37.7M | 93.0 | 0.2% |
+| `b15aq-ent02-seed1` | 0.02 | 722 | 11.2% | 9 | 99.4 | 97.3 @25.9M | 87.3 | 0.95% |
+| `b15ar-ent02-seed2` | 0.02 | 747 | 15.5% | 17 | 99.4 | 97.8 @39.9M | 86.0 | 0.64% |
+| `b15as-ent02-seed3` | 0.02 | 902 | 12.9% | 6 | 99.6 | 97.8 @49.5M | 88.2 | 0.27% |
+| `b15at-ent02-seed4` | 0.02 | 750 | 16.0% | 10 | 99.4 | 97.4 @42.5M | 86.1 | 1.41% |
+| `b15au-ent03-seed1` | 0.03 | 658 | 18.1% | 24 | 99.6 | 97.3 @18.3M | 85.0 | 0.48% |
+| `b15av-ent03-seed2` | 0.03 | 541 | 16.5% | 8 | 99.4 | 97.9 @35.0M | 79.7 | 1.34% |
+| `b15aw-ent03-seed3` | 0.03 | 1029 | 34.5% | 74 | 99.6 | 98.3 @46.6M | 85.1 | 1.01% |
+| `b15ax-ent03-seed4` | 0.03 | 587 | 19.8% | 16 | 99.4 | 98.0 @49.0M | 80.0 | 0.31% |
+| `b15ay-entanneal10-seed1` | entanneal10 | 513 | 22.6% | 16 | 99.6 | 97.7 @48.7M | 66.9 | 4.47% |
+| `b15az-entanneal10-seed2` | entanneal10 | 489 | 12.3% | 7 | 99.6 | 97.4 @48.1M | 71.0 | 2.74% |
+| `b15ba-entanneal10-seed3` | entanneal10 | 591 | 15.6% | 9 | 99.2 | 97.9 @46.4M | 72.0 | 1.95% |
+| `b15bb-entanneal10-seed4` | entanneal10 | 441 | 15.4% | 4 | 99.2 | 97.2 @46.4M | 72.1 | 2.56% |
+| `b15bc-entanneal03-seed1` | entanneal03 | 725 | 8.7% | 4 | 99.4 | 97.5 @25.0M | 84.4 | 0.38% |
+| `b15bd-entanneal03-seed2` | entanneal03 | 761 | 11.3% | 4 | 99.4 | 97.4 @35.0M | 83.9 | 2.0% |
+| `b15be-entanneal03-seed3` | entanneal03 | 786 | 10.2% | 8 | 99.4 | 97.4 @31.9M | 84.9 | 1.51% |
+| `b15bf-entanneal03-seed4` | entanneal03 | 913 | 17.7% | 19 | 99.6 | 97.7 @31.7M | 90.0 | 0.24% |
+| `b15bg-entanneal01-seed1` | entanneal01 | 904 | 10.5% | 5 | 99.2 | 97.5 @11.8M | 91.6 | 0.0% |
+| `b15bh-entanneal01-seed2` | entanneal01 | 1055 | 14.5% | 7 | 99.2 | 97.7 @40.0M | 93.2 | 0.17% |
+| `b15bi-entanneal01-seed3` | entanneal01 | 872 | 13.5% | 15 | 99.6 | 97.7 @16.5M | 87.8 | 0.25% |
+| `b15bj-entanneal01-seed4` | entanneal01 | 1052 | 13.2% | 12 | 99.6 | 98.2 @37.1M | 93.1 | 0.2% |
+| `b15bk-entanneal01to0-seed1` | entanneal01to0 | 1016 | 12.7% | 12 | 99.4 | 97.5 @41.4M | 90.6 | 0.0% |
+| `b15bl-entanneal01to0-seed2` | entanneal01to0 | 1056 | 12.3% | 9 | 99.2 | 97.6 @24.2M | 93.3 | 0.5% |
+| `b15bm-entanneal01to0-seed3` | entanneal01to0 | 952 | 7.6% | 2 | 99.6 | 97.5 @38.9M | 92.1 | 0.47% |
+| `b15bn-entanneal01to0-seed4` | entanneal01to0 | 999 | 10.3% | 4 | 99.4 | 97.6 @48.4M | 94.5 | 0.0% |
+
+<!-- /progress_update: batch b15 -->
+
+<!-- progress_update: batch b14 -->
+## Batch b14 — the `rollout` sweep, 6 values x 4 seeds, 50M, closed 2026-09-05
+
+Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell (`b9bw-lam99-seed1, b9bx-lam99-seed2, b9by-lam99-seed3, b9bz-lam99-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| rollout | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 32 | 7,470 | 13.0% | 11.3 9.9 10.8 18.0 | 78 | 99.8 | 97.88 (97.5-98.1) | 78.8 | 0.22% | 17.14% | 8.9% |
+| 64 | 7,123 | 22.9% | 23.3 21.4 25.9 21.6 | 246 | 100.0 | 98.30 (98.1-98.7) | 88.7 | 0.18% | 6.59% | 18.6% |
+| **128** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
+| 192 | 3,461 | 22.5% | 18.9 16.7 26.5 26.6 | 73 | 99.8 | 98.30 (98.1-98.5) | 90.4 | 1.29% | 6.18% | 28.1% |
+| 256 | 2,859 | 29.4% | 31.5 33.9 18.9 32.2 | 108 | 99.8 | 98.40 (98.1-98.7) | 90.6 | 0.85% | 4.71% | 32.0% |
+| 512 | 1,778 | 38.3% | 45.8 34.2 43.0 28.9 | 94 | 100.0 | 98.38 (98.2-98.5) | 89.8 | 0.96% | 4.45% | 43.4% |
+| 1024 | 759 | 31.2% | 27.4 24.6 52.3 19.3 | 30 | 99.6 | 98.22 (98.0-98.5) | 87.2 | 0.29% | 2.89% | 34.5% |
+
+<!-- reading -->
+**Verdict: density rises with rollout to 512 and stability rises with it all the way to 1024; the base 128 is the
+short side of the plateau, and 512 joins the corner grid.** Run on the laptop (dequeued 2026-09-03). Read against the
+bold reference at 128 — b9's λ 0.99 cell, which is right for this batch: b14 was generated at λ 0.99, unlike b15-b21.
+Density 13.0% at 32, 22.9% at 64, **27.3% at 128**, 22.5% at 192, 29.4% at 256, **38.3% at 512** (seeds 28.9-45.8, a
+100/500 row), 31.2% at 1024 (one seed at 52.3%, one at 19.3%). The share of evals below 80% falls without a reversal:
+17.1% at 32, 6.6 → 6.4 → 6.2% at 64-192, 4.7% at 256, 4.5% at 512, **2.9% at 1024**; best30 is flat at 98.2-98.4 from
+64 up. Rows and candidate counts are not comparable along the row — a checkpoint per update means 32 writes ten times
+the checkpoints of 1024 — so read shares: ≥99 rows per stage-B row are 2.7% at the reference, 3.5% at 64, 5.3% at 512,
+4.0% at 1024. Predictions: **32** worse than 64 — confirmed on every column. **64** slightly worse everywhere — worse on
+density only; best30, stability and best row match. **192** within noise — 5 pp below on density, matched elsewhere;
+wave 2's noisy stage A did not survive stage B. **256** equal-or-better stability at similar density — confirmed.
+**512** later onset, good stability if it arrives — arrived, with the batch's best density and second-best stability.
+**1024** "381 update rounds is too few by 50M" — falsified: it arrives, at the best stability in the batch and the
+widest seed spread. Not settled: 512 against 256 at n=4 (9 pp, with one 256 seed at 18.9).
+<!-- /reading -->
+
+### Every arm
+
+| arm | rollout | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b14a-roll32-seed1` | 32 | 2374 | 11.3% | 15 | 99.4 | 97.9 @16.8M | 86.0 | 0.07% |
+| `b14b-roll32-seed2` | 32 | 1267 | 9.9% | 5 | 99.4 | 98.0 @33.4M | 73.1 | 0.33% |
+| `b14c-roll32-seed3` | 32 | 1513 | 10.8% | 13 | 99.4 | 97.5 @40.3M | 75.7 | 0.45% |
+| `b14d-roll32-seed4` | 32 | 2316 | 18.0% | 45 | 99.8 | 98.1 @25.6M | 80.3 | 0.11% |
+| `b14e-roll64-seed1` | 64 | 1920 | 23.3% | 70 | 99.8 | 98.1 @44.3M | 90.5 | 0.19% |
+| `b14f-roll64-seed2` | 64 | 1922 | 21.4% | 66 | 99.8 | 98.3 @17.6M | 92.0 | 0.17% |
+| `b14g-roll64-seed3` | 64 | 1459 | 25.9% | 67 | 99.8 | 98.7 @42.1M | 81.0 | 1.55% |
+| `b14h-roll64-seed4` | 64 | 1822 | 21.6% | 43 | 100.0 | 98.1 @40.9M | 91.3 | 0.17% |
+| `b14i-roll192-seed1` | 192 | 798 | 18.9% | 13 | 99.4 | 98.3 @27.8M | 91.8 | 1.27% |
+| `b14j-roll192-seed2` | 192 | 804 | 16.7% | 11 | 99.2 | 98.1 @35.8M | 88.6 | 0.92% |
+| `b14k-roll192-seed3` | 192 | 942 | 26.5% | 26 | 99.8 | 98.3 @36.8M | 92.3 | 1.32% |
+| `b14l-roll192-seed4` | 192 | 917 | 26.6% | 23 | 99.6 | 98.5 @43.9M | 89.0 | 2.05% |
+| `b14m-roll256-seed1` | 256 | 806 | 31.5% | 33 | 99.8 | 98.6 @42.0M | 93.1 | 0.81% |
+| `b14n-roll256-seed2` | 256 | 722 | 33.9% | 27 | 99.6 | 98.2 @41.8M | 90.1 | 0.63% |
+| `b14o-roll256-seed3` | 256 | 644 | 18.9% | 10 | 99.6 | 98.1 @27.6M | 90.2 | 0.89% |
+| `b14p-roll256-seed4` | 256 | 687 | 32.2% | 38 | 99.6 | 98.7 @45.5M | 89.1 | 1.11% |
+| `b14q-roll512-seed1` | 512 | 480 | 45.8% | 40 | 99.8 | 98.5 @28.5M | 87.5 | 0.44% |
+| `b14r-roll512-seed2` | 512 | 438 | 34.2% | 12 | 99.4 | 98.2 @38.5M | 91.3 | 1.09% |
+| `b14s-roll512-seed3` | 512 | 442 | 43.0% | 30 | 100.0 | 98.4 @40.5M | 91.5 | 0.82% |
+| `b14t-roll512-seed4` | 512 | 418 | 28.9% | 12 | 99.4 | 98.4 @26.6M | 88.9 | 1.11% |
+| `b14u-roll1024-seed1` | 1024 | 186 | 27.4% | 5 | 99.6 | 98.5 @48.9M | 89.5 | 0.0% |
+| `b14v-roll1024-seed2` | 1024 | 187 | 24.6% | 3 | 99.0 | 98.1 @46.1M | 90.1 | 0.0% |
+| `b14w-roll1024-seed3` | 1024 | 199 | 52.3% | 21 | 99.4 | 98.3 @34.6M | 83.0 | 2.09% |
+| `b14x-roll1024-seed4` | 1024 | 187 | 19.3% | 1 | 99.2 | 98.0 @44.7M | 86.4 | 0.58% |
+
+<!-- /progress_update: batch b14 -->
+
 <!-- progress_update: batch b13 -->
 ## Batch b13 — the `minibatch` sweep, 8 values x 4 seeds, 50M, closed 2026-09-04
 

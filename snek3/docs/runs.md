@@ -6,6 +6,44 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b14 (rollout), b15 (entropy) and b16 (target KL) closed with their hof passes; b17 (clip) is on wave 4 of 8 on the
+desktop and b19 (switches) on wave 2 of 3 on the laptop.** As of 2026-09-05 15:35:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b17 (clip + anneals, 64 arms, 8 waves) | waves 1-3 closed with hof5000/hof30k; wave 4 (clip 0.1 anneal, lr anneal) training from 15:30 | training done ~03:40 2026-09-06; b18 (grad-norm clip, 24 arms) behind it; box clears ~09:20 Sun |
+| laptop | b19 (switches, 24 arms, 3 waves) | wave 1 (noadvnorm, mse) closed with hof5000; wave 2 (Adam ε 1e-5, 1e-8) training from ~15:25 | ~19:00 today; then b20 (lanes, 16 arms) and b21 (shaping, 24 arms); clears ~04:10 Sun |
+
+**‡ b15-b21 were generated from b7's base at λ 0.98, not the re-based λ 0.99.** Every arm's config table says
+`ppo_gae_lambda 0.98` (b13's and b14's say 0.99), and the spec notes name `b7aa-b7ad` as the control. Until this update
+the tables read them against b9's λ 0.99 cell (27.3% density), which made every b15-b17 cell look 8-14 pp short —
+b16's null-check cells included, which were predicted identical to the control. `viewer/references.json` now points
+b15-b21 at `b7aa-b7ad` (17.3%, best30 97.75, 6.2% of evals below 80%), and every reading below is against that.
+**The user's call: leave b18, b20 and b21 queued at 0.98** — consistent with b15-b19, comparable among themselves and
+with b7 — **or regenerate them at 0.99 before they start.** What 0.98 loses is the direct comparison with b11-b14.
+
+**What closed.** b14: density rises with rollout to 512 (38.3%) and stability with it to 1024; 512 joins the corner
+grid. b15: the entropy coefficient trades density for stability monotonically, the anneals average their endpoints,
+0.01 stays. b16: target KL is a no-op at 4 epochs. Verdicts in [`results.md`](results.md), tables in
+[`charts.md`](charts.md), findings under `## Established` in [`findings.md`](findings.md).
+
+**HOF candidates, not records.** `hof30k` rows at 99.4 /30,000: `b15ay-entanneal10-seed1` @24182784 and (2026-09-04)
+`b11ag-lr1e4-seed3` @33243136; the HOF's third place, `b9ch`, is 99.30 [99.2, 99.4]. Four b16 rows and three b15 rows
+read 99.3. Promotion is the `hof-promote` skill and the user's call; nothing approaches `b10ck`'s 99.65.
+
+**Live so far.** b17: clip is flat around the base from 0.05 to 0.2 and worse past it; loosening the clip *reduces*
+collapses; the 0.2→0.02 anneal matches the base on density with better stability. b19: **the mse value loss** reads
+22.2% density at 0.97% of evals below 80% (base 17.3% at 6.2%) — the most stable cell at this base, and denser;
+noadvnorm is as stable and 4 pp short.
+
+**Infrastructure today.** The desktop's `runner` is `daemon` ([`../plans/rename-runner-to-daemon.md`](../plans/rename-runner-to-daemon.md));
+the desktop scheduler restarted on the new code at 13:59 with b17 wave 3 adopted mid-training. `tools/progress_update.py`
+now tables every batch in `references.json` (b16 had closed without ever being tabled), separates an anneal cell from the
+fixed value it starts at, names the cells of a switches batch, and reads a laptop batch's state from the laptop's own
+status lines — uncommitted, awaiting review.
+
+## b14 and b15 mid-flight, as it read at 2026-09-04 19:10 (superseded)
+
 **b14 (rollout) wave 1 closed and wave 2 is training on the laptop; b15 (entropy) wave 1 closed on the
 desktop, which is now running the hall-of-fame passes queued ahead of b15's remaining waves; b11's two
 passes are done.** As of 2026-09-04 19:10:

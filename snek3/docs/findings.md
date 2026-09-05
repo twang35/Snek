@@ -17,6 +17,68 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### b15-b21 were generated at λ 0.98 (b7's base); their reference is `b7aa`-`b7ad`, not b9's λ 0.99 cell
+
+**Found 2026-09-05** reading b16's null-check cells: target KL 0.03-0.05, predicted identical to the control, read
+17-19% density against the 27.3% the tables compared them with. Every b15-b21 arm's config says `ppo_gae_lambda 0.98`
+(b13 and b14 say 0.99), and the spec notes name `b7aa-b7ad` as the control — the batches were generated from b7's frozen
+base after b11-b14 had been re-based to 0.99. The comparison is valid against b7's cell (17.3%, best30 97.75, 6.2% of
+evals below 80%), and that is what `viewer/references.json` now says; it is not valid against b11-b14. A knob's effect
+read against the wrong base looks like a uniform deficit, and the null cells are what catch it — keep one in every sweep.
+
+### Target KL is a no-op at 4 epochs
+
+**Measured 2026-09-05 on b16's 40 arms (laptop)** — 10 values of `target_kl` x 4 seeds at 50M, everything else b7's
+base at λ 0.98 (the reference at 0, off):
+
+| target_kl | **0** (ref) | 0.003 | 0.005 | 0.008 | 0.01 | 0.013 | 0.015 | 0.02 | 0.03 | 0.04 | 0.05 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | **17.3%** | 16.1 | 20.3 | 13.6 | 18.2 | 14.9 | 16.8 | 13.9 | 19.0 | 16.9 | 17.2 |
+| best30 | 97.75 | 97.90 | 98.08 | 97.72 | 98.00 | 97.83 | 97.97 | 97.78 | 98.03 | 98.00 | 97.75 |
+| evals < 80% | 6.2% | 6.9 | 6.5 | 4.8 | 4.6 | 5.6 | 4.4 | 5.1 | 3.9 | 4.7 | 5.0 |
+
+No column trends along the sweep and no cell leaves the reference's noise. The early stop does fire — same-seed arms
+at 0.03, 0.04 and 0.05 diverge from one another by 2.9-4.5M steps, so it fires during onset, where approx_kl is large —
+and it changes nothing that stage B can see. With 4 epochs there are three stopping points and the clip already bounds
+the step; the knob has nothing to do. Off stays the default, and target KL does not enter the corner grid.
+
+### Entropy: density and stability trade monotonically, and an anneal averages its endpoints
+
+**Measured 2026-09-05 on b15's 40 arms (desktop)** — 7 fixed values and 4 anneal schedules of `entropy_coef` x 4
+seeds at 50M, everything else b7's base at λ 0.98 (the reference at 0.01 fixed):
+
+| entropy_coef | 0 | 0.001 | 0.003 | 0.005 | **0.01** (ref) | 0.02 | 0.03 | 0.1→0.001 | 0.03→0.001 | 0.01→0.001 | 0.01→0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | 11.7% | 8.7 | 8.7 | 11.8 | **17.3** | 13.9 | **24.1** | 16.5 | 12.3 | 13.0 | 10.8 |
+| best30 | 97.75 | 97.90 | 97.65 | 97.50 | 97.75 | 97.58 | 97.88 | 97.55 | 97.50 | 97.78 | 97.55 |
+| evals < 80% | 1.7% | 1.9 | 1.5 | 2.7 | 6.2 | 9.5 | 14.2 | **23.8** | 12.3 | 4.4 | 4.2 |
+
+Stability is monotone in the coefficient from 1.5% of evals below 80% at 0.003 to 23.8% for the anneal from 0.1, and
+density rises with it to 0.03 (24.1%, one seed at 34.5%); there is no value that has both. The anneals from 0.01 to
+0.001 or 0 land between fixed 0.01 and fixed 0.001 on both columns — the hoped-for "0.01 top with the 0.001 tail" does
+not happen; an annealed run behaves like its time-averaged coefficient. No collapse from a coefficient of 0 (best row
+99.6, onset on time), so the term buys the top of the distribution here, not competence. 0.01 stays; the open question
+is 0.03, whose top is the richest in the batch (122 ≥99 rows from 2,815, three 99.3 /30,000 rows) at the worst
+stability of the fixed cells.
+
+### Rollout: density peaks at 512 and stability improves through 1024; 128 is the short side of the plateau
+
+**Measured 2026-09-05 on b14's 24 arms (laptop)** — 6 values of `rollout` x 4 seeds at 50M, everything else b9's
+λ 0.99 cell (the reference at 128; b14 was generated at 0.99):
+
+| rollout | 32 | 64 | **128** (ref) | 192 | 256 | 512 | 1024 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | 13.0% | 22.9 | **27.3** | 22.5 | 29.4 | **38.3** | 31.2 |
+| best30 | 97.88 | 98.30 | 98.33 | 98.30 | 98.40 | 98.38 | 98.22 |
+| evals < 80% | 17.1% | 6.6 | 6.4 | 6.2 | 4.7 | 4.5 | **2.9** |
+
+Stability improves with rollout at every step, density rises to 512 (seeds 28.9-45.8%) and gives some back at 1024
+(one seed at 52.3%, one at 19.3%), and best30 is flat from 64 up. Below 64 the GAE horizon is truncated against a
+34-step task horizon and everything suffers; above 128 the longer rollout is fewer, larger, lower-variance updates and
+the collapses thin out. Counts are not comparable along the row (a checkpoint per update means 32 writes ten times as
+many as 1024), so the shares are the comparison. 512 goes into the corner grid beside 128; 256 is the conservative
+alternative (29.4% at 4.7%). Not settled at n=4: 512 against 256.
+
 ### Minibatch: a plateau at 256-512, density lost on both sides, stability best at 64-192
 
 **Measured 2026-09-04 on b13's 32 arms (laptop)** — 8 values of `minibatch` x 4 seeds at 50M, everything
