@@ -35,7 +35,7 @@ Run order (section 7), each batch one knob, four seeds per value.
 | 10 | b18 | grad-norm clip | ceiling on the global gradient norm before each step | 3 | ~9 h | desktop, after b17: ~17:00 09-06 |
 | 11 | b19 | switches | adv-norm, value loss (mse/huber), Adam ε, vf_coef | 3 | laptop, ~10.5 h | laptop queue, after b16: ~04:00 09-06 |
 | 12 | b20 | collect lanes | parallel games vs. per-episode depth, same batch size as b14 | 2 | laptop, ~7 h | laptop queue, after b19: **~11:00 09-06** |
-| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 | ~9 h | desktop, after b18: **~02:00 09-07** |
+| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 | laptop, ~10.5 h | laptop queue, after b20 (moved from the desktop 2026-09-05 12:50): **~22:00 09-06** |
 | — | b22 | factorial | combine whichever knobs above won cleanly | 4 | ~12 h | after b21, once designed; either box is free by then |
 
 **What the times are.** The closed batches are measured, from the `results` branch: the first wave's
@@ -49,10 +49,11 @@ while they run**: b15's waves 2-5 are waiting on b12's and b13's passes now. b16
 pass per wave rather than per batch, so their estimates are 2.6 h plus ~0.3 h per wave. Laptop waves
 (b13, b14) train in ~5.7 h, not 2.3, with everything else it runs.
 
-**Split across the two boxes, as of 2026-09-04 23:30** (b16, b19 and b20 moved to the laptop, the
-`move-batch` skill; b13 and b14 were already there): the desktop has b15's last three waves, b17, b18
-and b21 — **~50 h, b21 closing ~02:00 2026-09-07**; the laptop has b16, b19 and b20 — **~35 h, b20
-closing ~11:00 2026-09-06**. Laptop waves cost ~3.5 h each because stage B and the hof passes run in
+**Split across the two boxes, as of 2026-09-05 12:50** (b21 moved to the laptop, the `move-batch`
+skill, after b16, b19 and b20 on 09-04 and b13, b14 before): the desktop has b17's last six waves and
+b18 — `status.json`'s new `remaining` read **~27 h, clear ~15:30 2026-09-06**; the laptop has b19, b20
+and b21 — **~24 h, b21 closing ~13:00 2026-09-06**. The move balanced 31 h against 14 h; the estimates
+are `tools/eta.py`'s and refine as each box's ledger fills. Laptop waves cost ~3.5 h each because stage B and the hof passes run in
 series there (b14's T 512/1024 waves were the exception at ~1 h, with an eval per eight rollouts). Moving
 b18 across too would even the two out at ~41 h and ~46 h. The original budget stands: 58 waves at ~2.6 h
 is ~150 h of waves plus ~16 h of hof passes, against the ~162 h planned in section 7.

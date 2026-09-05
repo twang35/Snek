@@ -18,7 +18,9 @@ passes are done.** As of 2026-09-04 19:10:
 
 Behind b15 on the desktop: b16-b21 (target-KL, clip, gradient clip, advantage normalisation, lanes,
 shaping), every one at λ 0.99 against **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%).
-`attention` is empty.
+`attention` is empty. **2026-09-05 12:50: b21 moved from the desktop to the laptop** (`move-batch`): `status.json`'s
+new `remaining` read ~31 h on the desktop against ~14 h on the laptop, so the laptop now runs b19, b20, b21
+in that order and the desktop b17 then b18.
 
 **b11's 30,000-episode result: a third-place candidate, not a record.** `b11ag-lr1e4-seed3` @33243136 read
 **99.4 /30,000** [99.3, 99.4], with its two neighbours at 99.3 and 99.1; `b11ba-lr1e3-seed3` @47382528 and
