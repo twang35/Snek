@@ -1,6 +1,6 @@
 # Laptop Wi‑Fi: the stuck association, and the plan to stop it
 
-**Status: diagnosed 2026-09-04; TWT ruled out the same evening (the router does not advertise it); next step is the 6 GHz radio.** The laptop's Wi‑Fi periodically drops into a state
+**Status: diagnosed 2026-09-04; TWT ruled out the same evening (the router does not advertise it); laptop joined the 6 GHz radio 2026-09-04 18:05 (ch 69, ‑60 dBm, 864 Mb/s); first checks clean, verdict needs a day of load.** The laptop's Wi‑Fi periodically drops into a state
 where a quarter to a half of packets vanish, at strong signal, until Wi‑Fi is switched off and on. It
 happens every few hours, usually during heavy Claude Code plus training activity, and it is what a hung
 `git fetch`, a stalled `rsync` to the desktop and a timed-out auto-mode classifier all look like from
@@ -93,7 +93,7 @@ From inside a session, without sudo:
 ```
 ping -c 20 -i 0.2 192.168.0.1                                       # loss with strong RSSI = this
 system_profiler SPAirPortDataType | grep -E 'Signal|Transmit Rate|MCS|Channel'
-ssh -o ConnectTimeout=10 the-claw-den 'ping -c 20 -i 0.2 192.168.0.236'   # the other side sees the same loss
+ssh -o ConnectTimeout=10 the-claw-den "ping -c 20 -i 0.2 $(ipconfig getifaddr en0)"   # the other side sees the same loss (the laptop's address changes; it was .236, then .102)
 ```
 
 From a real terminal (the `!` prefix cannot prompt for a password), before toggling, for the driver's view:
