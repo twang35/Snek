@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T07:24:53",
-  "ts": 1788618293.460737,
+  "iso": "2026-09-05T07:35:01",
+  "ts": 1788618901.636691,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | entanneal01, entanneal01to0 -- wave 5 of 5 | training 89% (8 arms)"
+      "b15 | entanneal01, entanneal01to0 | stage B (8 arms)"
     ],
     "queued": [
       "b15 evals | entanneal01, entanneal01to0 | queued (8 arms)",
@@ -17,7 +17,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl02, kl03 -- wave 4 of 5 | training (8 arms)"
+      "b16 | kl02, kl03 -- wave 4 of 5 | training 11% (8 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl02, kl03 | queued (8 arms)",
@@ -28,7 +28,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T07:19:52"
+    "laptop_iso": "2026-09-05T07:29:56"
   },
   "scheduler": {
     "alive": true,
@@ -36,7 +36,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T07:21:54"
+    "status_iso": "2026-09-05T07:30:58"
   },
   "runtime": {
     "max_trainers": 8,
@@ -55,84 +55,21 @@
   "config_notes": [],
   "running": [
     {
-      "id": "b15bg-entanneal01-seed1",
-      "type": "train",
+      "id": "b15-stageb-w5",
+      "type": "eval",
       "policy": "b15bg-entanneal01-seed1",
       "policies": [
-        "b15bg-entanneal01-seed1"
-      ],
-      "step": 46759936,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bh-entanneal01-seed2",
-      "type": "train",
-      "policy": "b15bh-entanneal01-seed2",
-      "policies": [
-        "b15bh-entanneal01-seed2"
-      ],
-      "step": 47235072,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bi-entanneal01-seed3",
-      "type": "train",
-      "policy": "b15bi-entanneal01-seed3",
-      "policies": [
-        "b15bi-entanneal01-seed3"
-      ],
-      "step": 44892160,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bj-entanneal01-seed4",
-      "type": "train",
-      "policy": "b15bj-entanneal01-seed4",
-      "policies": [
-        "b15bj-entanneal01-seed4"
-      ],
-      "step": 44318720,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bk-entanneal01to0-seed1",
-      "type": "train",
-      "policy": "b15bk-entanneal01to0-seed1",
-      "policies": [
-        "b15bk-entanneal01to0-seed1"
-      ],
-      "step": 44056576,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bl-entanneal01to0-seed2",
-      "type": "train",
-      "policy": "b15bl-entanneal01to0-seed2",
-      "policies": [
-        "b15bl-entanneal01to0-seed2"
-      ],
-      "step": 43630592,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bm-entanneal01to0-seed3",
-      "type": "train",
-      "policy": "b15bm-entanneal01to0-seed3",
-      "policies": [
-        "b15bm-entanneal01to0-seed3"
-      ],
-      "step": 43204608,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b15bn-entanneal01to0-seed4",
-      "type": "train",
-      "policy": "b15bn-entanneal01to0-seed4",
-      "policies": [
+        "b15bg-entanneal01-seed1",
+        "b15bh-entanneal01-seed2",
+        "b15bi-entanneal01-seed3",
+        "b15bj-entanneal01-seed4",
+        "b15bk-entanneal01to0-seed1",
+        "b15bl-entanneal01to0-seed2",
+        "b15bm-entanneal01to0-seed3",
         "b15bn-entanneal01to0-seed4"
       ],
-      "step": 43581440,
-      "max_steps": 50003968
+      "step": null,
+      "max_steps": null
     }
   ],
   "ledger": {
@@ -567,7 +504,14 @@
     "b15-stageb-w4": "done",
     "b15-hof5000-w4": "done",
     "b15-hof30k-w4": "done",
-    "b15-stageb-w5": "queued",
+    "b15bg-entanneal01-seed1": "done",
+    "b15bh-entanneal01-seed2": "done",
+    "b15bi-entanneal01-seed3": "done",
+    "b15bj-entanneal01-seed4": "done",
+    "b15bk-entanneal01to0-seed1": "done",
+    "b15bl-entanneal01to0-seed2": "done",
+    "b15bm-entanneal01to0-seed3": "done",
+    "b15bn-entanneal01to0-seed4": "done",
     "b15-hof5000-w5": "queued",
     "b15-hof30k-w5": "queued",
     "b17aa-clip005-seed1": "queued",
@@ -724,20 +668,13 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b15bg-entanneal01-seed1": "running",
-    "b15bh-entanneal01-seed2": "running",
-    "b15bi-entanneal01-seed3": "running",
-    "b15bj-entanneal01-seed4": "running",
-    "b15bk-entanneal01to0-seed1": "running",
-    "b15bl-entanneal01to0-seed2": "running",
-    "b15bm-entanneal01to0-seed3": "running",
-    "b15bn-entanneal01to0-seed4": "running"
+    "b15-stageb-w5": "running"
   },
-  "disk_free_gb": 126.5,
+  "disk_free_gb": 126.4,
   "head": "e297c1729b95",
   "load_avg": [
-    13.72900390625,
-    13.81591796875,
-    13.74658203125
+    16.0751953125,
+    14.4033203125,
+    13.85888671875
   ]
 }
