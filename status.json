@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-04T18:57:53",
-  "ts": 1788573473.0953767,
+  "iso": "2026-09-04T18:58:08",
+  "ts": 1788573488.1292963,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -82,8 +82,8 @@
       "step": 50003968,
       "label": "b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7",
       "max_steps": null,
-      "steps_per_sec": null,
-      "elapsed_s": 1170
+      "steps_per_sec": 0.0,
+      "elapsed_s": 1185
     }
   ],
   "ledger": {
@@ -786,8 +786,8 @@
   },
   "disk_free_gb": 132.4,
   "load_avg": [
-    1.11279296875,
-    2.09521484375,
-    5.18408203125
+    1.08740234375,
+    2.041015625,
+    5.1162109375
   ]
 }
