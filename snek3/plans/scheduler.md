@@ -178,6 +178,14 @@ close-out's pid, written by the scheduler that holds its `Popen`), so a schedule
 for it instead of launching a second close-out over the same shard files. A restart is now safe at any
 point, as §6 claimed; the row above about the wave boundary being the tidy moment is history.
 
+Verified live the same evening: a b17 wave-2 arm on the desktop was `kill -9`ed at step 32.9M; the
+scheduler relaunched it 12 s later and the trainer resumed at 33.18M from `resume.pt`, the wave intact.
+**The one hazard seen was the migration itself**: a scheduler started before pass registration leaves no
+`.pass-` entry, so the scheduler that replaced it mid-stage-B launched a second close-out (killed within
+seconds; the shards rewrite their own files, so the overlap healed). Every scheduler now running writes the
+entry, so this cannot recur; if an old one is ever found mid-pass again, `echo <close-out pid> >
+runs/.live/.pass-<label>` before starting the new scheduler makes it adopt the pass.
+
 Still deliberate, and worth knowing: a `SIGTERM`ed scheduler leaves its last status standing with running
 lines (the staleness signal the user asked for), and a reopen request rewrites the status at once so the
 new window has its panels.
