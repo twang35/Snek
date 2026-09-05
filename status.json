@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T12:19:54",
-  "ts": 1788635994.2386513,
+  "iso": "2026-09-05T12:29:22",
+  "ts": 1788636562.1129885,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -17,7 +17,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl04, kl05 | stage B (8 arms)"
+      "b16 | kl04, kl05 | hof5000 (8 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl04, kl05 | queued (8 arms)",
@@ -26,7 +26,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T12:17:02"
+    "laptop_iso": "2026-09-05T12:25:34"
   },
   "scheduler": {
     "alive": true,
@@ -34,7 +34,7 @@
     "spawned": 1788635134.6781955,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-120534.log",
-    "status_iso": "2026-09-05T12:17:56"
+    "status_iso": "2026-09-05T12:27:57"
   },
   "runtime": {
     "max_trainers": 8,
@@ -484,6 +484,7 @@
     "deploy-20260905T185457Z": "done",
     "deploy-20260905T190437Z": "done",
     "deploy-20260905T190919Z": "done",
+    "deploy-20260905T192908Z": "done",
     "b15-hof30k-w2": "done",
     "b15aq-ent02-seed1": "done",
     "b15ar-ent02-seed2": "done",
@@ -674,10 +675,10 @@
     "b17-stageb-w2": "running"
   },
   "disk_free_gb": 123.7,
-  "head": "ec6e0dcc34e6",
+  "head": "e7f6f2c9cee2",
   "load_avg": [
-    16.27197265625,
-    11.09521484375,
-    10.0380859375
+    16.62158203125,
+    15.63525390625,
+    12.93896484375
   ]
 }
