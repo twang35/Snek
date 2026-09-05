@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T10:48:29",
-  "ts": 1788630509.6092782,
+  "iso": "2026-09-05T10:54:15",
+  "ts": 1788630855.4330413,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip015, clip03 -- wave 2 of 8 | training (8 arms)"
+      "b17 | clip015, clip03 -- wave 2 of 8 | training 11% (8 arms)"
     ],
     "queued": [
       "b17 evals | clip015, clip03 | queued (8 arms)",
@@ -34,7 +34,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T10:38:47"
+    "status_iso": "2026-09-05T10:48:47"
   },
   "runtime": {
     "max_trainers": 8,
@@ -59,7 +59,7 @@
       "policies": [
         "b17ai-clip015-seed1"
       ],
-      "step": null,
+      "step": 5636096,
       "max_steps": 50003968
     },
     {
@@ -69,7 +69,7 @@
       "policies": [
         "b17aj-clip015-seed2"
       ],
-      "step": null,
+      "step": 5373952,
       "max_steps": 50003968
     },
     {
@@ -79,7 +79,7 @@
       "policies": [
         "b17ak-clip015-seed3"
       ],
-      "step": null,
+      "step": 5292032,
       "max_steps": 50003968
     },
     {
@@ -89,7 +89,7 @@
       "policies": [
         "b17al-clip015-seed4"
       ],
-      "step": null,
+      "step": 5308416,
       "max_steps": 50003968
     },
     {
@@ -99,7 +99,7 @@
       "policies": [
         "b17am-clip03-seed1"
       ],
-      "step": null,
+      "step": 5324800,
       "max_steps": 50003968
     },
     {
@@ -109,7 +109,7 @@
       "policies": [
         "b17an-clip03-seed2"
       ],
-      "step": null,
+      "step": 5505024,
       "max_steps": 50003968
     },
     {
@@ -119,7 +119,7 @@
       "policies": [
         "b17ao-clip03-seed3"
       ],
-      "step": null,
+      "step": 5177344,
       "max_steps": 50003968
     },
     {
@@ -129,7 +129,7 @@
       "policies": [
         "b17ap-clip03-seed4"
       ],
-      "step": null,
+      "step": 5111808,
       "max_steps": 50003968
     }
   ],
@@ -542,6 +542,7 @@
     "restart-20260905T070759Z": "done",
     "b15-hof5000-w2": "done",
     "deploy-20260905T083350Z": "done",
+    "deploy-20260905T175401Z": "done",
     "b15-hof30k-w2": "done",
     "b15aq-ent02-seed1": "done",
     "b15ar-ent02-seed2": "done",
@@ -731,11 +732,11 @@
     "b17ao-clip03-seed3": "running",
     "b17ap-clip03-seed4": "running"
   },
-  "disk_free_gb": 124.8,
-  "head": "e297c1729b95",
+  "disk_free_gb": 124.7,
+  "head": "1ba444bd1f08",
   "load_avg": [
-    13.35498046875,
-    13.1787109375,
-    14.02392578125
+    13.64892578125,
+    13.56884765625,
+    13.93359375
   ]
 }
