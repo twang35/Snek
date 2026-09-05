@@ -1,7 +1,23 @@
-"""Run a batch of desktop specs on the laptop the way the desktop daemon would.
+"""Run a batch of desktop specs on the laptop the way the desktop daemon would -- or a queue of them.
 
     PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batch \\
-        logs/b13specs/ > logs/b13-batch.log 2>&1 &
+        logs/b13specs/ > logs/b13-batch.log 2>&1 &                       # one batch
+    PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batch \\
+        --queue logs/laptop-queue/ > logs/laptop-queue.log 2>&1 &         # every batch dropped in there
+
+**`--queue <dir>` is the laptop's queue, and it is not a daemon.** Each subdirectory of the queue
+directory is one batch -- its desktop specs, `git show`n in from `ops` -- and the driver runs the
+batches in name order, one at a time, each with its waves and its three passes. **Between batches it
+rescans the directory**, so a batch dropped in while another runs is picked up next, and when nothing
+in the directory has unfinished work it exits. Nothing polls while there is no work; queueing a batch
+is making a directory. Rerunning the same command is still the whole recovery.
+
+**A pass whose file every arm already has is skipped, not rerun.** `runs/<arm>_checkpoint_evals
+[_<label>].json` is the merged result of a pass, and a shard resumes only from its own shard files,
+which the merge deletes -- so before 2026-09-04 rerunning the driver on a finished wave would have
+re-measured its stage B from scratch. Now it skips to whatever pass is missing, which is also how a
+driver started before the hof passes existed fills them in: rerun it, the arms and stage B are
+skipped, hof5000 and hof30k run.
 
 **The same spec files, the same waves, the same stage B.** The arguments are the daemon's own
 `queue/pending/*.json` specs (files, or directories of them; `git show origin/ops:...` them onto the
@@ -127,6 +143,23 @@ def stage_b_label(batch, number):
 
 # ---------------------------------------------------------------- one arm
 
+def pass_file(policy, pass_name, runs_dir=None):
+    """The merged file a pass writes for an arm: `runs/<arm>_checkpoint_evals[_<label>].json`.
+
+    `tools.results.stage_b_path` spells the same path but is pinned to `constants.RUNS_DIR`, and the
+    driver takes a `runs_dir` so a test can run a batch in a temporary directory.
+    """
+    label = closeout.PASSES[pass_name]['label']
+    name = '{0}_checkpoint_evals{1}.json'.format(policy, '_' + label if label else '')
+    return os.path.join(runs_dir or constants.RUNS_DIR, name)
+
+
+def pass_done(arms, pass_name, runs_dir=None):
+    """Whether every arm of a wave already has the pass's merged file. An empty file counts: an arm
+    with no candidates gets one, and the next pass reads it and selects nothing."""
+    return all(os.path.exists(pass_file(spec['policy'], pass_name, runs_dir)) for spec in arms)
+
+
 def finished(spec, runs_dir=None):
     path = os.path.join(runs_dir or constants.RUNS_DIR, '{0}_evals.json'.format(spec['policy']))
     try:
@@ -221,6 +254,9 @@ class Driver(object):
             return 0
         code = 0
         for pass_name in self.passes:
+            if pass_done(arms, pass_name, self.runs_dir):
+                _log('wave {0}: {1} already has every arm\'s file; skipping'.format(number, pass_name))
+                continue
             code = self.run_pass(pass_name, number, arms)
             if code:
                 # The next pass selects from the file this one wrote; with the pass failed, running
@@ -246,6 +282,19 @@ class Driver(object):
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
         return code
 
+    def pending(self):
+        """Whether anything in this batch is still to do: an arm short of its cap, or a wave short of
+        a pass's file for any arm. What the queue asks before picking a batch, so a finished batch
+        left in the queue directory costs nothing."""
+        if not self.stage_b:
+            return any(not finished(spec, self.runs_dir) for spec in self.specs)
+        for arms in waves(self.specs, self.wave):
+            if any(not finished(spec, self.runs_dir) for spec in arms):
+                return True
+            if any(not pass_done(arms, pass_name, self.runs_dir) for pass_name in self.passes):
+                return True
+        return False
+
     def wait_for(self, pid):
         if pid is None:
             return
@@ -267,9 +316,68 @@ class Driver(object):
         return worst
 
 
+# ---------------------------------------------------------------- the queue
+
+def queue_batches(queue_dir):
+    """The batch directories under `queue_dir`, in name order. A file at the top level is not a batch;
+    a subdirectory with no training specs is skipped with a line saying so."""
+    batches = []
+    for name in sorted(os.listdir(queue_dir)):
+        path = os.path.join(queue_dir, name)
+        if not os.path.isdir(path):
+            continue
+        try:
+            specs = load_specs([path])
+        except ValueError as error:
+            _log('skipping {0}: {1}'.format(path, error))
+            continue
+        if not specs:
+            _log('skipping {0}: no training specs'.format(path))
+            continue
+        batches.append((name, specs))
+    return batches
+
+
+def run_queue(queue_dir, make_driver, after=None):
+    """Runs every batch under `queue_dir` that has work left, rescanning between batches.
+
+    `make_driver(specs)` builds the `Driver` for one batch, so the queue carries no launch settings of
+    its own. Returns the worst exit status of the batches it ran. Exits -- returns -- when a scan
+    finds nothing pending, which is what makes this a queue and not a daemon: it lives exactly as
+    long as there is work.
+    """
+    worst = 0
+    ran = set()
+    if after is not None:
+        make_driver([]).wait_for(after)
+    while True:
+        pending = [(name, specs) for name, specs in queue_batches(queue_dir)
+                   if make_driver(specs).pending()]
+        if not pending:
+            _log('queue {0}: nothing pending; exiting'.format(queue_dir))
+            return worst
+        name, specs = pending[0]
+        if name in ran:
+            # Ran it and it still reports work: a pass that failed, an arm that will not reach its
+            # cap. Looping on it would spin; leave it for a human and move on to what is behind it.
+            rest = [item for item in pending if item[0] not in ran]
+            if not rest:
+                _log('queue {0}: every pending batch has already run once and still has work left '
+                     '({1}); exiting'.format(queue_dir, ', '.join(sorted(ran))))
+                return worst or 1
+            name, specs = rest[0]
+        _log('queue {0}: {1} of {2} pending, starting {3}'.format(
+            queue_dir, len(pending), len(queue_batches(queue_dir)), name))
+        ran.add(name)
+        worst = max(worst, make_driver(specs).run() or 0)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    parser.add_argument('specs', nargs='+', help='desktop spec files, or directories of them')
+    parser.add_argument('specs', nargs='*', help='desktop spec files, or directories of them')
+    parser.add_argument('--queue', metavar='DIR', default=None,
+                        help='run every batch directory under DIR in name order, rescanning between '
+                             'batches; exits when none has work left')
     parser.add_argument('--wave', type=int, default=DEFAULT_WAVE, help='arms per wave')
     parser.add_argument('--shards', type=int, default=DEFAULT_SHARDS, help='stage-B shards')
     parser.add_argument('--max-trainers', type=int, default=DEFAULT_MAX_TRAINERS,
@@ -280,12 +388,20 @@ def main(argv=None):
     parser.add_argument('--after', type=int, default=None, metavar='PID',
                         help='start only once this process (another driver, a closeout) has exited')
     args = parser.parse_args(argv)
+    passes = closeout.CHAIN[:1] if args.no_hof else closeout.CHAIN
+
+    def make_driver(specs):
+        return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
+                      max_trainers=args.max_trainers, passes=passes)
+
+    if args.queue:
+        if args.specs:
+            parser.error('--queue takes the queue directory only; put the batches under it')
+        return run_queue(args.queue, make_driver, after=args.after)
     specs = load_specs(args.specs)
     if not specs:
         parser.error('no training specs found')
-    passes = closeout.CHAIN[:1] if args.no_hof else closeout.CHAIN
-    return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
-                  max_trainers=args.max_trainers, passes=passes).run(after=args.after)
+    return make_driver(specs).run(after=args.after)
 
 
 if __name__ == '__main__':

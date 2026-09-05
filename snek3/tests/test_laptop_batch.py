@@ -220,3 +220,139 @@ def test_after_holds_the_whole_batch_until_that_process_has_exited(box, monkeypa
     d.run(after=4242)
     assert slept == [laptop_batch.POLL_SECONDS] * 2      # one check logs the wait, two more poll it
     assert [e[0] for e in calls.events] == ['train']
+
+
+# ---------------------------------------------------------------- passes already on disk
+
+def _pass_files(runs, policies, *pass_names):
+    for policy in policies:
+        for pass_name in pass_names:
+            open(laptop_batch.pass_file(policy, pass_name, runs), 'w').write('{"rows": []}')
+
+
+def test_a_pass_every_arm_already_has_is_skipped_and_the_chain_continues(box):
+    """A shard resumes only from its own shard files and the merge deletes them, so rerunning a
+    finished wave's stage B would re-measure it from scratch. Skipping to the missing pass is also
+    how a driver that predates the hof passes fills them in on a rerun."""
+    specs = [spec('b14a-roll32-seed1'), spec('b14b-roll32-seed2')]
+    for s in specs:
+        with open(os.path.join(box['runs'], s['policy'] + '_evals.json'), 'w') as handle:
+            json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
+    _pass_files(box['runs'], [s['policy'] for s in specs], 'stageb')
+    calls = Calls()
+    assert driver(specs, box, calls, wave=2).run() == 0
+    assert [e[0] for e in calls.events] == ['hof5000', 'hof30k']
+
+
+def test_a_pass_one_arm_lacks_still_runs_over_the_whole_wave(box):
+    specs = [spec('b14a-roll32-seed1'), spec('b14b-roll32-seed2')]
+    _pass_files(box['runs'], ['b14a-roll32-seed1'], 'stageb')
+    calls = Calls()
+    driver(specs, box, calls, wave=2).run()
+    assert [e[0] for e in calls.events] == ['train', 'train'] + PASSES
+
+
+def test_pending_is_false_only_when_every_arm_is_capped_and_every_pass_filed(box):
+    specs = [spec('b14a-roll32-seed1'), spec('b14b-roll32-seed2')]
+    d = driver(specs, box, Calls(), wave=2)
+    assert d.pending()
+    for s in specs:
+        with open(os.path.join(box['runs'], s['policy'] + '_evals.json'), 'w') as handle:
+            json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
+    assert d.pending(), 'trained but not measured'
+    _pass_files(box['runs'], [s['policy'] for s in specs], 'stageb', 'hof5000')
+    assert d.pending(), 'hof30k still owed'
+    _pass_files(box['runs'], [s['policy'] for s in specs], 'hof30k')
+    assert not d.pending()
+
+
+# ---------------------------------------------------------------- the queue
+
+def _queue(tmp_path, batches):
+    q = tmp_path / 'queue'
+    for name, policies in batches.items():
+        write_specs(str(q / name), policies)
+    return str(q)
+
+
+def test_the_queue_runs_batches_in_name_order_and_exits_when_none_has_work(tmp_path, box):
+    q = _queue(tmp_path, {'b16': ['b16a-kl-seed1'], 'b14': ['b14a-roll-seed1', 'b14b-roll-seed2']})
+    calls = Calls()
+
+    def make(specs):
+        return driver(specs, box, calls, wave=8)
+    # every arm's `_evals.json` appears as it "trains", so the second scan sees the batch finished
+    real_popen = calls.popen
+
+    def popen(argv, **kwargs):
+        with open(os.path.join(box['runs'], argv[-1] + '_evals.json'), 'w') as handle:
+            json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
+        return real_popen(argv, **kwargs)
+    calls.popen = popen
+    orig_call = calls.call
+
+    def call(argv, **kwargs):
+        code = orig_call(argv, **kwargs)
+        pass_name = calls.events[-1][0]
+        _pass_files(box['runs'], calls.events[-1][1], pass_name)
+        return code
+    calls.call = call
+    assert laptop_batch.run_queue(q, make) == 0
+    trained = [e[1] for e in calls.events if e[0] == 'train']
+    assert trained == ['b14a-roll-seed1', 'b14b-roll-seed2', 'b16a-kl-seed1'], 'b14 before b16, by name'
+    assert [e[0] for e in calls.events] == ['train', 'train'] + PASSES + ['train'] + PASSES
+
+
+def test_a_batch_dropped_in_while_another_runs_is_picked_up_next(tmp_path, box):
+    q = _queue(tmp_path, {'b14': ['b14a-roll-seed1']})
+    calls = Calls()
+    state = {'dropped': False}
+
+    def popen(argv, **kwargs):
+        with open(os.path.join(box['runs'], argv[-1] + '_evals.json'), 'w') as handle:
+            json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
+        if not state['dropped']:
+            write_specs(os.path.join(q, 'b16'), ['b16a-kl-seed1'])   # arrives mid-batch
+            state['dropped'] = True
+        calls.pid += 1
+        calls.events.append(('train', argv[-1], kwargs['env']))
+        return FakeProcess(calls.pid)
+
+    def call(argv, **kwargs):
+        pass_name = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
+        end = argv.index('--pass') if '--pass' in argv else argv.index('--shards')
+        arms = tuple(argv[argv.index('tools.closeout') + 1:end])
+        calls.events.append((pass_name, arms, argv[-1]))
+        _pass_files(box['runs'], arms, pass_name)
+        return 0
+    calls.popen, calls.call = popen, call
+    laptop_batch.run_queue(q, lambda specs: driver(specs, box, calls, wave=8))
+    assert [e[1] for e in calls.events if e[0] == 'train'] == ['b14a-roll-seed1', 'b16a-kl-seed1']
+
+
+def test_a_batch_that_still_has_work_after_running_is_not_looped_on(tmp_path, box):
+    """A failed pass leaves the batch pending forever; the queue must not spin on it."""
+    q = _queue(tmp_path, {'b14': ['b14a-roll-seed1']})
+    calls = Calls(codes={'stageb': 1})
+    runs = []
+
+    def make(specs):
+        runs.append([s['policy'] for s in specs])
+        return driver(specs, box, calls, wave=8)
+    assert laptop_batch.run_queue(q, make) == 1
+    assert [e[0] for e in calls.events] == ['train', 'stageb'], 'ran once, then left alone'
+
+
+def test_a_finished_batch_left_in_the_queue_costs_nothing(tmp_path, box):
+    q = _queue(tmp_path, {'b13': ['b13a-mb-seed1']})
+    with open(os.path.join(box['runs'], 'b13a-mb-seed1_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
+    _pass_files(box['runs'], ['b13a-mb-seed1'], *PASSES)
+    calls = Calls()
+    assert laptop_batch.run_queue(q, lambda specs: driver(specs, box, calls, wave=8)) == 0
+    assert calls.events == []
+
+
+def test_queue_and_specs_are_exclusive_on_the_command_line(tmp_path):
+    with pytest.raises(SystemExit):
+        laptop_batch.main(['--queue', str(tmp_path), 'somefile.json'])

@@ -69,10 +69,32 @@ PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batc
     > logs/<batch>-batch.log 2>&1 &
 ```
 
-Rerunning the same command after a kill or a reboot is the recovery procedure. To queue a batch
-behind one already running here, add `--after <pid of the running driver>`: it starts when that
-process exits, stage B included, rather than launching trainers into the closeout. Then check the config
-of one arm per wave with the two greps above, as for any launch.
+Rerunning the same command after a kill or a reboot is the recovery procedure: finished arms are
+skipped, and so is any pass whose merged file every arm of the wave already has -- a shard resumes
+only from its own shard files and the merge deletes them, so without that skip a rerun would
+re-measure a finished wave's stage B from scratch. Then check the config of one arm per wave with the
+two greps above, as for any launch.
+
+### Queueing batches here: `--queue`, not a daemon
+
+```
+mkdir -p logs/laptop-queue/<batch> && for f in $(git ls-tree --name-only origin/ops snek3/desktop/queue/pending/ | grep '/<batch>[a-z]'); do
+    git show "origin/ops:$f" > logs/laptop-queue/<batch>/$(basename $f); done
+ps -Ao pid=,command= | grep '[l]aptop_batch' | grep -v 'zsh -c'      # a queue driver already up? then you are done
+PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.laptop_batch --queue logs/laptop-queue/ \
+    > logs/laptop-queue.log 2>&1 &                                       # only if none is
+```
+
+Each subdirectory of `logs/laptop-queue/` is a batch. The driver runs them in name order, one at a
+time with waves and all three passes, **rescans the directory between batches** so a batch dropped in
+while another runs is picked up next, and exits when nothing there has work left. So queueing a batch
+while the driver is up is just the first two lines; while it is down, all four. It is not a daemon:
+nothing runs while there is no work. A batch that still reports work after it has run once -- a failed
+pass -- is left alone rather than looped on, and the log says so.
+
+`--after <pid>` still works on either form and is the way to start the queue behind a driver that
+predates it: the running one keeps its batch, the queue starts when it exits, and a rerun of that
+batch's directory later fills in whatever passes the old driver did not run.
 
 ## Stage B
 
