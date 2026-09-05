@@ -1,6 +1,6 @@
 # Laptop Wi‑Fi: the stuck association, and the plan to stop it
 
-**Status: diagnosed 2026-09-04, fixes not yet tried.** The laptop's Wi‑Fi periodically drops into a state
+**Status: diagnosed 2026-09-04; TWT ruled out the same evening (the router does not advertise it); next step is the 6 GHz radio.** The laptop's Wi‑Fi periodically drops into a state
 where a quarter to a half of packets vanish, at strong signal, until Wi‑Fi is switched off and on. It
 happens every few hours, usually during heavy Claude Code plus training activity, and it is what a hung
 `git fetch`, a stalled `rsync` to the desktop and a timed-out auto-mode classifier all look like from
@@ -50,16 +50,41 @@ Each step is one change, then wait for the next occurrence (a few hours of norma
 
 | # | where | change | how to tell it worked |
 |---|---|---|---|
-| 1 | router | **disable Target Wake Time (TWT)** on the 5 GHz radio | no stuck state in a day of Claude Code + training |
-| 2 | router | move 5 GHz off channel 153 to **36–48** (one neighbour there instead of nine); fixed channel, not auto; 40 MHz if 80 still struggles | `system_profiler SPAirPortDataType` shows the new channel; router-side channel-busy drops |
-| 3 | router | disable **OFDMA**, then **band steering / 802.11k/v/r** if 1–2 did not end it | same as 1 |
+| ~~1~~ | router | ~~disable Target Wake Time (TWT)~~ **Already off** — the 5 GHz beacon's HE MAC capabilities advertise no TWT responder, requester, broadcast or flexible TWT (read 2026-09-04, method below). Not the cause | — |
+| 1 | laptop | **join the router's 6 GHz radio** (channel 69, 160 MHz, WPA3, the only 6 GHz network in range). The laptop's card (Broadcom 0x4388, Wi‑Fi 6E) supports it. Zero co-channel neighbours instead of nine, a different radio and channel, and if it is its own SSID, no band steering for the laptop. Same LAN, same subnet — `rsync`/`ssh`/mDNS to the desktop unchanged | `system_profiler SPAirPortDataType` shows `Channel: 69 (6GHz…)`; RSSI still better than ‑65 dBm at the desk; no stuck state in a day |
+| 2 | router | if staying on 5 GHz: move off channel 153 to **36–48** (one neighbour there instead of nine); fixed channel, not auto; 40 MHz if 80 still struggles | new channel in `system_profiler`; router-side channel-busy drops |
+| 3 | router | disable **OFDMA**, then **band steering / 802.11k/v/r** (the beacon carries an RM Enabled Capabilities element, so 802.11k is on) if 1–2 did not end it | same as 1 |
 | 4 | laptop | **watchdog**: a launchd job that pings the gateway every 30 s and cycles Wi‑Fi (`networksetup -setairportpower en0 off/on`) after ≥60 s of ≥40% loss while the interface reports `status: active`. Automates the manual fix; does not remove the cause | the log shows it firing and the outage lasting seconds, not until someone notices |
 | 5 | laptop | **wired**: a USB-C Ethernet adapter. Removes the problem outright and makes `rsync`/`ssh` to the desktop reliable | — |
 | 6 | laptop | **reduce the trigger**: run `laptop_batch` under `nice -n 10`, and keep trainers + eval workers ≤ cores − 2 (14 cores: 8 trainers + 8 workers is 16 pegged processes). Also `SNEK_EVAL_WORKERS` could drop to 6 | load average stays under ~14 during a batch; no swap growth |
 
-Recommendation: do 1 and 2 together at the router (both are cheap and reversible), and 4 regardless,
-since it is the only step that helps even if the cause turns out to be something else. 5 is the certain fix
-if the router has no TWT/OFDMA toggles.
+Recommendation: do 1 (6 GHz) first — it is a laptop-side change, reversible in a click, and it removes the
+channel contention outright. If the stuck state follows the laptop onto 6 GHz, the cause is the Mac ↔
+router 802.11ax negotiation rather than the channel, and 3 is next. Do 4 regardless, since it is the only step
+that helps even if the cause turns out to be something else. 5 is the certain fix if nothing else is.
+
+**6 GHz caveats.** Range and wall penetration are worse than 5 GHz; at ‑55 dBm on 5 GHz the desk is close
+enough, but check the 6 GHz RSSI after joining. If the router runs Smart Connect (one SSID across bands),
+the router chooses the band and the Mac cannot pin it — give the 6 GHz radio its own SSID so the laptop is
+pinned there; the desktop stays on 5 GHz. The bands are one bridged LAN inside the router, so the laptop
+keeps its 192.168.0.x address, the desktop reaches it the same way, and `the-claw-den` mDNS still resolves.
+
+## Reading what the router actually advertises
+
+The router's admin page says what is *configured*; the beacon says what clients are *offered*. The desktop
+has passwordless `sudo` and `wpa_cli`, so from the laptop:
+
+```
+ssh the-claw-den 'sudo -n wpa_cli -i wlp11s0 scan >/dev/null; sleep 4; sudo -n wpa_cli -i wlp11s0 bss 72:7f:f0:55:99:f3' \
+  | grep -E '^(freq|ie)='
+```
+
+Then decode the `ie=` hex: walk the elements (id, length, body); element 255 with extension id 35 is HE
+Capabilities, and its first body byte is HE MAC capabilities byte 0 — bit 1 TWT requester, bit 2 TWT
+responder; byte 2 bit 4 broadcast TWT. On 2026-09-04 that byte was `0x01`: **no TWT of any kind**, which
+matches the router UI. The same dump showed 802.11k (element 70) present, an EHT Operation element (Wi‑Fi 7),
+and BSS Load at 9 stations and 29–35% channel utilisation. The desktop's `wpa_cli` only listed the 5 GHz BSS,
+so the 6 GHz radio's beacon has to be read from the laptop (`sudo wdutil info` while joined to it).
 
 ## Diagnosing it next time, in one minute
 
