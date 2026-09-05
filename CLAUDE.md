@@ -74,17 +74,13 @@ The rules, all of them, and each is the scheduler's alone:
 | a stale window from a previous scheduler | killed at start, by the pid the previous scheduler wrote into `.status.json`, after checking that pid is still a `tools.chart_viewer` |
 | off | `SNEK_CHART_WINDOW=0` in the scheduler's environment; the daemon sets it from `runtime.json`'s `viewer` |
 
-**Why this and not what came before.** Until 2026-09-05 the window was opened by the *work*: every
-`train.py` and every `closeout.py` spawned a viewer and an `flock` in the viewer picked the survivor.
-The flock did stop the five-windows-at-once race of 2026-08-29, and it left every *lifecycle* question
-to N processes that each knew only about themselves — so each gap grew a rule: a pid watch with three
-negative checks, a "no chart yet" branch that forgot to watch (a window held the eval slot for 15 h,
-2026-09-03), a stand-by loop for a predecessor's closing grace (a pass ran an hour with no window,
-2026-09-04), a zombie check so a hand relaunch was not refused, a hand-relaunched window with no pid to
-watch that never closed. The process that knows what is running is the scheduler; the window is now
-its. The design and the incident list are [`snek3/plans/scheduler.md`](snek3/plans/scheduler.md);
-the mechanism is [`snek3/tools/window.py`](snek3/tools/window.py). **Do not give the window back to
-the arms, and do not add a second opener.**
+**Why the scheduler and not the work.** When each trainer and close-out opened its own viewer, N
+processes that each knew only about themselves could not answer the lifecycle questions — who closes it,
+who replaces it, whether one is already up — and every gap grew a rule. The process that knows what is
+running is the scheduler, so the window is its. The design and the incident list are
+[`snek3/plans/scheduler.md`](snek3/plans/scheduler.md); the mechanism is
+[`snek3/tools/window.py`](snek3/tools/window.py). **Do not give the window back to the arms, and do not
+add a second opener.**
 
 **The scheduler also starts the box's shared stage-A eval workers before each wave**, for the same
 reason: eight arms racing `ensure_workers` for six slots once produced seven slot-0 workers
@@ -230,13 +226,9 @@ The daemon sets `SNEK_RUNS_DIR` to that one constant directory for every job, an
 same constant, so the scheduler and its chart window on the box read the directory the arms write
 without any per-run setting. What this buys is that the box's checkout of master holds nothing under a
 path master tracks: the laptop can commit every chart and every closed batch's JSON and `git merge
---ff-only` on the box cannot refuse. Before this the box wrote into `snek3/runs/` and every committed
-chart collided with its untracked copy; `snek3/desktop/deploy` settled those per file, and on
-2026-09-03 alone that rule tore twice (37 snek3 JSONs, then 75 snek2 files it had never looked at).
-`deploy` still runs the merge and still settles anything left over from before the move, and still
-**stops with exit 3, touching nothing, if any JSON differs** — but with nothing new landing in
-`snek3/runs/` on the box, that is now history rather than the normal case. The `desktop-deploy` skill
-has the procedure, including the one-time move of the box's pre-existing files.
+--ff-only` on the box cannot refuse. `deploy` runs that merge, settles a tracked chart the box has
+changed, and **stops with exit 3, touching nothing, if any JSON differs**. The `desktop-deploy` skill has
+the procedure.
 
 **One implementation for both boxes, wherever the behaviour wanted is the same.** The two hosts
 differ in what they *have* — cores, a monitor, a queue — and almost never in what the code should
@@ -244,8 +236,7 @@ differ in what they *have* — cores, a monitor, a queue — and almost never in
 them gets forgotten. Where a difference is real, read it at runtime (probe the display, count the
 cores) rather than branching on which box you are; where a knob is wanted, make it one knob both
 sides honour. `tools/scheduler.py` runs both boxes' batches and `tools/window.py` opens both boxes' windows, and the
-sizing knobs are read in one place for exactly this reason — before that the eval window had drifted
-into parsing the environment for itself, and had stopped honouring one of the two knobs as a result.
+sizing knobs are read in one place for exactly this reason.
 **When you fix something on one box, check whether the other has its own copy of it, and if
 it does, delete the copy rather than fixing it twice.**
 

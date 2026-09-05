@@ -98,8 +98,8 @@ when its `_evals.json` has reached the cap, a pass when its merged file exists, 
 beside the ledger: the scheduler's pid and boot id, the queue it was started on, the ids it saw running
 and the ids it has published. **An id that leaves the scheduler's `running` list is published only if the
 files say it finished** — an arm at its cap in `_evals.json`, a pass with every arm's merged file, an eval
-spec with its `.done-`/`.failed-` marker (2026-09-05; before that, a scheduler dying mid-wave published its
-half-trained arms as results and their batch, every id now "published", left the queue for good). An
+spec with its `.done-`/`.failed-` marker — otherwise a scheduler dying mid-wave would publish half-trained
+arms as results and their batch, every id "published", would leave the queue for good. An
 unfinished one is forgotten and seen running again when the next scheduler resumes it. A reboot is
 detected by the boot id: the scheduler is gone, so the next
 poll starts a fresh one and every arm resumes from its checkpoint, every pass from its shard files. Old
@@ -141,8 +141,7 @@ alive. To put a running scheduler on a new value or new code: pause, wait until 
 ### The automatic chain: training → stage B → hof5000 → hof30k
 
 Every batch gets all three passes without anyone queueing them, and **the scheduler runs the chain**
-— on the laptop and on the box, the same code (`tools/scheduler.py`; before 2026-09-05 the daemon had
-its own copy, which minted the pass jobs into its ledger). A batch's arms run in waves of
+— on the laptop and on the box, the same code (`tools/scheduler.py`). A batch's arms run in waves of
 `max_trainers`; after each wave, `tools.closeout <arms> --pass stageb`, then `hof5000`, then `hof30k`
 over that wave's arms, with the ids `b15-stageb`, `b15-hof5000`, `b15-hof30k` for wave 1 and `-w2`,
 `-w3`, … after. An `eval` spec in the queue runs once, after the batch's waves, as the command it
@@ -251,9 +250,6 @@ sudo cp snek3/desktop/systemd/snek3-daemon.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now snek3-daemon
 ```
 
-The package, the unit, `~/.snek3-daemon/` and `SNEK_DAEMON_*` were all `runner` until 2026-09-05
-(`plans/rename-runner-to-daemon.md`).
-
 `host.env` is **not** in git — only the example is. It holds machine identity (paths, branches, the
 two `ops` locations) and the hard ceilings; everything tunable at runtime is in `runtime.json`
 instead.
@@ -295,13 +291,7 @@ was never the limit. `status.json` now carries `head`, the commit the box runs, 
 a deploy landed. A deploy that exits 3 (a differing JSON; nothing touched) is `failed` in the ledger and
 under `attention`, and is never retried: fix it and queue a new id.
 
-**The one-time bootstrap.** A daemon older than this change marks a `deploy` spec malformed (`failed`,
-unknown type) and the new code then never runs it, so the first daemon that understands actions has to
-be started the old way: `ssh the-claw-den 'Snek/snek3/desktop/deploy'` and then, by the user at the
-prompt, `ssh the-claw-den 'sudo systemctl restart snek3-daemon'`.
-
-By hand, the old way still works: `snek3/desktop/deploy` over ssh (a fast-forward that settles any
-leftover from before the move) plus `sudo systemctl restart snek3-daemon` when `desktop/daemon/*`
+By hand, if the bus is down: `snek3/desktop/deploy` over ssh (the same fast-forward) plus `sudo systemctl restart snek3-daemon` when `desktop/daemon/*`
 changed. Piping it to `tail` hides the failure and its exit code.
 
 ## Reach the box from outside the home LAN
@@ -353,7 +343,6 @@ runs as `claw` on the box.
 |---|---|
 | a required `project` field | `ops` holds ~150 retired snek2 specs whose `script` would resolve to a TensorFlow trainer that does not exist here |
 | one eval stage, not two | `training → closeout → HOF` becomes `training → stage B`, so the `auto_hof` hop, the `-hof` id handling and the legacy phase branch all go. **Partly reversed 2026-09-04:** the chain now runs hof5000 and hof30k after stage B — but as deeper *re-measures* of the same protocol's file, named passes of one close-out, not snek2's tiered selection with its own gates and episode counts |
-| `_ensure_viewer` shrinks from ~200 lines to ~50 | snek2 needed a process registry, an `O_EXCL` claim lock, a grace period, zombie detection and a dedupe because four peer trainers each tried to open one shared window knowing nothing about each other. One process starts the arms here, so one process starts the window |
 | `publish_results` reports its push, and `push_unpushed` retries | a failed push left the commit local while the ledger said `done` — **indistinguishable from a pass that legitimately found nothing.** It hid four 500-episode result files, one a 98.2% checkpoint, for hours |
 | a `failed` eval reaches `attention` | silently never retrying one cost snek2's batch 46 wave 1 its whole measurement |
 | no episode count or gate in the launcher | snek2's daemon carried five protocol numbers as a second copy of what `eval_plan.py` defines, and they drifted |
@@ -362,9 +351,6 @@ runs as `claw` on the box.
 Carried across unchanged, each also a documented incident rather than a preference:
 
 - **The wave barrier.** Trainings and evals never overlap, and nothing backfills until a wave drains.
-- **`EVAL_RELEVANT_ENV`.** A wave is keyed only on the settings that can reach a measurement of an
-  already-trained checkpoint — shaping and reward knobs, not seeds or learning rates. Keying on the
-  whole inherited env once split one batch into three waves of 2/1/1 arms.
 - **`trigger`.** One ssh round trip that forces a fetch, a dispatch and a publish, and reports whether
   the daemon is polling at all — so one command both starts queued work and answers "did it start?".
   Exit 0 healthy, 2 not polling, 1 unreachable.
