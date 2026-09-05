@@ -1,15 +1,20 @@
 {
-  "iso": "2026-09-05T13:59:31",
-  "ts": 1788641971.262863,
+  "iso": "2026-09-05T14:01:00",
+  "ts": 1788642060.6507037,
   "project": "snek3",
   "at_a_glance": {
-    "running": [],
+    "running": [
+      "b17 | clip04, clipanneal -- wave 3 of 8 | training 61% (8 arms) | ~35m left"
+    ],
     "queued": [
-      "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... (48 arms)",
-      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms)"
+      "b17 evals | clip04, clipanneal (8 arms) | ~1.1h",
+      "b17 training | clip01anneal, lranneal, lranneal10, bothanneal, clipanneal2to1, clip04anneal,... (40 arms) | ~6.5h",
+      "b17 evals | clip01anneal, lranneal, lranneal10, bothanneal, clipanneal2to1, clip04anneal,... (40 arms) | ~5.3h",
+      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms) | ~4.1h",
+      "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 (24 arms) | ~3.2h"
     ],
     "attention": [],
-    "remaining": null,
+    "remaining": "~21h of work: 35m running + 20h queued; clear ~Sun 10:46",
     "laptop_running": [
       "b19 | noadvnorm, mse -- wave 1 of 3 | training 87% (8 arms) | ~12m left"
     ],
@@ -31,7 +36,7 @@
     "spawned": 1788641970.9263482,
     "last_exit": null,
     "log": "/home/claw/.snek3-daemon/logs/scheduler-20260905-135930.log",
-    "status_iso": "2026-09-05T13:50:34"
+    "status_iso": "2026-09-05T13:59:36"
   },
   "runtime": {
     "max_trainers": 8,
@@ -48,7 +53,96 @@
     "viewer": true
   },
   "config_notes": [],
-  "running": [],
+  "running": [
+    {
+      "id": "b17aq-clip04-seed1",
+      "type": "train",
+      "policy": "b17aq-clip04-seed1",
+      "policies": [
+        "b17aq-clip04-seed1"
+      ],
+      "step": 32096256,
+      "max_steps": 50003968,
+      "eta_seconds": 1622.6348046972334
+    },
+    {
+      "id": "b17ar-clip04-seed2",
+      "type": "train",
+      "policy": "b17ar-clip04-seed2",
+      "policies": [
+        "b17ar-clip04-seed2"
+      ],
+      "step": 31735808,
+      "max_steps": 50003968,
+      "eta_seconds": 1653.2194939360752
+    },
+    {
+      "id": "b17as-clip04-seed3",
+      "type": "train",
+      "policy": "b17as-clip04-seed3",
+      "policies": [
+        "b17as-clip04-seed3"
+      ],
+      "step": 30408704,
+      "max_steps": 50003968,
+      "eta_seconds": 1885.1884796732877
+    },
+    {
+      "id": "b17at-clip04-seed4",
+      "type": "train",
+      "policy": "b17at-clip04-seed4",
+      "policies": [
+        "b17at-clip04-seed4"
+      ],
+      "step": 30343168,
+      "max_steps": 50003968,
+      "eta_seconds": 1936.334985815993
+    },
+    {
+      "id": "b17au-clipanneal-seed1",
+      "type": "train",
+      "policy": "b17au-clipanneal-seed1",
+      "policies": [
+        "b17au-clipanneal-seed1"
+      ],
+      "step": 30031872,
+      "max_steps": 50003968,
+      "eta_seconds": 1937.931279435363
+    },
+    {
+      "id": "b17av-clipanneal-seed2",
+      "type": "train",
+      "policy": "b17av-clipanneal-seed2",
+      "policies": [
+        "b17av-clipanneal-seed2"
+      ],
+      "step": 30146560,
+      "max_steps": 50003968,
+      "eta_seconds": 1907.92177630087
+    },
+    {
+      "id": "b17aw-clipanneal-seed3",
+      "type": "train",
+      "policy": "b17aw-clipanneal-seed3",
+      "policies": [
+        "b17aw-clipanneal-seed3"
+      ],
+      "step": 29425664,
+      "max_steps": 50003968,
+      "eta_seconds": 2092.789940885721
+    },
+    {
+      "id": "b17ax-clipanneal-seed4",
+      "type": "train",
+      "policy": "b17ax-clipanneal-seed4",
+      "policies": [
+        "b17ax-clipanneal-seed4"
+      ],
+      "step": 29818880,
+      "max_steps": 50003968,
+      "eta_seconds": 1991.854537637807
+    }
+  ],
   "ledger": {
     "b1b-baseline-seed2": "done",
     "b1c-baseline-seed3": "done",
@@ -628,8 +722,8 @@
   "disk_free_gb": 122.8,
   "head": "b3a99bd4acb7",
   "load_avg": [
-    13.31201171875,
-    13.70361328125,
-    13.736328125
+    13.94287109375,
+    13.822265625,
+    13.77587890625
   ]
 }
