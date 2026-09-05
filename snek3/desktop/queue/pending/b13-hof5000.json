@@ -42,6 +42,6 @@
     "hof5000"
   ],
   "priority": 9,
-  "label": "b13 hof eval: 680 checkpoints >=99/500 from 30 arms at 5,000, then those >=99 at 30,000 (seed 7)",
+  "label": "hof eval: 680 checkpoints >=99/500 from 30 arms, at 5,000 then 30,000 (seed 7)",
   "notes": "Ten times the depth on every b13 checkpoint that cleared 99%/500 in the close-out: 680 rows across the 30 arms that have any. the minibatch sweep, 32 arms, trained and stage-B measured on the laptop; the 680 candidate checkpoints, each arm's arch.json and its stage-B and stage-A files were rsynced here on 2026-09-04. above:99 reads each arm's own stage-B file, so one wave covers every arm. Labelled hof5000 so the 500-episode pass is untouched. Ranks candidates, promotes nothing -- a hallOfFame/ copy is a separate deliberate step. Hand-queued 2026-09-04 because this batch's stage B finished before the daemon chained hof5000 and hof30k automatically; the explicit selector/episodes/label spelling is what the box's current code accepts (--pass hof5000 is the shorthand after the next deploy). ~3.4M episodes, ~26 min at 16 shards. b13-hof30k (priority 10) follows it and reads this pass's files."
 }
