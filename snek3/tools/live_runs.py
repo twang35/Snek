@@ -21,7 +21,7 @@ self-evidently dead rather than merely old.
 
 **The chart window no longer reads this directory** (2026-09-05). It follows `.status.json` here, which
 the scheduler writes — see `tools/window.py` for why the owner of the window is the scheduler and not
-the arms. The dot-files -- `.status.json`, `.reopen-window`, `.paused`, `.pass-<label>` -- are the scheduler's;
+the arms. The dot-files -- `.status.json`, `.reopen-window`, `.republish`, `.paused`, `.pass-<label>` -- are the scheduler's;
 `live()` skips anything starting with a dot.
 
 Best-effort throughout: this directory is a convenience, and **no failure here is worth a training
@@ -41,6 +41,9 @@ DIR_NAME = '.live'
 STATUS_NAME = '.status.json'
 # Dropped by `tools.scheduler --reopen-window`; the scheduler unlinks it and replaces its viewer.
 REOPEN_NAME = '.reopen-window'
+# Dropped by `tools.scheduler --republish`; the scheduler unlinks it and publishes its status at once
+# instead of at its next event or ten-minute refresh (a moved batch shows up within a poll).
+REPUBLISH_NAME = '.republish'
 # While this exists the scheduler launches nothing new: the desktop daemon writes it for
 # `runtime.json`'s `paused`/`drain`, a human touches it on the laptop. What is running finishes.
 HOLD_NAME = '.paused'
@@ -75,6 +78,28 @@ def status_path(runs_dir=None):
 
 def reopen_path(runs_dir=None):
     return os.path.join(directory(runs_dir), REOPEN_NAME)
+
+
+def republish_path(runs_dir=None):
+    return os.path.join(directory(runs_dir), REPUBLISH_NAME)
+
+
+def request_republish(runs_dir=None):
+    """`python -m tools.scheduler --republish`: asks the running scheduler to publish its status now."""
+    path = republish_path(runs_dir)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as handle:
+        handle.write('{0}\n'.format(os.getpid()))
+    return path
+
+
+def take_republish(runs_dir=None):
+    """Consumes a republish request if one is waiting. The unlink is the test, as for the reopen."""
+    try:
+        os.unlink(republish_path(runs_dir))
+    except OSError:
+        return False
+    return True
 
 
 def hold_path(runs_dir=None):

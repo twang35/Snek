@@ -1083,3 +1083,32 @@ def test_a_running_pass_says_what_is_left_of_it_and_a_queued_arm_is_estimated_at
     arm = [job for job in queued if job['id'] == todo['policy']][0]
     assert arm['wave'] == 2 and arm['eta_seconds'] == 1000.0                 # 100 steps at 0.1 steps/s
     assert [job['eta_seconds'] for job in queued if job['id'] == 'b13-stageb-w2'] == [400.0]
+
+
+def test_a_republish_request_publishes_at_the_next_poll_and_is_consumed(box, tmp_path):
+    """`tools.scheduler --republish` drops a file; the waiting driver publishes when it next polls and
+    unlinks the request, so one request is one publish -- a moved batch shows within a poll, not in
+    ten minutes (user, 2026-09-05)."""
+    published = Published()
+    calls = Calls()
+    real_popen = calls.popen
+    polls = {'n': 0}
+
+    def popen(argv, **kw):
+        real_popen(argv, **kw)
+        return FakeProcess(1, polls=4)
+    calls.popen = popen
+    d = driver([spec('b13aa-mb32-seed1')], box, calls, wave=1, stage_b=False,
+               reporter=scheduler.Reporter(published, runs_dir=box['runs']))
+    original_tick = d._tick
+
+    def tick():
+        polls['n'] += 1
+        if polls['n'] == 2:
+            live_runs.request_republish(box['runs'])
+        original_tick()
+    d._tick = tick
+    d.run()
+    assert len(published.statuses) == 3, 'launch, the republish tick, exit -- one publish per request'
+    assert not os.path.exists(live_runs.republish_path(box['runs'])), 'consumed'
+    assert scheduler.build_parser().parse_args(['--republish']).republish

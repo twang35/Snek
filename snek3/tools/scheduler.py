@@ -4,6 +4,7 @@ and owns the box's chart window and its shared eval workers. One implementation 
     PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.scheduler \\
         --queue logs/laptop-queue/ > logs/laptop-queue.log 2>&1 &         # every batch dropped in there
     PYTHONPATH=. python -m tools.scheduler --reopen-window                 # a fresh chart window, now
+    PYTHONPATH=. python -m tools.scheduler --republish                     # its status on the branch, now
 
 **`--queue <dir>` is the box's queue, and it is not a daemon.** Each subdirectory of the queue
 directory is one batch -- desktop-format specs, `git show`n in from `ops` on the laptop, materialised
@@ -55,8 +56,9 @@ Before each launch the scheduler waits until the box's live trainer count is bel
 
 **What it is doing is published** through `tools/laptop_status.py`: the local status file on every
 event, and the `laptop-status` branch too unless `--no-status` -- the daemon's own `at_a_glance` shape,
-rebuilt on every launch, exit, pass start and end, every ten minutes while waiting, and once more,
-empty, when the scheduler exits.
+rebuilt on every launch, exit, pass start and end, every ten minutes while waiting, on a `--republish`
+request (a `runs/.live/.republish` file, consumed at the next 20-second poll -- for a batch just moved
+between the boxes), and once more, empty, when the scheduler exits.
 """
 
 import argparse
@@ -479,6 +481,9 @@ class Driver(object):
         a window reopen request, and reaps exited workers so none stays a zombie."""
         if self.window is not None and self.window.poll():
             self._report()          # a fresh window reads its panels from the file; write it now
+        elif live_runs.take_republish(self.runs_dir):
+            _log('republish requested; publishing the status now')
+            self._report()
         self.workers = eval_queue.reap(self.workers)
         if self.reporter is not None and self.clock() - self._last_report >= laptop_status.REPUBLISH_SECONDS:
             self._report()
@@ -923,6 +928,8 @@ def build_parser():
                         help='do not publish what is running to the laptop-status branch')
     parser.add_argument('--reopen-window', action='store_true',
                         help='ask the running scheduler for a fresh chart window, then exit')
+    parser.add_argument('--republish', action='store_true',
+                        help='ask the running scheduler to publish its status now, then exit')
     return parser
 
 
@@ -932,6 +939,10 @@ def main(argv=None):
     if args.reopen_window:
         path = window_module.request_reopen()
         print('reopen requested ({0}); the scheduler replaces its window at its next poll'.format(path))
+        return 0
+    if args.republish:
+        path = live_runs.request_republish()
+        print('republish requested ({0}); the scheduler publishes at its next poll ({1} s)'.format(path, POLL_SECONDS))
         return 0
     # Everything the arguments can refuse is refused here, before a single side effect: nothing below
     # this line may run for an invocation that is going to exit on its arguments.
