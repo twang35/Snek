@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T14:08:26",
-  "ts": 1788642506.017637,
+  "iso": "2026-09-05T14:08:29",
+  "ts": 1788642509.815861,
   "box": "laptop",
   "project": "snek3",
   "pid": 64756,
   "at_a_glance": {
     "running": [
-      "b19 | mse -- wave 1 of 3 | training 100% (3 arms) | ~<1m left"
+      "b19 | mse -- wave 1 of 3 | training 100% (2 arms) | ~<1m left"
     ],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
@@ -21,17 +21,6 @@
     "remaining": "~19h of work: <1m running + 19h queued; clear ~Sun 09:31"
   },
   "running": [
-    {
-      "id": "b19f-mse-seed2",
-      "type": "train",
-      "policy": "b19f-mse-seed2",
-      "policies": [
-        "b19f-mse-seed2"
-      ],
-      "step": 50003968,
-      "max_steps": 50003968,
-      "eta_seconds": 0.0
-    },
     {
       "id": "b19g-mse-seed3",
       "type": "train",
@@ -50,9 +39,9 @@
       "policies": [
         "b19h-mse-seed4"
       ],
-      "step": 49971200,
+      "step": 50003968,
       "max_steps": 50003968,
-      "eta_seconds": 3.1801508663621543
+      "eta_seconds": 0.0
     }
   ],
   "queued_ids": [
