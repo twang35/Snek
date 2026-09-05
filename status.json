@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T08:05:07",
-  "ts": 1788620707.9814477,
+  "iso": "2026-09-05T08:15:14",
+  "ts": 1788621314.101729,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | entanneal01, entanneal01to0 | stage B (8 arms)"
+      "b15 | entanneal01, entanneal01to0 | hof5000 (8 arms)"
     ],
     "queued": [
       "b15 evals | entanneal01, entanneal01to0 | queued (8 arms)",
@@ -17,7 +17,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl02, kl03 -- wave 4 of 5 | training 48% (8 arms)"
+      "b16 | kl02, kl03 -- wave 4 of 5 | training 60% (8 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl02, kl03 | queued (8 arms)",
@@ -28,7 +28,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T08:00:11"
+    "laptop_iso": "2026-09-05T08:10:17"
   },
   "scheduler": {
     "alive": true,
@@ -36,7 +36,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T08:01:01"
+    "status_iso": "2026-09-05T08:15:02"
   },
   "runtime": {
     "max_trainers": 8,
@@ -55,7 +55,7 @@
   "config_notes": [],
   "running": [
     {
-      "id": "b15-stageb-w5",
+      "id": "b15-hof5000-w5",
       "type": "eval",
       "policy": "b15bg-entanneal01-seed1",
       "policies": [
@@ -512,7 +512,7 @@
     "b15bl-entanneal01to0-seed2": "done",
     "b15bm-entanneal01to0-seed3": "done",
     "b15bn-entanneal01to0-seed4": "done",
-    "b15-hof5000-w5": "queued",
+    "b15-stageb-w5": "done",
     "b15-hof30k-w5": "queued",
     "b17aa-clip005-seed1": "queued",
     "b17ab-clip005-seed2": "queued",
@@ -668,13 +668,13 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b15-stageb-w5": "running"
+    "b15-hof5000-w5": "running"
   },
-  "disk_free_gb": 126.4,
+  "disk_free_gb": 126.3,
   "head": "e297c1729b95",
   "load_avg": [
-    15.89306640625,
-    15.9462890625,
-    15.78662109375
+    12.564453125,
+    15.2490234375,
+    15.68310546875
   ]
 }
