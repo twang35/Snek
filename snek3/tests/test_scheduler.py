@@ -47,15 +47,26 @@ class FakeProcess(object):
 
 
 class Calls(object):
-    """Records every launch and every close-out call in order, the close-outs by pass name."""
+    """Records every launch and every close-out call in order, the close-outs by pass name.
+
+    A launched arm *finishes*: its `_evals.json` lands at the cap as the fake process exits, because an
+    arm that exits short of its cap is relaunched by the driver (2026-09-05) and a fixture that wants
+    that case says so (`CrashingCalls`)."""
 
     def __init__(self, codes=None):
         self.events, self.pid, self.codes = [], 1000, codes or {}
 
-    def popen(self, argv, **kwargs):
+    def record(self, argv, **kwargs):
         self.pid += 1
         self.events.append(('train', argv[-1], kwargs['env']))
         return FakeProcess(self.pid)
+
+    def popen(self, argv, **kwargs):
+        runs = kwargs['env'].get('SNEK_RUNS_DIR') or _RUNS.get('dir')
+        if runs:
+            with open(os.path.join(runs, argv[-1] + '_evals.json'), 'w') as handle:
+                json.dump({'summary': {'step': int(kwargs['env']['SNEK_MAX_STEPS'])}}, handle)
+        return self.record(argv, **kwargs)
 
     def call(self, argv, **kwargs):
         pass_name = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
@@ -66,6 +77,7 @@ class Calls(object):
 
 
 PASSES = ['stageb', 'hof5000', 'hof30k']
+_RUNS = {}      # the current test's runs dir, for `Calls.popen`; set by the `box` fixture
 
 
 @pytest.fixture
@@ -73,7 +85,9 @@ def box(tmp_path):
     runs = tmp_path / 'runs'
     runs.mkdir()
     logs = tmp_path / 'logs'
-    return {'runs': str(runs), 'logs': str(logs)}
+    _RUNS['dir'] = str(runs)
+    yield {'runs': str(runs), 'logs': str(logs)}
+    _RUNS.pop('dir', None)
 
 
 def no_workers(count, runs_dir=None):
@@ -153,7 +167,7 @@ def test_a_failed_pass_stops_the_chain_for_that_wave(box):
     assert [e[0] for e in calls.events] == ['train', 'train', 'stageb']
     calls = Calls(codes={'hof5000': 2})
     assert driver(specs, box, calls, wave=2).run() == 2
-    assert [e[0] for e in calls.events] == ['train', 'train', 'stageb', 'hof5000']
+    assert [e[0] for e in calls.events] == ['stageb', 'hof5000'], 'the arms are at their cap from the first run'
 
 
 def test_a_hold_marker_delays_every_launch_and_lifting_it_resumes(box):
@@ -224,7 +238,10 @@ def test_an_arm_already_live_on_the_box_is_waited_for_not_relaunched(box, monkey
 
     def alive(pid):
         ticks['n'] += 1
-        return pid == os.getpid() and ticks['n'] < 4         # "finishes" after a few polls
+        if ticks['n'] >= 4:                                   # "finishes" after a few polls, at its cap
+            with open(os.path.join(box['runs'], 'b13aa-mb32-seed1_evals.json'), 'w') as handle:
+                json.dump({'summary': {'step': 50003968}}, handle)
+        return pid == os.getpid() and ticks['n'] < 4
 
     monkeypatch.setattr(live_runs, 'alive', alive)
     calls = Calls()
@@ -488,7 +505,15 @@ def test_a_waiting_driver_republishes_every_ten_minutes_so_the_percent_moves(box
         clock['now'] += 400.0
 
     calls = Calls()
-    slow = FakeProcess(1, polls=3)
+
+    class Slow(FakeProcess):
+        def poll(self):
+            code = FakeProcess.poll(self)
+            if code is not None:                                 # reaches its cap as it exits
+                with open(os.path.join(box['runs'], 'b1a-x-seed1_evals.json'), 'w') as handle:
+                    json.dump({'summary': {'step': 100}}, handle)
+            return code
+    slow = Slow(1, polls=3)
     calls.popen = lambda argv, **kwargs: slow
     published = Published()
     d = scheduler.Driver([_spec('b1a-x-seed1', 'b1: x')], runs_dir=box['runs'], logs_dir=box['logs'],
@@ -826,3 +851,73 @@ def test_a_running_pass_is_registered_under_its_label_and_cleared_after(box):
     assert d.run() == 0
     assert registered == [['.pass-b13-stageb'], ['.pass-b13-hof5000'], ['.pass-b13-hof30k']]
     assert not any(name.startswith('.pass-') for name in os.listdir(live_runs.directory(box['runs'])))
+
+
+# ---------------------------------------------------------------- an arm that exits short of its cap
+
+class CrashingCalls(FinishingCalls):
+    """The named arm exits `crashes` times without reaching its cap (its evals file stays at a low
+    step), then finishes like the others."""
+
+    def __init__(self, runs, crashes, codes=None):
+        FinishingCalls.__init__(self, runs, codes)
+        self.crashes = dict(crashes)
+
+    def popen(self, argv, **kwargs):
+        policy = argv[-1]
+        if self.crashes.get(policy, 0) > 0:
+            self.crashes[policy] -= 1
+            with open(os.path.join(self.runs, policy + '_evals.json'), 'w') as handle:
+                json.dump({'summary': {'step': 1234}}, handle)
+            return self.record(argv, **kwargs)
+        return FinishingCalls.popen(self, argv, **kwargs)
+
+
+def test_an_arm_that_exits_short_of_its_cap_is_relaunched_in_its_wave_before_the_passes(box):
+    specs = [spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')]
+    calls = CrashingCalls(box['runs'], {'b13ab-mb32-seed2': 2})
+    d = driver(specs, box, calls, wave=2)
+    assert d.run() == 0
+    launches = [e[1] for e in calls.events if e[0] == 'train']
+    assert launches == ['b13aa-mb32-seed1', 'b13ab-mb32-seed2', 'b13ab-mb32-seed2', 'b13ab-mb32-seed2']
+    assert [e[0] for e in calls.events][-3:] == PASSES, 'stage B only after the arm reached its cap'
+    assert d.unfinished == [] and d.attention() == []
+
+
+def test_relaunches_are_bounded_and_the_wave_says_so(box):
+    specs = [spec('b13aa-mb32-seed1')]
+    calls = CrashingCalls(box['runs'], {'b13aa-mb32-seed1': 99})
+    d = driver(specs, box, calls, wave=1)
+    d.run()
+    assert [e[0] for e in calls.events].count('train') == 1 + scheduler.MAX_ARM_RELAUNCHES
+    assert d.unfinished == ['b13aa-mb32-seed1']
+    assert 'exited short of its cap' in d.attention()[0]
+    assert [e[0] for e in calls.events][-3:] == PASSES, 'the wave still gets its passes'
+
+
+def test_a_relaunch_waits_out_a_pause_so_kill_deploy_unpause_resumes_the_arms(box):
+    specs = [spec('b13aa-mb32-seed1')]
+    calls = CrashingCalls(box['runs'], {'b13aa-mb32-seed1': 1})
+    os.makedirs(live_runs.directory(box['runs']), exist_ok=True)
+    hold = live_runs.hold_path(box['runs'])
+    state = {'sleeps': 0}
+
+    def sleep(seconds):
+        state['sleeps'] += 1
+        if state['sleeps'] == 3:
+            os.remove(hold)                         # the deploy is done; unpause
+    launched_while_held = []
+    orig_popen = calls.popen
+
+    def popen(argv, **kwargs):
+        # the first launch happens unpaused; the crash lands while paused (as a deploy would arrange)
+        launched_while_held.append(os.path.exists(hold))
+        process = orig_popen(argv, **kwargs)
+        if len(launched_while_held) == 1:
+            open(hold, 'w').close()
+        return process
+    d = scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=popen,
+                         call=calls.call, sleep=sleep, python='py', ensure_workers=no_workers, wave=1)
+    assert d.run() == 0
+    assert launched_while_held == [False, False], 'the relaunch waited for the hold to lift'
+    assert state['sleeps'] >= 3

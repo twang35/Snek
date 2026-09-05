@@ -16,8 +16,9 @@ directory. Rerunning the same command is still the whole recovery.
 
 **State is the filesystem.** An arm is finished when its `runs/<arm>_evals.json` reports `max_steps`;
 a pass is done when its merged `runs/<arm>_checkpoint_evals[_<label>].json` exists for every arm of
-the wave; an arm already live on this box (`runs/.live/`, written by the trainer) is waited for rather
-than relaunched, and so is a pass a previous scheduler left running (`runs/.live/.pass-<label>`, written
+the wave; an arm that exits short of its cap is relaunched inside its wave (it resumes from its own
+`resume.pt`), three times at most; an arm already live on this box (`runs/.live/`, written by the
+trainer) is waited for rather than relaunched, and so is a pass a previous scheduler left running (`runs/.live/.pass-<label>`, written
 by that scheduler); a pass that failed is marked `.failed-<label>` in the batch directory so the queue
 does not loop on it (delete the marker to retry). Nothing else is remembered, which is why a kill, a
 reboot or a deploy costs nothing but a rerun.
@@ -84,6 +85,10 @@ DEFAULT_MAX_TRAINERS = 8
 # in `desktop/config/runtime.json`, 16 on 16 threads.
 DEFAULT_SHARDS = 12
 POLL_SECONDS = 20
+# An arm that exits short of its cap is relaunched inside its wave -- it resumes from `resume.pt` --
+# this many times before the wave gives up on it and says so. Bounded, so a trainer that dies on
+# start (a bad knob, a missing file) costs three launches and an attention line, never a loop.
+MAX_ARM_RELAUNCHES = 3
 
 
 def _log(message):
@@ -348,6 +353,7 @@ class Driver(object):
         self.reporter, self.clock = reporter, clock
         self.live, self.active_pass, self.active_eval = [], None, None
         self.panels = []
+        self.unfinished = []            # arms that exited short of their cap after every relaunch
         self._last_report = 0.0
         # The box's window and its shared eval workers, both owned here. `window` is a
         # `window_module.Window` or None (tests, `SNEK_CHART_WINDOW=0` is handled inside it).
@@ -402,6 +408,9 @@ class Driver(object):
             if spec.get('_dir') and marked(spec['_dir'], 'failed-' + spec['id']):
                 lines.append('** {0} failed and is not retried; delete {1} to retry'.format(
                     spec['id'], marker(spec['_dir'], 'failed-' + spec['id'])))
+        for policy in self.unfinished:
+            lines.append('** {0} exited short of its cap {1} times in a row; its wave went on without it. '
+                         'A rerun of the scheduler resumes it'.format(policy, MAX_ARM_RELAUNCHES + 1))
         return lines
 
     def _pass_failed(self, arms, pass_name, number):
@@ -515,13 +524,11 @@ class Driver(object):
         for spec, process in started:
             code = self._wait_process(process)
             _log('{0} exited {1}'.format(spec['policy'], code))
-            self.live = [item for item in self.live if item[0]['policy'] != spec['policy']]
-            self._report()
+            self._settle(spec)
         for spec, pid in adopted:
             self._wait_pid(pid)
-            _log('{0} (pid {1}) finished'.format(spec['policy'], pid))
-            self.live = [item for item in self.live if item[0]['policy'] != spec['policy']]
-            self._report()
+            _log('{0} (pid {1}) exited'.format(spec['policy'], pid))
+            self._settle(spec)
         if not self.stage_b:
             return 0
         code = 0
@@ -544,6 +551,33 @@ class Driver(object):
                          'exit {0}'.format(code))
                 break
         return code
+
+    def _settle(self, spec):
+        """An arm has exited. If it is short of its cap it is relaunched -- it resumes from its own
+        `resume.pt` -- up to `MAX_ARM_RELAUNCHES` times, waiting out a pause first so that "pause, kill
+        the arms, deploy, unpause" resumes them on the new code. Before 2026-09-05 an arm that died was
+        left for the next scheduler, and this wave's stage B then measured a half-trained arm whose
+        finished self never got one (the pass files already existed)."""
+        attempts = 0
+        while not finished(spec, self.runs_dir) and attempts < MAX_ARM_RELAUNCHES:
+            attempts += 1
+            _log('{0} is at step {1} of {2}; relaunching (attempt {3} of {4})'.format(
+                spec['policy'], current_step(spec, self.runs_dir), spec['max_steps'], attempts,
+                MAX_ARM_RELAUNCHES))
+            self._wait_while_held('relaunch of {0}'.format(spec['policy']))
+            self._start_workers([spec])
+            process = self._launch(spec)
+            self.live = [item for item in self.live if item[0]['policy'] != spec['policy']] + [(spec, process.pid)]
+            self._show(self.panels)
+            self._report()
+            code = self._wait_process(process)
+            _log('{0} exited {1}'.format(spec['policy'], code))
+        if not finished(spec, self.runs_dir):
+            _log('** {0} exited short of its cap after {1} relaunches; the wave goes on without it'.format(
+                spec['policy'], MAX_ARM_RELAUNCHES))
+            self.unfinished.append(spec['policy'])
+        self.live = [item for item in self.live if item[0]['policy'] != spec['policy']]
+        self._report()
 
     def run_pass(self, pass_name, number, arms):
         """One pass of the chain over a wave's arms, as one `tools.closeout` -- the daemon's command."""
