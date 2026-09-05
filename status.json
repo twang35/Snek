@@ -1,13 +1,15 @@
 {
-  "iso": "2026-09-05T15:16:20",
-  "ts": 1788646580.088463,
+  "iso": "2026-09-05T15:16:24",
+  "ts": 1788646584.018414,
   "box": "laptop",
   "project": "snek3",
   "pid": 64756,
   "at_a_glance": {
-    "running": [],
+    "running": [
+      "b19 | noadvnorm, mse | hof5000 (8 arms) | ~9m left"
+    ],
     "queued": [
-      "b19 evals | noadvnorm, mse (8 arms) | ~14m",
+      "b19 evals | noadvnorm, mse (8 arms) | ~4m",
       "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~2.9h",
       "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.7h",
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms)",
@@ -16,11 +18,29 @@
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~4.1h"
     ],
     "attention": [],
-    "remaining": "~13h of work: 13h queued; clear ~Sun 03:56"
+    "remaining": "~13h of work: 9m running + 13h queued; clear ~Sun 03:56"
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b19-hof5000",
+      "type": "eval",
+      "policy": "b19a-noadvnorm-seed1",
+      "policies": [
+        "b19a-noadvnorm-seed1",
+        "b19b-noadvnorm-seed2",
+        "b19c-noadvnorm-seed3",
+        "b19d-noadvnorm-seed4",
+        "b19e-mse-seed1",
+        "b19f-mse-seed2",
+        "b19g-mse-seed3",
+        "b19h-mse-seed4"
+      ],
+      "step": null,
+      "max_steps": null,
+      "eta_seconds": 569.9214951992035
+    }
+  ],
   "queued_ids": [
-    "b19-hof5000",
     "b19-hof30k",
     "b19i-adameps1e5-seed1",
     "b19j-adameps1e5-seed2",
@@ -101,14 +121,14 @@
     "b21-hof30k-w3"
   ],
   "panels": [
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19a-noadvnorm-seed1_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19b-noadvnorm-seed2_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19c-noadvnorm-seed3_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19d-noadvnorm-seed4_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19e-mse-seed1_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19f-mse-seed2_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19g-mse-seed3_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b19h-mse-seed4_checkpoint_evals.png"
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19a-noadvnorm-seed1_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19b-noadvnorm-seed2_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19c-noadvnorm-seed3_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19d-noadvnorm-seed4_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19e-mse-seed1_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19f-mse-seed2_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19g-mse-seed3_checkpoint_evals_hof5000.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b19h-mse-seed4_checkpoint_evals_hof5000.png"
   ],
   "window_pid": 64775
 }
