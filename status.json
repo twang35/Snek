@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T04:19:54",
-  "ts": 1788607194.7309453,
+  "iso": "2026-09-05T04:30:13",
+  "ts": 1788607813.8820066,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | entanneal10, entanneal03 -- wave 4 of 5 | training 9% (8 arms)"
+      "b15 | entanneal10, entanneal03 -- wave 4 of 5 | training 19% (8 arms)"
     ],
     "queued": [
       "b15 evals | entanneal10, entanneal03 | queued (8 arms)",
@@ -30,7 +30,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T04:10:12"
+    "laptop_iso": "2026-09-05T04:20:16"
   },
   "scheduler": {
     "alive": true,
@@ -38,7 +38,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T04:11:20"
+    "status_iso": "2026-09-05T04:21:20"
   },
   "runtime": {
     "max_trainers": 8,
@@ -63,7 +63,7 @@
       "policies": [
         "b15ay-entanneal10-seed1"
       ],
-      "step": 4800512,
+      "step": 9748480,
       "max_steps": 50003968
     },
     {
@@ -73,7 +73,7 @@
       "policies": [
         "b15az-entanneal10-seed2"
       ],
-      "step": 4554752,
+      "step": 9486336,
       "max_steps": 50003968
     },
     {
@@ -83,7 +83,7 @@
       "policies": [
         "b15ba-entanneal10-seed3"
       ],
-      "step": 4702208,
+      "step": 9732096,
       "max_steps": 50003968
     },
     {
@@ -93,7 +93,7 @@
       "policies": [
         "b15bb-entanneal10-seed4"
       ],
-      "step": 4702208,
+      "step": 9502720,
       "max_steps": 50003968
     },
     {
@@ -103,7 +103,7 @@
       "policies": [
         "b15bc-entanneal03-seed1"
       ],
-      "step": 4767744,
+      "step": 10010624,
       "max_steps": 50003968
     },
     {
@@ -113,7 +113,7 @@
       "policies": [
         "b15bd-entanneal03-seed2"
       ],
-      "step": 4636672,
+      "step": 9601024,
       "max_steps": 50003968
     },
     {
@@ -123,7 +123,7 @@
       "policies": [
         "b15be-entanneal03-seed3"
       ],
-      "step": 4653056,
+      "step": 9748480,
       "max_steps": 50003968
     },
     {
@@ -133,7 +133,7 @@
       "policies": [
         "b15bf-entanneal03-seed4"
       ],
-      "step": 4587520,
+      "step": 9601024,
       "max_steps": 50003968
     }
   ],
@@ -735,11 +735,11 @@
     "b15be-entanneal03-seed3": "running",
     "b15bf-entanneal03-seed4": "running"
   },
-  "disk_free_gb": 128.5,
+  "disk_free_gb": 128.4,
   "head": "e297c1729b95",
   "load_avg": [
-    13.453125,
-    13.134765625,
-    13.14453125
+    13.26416015625,
+    13.26904296875,
+    13.22509765625
   ]
 }
