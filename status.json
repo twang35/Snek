@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T11:27:48",
-  "ts": 1788632868.586022,
+  "iso": "2026-09-05T11:27:53",
+  "ts": 1788632873.65308,
   "box": "laptop",
   "project": "snek3",
   "pid": 67984,
@@ -13,9 +13,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "attention": [
-      "** paused: /Users/tony_wang/Projects/Snek/snek3/runs/.live/.paused exists; nothing new starts until it is removed"
-    ]
+    "attention": []
   },
   "running": [],
   "queued_ids": [
