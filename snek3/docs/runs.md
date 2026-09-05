@@ -33,9 +33,13 @@ reaches ≥98 on 18.6% of evals against 28.9%; rollout 32 is below on everything
 and 0.001 are the most stable arms trained so far (1.9-2.0% of evals below 80%, a third of the reference)
 with a lower top so far (best30 97.6-97.9 against 98.3).
 
-**Standing decisions**, unchanged: `hof5000` on b10 **on hold**; the γ × λ corner grid — γ {0.99, 0.9975,
-0.999} × λ {0.98, 0.99, 0.999}, with lr {3e-4, 2.5e-4} and now minibatch {256, 512} as candidate extra
-axes — runs **after b14 closes**. Every one-knob sweep since b9 has come back "plateau, base stays": the
+**Hall-of-fame passes.** b10's `hof5000` and `hof30k` ran on the laptop on 2026-09-03 (21 arms, 71 rows at
+30,000) and produced the current record, `b10ck` @30523392 at 99.65 /30,000 — see
+[`hallOfFame/HOF.md`](../hallOfFame/HOF.md); the "on hold" carried in earlier Now blocks was stale. **b11's
+are queued on the desktop** as of 17:21 (`b11-hof5000`, 661 checkpoints ≥99/500 from 25 arms, priority 5;
+`b11-hof30k` over its ≥99 rows at seed 7, priority 6), dispatching after b15 wave 1's stage B and before b15
+wave 2. **Standing decision**, unchanged: the γ × λ corner grid — γ {0.99, 0.9975, 0.999} × λ {0.98, 0.99,
+0.999}, with lr {3e-4, 2.5e-4} and minibatch {256, 512} as candidate extra axes — runs **after b14 closes**. Every one-knob sweep since b9 has come back "plateau, base stays": the
 corner grid is where the next gain is, if there is one.
 
 ## b11 closed, b12 and b13 in flight, as it read at 2026-09-04 09:45 (superseded)
