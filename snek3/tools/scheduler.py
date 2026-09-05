@@ -39,7 +39,7 @@ that once produced seven slot-0 workers has one contender.
 
 **The same spec files, the same waves, the same chain.** The arguments are the daemon's own
 `queue/pending/*.json` specs, read in id order and run in waves of `--wave` arms. Each `train` spec is
-`train.py <policy>` with the spec's `env` and `max_steps`, exactly as `desktop/runner/launch.py` set
+`train.py <policy>` with the spec's `env` and `max_steps`, exactly as `desktop/daemon/launch.py` set
 them; when every arm of a wave has exited, the wave's stage B runs as one `tools.closeout` over those
 arms, named `<batch>-stageb`, `<batch>-stageb-w2`, ... as the daemon named its auto-queued waves, and
 then the wave's `hof5000` and `hof30k` passes (`<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...), each
@@ -169,7 +169,7 @@ def waves(specs, size):
 def pass_label(batch, pass_name, number):
     """`b13-stageb`, then `b13-stageb-w2`, ... -- the daemon's names for its auto-queued passes.
 
-    The same shape for every pass: `b13-hof5000`, `b13-hof30k-w2`. `desktop/runner/runner.py`'s
+    The same shape for every pass: `b13-hof5000`, `b13-hof30k-w2`. `desktop/daemon/daemon.py`'s
     `mint_pass_id` is the desktop's spelling of this; the daemon cannot import from `tools/` and this
     module keeps the dependency one-way, so the two are pinned equal by a test rather than shared.
     """
@@ -248,7 +248,7 @@ def _live_entry(name, runs_dir=None):
 
 
 def training_env(spec, base=None):
-    """What `desktop/runner/launch.py` gives a trainer: the spec's env over ours, plus the cap."""
+    """What `desktop/daemon/launch.py` gives a trainer: the spec's env over ours, plus the cap."""
     env = dict(os.environ if base is None else base)
     env.update({key: str(value) for key, value in spec['env'].items()})
     env['SNEK_MAX_STEPS'] = str(spec['max_steps'])
@@ -279,7 +279,7 @@ def wave_workers(arms):
 
 
 def eval_argv(spec, python, shards):
-    """The `tools.closeout` command an eval spec spells -- `desktop/runner/launch.py`'s `eval_command`.
+    """The `tools.closeout` command an eval spec spells -- `desktop/daemon/launch.py`'s `eval_command`.
 
     Selector and episode count are passed only if the spec named them, so the close-out's own defaults
     stay the protocol; `--pass <name>` and anything else travel in `eval_args`.

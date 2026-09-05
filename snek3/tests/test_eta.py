@@ -1,4 +1,4 @@
-"""`tools/eta.py` and the estimate arithmetic in `desktop/runner/runner.py`'s `build_at_a_glance`:
+"""`tools/eta.py` and the estimate arithmetic in `desktop/daemon/daemon.py`'s `build_at_a_glance`:
 the `| ~40m left` and `| ~4.5h` on status.json's lines and the box's `remaining` total (2026-09-05).
 """
 
@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from desktop.runner import runner as runner_module
+from desktop.daemon import daemon as daemon_module
 from tools import eta
 from tools import live_runs
 
@@ -16,12 +16,12 @@ from tools import live_runs
 # ---------------------------------------------------------------- the arithmetic on the lines
 
 def test_format_eta_reads_as_minutes_then_tenths_of_hours_then_whole_hours():
-    assert runner_module.format_eta(None) is None
-    assert runner_module.format_eta(0) == '<1m'
-    assert runner_module.format_eta(59) == '<1m'
-    assert runner_module.format_eta(40 * 60) == '40m'
-    assert runner_module.format_eta(1.4 * 3600) == '1.4h'
-    assert runner_module.format_eta(12.4 * 3600) == '12h'
+    assert daemon_module.format_eta(None) is None
+    assert daemon_module.format_eta(0) == '<1m'
+    assert daemon_module.format_eta(59) == '<1m'
+    assert daemon_module.format_eta(40 * 60) == '40m'
+    assert daemon_module.format_eta(1.4 * 3600) == '1.4h'
+    assert daemon_module.format_eta(12.4 * 3600) == '12h'
 
 
 def test_a_wave_takes_its_slowest_arm_and_waves_and_passes_add():
@@ -29,12 +29,12 @@ def test_a_wave_takes_its_slowest_arm_and_waves_and_passes_add():
     wave 1, and every pass runs alone, so those add. A job without an estimate contributes nothing."""
     arms = [{'type': 'train', 'wave': 1, 'eta_seconds': 3600}, {'type': 'train', 'wave': 1, 'eta_seconds': 5400},
             {'type': 'train', 'wave': 2, 'eta_seconds': 1800}, {'type': 'train', 'wave': 2}]
-    assert runner_module.group_eta(arms) == 5400 + 1800
+    assert daemon_module.group_eta(arms) == 5400 + 1800
     passes = [{'type': 'eval', 'eta_seconds': 600}, {'type': 'eval', 'eta_seconds': 300}]
-    assert runner_module.group_eta(passes) == 900
+    assert daemon_module.group_eta(passes) == 900
     # running arms carry no wave: they are one wave
-    assert runner_module.group_eta([{'type': 'train', 'eta_seconds': 100}, {'type': 'train', 'eta_seconds': 250}]) == 250
-    assert runner_module.group_eta([{'type': 'train'}, {'type': 'eval'}]) is None
+    assert daemon_module.group_eta([{'type': 'train', 'eta_seconds': 100}, {'type': 'train', 'eta_seconds': 250}]) == 250
+    assert daemon_module.group_eta([{'type': 'train'}, {'type': 'eval'}]) is None
 
 
 def test_the_lines_carry_the_estimates_and_remaining_adds_them_up():
@@ -46,7 +46,7 @@ def test_the_lines_carry_the_estimates_and_remaining_adds_them_up():
               for letter, wave, seconds in (('a', 1, 5000), ('b', 1, 5400), ('c', 2, 5400))]
     queued.append({'id': 'b18-stageb', 'type': 'eval', 'policies': ['b18a-gc0-seed1', 'b18b-gc0-seed1'],
                    'eta_seconds': 3600})
-    glance = runner_module.build_at_a_glance(running, queued, {}, now=now)
+    glance = daemon_module.build_at_a_glance(running, queued, {}, now=now)
     assert glance['running'] == ['b17 | clip015 | stage B (2 arms) | ~40m left']
     assert glance['queued'] == ['b18 training | gc0 (3 arms) | ~3.0h',           # 5400 + 5400, not 3 x 5400
                                 'b18 evals | gc0 (2 arms) | ~1.0h']
@@ -55,7 +55,7 @@ def test_the_lines_carry_the_estimates_and_remaining_adds_them_up():
 
 
 def test_without_estimates_the_lines_are_as_before_and_remaining_is_null():
-    glance = runner_module.build_at_a_glance(
+    glance = daemon_module.build_at_a_glance(
         [{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'step': 1, 'max_steps': 2}],
         [{'id': 'b1-stageb', 'type': 'eval', 'policies': ['b1a-x']}], {}, now=0)
     assert glance['running'] == ['b1 | x | training 50% (1 arm)']
@@ -67,22 +67,22 @@ def test_a_partly_estimated_queue_says_so_and_an_idle_box_names_only_the_queued_
     now = time.mktime((2026, 9, 5, 12, 0, 0, 0, 0, -1))
     queued = [{'id': 'b19a-x-seed1', 'type': 'train', 'policy': 'b19a-x-seed1', 'wave': 1},
               {'id': 'b19-stageb', 'type': 'eval', 'policies': ['b19a-x-seed1'], 'eta_seconds': 1800}]
-    glance = runner_module.build_at_a_glance([], queued, {}, now=now)
+    glance = daemon_module.build_at_a_glance([], queued, {}, now=now)
     assert glance['queued'] == ['b19 training | x (1 arm)', 'b19 evals | x (1 arm) | ~30m']
     assert glance['remaining'] == '~30m of work: 30m queued; clear ~Sat 12:30'
     # a group with an estimate on some jobs and none on others is flagged, since its total is a floor
     mixed = [{'id': 'b19a-x-seed1', 'type': 'train', 'policy': 'b19a-x-seed1', 'wave': 1, 'eta_seconds': 600},
              {'id': 'b19b-x-seed2', 'type': 'train', 'policy': 'b19b-x-seed2', 'wave': 2}]
-    assert runner_module.build_at_a_glance([], mixed, {}, now=now)['remaining'].endswith('(some jobs have no estimate yet)')
+    assert daemon_module.build_at_a_glance([], mixed, {}, now=now)['remaining'].endswith('(some jobs have no estimate yet)')
 
 
 def test_the_laptops_remaining_is_folded_in_beside_its_lines():
     text = json.dumps({'iso': '2026-09-05T12:00:00', 'at_a_glance': {
         'running': [], 'queued': ['b19 evals | x (1 arm) | ~30m'], 'attention': [],
         'remaining': '~30m of work: 30m queued; clear ~Sat 12:30'}})
-    glance = runner_module.with_laptop({'running': [], 'queued': [], 'attention': [], 'remaining': None}, text)
+    glance = daemon_module.with_laptop({'running': [], 'queued': [], 'attention': [], 'remaining': None}, text)
     assert glance['laptop_remaining'] == '~30m of work: 30m queued; clear ~Sat 12:30'
-    assert runner_module.with_laptop({}, '')['laptop_remaining'] is None
+    assert daemon_module.with_laptop({}, '')['laptop_remaining'] is None
 
 
 # ---------------------------------------------------------------- an arm's rates

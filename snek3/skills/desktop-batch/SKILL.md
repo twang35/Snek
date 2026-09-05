@@ -70,7 +70,7 @@ the daemon's own parser**, which is stdlib-only and runs here:
 ```
 cd /Users/tony_wang/Projects/Snek/snek3/desktop && python3 -c "
 import sys, glob; sys.path.insert(0, '.')
-from runner.job import parse_job, JobError
+from daemon.job import parse_job, JobError
 for p in sorted(glob.glob('$OPS/snek3/desktop/queue/pending/*.json')):
     try:
         j = parse_job(open(p).read(), source=p)

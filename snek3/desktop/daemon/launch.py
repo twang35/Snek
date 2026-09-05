@@ -34,7 +34,7 @@ DISPLAY_ENV_KEYS = ('DISPLAY', 'XAUTHORITY')
 
 RUNS_SUBDIR = os.path.join('desktop', 'runs')
 # The local queue the scheduler reads: one directory per batch, one spec per file, mirrored from
-# `ops` by `runner.py` every poll. Gitignored, like `desktop/runs`.
+# `ops` by `daemon.py` every poll. Gitignored, like `desktop/runs`.
 QUEUE_SUBDIR = os.path.join('desktop', 'queue-local')
 
 # Type defaults the old `build_command` applied. A smoke scores ~0, so the checkpoint gate would write

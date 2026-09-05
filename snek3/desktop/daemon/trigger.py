@@ -35,13 +35,13 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from runner import config as config_module
-from runner import runner as runner_module
+from daemon import config as config_module
+from daemon import daemon as daemon_module
 
 # Its own unit, not snek2's `snek-runner`. The two must never both be active — they would fight over
 # the same worktrees and the same `--force-with-lease` — and a distinct name makes the handover an
 # explicit disable/enable rather than an overwrite that leaves no way back.
-UNIT_NAME = 'snek3-runner'
+UNIT_NAME = 'snek3-daemon'
 
 # Long enough to cover a cycle that lands mid-dispatch, short enough that whoever is waiting on the
 # ssh call gets an answer. A cycle with nothing to do finishes in well under a second.
@@ -118,11 +118,11 @@ def main(argv=None):
     timeout = float(argv[0]) if argv else DEFAULT_TIMEOUT
 
     host_env = os.environ.get(
-        'SNEK_RUNNER_HOST_ENV',
+        'SNEK_DAEMON_HOST_ENV',
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                      'config', 'host.env'))
     host = config_module.load_host_config(host_env)
-    path = runner_module.trigger_path(host)
+    path = daemon_module.trigger_path(host)
 
     if os.path.exists(path):
         print('note: a trigger from {0} was never consumed'.format(

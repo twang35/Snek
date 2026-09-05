@@ -66,7 +66,7 @@ def state_path(host):
     return os.path.join(os.path.dirname(host['LEDGER_PATH']), 'state.json')
 
 
-class Runner(object):
+class Daemon(object):
     def __init__(self, host):
         self.host = host
         self.runtime = dict(config_module.RUNTIME_DEFAULTS)
@@ -363,26 +363,26 @@ class Runner(object):
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return (result.stdout or '').strip()[:12]
 
-    def _runner_changed(self, before, after):
+    def _daemon_changed(self, before, after):
         """Whether the merge touched the daemon's own code -- the only thing a restart is for."""
         if not before or not after or before == after:
             return False
         result = self.run_command(
             ['git', 'diff', '--name-only', '{0}..{1}'.format(before, after), '--',
-             'snek3/desktop/runner', 'snek3/desktop/systemd'],
+             'snek3/desktop/daemon', 'snek3/desktop/systemd'],
             cwd=self.host['REPO_PATH'], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return bool((result.stdout or '').strip())
 
     def _deploy(self, job):
         """Runs `desktop/deploy` -- fetch, settle collisions, fast-forward -- as the box would from an
-        ssh, and restarts if the runner's code changed (or the spec says so). Recorded in the ledger
+        ssh, and restarts if the daemon's code changed (or the spec says so). Recorded in the ledger
         with the heads and the script's tail, so `status.json` says what happened and a failed deploy
         (exit 3: a differing JSON, nothing touched) shows under `attention` and is never retried."""
         started = time.time()
         before = self._head()
         desktop_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         try:
-            result = self.run_command([sys.executable, '-m', 'runner.deploy'], cwd=desktop_dir, text=True,
+            result = self.run_command([sys.executable, '-m', 'daemon.deploy'], cwd=desktop_dir, text=True,
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=900)
             rc, output = result.returncode, result.stdout or ''
         except (OSError, subprocess.SubprocessError) as error:
@@ -397,10 +397,10 @@ class Runner(object):
         self._save_ledger()
         if rc != 0:
             return
-        restart = job.restart if job.restart is not None else self._runner_changed(before, after)
+        restart = job.restart if job.restart is not None else self._daemon_changed(before, after)
         self.ledger[job.id]['restart'] = bool(restart)
         if restart:
-            self._restart(job, 'deploy {0} -> {1} changed the runner'.format(before, after))
+            self._restart(job, 'deploy {0} -> {1} changed the daemon'.format(before, after))
         else:
             self._save_ledger()
 
@@ -957,37 +957,37 @@ def _disk_free_gb(path):
 
 def main():
     host_env = os.environ.get(
-        'SNEK_RUNNER_HOST_ENV',
+        'SNEK_DAEMON_HOST_ENV',
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                      'config', 'host.env'))
     host = config_module.load_host_config(host_env)
-    runner = Runner(host)
+    daemon = Daemon(host)
 
     def handle(_signal, _frame):
-        runner.stop = True      # stop the daemon; the detached scheduler keeps running
+        daemon.stop = True      # stop the daemon; the detached scheduler keeps running
     signal.signal(signal.SIGTERM, handle)
     signal.signal(signal.SIGINT, handle)
 
     forced = False
-    while not runner.stop:
+    while not daemon.stop:
         try:
             # `True if forced else None`: a trigger forces the network half and a spawn attempt,
             # otherwise `poll_once` decides from `git_seconds`.
-            runner.poll_once(git=True if forced else None, forced=forced)
+            daemon.poll_once(git=True if forced else None, forced=forced)
         except Exception as error:      # the loop must never die
             sys.stderr.write('poll error: {0}\n'.format(error))
-        forced = _wait_for_next_poll(runner)
-    if runner.restart_requested:
+        forced = _wait_for_next_poll(daemon)
+    if daemon.restart_requested:
         sys.stderr.write('restarting for {0}: exiting so systemd relaunches the daemon\n'.format(
-            runner.restart_requested))
+            daemon.restart_requested))
 
 
-def _wait_for_next_poll(runner):
+def _wait_for_next_poll(daemon):
     """Sleeps `poll_seconds` in one-second steps, returning early on a stop or a manual trigger."""
-    for _ in range(int(runner.runtime['poll_seconds'])):
-        if runner.stop:
+    for _ in range(int(daemon.runtime['poll_seconds'])):
+        if daemon.stop:
             return False
-        if runner.take_trigger():
+        if daemon.take_trigger():
             return True
         time.sleep(1)
     return False

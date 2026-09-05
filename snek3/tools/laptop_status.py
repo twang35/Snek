@@ -9,7 +9,7 @@ desktop daemon folds into `ops-status` as `at_a_glance.laptop_running`, `.laptop
 task on both boxes, from anywhere.
 
 **One writer per branch, as the bus demands.** The laptop must not push into `ops-status`: two writers
-on one branch is the merge-and-`force-with-lease` failure `desktop/runner/gitbus.py` is shaped to
+on one branch is the merge-and-`force-with-lease` failure `desktop/daemon/gitbus.py` is shaped to
 avoid. So this is a branch of its own, published through gitbus's own `publish_status` with a laptop
 host dict -- one implementation of "write and push a status branch" for both boxes.
 
@@ -34,8 +34,8 @@ import time
 # `desktop/` shells out and imports nothing from this project; this direction -- a tool importing
 # the daemon's pure helpers -- is the one the "one implementation for both boxes" rule wants, rather
 # than a second copy of `build_at_a_glance` here. `desktop` is a namespace package (no `__init__.py`).
-from desktop.runner import gitbus
-from desktop.runner import runner as daemon
+from desktop.daemon import gitbus
+from desktop.daemon import daemon
 from tools import live_runs
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

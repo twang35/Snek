@@ -41,7 +41,7 @@ def test_ensure_worktree_makes_an_empty_rooted_branch_and_is_idempotent(tmp_path
     assert _git(['ls-tree', 'HEAD'], path) == ''                      # the empty root
     assert laptop_status.ensure_worktree(host) == path
     # and a publish through gitbus lands a commit on it (no remote: the push fails, the commit stays)
-    from desktop.runner import gitbus
+    from desktop.daemon import gitbus
     with open(os.path.join(path, '.git')):
         pass
     _git(['config', 'user.name', 't'], path)

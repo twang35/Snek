@@ -100,7 +100,7 @@ snek3/
     step_selectors.py  progress_chart.py  chart_viewer.py  stage_b_chart.py
 
   desktop/               the git-bus job queue, unchanged in design
-    runner/  systemd/  config/  README.md
+    daemon/  systemd/  config/  README.md
 
   docs/                  the investigation. starts nearly empty
     README.md  running.md  environment.md  protocol.md  invariants.md

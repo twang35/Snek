@@ -247,9 +247,12 @@ git worktree add /home/claw/snek-bus/status  ops-status
 git worktree add /home/claw/snek-bus/results results
 
 cp snek3/desktop/config/host.env.example snek3/desktop/config/host.env   # edit for this box
-sudo cp snek3/desktop/systemd/snek3-runner.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now snek3-runner
+sudo cp snek3/desktop/systemd/snek3-daemon.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now snek3-daemon
 ```
+
+The package, the unit, `~/.snek3-daemon/` and `SNEK_DAEMON_*` were all `runner` until 2026-09-05
+(`plans/rename-runner-to-daemon.md`); `desktop/systemd/rename-to-daemon.sh` is the one-time box-side move.
 
 `host.env` is **not** in git — only the example is. It holds machine identity (paths, branches, the
 two `ops` locations) and the hard ceilings; everything tunable at runtime is in `runtime.json`
@@ -274,7 +277,7 @@ free to commit every chart. A tool run by hand on the box (`tools.scheduler --re
 ### Deploy over the bus
 
 ```
-snek3/desktop/queue_action deploy            # from the laptop: fetch + ff-merge on the box, restart iff desktop/runner or systemd changed
+snek3/desktop/queue_action deploy            # from the laptop: fetch + ff-merge on the box, restart iff desktop/daemon or systemd changed
 snek3/desktop/queue_action deploy --restart  # restart regardless
 snek3/desktop/queue_action restart           # restart only
 ```
@@ -284,7 +287,7 @@ snek3/desktop/queue_action restart           # restart only
 sees them: **ahead of dispatch, beside running jobs, and under a pause** (a pause is how a deploy that
 must not race a wave is done). A deploy runs the box's own `desktop/deploy`, records `head_before`,
 `head_after`, the script's last lines and `rc` in the ledger, and restarts when the merge touched
-`desktop/runner/` or `desktop/systemd/` (or the spec says `"restart": true`). A **restart is the daemon
+`desktop/daemon/` or `desktop/systemd/` (or the spec says `"restart": true`). A **restart is the daemon
 recording the action as done, publishing, and exiting 0**; systemd's `Restart=always` relaunches it in
 10 s on the code now in the checkout, and it re-adopts the running scheduler by pid. No sudo anywhere, which is
 the point: the laptop's permission classifier refuses `sudo` over ssh, and the box's passwordless sudo
@@ -295,10 +298,10 @@ under `attention`, and is never retried: fix it and queue a new id.
 **The one-time bootstrap.** A daemon older than this change marks a `deploy` spec malformed (`failed`,
 unknown type) and the new code then never runs it, so the first daemon that understands actions has to
 be started the old way: `ssh the-claw-den 'Snek/snek3/desktop/deploy'` and then, by the user at the
-prompt, `ssh the-claw-den 'sudo systemctl restart snek3-runner'`.
+prompt, `ssh the-claw-den 'sudo systemctl restart snek3-daemon'`.
 
 By hand, the old way still works: `snek3/desktop/deploy` over ssh (a fast-forward that settles any
-leftover from before the move) plus `sudo systemctl restart snek3-runner` when `desktop/runner/*`
+leftover from before the move) plus `sudo systemctl restart snek3-daemon` when `desktop/daemon/*`
 changed. Piping it to `tail` hides the failure and its exit code.
 
 ## Reach the box from outside the home LAN

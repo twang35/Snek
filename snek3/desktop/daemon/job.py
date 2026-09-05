@@ -26,7 +26,7 @@ anything without one becomes `?` rather than an escape.
 
 Folding at parse time rather than at publish time means the ledger, the logs and `at_a_glance` all
 carry the same string, and a spec already sitting on `ops` is fixed without rewriting the branch.
-`runner.py` also publishes with `ensure_ascii=False` now, so a non-ASCII *policy name* — which is not
+`daemon.py` also publishes with `ensure_ascii=False` now, so a non-ASCII *policy name* — which is not
 folded, because it is a path — reads as itself rather than as an escape.
 
 ## An eval job carries `policies`, not one `policy`
@@ -82,7 +82,7 @@ class Job(object):
         self.id = id
         self.type = type
         self.project = project
-        # Runs in both directions: `_StubJob` in runner.py rebuilds a Job from a ledger record after
+        # Runs in both directions: `_StubJob` in daemon.py rebuilds a Job from a ledger record after
         # a daemon restart, with no spec in hand.
         self.policies = [name for name in (list(policies) if policies else [policy]) if name]
         self.policy = policy or (self.policies[0] if self.policies else None)
@@ -102,7 +102,7 @@ class Job(object):
         # 'b1: free space + chase-safe shaping, gate=75, c=0.10'. Optional.
         self.label = label
         # deploy only: True forces a restart after the merge, False forbids one, None (the default)
-        # restarts iff the merge changed `desktop/runner/` or `desktop/systemd/`.
+        # restarts iff the merge changed `desktop/daemon/` or `desktop/systemd/`.
         self.restart = restart
 
     @property

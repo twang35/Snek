@@ -64,7 +64,7 @@ def build_parser():
     green fixtures asserted the argv the daemon builds and none asked this parser to accept it.
 
     A test *does* run in the env, so the constraint that forces the duplication does not extend to
-    the fixture that guards it. See `tests/test_desktop_runner.py`.
+    the fixture that guards it. See `tests/test_daemon.py`.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('policy')

@@ -21,7 +21,7 @@ deploy that carries them, and that is fine: the daemon publishes from its own wo
 (`gitbus.py`), so the main checkout's status is nobody's input, and the next deploy saves and restores
 them again before the fast-forward would otherwise refuse over "local changes".
 
-Runs on base python on the box, like the rest of `runner/`, so stdlib only.
+Runs on base python on the box, like the rest of `daemon/`, so stdlib only.
 """
 
 import argparse

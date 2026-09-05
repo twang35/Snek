@@ -1,4 +1,4 @@
-"""The runner's two config tiers.
+"""The daemon's two config tiers.
 
 | tier | where | changed | holds |
 |---|---|---|---|

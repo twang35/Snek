@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 'desktop'))
 
-from runner import deploy  # noqa: E402
+from daemon import deploy  # noqa: E402
 
 
 def _git(repo, *args):

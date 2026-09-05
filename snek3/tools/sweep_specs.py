@@ -90,7 +90,7 @@ def build_specs(manifest, batch, cells):
 def validate(specs):
     """Run each spec through the daemon's parser; returns a list of error strings."""
     sys.path.insert(0, os.path.join(ROOT, 'desktop'))
-    from runner.job import parse_job, JobError  # stdlib-only, runs on the laptop
+    from daemon.job import parse_job, JobError  # stdlib-only, runs on the laptop
     errors = []
     for spec in specs:
         try:

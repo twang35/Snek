@@ -18,7 +18,7 @@ cd /Users/tony_wang/Projects/Snek && snek3/desktop/queue_action deploy
 
 It commits a `deploy-<stamp>.json` action to `ops`, triggers the daemon, and waits for the ledger: the
 box fetches and fast-forwards with its own `desktop/deploy`, and **restarts itself only if the merge
-touched `desktop/runner/` or `desktop/systemd/`** (a restart is the daemon recording the action, publishing
+touched `desktop/daemon/` or `desktop/systemd/`** (a restart is the daemon recording the action, publishing
 and exiting; systemd's `Restart=always` brings it back in 10 s, and it re-adopts the running scheduler by pid --
 the scheduler and everything under it are detached and never restart with the daemon).
 `--restart` forces the restart, `restart` alone just restarts, `--no-wait` returns after queueing. The
@@ -29,7 +29,7 @@ Exit codes: 0 done, 1 the action failed (the record's `error` and `attention` sa
 queue a new deploy), 2 not terminal within the timeout (the daemon may be mid-restart: read `ops-status`
 again in a minute).
 
-**Why not ssh.** `ssh the-claw-den 'sudo systemctl restart snek3-runner'` is refused by the laptop's
+**Why not ssh.** `ssh the-claw-den 'sudo systemctl restart snek3-daemon'` is refused by the laptop's
 permission classifier (2026-09-05), and the box's passwordless sudo was never the constraint. The action
 path runs as `claw` with no sudo at all. Named actions only: nothing on `ops` runs arbitrary shell.
 
@@ -40,7 +40,7 @@ ssh the-claw-den 'Snek/snek3/desktop/deploy'            # fetch, settle runs/ co
 ```
 
 then, **typed by the user at the prompt** (an agent's sudo over ssh is refused):
-`! ssh the-claw-den 'sudo systemctl restart snek3-runner'` — only if `desktop/runner/*` or the unit changed.
+`! ssh the-claw-den 'sudo systemctl restart snek3-daemon'` — only if `desktop/daemon/*` or the unit changed.
 Arms and passes are fresh processes, so a change under `ppo/`, `train.py`, `tools/closeout.py` is live for
 the next one with no restart. **A change to `tools/scheduler.py` or `tools/window.py` reaches the box only
 when the scheduler is next started**, since the running scheduler is the old code -- and **a pause does not
@@ -65,5 +65,5 @@ git fetch origin ops-status && git show origin/ops-status:status.json | python3 
 
 **The fetch is mandatory** — without it you read a stale local ref whose embedded timestamp reads like
 a dead daemon. If a heartbeat is frozen but `trigger` says the daemon is polling, a stale `index.lock`
-is the shape to look for: `journalctl -u snek3-runner | tail -50` on the box (`clear_stale_locks`
+is the shape to look for: `journalctl -u snek3-daemon | tail -50` on the box (`clear_stale_locks`
 handles the known case).

@@ -55,7 +55,7 @@ REDRAW_SECONDS = 20
 #
 # `--pass <name>` is how both boxes ask for one: the desktop daemon dispatches
 # `tools.closeout <arms> --pass hof5000` and carries none of these numbers (see
-# `desktop/runner/launch.py` for why it must not), and `tools/scheduler.py` runs the same command.
+# `desktop/daemon/launch.py` for why it must not), and `tools/scheduler.py` runs the same command.
 # `stageb` is the close-out's own defaults, so a command that names no pass is unchanged.
 PASSES = {
     'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0},
@@ -138,7 +138,7 @@ def measure_one(policy, episodes=500, width=None, seed=0):
 
     `one` is not a close-out; it is the spot check and the record re-measurement, and it goes through
     here only so that **every eval the desktop can dispatch has one entry point**. The alternative was
-    a second branch in `desktop/runner/launch.py` choosing between two scripts, which is the shape
+    a second branch in `desktop/daemon/launch.py` choosing between two scripts, which is the shape
     this change exists to remove.
 
     Imported where it is used rather than at the top: `evaluate.py` is a script, and a `tools/` module
@@ -276,10 +276,10 @@ def build_parser():
     """This module's command-line contract, as an object.
 
     Extracted for the same reason `evaluate.build_parser` is: the desktop daemon runs on base python
-    and cannot import this file, so `desktop/runner/launch.py` spells this interface out by hand.
+    and cannot import this file, so `desktop/daemon/launch.py` spells this interface out by hand.
     That duplication has drifted before — a `--selector` flag against a positional, and several
     policies against a single one, which made every wave the box dispatched exit 2 — so
-    `tests/test_desktop_runner.py` hands what the daemon builds to this parser.
+    `tests/test_daemon.py` hands what the daemon builds to this parser.
 
     The selector is a **flag** here and positional in `evaluate.py`. It has to be: `policies` is
     `nargs='+'`, and a trailing positional behind it is ambiguous.

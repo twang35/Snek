@@ -6,8 +6,8 @@
     snek3/desktop/queue_action restart              # just restart the daemon
     snek3/desktop/queue_action deploy --no-wait     # queue and return
 
-Replaces `ssh the-claw-den 'Snek/snek3/desktop/deploy'` + `ssh ... 'sudo systemctl restart snek3-runner'`:
-the daemon runs the action itself on the poll that sees it (`desktop/runner/runner.py`, `_run_actions`),
+Replaces `ssh the-claw-den 'Snek/snek3/desktop/deploy'` + `ssh ... 'sudo systemctl restart snek3-daemon'`:
+the daemon runs the action itself on the poll that sees it (`desktop/daemon/daemon.py`, `_run_actions`),
 so no ssh and no sudo -- which the laptop's permission classifier refused, 2026-09-05. Stdlib only.
 
 Writes one spec to `queue/pending/<type>-<UTC stamp>.json` in the `ops` worktree (found or created as

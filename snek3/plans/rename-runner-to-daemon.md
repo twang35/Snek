@@ -1,6 +1,6 @@
 # Rename `runner` to `daemon`
 
-**Status: planned 2026-09-05, not started. Runs after the working tree is clear** of the other
+**Status: laptop half done 2026-09-05 (uncommitted, awaiting approval); box half is the user-run script.** Was planned to run after the tree was clear of the other
 session's edits (`desktop/runner/runner.py`, `trigger.py`, `tools/scheduler.py`, `live_runs.py`,
 `laptop_status.py`, `eta.py` and their tests). A rename over a dirty tree is a merge conflict with
 ourselves.
