@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T11:41:06",
-  "ts": 1788633666.5165381,
+  "iso": "2026-09-05T11:51:24",
+  "ts": 1788634284.6470287,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip015, clip03 -- wave 2 of 8 | training 66% (7 arms)"
+      "b17 | clip015, clip03 -- wave 2 of 8 | training 80% (7 arms)"
     ],
     "queued": [
       "b17 training | clip015, clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, ... | queued (49 arms)",
@@ -27,7 +27,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T11:39:56"
+    "laptop_iso": "2026-09-05T11:50:04"
   },
   "scheduler": {
     "alive": true,
@@ -35,7 +35,7 @@
     "spawned": 1788632824.3692193,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-112704.log",
-    "status_iso": "2026-09-05T11:31:49"
+    "status_iso": "2026-09-05T11:41:49"
   },
   "runtime": {
     "max_trainers": 8,
@@ -60,7 +60,7 @@
       "policies": [
         "b17aj-clip015-seed2"
       ],
-      "step": 34635776,
+      "step": 41943040,
       "max_steps": 50003968
     },
     {
@@ -70,7 +70,7 @@
       "policies": [
         "b17ak-clip015-seed3"
       ],
-      "step": 32555008,
+      "step": 39616512,
       "max_steps": 50003968
     },
     {
@@ -80,7 +80,7 @@
       "policies": [
         "b17al-clip015-seed4"
       ],
-      "step": 32817152,
+      "step": 39976960,
       "max_steps": 50003968
     },
     {
@@ -90,7 +90,7 @@
       "policies": [
         "b17am-clip03-seed1"
       ],
-      "step": 32800768,
+      "step": 39616512,
       "max_steps": 50003968
     },
     {
@@ -100,7 +100,7 @@
       "policies": [
         "b17an-clip03-seed2"
       ],
-      "step": 32702464,
+      "step": 39567360,
       "max_steps": 50003968
     },
     {
@@ -110,7 +110,7 @@
       "policies": [
         "b17ao-clip03-seed3"
       ],
-      "step": 32243712,
+      "step": 39043072,
       "max_steps": 50003968
     },
     {
@@ -120,7 +120,7 @@
       "policies": [
         "b17ap-clip03-seed4"
       ],
-      "step": 32276480,
+      "step": 39124992,
       "max_steps": 50003968
     }
   ],
@@ -724,11 +724,11 @@
     "b17ao-clip03-seed3": "running",
     "b17ap-clip03-seed4": "running"
   },
-  "disk_free_gb": 123.9,
+  "disk_free_gb": 123.8,
   "head": "9b8f2d0d120e",
   "load_avg": [
-    13.22509765625,
-    13.537109375,
-    13.63330078125
+    13.57470703125,
+    13.72802734375,
+    13.7041015625
   ]
 }
