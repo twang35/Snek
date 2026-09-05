@@ -1,13 +1,14 @@
 {
-  "iso": "2026-09-05T09:49:04",
-  "ts": 1788626944.604931,
+  "iso": "2026-09-05T09:49:10",
+  "ts": 1788626950.569748,
   "box": "laptop",
   "project": "snek3",
   "pid": 26287,
   "at_a_glance": {
-    "running": [],
+    "running": [
+      "b16 | kl02, kl03 | hof30k (8 arms)"
+    ],
     "queued": [
-      "b16 evals | kl02, kl03 | queued (8 arms)",
       "b16 training | kl04, kl05 -- wave 5 of 5 | queued (8 arms)",
       "b16 evals | kl04, kl05 | queued (8 arms)",
       "b19 training | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 -- waves 1-3 of 3 | queued (24 arms)",
@@ -17,9 +18,26 @@
     ],
     "attention": []
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b16-hof30k-w4",
+      "type": "eval",
+      "policy": "b16ay-kl02-seed1",
+      "policies": [
+        "b16ay-kl02-seed1",
+        "b16az-kl02-seed2",
+        "b16ba-kl02-seed3",
+        "b16bb-kl02-seed4",
+        "b16bc-kl03-seed1",
+        "b16bd-kl03-seed2",
+        "b16be-kl03-seed3",
+        "b16bf-kl03-seed4"
+      ],
+      "step": null,
+      "max_steps": null
+    }
+  ],
   "queued_ids": [
-    "b16-hof30k-w4",
     "b16bg-kl04-seed1",
     "b16bh-kl04-seed2",
     "b16bi-kl04-seed3",
@@ -88,14 +106,14 @@
     "b20-hof30k-w2"
   ],
   "panels": [
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ay-kl02-seed1_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16az-kl02-seed2_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ba-kl02-seed3_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bb-kl02-seed4_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bc-kl03-seed1_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bd-kl03-seed2_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16be-kl03-seed3_checkpoint_evals_hof5000.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bf-kl03-seed4_checkpoint_evals_hof5000.png"
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ay-kl02-seed1_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16az-kl02-seed2_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ba-kl02-seed3_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bb-kl02-seed4_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bc-kl03-seed1_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bd-kl03-seed2_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16be-kl03-seed3_checkpoint_evals_hof30k.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bf-kl03-seed4_checkpoint_evals_hof30k.png"
   ],
   "window_pid": 26447
 }
