@@ -1,12 +1,13 @@
 {
-  "iso": "2026-09-04T17:16:40",
-  "ts": 1788567400.7112143,
+  "iso": "2026-09-04T17:21:22",
+  "ts": 1788567682.2030284,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "b15 | ent0, ent001 | stage B (8 arms)"
     ],
     "queued": [
+      "b11 eval | b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes, ... | queued (50 arms)",
       "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b16 stage B | kl003, kl005 | queued (8 arms)",
@@ -62,10 +63,12 @@
       "label": "",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 1880
+      "elapsed_s": 2162
     }
   ],
   "ledger": {
+    "b11-hof5000": "queued",
+    "b11-hof30k": "queued",
     "b15ai-ent003-seed1": "queued",
     "b15aj-ent003-seed2": "queued",
     "b15ak-ent003-seed3": "queued",
@@ -687,8 +690,8 @@
   },
   "disk_free_gb": 133.2,
   "load_avg": [
-    16.20263671875,
-    16.005859375,
-    15.53564453125
+    15.326171875,
+    15.85400390625,
+    15.63720703125
   ]
 }
