@@ -1,22 +1,24 @@
 {
-  "iso": "2026-09-05T12:46:51",
-  "ts": 1788637611.587592,
+  "iso": "2026-09-05T12:56:58",
+  "ts": 1788638218.8075352,
   "box": "laptop",
   "project": "snek3",
   "pid": 29215,
   "at_a_glance": {
     "running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training 6% (8 arms) | ~1.5h left"
+      "b19 | noadvnorm, mse -- wave 1 of 3 | training 17% (8 arms) | ~1.4h left"
     ],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
       "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~3.1h",
       "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.3h",
-      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms) | ~3.2h",
-      "b20 evals | lanes32, lanes64, lanes256, lanes512 (16 arms) | ~2.3h"
+      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms) | ~3.1h",
+      "b20 evals | lanes32, lanes64, lanes256, lanes512 (16 arms) | ~2.3h",
+      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 (24 arms) | ~4.6h",
+      "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
     ],
     "attention": [],
-    "remaining": "~14h of work: 1.5h running + 12h queued; clear ~Sun 02:22"
+    "remaining": "~21h of work: 1.4h running + 20h queued; clear ~Sun 10:15"
   },
   "running": [
     {
@@ -26,9 +28,9 @@
       "policies": [
         "b19a-noadvnorm-seed1"
       ],
-      "step": 3112960,
+      "step": 8798208,
       "max_steps": 50003968,
-      "eta_seconds": 5228.676215557884
+      "eta_seconds": 4658.405346192272
     },
     {
       "id": "b19b-noadvnorm-seed2",
@@ -37,9 +39,9 @@
       "policies": [
         "b19b-noadvnorm-seed2"
       ],
-      "step": 3244032,
+      "step": 9060352,
       "max_steps": 50003968,
-      "eta_seconds": 4919.586330739521
+      "eta_seconds": 4326.553919250677
     },
     {
       "id": "b19c-noadvnorm-seed3",
@@ -48,9 +50,9 @@
       "policies": [
         "b19c-noadvnorm-seed3"
       ],
-      "step": 3096576,
+      "step": 8634368,
       "max_steps": 50003968,
-      "eta_seconds": 5239.7322487910715
+      "eta_seconds": 4491.18842132968
     },
     {
       "id": "b19d-noadvnorm-seed4",
@@ -59,9 +61,9 @@
       "policies": [
         "b19d-noadvnorm-seed4"
       ],
-      "step": 3031040,
+      "step": 8667136,
       "max_steps": 50003968,
-      "eta_seconds": 5540.86418568204
+      "eta_seconds": 4613.764256347615
     },
     {
       "id": "b19e-mse-seed1",
@@ -70,9 +72,9 @@
       "policies": [
         "b19e-mse-seed1"
       ],
-      "step": 3096576,
+      "step": 8323072,
       "max_steps": 50003968,
-      "eta_seconds": 5525.724876306664
+      "eta_seconds": 4994.019847663863
     },
     {
       "id": "b19f-mse-seed2",
@@ -81,9 +83,9 @@
       "policies": [
         "b19f-mse-seed2"
       ],
-      "step": 3047424,
+      "step": 8732672,
       "max_steps": 50003968,
-      "eta_seconds": 5286.230163707907
+      "eta_seconds": 4619.977575106061
     },
     {
       "id": "b19g-mse-seed3",
@@ -92,9 +94,9 @@
       "policies": [
         "b19g-mse-seed3"
       ],
-      "step": 3162112,
+      "step": 8994816,
       "max_steps": 50003968,
-      "eta_seconds": 5278.414400871829
+      "eta_seconds": 4572.57075833586
     },
     {
       "id": "b19h-mse-seed4",
@@ -103,9 +105,9 @@
       "policies": [
         "b19h-mse-seed4"
       ],
-      "step": 3047424,
+      "step": 8683520,
       "max_steps": 50003968,
-      "eta_seconds": 5323.085085377916
+      "eta_seconds": 4869.2127833878285
     }
   ],
   "queued_ids": [
@@ -155,7 +157,40 @@
     "b20p-lanes512-seed4",
     "b20-stageb-w2",
     "b20-hof5000-w2",
-    "b20-hof30k-w2"
+    "b20-hof30k-w2",
+    "b21a-shape0-seed1",
+    "b21b-shape0-seed2",
+    "b21c-shape0-seed3",
+    "b21d-shape0-seed4",
+    "b21e-shape005-seed1",
+    "b21f-shape005-seed2",
+    "b21g-shape005-seed3",
+    "b21h-shape005-seed4",
+    "b21-stageb",
+    "b21-hof5000",
+    "b21-hof30k",
+    "b21i-shape02-seed1",
+    "b21j-shape02-seed2",
+    "b21k-shape02-seed3",
+    "b21l-shape02-seed4",
+    "b21m-gate60-seed1",
+    "b21n-gate60-seed2",
+    "b21o-gate60-seed3",
+    "b21p-gate60-seed4",
+    "b21-stageb-w2",
+    "b21-hof5000-w2",
+    "b21-hof30k-w2",
+    "b21q-gate85-seed1",
+    "b21r-gate85-seed2",
+    "b21s-gate85-seed3",
+    "b21t-gate85-seed4",
+    "b21u-gate0-seed1",
+    "b21v-gate0-seed2",
+    "b21w-gate0-seed3",
+    "b21x-gate0-seed4",
+    "b21-stageb-w3",
+    "b21-hof5000-w3",
+    "b21-hof30k-w3"
   ],
   "panels": [
     "/Users/tony_wang/Projects/Snek/snek3/runs/b19a-noadvnorm-seed1.png",
