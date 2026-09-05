@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T10:55:35",
-  "ts": 1788630935.424437,
+  "iso": "2026-09-05T11:05:40",
+  "ts": 1788631540.6823208,
   "box": "laptop",
   "project": "snek3",
   "pid": 40780,
   "at_a_glance": {
     "running": [
-      "b16 | kl04, kl05 -- wave 5 of 5 | training 71% (8 arms)"
+      "b16 | kl04, kl05 -- wave 5 of 5 | training 82% (8 arms)"
     ],
     "queued": [
       "b16 evals | kl04, kl05 | queued (8 arms)",
@@ -15,12 +15,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "attention": [
-      "** paused: /Users/tony_wang/Projects/Snek/snek3/runs/.live/.paused exists; nothing new starts until it is removed",
-      "** paused: /Users/tony_wang/Projects/Snek/snek3/runs/.live/.paused exists; nothing new starts until it is removed",
-      "** paused: /Users/tony_wang/Projects/Snek/snek3/runs/.live/.paused exists; nothing new starts until it is removed",
-      "** paused: /Users/tony_wang/Projects/Snek/snek3/runs/.live/.paused exists; nothing new starts until it is removed"
-    ]
+    "attention": []
   },
   "running": [
     {
@@ -30,7 +25,7 @@
       "policies": [
         "b16bg-kl04-seed1"
       ],
-      "step": 37093376,
+      "step": 43024384,
       "max_steps": 50003968
     },
     {
@@ -40,7 +35,7 @@
       "policies": [
         "b16bh-kl04-seed2"
       ],
-      "step": 36732928,
+      "step": 42680320,
       "max_steps": 50003968
     },
     {
@@ -50,7 +45,7 @@
       "policies": [
         "b16bi-kl04-seed3"
       ],
-      "step": 35471360,
+      "step": 41402368,
       "max_steps": 50003968
     },
     {
@@ -60,7 +55,7 @@
       "policies": [
         "b16bj-kl04-seed4"
       ],
-      "step": 35225600,
+      "step": 40730624,
       "max_steps": 50003968
     },
     {
@@ -70,7 +65,7 @@
       "policies": [
         "b16bk-kl05-seed1"
       ],
-      "step": 35028992,
+      "step": 40534016,
       "max_steps": 50003968
     },
     {
@@ -80,7 +75,7 @@
       "policies": [
         "b16bl-kl05-seed2"
       ],
-      "step": 34439168,
+      "step": 39829504,
       "max_steps": 50003968
     },
     {
@@ -90,7 +85,7 @@
       "policies": [
         "b16bm-kl05-seed3"
       ],
-      "step": 34553856,
+      "step": 40206336,
       "max_steps": 50003968
     },
     {
@@ -100,7 +95,7 @@
       "policies": [
         "b16bn-kl05-seed4"
       ],
-      "step": 34226176,
+      "step": 39796736,
       "max_steps": 50003968
     }
   ],
