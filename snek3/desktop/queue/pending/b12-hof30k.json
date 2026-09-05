@@ -51,6 +51,6 @@
     "7"
   ],
   "priority": 8,
-  "label": "b12 hof30k eval: every checkpoint >=99/5,000 at 30,000 episodes, seed 7",
+  "label": "b12 hof eval: 652 checkpoints >=99/500 from 37 arms at 5,000, then those >=99 at 30,000 (seed 7)",
   "notes": "Every b12 checkpoint at >=99 in the hof5000 pass, re-measured at the hall-of-fame depth on seed 7, the seed no selecting pass used, so a row here is a confirmed rate rather than a selected high. above:99:hof5000 reads each arm's hof5000 file; an arm with no row at 99 there selects nothing and its shards exit at once, which is why the policy list is the whole hof5000 set. Priority 8 so it dispatches only after b12-hof5000 (priority 7) has written those files. Labelled hof30k so neither earlier pass is touched. Ranks candidates, promotes nothing. Size unknown until hof5000 lands; b9's 727 candidates gave 33 rows, ~1M episodes, ~10 min at 16 shards. The record to beat is b5h at 98.96 /30,000."
 }

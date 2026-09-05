@@ -49,6 +49,6 @@
     "hof5000"
   ],
   "priority": 7,
-  "label": "b12 hof5000 eval: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes",
+  "label": "b12 hof eval: 652 checkpoints >=99/500 from 37 arms at 5,000, then those >=99 at 30,000 (seed 7)",
   "notes": "Ten times the depth on every b12 checkpoint that cleared 99%/500 in the close-out: 652 rows across the 37 arms that have any. the PPO-epochs sweep, 40 arms, trained and stage-B measured on this box. above:99 reads each arm's own stage-B file, so one wave covers every arm. Labelled hof5000 so the 500-episode pass is untouched. Ranks candidates, promotes nothing -- a hallOfFame/ copy is a separate deliberate step. Hand-queued 2026-09-04 because this batch's stage B finished before the daemon chained hof5000 and hof30k automatically; the explicit selector/episodes/label spelling is what the box's current code accepts (--pass hof5000 is the shorthand after the next deploy). ~3.3M episodes, ~25 min at 16 shards. b12-hof30k (priority 8) follows it and reads this pass's files."
 }

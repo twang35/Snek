@@ -20,6 +20,6 @@
     "hof5000"
   ],
   "priority": 11,
-  "label": "b15 hof5000 eval: 53 checkpoints >=99/500 from 8 arms at 5,000 episodes",
+  "label": "b15 hof eval: 53 checkpoints >=99/500 from 8 arms at 5,000, then those >=99 at 30,000 (seed 7)",
   "notes": "Ten times the depth on every b15 checkpoint that cleared 99%/500 in the close-out: 53 rows across the 8 arms that have any. the entropy sweep's first wave (ent0, ent001), the 8 arms whose stage B finished before the automatic chain existed; waves 2-5 get their hof passes from the chain. above:99 reads each arm's own stage-B file, so one wave covers every arm. Labelled hof5000 so the 500-episode pass is untouched. Ranks candidates, promotes nothing -- a hallOfFame/ copy is a separate deliberate step. Hand-queued 2026-09-04 because this batch's stage B finished before the daemon chained hof5000 and hof30k automatically; the explicit selector/episodes/label spelling is what the box's current code accepts (--pass hof5000 is the shorthand after the next deploy). ~0.3M episodes, ~2 min at 16 shards. b15-hof30k (priority 12) follows it and reads this pass's files."
 }
