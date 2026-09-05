@@ -283,6 +283,10 @@ class Viewer(object):
             axis.set_axis_off()
         self.images = {}
         self.figure.canvas.manager.set_window_title(self.title)
+        # No key handler at all: see `disable_keyboard_shortcuts`.
+        handler_id = getattr(self.figure.canvas.manager, 'key_press_handler_id', None)
+        if handler_id is not None:
+            self.figure.canvas.mpl_disconnect(handler_id)
         self.figure.set_size_inches(
             *fit_dims(rows, columns, self.aspect, self.scale, screen_inches(self.figure),
                       panel_width=panel_in, max_width=max_in))
@@ -358,9 +362,25 @@ class Viewer(object):
             time.sleep(FLUSH_SLICE)
 
 
+def disable_keyboard_shortcuts(rcparams=matplotlib.rcParams):
+    """Makes the window ignore the keyboard.
+
+    matplotlib binds a dozen bare keys and ctrl/cmd chords by default — `s` saves, `f` goes
+    fullscreen, `q`/`cmd+w` quits, `l`/`k` flip the axes to log, `cmd+c` copies — and acts on them
+    whenever this window has focus. The window shows PNGs and none of those do anything useful to it,
+    while a keystroke meant for something else (a monitor-input switch, 2026-09-05) lands here
+    instead. Every `keymap.*` entry is emptied, so the default handler matches nothing; `_build` also
+    disconnects that handler, so the window has no key handler at all.
+    """
+    for name in list(rcparams):
+        if name.startswith('keymap.'):
+            rcparams[name] = []
+
+
 def run(paths, glob_pattern=None, follow=None, interval=DEFAULT_INTERVAL,
         max_panels=DEFAULT_MAX_PANELS, title='snek3 charts', scale=DEFAULT_SCALE, dpi=None,
         max_width_px=DEFAULT_MAX_WIDTH_PX):
+    disable_keyboard_shortcuts()
     viewer = Viewer(title, interval, max_panels, scale, dpi, max_width_px)
     plt.ion()
     parent = os.getppid()

@@ -234,3 +234,15 @@ def test_the_viewer_claims_no_slot_and_watches_no_pids():
     for gone in ('fcntl', 'take_window_slot', 'stand_by_for_slot', 'watch_pids', 'NEGATIVE_CHECKS',
                  'from tools import live_runs'):
         assert gone not in source, gone
+
+
+def test_the_window_binds_no_keyboard_shortcuts():
+    """Every keymap.* is emptied, so a keystroke meant for something else is not acted on here."""
+    import matplotlib
+    with matplotlib.rc_context():
+        assert any(matplotlib.rcParams[k] for k in matplotlib.rcParams if k.startswith('keymap.'))
+        chart_viewer.disable_keyboard_shortcuts()
+        bound = {k: v for k, v in matplotlib.rcParams.items() if k.startswith('keymap.') and v}
+        assert bound == {}
+    # rc_context restored the defaults for the rest of the session.
+    assert matplotlib.rcParams['keymap.save']
