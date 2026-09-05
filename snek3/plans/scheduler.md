@@ -186,6 +186,19 @@ seconds; the shards rewrite their own files, so the overlap healed). Every sched
 entry, so this cannot recur; if an old one is ever found mid-pass again, `echo <close-out pid> >
 runs/.live/.pass-<label>` before starting the new scheduler makes it adopt the pass.
 
+**The crash-test on the desktop then found a trainer bug the scheduler had been hiding.** b17ai,
+`kill -9`ed mid-wave, was relaunched three times and died each time ~40 s in on
+`KeyError: 'steps_per_second'`; the wave went on without it (as designed) and its stage B started over
+the half-trained arm before the pause landed (killed by hand, marker cleared). Cause: a resumed arm
+re-trains the steps between its `resume.pt` and where it was killed, and its previous life had already
+queued those steps, so the first fresh eval step was appended to `pending_evals` a second time; merging
+the old result retired every file for the step, the fresh request included, and the orphaned entry was
+reclaimed with nothing on disk. Fixed at the source (a fresh eval supersedes the previous life's queued
+step -- `train.py`, `ec6e0dcc3`) and belt-and-braces (a row may carry no `steps_per_second`; a worker's
+result landing mid-reclaim wins -- `142bb2ab8`). Verified: b17ai killed again at 39.58M, relaunched in
+1 s, resumed at 39.80M with the overlap present and no warning. **Before 2026-09-05 no arm had ever been
+resumed under the eval queue**, which is why this had never fired.
+
 Still deliberate, and worth knowing: a `SIGTERM`ed scheduler leaves its last status standing with running
 lines (the staleness signal the user asked for), and a reopen request rewrites the status at once so the
 new window has its panels.
