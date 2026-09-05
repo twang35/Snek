@@ -756,3 +756,73 @@ def test_the_pause_is_reported_once_however_many_batches_wait(tmp_path, box):
     reporter = scheduler.Reporter(Published(), queue_dir=q, make_driver=make, runs_dir=box['runs'])
     _, _, attention = reporter.jobs(make(scheduler.queue_batches(q)[0][1]))
     assert len(attention) == 1 and attention[0].startswith('** paused')
+
+
+# ---------------------------------------------------------------- a pass left running by a previous scheduler
+
+def _register_pass(box, label, pid):
+    live_runs.register(live_runs.pass_entry(label), pid, box['runs'])
+
+
+def test_a_pass_a_previous_scheduler_left_running_is_waited_for_not_launched_twice(box, monkeypatch):
+    """Restarting the scheduler mid-pass used to start a second close-out over the same shard files."""
+    specs = [spec('b13aa-mb32-seed1')]
+    with open(os.path.join(box['runs'], 'b13aa-mb32-seed1_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}}, handle)
+    _register_pass(box, 'b13-stageb', 777)
+    polls = {'n': 0}
+
+    def alive(pid):                              # only the pass pid is ever asked: the arm is finished
+        assert pid == 777
+        polls['n'] += 1
+        if polls['n'] == 3:                      # the third poll finds it gone, and its file written
+            open(scheduler.pass_file('b13aa-mb32-seed1', 'stageb', box['runs']), 'w').close()
+        return polls['n'] < 3
+    monkeypatch.setattr(scheduler.live_runs, 'alive', alive)
+    calls = FinishingCalls(box['runs'])
+    d = driver(specs, box, calls, wave=1)
+    assert d.run() == 0
+    assert [e[0] for e in calls.events] == ['hof5000', 'hof30k'], 'stage B adopted, not launched; the chain went on'
+    assert polls['n'] == 3
+    assert not os.path.exists(live_runs.path_for(live_runs.pass_entry('b13-stageb'), box['runs'])), 'entry cleared'
+    assert live_runs.live(box['runs']) == [], 'a pass entry is never a trainer'
+
+
+def test_a_stale_pass_entry_is_ignored_and_the_pass_is_launched(box, monkeypatch):
+    specs = [spec('b13aa-mb32-seed1')]
+    with open(os.path.join(box['runs'], 'b13aa-mb32-seed1_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}}, handle)
+    _register_pass(box, 'b13-stageb', 777)
+    monkeypatch.setattr(scheduler.live_runs, 'alive', lambda pid: False if pid == 777 else True)
+    # dead already: the entry is stale, so the pass is launched normally
+    calls = FinishingCalls(box['runs'])
+    assert driver(specs, box, calls, wave=1).run() == 0
+    assert [e[0] for e in calls.events] == PASSES, 'a stale entry is ignored and the pass runs'
+
+
+def test_a_running_pass_is_registered_under_its_label_and_cleared_after(box):
+    specs = [spec('b13aa-mb32-seed1')]
+    with open(os.path.join(box['runs'], 'b13aa-mb32-seed1_evals.json'), 'w') as handle:
+        json.dump({'summary': {'step': 50003968}}, handle)
+    seen = {}
+
+    def popen(argv, **kwargs):
+        label = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
+        entry = live_runs.path_for(live_runs.pass_entry('b13-' + label), box['runs'])
+        seen[label] = os.path.exists(entry)   # not yet: registered right after Popen returns
+        for policy in argv[argv.index('tools.closeout') + 1:argv.index('--shards') if '--pass' not in argv else argv.index('--pass')]:
+            open(scheduler.pass_file(policy, label, box['runs']), 'w').close()
+        return FakeProcess(4000, polls=1)
+    import subprocess
+    d = scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=popen, call=subprocess.call,
+                         sleep=lambda s: None, python='py', ensure_workers=no_workers, wave=1)
+    registered = []
+    real_wait = d._wait_process
+
+    def wait(process):
+        registered.append(sorted(name for name in os.listdir(live_runs.directory(box['runs'])) if name.startswith('.pass-')))
+        return real_wait(process)
+    d._wait_process = wait
+    assert d.run() == 0
+    assert registered == [['.pass-b13-stageb'], ['.pass-b13-hof5000'], ['.pass-b13-hof30k']]
+    assert not any(name.startswith('.pass-') for name in os.listdir(live_runs.directory(box['runs'])))

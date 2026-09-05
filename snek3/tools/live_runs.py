@@ -21,8 +21,8 @@ self-evidently dead rather than merely old.
 
 **The chart window no longer reads this directory** (2026-09-05). It follows `.status.json` here, which
 the scheduler writes — see `tools/window.py` for why the owner of the window is the scheduler and not
-the arms. The dot-files -- `.status.json`, `.reopen-window`, `.paused` -- are the scheduler's; `live()` skips
-anything starting with a dot.
+the arms. The dot-files -- `.status.json`, `.reopen-window`, `.paused`, `.pass-<label>` -- are the scheduler's;
+`live()` skips anything starting with a dot.
 
 Best-effort throughout: this directory is a convenience, and **no failure here is worth a training
 run**.
@@ -42,6 +42,10 @@ REOPEN_NAME = '.reopen-window'
 # While this exists the scheduler launches nothing new: the desktop daemon writes it for
 # `runtime.json`'s `paused`/`drain`, a human touches it on the laptop. What is running finishes.
 HOLD_NAME = '.paused'
+# A pass the scheduler is running: `.pass-<label>` holding the close-out's pid, written by the scheduler
+# (it holds the Popen; the close-out never learns its pass id). A dot-file, so `live()` never counts it
+# as a trainer. What lets a restarted scheduler wait for a pass instead of launching it twice.
+PASS_PREFIX = '.pass-'
 
 
 def directory(runs_dir=None):
@@ -67,6 +71,11 @@ def reopen_path(runs_dir=None):
 
 def hold_path(runs_dir=None):
     return os.path.join(directory(runs_dir), HOLD_NAME)
+
+
+def pass_entry(label):
+    """The registry name for a running pass: `.pass-b17-stageb-w2`. Use with `register`/`read`/`path_for`."""
+    return PASS_PREFIX + str(label)
 
 
 def held(runs_dir=None):

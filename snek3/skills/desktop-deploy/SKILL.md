@@ -50,7 +50,9 @@ The procedure is: set `"paused": true` on `ops` (`desktop-batch`), wait until `s
 empty (the wave's arms and its pass have finished), then kill the scheduler **by the pid `status.json`
 names** -- `ssh the-claw-den 'kill <scheduler.pid>'`, never a pattern -- and set `"paused": false`. The
 daemon sees the hold lifted with no scheduler alive and starts one on the new code; its arms are untouched
-(their own sessions) and are adopted through `runs/.live/`. Without the pause the daemon also restarts a
+(their own sessions) and are adopted through `runs/.live/`, and so is a pass still running (`.pass-<label>`
+there, since 2026-09-05 evening -- before that a mid-pass restart launched the pass twice), so waiting for
+`running` to empty is tidiness, not a requirement. Without the pause the daemon also restarts a
 dead scheduler on its own once work is pending, after a 10-minute backoff, or at once on `trigger`. `desktop/README.md` ("Deploy over the bus", and the deploy script's exit codes 3 and 4) has the
 detail, including the one-time settling of the box's pre-2026-09-03 files.
 

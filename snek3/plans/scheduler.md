@@ -173,6 +173,11 @@ A second read of the built implementation found four defects, all fixed the same
 | `run_queue` skipped a batch it had run once whatever it now owed, so a spec dropped into the running batch never ran and the scheduler exited 1 — on both boxes, contrary to the `hof-remeasure` skill | the ran-once set remembers the owed ids; a batch runs again when it owes an id it did not owe before, and never for the same leftover |
 | the deploy skill said a pause restarts the scheduler; it does not (it waits inside its loop, and the unpause spawns only if none is alive) | pause, wait for `running` empty, kill the pid `status.json` names, unpause — in the skill and the README |
 
+Added the same evening: **a running pass is registered like an arm** (`runs/.live/.pass-<label>` = the
+close-out's pid, written by the scheduler that holds its `Popen`), so a scheduler restarted mid-pass waits
+for it instead of launching a second close-out over the same shard files. A restart is now safe at any
+point, as §6 claimed; the row above about the wave boundary being the tidy moment is history.
+
 Still deliberate, and worth knowing: a `SIGTERM`ed scheduler leaves its last status standing with running
 lines (the staleness signal the user asked for), and a reopen request rewrites the status at once so the
 new window has its panels.

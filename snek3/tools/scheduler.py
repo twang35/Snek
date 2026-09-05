@@ -17,7 +17,8 @@ directory. Rerunning the same command is still the whole recovery.
 **State is the filesystem.** An arm is finished when its `runs/<arm>_evals.json` reports `max_steps`;
 a pass is done when its merged `runs/<arm>_checkpoint_evals[_<label>].json` exists for every arm of
 the wave; an arm already live on this box (`runs/.live/`, written by the trainer) is waited for rather
-than relaunched; a pass that failed is marked `.failed-<label>` in the batch directory so the queue
+than relaunched, and so is a pass a previous scheduler left running (`runs/.live/.pass-<label>`, written
+by that scheduler); a pass that failed is marked `.failed-<label>` in the batch directory so the queue
 does not loop on it (delete the marker to retry). Nothing else is remembered, which is why a kill, a
 reboot or a deploy costs nothing but a rerun.
 
@@ -216,7 +217,16 @@ def eval_job(spec):
 
 def live_pid(spec, runs_dir=None):
     """The pid of a trainer already running this arm on this box, or None."""
-    pid = live_runs.read(live_runs.path_for(spec['policy'], runs_dir))
+    return _live_entry(spec['policy'], runs_dir)
+
+
+def live_pass_pid(label, runs_dir=None):
+    """The pid of a close-out already running this pass on this box (a predecessor scheduler's), or None."""
+    return _live_entry(live_runs.pass_entry(label), runs_dir)
+
+
+def _live_entry(name, runs_dir=None):
+    pid = live_runs.read(live_runs.path_for(name, runs_dir))
     if pid is not None and live_runs.alive(pid) and not live_runs.zombie(pid):
         return pid
     return None
@@ -546,22 +556,41 @@ class Driver(object):
         self.active_pass = (pass_name, number, list(arms))
         self._show(pass_panels([spec['policy'] for spec in arms], closeout.PASSES[pass_name]['label'],
                                self.runs_dir))
-        code = self._run_closeout(argv, label)
+        code = self._run_closeout(argv, label, expected=[pass_file(spec['policy'], pass_name, self.runs_dir)
+                                                          for spec in arms])
         self.active_pass = None
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
         self._report()
         return code
 
-    def _run_closeout(self, argv, label):
+    def _run_closeout(self, argv, label, expected=None):
+        """Runs one close-out as `label`, or waits for the one a predecessor scheduler left running.
+
+        The pass is registered as `runs/.live/.pass-<label>` = pid while it runs, by this scheduler,
+        which holds the Popen (the arms register themselves; a close-out does not know its pass id).
+        A restarted scheduler finds the entry alive and waits, as it does for an arm -- before this
+        (2026-09-05) it launched a second close-out over the same shard files. An adopted pass has no
+        exit code to read, so its success is `expected`: every file it was to write exists.
+        """
         os.makedirs(self.logs_dir, exist_ok=True)
         self._report()
+        pid = live_pass_pid(label, self.runs_dir)
+        if pid is not None:
+            _log('{0} already running here (pid {1}); waiting for it'.format(label, pid))
+            self._wait_pid(pid)
+            live_runs.unregister(live_runs.pass_entry(label), self.runs_dir)
+            return 0 if expected is None or all(os.path.exists(path) for path in expected) else 1
         with open(os.path.join(self.logs_dir, '{0}.log'.format(label)), 'a') as out:
             # `call` blocks, so the window's reopen request and the republish are checked from a
             # polling `popen` instead when the injected `call` is the real one.
             if self.call is subprocess.call:
                 process = self.popen(argv, cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
                                      stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
-                return self._wait_process(process)
+                live_runs.register(live_runs.pass_entry(label), process.pid, self.runs_dir)
+                try:
+                    return self._wait_process(process)
+                finally:
+                    live_runs.unregister(live_runs.pass_entry(label), self.runs_dir)
             return self.call(argv, cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
                              stdout=out, stderr=subprocess.STDOUT)
 
