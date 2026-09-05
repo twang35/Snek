@@ -1,22 +1,22 @@
 {
-  "iso": "2026-09-05T12:43:42",
-  "ts": 1788637422.6682649,
+  "iso": "2026-09-05T12:46:51",
+  "ts": 1788637611.587592,
   "box": "laptop",
   "project": "snek3",
-  "pid": 25936,
+  "pid": 29215,
   "at_a_glance": {
     "running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training 3% (8 arms) | ~1.8h left"
+      "b19 | noadvnorm, mse -- wave 1 of 3 | training 6% (8 arms) | ~1.5h left"
     ],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
-      "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~3.4h",
+      "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~3.1h",
       "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.3h",
-      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms) | ~3.5h",
+      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms) | ~3.2h",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 (16 arms) | ~2.3h"
     ],
     "attention": [],
-    "remaining": "~14h of work: 1.8h running + 13h queued; clear ~Sun 03:09"
+    "remaining": "~14h of work: 1.5h running + 12h queued; clear ~Sun 02:22"
   },
   "running": [
     {
@@ -26,9 +26,9 @@
       "policies": [
         "b19a-noadvnorm-seed1"
       ],
-      "step": 1294336,
+      "step": 3112960,
       "max_steps": 50003968,
-      "eta_seconds": 6253.327903877322
+      "eta_seconds": 5228.676215557884
     },
     {
       "id": "b19b-noadvnorm-seed2",
@@ -37,9 +37,9 @@
       "policies": [
         "b19b-noadvnorm-seed2"
       ],
-      "step": 1359872,
+      "step": 3244032,
       "max_steps": 50003968,
-      "eta_seconds": 5548.390555427874
+      "eta_seconds": 4919.586330739521
     },
     {
       "id": "b19c-noadvnorm-seed3",
@@ -48,9 +48,9 @@
       "policies": [
         "b19c-noadvnorm-seed3"
       ],
-      "step": 1376256,
+      "step": 3096576,
       "max_steps": 50003968,
-      "eta_seconds": 5708.254211962918
+      "eta_seconds": 5239.7322487910715
     },
     {
       "id": "b19d-noadvnorm-seed4",
@@ -59,9 +59,9 @@
       "policies": [
         "b19d-noadvnorm-seed4"
       ],
-      "step": 1245184,
+      "step": 3031040,
       "max_steps": 50003968,
-      "eta_seconds": 6471.384215726795
+      "eta_seconds": 5540.86418568204
     },
     {
       "id": "b19e-mse-seed1",
@@ -70,9 +70,9 @@
       "policies": [
         "b19e-mse-seed1"
       ],
-      "step": 1277952,
+      "step": 3096576,
       "max_steps": 50003968,
-      "eta_seconds": 6189.999150990992
+      "eta_seconds": 5525.724876306664
     },
     {
       "id": "b19f-mse-seed2",
@@ -81,9 +81,9 @@
       "policies": [
         "b19f-mse-seed2"
       ],
-      "step": 1277952,
+      "step": 3047424,
       "max_steps": 50003968,
-      "eta_seconds": 6114.365009242566
+      "eta_seconds": 5286.230163707907
     },
     {
       "id": "b19g-mse-seed3",
@@ -92,9 +92,9 @@
       "policies": [
         "b19g-mse-seed3"
       ],
-      "step": 1327104,
+      "step": 3162112,
       "max_steps": 50003968,
-      "eta_seconds": 5758.057423383432
+      "eta_seconds": 5278.414400871829
     },
     {
       "id": "b19h-mse-seed4",
@@ -103,9 +103,9 @@
       "policies": [
         "b19h-mse-seed4"
       ],
-      "step": 1294336,
+      "step": 3047424,
       "max_steps": 50003968,
-      "eta_seconds": 5852.679829681271
+      "eta_seconds": 5323.085085377916
     }
   ],
   "queued_ids": [
@@ -167,5 +167,5 @@
     "/Users/tony_wang/Projects/Snek/snek3/runs/b19g-mse-seed3.png",
     "/Users/tony_wang/Projects/Snek/snek3/runs/b19h-mse-seed4.png"
   ],
-  "window_pid": 25957
+  "window_pid": 29269
 }
