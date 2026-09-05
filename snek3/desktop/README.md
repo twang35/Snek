@@ -287,21 +287,24 @@ plain OpenSSH through a port forward. The box itself may run anything.
 | 4 | laptop | the `Match` block below in `~/.ssh/config`, so the same alias falls back to the DDNS name when mDNS does not answer | done; backup at `~/.ssh/config.bak-2026-09-04` |
 
 ```
+# BEFORE the Host block: ssh keeps the first value set for an option, so a Match
+# placed after it is silently ignored (found on the first hotspot test, 2026-09-04).
+Match host the-claw-den !exec "nc -z -w 1 -G 1 the-claw-den.local 22 2>/dev/null"
+  HostName clawden.tplinkdns.com
+  Port 2222
+
 Host the-claw-den
   HostName the-claw-den.local
   HostKeyAlias the-claw-den
   User claw
   IdentityFile ~/.ssh/snek_desktop
   IdentitiesOnly yes
-
-Match host the-claw-den !exec "nc -z -w 1 -G 1 the-claw-den.local 22 2>/dev/null"
-  HostName clawden.tplinkdns.com
-  Port 2222
 ```
 
 `HostKeyAlias` is already in the alias, so the known-hosts entry is shared by both paths and the fallback
 does not prompt. Verified 2026-09-04: on the LAN `ssh -G the-claw-den` picks `.local:22`; the forwarded path
-logged in by name and by address (the BE600 does NAT loopback, so it is testable from inside too). A DDNS name
+logged in by name and by address (the BE600 does NAT loopback, so it is testable from inside too), and
+**from a phone hotspot the plain alias logged in through the forward** — the real off-LAN test. A DDNS name
 that `dig` resolves but `ssh` does not is the Mac's negative resolver cache from before the record existed —
 `dscacheutil -flushcache`. Every existing command then works unchanged from anywhere. What stays home-LAN is the box
 reaching the laptop (only the diagnostic ping in `plans/laptop-wifi.md`), since the laptop's address is
