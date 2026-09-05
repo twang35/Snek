@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T11:18:58",
-  "ts": 1788632338.956226,
+  "iso": "2026-09-05T11:26:20",
+  "ts": 1788632780.5750554,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -17,7 +17,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl04, kl05 -- wave 5 of 5 | training 95% (6 arms)"
+      "b16 | kl04, kl05 | stage B (8 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl04, kl05 | queued (8 arms)",
@@ -26,7 +26,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T11:18:22"
+    "laptop_iso": "2026-09-05T11:22:57"
   },
   "scheduler": {
     "alive": true,
@@ -543,6 +543,7 @@
     "b15-hof5000-w2": "done",
     "deploy-20260905T083350Z": "done",
     "deploy-20260905T175401Z": "done",
+    "deploy-20260905T182607Z": "done",
     "b15-hof30k-w2": "done",
     "b15aq-ent02-seed1": "done",
     "b15ar-ent02-seed2": "done",
@@ -732,11 +733,11 @@
     "b17ao-clip03-seed3": "running",
     "b17ap-clip03-seed4": "running"
   },
-  "disk_free_gb": 124.3,
-  "head": "1ba444bd1f08",
+  "disk_free_gb": 124.2,
+  "head": "9b8f2d0d120e",
   "load_avg": [
-    13.3720703125,
-    13.65576171875,
-    13.76708984375
+    13.72705078125,
+    13.669921875,
+    13.7177734375
   ]
 }
