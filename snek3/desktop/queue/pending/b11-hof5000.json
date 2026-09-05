@@ -1,0 +1,42 @@
+{
+  "project": "snek3",
+  "id": "b11-hof5000",
+  "type": "eval",
+  "policies": [
+    "b11ae-lr1e4-seed1",
+    "b11af-lr1e4-seed2",
+    "b11ag-lr1e4-seed3",
+    "b11ah-lr1e4-seed4",
+    "b11ai-lr1.5e4-seed1",
+    "b11aj-lr1.5e4-seed2",
+    "b11ak-lr1.5e4-seed3",
+    "b11al-lr1.5e4-seed4",
+    "b11am-lr2.5e4-seed1",
+    "b11an-lr2.5e4-seed2",
+    "b11ao-lr2.5e4-seed3",
+    "b11ap-lr2.5e4-seed4",
+    "b11aq-lr5e4-seed1",
+    "b11ar-lr5e4-seed2",
+    "b11as-lr5e4-seed3",
+    "b11at-lr5e4-seed4",
+    "b11au-lr8e4-seed1",
+    "b11aw-lr8e4-seed3",
+    "b11ax-lr8e4-seed4",
+    "b11ay-lr1e3-seed1",
+    "b11az-lr1e3-seed2",
+    "b11ba-lr1e3-seed3",
+    "b11bb-lr1e3-seed4",
+    "b11bc-lr2e3-seed1",
+    "b11bd-lr2e3-seed2"
+  ],
+  "selector": "above:99",
+  "episodes": 5000,
+  "eval_shards": 16,
+  "eval_args": [
+    "--label",
+    "hof5000"
+  ],
+  "priority": 5,
+  "label": "b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes",
+  "notes": "Ten times the depth on every b11 (learning-rate sweep) checkpoint that cleared 99%/500 in the close-out: 661 rows across the 25 arms that have any (lr 4e-5 has none; b11av and b11be/b11bf none). above:99 reads each arm's own stage-B file, so one wave covers every arm. Labelled hof5000 so the 500-episode pass is untouched. Ranks candidates, promotes nothing -- a hallOfFame/ copy is a separate deliberate step. Priority 5 so it drains at the next b15 wave boundary; ~3.3M episodes, ~35 min at 16 shards. b11-hof30k (priority 6) follows it and reads this pass's files."
+}
