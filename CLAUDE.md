@@ -170,6 +170,12 @@ moment a commit also touches code, config, or anything that changes program beha
 change reverts to the code rule above and waits for approval. Chart images that accompany a docs
 edit ride along with the docs commit.
 
+**The chart viewer: commit and push without waiting** (standing authorization, 2026-09-04). A change
+to `snek3/viewer/index.html` is committed as soon as it is made, together with the `docs/` republish
+that `tools.publish_pages` produces from it, so the live page shows the fix a minute later. The
+only-if rule below still applies: a viewer edit that rides along with a trainer or tool change waits
+with that change.
+
 **Tests: commit and push without waiting** (standing authorization, 2026-08-14, for the stated
 reason that the user does not read these diffs). `snek3/tests/*.py` — assertions about behaviour,
 never behaviour.
