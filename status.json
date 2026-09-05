@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T00:05:20",
-  "ts": 1788591920.2916708,
+  "iso": "2026-09-05T00:07:06",
+  "ts": 1788592026.2676013,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -17,7 +17,20 @@
       "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 | queued (24 arms)",
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 | queued (24 arms)"
     ],
-    "attention": []
+    "attention": [],
+    "laptop_running": [
+      "b16 | kl003, kl005 -- wave 1 of 5 | training 45% (8 arms)"
+    ],
+    "laptop_queued": [
+      "b16 evals | kl003, kl005 | queued (8 arms)",
+      "b16 training | kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 -- waves 2-5 of 5 | queued (32 arms)",
+      "b16 evals | kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 | queued (32 arms)",
+      "b19 training | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 -- waves 1-3 of 3 | queued (24 arms)",
+      "b19 evals | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 | queued (24 arms)",
+      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
+      "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
+    ],
+    "laptop_iso": "2026-09-05T00:02:18"
   },
   "runtime": {
     "max_trainers": 8,
@@ -57,8 +70,8 @@
       "step": 50003968,
       "label": "",
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 2219
+      "steps_per_sec": null,
+      "elapsed_s": 2325
     }
   ],
   "ledger": {
@@ -658,9 +671,10 @@
     "b1d-baseline-seed4": "done"
   },
   "disk_free_gb": 130.2,
+  "head": "99f6a418bf1f",
   "load_avg": [
-    16.4541015625,
-    16.1298828125,
-    15.7158203125
+    16.40185546875,
+    16.22607421875,
+    15.80224609375
   ]
 }
