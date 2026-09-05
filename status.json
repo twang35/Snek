@@ -1,6 +1,6 @@
 {
-  "iso": "2026-09-05T13:00:10",
-  "ts": 1788638410.1843786,
+  "iso": "2026-09-05T13:00:48",
+  "ts": 1788638448.6347036,
   "project": "snek3",
   "at_a_glance": {
     "running": [
@@ -14,7 +14,7 @@
       "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 (24 arms) | ~3.5h"
     ],
     "attention": [],
-    "remaining": "~23h of work: 55m running + 22h queued; clear ~Sun 12:12",
+    "remaining": "~23h of work: 55m running + 22h queued; clear ~Sun 12:14",
     "laptop_running": [
       "b19 | noadvnorm, mse -- wave 1 of 3 | training 17% (8 arms) | ~1.4h left"
     ],
@@ -32,11 +32,11 @@
   },
   "scheduler": {
     "alive": true,
-    "pid": 1357242,
-    "spawned": 1788637670.049998,
+    "pid": 1375916,
+    "spawned": 1788638443.1929765,
     "last_exit": null,
-    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-124750.log",
-    "status_iso": "2026-09-05T12:57:56"
+    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-130043.log",
+    "status_iso": "2026-09-05T13:00:48"
   },
   "runtime": {
     "max_trainers": 8,
@@ -70,7 +70,7 @@
       ],
       "step": null,
       "max_steps": null,
-      "eta_seconds": 3300.0
+      "eta_seconds": 3299.507164955139
     }
   ],
   "ledger": {
@@ -650,8 +650,8 @@
   "disk_free_gb": 123.6,
   "head": "5b3357bc5633",
   "load_avg": [
-    16.3984375,
-    16.38916015625,
-    15.85595703125
+    16.345703125,
+    16.3720703125,
+    15.87451171875
   ]
 }
