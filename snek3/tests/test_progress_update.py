@@ -178,6 +178,16 @@ def test_import_skips_shard_files_and_existing_ones(tmp_path, monkeypatch):
     assert not (tmp_path / 'b20aa-k1-seed1_checkpoint_evals-s1of4.json').exists()
 
 
+def test_import_takes_a_done_hof_pass_too(tmp_path, monkeypatch):
+    # b11's hof5000/hof30k finished on the desktop 2026-09-04 and nothing imported them.
+    monkeypatch.setattr(pu.subprocess, 'run', lambda argv, **kw: type('R', (), {'stdout': b'{}', 'returncode': 0})())
+    tree = ['results/b11-hof30k/b11ae-lr1e4-seed1_checkpoint_evals_hof30k.json',
+            'results/b11-hof30k/b11ae-lr1e4-seed1_checkpoint_evals_hof5000-s1of8.json',
+            'results/b11-hof5000/b11ae-lr1e4-seed1_checkpoint_evals_hof5000.json']
+    copied = pu.import_closed_waves({'ledger': {'b11-hof30k': 'done', 'b11-hof5000': 'running'}}, tree, str(tmp_path))
+    assert copied == 1 and (tmp_path / 'b11ae-lr1e4-seed1_checkpoint_evals_hof30k.json').exists()
+
+
 def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp_path):
     live = tmp_path / '.live' / 'desktop'
     live.mkdir(parents=True)

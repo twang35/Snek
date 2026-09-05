@@ -73,9 +73,14 @@ def results_tree():
 
 
 def import_closed_waves(status, tree, runs_dir=None):
-    """Copies every done stage-B wave's files that `runs/` does not have yet. Returns the count."""
+    """Copies every done stage-B wave's and hof pass's files that `runs/` does not have yet. Returns the count.
+
+    A hof pass (`bN-hof5000`, `bN-hof30k`) is a measurement like a stage-B wave and its files belong on
+    master once the job is done; until 2026-09-04 only `stageb` jobs were imported, and b11's finished
+    passes sat on `results` unread."""
     runs_dir = runs_dir or constants.RUNS_DIR
-    done = {job for job, state in status['ledger'].items() if state == 'done' and 'stageb' in job}
+    done = {job for job, state in status['ledger'].items()
+            if state == 'done' and ('stageb' in job or 'hof' in job)}
     copied = 0
     for path in tree:
         parts = path.split('/')
