@@ -1,15 +1,15 @@
 {
-  "iso": "2026-09-04T19:13:24",
-  "ts": 1788574404.4653378,
+  "iso": "2026-09-04T19:13:57",
+  "ts": 1788574437.1926959,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "b12 | b12 hof5000 eval: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes | hof5000 (37 arms)"
     ],
     "queued": [
-      "b12 evals | b12 hof eval: 652 checkpoints >=99/500 from 37 arms at 5,000, then those >=99... | queued (37 arms)",
-      "b13 evals | b13 hof eval: 680 checkpoints >=99/500 from 30 arms at 5,000, then those >=99... | queued (30 arms)",
-      "b15 evals | b15 hof eval: 53 checkpoints >=99/500 from 8 arms at 5,000, then those >=99 a... | queued (8 arms)",
+      "b12 evals | hof eval: 652 checkpoints >=99/500 from 37 arms, at 5,000 then 30,000 (seed 7) | queued (37 arms)",
+      "b13 evals | hof eval: 680 checkpoints >=99/500 from 30 arms, at 5,000 then 30,000 (seed 7) | queued (30 arms)",
+      "b15 evals | hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7) | queued (8 arms)",
       "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b15 evals | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
@@ -95,7 +95,7 @@
       "label": "b12 hof5000 eval: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 595
+      "elapsed_s": 628
     }
   ],
   "ledger": {
@@ -798,8 +798,8 @@
   },
   "disk_free_gb": 132.2,
   "load_avg": [
-    12.85400390625,
-    9.748046875,
-    6.6630859375
+    14.365234375,
+    10.4111328125,
+    6.982421875
   ]
 }
