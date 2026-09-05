@@ -1,13 +1,11 @@
 {
-  "iso": "2026-09-05T02:09:26",
-  "ts": 1788599366.099585,
+  "iso": "2026-09-05T02:09:29",
+  "ts": 1788599369.0859299,
   "box": "laptop",
   "project": "snek3",
   "pid": 26287,
   "at_a_glance": {
-    "running": [
-      "b16 | kl003, kl005 | hof5000 (8 arms)"
-    ],
+    "running": [],
     "queued": [
       "b16 evals | kl003, kl005 | queued (8 arms)",
       "b16 training | kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 -- waves 2-5 of 5 | queued (32 arms)",
@@ -19,25 +17,7 @@
     ],
     "attention": []
   },
-  "running": [
-    {
-      "id": "b16-hof5000",
-      "type": "eval",
-      "policy": "b16aa-kl003-seed1",
-      "policies": [
-        "b16aa-kl003-seed1",
-        "b16ab-kl003-seed2",
-        "b16ac-kl003-seed3",
-        "b16ad-kl003-seed4",
-        "b16ae-kl005-seed1",
-        "b16af-kl005-seed2",
-        "b16ag-kl005-seed3",
-        "b16ah-kl005-seed4"
-      ],
-      "step": null,
-      "max_steps": null
-    }
-  ],
+  "running": [],
   "queued_ids": [
     "b16-hof30k",
     "b16ai-kl008-seed1",
