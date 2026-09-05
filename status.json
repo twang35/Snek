@@ -1,15 +1,14 @@
 {
-  "iso": "2026-09-04T23:15:11",
-  "ts": 1788588911.9367485,
+  "iso": "2026-09-04T23:25:35",
+  "ts": 1788589535.6043134,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | ent003, ent005 -- wave 2 of 5 | training 86% (8 arms)"
+      "b15 | ent003, ent005 -- wave 2 of 5 | training 97% (6 arms)"
     ],
     "queued": [
-      "b15 evals | ent003, ent005 | queued (8 arms)",
+      "b15 evals | ent003 | queued (2 arms)",
       "b15 training | ent02, ent03, entanneal10, entanneal03, entanneal01, entanneal01to0 -- waves ... | queued (24 arms)",
-      "b15 evals | ent02, ent03, entanneal10, entanneal03, entanneal01, entanneal01to0 | queued (24 arms)",
       "b17 training | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
       "b17 evals | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
       "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 | queued (24 arms)",
@@ -39,38 +38,10 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 8,
+    "trainer": 6,
     "eval": 0
   },
   "running": [
-    {
-      "id": "b15ai-ent003-seed1",
-      "type": "train",
-      "policy": "b15ai-ent003-seed1",
-      "policies": [
-        "b15ai-ent003-seed1"
-      ],
-      "pid": 80010,
-      "step": 44924928,
-      "label": "b15: ent003, seed 1 of 4 -- wave 2 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 7669.3,
-      "elapsed_s": 4580
-    },
-    {
-      "id": "b15aj-ent003-seed2",
-      "type": "train",
-      "policy": "b15aj-ent003-seed2",
-      "policies": [
-        "b15aj-ent003-seed2"
-      ],
-      "pid": 80011,
-      "step": 44400640,
-      "label": "b15: ent003, seed 2 of 4 -- wave 2 of 5",
-      "max_steps": 50003968,
-      "steps_per_sec": 9203.1,
-      "elapsed_s": 4580
-    },
     {
       "id": "b15ak-ent003-seed3",
       "type": "train",
@@ -79,11 +50,11 @@
         "b15ak-ent003-seed3"
       ],
       "pid": 80012,
-      "step": 42909696,
+      "step": 49348608,
       "label": "b15: ent003, seed 3 of 4 -- wave 2 of 5",
       "max_steps": 50003968,
-      "steps_per_sec": 9202.9,
-      "elapsed_s": 4580
+      "steps_per_sec": 13909.1,
+      "elapsed_s": 5204
     },
     {
       "id": "b15al-ent003-seed4",
@@ -93,11 +64,11 @@
         "b15al-ent003-seed4"
       ],
       "pid": 80013,
-      "step": 42598400,
+      "step": 49037312,
       "label": "b15: ent003, seed 4 of 4 -- wave 2 of 5",
       "max_steps": 50003968,
-      "steps_per_sec": 11247.8,
-      "elapsed_s": 4580
+      "steps_per_sec": 13908.9,
+      "elapsed_s": 5204
     },
     {
       "id": "b15am-ent005-seed1",
@@ -107,11 +78,11 @@
         "b15am-ent005-seed1"
       ],
       "pid": 80014,
-      "step": 42680320,
+      "step": 48988160,
       "label": "b15: ent005, seed 1 of 4 -- wave 2 of 5",
       "max_steps": 50003968,
-      "steps_per_sec": 11247.8,
-      "elapsed_s": 4580
+      "steps_per_sec": 15454.4,
+      "elapsed_s": 5204
     },
     {
       "id": "b15an-ent005-seed2",
@@ -121,11 +92,11 @@
         "b15an-ent005-seed2"
       ],
       "pid": 80015,
-      "step": 42074112,
+      "step": 48431104,
       "label": "b15: ent005, seed 2 of 4 -- wave 2 of 5",
       "max_steps": 50003968,
-      "steps_per_sec": 8691.4,
-      "elapsed_s": 4580
+      "steps_per_sec": 14423.7,
+      "elapsed_s": 5204
     },
     {
       "id": "b15ao-ent005-seed3",
@@ -135,11 +106,11 @@
         "b15ao-ent005-seed3"
       ],
       "pid": 80016,
-      "step": 41959424,
+      "step": 48218112,
       "label": "b15: ent005, seed 3 of 4 -- wave 2 of 5",
       "max_steps": 50003968,
-      "steps_per_sec": 9713.7,
-      "elapsed_s": 4580
+      "steps_per_sec": 14423.8,
+      "elapsed_s": 5204
     },
     {
       "id": "b15ap-ent005-seed4",
@@ -149,11 +120,11 @@
         "b15ap-ent005-seed4"
       ],
       "pid": 80017,
-      "step": 41811968,
+      "step": 47955968,
       "label": "b15: ent005, seed 4 of 4 -- wave 2 of 5",
       "max_steps": 50003968,
-      "steps_per_sec": 14314.9,
-      "elapsed_s": 4580
+      "steps_per_sec": 13908.5,
+      "elapsed_s": 5204
     }
   ],
   "ledger": {
@@ -168,9 +139,6 @@
     "b15av-ent03-seed2": "queued",
     "b15aw-ent03-seed3": "queued",
     "b15ax-ent03-seed4": "queued",
-    "b15-stageb-w3": "queued",
-    "b15-hof5000-w3": "queued",
-    "b15-hof30k-w3": "queued",
     "b15ay-entanneal10-seed1": "queued",
     "b15az-entanneal10-seed2": "queued",
     "b15ba-entanneal10-seed3": "queued",
@@ -179,9 +147,6 @@
     "b15bd-entanneal03-seed2": "queued",
     "b15be-entanneal03-seed3": "queued",
     "b15bf-entanneal03-seed4": "queued",
-    "b15-stageb-w4": "queued",
-    "b15-hof5000-w4": "queued",
-    "b15-hof30k-w4": "queued",
     "b15bg-entanneal01-seed1": "queued",
     "b15bh-entanneal01-seed2": "queued",
     "b15bi-entanneal01-seed3": "queued",
@@ -190,9 +155,6 @@
     "b15bl-entanneal01to0-seed2": "queued",
     "b15bm-entanneal01to0-seed3": "queued",
     "b15bn-entanneal01to0-seed4": "queued",
-    "b15-stageb-w5": "queued",
-    "b15-hof5000-w5": "queued",
-    "b15-hof30k-w5": "queued",
     "b17aa-clip005-seed1": "queued",
     "b17ab-clip005-seed2": "queued",
     "b17ac-clip005-seed3": "queued",
@@ -402,14 +364,14 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b15ai-ent003-seed1": "running",
-    "b15aj-ent003-seed2": "running",
     "b15ak-ent003-seed3": "running",
     "b15al-ent003-seed4": "running",
     "b15am-ent005-seed1": "running",
     "b15an-ent005-seed2": "running",
     "b15ao-ent005-seed3": "running",
     "b15ap-ent005-seed4": "running",
+    "b15aj-ent003-seed2": "done",
+    "b15ai-ent003-seed1": "done",
     "b15-hof30k": "done",
     "b15-hof5000": "done",
     "b13-hof30k": "done",
@@ -807,10 +769,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 130.5,
+  "disk_free_gb": 130.3,
   "load_avg": [
-    13.05224609375,
-    13.169921875,
-    13.01904296875
+    13.61328125,
+    13.38134765625,
+    13.17822265625
   ]
 }
