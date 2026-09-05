@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T07:14:31",
-  "ts": 1788617671.2751546,
+  "iso": "2026-09-05T07:24:53",
+  "ts": 1788618293.460737,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | entanneal01, entanneal01to0 -- wave 5 of 5 | training 76% (8 arms)"
+      "b15 | entanneal01, entanneal01to0 -- wave 5 of 5 | training 89% (8 arms)"
     ],
     "queued": [
       "b15 evals | entanneal01, entanneal01to0 | queued (8 arms)",
@@ -17,18 +17,18 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl013, kl015 | hof5000 (8 arms)"
+      "b16 | kl02, kl03 -- wave 4 of 5 | training (8 arms)"
     ],
     "laptop_queued": [
-      "b16 evals | kl013, kl015 | queued (8 arms)",
-      "b16 training | kl02, kl03, kl04, kl05 -- waves 4-5 of 5 | queued (16 arms)",
-      "b16 evals | kl02, kl03, kl04, kl05 | queued (16 arms)",
+      "b16 evals | kl02, kl03 | queued (8 arms)",
+      "b16 training | kl04, kl05 -- wave 5 of 5 | queued (8 arms)",
+      "b16 evals | kl04, kl05 | queued (8 arms)",
       "b19 training | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 -- waves 1-3 of 3 | queued (24 arms)",
       "b19 evals | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 | queued (24 arms)",
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T07:07:50"
+    "laptop_iso": "2026-09-05T07:19:52"
   },
   "scheduler": {
     "alive": true,
@@ -36,7 +36,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T07:11:53"
+    "status_iso": "2026-09-05T07:21:54"
   },
   "runtime": {
     "max_trainers": 8,
@@ -61,7 +61,7 @@
       "policies": [
         "b15bg-entanneal01-seed1"
       ],
-      "step": 39829504,
+      "step": 46759936,
       "max_steps": 50003968
     },
     {
@@ -71,7 +71,7 @@
       "policies": [
         "b15bh-entanneal01-seed2"
       ],
-      "step": 39944192,
+      "step": 47235072,
       "max_steps": 50003968
     },
     {
@@ -81,7 +81,7 @@
       "policies": [
         "b15bi-entanneal01-seed3"
       ],
-      "step": 38256640,
+      "step": 44892160,
       "max_steps": 50003968
     },
     {
@@ -91,7 +91,7 @@
       "policies": [
         "b15bj-entanneal01-seed4"
       ],
-      "step": 37715968,
+      "step": 44318720,
       "max_steps": 50003968
     },
     {
@@ -101,7 +101,7 @@
       "policies": [
         "b15bk-entanneal01to0-seed1"
       ],
-      "step": 37470208,
+      "step": 44056576,
       "max_steps": 50003968
     },
     {
@@ -111,7 +111,7 @@
       "policies": [
         "b15bl-entanneal01to0-seed2"
       ],
-      "step": 37142528,
+      "step": 43630592,
       "max_steps": 50003968
     },
     {
@@ -121,7 +121,7 @@
       "policies": [
         "b15bm-entanneal01to0-seed3"
       ],
-      "step": 36732928,
+      "step": 43204608,
       "max_steps": 50003968
     },
     {
@@ -131,7 +131,7 @@
       "policies": [
         "b15bn-entanneal01to0-seed4"
       ],
-      "step": 37076992,
+      "step": 43581440,
       "max_steps": 50003968
     }
   ],
@@ -733,11 +733,11 @@
     "b15bm-entanneal01to0-seed3": "running",
     "b15bn-entanneal01to0-seed4": "running"
   },
-  "disk_free_gb": 126.6,
+  "disk_free_gb": 126.5,
   "head": "e297c1729b95",
   "load_avg": [
-    13.7080078125,
-    13.625,
-    13.6826171875
+    13.72900390625,
+    13.81591796875,
+    13.74658203125
   ]
 }
