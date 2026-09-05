@@ -286,9 +286,11 @@ the desktop as down, drained or off-LAN from an unfetched read. The ladder, in o
 re-read; `ssh the-claw-den 'Snek/snek3/desktop/trigger'`, which makes the daemon publish *now* and
 reports whether it is polling at all; then `ssh the-claw-den -o ConnectTimeout=8 -o BatchMode=yes`,
 which settles reachability in seconds. Only after all three fail is the box worth calling
-unreachable. The git bus works from anywhere; `ssh` is home-LAN only (mDNS, no Tailscale since
-2026-08-13) — but "probably off-LAN" is a conclusion, not a starting assumption, and it has been
-wrong.
+unreachable. The git bus works from anywhere, and **since 2026-09-04 so does `ssh the-claw-den`**: the alias
+uses mDNS on the home LAN and falls back to the router's port forward (`clawden.tplinkdns.com:2222`, a
+`Match` block in `~/.ssh/config`) when the mDNS name does not answer; setup and hardening in
+`snek3/desktop/README.md`, "Reach the box from outside the home LAN". So "off-LAN" is no longer a reason
+for `ssh` to fail, and it never was a safe starting assumption — it has been wrong.
 
 **‡ `pgrep -f` and `pkill -f` match the shell that runs them, and this is the default outcome, not an
 edge case.** `-f` scans full command lines, and the invoking shell's own command line contains the
