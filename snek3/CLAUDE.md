@@ -57,7 +57,7 @@ cd snek3
 PYTHONPATH=. python -u train.py <policy>               # the name doubles as the checkpoint dir
 PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:97, 500 eps, 4 shards
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
-PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 8   # a whole batch's stage B
+PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 12  # a whole batch's stage B (laptop; the desktop uses 16)
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
 PYTHONPATH=. python -m tools.chart_window                # the box's chart window, if it is not up

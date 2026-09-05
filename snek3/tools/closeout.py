@@ -1,6 +1,6 @@
 """A batch's stage-B pass: every arm of a wave, measured in sequence, with a window over it.
 
-    PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --shards 8
+    PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --shards 12
 
 **This is the close-out, and both boxes run this file.** The desktop's daemon dispatches one `eval`
 job per batch and that job is this command; on the laptop the same command is typed by hand. Before

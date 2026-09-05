@@ -32,8 +32,9 @@ print('total', tot, '=', tot * 5000, 'episodes')
 EOF
 ```
 
-**~1,100 episodes/s across 8 shards**, so b4's 274 candidates (1.37M episodes) is ~25 min and b6's
-1,299 (6.5M) took ~1 h 45 m. Anything past ~2 h belongs on the desktop instead.
+**~1,100 episodes/s across 8 shards** (the laptop default until 2026-09-04; 12 is expected to be
+~25-40% faster and has not been timed yet), so b4's 274 candidates (1.37M episodes) was ~25 min at 8
+and b6's 1,299 (6.5M) took ~1 h 45 m. Anything past ~2 h belongs on the desktop instead.
 
 ## 2. The checkpoints have to be on this box, and probably are not
 
@@ -86,7 +87,7 @@ Its signature is `resolve(policy_dir, token, policy)` — three arguments, `poli
 
 ```
 PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -u -m tools.closeout <arm...> \
-    --selector above:99 --episodes 5000 --label hof5000 --shards 8 \
+    --selector above:99 --episodes 5000 --label hof5000 --shards 12 \
     > logs/<batch>-hof5000.log 2>&1 &
 ```
 

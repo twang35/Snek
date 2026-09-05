@@ -105,7 +105,7 @@ def test_a_batch_runs_in_waves_each_followed_by_its_own_stage_b(box):
     assert kinds == (['train'] * 8 + ['stageb']) * 4
     first_stage_b = calls.events[8]
     assert first_stage_b[1] == tuple(s['policy'] for s in specs[:8])
-    assert first_stage_b[2] == '8'
+    assert first_stage_b[2] == str(laptop_batch.DEFAULT_SHARDS)   # 12 since 2026-09-04
     assert len(os.listdir(box['logs'])) == 32 + 4          # one log per arm, one per stage-B wave
     assert os.path.exists(os.path.join(box['logs'], 'b13-stageb-w4.log'))
 

@@ -3,7 +3,7 @@
     PYTHONPATH=. python -u evaluate.py <policy> [selector] [options]
 
     PYTHONPATH=. python -u evaluate.py b1a-thing                    # stage B: screen:97, 500 eps
-    PYTHONPATH=. python -u evaluate.py b1a-thing screen:98 --shards 8
+    PYTHONPATH=. python -u evaluate.py b1a-thing screen:98 --shards 12
     PYTHONPATH=. python -u evaluate.py b44a-import one --episodes 3000
     PYTHONPATH=. python -u evaluate.py b45a-import steps:runs/ab.txt --episodes 100 --label ab
 

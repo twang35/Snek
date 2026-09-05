@@ -6,9 +6,9 @@ specification.
 
 ```
 PYTHONPATH=. python -u evaluate.py <policy>                     # screen:97, 500 episodes, 4 shards
-PYTHONPATH=. python -u evaluate.py <policy> screen:98 --shards 8
+PYTHONPATH=. python -u evaluate.py <policy> screen:98 --shards 12
 PYTHONPATH=. python -u evaluate.py <policy> one --episodes 1000 # a record re-measure, one process
-PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 8 # a batch's close-out, with a window
+PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 12 # a batch's close-out, with a window (laptop; desktop 16)
 PYTHONPATH=. python -m tools.compare_results <file-a> <file-b>  # is the gap noise?
 PYTHONPATH=. python -m tools.progress_chart <policy>            # redraw runs/<policy>.png
 PYTHONPATH=. python -m tools.stage_b_chart <policy> --label L   # the pass, drawn and summarised

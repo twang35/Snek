@@ -416,6 +416,17 @@ because snek2 measured 18 shards **losing 6-10%** on TensorFlow; on torch that c
 over-subscribing simply stops helping. The ceiling is worth keeping as a "no gain past here" bound
 rather than as protection from a regression.
 
+**The laptop's default was 8 and left 6 of its 14 cores idle** (found 2026-09-04 during b14's close-out:
+8 `tools.shard` processes at ~100% each, box at 66% user, 14% sys, 20% idle). Each shard is one
+process at one intra-op thread, and `measure_stream` already keeps several checkpoints resident in
+one wide env, so the per-shard rate is bound by one core and the only lever is more shards. Stage B
+runs alone on the laptop -- `laptop_batch` starts the next wave only after the close-out exits -- so
+the count should be sized to the box, not to what is left beside eight trainers. `DEFAULT_SHARDS` in
+`tools/laptop_batch.py` and every laptop command in the docs and skills now say **12**: it fills the 10
+performance cores plus two of the four efficiency cores, and leaves the driver, the eval window and the
+OS a core or two. Expect ~25-40% more throughput than 8, not 50%, because the efficiency cores are
+slower and the wave's tail is its slowest shard. Not yet timed; the desktop's 16 above is.
+
 **‡ One caveat on the 8-shard row.** It was the first eval wave and ran while the training phase's 12
 stage-A workers were still idling out their 300 s, so it is the one row that could be penalised. The
 12→16 step is unconfounded, and it is the larger part of the gain.

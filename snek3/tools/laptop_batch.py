@@ -48,7 +48,12 @@ from tools import live_runs
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_WAVE = 8
 DEFAULT_MAX_TRAINERS = 8
-DEFAULT_SHARDS = 8
+# Stage B runs alone on this box -- the next wave waits for it -- so the shard count is sized to the
+# laptop's 14 cores (10P + 4E), not to what is left beside eight trainers. 8 left 6 cores idle
+# (66% user, 20% idle, measured 2026-09-04 during b14's close-out); 12 fills the P cores and
+# leaves the driver, the viewer and the OS a core or two. The desktop's number is `eval_shards`
+# in `desktop/config/runtime.json`, 16 on 16 threads.
+DEFAULT_SHARDS = 12
 POLL_SECONDS = 20
 
 

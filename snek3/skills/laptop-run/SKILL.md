@@ -72,7 +72,7 @@ of one arm per wave with the two greps above, as for any launch.
 One process per batch, in arm order, with its own chart window:
 
 ```
-PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -u -m tools.closeout <policy...> --shards 8 \
+PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -u -m tools.closeout <policy...> --shards 12 \
     > logs/<batch>-closeout.log 2>&1 &
 ```
 
