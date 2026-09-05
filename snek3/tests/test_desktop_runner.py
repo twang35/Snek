@@ -1,8 +1,13 @@
-"""The desktop daemon: the `project` guard, the config tiers, `build_command`, and the scheduler.
+"""The desktop daemon: the `project` guard, the config tiers, the specs it hands the scheduler, and
+what it publishes.
 
 `desktop/` imports nothing from this project — it shells out — so it goes on `sys.path` separately
 here. It also runs on **base** python on the box, before the conda env exists, which is why it is
-stdlib-only and why these tests must not reach for numpy or torch either.
+stdlib-only and why these tests must not reach for numpy or torch either (the two tests that import
+`tools.scheduler` and `tools.closeout` are the deliberate exception, and say why).
+
+Since 2026-09-05 the daemon schedules nothing itself: it mirrors `ops` into a local queue for
+`tools/scheduler.py`, starts that once, and publishes what it finishes (`plans/scheduler.md`).
 
 Three things here are silent when broken and each costs a night:
 
@@ -10,8 +15,9 @@ Three things here are silent when broken and each costs a night:
   valid JSON with plausible ids.
 - **A local-only results commit reported as `done`.** Indistinguishable from a pass that found
   nothing, and it once hid a 98.2%/500 checkpoint for hours.
-- **A `failed` eval never retried and never surfaced.** It cost snek2's batch 46 its measurement.
+- **A scheduler started twice.** Two schedulers over one queue is two windows and sixteen trainers.
 """
+
 
 import json
 import os
@@ -199,20 +205,6 @@ def test_git_seconds_may_be_zero_because_zero_is_the_opt_out():
     assert config['git_seconds'] == 0 and notes == []
 
 
-def test_a_stage_b_wave_does_not_inherit_the_stage_a_queue_knobs():
-    """The queue configures how a *training* measures itself; a wave measures finished checkpoints.
-
-    `evaluate.py` reads none of the three, so carrying them was harmless — but this tuple exists to
-    stop a training-loop setting being attributed to a measurement, and `runs/<policy>.md` would
-    otherwise report a wave as having run under a worker count that never applied to it.
-    """
-    inherited = runner_module.inherited_eval_env({
-        'SNEK_EVAL_QUEUE': '1', 'SNEK_EVAL_QUEUE_DEPTH': '16', 'SNEK_EVAL_WORKERS': '6',
-        'SNEK_CHASE_SAFE_GATE': '75', 'SNEK_SEED': '2',
-    })
-    assert inherited == {'SNEK_CHASE_SAFE_GATE': '75', 'SNEK_SEED': '2'}
-
-
 def test_max_evals_is_gone_and_naming_it_is_an_error_rather_than_a_no_op():
     """Removed 2026-08-29: an eval job *is* a wave, so the count could only ever be 1.
 
@@ -259,104 +251,79 @@ def test_host_env_reads_comments_and_coerces_the_ceilings(tmp_path):
 
 # --- build_command ------------------------------------------------------------------------------
 
+
+# --- ops specs become the scheduler's queue ---------------------------------------------------------
+#
+# The daemon builds no command for a trainer or a close-out any more: `tools/scheduler.py` does, on both
+# boxes. What the daemon owes the scheduler is a spec in the shape it reads, with the type defaults the
+# old `build_command` applied folded in, so the scheduler needs no notion of a smoke or a benchmark.
+
 def runtime(**overrides):
     config = dict(config_module.RUNTIME_DEFAULTS)
     config.update(overrides)
     return config
 
 
-def test_a_training_invokes_train_py_with_its_policy():
-    argv, env, log, policy = launch.build_command(parse_job(spec()), HOST, runtime())
-    assert argv == ['/py', '-u', 'train.py', 'b1a-thing']
-    assert log == 'train-b1a-thing.log' and policy == 'b1a-thing'
-    assert env['PYTHONPATH'] == '.', 'snek3 entry points need the project root on the path'
+def test_a_training_becomes_a_train_spec_with_its_cap():
+    out = launch.materialise(parse_job(spec(max_steps=3000000, label='b1: thing', env={'A': '1'})))
+    assert out['type'] == 'train' and out['policy'] == 'b1a-thing' and out['max_steps'] == 3000000
+    assert out['env'] == {'A': '1'} and out['label'] == 'b1: thing' and out['id'] == 'b1a-thing'
 
 
-def test_a_batch_is_one_job_and_one_process():
-    """One ledger record, one publish and one process per batch — `tools/closeout.py` owns the order.
-
-    The close-out sequences the arms (pooled across `--shards` since 2026-09-04, one full-width wave
-    each before that). What changed on 2026-08-30 is *who* sequences them — this used to be a `sh -c`
-    chain built here, which the laptop's close-out did not share.
-    """
-    job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None))
-    argv, _, log, _ = launch.build_command(job, HOST, runtime(eval_shards=16))
-    assert argv[:4] == ['/py', '-u', '-m', 'tools.closeout']
-    assert argv[4:6] == ['b1a', 'b1b'], 'in the order the spec named them'
-    assert argv[argv.index('--shards') + 1] == '16'
-    assert log == 'eval-b1a-thing.log'
+def test_a_training_with_no_cap_is_refused_rather_than_run_forever():
+    with pytest.raises(ValueError):
+        launch.materialise(parse_job(spec()))
 
 
-def test_no_shell_is_involved_at_all():
-    """No `sh -c`, so nothing here quotes anything — which is what retires the whole hazard below."""
-    job = parse_job(spec(type='eval', policies=['b1a', 'b1b', 'b1c'], policy=None))
-    argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert argv[0] == '/py' and '-c' not in argv
+def test_an_action_materialises_to_nothing():
+    assert launch.materialise(parse_job(json.dumps({'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'}))) is None
+
+
+def test_an_eval_keeps_its_arms_selector_depth_and_extra_args_in_order():
+    job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None, selector='screen:98',
+                         episodes=1000, eval_args=['--pass', 'hof5000']))
+    out = launch.materialise(job)
+    assert out['type'] == 'eval' and out['policies'] == ['b1a', 'b1b']
+    assert out['selector'] == 'screen:98' and out['episodes'] == 1000 and out['eval_args'] == ['--pass', 'hof5000']
+    assert 'eval_shards' not in out, 'the pool is the runtime knob unless the spec names one'
 
 
 def test_a_policy_name_is_data_not_shell_syntax():
-    """It reaches the close-out as one argv element, so shell metacharacters in it mean nothing.
-
-    Kept as a fixture after the `sh -c` chain went away, because the property is the point and the
-    next person to reintroduce a shell here should see it fail.
-    """
-    job = parse_job(spec(type='eval', policies=['b1a; rm -rf /', 'b1b'], policy=None))
-    argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert argv[4] == 'b1a; rm -rf /', 'the name is passed through whole'
+    """The scheduler passes each policy as one argv element; no shell is involved anywhere."""
+    from tools import scheduler
+    out = launch.materialise(parse_job(spec(type='eval', policies=['b1a; rm -rf /', 'b1b'], policy=None)))
+    argv = scheduler.eval_argv(out, '/py', 12)
+    assert argv[4] == 'b1a; rm -rf /' and '-c' not in argv
     assert parsed(argv).policies == ['b1a; rm -rf /', 'b1b']
 
 
-def test_no_episode_count_or_gate_is_passed_unless_the_spec_asked():
-    """The protocol lives in `tools/closeout.py`'s defaults, not here.
-
-    snek2's daemon carried five protocol numbers as a second copy of `eval_plan.py`'s and they
-    drifted. So an unadorned eval job must pass neither, and inherit `screen:95` at 500 episodes.
-    """
-    job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
-    argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert '--episodes' not in argv
-    assert 'screen' not in ' '.join(argv)
+def test_a_smoke_run_can_write_checkpoints_and_reach_an_eval():
+    out = launch.materialise(parse_job(spec(type='smoke', policy=None, id='smoke-1')))
+    assert out['policy'] == 'smoke' and out['max_steps'] == launch.SMOKE_STEPS
+    assert out['env']['SNEK_MIN_CHECKPOINT_SCORE'] == '0' and out['env']['SNEK_EVAL_INTERVAL'] == '500'
 
 
-def test_a_spec_may_still_name_a_selector_and_a_depth():
-    """The selector is a `--selector` FLAG for the close-out, where `evaluate.py` takes a positional.
-
-    It has to be: the close-out's policies are `nargs='+'`, so a positional behind them is ambiguous.
-    Getting this backwards is one of the two drifts that made every dispatched wave exit 2.
-    """
-    job = parse_job(spec(type='eval', policies=['b1a'], policy=None,
-                         selector='screen:98', episodes=1000))
-    argv, _, _, _ = launch.build_command(job, HOST, runtime())
-    assert argv[4] == 'b1a'
-    assert argv[argv.index('--selector') + 1] == 'screen:98'
-    assert argv[argv.index('--episodes') + 1] == '1000'
+def test_a_benchmark_turns_stage_a_off_rather_than_shrinking_it():
+    out = launch.materialise(parse_job(spec(type='benchmark', policy=None, id='bench-7')))
+    assert out['policy'] == 'bench-bench-7' and out['max_steps'] == launch.BENCHMARK_STEPS
+    assert out['env']['SNEK_EVAL_QUEUE'] == '0' and out['env']['SNEK_EVAL_INTERVAL'] == str(launch.BENCHMARK_STEPS)
 
 
-# --- the command must parse, asked of the real parser ---------------------------------------------
+def test_a_specs_own_env_wins_over_the_type_default():
+    out = launch.materialise(parse_job(spec(type='smoke', env={'SNEK_EVAL_INTERVAL': '50'})))
+    assert out['env']['SNEK_EVAL_INTERVAL'] == '50'
+
+
+# --- the eval command must parse, asked of the real parser -------------------------------------------
 #
-# This is the one place these tests deliberately cross the stdlib-only line, and the reason is the
-# bug it exists for. The daemon runs on base python before the conda env exists, so it duplicates the
-# close-out's command line by hand -- and got it wrong twice, several policies where one is taken and
-# `--selector` where the selector is positional, so every wave the box dispatched exited 2. Four
-# green fixtures asserted the argv the daemon builds; none asked the parser to accept it. A test runs
-# in the env even though the daemon does not, so the constraint that forces the duplication does not
-# extend to the fixture that guards it.
+# The one place these tests deliberately cross the stdlib-only line. Before 2026-08-30 the daemon spelled
+# the close-out's command line by hand and got it wrong twice, so every wave the box dispatched exited 2.
+# The spelling now lives once, in `tools.scheduler.eval_argv`; this checks the spec the daemon hands it
+# still produces a command the close-out's parser accepts.
 
 def parsed(argv):
-    """`tools.closeout`'s own parser applied to a command the daemon built. Raises if it would exit 2.
-
-    `argv[4:]` because the command is `python -u -m tools.closeout ...` -- one token longer than the
-    `python -u evaluate.py ...` it replaced on 2026-08-30.
-    """
     from tools import closeout
     return closeout.build_parser().parse_args(argv[4:])
-
-
-def settings(argv):
-    """What the close-out would actually measure with: the pass's preset, under any explicit flag."""
-    from tools import closeout
-    args = parsed(argv)
-    return closeout.pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed)
 
 
 @pytest.mark.parametrize('overrides', [
@@ -368,158 +335,84 @@ def settings(argv):
     {'eval_args': ['--pass', 'hof5000']},
     {'eval_args': ['--pass', 'hof30k']},
 ])
-def test_every_command_the_daemon_builds_parses(overrides):
-    job = parse_job(spec(type='eval', policies=['b1a'], policy=None, **overrides))
-    argv = launch.eval_command(job, HOST, runtime(eval_shards=16))
-    parsed(argv)                  # SystemExit here is the daemon being wrong, not the test
+def test_every_eval_spec_the_daemon_writes_parses(overrides):
+    from tools import scheduler
+    job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None, **overrides))
+    argv = scheduler.eval_argv(launch.materialise(job), '/py', 12)
+    args = parsed(argv)
+    assert args.policies == ['b1a', 'b1b'] and args.shards == 12
 
 
-def test_a_whole_batch_is_one_command_naming_every_arm():
-    """The sequencing lives in `tools/closeout.py`, so the daemon builds one process, not a chain."""
-    job = parse_job(spec(type='eval', policies=['b1a', 'b1b', 'b1c'], policy=None))
-    argv = launch.eval_command(job, HOST, runtime())
-    assert argv[:4] == [HOST['PYTHON_BIN'], '-u', '-m', 'tools.closeout']
-    assert parsed(argv).policies == ['b1a', 'b1b', 'b1c']
-    assert 'sh' not in argv[0:1] and not any(token == '-c' for token in argv)
+# --- the scheduler's command and environment ----------------------------------------------------------
+
+def test_the_runtime_knobs_reach_the_scheduler_as_flags():
+    argv = launch.scheduler_command(HOST, runtime(max_trainers=6, eval_shards=16))
+    assert argv[:4] == ['/py', '-u', '-m', 'tools.scheduler']
+    assert argv[argv.index('--queue') + 1] == '/repo/snek3/desktop/queue-local'
+    assert argv[argv.index('--wave') + 1] == '6' and argv[argv.index('--max-trainers') + 1] == '6'
+    assert argv[argv.index('--shards') + 1] == '16'
+    assert '--no-status' in argv, 'the daemon publishes; the scheduler must not push laptop-status'
+    assert '--no-stage-b' not in argv
+    assert '--no-stage-b' in launch.scheduler_command(HOST, runtime(auto_stage_b=False))
 
 
-def test_an_unadorned_wave_inherits_the_protocol_from_the_closeout():
-    """What the daemon leaves unsaid has to arrive as `screen:97` at 500 episodes."""
-    job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
-    chosen = settings(launch.eval_command(job, HOST, runtime()))
-    assert chosen['selector'] == 'screen' and chosen['episodes'] == 500
-    assert chosen['label'] is None and chosen['seed'] == 0
+def test_the_scheduler_parser_accepts_what_the_daemon_spells():
+    from tools import scheduler
+    argv = launch.scheduler_command(HOST, runtime())
+    args = scheduler.build_parser().parse_args(argv[4:])
+    assert args.queue == '/repo/snek3/desktop/queue-local' and args.no_status
 
 
-def test_a_synthesised_hof_pass_names_the_pass_and_nothing_else():
-    """The daemon carries no protocol numbers: `--pass hof5000` is the whole instruction, and the
-    close-out's preset turns it into `above:99` at 5,000 under the `hof5000` label -- the label being
-    what keeps the pass from overwriting the 500-episode file it selects from."""
-    job = runner_module.Job(id='b12-hof5000', type='eval', policies=['b12aa-x', 'b12ab-x'],
-                            eval_args=['--pass', 'hof5000'], priority=11)
-    argv = launch.eval_command(job, HOST, runtime(eval_shards=16))
-    assert '--selector' not in argv and '--episodes' not in argv and '--label' not in argv
-    assert settings(argv) == {'selector': 'above:99', 'episodes': 5000, 'label': 'hof5000', 'seed': 0}
-    job = runner_module.Job(id='b12-hof30k', type='eval', policies=['b12aa-x'],
-                            eval_args=['--pass', 'hof30k'], priority=12)
-    assert settings(launch.eval_command(job, HOST, runtime())) == {
-        'selector': 'above:99:hof5000', 'episodes': 30000, 'label': 'hof30k', 'seed': 7}
+def test_every_job_is_pointed_at_the_desktop_runs_dir():
+    env = launch.scheduler_env(HOST, runtime())
+    assert env['SNEK_RUNS_DIR'] == '/repo/snek3/desktop/runs' and env['PYTHONPATH'] == '.'
+    assert launch.runs_dir(HOST) == '/repo/snek3/desktop/runs'
 
 
-def test_the_selector_reaches_the_closeout_as_a_flag():
-    """The one spelling difference from `evaluate.py`, where it is positional. See `eval_command`."""
-    job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None, selector='screen:98'))
-    argv = launch.eval_command(job, HOST, runtime())
-    assert argv[argv.index('--selector') + 1] == 'screen:98'
-    assert parsed(argv).selector == 'screen:98'
-
-
-def test_the_eval_job_still_forwards_the_display_so_its_window_can_open():
-    """The stage-B window is opened by the close-out, so it needs the same two variables a trainer
-    does -- and gets them because `build_command` forwards them for every job type."""
-    host = dict(HOST, DISPLAY=':0', XAUTHORITY='/home/x/.Xauthority')
-    _, env, _, _ = launch.build_command(
-        parse_job(spec(type='eval', policies=['b1a'], policy=None)), host, runtime())
-    assert env['DISPLAY'] == ':0' and env['XAUTHORITY'] == '/home/x/.Xauthority'
-
-
-def test_the_viewer_switch_reaches_an_eval_wave_too():
-    _, env, _, _ = launch.build_command(
-        parse_job(spec(type='eval', policies=['b1a'], policy=None)), HOST, runtime(viewer=False))
-    assert env['SNEK_CHART_WINDOW'] == '0'
-
-
-def test_the_thread_knobs_reach_the_subprocess():
-    _, env, _, _ = launch.build_command(parse_job(spec()), HOST,
-                                        runtime(torch_threads=2, omp_num_threads=3))
+def test_the_thread_knobs_reach_the_scheduler():
+    env = launch.scheduler_env(HOST, runtime(torch_threads=2, omp_num_threads=3))
     assert env['SNEK_TORCH_THREADS'] == '2' and env['OMP_NUM_THREADS'] == '3'
+    assert 'SNEK_TORCH_THREADS' not in launch.scheduler_env(HOST, runtime(torch_threads=0))
 
 
-def test_a_jobs_own_env_wins_over_the_runtime_default():
-    # Otherwise a per-arm override in a spec would be silently overruled by the box's config.
-    _, env, _, _ = launch.build_command(
-        parse_job(spec(env={'SNEK_TORCH_THREADS': '8'})), HOST, runtime(torch_threads=1))
-    assert env['SNEK_TORCH_THREADS'] == '8'
+# --- the chart window is the scheduler's -----------------------------------------------------------
+#
+# The daemon runs outside the graphical session, so it owes the scheduler the session's display and the
+# ops-level switch, and nothing else: the scheduler opens the one window and closes it (`tools/window.py`).
+
+VIEWER_HOST = dict(HOST, DISPLAY=':0', XAUTHORITY='/run/user/1000/gdm/Xauthority')
 
 
-def test_a_smoke_run_can_write_checkpoints_and_reach_an_eval():
-    """A smoke run scores ~0, so the default checkpoint gate would write nothing.
-
-    Which means it could not resume either — and "resume works" is most of what a smoke run is for.
-    """
-    _, env, _, policy = launch.build_command(
-        parse_job(spec(type='smoke', id='smoke-1', policy=None)), HOST, runtime())
-    assert policy == 'smoke'
-    assert env['SNEK_MIN_CHECKPOINT_SCORE'] == '0'
-    assert int(env['SNEK_EVAL_INTERVAL']) < int(env['SNEK_MAX_STEPS'])
+def test_the_scheduler_inherits_the_sessions_display():
+    env = launch.scheduler_env(VIEWER_HOST, runtime())
+    assert env['DISPLAY'] == ':0' and env['XAUTHORITY'] == '/run/user/1000/gdm/Xauthority'
 
 
-def test_a_benchmark_turns_stage_a_off_rather_than_shrinking_it():
-    # Stage A is ~90% of an arm's wall clock, so leaving it on would make it most of what the
-    # benchmark measured.
-    _, env, _, _ = launch.build_command(
-        parse_job(spec(type='benchmark', id='bench-1', policy=None, max_steps=20000)),
-        HOST, runtime())
-    assert env['SNEK_EVAL_INTERVAL'] == env['SNEK_MAX_STEPS'] == '20000'
+def test_a_headless_host_forwards_nothing_and_is_not_an_error():
+    env = launch.scheduler_env(HOST, runtime())
+    assert 'DISPLAY' not in env and 'XAUTHORITY' not in env
 
 
-def test_max_steps_from_the_spec_reaches_the_trainer():
-    _, env, _, _ = launch.build_command(parse_job(spec(max_steps=3000000)), HOST, runtime())
-    assert env['SNEK_MAX_STEPS'] == '3000000'
+def test_the_viewer_knob_reaches_the_scheduler_only_when_off():
+    assert launch.scheduler_env(VIEWER_HOST, runtime(viewer=False))['SNEK_CHART_WINDOW'] == '0'
+    assert 'SNEK_CHART_WINDOW' not in launch.scheduler_env(VIEWER_HOST, runtime(viewer=True))
 
 
-# --- the env split ------------------------------------------------------------------------------
-
-def test_the_eval_relevant_env_names_knobs_that_still_exist():
-    """A renamed reward knob would silently stop splitting waves that should be split.
-
-    Checked against `env/constants.py`'s own `SNEK_` reads, which is the definition — the daemon
-    cannot import it (numpy), so this test is the link between the two.
-    """
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    source = open(os.path.join(root, 'env', 'constants.py')).read()
-    for name in runner_module.EVAL_RELEVANT_ENV:
-        bare = name[len('SNEK_'):]
-        assert ("_num('{0}'".format(bare) in source
-                or "_flag('{0}'".format(bare) in source
-                or name in source), '{0} is not read by env/constants.py any more'.format(name)
+def test_the_daemon_does_not_manage_a_window():
+    """Pinning the absence, because re-adding it is the tempting mistake."""
+    assert not hasattr(runner_module.Runner, '_ensure_viewer')
+    assert not hasattr(launch, 'spawn_viewer')
+    assert not hasattr(launch, 'build_command'), 'the daemon builds no trainer or close-out command'
 
 
-def test_the_training_only_env_is_stripped_from_an_inherited_eval_env():
-    # A step cap is meaningless to a measurement, and the stage-A knobs describe a screen that
-    # already happened.
-    stripped = runner_module.inherited_eval_env(
-        {'SNEK_MAX_STEPS': '3000000', 'SNEK_SEED': '1', 'SNEK_CHASE_SAFE_SHAPING': '0.1'})
-    assert 'SNEK_MAX_STEPS' not in stripped
-    assert stripped == {'SNEK_SEED': '1', 'SNEK_CHASE_SAFE_SHAPING': '0.1'}
+def test_viewer_is_a_bool_knob():
+    parsed, notes = config_module.parse_runtime_config('{"viewer": 1}', HOST)
+    assert parsed is None and any('viewer' in note for note in notes)
+    parsed, notes = config_module.parse_runtime_config('{"viewer": false}', HOST)
+    assert parsed is not None and parsed['viewer'] is False
 
 
-def test_arms_differing_only_by_seed_share_one_wave():
-    """The failure this exists to prevent, measured on snek2's b45.
-
-    Keying on the whole env split its close-out into three waves of 2/1/1 arms, because its arms
-    differ in `SNEK_SEED` — which cannot reach a measurement of an already-trained checkpoint.
-    """
-    keys = [runner_module.stage_b_group_env({'SNEK_SEED': str(seed), 'SNEK_LEARNING_RATE': '1e-5'})
-            for seed in (1, 2, 3, 4)]
-    assert all(key == {} for key in keys)
-
-
-def test_arms_differing_in_a_reward_knob_do_not_share_a_wave():
-    # A wave is one process with one environment, and shaping changes what `avg_reward` means.
-    first = runner_module.stage_b_group_env({'SNEK_CHASE_SAFE_SHAPING': '0.1'})
-    second = runner_module.stage_b_group_env({'SNEK_CHASE_SAFE_SHAPING': '0.2'})
-    assert first != second
-
-
-def test_the_agreed_env_drops_what_the_arms_disagree_about():
-    # Handing the first arm's env to the whole wave would attribute one arm's seed to all four.
-    agreed = runner_module.agreed_env([{'SNEK_SEED': '1', 'SNEK_DISCOUNT': '0.99'},
-                                       {'SNEK_SEED': '2', 'SNEK_DISCOUNT': '0.99'}])
-    assert agreed == {'SNEK_DISCOUNT': '0.99'}
-
-
-# --- ids and phases -----------------------------------------------------------------------------
+# --- batches and phases --------------------------------------------------------------------------------
 
 def test_batch_of_reads_the_leading_batch_number():
     assert runner_module.batch_of('b12c-thing-seed3') == 'b12'
@@ -564,182 +457,11 @@ def test_a_second_wave_of_a_batch_is_still_stage_b():
 
 # --- the scheduler forecast ---------------------------------------------------------------------
 
-def test_a_batchs_measurement_slots_in_ahead_of_the_next_batch():
-    """The interleaving the box actually runs, and the whole point of the auto chain.
 
-    Never train the next thing before measuring the last.
-    """
-    queued = [{'id': 'b1{0}-x'.format(letter), 'type': 'train', 'policy': 'b1{0}-x'.format(letter),
-               'policies': ['b1{0}-x'.format(letter)], 'priority': 100}
-              for letter in 'ab']
-    queued += [{'id': 'b2a-y', 'type': 'train', 'policy': 'b2a-y', 'policies': ['b2a-y'],
-                'priority': 100}]
-    order = runner_module.anticipated_queue(
-        queued, [], {'trainer': 2, 'eval': 1}, True, {job['id'] for job in queued})
-    assert [job['id'] for job in order] == [
-        'b1a-x', 'b1b-x', 'b1-stageb', 'b1-hof5000', 'b1-hof30k',
-        'b2a-y', 'b2-stageb', 'b2-hof5000', 'b2-hof30k']
-    passes = {job['id']: job for job in order if job['type'] == 'eval'}
-    assert passes['b1-hof30k']['policies'] == ['b1a-x', 'b1b-x'], 'the same arms all the way down'
-    assert (passes['b1-stageb']['priority'] < passes['b1-hof5000']['priority']
-            < passes['b1-hof30k']['priority'] < 100), 'each pass outranks the next training'
-
-
-def test_a_batchs_four_arms_forecast_one_measurement_row_not_four():
-    queued = [{'id': 'b1{0}-x'.format(letter), 'type': 'train', 'policy': 'b1{0}-x'.format(letter),
-               'policies': ['b1{0}-x'.format(letter)], 'priority': 100}
-              for letter in 'abcd']
-    order = runner_module.anticipated_queue(
-        queued, [], {'trainer': 4, 'eval': 1}, True, {job['id'] for job in queued})
-    stage_b = [job for job in order if job['id'].endswith('-stageb')]
-    assert len(stage_b) == 1
-    assert stage_b[0]['policies'] == ['b1a-x', 'b1b-x', 'b1c-x', 'b1d-x']
-
-
-def test_nothing_is_forecast_when_the_auto_chain_is_off():
-    queued = [{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x'],
-               'priority': 100}]
-    order = runner_module.anticipated_queue(queued, [], {'trainer': 4, 'eval': 1}, False, {'b1a-x'})
-    assert [job['id'] for job in order] == ['b1a-x']
-
-
-def test_a_queued_spec_stands_for_its_wave_and_is_never_invented_twice():
-    """A hand-written `b1-stageb` in the queue is the wave; the forecast must not add a second.
-    The chain still continues past it -- the spec's pass earns the next one."""
-    queued = [{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x'],
-               'priority': 100},
-              {'id': 'b1-stageb', 'type': 'eval', 'policy': 'b1a-x', 'policies': ['b1a-x'],
-               'priority': 100}]
-    order = runner_module.anticipated_queue(
-        queued, [], {'trainer': 4, 'eval': 1}, True, {'b1a-x', 'b1-stageb'})
-    assert [job['id'] for job in order] == ['b1a-x', 'b1-stageb', 'b1-hof5000', 'b1-hof30k']
-
-
-def test_a_batch_whose_first_wave_is_measured_forecasts_its_second_as_w2_not_nothing():
-    """b15, 2026-09-04: wave 1 done and `b15-stageb` in the ledger, 32 arms still queued -- and the
-    forecast showed no b15 measurement at all, because it minted only the bare id and found it taken.
-    The dispatcher mints `-w2`, so the forecast has to."""
-    queued = [{'id': 'b15{0}-x'.format(letter), 'type': 'train', 'policy': 'b15{0}-x'.format(letter),
-               'policies': ['b15{0}-x'.format(letter)], 'priority': 100} for letter in 'ab']
-    existing = {job['id'] for job in queued} | {'b15-stageb', 'b15-hof5000', 'b15-hof30k'}
-    order = runner_module.anticipated_queue(queued, [], {'trainer': 8, 'eval': 1}, True, existing)
-    assert [job['id'] for job in order] == [
-        'b15a-x', 'b15b-x', 'b15-stageb-w2', 'b15-hof5000-w2', 'b15-hof30k-w2']
-
-
-def test_a_running_pass_earns_its_follow_on_in_the_forecast():
-    running = [{'id': 'b11-hof5000', 'type': 'eval', 'policy': 'b11a-x', 'policies': ['b11a-x', 'b11b-x']}]
-    order = runner_module.anticipated_queue([], running, {'trainer': 8, 'eval': 1}, True, {'b11-hof5000'})
-    assert [(job['id'], job['policies']) for job in order] == [('b11-hof30k', ['b11a-x', 'b11b-x'])]
-
-
-def test_only_a_training_earns_a_measurement():
-    # Smoke and benchmark share the `trainer` category but are throwaway, and a failed run has no
-    # checkpoint worth measuring.
-    assert runner_module.wants_stage_b('train', True, True) is True
-    assert runner_module.wants_stage_b('train', False, True) is False
-    assert runner_module.wants_stage_b('smoke', True, True) is False
-    assert runner_module.wants_stage_b('benchmark', True, True) is False
-    assert runner_module.wants_stage_b('train', True, False) is False
-
-
-def test_each_pass_earns_the_next_and_the_last_earns_nothing():
-    """training -> stageb -> hof5000 -> hof30k, over the same arms, and only on success: the next
-    pass selects from the file this one wrote, so a failed pass has nothing to hand on."""
-    nxt = runner_module.next_pass
-    assert nxt('b1a-x', 'train', True, True) == 'stageb'
-    assert nxt('b1-stageb', 'eval', True, True) == 'hof5000'
-    assert nxt('b1-stageb-w3', 'eval', True, True) == 'hof5000'
-    assert nxt('b1-hof5000', 'eval', True, True) == 'hof30k'
-    assert nxt('b1-hof30k', 'eval', True, True) is None
-    assert nxt('b9-spotcheck', 'eval', True, True) is None, 'a hand spec off the chain earns nothing'
-    assert nxt('b1-stageb', 'eval', False, True) is None
-    assert nxt('b1-stageb', 'eval', True, False) is None, 'auto_stage_b switches the whole chain'
-
-
-def test_the_old_stage_b_marker_still_reads_as_stage_b_owed():
-    """The box's ledger holds `stage_b: pending` on every training the daemon reaped before
-    2026-09-04; the new marker is `next_pass`. Both have to mean what they meant."""
-    assert runner_module.pending_pass({'stage_b': 'pending'}) == 'stageb'
-    assert runner_module.pending_pass({'next_pass': 'hof30k'}) == 'hof30k'
-    assert runner_module.pending_pass({'state': 'done'}) is None
-
-
-def test_pass_ids_count_past_spent_waves_and_stop_at_a_queued_spec():
-    mint = runner_module.mint_pass_id
-    assert mint('b13', 'hof5000') == 'b13-hof5000'
-    assert mint('b13', 'hof5000', used={'b13-hof5000'}) == 'b13-hof5000-w2'
-    assert mint('b13', 'stageb', used={'b13-stageb', 'b13-stageb-w2'}) == 'b13-stageb-w3'
-    assert mint('b13', 'stageb', blocked={'b13-stageb'}) is None
-    assert mint('b13', 'stageb', blocked={'b13-stageb-w2'}, used={'b13-stageb'}) is None
-
-
-def test_the_laptop_driver_spells_pass_ids_the_way_the_daemon_mints_them():
-    """Two boxes, one naming: `tools/scheduler.py` cannot be imported by the daemon, so the two
-    spellings are pinned equal here, where both are on the path."""
-    from tools import scheduler
-    for pass_name in runner_module.PASS_ORDER:
-        assert scheduler.pass_label('b13', pass_name, 1) == runner_module.mint_pass_id('b13', pass_name)
-        assert scheduler.pass_label('b13', pass_name, 3) == runner_module.mint_pass_id(
-            'b13', pass_name, used={'b13-' + pass_name, 'b13-' + pass_name + '-w2'})
-        assert runner_module.pass_of(scheduler.pass_label('b13', pass_name, 2)) == pass_name
-
-
-def _runner(tmp_path, ledger):
-    host = dict(HOST, LEDGER_PATH=str(tmp_path / 'ledger.json'))
-    with open(host['LEDGER_PATH'], 'w') as handle:
-        json.dump(ledger, handle)
-    return runner_module.Runner(host)
-
-
-def test_a_finished_stage_b_wave_synthesises_the_hof5000_pass_over_its_arms(tmp_path):
-    ledger = {
-        'b12-stageb': {'state': 'done', 'type': 'eval', 'policy': 'b12aa-x',
-                       'policies': ['b12aa-x', 'b12ab-x'], 'next_pass': 'hof5000',
-                       'env': {'SNEK_ZERO_OBS': '1'}},
-    }
-    jobs = _runner(tmp_path, ledger)._auto_jobs()
-    assert [(job.id, job.policies, job.eval_args, job.priority, job.env) for job in jobs] == [
-        ('b12-hof5000', ['b12aa-x', 'b12ab-x'], ['--pass', 'hof5000'], 11, {'SNEK_ZERO_OBS': '1'})]
-
-
-def test_arms_already_covered_by_a_hand_queued_hof_pass_are_not_measured_again(tmp_path):
-    """b11-hof5000 was a hand spec; its id carries the pass suffix, so the chain sees the arms as
-    measured and the box does not spend 35 minutes redoing them."""
-    ledger = {
-        'b11-stageb': {'state': 'done', 'type': 'eval', 'policies': ['b11a-x', 'b11b-x'],
-                       'next_pass': 'hof5000', 'env': {}},
-        'b11-hof5000': {'state': 'done', 'type': 'eval', 'policies': ['b11a-x', 'b11b-x'],
-                        'next_pass': 'hof30k', 'env': {}},
-    }
-    jobs = _runner(tmp_path, ledger)._auto_jobs()
-    assert [(job.id, job.policies) for job in jobs] == [('b11-hof30k', ['b11a-x', 'b11b-x'])]
-
-
-def test_a_legacy_marker_and_a_new_one_group_into_one_stage_b_wave(tmp_path):
-    ledger = {
-        'b16a-x': {'state': 'done', 'type': 'train', 'policy': 'b16a-x', 'policies': ['b16a-x'],
-                   'stage_b': 'pending', 'env': {}},
-        'b16b-x': {'state': 'done', 'type': 'train', 'policy': 'b16b-x', 'policies': ['b16b-x'],
-                   'next_pass': 'stageb', 'env': {}},
-    }
-    jobs = _runner(tmp_path, ledger)._auto_jobs()
-    assert [(job.id, job.policies, job.eval_args, job.priority) for job in jobs] == [
-        ('b16-stageb', ['b16a-x', 'b16b-x'], [], 10)]
-
-
-def test_a_second_wave_of_a_pass_gets_its_own_id(tmp_path):
-    ledger = {
-        'b15-stageb': {'state': 'done', 'type': 'eval', 'policies': ['b15a-x'], 'env': {}},
-        'b15-stageb-w2': {'state': 'done', 'type': 'eval', 'policies': ['b15b-x'],
-                          'next_pass': 'hof5000', 'env': {}},
-        'b15-hof5000': {'state': 'done', 'type': 'eval', 'policies': ['b15a-x'], 'env': {}},
-    }
-    jobs = _runner(tmp_path, ledger)._auto_jobs()
-    assert [(job.id, job.policies) for job in jobs] == [('b15-hof5000-w2', ['b15b-x'])]
-
-
-# --- at_a_glance ---------------------------------------------------------------------------------
+# --- at_a_glance --------------------------------------------------------------------------------------
+#
+# The scheduler builds its own lines with `tools.laptop_status`; these pin the daemon's copy, which
+# it uses for the queue when no scheduler is running, and every reader of status.json depends on.
 
 def test_a_wave_is_reported_in_arms_not_in_jobs():
     # One eval job is four arms; counting jobs would report a whole measurement as "1 arm", which is
@@ -864,68 +586,6 @@ def test_attention_is_empty_in_the_normal_case():
     assert runner_module.build_at_a_glance([], [], {})['attention'] == []
 
 
-# --- the chart window is the trainer's, not the daemon's -------------------------------------------
-#
-# `train.py` opens a window for its own arm, so one appears on the laptop too and nobody launches it
-# by hand. The daemon owes it two things and no more: the session's display, and the ops-level switch.
-# It deliberately does not manage the window — a daemon that opened its own would put a fifth window
-# on a box running four arms, and would be the one holding a handle the trainer is supposed to be
-# independent of.
-
-VIEWER_HOST = dict(HOST, DISPLAY=':0', XAUTHORITY='/run/user/1000/gdm/Xauthority')
-
-
-def test_a_job_inherits_the_sessions_display():
-    """Without these a job cannot reach the monitor: the daemon runs outside the graphical session."""
-    _, env, _, _ = launch.build_command(parse_job(spec()), VIEWER_HOST, runtime())
-    assert env['DISPLAY'] == ':0'
-    assert env['XAUTHORITY'] == '/run/user/1000/gdm/Xauthority'
-
-
-def test_a_headless_host_forwards_nothing_and_is_not_an_error():
-    _, env, _, _ = launch.build_command(parse_job(spec()), HOST, runtime())
-    assert 'DISPLAY' not in env and 'XAUTHORITY' not in env
-
-
-def test_the_viewer_knob_reaches_the_trainer_rather_than_the_daemon():
-    _, env, _, _ = launch.build_command(parse_job(spec()), VIEWER_HOST, runtime(viewer=False))
-    assert env['SNEK_CHART_WINDOW'] == '0'
-
-
-def test_the_viewer_knob_on_leaves_the_trainers_default_alone():
-    """On is the trainer's own default, so the daemon says nothing — one place decides, not two."""
-    _, env, _, _ = launch.build_command(parse_job(spec()), VIEWER_HOST, runtime(viewer=True))
-    assert 'SNEK_CHART_WINDOW' not in env
-
-
-def test_a_spec_may_still_ask_for_no_window():
-    job = parse_job(spec(env={'SNEK_CHART_WINDOW': '0'}))
-    _, env, _, _ = launch.build_command(job, VIEWER_HOST, runtime(viewer=True))
-    assert env['SNEK_CHART_WINDOW'] == '0'
-
-
-def test_a_benchmark_opens_no_window():
-    """It measures the training loop, and a window would be measured along with it."""
-    _, env, _, _ = launch.build_command(parse_job(spec(type='benchmark')), VIEWER_HOST, runtime())
-    assert env['SNEK_CHART_WINDOW'] == '0'
-
-
-def test_the_daemon_does_not_manage_a_window():
-    """Pinning the absence, because re-adding it is the tempting mistake.
-
-    Two windows for one arm, and a daemon holding a handle to a process the trainer is supposed to be
-    independent of.
-    """
-    assert not hasattr(runner_module.Runner, '_ensure_viewer')
-    assert not hasattr(launch, 'spawn_viewer')
-
-
-def test_viewer_is_a_bool_knob():
-    parsed, notes = config_module.parse_runtime_config('{"viewer": 1}', HOST)
-    assert parsed is None and any('viewer' in note for note in notes)
-    parsed, notes = config_module.parse_runtime_config('{"viewer": false}', HOST)
-    assert parsed is not None and parsed['viewer'] is False
-
 
 # --- job text is ASCII, because status.json is read raw ---------------------------------------
 
@@ -997,30 +657,6 @@ def test_at_a_glance_uses_no_em_dash_of_its_own():
     for line in glance['running'] + glance['queued']:
         assert line.isascii(), line
 
-
-# --- the box's run directory ----------------------------------------------------------------------
-#
-# 2026-09-03: every job writes under `<SNEK_DIR>/desktop/runs`, gitignored, so the box's checkout holds
-# nothing under a path master tracks and the deploy's fast-forward cannot collide with a committed chart.
-
-def test_every_job_is_pointed_at_the_desktop_runs_dir():
-    for job in (parse_job(spec()), parse_job(spec(type='eval', policies=['b7a-x', 'b7b-y']))):
-        _, env, _, _ = launch.build_command(job, HOST, runtime())
-        assert env['SNEK_RUNS_DIR'] == '/repo/snek3/desktop/runs'
-    assert launch.runs_dir(HOST) == '/repo/snek3/desktop/runs'
-
-
-def test_throughput_is_read_from_the_desktop_runs_dir(tmp_path):
-    host = dict(HOST, SNEK_DIR=str(tmp_path))
-    runs = launch.runs_dir(host)
-    os.makedirs(runs)
-    with open(os.path.join(runs, 'b7a-x_evals.json'), 'w') as handle:
-        json.dump({'summary': {'step': 4096}}, handle)
-    running = launch.RunningJob(parse_job(spec()), 'b7a-x', 1, str(tmp_path / 'log'))
-    launch.update_throughput(running, host)
-    assert running.current_step == 4096
-
-
 def test_a_whole_queued_batch_reads_as_a_wave_range_and_a_capped_cell_list():
     # b12's ten cells over five waves printed "wave 1 of 5, wave 2 of..." past the 80-char cut on 2026-09-03.
     def arm(i, cell, wave):
@@ -1081,15 +717,31 @@ def test_the_laptop_status_branch_is_fetched_apart_from_the_three_the_box_needs(
 
 # --- actions: deploy and restart over the bus -------------------------------------------------------
 
-def test_deploy_and_restart_are_job_types_that_take_no_work_fields():
-    deploy = parse_job(json.dumps({'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'}))
-    assert deploy.category == 'action' and deploy.restart is None
-    assert parse_job(json.dumps({'project': 'snek3', 'id': 'r1', 'type': 'restart'})).category == 'action'
-    assert parse_job(json.dumps({'project': 'snek3', 'id': 'd2', 'type': 'deploy', 'restart': True})).restart is True
-    for bad in ({'type': 'deploy', 'restart': 'yes'}, {'type': 'restart', 'restart': True},
-                {'type': 'deploy', 'policy': 'x'}, {'type': 'restart', 'env': {'A': '1'}}):
-        with pytest.raises(JobError):
-            parse_job(json.dumps(dict({'project': 'snek3', 'id': 'a'}, **bad)))
+
+
+# --- the daemon over the scheduler ------------------------------------------------------------------
+#
+# What is pinned: the specs on `ops` land in the local queue in the scheduler's shape and leave it when
+# dequeued; the scheduler is started once per change of the queue and adopted, never doubled; a pause is
+# a marker the scheduler sees; a job the scheduler finishes is published to `results`; status.json says
+# what the scheduler says, with the daemon's own attention lines and a derived `ledger` for the tools.
+
+class FakeScheduler(object):
+    def __init__(self, pid):
+        self.pid, self.returncode = pid, None
+
+    def poll(self):
+        return self.returncode
+
+
+class Spawns(object):
+    def __init__(self):
+        self.calls, self.pid = [], 9000
+
+    def __call__(self, host, runtime):
+        self.pid += 1
+        self.calls.append(dict(runtime))
+        return FakeScheduler(self.pid), '/var/snek/logs/scheduler-x.log'
 
 
 class Commands(object):
@@ -1114,96 +766,328 @@ class Commands(object):
         return result
 
 
-def _acting_runner(tmp_path, monkeypatch, specs, commands, paused=False):
-    published = []
-    monkeypatch.setattr(runner_module.gitbus, 'fetch', lambda host: None)
-    monkeypatch.setattr(runner_module.gitbus, 'fetch_laptop_status', lambda host: None)
-    monkeypatch.setattr(runner_module.gitbus, 'push_unpushed', lambda host: [])
-    monkeypatch.setattr(runner_module.gitbus, 'read_runtime_text', lambda host: json.dumps({'paused': paused}))
-    monkeypatch.setattr(runner_module.gitbus, 'read_laptop_status', lambda host: '')
-    monkeypatch.setattr(runner_module.gitbus, 'publish_status',
-                        lambda host, text: published.append(json.loads(text)) or True)
-    monkeypatch.setattr(runner_module.gitbus, 'read_pending_jobs',
-                        lambda host: [(spec['id'] + '.json', json.dumps(spec)) for spec in specs])
-    runner = _runner(tmp_path, {})
-    runner.run_command = commands
-    return runner, published
+class Bus(object):
+    """The git bus as the daemon sees it: specs on ops, a runtime, what was published where."""
+
+    def __init__(self, monkeypatch, specs, runtime_text='{}', laptop=''):
+        self.specs, self.runtime_text, self.laptop = list(specs), runtime_text, laptop
+        self.status, self.results = [], []
+        g = runner_module.gitbus
+        monkeypatch.setattr(g, 'fetch', lambda host: None)
+        monkeypatch.setattr(g, 'fetch_laptop_status', lambda host: None)
+        monkeypatch.setattr(g, 'push_unpushed', lambda host: [])
+        monkeypatch.setattr(g, 'read_runtime_text', lambda host: self.runtime_text)
+        monkeypatch.setattr(g, 'read_laptop_status', lambda host: self.laptop)
+        monkeypatch.setattr(g, 'publish_status', lambda host, text: self.status.append(json.loads(text)) or True)
+        monkeypatch.setattr(g, 'publish_results',
+                            lambda host, job, paths: self.results.append((job.id, sorted(paths))) or True)
+        monkeypatch.setattr(g, 'read_pending_jobs',
+                            lambda host: [(s['id'] + '.json', json.dumps(s)) for s in self.specs])
 
 
-def _train_spec(policy):
-    return {'project': 'snek3', 'id': policy, 'type': 'train', 'policy': policy, 'max_steps': 10}
+def _box(tmp_path, monkeypatch, specs, ledger=None, runtime_text='{}', laptop=''):
+    bus = Bus(monkeypatch, specs, runtime_text, laptop)
+    host = dict(HOST, SNEK_DIR=str(tmp_path / 'snek3'), REPO_PATH=str(tmp_path),
+                LEDGER_PATH=str(tmp_path / 'var' / 'ledger.json'), LOG_DIR=str(tmp_path / 'var' / 'logs'))
+    os.makedirs(os.path.dirname(host['LEDGER_PATH']))
+    with open(host['LEDGER_PATH'], 'w') as handle:
+        json.dump(ledger or {}, handle)
+    monkeypatch.setattr(runner_module, '_disk_free_gb', lambda path: 500.0)
+    runner = runner_module.Runner(host)
+    runner.run_command = Commands()
+    runner.spawn = Spawns()
+    return runner, bus
+
+
+def _train_spec(policy, **extra):
+    body = {'project': 'snek3', 'id': policy, 'type': 'train', 'policy': policy, 'max_steps': 10,
+            'label': ''}
+    body.update(extra)
+    return body
+
+
+def _queue_files(runner):
+    root = launch.queue_dir(runner.host)
+    return sorted(os.path.relpath(os.path.join(folder, name), root)
+                  for folder, _, names in os.walk(root) for name in names)
+
+
+def _scheduler_status(runner, running=(), queued_ids=(), attention=(), glance=None):
+    """What the scheduler writes to runs/.live/.status.json while it runs."""
+    path = os.path.join(runner.runs_dir(), runner_module.STATUS_RELATIVE)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    payload = {'iso': '2026-09-05T12:00:00', 'pid': runner.state.get('scheduler_pid'),
+               'running': list(running), 'queued_ids': list(queued_ids),
+               'at_a_glance': glance or {'running': ['b1 | x | training 50% (2 arms)'],
+                                         'queued': [], 'attention': list(attention)}}
+    with open(path, 'w') as handle:
+        json.dump(payload, handle)
+
+
+def test_the_ops_queue_is_mirrored_into_the_schedulers_queue_by_batch(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [
+        _train_spec('b1a-x'), _train_spec('b1b-x'), _train_spec('b2a-y'),
+        {'project': 'snek3', 'id': 'b1-hof5000', 'type': 'eval', 'policies': ['b1a-x', 'b1b-x'],
+         'eval_args': ['--pass', 'hof5000']}])
+    runner.poll_once(git=True)
+    assert _queue_files(runner) == ['b1/b1-hof5000.json', 'b1/b1a-x.json', 'b1/b1b-x.json', 'b2/b2a-y.json']
+    with open(os.path.join(launch.queue_dir(runner.host), 'b1', 'b1a-x.json')) as handle:
+        assert json.load(handle) == launch.materialise(parse_job(json.dumps(_train_spec('b1a-x'))))
+    # dequeued on ops: gone here, and the scheduler's own markers are left alone
+    open(os.path.join(launch.queue_dir(runner.host), 'b1', '.done-b1a-x'), 'w').close()
+    bus.specs = [s for s in bus.specs if s['id'] != 'b2a-y']
+    runner.poll_once(git=True)
+    assert _queue_files(runner) == ['b1/.done-b1a-x', 'b1/b1-hof5000.json', 'b1/b1a-x.json', 'b1/b1b-x.json']
+
+
+def test_a_batch_with_every_job_published_is_not_mirrored_but_a_batch_with_one_left_is_mirrored_whole(tmp_path, monkeypatch):
+    """`ops` still carries every finished spec, and a finished batch whose files are not in the
+    box's runs directory would be retrained. A half-done batch keeps its done arms so wave numbering
+    -- and the pass ids already on `results` -- stay the same."""
+    ledger = {job_id: {'state': 'done', 'type': 'train', 'finished': 1.0}
+              for job_id in ('b7a-x', 'b7b-x', 'b15a-e', 'b15b-e')}
+    ledger['b7-stageb'] = {'state': 'done', 'type': 'eval', 'finished': 1.0}
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b7a-x'), _train_spec('b7b-x'),
+                                               _train_spec('b15a-e'), _train_spec('b15b-e'), _train_spec('b15c-e')],
+                       ledger=ledger)
+    runner.poll_once(git=True)
+    assert _queue_files(runner) == ['b15/b15a-e.json', 'b15/b15b-e.json', 'b15/b15c-e.json']
+    assert bus.status[-1]['ledger']['b7a-x'] == 'done' and bus.status[-1]['ledger']['b7-stageb'] == 'done'
+
+
+def test_a_malformed_spec_is_recorded_once_and_the_rest_of_the_queue_goes_on(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [
+        {'project': 'snek2', 'id': 'b46a-old', 'type': 'train', 'policy': 'b46a-old'},   # the stale snek2 spec
+        _train_spec('b1a-x', max_steps=None),                                            # no cap
+        _train_spec('b1b-x')])
+    runner.poll_once(git=True)
+    assert _queue_files(runner) == ['b1/b1b-x.json']
+    assert runner.ledger['b46a-old']['state'] == 'failed' and runner.ledger['b1a-x']['state'] == 'failed'
+    assert runner.ledger['b1a-x']['error'].startswith('b1a-x: a train spec needs max_steps')
+    lines = bus.status[-1]['at_a_glance']['attention']
+    assert any('b46a-old is malformed' in line for line in lines)
+    assert bus.status[-1]['ledger']['b1a-x'] == 'failed'
+
+
+def test_the_scheduler_is_started_once_per_queue_change_and_adopted_meanwhile(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    assert len(runner.spawn.calls) == 1 and runner.state['scheduler_pid'] == 9001
+    assert bus.status[-1]['scheduler']['alive'] is True and bus.status[-1]['scheduler']['pid'] == 9001
+    runner.poll_once(git=True)
+    runner.poll_once(git=False)
+    assert len(runner.spawn.calls) == 1, 'alive: never a second one'
+    runner.scheduler.returncode = 0             # it finished the queue and exited
+    runner.poll_once(git=True)
+    assert len(runner.spawn.calls) == 1, 'same queue, nothing new to do: not restarted'
+    assert bus.status[-1]['scheduler']['alive'] is False and bus.status[-1]['scheduler']['last_exit'] == 0
+    bus.specs.append(_train_spec('b2a-y'))
+    runner.poll_once(git=True)
+    assert len(runner.spawn.calls) == 2 and runner.state['scheduler_pid'] == 9002, 'a new spec starts it'
+
+
+def test_a_trigger_starts_the_scheduler_even_when_the_queue_did_not_change(tmp_path, monkeypatch):
+    runner, _ = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    runner.scheduler.returncode = 1              # crashed
+    runner.poll_once(git=True)
+    assert len(runner.spawn.calls) == 1, 'a failed exit is not retried on its own inside the backoff'
+    runner.poll_once(git=True, forced=True)
+    assert len(runner.spawn.calls) == 2
+
+
+def test_a_daemon_restart_adopts_the_scheduler_by_pid_and_a_reboot_forgets_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner_module, 'boot_id', lambda: 'boot-1')
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    alive = {9001}
+    monkeypatch.setattr(launch, 'pid_alive', lambda pid: pid in alive)
+    again = runner_module.Runner(runner.host)
+    again.spawn = Spawns()
+    again.poll_once(git=True)
+    assert again.spawn.calls == [] and again.state['scheduler_pid'] == 9001
+    monkeypatch.setattr(runner_module, 'boot_id', lambda: 'a-different-boot')
+    rebooted = runner_module.Runner(runner.host)
+    rebooted.spawn = Spawns()
+    assert rebooted.state['scheduler_pid'] is None
+    rebooted.poll_once(git=True)
+    assert len(rebooted.spawn.calls) == 1, 'after a reboot the queue is resumed by a fresh scheduler'
+
+
+def test_a_pause_is_a_marker_the_scheduler_reads_and_no_scheduler_is_started_under_it(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')], runtime_text='{"paused": true}')
+    runner.poll_once(git=True)
+    hold = os.path.join(runner.runs_dir(), runner_module.HOLD_RELATIVE)
+    assert os.path.exists(hold) and runner.spawn.calls == []
+    assert bus.status[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
+    assert bus.status[-1]['at_a_glance']['queued'][1:] == ['b1 training | x | queued (1 arm)']
+    assert bus.status[-1]['ledger'] == {'b1a-x': 'queued'}
+    bus.runtime_text = '{}'
+    runner.poll_once(git=True)
+    assert not os.path.exists(hold) and len(runner.spawn.calls) == 1, 'lifting the hold starts it'
+
+
+def test_the_runtime_knobs_at_spawn_are_the_ones_the_scheduler_gets(tmp_path, monkeypatch):
+    runner, _ = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')],
+                     runtime_text='{"max_trainers": 6, "eval_shards": 10}')
+    runner.poll_once(git=True)
+    assert runner.spawn.calls[0]['max_trainers'] == 6 and runner.spawn.calls[0]['eval_shards'] == 10
+
+
+def test_a_job_the_scheduler_finished_is_published_with_its_arms_files(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x'), _train_spec('b1b-x')])
+    runner.poll_once(git=True)
+    runs = runner.runs_dir()
+    os.makedirs(runs)
+    for name in ('b1a-x.png', 'b1a-x.md', 'b1a-x_evals.json', 'b1a-x_checkpoint_evals.json',
+                 'b1b-x.png', 'b1ab-other.png'):
+        open(os.path.join(runs, name), 'w').close()
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']},
+                                       {'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x']}])
+    runner.poll_once(git=False)
+    assert bus.results == [] and set(runner.state['running']) == {'b1a-x', 'b1b-x'}
+    _scheduler_status(runner, running=[{'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x']},
+                                       {'id': 'b1-stageb', 'type': 'eval', 'policies': ['b1a-x']}],
+                      queued_ids=['b1-hof5000'])
+    runner.poll_once(git=True)
+    assert [job_id for job_id, _ in bus.results] == ['b1a-x']
+    assert [os.path.basename(path) for path in bus.results[0][1]] == \
+        ['b1a-x.md', 'b1a-x.png', 'b1a-x_checkpoint_evals.json', 'b1a-x_evals.json']
+    assert 'b1a-x' in runner.state['published']
+    assert bus.status[-1]['ledger'] == {'b1a-x': 'done', 'b1b-x': 'running', 'b1-stageb': 'running',
+                                        'b1-hof5000': 'queued'}
+    assert bus.status[-1]['running'][1]['id'] == 'b1-stageb'
+    # a pass that finishes publishes every arm's files under its own id, as the old daemon did
+    _scheduler_status(runner, running=[], queued_ids=[])
+    runner.poll_once(git=False)
+    assert [job_id for job_id, _ in bus.results] == ['b1a-x', 'b1b-x', 'b1-stageb']
+    assert [os.path.basename(p) for p in dict(bus.results)['b1-stageb']] == \
+        ['b1a-x.md', 'b1a-x.png', 'b1a-x_checkpoint_evals.json', 'b1a-x_evals.json']
+
+
+def test_a_job_seen_running_before_a_restart_is_still_published_after_it(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
+    runner.poll_once(git=False)
+    monkeypatch.setattr(launch, 'pid_alive', lambda pid: False)     # scheduler and daemon both gone
+    again = runner_module.Runner(runner.host)
+    again.spawn = Spawns()
+    again.poll_once(git=False)
+    assert [job_id for job_id, _ in bus.results] == ['b1a-x']
+
+
+def test_status_carries_the_schedulers_glance_its_attention_and_the_laptop(tmp_path, monkeypatch):
+    laptop = json.dumps({'iso': '2026-09-05T11:00:00', 'at_a_glance': {'running': ['b16 | kl | training 3% (8 arms)'],
+                                                                        'queued': [], 'attention': []}})
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')], laptop=laptop)
+    runner.poll_once(git=True)
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}],
+                      attention=['** b1-stageb failed (exit 1); marked, not retried'])
+    runner.poll_once(git=True)
+    glance = bus.status[-1]['at_a_glance']
+    assert glance['running'] == ['b1 | x | training 50% (2 arms)']
+    assert glance['attention'] == ['** b1-stageb failed (exit 1); marked, not retried']
+    assert glance['laptop_running'] == ['b16 | kl | training 3% (8 arms)'] and glance['laptop_iso'] == '2026-09-05T11:00:00'
+    assert bus.status[-1]['ledger']['b1-stageb'] == 'failed'
+    assert bus.status[-1]['scheduler']['status_iso'] == '2026-09-05T12:00:00'
+    assert 'counts' not in bus.status[-1] and bus.status[-1]['head'] in ('aaaaaaaaaaaa', 'bbbbbbbbbbbb')
+
+
+def test_a_stale_status_file_from_a_dead_scheduler_is_not_shown_as_running(tmp_path, monkeypatch):
+    runner, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
+    runner.poll_once(git=True)
+    _scheduler_status(runner, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
+    runner.scheduler.returncode = -9
+    runner.poll_once(git=True)
+    assert bus.status[-1]['at_a_glance']['running'] == [] and bus.status[-1]['running'] == []
+    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x | queued (1 arm)'], 'the arm is short of its cap'
+    assert any('the scheduler exited -9' in line for line in bus.status[-1]['at_a_glance']['attention'])
+
+
+def test_an_eval_the_old_daemon_already_ran_gets_a_done_marker_so_the_scheduler_skips_it(tmp_path, monkeypatch):
+    ledger = {'b1-hof5000': {'state': 'done', 'type': 'eval', 'finished': 1.0},
+              'b1a-x': {'state': 'done', 'type': 'train', 'finished': 1.0}}
+    runner, bus = _box(tmp_path, monkeypatch, [
+        {'project': 'snek3', 'id': 'b1-hof5000', 'type': 'eval', 'policies': ['b1a-x'], 'eval_args': ['--pass', 'hof5000']},
+        _train_spec('b1a-x'), _train_spec('b1b-x')], ledger=ledger)     # b1b-x keeps the batch live
+    runner.poll_once(git=True)
+    assert os.path.exists(os.path.join(launch.queue_dir(runner.host), 'b1', '.done-b1-hof5000'))
+    assert bus.status[-1]['ledger']['b1-hof5000'] == 'done' and bus.status[-1]['ledger']['b1a-x'] == 'done'
+
+
+# --- actions: deploy and restart over the bus -------------------------------------------------------
+
+def test_deploy_and_restart_are_job_types_that_take_no_work_fields():
+    deploy = parse_job(json.dumps({'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'}))
+    assert deploy.category == 'action' and deploy.restart is None
+    assert parse_job(json.dumps({'project': 'snek3', 'id': 'r1', 'type': 'restart'})).category == 'action'
+    assert parse_job(json.dumps({'project': 'snek3', 'id': 'd2', 'type': 'deploy', 'restart': True})).restart is True
+    for bad in ({'type': 'deploy', 'restart': 'yes'}, {'type': 'restart', 'restart': True},
+                {'type': 'deploy', 'policy': 'x'}, {'type': 'restart', 'env': {'A': '1'}}):
+        with pytest.raises(JobError):
+            parse_job(json.dumps(dict({'project': 'snek3', 'id': 'a'}, **bad)))
 
 
 def test_a_deploy_that_changes_the_runner_merges_records_publishes_and_stops_for_systemd(tmp_path, monkeypatch):
     """The named action replaces `ssh ... deploy; ssh ... sudo systemctl restart`: the daemon runs the
     box's own deploy, sees the runner changed between the heads, publishes the done record, and exits
-    -- `Restart=always` relaunches it on the new code. Nothing was dispatched on the way out."""
-    commands = Commands()
-    runner, published = _acting_runner(tmp_path, monkeypatch,
-                                       [{'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'},
-                                        _train_spec('b1a-x')], commands)
-    launched = []
-    monkeypatch.setattr(runner, '_launch', lambda job: launched.append(job.id))
+    -- `Restart=always` relaunches it on the new code. The scheduler, detached, is untouched."""
+    runner, bus = _box(tmp_path, monkeypatch, [{'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'},
+                                               _train_spec('b1a-x')])
+    commands = runner.run_command
     runner.poll_once(git=True)
     record = runner.ledger['deploy-1']
     assert record['state'] == 'done' and record['restart'] is True and record['restarted'] is True
     assert (record['head_before'], record['head_after']) == ('aaaaaaaaaaaa', 'bbbbbbbbbbbb')
     assert record['output'] == ['HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; kept 0 pictures']
     assert runner.stop and 'deploy-1' in runner.restart_requested
-    assert launched == []                                  # the poll ended at the restart
-    assert [job.id for job in runner._queued] == ['b1a-x']  # actions never sit in the queue
-    assert published[-1]['ledger']['deploy-1'] == 'done'
-    assert published[-1]['head'] == 'bbbbbbbbbbbb'
+    assert runner.spawn.calls == [], 'the poll ended at the restart'
+    assert _queue_files(runner) == ['b1/b1a-x.json'], 'actions never reach the scheduler'
+    assert bus.status[-1]['ledger']['deploy-1'] == 'done'
+    assert bus.status[-1]['head'] == 'bbbbbbbbbbbb'
     assert commands.calls[1][-2:] == ['-m', 'runner.deploy']
-    # and the ledger on disk already says done, so the relaunched daemon does not run it again
     with open(runner.host['LEDGER_PATH']) as handle:
         assert json.load(handle)['deploy-1']['state'] == 'done'
 
 
-def test_a_deploy_that_touches_only_tools_does_not_restart_and_dispatch_goes_on(tmp_path, monkeypatch):
-    commands = Commands(changed='')
-    runner, published = _acting_runner(tmp_path, monkeypatch,
-                                       [{'project': 'snek3', 'id': 'deploy-2', 'type': 'deploy'},
-                                        _train_spec('b1a-x')], commands)
-    launched = []
-    monkeypatch.setattr(runner, '_launch', lambda job: launched.append(job.id))
+def test_a_deploy_that_touches_only_tools_does_not_restart_and_the_scheduler_starts(tmp_path, monkeypatch):
+    runner, _ = _box(tmp_path, monkeypatch, [{'project': 'snek3', 'id': 'deploy-2', 'type': 'deploy'},
+                                             _train_spec('b1a-x')])
+    runner.run_command = Commands(changed='')
     runner.poll_once(git=True)
     assert runner.ledger['deploy-2']['state'] == 'done' and runner.ledger['deploy-2']['restart'] is False
-    assert not runner.stop and launched == ['b1a-x']
-    assert any(argv[:2] == ['git', 'diff'] for argv in commands.calls)      # the diff decided it
+    assert not runner.stop and len(runner.spawn.calls) == 1
+    assert any(argv[:2] == ['git', 'diff'] for argv in runner.run_command.calls)
 
 
 def test_restart_true_forces_it_and_a_failed_deploy_is_attention_never_a_restart(tmp_path, monkeypatch):
-    commands = Commands(changed='')
-    runner, _ = _acting_runner(tmp_path, monkeypatch,
-                               [{'project': 'snek3', 'id': 'deploy-3', 'type': 'deploy', 'restart': True}],
-                               commands)
+    runner, _ = _box(tmp_path, monkeypatch, [{'project': 'snek3', 'id': 'deploy-3', 'type': 'deploy', 'restart': True}])
+    runner.run_command = Commands(changed='')
     runner.poll_once(git=True)
     assert runner.stop and runner.ledger['deploy-3']['restarted'] is True
 
-    failing = Commands(heads=('aaaaaaaaaaaa',), deploy_rc=3,
-                       deploy_out='snek3/runs/b1a_evals.json differs from the commit; nothing touched\n')
-    runner, published = _acting_runner(tmp_path, monkeypatch,
-                                       [{'project': 'snek3', 'id': 'deploy-4', 'type': 'deploy', 'restart': True}],
-                                       failing)
+    runner, bus = _box(tmp_path / 'two', monkeypatch,
+                       [{'project': 'snek3', 'id': 'deploy-4', 'type': 'deploy', 'restart': True}])
+    runner.run_command = Commands(heads=('aaaaaaaaaaaa',), deploy_rc=3,
+                                  deploy_out='snek3/runs/b1a_evals.json differs from the commit; nothing touched\n')
     runner.poll_once(git=True)
     record = runner.ledger['deploy-4']
     assert record['state'] == 'failed' and record['rc'] == 3 and 'restart' not in record
     assert not runner.stop
-    assert published[-1]['at_a_glance']['attention'] == [
+    assert bus.status[-1]['at_a_glance']['attention'] == [
         '** deploy-4 failed: deploy exited 3: snek3/runs/b1a_evals.json differs from the commit; '
         'nothing touched. Nothing was changed; fix it and queue a new id.']
 
 
 def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated(tmp_path, monkeypatch):
-    runner, published = _acting_runner(tmp_path, monkeypatch,
-                                       [{'project': 'snek3', 'id': 'restart-1', 'type': 'restart'}],
-                                       Commands(), paused=True)
+    runner, bus = _box(tmp_path, monkeypatch, [{'project': 'snek3', 'id': 'restart-1', 'type': 'restart'}],
+                       runtime_text='{"paused": true}')
     runner.poll_once(git=True)
     assert runner.stop and runner.ledger['restart-1']['state'] == 'done'
-    assert published[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
-    # the relaunched daemon reads the same spec and the same ledger: nothing happens
-    again = _runner(tmp_path, json.load(open(runner.host['LEDGER_PATH'])))
+    assert bus.status[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
+    again = runner_module.Runner(runner.host)
     again.run_command = Commands()
+    again.spawn = Spawns()
     again.poll_once(git=True)
     assert not again.stop and again.restart_requested is None

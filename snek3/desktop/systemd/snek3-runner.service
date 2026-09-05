@@ -15,10 +15,10 @@ ExecStart=/home/claw/miniconda3/bin/python -u -m runner.runner
 Restart=always
 RestartSec=10
 
-# Stop ONLY the daemon on stop/restart, never its children. Jobs are launched
-# detached (setsid) and self-terminate at SNEK_MAX_STEPS, so a deploy can restart
-# the daemon with four arms mid-run and they keep going. The daemon re-adopts them
-# by pid on the next poll.
+# Stop ONLY the daemon on stop/restart, never its children. The scheduler it
+# starts (tools/scheduler.py) is launched detached (setsid) and runs the batch on
+# its own, so a deploy can restart the daemon mid-wave and nothing under it
+# notices. The daemon re-adopts the scheduler by pid on the next poll.
 KillMode=process
 
 [Install]

@@ -1,6 +1,6 @@
 # One scheduler, and it owns the window — design proposal (2026-09-05)
 
-Status: **approved 2026-09-05; phase 1 and phase 3 built the same day (laptop), phase 2 in progress (desktop).** Section 0 is the argument, 1–3 are the
+Status: **approved and built 2026-09-05, all three phases** — phases 1 and 3 on the laptop that afternoon, phase 2 deployed to the desktop that evening. Section 0 is the argument, 1–3 are the
 design, 4 is the phasing, 5 is what is deliberately left alone, 6 is the open questions.
 
 ## 0. What is wrong, in one sentence each
@@ -122,18 +122,25 @@ hand-launched trainer against the cap. It stops being the window's input.
 | phase | what lands | where | when |
 |---|---|---|---|
 | **1** | `tools/scheduler.py` (from `laptop_batch`) with the window owner; `chart_viewer --follow`; `train.py`/`closeout.py` stop opening windows; delete `eval_window.py`, `chart_window.py`; `laptop-run`, `stop-run`, docs updated | laptop | at a batch boundary — the driver exits between batches, the scheduler starts on the next one. The desktop keeps today's flock window until phase 2; the known remedy still applies there |
-| **2** | daemon → bus adapter; spec materialisation; results publish from files; `at_a_glance` moves to `tools/`; `laptop_status` simplified; `desktop-deploy`, `desktop-batch`, `progress-update` skills updated | desktop | `drain: true`, wait for the wave and its passes, deploy, `drain: false`. The desktop gets the unified scheduler and the window fix in one deploy |
+| **2** | daemon → bus adapter (`desktop/runner/runner.py`, `launch.py`); spec materialisation into `desktop/queue-local/`; results publish when a running id leaves the scheduler's status; `.paused` hold marker relayed from `runtime.json`; `desktop-deploy`, `desktop-batch` skills and `desktop/README.md` updated | desktop | `drain: true`, wait for the wave and its passes, deploy, `drain: false`. The desktop gets the unified scheduler and the window fix in one deploy |
 | **3** (optional) | scheduler starts the stage-A workers before each wave | both | any time after 2 |
 
 Phase 1 is ordered first because the window is the acute pain and because building the owner once,
 inside the shared scheduler, is what keeps it from being written twice. Putting a window owner into
 today's daemon *and* today's driver would be exactly the two-copies rule this repo already has.
 
-**Migration notes for phase 2.** The box's ledger is not read by the new daemon: finished arms and
-passes are read from `desktop/runs/` (present for every closed batch), so nothing re-runs; a pass the
-ledger marks `failed` will be tried once more and then marked with the new file. `status.json` loses the
-`ledger` block (hundreds of ids) — see open question 4. The `ops` branch and spec format are unchanged,
-so nothing about queueing from the laptop changes.
+**Migration notes for phase 2, as built.** The box's ledger is read once, for its `done` records: they
+seed the daemon's `published` set, and that set decides two things. **A batch with every job published
+is not mirrored at all** — `ops` still carries every spec of b7-b13, and b7-b10's files predate
+`desktop/runs/` (2026-09-03), so a scheduler shown those specs would have retrained them. A batch with
+one job left (b15) is mirrored *whole*, finished arms included, so the scheduler's waves and pass ids
+(`b15-stageb-w3`) line up with the ones already on `results`; finished arms and passes are then read from
+`desktop/runs/` and skipped. An eval spec already published gets a `.done-<id>` marker so it is not
+measured again. `status.json` keeps a *derived* `ledger` block (`{id: state}`), because
+`tools/progress_update.py` and `tools/viewer_manifest.py` read one — open question 4 was about the
+human reader, and `at_a_glance` is what they read. The `ops` branch and spec format are unchanged.
+Verified end to end on the laptop before deploying: real daemon loop, real scheduler, a 1,500-step smoke
+arm, four results publishes (arm, stage B, hof5000, hof30k), derived ledger correct throughout.
 
 ## 5. Left alone, deliberately
 

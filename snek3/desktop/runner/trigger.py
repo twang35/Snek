@@ -93,7 +93,7 @@ def _print_glance(host):
     except (OSError, ValueError) as error:
         print('(could not read status.json: {0})'.format(error))
         return
-    print('at {0}  counts={1}'.format(status.get('iso'), status.get('counts')))
+    print('at {0}  scheduler={1}'.format(status.get('iso'), status.get('scheduler')))
     glance = status.get('at_a_glance') or {}
     # {'running': [str], 'queued': [str], 'attention': [str]} — a hold notice arrives as the first
     # `queued` line, and anything needing a human arrives under `attention`.

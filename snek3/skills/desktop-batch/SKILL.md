@@ -109,12 +109,13 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 **The fetch is mandatory** — without it you read an old local ref whose embedded timestamp looks like
 a dead daemon. Read `at_a_glance` first, then `attention`.
 
-**Nothing starts while anything is running.** `_dispatch` returns early whenever any job is live, so
-waves never overlap and a freed slot is never backfilled mid-wave. A queued batch behind a running
-one is normal, not stuck. With `auto_stage_b` on, each finished training queues its own stage B at
-priority 10, the stage B queues the batch's hof5000 at 11 and that queues its hof30k at 12 -- one
-`evals` line per batch in `at_a_glance.queued`, three jobs. No hof spec needs writing for a batch
-that finishes under the chain; `desktop/README.md` has the table.
+**The daemon does not run the batch; `tools/scheduler.py` does**, the same scheduler as the laptop's
+(2026-09-05). The daemon mirrors the specs into `desktop/queue-local/<batch>/` and starts a scheduler if
+none is running; `status.json`'s `scheduler` block says whether one is alive and its pid. A wave of
+`max_trainers` arms trains, its stage B, hof5000 and hof30k run over it, then the next wave -- so a queued
+batch behind a running one is normal, not stuck, and no hof spec needs writing for a batch that finishes
+under the chain (`desktop/README.md` has the table). **A new batch pushed while a scheduler runs is picked
+up by that scheduler** at its next batch boundary, in name order; nothing needs restarting.
 
 ## Retune or hold the box
 

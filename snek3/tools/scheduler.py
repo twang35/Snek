@@ -41,6 +41,10 @@ only if the pass before it exited 0, because each selects from the file the one 
 `eval` spec in a batch directory -- a hand hof pass, a `one` re-measure -- runs after the batch's
 waves as the `tools.closeout` command it spells, once, marked `.done-<id>` beside it.
 
+**A `runs/.live/.paused` file pauses it**: what is running finishes, and the next wave, pass or eval
+waits until the file is gone. The desktop daemon writes it for `runtime.json`'s `paused`/`drain`; on
+the laptop, `touch` and `rm` it.
+
 **Never more than `--max-trainers` (8) trainers on the box, counting anything else running here.**
 Before each launch the scheduler waits until the box's live trainer count is below the cap.
 
@@ -373,6 +377,9 @@ class Driver(object):
     def attention(self):
         """One line per failed pass, so a marker is never silent: the queue skips it, this names it."""
         lines = []
+        if live_runs.held(self.runs_dir):
+            lines.append('** paused: {0} exists; nothing new starts until it is removed'.format(
+                live_runs.hold_path(self.runs_dir)))
         for number, arms in enumerate(waves(self.specs, self.wave), start=1):
             for pass_name in self.passes if self.stage_b else ():
                 if self._pass_failed(arms, pass_name, number):
@@ -420,6 +427,20 @@ class Driver(object):
             self.sleep(POLL_SECONDS)
             self._tick()
         return process.returncode
+
+    def _wait_while_held(self, what):
+        """Blocks while the box is paused (`live_runs.held`). Nothing running is touched; the next
+        launch waits. The status keeps refreshing so the pause is visible from either box."""
+        waited = False
+        while live_runs.held(self.runs_dir):
+            if not waited:
+                _log('paused ({0} exists); {1} waits until it is removed'.format(
+                    live_runs.hold_path(self.runs_dir), what))
+                waited = True
+            self.sleep(POLL_SECONDS)
+            self._tick()
+        if waited:
+            _log('unpaused; {0} goes ahead'.format(what))
 
     def _wait_for_slot(self):
         waited = False
@@ -472,6 +493,7 @@ class Driver(object):
                 continue
             to_launch.append(spec)
         if to_launch:
+            self._wait_while_held('wave {0}'.format(number))
             self._start_workers(to_launch)
         for spec in to_launch:
             started.append((spec, self._launch(spec)))
@@ -499,6 +521,7 @@ class Driver(object):
             if self._pass_failed(arms, pass_name, number):
                 _log('wave {0}: {1} is marked failed; not retried'.format(number, pass_name))
                 return 1
+            self._wait_while_held('wave {0} {1}'.format(number, pass_name))
             code = self.run_pass(pass_name, number, arms)
             if code:
                 # The next pass selects from the file this one wrote; with the pass failed, running
@@ -547,6 +570,7 @@ class Driver(object):
         for spec in self.evals:
             if self._eval_done(spec):
                 continue
+            self._wait_while_held('eval {0}'.format(spec['id']))
             _log('eval {0}: {1}'.format(spec['id'], ' '.join(spec['policies'])))
             self.active_eval = spec
             self._show(pass_panels(spec['policies'], eval_label(spec), self.runs_dir))
@@ -708,7 +732,7 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None):
         worst = max(worst, driver_for(specs).run() or 0)
 
 
-def main(argv=None):
+def build_parser():
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('specs', nargs='*', help='desktop spec files, or directories of them')
     parser.add_argument('--queue', metavar='DIR', default=None,
@@ -727,6 +751,11 @@ def main(argv=None):
                         help='do not publish what is running to the laptop-status branch')
     parser.add_argument('--reopen-window', action='store_true',
                         help='ask the running scheduler for a fresh chart window, then exit')
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.reopen_window:
         path = window_module.request_reopen()

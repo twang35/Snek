@@ -1,10 +1,12 @@
 # The desktop — `the-claw-den`
 
 A stdlib-only systemd daemon on a dedicated Linux box that runs trainings and evals unattended. It
-**imports nothing from this project** — it shells out to `train.py` and `tools/closeout.py` — and it talks
-to the laptop only through four single-writer git branches. That decoupling is the design's best
-property: the bus works from anywhere, `ssh` is a convenience, and the daemon cannot be broken by a
-change to the trainer.
+**imports nothing from this project** and **schedules nothing itself** (since 2026-09-05): it mirrors the
+specs on `ops` into a local queue, starts `tools/scheduler.py` — the same scheduler the laptop runs — over
+that queue, and publishes what the scheduler finishes. It talks to the laptop only through four
+single-writer git branches. That decoupling is the design's best property: the bus works from anywhere,
+`ssh` is a convenience, and the daemon cannot be broken by a change to the trainer or the scheduler.
+The design and its decisions are [`../plans/scheduler.md`](../plans/scheduler.md).
 
 **snek3's daemon owns the box as of 2026-08-28**, replacing snek2's. The two eras share the `ops`
 branch, which is why every spec carries a required `project` field.
@@ -78,20 +80,25 @@ calling unreachable.
 **A `status.json` up to 10 minutes old is a healthy daemon** — see `git_seconds` below.
 
 Start with `at_a_glance`: one line per running batch with a percentage, one per queued batch-phase,
-and an `attention` list for anything needing a human — a failed eval, a stuck push, a rejected spec.
-`counts`, `running`, `ledger`, `disk_free_gb` and `load_avg` are underneath it.
+and an `attention` list for anything needing a human — a failed pass, a stuck push, a rejected spec,
+a scheduler that exited non-zero. While the scheduler runs, the lines are **its own** (`runs/.live/
+.status.json` on the box, the same file its chart window follows); the daemon adds its attention lines,
+the hold notice, and the laptop's lines. Underneath:
 
-Ledger states, and the one worth knowing:
-
-| state | means |
+| key | means |
 |---|---|
-| `queued` → `running` → `done` | the normal path |
-| `failed` | non-zero exit, or a traceback in the log |
-| **`interrupted`** | the box rebooted under it. **Non-terminal, so it is relaunched**, and a training resumes from its checkpoint |
+| `scheduler` | `alive`, `pid`, `spawned`, `last_exit`, `log`, and `status_iso` — the scheduler's own timestamp |
+| `running` | the scheduler's running jobs: `id`, `type`, `policies`, `step`/`max_steps` for an arm |
+| `ledger` | `{job id: queued / running / done / failed}`, derived for the tools that read one (`tools/progress_update.py`, `tools/viewer_manifest.py`); `done` means published to `results` |
+| `runtime`, `config_notes`, `disk_free_gb`, `head`, `load_avg` | the box |
 
-`interrupted` exists because the same situation used to read `done`, which **published truncated arms
-as finished and silently consumed their measurements.** It is detected by comparing the record's boot
-id against `/proc/sys/kernel/random/boot_id`. Read it as "lost wall clock, nothing else".
+**The scheduler's state is the filesystem, and so is the daemon's memory of it.** An arm is finished
+when its `_evals.json` has reached the cap, a pass when its merged file exists, a failed pass leaves a
+`.failed-<id>` marker beside its spec (`tools/scheduler.py`). The daemon keeps one small `state.json`
+beside the ledger: the scheduler's pid and boot id, the queue it was started on, the ids it saw running
+and the ids it has published. A reboot is detected by the boot id: the scheduler is gone, so the next
+poll starts a fresh one and every arm resumes from its checkpoint, every pass from its shard files. Old
+`interrupted` records and the boot-id check per job are gone with the per-job ledger.
 
 ## Tune it while it runs
 
@@ -103,29 +110,33 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 
 | knob | default | notes |
 |---|---:|---|
-| `max_trainers` | 8 | concurrent train/smoke/benchmark jobs **in one wave**. Not what keeps waves from overlapping — see below |
-| `eval_shards` | 16 | **this is the knob that fills the box.** One wave owns every arm of a batch |
-| `poll_seconds` | 30 | the local half: reap, read the fetched ref, dispatch. Off-network, so it stays fast |
+| `max_trainers` | 8 | the scheduler's `--wave` and `--max-trainers`: arms per wave, and the cap counting anything else on the box |
+| `eval_shards` | 16 | the scheduler's `--shards`: the stage-B shard pool, spread over the wave's arms |
+| `poll_seconds` | 30 | the local half: mirror the queue, relay the hold, publish what finished. Off-network, so it stays fast |
 | `git_seconds` | 600 | the network half: one fetch, one status push, one retry of any local-only commit |
 | `torch_threads` | 1 | measured, not cautious. `SNEK_TORCH_THREADS` |
 | `omp_num_threads` | 1 | same, for numpy's BLAS underneath |
 | `nice` | 0 | |
 | `disk_min_gb` | 5 | refuse to launch below this much free |
-| `paused` / `drain` | false | finish what is running, start nothing new |
-| `auto_stage_b` | true | the automatic chain: a finished training queues its stage B, which queues its hof5000, which queues its hof30k — see below. Off switches all three |
-| `viewer` | true | let the trainings this box launches open their chart window — see below |
+| `paused` / `drain` | false | finish what is running, start nothing new. **Relayed at once** as the scheduler's hold marker, `desktop/runs/.live/.paused` |
+| `auto_stage_b` | true | the chain: every wave is followed by its stage B, hof5000 and hof30k — see below. Off is the scheduler's `--no-stage-b` |
+| `viewer` | true | the chart window; off reaches the scheduler as `SNEK_CHART_WINDOW=0` |
+
+**Every knob but `paused`/`drain` applies when the scheduler is next started**, because they reach it
+as flags and environment at spawn. A scheduler is started when the mirrored queue changes, when a hold
+is lifted, or when `trigger` asks and none is running; a change of `max_trainers` alone does not
+restart a running one — pause, wait for the wave, unpause, and the next scheduler has the new value.
+
 
 ### The automatic chain: training → stage B → hof5000 → hof30k
 
-Every batch gets all three passes without anyone queueing them (since 2026-09-04; before that only
-stage B was automatic, every hof pass was a hand-written spec, and b12's and b13's were never
-written). When a job finishes well, `_reap` marks its ledger record `next_pass: <name>`; at the next
-dispatch `_auto_jobs` groups every marked record's arms by batch and pass, drops the arms a wave of
-that pass already covers (a hand spec counts, if its id carries the pass suffix — `b11-hof5000` did),
-and mints one `tools.closeout <arms> --pass <name>` job per batch and pass:
-`b15-stageb`, `b15-hof5000`, `b15-hof30k`, then `-w2`, `-w3`, … for the batch's later waves. The
-priorities 10/11/12 put the three ahead of any queued training and in order, so a training wave is
-followed by its three measurements before the next wave trains.
+Every batch gets all three passes without anyone queueing them, and **the scheduler runs the chain**
+— on the laptop and on the box, the same code (`tools/scheduler.py`; before 2026-09-05 the daemon had
+its own copy, which minted the pass jobs into its ledger). A batch's arms run in waves of
+`max_trainers`; after each wave, `tools.closeout <arms> --pass stageb`, then `hof5000`, then `hof30k`
+over that wave's arms, with the ids `b15-stageb`, `b15-hof5000`, `b15-hof30k` for wave 1 and `-w2`,
+`-w3`, … after. An `eval` spec in the queue runs once, after the batch's waves, as the command it
+spells, and a pass the arm already has the file for is skipped.
 
 | pass | id | selects | episodes | seed | writes |
 |---|---|---|---|---:|---|
@@ -133,118 +144,82 @@ followed by its three measurements before the next wave trains.
 | hof5000 | `<batch>-hof5000` | `above:99` — stage-B rows at ≥99/500 | 5,000 | 0 | `…_checkpoint_evals_hof5000.json` |
 | hof30k | `<batch>-hof30k` | `above:99:hof5000` — hof5000 rows at ≥99/5,000 | 30,000 | 7 | `…_checkpoint_evals_hof30k.json` |
 
-**The numbers are not in the daemon.** They are `tools/closeout.py`'s `PASSES`; the daemon passes the
-name and the close-out's preset does the rest, for the reason `launch.py` records — snek2's daemon
-carried five protocol numbers as a second copy and they drifted. A pass with no candidates in an arm
-is not an error: the shards exit at once and an empty labelled file is written, so the next pass reads
-it and selects nothing in turn.
+**The numbers are in neither the daemon nor the scheduler.** They are `tools/closeout.py`'s `PASSES`;
+the scheduler passes the name and the close-out's preset does the rest — snek2's daemon carried five
+protocol numbers as a second copy and they drifted. A pass with no candidates in an arm is not an
+error: the shards exit at once and an empty labelled file is written, so the next pass selects nothing
+in turn.
 
 **Success is required at every hop.** hof5000 selects from the file stage B wrote, so a failed stage B
-earns no hof5000 — running it would fail too and bury the real failure. The failed pass is under
-`attention`, as before; delete its ledger record to re-queue it and the chain resumes from there.
+earns no hof5000. A failed pass is marked `.failed-<id>` beside the batch's specs in the local queue
+(`desktop/queue-local/<batch>/`), named under `attention`, and never retried on its own; delete the
+marker and the chain resumes from there at the scheduler's next run.
 
-`status.json`'s queue shows a batch's three owed passes as **one line**, `b16 evals | … | queued
-(8 arms)`, because a batch owed its stage B is owed the other two; the running line still names the
-pass that is running. `tools/laptop_batch.py` runs the same chain on the laptop, with the same ids.
+**The scheduler also starts the stage-A eval workers** a wave needs (`tools.eval_queue`), sized from
+the wave's specs, before it launches the arms — so a wave never trains against an empty worker pool.
 
-### One wave at a time is structural, and no limit enforces it
+`status.json`'s queue shows a batch's owed passes as **one line**, `b16 evals | … | queued (8 arms)`;
+the running line names the pass that is running.
 
-**`runner.py:_dispatch` returns early whenever anything is running at all:**
+### One wave at a time is the scheduler's, and no limit enforces it
 
-    if self.running or not desired:
-        return
+The scheduler launches a wave, waits for every arm of it, runs the wave's passes, then launches the
+next wave. Nothing new starts until the wave and its passes are done, a freed slot is never backfilled
+mid-wave, and trainings and passes therefore never overlap. `max_trainers` only caps how *wide* a
+wave is and how many trainers the box may hold counting any launched by hand; `eval_shards` is the
+shard pool a pass spreads over its arms. It was 4 because snek2's TensorFlow workers cost 230 MB of
+arena each; on this code a trainer is 290 MB and the ceiling is threads (Ryzen 7 9700X, 8 cores / 16
+SMT threads), so 8 trainers beside the stage-A queue's workers is the same shape as the 16-shard eval
+wave. Raised to 8 on 2026-08-29.
 
-That single line is the whole guarantee. A wave is a set of same-type jobs launched together; nothing
-new starts until every one of them finishes, a freed slot is never backfilled mid-wave, and trainings
-and evals therefore never overlap. It holds for any value of any knob below, including 0.
+**Cores are the binding constraint, not memory.** Measured 2026-08-28: an eval shard peaks at 202 MB
+and a trainer at 290 MB, so a full box is 4.4 GB of 15,030. 16 shards at one intra-op thread each is
+the measured optimum, and 18 loses 6-10%; `eval_shards` is clamped to `HARD_MAX_EVAL_SHARDS` (16).
 
-So **`max_trainers` is not the mechanism** — it only caps how *wide* one wave may be, and its job is
-now purely to stop a queue commit with twenty specs from launching twenty trainers. It was 4 because
-snek2's TensorFlow workers cost 230 MB of arena each and memory ran out first; on this code a trainer
-is 290 MB and the ceiling is threads, so 8 trainers beside the stage-A queue's 6 workers is 14
-single-threaded processes on 16 threads — the same shape as the 16-shard eval wave the box is already
-tuned for. Raised to 8 on 2026-08-29.
-
-**Three settings were removed on 2026-08-29 for being unable to affect anything.**
-
-`max_evals` and `HARD_MAX_EVALS` are gone: an eval job *is* a whole wave, so the barrier already
-prevented a second one and the count's only legal value was the 1 it shipped as. `clamp_total_shards`
-went with them — it existed to divide the shard ceiling by the wave count, which meant asking for two
-waves silently halved the width of the one wave that could actually run. `eval_shards` is now clamped
-straight to `HARD_MAX_EVAL_SHARDS`, which is a real ceiling: threads.
-
-`HARD_MAX_TRAINERS` is gone because wave width is not a safety property, and as a second tier it was
-worse than redundant — `runtime.json` was clamped to it and the request merely *noted* in
-`status.json`, so a commit asking for 8 arms against a stale ceiling of 4 ran 4 and looked like it had
-worked. That is precisely what happened on 2026-08-29. `max_trainers` is now honoured as written,
-bounded only by a far-away sanity clamp, and its job is simply to stop a queue commit with twenty
-specs from launching twenty trainers.
-
-**A `runtime.json` still naming `max_evals` is now rejected whole**, not ignored — the unknown-key
-path keeps the last known-good config and says so in `status.json`, which is the right outcome for a
-stale `ops` commit. **A `host.env` still carrying the two removed ceilings is fine**; extra keys are
-ignored, so an unchanged box keeps working and a rollback stays possible.
-
-**Cores are the binding constraint, not memory** — which is a change from snek2. Measured 2026-08-28
-on this code: an eval shard peaks at **202 MB** (193 of it torch's import) and a trainer at **290
-MB**, so a full box is **4.4 GB of 15,030**, 29%. snek2's memory-driven three-way clamp therefore
-collapses into one ceiling tied to the box's **16 SMT threads** (Ryzen 7 9700X, 8 physical cores): 16
-shards at one intra-op thread each is the measured optimum, and 18 loses 6-10%. `eval_shards` is
-clamped straight to that ceiling.
+**Removed settings, kept as history so nobody re-adds them.** `max_evals` and `HARD_MAX_EVALS` went on
+2026-08-29 (an eval job is a whole wave, so the count's only legal value was 1); `clamp_total_shards`
+went with them; `HARD_MAX_TRAINERS` went because wave width is not a safety property and a silently
+clamped request ran 4 arms while looking like 8. A `runtime.json` still naming `max_evals` is rejected
+whole and the last-known-good config kept, with a note in `status.json`. Extra keys in `host.env` are
+ignored, so an unchanged box keeps working.
 
 `git_seconds` is separate from `poll_seconds` because at 30 s the box made ~2,880 fetches and ~2,880
-pushes to github a day — enough sustained machine-shaped traffic from a home connection to be worth
-not making. 600 s cuts both to 144 while costing nothing locally, and `trigger` covers the case where
-a batch should start *now*.
+pushes to github a day. 600 s cuts both to 144 while costing nothing locally, and `trigger` covers the
+case where a batch should start *now*.
 
 ## The chart window
 
-**While anything is training, the box's monitor shows one window with every running arm in it** — and
-the daemon does not open it. Every trainer asks for it: the arm whose viewer wins the slot becomes the
-window, later arms join the one already up, each arm's panel stays for the rest of the wave, and it
-closes itself a few minutes after the last arm finishes. The mechanism is `tools/chart_window.py`, the
-`flock` in `tools/chart_viewer.py` and the pid registry in `tools/live_runs.py`, and it is identical on
-the laptop, which is the point of moving it out of the daemon.
+**One window per box, owned by the scheduler** (2026-09-05; the root `CLAUDE.md` has the history of the
+three designs before it). The scheduler opens it at its first launch — `tools.chart_viewer --follow
+desktop/runs/.live/.status.json` — repoints it at each wave's arms and then at each pass's, and closes
+it when it exits. Nothing else on the box opens a window: not the arms, not the close-outs, not the
+daemon. So "a pass is running and there is no window" has one cause now, the scheduler's viewer died
+or was closed, and one remedy:
 
-**Eight arms starting together spawn eight viewers, and seven exit within a second.** Expected, not a
-fault: the viewer holds an exclusive `flock` on `runs/.live/.window` and the losers stand down before
-drawing. Seeing *more than one* survive is the fault — this box opened five on 2026-08-29, when the
-launcher still tried to decide for itself. Check with
-`ps -Ao pid=,command= | grep '[c]hart_viewer'`.
+```
+ssh the-claw-den 'cd Snek/snek3 && SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs PYTHONPATH=. ~/miniconda3/envs/snek3/bin/python -m tools.scheduler --reopen-window'
+```
 
-**The daemon owed the window two things and it still owes exactly those two.** `DISPLAY` and
-`XAUTHORITY` from `host.env` are forwarded into every job's environment — without them a job cannot
-reach the monitor, because the daemon runs outside the graphical session — and `runtime.json`'s
-`viewer: false` reaches the trainer as `SNEK_CHART_WINDOW=0`. Benchmarks get that too, since a window
-would land in the numbers they exist to produce. Those two keys are the only optional ones in
-`host.env`; without them jobs run headless and no window appears.
+which drops a request file the running scheduler picks up within a poll. **A window you close stays
+closed until the scheduler's next launch** (user, 2026-09-05), and closing it is safe: the window reads
+a status file and some PNGs, and nothing in a trainer reads it, waits on it or reopens it. A daemon
+restart does not touch it (the scheduler is detached); a scheduler restart replaces it (the old one is
+killed by pid, after checking the pid is still a viewer).
 
-**A daemon-owned window was the first design and it was wrong twice over.** It drew a fixed 2x2 of the
-wave it launched, so it had to be closed and reopened whenever an arm joined or finished — and it left
-the laptop with no window at all, which is where most one-off arms actually run. Both fall out of the
-same mistake: the daemon is not the thing that knows what is training.
+**The daemon owes the window two things.** `DISPLAY` and `XAUTHORITY` from `host.env` reach the
+scheduler's environment — the daemon runs outside the graphical session — and `runtime.json`'s
+`viewer: false` reaches it as `SNEK_CHART_WINDOW=0`. Those two keys are the only optional ones in
+`host.env`; without them the scheduler runs headless and no window appears.
 
-**This is on in snek3 and was off in snek2, and the reason it is now safe is the important part.**
-snek2's window was the *trainer's* own in-process cv2 canvas, and one fatal XIO error under memory
-pressure killed all four arms at once on 2026-08-09 — which is why `SNEK_CHART_WINDOW=0` is in
-snek2's unit file. snek3's trainer never draws. The window is a separate session that only *reads* the
-PNGs the trainer already writes, so the worst a display failure can do is kill a window: nothing in a
-training loop reads it, waits on it, or reopens it.
-
-**A window you close stays closed**, and closing one while four arms train is safe. Nothing reopens it
-until the next arm starts; to get it back now, `PYTHONPATH=. python -m tools.chart_window`.
+**Why not the daemon's own window**, the first design: it drew a fixed grid of the wave it launched, had
+to be reopened whenever an arm joined or finished, and left the laptop with no window at all. Why not
+the arms' own, the second: eight arms racing for one `flock` opened five windows on 2026-08-29 and a
+stale winner held the slot for 15 hours on 2026-09-03. The scheduler is the one process that knows what
+is running, on both boxes, so it holds the one handle.
 
 **The window is sized from the display, not from a number of inches.** It fills 95% x 88% of whatever
-screen it opens on — 3086x1951 on this box's 3840x2160 panel. The first version asked for a fixed
-6x3 inches per panel and opened at 1201x650, 31% of the width; snek2 tuned fixed caps through three
-revisions and its last would still only have reached 47% here. `--scale` is a fraction of the screen
-budget, so `--scale 0.6` gives a window you can put something beside.
-
-**If it ever appears to flash, the daemon is not the cause** — check that first and check it cheaply:
-the viewer's pid in `ps` and `journalctl -u snek3-runner | grep viewer`. A stable pid with no journal
-lines means the process was never restarted and the flicker is inside it. That was the case on
-2026-08-29: `panels` returned its list in mtime order, so every eval an arm wrote permuted it, and
-`refresh` rebuilds the figure — a `plt.close` and a new window — whenever the panel set changes.
+screen it opens on — 3086x1951 on this box's 3840x2160 panel. `SNEK_CHART_WINDOW_SCALE` is a fraction of
+that budget and `SNEK_CHART_WINDOW_MAX_PX` caps the width, in the scheduler's environment.
 
 ## Set the box up
 
@@ -266,16 +241,20 @@ two `ops` locations) and the hard ceilings; everything tunable at runtime is in 
 instead.
 
 The daemon runs on **base** python, not the conda env, so it can start before `snek3` is built;
-`PYTHON_BIN` is the env python and is what actually needs torch. `KillMode=process` means a deploy
-can restart the daemon with four arms mid-run — jobs are launched detached with `setsid`, they
-self-terminate at `SNEK_MAX_STEPS`, and the daemon re-adopts them by pid on the next poll.
+`PYTHON_BIN` is the env python, and it is what runs the scheduler and everything under it.
+`KillMode=process` means a deploy can restart the daemon mid-batch — the scheduler is launched
+detached with `setsid`, it carries on, and the daemon re-adopts it by pid on the next poll. Its log is
+`LOG_DIR/scheduler-<stamp>.log`; the arms' and passes' logs are the scheduler's, under
+`desktop/runs/../logs` as on the laptop.
 
 **Every job on the box writes under `snek3/desktop/runs/`, gitignored, never `snek3/runs/`** (2026-09-03).
-`launch.runs_dir(host)` is the one place the path is defined; it goes to every job as `SNEK_RUNS_DIR`,
-and the daemon reads throughput and collects a finished job's artifacts for `results` from the same
-place. So the box's checkout of master holds nothing under a path master tracks, and the laptop is free
-to commit every chart. A tool run by hand on the box (`tools.eval_window`, `tools.closeout`) needs
-`SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs` exported or it looks in the empty `runs/`.
+`launch.runs_dir(host)` is the one place the path is defined; it goes to the scheduler as
+`SNEK_RUNS_DIR` and from there to every arm and pass, and the daemon collects a finished job's artifacts
+for `results` from the same place. The mirrored queue is beside it, `snek3/desktop/queue-local/`, also
+gitignored. So the box's checkout of master holds nothing under a path master tracks, and the laptop is
+free to commit every chart. A tool run by hand on the box (`tools.scheduler --reopen-window`,
+`tools.closeout`) needs `SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs` exported or it looks in the empty
+`runs/`.
 
 ### Deploy over the bus
 
@@ -292,7 +271,7 @@ must not race a wave is done). A deploy runs the box's own `desktop/deploy`, rec
 `head_after`, the script's last lines and `rc` in the ledger, and restarts when the merge touched
 `desktop/runner/` or `desktop/systemd/` (or the spec says `"restart": true`). A **restart is the daemon
 recording the action as done, publishing, and exiting 0**; systemd's `Restart=always` relaunches it in
-10 s on the code now in the checkout, and it re-adopts running jobs by pid. No sudo anywhere, which is
+10 s on the code now in the checkout, and it re-adopts the running scheduler by pid. No sudo anywhere, which is
 the point: the laptop's permission classifier refuses `sudo` over ssh, and the box's passwordless sudo
 was never the limit. `status.json` now carries `head`, the commit the box runs, so the laptop can check
 a deploy landed. A deploy that exits 3 (a differing JSON; nothing touched) is `failed` in the ledger and

@@ -156,6 +156,30 @@ def test_a_failed_pass_stops_the_chain_for_that_wave(box):
     assert [e[0] for e in calls.events] == ['train', 'train', 'stageb', 'hof5000']
 
 
+def test_a_hold_marker_delays_every_launch_and_lifting_it_resumes(box):
+    """`runs/.live/.paused`: what is running finishes, the next wave, pass or eval waits. The desktop
+    daemon writes it for `paused`/`drain`; on the laptop it is touched by hand."""
+    from tools import live_runs
+    specs = [spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')]
+    calls = Calls()
+    hold = live_runs.hold_path(box['runs'])
+    os.makedirs(os.path.dirname(hold))
+    open(hold, 'w').close()
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        if len(slept) == 3:
+            os.remove(hold)                   # the pause is lifted after three polls
+    d = scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=calls.popen,
+                         call=calls.call, sleep=sleep, python='py', ensure_workers=no_workers, wave=2)
+    assert not calls.events
+    assert d.run() == 0
+    assert len(slept) >= 3 and [e[0] for e in calls.events] == ['train', 'train'] + PASSES
+    open(hold, 'w').close()
+    assert any('paused' in line for line in d.attention())
+
+
 def test_no_hof_keeps_stage_b_and_drops_the_two_re_measures(box):
     specs = [spec('b13aa-mb32-seed1')]
     calls = Calls()

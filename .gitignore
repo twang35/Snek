@@ -59,6 +59,11 @@ __pycache__/
 # files reach it by rsync (charts, any time) or from the `results` branch (JSON, at close-out).
 /snek3/desktop/runs/
 
+# The daemon's local copy of the ops queue, one directory per batch, which the scheduler reads on
+# the box exactly as it reads logs/laptop-queue/ on the laptop (tools/scheduler.py). Mirrored from
+# the ops branch every poll; the markers the scheduler leaves beside the specs live here too.
+/snek3/desktop/queue-local/
+
 # Which trainings are running on THIS box, one file per arm holding its pid, plus
 # the scheduler's status file the chart window follows (tools/live_runs.py). Machine-local by definition:
 # committing a laptop's pids would tell the desktop that four arms it has never

@@ -21,7 +21,7 @@ self-evidently dead rather than merely old.
 
 **The chart window no longer reads this directory** (2026-09-05). It follows `.status.json` here, which
 the scheduler writes — see `tools/window.py` for why the owner of the window is the scheduler and not
-the arms. The two dot-files, `.status.json` and `.reopen-window`, are the scheduler's; `live()` skips
+the arms. The dot-files -- `.status.json`, `.reopen-window`, `.paused` -- are the scheduler's; `live()` skips
 anything starting with a dot.
 
 Best-effort throughout: this directory is a convenience, and **no failure here is worth a training
@@ -39,6 +39,9 @@ DIR_NAME = '.live'
 STATUS_NAME = '.status.json'
 # Dropped by `tools.scheduler --reopen-window`; the scheduler unlinks it and replaces its viewer.
 REOPEN_NAME = '.reopen-window'
+# While this exists the scheduler launches nothing new: the desktop daemon writes it for
+# `runtime.json`'s `paused`/`drain`, a human touches it on the laptop. What is running finishes.
+HOLD_NAME = '.paused'
 
 
 def directory(runs_dir=None):
@@ -60,6 +63,15 @@ def status_path(runs_dir=None):
 
 def reopen_path(runs_dir=None):
     return os.path.join(directory(runs_dir), REOPEN_NAME)
+
+
+def hold_path(runs_dir=None):
+    return os.path.join(directory(runs_dir), HOLD_NAME)
+
+
+def held(runs_dir=None):
+    """Whether the box is paused: the hold marker exists."""
+    return os.path.exists(hold_path(runs_dir))
 
 
 def alive(pid):
