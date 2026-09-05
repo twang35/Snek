@@ -29,8 +29,10 @@ run**.
 """
 
 import errno
+import json
 import os
 import subprocess
+import time
 
 from env import constants
 
@@ -46,6 +48,12 @@ HOLD_NAME = '.paused'
 # (it holds the Popen; the close-out never learns its pass id). A dot-file, so `live()` never counts it
 # as a trainer. What lets a restarted scheduler wait for a pass instead of launching it twice.
 PASS_PREFIX = '.pass-'
+# What the scheduler measured on this box: how long each finished pass took, the last `DURATIONS_KEEP`
+# per pass kind. `tools/eta.py` reads it to estimate the passes queued; a box with no ledger yet
+# estimates from defaults. Per box by construction, since it lives in the box's runs dir. (Arms need
+# no ledger: their `arch.json` and `_evals.json` mtimes are their wall clock.)
+DURATIONS_NAME = '.durations.json'
+DURATIONS_KEEP = 16
 
 
 def directory(runs_dir=None):
@@ -81,6 +89,40 @@ def pass_entry(label):
 def held(runs_dir=None):
     """Whether the box is paused: the hold marker exists."""
     return os.path.exists(hold_path(runs_dir))
+
+
+def durations_path(runs_dir=None):
+    return os.path.join(directory(runs_dir), DURATIONS_NAME)
+
+
+def durations(runs_dir=None):
+    """The ledger: `kind -> [entry]`, oldest first, each entry `{'seconds', 'ts', 'arms', 'label'}`.
+    `{}` when there is none yet."""
+    try:
+        with open(durations_path(runs_dir)) as handle:
+            loaded = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def record_duration(kind, seconds, runs_dir=None, **fields):
+    """Appends one measured duration under `kind`, keeping the last `DURATIONS_KEEP`. Returns the
+    path, or None: a readout, never worth a run, so a failure to write is swallowed."""
+    ledger = durations(runs_dir)
+    entries = [entry for entry in (ledger.get(kind) or []) if isinstance(entry, dict)]
+    entries.append(dict(fields, seconds=float(seconds), ts=time.time()))
+    ledger[kind] = entries[-DURATIONS_KEEP:]
+    path = durations_path(runs_dir)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        staging = '{0}.{1}.partial'.format(path, os.getpid())
+        with open(staging, 'w') as handle:
+            json.dump(ledger, handle, indent=1)
+        os.replace(staging, path)
+    except OSError:
+        return None
+    return path
 
 
 def alive(pid):

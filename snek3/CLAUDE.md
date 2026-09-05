@@ -232,7 +232,8 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/chart_viewer.py` | a live grid of chart PNGs; `--follow` draws what the scheduler's status file names. Reads, never writes, never trains |
 | `tools/viewer_manifest.py` | `viewer/manifest.js`: every arm reduced to the docs tables' numbers, for the web viewer |
 | `tools/publish_pages.py` | rebuilds the repository's top-level `docs/` — the GitHub-Pages site — from `viewer/` and `runs/`. First step of every progress update |
-| `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm; beside them the scheduler's `.status.json` and `.reopen-window` |
+| `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm; beside them the scheduler's `.status.json`, `.reopen-window` and `.durations.json` (how long each pass took here) |
+| `tools/eta.py` | the time estimates on `status.json`'s lines and its `remaining` total: a queued arm at the batch's finished arms' wall rate, a running arm at its recent rate plus its overhead, a pass at the box's median for that pass |
 | `tools/import_tf_checkpoint.py` | a snek2 TF checkpoint, or a whole arm, converted to torch |
 | `tools/prune_runs.py` | reclaims disk from finished work: a merged pass's duplicate shard files, the two dead per-episode arrays, and a closed arm's checkpoints below a stage-B threshold. Dry run by default |
 | `tools/mutate.py` | mutation testing. Use it rather than the shell version — see the four hazards above |

@@ -21,7 +21,7 @@ def test_build_is_the_daemons_shape_with_the_laptops_own_timestamp():
     assert status['box'] == 'laptop' and status['ts'] == 1788600000.0
     assert status['iso'].startswith('2026-09-05T')
     assert status['at_a_glance']['running'] == ['b16 | kl003 -- wave 1 of 5 | training 50% (1 arm)']
-    assert status['at_a_glance']['queued'] == ['b16 evals | kl003 | queued (1 arm)']
+    assert status['at_a_glance']['queued'] == ['b16 evals | kl003 (1 arm)']
     assert status['running'][0]['step'] == 25000000 and status['queued_ids'] == ['b16-stageb']
     json.dumps(status)     # what goes on the branch
 

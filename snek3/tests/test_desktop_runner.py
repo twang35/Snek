@@ -469,7 +469,7 @@ def test_a_wave_is_reported_in_arms_not_in_jobs():
     glance = runner_module.build_at_a_glance(
         [], [{'id': 'b1-stageb', 'type': 'eval', 'policy': 'b1a',
               'policies': ['b1a', 'b1b', 'b1c', 'b1d'], 'priority': 10}], {})
-    assert glance['queued'] == ['b1 evals | queued (4 arms)']
+    assert glance['queued'] == ['b1 evals (4 arms)']
 
 
 def test_a_batchs_three_queued_passes_take_one_line_not_three():
@@ -482,8 +482,8 @@ def test_a_batchs_three_queued_passes_take_one_line_not_three():
     queued.append({'id': 'b17a-clip005-seed1', 'type': 'train', 'policy': 'b17a-clip005-seed1',
                    'policies': ['b17a-clip005-seed1'], 'priority': 100})
     glance = runner_module.build_at_a_glance([], queued, {})
-    assert glance['queued'] == ['b16 evals | kl003 | queued (4 arms)',
-                                'b17 training | clip005 | queued (1 arm)']
+    assert glance['queued'] == ['b16 evals | kl003 (4 arms)',
+                                'b17 training | clip005 (1 arm)']
 
 
 def test_passes_owed_after_a_queued_training_are_shown_after_it():
@@ -503,11 +503,11 @@ def test_passes_owed_after_a_queued_training_are_shown_after_it():
                'policies': ['b16a-kl-seed1'], 'priority': 100},
               {'id': 'b16-stageb', 'type': 'eval', 'policies': ['b16a-kl-seed1'], 'priority': 10}]
     glance = runner_module.build_at_a_glance([], order, {})
-    assert glance['queued'] == ['b15 evals | ent | queued (2 arms)',
-                                'b15 training | ent | queued (2 arms)',
-                                'b15 evals | ent | queued (2 arms)',
-                                'b16 training | kl | queued (1 arm)',
-                                'b16 evals | kl | queued (1 arm)']
+    assert glance['queued'] == ['b15 evals | ent (2 arms)',
+                                'b15 training | ent (2 arms)',
+                                'b15 evals | ent (2 arms)',
+                                'b16 training | kl (1 arm)',
+                                'b16 evals | kl (1 arm)']
 
 
 def test_a_running_pass_is_named_because_only_one_runs_at_a_time():
@@ -542,7 +542,7 @@ def test_a_running_wave_is_captioned_by_its_own_arms_not_by_the_next_queued_spec
     labels = {'b11': queued[0]['label']}          # what _batch_labels would have handed over
     glance = runner_module.build_at_a_glance(running, queued, labels)
     assert glance['running'] == ['b11 | lr5e4, lr8e4 -- wave 3 of 4 | training 50% (3 arms)']
-    assert glance['queued'] == ['b11 training | lr1e3, lr2e3 -- wave 4 of 4 | queued (3 arms)']
+    assert glance['queued'] == ['b11 training | lr1e3, lr2e3 -- wave 4 of 4 (3 arms)']
 
 
 def test_an_unlabelled_stage_b_is_captioned_by_the_cells_it_measures():
@@ -680,15 +680,15 @@ def test_the_laptops_status_is_folded_in_with_its_own_timestamp():
     publish is empty, so lines under an old `laptop_iso` mean a dead driver, not a slow one."""
     text = json.dumps({'iso': '2026-09-04T23:14:09', 'box': 'laptop',
                        'at_a_glance': {'running': ['b16 | kl003, kl005 -- wave 1 of 5 | training 12% (8 arms)'],
-                                       'queued': ['b16 evals | kl003, kl005 | queued (8 arms)',
-                                                  'b19 training | noadvnorm, mse | queued (24 arms)'],
+                                       'queued': ['b16 evals | kl003, kl005 (8 arms)',
+                                                  'b19 training | noadvnorm, mse (24 arms)'],
                                        'attention': []}})
     glance = runner_module.with_laptop({'running': ['b15 | ent003 | stage B (8 arms)'], 'queued': [],
                                         'attention': []}, text)
     assert glance['running'] == ['b15 | ent003 | stage B (8 arms)']          # the box's own, untouched
     assert glance['laptop_running'] == ['b16 | kl003, kl005 -- wave 1 of 5 | training 12% (8 arms)']
-    assert glance['laptop_queued'] == ['b16 evals | kl003, kl005 | queued (8 arms)',
-                                       'b19 training | noadvnorm, mse | queued (24 arms)']
+    assert glance['laptop_queued'] == ['b16 evals | kl003, kl005 (8 arms)',
+                                       'b19 training | noadvnorm, mse (24 arms)']
     assert glance['laptop_iso'] == '2026-09-04T23:14:09'
 
 
@@ -929,7 +929,7 @@ def test_a_pause_is_a_marker_the_scheduler_reads_and_no_scheduler_is_started_und
     hold = os.path.join(runner.runs_dir(), runner_module.HOLD_RELATIVE)
     assert os.path.exists(hold) and runner.spawn.calls == []
     assert bus.status[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
-    assert bus.status[-1]['at_a_glance']['queued'][1:] == ['b1 training | x | queued (1 arm)']
+    assert bus.status[-1]['at_a_glance']['queued'][1:] == ['b1 training | x (1 arm)']
     assert bus.status[-1]['ledger'] == {'b1a-x': 'queued'}
     bus.runtime_text = '{}'
     runner.poll_once(git=True)
@@ -1012,7 +1012,7 @@ def test_a_stale_status_file_from_a_dead_scheduler_is_not_shown_as_running(tmp_p
     runner.scheduler.returncode = -9
     runner.poll_once(git=True)
     assert bus.status[-1]['at_a_glance']['running'] == [] and bus.status[-1]['running'] == []
-    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x | queued (1 arm)'], 'the arm is short of its cap'
+    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x (1 arm)'], 'the arm is short of its cap'
     assert any('the scheduler exited -9' in line for line in bus.status[-1]['at_a_glance']['attention'])
 
 
@@ -1118,7 +1118,7 @@ def test_a_dead_schedulers_unfinished_arm_is_not_published_and_its_batch_is_resu
     assert 'b1a-x' not in runner.state['running'], 'forgotten until the next scheduler shows it running'
     runner.poll_once(git=True)
     assert 'b1a-x' in runner.state['specs'], 'the batch stays in the queue'
-    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x | queued (1 arm)']
+    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x (1 arm)']
     assert len(runner.spawn.calls) == 1, 'inside the backoff, not yet'
     runner.state['spawned'] -= runner_module.RESPAWN_BACKOFF_SECONDS
     runner.poll_once(git=False)

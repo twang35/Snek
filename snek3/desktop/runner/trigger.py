@@ -100,6 +100,8 @@ def _print_glance(host):
     for key in ('running', 'queued', 'attention'):
         for line in glance.get(key) or []:
             print('  {0}: {1}'.format(key, line))
+    if glance.get('remaining'):
+        print('  remaining: {0}'.format(glance['remaining']))
     # The laptop's lines, folded in from `laptop-status` -- with the laptop's own timestamp, because
     # that is what tells an idle laptop (empty, recent) from a dead driver (lines, hours old).
     if 'laptop_iso' in glance:
@@ -107,6 +109,8 @@ def _print_glance(host):
         for key in ('laptop_running', 'laptop_queued'):
             for line in glance.get(key) or []:
                 print('    {0}: {1}'.format(key[len('laptop_'):], line))
+        if glance.get('laptop_remaining'):
+            print('    remaining: {0}'.format(glance['laptop_remaining']))
 
 
 def main(argv=None):

@@ -753,14 +753,73 @@ def describe_jobs(jobs):
     return ', '.join(tokens)
 
 
-def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
-    """The `at_a_glance` block: `{'running': [str], 'queued': [str], 'attention': [str]}`.
+def format_eta(seconds):
+    """Seconds as a reader's estimate: `<1m`, `40m`, `1.4h`, `12h`. None for None."""
+    if seconds is None:
+        return None
+    seconds = max(0.0, float(seconds))
+    if seconds < 60:
+        return '<1m'
+    if seconds < 3600:
+        return '{0}m'.format(int(round(seconds / 60.0)))
+    hours = seconds / 3600.0
+    return '{0:.1f}h'.format(hours) if hours < 10 else '{0}h'.format(int(round(hours)))
+
+
+def group_eta(jobs):
+    """Seconds a group of jobs takes together, or None when no job carries an `eta_seconds`.
+
+    Training arms of one wave run at once, so a wave takes its slowest arm (`wave` groups them; arms
+    without one are taken as one wave, which is what a running wave is); waves and passes run one
+    after another, so they add. A job without an estimate contributes nothing, so a group with some
+    unknown arms reads low rather than not at all -- `remaining_text` says when that happened.
+    """
+    waves, serial, known = {}, 0.0, False
+    for job in jobs:
+        eta = job.get('eta_seconds')
+        if eta is None:
+            continue
+        known = True
+        if job.get('type') == 'train':
+            key = job.get('wave')
+            waves[key] = max(waves.get(key, 0.0), float(eta))
+        else:
+            serial += float(eta)
+    return sum(waves.values()) + serial if known else None
+
+
+def remaining_text(running_seconds, queued_seconds, now, partial=False):
+    """One line for the whole box: `~11.3h of work: 0.6h running + 10.7h queued; clear ~Sat 23:40`.
+
+    None when neither part has an estimate. `partial` appends a note that some job carried no
+    estimate, so the total is a floor rather than a forecast.
+    """
+    if running_seconds is None and queued_seconds is None:
+        return None
+    parts = [format_eta(seconds) + ' ' + word for seconds, word in
+             ((running_seconds, 'running'), (queued_seconds, 'queued')) if seconds is not None]
+    total = (running_seconds or 0.0) + (queued_seconds or 0.0)
+    text = '~{0} of work: {1}; clear ~{2}'.format(
+        format_eta(total), ' + '.join(parts), time.strftime('%a %H:%M', time.localtime(now + total)))
+    return text + ' (some jobs have no estimate yet)' if partial else text
+
+
+def build_at_a_glance(running, queued_order, labels, held_by=(), attention=(), now=None):
+    """The `at_a_glance` block: `{'running': [str], 'queued': [str], 'attention': [str], 'remaining': str|None}`.
 
     One line per `(batch, phase)` group in first-seen order. A running trainer dict carries
     `step`/`max_steps`, from which each running line shows the mean percent done across that batch's
     arms. `labels` maps a batch id to its human description. `held_by` puts `hold_notice` first in
     `queued`. Kept a pure function of plain dicts, so it is testable without a live box — and so the
     scheduler on either box can build its own lines with it.
+
+    **Time estimates ride on the jobs** (user, 2026-09-05: "how much time is queued up for both
+    boxes, to see if anything needs to be shifted"). A job may carry `eta_seconds` -- what is left of
+    a running job, the whole of a queued one -- and a queued training arm its `wave` number; the
+    scheduler (`tools/eta.py`) computes both and this only adds them up: a running line ends
+    `| ~40m left`, a queued line `| ~4.5h`, and `remaining` is the box's total with the clock time it
+    clears. Without estimates the lines are as before and `remaining` is None -- the daemon's own
+    idle-queue view, for one.
     """
     def group(jobs, collapse_passes=False):
         # `collapse_passes` folds the chain's three passes into one `evals` group per batch, split by
@@ -803,31 +862,53 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
         count = len(names) + unnamed
         return '{0} arm{1}'.format(count, '' if count == 1 else 's')
 
+    def eta_of(jobs):
+        """`(group seconds or None, whether any job lacked an estimate)`."""
+        seconds = group_eta(jobs)
+        return seconds, seconds is not None and any(job.get('eta_seconds') is None for job in jobs)
+
+    totals = {'running': None, 'queued': None}
+    partial = False
+
+    def add(kind, seconds):
+        if seconds is not None:
+            totals[kind] = (totals[kind] or 0.0) + seconds
+
     running_lines = []
     for batch, phase, jobs in group(running):
         percents = [100.0 * job['step'] / job['max_steps']
                     for job in jobs if job.get('step') and job.get('max_steps')]
         percent = (' {0}%'.format(int(round(sum(percents) / len(percents))))
                    if percents else '')
-        running_lines.append('{0}{1} | {2}{3} ({4})'.format(
-            batch, described(batch, jobs), phase, percent, arms(jobs)))
+        seconds, missing = eta_of(jobs)
+        partial = partial or missing
+        add('running', seconds)
+        running_lines.append('{0}{1} | {2}{3} ({4}){5}'.format(
+            batch, described(batch, jobs), phase, percent, arms(jobs),
+            ' | ~{0} left'.format(format_eta(seconds)) if seconds is not None else ''))
 
     queued_lines = []
     notice = hold_notice(held_by)
     if notice:
         queued_lines.append(notice)
     for batch, phase, jobs in group(queued_order, collapse_passes=True):
-        queued_lines.append('{0} {1}{2} | queued ({3})'.format(
-            batch, phase, described(batch, jobs), arms(jobs)))
+        seconds, missing = eta_of(jobs)
+        partial = partial or missing
+        add('queued', seconds)
+        queued_lines.append('{0} {1}{2} ({3}){4}'.format(
+            batch, phase, described(batch, jobs), arms(jobs),
+            ' | ~{0}'.format(format_eta(seconds)) if seconds is not None else ''))
 
-    return {'running': running_lines, 'queued': queued_lines, 'attention': list(attention)}
+    return {'running': running_lines, 'queued': queued_lines, 'attention': list(attention),
+            'remaining': remaining_text(totals['running'], totals['queued'],
+                                        time.time() if now is None else now, partial=partial)}
 
 
-LAPTOP_KEYS = ('laptop_running', 'laptop_queued', 'laptop_iso')
+LAPTOP_KEYS = ('laptop_running', 'laptop_queued', 'laptop_remaining', 'laptop_iso')
 
 
 def with_laptop(glance, laptop_status_text):
-    """`glance` plus the laptop's lines: `laptop_running`, `laptop_queued` and `laptop_iso`.
+    """`glance` plus the laptop's lines: `laptop_running`, `laptop_queued`, `laptop_remaining` and `laptop_iso`.
 
     The laptop's scheduler publishes its own `status.json` to the `laptop-status` branch
     (`tools/laptop_status.py`), in this same `at_a_glance` shape. **`laptop_iso` is the laptop's own
@@ -845,6 +926,8 @@ def with_laptop(glance, laptop_status_text):
     laptop = status.get('at_a_glance') or {}
     out['laptop_running'] = [str(line) for line in (laptop.get('running') or [])]
     out['laptop_queued'] = [str(line) for line in (laptop.get('queued') or [])]
+    remaining = laptop.get('remaining')
+    out['laptop_remaining'] = str(remaining) if remaining is not None else None
     out['laptop_iso'] = status.get('iso')
     return out
 

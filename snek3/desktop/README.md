@@ -168,8 +168,13 @@ marker and the chain resumes from there at the scheduler's next run.
 **The scheduler also starts the stage-A eval workers** a wave needs (`tools.eval_queue`), sized from
 the wave's specs, before it launches the arms — so a wave never trains against an empty worker pool.
 
-`status.json`'s queue shows a batch's owed passes as **one line**, `b16 evals | … | queued (8 arms)`;
-the running line names the pass that is running.
+`status.json`'s queue shows a batch's owed passes as **one line**, `b16 evals | … (8 arms) | ~1.1h`;
+the running line names the pass that is running and what is left of it (`| ~40m left`). The time
+estimates -- and `at_a_glance.remaining`, the box's total with the clock time it clears -- are
+`tools/eta.py`'s: a queued arm at the wall rate of the batch's finished arms (`arch.json` to
+`_evals.json` mtime), a running arm at its recent loop rate plus the overhead it has shown, a pass at
+the box's own median for that pass (`runs/.live/.durations.json`, written by the scheduler). Both boxes
+read alike: `remaining` for the desktop, `laptop_remaining` for the laptop (2026-09-05).
 
 ### One wave at a time is the scheduler's, and no limit enforces it
 

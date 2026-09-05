@@ -68,8 +68,9 @@ def build(running, queued, now=None, panels=(), window_pid=None, attention=(), b
         'box': box,
         'project': 'snek3',
         'pid': os.getpid(),
-        'at_a_glance': daemon.build_at_a_glance(running, queued, {}, attention=list(attention)),
-        'running': [{key: job.get(key) for key in ('id', 'type', 'policy', 'policies', 'step', 'max_steps')}
+        'at_a_glance': daemon.build_at_a_glance(running, queued, {}, attention=list(attention), now=now),
+        'running': [{key: job.get(key) for key in ('id', 'type', 'policy', 'policies', 'step', 'max_steps',
+                                                    'eta_seconds')}
                     for job in running],
         'queued_ids': [job.get('id') for job in queued],
         'panels': list(panels),

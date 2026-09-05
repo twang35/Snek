@@ -71,6 +71,7 @@ import time
 
 from env import constants
 from tools import closeout
+from tools import eta
 from tools import eval_queue
 from tools import laptop_status
 from tools import live_runs
@@ -301,6 +302,15 @@ def eval_label(spec):
     return None
 
 
+def eval_pass(spec):
+    """Which of the chain's passes an eval spec spells (`--pass hof5000`), for its time estimate;
+    `stageb` for a hand pass that names none, since that is the shape of a hand re-measure."""
+    args = [str(arg) for arg in spec.get('eval_args') or []]
+    if '--pass' in args and args.index('--pass') + 1 < len(args) and args[args.index('--pass') + 1] in closeout.PASSES:
+        return args[args.index('--pass') + 1]
+    return 'stageb'
+
+
 def marker(spec_dir, name):
     return os.path.join(spec_dir, '.' + name)
 
@@ -368,24 +378,41 @@ class Driver(object):
         self.ensure_workers = ensure_workers
         self.workers = []
         self.killpg = killpg
+        # For the time estimates (`tools/eta.py`): when the pass or eval in flight started, so its
+        # line says what is left rather than the whole.
+        self._pass_started = None
 
     # ---- what is running and what is owed, in the daemon's job-dict shape
 
     def jobs(self):
         """`(running, queued)` for this batch: live arms and the pass in flight; then every arm short
         of its cap that is not live, every pass not yet filed, wave by wave, and every eval spec not
-        yet run. The same job dicts the daemon's `build_at_a_glance` reads."""
-        running = [dict(arm_job(spec, self.runs_dir), pid=pid) for spec, pid in self.live]
+        yet run. The same job dicts the daemon's `build_at_a_glance` reads, each with its
+        `eta_seconds` where one can be had and a queued arm with its `wave`."""
+        reference = self._reference_rate()
+        running = []
+        for spec, pid in self.live:
+            job = dict(arm_job(spec, self.runs_dir), pid=pid)
+            job['eta_seconds'] = eta.running_arm_seconds(spec['policy'], job['step'], job['max_steps'],
+                                                         self.runs_dir, now=self.clock(), fallback_rate=reference)
+            running.append(job)
         if self.active_pass is not None:
-            running.append(pass_job(self.batch, *self.active_pass))
+            pass_name, _, arms = self.active_pass
+            running.append(dict(pass_job(self.batch, *self.active_pass),
+                                eta_seconds=self._running_pass_seconds(pass_name, len(arms))))
         if self.active_eval is not None:
-            running.append(eval_job(self.active_eval))
+            running.append(dict(eval_job(self.active_eval),
+                                eta_seconds=self._running_pass_seconds(eval_pass(self.active_eval),
+                                                                       len(self.active_eval['policies']))))
         live_policies = {spec['policy'] for spec, _ in self.live}
         queued = []
         for number, arms in enumerate(waves(self.specs, self.wave), start=1):
             for spec in arms:
                 if spec['policy'] not in live_policies and not finished(spec, self.runs_dir):
-                    queued.append(arm_job(spec, self.runs_dir))
+                    job = arm_job(spec, self.runs_dir)
+                    job['wave'] = number
+                    job['eta_seconds'] = eta.arm_seconds(job['step'], job['max_steps'], reference)
+                    queued.append(job)
             if not self.stage_b:
                 continue
             for pass_name in self.passes:
@@ -393,11 +420,23 @@ class Driver(object):
                     continue
                 if self.active_pass is not None and self.active_pass[:2] == (pass_name, number):
                     continue
-                queued.append(pass_job(self.batch, pass_name, number, arms))
+                queued.append(dict(pass_job(self.batch, pass_name, number, arms),
+                                   eta_seconds=eta.pass_seconds(pass_name, len(arms), self.runs_dir)))
         for spec in self.evals:
             if not self._eval_done(spec) and spec is not self.active_eval:
-                queued.append(eval_job(spec))
+                queued.append(dict(eval_job(spec), eta_seconds=eta.pass_seconds(
+                    eval_pass(spec), len(spec['policies']), self.runs_dir)))
         return running, queued
+
+    def _reference_rate(self):
+        """The wall rate a queued arm of this batch is estimated at: the batch's finished arms', else
+        the box's most recently finished arms' (`eta.reference_rate` falls through to those)."""
+        done = [spec['policy'] for spec in self.specs if finished(spec, self.runs_dir)]
+        return eta.reference_rate(done, self.runs_dir)
+
+    def _running_pass_seconds(self, kind, arms):
+        elapsed = 0.0 if self._pass_started is None else max(0.0, self.clock() - self._pass_started)
+        return eta.running_pass_seconds(kind, arms, elapsed, self.runs_dir)
 
     def attention(self):
         """One line per failed pass, so a marker is never silent: the queue skips it, this names it."""
@@ -596,11 +635,16 @@ class Driver(object):
             argv += ['--pass', pass_name]
         argv += ['--shards', str(self.shards)]
         self.active_pass = (pass_name, number, list(arms))
+        self._pass_started = self.clock()
         self._show(pass_panels([spec['policy'] for spec in arms], closeout.PASSES[pass_name]['label'],
                                self.runs_dir))
         code = self._run_closeout(argv, label, expected=[pass_file(spec['policy'], pass_name, self.runs_dir)
                                                           for spec in arms])
         self.active_pass = None
+        seconds = self.clock() - self._pass_started
+        self._pass_started = None
+        if code == 0 and seconds > 0:
+            live_runs.record_duration(pass_name, seconds, self.runs_dir, arms=len(arms), label=label)
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
         self._report()
         return code
@@ -683,9 +727,10 @@ class Driver(object):
             self._wait_while_held('eval {0}'.format(spec['id']))
             _log('eval {0}: {1}'.format(spec['id'], ' '.join(spec['policies'])))
             self.active_eval = spec
+            self._pass_started = self.clock()
             self._show(pass_panels(spec['policies'], eval_label(spec), self.runs_dir))
             code = self._run_closeout(eval_argv(spec, self.python, self.shards), spec['id'])
-            self.active_eval = None
+            self.active_eval, self._pass_started = None, None
             _log('eval {0} exited {1}'.format(spec['id'], code))
             if spec.get('_dir'):
                 mark(spec['_dir'], ('done-' if code == 0 else 'failed-') + spec['id'], 'exit {0}'.format(code))

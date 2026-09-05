@@ -485,16 +485,19 @@ def test_the_queue_publishes_both_boxes_shape_on_every_event_and_empty_when_it_e
 
     first = published.glance(0)
     assert first['running'] == ['b1 | x -- wave 1 of 1 | training 100% (2 arms)']
-    assert first['queued'] == ['b1 evals | x | queued (2 arms)',
-                               'b2 training | y -- wave 1 of 1 | queued (1 arm)',
-                               'b2 evals | y | queued (1 arm)']
+    # the passes carry the default estimate (no ledger yet: 69 min per 8 arms); the arm has no wall
+    # rate to read in a fresh box, so its line has none
+    assert first['queued'] == ['b1 evals | x (2 arms) | ~17m',
+                               'b2 training | y -- wave 1 of 1 (1 arm)',
+                               'b2 evals | y (1 arm) | ~9m']
     running_lines = [line for status in published.statuses for line in status['at_a_glance']['running']]
-    assert 'b1 | x | stage B (2 arms)' in running_lines
-    assert 'b1 | x | hof5000 (2 arms)' in running_lines
-    assert 'b1 | x | hof30k (2 arms)' in running_lines
+    # each running pass says what is left of it, from the default estimate on a box with no ledger
+    assert 'b1 | x | stage B (2 arms) | ~14m left' in running_lines
+    assert 'b1 | x | hof5000 (2 arms) | ~2m left' in running_lines
+    assert 'b1 | x | hof30k (2 arms) | ~1m left' in running_lines
     assert 'b2 | y -- wave 1 of 1 | training 100% (1 arm)' in running_lines
     last = published.statuses[-1]
-    assert last['at_a_glance'] == {'running': [], 'queued': [], 'attention': []}
+    assert last['at_a_glance'] == {'running': [], 'queued': [], 'attention': [], 'remaining': None}
     assert last['box'] == 'laptop' and last['iso'] and last['running'] == []
 
 
@@ -1031,3 +1034,48 @@ def test_a_scheduler_killed_mid_pass_leaves_the_pass_entry_for_its_successor(box
     with pytest.raises(SystemExit):
         d.run()
     assert live_runs.read(live_runs.path_for(live_runs.pass_entry('b13-stageb'), box['runs'])) == 8001
+
+
+def test_a_finished_pass_goes_in_the_durations_ledger_and_a_failed_one_does_not(box):
+    """`tools/eta.py` estimates a queued pass from the passes this box has run, so each finished pass
+    is recorded with its arms and its label; a failed pass is not, since its time says nothing."""
+    ticks = iter(range(0, 10 ** 6, 100))               # every clock read is 100 s later
+    clock = lambda: next(ticks)
+    specs = [spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')]
+    calls = FinishingCalls(box['runs'], codes={'hof5000': 1})
+    d = scheduler.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=calls.popen, call=calls.call,
+                         sleep=lambda s: None, python='py', ensure_workers=no_workers, clock=clock)
+    d.run()
+    ledger = live_runs.durations(box['runs'])
+    assert [entry['label'] for entry in ledger['stageb']] == ['b13-stageb']
+    assert ledger['stageb'][0]['arms'] == 2 and ledger['stageb'][0]['seconds'] > 0
+    assert 'hof5000' not in ledger and 'hof30k' not in ledger
+
+
+def test_a_running_pass_says_what_is_left_of_it_and_a_queued_arm_is_estimated_at_the_batchs_rate(box, monkeypatch):
+    """The running pass's estimate is the ledger's median less the time it has run; the queued arm's
+    is its cap at the wall rate of the batch's finished arm (`arch.json` to `_evals.json`)."""
+    from tools import eta as eta_module
+    policies = os.path.join(box['runs'], 'policies')
+    monkeypatch.setattr(eta_module.constants, 'POLICY_DIR', policies)
+    # a finished arm that took 1,000 s for its 100 steps (0.1 steps/s), and a ledger of 400-s passes
+    done, todo = spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')
+    for s in (done, todo):
+        s['max_steps'] = 100
+    os.makedirs(os.path.join(policies, done['policy']))
+    arch = os.path.join(policies, done['policy'], 'arch.json')
+    open(arch, 'w').close()
+    os.utime(arch, (1000.0, 1000.0))
+    evals = os.path.join(box['runs'], done['policy'] + '_evals.json')
+    with open(evals, 'w') as handle:
+        json.dump({'summary': {'step': 100}, 'evals': [{'step': 100, 'steps_per_second': 1.0}]}, handle)
+    os.utime(evals, (2000.0, 2000.0))
+    live_runs.record_duration('stageb', 400.0, box['runs'], arms=1)
+    d = driver([done, todo], box, Calls(), wave=1, clock=lambda: 5000.0)
+    d.active_pass = ('stageb', 1, [done])
+    d._pass_started = 4900.0                          # 100 s into a 400-s pass
+    running, queued = d.jobs()
+    assert running[0]['id'] == 'b13-stageb' and running[0]['eta_seconds'] == 300.0
+    arm = [job for job in queued if job['id'] == todo['policy']][0]
+    assert arm['wave'] == 2 and arm['eta_seconds'] == 1000.0                 # 100 steps at 0.1 steps/s
+    assert [job['eta_seconds'] for job in queued if job['id'] == 'b13-stageb-w2'] == [400.0]
