@@ -228,10 +228,12 @@
   }
   function unzoom() { $('lightbox').style.display = 'none'; }
 
-  $('batch').addEventListener('change', function () { state.batch = this.value; state.start = 0; render(); });
-  $('sort').addEventListener('change', function () { state.sort = this.value; state.start = 0; render(); });
-  $('mode').addEventListener('change', function () { state.mode = this.value; render(); });
-  $('per').addEventListener('change', function () { state.per = this.value; render(); });
+  // Each select drops focus once a choice is made, so the arrow keys go back to paging
+  // instead of cycling the dropdown (the keydown handler below ignores keys aimed at a SELECT).
+  $('batch').addEventListener('change', function () { state.batch = this.value; state.start = 0; this.blur(); render(); });
+  $('sort').addEventListener('change', function () { state.sort = this.value; state.start = 0; this.blur(); render(); });
+  $('mode').addEventListener('change', function () { state.mode = this.value; this.blur(); render(); });
+  $('per').addEventListener('change', function () { state.per = this.value; this.blur(); render(); });
   $('prev').addEventListener('click', function () { move(-PAGE); });
   $('next').addEventListener('click', function () { move(PAGE); });
   $('first').addEventListener('click', function () { state.start = 0; render(); });
