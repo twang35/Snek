@@ -1,11 +1,13 @@
 {
-  "iso": "2026-09-05T01:02:14",
-  "ts": 1788595334.66062,
+  "iso": "2026-09-05T01:02:17",
+  "ts": 1788595337.5399811,
   "box": "laptop",
   "project": "snek3",
   "pid": 26287,
   "at_a_glance": {
-    "running": [],
+    "running": [
+      "b16 | kl003, kl005 | stage B (8 arms)"
+    ],
     "queued": [
       "b16 evals | kl003, kl005 | queued (8 arms)",
       "b16 training | kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 -- waves 2-5 of 5 | queued (32 arms)",
@@ -17,9 +19,26 @@
     ],
     "attention": []
   },
-  "running": [],
+  "running": [
+    {
+      "id": "b16-stageb",
+      "type": "eval",
+      "policy": "b16aa-kl003-seed1",
+      "policies": [
+        "b16aa-kl003-seed1",
+        "b16ab-kl003-seed2",
+        "b16ac-kl003-seed3",
+        "b16ad-kl003-seed4",
+        "b16ae-kl005-seed1",
+        "b16af-kl005-seed2",
+        "b16ag-kl005-seed3",
+        "b16ah-kl005-seed4"
+      ],
+      "step": null,
+      "max_steps": null
+    }
+  ],
   "queued_ids": [
-    "b16-stageb",
     "b16-hof5000",
     "b16-hof30k",
     "b16ai-kl008-seed1",
@@ -122,6 +141,15 @@
     "b20-hof5000-w2",
     "b20-hof30k-w2"
   ],
-  "panels": [],
-  "window_pid": null
+  "panels": [
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16aa-kl003-seed1_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ab-kl003-seed2_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ac-kl003-seed3_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ad-kl003-seed4_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ae-kl005-seed1_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16af-kl005-seed2_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ag-kl005-seed3_checkpoint_evals.png",
+    "/Users/tony_wang/Projects/Snek/snek3/runs/b16ah-kl005-seed4_checkpoint_evals.png"
+  ],
+  "window_pid": 26447
 }
