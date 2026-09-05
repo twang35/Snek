@@ -1,21 +1,22 @@
 {
-  "iso": "2026-09-05T11:30:47",
-  "ts": 1788633047.9350636,
+  "iso": "2026-09-05T11:41:06",
+  "ts": 1788633666.5165381,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip015, clip03 -- wave 2 of 8 | training 64% (8 arms)"
+      "b17 | clip015, clip03 -- wave 2 of 8 | training 66% (7 arms)"
     ],
     "queued": [
-      "b17 evals | clip015, clip03 | queued (8 arms)",
-      "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
-      "b17 evals | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
+      "b17 training | clip015, clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, ... | queued (49 arms)",
+      "b17 evals | clip015, clip03, clip04, clipanneal, clip01anneal, lranneal, lranneal10, both... | queued (56 arms)",
       "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 | queued (24 arms)",
       "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 | queued (24 arms)",
       "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 | queued (24 arms)",
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 | queued (24 arms)"
     ],
-    "attention": [],
+    "attention": [
+      "** b17ai-clip015-seed1 exited short of its cap 4 times in a row; its wave went on without it. A rerun of the scheduler resumes it"
+    ],
     "laptop_running": [
       "b16 | kl04, kl05 | stage B (8 arms)"
     ],
@@ -26,7 +27,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T11:29:30"
+    "laptop_iso": "2026-09-05T11:39:56"
   },
   "scheduler": {
     "alive": true,
@@ -34,7 +35,7 @@
     "spawned": 1788632824.3692193,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-112704.log",
-    "status_iso": "2026-09-05T11:30:28"
+    "status_iso": "2026-09-05T11:31:49"
   },
   "runtime": {
     "max_trainers": 8,
@@ -59,7 +60,7 @@
       "policies": [
         "b17aj-clip015-seed2"
       ],
-      "step": 33701888,
+      "step": 34635776,
       "max_steps": 50003968
     },
     {
@@ -69,7 +70,7 @@
       "policies": [
         "b17ak-clip015-seed3"
       ],
-      "step": 31686656,
+      "step": 32555008,
       "max_steps": 50003968
     },
     {
@@ -79,7 +80,7 @@
       "policies": [
         "b17al-clip015-seed4"
       ],
-      "step": 31899648,
+      "step": 32817152,
       "max_steps": 50003968
     },
     {
@@ -89,7 +90,7 @@
       "policies": [
         "b17am-clip03-seed1"
       ],
-      "step": 31948800,
+      "step": 32800768,
       "max_steps": 50003968
     },
     {
@@ -99,7 +100,7 @@
       "policies": [
         "b17an-clip03-seed2"
       ],
-      "step": 31850496,
+      "step": 32702464,
       "max_steps": 50003968
     },
     {
@@ -109,7 +110,7 @@
       "policies": [
         "b17ao-clip03-seed3"
       ],
-      "step": 31342592,
+      "step": 32243712,
       "max_steps": 50003968
     },
     {
@@ -119,17 +120,7 @@
       "policies": [
         "b17ap-clip03-seed4"
       ],
-      "step": 31424512,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17ai-clip015-seed1",
-      "type": "train",
-      "policy": "b17ai-clip015-seed1",
-      "policies": [
-        "b17ai-clip015-seed1"
-      ],
-      "step": 33210368,
+      "step": 32276480,
       "max_steps": 50003968
     }
   ],
@@ -589,6 +580,7 @@
     "b17-stageb": "done",
     "b17-hof5000": "done",
     "b17-hof30k": "done",
+    "b17ai-clip015-seed1": "queued",
     "b17-stageb-w2": "queued",
     "b17-hof5000-w2": "queued",
     "b17-hof30k-w2": "queued",
@@ -730,14 +722,13 @@
     "b17am-clip03-seed1": "running",
     "b17an-clip03-seed2": "running",
     "b17ao-clip03-seed3": "running",
-    "b17ap-clip03-seed4": "running",
-    "b17ai-clip015-seed1": "running"
+    "b17ap-clip03-seed4": "running"
   },
-  "disk_free_gb": 124.1,
+  "disk_free_gb": 123.9,
   "head": "9b8f2d0d120e",
   "load_avg": [
-    13.42138671875,
-    13.52392578125,
-    13.642578125
+    13.22509765625,
+    13.537109375,
+    13.63330078125
   ]
 }
