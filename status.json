@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T10:27:58",
-  "ts": 1788629278.5584502,
+  "iso": "2026-09-05T10:38:06",
+  "ts": 1788629886.2568698,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip005, clip01 | stage B (8 arms)"
+      "b17 | clip005, clip01 | hof5000 (8 arms)"
     ],
     "queued": [
       "b17 evals | clip005, clip01 | queued (8 arms)",
@@ -17,7 +17,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl04, kl05 -- wave 5 of 5 | training 33% (8 arms)"
+      "b16 | kl04, kl05 -- wave 5 of 5 | training 45% (8 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl04, kl05 | queued (8 arms)",
@@ -26,7 +26,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T10:24:01"
+    "laptop_iso": "2026-09-05T10:34:06"
   },
   "scheduler": {
     "alive": true,
@@ -34,7 +34,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T10:25:46"
+    "status_iso": "2026-09-05T10:30:26"
   },
   "runtime": {
     "max_trainers": 8,
@@ -53,7 +53,7 @@
   "config_notes": [],
   "running": [
     {
-      "id": "b17-stageb",
+      "id": "b17-hof5000",
       "type": "eval",
       "policy": "b17aa-clip005-seed1",
       "policies": [
@@ -521,7 +521,7 @@
     "b17af-clip01-seed2": "done",
     "b17ag-clip01-seed3": "done",
     "b17ah-clip01-seed4": "done",
-    "b17-hof5000": "queued",
+    "b17-stageb": "done",
     "b17-hof30k": "queued",
     "b17ai-clip015-seed1": "queued",
     "b17aj-clip015-seed2": "queued",
@@ -666,13 +666,13 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b17-stageb": "running"
+    "b17-hof5000": "running"
   },
   "disk_free_gb": 125.0,
   "head": "e297c1729b95",
   "load_avg": [
-    16.2880859375,
-    16.07568359375,
-    15.95654296875
+    10.15966796875,
+    14.49072265625,
+    15.4482421875
   ]
 }
