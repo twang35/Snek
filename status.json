@@ -1,14 +1,12 @@
 {
-  "iso": "2026-09-05T06:02:05",
-  "ts": 1788613325.3522599,
+  "iso": "2026-09-05T06:12:36",
+  "ts": 1788613956.9254553,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | entanneal10, entanneal03 | stage B (8 arms)"
+      "b15 | entanneal01, entanneal01to0 -- wave 5 of 5 | training (8 arms)"
     ],
     "queued": [
-      "b15 evals | entanneal10, entanneal03 | queued (8 arms)",
-      "b15 training | entanneal01, entanneal01to0 -- wave 5 of 5 | queued (8 arms)",
       "b15 evals | entanneal01, entanneal01to0 | queued (8 arms)",
       "b17 training | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
       "b17 evals | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
@@ -19,7 +17,7 @@
     ],
     "attention": [],
     "laptop_running": [
-      "b16 | kl013, kl015 -- wave 3 of 5 | training 84% (8 arms)"
+      "b16 | kl015 -- wave 3 of 5 | training 99% (3 arms)"
     ],
     "laptop_queued": [
       "b16 evals | kl013, kl015 | queued (8 arms)",
@@ -30,7 +28,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T05:58:09"
+    "laptop_iso": "2026-09-05T06:12:12"
   },
   "scheduler": {
     "alive": true,
@@ -38,7 +36,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T06:01:08"
+    "status_iso": "2026-09-05T06:11:49"
   },
   "runtime": {
     "max_trainers": 8,
@@ -57,21 +55,84 @@
   "config_notes": [],
   "running": [
     {
-      "id": "b15-stageb-w4",
-      "type": "eval",
-      "policy": "b15ay-entanneal10-seed1",
+      "id": "b15bg-entanneal01-seed1",
+      "type": "train",
+      "policy": "b15bg-entanneal01-seed1",
       "policies": [
-        "b15ay-entanneal10-seed1",
-        "b15az-entanneal10-seed2",
-        "b15ba-entanneal10-seed3",
-        "b15bb-entanneal10-seed4",
-        "b15bc-entanneal03-seed1",
-        "b15bd-entanneal03-seed2",
-        "b15be-entanneal03-seed3",
-        "b15bf-entanneal03-seed4"
+        "b15bg-entanneal01-seed1"
       ],
       "step": null,
-      "max_steps": null
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bh-entanneal01-seed2",
+      "type": "train",
+      "policy": "b15bh-entanneal01-seed2",
+      "policies": [
+        "b15bh-entanneal01-seed2"
+      ],
+      "step": null,
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bi-entanneal01-seed3",
+      "type": "train",
+      "policy": "b15bi-entanneal01-seed3",
+      "policies": [
+        "b15bi-entanneal01-seed3"
+      ],
+      "step": null,
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bj-entanneal01-seed4",
+      "type": "train",
+      "policy": "b15bj-entanneal01-seed4",
+      "policies": [
+        "b15bj-entanneal01-seed4"
+      ],
+      "step": null,
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bk-entanneal01to0-seed1",
+      "type": "train",
+      "policy": "b15bk-entanneal01to0-seed1",
+      "policies": [
+        "b15bk-entanneal01to0-seed1"
+      ],
+      "step": null,
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bl-entanneal01to0-seed2",
+      "type": "train",
+      "policy": "b15bl-entanneal01to0-seed2",
+      "policies": [
+        "b15bl-entanneal01to0-seed2"
+      ],
+      "step": null,
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bm-entanneal01to0-seed3",
+      "type": "train",
+      "policy": "b15bm-entanneal01to0-seed3",
+      "policies": [
+        "b15bm-entanneal01to0-seed3"
+      ],
+      "step": null,
+      "max_steps": 50003968
+    },
+    {
+      "id": "b15bn-entanneal01to0-seed4",
+      "type": "train",
+      "policy": "b15bn-entanneal01to0-seed4",
+      "policies": [
+        "b15bn-entanneal01to0-seed4"
+      ],
+      "step": null,
+      "max_steps": 50003968
     }
   ],
   "ledger": {
@@ -503,16 +564,9 @@
     "b15bd-entanneal03-seed2": "done",
     "b15be-entanneal03-seed3": "done",
     "b15bf-entanneal03-seed4": "done",
-    "b15-hof5000-w4": "queued",
-    "b15-hof30k-w4": "queued",
-    "b15bg-entanneal01-seed1": "queued",
-    "b15bh-entanneal01-seed2": "queued",
-    "b15bi-entanneal01-seed3": "queued",
-    "b15bj-entanneal01-seed4": "queued",
-    "b15bk-entanneal01to0-seed1": "queued",
-    "b15bl-entanneal01to0-seed2": "queued",
-    "b15bm-entanneal01to0-seed3": "queued",
-    "b15bn-entanneal01to0-seed4": "queued",
+    "b15-stageb-w4": "done",
+    "b15-hof5000-w4": "done",
+    "b15-hof30k-w4": "done",
     "b15-stageb-w5": "queued",
     "b15-hof5000-w5": "queued",
     "b15-hof30k-w5": "queued",
@@ -670,13 +724,20 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b15-stageb-w4": "running"
+    "b15bg-entanneal01-seed1": "running",
+    "b15bh-entanneal01-seed2": "running",
+    "b15bi-entanneal01-seed3": "running",
+    "b15bj-entanneal01-seed4": "running",
+    "b15bk-entanneal01to0-seed1": "running",
+    "b15bl-entanneal01to0-seed2": "running",
+    "b15bm-entanneal01to0-seed3": "running",
+    "b15bn-entanneal01to0-seed4": "running"
   },
-  "disk_free_gb": 127.5,
+  "disk_free_gb": 127.4,
   "head": "e297c1729b95",
   "load_avg": [
-    16.046875,
-    16.06005859375,
-    15.7001953125
+    9.00048828125,
+    9.01513671875,
+    12.4384765625
   ]
 }
