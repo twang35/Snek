@@ -1,41 +1,42 @@
 {
-  "iso": "2026-09-05T12:42:59",
-  "ts": 1788637379.5843885,
+  "iso": "2026-09-05T12:44:09",
+  "ts": 1788637449.6941347,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip015, clip03 | stage B (8 arms)"
+      "b17 | clip015, clip03 | stage B (8 arms) | ~55m left"
     ],
     "queued": [
-      "b17 evals | clip015, clip03 | queued (8 arms)",
-      "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
-      "b17 evals | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
-      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 | queued (24 arms)",
-      "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 | queued (24 arms)",
-      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 | queued (24 arms)",
-      "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 | queued (24 arms)"
+      "b17 evals | clip015, clip03 (8 arms) | ~14m",
+      "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... (48 arms) | ~7.9h",
+      "b17 evals | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... (48 arms) | ~6.9h",
+      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms) | ~3.9h",
+      "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 (24 arms) | ~3.5h",
+      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 (24 arms) | ~3.9h",
+      "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
     ],
     "attention": [],
+    "remaining": "~31h of work: 55m running + 30h queued; clear ~Sun 19:18",
     "laptop_running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training (8 arms)"
+      "b19 | noadvnorm, mse -- wave 1 of 3 | training 3% (8 arms) | ~1.8h left"
     ],
     "laptop_queued": [
-      "b19 evals | noadvnorm, mse | queued (8 arms)",
-      "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 | queued (16 arms)",
-      "b19 evals | adameps1e5, adameps1e8, vf01, vf10 | queued (16 arms)",
-      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
-      "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
+      "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
+      "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~3.4h",
+      "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.3h",
+      "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms) | ~3.5h",
+      "b20 evals | lanes32, lanes64, lanes256, lanes512 (16 arms) | ~2.3h"
     ],
-    "laptop_remaining": null,
-    "laptop_iso": "2026-09-05T12:40:56"
+    "laptop_remaining": "~14h of work: 1.8h running + 13h queued; clear ~Sun 03:09",
+    "laptop_iso": "2026-09-05T12:43:42"
   },
   "scheduler": {
     "alive": true,
-    "pid": 1295340,
-    "spawned": 1788635134.6781955,
+    "pid": 1351276,
+    "spawned": 1788637443.7459948,
     "last_exit": null,
-    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-120534.log",
-    "status_iso": "2026-09-05T12:37:57"
+    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-124403.log",
+    "status_iso": "2026-09-05T12:44:08"
   },
   "runtime": {
     "max_trainers": 8,
@@ -68,7 +69,8 @@
         "b17ap-clip03-seed4"
       ],
       "step": null,
-      "max_steps": null
+      "max_steps": null,
+      "eta_seconds": 3299.681496858597
     }
   ],
   "ledger": {
@@ -679,8 +681,8 @@
   "disk_free_gb": 123.6,
   "head": "d7ec421714e6",
   "load_avg": [
-    16.42529296875,
-    16.12060546875,
-    14.8544921875
+    15.49560546875,
+    15.97314453125,
+    14.90185546875
   ]
 }
