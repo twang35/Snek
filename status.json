@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T15:16:24",
-  "ts": 1788646584.018414,
+  "iso": "2026-09-05T15:26:28",
+  "ts": 1788647188.737049,
   "box": "laptop",
   "project": "snek3",
   "pid": 64756,
   "at_a_glance": {
     "running": [
-      "b19 | noadvnorm, mse | hof5000 (8 arms) | ~9m left"
+      "b19 | noadvnorm, mse | hof5000 (8 arms) | ~1m left"
     ],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~4m",
@@ -18,7 +18,7 @@
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~4.1h"
     ],
     "attention": [],
-    "remaining": "~13h of work: 9m running + 13h queued; clear ~Sun 03:56"
+    "remaining": "~13h of work: 1m running + 13h queued; clear ~Sun 03:57"
   },
   "running": [
     {
@@ -37,7 +37,7 @@
       ],
       "step": null,
       "max_steps": null,
-      "eta_seconds": 569.9214951992035
+      "eta_seconds": 60.0
     }
   ],
   "queued_ids": [
