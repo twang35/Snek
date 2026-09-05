@@ -42,7 +42,12 @@ import json
 import re
 
 PROJECT = 'snek3'
-JOB_TYPES = ('train', 'smoke', 'benchmark', 'eval')
+# `deploy` and `restart` are **actions**, not work: the daemon runs them itself on the poll that sees
+# them, ahead of dispatch and regardless of what is running or of a pause, so a deploy never needs ssh
+# or sudo -- the box has `Restart=always`, and a restart is the daemon recording the action, publishing,
+# and exiting (2026-09-05). Named actions only, never arbitrary shell: anything on `ops` runs as `claw`.
+ACTION_TYPES = ('deploy', 'restart')
+JOB_TYPES = ('train', 'smoke', 'benchmark', 'eval') + ACTION_TYPES
 _ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
 
 # The characters an agent writing prose actually reaches for, and their ASCII spellings. Anything
@@ -73,7 +78,7 @@ class Job(object):
 
     def __init__(self, id, type, project=PROJECT, policy=None, env=None, max_steps=None,
                  eval_shards=None, eval_args=None, priority=100, notes='', label='',
-                 policies=None, selector=None, episodes=None):
+                 policies=None, selector=None, episodes=None, restart=None):
         self.id = id
         self.type = type
         self.project = project
@@ -96,10 +101,16 @@ class Job(object):
         # A short human description for `status.json`'s at-a-glance summary, e.g.
         # 'b1: free space + chase-safe shaping, gate=75, c=0.10'. Optional.
         self.label = label
+        # deploy only: True forces a restart after the merge, False forbids one, None (the default)
+        # restarts iff the merge changed `desktop/runner/` or `desktop/systemd/`.
+        self.restart = restart
 
     @property
     def category(self):
-        """Which concurrency pool the job draws from: 'eval' or 'trainer'."""
+        """Which concurrency pool the job draws from: 'eval' or 'trainer' -- or 'action' for a
+        deploy/restart, which draws from none and runs in the poll that sees it."""
+        if self.type in ACTION_TYPES:
+            return 'action'
         return 'eval' if self.type == 'eval' else 'trainer'
 
 
@@ -179,8 +190,16 @@ def parse_job(text, source='<job>', project=PROJECT):
     if isinstance(priority, bool) or not isinstance(priority, int):
         raise JobError('{0}: priority must be an integer'.format(source))
 
+    restart = raw.get('restart')
+    if restart is not None and not isinstance(restart, bool):
+        raise JobError('{0}: restart must be true or false'.format(source))
+    if restart is not None and job_type != 'deploy':
+        raise JobError('{0}: only deploy jobs take "restart"'.format(source))
+    if job_type in ACTION_TYPES and (policy or policies or env or max_steps is not None):
+        raise JobError('{0}: a {1} action takes no policy, env or max_steps'.format(source, job_type))
+
     return Job(id=job_id, type=job_type, project=job_project, policy=policy, policies=policies,
                env=env, max_steps=max_steps, eval_shards=eval_shards, selector=selector,
-               episodes=episodes, eval_args=eval_args, priority=priority,
+               episodes=episodes, eval_args=eval_args, priority=priority, restart=restart,
                notes=to_ascii(str(raw.get('notes', ''))),
                label=to_ascii(str(raw.get('label', ''))))

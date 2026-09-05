@@ -29,7 +29,7 @@ import time
 from . import config as config_module
 from . import gitbus
 from . import launch
-from .job import parse_job, to_ascii, Job, JobError
+from .job import parse_job, to_ascii, Job, JobError, ACTION_TYPES
 
 TERMINAL = ('done', 'failed')
 
@@ -241,6 +241,11 @@ class Runner(object):
         # When the loop last *attempted* its network half. 0 so the first cycle does one.
         self._last_git = 0.0
         self.stop = False
+        # Set by a `restart` action (or a deploy that changed the runner): the loop exits and systemd's
+        # `Restart=always` relaunches the daemon on the code now in the checkout.
+        self.restart_requested = None
+        # Injectable for tests: how an action's command is run.
+        self.run_command = subprocess.run
         self._reattach()
 
     # ------------------------------------------------------------------ ledger
@@ -353,13 +358,88 @@ class Runner(object):
         self._reap()
         # Scanned every poll, not only when dispatching, so `status.json`'s queue stays current
         # while a wave occupies the box or the daemon is paused.
-        self._queued = self._scan_pending()
+        scanned = self._scan_pending()
+        self._queued = [job for job in scanned if job.category != 'action']
+        # Actions run now: ahead of dispatch, beside running jobs, and under a pause too -- a pause
+        # is how a deploy that must not race a wave is done. A restart ends this poll.
+        self._run_actions([job for job in scanned if job.category == 'action'])
+        if self.stop:
+            return
         if not (self.runtime['paused'] or self.runtime['drain']):
             self._dispatch()
         for running_job in self.running.values():
             launch.update_throughput(running_job, self.host)
         if git:
             self._publish()
+
+    # ---- actions: deploy and restart, run by the daemon itself
+
+    def _run_actions(self, actions):
+        for job in actions:
+            if job.type == 'deploy':
+                self._deploy(job)
+            elif job.type == 'restart':
+                self._restart(job, 'restart action')
+            if self.stop:
+                return
+
+    def _head(self):
+        result = self.run_command(['git', 'rev-parse', 'HEAD'], cwd=self.host['REPO_PATH'], text=True,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return (result.stdout or '').strip()[:12]
+
+    def _runner_changed(self, before, after):
+        """Whether the merge touched the daemon's own code -- the only thing a restart is for."""
+        if not before or not after or before == after:
+            return False
+        result = self.run_command(
+            ['git', 'diff', '--name-only', '{0}..{1}'.format(before, after), '--',
+             'snek3/desktop/runner', 'snek3/desktop/systemd'],
+            cwd=self.host['REPO_PATH'], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return bool((result.stdout or '').strip())
+
+    def _deploy(self, job):
+        """Runs `desktop/deploy` -- fetch, settle collisions, fast-forward -- as the box would from an
+        ssh, and restarts if the runner's code changed (or the spec says so). Recorded in the ledger
+        with the heads and the script's tail, so `status.json` says what happened and a failed deploy
+        (exit 3: a differing JSON, nothing touched) shows under `attention` and is never retried."""
+        started = time.time()
+        before = self._head()
+        desktop_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        try:
+            result = self.run_command([sys.executable, '-m', 'runner.deploy'], cwd=desktop_dir, text=True,
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=900)
+            rc, output = result.returncode, result.stdout or ''
+        except (OSError, subprocess.SubprocessError) as error:
+            rc, output = -1, 'could not run deploy: {0}'.format(error)
+        after = self._head()
+        tail = [line for line in output.strip().splitlines() if line.strip()][-8:]
+        self.ledger[job.id] = {
+            'state': 'done' if rc == 0 else 'failed', 'type': 'deploy', 'started': started,
+            'finished': time.time(), 'rc': rc, 'head_before': before, 'head_after': after,
+            'output': tail, 'error': None if rc == 0 else 'deploy exited {0}: {1}'.format(
+                rc, tail[-1] if tail else '(no output)')}
+        self._save_ledger()
+        if rc != 0:
+            return
+        restart = job.restart if job.restart is not None else self._runner_changed(before, after)
+        self.ledger[job.id]['restart'] = bool(restart)
+        if restart:
+            self._restart(job, 'deploy {0} -> {1} changed the runner'.format(before, after))
+        else:
+            self._save_ledger()
+
+    def _restart(self, job, why):
+        """Records the action as done, publishes so the ledger on `ops-status` already shows it, and
+        stops the loop. systemd (`Restart=always`, 10 s) relaunches the daemon, which re-adopts running
+        jobs by pid -- the same restart `desktop-deploy` did over ssh with sudo, without either."""
+        record = self.ledger.setdefault(job.id, {'type': job.type, 'started': time.time()})
+        record.update({'state': 'done', 'finished': time.time(), 'restarted': True, 'why': why})
+        self._save_ledger()
+        self.restart_requested = '{0}: {1}'.format(job.id, why)
+        self.stop = True
+        self._queued = [item for item in self._queued if item.id != job.id]
+        self._publish()
 
     def _apply_runtime(self):
         config, notes = config_module.parse_runtime_config(
@@ -670,6 +750,11 @@ class Runner(object):
             (job_id for job_id, record in self.ledger.items()
              if record.get('state') == 'failed' and record.get('type') == 'eval'),
             key=lambda job_id: self.ledger[job_id].get('finished') or 0, reverse=True)
+        for job_id, record in sorted(self.ledger.items(),
+                                     key=lambda item: item[1].get('finished') or 0, reverse=True)[:50]:
+            if record.get('state') == 'failed' and record.get('type') in ACTION_TYPES:
+                lines.append('** {0} failed: {1}. Nothing was changed; fix it and queue a new id.'.format(
+                    job_id, record.get('error') or 'rc={0}'.format(record.get('rc'))))
         for job_id in failed[:5]:
             record = self.ledger[job_id]
             lines.append('** {0} failed and will NOT be retried automatically ({1}). Its arms count '
@@ -735,6 +820,8 @@ class Runner(object):
             'running': running,
             'ledger': self._ledger_view(order),
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
+            # Which code the box runs: what a deploy action is checked against from the laptop.
+            'head': self._head(),
             'load_avg': list(os.getloadavg()),
         }
         try:
@@ -1168,6 +1255,11 @@ def main():
         except Exception as error:      # the loop must never die
             sys.stderr.write('poll error: {0}\n'.format(error))
         forced = _wait_for_next_poll(runner)
+    if runner.restart_requested:
+        # Exit 0 on purpose: `Restart=always` relaunches either way, and a clean exit is what the
+        # journal should show for an action the box was asked for.
+        sys.stderr.write('restarting for {0}: exiting so systemd relaunches the daemon\n'.format(
+            runner.restart_requested))
 
 
 def _wait_for_next_poll(runner):

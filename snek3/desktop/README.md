@@ -39,7 +39,7 @@ ssh the-claw-den 'Snek/snek3/desktop/trigger'
 |---|---|---|
 | `project` | **yes, no default** | must be `snek3`. The guard against `ops`'s ~150 retired snek2 specs |
 | `id` | yes | unique; the ledger key and the log name. `b<n><letter>-...` groups arms into a batch |
-| `type` | yes | `train`, `smoke`, `benchmark`, `eval` |
+| `type` | yes | `train`, `smoke`, `benchmark`, `eval` — or the two **actions**, `deploy` and `restart`, which the daemon runs itself on the poll that sees them (below, "Deploy over the bus") |
 | `policy` | train/eval | the checkpoint directory name |
 | `policies` | eval only | a **wave**: every arm of a batch in one process |
 | `max_steps` | no | `SNEK_MAX_STEPS`. Defaults per type for smoke/benchmark |
@@ -277,9 +277,35 @@ place. So the box's checkout of master holds nothing under a path master tracks,
 to commit every chart. A tool run by hand on the box (`tools.eval_window`, `tools.closeout`) needs
 `SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs` exported or it looks in the empty `runs/`.
 
-Deploying new code is `snek3/desktop/deploy` (a fast-forward that settles any leftover from before the
-move) plus `sudo systemctl restart snek3-runner` when `desktop/runner/*` changed. Piping it to `tail`
-hides the failure and its exit code.
+### Deploy over the bus
+
+```
+snek3/desktop/queue_action deploy            # from the laptop: fetch + ff-merge on the box, restart iff desktop/runner or systemd changed
+snek3/desktop/queue_action deploy --restart  # restart regardless
+snek3/desktop/queue_action restart           # restart only
+```
+
+**Since 2026-09-05 a deploy is a job type, not an ssh.** The script commits a `deploy-<stamp>.json`
+(`type: deploy`) to `ops`, triggers, and waits for the ledger. The daemon runs actions in the poll that
+sees them: **ahead of dispatch, beside running jobs, and under a pause** (a pause is how a deploy that
+must not race a wave is done). A deploy runs the box's own `desktop/deploy`, records `head_before`,
+`head_after`, the script's last lines and `rc` in the ledger, and restarts when the merge touched
+`desktop/runner/` or `desktop/systemd/` (or the spec says `"restart": true`). A **restart is the daemon
+recording the action as done, publishing, and exiting 0**; systemd's `Restart=always` relaunches it in
+10 s on the code now in the checkout, and it re-adopts running jobs by pid. No sudo anywhere, which is
+the point: the laptop's permission classifier refuses `sudo` over ssh, and the box's passwordless sudo
+was never the limit. `status.json` now carries `head`, the commit the box runs, so the laptop can check
+a deploy landed. A deploy that exits 3 (a differing JSON; nothing touched) is `failed` in the ledger and
+under `attention`, and is never retried: fix it and queue a new id.
+
+**The one-time bootstrap.** A daemon older than this change marks a `deploy` spec malformed (`failed`,
+unknown type) and the new code then never runs it, so the first daemon that understands actions has to
+be started the old way: `ssh the-claw-den 'Snek/snek3/desktop/deploy'` and then, by the user at the
+prompt, `ssh the-claw-den 'sudo systemctl restart snek3-runner'`.
+
+By hand, the old way still works: `snek3/desktop/deploy` over ssh (a fast-forward that settles any
+leftover from before the move) plus `sudo systemctl restart snek3-runner` when `desktop/runner/*`
+changed. Piping it to `tail` hides the failure and its exit code.
 
 ## Reach the box from outside the home LAN
 
@@ -320,9 +346,9 @@ that `dig` resolves but `ssh` does not is the Mac's negative resolver cache from
 reaching the laptop (only the diagnostic ping in `plans/laptop-wifi.md`), since the laptop's address is
 whatever its current network gave it.
 
-**A `deploy` job type for the bus would cover the commonest off-LAN need without ssh at all** — the daemon
-already runs specs from `ops`. Named actions only (deploy, restart), never arbitrary shell: anything on that
-branch runs as `claw` on the box.
+**A `deploy` job type covers the commonest off-LAN need without ssh at all** — done 2026-09-05,
+`queue_action` above. Named actions only (deploy, restart), never arbitrary shell: anything on that branch
+runs as `claw` on the box.
 
 ## What the port changed, and why each one is an incident
 

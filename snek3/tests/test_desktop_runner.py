@@ -1077,3 +1077,133 @@ def test_the_laptop_status_branch_is_fetched_apart_from_the_three_the_box_needs(
     assert fetched == [['fetch', 'origin', 'ops', 'ops-status', 'results'],
                        ['fetch', 'origin', 'laptop-status']]
     assert gitbus.laptop_status_branch(dict(host, LAPTOP_STATUS_BRANCH='lap')) == 'lap'
+
+
+# --- actions: deploy and restart over the bus -------------------------------------------------------
+
+def test_deploy_and_restart_are_job_types_that_take_no_work_fields():
+    deploy = parse_job(json.dumps({'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'}))
+    assert deploy.category == 'action' and deploy.restart is None
+    assert parse_job(json.dumps({'project': 'snek3', 'id': 'r1', 'type': 'restart'})).category == 'action'
+    assert parse_job(json.dumps({'project': 'snek3', 'id': 'd2', 'type': 'deploy', 'restart': True})).restart is True
+    for bad in ({'type': 'deploy', 'restart': 'yes'}, {'type': 'restart', 'restart': True},
+                {'type': 'deploy', 'policy': 'x'}, {'type': 'restart', 'env': {'A': '1'}}):
+        with pytest.raises(JobError):
+            parse_job(json.dumps(dict({'project': 'snek3', 'id': 'a'}, **bad)))
+
+
+class Commands(object):
+    """Stands in for `subprocess.run` inside the daemon: heads in sequence, a diff, a deploy result."""
+
+    def __init__(self, heads=('aaaaaaaaaaaa', 'bbbbbbbbbbbb'), changed='snek3/desktop/runner/runner.py',
+                 deploy_rc=0, deploy_out='HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; kept 0 pictures\n'):
+        self.heads, self.changed, self.deploy_rc, self.deploy_out = list(heads), changed, deploy_rc, deploy_out
+        self.calls = []
+
+    def __call__(self, argv, **kwargs):
+        self.calls.append(argv)
+        result = type('R', (), {})()
+        if argv[:3] == ['git', 'rev-parse', 'HEAD']:
+            result.returncode, result.stdout = 0, (self.heads.pop(0) if len(self.heads) > 1 else self.heads[0]) + '\n'
+        elif argv[:3] == ['git', 'diff', '--name-only']:
+            result.returncode, result.stdout = 0, self.changed
+        elif argv[-2:] == ['-m', 'runner.deploy']:
+            result.returncode, result.stdout = self.deploy_rc, self.deploy_out
+        else:
+            raise AssertionError('unexpected command {0}'.format(argv))
+        return result
+
+
+def _acting_runner(tmp_path, monkeypatch, specs, commands, paused=False):
+    published = []
+    monkeypatch.setattr(runner_module.gitbus, 'fetch', lambda host: None)
+    monkeypatch.setattr(runner_module.gitbus, 'fetch_laptop_status', lambda host: None)
+    monkeypatch.setattr(runner_module.gitbus, 'push_unpushed', lambda host: [])
+    monkeypatch.setattr(runner_module.gitbus, 'read_runtime_text', lambda host: json.dumps({'paused': paused}))
+    monkeypatch.setattr(runner_module.gitbus, 'read_laptop_status', lambda host: '')
+    monkeypatch.setattr(runner_module.gitbus, 'publish_status',
+                        lambda host, text: published.append(json.loads(text)) or True)
+    monkeypatch.setattr(runner_module.gitbus, 'read_pending_jobs',
+                        lambda host: [(spec['id'] + '.json', json.dumps(spec)) for spec in specs])
+    runner = _runner(tmp_path, {})
+    runner.run_command = commands
+    return runner, published
+
+
+def _train_spec(policy):
+    return {'project': 'snek3', 'id': policy, 'type': 'train', 'policy': policy, 'max_steps': 10}
+
+
+def test_a_deploy_that_changes_the_runner_merges_records_publishes_and_stops_for_systemd(tmp_path, monkeypatch):
+    """The named action replaces `ssh ... deploy; ssh ... sudo systemctl restart`: the daemon runs the
+    box's own deploy, sees the runner changed between the heads, publishes the done record, and exits
+    -- `Restart=always` relaunches it on the new code. Nothing was dispatched on the way out."""
+    commands = Commands()
+    runner, published = _acting_runner(tmp_path, monkeypatch,
+                                       [{'project': 'snek3', 'id': 'deploy-1', 'type': 'deploy'},
+                                        _train_spec('b1a-x')], commands)
+    launched = []
+    monkeypatch.setattr(runner, '_launch', lambda job: launched.append(job.id))
+    runner.poll_once(git=True)
+    record = runner.ledger['deploy-1']
+    assert record['state'] == 'done' and record['restart'] is True and record['restarted'] is True
+    assert (record['head_before'], record['head_after']) == ('aaaaaaaaaaaa', 'bbbbbbbbbbbb')
+    assert record['output'] == ['HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; kept 0 pictures']
+    assert runner.stop and 'deploy-1' in runner.restart_requested
+    assert launched == []                                  # the poll ended at the restart
+    assert [job.id for job in runner._queued] == ['b1a-x']  # actions never sit in the queue
+    assert published[-1]['ledger']['deploy-1'] == 'done'
+    assert published[-1]['head'] == 'bbbbbbbbbbbb'
+    assert commands.calls[1][-2:] == ['-m', 'runner.deploy']
+    # and the ledger on disk already says done, so the relaunched daemon does not run it again
+    with open(runner.host['LEDGER_PATH']) as handle:
+        assert json.load(handle)['deploy-1']['state'] == 'done'
+
+
+def test_a_deploy_that_touches_only_tools_does_not_restart_and_dispatch_goes_on(tmp_path, monkeypatch):
+    commands = Commands(changed='')
+    runner, published = _acting_runner(tmp_path, monkeypatch,
+                                       [{'project': 'snek3', 'id': 'deploy-2', 'type': 'deploy'},
+                                        _train_spec('b1a-x')], commands)
+    launched = []
+    monkeypatch.setattr(runner, '_launch', lambda job: launched.append(job.id))
+    runner.poll_once(git=True)
+    assert runner.ledger['deploy-2']['state'] == 'done' and runner.ledger['deploy-2']['restart'] is False
+    assert not runner.stop and launched == ['b1a-x']
+    assert any(argv[:2] == ['git', 'diff'] for argv in commands.calls)      # the diff decided it
+
+
+def test_restart_true_forces_it_and_a_failed_deploy_is_attention_never_a_restart(tmp_path, monkeypatch):
+    commands = Commands(changed='')
+    runner, _ = _acting_runner(tmp_path, monkeypatch,
+                               [{'project': 'snek3', 'id': 'deploy-3', 'type': 'deploy', 'restart': True}],
+                               commands)
+    runner.poll_once(git=True)
+    assert runner.stop and runner.ledger['deploy-3']['restarted'] is True
+
+    failing = Commands(heads=('aaaaaaaaaaaa',), deploy_rc=3,
+                       deploy_out='snek3/runs/b1a_evals.json differs from the commit; nothing touched\n')
+    runner, published = _acting_runner(tmp_path, monkeypatch,
+                                       [{'project': 'snek3', 'id': 'deploy-4', 'type': 'deploy', 'restart': True}],
+                                       failing)
+    runner.poll_once(git=True)
+    record = runner.ledger['deploy-4']
+    assert record['state'] == 'failed' and record['rc'] == 3 and 'restart' not in record
+    assert not runner.stop
+    assert published[-1]['at_a_glance']['attention'] == [
+        '** deploy-4 failed: deploy exited 3: snek3/runs/b1a_evals.json differs from the commit; '
+        'nothing touched. Nothing was changed; fix it and queue a new id.']
+
+
+def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated(tmp_path, monkeypatch):
+    runner, published = _acting_runner(tmp_path, monkeypatch,
+                                       [{'project': 'snek3', 'id': 'restart-1', 'type': 'restart'}],
+                                       Commands(), paused=True)
+    runner.poll_once(git=True)
+    assert runner.stop and runner.ledger['restart-1']['state'] == 'done'
+    assert published[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
+    # the relaunched daemon reads the same spec and the same ledger: nothing happens
+    again = _runner(tmp_path, json.load(open(runner.host['LEDGER_PATH'])))
+    again.run_command = Commands()
+    again.poll_once(git=True)
+    assert not again.stop and again.restart_requested is None

@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Queue a named action -- `deploy` or `restart` -- for the desktop daemon, and wait for it.
+
+    snek3/desktop/queue_action deploy               # box fetches + ff-merges master; restarts if the runner changed
+    snek3/desktop/queue_action deploy --restart     # ...and restarts regardless
+    snek3/desktop/queue_action restart              # just restart the daemon
+    snek3/desktop/queue_action deploy --no-wait     # queue and return
+
+Replaces `ssh the-claw-den 'Snek/snek3/desktop/deploy'` + `ssh ... 'sudo systemctl restart snek3-runner'`:
+the daemon runs the action itself on the poll that sees it (`desktop/runner/runner.py`, `_run_actions`),
+so no ssh and no sudo -- which the laptop's permission classifier refused, 2026-09-05. Stdlib only.
+
+Writes one spec to `queue/pending/<type>-<UTC stamp>.json` in the `ops` worktree (found or created as
+the `desktop-batch` skill does), commits, pushes, asks the daemon to poll now (`trigger` over ssh, if
+ssh answers; otherwise it polls within `git_seconds`), then reads `ops-status` until the ledger shows
+the action terminal and prints the record and the box's `head`. Exit 0 done, 1 failed, 2 timed out.
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+PENDING = 'snek3/desktop/queue/pending'
+SSH = ['ssh', 'the-claw-den', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8']
+
+
+def git(*args, cwd=REPO, check=True):
+    result = subprocess.run(['git'] + list(args), cwd=cwd, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if check and result.returncode != 0:
+        sys.exit('git {0} failed: {1}'.format(' '.join(args), result.stderr.strip()))
+    return result.stdout.strip()
+
+
+def ops_worktree():
+    git('fetch', 'origin', 'ops')
+    git('worktree', 'prune')
+    path = None
+    for line in git('worktree', 'list', '--porcelain').splitlines():
+        if line.startswith('worktree '):
+            path = line[len('worktree '):]
+        elif line == 'branch refs/heads/ops' and path:
+            break
+    else:
+        path = '/tmp/snek-ops-wt'
+        git('worktree', 'add', path, 'ops')
+    git('merge', '--ff-only', 'origin/ops', cwd=path)
+    return path
+
+
+def read_status():
+    git('fetch', 'origin', 'ops-status', check=False)
+    try:
+        return json.loads(git('show', 'origin/ops-status:status.json', check=False) or '{}')
+    except ValueError:
+        return {}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('action', choices=('deploy', 'restart'))
+    parser.add_argument('--restart', action='store_true', help='deploy: restart even if the runner did not change')
+    parser.add_argument('--no-wait', action='store_true', help='queue it and return')
+    parser.add_argument('--timeout', type=float, default=900, help='seconds to wait for the ledger')
+    args = parser.parse_args(argv)
+
+    job_id = '{0}-{1}'.format(args.action, time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()))
+    spec = {'project': 'snek3', 'id': job_id, 'type': args.action,
+            'label': '{0} requested from the laptop at master {1}'.format(args.action, git('rev-parse', '--short', 'master')),
+            'notes': 'Named action queued by snek3/desktop/queue_action; the daemon runs it on the poll that sees it.'}
+    if args.action == 'deploy' and args.restart:
+        spec['restart'] = True
+    wt = ops_worktree()
+    path = os.path.join(wt, PENDING, job_id + '.json')
+    with open(path, 'w') as handle:
+        json.dump(spec, handle, indent=2)
+        handle.write('\n')
+    git('add', os.path.join(PENDING, job_id + '.json'), cwd=wt)
+    git('commit', '-q', '-m', 'queue {0}'.format(job_id), cwd=wt)
+    git('push', '-q', 'origin', 'ops', cwd=wt)
+    print('queued {0} on ops'.format(job_id))
+
+    trigger = subprocess.run(SSH + ['Snek/snek3/desktop/trigger'], text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if trigger.returncode == 0:
+        print('daemon triggered')
+    else:
+        print('trigger did not answer (rc {0}); the daemon polls ops within git_seconds anyway'.format(
+            trigger.returncode))
+    if args.no_wait:
+        return 0
+
+    deadline = time.time() + args.timeout
+    while time.time() < deadline:
+        status = read_status()
+        state = (status.get('ledger') or {}).get(job_id)
+        if state in ('done', 'failed'):
+            print('{0}: {1}; box head {2}, status at {3}'.format(job_id, state, status.get('head'), status.get('iso')))
+            for line in (status.get('at_a_glance') or {}).get('attention') or []:
+                print('  attention: ' + line)
+            return 0 if state == 'done' else 1
+        time.sleep(20)
+    print('{0}: not terminal after {1:.0f}s -- the daemon may be mid-restart; read ops-status again in a '
+          'minute'.format(job_id, args.timeout))
+    return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

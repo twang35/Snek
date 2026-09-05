@@ -41,7 +41,7 @@ Then write one JSON file per arm into `$OPS/snek3/desktop/queue/pending/<id>.jso
 |---|---|---|
 | `project` | **yes, no default** | must be `"snek3"`. The guard against `ops`'s ~150 retired snek2 specs |
 | `id` | yes | unique; ledger key and log name. `b<n><letter>-...` groups arms into a batch |
-| `type` | yes | `train`, `smoke`, `benchmark`, `eval` |
+| `type` | yes | `train`, `smoke`, `benchmark`, `eval`; `deploy` / `restart` are actions — use `desktop/queue_action` (the `desktop-deploy` skill), not a hand spec |
 | `policy` / `policies` | yes | the checkpoint dir; `policies` is eval-only and makes one wave own every arm |
 | `max_steps` | no | `SNEK_MAX_STEPS`. **Absolute**, not "this many more" |
 | `env` | no | any `SNEK_*` knob; wins over the runtime defaults. See `docs/running.md` |
