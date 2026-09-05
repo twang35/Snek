@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-04T19:50:19",
-  "ts": 1788576619.9233859,
+  "iso": "2026-09-04T20:00:38",
+  "ts": 1788577238.5903122,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b12 | b12 hof5000 eval: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes | hof5000 (37 arms)"
+      "b12 | hof eval: 652 checkpoints >=99/500 from 37 arms, at 5,000 then 30,000 (seed 7) | hof30k (37 arms)"
     ],
     "queued": [
-      "b12 evals | hof eval: 652 checkpoints >=99/500 from 37 arms, at 5,000 then 30,000 (seed 7) | queued (37 arms)",
       "b13 evals | hof eval: 680 checkpoints >=99/500 from 30 arms, at 5,000 then 30,000 (seed 7) | queued (30 arms)",
       "b15 evals | hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7) | queued (8 arms)",
       "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
@@ -46,7 +45,7 @@
   },
   "running": [
     {
-      "id": "b12-hof5000",
+      "id": "b12-hof30k",
       "type": "eval",
       "policy": "b12aa-ep1-seed1",
       "policies": [
@@ -88,16 +87,15 @@
         "b12bj-ep12-seed4",
         "b12bm-ep16-seed3"
       ],
-      "pid": 4009472,
+      "pid": 4090981,
       "step": 50003968,
-      "label": "b12 hof5000 eval: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes",
+      "label": "hof eval: 652 checkpoints >=99/500 from 37 arms, at 5,000 then 30,000 (seed 7)",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2811
+      "elapsed_s": 245
     }
   ],
   "ledger": {
-    "b12-hof30k": "queued",
     "b13-hof5000": "queued",
     "b13-hof30k": "queued",
     "b15-hof5000": "queued",
@@ -347,7 +345,8 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b12-hof5000": "running",
+    "b12-hof30k": "running",
+    "b12-hof5000": "done",
     "b11-hof30k": "done",
     "b11-hof5000": "done",
     "b15-stageb": "done",
@@ -739,10 +738,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 132.2,
+  "disk_free_gb": 132.1,
   "load_avg": [
-    3.32763671875,
-    8.22314453125,
-    10.64111328125
+    2.294921875,
+    3.5625,
+    6.85986328125
   ]
 }
