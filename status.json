@@ -1,12 +1,12 @@
 {
-  "iso": "2026-09-05T12:56:58",
-  "ts": 1788638218.8075352,
+  "iso": "2026-09-05T13:07:05",
+  "ts": 1788638825.85863,
   "box": "laptop",
   "project": "snek3",
   "pid": 29215,
   "at_a_glance": {
     "running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training 17% (8 arms) | ~1.4h left"
+      "b19 | noadvnorm, mse -- wave 1 of 3 | training 28% (8 arms) | ~1.2h left"
     ],
     "queued": [
       "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
@@ -18,7 +18,7 @@
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
     ],
     "attention": [],
-    "remaining": "~21h of work: 1.4h running + 20h queued; clear ~Sun 10:15"
+    "remaining": "~21h of work: 1.2h running + 20h queued; clear ~Sun 10:14"
   },
   "running": [
     {
@@ -28,9 +28,9 @@
       "policies": [
         "b19a-noadvnorm-seed1"
       ],
-      "step": 8798208,
+      "step": 14270464,
       "max_steps": 50003968,
-      "eta_seconds": 4658.405346192272
+      "eta_seconds": 3979.421376322603
     },
     {
       "id": "b19b-noadvnorm-seed2",
@@ -39,9 +39,9 @@
       "policies": [
         "b19b-noadvnorm-seed2"
       ],
-      "step": 9060352,
+      "step": 14663680,
       "max_steps": 50003968,
-      "eta_seconds": 4326.553919250677
+      "eta_seconds": 3692.185516633872
     },
     {
       "id": "b19c-noadvnorm-seed3",
@@ -50,9 +50,9 @@
       "policies": [
         "b19c-noadvnorm-seed3"
       ],
-      "step": 8634368,
+      "step": 14139392,
       "max_steps": 50003968,
-      "eta_seconds": 4491.18842132968
+      "eta_seconds": 3903.281640216237
     },
     {
       "id": "b19d-noadvnorm-seed4",
@@ -61,9 +61,9 @@
       "policies": [
         "b19d-noadvnorm-seed4"
       ],
-      "step": 8667136,
+      "step": 13959168,
       "max_steps": 50003968,
-      "eta_seconds": 4613.764256347615
+      "eta_seconds": 3953.018044071111
     },
     {
       "id": "b19e-mse-seed1",
@@ -72,9 +72,9 @@
       "policies": [
         "b19e-mse-seed1"
       ],
-      "step": 8323072,
+      "step": 13615104,
       "max_steps": 50003968,
-      "eta_seconds": 4994.019847663863
+      "eta_seconds": 4189.834251789076
     },
     {
       "id": "b19f-mse-seed2",
@@ -83,9 +83,9 @@
       "policies": [
         "b19f-mse-seed2"
       ],
-      "step": 8732672,
+      "step": 14172160,
       "max_steps": 50003968,
-      "eta_seconds": 4619.977575106061
+      "eta_seconds": 3994.797027926341
     },
     {
       "id": "b19g-mse-seed3",
@@ -94,9 +94,9 @@
       "policies": [
         "b19g-mse-seed3"
       ],
-      "step": 8994816,
+      "step": 14483456,
       "max_steps": 50003968,
-      "eta_seconds": 4572.57075833586
+      "eta_seconds": 3722.65244109184
     },
     {
       "id": "b19h-mse-seed4",
@@ -105,9 +105,9 @@
       "policies": [
         "b19h-mse-seed4"
       ],
-      "step": 8683520,
+      "step": 13942784,
       "max_steps": 50003968,
-      "eta_seconds": 4869.2127833878285
+      "eta_seconds": 4094.7431588434924
     }
   ],
   "queued_ids": [
