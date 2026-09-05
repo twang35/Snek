@@ -1,25 +1,25 @@
 {
-  "iso": "2026-09-05T14:01:00",
-  "ts": 1788642060.6507037,
+  "iso": "2026-09-05T14:11:19",
+  "ts": 1788642679.9894562,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip04, clipanneal -- wave 3 of 8 | training 61% (8 arms) | ~35m left"
+      "b17 | clip04, clipanneal -- wave 3 of 8 | training 74% (8 arms) | ~25m left"
     ],
     "queued": [
       "b17 evals | clip04, clipanneal (8 arms) | ~1.1h",
       "b17 training | clip01anneal, lranneal, lranneal10, bothanneal, clipanneal2to1, clip04anneal,... (40 arms) | ~6.5h",
       "b17 evals | clip01anneal, lranneal, lranneal10, bothanneal, clipanneal2to1, clip04anneal,... (40 arms) | ~5.3h",
-      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms) | ~4.1h",
+      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms) | ~4.0h",
       "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 (24 arms) | ~3.2h"
     ],
     "attention": [],
-    "remaining": "~21h of work: 35m running + 20h queued; clear ~Sun 10:46",
+    "remaining": "~21h of work: 25m running + 20h queued; clear ~Sun 10:46",
     "laptop_running": [
-      "b19 | noadvnorm, mse -- wave 1 of 3 | training 87% (8 arms) | ~12m left"
+      "b19 | noadvnorm, mse | stage B (8 arms) | ~55m left"
     ],
     "laptop_queued": [
-      "b19 evals | noadvnorm, mse (8 arms) | ~1.1h",
+      "b19 evals | noadvnorm, mse (8 arms) | ~14m",
       "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~2.9h",
       "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.3h",
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 (16 arms) | ~2.9h",
@@ -27,8 +27,8 @@
       "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 (24 arms) | ~4.4h",
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~3.5h"
     ],
-    "laptop_remaining": "~20h of work: 12m running + 19h queued; clear ~Sun 09:34",
-    "laptop_iso": "2026-09-05T13:56:57"
+    "laptop_remaining": "~19h of work: 55m running + 18h queued; clear ~Sun 09:31",
+    "laptop_iso": "2026-09-05T14:08:41"
   },
   "scheduler": {
     "alive": true,
@@ -36,7 +36,7 @@
     "spawned": 1788641970.9263482,
     "last_exit": null,
     "log": "/home/claw/.snek3-daemon/logs/scheduler-20260905-135930.log",
-    "status_iso": "2026-09-05T13:59:36"
+    "status_iso": "2026-09-05T14:09:37"
   },
   "runtime": {
     "max_trainers": 8,
@@ -61,9 +61,9 @@
       "policies": [
         "b17aq-clip04-seed1"
       ],
-      "step": 32096256,
+      "step": 38813696,
       "max_steps": 50003968,
-      "eta_seconds": 1622.6348046972334
+      "eta_seconds": 1003.3598329228053
     },
     {
       "id": "b17ar-clip04-seed2",
@@ -72,9 +72,9 @@
       "policies": [
         "b17ar-clip04-seed2"
       ],
-      "step": 31735808,
+      "step": 38354944,
       "max_steps": 50003968,
-      "eta_seconds": 1653.2194939360752
+      "eta_seconds": 1069.17573632111
     },
     {
       "id": "b17as-clip04-seed3",
@@ -83,9 +83,9 @@
       "policies": [
         "b17as-clip04-seed3"
       ],
-      "step": 30408704,
+      "step": 36683776,
       "max_steps": 50003968,
-      "eta_seconds": 1885.1884796732877
+      "eta_seconds": 1251.6066937330938
     },
     {
       "id": "b17at-clip04-seed4",
@@ -94,9 +94,9 @@
       "policies": [
         "b17at-clip04-seed4"
       ],
-      "step": 30343168,
+      "step": 36552704,
       "max_steps": 50003968,
-      "eta_seconds": 1936.334985815993
+      "eta_seconds": 1275.7415044506188
     },
     {
       "id": "b17au-clipanneal-seed1",
@@ -105,9 +105,9 @@
       "policies": [
         "b17au-clipanneal-seed1"
       ],
-      "step": 30031872,
+      "step": 36274176,
       "max_steps": 50003968,
-      "eta_seconds": 1937.931279435363
+      "eta_seconds": 1351.4272187040224
     },
     {
       "id": "b17av-clipanneal-seed2",
@@ -116,9 +116,9 @@
       "policies": [
         "b17av-clipanneal-seed2"
       ],
-      "step": 30146560,
+      "step": 36405248,
       "max_steps": 50003968,
-      "eta_seconds": 1907.92177630087
+      "eta_seconds": 1342.4591701741513
     },
     {
       "id": "b17aw-clipanneal-seed3",
@@ -127,9 +127,9 @@
       "policies": [
         "b17aw-clipanneal-seed3"
       ],
-      "step": 29425664,
+      "step": 35504128,
       "max_steps": 50003968,
-      "eta_seconds": 2092.789940885721
+      "eta_seconds": 1496.4910840967757
     },
     {
       "id": "b17ax-clipanneal-seed4",
@@ -138,9 +138,9 @@
       "policies": [
         "b17ax-clipanneal-seed4"
       ],
-      "step": 29818880,
+      "step": 36012032,
       "max_steps": 50003968,
-      "eta_seconds": 1991.854537637807
+      "eta_seconds": 1364.0143646976587
     }
   ],
   "ledger": {
@@ -719,11 +719,11 @@
     "b17aw-clipanneal-seed3": "running",
     "b17ax-clipanneal-seed4": "running"
   },
-  "disk_free_gb": 122.8,
+  "disk_free_gb": 122.6,
   "head": "b3a99bd4acb7",
   "load_avg": [
-    13.94287109375,
-    13.822265625,
-    13.77587890625
+    13.39599609375,
+    13.64013671875,
+    13.7353515625
   ]
 }
