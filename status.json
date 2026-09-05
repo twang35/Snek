@@ -1,12 +1,13 @@
 {
-  "iso": "2026-09-05T11:26:20",
-  "ts": 1788632780.5750554,
+  "iso": "2026-09-05T11:26:51",
+  "ts": 1788632811.2839992,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "b17 | clip015, clip03 -- wave 2 of 8 | training 47% (8 arms)"
     ],
     "queued": [
+      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
       "b17 evals | clip015, clip03 | queued (8 arms)",
       "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
       "b17 evals | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
@@ -45,7 +46,7 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": false,
+    "paused": true,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
@@ -736,8 +737,8 @@
   "disk_free_gb": 124.2,
   "head": "9b8f2d0d120e",
   "load_avg": [
-    13.72705078125,
-    13.669921875,
-    13.7177734375
+    13.19140625,
+    13.5556640625,
+    13.6796875
   ]
 }
