@@ -1,10 +1,10 @@
 {
-  "iso": "2026-09-05T08:45:47",
-  "ts": 1788623147.1018407,
+  "iso": "2026-09-05T08:56:07",
+  "ts": 1788623767.5055988,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b17 | clip005, clip01 -- wave 1 of 8 | training 21% (8 arms)"
+      "b17 | clip005, clip01 -- wave 1 of 8 | training 34% (8 arms)"
     ],
     "queued": [
       "b17 evals | clip005, clip01 | queued (8 arms)",
@@ -28,7 +28,7 @@
       "b20 training | lanes32, lanes64, lanes256, lanes512 -- waves 1-2 of 2 | queued (16 arms)",
       "b20 evals | lanes32, lanes64, lanes256, lanes512 | queued (16 arms)"
     ],
-    "laptop_iso": "2026-09-05T08:44:17"
+    "laptop_iso": "2026-09-05T08:54:24"
   },
   "scheduler": {
     "alive": true,
@@ -36,7 +36,7 @@
     "spawned": 1788597329.4796128,
     "last_exit": null,
     "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-013529.log",
-    "status_iso": "2026-09-05T08:43:44"
+    "status_iso": "2026-09-05T08:53:44"
   },
   "runtime": {
     "max_trainers": 8,
@@ -61,7 +61,7 @@
       "policies": [
         "b17aa-clip005-seed1"
       ],
-      "step": 10960896,
+      "step": 17661952,
       "max_steps": 50003968
     },
     {
@@ -71,7 +71,7 @@
       "policies": [
         "b17ab-clip005-seed2"
       ],
-      "step": 10780672,
+      "step": 17383424,
       "max_steps": 50003968
     },
     {
@@ -81,7 +81,7 @@
       "policies": [
         "b17ac-clip005-seed3"
       ],
-      "step": 10534912,
+      "step": 16728064,
       "max_steps": 50003968
     },
     {
@@ -91,7 +91,7 @@
       "policies": [
         "b17ad-clip005-seed4"
       ],
-      "step": 10485760,
+      "step": 16678912,
       "max_steps": 50003968
     },
     {
@@ -101,7 +101,7 @@
       "policies": [
         "b17ae-clip01-seed1"
       ],
-      "step": 10682368,
+      "step": 16547840,
       "max_steps": 50003968
     },
     {
@@ -111,7 +111,7 @@
       "policies": [
         "b17af-clip01-seed2"
       ],
-      "step": 10600448,
+      "step": 16859136,
       "max_steps": 50003968
     },
     {
@@ -121,7 +121,7 @@
       "policies": [
         "b17ag-clip01-seed3"
       ],
-      "step": 10616832,
+      "step": 16793600,
       "max_steps": 50003968
     },
     {
@@ -131,7 +131,7 @@
       "policies": [
         "b17ah-clip01-seed4"
       ],
-      "step": 10518528,
+      "step": 16941056,
       "max_steps": 50003968
     }
   ],
@@ -733,11 +733,11 @@
     "b17ag-clip01-seed3": "running",
     "b17ah-clip01-seed4": "running"
   },
-  "disk_free_gb": 126.0,
+  "disk_free_gb": 125.8,
   "head": "e297c1729b95",
   "load_avg": [
-    14.130859375,
-    13.82177734375,
-    13.2080078125
+    13.36083984375,
+    13.677734375,
+    13.462890625
   ]
 }
