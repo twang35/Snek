@@ -1,13 +1,13 @@
 {
-  "iso": "2026-09-04T17:41:30",
-  "ts": 1788568890.852079,
+  "iso": "2026-09-04T17:51:50",
+  "ts": 1788569510.4761605,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | ent0, ent001 | stage B (8 arms)"
+      "b11 | b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes | eval (25 arms)"
     ],
     "queued": [
-      "b11 eval | b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes, ... | queued (50 arms)",
+      "b11 eval | b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7 | queued (25 arms)",
       "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b16 stage B | kl003, kl005 | queued (8 arms)",
@@ -45,29 +45,45 @@
   },
   "running": [
     {
-      "id": "b15-stageb",
+      "id": "b11-hof5000",
       "type": "eval",
-      "policy": "b15aa-ent0-seed1",
+      "policy": "b11ae-lr1e4-seed1",
       "policies": [
-        "b15aa-ent0-seed1",
-        "b15ab-ent0-seed2",
-        "b15ac-ent0-seed3",
-        "b15ad-ent0-seed4",
-        "b15ae-ent001-seed1",
-        "b15af-ent001-seed2",
-        "b15ag-ent001-seed3",
-        "b15ah-ent001-seed4"
+        "b11ae-lr1e4-seed1",
+        "b11af-lr1e4-seed2",
+        "b11ag-lr1e4-seed3",
+        "b11ah-lr1e4-seed4",
+        "b11ai-lr1.5e4-seed1",
+        "b11aj-lr1.5e4-seed2",
+        "b11ak-lr1.5e4-seed3",
+        "b11al-lr1.5e4-seed4",
+        "b11am-lr2.5e4-seed1",
+        "b11an-lr2.5e4-seed2",
+        "b11ao-lr2.5e4-seed3",
+        "b11ap-lr2.5e4-seed4",
+        "b11aq-lr5e4-seed1",
+        "b11ar-lr5e4-seed2",
+        "b11as-lr5e4-seed3",
+        "b11at-lr5e4-seed4",
+        "b11au-lr8e4-seed1",
+        "b11aw-lr8e4-seed3",
+        "b11ax-lr8e4-seed4",
+        "b11ay-lr1e3-seed1",
+        "b11az-lr1e3-seed2",
+        "b11ba-lr1e3-seed3",
+        "b11bb-lr1e3-seed4",
+        "b11bc-lr2e3-seed1",
+        "b11bd-lr2e3-seed2"
       ],
-      "pid": 3794650,
+      "pid": 3892651,
       "step": 50003968,
-      "label": "",
+      "label": "b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 3370
+      "elapsed_s": 63
     }
   ],
   "ledger": {
-    "b11-hof5000": "queued",
     "b11-hof30k": "queued",
     "b15ai-ent003-seed1": "queued",
     "b15aj-ent003-seed2": "queued",
@@ -299,7 +315,8 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b15-stageb": "running",
+    "b11-hof5000": "running",
+    "b15-stageb": "done",
     "b15ah-ent001-seed4": "done",
     "b15ag-ent001-seed3": "done",
     "b15af-ent001-seed2": "done",
@@ -688,10 +705,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 133.2,
+  "disk_free_gb": 133.1,
   "load_avg": [
-    16.1689453125,
-    16.04345703125,
-    15.91796875
+    8.52099609375,
+    13.19384765625,
+    14.96826171875
   ]
 }
