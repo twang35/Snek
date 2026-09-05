@@ -184,8 +184,11 @@ def test_import_takes_a_done_hof_pass_too(tmp_path, monkeypatch):
     tree = ['results/b11-hof30k/b11ae-lr1e4-seed1_checkpoint_evals_hof30k.json',
             'results/b11-hof30k/b11ae-lr1e4-seed1_checkpoint_evals_hof5000-s1of8.json',
             'results/b11-hof5000/b11ae-lr1e4-seed1_checkpoint_evals_hof5000.json']
-    copied = pu.import_closed_waves({'ledger': {'b11-hof30k': 'done', 'b11-hof5000': 'running'}}, tree, str(tmp_path))
+    tree.append('results/p2-hof5000/p2a-ep8-seed1_checkpoint_evals_hof5000.json')   # b5 under its old name: stays on results
+    ledger = {'b11-hof30k': 'done', 'b11-hof5000': 'running', 'p2-hof5000': 'done'}
+    copied = pu.import_closed_waves({'ledger': ledger}, tree, str(tmp_path))
     assert copied == 1 and (tmp_path / 'b11ae-lr1e4-seed1_checkpoint_evals_hof30k.json').exists()
+    assert not (tmp_path / 'p2a-ep8-seed1_checkpoint_evals_hof5000.json').exists()
 
 
 def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp_path):

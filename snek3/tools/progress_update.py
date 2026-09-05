@@ -79,8 +79,9 @@ def import_closed_waves(status, tree, runs_dir=None):
     master once the job is done; until 2026-09-04 only `stageb` jobs were imported, and b11's finished
     passes sat on `results` unread."""
     runs_dir = runs_dir or constants.RUNS_DIR
+    # Pre-rename jobs (`p2-hof5000` is b5's) stay on `results` by design — results.md, "Where the raw rows are".
     done = {job for job, state in status['ledger'].items()
-            if state == 'done' and ('stageb' in job or 'hof' in job)}
+            if state == 'done' and ('stageb' in job or 'hof' in job) and not re.match(r'p\d+-', job)}
     copied = 0
     for path in tree:
         parts = path.split('/')
