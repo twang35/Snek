@@ -1,16 +1,17 @@
 {
-  "iso": "2026-09-04T18:49:18",
-  "ts": 1788572958.9896,
+  "iso": "2026-09-04T18:57:53",
+  "ts": 1788573473.0953767,
   "project": "snek3",
   "at_a_glance": {
     "running": [
       "b11 | b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7 | hof30k (25 arms)"
     ],
     "queued": [
-      "b12 evals | b12 HOF re-measure: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes, ... | queued (37 arms)",
-      "b13 evals | b13 HOF re-measure: 680 checkpoints >=99/500 from 30 arms at 5,000 episodes, ... | queued (30 arms)",
-      "b15 evals | b15 HOF re-measure: 53 checkpoints >=99/500 from 8 arms at 5,000 episodes, b1... | queued (40 arms)",
+      "b12 evals | b12 hof5000 eval: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes, b1... | queued (37 arms)",
+      "b13 evals | b13 hof5000 eval: 680 checkpoints >=99/500 from 30 arms at 5,000 episodes, b1... | queued (30 arms)",
+      "b15 evals | b15 hof5000 eval: 53 checkpoints >=99/500 from 8 arms at 5,000 episodes, b15 ... | queued (8 arms)",
       "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
+      "b15 evals | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
       "b16 training | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, +2 more -- waves 1-5 of 5 | queued (40 arms)",
       "b16 evals | kl003, kl005, kl008, kl01, kl013, kl015, kl02, kl03, kl04, kl05 | queued (40 arms)",
       "b17 training | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
@@ -81,8 +82,8 @@
       "step": 50003968,
       "label": "b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7",
       "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 656
+      "steps_per_sec": null,
+      "elapsed_s": 1170
     }
   ],
   "ledger": {
@@ -785,8 +786,8 @@
   },
   "disk_free_gb": 132.4,
   "load_avg": [
-    1.4912109375,
-    4.6982421875,
-    7.84033203125
+    1.11279296875,
+    2.09521484375,
+    5.18408203125
   ]
 }
