@@ -8,6 +8,7 @@ docs say *what is true*; a skill says *what to do, in order*.
 | [`progress-update`](progress-update/SKILL.md) | what is running on both boxes, then bring the docs up to date. Read-only with respect to processes |
 | [`laptop-run`](laptop-run/SKILL.md) | start a training, a batch or a stage-B close-out here |
 | [`desktop-batch`](desktop-batch/SKILL.md) | queue work on `the-claw-den`, and pause/retune it |
+| [`move-batch`](move-batch/SKILL.md) | move a queued batch from the desktop to the laptop, or back |
 | [`stop-run`](stop-run/SKILL.md) | kill an arm or a wave on either box, and clean up its children |
 | [`desktop-deploy`](desktop-deploy/SKILL.md) | get the box on new code |
 | [`mutation-test`](mutation-test/SKILL.md) | prove the tests cover a change |
