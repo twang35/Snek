@@ -42,15 +42,16 @@ it took three attempts to get there).
 | 256 | 0 | – | – – – – | 0 | – | 98.03 (97.7-98.4) | 86.2 | 1.29% | 6.65% | 27.3% |
 
 <!-- reading -->
-**Wave 1 (rollout 32, 64) trained on the laptop 10:32-16:14 and its stage B started 16:14; rollout
-192/256 and 512/1024 follow in two more waves.** Stage A only so far, read against the bold reference at
-128: rollout 64 matches its best30 (98.30 vs 98.33) and its stability (6.6% of evals below 80% vs 6.4%) but
-reaches ≥98 on 18.6% of evals against 28.9%; rollout 32 is below on every column (best30 97.9, `sef` 79,
-17% below 80%, 8.9% of evals ≥98) — GAE truncated at 32 steps against a 34-step horizon, as the spec
-predicted. Note that stage A's interval is one rollout, so T=32 writes four times the checkpoints of the
-reference and T=1024 an eighth; the shares are rates and compare, the row counts will not. The stage-B rows
-for 32 and 64 land within the hour; the two remaining waves say whether 256 is the "alternative default" the
-spec has it as.
+**Wave 1 (rollout 32, 64) closed at 18:30; wave 2 (192, 256) is training on the laptop, at 34-43M of 50M
+at 19:10; wave 3 (512, 1024) follows.** Read against the bold reference at 128. Rollout 64 is the interesting
+row: it matches the reference's best30 (98.30 vs 98.33), its stability (6.6% of evals below 80% vs 6.4%) and
+its best row (100/500), and carries 246 `hof5000` candidates against 138 — but its stage-B density is 22.9%
+against 27.3%, with every seed 21-26%. The candidate count is inflated by T=64 writing twice the checkpoints,
+so the shares are the comparison, and on shares 64 is a little below, as b3p predicted. Rollout 32 is below on
+every column (13.0% density, `sef` 79, 17% of evals below 80%) — GAE truncated at 32 steps against a 34-step
+horizon, as the spec said. Stage A on wave 2 so far: 256 tracks the reference (best30 98.03, 6.7% below 80%,
+27.3% of evals ≥98) and 192 is noisier than either neighbour (12% below 80%, 2.5% below 50%, best30 97.8) —
+if that holds through its close-out it is a seed effect to look at per arm, not a property of the knob.
 <!-- /reading -->
 
 **rollout 32** — `b14a`-`b14d`:
@@ -114,14 +115,17 @@ spec has it as.
 | **0.01** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
 
 <!-- reading -->
-**Wave 1 of 5 (entropy 0 and 0.001) at ~80% of 50M on the desktop, 70 min in; 0.003, 0.005, 0.02, 0.03
-and four annealing schedules follow, ~05:00 tomorrow.** Stage A only, against the bold reference at 0.01:
-both cells are the most *stable* arms this project has trained — 1.9-2.0% of evals below 80% against 6.4%,
-drawdown below 50% at 0.02-0.27% against 0.77%, `sef` 94 — and both sit below the reference at the top so
-far (best30 97.6 and 97.9 against 98.3; 18-21% of evals ≥98 against 28.9%). That is the trade the knob was
-expected to expose: less exploration noise, a calmer plateau, a lower ceiling. Whether the ceiling recovers
-by 50M, and whether the stage-B density follows the stage-A share down, is what this wave's close-out says;
-the annealing cells are the attempt to have both.
+**Wave 1 of 5 (entropy 0 and 0.001) closed on the desktop at ~18:00; waves 2-5 (0.003, 0.005, 0.02, 0.03
+and four annealing schedules) train after the b12, b13 and b15 hall-of-fame passes ahead of them in the
+queue.** Read against the bold reference at 0.01. Stage B confirmed the stage-A trade and settled its size:
+both cells are the most stable arms trained so far — 1.7-1.9% of evals below 80% against 6.4%, drawdown
+below 50% at 0.01-0.22% against 0.77%, `sef` 95 — and both give up most of the density for it: 11.7% at 0
+and 8.7% at 0.001 against 27.3%, every seed below the reference's worst, 35 and 18 `hof5000` candidates
+against 138, best30 97.75-97.90 against 98.33. The spec's condition for moving the default — "monotone
+down to here with no density loss" — is falsified on the density half. Neither stalled (best rows 99.4-99.6,
+onset on time), so the predicted early-deterministic failure did not happen either; the term buys the top
+of the distribution, not competence. The annealing cells in waves 4-5 are now the only way this batch moves
+the base: the 0.01 top with the 0.001 tail.
 <!-- /reading -->
 
 **entropy_coef 0.0** — `b15aa`-`b15ad`:

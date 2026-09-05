@@ -6,6 +6,47 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b14 (rollout) wave 1 closed and wave 2 is training on the laptop; b15 (entropy) wave 1 closed on the
+desktop, which is now running the hall-of-fame passes queued ahead of b15's remaining waves; b11's two
+passes are done.** As of 2026-09-04 19:10:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| laptop | b14 (rollout, 24 arms) | wave 1 (32, 64) closed 18:30; wave 2 (192, 256) at 34-43M of 50M, 45 min in; wave 3 (512, 1024) to train | wave 2 close-out tonight; wave 3 through the morning of 2026-09-05 |
+| desktop | b15 (entropy coef, 40 arms) | wave 1 (0, 0.001) closed ~18:00; 4 waves queued **behind `b12-hof5000` (running since 19:03), `b12-hof30k`, `b13-hof5000`, `b15-hof5000`** | the tool's ~05:13 is training time alone; with three passes ahead at ~40-80 min each, closer to 08:00-10:00 2026-09-05 |
+| desktop | b11 hof passes | **done** — `hof5000` over 661 checkpoints, `hof30k` over 22 rows | — |
+
+Behind b15 on the desktop: b16-b21 (target-KL, clip, gradient clip, advantage normalisation, lanes,
+shaping), every one at λ 0.99 against **b9's λ 0.99 arms `b9bw`-`b9bz`** (best30 98.3-98.4, density 27.3%).
+`attention` is empty.
+
+**b11's 30,000-episode result: a third-place candidate, not a record.** `b11ag-lr1e4-seed3` @33243136 read
+**99.4 /30,000** [99.3, 99.4], with its two neighbours at 99.3 and 99.1; `b11ba-lr1e3-seed3` @47382528 and
+`b11am-lr2.5e4-seed1` @47644672 read 99.2. That sits below `b10ck`'s 99.65 and 99.55 and above `b9ch`'s
+99.30, so it would enter [`hallOfFame/HOF.md`](../hallOfFame/HOF.md) third if promoted — the `hof-promote`
+skill's basin check is the step, and it is the user's call. The 22 rows at 30k were the ≥99 /5,000 rows
+from 661 measured at 5,000; the counts match the ledger.
+
+**What the two closed waves say.** b14 rollout 64 matches the reference on best30, stability and best row,
+and is a little below on density (22.9% vs 27.3%); rollout 32 is below on everything. b15 entropy 0 and
+0.001 are the most stable arms trained so far (1.7-1.9% of evals below 80%) at less than half the density
+(8.7-11.7%): the spec's condition for moving the default is falsified, and only the annealing schedules in
+waves 4-5 can still move the base. Readings in [`charts.md`](charts.md).
+
+**Infrastructure, 2026-09-04 evening.** The laptop joined the router's 6 GHz radio at 18:05 (the stuck
+5 GHz association is the suspect; verdict needs a day of load — [`../plans/laptop-wifi.md`](../plans/laptop-wifi.md)).
+`ssh the-claw-den` now works from outside the home LAN through a port forward
+([`../desktop/README.md`](../desktop/README.md), "Reach the box from outside the home LAN"); this update ran
+over a phone hotspot, live charts rsync'd from the box included. And `progress_update` now imports a finished
+hall-of-fame pass's files from `results` — b11's had been sitting there unread.
+
+**Standing decision**, unchanged: the γ × λ corner grid — γ {0.99, 0.9975, 0.999} × λ {0.98, 0.99, 0.999},
+with lr {3e-4, 2.5e-4} and minibatch {256, 512} as candidate extra axes — runs **after b14 closes**. Every
+one-knob sweep since b9 has come back "plateau, base stays": the corner grid is where the next gain is, if
+there is one.
+
+## b12 and b13 closed, b14 and b15 in flight, as it read at 2026-09-04 16:30 (superseded)
+
 **b12 (epochs) and b13 (minibatch) closed; b14 (rollout) is on the laptop with wave 1 in stage B; b15
 (entropy) is on the desktop at wave 1 of 5.** As of 2026-09-04 16:30:
 
