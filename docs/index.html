@@ -22,7 +22,16 @@
   .cell .cap b { color:#fff; }
   .cell .cap span { color:var(--dim); white-space:nowrap; }
   .cell .cap span em { color:var(--fg); font-style:normal; }
-  .cell.missing { align-items:center; justify-content:center; color:var(--dim); min-height:12em; }
+  .cell.missing { align-items:center; justify-content:center; color:var(--dim); min-height:12em; text-align:center; line-height:1.6; }
+  .cell.missing b { color:var(--fg); font-weight:normal; }
+  /* where the view's pass stands for this arm: complete, in progress, queued, not yet run, or never */
+  .st { border-radius:3px; padding:0 .4em; font-size:.92em; border:1px solid transparent; }
+  .st-done { color:var(--dim); border-color:#333; }
+  .st-running { color:#4c9; border-color:#4c9; }
+  .st-queued { color:#7ab8ff; border-color:#7ab8ff; }
+  .st-pending { color:#e6b422; border-color:#e6b422; }
+  .st-none, .st-upstream { color:var(--dim); border-color:#444; }
+  .cell.missing .st { display:inline-block; margin-top:.4em; }
   .group-start { box-shadow: inset 3px 0 0 var(--hi); }
   .reference { box-shadow: inset 3px 0 0 #e6b422; }
   .reference .cap b::after { content: ' · reference'; color:#e6b422; font-weight:normal; }
@@ -67,7 +76,7 @@
   </div>
 </header>
 <div class="grid" id="grid"></div>
-<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by four arms · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd>/<kbd>k</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. The URL carries the view, so it can be linked.</p>
+<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by four arms · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd>/<kbd>k</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. Each caption says where the view's pass stands for that arm — complete, in progress, queued on the desktop, not yet run, or never (nothing qualified) — as of the manifest's timestamp. The URL carries the view, so it can be linked.</p>
 <div id="lightbox"><img alt=""><div class="cap"></div></div>
 
 <script src="manifest.js"></script>
@@ -149,8 +158,32 @@
     if (v === null || v === undefined) return '–';
     return (digits === undefined ? v : Number(v).toFixed(digits)) + (suffix || '');
   }
+  // ---- pass state: one word per view from the manifest (`status: {a, b, h, k}`), see tools/viewer_manifest.py
+  var PASS = { a: 'training', b: 'stage B', h: 'hof5000', k: 'hof30k' };
+  var CUT = { h: '≥99 /500', k: '≥99 /5,000' };
+  function stateOf(a) { return (a.status || {})[state.mode] || null; }
+  // How many checkpoints the view's pass would measure for this arm (its candidate cut).
+  function candidates(a) { return state.mode === 'h' ? a.cands99 : state.mode === 'k' ? a.hof_99 : null; }
+  function stateText(a) {
+    var st = stateOf(a), m = state.mode, n = candidates(a);
+    if (st === 'done') return m === 'a' ? 'training complete' : PASS[m] + ' complete';
+    if (st === 'running') return m === 'a' ? 'training' : PASS[m] + ' in progress';
+    if (st === 'queued') return PASS[m] + ' queued on the desktop' + (n ? ' — ' + n + ' at ' + CUT[m] : '');
+    if (st === 'pending') return m === 'b' ? 'stage B not yet run' : PASS[m] + ' not yet run — ' + n + ' at ' + CUT[m];
+    if (st === 'none') return n === null || n === undefined ? 'never — nothing qualified upstream' : 'never — 0 rows at ' + CUT[m];
+    if (st === 'upstream') return m === 'b' ? 'still training' : m === 'h' ? 'no stage B yet' : 'no hof5000 pass yet';
+    return null;
+  }
+  function badge(a) {
+    var st = stateOf(a), text = stateText(a);
+    return st ? '<span class="st st-' + st + '" title="' + text + '">' + text + '</span>' : '';
+  }
+  function missing(a) {
+    var st = stateOf(a), text = stateText(a) || 'no ' + PASS[state.mode] + ' panel';
+    return '<div><b>' + a.policy + '</b><br>no ' + PASS[state.mode] + ' panel<br><span class="st st-' + (st || 'none') + '">' + text + '</span></div>';
+  }
   function cap(a) {
-    var parts = ['<b>' + a.policy + '</b>'];
+    var parts = ['<b>' + a.policy + '</b>', badge(a)];
     if (state.mode === 'k') {
       parts.push('<span>rows <em>' + fmt(a.hof30k_rows) + '</em></span>');
       parts.push('<span>mean /30k <em>' + fmt(a.hof30k_mean) + '</em></span>');
@@ -196,15 +229,11 @@
       var prev = current[state.start + i - 1];
       if (state.sort === 'arm' && (!prev || prev.knob !== a.knob)) cell.className += ' group-start';
       if (a.reference) cell.className += ' reference';
-      if (state.mode === 'b' && !a.stage_b_png) {
+      var hasPng = state.mode === 'b' ? a.stage_b_png : state.mode === 'h' ? a.hof_png : state.mode === 'k' ? a.hof30k_png : true;
+      if (!hasPng) {
         cell.className += ' missing';
-        cell.innerHTML = '<div>' + a.policy + '<br>no stage-B panel' + (a.rows === 0 ? ' — screened zero checkpoints' : '') + '</div>';
-      } else if (state.mode === 'k' && !a.hof30k_png) {
-        cell.className += ' missing';
-        cell.innerHTML = '<div>' + a.policy + '<br>no hof30k panel' + (a.hof_rows ? ' — nothing at ≥99 /5,000' : '') + '</div>';
-      } else if (state.mode === 'h' && !a.hof_png) {
-        cell.className += ' missing';
-        cell.innerHTML = '<div>' + a.policy + '<br>no hof5000 panel' + (a.rows ? ' — no checkpoint made the cut' : '') + '</div>';
+        cell.innerHTML = missing(a);
+        if (state.mode === 'b' && a.rows === 0) cell.firstChild.innerHTML += '<br>screened zero checkpoints';
       } else {
         var img = document.createElement('img'); img.src = src(a); img.alt = a.policy; img.loading = 'lazy';
         img.addEventListener('click', function () { zoom(a); });
@@ -215,7 +244,9 @@
     });
     var lo = n ? state.start + 1 : 0, hi = Math.min(n, state.start + PAGE);
     $('where').textContent = lo + '–' + hi + ' of ' + n;
-    $('summary').textContent = 'manifest ' + (M.generated || '?').replace('T', ' ') + (refLabel[state.batch] ? ' · gold edge = ' + refLabel[state.batch] : '');
+    $('summary').textContent = 'manifest ' + (M.generated || '?').replace('T', ' ')
+      + (M.desktop_iso ? ' · desktop ledger ' + M.desktop_iso.replace('T', ' ') : '')
+      + (refLabel[state.batch] ? ' · gold edge = ' + refLabel[state.batch] : '');
     $('prev').disabled = $('first').disabled = state.start === 0;
     $('next').disabled = $('last').disabled = state.start + PAGE >= n;
     writeHash();

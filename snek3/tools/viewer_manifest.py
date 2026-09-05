@@ -16,6 +16,13 @@ the page and the tables cannot disagree:
 | `drawdown50`, `drawdown80` | share of post-competence stage-A evals (onset = first >=80%) below 50 / 80 |
 | `hof_rows`, `hof_mean`, `hof_best`, `hof_9873` | the `hof5000` pass: rows, mean, max, count at >=98.73 (the snek2 champion) |
 | `hof30k_rows`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step` | the `hof30k` pass (30,000 episodes, seed 7): rows, mean, max and where it is |
+| `hof_99` | `hof5000` rows at >=99 /5,000 — the `hof30k` candidate cut |
+| `status` | `{a, b, h, k}`: one word per view, see `pass_state` — so the page can say whether a missing panel is a pass still to come or one that found nothing |
+
+The status of a pass is read off the files, plus two liveness sources: the laptop's own `.live/` pid
+registry (`tools/live_runs.py`) and a snapshot of the desktop's `status.json` that `tools/progress_update.py`
+saves at `runs/.live/desktop/status.json` on every sync. Both are optional — with neither, every pass is
+`done`, `pending`, `none` or `upstream`, which is still right about what the files say.
 
 The output is JavaScript rather than JSON — `window.SNEK_MANIFEST = {...}` — because a `<script src>`
 loads from `file://` and `fetch()` does not, and the page has to work opened from disk as well as from
@@ -29,6 +36,7 @@ import os
 import re
 
 from env import constants
+from tools import live_runs
 
 MANIFEST_PATH = os.path.join(constants.ROOT, 'viewer', 'manifest.js')
 # Which earlier arms are a batch's control cell, so the page can show them beside the batch's own.
@@ -79,6 +87,61 @@ def drawdown(evals, below):
 
 
 LIVE_SUBDIR = os.path.join('.live', 'desktop')
+DESKTOP_STATUS = os.path.join(LIVE_SUBDIR, 'status.json')
+# The pass each view shows, its file label, and the desktop job id suffix the daemon gives that pass.
+PASSES = {'b': (None, '-stageb'), 'h': ('hof5000', '-hof5000'), 'k': ('hof30k', '-hof30k')}
+STATES = ('done', 'running', 'queued', 'pending', 'none', 'upstream')
+
+
+def shard_files(runs_dir, policy, label=None):
+    """The shard files of a pass in flight — `<policy>_checkpoint_evals[_<label>]-s<i>of<n>.json`.
+    Same rule as `tools.results.shard_paths`, which is pinned to `constants.RUNS_DIR` and so cannot
+    serve a manifest built from another directory. The regex keeps `_hof5000-s1of8` out of the
+    unlabelled pass's list."""
+    stem = policy + '_checkpoint_evals' + ('_' + label if label else '')
+    exact = re.compile(re.escape(stem) + r'-s(\d+)of(\d+)\.json$')
+    return sorted(p for p in glob.glob(os.path.join(runs_dir, stem + '-s*of*.json'))
+                  if exact.search(os.path.basename(p)))
+
+
+def desktop_ledger(runs_dir):
+    """What the desktop was doing when the progress update last looked: `{'iso', 'jobs', 'running'}`
+    — `jobs` is the ledger (`{job id: 'queued'|'running'|'done'|'failed'}`), `running` maps each view
+    to the policies a running job of that kind covers. Empty when no snapshot has been saved."""
+    status = _read(os.path.join(runs_dir, DESKTOP_STATUS)) or {}
+    running = {'a': set(), 'b': set(), 'h': set(), 'k': set()}
+    for job in status.get('running') or []:
+        policies = set(job.get('policies') or ([job['policy']] if job.get('policy') else []))
+        job_id = job.get('id') or ''
+        kind = 'a' if job.get('type') == 'train' else next(
+            (k for k, (_label, suffix) in PASSES.items() if job_id.endswith(suffix)), None)
+        if kind:
+            running[kind] |= policies
+    return {'iso': status.get('iso'), 'jobs': status.get('ledger') or {}, 'running': running}
+
+
+def pass_state(have_file, have_shards, candidates, in_running_job, ledger_state):
+    """One word for where a pass stands, for one arm:
+
+    | state | meaning |
+    |---|---|
+    | `done` | the pass's file exists |
+    | `running` | shard files exist, or a running desktop job names the arm |
+    | `queued` | the desktop ledger has the batch's pass queued (or running, but not yet on this arm) |
+    | `pending` | nothing has run and the arm has candidates for it |
+    | `none` | nothing has run and the arm has no candidates — a panel will never appear |
+    | `upstream` | the pass it selects from has not happened yet |
+
+    `candidates` is None when the upstream pass is missing, else the count that clears its cut."""
+    if have_file:
+        return 'done'
+    if have_shards or in_running_job:
+        return 'running'
+    if ledger_state in ('queued', 'running'):
+        return 'queued'
+    if candidates is None:
+        return 'upstream'
+    return 'pending' if candidates else 'none'
 
 
 def _measurement(runs_dir, name):
@@ -99,12 +162,16 @@ def _read(path):
         return json.load(handle)
 
 
-def arm_record(policy, runs_dir):
-    """The manifest row for one arm, or None if it has no chart to show."""
+def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset()):
+    """The manifest row for one arm, or None if it has no chart to show. `desktop` is
+    `desktop_ledger(runs_dir)` and `laptop_live` the policies training on this box; `build` passes
+    both so they are read once per manifest rather than once per arm."""
     png = os.path.join(runs_dir, policy + '.png')
     if not os.path.exists(png):
         return None
-    record = {'policy': policy, 'batch': batch_of(policy), 'knob': knob_of(policy),
+    desktop = desktop if desktop is not None else desktop_ledger(runs_dir)
+    batch = batch_of(policy)
+    record = {'policy': policy, 'batch': batch, 'knob': knob_of(policy),
               'seed': seed_of(policy),
               'stage_b_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals.png')),
               'hof_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.png')),
@@ -147,7 +214,31 @@ def arm_record(policy, runs_dir):
         'hof30k_mean': round(sum(r.get('perfect_percent', 0) for r in h30_rows) / len(h30_rows), 2) if h30_rows else None,
         'hof30k_best': best.get('perfect_percent') if best else None,
         'hof30k_best_step': best.get('step') if best else None,
+        'hof_99': sum(s >= 99 for s in hof_scores) if hof is not None else None,
     })
+    # Where each view stands. Stage A is live if this box or the desktop is training it, or if its
+    # measurements are still the desktop snapshot rather than the close-out's file.
+    jobs, running = desktop['jobs'], desktop['running']
+    job = jobs.get(policy)                      # the desktop ledger's entry for the training itself
+    snapshot_only = bool(stage_a) and not os.path.exists(os.path.join(runs_dir, policy + '_evals.json'))
+    if policy in laptop_live or policy in running['a'] or job == 'running' or (job is None and snapshot_only):
+        stage_a_state = 'running'
+    else:
+        stage_a_state = 'queued' if job == 'queued' else 'done'
+    # Each pass selects from the one before it: stage B needs the training finished, hof5000 needs
+    # stage-B rows at >=99 /500, hof30k needs hof5000 rows at >=99 /5,000.
+    candidates = {'b': None if stage_a_state != 'done' else 1,
+                  'h': sum(s >= 99 for s in scores) if stage_b is not None else None,
+                  'k': record['hof_99']}
+    record['status'] = {'a': stage_a_state}
+    for kind, (label, suffix) in PASSES.items():
+        have = {'b': stage_b, 'h': hof, 'k': h30}[kind] is not None
+        record['status'][kind] = pass_state(have, bool(shard_files(runs_dir, policy, label)), candidates[kind],
+                                            policy in running[kind], jobs.get(batch + suffix))
+    # A pass whose upstream found nothing will never run either: say `none`, not `upstream`.
+    for kind, before in (('h', 'b'), ('k', 'h')):
+        if record['status'][kind] == 'upstream' and record['status'][before] == 'none':
+            record['status'][kind] = 'none'
     return record
 
 
@@ -164,13 +255,15 @@ def build(runs_dir=None, references_path=None):
     # `_checkpoint_evals_hof5000`, `_eval_progress`) has one. So the stem decides.
     policies = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(runs_dir, '*.png'))
                       if '_' not in os.path.basename(p))
-    arms = [rec for rec in (arm_record(p, runs_dir) for p in policies) if rec]
+    desktop = desktop_ledger(runs_dir)
+    laptop_live = frozenset(policy for policy, _pid in live_runs.live(runs_dir, prune=False))
+    arms = [rec for rec in (arm_record(p, runs_dir, desktop, laptop_live) for p in policies) if rec]
     known = {a['policy'] for a in arms}
     refs = {batch: {'arms': [a for a in ref.get('arms', []) if a in known], 'label': ref.get('label', ''),
                     'after': ref.get('after')}
             for batch, ref in references(references_path).items()}
     return {'generated': datetime.datetime.now().isoformat(timespec='seconds'), 'arms': arms,
-            'references': refs}
+            'references': refs, 'desktop_iso': desktop['iso']}
 
 
 def render(manifest, charts_dir='../runs/'):

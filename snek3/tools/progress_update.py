@@ -9,7 +9,7 @@ different each time:
 
 | step | what |
 |---|---|
-| sync | `git fetch` `results` and `ops-status`; import every closed stage-B wave's files that `runs/` lacks; `rsync` the live batches' charts into `runs/` and their live JSON into the gitignored `runs/.live/desktop/` |
+| sync | `git fetch` `results` and `ops-status`; save the ledger to `runs/.live/desktop/status.json` for the viewer's pass states; import every closed stage-B wave's files that `runs/` lacks; `rsync` the live batches' charts into `runs/` and their live JSON into the gitignored `runs/.live/desktop/` |
 | publish | `tools.publish_pages` — manifest and the Pages site |
 | tables | one canonical per-batch table: knob value **read from the spec's env on `ops`**, rows, density, per-seed shares, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98 share, onset, plus the reference cell's row |
 | charts.md | regenerates the sections it owns (marked) — table, reading slot, every panel including the reference group — and can adopt a hand-written one |
@@ -133,6 +133,18 @@ def pull_live_charts(batches, runs_dir=None):
                 result.returncode)
         pulled += 1
     return True, 'live charts and measurements pulled for ' + ', '.join(batches)
+
+
+def save_desktop_status(status, runs_dir=None):
+    """Keeps the ledger just fetched at `runs/.live/desktop/status.json`, where `tools.viewer_manifest`
+    reads it to mark each arm's passes running, queued or still to come. Gitignored with the rest of
+    `.live/`, and never in `runs/` itself, so `drop_superseded_snapshots` leaves it alone."""
+    runs_dir = runs_dir or constants.RUNS_DIR
+    path = os.path.join(runs_dir, viewer_manifest.DESKTOP_STATUS)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as handle:
+        json.dump(status, handle)
+    return path
 
 
 def drop_superseded_snapshots(runs_dir=None):
@@ -502,6 +514,7 @@ def main(argv=None):
     status = None
     if not args.no_sync:
         status = ledger()
+        save_desktop_status(status)
         copied = import_closed_waves(status, results_tree())
         live = live_batches(status)
         ok, msg = pull_live_charts(live)

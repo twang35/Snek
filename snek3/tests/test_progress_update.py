@@ -212,3 +212,14 @@ def test_laptop_state_line_closes_only_when_every_arm_is_at_cap_and_measured(tmp
     monkeypatch.setattr(pu.live_runs, 'live', lambda runs_dir, prune: [('b13ab-mb32-seed2', 1)])
     assert '1 running' in pu.laptop_state_line('b13', str(tmp_path))
     assert pu.laptop_state_line('b99', str(tmp_path)).startswith('Not on the desktop ledger')
+
+
+def test_save_desktop_status_lands_where_the_manifest_reads_it(tmp_path):
+    from tools import progress_update, viewer_manifest
+    path = progress_update.save_desktop_status({'iso': 'now', 'ledger': {'b9-hof30k': 'queued'}, 'running': []},
+                                               runs_dir=str(tmp_path))
+    assert path == str(tmp_path / viewer_manifest.DESKTOP_STATUS)
+    ledger = viewer_manifest.desktop_ledger(str(tmp_path))
+    assert ledger['iso'] == 'now' and ledger['jobs'] == {'b9-hof30k': 'queued'}
+    # nothing in runs/ shares its name, so the superseded-snapshot sweep leaves it alone
+    assert progress_update.drop_superseded_snapshots(str(tmp_path)) == 0 and os.path.exists(path)
