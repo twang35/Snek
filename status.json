@@ -1,20 +1,13 @@
 {
-  "iso": "2026-09-05T11:26:51",
-  "ts": 1788632811.2839992,
+  "iso": "2026-09-05T11:27:04",
+  "ts": 1788632824.5716186,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "b17 | clip015, clip03 -- wave 2 of 8 | training 47% (8 arms)"
-    ],
+    "running": [],
     "queued": [
-      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
-      "b17 evals | clip015, clip03 | queued (8 arms)",
-      "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
-      "b17 evals | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... | queued (48 arms)",
+      "b17 training | clip015, clip03, clip04, clipanneal, clip01anneal, lranneal, lranneal10, both... | queued (56 arms)",
       "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 | queued (24 arms)",
-      "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 | queued (24 arms)",
-      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 | queued (24 arms)",
-      "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 | queued (24 arms)"
+      "b21 training | shape0, shape005, shape02, gate60, gate85, gate0 -- waves 1-3 of 3 | queued (24 arms)"
     ],
     "attention": [],
     "laptop_running": [
@@ -31,10 +24,10 @@
   },
   "scheduler": {
     "alive": true,
-    "pid": 1193263,
-    "spawned": 1788631053.213255,
+    "pid": 1235373,
+    "spawned": 1788632824.3692193,
     "last_exit": null,
-    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-105733.log",
+    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-112704.log",
     "status_iso": "2026-09-05T11:17:36"
   },
   "runtime": {
@@ -46,94 +39,13 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": true,
+    "paused": false,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
   },
   "config_notes": [],
-  "running": [
-    {
-      "id": "b17ai-clip015-seed1",
-      "type": "train",
-      "policy": "b17ai-clip015-seed1",
-      "policies": [
-        "b17ai-clip015-seed1"
-      ],
-      "step": 24510464,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17aj-clip015-seed2",
-      "type": "train",
-      "policy": "b17aj-clip015-seed2",
-      "policies": [
-        "b17aj-clip015-seed2"
-      ],
-      "step": 24772608,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17ak-clip015-seed3",
-      "type": "train",
-      "policy": "b17ak-clip015-seed3",
-      "policies": [
-        "b17ak-clip015-seed3"
-      ],
-      "step": 23216128,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17al-clip015-seed4",
-      "type": "train",
-      "policy": "b17al-clip015-seed4",
-      "policies": [
-        "b17al-clip015-seed4"
-      ],
-      "step": 23429120,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17am-clip03-seed1",
-      "type": "train",
-      "policy": "b17am-clip03-seed1",
-      "policies": [
-        "b17am-clip03-seed1"
-      ],
-      "step": 23527424,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17an-clip03-seed2",
-      "type": "train",
-      "policy": "b17an-clip03-seed2",
-      "policies": [
-        "b17an-clip03-seed2"
-      ],
-      "step": 23461888,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17ao-clip03-seed3",
-      "type": "train",
-      "policy": "b17ao-clip03-seed3",
-      "policies": [
-        "b17ao-clip03-seed3"
-      ],
-      "step": 23265280,
-      "max_steps": 50003968
-    },
-    {
-      "id": "b17ap-clip03-seed4",
-      "type": "train",
-      "policy": "b17ap-clip03-seed4",
-      "policies": [
-        "b17ap-clip03-seed4"
-      ],
-      "step": 23134208,
-      "max_steps": 50003968
-    }
-  ],
+  "running": [],
   "ledger": {
     "b1b-baseline-seed2": "done",
     "b1c-baseline-seed3": "done",
@@ -737,8 +649,8 @@
   "disk_free_gb": 124.2,
   "head": "9b8f2d0d120e",
   "load_avg": [
-    13.19140625,
-    13.5556640625,
-    13.6796875
+    13.5498046875,
+    13.62060546875,
+    13.69970703125
   ]
 }
