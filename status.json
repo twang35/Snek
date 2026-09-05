@@ -1,20 +1,15 @@
 {
-  "iso": "2026-09-05T13:58:29",
-  "ts": 1788641909.5203397,
+  "iso": "2026-09-05T13:59:31",
+  "ts": 1788641971.262863,
   "project": "snek3",
   "at_a_glance": {
-    "running": [
-      "b17 | clip04, clipanneal -- wave 3 of 8 | training 49% (8 arms) | ~43m left"
-    ],
+    "running": [],
     "queued": [
-      "b17 evals | clip04, clipanneal (8 arms) | ~1.1h",
-      "b17 training | clip01anneal, lranneal, lranneal10, bothanneal, clipanneal2to1, clip04anneal,... (40 arms) | ~6.5h",
-      "b17 evals | clip01anneal, lranneal, lranneal10, bothanneal, clipanneal2to1, clip04anneal,... (40 arms) | ~5.3h",
-      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms) | ~4.1h",
-      "b18 evals | gc0, gc01, gc025, gc1, gc2, gc5 (24 arms) | ~3.2h"
+      "b17 training | clip04, clipanneal, clip01anneal, lranneal, lranneal10, bothanneal, clipannea... (48 arms)",
+      "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 (24 arms)"
     ],
     "attention": [],
-    "remaining": "~21h of work: 43m running + 20h queued; clear ~Sun 10:48",
+    "remaining": null,
     "laptop_running": [
       "b19 | noadvnorm, mse -- wave 1 of 3 | training 87% (8 arms) | ~12m left"
     ],
@@ -32,10 +27,10 @@
   },
   "scheduler": {
     "alive": true,
-    "pid": 1375916,
-    "spawned": 1788638443.1929765,
+    "pid": 1459379,
+    "spawned": 1788641970.9263482,
     "last_exit": null,
-    "log": "/home/claw/.snek3-runner/logs/scheduler-20260905-130043.log",
+    "log": "/home/claw/.snek3-daemon/logs/scheduler-20260905-135930.log",
     "status_iso": "2026-09-05T13:50:34"
   },
   "runtime": {
@@ -53,96 +48,7 @@
     "viewer": true
   },
   "config_notes": [],
-  "running": [
-    {
-      "id": "b17aq-clip04-seed1",
-      "type": "train",
-      "policy": "b17aq-clip04-seed1",
-      "policies": [
-        "b17aq-clip04-seed1"
-      ],
-      "step": 26148864,
-      "max_steps": 50003968,
-      "eta_seconds": 1845.6029350096942
-    },
-    {
-      "id": "b17ar-clip04-seed2",
-      "type": "train",
-      "policy": "b17ar-clip04-seed2",
-      "policies": [
-        "b17ar-clip04-seed2"
-      ],
-      "step": 25903104,
-      "max_steps": 50003968,
-      "eta_seconds": 2143.4721717300617
-    },
-    {
-      "id": "b17as-clip04-seed3",
-      "type": "train",
-      "policy": "b17as-clip04-seed3",
-      "policies": [
-        "b17as-clip04-seed3"
-      ],
-      "step": 24690688,
-      "max_steps": 50003968,
-      "eta_seconds": 2473.0047554590624
-    },
-    {
-      "id": "b17at-clip04-seed4",
-      "type": "train",
-      "policy": "b17at-clip04-seed4",
-      "policies": [
-        "b17at-clip04-seed4"
-      ],
-      "step": 24363008,
-      "max_steps": 50003968,
-      "eta_seconds": 2452.1047514560078
-    },
-    {
-      "id": "b17au-clipanneal-seed1",
-      "type": "train",
-      "policy": "b17au-clipanneal-seed1",
-      "policies": [
-        "b17au-clipanneal-seed1"
-      ],
-      "step": 24182784,
-      "max_steps": 50003968,
-      "eta_seconds": 2502.48287960508
-    },
-    {
-      "id": "b17av-clipanneal-seed2",
-      "type": "train",
-      "policy": "b17av-clipanneal-seed2",
-      "policies": [
-        "b17av-clipanneal-seed2"
-      ],
-      "step": 24346624,
-      "max_steps": 50003968,
-      "eta_seconds": 2425.0169905538887
-    },
-    {
-      "id": "b17aw-clipanneal-seed3",
-      "type": "train",
-      "policy": "b17aw-clipanneal-seed3",
-      "policies": [
-        "b17aw-clipanneal-seed3"
-      ],
-      "step": 23887872,
-      "max_steps": 50003968,
-      "eta_seconds": 2596.0832563301
-    },
-    {
-      "id": "b17ax-clipanneal-seed4",
-      "type": "train",
-      "policy": "b17ax-clipanneal-seed4",
-      "policies": [
-        "b17ax-clipanneal-seed4"
-      ],
-      "step": 24051712,
-      "max_steps": 50003968,
-      "eta_seconds": 2566.824161649056
-    }
-  ],
+  "running": [],
   "ledger": {
     "b1b-baseline-seed2": "done",
     "b1c-baseline-seed3": "done",
@@ -722,8 +628,8 @@
   "disk_free_gb": 122.8,
   "head": "b3a99bd4acb7",
   "load_avg": [
-    13.8505859375,
-    13.8447265625,
-    13.78076171875
+    13.31201171875,
+    13.70361328125,
+    13.736328125
   ]
 }
