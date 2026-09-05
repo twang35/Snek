@@ -808,12 +808,16 @@ def test_a_pass_a_previous_scheduler_left_running_is_waited_for_not_launched_twi
         return polls['n'] < 3
     monkeypatch.setattr(scheduler.live_runs, 'alive', alive)
     calls = FinishingCalls(box['runs'])
-    d = driver(specs, box, calls, wave=1)
+    ticks = iter(range(0, 10 ** 6, 100))
+    d = driver(specs, box, calls, wave=1, clock=lambda: next(ticks))
     assert d.run() == 0
     assert [e[0] for e in calls.events] == ['hof5000', 'hof30k'], 'stage B adopted, not launched; the chain went on'
     assert polls['n'] == 3
     assert not os.path.exists(live_runs.path_for(live_runs.pass_entry('b13-stageb'), box['runs'])), 'entry cleared'
     assert live_runs.live(box['runs']) == [], 'a pass entry is never a trainer'
+    # the adopted pass's duration is unknown here (only its tail was seen), so the ledger gets the two
+    # passes this scheduler ran and not that one
+    assert sorted(live_runs.durations(box['runs'])) == ['hof30k', 'hof5000']
 
 
 def test_a_stale_pass_entry_is_ignored_and_the_pass_is_launched(box, monkeypatch):

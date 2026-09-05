@@ -641,9 +641,11 @@ class Driver(object):
         code = self._run_closeout(argv, label, expected=[pass_file(spec['policy'], pass_name, self.runs_dir)
                                                           for spec in arms])
         self.active_pass = None
-        seconds = self.clock() - self._pass_started
+        # Not recorded when the pass was adopted from a predecessor (`_pass_started` cleared): this
+        # scheduler saw only its tail, and a tail in the ledger would read as a fast pass.
+        seconds = None if self._pass_started is None else self.clock() - self._pass_started
         self._pass_started = None
-        if code == 0 and seconds > 0:
+        if code == 0 and seconds is not None and seconds > 0:
             live_runs.record_duration(pass_name, seconds, self.runs_dir, arms=len(arms), label=label)
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
         self._report()
@@ -680,6 +682,7 @@ class Driver(object):
         pid = live_pass_pid(label, self.runs_dir)
         if pid is not None:
             _log('{0} already running here (pid {1}); waiting for it'.format(label, pid))
+            self._pass_started = None       # its start is unknown here: no duration to record
             self._wait_pid(pid)
             live_runs.unregister(live_runs.pass_entry(label), self.runs_dir)
             return (0 if expected is None or all(os.path.exists(path) for path in expected) else 1), pid
