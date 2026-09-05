@@ -1,13 +1,11 @@
 {
-  "iso": "2026-09-05T11:28:09",
-  "ts": 1788632889.343748,
+  "iso": "2026-09-05T11:29:02",
+  "ts": 1788632942.996673,
   "box": "laptop",
   "project": "snek3",
-  "pid": 67984,
+  "pid": 70113,
   "at_a_glance": {
-    "running": [
-      "b16 | kl04, kl05 | stage B (8 arms)"
-    ],
+    "running": [],
     "queued": [
       "b16 evals | kl04, kl05 | queued (8 arms)",
       "b19 training | noadvnorm, mse, adameps1e5, adameps1e8, vf01, vf10 -- waves 1-3 of 3 | queued (24 arms)",
@@ -17,26 +15,9 @@
     ],
     "attention": []
   },
-  "running": [
-    {
-      "id": "b16-stageb-w5",
-      "type": "eval",
-      "policy": "b16bg-kl04-seed1",
-      "policies": [
-        "b16bg-kl04-seed1",
-        "b16bh-kl04-seed2",
-        "b16bi-kl04-seed3",
-        "b16bj-kl04-seed4",
-        "b16bk-kl05-seed1",
-        "b16bl-kl05-seed2",
-        "b16bm-kl05-seed3",
-        "b16bn-kl05-seed4"
-      ],
-      "step": null,
-      "max_steps": null
-    }
-  ],
+  "running": [],
   "queued_ids": [
+    "b16-stageb-w5",
     "b16-hof5000-w5",
     "b16-hof30k-w5",
     "b19a-noadvnorm-seed1",
@@ -95,15 +76,6 @@
     "b20-hof5000-w2",
     "b20-hof30k-w2"
   ],
-  "panels": [
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bg-kl04-seed1_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bh-kl04-seed2_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bi-kl04-seed3_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bj-kl04-seed4_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bk-kl05-seed1_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bl-kl05-seed2_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bm-kl05-seed3_checkpoint_evals.png",
-    "/Users/tony_wang/Projects/Snek/snek3/runs/b16bn-kl05-seed4_checkpoint_evals.png"
-  ],
-  "window_pid": 68796
+  "panels": [],
+  "window_pid": null
 }
