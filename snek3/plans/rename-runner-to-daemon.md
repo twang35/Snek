@@ -1,9 +1,8 @@
 # Rename `runner` to `daemon`
 
-**Status: laptop half done 2026-09-05 (uncommitted, awaiting approval); box half is the user-run script.** Was planned to run after the tree was clear of the other
-session's edits (`desktop/runner/runner.py`, `trigger.py`, `tools/scheduler.py`, `live_runs.py`,
-`laptop_status.py`, `eta.py` and their tests). A rename over a dirty tree is a merge conflict with
-ourselves.
+**Status: done 2026-09-05.** Laptop commit 1140b1e94; the box swapped units at 13:06 with the running
+scheduler (pid 1375916) and its b17 hof5000 pass untouched, re-adopted by the new daemon on its first poll.
+The box script ran once and was then deleted from the tree, as planned.
 
 ## Why
 

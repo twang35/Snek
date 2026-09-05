@@ -252,7 +252,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now snek3-daemon
 ```
 
 The package, the unit, `~/.snek3-daemon/` and `SNEK_DAEMON_*` were all `runner` until 2026-09-05
-(`plans/rename-runner-to-daemon.md`); `desktop/systemd/rename-to-daemon.sh` is the one-time box-side move.
+(`plans/rename-runner-to-daemon.md`).
 
 `host.env` is **not** in git — only the example is. It holds machine identity (paths, branches, the
 two `ops` locations) and the hard ceilings; everything tunable at runtime is in `runtime.json`
