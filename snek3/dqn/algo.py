@@ -257,7 +257,8 @@ class DqnAlgo(object):
     # ------------------------------------------------------------ the log
 
     def log_note(self, row):
-        return 'eps {0:<7}'.format(row['epsilon'])
+        # `.get`: a row the trainer had to build with no request on disk carries no schedule fields.
+        return 'eps {0:<7}'.format(row.get('epsilon', '?'))
 
     def log_extra(self, row):
         if not row.get('fork'):

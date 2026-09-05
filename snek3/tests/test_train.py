@@ -1232,3 +1232,47 @@ def test_a_dead_workers_claim_does_not_hold_the_queue(tmp_path, monkeypatch):
     folder = eval_queue.policy_directory('qa', queue)
     os.rename(os.path.join(folder, '10.req'), os.path.join(folder, '10.claim.999999999'))
     assert eval_queue.held_by_live_worker('qa', 10, queue) is False
+
+
+# ---------------------------------------------------------------- a reclaimed step with no request on disk
+
+def test_a_row_without_a_known_speed_omits_the_field_rather_than_failing():
+    measured = {'avg_score': 90.0, 'min_score': 80.0, 'max_score': 95.0, 'avg_reward': 100.0, 'perfect': 0.5}
+    row = train.build_eval_row(10, measured, 88.0, None)
+    assert 'steps_per_second' not in row and row['perfect_percent'] == 50.0
+    assert train.build_eval_row(10, measured, 88.0, 12.34)['steps_per_second'] == 12.3
+
+
+def test_a_reclaimed_step_with_no_file_left_is_measured_and_recorded_not_a_crash(tmp_path, monkeypatch, capsys):
+    """2026-09-05: b17ai died three relaunches running on `fields['steps_per_second']` after a resume
+    put it at its bound while workers were finishing its adopted requests -- one of them between
+    deleting its claim and writing its `.done`, so the step had no file at all."""
+    trainer = make_trainer(tmp_path, policy='qr', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=1, eval_workers=0)
+    checkpoints.save(trainer.policy_dir, 10, trainer.algo.net)
+    trainer.pending_evals = [10]                       # adopted from a previous life; no request on disk
+    monkeypatch.setattr(train, 'RECLAIM_GRACE_SECONDS', 0.0)
+    trainer._reclaim_oldest()
+    assert trainer.pending_evals == []
+    assert [row['step'] for row in trainer.eval_rows] == [10]
+    assert 'steps_per_second' not in trainer.eval_rows[0]
+    assert 'no request on disk' in capsys.readouterr().out
+
+
+def test_a_workers_result_that_lands_during_the_reclaim_wins_with_its_fields(tmp_path, monkeypatch):
+    trainer = make_trainer(tmp_path, policy='qs', monkeypatch=monkeypatch,
+                           eval_queue=True, eval_queue_depth=1, eval_workers=0)
+    checkpoints.save(trainer.policy_dir, 10, trainer.algo.net)
+    trainer.pending_evals = [10]
+    monkeypatch.setattr(train, 'RECLAIM_GRACE_SECONDS', 0.0)
+    real_measure = train.engine.measure
+
+    def measure(policy_fn, episodes, seed=0):
+        held = real_measure(policy_fn, episodes, seed=seed)
+        eval_queue._write_json(eval_queue.done_path('qs', 10),          # the worker finishes meanwhile
+                               {'step': 10, 'held': held, 'fields': _fields(0.4)})
+        return held
+    monkeypatch.setattr(train.engine, 'measure', measure)
+    trainer._reclaim_oldest()
+    assert trainer.eval_rows[0]['steps_per_second'] == _fields(0.4)['steps_per_second']
+    assert eval_queue.outstanding('qs') == [], 'retired after the merge'

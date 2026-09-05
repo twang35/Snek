@@ -266,8 +266,13 @@ def build_eval_row(step, measured, trailing, steps_per_second, algo_fields=None,
            'min_score': round(measured['min_score'], 1),
            'max_score': round(measured['max_score'], 1),
            'avg_reward': round(measured['avg_reward'], 3),
-           'perfect_percent': round(100.0 * measured['perfect'], 1),
-           'steps_per_second': round(float(steps_per_second), 1)}
+           'perfect_percent': round(100.0 * measured['perfect'], 1)}
+    # Same rule as `transitions`: absent when unknown. A queued step the trainer had to measure itself
+    # with no request file left to read (2026-09-05, b17ai: the worker was between deleting its claim
+    # and writing its result) has no speed to report, and a row without one beats no row -- the arm
+    # died on this KeyError three relaunches running.
+    if steps_per_second is not None:
+        row['steps_per_second'] = round(float(steps_per_second), 1)
     if transitions is not None:
         row['transitions'] = int(transitions)
     for key, value in (algo_fields or {}).items():
@@ -562,7 +567,7 @@ class Trainer(object):
         reported = dict(fields.get('algo') or {})
         if not self.config['eval_queue']:
             reported.update(computed)
-        row = build_eval_row(step, measured, trailing, fields['steps_per_second'],
+        row = build_eval_row(step, measured, trailing, fields.get('steps_per_second'),
                              reported, fields.get('transitions'))
         run_report.merge_eval_row(self.eval_rows, row)
         summary = run_report.save_history(self.history_path, self.eval_rows, self.resume_steps)
@@ -745,11 +750,21 @@ class Trainer(object):
             if eval_queue.landed(self.policy, step) is not None:
                 return
             fields = eval_queue.fields_of(self.policy, step) or {}
+            if not fields:
+                # No file for the step at all: a worker is between deleting its claim and writing its
+                # `.done` (found 2026-09-05 on a resumed arm sitting at its bound while eight workers
+                # finished its adopted requests). Measured here anyway -- forward progress -- and if
+                # the worker's result lands meanwhile it is preferred below, fields intact.
+                print('step {0:,}: no request on disk; measuring it here, its row may carry no '
+                      'steps_per_second'.format(step), flush=True)
         # Restored rather than measured from `self.algo.net`: the arm has trained on since this step
         # and stage A is a measurement of the checkpoint, not of the current weights.
         policy_fn, _, _ = restore.restore(self.policy_dir, step=step, device=self.device)
         held = engine.measure(policy_fn, EVAL_EPISODES,
                               seed=eval_seed(self.config['seed'], step))
+        landed = eval_queue.landed(self.policy, step)
+        if landed is not None and landed.get('fields'):
+            held, fields = landed['held'], landed['fields']       # the worker's, complete; ours is the duplicate
         self.pending_evals.pop(0)
         self._record(step, summarise(held), fields)
         eval_queue.retire(self.policy, step)
@@ -787,11 +802,12 @@ class Trainer(object):
         if not (index % QUIET_EVAL_INTERVAL == 0 or is_best or index <= 1):
             return
         note = '  <- best so far' if is_best else ('' if keep else '  no ckpt')
+        speed = row.get('steps_per_second')
         print('{0:>9,}  score {1:>5.1f}  trail {2:>5.1f}  pf {3:>3.0f}%  best30 {4:>4.1f}%  '
-              '{5} {6:>5.0f} st/s{7}'.format(
+              '{5} {6} st/s{7}'.format(
                   row['step'], row['avg_score'], row['trailing_avg_score'], row['perfect_percent'],
                   summary['best_perfect30']['value'], self.algo.log_note(row),
-                  row['steps_per_second'], note),
+                  '{0:>5.0f}'.format(speed) if speed is not None else '    ?', note),
               flush=True)
         for line in self.algo.log_extra(row):
             print(line, flush=True)
