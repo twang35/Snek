@@ -5,7 +5,7 @@ description: Re-measure a batch's stage-B winners at 5,000 episodes — the hof5
 
 # The `hof5000` pass — 5,000 episodes on the close-out's winners
 
-**Since 2026-09-04 this pass and the `hof30k` after it run by themselves**, on both boxes, after every
+**This pass and the `hof30k` after it run by themselves**, on both boxes, after every
 wave's stage B — the desktop daemon and `tools.scheduler` chain `tools.closeout <arms> --pass
 hof5000` then `--pass hof30k`, and a batch that finished under the chain needs nothing from this skill.
 Use it for a batch measured before that date, a driver started before it, or a re-run; `--pass hof5000`
@@ -16,7 +16,7 @@ Stage B measures every screened checkpoint at 500 episodes. **A 500-episode maxi
 high, not a rate** — pooled over b6, the ≥98.5 %/500 rows averaged 98.80 there and **97.86** at
 5,000, a −0.94 pp regression. This pass buys back most of that.
 
-**The candidate cut is ≥99 %/500** (raised from 98.5 on 2026-09-02, user's decision). At b9's
+**The candidate cut is ≥99 %/500** (user's decision). At b9's
 density a 98.5 cut was 2,289 candidates against 727 at 99, and with the usual −1 pp regression a
 98.5/500 row almost never reaches the 98.73 record region at 5,000 — b7's 766 candidates yielded 6.
 
@@ -68,8 +68,8 @@ rsync -a --files-from=/tmp/files-<local-arm>.txt \
   the-claw-den:Snek/snek3/savedPolicies/<remote-arm>/ savedPolicies/<local-arm>/
 ```
 
-- **‡ The box may hold the arm under a different name.** Batches were renamed p0-p3 → b3-b6 on the
-  laptop 2026-08-31 and the desktop was not redeployed, so **b4 is `p1` there** and b5 is `p2`. Map
+- **‡ The box may hold the arm under a different name.** The box still holds b3-b6 under their
+  original `p0`-`p3` names, so **b4 is `p1` there** and b5 is `p2`. Map
   the letter, not the whole name: `b4c` ← `p1c`. `ls -d savedPolicies/*<config-fragment>*` on the box
   finds them.
 - **`--files-from` is the form that works.** Multi-source rsync over ssh takes neither `'host:a b'`
@@ -108,12 +108,12 @@ Call the env python directly, never `conda run` — it buffers a backgrounded lo
 **‡ Do not pass the arm list through a zsh variable.** `ARMS="a b c"; ... closeout $ARMS` hands the
 controller **one** policy named `a b c` (zsh does not word-split a parameter), and it exits status 1 in
 0.0 min having opened a window for a nonexistent arm. Type the names, or use `$(cat list.txt)` — an
-unquoted command substitution *is* split. Cost one relaunch on b9, 2026-09-02.
+unquoted command substitution *is* split.
 
 ## 4. Watch it
 
 The controller prints `[done/total] N shard(s) alive` per arm. **A hand-typed close-out has no chart
-window** (2026-09-05): the scheduler owns the box's window and points it at a pass only when the
+window**: the scheduler owns the box's window and points it at a pass only when the
 scheduler runs the pass. To get the window, queue the pass as an eval spec instead of typing it:
 
 ```

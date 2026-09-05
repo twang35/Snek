@@ -15,7 +15,7 @@ The desktop side is a push to `ops`, which starts or stops real work on another 
 has asked for *this* move** before any of the below runs. Say which batches and which direction back
 to them.
 
-## Desktop -> laptop (as b13, b14, b16, b19, b20 were, 2026-09-03/04)
+## Desktop -> laptop
 
 Run from `/Users/tony_wang/Projects/Snek`. The commit that dequeues is where the specs will be read
 from later, so copy them out **before** removing them, from the ref they are still on:
@@ -31,7 +31,7 @@ ls $Q/$B | wc -l          # must equal the batch's arm count; 0 means the grep o
 
 `git ls-tree` paths are **relative to the shell's cwd inside the repo**, so run it from the repo root,
 not `snek3/`. From `snek3/` the path resolves to `snek3/snek3/...`, matches nothing, and the loop
-writes nothing — 2026-09-04, caught by the count.
+writes nothing — caught by the count.
 
 Then remove them from `ops` in its worktree (the `desktop-batch` skill's worktree block finds or makes
 it; **globs there need the worktree's absolute path**, since a relative glob expands against the cwd):

@@ -17,7 +17,7 @@ docs say *what is true*; a skill says *what to do, in order*.
 
 ## Which model runs a skill
 
-`desktop-deploy` and `progress-update` carry `model: sonnet` in their frontmatter (2026-09-02): both are
+`desktop-deploy` and `progress-update` carry `model: sonnet` in their frontmatter: both are
 procedures with the judgement already written down, so the cheaper model runs them for the turn and
 the session's own model resumes afterwards. Add the field to any skill that is a checklist rather than
 an investigation; leave it off the ones that weigh evidence (`hof-promote`, `hof-remeasure`).

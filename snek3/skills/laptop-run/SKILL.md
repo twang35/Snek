@@ -28,7 +28,7 @@ scheduler** ("Queueing batches here" below) — for a batch dequeued from the de
 for the laptop: write the specs (`queue/examples/` on `ops` has the shape; `tools.sweep_specs` writes a
 batch's) and queue them. The scheduler is what publishes the laptop's state to the `laptop-status` branch,
 which the desktop folds into `ops-status` as `laptop_running` / `laptop_queued`, so an arm started with
-a bare `train.py` is invisible to every status read (user, 2026-09-04). The bare command below is for a
+a bare `train.py` is invisible to every status read. The bare command below is for a
 smoke or a one-off check, not for an arm anyone will read about later.
 
 ## Train (one-off only)
@@ -60,10 +60,10 @@ before the trainer's config exists. That is exactly the set a shaping experiment
 ## A whole batch of desktop specs
 
 To run a batch here that was written for the desktop -- dequeued from `ops` to shorten the box's
-queue, as b13 was on 2026-09-03 -- do not launch the arms by hand. `tools.scheduler` takes the
+queue -- do not launch the arms by hand. `tools.scheduler` takes the
 daemon's own `queue/pending/*.json` specs and runs them the way the daemon would: waves of 8, each
 arm with the spec's `env` and `max_steps`, each wave followed by its own `tools.closeout` named
-`<batch>-stageb`, `-w2`, ... and then -- as the daemon also does since 2026-09-04 -- the wave's
+`<batch>-stageb`, `-w2`, ... and then the wave's
 `hof5000` and `hof30k` passes over the same arms (`<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...),
 each only if the pass before it exited 0. It skips an arm already at its cap, waits for an arm
 already live here instead of relaunching it, and never puts a ninth trainer on the box.

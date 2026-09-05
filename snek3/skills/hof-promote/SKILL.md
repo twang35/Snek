@@ -16,8 +16,8 @@ fall.** Measured here:
 
 | | selected | fresh | drop |
 |---|---|---|---|
-| snek2's top four HOF entries (2026-08-20) | 98.0-99.0 /500 | 95.9-97.5 /1000 | mean **−1.45 pp** |
-| `b5h` @9027584 (2026-09-01, max of 2,172 rows) | 99.20 /5000 | 98.8 /2000 | **−0.4 pp** |
+| snek2's top four HOF entries | 98.0-99.0 /500 | 95.9-97.5 /1000 | mean **−1.45 pp** |
+| `b5h` @9027584 (max of 2,172 rows) | 99.20 /5000 | 98.8 /2000 | **−0.4 pp** |
 
 ```
 PYTHONPATH=. python -u evaluate.py <policy> one --step <step> \
@@ -31,8 +31,7 @@ PYTHONPATH=. python -u evaluate.py <policy> one --step <step> \
   single-process (sharding splits by checkpoint, not by episodes), so run several candidates as
   parallel processes rather than reaching for `--shards`.
 - **A desktop `hof30k` wave is this step done in bulk** — an eval spec with `"episodes": 30000`,
-  `"eval_args": ["--label", "hof30k", "--seed", "7"]` and `above:99:hof5000`, as b9's was on
-  2026-09-03. Same episodes, same seed, same eval path; its rows are confirmed rates and go straight
+  `"eval_args": ["--label", "hof30k", "--seed", "7"]` and `above:99:hof5000`, as b9's was. Same episodes, same seed, same eval path; its rows are confirmed rates and go straight
   to step 1.
 - **The number that goes in `HOF.md` is this one.** Never a stage-A /100, never a graph point, never
   the close-out /500 the candidate was picked by.
@@ -40,7 +39,7 @@ PYTHONPATH=. python -u evaluate.py <policy> one --step <step> \
 ### ‡ If the claim is "a record", re-measure the incumbent at the same depth too
 
 **Never rank a fresh deep number against a published shallower one — the incumbent is a selected high
-as well.** Measured 2026-09-01: the snek2 champion's published 98.73% /3,000 read **98.48% /30,000**
+as well.** Measured: the snek2 champion's published 98.73% /3,000 read **98.48% /30,000**
 on the same afternoon, same seed, same eval path. Against the published figure the new checkpoint
 looked tied (p = 0.26); against the matched re-measure it wins by +0.47 pp (p < 1e-6). Same weights
 both times. A cross-depth comparison would have recorded the opposite conclusion.
@@ -49,7 +48,7 @@ Re-measuring the incumbent costs one more `one` run. Do it before writing "recor
 
 ### Choosing between near-tied candidates: take the one in the better basin
 
-A validated tie-break (2026-09-01) — the mean score of a candidate's **neighbours within ±1M
+A validated tie-break — the mean score of a candidate's **neighbours within ±1M
 transitions** predicts its true deep rate *better than its own selected score does* (r = +0.46
 against +0.25 on 181 rows). Two `b5h` rows both read 99.20 /5000; their basins did not:
 

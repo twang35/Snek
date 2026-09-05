@@ -31,7 +31,7 @@ git -C "$OPS" merge --ff-only origin/ops && echo "ops worktree: $OPS"
 
 **`substr($0,10)` rather than `$2`, and that is not a style choice.** Invoking a skill with
 arguments substitutes `$1`, `$2`, ... inside its body, including inside fenced code — measured
-2026-09-01, when `/desktop-batch queue an fc-layout sweep` rendered this line as `p=fc-layout`
+when `/desktop-batch queue an fc-layout sweep` rendered this line as `p=fc-layout`
 and the worktree lookup returned nothing. **No snippet in any skill may contain a bare `$<digit>`.**
 
 Then write one JSON file per arm into `$OPS/snek3/desktop/queue/pending/<id>.json`.
@@ -110,7 +110,7 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 a dead daemon. Read `at_a_glance` first, then `attention`.
 
 **The daemon does not run the batch; `tools/scheduler.py` does**, the same scheduler as the laptop's
-(2026-09-05). The daemon mirrors the specs into `desktop/queue-local/<batch>/` and starts a scheduler if
+The daemon mirrors the specs into `desktop/queue-local/<batch>/` and starts a scheduler if
 none is running; `status.json`'s `scheduler` block says whether one is alive and its pid. A wave of
 `max_trainers` arms trains, its stage B, hof5000 and hof30k run over it, then the next wave -- so a queued
 batch behind a running one is normal, not stuck, and no hof spec needs writing for a batch that finishes
@@ -125,8 +125,8 @@ worktree, same push. Keys: `max_trainers` 8, `eval_shards` 16, `poll_seconds` 30
 `viewer`.
 
 **A malformed or unknown-key file is rejected whole and the last known-good config kept**, and it says
-so in `status.json`. `max_evals`, `HARD_MAX_EVALS` and `clamp_total_shards` were removed on
-2026-08-29 — a `runtime.json` still naming one is rejected.
+so in `status.json`. A `runtime.json` naming the retired `max_evals`, `HARD_MAX_EVALS` or
+`clamp_total_shards` is rejected.
 
 `paused` / `drain`: finish what is running, start nothing new. Set one before killing a desktop job
 (see the `stop-run` skill) or the freed slot refills within one poll.

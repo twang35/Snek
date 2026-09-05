@@ -1,15 +1,14 @@
 # The desktop — `the-claw-den`
 
 A stdlib-only systemd daemon on a dedicated Linux box that runs trainings and evals unattended. It
-**imports nothing from this project** and **schedules nothing itself** (since 2026-09-05): it mirrors the
+**imports nothing from this project** and **schedules nothing itself**: it mirrors the
 specs on `ops` into a local queue, starts `tools/scheduler.py` — the same scheduler the laptop runs — over
 that queue, and publishes what the scheduler finishes. It talks to the laptop only through four
 single-writer git branches. That decoupling is the design's best property: the bus works from anywhere,
 `ssh` is a convenience, and the daemon cannot be broken by a change to the trainer or the scheduler.
 The design and its decisions are [`../plans/scheduler.md`](../plans/scheduler.md).
 
-**snek3's daemon owns the box as of 2026-08-28**, replacing snek2's. The two eras share the `ops`
-branch, which is why every spec carries a required `project` field.
+**snek3's daemon owns the box**, but the two eras share the `ops` branch, which is why every spec carries a required `project` field.
 
 | branch | writer | payload |
 |---|---|---|
@@ -19,8 +18,7 @@ branch, which is why every spec carries a required `project` field.
 | `laptop-status` | **laptop** (`tools/laptop_status.py`, from the queue driver) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |
 
 One writer per branch, so every push is `--force-with-lease` and nothing ever merges. The laptop's queue
-reaches `ops-status` *through* the daemon rather than by the laptop writing there, for exactly that reason
-(2026-09-05).
+reaches `ops-status` *through* the daemon rather than by the laptop writing there, for exactly that reason.
 
 ## Queue a job
 
@@ -131,8 +129,7 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 as flags and environment at spawn. A scheduler is started, when none is alive, on any of: the mirrored
 queue changed, a hold was lifted, `trigger` asked, or work is pending with nothing running it (an arm
 short of its cap, or a scheduler that exited non-zero — backed off 10 minutes, so a scheduler that cannot
-progress costs one start per backoff, never a loop; added 2026-09-05 after a dead scheduler left its
-batch idle). A change of `max_trainers` alone does not restart a running one, **and neither does a
+progress costs one start per backoff, never a loop). A change of `max_trainers` alone does not restart a running one, **and neither does a
 pause**: a paused scheduler waits inside its loop and lifting the hold starts a new one only if none is
 alive. To put a running scheduler on a new value or new code: pause, wait until `running` is empty,
 `kill` the pid `status.json`'s `scheduler.pid` names, unpause — `skills/desktop-deploy` has the steps.
@@ -173,7 +170,7 @@ estimates -- and `at_a_glance.remaining`, the box's total with the clock time it
 `tools/eta.py`'s: a queued arm at the wall rate of the batch's finished arms (`arch.json` to
 `_evals.json` mtime), a running arm at its recent loop rate plus the overhead it has shown, a pass at
 the box's own median for that pass (`runs/.live/.durations.json`, written by the scheduler). Both boxes
-read alike: `remaining` for the desktop, `laptop_remaining` for the laptop (2026-09-05).
+read alike: `remaining` for the desktop, `laptop_remaining` for the laptop.
 
 ### One wave at a time is the scheduler's, and no limit enforces it
 
@@ -181,21 +178,17 @@ The scheduler launches a wave, waits for every arm of it, runs the wave's passes
 next wave. Nothing new starts until the wave and its passes are done, a freed slot is never backfilled
 mid-wave, and trainings and passes therefore never overlap. `max_trainers` only caps how *wide* a
 wave is and how many trainers the box may hold counting any launched by hand; `eval_shards` is the
-shard pool a pass spreads over its arms. It was 4 because snek2's TensorFlow workers cost 230 MB of
-arena each; on this code a trainer is 290 MB and the ceiling is threads (Ryzen 7 9700X, 8 cores / 16
+shard pool a pass spreads over its arms. A trainer is 290 MB and the ceiling is threads (Ryzen 7 9700X, 8 cores / 16
 SMT threads), so 8 trainers beside the stage-A queue's workers is the same shape as the 16-shard eval
-wave. Raised to 8 on 2026-08-29.
+wave.
 
-**Cores are the binding constraint, not memory.** Measured 2026-08-28: an eval shard peaks at 202 MB
+**Cores are the binding constraint, not memory.** Measured: an eval shard peaks at 202 MB
 and a trainer at 290 MB, so a full box is 4.4 GB of 15,030. 16 shards at one intra-op thread each is
 the measured optimum, and 18 loses 6-10%; `eval_shards` is clamped to `HARD_MAX_EVAL_SHARDS` (16).
 
-**Removed settings, kept as history so nobody re-adds them.** `max_evals` and `HARD_MAX_EVALS` went on
-2026-08-29 (an eval job is a whole wave, so the count's only legal value was 1); `clamp_total_shards`
-went with them; `HARD_MAX_TRAINERS` went because wave width is not a safety property and a silently
-clamped request ran 4 arms while looking like 8. A `runtime.json` still naming `max_evals` is rejected
-whole and the last-known-good config kept, with a note in `status.json`. Extra keys in `host.env` are
-ignored, so an unchanged box keeps working.
+**`max_evals`, `HARD_MAX_EVALS`, `clamp_total_shards` and `HARD_MAX_TRAINERS` do not exist**: an eval job
+is a whole wave, wave width is not a safety property (a silently clamped request once ran 4 arms while
+looking like 8), and a `runtime.json` naming one of them is rejected whole.
 
 `git_seconds` is separate from `poll_seconds` because at 30 s the box made ~2,880 fetches and ~2,880
 pushes to github a day. 600 s cuts both to 144 while costing nothing locally, and `trigger` covers the
@@ -203,8 +196,7 @@ case where a batch should start *now*.
 
 ## The chart window
 
-**One window per box, owned by the scheduler** (2026-09-05; the root `CLAUDE.md` has the history of the
-three designs before it). The scheduler opens it at its first launch — `tools.chart_viewer --follow
+**One window per box, owned by the scheduler.** The scheduler opens it at its first launch — `tools.chart_viewer --follow
 desktop/runs/.live/.status.json` — repoints it at each wave's arms and then at each pass's, and closes
 it when it exits. Nothing else on the box opens a window: not the arms, not the close-outs, not the
 daemon. So "a pass is running and there is no window" has one cause now, the scheduler's viewer died
@@ -215,7 +207,7 @@ ssh the-claw-den 'cd Snek/snek3 && SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs PYTHO
 ```
 
 which drops a request file the running scheduler picks up within a poll. **A window you close stays
-closed until the scheduler's next launch** (user, 2026-09-05), and closing it is safe: the window reads
+closed until the scheduler's next launch**, and closing it is safe: the window reads
 a status file and some PNGs, and nothing in a trainer reads it, waits on it or reopens it. A daemon
 restart does not touch it (the scheduler is detached); a scheduler restart replaces it (the old one is
 killed by pid, after checking the pid is still a viewer).
@@ -224,12 +216,6 @@ killed by pid, after checking the pid is still a viewer).
 scheduler's environment — the daemon runs outside the graphical session — and `runtime.json`'s
 `viewer: false` reaches it as `SNEK_CHART_WINDOW=0`. Those two keys are the only optional ones in
 `host.env`; without them the scheduler runs headless and no window appears.
-
-**Why not the daemon's own window**, the first design: it drew a fixed grid of the wave it launched, had
-to be reopened whenever an arm joined or finished, and left the laptop with no window at all. Why not
-the arms' own, the second: eight arms racing for one `flock` opened five windows on 2026-08-29 and a
-stale winner held the slot for 15 hours on 2026-09-03. The scheduler is the one process that knows what
-is running, on both boxes, so it holds the one handle.
 
 **The window is sized from the display, not from a number of inches.** It fills 95% x 88% of whatever
 screen it opens on — 3086x1951 on this box's 3840x2160 panel. `SNEK_CHART_WINDOW_SCALE` is a fraction of
@@ -261,7 +247,7 @@ detached with `setsid`, it carries on, and the daemon re-adopts it by pid on the
 `LOG_DIR/scheduler-<stamp>.log`; the arms' and passes' logs are the scheduler's, under
 `desktop/runs/../logs` as on the laptop.
 
-**Every job on the box writes under `snek3/desktop/runs/`, gitignored, never `snek3/runs/`** (2026-09-03).
+**Every job on the box writes under `snek3/desktop/runs/`, gitignored, never `snek3/runs/`.**
 `launch.runs_dir(host)` is the one place the path is defined; it goes to the scheduler as
 `SNEK_RUNS_DIR` and from there to every arm and pass, and the daemon collects a finished job's artifacts
 for `results` from the same place. The mirrored queue is beside it, `snek3/desktop/queue-local/`, also
@@ -278,7 +264,7 @@ snek3/desktop/queue_action deploy --restart  # restart regardless
 snek3/desktop/queue_action restart           # restart only
 ```
 
-**Since 2026-09-05 a deploy is a job type, not an ssh.** The script commits a `deploy-<stamp>.json`
+**A deploy is a job type, not an ssh.** The script commits a `deploy-<stamp>.json`
 (`type: deploy`) to `ops`, triggers, and waits for the ledger. The daemon runs actions in the poll that
 sees them: **ahead of dispatch, beside running jobs, and under a pause** (a pause is how a deploy that
 must not race a wave is done). A deploy runs the box's own `desktop/deploy`, records `head_before`,
@@ -296,22 +282,19 @@ changed. Piping it to `tail` hides the failure and its exit code.
 
 ## Reach the box from outside the home LAN
 
-**Status 2026-09-04: done and verified end to end.** `ssh the-claw-den` resolves by mDNS on the home LAN and
-the box sits behind the router's NAT, so before this the alias, `deploy`, `trigger`, `journalctl` and the
-live-chart `rsync` were home-LAN only; the git bus worked from anywhere regardless. The
-constraint is **nothing new on the laptop** (Tailscale was removed 2026-08-13 for that reason), so the path is
-plain OpenSSH through a port forward. The box itself may run anything.
+`ssh the-claw-den` resolves by mDNS on the home LAN and falls back to the router's port forward when the
+mDNS name does not answer, so every ssh command here works from anywhere; the git bus never needed the LAN.
+The constraint is **nothing new on the laptop**, so the path is plain OpenSSH through a port forward.
 
-| # | where | change | done |
-|---|---|---|---|
-| 1 | desktop | `ssh the-claw-den 'bash -s' < snek3/desktop/harden_ssh.sh` — rewrites the sshd hardening file (key-only, no root, `AllowUsers claw`, `MaxAuthTries 3`) and **asserts the effective config with `sshd -T`, refusing to touch the firewall if anything is not key-only or `authorized_keys` is empty**; then fail2ban (5 failures / 10 min → 1 h, LAN exempt) and ufw with the LAN trusted and port 22 rate-limited | **done 2026-09-04**: all seven asserts ok, fail2ban jail `sshd` active, ufw active, fresh login and mDNS verified afterwards |
-| 2 | router | DHCP reservation for the desktop at `192.168.0.79`; port forward WAN **2222** → `192.168.0.79:22` TCP; TP-Link DDNS as **`clawden.tplinkdns.com`** | done 2026-09-04 |
-| 3 | router | confirm the WAN status page shows the same address as `curl -4 ifconfig.me` from the box (75.164.174.153 on 2026-09-04). A 100.64–100.127 or 10.x address there means carrier NAT and the forward cannot work; the fallback is then a reverse tunnel from the box to a small VPS | done: WAN page shows 75.164.174.153, same as the box sees |
-| 4 | laptop | the `Match` block below in `~/.ssh/config`, so the same alias falls back to the DDNS name when mDNS does not answer | done; backup at `~/.ssh/config.bak-2026-09-04` |
+| where | what is in place |
+|---|---|
+| desktop | `snek3/desktop/harden_ssh.sh` (re-runnable: `ssh the-claw-den 'bash -s' < snek3/desktop/harden_ssh.sh`) — sshd key-only, no root, `AllowUsers claw`, `MaxAuthTries 3`, asserted with `sshd -T` before it touches the firewall; fail2ban (5 failures / 10 min → 1 h, LAN exempt); ufw with the LAN trusted and port 22 rate-limited |
+| router | DHCP reservation `192.168.0.79`; port forward WAN **2222** → `192.168.0.79:22`; TP-Link DDNS **`clawden.tplinkdns.com`**. A 100.64–100.127 or 10.x WAN address would mean carrier NAT and the forward could not work |
+| laptop | the `Match` block below in `~/.ssh/config` |
 
 ```
 # BEFORE the Host block: ssh keeps the first value set for an option, so a Match
-# placed after it is silently ignored (found on the first hotspot test, 2026-09-04).
+# placed after it is silently ignored.
 Match host the-claw-den !exec "nc -z -w 1 -G 1 the-claw-den.local 22 2>/dev/null"
   HostName clawden.tplinkdns.com
   Port 2222
@@ -324,25 +307,20 @@ Host the-claw-den
   IdentitiesOnly yes
 ```
 
-`HostKeyAlias` is already in the alias, so the known-hosts entry is shared by both paths and the fallback
-does not prompt. Verified 2026-09-04: on the LAN `ssh -G the-claw-den` picks `.local:22`; the forwarded path
-logged in by name and by address (the BE600 does NAT loopback, so it is testable from inside too), and
-**from a phone hotspot the plain alias logged in through the forward** — the real off-LAN test. A DDNS name
-that `dig` resolves but `ssh` does not is the Mac's negative resolver cache from before the record existed —
-`dscacheutil -flushcache`. Every existing command then works unchanged from anywhere. What stays home-LAN is the box
-reaching the laptop (only the diagnostic ping in `plans/laptop-wifi.md`), since the laptop's address is
-whatever its current network gave it.
+`HostKeyAlias` is shared by both paths, so the fallback does not prompt; `ssh -G the-claw-den` shows which
+one is in effect. A DDNS name that `dig` resolves but `ssh` does not is the Mac's negative resolver cache —
+`dscacheutil -flushcache`. What stays home-LAN is the box reaching the laptop (only the diagnostic ping in
+`plans/laptop-wifi.md`), since the laptop's address is whatever its current network gave it.
 
-**A `deploy` job type covers the commonest off-LAN need without ssh at all** — done 2026-09-05,
-`queue_action` above. Named actions only (deploy, restart), never arbitrary shell: anything on that branch
-runs as `claw` on the box.
+**A `deploy` job type covers the commonest off-LAN need without ssh at all** — `queue_action` above.
+Named actions only (deploy, restart), never arbitrary shell: anything on that branch runs as `claw` on the box.
 
 ## What the port changed, and why each one is an incident
 
 | change | the incident behind it |
 |---|---|
 | a required `project` field | `ops` holds ~150 retired snek2 specs whose `script` would resolve to a TensorFlow trainer that does not exist here |
-| one eval stage, not two | `training → closeout → HOF` becomes `training → stage B`, so the `auto_hof` hop, the `-hof` id handling and the legacy phase branch all go. **Partly reversed 2026-09-04:** the chain now runs hof5000 and hof30k after stage B — but as deeper *re-measures* of the same protocol's file, named passes of one close-out, not snek2's tiered selection with its own gates and episode counts |
+| one eval stage, not two | `training → closeout → HOF` becomes `training → stage B`, so the `auto_hof` hop, the `-hof` id handling and the legacy phase branch all go. **Partly reversed:** the chain now runs hof5000 and hof30k after stage B — but as deeper *re-measures* of the same protocol's file, named passes of one close-out, not snek2's tiered selection with its own gates and episode counts |
 | `publish_results` reports its push, and `push_unpushed` retries | a failed push left the commit local while the ledger said `done` — **indistinguishable from a pass that legitimately found nothing.** It hid four 500-episode result files, one a 98.2% checkpoint, for hours |
 | a `failed` eval reaches `attention` | silently never retrying one cost snek2's batch 46 wave 1 its whole measurement |
 | no episode count or gate in the launcher | snek2's daemon carried five protocol numbers as a second copy of what `eval_plan.py` defines, and they drifted |

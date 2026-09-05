@@ -111,7 +111,7 @@ file is full length and directly comparable**, which was not true of snek2's fil
 is absent, not null with a number to check. What follows stage B is not a stage: the `hof5000` pass
 takes every row at ≥99/500 to 5,000 episodes, and `hof30k` takes every hof5000 row at ≥99/5,000 to
 30,000 on seed 7, a seed no selecting pass used — each a separately labelled file beside the
-stage-B one, never in place of it. **Every batch gets all three automatically** (2026-09-04): the
+stage-B one, never in place of it. **Every batch gets all three automatically**: the
 desktop daemon and `tools/scheduler.py` both run `tools.closeout <arms> --pass hof5000` then
 `--pass hof30k` after a wave's stage B, and the presets are `closeout.PASSES`.
 
@@ -288,10 +288,8 @@ learned — it should not be a scroll to the bottom to find it. Reference sectio
 chronological (`Imported policies`, `Reading this table`, `protocol.md`, `running.md`,
 `invariants.md`, `environment.md`) keep whatever order reads best and stay put.
 
-**A batch is `b<number>` and there is no second prefix.** A `p` series was tried for PPO and
-renamed back on 2026-08-31 (`p0`-`p3` -> `b3`-`b6`); the day it existed, the desktop's `_BATCH_RE`
-did not know about it and every arm became its own batch, which silently gave `_auto_stage_b_jobs`
-one wave per arm. Arms stay `b<n><letter>-<what-it-changes>[-seed<N>]`, seed N pinned to letter N.
+**A batch is `b<number>` and there is no second prefix.** The batch regex and the wave grouping key on
+it, and a prefix it does not know makes every arm its own batch with its own wave. Arms stay `b<n><letter>-<what-it-changes>[-seed<N>]`, seed N pinned to letter N.
 
 **`docs/charts.md` links `../runs/<policy>.png` directly.** There is no copy step and no separate
 chart directory to keep in sync — that duplication is what snek2 needed `refresh_charts.sh` and a
@@ -339,8 +337,7 @@ Neither is a verdict — a snek2 arm recovered from 1.2M steps near zero to 63.7
 
 ## Two rules that are easy to get wrong
 
-- **Never run more than 8 trainers at once on the laptop**, counting human-started ones — raised from
-  4 on 2026-08-29, when the stage-A queue made eight arms cheaper than four used to be. Check with
+- **Never run more than 8 trainers at once on the laptop**, counting human-started ones. Check with
   `ps -Ao pid=,command= | grep '[t]rain.py'`, not `pgrep -f` — see the root file on why a process
   scan both over- and under-reports.
 - **This domain is very noisy** — the same snek2 config produced 62.5 and 18.0. Never conclude from a

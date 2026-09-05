@@ -14,16 +14,15 @@ deliberate. If a rule you need is missing from `snek3/CLAUDE.md`, it may be in `
 describing snek2's version of the same thing; carry it across rather than editing snek2.
 
 **`docs/` at the repository root is the GitHub-Pages site, and it is generated.** Pages serves `master`'s
-`/docs` (switched from the branch root 2026-09-03, so the site is the ~25 MB it needs rather than the
-whole checkout). `snek3/tools/publish_pages.py` rewrites it from `snek3/viewer/` and `snek3/runs/`
+`/docs` (so the site is the ~25 MB it needs rather than the whole checkout). `snek3/tools/publish_pages.py` rewrites it from `snek3/viewer/` and `snek3/runs/`
 — the chart viewer, its manifest, and every chart the manifest refers to — and the progress-update skill
 runs it first and commits the result, so the site is current a minute after the update's first push.
 Never edit anything under `docs/` by hand; edit `snek3/viewer/index.html` and republish. The live page
 is https://twang35.github.io/Snek/ .
 
 **`README.md` is for humans and stays barebones** — the eras, a sentence each, a gif each. Anything
-an agent needs belongs here or in an era's own manual, not there. Details that were moved out of it
-on 2026-08-29 are the two sections below.
+an agent needs belongs here or in an era's own manual, not there. The two sections below are what an
+agent needs instead.
 
 ## What each era is, and how to run it
 
@@ -55,7 +54,7 @@ snek3's investigation is [`snek3/docs/`](snek3/docs/) and its records are
 ## The scheduler owns the one chart window per box, and nothing else opens one
 
 **Every training and every eval runs under the scheduler (`snek3/tools/scheduler.py`), and the
-scheduler opens the box's one chart window, tells it what to draw, and closes it** (2026-09-05). On the
+scheduler opens the box's one chart window, tells it what to draw, and closes it.** On the
 laptop the scheduler is what the `laptop-run` skill starts over `logs/laptop-queue/`; on the desktop the
 daemon starts it over the specs it materialises from `ops`. The window is `tools/chart_viewer.py`
 following the scheduler's own `runs/.live/.status.json`, whose `panels` list is every arm of the wave
@@ -83,8 +82,8 @@ running is the scheduler, so the window is its. The design and the incident list
 add a second opener.**
 
 **The scheduler also starts the box's shared stage-A eval workers before each wave**, for the same
-reason: eight arms racing `ensure_workers` for six slots once produced seven slot-0 workers
-(2026-09-03). The trainers still ask, and find the slots held.
+reason: eight arms racing `ensure_workers` for six slots once produced seven slot-0 workers.
+The trainers still ask, and find the slots held.
 
 The window is **disposable and the training is not**: its own session, no training reads from or
 waits on it, and killing it cannot affect a run. **The window is sized from the monitor, from the
@@ -195,19 +194,18 @@ verification evals. Judge by what produced it, not by where it lives.
 
 ## There are two compute hosts — say which one you mean
 
-Since 2026-08-08 a dedicated desktop (`the-claw-den`) also runs trainings and evals, driven entirely
-by git: you commit a job spec, it runs it, it pushes results back. **snek3's daemon owns the box as
-of 2026-08-28**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.md).
+A dedicated desktop (`the-claw-den`) also runs trainings and evals, driven entirely by git: you
+commit a job spec, it runs it, it pushes results back. **snek3's daemon owns the box**; full docs in [`snek3/desktop/README.md`](snek3/desktop/README.md).
 
 | | laptop | desktop `the-claw-den` |
 |---|---|---|
 | limit | **8 trainers** | `max_trainers` (8; no host ceiling), `eval_shards` ≤ 16 |
-| check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop's scheduler to `laptop-status`, folded in by the daemon since 2026-09-05); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
+| check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop's scheduler to `laptop-status`, folded in by the daemon); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
 | queue work | drop the specs in `snek3/logs/laptop-queue/<batch>/` and start the scheduler (`laptop-run` skill) — agents launch arms this way, not by hand, so the launch is published | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
 | start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
 
 **Every progress update commits every arm's `runs/<policy>.png` and `.md`, live desktop arms included**
-(rule changed 2026-09-02; before that live arms' charts were never committed). Those two files are
+Those two files are
 pictures of the JSON, redrawn on every eval, so a committed copy is simply a snapshot that the next
 update overwrites — and it is what the GitHub-Pages chart viewer at `snek3/viewer/` shows, so a live
 batch is visible there between close-outs. A live desktop arm's charts are pulled from the box first:
@@ -221,7 +219,7 @@ rsync -a --include='<batch>*.png' --include='<batch>*.md' --exclude='*' the-claw
 report are rebuilt from across restarts; the stage-B file is a pass in progress. They arrive on the
 `results` branch at close-out, and only then are they committed here. A laptop arm's own files are fine.
 
-**The box writes to `snek3/desktop/runs/`, which is gitignored, and never to `snek3/runs/`** (2026-09-03).
+**The box writes to `snek3/desktop/runs/`, which is gitignored, and never to `snek3/runs/`.**
 The daemon sets `SNEK_RUNS_DIR` to that one constant directory for every job, and every tool reads the
 same constant, so the scheduler and its chart window on the box read the directory the arms write
 without any per-run setting. What this buys is that the box's checkout of master holds nothing under a
@@ -256,11 +254,10 @@ the desktop as down, drained or off-LAN from an unfetched read. The ladder, in o
 re-read; `ssh the-claw-den 'Snek/snek3/desktop/trigger'`, which makes the daemon publish *now* and
 reports whether it is polling at all; then `ssh the-claw-den -o ConnectTimeout=8 -o BatchMode=yes`,
 which settles reachability in seconds. Only after all three fail is the box worth calling
-unreachable. The git bus works from anywhere, and **since 2026-09-04 so does `ssh the-claw-den`**: the alias
+unreachable. The git bus works from anywhere, and **so does `ssh the-claw-den`**: the alias
 uses mDNS on the home LAN and falls back to the router's port forward (`clawden.tplinkdns.com:2222`, a
 `Match` block in `~/.ssh/config`) when the mDNS name does not answer; setup and hardening in
-`snek3/desktop/README.md`, "Reach the box from outside the home LAN". So "off-LAN" is no longer a reason
-for `ssh` to fail, and it never was a safe starting assumption — it has been wrong.
+`snek3/desktop/README.md`, "Reach the box from outside the home LAN". So "off-LAN" is not a reason for `ssh` to fail.
 
 **‡ `pgrep -f` and `pkill -f` match the shell that runs them, and this is the default outcome, not an
 edge case.** `-f` scans full command lines, and the invoking shell's own command line contains the

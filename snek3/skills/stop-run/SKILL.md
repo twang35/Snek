@@ -26,8 +26,7 @@ than a stop, do not kill anything — that is a different skill.
 
 ### ‡ Kill only pids you derived from the job you were asked to stop
 
-**Never sweep by a shape — `ppid == 1`, "all snek3 pythons", a bare module name.** Measured
-2026-08-30: an orphan sweep on `ppid == 1` killed a live 8-arm stage-B close-out along with its
+**Never sweep by a shape — `ppid == 1`, "all snek3 pythons", a bare module name.** Measured: an orphan sweep on `ppid == 1` killed a live 8-arm stage-B close-out along with its
 target, because `tools/closeout.py` had been launched detached and so had ppid 1 exactly like the
 orphans. **A detached parent and an orphaned child are indistinguishable by ppid.** List the pids,
 read the full command line of each one, and pass that list.

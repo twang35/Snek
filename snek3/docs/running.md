@@ -49,7 +49,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 
 | knob | default | notes |
 |---|---|---|
-| `SNEK_RUNS_DIR` | `runs/` | where every run artifact goes -- graph, report, `_evals.json`, stage-B files, `.live/`, `.evalq/`. **The desktop daemon sets it to the gitignored `desktop/runs/` for every job** (2026-09-03), so the box's checkout never holds an untracked file under a path master tracks and its deploy cannot collide with a committed chart; the laptop leaves it unset, and its `runs/` is the archive master tracks. A tool spawned by a job inherits it; a tool run by hand on the box needs it exported |
+| `SNEK_RUNS_DIR` | `runs/` | where every run artifact goes -- graph, report, `_evals.json`, stage-B files, `.live/`, `.evalq/`. **The desktop daemon sets it to the gitignored `desktop/runs/` for every job**, so the box's checkout never holds an untracked file under a path master tracks and its deploy cannot collide with a committed chart; the laptop leaves it unset, and its `runs/` is the archive master tracks. A tool spawned by a job inherits it; a tool run by hand on the box needs it exported |
 | `SNEK_ALGO` | `dqn` | which algorithm to train. An unknown value is **refused by name** rather than defaulting, so an arm launched as something this build has no code for cannot quietly train DQN and be reported as the other thing |
 | `SNEK_SEED` | 1 | seeds the network initialisation, the exploration coins, the replay sampler, the env's food and every eval. Recorded in `runs/<policy>.md`, so two arms of the same config are the same arm |
 | `SNEK_MAX_STEPS` | 10,000,000 | **absolute**, not "run this many more" — `global_step` is restored on resume. An arm at its cap prints so and exits after its opening eval. **Counted steps, not game moves**: at the default `fork_branches=4` a DQN step is four moves, and every eval row carries `transitions` for that reason |
@@ -70,7 +70,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_BATCH_SIZE` | 128 |
 | `SNEK_DISCOUNT` | 0.99 |
 | `SNEK_TARGET_UPDATE_PERIOD` | 8 |
-| `SNEK_TARGET_UPDATE_TAU` | 1.0 (a hard copy). **Below 1.0 was applying twice per gradient step until 2026-08-29** — `train.py` called `maybe_update_target()` after `agent.update()`, which already calls it, so a requested 0.05 ran at 1 - (1 - 0.05)² = 0.0975. Invisible at 1.0, where a second hard copy is idempotent, so no arm ever run was affected. The *period* was never wrong |
+| `SNEK_TARGET_UPDATE_TAU` | 1.0 (a hard copy). `agent.update()` applies it; nothing else may call `maybe_update_target()` or a soft tau applies twice per step |
 | `SNEK_GRADIENT_CLIPPING` | 0 (off) |
 | `SNEK_N_STEP_UPDATE` | 1 |
 
@@ -131,7 +131,7 @@ launchable at all.
 | `SNEK_PPO_VF_COEF` | 0.5 | near-inert: the towers are separate, so it only rescales the critic's own learning rate |
 | `SNEK_PPO_LEARNING_RATE` | 3e-4 | **not** DQN's 1e-5, and that is the point of the separate name |
 | `SNEK_PPO_LEARNING_RATE_FINAL` | unset | the same ramp for Adam's step size; 0 is allowed and means the tail of the run takes no gradient steps. Both ramps re-stretch if an arm is resumed to a higher cap, so an annealed arm is never resumed for comparison. Batch b17 |
-| `SNEK_PPO_ANNEAL_FRACTION` | 1.0 | the share of `SNEK_MAX_STEPS` all three ramps take to reach their `_FINAL` value; 0.8 lands at 80% of the cap and holds the floor for the last 20%. Must be in (0, 1]. Batch b17 (2026-09-03) |
+| `SNEK_PPO_ANNEAL_FRACTION` | 1.0 | the share of `SNEK_MAX_STEPS` all three ramps take to reach their `_FINAL` value; 0.8 lands at 80% of the cap and holds the floor for the last 20%. Must be in (0, 1]. Batch b17 |
 | `SNEK_PPO_ADAM_EPSILON` | 1e-7 | |
 | `SNEK_PPO_GRADIENT_CLIPPING` | 0.5 | global norm over both towers. 0 disables |
 | `SNEK_PPO_TARGET_KL` | 0 (off) | stops the epoch loop early when `approx_kl` exceeds it — **between epochs, never mid-epoch**, or some samples are used more often than others. `approx_kl` is reported either way |
@@ -163,7 +163,7 @@ step no checkpoint exists at is the one thing the protocol cannot tolerate.
 | `SNEK_EVAL_INTERVAL` | 1000 | **sets the checkpoint interval too, from the same value.** They must be equal — a checkpoint at a step no eval screens can never be measured — so there is one knob rather than two that can disagree. Lower it for a smoke test and nothing else. **Rounded up to a whole algorithm step**, which changes nothing for DQN (granularity 1) and is what lets an algorithm whose step is a whole rollout keep the equality; `runs/<policy>.md` records the interval the arm actually ran |
 | `SNEK_EVAL_QUEUE` | **1** | hands stage A to shared worker processes instead of measuring it in the training loop. **Measured 3.83x** end to end at the tuned defaults (9.12 h -> 2.38 h per arm to 3M, four arms, laptop). It **changes the training** — bounded schedule lag, and stage-A rows are no longer bit-reproducible from the arm's seed — so `0` is what an arm being diffed against b1 or b2 must use. See below |
 | `SNEK_EVAL_QUEUE_DEPTH` | **16** | how many checkpoints may be **unmeasured**. **This is both the schedule's blind spot and the throughput lever**: at 16 the epsilon and shield schedules read a measurement up to 16,000 counted steps old. 16 is where an arm stops being eval-bound — all 19 swept configurations at depth 8 sat pinned against their cap with the trainer waiting, while at 16 the queue drains and the arm reaches 94% of its unblocked rate. 24 regresses, 12 gets 63% of the gain. **0 is the verification mode** — the trainer measures each checkpoint before resuming, which reproduces an unqueued arm bit for bit and recovers nothing |
-| `SNEK_EVAL_WORKERS` | **6** | worker processes **per box**, shared by every arm on it. **‡ 6 was tuned at four DQN trainers and is too low for eight PPO ones** — measured 2026-08-30, workers pinned at 100% with the trainers at half and a third of the box idle. For PPO the bound is also free to raise, because its only schedule is a function of the step rather than of the eval history; see [`findings.md`](findings.md). Unlike depth this turns over: at four arms the sweep measured 4.84 h (2w), 3.94 h (4w), **3.21 h (6w)**, 3.27 h (8w), 3.55 h (10w) — past six, workers starve the trainers, whose unblocked rate falls 380 -> 306 st/s, and the box reaches 4% idle to run *slower*. **Idle CPU is not the target**; the fastest configuration leaves ~20% of the box free. Starting none is safe — the arm measures its own and runs at today's speed |
+| `SNEK_EVAL_WORKERS` | **6** | worker processes **per box**, shared by every arm on it. **‡ 6 was tuned at four DQN trainers and is too low for eight PPO ones** — measured with workers pinned at 100% with the trainers at half and a third of the box idle. For PPO the bound is also free to raise, because its only schedule is a function of the step rather than of the eval history; see [`findings.md`](findings.md). Unlike depth this turns over: at four arms the sweep measured 4.84 h (2w), 3.94 h (4w), **3.21 h (6w)**, 3.27 h (8w), 3.55 h (10w) — past six, workers starve the trainers, whose unblocked rate falls 380 -> 306 st/s, and the box reaches 4% idle to run *slower*. **Idle CPU is not the target**; the fastest configuration leaves ~20% of the box free. Starting none is safe — the arm measures its own and runs at today's speed |
 
 **‡ Sweeping this knob only works in ascending order, and a descending step is silently wrong.**
 `eval_queue.ensure_workers(target)` iterates `range(target)` and starts the slots that are not live —
@@ -171,7 +171,7 @@ it **never reaps a worker in a slot ≥ target.** A worker self-exits only after
 `IDLE_EXIT_SECONDS = 300` of claiming nothing, and the desktop's gap between waves is one 30 s poll,
 so a wave that follows a *higher*-worker wave inherits the extras — and they are not idle, because the
 new wave's arms are producing checkpoints, so they claim its queue work and contribute. The wave then
-measures more workers than its label says. A first draft of the 2026-08-30 desktop sweep ordered
+measures more workers than its label says. A first draft of the desktop sweep ordered
 8, 4, 6, 10, 12 and would have read "4 is surprisingly fine". The same leftovers during a *stage-B*
 phase are harmless: there is no stage-A work then, so they poll with sleeps at ~200 MB and near-zero
 CPU, and exit within five minutes.
