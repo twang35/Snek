@@ -1,12 +1,13 @@
 {
-  "iso": "2026-09-05T00:29:12",
-  "ts": 1788593352.1562061,
+  "iso": "2026-09-05T00:33:07",
+  "ts": 1788593587.4237132,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | ent003, ent005 | stage B (8 arms)"
+      "b15 | ent003, ent005 | hof5000 (8 arms)"
     ],
     "queued": [
+      "** queue paused: nothing new will start. Set \"paused\": false in runtime.json on ops to resume",
       "b15 evals | ent003, ent005 | queued (8 arms)",
       "b15 training | ent02, ent03, entanneal10, entanneal03, entanneal01, entanneal01to0 -- waves ... | queued (24 arms)",
       "b15 evals | ent02, ent03, entanneal10, entanneal03, entanneal01, entanneal01to0 | queued (24 arms)",
@@ -41,7 +42,7 @@
     "omp_num_threads": 1,
     "nice": 0,
     "disk_min_gb": 5,
-    "paused": false,
+    "paused": true,
     "drain": false,
     "auto_stage_b": true,
     "viewer": true
@@ -53,7 +54,7 @@
   },
   "running": [
     {
-      "id": "b15-stageb-w2",
+      "id": "b15-hof5000-w2",
       "type": "eval",
       "policy": "b15ai-ent003-seed1",
       "policies": [
@@ -66,16 +67,15 @@
         "b15ao-ent005-seed3",
         "b15ap-ent005-seed4"
       ],
-      "pid": 214256,
+      "pid": 301863,
       "step": 50003968,
       "label": "",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 3651
+      "elapsed_s": 126
     }
   ],
   "ledger": {
-    "b15-hof5000-w2": "queued",
     "b15-hof30k-w2": "queued",
     "b15aq-ent02-seed1": "queued",
     "b15ar-ent02-seed2": "queued",
@@ -264,7 +264,8 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b15-stageb-w2": "running",
+    "b15-hof5000-w2": "running",
+    "b15-stageb-w2": "done",
     "restart-20260905T070759Z": "done",
     "b15ap-ent005-seed4": "done",
     "b15ao-ent005-seed3": "done",
@@ -674,8 +675,8 @@
   "disk_free_gb": 130.2,
   "head": "99f6a418bf1f",
   "load_avg": [
-    16.30517578125,
-    16.166015625,
-    16.017578125
+    15.583984375,
+    15.3095703125,
+    15.66796875
   ]
 }
