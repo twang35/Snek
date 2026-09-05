@@ -1,13 +1,11 @@
 {
-  "iso": "2026-09-05T15:27:56",
-  "ts": 1788647276.919095,
+  "iso": "2026-09-05T15:32:20",
+  "ts": 1788647540.6471832,
   "box": "laptop",
   "project": "snek3",
   "pid": 64756,
   "at_a_glance": {
-    "running": [
-      "b19 | noadvnorm, mse | hof30k (8 arms) | ~4m left"
-    ],
+    "running": [],
     "queued": [
       "b19 training | adameps1e5, adameps1e8, vf01, vf10 -- waves 2-3 of 3 (16 arms) | ~2.9h",
       "b19 evals | adameps1e5, adameps1e8, vf01, vf10 (16 arms) | ~2.8h",
@@ -17,28 +15,9 @@
       "b21 evals | shape0, shape005, shape02, gate60, gate85, gate0 (24 arms) | ~4.2h"
     ],
     "attention": [],
-    "remaining": "~13h of work: 4m running + 13h queued; clear ~Sun 04:12"
+    "remaining": "~13h of work: 13h queued; clear ~Sun 04:11"
   },
-  "running": [
-    {
-      "id": "b19-hof30k",
-      "type": "eval",
-      "policy": "b19a-noadvnorm-seed1",
-      "policies": [
-        "b19a-noadvnorm-seed1",
-        "b19b-noadvnorm-seed2",
-        "b19c-noadvnorm-seed3",
-        "b19d-noadvnorm-seed4",
-        "b19e-mse-seed1",
-        "b19f-mse-seed2",
-        "b19g-mse-seed3",
-        "b19h-mse-seed4"
-      ],
-      "step": null,
-      "max_steps": null,
-      "eta_seconds": 269.9236800670624
-    }
-  ],
+  "running": [],
   "queued_ids": [
     "b19i-adameps1e5-seed1",
     "b19j-adameps1e5-seed2",
