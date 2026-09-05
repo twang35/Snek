@@ -21,25 +21,38 @@ procedure is now generated rather than described.
 
 Run order (section 7), each batch one knob, four seeds per value.
 
-| order | batch | knob | what it is | waves |
-|---:|---|---|---|---:|
-| 1 | b9 | GAE λ | how far the advantage reads from the rollout vs. the critic | 8 |
-| 2 | b10 | discount γ | how far ahead the value function looks | 8 |
-| 3 | b11 | learning rate | Adam step size | 4 |
-| 4 | b12 | epochs | passes over each rollout | 5 |
-| 5 | b13 | minibatch | gradient batch size, and steps per epoch | 4 |
-| 6 | b14 | rollout T | steps per lane before an update | 3 |
-| 7 | b15 | entropy coef | bonus for a stochastic policy, plus two anneals | 5 |
-| 8 | b16 | target_KL | early-stops the epoch loop after a big update | 5 |
-| 9 | b17 | clip + anneals | trust region on the policy ratio; anneal clip and lr to ~0 (**code needed first**) | 5 |
-| 10 | b18 | grad-norm clip | ceiling on the global gradient norm before each step | 3 |
-| 11 | b19 | switches | adv-norm, value loss (mse/huber), Adam ε, vf_coef | 3 |
-| 12 | b20 | collect lanes | parallel games vs. per-episode depth, same batch size as b14 | 2 |
-| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 |
-| — | b22 | factorial | combine whichever knobs above won cleanly | 4 |
+| order | batch | knob | what it is | waves | ~time | state (2026-09-04 19:30) |
+|---:|---|---|---|---:|---:|---|
+| 1 | b9 | GAE λ | how far the advantage reads from the rollout vs. the critic | 8 | 20 h | closed 09-02 16:48 |
+| 2 | b10 | discount γ | how far ahead the value function looks | 8 | 23 h | closed 09-03 16:08 (the γ 1.00 wave ran 6 h) |
+| 3 | b11 | learning rate | Adam step size | 4 | 10.3 h + 1.2 h hof | closed 09-04 02:24; hof passes done 19:03 |
+| 4 | b12 | epochs | passes over each rollout | 5 | 12.9 h + ~1.3 h hof | closed 09-04 15:15; `hof5000` (652 rows) running |
+| 5 | b13 | minibatch | gradient batch size, and steps per epoch | 4 | laptop, ~6 h/wave | closed 09-04; hof passes queued on the desktop |
+| 6 | b14 | rollout T | steps per lane before an update | 3 | laptop, ~6 h/wave | wave 2 training; closes ~midday 09-05 |
+| 7 | b15 | entropy coef | bonus for a stochastic policy, plus two anneals | 5 | 13 h + hof | wave 1 closed 17:50; waves 2-5 behind three hof passes, **~08:00-10:00 09-05** |
+| 8 | b16 | target_KL | early-stops the epoch loop after a big update | 5 | ~14.5 h | **~evening 09-05** |
+| 9 | b17 | clip + anneals | trust region on the policy ratio; anneal clip and lr to ~0 (anneal code landed) | 8 | ~23 h | **~evening 09-06** |
+| 10 | b18 | grad-norm clip | ceiling on the global gradient norm before each step | 3 | ~9 h | ~morning 09-07 |
+| 11 | b19 | switches | adv-norm, value loss (mse/huber), Adam ε, vf_coef | 3 | ~9 h | ~afternoon 09-07 |
+| 12 | b20 | collect lanes | parallel games vs. per-episode depth, same batch size as b14 | 2 | ~6 h | ~evening 09-07 |
+| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 | ~9 h | **~morning 09-08** |
+| — | b22 | factorial | combine whichever knobs above won cleanly | 4 | ~12 h | after b21, once designed |
 
-**58 waves, 464 arms, ~162 h of desktop, across b9–b21**; b22 adds ~4 waves once it is designed. Full
-budget and the queueing order is section 7.
+**What the times are.** The closed batches are measured, from the `results` branch: the first wave's
+arms land ~2.3 h after the previous batch's last stage-B pass, each wave after that lands 2.3-3.0 h
+behind the one before (stage B runs beside the next wave's training, so it costs the batch only its
+last pass, ~1 h), which comes to **~2.6 h per 8-arm wave all in** — b7's 2.8 h estimate held. Cells
+with more gradient steps run at the slow end (b12's epochs 12-16 waves took 2.8-3.0 h). The two
+hall-of-fame passes a batch gets after stage B — `hof5000` over its ≥99/500 rows, `hof30k` over the
+≥99/5,000 survivors — took b11 47 min and 25 min (661 rows, then 22), and **they hold training back
+while they run**: b15's waves 2-5 are waiting on b12's and b13's passes now. b16-b21 are queued with a
+pass per wave rather than per batch, so their estimates are 2.6 h plus ~0.3 h per wave. Laptop waves
+(b13, b14) train in ~5.7 h, not 2.3, with everything else it runs.
+
+**Remaining desktop work from here, b15's waves 2-5 through b21: ~80 h, so b21 closes around
+2026-09-08 morning** if nothing is pulled from the queue and nothing else is put in front of it. The
+original budget stands: 58 waves at ~2.6 h is ~150 h of waves plus ~16 h of hof passes, against the
+~162 h planned in section 7.
 
 ## 1. What this project has learned about sweeps, and what it forces here
 
