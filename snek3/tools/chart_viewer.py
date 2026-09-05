@@ -39,7 +39,7 @@ import matplotlib
 # Figure/FigureCanvasAgg object API instead, because pyplot's global manager keeps artists alive.
 import matplotlib.pyplot as plt
 
-DEFAULT_INTERVAL = 2.0
+DEFAULT_INTERVAL = 5.0
 DEFAULT_MAX_PANELS = 8
 # Never `plt.pause`: it runs a nested event loop and re-enters the draw, which on the Tk backend
 # deadlocks against a resize. `flush_events` plus a plain sleep does the same job.

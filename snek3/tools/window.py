@@ -44,9 +44,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIEWER_MODULE = 'tools.chart_viewer'
 TITLE = 'snek3'
 
-# Slower than the viewer's own 2 s default: the trainers rewrite their PNGs once per report and a
-# shard every ~10 s, so redrawing faster than that is pure CPU on a box whose job is training.
-REFRESH_SECONDS = 15
+# The viewer's own default is the same 5 s. A shard rewrites its chart every ~10 s and a trainer once
+# per report, so 5 s shows a new chart within a few seconds of it landing without much redraw CPU
+# (was 15 s until 2026-09-05; the user wanted to see the refresh more often).
+REFRESH_SECONDS = 5
 
 # `SNEK_CHART_WINDOW=0` opens no window; the size knobs are read here and nowhere else.
 SWITCH_ENV = 'SNEK_CHART_WINDOW'
