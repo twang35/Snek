@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snek charts</title>
+<style>
+  :root { --bg:#111; --fg:#ddd; --dim:#888; --line:#333; --hi:#4c9; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.4 -apple-system, system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:.6em 1.2em; align-items:center; padding:.5em .8em; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:2; }
+  header label { color:var(--dim); }
+  select, button { background:#222; color:var(--fg); border:1px solid #444; border-radius:4px; padding:.2em .5em; font:inherit; }
+  button:hover { border-color:var(--hi); cursor:pointer; }
+  .pager { margin-left:auto; display:flex; gap:.5em; align-items:center; }
+  .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:.5em; padding:.5em; }
+  .grid.two { grid-template-columns:repeat(2, 1fr); }
+  /* two rows must fit the window without scrolling: cap each chart at half the height minus header and caption */
+  .grid.two .cell img { max-height:calc(50vh - 5em); object-fit:contain; }
+  .cell { background:#181818; border:1px solid var(--line); border-radius:4px; overflow:hidden; display:flex; flex-direction:column; }
+  .cell img { width:100%; height:auto; display:block; background:#fff; cursor:zoom-in; }
+  .cell .cap { padding:.3em .5em; display:flex; flex-wrap:wrap; gap:.2em .8em; }
+  .cell .cap b { color:#fff; }
+  .cell .cap span { color:var(--dim); white-space:nowrap; }
+  .cell .cap span em { color:var(--fg); font-style:normal; }
+  .cell.missing { align-items:center; justify-content:center; color:var(--dim); min-height:12em; text-align:center; line-height:1.6; }
+  .cell.missing b { color:var(--fg); font-weight:normal; }
+  /* where the view's pass stands for this arm: complete, in progress, queued, not yet run, or never */
+  .st { border-radius:3px; padding:0 .4em; font-size:.92em; border:1px solid transparent; }
+  .st-done { color:var(--dim); border-color:#333; }
+  .st-running { color:#4c9; border-color:#4c9; }
+  .st-queued { color:#7ab8ff; border-color:#7ab8ff; }
+  .st-pending { color:#e6b422; border-color:#e6b422; }
+  .st-none, .st-upstream { color:var(--dim); border-color:#444; }
+  .cell .cap .box { font-size:10px; padding:0 4px; border-radius:3px; border:1px solid #444; color:var(--dim); }
+  .cell .cap .box-laptop { border-color:#7ab8ff55; color:#7ab8ff; }
+  .cell .cap .box-desktop { border-color:#4c995; color:#4c9; }
+  .cell.missing .st { display:inline-block; margin-top:.4em; }
+  .group-start { box-shadow: inset 3px 0 0 var(--hi); }
+  .reference { box-shadow: inset 3px 0 0 #e6b422; }
+  .reference .cap b::after { content: ' · reference'; color:#e6b422; font-weight:normal; }
+  .help { color:var(--dim); padding:0 .8em .8em; }
+  kbd { background:#222; border:1px solid #444; border-radius:3px; padding:0 .3em; font:inherit; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.9); display:none; flex-direction:column; align-items:center; justify-content:center; gap:.6em; padding:1vh 1vw; box-sizing:border-box; z-index:5; cursor:zoom-out; }
+  /* fill the window either way: object-fit scales the PNG up past its native size, keeping its aspect ratio */
+  #lightbox img { width:98vw; height:calc(98vh - 2.4em); object-fit:contain; background:transparent; }
+  #lightbox .cap { flex:none; text-align:center; color:#fff; font-size:1.1em; }
+  @media (max-width: 1100px) { .grid { grid-template-columns:repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <label title="n / p: next (newer) / previous (older) batch">batch <select id="batch"></select></label>
+  <label>sort <select id="sort">
+    <option value="arm">arm order</option>
+    <option value="density">≥98%/500 density</option>
+    <option value="best30">best30</option>
+    <option value="drawdown">drawdown &lt; 50%</option>
+    <option value="sef">sef</option>
+    <option value="hof">best /5,000 (hof5000)</option>
+    <option value="hof30k">best /30,000 (hof30k)</option>
+  </select></label>
+  <label>show <select id="mode">
+    <option value="a">stage A (training)</option>
+    <option value="b">stage B (checkpoints)</option>
+    <option value="h">hof5000 (5,000-episode re-measure)</option>
+    <option value="k">hof30k (30,000 episodes, seed 7)</option>
+  </select></label>
+  <label>per page <select id="per">
+    <option value="8">8 (4 x 2)</option>
+    <option value="4">4 (2 x 2, bigger)</option>
+  </select></label>
+  <span id="summary" style="color:var(--dim)"></span>
+  <div class="pager">
+    <button id="first" title="Home">⇤</button>
+    <button id="prev" title="←">←</button>
+    <span id="where"></span>
+    <button id="next" title="→">→</button>
+    <button id="last" title="End">⇥</button>
+  </div>
+</header>
+<div class="grid" id="grid"></div>
+<p class="help"><kbd>j</kbd> <kbd>k</kbd> or <kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧j</kbd> <kbd>⇧k</kbd> or <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by four arms · <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · <kbd>n</kbd>/<kbd>p</kbd> next (newer) or previous (older) batch · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. Each caption says where the view's pass stands for that arm — complete, in progress or queued (and on which box), not yet run, or never (nothing qualified) — as of the manifest's timestamp. The URL carries the view, so it can be linked.</p>
+<div id="lightbox"><img alt=""><div class="cap"></div></div>
+
+<script src="manifest.js"></script>
+<script>
+(function () {
+  var M = window.SNEK_MANIFEST || { generated: '', arms: [] };
+  var PAGE = 8;                    // reset from state.per on every render
+  var RUNS = M.charts_dir || '../runs/';   // '../runs/' beside the source; 'charts/' on the published site
+  var SORTS = ['arm', 'density', 'best30', 'drawdown', 'sef', 'hof', 'hof30k'];
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- state lives in the URL hash so a view is a link
+  var state = { batch: null, sort: 'arm', mode: 'a', per: '8', start: 0 };
+  function readHash() {
+    var h = location.hash.replace(/^#/, '');
+    h.split('&').forEach(function (kv) {
+      var p = kv.split('='); if (p.length !== 2) return;
+      if (p[0] === 'start') state.start = parseInt(p[1], 10) || 0;
+      else if (p[0] === 'zoom') state.zoom = decodeURIComponent(p[1]);   // open the lightbox on load; not written back
+      else if (p[0] === 'cols') state.per = p[1] === '2' ? '4' : '8';       // the old name for this knob
+      else if (p[0] in state) state[p[0]] = decodeURIComponent(p[1]);
+    });
+  }
+  function writeHash() {
+    var h = 'batch=' + state.batch + '&sort=' + state.sort + '&mode=' + state.mode + '&per=' + state.per + '&start=' + state.start;
+    if (location.hash.replace(/^#/, '') !== h) history.replaceState(null, '', '#' + h);
+  }
+
+  // ---- batches: newest first in the picker, b9 default when present
+  var batches = {};
+  M.arms.forEach(function (a) { (batches[a.batch] = batches[a.batch] || []).push(a); });
+  // A batch's control cell from an earlier batch rides along at the end of its list, marked, so the
+  // comparison the batch exists for is on the page with it.
+  var byPolicy = {}; M.arms.forEach(function (a) { byPolicy[a.policy] = a; });
+  var refLabel = {};
+  Object.keys(M.references || {}).forEach(function (batch) {
+    var ref = M.references[batch]; if (!batches[batch]) return;
+    var copies = [];
+    ref.arms.forEach(function (p) {
+      var a = byPolicy[p]; if (!a) return;
+      copies.push(Object.assign({}, a, { reference: true, knob: 'reference' }));
+    });
+    // Slot the reference where its knob value belongs in the sweep: right after the batch's own group
+    // named by `after`. With no `after`, or none matching, it goes at the end.
+    var at = batches[batch].length;
+    if (ref.after) {
+      for (var i = 0; i < batches[batch].length; i++) if (batches[batch][i].knob === ref.after) at = i + 1;
+    }
+    batches[batch].splice.apply(batches[batch], [at, 0].concat(copies));
+    refLabel[batch] = ref.label;
+  });
+  var names = Object.keys(batches).sort(function (x, y) {
+    var nx = parseInt(x.replace(/\D/g, ''), 10), ny = parseInt(y.replace(/\D/g, ''), 10);
+    if (isNaN(nx) || isNaN(ny)) return x < y ? -1 : 1;
+    return ny - nx;
+  });
+  names.forEach(function (n) {
+    var o = document.createElement('option'); o.value = n;
+    var own = batches[n].filter(function (a) { return !a.reference; }).length;
+    o.textContent = n + ' (' + own + (batches[n].length > own ? ' + ' + (batches[n].length - own) + ' ref' : '') + ')'; $('batch').appendChild(o);
+  });
+
+  function num(v) { return (v === null || v === undefined) ? null : v; }
+  function sorted(arms) {
+    var s = state.sort, out = arms.slice();
+    if (s === 'arm') return out;                    // manifest order is name order is knob order
+    var key = { density: 'density98', best30: 'best30', drawdown: 'drawdown50', sef: 'sef', hof: 'hof_best', hof30k: 'hof30k_best' }[s];
+    var asc = (s === 'drawdown');
+    out.sort(function (a, b) {
+      var x = num(a[key]), y = num(b[key]);
+      if (x === null && y === null) return 0;
+      if (x === null) return 1; if (y === null) return -1;
+      return asc ? x - y : y - x;
+    });
+    return out;
+  }
+
+  function fmt(v, suffix, digits) {
+    if (v === null || v === undefined) return '–';
+    return (digits === undefined ? v : Number(v).toFixed(digits)) + (suffix || '');
+  }
+  // ---- pass state: one word per view from the manifest (`status: {a, b, h, k}`), see tools/viewer_manifest.py
+  var PASS = { a: 'training', b: 'stage B', h: 'hof5000', k: 'hof30k' };
+  var CUT = { h: '≥99 /500', k: '≥99 /5,000' };
+  function stateOf(a) { return (a.status || {})[state.mode] || null; }
+  // How many checkpoints the view's pass would measure for this arm (its candidate cut).
+  function candidates(a) { return state.mode === 'h' ? a.cands99 : state.mode === 'k' ? a.hof_99 : null; }
+  // " on the desktop" / " on the laptop" from the manifest's `status_box`, or nothing when it does not know.
+  function boxText(a) { var b = (a.status_box || {})[state.mode]; return b ? ' on the ' + b : ''; }
+  function stateText(a) {
+    var st = stateOf(a), m = state.mode, n = candidates(a);
+    if (st === 'done') return m === 'a' ? 'training complete' : PASS[m] + ' complete';
+    if (st === 'running') return (m === 'a' ? 'training' : PASS[m] + ' in progress') + boxText(a);
+    if (st === 'queued') return PASS[m] + ' queued' + boxText(a) + (n ? ' — ' + n + ' at ' + CUT[m] : '');
+    if (st === 'pending') return m === 'b' ? 'stage B not yet run' : PASS[m] + ' not yet run — ' + n + ' at ' + CUT[m];
+    if (st === 'none') return n === null || n === undefined ? 'never — nothing qualified upstream' : 'never — 0 rows at ' + CUT[m];
+    if (st === 'upstream') return m === 'b' ? 'still training' : m === 'h' ? 'no stage B yet' : 'no hof5000 pass yet';
+    return null;
+  }
+  function badge(a) {
+    var st = stateOf(a), text = stateText(a);
+    return st ? '<span class="st st-' + st + '" title="' + text + '">' + text + '</span>' : '';
+  }
+  function missing(a) {
+    var st = stateOf(a), text = stateText(a) || 'no ' + PASS[state.mode] + ' panel';
+    return '<div><b>' + a.policy + '</b><br>no ' + PASS[state.mode] + ' panel<br><span class="st st-' + (st || 'none') + '">' + text + '</span></div>';
+  }
+  function cap(a) {
+    var parts = ['<b>' + a.policy + '</b>', badge(a)];
+    // Which box trained the arm: a batch can span both (one queue, waves claimed by either box), and
+    // the two boxes' steps/s differ enough that a split batch's stage-A traces would read as an effect.
+    if (a.box) parts.push('<span class="box box-' + a.box + '">' + a.box + '</span>');
+    if (state.mode === 'k') {
+      parts.push('<span>rows <em>' + fmt(a.hof30k_rows) + '</em>' + (a.hof30k_stopped ? ' <small>(' + a.hof30k_stopped + ' stopped)</small>' : '') + '</span>');
+      parts.push('<span>≥99.8 /30k <em>' + fmt(a.hof30k_998) + '</em></span>');
+      parts.push('<span>best /30k <em>' + fmt(a.hof30k_best) + '</em>' + (a.hof30k_best_step ? ' @' + (a.hof30k_best_step / 1e6).toFixed(2) + 'M' : '') + '</span>');
+      parts.push('<span>best /5000 <em>' + fmt(a.hof_best) + '</em></span>');
+      return parts.join('');
+    }
+    if (state.mode === 'h') {
+      parts.push('<span>hof rows <em>' + fmt(a.hof_rows) + '</em>' + (a.hof_stopped ? ' <small>(' + a.hof_stopped + ' stopped)</small>' : '') + '</span>');
+      parts.push('<span>≥99.6 /5000 <em>' + fmt(a.hof_996) + '</em></span>');
+      parts.push('<span>best /5000 <em>' + fmt(a.hof_best) + '</em></span>');
+      parts.push('<span>≥98.73 <em>' + fmt(a.hof_9873) + '</em></span>');
+      parts.push('<span>best row /500 <em>' + fmt(a.best_row) + '</em></span>');
+      return parts.join('');
+    }
+    parts.push('<span>best30 <em>' + fmt(a.best30) + '</em></span>');
+    parts.push('<span>≥98/500 <em>' + fmt(a.density98, '%') + '</em>' + (a.rows !== null && a.rows !== undefined ? ' of ' + a.rows : '') + '</span>');
+    parts.push('<span>best row <em>' + fmt(a.best_row) + '</em></span>');
+    parts.push('<span>dd&lt;50 <em>' + fmt(a.drawdown50, '%') + '</em></span>');
+    parts.push('<span>sef <em>' + fmt(a.sef) + '</em></span>');
+    if (a.step) parts.push('<span>' + (a.step / 1e6).toFixed(1) + 'M</span>');
+    return parts.join('');
+  }
+  function src(a) {
+    var stem = state.mode === 'b' ? a.policy + '_checkpoint_evals'
+             : state.mode === 'h' ? a.policy + '_checkpoint_evals_hof5000'
+             : state.mode === 'k' ? a.policy + '_checkpoint_evals_hof30k' : a.policy;
+    return RUNS + stem + '.png?v=' + encodeURIComponent(M.generated);
+  }
+
+  var current = [];
+  function render() {
+    if (!(state.batch in batches)) state.batch = names.indexOf('b9') >= 0 ? 'b9' : names[0];
+    current = sorted(batches[state.batch] || []);
+    var n = current.length;
+    state.start = Math.max(0, Math.min(state.start, Math.max(0, n - 1)));
+    PAGE = state.per === '4' ? 4 : 8;
+    $('batch').value = state.batch; $('sort').value = state.sort; $('mode').value = state.mode; $('per').value = String(PAGE);
+    var grid = $('grid'); grid.innerHTML = ''; grid.className = 'grid' + (PAGE === 4 ? ' two' : '');
+    var page = current.slice(state.start, state.start + PAGE);
+    page.forEach(function (a, i) {
+      var cell = document.createElement('div'); cell.className = 'cell';
+      var prev = current[state.start + i - 1];
+      if (state.sort === 'arm' && (!prev || prev.knob !== a.knob)) cell.className += ' group-start';
+      if (a.reference) cell.className += ' reference';
+      var hasPng = state.mode === 'b' ? a.stage_b_png : state.mode === 'h' ? a.hof_png : state.mode === 'k' ? a.hof30k_png : true;
+      if (!hasPng) {
+        cell.className += ' missing';
+        cell.innerHTML = missing(a);
+        if (state.mode === 'b' && a.rows === 0) cell.firstChild.innerHTML += '<br>screened zero checkpoints';
+      } else {
+        var img = document.createElement('img'); img.src = src(a); img.alt = a.policy; img.loading = 'lazy';
+        img.addEventListener('click', function () { zoom(a); });
+        cell.appendChild(img);
+        var c = document.createElement('div'); c.className = 'cap'; c.innerHTML = cap(a); cell.appendChild(c);
+      }
+      grid.appendChild(cell);
+    });
+    var lo = n ? state.start + 1 : 0, hi = Math.min(n, state.start + PAGE);
+    $('where').textContent = lo + '–' + hi + ' of ' + n;
+    $('summary').textContent = 'manifest ' + (M.generated || '?').replace('T', ' ')
+      + (M.desktop_iso ? ' · desktop ledger ' + M.desktop_iso.replace('T', ' ') : '')
+      + (refLabel[state.batch] ? ' · gold edge = ' + refLabel[state.batch] : '');
+    $('prev').disabled = $('first').disabled = state.start === 0;
+    $('next').disabled = $('last').disabled = state.start + PAGE >= n;
+    writeHash();
+  }
+
+  function move(d) { state.start = Math.max(0, Math.min(state.start + d, Math.max(0, current.length - PAGE))); render(); }
+  function zoom(a) {
+    var lb = $('lightbox'); lb.querySelector('img').src = src(a);
+    lb.querySelector('.cap').textContent = a.policy + (state.mode === 'b' ? ' — stage B' : state.mode === 'h' ? ' — hof5000' : state.mode === 'k' ? ' — hof30k' : ' — stage A'); lb.style.display = 'flex';
+  }
+  function unzoom() { $('lightbox').style.display = 'none'; }
+
+  // Each select drops focus once a choice is made, so the arrow keys go back to paging
+  // instead of cycling the dropdown (the keydown handler below ignores keys aimed at a SELECT).
+  $('batch').addEventListener('change', function () { state.batch = this.value; state.start = 0; this.blur(); render(); });
+  $('sort').addEventListener('change', function () { state.sort = this.value; state.start = 0; this.blur(); render(); });
+  $('mode').addEventListener('change', function () { state.mode = this.value; this.blur(); render(); });
+  $('per').addEventListener('change', function () { state.per = this.value; this.blur(); render(); });
+  $('prev').addEventListener('click', function () { move(-PAGE); });
+  $('next').addEventListener('click', function () { move(PAGE); });
+  $('first').addEventListener('click', function () { state.start = 0; render(); });
+  $('last').addEventListener('click', function () { state.start = Math.max(0, current.length - PAGE); render(); });
+  $('lightbox').addEventListener('click', unzoom);
+  // n / p step the batch picker. `names` is newest first, so "next" is the newer batch (one index up),
+  // "previous" the older. Stops at the ends, no wrap.
+  function stepBatch(dir) {
+    var i = names.indexOf(state.batch), j = i - dir;
+    if (i < 0 || j < 0 || j >= names.length) return;
+    state.batch = names[j]; state.start = 0; render();
+  }
+  // 1-4 pick the view: stage A, stage B, hof5000, hof30k (user, 2026-09-07; the letters clashed with j/k paging).
+  var MODE_KEYS = { '1': 'a', '2': 'b', '3': 'h', '4': 'k' };
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'SELECT') return;
+    if (e.key === 'Escape') return unzoom();
+    if ($('lightbox').style.display === 'flex') return;
+    // j / k page left / right like the arrows (vim order: j back, k forward); shift slides by four arms.
+    var key = e.key.toLowerCase();
+    if (e.key === 'ArrowRight' || key === 'k') { move(e.shiftKey ? 4 : PAGE); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || key === 'j') { move(e.shiftKey ? -4 : -PAGE); e.preventDefault(); }
+    else if (e.key === 'Home') { state.start = 0; render(); }
+    else if (e.key === 'End') { state.start = Math.max(0, current.length - PAGE); render(); }
+    else if (MODE_KEYS[e.key]) { state.mode = MODE_KEYS[e.key]; render(); }
+    else if (e.key === 'c') { state.per = state.per === '4' ? '8' : '4'; render(); }
+    else if (e.key === 's') { state.sort = SORTS[(SORTS.indexOf(state.sort) + 1) % SORTS.length]; state.start = 0; render(); }
+    else if (e.key === 'n') stepBatch(1);
+    else if (e.key === 'p') stepBatch(-1);
+  });
+  window.addEventListener('hashchange', function () { readHash(); render(); });
+
+  readHash(); render();
+  if (state.zoom) { var z = current.filter(function (a) { return a.policy === state.zoom; })[0]; if (z) zoom(z); }
+})();
+</script>
+</body>
+</html>
