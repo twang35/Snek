@@ -8,9 +8,12 @@
 laptop), read in id order and run in waves of `--wave` arms. Each arm is `train.py <policy>` with the
 spec's `env` and `max_steps`, exactly as `desktop/runner/launch.py` would set them; when every arm of
 a wave has exited, the wave's stage B runs as one `tools.closeout` over those arms, named
-`<batch>-stageb`, `<batch>-stageb-w2`, ... as the daemon names its auto-queued waves. Then the next
-wave. So a batch dequeued from the desktop -- b13 on 2026-09-03, to shorten the box's queue -- runs
-here with nothing rewritten and lands in `runs/` under the names every later tool expects.
+`<batch>-stageb`, `<batch>-stageb-w2`, ... as the daemon names its auto-queued waves, and then --
+since 2026-09-04, as the daemon also does -- the wave's `hof5000` and `hof30k` passes over the same
+arms (`<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...), each only if the pass before it exited 0,
+because each selects from the file the one before it wrote. Then the next wave. So a batch dequeued
+from the desktop -- b13 on 2026-09-03, to shorten the box's queue -- runs here with nothing
+rewritten and lands in `runs/` under the names every later tool expects, hof passes included.
 
 **Resumable, and it never doubles an arm.** An arm whose `_evals.json` already reports `max_steps` is
 skipped; an arm that is *live on this box* -- registered in `runs/.live/` by a trainer that this
@@ -43,6 +46,7 @@ import sys
 import time
 
 from env import constants
+from tools import closeout
 from tools import live_runs
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -106,9 +110,19 @@ def waves(specs, size):
     return [specs[i:i + size] for i in range(0, len(specs), size)]
 
 
+def pass_label(batch, pass_name, number):
+    """`b13-stageb`, then `b13-stageb-w2`, ... -- the daemon's names for its auto-queued passes.
+
+    The same shape for every pass: `b13-hof5000`, `b13-hof30k-w2`. `desktop/runner/runner.py`'s
+    `mint_pass_id` is the desktop's spelling of this; the daemon cannot import from `tools/` and this
+    module keeps the dependency one-way, so the two are pinned equal by a test rather than shared.
+    """
+    base = '{0}-{1}'.format(batch, pass_name)
+    return base if number == 1 else '{0}-w{1}'.format(base, number)
+
+
 def stage_b_label(batch, number):
-    """`b13-stageb`, then `b13-stageb-w2`, ... -- the daemon's names for its auto-queued waves."""
-    return '{0}-stageb'.format(batch) if number == 1 else '{0}-stageb-w{1}'.format(batch, number)
+    return pass_label(batch, 'stageb', number)
 
 
 # ---------------------------------------------------------------- one arm
@@ -150,10 +164,14 @@ class Driver(object):
 
     def __init__(self, specs, wave=DEFAULT_WAVE, shards=DEFAULT_SHARDS, stage_b=True,
                  max_trainers=DEFAULT_MAX_TRAINERS, python=sys.executable, runs_dir=None,
-                 logs_dir=None, popen=subprocess.Popen, call=subprocess.call, sleep=time.sleep):
+                 logs_dir=None, popen=subprocess.Popen, call=subprocess.call, sleep=time.sleep,
+                 passes=closeout.CHAIN):
         if wave > max_trainers:
             raise ValueError('a wave of {0} exceeds the {1}-trainer cap'.format(wave, max_trainers))
         self.specs, self.wave, self.shards, self.stage_b = specs, int(wave), int(shards), stage_b
+        # The passes each wave gets after its arms finish, in order; `stage_b=False` turns them all
+        # off. The default is the whole chain, the same one the desktop daemon runs.
+        self.passes = tuple(passes)
         self.max_trainers, self.python, self.runs_dir = int(max_trainers), python, runs_dir
         self.logs_dir = logs_dir or os.path.join(ROOT, 'logs')
         self.popen, self.call, self.sleep = popen, call, sleep
@@ -201,15 +219,31 @@ class Driver(object):
             _log('{0} (pid {1}) finished'.format(spec['policy'], pid))
         if not self.stage_b:
             return 0
-        label = stage_b_label(self.batch, number)
-        _log('wave {0}: stage B as {1}'.format(number, label))
+        code = 0
+        for pass_name in self.passes:
+            code = self.run_pass(pass_name, number, arms)
+            if code:
+                # The next pass selects from the file this one wrote; with the pass failed, running
+                # it would fail too and bury the real failure. The daemon stops its chain the same
+                # way (`next_pass` needs `ok`).
+                _log('wave {0}: {1} failed, so the passes behind it are not run'.format(
+                    number, pass_name))
+                break
+        return code
+
+    def run_pass(self, pass_name, number, arms):
+        """One pass of the chain over a wave's arms, as one `tools.closeout` -- the daemon's command."""
+        label = pass_label(self.batch, pass_name, number)
+        _log('wave {0}: {1} as {2}'.format(number, pass_name, label))
         os.makedirs(self.logs_dir, exist_ok=True)
+        argv = [self.python, '-u', '-m', 'tools.closeout', *[spec['policy'] for spec in arms]]
+        if pass_name != 'stageb':
+            argv += ['--pass', pass_name]
+        argv += ['--shards', str(self.shards)]
         with open(os.path.join(self.logs_dir, '{0}.log'.format(label)), 'a') as out:
-            code = self.call([self.python, '-u', '-m', 'tools.closeout',
-                              *[spec['policy'] for spec in arms], '--shards', str(self.shards)],
-                             cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
+            code = self.call(argv, cwd=ROOT, env={**os.environ, 'PYTHONPATH': ROOT},
                              stdout=out, stderr=subprocess.STDOUT)
-        _log('wave {0}: stage B exited {1}'.format(number, code))
+        _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
         return code
 
     def wait_for(self, pid):
@@ -222,8 +256,9 @@ class Driver(object):
     def run(self, after=None):
         self.wait_for(after)
         plan = waves(self.specs, self.wave)
-        _log('{0}: {1} arms in {2} wave(s) of {3}, stage B {4}'.format(
-            self.batch, len(self.specs), len(plan), self.wave, 'on' if self.stage_b else 'off'))
+        _log('{0}: {1} arms in {2} wave(s) of {3}, passes after each: {4}'.format(
+            self.batch, len(self.specs), len(plan), self.wave,
+            ', '.join(self.passes) if self.stage_b else 'none'))
         worst = 0
         for number, arms in enumerate(plan, start=1):
             _log('wave {0} of {1}: {2}'.format(number, len(plan), [spec['policy'] for spec in arms]))
@@ -239,15 +274,18 @@ def main(argv=None):
     parser.add_argument('--shards', type=int, default=DEFAULT_SHARDS, help='stage-B shards')
     parser.add_argument('--max-trainers', type=int, default=DEFAULT_MAX_TRAINERS,
                         help='never more trainers than this on the box, counting others')
-    parser.add_argument('--no-stage-b', action='store_true', help='train only')
+    parser.add_argument('--no-stage-b', action='store_true', help='train only: no passes at all')
+    parser.add_argument('--no-hof', action='store_true',
+                        help='stage B only after each wave; no hof5000 or hof30k')
     parser.add_argument('--after', type=int, default=None, metavar='PID',
                         help='start only once this process (another driver, a closeout) has exited')
     args = parser.parse_args(argv)
     specs = load_specs(args.specs)
     if not specs:
         parser.error('no training specs found')
+    passes = closeout.CHAIN[:1] if args.no_hof else closeout.CHAIN
     return Driver(specs, wave=args.wave, shards=args.shards, stage_b=not args.no_stage_b,
-                  max_trainers=args.max_trainers).run(after=args.after)
+                  max_trainers=args.max_trainers, passes=passes).run(after=args.after)
 
 
 if __name__ == '__main__':

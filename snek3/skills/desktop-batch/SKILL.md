@@ -112,7 +112,9 @@ a dead daemon. Read `at_a_glance` first, then `attention`.
 **Nothing starts while anything is running.** `_dispatch` returns early whenever any job is live, so
 waves never overlap and a freed slot is never backfilled mid-wave. A queued batch behind a running
 one is normal, not stuck. With `auto_stage_b` on, each finished training queues its own stage B at
-priority 10.
+priority 10, the stage B queues the batch's hof5000 at 11 and that queues its hof30k at 12 -- one
+`evals` line per batch in `at_a_glance.queued`, three jobs. No hof spec needs writing for a batch
+that finishes under the chain; `desktop/README.md` has the table.
 
 ## Retune or hold the box
 

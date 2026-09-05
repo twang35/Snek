@@ -120,6 +120,23 @@ def desktop_ledger(runs_dir):
     return {'iso': status.get('iso'), 'jobs': status.get('ledger') or {}, 'running': running}
 
 
+def ledger_pass_state(jobs, batch, suffix):
+    """The desktop ledger's state for a batch's pass, across every wave of it.
+
+    The daemon names a batch's second wave `<batch>-stageb-w2` (and `-hof5000-w2`, ...), so a bare
+    `jobs.get(batch + suffix)` saw only the first wave and called an arm of wave 3 done as soon as
+    wave 1 was. With several waves the most informative state wins: a running one says the pass is
+    under way on the box, a queued one says this arm's turn is still to come, and only when every
+    wave is finished does a missing file mean the arm is owed its pass.
+    """
+    pattern = re.compile(re.escape(batch + suffix) + r'(-w\d+)?$')
+    states = [state for job_id, state in jobs.items() if pattern.match(job_id)]
+    for wanted in ('running', 'queued'):
+        if wanted in states:
+            return wanted
+    return states[0] if states else None
+
+
 def pass_state(have_file, have_shards, candidates, in_running_job, ledger_state):
     """One word for where a pass stands, for one arm:
 
@@ -234,7 +251,8 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset()):
     for kind, (label, suffix) in PASSES.items():
         have = {'b': stage_b, 'h': hof, 'k': h30}[kind] is not None
         record['status'][kind] = pass_state(have, bool(shard_files(runs_dir, policy, label)), candidates[kind],
-                                            policy in running[kind], jobs.get(batch + suffix))
+                                            policy in running[kind],
+                                            ledger_pass_state(jobs, batch, suffix))
     # A pass whose upstream found nothing will never run either: say `none`, not `upstream`.
     for kind, before in (('h', 'b'), ('k', 'h')):
         if record['status'][kind] == 'upstream' and record['status'][before] == 'none':

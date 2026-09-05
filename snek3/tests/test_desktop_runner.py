@@ -352,12 +352,21 @@ def parsed(argv):
     return closeout.build_parser().parse_args(argv[4:])
 
 
+def settings(argv):
+    """What the close-out would actually measure with: the pass's preset, under any explicit flag."""
+    from tools import closeout
+    args = parsed(argv)
+    return closeout.pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed)
+
+
 @pytest.mark.parametrize('overrides', [
     {},
     {'selector': 'screen:98'},
     {'episodes': 1000},
     {'selector': 'one', 'episodes': 3000},
     {'eval_args': ['--label', 'ab']},
+    {'eval_args': ['--pass', 'hof5000']},
+    {'eval_args': ['--pass', 'hof30k']},
 ])
 def test_every_command_the_daemon_builds_parses(overrides):
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None, **overrides))
@@ -377,8 +386,24 @@ def test_a_whole_batch_is_one_command_naming_every_arm():
 def test_an_unadorned_wave_inherits_the_protocol_from_the_closeout():
     """What the daemon leaves unsaid has to arrive as `screen:97` at 500 episodes."""
     job = parse_job(spec(type='eval', policies=['b1a'], policy=None))
-    args = parsed(launch.eval_command(job, HOST, runtime()))
-    assert args.selector == 'screen' and args.episodes == 500
+    chosen = settings(launch.eval_command(job, HOST, runtime()))
+    assert chosen['selector'] == 'screen' and chosen['episodes'] == 500
+    assert chosen['label'] is None and chosen['seed'] == 0
+
+
+def test_a_synthesised_hof_pass_names_the_pass_and_nothing_else():
+    """The daemon carries no protocol numbers: `--pass hof5000` is the whole instruction, and the
+    close-out's preset turns it into `above:99` at 5,000 under the `hof5000` label -- the label being
+    what keeps the pass from overwriting the 500-episode file it selects from."""
+    job = runner_module.Job(id='b12-hof5000', type='eval', policies=['b12aa-x', 'b12ab-x'],
+                            eval_args=['--pass', 'hof5000'], priority=11)
+    argv = launch.eval_command(job, HOST, runtime(eval_shards=16))
+    assert '--selector' not in argv and '--episodes' not in argv and '--label' not in argv
+    assert settings(argv) == {'selector': 'above:99', 'episodes': 5000, 'label': 'hof5000', 'seed': 0}
+    job = runner_module.Job(id='b12-hof30k', type='eval', policies=['b12aa-x'],
+                            eval_args=['--pass', 'hof30k'], priority=12)
+    assert settings(launch.eval_command(job, HOST, runtime())) == {
+        'selector': 'above:99:hof5000', 'episodes': 30000, 'label': 'hof30k', 'seed': 7}
 
 
 def test_the_selector_reaches_the_closeout_as_a_flag():
@@ -551,7 +576,13 @@ def test_a_batchs_measurement_slots_in_ahead_of_the_next_batch():
                 'priority': 100}]
     order = runner_module.anticipated_queue(
         queued, [], {'trainer': 2, 'eval': 1}, True, {job['id'] for job in queued})
-    assert [job['id'] for job in order] == ['b1a-x', 'b1b-x', 'b1-stageb', 'b2a-y', 'b2-stageb']
+    assert [job['id'] for job in order] == [
+        'b1a-x', 'b1b-x', 'b1-stageb', 'b1-hof5000', 'b1-hof30k',
+        'b2a-y', 'b2-stageb', 'b2-hof5000', 'b2-hof30k']
+    passes = {job['id']: job for job in order if job['type'] == 'eval'}
+    assert passes['b1-hof30k']['policies'] == ['b1a-x', 'b1b-x'], 'the same arms all the way down'
+    assert (passes['b1-stageb']['priority'] < passes['b1-hof5000']['priority']
+            < passes['b1-hof30k']['priority'] < 100), 'each pass outranks the next training'
 
 
 def test_a_batchs_four_arms_forecast_one_measurement_row_not_four():
@@ -572,12 +603,34 @@ def test_nothing_is_forecast_when_the_auto_chain_is_off():
     assert [job['id'] for job in order] == ['b1a-x']
 
 
-def test_a_job_that_already_exists_is_never_invented_twice():
+def test_a_queued_spec_stands_for_its_wave_and_is_never_invented_twice():
+    """A hand-written `b1-stageb` in the queue is the wave; the forecast must not add a second.
+    The chain still continues past it -- the spec's pass earns the next one."""
     queued = [{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x'],
+               'priority': 100},
+              {'id': 'b1-stageb', 'type': 'eval', 'policy': 'b1a-x', 'policies': ['b1a-x'],
                'priority': 100}]
     order = runner_module.anticipated_queue(
         queued, [], {'trainer': 4, 'eval': 1}, True, {'b1a-x', 'b1-stageb'})
-    assert [job['id'] for job in order] == ['b1a-x']
+    assert [job['id'] for job in order] == ['b1a-x', 'b1-stageb', 'b1-hof5000', 'b1-hof30k']
+
+
+def test_a_batch_whose_first_wave_is_measured_forecasts_its_second_as_w2_not_nothing():
+    """b15, 2026-09-04: wave 1 done and `b15-stageb` in the ledger, 32 arms still queued -- and the
+    forecast showed no b15 measurement at all, because it minted only the bare id and found it taken.
+    The dispatcher mints `-w2`, so the forecast has to."""
+    queued = [{'id': 'b15{0}-x'.format(letter), 'type': 'train', 'policy': 'b15{0}-x'.format(letter),
+               'policies': ['b15{0}-x'.format(letter)], 'priority': 100} for letter in 'ab']
+    existing = {job['id'] for job in queued} | {'b15-stageb', 'b15-hof5000', 'b15-hof30k'}
+    order = runner_module.anticipated_queue(queued, [], {'trainer': 8, 'eval': 1}, True, existing)
+    assert [job['id'] for job in order] == [
+        'b15a-x', 'b15b-x', 'b15-stageb-w2', 'b15-hof5000-w2', 'b15-hof30k-w2']
+
+
+def test_a_running_pass_earns_its_follow_on_in_the_forecast():
+    running = [{'id': 'b11-hof5000', 'type': 'eval', 'policy': 'b11a-x', 'policies': ['b11a-x', 'b11b-x']}]
+    order = runner_module.anticipated_queue([], running, {'trainer': 8, 'eval': 1}, True, {'b11-hof5000'})
+    assert [(job['id'], job['policies']) for job in order] == [('b11-hof30k', ['b11a-x', 'b11b-x'])]
 
 
 def test_only_a_training_earns_a_measurement():
@@ -590,6 +643,102 @@ def test_only_a_training_earns_a_measurement():
     assert runner_module.wants_stage_b('train', True, False) is False
 
 
+def test_each_pass_earns_the_next_and_the_last_earns_nothing():
+    """training -> stageb -> hof5000 -> hof30k, over the same arms, and only on success: the next
+    pass selects from the file this one wrote, so a failed pass has nothing to hand on."""
+    nxt = runner_module.next_pass
+    assert nxt('b1a-x', 'train', True, True) == 'stageb'
+    assert nxt('b1-stageb', 'eval', True, True) == 'hof5000'
+    assert nxt('b1-stageb-w3', 'eval', True, True) == 'hof5000'
+    assert nxt('b1-hof5000', 'eval', True, True) == 'hof30k'
+    assert nxt('b1-hof30k', 'eval', True, True) is None
+    assert nxt('b9-spotcheck', 'eval', True, True) is None, 'a hand spec off the chain earns nothing'
+    assert nxt('b1-stageb', 'eval', False, True) is None
+    assert nxt('b1-stageb', 'eval', True, False) is None, 'auto_stage_b switches the whole chain'
+
+
+def test_the_old_stage_b_marker_still_reads_as_stage_b_owed():
+    """The box's ledger holds `stage_b: pending` on every training the daemon reaped before
+    2026-09-04; the new marker is `next_pass`. Both have to mean what they meant."""
+    assert runner_module.pending_pass({'stage_b': 'pending'}) == 'stageb'
+    assert runner_module.pending_pass({'next_pass': 'hof30k'}) == 'hof30k'
+    assert runner_module.pending_pass({'state': 'done'}) is None
+
+
+def test_pass_ids_count_past_spent_waves_and_stop_at_a_queued_spec():
+    mint = runner_module.mint_pass_id
+    assert mint('b13', 'hof5000') == 'b13-hof5000'
+    assert mint('b13', 'hof5000', used={'b13-hof5000'}) == 'b13-hof5000-w2'
+    assert mint('b13', 'stageb', used={'b13-stageb', 'b13-stageb-w2'}) == 'b13-stageb-w3'
+    assert mint('b13', 'stageb', blocked={'b13-stageb'}) is None
+    assert mint('b13', 'stageb', blocked={'b13-stageb-w2'}, used={'b13-stageb'}) is None
+
+
+def test_the_laptop_driver_spells_pass_ids_the_way_the_daemon_mints_them():
+    """Two boxes, one naming: `tools/laptop_batch.py` cannot be imported by the daemon, so the two
+    spellings are pinned equal here, where both are on the path."""
+    from tools import laptop_batch
+    for pass_name in runner_module.PASS_ORDER:
+        assert laptop_batch.pass_label('b13', pass_name, 1) == runner_module.mint_pass_id('b13', pass_name)
+        assert laptop_batch.pass_label('b13', pass_name, 3) == runner_module.mint_pass_id(
+            'b13', pass_name, used={'b13-' + pass_name, 'b13-' + pass_name + '-w2'})
+        assert runner_module.pass_of(laptop_batch.pass_label('b13', pass_name, 2)) == pass_name
+
+
+def _runner(tmp_path, ledger):
+    host = dict(HOST, LEDGER_PATH=str(tmp_path / 'ledger.json'))
+    with open(host['LEDGER_PATH'], 'w') as handle:
+        json.dump(ledger, handle)
+    return runner_module.Runner(host)
+
+
+def test_a_finished_stage_b_wave_synthesises_the_hof5000_pass_over_its_arms(tmp_path):
+    ledger = {
+        'b12-stageb': {'state': 'done', 'type': 'eval', 'policy': 'b12aa-x',
+                       'policies': ['b12aa-x', 'b12ab-x'], 'next_pass': 'hof5000',
+                       'env': {'SNEK_ZERO_OBS': '1'}},
+    }
+    jobs = _runner(tmp_path, ledger)._auto_jobs()
+    assert [(job.id, job.policies, job.eval_args, job.priority, job.env) for job in jobs] == [
+        ('b12-hof5000', ['b12aa-x', 'b12ab-x'], ['--pass', 'hof5000'], 11, {'SNEK_ZERO_OBS': '1'})]
+
+
+def test_arms_already_covered_by_a_hand_queued_hof_pass_are_not_measured_again(tmp_path):
+    """b11-hof5000 was a hand spec; its id carries the pass suffix, so the chain sees the arms as
+    measured and the box does not spend 35 minutes redoing them."""
+    ledger = {
+        'b11-stageb': {'state': 'done', 'type': 'eval', 'policies': ['b11a-x', 'b11b-x'],
+                       'next_pass': 'hof5000', 'env': {}},
+        'b11-hof5000': {'state': 'done', 'type': 'eval', 'policies': ['b11a-x', 'b11b-x'],
+                        'next_pass': 'hof30k', 'env': {}},
+    }
+    jobs = _runner(tmp_path, ledger)._auto_jobs()
+    assert [(job.id, job.policies) for job in jobs] == [('b11-hof30k', ['b11a-x', 'b11b-x'])]
+
+
+def test_a_legacy_marker_and_a_new_one_group_into_one_stage_b_wave(tmp_path):
+    ledger = {
+        'b16a-x': {'state': 'done', 'type': 'train', 'policy': 'b16a-x', 'policies': ['b16a-x'],
+                   'stage_b': 'pending', 'env': {}},
+        'b16b-x': {'state': 'done', 'type': 'train', 'policy': 'b16b-x', 'policies': ['b16b-x'],
+                   'next_pass': 'stageb', 'env': {}},
+    }
+    jobs = _runner(tmp_path, ledger)._auto_jobs()
+    assert [(job.id, job.policies, job.eval_args, job.priority) for job in jobs] == [
+        ('b16-stageb', ['b16a-x', 'b16b-x'], [], 10)]
+
+
+def test_a_second_wave_of_a_pass_gets_its_own_id(tmp_path):
+    ledger = {
+        'b15-stageb': {'state': 'done', 'type': 'eval', 'policies': ['b15a-x'], 'env': {}},
+        'b15-stageb-w2': {'state': 'done', 'type': 'eval', 'policies': ['b15b-x'],
+                          'next_pass': 'hof5000', 'env': {}},
+        'b15-hof5000': {'state': 'done', 'type': 'eval', 'policies': ['b15a-x'], 'env': {}},
+    }
+    jobs = _runner(tmp_path, ledger)._auto_jobs()
+    assert [(job.id, job.policies) for job in jobs] == [('b15-hof5000-w2', ['b15b-x'])]
+
+
 # --- at_a_glance ---------------------------------------------------------------------------------
 
 def test_a_wave_is_reported_in_arms_not_in_jobs():
@@ -598,7 +747,29 @@ def test_a_wave_is_reported_in_arms_not_in_jobs():
     glance = runner_module.build_at_a_glance(
         [], [{'id': 'b1-stageb', 'type': 'eval', 'policy': 'b1a',
               'policies': ['b1a', 'b1b', 'b1c', 'b1d'], 'priority': 10}], {})
-    assert glance['queued'] == ['b1 stage B | queued (4 arms)']
+    assert glance['queued'] == ['b1 evals | queued (4 arms)']
+
+
+def test_a_batchs_three_queued_passes_take_one_line_not_three():
+    """The queue says what is owed, and a batch owed its stage B is owed its hof passes too; three
+    rows per batch said it three times (2026-09-04). Arms are counted once, not once per pass."""
+    arms = ['b16{0}-kl003-seed1'.format(letter) for letter in 'abcd']
+    queued = [{'id': 'b16-' + pass_name, 'type': 'eval', 'policy': arms[0], 'policies': arms,
+               'priority': priority}
+              for pass_name, priority in (('stageb', 10), ('hof5000', 11), ('hof30k', 12))]
+    queued.append({'id': 'b17a-clip005-seed1', 'type': 'train', 'policy': 'b17a-clip005-seed1',
+                   'policies': ['b17a-clip005-seed1'], 'priority': 100})
+    glance = runner_module.build_at_a_glance([], queued, {})
+    assert glance['queued'] == ['b16 evals | kl003 | queued (4 arms)',
+                                'b17 training | clip005 | queued (1 arm)']
+
+
+def test_a_running_pass_is_named_because_only_one_runs_at_a_time():
+    running = [{'id': 'b11-hof5000', 'type': 'eval', 'policy': 'b11ae-lr1e4-seed1',
+                'policies': ['b11ae-lr1e4-seed1', 'b11af-lr1e4-seed2']}]
+    glance = runner_module.build_at_a_glance(running, [], {})
+    assert glance['running'] == ['b11 | lr1e4 | hof5000 (2 arms)']
+    assert runner_module.phase_of('b11-hof30k-w2', 'eval') == 'hof30k'
 
 
 def test_a_running_batch_shows_the_mean_percent_across_its_arms():

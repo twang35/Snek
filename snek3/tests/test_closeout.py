@@ -251,3 +251,53 @@ def test_a_hand_relaunched_window_without_a_pid_says_it_will_not_close(monkeypat
     monkeypatch.setattr(chart_window, 'spawn', lambda argv, label: object())
     assert eval_window.main([]) == 0
     assert 'stay up until it is closed by hand' in capsys.readouterr().out
+
+
+# --- the passes, by name ---------------------------------------------------------------------------
+
+def test_the_chain_is_three_passes_each_selecting_from_the_one_before():
+    assert closeout.CHAIN == ('stageb', 'hof5000', 'hof30k')
+    assert closeout.FOLLOW_ON == {'stageb': 'hof5000', 'hof5000': 'hof30k'}
+    assert closeout.PASSES['hof5000']['selector'] == 'above:99'
+    assert closeout.PASSES['hof30k']['selector'] == 'above:99:hof5000', 'reads the hof5000 file'
+
+
+def test_stage_b_is_the_default_pass_and_the_close_outs_own_defaults():
+    """A command that names no pass is unchanged: `screen:97` at 500, unlabelled, seed 0."""
+    assert closeout.pass_settings('stageb') == {'selector': 'screen', 'episodes': 500,
+                                                'label': None, 'seed': 0}
+    args = closeout.build_parser().parse_args(['b1a'])
+    assert args.pass_name == 'stageb'
+
+
+def test_a_hof_pass_is_labelled_so_it_never_overwrites_what_it_selected_from():
+    """The output path is `runs/<arm>_checkpoint_evals[_<label>].json`; unlabelled, the 5,000-episode
+    rows would replace the 500-episode file `above:99` reads. The hof-remeasure skill calls omitting
+    the label 'destroying the input'; the preset makes it impossible to omit."""
+    assert closeout.pass_settings('hof5000') == {'selector': 'above:99', 'episodes': 5000,
+                                                 'label': 'hof5000', 'seed': 0}
+    assert closeout.pass_settings('hof30k') == {'selector': 'above:99:hof5000', 'episodes': 30000,
+                                                'label': 'hof30k', 'seed': 7}
+
+
+def test_an_explicit_flag_wins_over_the_preset_but_none_never_unsets_it():
+    chosen = closeout.pass_settings('hof5000', episodes=2000, seed=3)
+    assert (chosen['episodes'], chosen['seed'], chosen['label']) == (2000, 3, 'hof5000')
+    assert closeout.pass_settings('hof5000', label=None)['label'] == 'hof5000'
+    with pytest.raises(ValueError):
+        closeout.pass_settings('hof9000')
+
+
+def test_main_hands_the_pass_to_run(monkeypatch):
+    seen = {}
+
+    def run(policies, selector, episodes, shards, label, width, seed, resume, merge, window):
+        seen.update(policies=policies, selector=selector, episodes=episodes, shards=shards,
+                    label=label, seed=seed)
+        return 0
+    monkeypatch.setattr(closeout, 'run', run)
+    assert closeout.main(['b1a', 'b1b', '--pass', 'hof30k', '--shards', '12']) == 0
+    assert seen == {'policies': ['b1a', 'b1b'], 'selector': 'above:99:hof5000', 'episodes': 30000,
+                    'shards': 12, 'label': 'hof30k', 'seed': 7}
+    closeout.main(['b1a'])
+    assert (seen['selector'], seen['episodes'], seen['label'], seen['seed']) == ('screen', 500, None, 0)

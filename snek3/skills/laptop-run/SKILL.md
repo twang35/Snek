@@ -52,8 +52,15 @@ To run a batch here that was written for the desktop -- dequeued from `ops` to s
 queue, as b13 was on 2026-09-03 -- do not launch the arms by hand. `tools.laptop_batch` takes the
 daemon's own `queue/pending/*.json` specs and runs them the way the daemon would: waves of 8, each
 arm with the spec's `env` and `max_steps`, each wave followed by its own `tools.closeout` named
-`<batch>-stageb`, `-w2`, ... It skips an arm already at its cap, waits for an arm already live here
-instead of relaunching it, and never puts a ninth trainer on the box.
+`<batch>-stageb`, `-w2`, ... and then -- as the daemon also does since 2026-09-04 -- the wave's
+`hof5000` and `hof30k` passes over the same arms (`<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...),
+each only if the pass before it exited 0. It skips an arm already at its cap, waits for an arm
+already live here instead of relaunching it, and never puts a ninth trainer on the box.
+`--no-hof` stops after stage B; `--no-stage-b` trains only.
+
+**A driver started before that date runs the code it loaded**, so its remaining waves get stage B
+only; queue the two hof passes by hand for those (`hof-remeasure`), or restart the driver -- the same
+command resumes it -- once the wave in flight has finished.
 
 ```
 mkdir -p logs/<batch>specs && for f in $(git ls-tree --name-only origin/ops snek3/desktop/queue/pending/ | grep '/<batch>[a-z]'); do

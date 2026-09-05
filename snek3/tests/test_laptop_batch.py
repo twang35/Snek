@@ -1,8 +1,9 @@
-"""The laptop batch driver: desktop specs, run here in waves, each followed by its stage B.
+"""The laptop batch driver: desktop specs, run here in waves, each followed by its stage B and the
+two hof passes.
 
 Every process call is a stand-in, so a test runs a 32-arm batch in milliseconds and asserts on what
-would have been launched: the wave barrier, the stage-B naming the desktop uses, the skip of a
-finished arm, the wait on an arm already live, and the trainer cap.
+would have been launched: the wave barrier, the pass naming the desktop uses, the chain stopping at
+a failed pass, the skip of a finished arm, the wait on an arm already live, and the trainer cap.
 """
 
 import json
@@ -35,10 +36,10 @@ class FakeProcess(object):
 
 
 class Calls(object):
-    """Records every launch and every stage-B call in order."""
+    """Records every launch and every close-out call in order, the close-outs by pass name."""
 
-    def __init__(self):
-        self.events, self.pid = [], 1000
+    def __init__(self, codes=None):
+        self.events, self.pid, self.codes = [], 1000, codes or {}
 
     def popen(self, argv, **kwargs):
         self.pid += 1
@@ -46,9 +47,14 @@ class Calls(object):
         return FakeProcess(self.pid)
 
     def call(self, argv, **kwargs):
-        arms = argv[argv.index('tools.closeout') + 1:argv.index('--shards')]
-        self.events.append(('stageb', tuple(arms), argv[-1]))
-        return 0
+        pass_name = argv[argv.index('--pass') + 1] if '--pass' in argv else 'stageb'
+        end = argv.index('--pass') if '--pass' in argv else argv.index('--shards')
+        arms = argv[argv.index('tools.closeout') + 1:end]
+        self.events.append((pass_name, tuple(arms), argv[-1]))
+        return self.codes.get(pass_name, 0)
+
+
+PASSES = ['stageb', 'hof5000', 'hof30k']
 
 
 @pytest.fixture
@@ -83,6 +89,8 @@ def test_batch_id_and_stage_b_labels_match_the_daemon():
     assert laptop_batch.batch_id(specs) == 'b13'
     assert laptop_batch.stage_b_label('b13', 1) == 'b13-stageb'
     assert laptop_batch.stage_b_label('b13', 3) == 'b13-stageb-w3'
+    assert laptop_batch.pass_label('b13', 'hof5000', 1) == 'b13-hof5000'
+    assert laptop_batch.pass_label('b13', 'hof30k', 2) == 'b13-hof30k-w2'
     assert laptop_batch.batch_id([spec('b13aa-x-seed1'), spec('b14a-y-seed1')]) == 'batch'
 
 
@@ -102,12 +110,51 @@ def test_a_batch_runs_in_waves_each_followed_by_its_own_stage_b(box):
     calls = Calls()
     assert driver(specs, box, calls).run() == 0
     kinds = [e[0] for e in calls.events]
-    assert kinds == (['train'] * 8 + ['stageb']) * 4
-    first_stage_b = calls.events[8]
-    assert first_stage_b[1] == tuple(s['policy'] for s in specs[:8])
+    assert kinds == (['train'] * 8 + PASSES) * 4
+    first_stage_b, first_hof, first_30k = calls.events[8:11]
+    assert first_stage_b[1] == first_hof[1] == first_30k[1] == tuple(s['policy'] for s in specs[:8])
     assert first_stage_b[2] == str(laptop_batch.DEFAULT_SHARDS)   # 12 since 2026-09-04
-    assert len(os.listdir(box['logs'])) == 32 + 4          # one log per arm, one per stage-B wave
+    assert len(os.listdir(box['logs'])) == 32 + 4 * 3      # one log per arm, one per pass per wave
     assert os.path.exists(os.path.join(box['logs'], 'b13-stageb-w4.log'))
+    assert os.path.exists(os.path.join(box['logs'], 'b13-hof30k-w4.log'))
+
+
+def test_a_failed_pass_stops_the_chain_for_that_wave(box):
+    """hof5000 selects from the file stage B wrote, so with stage B failed it would fail too and
+    bury the real failure. Same rule as the daemon's `next_pass`."""
+    specs = [spec('b13aa-mb32-seed1'), spec('b13ab-mb32-seed2')]
+    calls = Calls(codes={'stageb': 1})
+    assert driver(specs, box, calls, wave=2).run() == 1
+    assert [e[0] for e in calls.events] == ['train', 'train', 'stageb']
+    calls = Calls(codes={'hof5000': 2})
+    assert driver(specs, box, calls, wave=2).run() == 2
+    assert [e[0] for e in calls.events] == ['train', 'train', 'stageb', 'hof5000']
+
+
+def test_no_hof_keeps_stage_b_and_drops_the_two_re_measures(box):
+    specs = [spec('b13aa-mb32-seed1')]
+    calls = Calls()
+    driver(specs, box, calls, wave=1, passes=('stageb',)).run()
+    assert [e[0] for e in calls.events] == ['train', 'stageb']
+
+
+def test_the_pass_reaches_the_close_out_as_pass_and_never_as_numbers(box):
+    """`--pass hof5000` is the whole instruction; the selector, depth, label and seed are the
+    close-out's presets, so this driver carries none of them -- the same rule as the daemon."""
+    specs = [spec('b13aa-mb32-seed1')]
+    argvs = []
+
+    def call(argv, **kwargs):
+        argvs.append(argv)
+        return 0
+    laptop_batch.Driver(specs, runs_dir=box['runs'], logs_dir=box['logs'], popen=Calls().popen,
+                        call=call, sleep=lambda s: None, python='py', wave=1).run()
+    assert [a[a.index('tools.closeout') + 1:] for a in argvs] == [
+        ['b13aa-mb32-seed1', '--shards', '12'],
+        ['b13aa-mb32-seed1', '--pass', 'hof5000', '--shards', '12'],
+        ['b13aa-mb32-seed1', '--pass', 'hof30k', '--shards', '12']]
+    for argv in argvs:
+        assert not {'--selector', '--episodes', '--label', '--seed'} & set(argv)
 
 
 def test_a_finished_arm_is_skipped_and_its_wave_still_gets_stage_b(box):
@@ -116,8 +163,8 @@ def test_a_finished_arm_is_skipped_and_its_wave_still_gets_stage_b(box):
         json.dump({'summary': {'step': 50003968}, 'evals': []}, handle)
     calls = Calls()
     driver(specs, box, calls, wave=2).run()
-    assert [e[:2] for e in calls.events] == [('train', 'b13ab-mb32-seed2'),
-                                             ('stageb', ('b13aa-mb32-seed1', 'b13ab-mb32-seed2'))]
+    assert [e[:2] for e in calls.events][:2] == [('train', 'b13ab-mb32-seed2'),
+                                                 ('stageb', ('b13aa-mb32-seed1', 'b13ab-mb32-seed2'))]
 
 
 def test_an_arm_already_live_on_the_box_is_waited_for_not_relaunched(box, monkeypatch):
@@ -134,7 +181,7 @@ def test_an_arm_already_live_on_the_box_is_waited_for_not_relaunched(box, monkey
     calls = Calls()
     driver(specs, box, calls, wave=2).run()
     assert [e[1] for e in calls.events if e[0] == 'train'] == ['b13ab-mb32-seed2']
-    assert calls.events[-1][0] == 'stageb'
+    assert [e[0] for e in calls.events[-3:]] == PASSES
 
 
 def test_no_launch_while_the_box_is_at_the_trainer_cap(box, monkeypatch):

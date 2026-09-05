@@ -35,13 +35,24 @@ TERMINAL = ('done', 'failed')
 
 # `interrupted` is deliberately NOT terminal. A job the machine killed has not finished, so it must
 # stay launchable: `_scan_pending` relaunches it from its still-present spec (a training resumes from
-# its checkpoint, since `SNEK_MAX_STEPS` is absolute), and `_auto_stage_b_jobs` re-synthesises a wave
+# its checkpoint, since `SNEK_MAX_STEPS` is absolute), and `_auto_jobs` re-synthesises a wave
 # whose previous attempt was cut short. Both are the recovery.
 
-# A synthesised stage-B wave outranks any pending training (default priority 100), so when a training
-# wave drains its measurement forms the next wave before any new training starts. That is the whole
-# point of the auto chain: never train the next thing before measuring the last.
-AUTO_STAGE_B_PRIORITY = 10
+# **The automatic chain: `training -> stageb -> hof5000 -> hof30k`, over the same arms.** A job that
+# finishes well earns the next pass; a synthesised pass outranks any pending training (default
+# priority 100), so when a training wave drains, its stage B, then its hof5000, then its hof30k form
+# the next three waves before any new training starts. That is the whole point of the chain: never
+# train the next thing before measuring the last — and since 2026-09-04, measuring means all three
+# passes, because every batch's hof passes had been queued by hand and the b12/b13 ones were not.
+#
+# The passes' selectors, depths, labels and seeds live in `tools/closeout.py`'s `PASSES`; the daemon
+# dispatches `tools.closeout <arms> --pass <name>` and carries only the names and the order. The
+# `runtime.json` knob is still `auto_stage_b`, and it switches the whole chain.
+FOLLOW_ON = {'train': 'stageb', 'stageb': 'hof5000', 'hof5000': 'hof30k'}
+PASS_ORDER = ('stageb', 'hof5000', 'hof30k')
+AUTO_PRIORITY = {'stageb': 10, 'hof5000': 11, 'hof30k': 12}
+AUTO_STAGE_B_PRIORITY = AUTO_PRIORITY['stageb']
+PHASE_NAMES = {'stageb': 'stage B', 'hof5000': 'hof5000', 'hof30k': 'hof30k'}
 
 # `SNEK_*` that belong to a *training* and must not be inherited by its measurement. Each would
 # change what the wave does rather than what it measures: a step cap is meaningless to an eval, and
@@ -124,7 +135,60 @@ def wants_stage_b(job_type, ok, auto_enabled):
     Only a **training** that finished successfully: smoke and benchmark runs share the `trainer`
     category but are throwaway, and a failed run has no checkpoint worth measuring.
     """
-    return bool(auto_enabled) and ok and job_type == 'train'
+    return next_pass('', job_type, ok, auto_enabled) == 'stageb'
+
+
+def next_pass(job_id, job_type, ok, auto_enabled):
+    """The pass a just-finished job earns over its arms, or None.
+
+    A training earns stage B (`wants_stage_b` says which trainings); a stage-B wave earns hof5000; a
+    hof5000 pass earns hof30k; hof30k and any eval that is not one of the chain's passes — a hand
+    spec with its own id, a `one` re-measure — earn nothing. Success is required at every hop, for
+    the same reason at every hop: the next pass selects from the file this one wrote, and a failed
+    pass wrote none, so its follow-on would fail too and hide the real failure behind it.
+    """
+    if not auto_enabled or not ok:
+        return None
+    if job_type == 'train':
+        return FOLLOW_ON['train']
+    if job_type == 'eval':
+        return FOLLOW_ON.get(pass_of(job_id))
+    return None
+
+
+def pending_pass(record):
+    """The pass a finished ledger record is still owed, or None.
+
+    `next_pass` is written as the record's `next_pass` marker. `stage_b: pending` is the marker the
+    daemon wrote before 2026-09-04 and the box's ledger is full of them, so it reads as stage B.
+    """
+    return record.get('next_pass') or ('stageb' if record.get('stage_b') == 'pending' else None)
+
+
+def mint_pass_id(batch, pass_name, blocked=(), used=()):
+    """`<batch>-<pass>`, or `<batch>-<pass>-w<k>` for a later wave of the same batch and pass.
+
+    The plain id is not enough and the case is real: snek2's `b20` ran 36 arms under one prefix in
+    nine waves of four, and each wave needs its own id or the second collides with the first. `k`
+    counts up to the first free id, which does not churn between polls because ledger records are
+    never deleted.
+
+    `used` ids are spent — a finished wave, or one running now — and push `k` past them. `blocked`
+    ids stop the mint outright (None): a pending spec of that id already stands for the wave, and
+    `_scan_pending` keeps a manual spec over a synthesised one for the same reason. The forecast in
+    `anticipated_queue` and the dispatcher in `_auto_jobs` mint through this one function so the
+    queue shown is the queue that runs; before that the forecast minted only the bare id and hid
+    every later wave of a batch whose first wave had finished (b15, 2026-09-04).
+    """
+    base = '{0}-{1}'.format(batch, pass_name)
+    for index in range(1, 100):
+        job_id = base if index == 1 else '{0}-w{1}'.format(base, index)
+        if job_id in blocked:
+            return None
+        if job_id in used:
+            continue
+        return job_id
+    return None
 
 
 class _StubJob(object):
@@ -241,9 +305,10 @@ class Runner(object):
                 # exit code is unknown across reparenting, so success is assumed — and on that same
                 # assumption the arm still earns its measurement, so the auto chain does not
                 # silently skip a restart-straddling arm.
-                if wants_stage_b(record.get('type'), True,
-                                 self.runtime.get('auto_stage_b', True)):
-                    record['stage_b'] = 'pending'
+                owed = next_pass(job_id, record.get('type'), True,
+                                 self.runtime.get('auto_stage_b', True))
+                if owed:
+                    record['next_pass'] = owed
         self._save_ledger()
 
     # -------------------------------------------------------------------- loop
@@ -311,62 +376,69 @@ class Runner(object):
 
     # ------------------------------------------------------- the automatic chain
 
-    def _auto_stage_b_jobs(self):
-        """Stage-B waves for trainings that finished and have not been measured yet.
+    def _auto_jobs(self):
+        """The chain's next passes for jobs that finished and whose arms have not had them yet.
 
         Synthesised fresh each dispatch, never persisted as specs, and driven entirely off the ledger
-        so it survives a daemon restart — the `stage_b: pending` markers and each training's stored
-        `env` both persist.
+        so it survives a daemon restart — the `next_pass` markers and each job's stored `env` both
+        persist. A training's marker says stage B; a stage-B wave's says hof5000; a hof5000 pass's
+        says hof30k.
 
-        **One job per batch, not one per arm.** A batch's arms become a single `tools/closeout.py`
-        job carrying every policy: one ledger record, one publish, one log, and one stage-B window
-        over the batch. Grouping is safe because of the wave barrier:
-        `_dispatch` returns early while anything runs, so by the time this is read the set of markers
-        is closed. That is also why grouping happens at dispatch rather than in `_scan_pending` — an
-        id that shifted as more markers appeared would let a partly-finished wave relaunch under a
-        new id and redo the work.
+        **One job per batch and pass, not one per arm.** A batch's arms become a single
+        `tools/closeout.py` job carrying every policy: one ledger record, one publish, one log, and
+        one window over the batch. Grouping is safe because of the wave barrier: `_dispatch` returns
+        early while anything runs, so by the time this is read the set of markers is closed. That is
+        also why grouping happens at dispatch rather than in `_scan_pending` — an id that shifted as
+        more markers appeared would let a partly-finished wave relaunch under a new id and redo the
+        work.
 
-        **What stops a re-measure is `_measured_policies`, not the job id.** A `stage_b: pending`
-        marker is never cleared, so the marker set says "this arm was trained", not "this arm still
-        needs measuring".
+        **What stops a re-measure is `_measured_policies`, not the job id.** A marker is never
+        cleared, so the marker set says "this job finished", not "its arms still need the pass".
         """
         if not self.runtime.get('auto_stage_b', True):
             return []
-        measured = self._measured_policies()
+        measured = {name: self._measured_policies(name) for name in PASS_ORDER}
         groups = {}
-        for record in sorted(self.ledger.values(), key=lambda rec: str(rec.get('policy'))):
-            if record.get('stage_b') != 'pending' or not record.get('policy'):
-                continue
-            if record['policy'] in measured:
+        for job_id, record in self.ledger.items():
+            pass_name = pending_pass(record)
+            if pass_name not in PASS_ORDER:
                 continue
             env = inherited_eval_env(record.get('env'))
-            key = (batch_of(record['policy']),
-                   tuple(sorted(stage_b_group_env(env).items())))
-            groups.setdefault(key, {'policies': [], 'envs': []})
-            groups[key]['policies'].append(record['policy'])
-            groups[key]['envs'].append(env)
+            for policy in (record.get('policies') or [record.get('policy')]):
+                if not policy or policy in measured[pass_name]:
+                    continue
+                key = (PASS_ORDER.index(pass_name), batch_of(policy),
+                       tuple(sorted(stage_b_group_env(env).items())))
+                groups.setdefault(key, {'policies': [], 'envs': []})
+                groups[key]['policies'].append(policy)
+                groups[key]['envs'].append(env)
         jobs, taken = [], set()
-        for (batch, _), group in sorted(groups.items(), key=lambda item: item[1]['policies'][0]):
-            job_id = self._stage_b_id(batch, taken)
+        for (order, batch, _), group in sorted(groups.items(),
+                                               key=lambda item: (item[0][0],
+                                                                 min(item[1]['policies']))):
+            pass_name = PASS_ORDER[order]
+            job_id = self._pass_id(batch, pass_name, taken)
             if job_id is None:
                 continue
             taken.add(job_id)
-            jobs.append(Job(id=job_id, type='eval', policies=sorted(group['policies']),
-                            env=agreed_env(group['envs']),
-                            priority=AUTO_STAGE_B_PRIORITY))
+            jobs.append(Job(id=job_id, type='eval', policies=sorted(set(group['policies'])),
+                            env=agreed_env(group['envs']), priority=AUTO_PRIORITY[pass_name],
+                            eval_args=[] if pass_name == 'stageb' else ['--pass', pass_name]))
         return jobs
 
-    def _measured_policies(self):
-        """Every policy a stage-B wave has already measured, or is measuring right now.
+    def _measured_policies(self, pass_name='stageb'):
+        """Every policy a wave of `pass_name` has already measured, or is measuring right now.
 
-        Read off the wave *records*, never off the trainings' markers: a marker is set when a
-        training finishes and is never cleared, so the marker set is everything ever trained. What
-        used to stop a re-measure in snek2 was incidental — the id `<policy>-closeout` was already
-        taken — and grouping a batch into one wave changed the id, so on the first restart after the
-        wave controller shipped the daemon forecast **thirteen** waves it had already run.
+        Read off the wave *records*, never off the markers: a marker is set when a job finishes and
+        is never cleared, so the marker set is everything ever finished. What used to stop a
+        re-measure in snek2 was incidental — the id `<policy>-closeout` was already taken — and
+        grouping a batch into one wave changed the id, so on the first restart after the wave
+        controller shipped the daemon forecast **thirteen** waves it had already run.
 
         Covering by *policy* rather than by id handles three cases at once: legacy per-arm ids, an
-        arm mid-migration, and a batch measured across several waves.
+        arm mid-migration, and a batch measured across several waves. A hand-queued spec counts too,
+        as long as it uses the pass's id suffix (`b11-hof5000`, as the hand-written ones did), which
+        is what lets a batch measured by hand before this chain existed not be measured again.
 
         `failed` counts as measured, because the reason usually is not transient — but it is
         surfaced under `attention` in `status.json`, which is the fix for snek2 silently never
@@ -376,7 +448,7 @@ class Runner(object):
         covered = set()
 
         def add(job_id, policies):
-            if _STAGE_B_ID_RE.search(str(job_id)):
+            if pass_of(job_id) == pass_name:
                 covered.update(str(name) for name in policies if name)
 
         for job_id, running_job in self.running.items():
@@ -386,13 +458,8 @@ class Runner(object):
                 add(job_id, record.get('policies') or [record.get('policy')])
         return covered
 
-    def _stage_b_id(self, batch, taken=()):
-        """`<batch>-stageb`, or `<batch>-stageb-w<k>` for a later wave of the same batch.
-
-        The plain id is not enough and the case is real: snek2's `b20` ran 36 arms under one prefix
-        in nine waves of four, and each wave needs its own id or the second collides with the first.
-        `k` counts up to the first free id, which does not churn between polls because ledger records
-        are never deleted.
+    def _pass_id(self, batch, pass_name, taken=()):
+        """`<batch>-<pass>`, or `-w<k>`, free of everything the ledger knows — see `mint_pass_id`.
 
         Free means: not claimed in this same pass, not running, and either absent from the ledger or
         **non-terminal** — an `interrupted` wave is relaunched under its own id so its completed rows
@@ -402,15 +469,10 @@ class Runner(object):
         matters whenever one batch splits into two waves for disagreeing envs: without it both groups
         get the same id and the second silently replaces the first.
         """
-        base = '{0}-stageb'.format(batch)
-        for index in range(1, 100):
-            job_id = base if index == 1 else '{0}-w{1}'.format(base, index)
-            if job_id in taken or job_id in self.running:
-                continue
-            if self.ledger.get(job_id, {}).get('state') in TERMINAL:
-                continue
-            return job_id
-        return None
+        used = set(taken) | set(self.running)
+        used |= {job_id for job_id, record in self.ledger.items()
+                 if record.get('state') in TERMINAL}
+        return mint_pass_id(batch, pass_name, used=used)
 
     # ----------------------------------------------------------- scan and dispatch
 
@@ -439,7 +501,7 @@ class Runner(object):
                 continue
             desired.append(job)
         seen = {job.id for job in desired}
-        desired += [job for job in self._auto_stage_b_jobs() if job.id not in seen]
+        desired += [job for job in self._auto_jobs() if job.id not in seen]
         desired.sort(key=lambda job: job.priority)
         if marked:
             self._save_ledger()
@@ -515,8 +577,10 @@ class Runner(object):
             record.update({'state': 'done' if ok else 'failed', 'type': running_job.job.type,
                            'policy': running_job.policy, 'finished': time.time(),
                            'returncode': code})
-            if wants_stage_b(running_job.job.type, ok, self.runtime.get('auto_stage_b', True)):
-                record['stage_b'] = 'pending'    # picked up by _auto_stage_b_jobs next dispatch
+            owed = next_pass(job_id, running_job.job.type, ok,
+                             self.runtime.get('auto_stage_b', True))
+            if owed:
+                record['next_pass'] = owed      # picked up by _auto_jobs next dispatch
             del self.running[job_id]
             if ok:
                 self._publish_results(running_job)
@@ -700,7 +764,7 @@ def status_json(status):
 # for PPO and renamed back on 2026-08-31 (`p0-p3` -> `b3-b6`) precisely so this pattern stays one
 # character wide: the prefix was missing from it for a day, and every PPO arm became its own batch —
 # `b4a-...` fell through to the `split('-')[0]` fallback and returned `b4a`. Nothing measured wrong,
-# but the two things that group by batch both degraded silently: `_auto_stage_b_jobs` synthesised one
+# but the two things that group by batch both degraded silently: `_auto_jobs` synthesised one
 # wave per arm instead of one per batch, and `at_a_glance` listed eight separate lines where it should
 # show one batch with eight arms. **Do not add a second prefix — name the batch `b<n>`.**
 #
@@ -708,7 +772,7 @@ def status_json(status):
 # fallback and read as one batch per arm. That is cosmetic and confined to the ledger's display: every
 # one of those waves is `done`, and nothing re-groups a finished record.
 _BATCH_RE = re.compile(r'^(b\d+)')
-_STAGE_B_ID_RE = re.compile(r'-stageb(-w\d+)?$')
+_PASS_ID_RE = re.compile(r'-(stageb|hof5000|hof30k)(-w\d+)?$')
 
 
 def batch_of(job_id):
@@ -722,15 +786,23 @@ def batch_of(job_id):
     return match.group(1) if match else (job_id.split('-')[0] or job_id)
 
 
-def phase_of(job_id, job_type):
-    """A job's phase: `'stage B'`, `'training'`, `'eval'`, `'smoke'` or `'benchmark'`.
+def pass_of(job_id):
+    """Which of the chain's passes a job id names — `'stageb'`, `'hof5000'`, `'hof30k'` — or None.
 
-    Read off the id suffix the daemon mints, with the job type as the fallback. **The `-w<k>` tail
+    Read off the id suffix the daemon mints (and hand specs copy: `b11-hof5000`). **The `-w<k>` tail
     has to be part of the pattern**: a batch's second wave is `b1-stageb-w2`, and a plain
-    `endswith('-stageb')` would call that a bare `'eval'` and split the at-a-glance grouping in two.
+    `endswith('-stageb')` would call that a bare eval and split the at-a-glance grouping in two.
     """
-    if _STAGE_B_ID_RE.search(str(job_id or '')):
-        return 'stage B'
+    match = _PASS_ID_RE.search(str(job_id or ''))
+    return match.group(1) if match else None
+
+
+def phase_of(job_id, job_type):
+    """A job's phase: `'stage B'`, `'hof5000'`, `'hof30k'`, `'training'`, `'eval'`, `'smoke'` or
+    `'benchmark'`. The id suffix decides for the chain's passes, the job type is the fallback."""
+    pass_name = pass_of(job_id)
+    if pass_name:
+        return PHASE_NAMES[pass_name]
     return {'train': 'training'}.get(job_type, job_type or 'eval')
 
 
@@ -843,10 +915,17 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
 
     Kept a pure function of plain dicts, so it is testable without a live box.
     """
-    def group(jobs):
+    def group(jobs, collapse_passes=False):
+        # `collapse_passes` folds the chain's three passes into one `evals` group per batch: the
+        # queue shows what is owed, and a batch owed its stage B is owed its hof passes too — three
+        # rows per batch said the same thing three times (user, 2026-09-04). A *running* job is one
+        # pass, so the running line still names it.
         groups, index = [], {}
         for job in jobs:
-            key = (batch_of(job['id']), phase_of(job['id'], job.get('type')))
+            phase = phase_of(job['id'], job.get('type'))
+            if collapse_passes and pass_of(job['id']):
+                phase = 'evals'
+            key = (batch_of(job['id']), phase)
             if key not in index:
                 index[key] = len(groups)
                 groups.append((key[0], key[1], []))
@@ -869,12 +948,21 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
         return ' | ' + (label if len(label) <= 80 else label[:77] + '...')
 
     def arms(jobs):
-        """"N arms", counted in **policies**, not in jobs.
+        """"N arms", counted in **distinct policies**, not in jobs.
 
         One eval job is a wave of four arms, so counting jobs would report a batch's whole
-        measurement as "1 arm" — the number a reader uses to check that nothing was dropped.
+        measurement as "1 arm" — the number a reader uses to check that nothing was dropped. And
+        distinct, because a collapsed `evals` group holds the same arms under three passes.
         """
-        count = sum(len(job.get('policies') or [job.get('policy')] or []) or 1 for job in jobs)
+        names = set()
+        unnamed = 0
+        for job in jobs:
+            policies = [name for name in (job.get('policies') or [job.get('policy')]) if name]
+            if policies:
+                names.update(policies)
+            else:
+                unnamed += 1
+        count = len(names) + unnamed
         return '{0} arm{1}'.format(count, '' if count == 1 else 's')
 
     running_lines = []
@@ -890,7 +978,7 @@ def build_at_a_glance(running, queued_order, labels, held_by=(), attention=()):
     notice = hold_notice(held_by)
     if notice:
         queued_lines.append(notice)
-    for batch, phase, jobs in group(queued_order):
+    for batch, phase, jobs in group(queued_order, collapse_passes=True):
         queued_lines.append('{0} {1}{2} | queued ({3})'.format(
             batch, phase, described(batch, jobs), arms(jobs)))
 
@@ -901,48 +989,56 @@ def anticipated_queue(queued, running, limits, auto_stage_b, existing_ids):
     """The pending queue in the order it is expected to launch, waves and all.
 
     Modelled straight from `_dispatch`: repeatedly form a wave from the highest-priority job's
-    category up to that category's limit, drain it, and let the trainings in it spawn **one** stage-B
-    wave per batch (priority `AUTO_STAGE_B_PRIORITY`) that competes in the next wave. A measurement
-    outranks a queued training, so a batch's wave always slots in ahead of the following batch —
-    the exact interleaving the box will run.
+    category up to that category's limit, drain it, and let the jobs in it spawn their follow-ons —
+    **one** pass per batch (priority `AUTO_PRIORITY[pass]`) that competes in the next wave: a wave of
+    trainings spawns its stage B, the stage B spawns its hof5000, that spawns its hof30k. A
+    measurement outranks a queued training, so a batch's three passes always slot in ahead of the
+    following batch — the exact interleaving the box will run.
 
     A batch's four trainings collapsing into one stage-B row is the *reason* this is grouped: snek2's
     ungrouped forecast showed four close-out jobs and then four HOF jobs, eight rows for what is now
     one process.
 
     `queued` and `running` are lists of dicts with id/type/policy — `queued` also has priority, a
-    wave also has `policies`. `existing_ids` is every id already known, so a job that exists
-    somewhere is never invented twice.
+    wave also has `policies`. `existing_ids` is every id already known — the ledger, the running
+    jobs, the queued specs. An id in it that is *queued* stands for its wave and stops the mint; any
+    other (finished, running) is spent and pushes the wave number, exactly as `_pass_id` does with
+    the ledger, so a batch whose first wave is done forecasts `-w2` rather than nothing.
     """
     def category(job_type):
         return 'eval' if job_type == 'eval' else 'trainer'
 
-    seen = set(existing_ids)
+    queued_ids = {job['id'] for job in queued}
+    used = set(existing_ids) - queued_ids
+    minted = set()
 
-    def stage_b_for(jobs):
-        """One stage-B wave dict per batch for a set of just-placed trainings.
+    def follow_ons_for(jobs):
+        """One next-pass dict per batch for a set of just-placed jobs.
 
-        Grouped by batch exactly as `_auto_stage_b_jobs` groups the real markers, but **not** by env:
-        a forecast has no env to read, and getting the count of rows right is what this is for.
+        Grouped by batch exactly as `_auto_jobs` groups the real markers, but **not** by env: a
+        forecast has no env to read, and getting the count of rows right is what this is for.
         """
         out = []
         by_batch = {}
         for job in jobs:
-            policy = job.get('policy')
-            if not policy or not wants_stage_b(job.get('type'), True, auto_stage_b):
+            pass_name = next_pass(job.get('id'), job.get('type'), True, auto_stage_b)
+            if not pass_name:
                 continue
-            by_batch.setdefault(batch_of(policy), []).append(policy)
-        for batch, policies in sorted(by_batch.items()):
-            job_id = '{0}-stageb'.format(batch)
-            if job_id in seen:
+            for policy in (job.get('policies') or [job.get('policy')]):
+                if policy:
+                    by_batch.setdefault((pass_name, batch_of(policy)), []).append(policy)
+        for (pass_name, batch), policies in sorted(by_batch.items()):
+            job_id = mint_pass_id(batch, pass_name, blocked=queued_ids, used=used | minted)
+            if job_id is None:
                 continue
-            seen.add(job_id)
+            minted.add(job_id)
+            policies = sorted(set(policies))
             out.append({'id': job_id, 'type': 'eval', 'policy': policies[0],
-                        'policies': sorted(policies), 'priority': AUTO_STAGE_B_PRIORITY})
+                        'policies': policies, 'priority': AUTO_PRIORITY[pass_name]})
         return out
 
     pool = [dict(job) for job in queued]
-    pool += stage_b_for(running)                    # follow-ons for jobs on the box now
+    pool += follow_ons_for(running)                 # follow-ons for jobs on the box now
 
     order = []
     while pool:
@@ -955,7 +1051,7 @@ def anticipated_queue(queued, running, limits, auto_stage_b, existing_ids):
         wave_ids = {job['id'] for job in wave}
         order.extend(wave)
         pool = [job for job in pool if job['id'] not in wave_ids]
-        pool += stage_b_for(wave)       # the wave's trainings spawn their batches' measurements
+        pool += follow_ons_for(wave)    # the wave's jobs spawn their batches' next passes
     return order
 
 

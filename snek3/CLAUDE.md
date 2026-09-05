@@ -58,6 +58,7 @@ PYTHONPATH=. python -u train.py <policy>               # the name doubles as the
 PYTHONPATH=. python -u evaluate.py <policy> [selector]  # stage B: screen:97, 500 eps, 4 shards
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
 PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 12  # a whole batch's stage B (laptop; the desktop uses 16)
+PYTHONPATH=. python -u -m tools.closeout <policy...> --pass hof5000 --shards 12  # its hof5000 re-measure; --pass hof30k after that
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
 PYTHONPATH=. python -m tools.chart_window                # the box's chart window, if it is not up
@@ -106,10 +107,15 @@ and a batch being measured at once.
 | **A** | the trainer, every 1,000 steps — in-process, or `SNEK_EVAL_QUEUE=1` for shared workers | every checkpoint | 100 |
 | **B** | a wave of shard processes, after the arm stops | every checkpoint at **≥97/100** in stage A | 500 |
 
-**Stage B is the hall-of-fame measurement.** There is no third stage, no tiered selection, no
-screen/confirm split and no min-achievable gate — so **every row in every result file is full length
-and directly comparable**, which was not true of snek2's files. `min_achievable` is absent, not null
-with a number to check.
+**Stage B is the selection, and two deeper passes re-measure what it selected.** There is no
+tiered selection, no screen/confirm split and no min-achievable gate — so **every row in every result
+file is full length and directly comparable**, which was not true of snek2's files. `min_achievable`
+is absent, not null with a number to check. What follows stage B is not a stage: the `hof5000` pass
+takes every row at ≥99/500 to 5,000 episodes, and `hof30k` takes every hof5000 row at ≥99/5,000 to
+30,000 on seed 7, a seed no selecting pass used — each a separately labelled file beside the
+stage-B one, never in place of it. **Every batch gets all three automatically** (2026-09-04): the
+desktop daemon and `tools/laptop_batch.py` both run `tools.closeout <arms> --pass hof5000` then
+`--pass hof30k` after a wave's stage B, and the presets are `closeout.PASSES`.
 
 Four consequences worth holding on to:
 
@@ -216,7 +222,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
 | `tools/closeout.py` | **a batch's stage B: every arm in turn, one process.** What the desktop dispatches and what an agent types here |
-| `tools/laptop_batch.py` | **a batch of desktop specs, run here the way the daemon would**: waves of 8, each followed by its stage B as `<batch>-stageb`, `-w2`, ... Resumable; adopts a live arm rather than relaunching it; never a ninth trainer. `skills/laptop-run` has the command |
+| `tools/laptop_batch.py` | **a batch of desktop specs, run here the way the daemon would**: waves of 8, each followed by its stage B, hof5000 and hof30k as `<batch>-stageb`, `<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ... Resumable; adopts a live arm rather than relaunching it; never a ninth trainer. `skills/laptop-run` has the command |
 | `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
 | `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |
 | `tools/eval_plan.py` | a measured checkpoint as a result row, plus the Wilson interval |

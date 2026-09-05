@@ -1,6 +1,7 @@
 """A batch's stage-B pass: every arm of a wave, measured in sequence, with a window over it.
 
-    PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --shards 12
+    PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --shards 12                  # stage B
+    PYTHONPATH=. python -u -m tools.closeout b6a b6b b6c --pass hof5000 --shards 12   # its follow-on
 
 **This is the close-out, and both boxes run this file.** The desktop's daemon dispatches one `eval`
 job per batch and that job is this command; on the laptop the same command is typed by hand. Before
@@ -36,6 +37,45 @@ from tools import stage_b_chart
 # How often an arm's PNG is rebuilt from its shard files. A shard writes a row every ~10 s and the
 # window redraws on its own clock; faster than this is CPU taken off the measurement.
 REDRAW_SECONDS = 20
+
+# **The protocol's passes, by name — the one place their numbers live.** Every batch gets all three,
+# in this order, and each selects from the pass before it: stage B screens every checkpoint at
+# >=97/100 in stage A and measures it at 500; `hof5000` takes the rows at >=99/500 to 5,000; `hof30k`
+# takes the rows at >=99/5,000 to 30,000 on seed 7, a seed no selecting pass used, so a row there is a
+# confirmed rate rather than a selected high. The labels are the files: `runs/<arm>_checkpoint_evals
+# [_<label>].json`, so a pass never overwrites the one it read from — omitting `hof5000`'s label
+# would replace the 500-episode file `above:99` selects from with 5,000-episode rows.
+#
+# `--pass <name>` is how both boxes ask for one: the desktop daemon dispatches
+# `tools.closeout <arms> --pass hof5000` and carries none of these numbers (see
+# `desktop/runner/launch.py` for why it must not), and `tools/laptop_batch.py` runs the same command.
+# `stageb` is the close-out's own defaults, so a command that names no pass is unchanged.
+PASSES = {
+    'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0},
+    'hof5000': {'selector': 'above:99', 'episodes': 5000, 'label': 'hof5000', 'seed': 0},
+    'hof30k': {'selector': 'above:99:hof5000', 'episodes': 30000, 'label': 'hof30k', 'seed': 7},
+}
+# The chain, in the order the passes run. `FOLLOW_ON[pass]` is what a finished pass earns.
+CHAIN = ('stageb', 'hof5000', 'hof30k')
+FOLLOW_ON = {CHAIN[i]: CHAIN[i + 1] for i in range(len(CHAIN) - 1)}
+
+
+def pass_settings(name, selector=None, episodes=None, label=None, seed=None):
+    """`{'selector', 'episodes', 'label', 'seed'}` for a named pass, with any explicit value winning.
+
+    Explicit means "the caller typed it": `None` is the not-given value for every field, including
+    `label`, whose preset for stage B *is* None — so a caller cannot un-label a hof pass by accident,
+    and the hand-typed `--selector above:99 --episodes 5000 --label hof5000` still spells the same
+    pass `--pass hof5000` does.
+    """
+    if name not in PASSES:
+        raise ValueError('unknown pass {0!r}; known: {1}'.format(name, ', '.join(CHAIN)))
+    settings = dict(PASSES[name])
+    for key, value in (('selector', selector), ('episodes', episodes), ('label', label),
+                       ('seed', seed)):
+        if value is not None:
+            settings[key] = value
+    return settings
 
 
 class Drawer(object):
@@ -147,13 +187,16 @@ def build_parser():
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('policies', nargs='+')
-    parser.add_argument('--selector', default='screen',
-                        help='a step selector; the default is the protocol, screen:97')
-    parser.add_argument('--episodes', type=int, default=500)
+    parser.add_argument('--pass', dest='pass_name', default='stageb', choices=CHAIN,
+                        help='which pass of the protocol: its selector, depth, label and seed. '
+                             'stageb is the default; hof5000 and hof30k select from the pass before')
+    parser.add_argument('--selector', default=None,
+                        help='a step selector; the default is the pass\'s, screen:97 for stage B')
+    parser.add_argument('--episodes', type=int, default=None)
     parser.add_argument('--shards', type=int, default=4)
     parser.add_argument('--label', default=None, help='names the pass, so two do not collide')
     parser.add_argument('--width', type=int, default=None, help='games in lockstep, per process')
-    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--no-resume', action='store_true')
     parser.add_argument('--no-merge', action='store_true')
     parser.add_argument('--no-window', action='store_true')
@@ -162,8 +205,9 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    return run(args.policies, args.selector, args.episodes, args.shards, args.label, args.width,
-               args.seed, not args.no_resume, not args.no_merge, not args.no_window)
+    pass_ = pass_settings(args.pass_name, args.selector, args.episodes, args.label, args.seed)
+    return run(args.policies, pass_['selector'], pass_['episodes'], args.shards, pass_['label'],
+               args.width, pass_['seed'], not args.no_resume, not args.no_merge, not args.no_window)
 
 
 if __name__ == '__main__':

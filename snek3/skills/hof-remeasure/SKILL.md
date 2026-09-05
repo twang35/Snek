@@ -5,6 +5,13 @@ description: Re-measure a batch's stage-B winners at 5,000 episodes — the hof5
 
 # The `hof5000` pass — 5,000 episodes on the close-out's winners
 
+**Since 2026-09-04 this pass and the `hof30k` after it run by themselves**, on both boxes, after every
+wave's stage B — the desktop daemon and `tools.laptop_batch` chain `tools.closeout <arms> --pass
+hof5000` then `--pass hof30k`, and a batch that finished under the chain needs nothing from this skill.
+Use it for a batch measured before that date, a driver started before it, or a re-run; `--pass hof5000`
+is the shorthand for the `--selector above:99 --episodes 5000 --label hof5000` below and the
+desktop's own spec is `tools/closeout.py`'s `PASSES`.
+
 Stage B measures every screened checkpoint at 500 episodes. **A 500-episode maximum is a selected
 high, not a rate** — pooled over b6, the ≥98.5 %/500 rows averaged 98.80 there and **97.86** at
 5,000, a −0.94 pp regression. This pass buys back most of that.

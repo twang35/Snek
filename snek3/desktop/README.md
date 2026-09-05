@@ -43,7 +43,7 @@ ssh the-claw-den 'Snek/snek3/desktop/trigger'
 | `env` | no | any `SNEK_*` knob; wins over the runtime defaults. See [`../docs/running.md`](../docs/running.md) |
 | `selector`, `episodes` | eval, no | **omit them.** Absent means `tools/closeout.py`'s own defaults, which *are* the protocol |
 | `eval_shards` | no | shard processes for this wave; defaults to the runtime config's 16 |
-| `priority` | no | lower runs first. Default 100, auto-queued stage B is 10 |
+| `priority` | no | lower runs first. Default 100; the auto-queued passes are 10 (stage B), 11 (hof5000), 12 (hof30k) |
 | `label` | no | one line for `at_a_glance` |
 | `notes` | no | free text, for the reader |
 
@@ -102,8 +102,40 @@ than a rejected one because it looks like it worked. Values are then clamped to 
 | `nice` | 0 | |
 | `disk_min_gb` | 5 | refuse to launch below this much free |
 | `paused` / `drain` | false | finish what is running, start nothing new |
-| `auto_stage_b` | true | a finished training auto-queues its stage-B wave at priority 10 |
+| `auto_stage_b` | true | the automatic chain: a finished training queues its stage B, which queues its hof5000, which queues its hof30k — see below. Off switches all three |
 | `viewer` | true | let the trainings this box launches open their chart window — see below |
+
+### The automatic chain: training → stage B → hof5000 → hof30k
+
+Every batch gets all three passes without anyone queueing them (since 2026-09-04; before that only
+stage B was automatic, every hof pass was a hand-written spec, and b12's and b13's were never
+written). When a job finishes well, `_reap` marks its ledger record `next_pass: <name>`; at the next
+dispatch `_auto_jobs` groups every marked record's arms by batch and pass, drops the arms a wave of
+that pass already covers (a hand spec counts, if its id carries the pass suffix — `b11-hof5000` did),
+and mints one `tools.closeout <arms> --pass <name>` job per batch and pass:
+`b15-stageb`, `b15-hof5000`, `b15-hof30k`, then `-w2`, `-w3`, … for the batch's later waves. The
+priorities 10/11/12 put the three ahead of any queued training and in order, so a training wave is
+followed by its three measurements before the next wave trains.
+
+| pass | id | selects | episodes | seed | writes |
+|---|---|---|---|---:|---|
+| stage B | `<batch>-stageb` | `screen:97` — every checkpoint at ≥97/100 in stage A | 500 | 0 | `runs/<arm>_checkpoint_evals.json` |
+| hof5000 | `<batch>-hof5000` | `above:99` — stage-B rows at ≥99/500 | 5,000 | 0 | `…_checkpoint_evals_hof5000.json` |
+| hof30k | `<batch>-hof30k` | `above:99:hof5000` — hof5000 rows at ≥99/5,000 | 30,000 | 7 | `…_checkpoint_evals_hof30k.json` |
+
+**The numbers are not in the daemon.** They are `tools/closeout.py`'s `PASSES`; the daemon passes the
+name and the close-out's preset does the rest, for the reason `launch.py` records — snek2's daemon
+carried five protocol numbers as a second copy and they drifted. A pass with no candidates in an arm
+is not an error: the shards exit at once and an empty labelled file is written, so the next pass reads
+it and selects nothing in turn.
+
+**Success is required at every hop.** hof5000 selects from the file stage B wrote, so a failed stage B
+earns no hof5000 — running it would fail too and bury the real failure. The failed pass is under
+`attention`, as before; delete its ledger record to re-queue it and the chain resumes from there.
+
+`status.json`'s queue shows a batch's three owed passes as **one line**, `b16 evals | … | queued
+(8 arms)`, because a batch owed its stage B is owed the other two; the running line still names the
+pass that is running. `tools/laptop_batch.py` runs the same chain on the laptop, with the same ids.
 
 ### One wave at a time is structural, and no limit enforces it
 
@@ -239,12 +271,52 @@ Deploying new code is `snek3/desktop/deploy` (a fast-forward that settles any le
 move) plus `sudo systemctl restart snek3-runner` when `desktop/runner/*` changed. Piping it to `tail`
 hides the failure and its exit code.
 
+## Reach the box from outside the home LAN
+
+**Status 2026-09-04: done and verified end to end.** `ssh the-claw-den` resolves by mDNS on the home LAN and
+the box sits behind the router's NAT, so before this the alias, `deploy`, `trigger`, `journalctl` and the
+live-chart `rsync` were home-LAN only; the git bus worked from anywhere regardless. The
+constraint is **nothing new on the laptop** (Tailscale was removed 2026-08-13 for that reason), so the path is
+plain OpenSSH through a port forward. The box itself may run anything.
+
+| # | where | change | done |
+|---|---|---|---|
+| 1 | desktop | `ssh the-claw-den 'bash -s' < snek3/desktop/harden_ssh.sh` — rewrites the sshd hardening file (key-only, no root, `AllowUsers claw`, `MaxAuthTries 3`) and **asserts the effective config with `sshd -T`, refusing to touch the firewall if anything is not key-only or `authorized_keys` is empty**; then fail2ban (5 failures / 10 min → 1 h, LAN exempt) and ufw with the LAN trusted and port 22 rate-limited | **done 2026-09-04**: all seven asserts ok, fail2ban jail `sshd` active, ufw active, fresh login and mDNS verified afterwards |
+| 2 | router | DHCP reservation for the desktop at `192.168.0.79`; port forward WAN **2222** → `192.168.0.79:22` TCP; TP-Link DDNS as **`clawden.tplinkdns.com`** | done 2026-09-04 |
+| 3 | router | confirm the WAN status page shows the same address as `curl -4 ifconfig.me` from the box (75.164.174.153 on 2026-09-04). A 100.64–100.127 or 10.x address there means carrier NAT and the forward cannot work; the fallback is then a reverse tunnel from the box to a small VPS | done: WAN page shows 75.164.174.153, same as the box sees |
+| 4 | laptop | the `Match` block below in `~/.ssh/config`, so the same alias falls back to the DDNS name when mDNS does not answer | done; backup at `~/.ssh/config.bak-2026-09-04` |
+
+```
+Host the-claw-den
+  HostName the-claw-den.local
+  HostKeyAlias the-claw-den
+  User claw
+  IdentityFile ~/.ssh/snek_desktop
+  IdentitiesOnly yes
+
+Match host the-claw-den !exec "nc -z -w 1 -G 1 the-claw-den.local 22 2>/dev/null"
+  HostName clawden.tplinkdns.com
+  Port 2222
+```
+
+`HostKeyAlias` is already in the alias, so the known-hosts entry is shared by both paths and the fallback
+does not prompt. Verified 2026-09-04: on the LAN `ssh -G the-claw-den` picks `.local:22`; the forwarded path
+logged in by name and by address (the BE600 does NAT loopback, so it is testable from inside too). A DDNS name
+that `dig` resolves but `ssh` does not is the Mac's negative resolver cache from before the record existed —
+`dscacheutil -flushcache`. Every existing command then works unchanged from anywhere. What stays home-LAN is the box
+reaching the laptop (only the diagnostic ping in `plans/laptop-wifi.md`), since the laptop's address is
+whatever its current network gave it.
+
+**A `deploy` job type for the bus would cover the commonest off-LAN need without ssh at all** — the daemon
+already runs specs from `ops`. Named actions only (deploy, restart), never arbitrary shell: anything on that
+branch runs as `claw` on the box.
+
 ## What the port changed, and why each one is an incident
 
 | change | the incident behind it |
 |---|---|
 | a required `project` field | `ops` holds ~150 retired snek2 specs whose `script` would resolve to a TensorFlow trainer that does not exist here |
-| one eval stage, not two | `training → closeout → HOF` becomes `training → stage B`, so the `auto_hof` hop, the `-hof` id handling and the legacy phase branch all go |
+| one eval stage, not two | `training → closeout → HOF` becomes `training → stage B`, so the `auto_hof` hop, the `-hof` id handling and the legacy phase branch all go. **Partly reversed 2026-09-04:** the chain now runs hof5000 and hof30k after stage B — but as deeper *re-measures* of the same protocol's file, named passes of one close-out, not snek2's tiered selection with its own gates and episode counts |
 | `_ensure_viewer` shrinks from ~200 lines to ~50 | snek2 needed a process registry, an `O_EXCL` claim lock, a grace period, zombie detection and a dedupe because four peer trainers each tried to open one shared window knowing nothing about each other. One process starts the arms here, so one process starts the window |
 | `publish_results` reports its push, and `push_unpushed` retries | a failed push left the commit local while the ledger said `done` — **indistinguishable from a pass that legitimately found nothing.** It hid four 500-episode result files, one a 98.2% checkpoint, for hours |
 | a `failed` eval reaches `attention` | silently never retrying one cost snek2's batch 46 wave 1 its whole measurement |

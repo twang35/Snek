@@ -182,3 +182,15 @@ def test_status_reads_the_desktop_ledger_snapshot(tmp_path):
     assert vm.build(runs)['arms'][0]['status']                         # and without a snapshot nothing breaks
     (live / 'status.json').unlink()
     assert vm.build(runs)['desktop_iso'] is None
+
+
+def test_the_desktop_ledger_is_read_across_every_wave_of_a_pass():
+    """The daemon names a batch's later waves `-w2`, `-w3`; a bare lookup saw only the first and
+    called an arm of wave 3 done as soon as wave 1 was. Running, then queued, then whatever is left."""
+    jobs = {'b15-stageb': 'done', 'b15-stageb-w2': 'running', 'b15-stageb-w3': 'queued',
+            'b15-hof5000': 'done', 'b15-hof5000-w2': 'queued', 'b150-stageb': 'failed'}
+    assert vm.ledger_pass_state(jobs, 'b15', '-stageb') == 'running'
+    assert vm.ledger_pass_state(jobs, 'b15', '-hof5000') == 'queued'
+    assert vm.ledger_pass_state({'b15-hof5000': 'done'}, 'b15', '-hof5000') == 'done'
+    assert vm.ledger_pass_state(jobs, 'b15', '-hof30k') is None
+    assert vm.ledger_pass_state(jobs, 'b1', '-stageb') is None, 'b15 is not a wave of b1'
