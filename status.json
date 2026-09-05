@@ -1,13 +1,12 @@
 {
-  "iso": "2026-09-04T18:35:35",
-  "ts": 1788572135.596966,
+  "iso": "2026-09-04T18:46:04",
+  "ts": 1788572764.3261452,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b11 | b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes | eval (25 arms)"
+      "b11 | b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7 | eval (25 arms)"
     ],
     "queued": [
-      "b11 eval | b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7 | queued (25 arms)",
       "b12 eval | b12 HOF re-measure: 652 checkpoints >=99/500 from 37 arms at 5,000 episodes, ... | queued (74 arms)",
       "b13 eval | b13 HOF re-measure: 680 checkpoints >=99/500 from 30 arms at 5,000 episodes, ... | queued (60 arms)",
       "b15 eval | b15 HOF re-measure: 53 checkpoints >=99/500 from 8 arms at 5,000 episodes, b1... | queued (16 arms)",
@@ -48,7 +47,7 @@
   },
   "running": [
     {
-      "id": "b11-hof5000",
+      "id": "b11-hof30k",
       "type": "eval",
       "policy": "b11ae-lr1e4-seed1",
       "policies": [
@@ -78,16 +77,15 @@
         "b11bc-lr2e3-seed1",
         "b11bd-lr2e3-seed2"
       ],
-      "pid": 3892651,
+      "pid": 3968647,
       "step": 50003968,
-      "label": "b11 HOF re-measure: 661 checkpoints >=99/500 from 25 arms at 5,000 episodes",
+      "label": "b11 HOF confirm: every checkpoint >=99/5,000 at 30,000 episodes, seed 7",
       "max_steps": null,
       "steps_per_sec": 0.0,
-      "elapsed_s": 2688
+      "elapsed_s": 461
     }
   ],
   "ledger": {
-    "b11-hof30k": "queued",
     "b12-hof5000": "queued",
     "b12-hof30k": "queued",
     "b13-hof5000": "queued",
@@ -324,7 +322,8 @@
     "b21v-gate0-seed2": "queued",
     "b21w-gate0-seed3": "queued",
     "b21x-gate0-seed4": "queued",
-    "b11-hof5000": "running",
+    "b11-hof30k": "running",
+    "b11-hof5000": "done",
     "b15-stageb": "done",
     "b15ah-ent001-seed4": "done",
     "b15ag-ent001-seed3": "done",
@@ -714,10 +713,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 132.5,
+  "disk_free_gb": 132.4,
   "load_avg": [
-    11.75634765625,
-    11.7197265625,
-    12.5029296875
+    9.68212890625,
+    7.4443359375,
+    9.23828125
   ]
 }
