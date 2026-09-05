@@ -1,15 +1,15 @@
 {
-  "iso": "2026-09-04T21:52:43",
-  "ts": 1788583963.6916351,
+  "iso": "2026-09-04T22:02:58",
+  "ts": 1788584578.7367737,
   "project": "snek3",
   "at_a_glance": {
     "running": [
-      "b15 | hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7) | hof5000 (8 arms)"
+      "b15 | ent003, ent005 -- wave 2 of 5 | training 3% (8 arms)"
     ],
     "queued": [
-      "b15 evals | hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7) | queued (8 arms)",
-      "b15 training | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
-      "b15 evals | ent003, ent005, ent02, ent03, entanneal10, entanneal03, entanneal01, entannea... | queued (32 arms)",
+      "b15 evals | ent003, ent005 | queued (8 arms)",
+      "b15 training | ent02, ent03, entanneal10, entanneal03, entanneal01, entanneal01to0 -- waves ... | queued (24 arms)",
+      "b15 evals | ent02, ent03, entanneal10, entanneal03, entanneal01, entanneal01to0 | queued (24 arms)",
       "b17 training | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
       "b17 evals | clip005, clip01, clip015, clip03, clip04, clipanneal, clip01anneal, lranneal,... | queued (64 arms)",
       "b18 training | gc0, gc01, gc025, gc1, gc2, gc5 -- waves 1-3 of 3 | queued (24 arms)",
@@ -39,44 +39,127 @@
   },
   "config_notes": [],
   "counts": {
-    "trainer": 0,
-    "eval": 1
+    "trainer": 8,
+    "eval": 0
   },
   "running": [
     {
-      "id": "b15-hof5000",
-      "type": "eval",
-      "policy": "b15aa-ent0-seed1",
+      "id": "b15ai-ent003-seed1",
+      "type": "train",
+      "policy": "b15ai-ent003-seed1",
       "policies": [
-        "b15aa-ent0-seed1",
-        "b15ab-ent0-seed2",
-        "b15ac-ent0-seed3",
-        "b15ad-ent0-seed4",
-        "b15ae-ent001-seed1",
-        "b15af-ent001-seed2",
-        "b15ag-ent001-seed3",
-        "b15ah-ent001-seed4"
+        "b15ai-ent003-seed1"
       ],
-      "pid": 66527,
-      "step": 50003968,
-      "label": "hof eval: 53 checkpoints >=99/500 from 8 arms, at 5,000 then 30,000 (seed 7)",
-      "max_steps": null,
-      "steps_per_sec": 0.0,
-      "elapsed_s": 155
+      "pid": 80010,
+      "step": 1736704,
+      "label": "b15: ent003, seed 1 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 7235.9,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15aj-ent003-seed2",
+      "type": "train",
+      "policy": "b15aj-ent003-seed2",
+      "policies": [
+        "b15aj-ent003-seed2"
+      ],
+      "pid": 80011,
+      "step": 1572864,
+      "label": "b15: ent003, seed 2 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 7235.9,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15ak-ent003-seed3",
+      "type": "train",
+      "policy": "b15ak-ent003-seed3",
+      "policies": [
+        "b15ak-ent003-seed3"
+      ],
+      "pid": 80012,
+      "step": 1622016,
+      "label": "b15: ent003, seed 3 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 6202.2,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15al-ent003-seed4",
+      "type": "train",
+      "policy": "b15al-ent003-seed4",
+      "policies": [
+        "b15al-ent003-seed4"
+      ],
+      "pid": 80013,
+      "step": 1523712,
+      "label": "b15: ent003, seed 4 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 6202.2,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15am-ent005-seed1",
+      "type": "train",
+      "policy": "b15am-ent005-seed1",
+      "policies": [
+        "b15am-ent005-seed1"
+      ],
+      "pid": 80014,
+      "step": 1507328,
+      "label": "b15: ent005, seed 1 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 6202.2,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15an-ent005-seed2",
+      "type": "train",
+      "policy": "b15an-ent005-seed2",
+      "policies": [
+        "b15an-ent005-seed2"
+      ],
+      "pid": 80015,
+      "step": 1540096,
+      "label": "b15: ent005, seed 2 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 7752.7,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15ao-ent005-seed3",
+      "type": "train",
+      "policy": "b15ao-ent005-seed3",
+      "policies": [
+        "b15ao-ent005-seed3"
+      ],
+      "pid": 80016,
+      "step": 1556480,
+      "label": "b15: ent005, seed 3 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 5168.4,
+      "elapsed_s": 247
+    },
+    {
+      "id": "b15ap-ent005-seed4",
+      "type": "train",
+      "policy": "b15ap-ent005-seed4",
+      "policies": [
+        "b15ap-ent005-seed4"
+      ],
+      "pid": 80017,
+      "step": 1540096,
+      "label": "b15: ent005, seed 4 of 4 -- wave 2 of 5",
+      "max_steps": 50003968,
+      "steps_per_sec": 7752.6,
+      "elapsed_s": 247
     }
   ],
   "ledger": {
-    "b15-hof30k": "queued",
-    "b15ai-ent003-seed1": "queued",
-    "b15aj-ent003-seed2": "queued",
-    "b15ak-ent003-seed3": "queued",
-    "b15al-ent003-seed4": "queued",
-    "b15am-ent005-seed1": "queued",
-    "b15an-ent005-seed2": "queued",
-    "b15ao-ent005-seed3": "queued",
-    "b15ap-ent005-seed4": "queued",
     "b15-stageb-w2": "queued",
     "b15-hof5000-w2": "queued",
+    "b15-hof30k-w2": "queued",
     "b15aq-ent02-seed1": "queued",
     "b15ar-ent02-seed2": "queued",
     "b15as-ent02-seed3": "queued",
@@ -87,6 +170,7 @@
     "b15ax-ent03-seed4": "queued",
     "b15-stageb-w3": "queued",
     "b15-hof5000-w3": "queued",
+    "b15-hof30k-w3": "queued",
     "b15ay-entanneal10-seed1": "queued",
     "b15az-entanneal10-seed2": "queued",
     "b15ba-entanneal10-seed3": "queued",
@@ -97,6 +181,7 @@
     "b15bf-entanneal03-seed4": "queued",
     "b15-stageb-w4": "queued",
     "b15-hof5000-w4": "queued",
+    "b15-hof30k-w4": "queued",
     "b15bg-entanneal01-seed1": "queued",
     "b15bh-entanneal01-seed2": "queued",
     "b15bi-entanneal01-seed3": "queued",
@@ -107,6 +192,7 @@
     "b15bn-entanneal01to0-seed4": "queued",
     "b15-stageb-w5": "queued",
     "b15-hof5000-w5": "queued",
+    "b15-hof30k-w5": "queued",
     "b17aa-clip005-seed1": "queued",
     "b17ab-clip005-seed2": "queued",
     "b17ac-clip005-seed3": "queued",
@@ -316,7 +402,16 @@
     "b21-stageb-w3": "queued",
     "b21-hof5000-w3": "queued",
     "b21-hof30k-w3": "queued",
-    "b15-hof5000": "running",
+    "b15ai-ent003-seed1": "running",
+    "b15aj-ent003-seed2": "running",
+    "b15ak-ent003-seed3": "running",
+    "b15al-ent003-seed4": "running",
+    "b15am-ent005-seed1": "running",
+    "b15an-ent005-seed2": "running",
+    "b15ao-ent005-seed3": "running",
+    "b15ap-ent005-seed4": "running",
+    "b15-hof30k": "done",
+    "b15-hof5000": "done",
     "b13-hof30k": "done",
     "b13-hof5000": "done",
     "b12-hof30k": "done",
@@ -712,10 +807,10 @@
     "b1b-baseline-seed2": "done",
     "b1d-baseline-seed4": "done"
   },
-  "disk_free_gb": 131.6,
+  "disk_free_gb": 131.5,
   "load_avg": [
-    7.41259765625,
-    4.12158203125,
-    4.08544921875
+    12.22216796875,
+    9.2578125,
+    6.5361328125
   ]
 }
