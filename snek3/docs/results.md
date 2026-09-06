@@ -21,6 +21,197 @@ the b-series is not chronological — b5 and b6 ran before b4. Renamed here, in 
 whose published artifacts are history, and the daemon's ledger, whose keys are the job ids those
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
+
+<!-- progress_update: batch b20 -->
+## Batch b20 — the `collect_envs` sweep, 4 values x 4 seeds, 50M, closed 2026-09-06
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| collect_envs | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 32 | 15,485 | 19.1% | 12.7 15.2 17.9 27.1 | 331 | 99.8 | 98.35 (98.1-98.8) | 91.1 | 0.04% | 6.06% | 20.2% |
+| 64 | 8,408 | 20.5% | 15.8 16.0 24.9 22.9 | 166 | 99.8 | 98.15 (97.7-98.6) | 92.2 | 0.27% | 5.97% | 22.2% |
+| **128** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+| 256 | 2,329 | 20.7% | 21.7 23.5 22.6 14.8 | 58 | 99.8 | 97.95 (97.6-98.4) | 91.5 | 0.04% | 3.88% | 24.5% |
+| 512 | 1,230 | 17.8% | 12.8 20.6 24.3 13.3 | 22 | 99.4 | 97.75 (97.4-98.0) | 87.5 | 0.0% | 2.19% | 25.4% |
+
+<!-- reading -->
+Read against the bold reference, b7's λ 0.98 cell `b7aa`-`b7ad` (17.3% density, best30 97.75, 6.2% of evals below 80%), which b15-b21 were generated from. **`collect_envs` is a throughput knob, not a learning knob, from 32 to 512 lanes at a fixed rollout.** Density is within noise of the base at every value (19.1, 20.5, 17.3, 20.7, 17.8%), best30 spans 97.75-98.35 with the base at the bottom of that range, and no cell's best row beats 99.8. The row counts scale with the eval cadence, not with the policy: 32 lanes logs 15,485 stage-B rows to 512's 1,230 because it makes four times the updates per step, and its 331 `hof5000` candidates are the same ~2% of rows the base has. **The spec's prediction for 32 — worse than the equivalent rollout because episode diversity is lower — is falsified**: 32 lanes matches the base on density and beats it on best30 (98.35). **What does move is stability**: 512 lanes has 0.0% of evals below 50% and 2.19% below 80% against the base's 6.18%, 256 lanes 3.88%, the smoothest endgame of any cell trained at this base, and stage-A density rises with lanes (24.5, 25.4% at 256, 512 against 20.4). The comparison the spec asked for — 256 lanes against b14's rollout 256, the same batch size two ways — is confounded by λ (b14 ran at 0.99), but the direction is not close: b14's rollout 512 read +11 pp over *its* base and 512 lanes reads +0.5 pp over this one, so **the rollout's gain came from depth, not from batch size or episode diversity**. At 30,000 episodes the batch's best is `b20g-lanes64-seed3` @13729792 at 99.3, nothing for the HOF. 128 stays the default for speed; 256-512 lanes is a stability lever at no density cost if the corner grid wants one.
+<!-- /reading -->
+
+### Every arm
+
+| arm | collect_envs | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b20a-lanes32-seed1` | 32 | 3231 | 12.7% | 31 | 99.4 | 98.1 @21.2M | 88.9 | 0.06% |
+| `b20b-lanes32-seed2` | 32 | 3450 | 15.2% | 51 | 99.8 | 98.3 @49.3M | 89.9 | 0.17% |
+| `b20c-lanes32-seed3` | 32 | 3866 | 17.9% | 52 | 99.4 | 98.2 @11.4M | 93.4 | 0.02% |
+| `b20d-lanes32-seed4` | 32 | 4938 | 27.1% | 197 | 99.8 | 98.8 @17.9M | 92.3 | 0.0% |
+| `b20e-lanes64-seed1` | 64 | 1765 | 15.8% | 22 | 99.8 | 97.7 @36.5M | 91.1 | 0.34% |
+| `b20f-lanes64-seed2` | 64 | 1824 | 16.0% | 26 | 99.8 | 98.0 @24.5M | 91.4 | 0.2% |
+| `b20g-lanes64-seed3` | 64 | 2597 | 24.9% | 80 | 99.8 | 98.6 @34.0M | 94.8 | 0.0% |
+| `b20h-lanes64-seed4` | 64 | 2222 | 22.9% | 38 | 99.6 | 98.3 @42.4M | 91.5 | 0.72% |
+| `b20i-lanes256-seed1` | 256 | 581 | 21.7% | 13 | 99.8 | 98.4 @42.9M | 92.1 | 1.16% |
+| `b20j-lanes256-seed2` | 256 | 588 | 23.5% | 21 | 99.4 | 98.0 @26.3M | 89.3 | 0.0% |
+| `b20k-lanes256-seed3` | 256 | 605 | 22.6% | 16 | 99.6 | 97.8 @23.6M | 91.4 | 0.07% |
+| `b20l-lanes256-seed4` | 256 | 555 | 14.8% | 8 | 99.6 | 97.6 @13.3M | 93.4 | 0.0% |
+| `b20m-lanes512-seed1` | 512 | 274 | 12.8% | 4 | 99.2 | 97.4 @29.4M | 84.3 | 0.0% |
+| `b20n-lanes512-seed2` | 512 | 311 | 20.6% | 7 | 99.4 | 97.8 @45.8M | 84.8 | 0.29% |
+| `b20o-lanes512-seed3` | 512 | 313 | 24.3% | 9 | 99.2 | 98.0 @44.8M | 92.0 | 0.0% |
+| `b20p-lanes512-seed4` | 512 | 332 | 13.3% | 2 | 99.0 | 97.8 @49.7M | 88.7 | 0.0% |
+
+<!-- /progress_update: batch b20 -->
+
+<!-- progress_update: batch b17 -->
+## Batch b17 — the `clip` sweep, 16 values x 4 seeds, 50M, closed 2026-09-06
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| clip | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 0.05 | 3,837 | 17.4% | 10.5 22.2 12.0 22.7 | 76 | 100.0 | 98.30 (97.9-98.7) | 85.7 | 0.09% | 8.17% | 20.4% |
+| 0.1 | 4,061 | 13.8% | 14.7 15.1 13.6 12.1 | 45 | 99.6 | 98.00 (97.8-98.2) | 89.6 | 0.17% | 6.56% | 20.2% |
+| 0.15 | 4,078 | 18.6% | 11.0 13.8 28.4 17.8 | 74 | 99.8 | 98.00 (97.6-98.4) | 90.5 | 0.11% | 5.02% | 21.3% |
+| **0.2** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+| 0.3 | 3,991 | 14.9% | 12.0 9.5 17.6 18.7 | 57 | 99.8 | 97.58 (97.0-98.0) | 93.5 | 0.31% | 4.01% | 20.4% |
+| 0.4 | 3,642 | 12.3% | 8.3 11.8 18.6 8.5 | 27 | 99.6 | 97.33 (96.8-97.8) | 92.8 | 0.3% | 4.46% | 17.9% |
+| clipanneal | 4,615 | 16.7% | 15.8 15.3 22.0 13.3 | 65 | 99.8 | 98.25 (98.2-98.4) | 92.7 | 0.29% | 4.29% | 24.2% |
+| clip01anneal | 4,235 | 20.0% | 14.9 31.0 16.2 18.3 | 86 | 99.8 | 98.20 (98.0-98.3) | 86.9 | 0.16% | 7.54% | 22.7% |
+| lranneal | 5,273 | 23.7% | 13.1 34.6 22.4 22.2 | 98 | 99.6 | 98.33 (98.2-98.6) | 91.9 | 0.26% | 4.42% | 28.8% |
+| lranneal10 | 5,178 | 18.9% | 13.2 18.9 24.9 17.4 | 70 | 99.6 | 98.17 (97.9-98.6) | 92.4 | 0.05% | 4.22% | 27.6% |
+| bothanneal | 5,138 | 18.2% | 20.8 20.9 10.1 20.2 | 67 | 99.8 | 98.15 (98.1-98.2) | 92.8 | 0.12% | 3.25% | 27.5% |
+| clipanneal2to1 | 4,258 | 18.1% | 12.7 14.0 15.5 28.3 | 73 | 99.6 | 98.05 (97.8-98.5) | 91.3 | 0.11% | 4.27% | 22.4% |
+| clip04anneal | 4,515 | 16.3% | 12.5 13.4 17.4 20.8 | 51 | 100.0 | 98.33 (98.0-98.6) | 93.2 | 0.22% | 3.86% | 23.4% |
+| clipanneal001 | 4,398 | 17.4% | 17.1 19.0 11.9 20.1 | 74 | 99.8 | 98.22 (97.7-98.6) | 92.0 | 0.24% | 4.98% | 22.9% |
+| clipanneal005 | 4,052 | 18.3% | 15.8 20.4 23.5 13.2 | 66 | 99.6 | 98.33 (97.9-98.5) | 89.8 | 0.09% | 7.3% | 20.9% |
+| clipannealhold80 | 4,883 | 23.5% | 13.8 23.6 30.7 25.4 | 115 | 99.8 | 98.48 (97.9-98.9) | 92.5 | 0.24% | 3.89% | 26.8% |
+| clipanneal001hold80 | 4,436 | 24.3% | 24.4 18.5 16.7 32.5 | 122 | 99.8 | 98.45 (97.8-98.8) | 91.8 | 0.15% | 4.82% | 23.9% |
+
+<!-- reading -->
+Read against the bold reference, b7's λ 0.98 cell `b7aa`-`b7ad` (17.3% density, best30 97.75, 6.2% of evals below 80%), which b15-b21 were generated from. **The clip is flat from 0.05 to 0.2 and worse above it** — 17.4, 13.8, 18.6, 17.3% density, then 14.9 at 0.3 and 12.3 at 0.4 — and best30 runs the other way, highest at the tight end (98.30 at 0.05, one of the batch's two 100/500 rows) and lowest at 0.4 (97.33). Loosening the clip *reduces* collapses (8.2% of evals below 80% at 0.05 down to 4.0-4.5% at 0.3-0.4), the reverse of the spec's "looser: more collapses"; the tight end trades stability for a higher top. **Every anneal sits above the base on best30 (98.05-98.48 against 97.75) and all but two below it on collapses**, so annealing the trust region is worth having, but the plain anneals only match the base on density (16.7-20.0%). **What lifts density is holding at the floor**: `clipannealhold80` and `clipanneal001hold80`, which reach the floor at 40M and train the last 10M there, read 23.5 and 24.3% at best30 98.48 and 98.45 — +6-7 pp on the base, the batch's two highest `hof5000` candidate counts (115, 122), at 3.9-4.8% below 80%. The floor's value barely matters (0.02, 0.005 and 0.001 without a hold: 16.7, 18.3, 17.4%); the hold does. `lranneal` does the same thing through the parameters (23.7%, best30 98.33, 4.4%), and annealing the lr to zero beats annealing to a tenth (18.9%): the near-frozen last stretch is what the endgame wants. `bothanneal` is the most stable cell in the batch (3.25% below 80%) at base density. Per-seed spread is wide in the winning cells (13.8-30.7, 16.7-32.5), so the +6 pp is an n=4 reading. **At 30,000 episodes: `b17cl-clipanneal001hold80-seed4` @11386880 read 99.5 [99.4, 99.6]**, its neighbours 99.4 and 99.3 — third place in the HOF if promoted, above `b9ch`'s 99.30 and below `b10ck`'s 99.65 and 99.55, and from a checkpoint at 11.4M steps, a fifth of the run. A hold-at-floor anneal enters the corner grid; which of the two floors is the user's pick, since they do not separate.
+<!-- /reading -->
+
+### Every arm
+
+| arm | clip | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b17aa-clip005-seed1` | 0.05 | 811 | 10.5% | 4 | 99.4 | 98.4 @41.2M | 85.3 | 0.11% |
+| `b17ab-clip005-seed2` | 0.05 | 1016 | 22.2% | 32 | 100.0 | 98.7 @28.9M | 87.4 | 0.17% |
+| `b17ac-clip005-seed3` | 0.05 | 930 | 12.0% | 9 | 99.4 | 97.9 @16.4M | 80.8 | 0.07% |
+| `b17ad-clip005-seed4` | 0.05 | 1080 | 22.7% | 31 | 99.4 | 98.2 @30.3M | 89.1 | 0.0% |
+| `b17ae-clip01-seed1` | 0.1 | 932 | 14.7% | 15 | 99.4 | 97.8 @39.1M | 90.8 | 0.0% |
+| `b17af-clip01-seed2` | 0.1 | 1080 | 15.1% | 10 | 99.2 | 98.2 @28.3M | 88.8 | 0.2% |
+| `b17ag-clip01-seed3` | 0.1 | 959 | 13.6% | 13 | 99.2 | 97.8 @40.5M | 88.1 | 0.17% |
+| `b17ah-clip01-seed4` | 0.1 | 1090 | 12.1% | 7 | 99.6 | 98.2 @47.5M | 90.6 | 0.17% |
+| `b17ai-clip015-seed1` | 0.15 | 865 | 11.0% | 4 | 99.2 | 97.6 @29.3M | 90.1 | 0.2% |
+| `b17aj-clip015-seed2` | 0.15 | 993 | 13.8% | 12 | 99.4 | 97.9 @42.9M | 91.3 | 0.0% |
+| `b17ak-clip015-seed3` | 0.15 | 1239 | 28.4% | 47 | 99.8 | 98.4 @43.5M | 90.4 | 0.14% |
+| `b17al-clip015-seed4` | 0.15 | 981 | 17.8% | 11 | 99.2 | 98.1 @15.6M | 90.1 | 0.07% |
+| `b17am-clip03-seed1` | 0.3 | 951 | 12.0% | 11 | 99.6 | 97.0 @10.6M | 92.4 | 0.27% |
+| `b17an-clip03-seed2` | 0.3 | 846 | 9.5% | 2 | 99.2 | 97.3 @23.8M | 93.3 | 0.34% |
+| `b17ao-clip03-seed3` | 0.3 | 1063 | 17.6% | 22 | 99.8 | 98.0 @12.3M | 94.6 | 0.0% |
+| `b17ap-clip03-seed4` | 0.3 | 1131 | 18.7% | 22 | 99.4 | 98.0 @32.2M | 93.5 | 0.37% |
+| `b17aq-clip04-seed1` | 0.4 | 744 | 8.3% | 2 | 99.0 | 96.8 @16.4M | 92.4 | 0.4% |
+| `b17ar-clip04-seed2` | 0.4 | 932 | 11.8% | 6 | 99.4 | 97.5 @8.5M | 92.7 | 0.67% |
+| `b17as-clip04-seed3` | 0.4 | 1082 | 18.6% | 17 | 99.6 | 97.8 @10.5M | 92.5 | 0.1% |
+| `b17at-clip04-seed4` | 0.4 | 884 | 8.5% | 2 | 99.2 | 97.2 @40.6M | 93.6 | 0.2% |
+| `b17au-clipanneal-seed1` | clipanneal | 1011 | 15.8% | 9 | 99.8 | 98.2 @34.8M | 90.1 | 0.24% |
+| `b17av-clipanneal-seed2` | clipanneal | 1108 | 15.3% | 19 | 99.6 | 98.2 @46.4M | 93.4 | 0.4% |
+| `b17aw-clipanneal-seed3` | clipanneal | 1258 | 22.0% | 25 | 99.4 | 98.4 @28.2M | 93.2 | 0.23% |
+| `b17ax-clipanneal-seed4` | clipanneal | 1238 | 13.3% | 12 | 99.4 | 98.2 @43.8M | 93.9 | 0.34% |
+| `b17ay-clip01anneal-seed1` | clip01anneal | 1125 | 14.9% | 15 | 99.2 | 98.0 @31.5M | 88.7 | 0.46% |
+| `b17az-clip01anneal-seed2` | clip01anneal | 1036 | 31.0% | 43 | 99.8 | 98.3 @36.7M | 85.6 | 0.28% |
+| `b17ba-clip01anneal-seed3` | clip01anneal | 1102 | 16.2% | 17 | 99.4 | 98.2 @35.8M | 88.9 | 0.03% |
+| `b17bb-clip01anneal-seed4` | clip01anneal | 972 | 18.3% | 11 | 99.4 | 98.3 @32.8M | 84.3 | 0.03% |
+| `b17bc-lranneal-seed1` | lranneal | 1214 | 13.1% | 4 | 99.2 | 98.2 @49.9M | 92.2 | 0.34% |
+| `b17bd-lranneal-seed2` | lranneal | 1521 | 34.6% | 56 | 99.6 | 98.6 @15.7M | 93.1 | 0.17% |
+| `b17be-lranneal-seed3` | lranneal | 1354 | 22.4% | 22 | 99.4 | 98.2 @25.8M | 89.7 | 0.44% |
+| `b17bf-lranneal-seed4` | lranneal | 1184 | 22.2% | 16 | 99.6 | 98.3 @47.1M | 92.6 | 0.03% |
+| `b17bg-lranneal10-seed1` | lranneal10 | 1159 | 13.2% | 6 | 99.2 | 97.9 @14.3M | 93.0 | 0.14% |
+| `b17bh-lranneal10-seed2` | lranneal10 | 1262 | 18.9% | 23 | 99.4 | 98.1 @45.3M | 92.0 | 0.07% |
+| `b17bi-lranneal10-seed3` | lranneal10 | 1411 | 24.9% | 26 | 99.6 | 98.6 @47.8M | 92.0 | 0.03% |
+| `b17bj-lranneal10-seed4` | lranneal10 | 1346 | 17.4% | 15 | 99.6 | 98.1 @48.3M | 92.6 | 0.0% |
+| `b17bk-bothanneal-seed1` | bothanneal | 1457 | 20.8% | 19 | 99.6 | 98.2 @37.8M | 94.6 | 0.1% |
+| `b17bl-bothanneal-seed2` | bothanneal | 1330 | 20.9% | 29 | 99.8 | 98.1 @24.4M | 93.3 | 0.03% |
+| `b17bm-bothanneal-seed3` | bothanneal | 1181 | 10.1% | 4 | 99.2 | 98.1 @39.4M | 90.5 | 0.14% |
+| `b17bn-bothanneal-seed4` | bothanneal | 1170 | 20.2% | 15 | 99.4 | 98.2 @41.6M | 92.9 | 0.14% |
+| `b17bo-clipanneal2to1-seed1` | clipanneal2to1 | 1083 | 12.7% | 8 | 99.6 | 97.9 @38.6M | 91.1 | 0.07% |
+| `b17bp-clipanneal2to1-seed2` | clipanneal2to1 | 935 | 14.0% | 9 | 99.4 | 98.0 @30.1M | 89.0 | 0.14% |
+| `b17bq-clipanneal2to1-seed3` | clipanneal2to1 | 1027 | 15.5% | 14 | 99.2 | 97.8 @40.0M | 92.6 | 0.3% |
+| `b17br-clipanneal2to1-seed4` | clipanneal2to1 | 1213 | 28.3% | 42 | 99.6 | 98.5 @43.7M | 92.7 | 0.03% |
+| `b17bs-clip04anneal-seed1` | clip04anneal | 1070 | 12.5% | 7 | 99.2 | 98.0 @46.9M | 93.5 | 0.44% |
+| `b17bt-clip04anneal-seed2` | clip04anneal | 988 | 13.4% | 7 | 99.4 | 98.4 @47.5M | 93.5 | 0.03% |
+| `b17bu-clip04anneal-seed3` | clip04anneal | 1273 | 17.4% | 16 | 99.4 | 98.3 @47.3M | 94.5 | 0.1% |
+| `b17bv-clip04anneal-seed4` | clip04anneal | 1184 | 20.8% | 21 | 100.0 | 98.6 @48.4M | 91.3 | 0.34% |
+| `b17bw-clipanneal001-seed1` | clipanneal001 | 957 | 17.1% | 15 | 99.4 | 98.2 @38.3M | 92.7 | 0.27% |
+| `b17bx-clipanneal001-seed2` | clipanneal001 | 1298 | 19.0% | 24 | 99.6 | 98.4 @15.0M | 92.6 | 0.14% |
+| `b17by-clipanneal001-seed3` | clipanneal001 | 950 | 11.9% | 9 | 99.4 | 97.7 @18.5M | 91.3 | 0.2% |
+| `b17bz-clipanneal001-seed4` | clipanneal001 | 1193 | 20.1% | 26 | 99.8 | 98.6 @37.5M | 91.3 | 0.54% |
+| `b17ca-clipanneal005-seed1` | clipanneal005 | 1001 | 15.8% | 13 | 99.6 | 97.9 @37.3M | 89.4 | 0.5% |
+| `b17cb-clipanneal005-seed2` | clipanneal005 | 918 | 20.4% | 23 | 99.4 | 98.5 @29.4M | 89.8 | 0.03% |
+| `b17cc-clipanneal005-seed3` | clipanneal005 | 1102 | 23.5% | 22 | 99.6 | 98.5 @39.2M | 89.4 | 0.14% |
+| `b17cd-clipanneal005-seed4` | clipanneal005 | 1031 | 13.2% | 8 | 99.4 | 98.4 @29.9M | 90.8 | 0.0% |
+| `b17ce-clipannealhold80-seed1` | clipannealhold80 | 1172 | 13.8% | 6 | 99.4 | 97.9 @42.4M | 93.2 | 0.2% |
+| `b17cf-clipannealhold80-seed2` | clipannealhold80 | 1231 | 23.6% | 22 | 99.8 | 98.4 @41.8M | 90.6 | 0.27% |
+| `b17cg-clipannealhold80-seed3` | clipannealhold80 | 1243 | 30.7% | 49 | 99.8 | 98.9 @45.8M | 95.0 | 0.07% |
+| `b17ch-clipannealhold80-seed4` | clipannealhold80 | 1237 | 25.4% | 38 | 99.8 | 98.7 @26.3M | 91.3 | 0.55% |
+| `b17ci-clipanneal001hold80-seed1` | clipanneal001hold80 | 1401 | 24.4% | 33 | 99.6 | 98.7 @41.9M | 91.5 | 0.07% |
+| `b17cj-clipanneal001hold80-seed2` | clipanneal001hold80 | 892 | 18.5% | 10 | 99.2 | 97.8 @44.1M | 90.2 | 0.27% |
+| `b17ck-clipanneal001hold80-seed3` | clipanneal001hold80 | 801 | 16.7% | 6 | 99.4 | 98.5 @50.0M | 92.2 | 0.24% |
+| `b17cl-clipanneal001hold80-seed4` | clipanneal001hold80 | 1342 | 32.5% | 73 | 99.8 | 98.8 @9.9M | 93.3 | 0.0% |
+
+<!-- /progress_update: batch b17 -->
+
+<!-- progress_update: batch b19 -->
+## Batch b19 — the switches batch (advantage normalisation off, mse value loss, Adam ε 1e-5 / 1e-8, vf coef 0.1 / 1.0), 6 cells x 4 seeds, 50M, closed 2026-09-05
+
+Closed on the laptop under the old per-box queue, before the shared queue; every arm has its stage-B, hof5000 and hof30k files in `runs/`. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| noadvnorm | 3,826 | 12.9% | 18.4 13.0 11.7 5.2 | 34 | 99.4 | 97.85 (97.2-98.4) | 93.1 | 0.0% | 1.18% | 19.0% |
+| mse | 6,188 | 22.2% | 27.6 23.5 21.2 14.6 | 109 | 99.8 | 98.35 (98.2-98.6) | 96.0 | 0.26% | 0.97% | 33.9% |
+| adameps1e5 | 4,439 | 20.5% | 20.2 17.7 25.8 18.5 | 91 | 99.6 | 98.20 (98.1-98.3) | 92.2 | 0.11% | 4.24% | 23.3% |
+| adameps1e8 | 4,050 | 16.1% | 16.2 7.9 21.0 17.9 | 59 | 99.8 | 97.97 (97.4-98.6) | 92.5 | 0.1% | 4.39% | 20.5% |
+| vf01 | 4,486 | 20.5% | 19.3 20.5 16.1 26.0 | 81 | 99.8 | 98.17 (97.9-98.3) | 91.8 | 0.26% | 4.76% | 23.4% |
+| vf10 | 4,258 | 19.5% | 18.1 25.3 13.2 20.5 | 82 | 99.8 | 97.88 (97.7-98.2) | 91.8 | 0.14% | 4.03% | 21.7% |
+| **base** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+
+<!-- reading -->
+Read against the bold reference, b7's λ 0.98 cell `b7aa`-`b7ad` (17.3% density, best30 97.75, 6.2% of evals below 80%), which b15-b21 were generated from. A switches batch, so each cell is named rather than valued. **`mse` is the row to look at**: 22.2% density against 17.3% (three seeds at 21-28%, one at 14.6%), best30 98.35 against 97.75, stage-A density 33.9% against 20.4, and **0.97% of evals below 80% against 6.2%** at sef 96 — the most stable cell trained at this base and the densest in the batch, where the spec predicted a noisier critic and more collapses. `noadvnorm` is as stable (1.18% below 80%, 0.0% below 50%) and 4 pp short on density, with one seed at 5.2%: turning advantage normalisation off removes the collapses and costs some of the top. Both switches were predicted to add collapses; both removed them, which says the base's collapses come through the critic and the advantage scale, not the policy step. **The Adam ε and vf-coefficient cells are within noise** (16.1-20.5% density, best30 97.88-98.20, 4.0-4.8% below 80%): the value loss's weight does not matter between 0.1 and 1.0, but its form does. At 30,000 episodes the batch's best rows are `b19u-vf10-seed1` @8175616 and `b19o-adameps1e8-seed3` @30261248 at 99.2, nothing for the HOF. `mse` enters the corner grid.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b19a-noadvnorm-seed1` | noadvnorm | 1121 | 18.4% | 20 | 99.4 | 97.9 @25.7M | 94.1 | 0.0% |
+| `b19b-noadvnorm-seed2` | noadvnorm | 1059 | 13.0% | 9 | 99.4 | 98.4 @34.4M | 92.5 | 0.0% |
+| `b19c-noadvnorm-seed3` | noadvnorm | 997 | 11.7% | 3 | 99.4 | 97.9 @46.4M | 93.1 | 0.0% |
+| `b19d-noadvnorm-seed4` | noadvnorm | 649 | 5.2% | 2 | 99.4 | 97.2 @23.2M | 92.7 | 0.0% |
+| `b19e-mse-seed1` | mse | 1733 | 27.6% | 36 | 99.6 | 98.2 @13.5M | 95.3 | 0.27% |
+| `b19f-mse-seed2` | mse | 1564 | 23.5% | 42 | 99.8 | 98.6 @39.9M | 96.7 | 0.07% |
+| `b19g-mse-seed3` | mse | 1568 | 21.2% | 23 | 99.6 | 98.4 @26.3M | 96.8 | 0.24% |
+| `b19h-mse-seed4` | mse | 1323 | 14.6% | 8 | 99.4 | 98.2 @34.5M | 95.2 | 0.77% |
+| `b19i-adameps1e5-seed1` | adameps1e5 | 1209 | 20.2% | 23 | 99.4 | 98.3 @30.7M | 91.0 | 0.57% |
+| `b19j-adameps1e5-seed2` | adameps1e5 | 1038 | 17.7% | 22 | 99.4 | 98.1 @14.3M | 91.3 | 0.07% |
+| `b19k-adameps1e5-seed3` | adameps1e5 | 1063 | 25.8% | 25 | 99.6 | 98.1 @47.2M | 92.3 | 0.03% |
+| `b19l-adameps1e5-seed4` | adameps1e5 | 1129 | 18.5% | 21 | 99.4 | 98.3 @48.9M | 94.3 | 0.14% |
+| `b19m-adameps1e8-seed1` | adameps1e8 | 1049 | 16.2% | 11 | 99.8 | 97.9 @10.3M | 93.2 | 0.1% |
+| `b19n-adameps1e8-seed2` | adameps1e8 | 906 | 7.9% | 4 | 99.2 | 97.4 @45.4M | 93.7 | 0.1% |
+| `b19o-adameps1e8-seed3` | adameps1e8 | 1085 | 21.0% | 27 | 99.6 | 98.6 @15.0M | 91.5 | 0.24% |
+| `b19p-adameps1e8-seed4` | adameps1e8 | 1010 | 17.9% | 17 | 99.4 | 98.0 @24.4M | 91.7 | 0.0% |
+| `b19q-vf01-seed1` | vf01 | 1134 | 19.3% | 11 | 99.6 | 97.9 @31.0M | 91.8 | 0.28% |
+| `b19r-vf01-seed2` | vf01 | 1074 | 20.5% | 21 | 99.8 | 98.3 @29.6M | 90.7 | 0.24% |
+| `b19s-vf01-seed3` | vf01 | 1125 | 16.1% | 17 | 99.6 | 98.3 @14.1M | 93.7 | 0.14% |
+| `b19t-vf01-seed4` | vf01 | 1153 | 26.0% | 32 | 99.6 | 98.2 @26.2M | 91.1 | 0.81% |
+| `b19u-vf10-seed1` | vf10 | 965 | 18.1% | 22 | 99.8 | 97.7 @30.4M | 91.3 | 0.0% |
+| `b19v-vf10-seed2` | vf10 | 1153 | 25.3% | 32 | 99.6 | 98.2 @26.3M | 91.1 | 0.24% |
+| `b19w-vf10-seed3` | vf10 | 1025 | 13.2% | 8 | 99.2 | 97.8 @41.8M | 92.1 | 0.14% |
+| `b19x-vf10-seed4` | vf10 | 1115 | 20.5% | 20 | 99.6 | 97.8 @37.8M | 92.8 | 0.14% |
+
+<!-- /progress_update: batch b19 -->
+
 <!-- progress_update: batch b16 -->
 ## Batch b16 — the `target_kl` sweep, 10 values x 4 seeds, 50M, closed 2026-09-05
 

@@ -6,6 +6,46 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b17 (clip), b19 (switches) and b20 (lanes) closed with their hof passes; b21 (shaping) is on its last wave on the desktop
+and b18 (gradient clip) on its first on the laptop — both boxes pulling from the shared queue since 23:44 last night.**
+As of 2026-09-06 08:30:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b21 (shaping, 24 arms, 3 waves) | waves 1 (desktop) and 2 (laptop) closed with hof5000/hof30k; wave 3 (gate85, gate0) training from 07:20, 61% | training done ~08:50, passes to ~10:30; then it claims b18's wave 2 |
+| laptop | b18 (gradient-norm clip, 24 arms, 3 waves) | wave 1 (0, 0.1) training from 07:55, ~15% | wave 1 done ~10:30 plus passes; 16 arms unclaimed, ~2.5 h a wave, training done ~15:40 |
+
+**The shared queue ran its first night without a fault** ([`../plans/archive/shared-queue.md`](../plans/archive/shared-queue.md)):
+one queue on `ops`, each box claiming a wave by pushing to the `claims` branch. The desktop claimed b17 w8, b20 w2, b21
+w1 and w3; the laptop b21 w2 and b18 w1; b20 was the first batch split across the boxes, and its wave 2 ran on the desktop
+rather than the laptop because the desktop came free first — that is the design, not a routing error. Queueing is the
+`queue-batch` skill; `at_a_glance.pool` in `status.json` is what is unclaimed and who holds what. `attention` is empty.
+
+**What closed.** b17: the static clip is flat from 0.05 to 0.2 and worse above; **annealing the clip and holding the
+last 10M at the floor reads 23.5-24.3% density (+6-7 pp) at best30 98.45-98.48 and better stability**, the floor's value
+not mattering and the hold mattering; `lranneal` does the same (23.7%). b19: **the mse value loss is the most stable cell
+at this base (0.97% of evals below 80%) and 5 pp denser**; advantage normalisation off is as stable and 4 pp short; Adam
+ε and the vf coefficient are within noise. b20: `collect_envs` is a throughput knob — every value within noise on density,
+512 lanes the smoothest endgame (2.2% below 80%) — and against b14 the rollout's gain came from depth, not batch size.
+Verdicts in [`results.md`](results.md), tables in [`charts.md`](charts.md), findings under `## Established` in
+[`findings.md`](findings.md).
+
+**HOF candidate: `b17cl-clipanneal001hold80-seed4` @11386880 read 99.5 /30,000 [99.4, 99.6]**, neighbours 99.4 and
+99.3, from a checkpoint at 11.4M steps. Third place if promoted — above `b9ch`'s 99.30, below `b10ck`'s 99.65 and 99.55.
+Promotion is the `hof-promote` skill and the user's call. Nothing else at 30k this update reads above 99.3.
+
+**Live so far.** b21: the shaping dose is a no-op — 0.0, 0.05, 0.2 and gate60 all inside the base's noise on density and
+a little more stable, shaping *off* the most stable of them; wave 3 (gate85, gate0) is the last word on whether the gate
+matters. b18: too early to read.
+
+**Corner-grid candidates so far at λ 0.98**: a hold-at-floor clip anneal (b17), `lranneal` (b17), `mse` value loss
+(b19), 256-512 lanes as a stability lever (b20); b18 pending. b14's rollout 512 is on the λ 0.99 side of the split.
+
+**Tooling.** `tools/progress_update.py` now reads a batch's close from its files when the bus knows nothing of it —
+b19 closed under the old laptop queue and had no results section until this update.
+
+## b17 and b19 mid-flight, as it read at 2026-09-05 15:35 (superseded)
+
 **b14 (rollout), b15 (entropy) and b16 (target KL) closed with their hof passes; b17 (clip) is on wave 4 of 8 on the
 desktop and b19 (switches) on wave 2 of 3 on the laptop.** As of 2026-09-05 15:35:
 

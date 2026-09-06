@@ -17,6 +17,59 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### `collect_envs` is a throughput knob: 32 to 512 lanes at a fixed rollout is within noise, and the rollout's gain was depth
+
+**Measured 2026-09-06 on b20's 16 arms (both boxes)** — 4 values x 4 seeds at 50M, b7's base at λ 0.98 (the reference 128):
+
+| lanes | 32 | 64 | **128** (ref) | 256 | 512 |
+|---|---:|---:|---:|---:|---:|
+| ≥98%/500 density | 19.1 | 20.5 | **17.3%** | 20.7 | 17.8 |
+| best30 | 98.35 | 98.15 | 97.75 | 97.95 | 97.75 |
+| evals < 80% | 6.1% | 6.0 | 6.2 | 3.9 | 2.2 |
+| stage-A ≥98% | 20.2 | 22.2 | 20.4 | 24.5 | 25.4 |
+
+Every cell is inside the reference's noise on density and best row; what moves is the endgame's stability, which improves
+with lanes (512: 0.0% of evals below 50%). The row counts scale with the update cadence (32 lanes: 15,485 stage-B rows to
+512's 1,230) and say nothing about the policy. The spec's "32 is worse than the equivalent rollout because episode
+diversity is lower" is falsified. And the same batch size reached two ways does not read the same: b14's rollout 512
+was +11 pp over its (λ 0.99) base, 512 lanes is +0.5 pp over this one — **the rollout's gain came from depth, not from
+batch size**. 128 stays the default for speed.
+
+### Annealing the clip helps the endgame, and holding the last 10M at the floor is what lifts density
+
+**Measured 2026-09-06 on b17's 64 arms (desktop)** — 6 static clips and 10 anneals x 4 seeds at 50M, b7's base at λ 0.98
+(the reference 0.2):
+
+| cell | 0.05 | 0.1 | 0.15 | **0.2** (ref) | 0.3 | 0.4 | 0.2→0.02 | 0.2→0.005 | 0.2→0.001 | 0.4→0.02 | **→0.02, hold 40M** | **→0.001, hold 40M** | lr→0 | lr→/10 | both |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | 17.4 | 13.8 | 18.6 | **17.3%** | 14.9 | 12.3 | 16.7 | 18.3 | 17.4 | 16.3 | **23.5** | **24.3** | 23.7 | 18.9 | 18.2 |
+| best30 | 98.30 | 98.00 | 98.00 | 97.75 | 97.58 | 97.33 | 98.25 | 98.33 | 98.22 | 98.33 | 98.48 | 98.45 | 98.33 | 98.17 | 98.15 |
+| evals < 80% | 8.2% | 6.6 | 5.0 | 6.2 | 4.0 | 4.5 | 4.3 | 7.3 | 5.0 | 3.9 | 3.9 | 4.8 | 4.4 | 4.2 | 3.3 |
+
+The static clip is flat from 0.05 to 0.2 and worse above it; loosening it *reduces* collapses, the reverse of the
+prediction. Every anneal beats the base on best30, but the plain anneals only match it on density whatever the floor
+(0.02, 0.005, 0.001); the two that hold the floor for the last 10M read +6-7 pp with the batch's highest `hof5000`
+candidate counts, and annealing the lr to zero (+6 pp) beats annealing it to a tenth (+2). **The endgame wants a small
+trust region held for a long time**, not a descent toward one. n=4 with a wide per-seed spread in the winning cells
+(13.8-30.7%). `b17cl-clipanneal001hold80-seed4` @11386880 read 99.5 [99.4, 99.6] on 30,000 episodes, a HOF candidate.
+
+### The mse value loss is the most stable cell at this base and denser; advantage normalisation off is as stable and 4 pp short
+
+**Measured 2026-09-05 on b19's 24 arms (laptop)** — six switches x 4 seeds at 50M, b7's base at λ 0.98:
+
+| cell | **base** (ref) | mse | noadvnorm | Adam ε 1e-5 | Adam ε 1e-8 | vf 0.1 | vf 1.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | **17.3%** | 22.2 | 12.9 | 20.5 | 16.1 | 20.5 | 19.5 |
+| best30 | 97.75 | 98.35 | 97.85 | 98.20 | 97.97 | 98.17 | 97.88 |
+| evals < 80% | 6.2% | **0.97** | 1.18 | 4.2 | 4.4 | 4.8 | 4.0 |
+| stage-A ≥98% | 20.4 | 33.9 | 19.0 | 23.3 | 20.5 | 23.4 | 21.7 |
+
+Both switches were predicted to add collapses (a noisier critic; an unnormalised advantage scale) and both removed
+them — 6.2% of evals below 80% to ~1% — which locates the base's collapses in the critic and the advantage scale rather
+than the policy step. `mse` also gains 5 pp of density and the highest stage-A density of any cell at this base; the
+weight of the value loss (0.1 to 1.0) and Adam's ε are within noise, so the *form* of the value loss is the lever. `mse`
+enters the corner grid.
+
 ### b15-b21 were generated at λ 0.98 (b7's base); their reference is `b7aa`-`b7ad`, not b9's λ 0.99 cell
 
 **Found 2026-09-05** reading b16's null-check cells: target KL 0.03-0.05, predicted identical to the control, read
