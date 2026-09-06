@@ -116,14 +116,22 @@ def wall_rate(policy, runs_dir=None, policy_dir=None):
 
 
 def recent_arms_rate(runs_dir=None, policy_dir=None, count=RECENT_ARMS):
-    """The box's own rate: the median `wall_rate` of the `count` most recently touched arms here."""
+    """The box's own rate: the median `wall_rate` of the `count` most recently touched **finished** arms
+    here -- arms live in the `runs/.live/` registry are skipped, unless nothing else has ever run.
+
+    Finished, because the most recently touched arms are the wave training now, and one odd wave then
+    forecasts everything queued behind it: 2026-09-05 the laptop's b20 lanes-32/64 wave ran at 2,400-4,800
+    wall steps/s (eval-queue bound) against b19's 9,800, and b18's three base-config waves read 12 h of
+    training instead of ~4 h. A finished arm's wall rate is also its true one."""
+    live = {policy for policy, _ in live_runs.live(runs_dir, prune=False)}
     # `*_evals.json` also matches a pass's `<arm>_checkpoint_evals[_<label>].json`; those are not arms.
     paths = [path for path in glob.glob(os.path.join(runs_dir or constants.RUNS_DIR, '*_evals.json'))
              if '_checkpoint_evals' not in os.path.basename(path)]
     paths.sort(key=lambda path: os.stat(path).st_mtime if os.path.exists(path) else 0, reverse=True)
+    policies = [os.path.basename(path)[:-len('_evals.json')] for path in paths]
+    finished = [policy for policy in policies if policy not in live]
     rates = []
-    for path in paths[:count]:
-        policy = os.path.basename(path)[:-len('_evals.json')]
+    for policy in (finished or policies)[:count]:
         rate = wall_rate(policy, runs_dir, policy_dir)
         if rate:
             rates.append(rate)

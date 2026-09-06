@@ -1199,3 +1199,20 @@ def test_the_queue_orders_batches_by_their_lowest_priority_then_name(tmp_path):
     _, queued, _ = reporter.jobs(None)
     assert [job['id'] for job in queued] == ['b7aa-fc320-seed1', 'b18a-gc0-seed1', 'b21a-shape0-seed1',
                                               'b21b-shape0-seed2']
+
+
+def test_a_batch_with_arms_live_here_runs_first_whatever_its_priority(tmp_path, box):
+    q = tmp_path / 'queue'
+    for batch, arms in {'b18': [('b18a-gc0-seed1', 200)], 'b20': [('b20a-lanes32-seed1', 220), ('b20b-lanes32-seed2', 220)]}.items():
+        os.makedirs(str(q / batch))
+        for name, priority in arms:
+            body = dict(spec(name), priority=priority)
+            with open(os.path.join(str(q / batch), name + '.json'), 'w') as handle:
+                json.dump(body, handle)
+    assert [name for name, _ in scheduler.queue_batches(str(q), box['runs'])] == ['b18', 'b20'], 'by priority when nothing is live'
+    live_runs.register('b20b-lanes32-seed2', os.getpid(), box['runs'])           # this test's own pid: alive
+    assert [name for name, _ in scheduler.queue_batches(str(q), box['runs'])] == ['b20', 'b18'], 'the live wave first'
+    reporter = scheduler.Reporter(queue_dir=str(q), make_driver=lambda specs: driver(specs, box, Calls()), runs_dir=box['runs'])
+    _, queued, _ = reporter.jobs(None)
+    arms = [job['id'] for job in queued if job['type'] == 'train']
+    assert arms == ['b20a-lanes32-seed1', 'b20b-lanes32-seed2', 'b18a-gc0-seed1'], 'the status lists the live wave first too'

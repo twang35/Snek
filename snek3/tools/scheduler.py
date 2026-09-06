@@ -30,7 +30,7 @@ reboot or a deploy costs nothing but a rerun.
 viewer when it launches a wave or a pass, writes the PNGs to show into its own status file
 (`runs/.live/.status.json` -- every arm of the current wave while training, every arm's stage-B chart
 while a pass runs), and closes the viewer when it exits. No arm and no close-out opens a window any
-more; `plans/scheduler.md` §0 lists what went wrong when they did.
+more; `plans/archive/scheduler.md` §0 lists what went wrong when they did.
 
 **The scheduler starts the box's shared stage-A eval workers before each wave** (phase 3 of the same
 plan). The trainers still call `ensure_workers` themselves -- a bare `train.py` gets its workers that
@@ -836,7 +836,7 @@ class Reporter(object):
         attention = [] if driver is None else driver.attention()
         if self.queue_dir and self.make_driver:
             current = None if driver is None else driver.batch
-            for name, specs in queue_batches(self.queue_dir):
+            for name, specs in queue_batches(self.queue_dir, self.runs_dir):
                 other = self.make_driver(specs)
                 if other.batch == current:
                     continue
@@ -863,9 +863,19 @@ class Reporter(object):
 
 # ---------------------------------------------------------------- the queue
 
-def queue_batches(queue_dir):
-    """The batch directories under `queue_dir`, in priority order: by the lowest `priority` any spec
-    of the batch carries, then by name. So the batch whose specs say to run first runs first, and a
+def batch_live(specs, runs_dir=None):
+    """How many of the batch's arms are training on this box right now (the `runs/.live/` registry)."""
+    return sum(1 for spec in train_specs(specs) if live_pid(spec, runs_dir) is not None)
+
+
+def queue_batches(queue_dir, runs_dir=None):
+    """The batch directories under `queue_dir`, in the order they run: **a batch with arms live on this
+    box first**, then by the lowest `priority` any spec of the batch carries, then by name.
+
+    Live first because a scheduler that starts while a wave trains -- a restart onto new code -- must
+    pick that wave up, whatever the numbers say: 2026-09-05 22:17 the laptop's new scheduler chose b18
+    (priority 200) over the b20 wave (220) that had eight arms live, and those arms trained on with
+    nothing watching them. Then priority, so the batch whose specs say to run first runs first, and a
     hand pass queued at a low number (`b7-hof30k-confirm` at 15) goes ahead of the training batches
     rather than behind them by its name (`b7` sorts after `b21`). A file at the top level is not a
     batch; a subdirectory with no specs is skipped with a line saying so."""
@@ -883,11 +893,12 @@ def queue_batches(queue_dir):
             _log('skipping {0}: no specs'.format(path))
             continue
         batches.append((name, specs))
-    batches.sort(key=lambda item: (min(spec_priority(spec) for spec in item[1]), item[0]))
+    batches.sort(key=lambda item: (0 if batch_live(item[1], runs_dir) else 1,
+                                   min(spec_priority(spec) for spec in item[1]), item[0]))
     return batches
 
 
-def run_queue(queue_dir, make_driver, after=None, reporter=None):
+def run_queue(queue_dir, make_driver, after=None, reporter=None, runs_dir=None):
     """Runs every batch under `queue_dir` that has work left, rescanning between batches.
 
     `make_driver(specs)` builds the `Driver` for one batch, so the queue carries no launch settings of
@@ -919,7 +930,7 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None):
         make_driver([]).wait_for(after)
     while True:
         pending = []
-        for name, specs in queue_batches(queue_dir):
+        for name, specs in queue_batches(queue_dir, runs_dir):
             made = make_driver(specs)
             if made.pending():
                 pending.append((name, specs, owed_ids(made)))
@@ -936,7 +947,7 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None):
             _log('queue {0}: {1} has new work since it ran ({2}); running it again'.format(
                 queue_dir, name, ', '.join(sorted(owed - ran[name]))))
         _log('queue {0}: {1} of {2} pending, starting {3}'.format(
-            queue_dir, len(pending), len(queue_batches(queue_dir)), name))
+            queue_dir, len(pending), len(queue_batches(queue_dir, runs_dir)), name))
         ran[name] = owed
         worst = max(worst, driver_for(specs).run() or 0)
 

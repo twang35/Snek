@@ -140,6 +140,13 @@ def test_the_reference_rate_is_the_batchs_finished_arms_else_the_boxs_recent_arm
     (tmp_path / 'runs' / 'b1a-x_checkpoint_evals.json').write_text('{}')
     (tmp_path / 'runs' / 'b1a-x_checkpoint_evals_hof5000.json').write_text('{}')
     assert eta.recent_arms_rate(runs, policies) == 50.0
+    # an arm training now is not the box's rate: with b1c live, the median is over b1a and b1b
+    live_runs.register('b1c-x', os.getpid(), runs)
+    assert eta.recent_arms_rate(runs, policies) == 75.0
+    # ... unless nothing finished has ever run here, when the live arms are all there is
+    live_runs.register('b1a-x', os.getpid(), runs)
+    live_runs.register('b1b-x', os.getpid(), runs)
+    assert eta.recent_arms_rate(runs, policies) == 50.0
     assert eta.reference_rate([], str(tmp_path / 'empty'), policies) is None
     assert eta.arm_seconds(30000, 50000, 100.0) == 200.0 and eta.arm_seconds(None, 50000, None) is None
 
