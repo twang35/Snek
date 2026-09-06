@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b21i-shape02-seed1",
+  "b21j-shape02-seed2",
+  "b21k-shape02-seed3",
+  "b21l-shape02-seed4",
+  "b21m-gate60-seed1",
+  "b21n-gate60-seed2",
+  "b21o-gate60-seed3",
+  "b21p-gate60-seed4"
+ ],
+ "batch": "b21",
+ "box": "laptop",
+ "claimed_iso": "2026-09-06T05:19:21",
+ "claimed_ts": 1788697161.78833,
+ "kind": "wave",
+ "wave": 2
+}
