@@ -41,8 +41,16 @@ OPS=$(git worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branc
 git -C "$OPS" merge --ff-only origin/ops
 git -C "$OPS" rm -q $OPS/snek3/desktop/queue/pending/${B}[a-z]*.json
 git -C "$OPS" commit -m "dequeue $B (<n> arms): moved to the laptop queue driver" && git -C "$OPS" push origin ops
-ssh the-claw-den 'Snek/snek3/desktop/trigger'      # prints the queue as the daemon now sees it; the batch must be gone
+ssh the-claw-den 'Snek/snek3/desktop/trigger'
+ssh the-claw-den 'ls Snek/snek3/desktop/queue-local/'$B' | grep -c json'   # 0: the daemon mirrored the dequeue
 ```
+
+**The trigger's printout is not the confirmation.** Its `queued:` lines are the scheduler's own status,
+and the scheduler rescans its queue only between batches, so the moved batch keeps showing there (and
+`status.json`'s `ledger` keeps its arms `queued`) until the batch in front of it closes. What the
+daemon does on the trigger is mirror `ops` into `desktop/queue-local/<batch>/` on the box, and that
+directory is the check: empty after a dequeue, the arm count after a requeue (2026-09-05 21:32, moving
+b18 off and b21 on: the printout still listed b18 and not b21 while `queue-local` already had 0 and 24).
 
 Only the training specs exist on `ops`; the batch's stage B and hof passes are queued by the chain
 when a training finishes, so they vanish with the specs and nothing else needs removing.
@@ -65,6 +73,7 @@ mv $Q/$B /Users/tony_wang/Projects/Snek/snek3/logs/laptop-queue-moved-$B
 cp /Users/tony_wang/Projects/Snek/snek3/logs/laptop-queue-moved-$B/*.json $OPS/snek3/desktop/queue/pending/
 git -C "$OPS" add snek3/desktop/queue/pending/ && git -C "$OPS" commit -m "requeue $B (<n> arms): moved back from the laptop" && git -C "$OPS" push origin ops
 ssh the-claw-den 'Snek/snek3/desktop/trigger'
+ssh the-claw-den 'ls Snek/snek3/desktop/queue-local/'$B' | grep -c json'   # the arm count; see the note above on why not the printout
 ```
 
 Validate the specs with the daemon's parser first if anything in them was edited (`desktop-batch`,
