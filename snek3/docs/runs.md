@@ -11,7 +11,7 @@ mid-afternoon; the desktop is idle and the shared queue holds nothing else.** As
 
 | box | batch | state | ETA |
 |---|---|---|---|
-| laptop | b18 (gradient-norm clip, 24 arms, 3 waves) | waves 1 (laptop) and 2 (desktop) closed with hof5000/hof30k; wave 3 (2.0, 5.0) trained, stage B running from 12:08, 4 of 8 arms in | stage B ~13:25, hof passes after; closes ~14:30 |
+| laptop | b18 (gradient-norm clip, 24 arms, 3 waves) | waves 1 (laptop) and 2 (desktop) closed with hof5000/hof30k; wave 3 (2.0, 5.0) trained, stage B running from 12:08, 4 of 8 arms in | stage B ~13:20, hof passes after; closes ~13:40 (the daemon's own estimate) |
 | desktop | — | idle since b18's wave 2 closed; nothing unclaimed on the pool | **free for the corner grid** |
 
 **What closed.** b21: **the chase-safe shaping is a no-op for PPO** — dose 0 to 0.2 and gate 0 to 85 all inside the
@@ -30,7 +30,7 @@ leaves the grid.
 a clip anneal held at the floor for the last 10M (b17, +6-7 pp), `lranneal` to zero (b17, +6 pp), the `mse` value loss
 (b19, +5 pp and the most stable cell), 256-512 lanes as a stability lever (b20); simplifications at no cost: shaping off
 (b21), and — pending its last wave — gradient clip left at 0.5 (b18). b14's rollout 512 is on the λ 0.99 side of the
-split. The corner grid's spec is the user's call; the desktop is free for it now and the laptop from ~14:30.
+split. The corner grid's spec is the user's call; the desktop is free for it now and the laptop from ~13:40.
 
 **Housekeeping.** `runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` (12 files) are stray per-shard files from a
 stage-B pass that later merged; untracked, harmless, not committed.
