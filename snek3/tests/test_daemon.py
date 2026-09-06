@@ -744,7 +744,7 @@ class Spawns(object):
         return FakeScheduler(self.pid), '/var/snek/logs/scheduler-x.log'
 
 
-POOL = {'lines': ['b21 training | 24/24 arms', 'laptop holds b20-w1 (8 arms, running)'],
+POOL = {'lines': ['b21 training | 24/24 arms', 'laptop holds b20-w1 (8 arms)'],
         'unclaimed': [{'batch': 'b21', 'phase': 'training', 'ids': ['b21a-x'], 'pins': {}, 'priority': 220}],
         'held': {'laptop': [{'id': 'b20-w1', 'batch': 'b20', 'kind': 'wave', 'wave': 1, 'arms': ['b20a-x'],
                              'done': False, 'running': True}]},

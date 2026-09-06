@@ -348,9 +348,11 @@ def pool_view(specs, records, published=frozenset(), running=None, status_ages=N
     for box in sorted(held):
         open_ones = [h for h in held[box] if not h['done']]
         if open_ones:
+            # No running tag: whether a holding's wave or pass is live is the box's own running line,
+            # a row up in the same block (user, 2026-09-06). `held[...]['running']` stays for the tools.
             lines.append('{0} holds {1}'.format(box, ', '.join(
-                '{0} ({1} arm{2}{3})'.format(h['id'], len(h['arms']), '' if len(h['arms']) == 1 else 's',
-                                             ', running' if h['running'] else '') for h in open_ones)))
+                '{0} ({1} arm{2})'.format(h['id'], len(h['arms']), '' if len(h['arms']) == 1 else 's')
+                for h in open_ones)))
     attention = []
     ages = status_ages or {}
     for box in sorted(held):

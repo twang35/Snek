@@ -129,7 +129,7 @@ def test_the_pool_view_lists_unclaimed_work_by_batch_each_boxs_open_holdings_and
                             status_ages={'laptop': 3 * 3600, 'desktop': 10.0})
     assert view['lines'] == ['b7 eval | b7-hof30k-confirm | pinned laptop',
                              'b18 training | 8/8 arms',
-                             'laptop holds b21-w2 (8 arms, running)'], \
+                             'laptop holds b21-w2 (8 arms)'], \
         'a line naming a batch and no box is unclaimed by construction; the count is out of the batch on ops'
     assert view['held']['desktop'][0]['done'] is True and view['held']['laptop'][0]['done'] is False
     assert view['attention'] == ['** laptop holds b21-w2 but its status is 3.0h old; if it is not coming back, '

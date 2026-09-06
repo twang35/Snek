@@ -1329,6 +1329,6 @@ def test_an_arm_training_here_that_no_claim_covers_is_named_and_left_alone(tmp_p
     assert shared.mirrored == {'b21a-x-seed1'}
     lines = shared.unheld()
     assert len(lines) == 1 and 'b21b-x-seed2 is training here (pid 4242) but this box holds no claim' in lines[0]
-    assert shared.lines() == ['b21 training | 1/2 arms', 'laptop holds b21-w1 (1 arm, running)'], \
+    assert shared.lines() == ['b21 training | 1/2 arms', 'laptop holds b21-w1 (1 arm)'], \
         'the pool lines this box publishes read the statuses and the feeds, or every holding reads as open'
     assert os.path.exists(os.path.join(box['runs'], '.live', 'b21b-x-seed2')), 'a sync never kills a trainer'
