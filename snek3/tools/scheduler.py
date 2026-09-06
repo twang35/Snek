@@ -991,10 +991,16 @@ class SharedQueue(object):
     """This box's view of the shared queue between syncs: the claims store, the specs off `ops`, and what
     the mirror last wrote. `sync` is the only network step; `lines` and `unheld` read what it left."""
 
-    def __init__(self, store, box, queue_dir, runs_dir=None, read_specs=claims.read_specs, log=_log):
+    def __init__(self, store, box, queue_dir, runs_dir=None, read_specs=claims.read_specs, log=_log,
+                 read_published=None, read_running=None):
         self.store, self.box, self.queue_dir, self.runs_dir = store, box, queue_dir, runs_dir
         self.read_specs, self.log = read_specs, log
+        # The feeds and the statuses are what make a holding `done` or `running` in the pool lines this
+        # box publishes; without them every wave the other box ever held reads as open (2026-09-05).
+        self.read_published = read_published or (lambda: claims.published_ids(repo=store.repo, remote=store.remote))
+        self.read_running = read_running or (lambda: claims.running_ids(repo=store.repo, remote=store.remote))
         self.specs, self.malformed, self.mirrored = {}, [], set()
+        self.published, self.running, self.status_ages = set(), {}, {}
         self.synced = False
 
     def sync(self):
@@ -1006,6 +1012,8 @@ class SharedQueue(object):
             self.specs, self.malformed = self.read_specs()
             self.mirrored = claims.mirror(self.queue_dir, self.specs,
                                           claims.mine(self.store.records, self.box), log=self.log)
+            self.published = set(self.read_published())
+            self.running, self.status_ages = self.read_running()
             self.synced = True
         except Exception as error:      # noqa: BLE001 -- the run is the arms; the bus is best effort
             self.log('shared queue: could not sync ({0}); running what is mirrored'.format(error))
@@ -1028,7 +1036,8 @@ class SharedQueue(object):
     def lines(self):
         if not self.synced:
             return []
-        return claims.pool_view(self.specs, self.store.records, malformed=self.malformed)['lines']
+        return claims.pool_view(self.specs, self.store.records, published=self.published, running=self.running,
+                                status_ages=self.status_ages, malformed=self.malformed)['lines']
 
     def claim_next(self, wave_size):
         return claims.claim_next(self.store, self.box, wave_size, read_specs=self.read_specs, log=self.log)
