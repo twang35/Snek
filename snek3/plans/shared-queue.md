@@ -1,8 +1,9 @@
 # One queue for both boxes — design proposal (2026-09-05)
 
-Status: **proposal, for discussion.** Section 0 is the problem, 1 is the mechanism and why it beats the
-alternatives, 2 is the design piece by piece, 3 is what changes in each file, 4 the migration, 5 the
-phasing, 6 the decisions to take.
+Status: **approved 2026-09-05 evening, decisions 1-6 and 8 taken (section 6); 7 open.** Section 0 is the
+problem, 1 is the mechanism and why it beats the alternatives, 2 is the design piece by piece, 3 is what
+changes in each file, 4 the migration, 5 the phasing, 6 the decisions, 7 what happens with one box or a
+late start.
 
 ## 0. The problem
 
@@ -212,9 +213,9 @@ the laptop has b20 wave 1 training, b20 wave 2 and b18 (24 arms) in `logs/laptop
 | 4 | `batch_state`, `progress_update`, manifest `box` | a split batch's table and state line read right |
 | 5 | skills and docs; retire `move-batch` | the next queueing goes through `queue-batch` |
 
-## 6. Decisions to take
+## 6. Decisions (user, 2026-09-05)
 
-| # | question | recommendation |
+| # | question | decision |
 |---|---|---|
 | 1 | claim unit: wave, or whole batch | **wave.** A batch spanning boxes costs only a `box` column on the page; the balance is the point |
 | 2 | laptop scheduler lifetime | **exits when idle, as now.** The laptop joins by starting it; a scheduler that polls forever is a second daemon with a second set of liveness rules |
@@ -222,5 +223,35 @@ the laptop has b20 wave 1 training, b20 wave 2 and b18 (24 arms) in `logs/laptop
 | 4 | claim timing | **just before launch**, never one ahead: the smallest possible stranded window, and the pool in the status is what is really free |
 | 5 | pin syntax | `"box": "desktop" \| "laptop"`, absent for either. No `any` keyword to misspell |
 | 6 | the pass numbering across boxes | **global per batch from the claims**, so `b21-stageb-w2` means one wave everywhere; a released number is never reused |
-| 7 | eval specs whose checkpoints are on neither box (a re-measure of a batch closed on the old laptop `runs/`) | unclaimable, shown in the pool as `needs checkpoints`; the `hof-remeasure` skill keeps its rsync step for that case |
-| 8 | retire `move-batch` | **yes**, once phase 5 lands; its priority trap is what the shared order removes |
+| 7 | a hand eval spec over arms whose checkpoints are not all on one box | **open** -- see below |
+| 8 | retire `move-batch` | **yes**, and delete its content from every other doc and tool that carries it (`CLAUDE.md`'s two-hosts table, `desktop/README.md`, `laptop-run`, `desktop-batch`, `hyperparam-sweep.md`'s move notes) rather than marking it obsolete |
+
+**Decision 7, spelled out.** The chain's passes are per wave and never hit this: a wave's arms and their
+checkpoints are on the box that trained them. The case is a **hand eval spec** -- `b7-hof30k-confirm`, a
+`hof-remeasure`, a `one` re-measure -- whose `policies` list arms whose `savedPolicies/<arm>/` are not all on
+one box. Today that is a batch trained before the desktop existed (checkpoints on the laptop only, so the
+laptop claims it, no problem) or one whose checkpoints were pruned. **Under this plan it also becomes every
+batch that was split across the boxes**: an eval spec over all 24 arms of a split b21 is claimable by
+neither box, because each holds 16 of the checkpoints. Two ways to handle it:
+
+| | a. rsync, as now | b. the spec runs in parts |
+|---|---|---|
+| what happens | the spec sits in the pool as `b21-hof30k-confirm | needs checkpoints: 8 arms not on this box`, from each box's view; a person rsyncs the missing `savedPolicies/` to one box (the `hof-remeasure` skill's existing step) and the spec is claimed on the next boundary | each box claims the spec **for the policies it holds** (`claims/b21/eval-b21-hof30k-confirm-laptop.json`), runs the close-out over those, publishes their files; the spec is done when every policy has its file on some feed |
+| cost | a hand step per split-batch re-measure, and the checkpoints copied twice on disk | ~60 lines in `next_claim` and the mirror, one more claim shape, and a "done" test that reads both feeds |
+| recommended | **for now.** Hand evals are rare (four so far) and the pool line says exactly what to copy | if split-batch re-measures become routine |
+
+## 7. One box, or a late start
+
+Both work, and nothing in the design assumes two boxes are up.
+
+| situation | what happens |
+|---|---|
+| only the desktop is running | its scheduler claims the next free wave at every boundary until the pool holds nothing it may take. Specs pinned `laptop` stay in the pool, listed as such |
+| only the laptop is running | the same. The desktop's daemon being down or off-bus changes nothing: the laptop reads `ops` and pushes `claims` itself |
+| a box starts at any time | its scheduler reads `ops` and `claims`, first runs whatever it already holds (a wave it was mid-way through -- checkpoints local, arms resume; the just-committed "live arms first" rule, `2116545a1`, is the same behaviour), then claims the next free wave. There is no registration, no roster of boxes, and no state about a box anywhere but the claims it holds |
+| a box goes away mid-wave | the wave stays claimed (2.5). It resumes when the box returns, or a person releases it |
+| the desktop daemon starts a scheduler | on any movement of the `ops` or `claims` head, or a trigger, when none is alive (2.3). So the laptop claiming a wave wakes the desktop's scheduler too, which is right: the pool changed and the desktop may now be the one with work to take |
+| the laptop scheduler | started by hand or by the `queue-batch` skill; exits when it can claim nothing (decision 2). A dead laptop scheduler is simply a box that claims nothing |
+
+"Unclaimed" is purely *not in any claim*: a finished wave is claimed, a running wave is claimed, and the
+claimant never needs to know whether the other box exists.
