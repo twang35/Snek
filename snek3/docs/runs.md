@@ -6,6 +6,37 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b21 (shaping) closed with its hof passes; b18 (gradient clip) is on its last wave's stage B on the laptop and closes
+mid-afternoon; the desktop is idle and the shared queue holds nothing else.** As of 2026-09-06 12:35:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| laptop | b18 (gradient-norm clip, 24 arms, 3 waves) | waves 1 (laptop) and 2 (desktop) closed with hof5000/hof30k; wave 3 (2.0, 5.0) trained, stage B running from 12:08, 4 of 8 arms in | stage B ~13:25, hof passes after; closes ~14:30 |
+| desktop | — | idle since b18's wave 2 closed; nothing unclaimed on the pool | **free for the corner grid** |
+
+**What closed.** b21: **the chase-safe shaping is a no-op for PPO** — dose 0 to 0.2 and gate 0 to 85 all inside the
+base's noise on density (16.3-18.2% against 17.3) and best30, every cell a little more stable; shaping *off* is the most
+stable cell (3.6% of evals below 80%) and gate85 the densest with the batch's best at depth (`b21s-gate85-seed3`
+@38748160, 98.9 /30,000, below the HOF). Both spec predictions falsified. Shaping off goes into the corner grid as a
+simplification. Verdict in [`results.md`](results.md), table in [`charts.md`](charts.md), finding under `## Established`
+in [`findings.md`](findings.md).
+
+**Live.** b18: 22 of 24 arms have stage-B rows and **the knob reads as a no-op so far** — clip off is 17.3%, the base's
+density to the decimal, and 0.1 / 0.25 / 1.0 / 2.0 read 19.1 / 16.7 / 16.7 / 19.5, every cell a little more stable than
+the base. 5.0 and 2.0's last two seeds are what is left; unless they surprise, the gradient-norm clip stays at 0.5 and
+leaves the grid.
+
+**Next: the corner grid.** With b18 the one-knob sweeps at λ 0.98 are done. The levers that survived, all at b7's base:
+a clip anneal held at the floor for the last 10M (b17, +6-7 pp), `lranneal` to zero (b17, +6 pp), the `mse` value loss
+(b19, +5 pp and the most stable cell), 256-512 lanes as a stability lever (b20); simplifications at no cost: shaping off
+(b21), and — pending its last wave — gradient clip left at 0.5 (b18). b14's rollout 512 is on the λ 0.99 side of the
+split. The corner grid's spec is the user's call; the desktop is free for it now and the laptop from ~14:30.
+
+**Housekeeping.** `runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` (12 files) are stray per-shard files from a
+stage-B pass that later merged; untracked, harmless, not committed.
+
+## b21 on its last wave and b18 on its first, as it read at 2026-09-06 08:30 (superseded)
+
 **b17 (clip), b19 (switches) and b20 (lanes) closed with their hof passes; b21 (shaping) is on its last wave on the desktop
 and b18 (gradient clip) on its first on the laptop — both boxes pulling from the shared queue since 23:44 last night.**
 As of 2026-09-06 08:30:

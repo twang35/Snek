@@ -22,6 +22,56 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b21 -->
+## Batch b21 — the `chase_safe_shaping` sweep, 6 values x 4 seeds, 50M, closed 2026-09-06
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| chase_safe_shaping | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 0.0 | 4,239 | 17.1% | 11.9 18.7 18.3 18.5 | 58 | 99.6 | 98.08 (97.8-98.3) | 92.7 | 0.07% | 3.56% | 21.7% |
+| 0.05 | 3,919 | 16.3% | 12.9 17.0 19.6 14.7 | 51 | 99.6 | 97.80 (97.7-97.9) | 91.4 | 0.22% | 4.57% | 20.1% |
+| **0.1** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+| 0.2 | 4,291 | 16.6% | 10.5 22.3 19.8 13.2 | 62 | 99.8 | 98.05 (97.5-98.4) | 92.6 | 0.14% | 4.14% | 21.6% |
+| gate60 | 4,644 | 17.5% | 15.1 19.5 18.7 16.8 | 42 | 99.8 | 98.20 (97.9-98.5) | 92.5 | 0.33% | 4.93% | 23.9% |
+| gate85 | 4,262 | 18.2% | 10.6 11.1 23.3 23.4 | 75 | 100.0 | 98.22 (97.6-98.5) | 91.9 | 0.17% | 4.45% | 21.6% |
+| gate0 | 4,002 | 17.6% | 11.1 17.9 16.3 24.0 | 60 | 99.8 | 97.92 (97.3-98.3) | 92.1 | 0.23% | 4.24% | 20.4% |
+
+<!-- reading -->
+Read against the bold reference, b7's λ 0.98 cell `b7aa`-`b7ad` (17.3% density, best30 97.75, 6.2% of evals below 80%), which b15-b21 were generated from. **The chase-safe shaping is a no-op for PPO at this base — neither the dose nor the gate moves anything.** Density is inside the reference's noise at every cell (16.3-18.2% against 17.3), best30 spans 97.80-98.22 with the base at the bottom of the range, and every cell is a little *more* stable than the base (3.6-4.9% of evals below 80% against 6.2). **Two predictions are falsified.** Shaping off (0.0) was to have a late onset and possibly never arrive: it matches the base on density (17.1%) and stage-A density (21.7 against 20.4), and is the most stable cell of the seven (3.56% below 80%, 0.07% below 50%). gate85, snek3's own default gate with only the last 10 squares shaped, was to read worse than 75: it is the densest cell (18.2%), has the batch's only 100.0 row, and its best checkpoint `b21s-gate85-seed3` @38748160 reads 99.1 /5,000 and **98.9 /30,000 [98.8, 99.0]**, the batch's best at depth and below the HOF's 99.30 third place; the other 30k row, `b21b-shape0-seed2` @35618816, reads 98.7. gate0 (shaped from the first move) and gate60 read 17.6 and 17.5%, so the gate's position from 0 to 85 does nothing either; the direction snek2 improved in does not carry to PPO. What the stage-A traces add: seed 1 is the weak seed in five of the six cells (10.5-12.9% share against the reference's 18.5), a seed effect across the batch rather than a knob effect anywhere in it. What the batch does not settle is whether the shaping mattered at a weaker base — the 1%-perfect gate arm at 508k was DQN-era — but at b7's base it is a knob PPO does not need. **Shaping off is the simplest config at no cost** and is the setting to carry into the corner grid; nothing here is a lever.
+<!-- /reading -->
+
+### Every arm
+
+| arm | chase_safe_shaping | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b21a-shape0-seed1` | 0.0 | 927 | 11.9% | 5 | 99.6 | 97.8 @42.5M | 91.1 | 0.2% |
+| `b21b-shape0-seed2` | 0.0 | 1132 | 18.7% | 23 | 99.6 | 98.3 @35.3M | 93.0 | 0.07% |
+| `b21c-shape0-seed3` | 0.0 | 1148 | 18.3% | 20 | 99.4 | 98.2 @49.8M | 93.4 | 0.07% |
+| `b21d-shape0-seed4` | 0.0 | 1032 | 18.5% | 10 | 99.6 | 98.0 @47.3M | 93.4 | 0.07% |
+| `b21e-shape005-seed1` | 0.05 | 876 | 12.9% | 12 | 99.4 | 97.7 @10.7M | 91.5 | 0.03% |
+| `b21f-shape005-seed2` | 0.05 | 945 | 17.0% | 17 | 99.6 | 97.8 @31.5M | 89.2 | 0.71% |
+| `b21g-shape005-seed3` | 0.05 | 1162 | 19.6% | 11 | 99.2 | 97.8 @45.8M | 92.4 | 0.03% |
+| `b21h-shape005-seed4` | 0.05 | 936 | 14.7% | 11 | 99.4 | 97.9 @47.0M | 92.4 | 0.41% |
+| `b21i-shape02-seed1` | 0.2 | 1006 | 10.5% | 1 | 99.0 | 97.5 @39.4M | 94.3 | 0.0% |
+| `b21j-shape02-seed2` | 0.2 | 1130 | 22.3% | 29 | 99.8 | 98.0 @29.4M | 92.8 | 0.07% |
+| `b21k-shape02-seed3` | 0.2 | 1094 | 19.8% | 16 | 99.4 | 98.4 @45.1M | 91.3 | 0.61% |
+| `b21l-shape02-seed4` | 0.2 | 1061 | 13.2% | 16 | 99.6 | 98.3 @7.7M | 92.1 | 0.2% |
+| `b21m-gate60-seed1` | gate60 | 1099 | 15.1% | 9 | 99.6 | 98.3 @40.8M | 93.7 | 0.57% |
+| `b21n-gate60-seed2` | gate60 | 1080 | 19.5% | 13 | 99.8 | 98.1 @26.6M | 91.5 | 0.17% |
+| `b21o-gate60-seed3` | gate60 | 1131 | 18.7% | 9 | 99.4 | 97.9 @35.2M | 92.0 | 0.2% |
+| `b21p-gate60-seed4` | gate60 | 1334 | 16.8% | 11 | 99.4 | 98.5 @20.2M | 92.9 | 0.45% |
+| `b21q-gate85-seed1` | gate85 | 834 | 10.6% | 6 | 99.2 | 97.6 @19.3M | 93.1 | 0.03% |
+| `b21r-gate85-seed2` | gate85 | 912 | 11.1% | 4 | 99.4 | 98.3 @36.3M | 90.2 | 0.17% |
+| `b21s-gate85-seed3` | gate85 | 1260 | 23.3% | 41 | 100.0 | 98.5 @34.6M | 92.6 | 0.17% |
+| `b21t-gate85-seed4` | gate85 | 1256 | 23.4% | 24 | 99.6 | 98.5 @44.4M | 91.7 | 0.21% |
+| `b21u-gate0-seed1` | gate0 | 889 | 11.1% | 8 | 99.6 | 97.3 @48.1M | 93.8 | 0.37% |
+| `b21v-gate0-seed2` | gate0 | 1016 | 17.9% | 8 | 99.4 | 98.3 @33.0M | 88.8 | 0.44% |
+| `b21w-gate0-seed3` | gate0 | 1041 | 16.3% | 13 | 99.6 | 97.9 @23.9M | 93.1 | 0.1% |
+| `b21x-gate0-seed4` | gate0 | 1056 | 24.0% | 31 | 99.8 | 98.2 @31.1M | 92.8 | 0.1% |
+
+<!-- /progress_update: batch b21 -->
+
 <!-- progress_update: batch b20 -->
 ## Batch b20 — the `collect_envs` sweep, 4 values x 4 seeds, 50M, closed 2026-09-06
 

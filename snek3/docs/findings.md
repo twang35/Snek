@@ -17,6 +17,25 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The chase-safe shaping is a no-op for PPO: dose 0 to 0.2 and gate 0 to 85 are all within noise of the base
+
+**Measured 2026-09-06 on b21's 24 arms (both boxes)** — 3 doses and 3 gates x 4 seeds at 50M, b7's base at λ 0.98 (the
+reference: dose 0.1, gate 75):
+
+| cell | 0.0 (off) | 0.05 | **0.1** (ref) | 0.2 | gate60 | gate85 | gate0 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | 17.1 | 16.3 | **17.3%** | 16.6 | 17.5 | 18.2 | 17.6 |
+| best30 | 98.08 | 97.80 | 97.75 | 98.05 | 98.20 | 98.22 | 97.92 |
+| evals < 80% | **3.6%** | 4.6 | 6.2 | 4.1 | 4.9 | 4.5 | 4.2 |
+| stage-A ≥98% | 21.7 | 20.1 | 20.4 | 21.6 | 23.9 | 21.6 | 20.4 |
+
+Every cell is inside the reference's noise on density and best row, and every cell is a little more stable than the
+base. Both predictions fell: shaping *off* was to onset late and possibly never arrive, and it matches the base on
+density and stage-A density and is the most stable cell; gate85 was to read worse than 75, and it is the densest cell
+with the batch's best checkpoint at depth (`b21s-gate85-seed3` @38748160, 98.9 /30,000 [98.8, 99.0]). The shaping was
+a DQN-era lever — snek2 improved by starting it earlier — and PPO on the bare reward reaches the same place at the same
+time. **Shaping off is the simplest config at no cost**; it goes into the corner grid as a simplification, not a lever.
+
 ### `collect_envs` is a throughput knob: 32 to 512 lanes at a fixed rollout is within noise, and the rollout's gain was depth
 
 **Measured 2026-09-06 on b20's 16 arms (both boxes)** — 4 values x 4 seeds at 50M, b7's base at λ 0.98 (the reference 128):
