@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b20i-lanes256-seed1",
+  "b20j-lanes256-seed2",
+  "b20k-lanes256-seed3",
+  "b20l-lanes256-seed4",
+  "b20m-lanes512-seed1",
+  "b20n-lanes512-seed2",
+  "b20o-lanes512-seed3",
+  "b20p-lanes512-seed4"
+ ],
+ "batch": "b20",
+ "box": "desktop",
+ "claimed_iso": "2026-09-06T03:49:09",
+ "claimed_ts": 1788691749.2784486,
+ "kind": "wave",
+ "wave": 2
+}
