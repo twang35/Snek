@@ -59,6 +59,19 @@ publishes with `ensure_ascii=False`. Neither is a reason to type the character â
 one-way guess at what you meant, and it applies only to `label` and `notes`, not to an `id` or a
 `policy`, which are paths and are left exactly as given.
 
+**A hand eval on a closed batch wakes the whole batch, and its arms retrain unless they read finished.**
+The daemon mirrors a batch to the scheduler only while one of its specs is unpublished, and then it
+mirrors *every* spec of that batch, the 32 finished train arms included (`_batches_with_work`). The
+scheduler calls an arm finished from `<arm>_evals.json` in `desktop/runs/`, and a batch that closed before
+2026-09-03 has none there. So before pushing an eval spec for such a batch, `rsync` the batch's
+`runs/<arm>_evals.json` (and its `_checkpoint_evals*.json`, which the passes read) from the laptop into
+`the-claw-den:Snek/snek3/desktop/runs/`, then confirm the scheduler will see them as done:
+`python3 -c` over `summary.step >= max_steps` for every arm. 2026-09-05 21:43, queueing `b7-hof30k`:
+the daemon mirrored 33 b7 specs into `queue-local/b7/` with no `_evals.json` on the box; the files were
+rsynced before b17's wave closed, so nothing retrained, but a rescan first would have relaunched b7 from
+scratch. Once the batch is live the chain runs its own missing passes per wave (`b7-hof30k`, `-w2`, ...),
+so the hand spec only needs to exist; give it an id that is not a chain pass label (`b7-hof30k-confirm`).
+
 **Omit `selector` and `episodes` on an eval.** Absent means `tools/closeout.py`'s own defaults, which
 *are* the protocol. `eval_shards` and `priority` are in
 [`desktop/README.md`](../../desktop/README.md) with the rest.
