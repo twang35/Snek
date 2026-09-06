@@ -1,6 +1,12 @@
 # The chart viewer keeps itself current
 
-**Status: implemented 2026-09-05** (steps 1-5; step 6, the feeds' de-duplication, is partly done -- an arm's `_evals.json` is published once, with the arm -- and the snapshot form of the feeds is still open). Below is the plan as approved. The question: can both boxes publish their charts as each
+**Status: live 2026-09-05 17:05.** Commit b6efd7589, deployed 16:58; both schedulers restarted onto it (the desktop's
+adopted b17's stage-B w4 mid-pass, the laptop's adopted b19's wave 2 and published its eight arms as they reached
+their cap). Pages switched to `site` / `/` at 17:02 through the API. The first build flattened the whole `results`
+feed (6,276 files, 126 s); an incremental build is ~40 s, most of it the manifest walk. The laptop's closed batches
+b13, b14, b16 and b19 wave 1 were back-filled into `laptop-results` by hand once (`tools.results_feed`), so the site
+carries 582 arms and 1,290 charts. Step 6 is partly done -- an arm's `_evals.json` is published once, with the arm --
+and the snapshot form of the feeds is still open. Below is the plan as approved. The question: can both boxes publish their charts as each
 wave finishes, so the [Pages viewer](https://twang35.github.io/Snek/) is current without a progress update,
 and without bringing back the merge failures the box's `snek3/runs/` collisions caused?
 
