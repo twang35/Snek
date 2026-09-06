@@ -30,9 +30,10 @@ at this base (0.97% of evals below 80%) and 5 pp denser**; advantage normalisati
 Verdicts in [`results.md`](results.md), tables in [`charts.md`](charts.md), findings under `## Established` in
 [`findings.md`](findings.md).
 
-**HOF candidate: `b17cl-clipanneal001hold80-seed4` @11386880 read 99.5 /30,000 [99.4, 99.6]**, neighbours 99.4 and
-99.3, from a checkpoint at 11.4M steps. Third place if promoted — above `b9ch`'s 99.30, below `b10ck`'s 99.65 and 99.55.
-Promotion is the `hof-promote` skill and the user's call. Nothing else at 30k this update reads above 99.3.
+**Promoted to the HOF (user's decision, 2026-09-06 09:05): `b17cl-clipanneal001hold80-seed4` @11386880, 99.50 /30,000
+[99.4, 99.6]**, neighbours 99.4 and 99.3, from a checkpoint at 11.4M steps — third place, above `b9ch`'s 99.30 and not
+distinguishable from the lower `b10ck` entry (z = 0.9). Copy verified 496/500 on seed 11; entry in
+[`hallOfFame/HOF.md`](../hallOfFame/HOF.md). Nothing else at 30k this update reads above 99.3.
 
 **Live so far.** b21: the shaping dose is a no-op — 0.0, 0.05, 0.2 and gate60 all inside the base's noise on density and
 a little more stable, shaping *off* the most stable of them; wave 3 (gate85, gate0) is the last word on whether the gate

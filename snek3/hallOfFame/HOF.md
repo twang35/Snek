@@ -11,21 +11,42 @@ nothing.
 ## The entries
 
 All admitted on 30,000 fresh episodes at **seed 7** — a seed the selecting pass never used; `b5h` and
-`b6b` on 2026-09-01, `b9ch` and the two `b10ck` checkpoints on 2026-09-03. Add one with the
+`b6b` on 2026-09-01, `b9ch` and the two `b10ck` checkpoints on 2026-09-03, `b17cl` on 2026-09-06. Add one with the
 [`hof-promote`](../skills/hof-promote/SKILL.md) skill.
 
 | entry | algo / net | confirmed **/30,000** | 95% CI | selected at | drop |
 |---|---|---|---|---|---|
 | **`b10ck-g100-seed3-ckpt30523392`** | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.65%** (29894) | [99.6, 99.7] | 99.5 /5000 | +0.15 pp |
 | `b10ck-g100-seed3-ckpt30539776` | PPO, `fc 320`, 4 epochs, λ 0.98, **γ 1.00** | **99.55%** (29866) | [99.5, 99.6] | 99.3 /5000 | +0.25 pp |
+| `b17cl-clipanneal001hold80-seed4-ckpt11386880` | PPO, `fc 320`, 4 epochs, λ 0.98, **clip 0.2→0.001 annealed over 40M, held for the last 10M** | **99.50%** (29851) | [99.4, 99.6] | 99.6 /5000 | −0.10 pp |
 | **`b9ch-lam999-seed4-ckpt47251456`** | PPO, `fc 320`, 4 epochs, **λ 0.999** | **99.30%** (29790) | [99.2, 99.4] | 99.40 /5000 | −0.10 pp |
 | `b5h-ep8-seed8-ckpt9027584` | PPO, `fc 320`, 8 epochs | **98.96%** (29687) | [98.84, 99.07] | 99.20 /5000 | −0.24 pp |
 | `b6b-fc200x100-seed2-ckpt133120000` | PPO, `fc 200,100`, 4 epochs | **98.73%** (29619) | [98.60, 98.85] | 99.10 /5000 | −0.37 pp |
 
 `b10ck` @30523392 leads `b9ch` by 0.35 pp (z = 5.9, p < 1e-8); the two `b10ck` entries are 16,384
 transitions apart and **not distinguishable from each other** (z = 1.8, p = 0.07) — they are one
-region admitted as a pair, not a first and a second place. `b9ch` leads `b5h` by 0.34 pp (z = 4.5,
+region admitted as a pair, not a first and a second place. `b17cl` @11386880 sits between them and `b9ch`:
+it is **not distinguishable from the lower `b10ck` entry** (z = 0.9, p = 0.37), 0.15 pp behind the upper one
+(z = 2.7, p = 0.007), and 0.20 pp ahead of `b9ch` (z = 3.2, p = 0.001). `b9ch` leads `b5h` by 0.34 pp (z = 4.5,
 p < 1e-5) and `b5h` leads `b6b` by 0.23 pp (z = 2.60, p = 0.0094), so the rest of the ordering is real.
+
+## Third place: `b17cl` @11386880, 99.50% over 30,000 episodes — 2026-09-06
+
+**The first entry from an anneal, and the earliest checkpoint in the table by a factor of three.** b17 swept
+the PPO clip off b7's `fc 320` / 4-epoch / λ 0.98 cell; `clipanneal001hold80` anneals the clip from 0.2 to 0.001
+over the first 40M transitions and holds it there for the last 10M, and seed 4 is the arm. Its checkpoint at
+11.4M — a fifth of the run, while the clip was still near 0.15 — is the one that held up: found by the protocol
+end to end, 1,342 checkpoints screened at 500 episodes, 73 re-measured at 5,000 (`hof5000`, desktop), the 11 at
+≥99 /5,000 re-measured at 30,000 on seed 7 (`hof30k`, desktop, 16 rows across the batch). **The region is
+real**: its seven `hof30k` neighbours within ±1M read 98.8-99.4 with a mean of 99.14, and its 17 `hof5000`
+neighbours within ±1M average 98.89 (16 of them ≥98.5), a basin above `b9ch`'s 98.70 and below `b10ck`'s
+99.17. Across the batch's 16 confirmed rows the 5,000 → 30,000 drop was **−0.14 pp**; 8 of the 16 beat `b5h`'s
+98.96 and 2 beat `b9ch`'s 99.30, both of them this arm's (@11370496 read 99.4). The cell it comes from is the
+batch's densest with `clipannealhold80` (24.3 and 23.5% of stage-B rows ≥98%, against the base's 17.3%) —
+`docs/findings.md`, "holding the last 10M at the floor". Not a record: it does not separate from the lower
+`b10ck` entry and is behind the upper one.
+
+The copy was verified from `hallOfFame/` at 500 episodes on seed 11: 496/500.
 
 ## ‡ The record: `b10ck` @30523392 and @30539776, 99.6% over 30,000 episodes — 2026-09-03
 
