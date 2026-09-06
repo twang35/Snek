@@ -8,7 +8,7 @@ on the box is the same writer with the same worktree and lease. Pages serves bra
 
 | step | what |
 |---|---|
-| feeds | `git fetch` `results`, `laptop-results` and `ops-status`; each feed's tree is flattened into the build directory -- `results/<job-id>/<file>` becomes `<file>` -- incrementally, by `git diff --name-only` since the commit last flattened (`.feeds.json` beside the files). **Only snek3 arms' files** (`b<n><letters>-<what>-seed<N>`): `results` is shared with snek2's era and holds its arms, smoke and sweep jobs, and the old p-names of b3-b6 |
+| feeds | `git fetch` `results`, `laptop-results` and `ops-status`; each feed's tree is flattened into the build directory -- `results/<job-id>/<file>` becomes `<file>` -- incrementally, by `git diff --name-status` since the commit last flattened (`.feeds.json` beside the files), so a file deleted from a feed leaves the site too. Only arms' files (`b<n><letters>-...`): the p0-p2 copies of b3-b6 and the smoke and sweep jobs are not |
 | this box | every file in `SNEK_RUNS_DIR` newer than the build directory's copy is copied over it: the box's own live pictures and measurements win over the feeds' |
 | status | `origin/ops-status:status.json` lands at `.live/desktop/status.json`, so the manifest knows which pass is running or queued |
 | site | `viewer_manifest.build(build_dir)` and `publish_pages.publish(...)` into the `site` worktree: `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` |
@@ -40,19 +40,16 @@ BRANCH = os.environ.get('SNEK_SITE_BRANCH', 'site')
 WORKTREE = os.environ.get('SNEK_SITE_WORKTREE', os.path.expanduser('~/.snek3-laptop/site'))
 FEEDS = ('results', 'laptop-results')
 STATUS_BRANCH = 'ops-status'
+FEEDS_STATE = '.feeds.json'
 SHARD = re.compile(r'-s\d+of\d+\.json$|\.partial')
-# A snek3 arm: `b<n><letters>-<what>-seed<N>`. The `results` branch is shared with snek2's era (b22-b47,
-# named `b46a-c51batch512seed1`), and holds smoke and worker-sweep jobs and the p0-p2 copies of b3-b6
-# under their old names; none of those are the viewer's (2026-09-05: 45 batches showed where 17 belonged).
-ARM = re.compile(r'^b\d+[a-z]+-.+-seed\d+$')
+# An arm's file is named `b<n><letters>-...`; the feeds also carry the p0-p2 copies of b3-b6 under their
+# old names, smoke and worker-sweep jobs. (snek2's batches were deleted from `results` on 2026-09-05,
+# after the site showed 45 batches -- no name rule told the eras apart.)
+ARM_FILE = re.compile(r'^b\d+[a-z]+-')
 
 
 def is_arm_file(name):
-    """Whether a runs-style file name belongs to a snek3 arm: `<policy>.png`, `<policy>_evals.json`, ..."""
-    stem = name.split('_', 1)[0]
-    stem = stem[:-len('.png')] if stem.endswith('.png') else stem[:-len('.md')] if stem.endswith('.md') else stem
-    return bool(ARM.match(stem))
-FEEDS_STATE = '.feeds.json'
+    return bool(ARM_FILE.match(name))
 
 
 def _git(args, cwd, check=True):
@@ -67,30 +64,45 @@ def _rev(repo, ref):
 
 
 def flatten_feed(repo, remote, feed, build_dir, since):
-    """Copies every non-shard file the feed added or changed since `since` (a commit, or None for all)
-    into `build_dir`, flattened. Returns `(new head or None, files written)`. Within one update a later
-    job directory wins, and arm directories sort before pass directories, so a pass's copy of a file
-    replaces the arm's -- the daemon's pre-2026-09-05 feeds hold both."""
+    """Copies every non-shard arm file the feed added or changed since `since` (a commit, or None for all)
+    into `build_dir`, flattened, and removes what the feed deleted. Returns `(new head or None, files
+    written or removed)`. Within one update a later job directory wins, and arm directories sort before
+    pass directories, so a pass's copy of a file replaces the arm's -- the daemon's pre-2026-09-05 feeds
+    hold both."""
     head = _rev(repo, '{0}/{1}'.format(remote, feed))
     if head is None:
         return None, 0
-    if since and since != head and _rev(repo, since):
-        listing = _git(['diff', '--name-only', '--diff-filter=AMR', since, head], cwd=repo)
-    elif since == head:
+    if since == head:
         return head, 0
+    if since and _rev(repo, since):
+        listing = _git(['diff', '--name-status', since, head], cwd=repo)
     else:
         listing = _git(['ls-tree', '-r', '--name-only', head], cwd=repo)
-    paths = [p for p in listing.splitlines() if p.count('/') == 2 and p.startswith('results/')
-             and not SHARD.search(p) and is_arm_file(p.split('/')[2])]
-    written = 0
-    for path in sorted(paths, key=lambda p: ('-stageb' in p or '-hof' in p, p)):
+        listing = '\n'.join('A\t' + line for line in listing.splitlines())
+    changed, deleted = set(), set()
+    for line in listing.splitlines():
+        status, _, path = line.partition('\t')
+        if status.startswith('R'):          # R<score>\told\tnew
+            old, _, path = path.partition('\t')
+            deleted.add(old)
+        if path.count('/') != 2 or not path.startswith('results/') or SHARD.search(path) or not is_arm_file(path.split('/')[2]):
+            continue
+        (deleted if status == 'D' else changed).add(path)
+    count = 0
+    for path in sorted(changed, key=lambda p: ('-stageb' in p or '-hof' in p, p)):
         target = os.path.join(build_dir, path.split('/')[2])
         with open(target + '.partial', 'wb') as handle:
             handle.write(subprocess.run(['git', 'show', '{0}:{1}'.format(head, path)], cwd=repo,
                                         stdout=subprocess.PIPE, check=True).stdout)
         os.replace(target + '.partial', target)
-        written += 1
-    return head, written
+        count += 1
+    still = {p.split('/')[2] for p in changed}
+    for path in deleted:
+        name = path.split('/')[2]
+        if name not in still and os.path.exists(os.path.join(build_dir, name)):
+            os.remove(os.path.join(build_dir, name))
+            count += 1
+    return head, count
 
 
 def overlay_runs(runs_dir, build_dir):

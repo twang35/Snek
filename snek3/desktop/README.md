@@ -14,7 +14,7 @@ The design and its decisions are [`../plans/scheduler.md`](../plans/scheduler.md
 |---|---|---|
 | `ops` | **laptop** | `snek3/desktop/queue/pending/*.json` specs, `snek3/desktop/config/runtime.json` |
 | `ops-status` | **desktop** | `status.json` — heartbeat, running jobs, ledger, `at_a_glance` |
-| `results` | **desktop's scheduler** (`tools/results_feed.py`) | `results/<job-id>/*`: a finished arm's `.md`, `.png`, `_evals.json`; a finished pass's merged files and pictures |
+| `results` | **desktop's scheduler** (`tools/results_feed.py`) | `results/<job-id>/*`: a finished arm's `.md`, `.png`, `_evals.json`; a finished pass's merged files and pictures. snek3 jobs only: snek2's were deleted 2026-09-05 (they are on master under `snek2/runs/`) |
 | `laptop-results` | **laptop's scheduler** (the same module) | the same, for the laptop's work |
 | `site` | **desktop daemon** (`tools/site_build.py`, every network cycle) | the GitHub Pages viewer, built from both feeds and the box's live charts; one snapshot commit, rewritten each build |
 | `laptop-status` | **laptop** (`tools/laptop_status.py`, from the queue driver) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |

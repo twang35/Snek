@@ -8,9 +8,7 @@ b13, b14, b16 and b19 wave 1 were back-filled into `laptop-results` by hand once
 carried 582 arms and 1,290 charts; 1abf3282c then restricted the build to snek3 arm names (`b<n><letters>-<what>-seed<N>`),
 which took it to 477 arms and 1,215 charts. **Verified 2026-09-05 18:00** (tests pass; both schedulers publish on the
 event -- the laptop's b19 arms and stage-B pass, the desktop's b17 passes -- and the daemon rebuilt within a minute of
-a feed moving; Pages serves `site` `/`, one commit deep, byte-identical to the live page). **Open:** the name filter drops
-b3, whose eleven arms carry no `-seedN` and were on the old site, and lets snek2's b41 and b47 through, because they do;
-shape alone cannot tell the eras apart on the shared `results` branch. Step 4's picture half was not done: `runs/*.png`
+a feed moving; Pages serves `site` `/`, one commit deep, byte-identical to the live page). **Resolved 2026-09-05 18:30:** a name filter could not tell the eras apart (it dropped b3, whose arms carry no `-seedN`, and let snek2's b41 and b47 through), so snek2's 253 job directories were deleted from `results` -- they are on master under `snek2/runs/` -- and the build now removes what a feed deletes (`git diff --name-status`), keeping only `b<n><letters>-` names. Step 4's picture half was not done: `runs/*.png`
 stay tracked on master (the progress update commits a closed batch's), and only `docs/` and `viewer/manifest.js` left.
 Step 5 imports from `results` only -- the laptop's own `runs/` already holds what `laptop-results` carries. Step 6 is
 partly done -- an arm's `_evals.json` is published once, with the arm -- and the snapshot form of the feeds is still open. Below is the plan as approved. The question: can both boxes publish their charts as each
