@@ -11,8 +11,8 @@ desktop and b19 (switches) on wave 2 of 3 on the laptop.** As of 2026-09-05 15:3
 
 | box | batch | state | ETA |
 |---|---|---|---|
-| desktop | b17 (clip + anneals, 64 arms, 8 waves) | waves 1-3 closed with hof5000/hof30k; wave 4 (clip 0.1 anneal, lr anneal) training from 15:30 | training done ~03:40 2026-09-06; b18 (grad-norm clip, 24 arms) behind it; box clears ~09:20 Sun |
-| laptop | b19 (switches, 24 arms, 3 waves) | wave 1 (noadvnorm, mse) closed with hof5000; wave 2 (Adam ε 1e-5, 1e-8) training from ~15:25 | ~19:00 today; then b20 (lanes, 16 arms) and b21 (shaping, 24 arms); clears ~04:10 Sun |
+| desktop | b17 (clip + anneals, 64 arms, 8 waves) | waves 1-3 closed with hof5000/hof30k; wave 4 (clip 0.1 anneal, lr anneal) training from 15:30 | training done ~03:40 2026-09-06; **b21 (shaping, 24 arms) behind it since the 21:32 swap**; box clears ~11:00 Sun |
+| laptop | b19 (switches, 24 arms, 3 waves) | wave 1 (noadvnorm, mse) closed with hof5000; wave 2 (Adam ε 1e-5, 1e-8) training from ~15:25 | ~19:00 today; then b20 (lanes, 16 arms) and **b18 (grad-norm clip, 24 arms, swapped in for b21 at 21:32)**; clears ~20:00 Sun |
 
 **‡ b15-b21 were generated from b7's base at λ 0.98, not the re-based λ 0.99.** Every arm's config table says
 `ppo_gae_lambda 0.98` (b13's and b14's say 0.99), and the spec notes name `b7aa-b7ad` as the control. Until this update

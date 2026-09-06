@@ -32,10 +32,10 @@ Run order (section 7), each batch one knob, four seeds per value.
 | 7 | b15 | entropy coef | bonus for a stochastic policy, plus two anneals | 5 | 13 h + hof | wave 2 in stage B 23:30; waves 3-5 **~09:00 09-05** |
 | 8 | b16 | target_KL | early-stops the epoch loop after a big update | 5 | laptop, ~17.5 h | wave 1 training since 23:14; **~17:00 09-05** |
 | 9 | b17 | clip + anneals | trust region on the policy ratio; anneal clip and lr to ~0 (anneal code landed) | 8 | ~23 h | desktop, after b15: **~08:00 09-06** |
-| 10 | b18 | grad-norm clip | ceiling on the global gradient norm before each step | 3 | ~9 h | desktop, after b17: ~17:00 09-06 |
+| 10 | b18 | grad-norm clip | ceiling on the global gradient norm before each step | 3 | laptop, ~10.5 h | laptop queue, after b20 (swapped with b21 2026-09-05 21:32): **~20:00 09-06** |
 | 11 | b19 | switches | adv-norm, value loss (mse/huber), Adam ε, vf_coef | 3 | laptop, ~10.5 h | laptop queue, after b16: ~04:00 09-06 |
 | 12 | b20 | collect lanes | parallel games vs. per-episode depth, same batch size as b14 | 2 | laptop, ~7 h | laptop queue, after b19: **~11:00 09-06** |
-| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 | laptop, ~10.5 h | laptop queue, after b20 (moved from the desktop 2026-09-05 12:50): **~22:00 09-06** |
+| 13 | b21 | shaping coef + gate | the reward's dense safety signal (runs last — it's a reward knob) | 3 | desktop, ~7.5 h | desktop, after b17 (swapped with b18 2026-09-05 21:32): **~11:00 09-06** |
 | — | b22 | factorial | combine whichever knobs above won cleanly | 4 | ~12 h | after b21, once designed; either box is free by then |
 
 **What the times are.** The closed batches are measured, from the `results` branch: the first wave's
@@ -49,13 +49,8 @@ while they run**: b15's waves 2-5 are waiting on b12's and b13's passes now. b16
 pass per wave rather than per batch, so their estimates are 2.6 h plus ~0.3 h per wave. Laptop waves
 (b13, b14) train in ~5.7 h, not 2.3, with everything else it runs.
 
-**Split across the two boxes, as of 2026-09-05 12:50** (b21 moved to the laptop, the `move-batch`
-skill, after b16, b19 and b20 on 09-04 and b13, b14 before): the desktop has b17's last six waves and
-b18 — `status.json`'s new `remaining` read **~27 h, clear ~15:30 2026-09-06**; the laptop has b19, b20
-and b21 — **~24 h, b21 closing ~13:00 2026-09-06**. The move balanced 31 h against 14 h; the estimates
-are `tools/eta.py`'s and refine as each box's ledger fills. Laptop waves cost ~3.5 h each because stage B and the hof passes run in
-series there (b14's T 512/1024 waves were the exception at ~1 h, with an eval per eight rollouts). Moving
-b18 across too would even the two out at ~41 h and ~46 h. The original budget stands: 58 waves at ~2.6 h
+**Split across the two boxes, as of 2026-09-05 21:32** (b18 and b21 swapped with the `move-batch` skill: b21 to the desktop, b18 to the laptop; b21 had gone the other way at 12:50): the desktop has b17's last three waves and then b21 — `status.json`'s `remaining` read ~13 h before the swap, b21 replacing b18 at the same arm count, so **clear ~11:00 2026-09-06**; the laptop has b20 and then b18 — b20's first wave was 13% in with ~5.3 h left (lanes 32 is slow per step), the whole of b20 ~11.5 h, then b18's three waves at ~3.5 h each, **~20:00 2026-09-06**. The reason for the swap is that b20 is running long, and b21 is the reward-knob batch we want read soonest. Laptop waves cost ~3.5 h each because stage B and the hof passes run in
+series there (b14's T 512/1024 waves were the exception at ~1 h, with an eval per eight rollouts). The original budget stands: 58 waves at ~2.6 h
 is ~150 h of waves plus ~16 h of hof passes, against the ~162 h planned in section 7.
 
 ## 1. What this project has learned about sweeps, and what it forces here
