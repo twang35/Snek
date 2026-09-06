@@ -266,3 +266,16 @@ def test_knob_key_is_none_for_a_switches_batch_and_anneal_cells_are_their_own_gr
     assert pu.knob_key(envs) == 'SNEK_PPO_ENTROPY_COEF'
     arms = [{'policy': p} for p in envs]
     assert [v for v, _ in pu.group_arms(arms, envs, 'SNEK_PPO_ENTROPY_COEF')] == ['0.003', '0.02', 'entanneal01', 'entanneal01to0']
+
+
+def test_a_batch_off_the_bus_is_closed_when_every_arm_has_its_three_pass_files(tmp_path):
+    from tools import progress_update
+    arms = ['b19a-noadvnorm-seed1', 'b19b-noadvnorm-seed2']
+    for arm in arms:
+        for suffix in progress_update.PASS_SUFFIXES[:2]:
+            (tmp_path / (arm + suffix)).write_text('{}')
+    assert not progress_update.files_closed(arms, str(tmp_path)), 'hof30k still owed'
+    for arm in arms:
+        (tmp_path / (arm + progress_update.PASS_SUFFIXES[2])).write_text('{}')
+    assert progress_update.files_closed(arms, str(tmp_path))
+    assert not progress_update.files_closed([], str(tmp_path)), 'no arms is not a closed batch'

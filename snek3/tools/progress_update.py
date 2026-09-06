@@ -456,6 +456,18 @@ def update_charts_md(text, table, title, status_line, adopt=False, runs_dir=None
     return text[:i] + section + '\n' + text[i:]
 
 
+PASS_SUFFIXES = ('_checkpoint_evals.json', '_checkpoint_evals_hof5000.json', '_checkpoint_evals_hof30k.json')
+
+
+def files_closed(arms, runs_dir=None):
+    """A batch with no claims on the bus -- one that closed before the shared queue, or a laptop-only batch --
+    is closed when every arm has its stage-B, hof5000 and hof30k files in `runs/`. b19 closed 2026-09-05 under
+    the old laptop queue and got no `results.md` skeleton because the bus knew nothing of it."""
+    runs_dir = runs_dir or constants.RUNS_DIR
+    return bool(arms) and all(os.path.exists(os.path.join(runs_dir, arm + suffix))
+                              for arm in arms for suffix in PASS_SUFFIXES)
+
+
 def results_skeleton(table, title, facts):
     return '\n'.join([MARK.format(table['batch']), '## {0}'.format(title), '', facts, '',
                       group_table_md(table), READING, '', '_Reading to be written: what the table says, '
@@ -592,7 +604,7 @@ def main(argv=None):
         if top:
             say('top rows: ' + ', '.join('{0} {1} @{2}'.format(*t) for t in top))
         if not args.no_docs:
-            closed = where.startswith('Closed')
+            closed = where.startswith('Closed') or (not where.startswith('In flight') and files_closed(arms))
             caps = {e.get('_max_steps') for p, e in envs.items() if p in arms} - {None}
             cap = '{0:.0f}M'.format(max(caps) / 1e6) if caps else '50M'
             title = '{0} — the `{1}` sweep, {2} values x {3} seeds, {4}'.format(
