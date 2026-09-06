@@ -56,13 +56,21 @@ def test_a_released_wave_number_is_never_reused_and_its_arms_go_back_to_the_pool
     specs = _batch('b21', 16, 220)
     arms = sorted(specs)
     held = [_claim('b21', 1, 'desktop', arms[:8]), _claim('b21', 2, 'laptop', arms[8:])]
-    released = [held[0]]                            # w2 released: the laptop went quiet
+    # w2 released: the laptop went quiet. `release` leaves a tombstone -- no arms, the number kept --
+    # so the arms come back but the next wave is w3, never a second w2 (its pass ids are on a feed).
+    tombstone = dict(held[1], kind='released', arms=[])
+    released = [held[0], tombstone]
+    assert claims.claimed_ids(released) == set(arms[:8]), 'a tombstone covers no arm'
     record = claims.next_claim(specs, released, 'desktop', 8)
-    assert record['wave'] == 2 and record['arms'] == arms[8:], 'the highest remaining claim is 1'
-    both_gone = []
-    record = claims.next_claim(specs, both_gone, 'desktop', 8)
-    assert record['wave'] == 1, 'with every claim gone the numbering restarts -- a fresh batch'
-    # but with wave 3 still standing a release of 1 and 2 numbers the next wave 4
+    assert record['wave'] == 3 and record['arms'] == arms[8:]
+    # a tombstone holds nothing in the pool view and is nothing to mirror
+    view = claims.pool_view(specs, released)
+    assert [h['id'] for h in view['held']['laptop']] == [] if 'laptop' in view['held'] else True
+    assert view['lines'] == ['b21 training | 8 arms unclaimed', 'desktop holds b21-w1 (8 arms)']
+    # with every live claim gone but the tombstones the numbering still continues
+    record = claims.next_claim(specs, [dict(held[0], kind='released', arms=[]), tombstone], 'desktop', 8)
+    assert record['wave'] == 3 and record['arms'] == arms[:8]
+    # and with wave 3 still standing a release of 1 and 2 numbers the next wave 4
     record = claims.next_claim(specs, [_claim('b21', 3, 'laptop', [])], 'desktop', 8)
     assert record['wave'] == 4
 
@@ -274,9 +282,16 @@ def test_release_returns_the_arms_to_the_pool_and_the_next_claim_numbers_past_it
     assert desktop.try_release('b21-w2') == 'won'
     assert desktop.try_release('b21-w2') == 'missing'
     laptop.sync()
-    assert [r['wave'] for r in laptop.records] == [1]
+    assert [(r['wave'], r['kind']) for r in laptop.records] == [(1, 'wave'), (2, 'released')], \
+        'the release leaves a tombstone in place of the claim'
+    assert laptop.records[1]['arms'] == [] and laptop.records[1]['released_iso']
     again = claims.claim_next(laptop, 'laptop', 8, read_specs=_read(laptop), log=lambda m: None)
-    assert again['wave'] == 2 and again['arms'] == second['arms'], 'the highest standing claim is 1'
+    assert again['wave'] == 3 and again['arms'] == second['arms'], 'the released number is never reused'
+    view = claims.pool_view(bus['specs'], laptop.records)
+    assert [h['id'] for h in view['held']['laptop']] == ['b21-w3'], 'the tombstone is not a holding'
+    # a tombstone cannot be released again, and the eval-less pool has nothing left of b21 unclaimed
+    laptop.sync()
+    assert laptop.try_release('b21-w2') == 'missing'
 
 
 def test_a_failed_push_drops_the_local_commit_so_the_worktree_tracks_the_remote(bus, monkeypatch):

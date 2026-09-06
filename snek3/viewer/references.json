@@ -1,5 +1,5 @@
 {
-  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (desktop-batch skill). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it. `knob: \"name\"` says the batch has no single knob (b19's switches): each arm's name token is its cell.",
+  "_comment": "Per batch: the arms from an earlier batch that are its control cell, so the viewer shows them beside the batch's own arms. `after` is the knob token of the batch's own group the reference slots in behind (its knob value's place in the sweep); without it the reference goes at the end. Edit when a batch is queued (queue-batch skill, step 1c). `value` is the reference cell's value of the batch's knob, as the batch's specs spell it; tools/progress_update.py slots the reference row into the batch table by it. `knob: \"name\"` says the batch has no single knob (b19's switches): each arm's name token is its cell.",
   "b8": {
     "arms": [
       "b4a-fc200x100ep8-seed1",

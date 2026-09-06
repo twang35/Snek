@@ -33,7 +33,8 @@ eligible training specs of the first batch that has any.
 **Claims are made just before launch, never ahead**, so the pool in the status is what is really free
 and a claim held by a box that then goes quiet (a laptop lid) is at most the wave it was about to run.
 There is **no expiry**: an expiry that fires while a box is merely slow is two boxes training the same
-arms. A stranded claim is a line under `attention` and a human's `release`.
+arms. A stranded claim is a line under `attention` and a human's `release`, which rewrites a wave's file
+as a `released` tombstone: its arms go back to the pool, its number stays taken.
 
 **Reading is from the refs, writing through a worktree** outside the checkout (`~/.snek3-laptop/claims`
 on the laptop, beside `snek-bus/status` on the desktop; `SNEK_CLAIMS_WORKTREE`), made by
@@ -64,6 +65,10 @@ WORKTREE = os.environ.get('SNEK_CLAIMS_WORKTREE', os.path.expanduser('~/.snek3-l
 STATUS_BRANCHES = {'desktop': 'ops-status', 'laptop': 'laptop-status'}
 FEEDS = {'desktop': 'results', 'laptop': 'laptop-results'}
 DIR = 'claims'
+# The record kinds that carry a wave number: a live claim, and the tombstone `release` leaves in its
+# place so the number is never handed out again (decision 6 of the plan: `b21-stageb-w2` on a feed must
+# mean one wave, and a wave retrained elsewhere after a release is `w4`, never a second `w2`).
+WAVE_KINDS = ('wave', 'released')
 # A spec with no `priority`, as `desktop/daemon/job.py` defaults it: lower runs first.
 DEFAULT_PRIORITY = 100
 # How many times a claim is recomputed after losing the race before this round gives up. Each loss
@@ -134,14 +139,14 @@ def wave_id(batch, number):
 
 def record_path(record):
     """Where a record lives on the branch: `claims/<batch>/w<N>.json`, or `claims/<batch>/eval-<id>.json`."""
-    if record.get('kind', 'wave') == 'wave':
+    if record.get('kind', 'wave') in WAVE_KINDS:
         return '{0}/{1}/w{2}.json'.format(DIR, record['batch'], int(record['wave']))
     return '{0}/{1}/eval-{2}.json'.format(DIR, record['batch'], record['id'])
 
 
 def record_id(record):
     """`b21-w3` for a wave, the spec's id for an eval: what `release` takes and the status names."""
-    if record.get('kind', 'wave') == 'wave':
+    if record.get('kind', 'wave') in WAVE_KINDS:
         return wave_id(record['batch'], int(record['wave']))
     return record['id']
 
@@ -159,6 +164,8 @@ def eval_record(batch, eval_id, box, policies, now=None):
 
 
 def describe(record):
+    if record.get('kind', 'wave') == 'released':
+        return '{0} released (was {1}\'s)'.format(record_id(record), record['box'])
     if record.get('kind', 'wave') == 'wave':
         return '{0} ({1} arms: {2}) for {3}'.format(record_id(record), len(record['arms']),
                                                     ', '.join(record['arms']), record['box'])
@@ -186,7 +193,7 @@ def read_records(worktree):
                 if not isinstance(record, dict) or record.get('box') not in BOXES or not record.get('batch'):
                     raise ValueError('not a claim record')
                 record.setdefault('kind', 'wave')
-                if record['kind'] == 'wave':
+                if record['kind'] in WAVE_KINDS:
                     record['wave'] = int(record['wave'])
                 record['arms'] = [str(arm) for arm in record.get('arms') or []]
             except (OSError, ValueError, KeyError, TypeError) as error:
@@ -201,12 +208,14 @@ def read_records(worktree):
 # ---------------------------------------------------------------- the pure part
 
 def claimed_ids(records):
-    """Every spec id some claim covers: a wave's arms, an eval claim's spec id."""
+    """Every spec id some claim covers: a wave's arms, an eval claim's spec id. A released wave's
+    tombstone covers nothing -- its arms are back in the pool."""
     taken = set()
     for record in records:
-        if record.get('kind', 'wave') == 'wave':
+        kind = record.get('kind', 'wave')
+        if kind == 'wave':
             taken.update(record['arms'])
-        else:
+        elif kind == 'eval':
             taken.add(record['id'])
     return taken
 
@@ -249,7 +258,7 @@ def next_claim(specs, records, box, wave_size, has_checkpoints=default_has_check
             if spec.get('type', 'train') == 'train':
                 arms = [s['id'] for s in candidates if s.get('type', 'train') == 'train'][:max(1, int(wave_size))]
                 number = 1 + max([r['wave'] for r in records
-                                  if r.get('kind', 'wave') == 'wave' and r['batch'] == batch] or [0])
+                                  if r.get('kind', 'wave') in WAVE_KINDS and r['batch'] == batch] or [0])
                 return wave_record(batch, number, box, arms, now=now)
             policies = list(spec.get('policies') or [spec.get('policy')])
             if any(policy in unclaimed_train for policy in policies):
@@ -308,6 +317,8 @@ def pool_view(specs, records, published=frozenset(), running=None, status_ages=N
                              'priority': min(spec_priority(spec) for spec in these)})
     held = {}
     for record in records:
+        if record.get('kind', 'wave') == 'released':
+            continue                    # a tombstone holds nothing; it only keeps its number taken
         arms = record['arms']
         if record.get('kind', 'wave') == 'wave':
             done = bool(arms) and all(arm in published for arm in arms) and all(
@@ -361,6 +372,8 @@ def mirror(queue_dir, specs, records, log=_log):
     Returns the set of ids mirrored. `records` are already this box's (`mine`)."""
     wanted = {}
     for record in records:
+        if record.get('kind', 'wave') == 'released':
+            continue
         for arm in record['arms'] if record.get('kind', 'wave') == 'wave' else [record['id']]:
             spec = specs.get(arm)
             if spec is None:
@@ -472,17 +485,35 @@ class Store(object):
         return self._commit_and_push('claim {0}'.format(record_id(record)))
 
     def try_release(self, claim_id):
-        """Deletes the claim named `claim_id` (`b21-w3`, or an eval spec's id) and pushes."""
+        """Returns the claim named `claim_id` (`b21-w3`, or an eval spec's id) to the pool and pushes.
+
+        A wave's file is rewritten as a `released` tombstone -- no arms, so `claimed_ids` frees them,
+        but the number stays in the batch's count so the next claim is `w<N+1>`, never a second `w<N>`
+        (the pass ids on the feeds would otherwise collide). An eval claim is simply deleted."""
         self.ensure()
-        match = [record for record in self.records if record_id(record) == claim_id]
+        match = [record for record in self.records if record_id(record) == claim_id
+                 and record.get('kind', 'wave') != 'released']
         if not match:
             return 'missing'
-        path = os.path.join(self.worktree, match[0]['_path'])
+        record = match[0]
+        path = os.path.join(self.worktree, record['_path'])
         try:
-            os.remove(path)
+            if record.get('kind', 'wave') == 'wave':
+                now = time.time()
+                tombstone = {'kind': 'released', 'batch': record['batch'], 'wave': int(record['wave']),
+                             'box': record['box'], 'arms': [], 'claimed_iso': record.get('claimed_iso'),
+                             'released_iso': time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(now)),
+                             'released_ts': now}
+                with open(path, 'w') as handle:
+                    json.dump(tombstone, handle, indent=1, sort_keys=True)
+                    handle.write('\n')
+            else:
+                os.remove(path)
         except OSError:
             return 'missing'
-        return self._commit_and_push('release {0}'.format(claim_id))
+        outcome = self._commit_and_push('release {0}'.format(claim_id))
+        self.records = read_records(self.worktree)     # won: the tombstone; lost or failed: the remote's
+        return outcome
 
 
 def claim_next(store, box, wave_size, has_checkpoints=default_has_checkpoints, read_specs=read_specs,
@@ -584,7 +615,7 @@ def _seed(store, batch, box, waves, wave_size):
     if not arms:
         print('no training specs for {0} on ops'.format(batch))
         return 1
-    existing = {r['wave'] for r in store.records if r.get('kind', 'wave') == 'wave' and r['batch'] == batch}
+    existing = {r['wave'] for r in store.records if r.get('kind', 'wave') in WAVE_KINDS and r['batch'] == batch}
     for number in range(1, int(waves) + 1):
         chunk = arms[(number - 1) * wave_size: number * wave_size]
         if not chunk:

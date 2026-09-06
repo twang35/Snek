@@ -103,6 +103,8 @@ DEFAULT_MAX_TRAINERS = 8
 # in `desktop/config/runtime.json`, 16 on 16 threads.
 DEFAULT_SHARDS = 12
 POLL_SECONDS = 20
+# Queue subdirectories already reported as holding no specs, so `queue_batches` says it once each.
+_SKIPPED_EMPTY = set()
 # An arm that exits short of its cap is relaunched inside its wave -- it resumes from `resume.pt` --
 # this many times before the wave gives up on it and says so. Bounded, so a trainer that dies on
 # start (a bad knob, a missing file) costs three launches and an attention line, never a loop.
@@ -913,7 +915,12 @@ def queue_batches(queue_dir, runs_dir=None):
             _log('skipping {0}: {1}'.format(path, error))
             continue
         if not specs:
-            _log('skipping {0}: no specs'.format(path))
+            # Once per directory per scheduler: a closed batch's directory holds only its markers after
+            # the mirror drops its specs, and the shared queue rescans every ten minutes for as long as
+            # the box runs -- the desktop's log carried 721 of these lines in one night (2026-09-06).
+            if path not in _SKIPPED_EMPTY:
+                _SKIPPED_EMPTY.add(path)
+                _log('skipping {0}: no specs (not repeated for this directory)'.format(path))
             continue
         batches.append((name, specs))
     batches.sort(key=lambda item: (0 if batch_live(item[1], runs_dir) else 1,

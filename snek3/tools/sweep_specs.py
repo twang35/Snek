@@ -10,7 +10,7 @@ the letter running over arms as b7 and b8 did (single letters up to 26 arms, two
 spec is validated against the daemon's own `parse_job` before it is written, because a malformed spec
 is skipped silently on the box and would not tell you until after the push.
 
-**This writes files and nothing else.** The push to `ops` is the `desktop-batch` skill's step 2 and
+**This writes files and nothing else.** The push to `ops` is the `queue-batch` skill's step 2 and
 needs the user's approval for that batch. Cells whose knob does not exist yet (`requires_code`) are
 dropped with a note unless `--include-uncoded` is given, so a batch cannot be queued with an arm the
 trainer would refuse by name.
