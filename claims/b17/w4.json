@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b17ay-clip01anneal-seed1",
+  "b17az-clip01anneal-seed2",
+  "b17ba-clip01anneal-seed3",
+  "b17bb-clip01anneal-seed4",
+  "b17bc-lranneal-seed1",
+  "b17bd-lranneal-seed2",
+  "b17be-lranneal-seed3",
+  "b17bf-lranneal-seed4"
+ ],
+ "batch": "b17",
+ "box": "desktop",
+ "claimed_iso": "2026-09-05T23:43:15",
+ "claimed_ts": 1788676995.776173,
+ "kind": "wave",
+ "wave": 4
+}
