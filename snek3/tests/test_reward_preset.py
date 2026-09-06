@@ -74,7 +74,7 @@ def test_a_ppo_arm_at_no_knobs_gets_b2s_reward_function():
 def test_the_two_algorithms_bare_defaults_genuinely_differ():
     """**The hazard, asserted rather than left in a comment.**
 
-    This is the failure `plans/ppo.md` is shaped to avoid, now deliberately accepted: a bare
+    This is the failure `plans/archive/ppo.md` is shaped to avoid, now deliberately accepted: a bare
     `SNEK_ALGO=dqn` arm and a bare `SNEK_ALGO=ppo` arm are not an algorithm A/B. Anyone who deletes
     this fixture because it "asserts a difference nobody wants" should read the preset's comment
     first — and anyone who makes the two agree again has to delete it, which is the point.

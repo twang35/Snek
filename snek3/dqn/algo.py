@@ -8,7 +8,7 @@ and `schedules.py`. Nothing in those changed to make this file exist.
 **The point of the seam is that PPO reuses the measurement path rather than forking it.** An arm's
 numbers are only comparable across algorithms if the same code screened the checkpoints, ran the same
 100 episodes, wrote the same rows and drew the same chart — so the one thing that must not be
-duplicated for a second algorithm is `train.py`. See [`../plans/ppo.md`](../plans/ppo.md).
+duplicated for a second algorithm is `train.py`. See [`../plans/archive/ppo.md`](../plans/archive/ppo.md).
 
 ## The seam
 

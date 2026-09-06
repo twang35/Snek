@@ -175,7 +175,7 @@ STARVE_REWARD = -0.5
 # function (batch b3, 2026-08-29), so it is PPO's default rather than something every launch has to
 # restate. `SNEK_REWARD_PRESET` names it directly, and any individual knob still wins over the preset.
 #
-# **‡ The cost, stated plainly, because it is the exact failure `plans/ppo.md` is shaped to avoid: a
+# **‡ The cost, stated plainly, because it is the exact failure `plans/archive/ppo.md` is shaped to avoid: a
 # bare `SNEK_ALGO=dqn` arm and a bare `SNEK_ALGO=ppo` arm now optimise different objectives.** So an
 # algorithm A/B must name the reward knobs on *both* sides — b4-vs-b2 is matched because b2's spec
 # states them explicitly and b4 will too. The startup line `reward config:` prints the resolved

@@ -215,7 +215,7 @@ def test_a_nonsense_ppo_knob_is_refused(knob, value, match, monkeypatch):
 
 
 def test_the_defaults_are_the_ones_the_plan_and_the_docs_state(monkeypatch):
-    """Hand-copied from `plans/ppo.md`'s knob table, so a drift between them fails here.
+    """Hand-copied from `plans/archive/ppo.md`'s knob table, so a drift between them fails here.
 
     Compared against literals rather than parsed out of the doc: a parser follows the doc wherever it
     goes, and the point is to notice when the two disagree.

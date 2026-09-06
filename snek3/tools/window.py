@@ -7,7 +7,7 @@ the *work*: every `train.py` and every `tools/closeout.py` spawned a viewer, an 
 picked the survivor, and every lifecycle question — is there one, what does it show, when does it
 close — was answered by N processes that each knew only about themselves. Every gap between them grew
 a rule (a pid watch, three negative checks, a stand-by loop, a zombie check), and the incidents behind
-those rules are in `plans/scheduler.md` §0: five windows on the desktop, a chart-less window holding
+those rules are in `plans/archive/scheduler.md` §0: five windows on the desktop, a chart-less window holding
 the slot for 15 hours, a pass running an hour with no window because the previous pass's window was
 still in its closing grace.
 

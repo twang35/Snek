@@ -11,7 +11,7 @@ and one entry in `ALGOS` rather than a second copy of this file.
 
 That is not tidiness. An arm's numbers are comparable across algorithms only if the same code screened
 the checkpoints, ran the same 100 episodes, wrote the same rows and drew the same chart, so **the one
-thing that must not be duplicated for PPO is this file.** See [`plans/ppo.md`](plans/ppo.md).
+thing that must not be duplicated for PPO is this file.** See [`plans/archive/ppo.md`](plans/archive/ppo.md).
 
 ## The two intervals that are not knobs
 
@@ -245,7 +245,7 @@ def build_eval_row(step, measured, trailing, steps_per_second, algo_fields=None,
     [`docs/findings.md`](docs/findings.md) records: `collector.step()` advances every lane, so at b2's
     `fork_branches=4` one counted step is four game moves, four buffer rows and four gradient steps.
     Recording both removes the ambiguity at the source rather than leaving it to a doc warning, and it
-    is what a PPO row will be compared against — see [`plans/ppo.md`](plans/ppo.md).
+    is what a PPO row will be compared against — see [`plans/archive/ppo.md`](plans/archive/ppo.md).
 
     It counts the prefill, because those moves were played and are learned from, so it is not
     `step * width` plus nothing: a fresh arm's first row already carries
