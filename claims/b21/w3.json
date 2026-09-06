@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b21q-gate85-seed1",
+  "b21r-gate85-seed2",
+  "b21s-gate85-seed3",
+  "b21t-gate85-seed4",
+  "b21u-gate0-seed1",
+  "b21v-gate0-seed2",
+  "b21w-gate0-seed3",
+  "b21x-gate0-seed4"
+ ],
+ "batch": "b21",
+ "box": "desktop",
+ "claimed_iso": "2026-09-06T07:19:47",
+ "claimed_ts": 1788704387.1220562,
+ "kind": "wave",
+ "wave": 3
+}
