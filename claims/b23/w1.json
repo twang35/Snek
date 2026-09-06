@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b23a-g999roll512mse-seed1",
+  "b23b-g999roll512mse-seed2",
+  "b23c-g999roll512mse-seed3",
+  "b23d-g999roll512mse-seed4",
+  "b23e-g999roll512msehold-seed1",
+  "b23f-g999roll512msehold-seed2",
+  "b23g-g999roll512msehold-seed3",
+  "b23h-g999roll512msehold-seed4"
+ ],
+ "batch": "b23",
+ "box": "laptop",
+ "claimed_iso": "2026-09-06T15:03:39",
+ "claimed_ts": 1788732219.952062,
+ "kind": "wave",
+ "wave": 1
+}
