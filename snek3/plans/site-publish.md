@@ -5,8 +5,15 @@ adopted b17's stage-B w4 mid-pass, the laptop's adopted b19's wave 2 and publish
 their cap). Pages switched to `site` / `/` at 17:02 through the API. The first build flattened the whole `results`
 feed (6,276 files, 126 s); an incremental build is ~40 s, most of it the manifest walk. The laptop's closed batches
 b13, b14, b16 and b19 wave 1 were back-filled into `laptop-results` by hand once (`tools.results_feed`), so the site
-carries 582 arms and 1,290 charts. Step 6 is partly done -- an arm's `_evals.json` is published once, with the arm --
-and the snapshot form of the feeds is still open. Below is the plan as approved. The question: can both boxes publish their charts as each
+carried 582 arms and 1,290 charts; 1abf3282c then restricted the build to snek3 arm names (`b<n><letters>-<what>-seed<N>`),
+which took it to 477 arms and 1,215 charts. **Verified 2026-09-05 18:00** (tests pass; both schedulers publish on the
+event -- the laptop's b19 arms and stage-B pass, the desktop's b17 passes -- and the daemon rebuilt within a minute of
+a feed moving; Pages serves `site` `/`, one commit deep, byte-identical to the live page). **Open:** the name filter drops
+b3, whose eleven arms carry no `-seedN` and were on the old site, and lets snek2's b41 and b47 through, because they do;
+shape alone cannot tell the eras apart on the shared `results` branch. Step 4's picture half was not done: `runs/*.png`
+stay tracked on master (the progress update commits a closed batch's), and only `docs/` and `viewer/manifest.js` left.
+Step 5 imports from `results` only -- the laptop's own `runs/` already holds what `laptop-results` carries. Step 6 is
+partly done -- an arm's `_evals.json` is published once, with the arm -- and the snapshot form of the feeds is still open. Below is the plan as approved. The question: can both boxes publish their charts as each
 wave finishes, so the [Pages viewer](https://twang35.github.io/Snek/) is current without a progress update,
 and without bringing back the merge failures the box's `snek3/runs/` collisions caused?
 
@@ -66,7 +73,7 @@ for the scheduler. No new job type, no new action: a function on the tick, and `
 
 | step | where | what |
 |---|---|---|
-| 1 | `tools/scheduler.py` + `gitbus` | **the scheduler publishes its finished work**, on both boxes: at a wave's stage B, `hof5000` and `hof30k` end, copy the wave's `.md`, `.png`, JSON and stage-B files to `<branch>/<job-id>/` through a worktree outside the checkout. The branch is the box's: `results` (desktop, from `host.env`) and `laptop-results` (laptop). Best-effort like `laptop-status`: a failure is logged and retried at the next event, and `tools.scheduler --publish-results <batch>` re-publishes by hand. The daemon's own `publish_results` and its "an id left `running`" logic are deleted |
+| 1 | `tools/scheduler.py` + `gitbus` | **the scheduler publishes its finished work**, on both boxes: at a wave's stage B, `hof5000` and `hof30k` end, copy the wave's `.md`, `.png`, JSON and stage-B files to `<branch>/<job-id>/` through a worktree outside the checkout. The branch is the box's: `results` (desktop, from `host.env`) and `laptop-results` (laptop). Best-effort like `laptop-status`: a failure is logged and retried at the next event, and `python -m tools.results_feed <job-id> <file>...` re-publishes by hand. The daemon's own `publish_results` and its "an id left `running`" logic are deleted |
 | 2 | `tools/site_build.py` | **the build**: fetch both feeds; stage `desktop/runs/` (this box's live pictures) plus every file under both feeds into a build directory; `viewer_manifest.build(build_dir)`; `publish_pages.publish(...)` into a `site` worktree (`~/snek-bus/site`); one snapshot commit; `--force-with-lease`. Skips when neither feed's head moved and `--force` is not given |
 | 3 | `desktop/daemon/daemon.py` | the network cycle runs `PYTHON_BIN -m tools.site_build` after its fetches; a triggered cycle passes `--force`, so `ssh the-claw-den 'Snek/snek3/desktop/trigger'` is the "rebuild now" button, live desktop charts included. A build failure is a line in `status.json`'s `attention`, never a stopped daemon |
 | 4 | repo settings | Pages source → branch `site`, path `/`. `docs/` and `runs/*.png` leave `master` (`.gitignore` both) |
@@ -84,8 +91,8 @@ approved code change, to save one Pages setting.
 
 **Who writes `site`, and what a person does when a publish fails.** The box, and only the box: the daemon's
 cycle, or the same `tools.site_build --force` typed over ssh, which is the same writer with the same worktree
-and lease. An agent on the laptop never pushes to `site`. If the laptop's feed is behind, `tools.scheduler
---publish-results <batch>` then `trigger`; if the build itself is broken, fix `site_build` and deploy — the
+and lease. An agent on the laptop never pushes to `site`. If the laptop's feed is behind, `python -m
+tools.results_feed <job-id> <file>...` then `trigger`; if the build itself is broken, fix `site_build` and deploy — the
 page is stale meanwhile, and that is accepted (user, 2026-09-05). Two builds racing (a hand run during a
 cycle) is settled by `--force-with-lease`: one loses, the next cycle rebuilds from the same inputs.
 
