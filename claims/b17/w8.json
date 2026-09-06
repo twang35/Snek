@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b17ce-clipannealhold80-seed1",
+  "b17cf-clipannealhold80-seed2",
+  "b17cg-clipannealhold80-seed3",
+  "b17ch-clipannealhold80-seed4",
+  "b17ci-clipanneal001hold80-seed1",
+  "b17cj-clipanneal001hold80-seed2",
+  "b17ck-clipanneal001hold80-seed3",
+  "b17cl-clipanneal001hold80-seed4"
+ ],
+ "batch": "b17",
+ "box": "desktop",
+ "claimed_iso": "2026-09-06T01:14:32",
+ "claimed_ts": 1788682472.3644722,
+ "kind": "wave",
+ "wave": 8
+}
