@@ -68,7 +68,8 @@ def materialise(job):
         return None
     if job.type == 'eval':
         spec = {'project': job.project, 'id': job.id, 'type': 'eval', 'policies': list(job.policies),
-                'label': job.label, 'notes': job.notes, 'eval_args': list(job.eval_args)}
+                'label': job.label, 'notes': job.notes, 'eval_args': list(job.eval_args),
+                'priority': job.priority}
         if job.selector:
             spec['selector'] = job.selector
         if job.episodes:

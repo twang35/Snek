@@ -1157,3 +1157,45 @@ def test_a_failed_pass_publishes_nothing(box):
     feed = FakeFeed()
     assert driver(specs, box, Calls(codes={'stageb': 1}), wave=1, results=feed).run() == 1
     assert [job for job, _ in feed.published] == ['b14a-roll32-seed1']
+
+
+def test_specs_sort_by_priority_then_id_and_a_missing_priority_is_100(tmp_path):
+    d = str(tmp_path / 'b20')
+    os.makedirs(d)
+    for name, priority in (('b20a-lanes32-seed1', 221), ('b20b-lanes32-seed2', 220), ('b20c-lanes32-seed3', None),
+                           ('b20d-lanes32-seed4', 'junk')):
+        body = spec(name)
+        if priority is not None:
+            body['priority'] = priority
+        with open(os.path.join(d, name + '.json'), 'w') as handle:
+            json.dump(body, handle)
+    with open(os.path.join(d, 'b20-hof30k-confirm.json'), 'w') as handle:
+        json.dump({'id': 'b20-hof30k-confirm', 'type': 'eval', 'policies': ['b20a-lanes32-seed1'],
+                   'eval_args': ['--pass', 'hof30k'], 'priority': 15}, handle)
+    specs = scheduler.load_specs([d])
+    # 15, then the two unprioritised at the default 100 by id, then 220, then 221
+    assert [s['id'] for s in specs] == ['b20-hof30k-confirm', 'b20c-lanes32-seed3', 'b20d-lanes32-seed4',
+                                        'b20b-lanes32-seed2', 'b20a-lanes32-seed1']
+    assert scheduler.spec_priority(specs[1]) == scheduler.DEFAULT_PRIORITY == 100
+
+
+def test_the_queue_orders_batches_by_their_lowest_priority_then_name(tmp_path):
+    q = tmp_path / 'queue'
+    for batch, arms in {'b21': [('b21a-shape0-seed1', 230), ('b21b-shape0-seed2', 231)],
+                        'b7': [('b7aa-fc320-seed1', 20)],
+                        'b18': [('b18a-gc0-seed1', None)]}.items():
+        os.makedirs(str(q / batch))
+        for name, priority in arms:
+            body = spec(name)
+            if priority is not None:
+                body['priority'] = priority
+            with open(os.path.join(str(q / batch), name + '.json'), 'w') as handle:
+                json.dump(body, handle)
+    # b7 at 20 first, then b18 at the default 100, then b21 at 230 -- not b18, b21, b7 by name
+    assert [name for name, _ in scheduler.queue_batches(str(q))] == ['b7', 'b18', 'b21']
+    # the status's queued lines follow the same order, so they read as "what runs next"
+    reporter = scheduler.Reporter(queue_dir=str(q), make_driver=lambda specs: scheduler.Driver(
+        specs, runs_dir=str(tmp_path / 'runs'), stage_b=False))
+    _, queued, _ = reporter.jobs(None)
+    assert [job['id'] for job in queued] == ['b7aa-fc320-seed1', 'b18a-gc0-seed1', 'b21a-shape0-seed1',
+                                              'b21b-shape0-seed2']

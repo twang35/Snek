@@ -281,9 +281,10 @@ def test_an_action_materialises_to_nothing():
 
 def test_an_eval_keeps_its_arms_selector_depth_and_extra_args_in_order():
     job = parse_job(spec(type='eval', policies=['b1a', 'b1b'], policy=None, selector='screen:98',
-                         episodes=1000, eval_args=['--pass', 'hof5000']))
+                         episodes=1000, eval_args=['--pass', 'hof5000'], priority=15))
     out = launch.materialise(job)
     assert out['type'] == 'eval' and out['policies'] == ['b1a', 'b1b']
+    assert out['priority'] == 15, 'the scheduler orders by it, so an eval spec carries it like a train spec'
     assert out['selector'] == 'screen:98' and out['episodes'] == 1000 and out['eval_args'] == ['--pass', 'hof5000']
     assert 'eval_shards' not in out, 'the pool is the runtime knob unless the spec names one'
 

@@ -96,7 +96,8 @@ Each subdirectory of `logs/laptop-queue/` is a batch. The scheduler publishes wh
 `laptop-status` branch on every launch, exit and pass, every ten minutes while it waits, and once more,
 empty, as it exits (`--no-status` turns that off, for a smoke); read it with the desktop's
 `git fetch origin ops-status && git show origin/ops-status:status.json` under `laptop_running` /
-`laptop_queued`. The scheduler runs the batches in name order, one at a
+`laptop_queued`. The scheduler runs the batches in priority order -- the lowest `priority` any of a batch's specs
+carries, then name; specs within a batch by priority then id -- one at a
 time with waves and all three passes, **rescans the directory between batches** so a batch dropped in
 while another runs is picked up next, and exits when nothing there has work left. So queueing a batch
 while the scheduler is up is just the first two lines; while it is down, all four. It is not a daemon:

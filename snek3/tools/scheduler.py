@@ -8,7 +8,7 @@ and owns the box's chart window and its shared eval workers. One implementation 
 
 **`--queue <dir>` is the box's queue, and it is not a daemon.** Each subdirectory of the queue
 directory is one batch -- desktop-format specs, `git show`n in from `ops` on the laptop, materialised
-from `ops` by the daemon on the desktop -- and the scheduler runs the batches in name order, one at a
+from `ops` by the daemon on the desktop -- and the scheduler runs the batches in priority order, one at a
 time, each with its waves and its three passes. **Between batches it rescans the directory**, so a
 batch dropped in while another runs is picked up next -- and so is work dropped into a batch that has
 already run (a hand eval spec, an added arm): a batch runs again when it owes an id it did not owe
@@ -38,7 +38,7 @@ way -- but under the scheduler the slots are already held, so the eight-arms-rac
 that once produced seven slot-0 workers has one contender.
 
 **The same spec files, the same waves, the same chain.** The arguments are the daemon's own
-`queue/pending/*.json` specs, read in id order and run in waves of `--wave` arms. Each `train` spec is
+`queue/pending/*.json` specs, read in priority order (then id) and run in waves of `--wave` arms. Each `train` spec is
 `train.py <policy>` with the spec's `env` and `max_steps`, exactly as `desktop/daemon/launch.py` set
 them; when every arm of a wave has exited, the wave's stage B runs as one `tools.closeout` over those
 arms, named `<batch>-stageb`, `<batch>-stageb-w2`, ... as the daemon named its auto-queued waves, and
@@ -83,6 +83,8 @@ from tools import window as window_module
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_WAVE = 8
+# A spec with no `priority`, as `desktop/daemon/job.py` defaults it: lower runs first.
+DEFAULT_PRIORITY = 100
 DEFAULT_MAX_TRAINERS = 8
 # A pass runs alone on this box -- the next wave waits for it -- so the shard count is sized to the
 # laptop's 14 cores (10P + 4E), not to what is left beside eight trainers. 8 left 6 cores idle
@@ -109,9 +111,11 @@ def _log(message):
 # ---------------------------------------------------------------- the specs
 
 def load_specs(paths):
-    """Every `train` and `eval` spec under `paths` (files or directories), in id order.
+    """Every `train` and `eval` spec under `paths` (files or directories), in priority order, then id.
 
-    Each spec remembers the directory it came from (`_dir`), which is where its markers live. Anything
+    `priority` is the spec's own key, lower first, `DEFAULT_PRIORITY` when it has none -- the same
+    number the daemon documents (`desktop/README.md`) and the batch generators write per wave, so the
+    waves the scheduler cuts are the waves the labels name. Each spec remembers the directory it came from (`_dir`), which is where its markers live. Anything
     that is neither -- a smoke, an action -- is skipped with a line saying so.
     """
     files = []
@@ -139,11 +143,24 @@ def load_specs(paths):
         spec.setdefault('env', {})
         spec['_dir'] = os.path.dirname(os.path.abspath(path))
         specs.append(spec)
-    specs.sort(key=lambda spec: spec['id'])
+    specs.sort(key=spec_order)
     trained = [spec['policy'] for spec in specs if spec['type'] == 'train'] if specs else []
     if len(set(trained)) != len(trained):
         raise ValueError('two specs name the same policy')
     return specs
+
+
+def spec_priority(spec):
+    """The spec's `priority`, lower first; `DEFAULT_PRIORITY` for a spec that names none or a bad one."""
+    try:
+        return int(spec.get('priority'))
+    except (TypeError, ValueError):
+        return DEFAULT_PRIORITY
+
+
+def spec_order(spec):
+    """Sort key: priority, then id. What orders the specs of a batch and the queued lines of the status."""
+    return (spec_priority(spec), spec['id'])
 
 
 def train_specs(specs):
@@ -847,8 +864,11 @@ class Reporter(object):
 # ---------------------------------------------------------------- the queue
 
 def queue_batches(queue_dir):
-    """The batch directories under `queue_dir`, in name order. A file at the top level is not a batch;
-    a subdirectory with no specs is skipped with a line saying so."""
+    """The batch directories under `queue_dir`, in priority order: by the lowest `priority` any spec
+    of the batch carries, then by name. So the batch whose specs say to run first runs first, and a
+    hand pass queued at a low number (`b7-hof30k-confirm` at 15) goes ahead of the training batches
+    rather than behind them by its name (`b7` sorts after `b21`). A file at the top level is not a
+    batch; a subdirectory with no specs is skipped with a line saying so."""
     batches = []
     for name in sorted(os.listdir(queue_dir)):
         path = os.path.join(queue_dir, name)
@@ -863,6 +883,7 @@ def queue_batches(queue_dir):
             _log('skipping {0}: no specs'.format(path))
             continue
         batches.append((name, specs))
+    batches.sort(key=lambda item: (min(spec_priority(spec) for spec in item[1]), item[0]))
     return batches
 
 
@@ -931,7 +952,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('specs', nargs='*', help='desktop spec files, or directories of them')
     parser.add_argument('--queue', metavar='DIR', default=None,
-                        help='run every batch directory under DIR in name order, rescanning between '
+                        help='run every batch directory under DIR in priority order (lowest spec first, then name), rescanning between '
                              'batches; exits when none has work left')
     parser.add_argument('--wave', type=int, default=DEFAULT_WAVE, help='arms per wave')
     parser.add_argument('--shards', type=int, default=DEFAULT_SHARDS, help='stage-B shard pool')
