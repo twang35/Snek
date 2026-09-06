@@ -41,8 +41,9 @@ an mtime-keyed cache of the per-arm records would take it under 15 s if wanted.
 today and are on neither feed — a hof30k pass over b7's 32 arms, with one candidate: `b7av-fc100x100-seed2` @4096000,
 **99.0 /30,000 [98.9, 99.1]** on seed 7, from a checkpoint at 4.1M steps, below the HOF's 99.30 third place. b7 is
 closed, so they are committed with b18's archive.
-`runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` (12 files) are stray per-shard files from a stage-B pass that later
-merged; untracked, harmless, not committed.
+The 12 `runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` shard files were deleted (user, 2026-09-06): a second stage-B
+pass over the arm, started 14 min after the first had merged and killed at 661 of 1,170 steps; every one of its rows was
+already in the merged file with an identical measurement.
 
 ## b21 closed and b18 on its last stage B, as it read at 2026-09-06 12:35 (superseded)
 
