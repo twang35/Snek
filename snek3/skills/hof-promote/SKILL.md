@@ -9,7 +9,35 @@ description: Promote a snek3 checkpoint into hallOfFame/, on a confirmed fresh m
 `savedPolicies/`. snek2 lost a 17.0% peak permanently for want of this. The bar is not "it scored
 well once" — it is **a number that held up on episodes nobody selected on**.
 
+**A promotion is five things, and the folder has been left with three of them** (2026-09-06, `b17cl`: checkpoint,
+entries row and prose landed; the recording and its row did not, because this skill had no step for them):
+
+| piece | where | step |
+|---|---|---|
+| the confirmed /30,000 number on seed 7 | `runs/<arm>_checkpoint_evals_hof30k.json`, or a fresh `evaluate.py ... one` | 0 |
+| the checkpoint + `arch.json`, loaded from the copy | `hallOfFame/<arm>-ckpt<step>/` | 1-3 |
+| the row and the prose | `hallOfFame/HOF.md`: entries table, "All admitted" line, ordering paragraph, a section | 4 |
+| the recording and its row | `hallOfFame/gifs/<entry>.gif`, the recordings table | 5 |
+| the check | `tests/test_hof_entries.py` fails on any entry missing a piece | 6 |
+
 ## 0. Confirm on a fresh seed. Not optional, and the seed is the whole point
+
+**First look for the measurement that already exists.** Every batch's chain ends in an `hof30k` pass — 30,000
+episodes on seed 7 over the rows that read ≥99 /5,000 — so a candidate handed over by a progress update usually
+has its confirmed number on disk already:
+
+```
+python3 -c "
+import json; d=json.load(open('runs/<arm>_checkpoint_evals_hof30k.json'))
+print('seed', d['seed'], 'episodes', d['episodes'])
+for r in sorted(d['rows'], key=lambda r: r['step']): print(r['step'], r['perfect_percent'], r['perfect_ci95'], r['perfect_games'])
+"
+```
+
+`seed 7`, `episodes 30000`, and a row at the step: that row is the confirmed number, its neighbours in the same
+list are the basin (below), and there is nothing to re-run — go to step 1. No file, or no row at the step (the
+checkpoint never read ≥99 /5,000, or the pass has not run yet — `tools.batch_state <batch>` says whether the
+wave's `hof30k` is owed): run the measurement below, or the `hof-remeasure` skill for a whole batch.
 
 **Every candidate you are handed is the maximum of a selection, so it is biased upward and it will
 fall.** Measured here:
@@ -113,10 +141,44 @@ could not; do not carry that step across.) It must read like a champion.
 Then delete the step-1 staging directory. A partial `savedPolicies/` arm left behind looks like a real
 one to every other tool.
 
-## 4. Write the row, then push
+## 4. Write `HOF.md` — four places, not one
 
-Add a row to `hallOfFame/HOF.md` carrying the **confirmed** rate, its CI, the episode count and the
-seed. State what it was selected out of; that is what lets a later session judge the number.
+| place | what |
+|---|---|
+| the entries table | a row in rate order: entry name, algo / net / the knob that made it, **confirmed** rate with the perfect-game count, CI, the /5000 it was selected at, the drop. Bold the record only |
+| the "All admitted on 30,000 fresh episodes" line under `## The entries` | add the entry and its date |
+| the ordering paragraph below the table | where it sits against its neighbours, with z and p (two-proportion z on the perfect-game counts) — "not distinguishable" when p > 0.05, and say so |
+| its own `##` section, newest first, above the record's | what batch and knob it came from, how the protocol found it (screened / re-measured / confirmed counts), the basin (its `hof30k` neighbours within ±1M and their mean; its `hof5000` neighbours' mean against the other entries' basins), the batch's 5,000 → 30,000 drop, whether it is a record — and the step-3 verification count |
+
+State what it was selected out of; that is what lets a later session judge the number. **If it is a record**, the
+section takes the `‡ The record:` title, the old record's section is retitled `‡ The previous record:`, and the
+recordings table's "— the record" tag moves; `record_gif.py`'s `HOF_RECORD` does **not** move (user's decision,
+2026-09-03).
+
+## 5. Record it, and add the recording's row
+
+Every entry has three complete games in `hallOfFame/gifs/`, at the folder's settings so the eras' folders read alike:
+
+```
+PYTHONPATH=. python -u record_gif.py hallOfFame/<entry> --tile 20 --colors 32 --out hallOfFame/gifs/<entry>.gif
+```
+
+~1 s to capture, a 2-5 MB file, deterministic (greedy policy, seeded food). The printout gives the three game
+lengths; put them in the row. Then add the row to the **recordings table** in `HOF.md`, in the same order as the
+entries table: `![short](gifs/<entry>.gif)<br>**\`<arm>\`** @<step><br>**<rate>% /30,000**`, and in the second
+column what to watch for *against the other recordings* (game length, route shape) — never a claim about the rate,
+which three games cannot support. Bump the section's size total.
+
+## 6. Check, then push
+
+```
+PYTHONPATH=. python -m pytest -q tests/test_hof_entries.py
+```
+
+`test_every_real_entry_has_its_recording_and_both_of_its_rows_in_hof_md` reads the real folder: every entry
+directory must have its gif and its two rows, or it names what is missing. Then commit `hallOfFame/` (the entry,
+the gif, `HOF.md`) and the doc lines that called it a candidate (`docs/runs.md`'s `Now`, the batch's readings in
+`docs/results.md` and `docs/charts.md`) in one commit.
 
 `hallOfFame/` is committed output and `HOF.md` is documentation, so both go up without waiting —
 **unless the same commit touches code**, which sends the whole thing back to needing approval.

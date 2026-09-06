@@ -76,3 +76,32 @@ def test_the_shipped_record_is_an_entry_that_exists():
     # HOF_RECORD is a hand-edited constant; a typo in it turns `hof` into a resolution failure.
     if record_gif.HOF_RECORD is not None:
         assert record_gif.HOF_RECORD in record_gif.hof_entries()
+
+
+# ---------------------------------------------------------------- the real folder
+
+REAL_HOF = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'hallOfFame')
+
+
+def real_entries():
+    return [d for d in sorted(os.listdir(REAL_HOF))
+            if os.path.isfile(os.path.join(REAL_HOF, d, 'arch.json'))]
+
+
+def test_every_real_entry_has_its_recording_and_both_of_its_rows_in_hof_md():
+    """A promotion is the checkpoint, its row in the entries table, its row in the recordings table and its
+    gif -- 2026-09-06 `b17cl` landed with the first two and neither of the last, because the promote skill had
+    no recording step. `hof-promote` now has one, and this pins it for every entry the folder ever gets."""
+    text = open(os.path.join(REAL_HOF, 'HOF.md')).read()
+    missing = []
+    for entry in real_entries():
+        if not os.path.isfile(os.path.join(REAL_HOF, 'gifs', entry + '.gif')):
+            missing.append('gifs/{0}.gif'.format(entry))
+        if not any(line.startswith('|') and '`{0}`'.format(entry) in line and '/30,000' in line
+                   for line in text.splitlines()) and \
+           not any(line.startswith('|') and '`{0}`'.format(entry) in line for line in text.splitlines()):
+            missing.append('an entries-table row naming `{0}`'.format(entry))
+        if 'gifs/{0}.gif'.format(entry) not in text:
+            missing.append('a recordings-table row for {0}'.format(entry))
+    assert not missing, 'HOF entries without their pieces: ' + ', '.join(missing)
+    assert real_entries(), 'the folder has entries'
