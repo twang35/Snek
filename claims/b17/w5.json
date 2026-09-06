@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b17bg-lranneal10-seed1",
+  "b17bh-lranneal10-seed2",
+  "b17bi-lranneal10-seed3",
+  "b17bj-lranneal10-seed4",
+  "b17bk-bothanneal-seed1",
+  "b17bl-bothanneal-seed2",
+  "b17bm-bothanneal-seed3",
+  "b17bn-bothanneal-seed4"
+ ],
+ "batch": "b17",
+ "box": "desktop",
+ "claimed_iso": "2026-09-05T23:43:18",
+ "claimed_ts": 1788676998.490198,
+ "kind": "wave",
+ "wave": 5
+}
