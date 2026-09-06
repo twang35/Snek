@@ -6,7 +6,15 @@ and owns the box's chart window and its shared eval workers. One implementation 
     PYTHONPATH=. python -m tools.scheduler --reopen-window                 # a fresh chart window, now
     PYTHONPATH=. python -m tools.scheduler --republish                     # its status on the branch, now
 
-**`--queue <dir>` is the box's queue, and it is not a daemon.** Each subdirectory of the queue
+**`--shared --queue <dir>` is how both boxes run now: one queue, on the `ops` branch, and each box
+claims a wave of it at a time** (`tools/claims.py`, design `plans/archive/shared-queue.md`). The queue directory
+is then the scheduler's own mirror of the waves this box holds -- rewritten from the claims at every
+boundary, each spec carrying its `_wave` -- and the scheduler claims the next free wave, or eval spec,
+only when nothing it holds is left to run, so a claim is never made ahead of its launch. It exits when
+the pool has nothing this box may take; the desktop daemon starts it again when `ops` or `claims` move,
+and on the laptop the `queue-batch` skill does.
+
+**`--queue <dir>` alone is the box's own queue, and it is not a daemon.** Each subdirectory of the queue
 directory is one batch -- desktop-format specs, `git show`n in from `ops` on the laptop, materialised
 from `ops` by the daemon on the desktop -- and the scheduler runs the batches in priority order, one at a
 time, each with its waves and its three passes. **Between batches it rescans the directory**, so a
@@ -72,6 +80,7 @@ import sys
 import time
 
 from env import constants
+from tools import claims
 from tools import closeout
 from tools import eta
 from tools import eval_queue
@@ -80,6 +89,7 @@ from tools import results_feed
 from tools import live_runs
 from tools import results
 from tools import window as window_module
+from desktop.daemon import gitbus
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_WAVE = 8
@@ -150,17 +160,9 @@ def load_specs(paths):
     return specs
 
 
-def spec_priority(spec):
-    """The spec's `priority`, lower first; `DEFAULT_PRIORITY` for a spec that names none or a bad one."""
-    try:
-        return int(spec.get('priority'))
-    except (TypeError, ValueError):
-        return DEFAULT_PRIORITY
-
-
-def spec_order(spec):
-    """Sort key: priority, then id. What orders the specs of a batch and the queued lines of the status."""
-    return (spec_priority(spec), spec['id'])
+# The order is the shared queue's (`tools/claims.py`), so the waves this box cuts are the waves it claims.
+spec_priority = claims.spec_priority
+spec_order = claims.spec_order
 
 
 def train_specs(specs):
@@ -181,7 +183,22 @@ def batch_id(specs):
 
 
 def waves(specs, size):
-    return [specs[i:i + size] for i in range(0, len(specs), size)]
+    """`[(number, arms)]`: the batch's waves, numbered as their pass ids are.
+
+    A spec that carries `_wave` -- the mirror of a shared-queue claim writes it -- belongs to that wave,
+    whatever box numbered it, so `b21-stageb-w2` means one wave on both feeds. Specs without one are
+    chunked `size` at a time after the numbered waves (all of them, when none is numbered: the bare
+    `tools.scheduler <specs>` form, and every batch before the shared queue).
+    """
+    numbered = {}
+    for spec in specs:
+        if spec.get('_wave') is not None:
+            numbered.setdefault(int(spec['_wave']), []).append(spec)
+    out = [(number, numbered[number]) for number in sorted(numbered)]
+    rest = [spec for spec in specs if spec.get('_wave') is None]
+    start = out[-1][0] + 1 if out else 1
+    out += [(start + i, rest[j:j + size]) for i, j in enumerate(range(0, len(rest), size))]
+    return out
 
 
 def pass_label(batch, pass_name, number):
@@ -429,7 +446,7 @@ class Driver(object):
                                                                        len(self.active_eval['policies']))))
         live_policies = {spec['policy'] for spec, _ in self.live}
         queued = []
-        for number, arms in enumerate(waves(self.specs, self.wave), start=1):
+        for number, arms in waves(self.specs, self.wave):
             for spec in arms:
                 if spec['policy'] not in live_policies and not finished(spec, self.runs_dir):
                     job = arm_job(spec, self.runs_dir)
@@ -467,7 +484,7 @@ class Driver(object):
         if live_runs.held(self.runs_dir):
             lines.append('** paused: {0} exists; nothing new starts until it is removed'.format(
                 live_runs.hold_path(self.runs_dir)))
-        for number, arms in enumerate(waves(self.specs, self.wave), start=1):
+        for number, arms in waves(self.specs, self.wave):
             for pass_name in self.passes if self.stage_b else ():
                 if self._pass_failed(arms, pass_name, number):
                     lines.append('** {0} failed and is not retried; delete {1} to retry'.format(
@@ -785,7 +802,7 @@ class Driver(object):
         """Whether anything in this batch is still to do: an arm short of its cap, a wave short of a
         pass's file for any arm (unless that pass is marked failed), or an eval spec not yet run.
         What the queue asks before picking a batch, so a finished batch left in the queue costs nothing."""
-        for number, arms in enumerate(waves(self.specs, self.wave), start=1):
+        for number, arms in waves(self.specs, self.wave):
             if any(not finished(spec, self.runs_dir) for spec in arms):
                 return True
             if not self.stage_b:
@@ -811,8 +828,8 @@ class Driver(object):
             self.batch, len(self.specs), len(plan), self.wave,
             ', '.join(self.passes) if self.stage_b else 'none', len(self.evals)))
         worst = 0
-        for number, arms in enumerate(plan, start=1):
-            _log('wave {0} of {1}: {2}'.format(number, len(plan), [spec['policy'] for spec in arms]))
+        for number, arms in plan:
+            _log('wave {0} ({1} wave(s) in this batch here): {2}'.format(number, len(plan), [spec['policy'] for spec in arms]))
             worst = max(worst, self.run_wave(number, arms) or 0)
         worst = max(worst, self.run_evals())
         _log('{0} done'.format(self.batch))
@@ -827,9 +844,13 @@ class Reporter(object):
     `laptop_status.Publisher` if there is one. `publish(None)` is the empty status a scheduler leaves
     when it exits with nothing to do."""
 
-    def __init__(self, publisher=None, queue_dir=None, make_driver=None, runs_dir=None, window=None):
+    def __init__(self, publisher=None, queue_dir=None, make_driver=None, runs_dir=None, window=None,
+                 pool=None, extra=None):
         self.publisher, self.queue_dir, self.make_driver = publisher, queue_dir, make_driver
         self.runs_dir, self.window = runs_dir, window
+        # `pool` returns the shared queue's lines (`claims.pool_view`'s) as of the last sync, `extra`
+        # any attention lines the queue loop wants shown (an arm training here that no claim covers).
+        self.pool, self.extra = pool, extra
 
     def jobs(self, driver):
         running, queued = ([], []) if driver is None else driver.jobs()
@@ -843,6 +864,8 @@ class Reporter(object):
                 _, owed = other.jobs()
                 queued.extend(owed)
                 attention.extend(other.attention())
+        if self.extra is not None:
+            attention.extend(self.extra())
         # Every driver names the box's hold; the box has one. Order kept, duplicates dropped.
         return running, queued, list(dict.fromkeys(attention))
 
@@ -851,7 +874,7 @@ class Reporter(object):
         panels = [] if driver is None else driver.panels
         window_pid = self.window.pid() if self.window is not None else None
         return laptop_status.build(running, queued, panels=panels, window_pid=window_pid,
-                                   attention=attention)
+                                   attention=attention, pool=self.pool() if self.pool is not None else ())
 
     def publish(self, driver):
         status = self.status(driver)
@@ -898,6 +921,37 @@ def queue_batches(queue_dir, runs_dir=None):
     return batches
 
 
+def _next_batch(queue_dir, make_driver, ran, runs_dir=None):
+    """One scan of the queue: `('run', name, specs)` for the first pending batch that owes something it
+    did not owe when it last ran, `('stale', names)` when every pending batch has already run once with
+    the same work left, `('idle', None)` when nothing is pending.
+
+    `ran` is batch name -> the set of job ids it still owed when it last ran, kept by the caller. A
+    batch is run again only if it now owes an id it did not owe then: work queued into it while it ran
+    (a hand eval spec, an added arm, a newly claimed wave), picked up at this boundary like a new
+    batch would be. The same set, or a smaller one, is an arm that will not reach its cap, and looping
+    on it would spin.
+    """
+    pending = []
+    for name, specs in queue_batches(queue_dir, runs_dir):
+        made = make_driver(specs)
+        if made.pending():
+            pending.append((name, specs, owed_ids(made)))
+    if not pending:
+        return 'idle', None
+    fresh = [item for item in pending if item[2] - ran.get(item[0], frozenset())]
+    if not fresh:
+        return 'stale', sorted(ran)
+    name, specs, owed = fresh[0]
+    if name in ran:
+        _log('queue {0}: {1} has new work since it ran ({2}); running it again'.format(
+            queue_dir, name, ', '.join(sorted(owed - ran[name]))))
+    _log('queue {0}: {1} of {2} pending, starting {3}'.format(
+        queue_dir, len(pending), len(queue_batches(queue_dir, runs_dir)), name))
+    ran[name] = owed
+    return 'run', name, specs
+
+
 def run_queue(queue_dir, make_driver, after=None, reporter=None, runs_dir=None):
     """Runs every batch under `queue_dir` that has work left, rescanning between batches.
 
@@ -910,16 +964,7 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None, runs_dir=None):
     that says the box is idle.
     """
     worst = 0
-    # batch name -> the set of job ids it still owed when it last ran. A batch is run again only if
-    # it now owes an id it did not owe then: work queued into it while it ran (a hand eval spec, an
-    # added arm), picked up at this boundary like a new batch would be. The same set, or a smaller
-    # one, is an arm that will not reach its cap, and looping on it would spin.
     ran = {}
-
-    def driver_for(specs):
-        made = make_driver(specs)
-        made.reporter = reporter
-        return made
 
     def exit_with(code):
         if reporter is not None:
@@ -929,27 +974,103 @@ def run_queue(queue_dir, make_driver, after=None, reporter=None, runs_dir=None):
     if after is not None:
         make_driver([]).wait_for(after)
     while True:
-        pending = []
-        for name, specs in queue_batches(queue_dir, runs_dir):
-            made = make_driver(specs)
-            if made.pending():
-                pending.append((name, specs, owed_ids(made)))
-        if not pending:
+        picked = _next_batch(queue_dir, make_driver, ran, runs_dir)
+        if picked[0] == 'idle':
             _log('queue {0}: nothing pending; exiting'.format(queue_dir))
             return exit_with(worst)
-        fresh = [item for item in pending if item[2] - ran.get(item[0], frozenset())]
-        if not fresh:
+        if picked[0] == 'stale':
             _log('queue {0}: every pending batch has already run once with the same work left '
-                 '({1}); exiting'.format(queue_dir, ', '.join(sorted(ran))))
+                 '({1}); exiting'.format(queue_dir, ', '.join(picked[1])))
             return exit_with(worst or 1)
-        name, specs, owed = fresh[0]
-        if name in ran:
-            _log('queue {0}: {1} has new work since it ran ({2}); running it again'.format(
-                queue_dir, name, ', '.join(sorted(owed - ran[name]))))
-        _log('queue {0}: {1} of {2} pending, starting {3}'.format(
-            queue_dir, len(pending), len(queue_batches(queue_dir, runs_dir)), name))
-        ran[name] = owed
-        worst = max(worst, driver_for(specs).run() or 0)
+        driver = make_driver(picked[2])
+        driver.reporter = reporter
+        worst = max(worst, driver.run() or 0)
+
+
+class SharedQueue(object):
+    """This box's view of the shared queue between syncs: the claims store, the specs off `ops`, and what
+    the mirror last wrote. `sync` is the only network step; `lines` and `unheld` read what it left."""
+
+    def __init__(self, store, box, queue_dir, runs_dir=None, read_specs=claims.read_specs, log=_log):
+        self.store, self.box, self.queue_dir, self.runs_dir = store, box, queue_dir, runs_dir
+        self.read_specs, self.log = read_specs, log
+        self.specs, self.malformed, self.mirrored = {}, [], set()
+        self.synced = False
+
+    def sync(self):
+        """Fetches `ops` and `claims`, rewrites the mirror from this box's claims. Never raises: offline,
+        the mirror as it stands is run and the next boundary tries again."""
+        try:
+            gitbus.fetch_branch(self.store.repo, self.store.remote, claims.OPS_BRANCH)
+            self.store.sync()
+            self.specs, self.malformed = self.read_specs()
+            self.mirrored = claims.mirror(self.queue_dir, self.specs,
+                                          claims.mine(self.store.records, self.box), log=self.log)
+            self.synced = True
+        except Exception as error:      # noqa: BLE001 -- the run is the arms; the bus is best effort
+            self.log('shared queue: could not sync ({0}); running what is mirrored'.format(error))
+        for line in self.unheld():
+            self.log(line)
+
+    def unheld(self):
+        """An arm training on this box that no claim of ours covers -- released while it ran, or a bare
+        launch of a spec on ops. Left alone (a sync never kills a trainer) and never published here."""
+        if not self.synced:
+            return []
+        lines = []
+        for policy, pid in live_runs.live(self.runs_dir, prune=False):
+            if policy in self.mirrored or policy not in self.specs:
+                continue
+            lines.append('** {0} is training here (pid {1}) but this box holds no claim on it; left alone, '
+                         'not published. `tools.claims show` says who holds it'.format(policy, pid))
+        return lines
+
+    def lines(self):
+        if not self.synced:
+            return []
+        return claims.pool_view(self.specs, self.store.records, malformed=self.malformed)['lines']
+
+    def claim_next(self, wave_size):
+        return claims.claim_next(self.store, self.box, wave_size, read_specs=self.read_specs, log=self.log)
+
+
+def run_shared(queue_dir, make_driver, shared, wave_size, after=None, reporter=None, runs_dir=None):
+    """The shared queue: run what this box holds, then claim the next wave, until the pool has nothing
+    for it. Returns the worst exit status of the batches it ran.
+
+    Each pass of the loop syncs the mirror from the claims, runs one pending batch directory if any
+    (the existing `Driver`, its waves numbered by the claims), and when nothing held is left to run --
+    or what is left has already run once and is stuck on a failed pass -- claims the next wave or eval
+    spec for this box. A claim won is a spec in the mirror at the next sync; none to claim is the exit.
+    """
+    worst = 0
+    ran = {}
+
+    def exit_with(code):
+        if reporter is not None:
+            reporter.publish(None)
+        return code
+
+    if after is not None:
+        make_driver([]).wait_for(after)
+    while True:
+        shared.sync()
+        picked = _next_batch(queue_dir, make_driver, ran, runs_dir)
+        if picked[0] == 'run':
+            driver = make_driver(picked[2])
+            driver.reporter = reporter
+            worst = max(worst, driver.run() or 0)
+            continue
+        if picked[0] == 'stale':
+            _log('shared queue: {0} still owe work that already ran once here (a failed pass); left as is'.format(
+                ', '.join(picked[1])))
+        record = shared.claim_next(wave_size)
+        if record is None:
+            _log('shared queue: nothing in the pool for {0}; exiting'.format(shared.box))
+            return exit_with(worst or (1 if picked[0] == 'stale' else 0))
+        _log('claimed {0}'.format(claims.describe(record)))
+        if reporter is not None:
+            reporter.publish(None)
 
 
 def owed_ids(driver):
@@ -965,6 +1086,11 @@ def build_parser():
     parser.add_argument('--queue', metavar='DIR', default=None,
                         help='run every batch directory under DIR in priority order (lowest spec first, then name), rescanning between '
                              'batches; exits when none has work left')
+    parser.add_argument('--shared', action='store_true',
+                        help='the shared queue: DIR is this box\'s mirror of the waves it holds on the claims branch; '
+                             'claim the next free wave of ops when nothing held is left, exit when the pool has none')
+    parser.add_argument('--box', default=None, choices=('desktop', 'laptop'),
+                        help='this box\'s name on the shared queue (default: SNEK_BOX, else laptop)')
     parser.add_argument('--wave', type=int, default=DEFAULT_WAVE, help='arms per wave')
     parser.add_argument('--shards', type=int, default=DEFAULT_SHARDS, help='stage-B shard pool')
     parser.add_argument('--max-trainers', type=int, default=DEFAULT_MAX_TRAINERS,
@@ -1001,6 +1127,8 @@ def main(argv=None):
     # this line may run for an invocation that is going to exit on its arguments.
     if args.queue and args.specs:
         parser.error('--queue takes the queue directory only; put the batches under it')
+    if args.shared and not args.queue:
+        parser.error('--shared needs --queue DIR, the directory the claims are mirrored into')
     specs = None
     if not args.queue:
         specs = load_specs(args.specs)
@@ -1029,13 +1157,20 @@ def main(argv=None):
                       max_trainers=args.max_trainers, passes=passes, window=window, results=results)
 
     publisher = None if args.no_status else laptop_status.Publisher(log=_log)
-    reporter = Reporter(publisher, queue_dir=args.queue, make_driver=make_driver, window=window)
+    shared = None
+    if args.shared:
+        box = args.box or claims.box_name()
+        shared = SharedQueue(claims.Store(log=_log), box, args.queue)
+    reporter = Reporter(publisher, queue_dir=args.queue, make_driver=make_driver, window=window,
+                        pool=shared.lines if shared else None, extra=shared.unheld if shared else None)
 
     def stop(signum, _frame):
         raise SystemExit(128 + signum)
     signal.signal(signal.SIGTERM, stop)
 
     try:
+        if shared is not None:
+            return run_shared(args.queue, make_driver, shared, args.wave, after=args.after, reporter=reporter)
         if args.queue:
             return run_queue(args.queue, make_driver, after=args.after, reporter=reporter)
         single = make_driver(specs)

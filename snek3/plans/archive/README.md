@@ -10,3 +10,4 @@ of what was decided and why, and the docs still link into them. Live plans stay 
 | [`scheduler.md`](scheduler.md) | 2026-09-05, all three phases built |
 | [`rename-runner-to-daemon.md`](rename-runner-to-daemon.md) | 2026-09-05 |
 | [`site-publish.md`](site-publish.md) | live 2026-09-05; the feed-snapshot question stays open in the file |
+| [`shared-queue.md`](shared-queue.md) | 2026-09-06, built and deployed; section 8 is the as-built |

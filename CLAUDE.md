@@ -59,8 +59,10 @@ snek3's investigation is [`snek3/docs/`](snek3/docs/) and its records are
 
 **Every training and every eval runs under the scheduler (`snek3/tools/scheduler.py`), and the
 scheduler opens the box's one chart window, tells it what to draw, and closes it.** On the
-laptop the scheduler is what the `laptop-run` skill starts over `logs/laptop-queue/`; on the desktop the
-daemon starts it over the specs it materialises from `ops`. The window is `tools/chart_viewer.py`
+laptop the scheduler is what the `laptop-run` skill starts (`--shared --queue logs/laptop-queue/`); on the
+desktop the daemon starts it. Both run the **shared queue** (`snek3/tools/claims.py`): one queue of specs on
+`ops`, each box claiming a wave at a time by pushing to the `claims` branch, and the queue directory is the
+box's mirror of the waves it holds. The window is `tools/chart_viewer.py`
 following the scheduler's own `runs/.live/.status.json`, whose `panels` list is every arm of the wave
 while it trains (finished arms included, so a batch with one arm left still shows all of them) and every
 arm's stage-B chart while a pass runs. One window, both kinds of panel, no slot to claim.
@@ -204,8 +206,8 @@ commit a job spec, it runs it, it pushes results back. **snek3's daemon owns the
 |---|---|---|
 | limit | **8 trainers** | `max_trainers` (8; no host ceiling), `eval_shards` ≤ 16 |
 | check | **the same `status.json`: `at_a_glance.laptop_running` / `laptop_queued`, with `laptop_iso` as the laptop's own timestamp** (published by the laptop's scheduler to `laptop-status`, folded in by the daemon); `ps -Ao pid=,command= \| grep '[t]rain.py'` is the cross-check on the laptop itself | **`git fetch origin ops-status && git show origin/ops-status:status.json`** |
-| queue work | drop the specs in `snek3/logs/laptop-queue/<batch>/` and start the scheduler (`laptop-run` skill) — agents launch arms this way, not by hand, so the launch is published | commit a JSON spec to `queue/pending/` on the `ops` branch, then trigger |
-| start it now | — | `ssh the-claw-den 'Snek/snek3/desktop/trigger'` |
+| queue work | **one queue for both**: commit the specs to `queue/pending/` on `ops` (`queue-batch` skill), unpinned or `"box": "desktop"` / `"laptop"`; each box's scheduler claims a wave when it comes free (`snek3/tools/claims.py`). `at_a_glance.pool` is the shared queue: what is unclaimed and what each box holds | the same specs, the same branch |
+| start it now | start the laptop's scheduler if none is up (`laptop-run`); it claims while it runs and exits when the pool has nothing for it | `ssh the-claw-den 'Snek/snek3/desktop/trigger'`; the daemon also starts a scheduler whenever `ops` or `claims` moves |
 
 **A progress update commits a closed batch's `runs/` files — JSON, `.md` and `.png` — and nothing for a
 live one.** The pictures of a live arm are on the `site` branch, rebuilt by the desktop from both boxes'

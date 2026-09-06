@@ -48,6 +48,9 @@ PROJECT = 'snek3'
 # and exiting (2026-09-05). Named actions only, never arbitrary shell: anything on `ops` runs as `claw`.
 ACTION_TYPES = ('deploy', 'restart')
 JOB_TYPES = ('train', 'smoke', 'benchmark', 'eval') + ACTION_TYPES
+# The two boxes that pull from the shared queue (`tools/claims.py`). A spec's optional `box` pins it to
+# one of them; absent means either box may claim it.
+BOXES = ('desktop', 'laptop')
 _ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
 
 # The characters an agent writing prose actually reaches for, and their ASCII spellings. Anything
@@ -78,7 +81,7 @@ class Job(object):
 
     def __init__(self, id, type, project=PROJECT, policy=None, env=None, max_steps=None,
                  eval_shards=None, eval_args=None, priority=100, notes='', label='',
-                 policies=None, selector=None, episodes=None, restart=None):
+                 policies=None, selector=None, episodes=None, restart=None, box=None):
         self.id = id
         self.type = type
         self.project = project
@@ -104,6 +107,8 @@ class Job(object):
         # deploy only: True forces a restart after the merge, False forbids one, None (the default)
         # restarts iff the merge changed `desktop/daemon/` or `desktop/systemd/`.
         self.restart = restart
+        # Which box may claim this spec from the shared queue: 'desktop', 'laptop', or None for either.
+        self.box = box
 
     @property
     def category(self):
@@ -198,8 +203,14 @@ def parse_job(text, source='<job>', project=PROJECT):
     if job_type in ACTION_TYPES and (policy or policies or env or max_steps is not None):
         raise JobError('{0}: a {1} action takes no policy, env or max_steps'.format(source, job_type))
 
+    box = raw.get('box')
+    if box is not None and box not in BOXES:
+        raise JobError('{0}: box must be one of {1} (or absent, for either)'.format(source, BOXES))
+    if box is not None and job_type in ACTION_TYPES:
+        raise JobError('{0}: a {1} action takes no box'.format(source, job_type))
+
     return Job(id=job_id, type=job_type, project=job_project, policy=policy, policies=policies,
                env=env, max_steps=max_steps, eval_shards=eval_shards, selector=selector,
-               episodes=episodes, eval_args=eval_args, priority=priority, restart=restart,
+               episodes=episodes, eval_args=eval_args, priority=priority, restart=restart, box=box,
                notes=to_ascii(str(raw.get('notes', ''))),
                label=to_ascii(str(raw.get('label', ''))))

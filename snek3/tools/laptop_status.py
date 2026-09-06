@@ -51,7 +51,7 @@ def host(repo=REPO, worktree=WORKTREE, branch=BRANCH, remote=REMOTE):
             'GIT_REMOTE': remote}
 
 
-def build(running, queued, now=None, panels=(), window_pid=None, attention=(), box='laptop'):
+def build(running, queued, now=None, panels=(), window_pid=None, attention=(), box=None, pool=()):
     """The scheduler's `status.json`: the daemon's `at_a_glance` shape over the scheduler's job dicts,
     plus what the window needs.
 
@@ -61,13 +61,17 @@ def build(running, queued, now=None, panels=(), window_pid=None, attention=(), b
     window draws; `window_pid` is the viewer the scheduler holds, so its next life can kill a stale one.
     """
     now = time.time() if now is None else now
+    glance = daemon.build_at_a_glance(running, queued, {}, attention=list(attention), now=now)
+    # The shared queue's lines (`tools/claims.py`): unclaimed work by batch and each box's holdings, as
+    # of this scheduler's last sync. The same on both boxes, so the reader sees one pool.
+    glance['pool'] = list(pool)
     return {
         'iso': time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(now)),
         'ts': now,
-        'box': box,
+        'box': box or os.environ.get('SNEK_BOX') or 'laptop',
         'project': 'snek3',
         'pid': os.getpid(),
-        'at_a_glance': daemon.build_at_a_glance(running, queued, {}, attention=list(attention), now=now),
+        'at_a_glance': glance,
         'running': [{key: job.get(key) for key in ('id', 'type', 'policy', 'policies', 'step', 'max_steps',
                                                     'eta_seconds')}
                     for job in running],

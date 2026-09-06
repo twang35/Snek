@@ -117,15 +117,15 @@ window**: the scheduler owns the box's window and points it at a pass only when 
 scheduler runs the pass. To get the window, queue the pass as an eval spec instead of typing it:
 
 ```
-mkdir -p logs/laptop-queue/<batch> && cat > logs/laptop-queue/<batch>/<batch>-hof5000.json <<'SPEC'
-{"project": "snek3", "id": "<batch>-hof5000", "type": "eval", "policies": ["<arm>", "<arm>"],
- "eval_args": ["--pass", "hof5000"]}
-SPEC
-PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.scheduler --queue logs/laptop-queue/ \
-    > logs/laptop-queue.log 2>&1 &            # only if no scheduler is up; a running one picks the spec up next
+{"project": "snek3", "id": "<batch>-hof5000-confirm", "type": "eval", "policies": ["<arm>", "<arm>"],
+ "eval_args": ["--pass", "hof5000"], "box": "laptop"}
 ```
 
-The scheduler runs it once (marked `.done-<id>` beside the spec), with the window on its charts.
+-- pushed to `ops` (the `queue-batch` skill), pinned to the box that holds the checkpoints (step 2), with an
+id that is not a chain pass label. The box's scheduler claims it once none of its arms is an unclaimed
+training spec, runs it once (marked `.done-<id>` beside the spec in its queue mirror), with the window on
+its charts. Unpinned, whichever box holds every checkpoint takes it; a spec over arms split across the
+boxes is claimable by neither until step 2's rsync puts them on one.
 
 Per-shard truth is `logs/<arm>_checkpoint_evals_hof5000-s<i>of<n>.log`.
 

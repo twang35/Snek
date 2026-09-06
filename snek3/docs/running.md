@@ -13,7 +13,7 @@ PYTHONPATH=. python -u evaluate.py <policy> [selector]  # a stage-B wave
 PYTHONPATH=. python -u evaluate.py <policy> one         # one checkpoint, in this process
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
-PYTHONPATH=. python -m tools.scheduler --queue logs/laptop-queue/   # the queue: waves, passes, the window
+PYTHONPATH=. python -m tools.scheduler --shared --queue logs/laptop-queue/   # the shared queue: claim waves, run them, passes, the window
 PYTHONPATH=. python -m tools.scheduler --reopen-window   # a fresh chart window, from the running scheduler
 python -m pytest -q                                     # the suite; conftest.py handles the path
 ```

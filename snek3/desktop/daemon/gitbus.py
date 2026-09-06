@@ -8,6 +8,7 @@
 | `laptop-results` | laptop scheduler (`tools/results_feed.py`) | by `tools/site_build.py` | the same, for the laptop's work |
 | `laptop-status` | laptop scheduler (`tools/laptop_status.py`) | yes, read-only | the laptop's `status.json`, folded into ours as `at_a_glance.laptop_*` |
 | `site` | **desktop daemon** (`tools/site_build.py`) | no | the GitHub Pages viewer: a snapshot, one commit rewritten per build |
+| `claims` | **both schedulers** (`tools/claims.py`) | yes | `claims/<batch>/w<N>.json`: which box holds which wave. The one multi-writer branch, and it is a lock, not a feed: a plain fast-forward push, and the loser of a race discards its commit and recomputes (`push_fast_forward`) |
 
 `ops` is read straight from the fetched ref with `git show` / `git ls-tree`, so it is never checked
 out and never risks a working-tree conflict. The two written branches go through dedicated
@@ -160,18 +161,40 @@ def read_pending_jobs(host):
 
     Read directly from the ref, so no checkout happens and a malformed spec cannot leave the working
     tree dirty. The directory comes from the host config rather than a literal, because the whole
-    point of the `project` field is that two eras' queues can coexist on one branch.
+    point of the `project` field is that two eras' queues can coexist on one branch. **Two git calls
+    for the whole directory**, not one per file: `ls-tree` for the blob ids, then `cat-file --batch`
+    for every content -- the scheduler reads this at every wave boundary and every claim, and a
+    `git show` per spec was a minute of process starts on a laptop whose git carries a wrapper.
     """
     ref = _ops_ref(host)
     base = host['QUEUE_DIR']
-    listing = _git(['ls-tree', '-r', '--name-only', ref, '--', base], cwd=host['REPO_PATH'])
-    jobs = []
-    for path in listing.splitlines():
-        path = path.strip()
+    listing = _git(['ls-tree', '-r', ref, '--', base], cwd=host['REPO_PATH'])
+    wanted = []            # (sha, filename), json files only, in listing order
+    for line in listing.splitlines():
+        meta, _, path = line.partition('\t')
         if not path.endswith('.json'):
             continue
-        text = _git(['show', '{0}:{1}'.format(ref, path)], cwd=host['REPO_PATH'])
-        jobs.append((os.path.basename(path), text))
+        parts = meta.split()
+        if len(parts) >= 3:
+            wanted.append((parts[2], os.path.basename(path.strip())))
+    if not wanted:
+        return []
+    result = subprocess.run(['git', 'cat-file', '--batch'], cwd=host['REPO_PATH'], input=''.join(
+        sha + '\n' for sha, _ in wanted).encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    data = result.stdout
+    jobs, offset = [], 0
+    for sha, name in wanted:
+        end = data.find(b'\n', offset)
+        if end < 0:
+            break
+        header = data[offset:end].decode('utf-8', 'replace').split()
+        offset = end + 1
+        if len(header) < 3 or header[1] == 'missing':
+            jobs.append((name, ''))
+            continue
+        size = int(header[2])
+        jobs.append((name, data[offset:offset + size].decode('utf-8', 'replace')))
+        offset += size + 1                 # the trailing newline cat-file adds
     return jobs
 
 
@@ -266,6 +289,27 @@ def _commit_and_push(worktree, branch, host, message):
     if _git(['status', '--porcelain'], cwd=worktree).strip():
         _git(['commit', '-q', '-m', message], cwd=worktree, check=True)
     return push(worktree, branch, host)
+
+
+def ref_head(repo, ref):
+    """The commit `ref` points at, or None when it does not exist (a branch nobody has written yet)."""
+    return _git(['rev-parse', '--verify', '--quiet', ref], cwd=repo).strip() or None
+
+
+def push_fast_forward(worktree, branch, remote):
+    """A plain push of `HEAD` to `branch`: `'pushed'`, `'rejected'` (not a fast-forward -- someone else
+    pushed first, which on the `claims` branch means the race was lost and the caller recomputes) or
+    `'failed'` (anything else: offline, auth). No lease and no force: the server's fast-forward check
+    is the compare-and-swap the shared queue is built on (`tools/claims.py`)."""
+    result = subprocess.run(['git', 'push', remote, 'HEAD:' + branch], cwd=worktree, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode == 0:
+        return 'pushed'
+    text = (result.stderr or '') + (result.stdout or '')
+    if 'rejected' in text or 'non-fast-forward' in text or 'fetch first' in text or 'stale info' in text:
+        return 'rejected'
+    sys.stderr.write('push to {0} failed: {1}\n'.format(branch, text.strip()[-500:]))
+    return 'failed'
 
 
 def push(worktree, branch, host):

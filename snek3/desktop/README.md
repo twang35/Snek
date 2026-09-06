@@ -1,12 +1,15 @@
 # The desktop — `the-claw-den`
 
 A stdlib-only systemd daemon on a dedicated Linux box that runs trainings and evals unattended. It
-**imports nothing from this project** and **schedules nothing itself**: it mirrors the
-specs on `ops` into a local queue, starts `tools/scheduler.py` — the same scheduler the laptop runs — over
-that queue, and publishes what the scheduler finishes. It talks to the laptop only through four
-single-writer git branches. That decoupling is the design's best property: the bus works from anywhere,
-`ssh` is a convenience, and the daemon cannot be broken by a change to the trainer or the scheduler.
-The design and its decisions are [`../plans/archive/scheduler.md`](../plans/archive/scheduler.md).
+**imports nothing from this project** and **schedules nothing itself**: it starts `tools/scheduler.py` —
+the same scheduler the laptop runs — whenever the shared queue moves, relays the runtime knobs and the
+hold, publishes the box's status and the pool, and builds the site. **Both boxes pull from one queue**:
+the specs on `ops`, a wave at a time, each box claiming its wave by pushing to the `claims` branch
+(`tools/claims.py`, [`../plans/archive/shared-queue.md`](../plans/archive/shared-queue.md)); the scheduler
+mirrors the waves this box holds into its own queue directory and claims the next when it has nothing
+left. That decoupling is the design's best property: the bus works from anywhere, `ssh` is a convenience,
+and the daemon cannot be broken by a change to the trainer or the scheduler. The scheduler's own design is
+[`../plans/archive/scheduler.md`](../plans/archive/scheduler.md).
 
 **snek3's daemon owns the box**, but the two eras share the `ops` branch, which is why every spec carries a required `project` field.
 
@@ -17,15 +20,19 @@ The design and its decisions are [`../plans/archive/scheduler.md`](../plans/arch
 | `results` | **desktop's scheduler** (`tools/results_feed.py`) | `results/<job-id>/*`: a finished arm's `.md`, `.png`, `_evals.json`; a finished pass's merged files and pictures. snek3 jobs only: snek2's were deleted 2026-09-05 (they are on master under `snek2/runs/`) |
 | `laptop-results` | **laptop's scheduler** (the same module) | the same, for the laptop's work |
 | `site` | **desktop daemon** (`tools/site_build.py`, every network cycle) | the GitHub Pages viewer, built from both feeds and the box's live charts; one snapshot commit, rewritten each build |
-| `laptop-status` | **laptop** (`tools/laptop_status.py`, from the queue driver) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |
+| `laptop-status` | **laptop** (`tools/laptop_status.py`, from its scheduler) | the laptop's `status.json`, same `at_a_glance` shape; the daemon reads it each network cycle and publishes it inside its own as `at_a_glance.laptop_running`, `laptop_queued`, `laptop_iso` |
+| `claims` | **both schedulers** (`tools/claims.py`) | `claims/<batch>/w<N>.json`: which box holds which wave, with its arms. **The one multi-writer branch, and it is a lock, not a feed**: a plain fast-forward push, and the loser of a race discards its commit and recomputes, so nothing ever merges here either |
 
-One writer per branch, so every push is `--force-with-lease` and nothing ever merges. The laptop's queue
-reaches `ops-status` *through* the daemon rather than by the laptop writing there, for exactly that reason.
+One writer per feed branch, so every push there is `--force-with-lease` and nothing ever merges. The
+laptop's status reaches `ops-status` *through* the daemon rather than by the laptop writing there, for
+exactly that reason. `claims` is the deliberate exception: a compare-and-swap through the server's
+fast-forward check, a few hundred bytes per write.
 
 ## Queue a job
 
 The procedure — the `ops` worktree, validating a spec against `parse_job` before pushing, the push
-and the trigger — is [`../skills/desktop-batch`](../skills/desktop-batch/SKILL.md).
+and the trigger — is [`../skills/queue-batch`](../skills/queue-batch/SKILL.md). A spec runs on whichever
+box claims it first unless its `box` field pins it.
 
 **Pushing to `ops` starts real work on another machine**, so it needs the user's approval for *that*
 job — see the root [`CLAUDE.md`](../../CLAUDE.md). The trigger is what makes it start now rather than
@@ -40,7 +47,7 @@ ssh the-claw-den 'Snek/snek3/desktop/trigger'
 | field | required | means |
 |---|---|---|
 | `project` | **yes, no default** | must be `snek3`. The guard against `ops`'s ~150 retired snek2 specs |
-| `id` | yes | unique; the ledger key and the log name. `b<n><letter>-...` groups arms into a batch |
+| `id` | yes | unique; the log name. `b<n><letter>-...` groups arms into a batch |
 | `type` | yes | `train`, `smoke`, `benchmark`, `eval` — or the two **actions**, `deploy` and `restart`, which the daemon runs itself on the poll that sees them (below, "Deploy over the bus") |
 | `policy` | train/eval | the checkpoint directory name |
 | `policies` | eval only | a **wave**: every arm of a batch in one process |
@@ -48,12 +55,16 @@ ssh the-claw-den 'Snek/snek3/desktop/trigger'
 | `env` | no | any `SNEK_*` knob; wins over the runtime defaults. See [`../docs/running.md`](../docs/running.md) |
 | `selector`, `episodes` | eval, no | **omit them.** Absent means `tools/closeout.py`'s own defaults, which *are* the protocol |
 | `eval_shards` | no | shard processes for this wave; defaults to the runtime config's 16 |
-| `priority` | no | lower runs first. Default 100; the auto-queued passes are 10 (stage B), 11 (hof5000), 12 (hof30k) |
+| `priority` | no | lower runs first, across the whole pool: batches by their lowest spec, then name; within a batch by priority, then id. Default 100 |
+| `box` | no | `desktop` or `laptop`: only that box may claim the spec. Absent means either |
 | `label` | no | one line for `at_a_glance` |
 | `notes` | no | free text, for the reader |
 
-A malformed spec is **recorded against its filename and skipped**, never raised into the loop, so one
-bad commit cannot stop the box.
+A malformed spec is **recorded against its filename and skipped**, never raised into either scheduler's
+loop, so one bad commit cannot stop a box; it shows under `attention`. **`ops` is the queue, and only the
+live batches belong on it**: a spec stays claimable until some claim covers it, so a closed batch's specs
+are removed from `queue/pending/` when the batch closes (the progress update), not left as a record --
+2026-09-06's migration pruned ~400 of them, every one of which the pool would otherwise have offered.
 
 ## Read the box — and the laptop
 
@@ -62,11 +73,14 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 ```
 
 `at_a_glance.running` / `queued` / `attention` are the box; `laptop_running` / `laptop_queued` are the
-laptop's queue driver, as of `laptop_iso` (the laptop's own clock). The driver's last publish before it
-exits is **empty**, so empty lists mean an idle laptop, and lines under a `laptop_iso` hours old mean the
-driver died — the two are meant to read differently. `python -m tools.laptop_status` on the laptop
-publishes an empty status by hand after a killed driver. The laptop's lines are as fresh as the box's last
-network cycle: `trigger` refreshes both now.
+laptop's scheduler, as of `laptop_iso` (the laptop's own clock); **`pool` is the shared queue** -- what is
+unclaimed, by batch, and what each box holds (`laptop holds b21-w2 (8 arms, running)`), the daemon's own
+read each network cycle (`tools.claims show --json`). The laptop scheduler's last publish before it exits
+is **empty**, so empty lists mean an idle laptop, and lines under a `laptop_iso` hours old mean it died —
+the two are meant to read differently; a claim held by a box whose status is two hours old is a line under
+`attention`. `python -m tools.laptop_status` on the laptop publishes an empty status by hand after a
+killed scheduler. The laptop's lines are as fresh as the box's last network cycle: `trigger` refreshes
+both now.
 
 **`git fetch` is not optional, and leaving it out is the single most repeated mistake in this
 project's history with the desktop.** `git show origin/ops-status:…` reads a local remote-tracking
@@ -89,22 +103,21 @@ the hold notice, and the laptop's lines. Underneath:
 |---|---|
 | `scheduler` | `alive`, `pid`, `spawned`, `last_exit`, `log`, and `status_iso` — the scheduler's own timestamp |
 | `running` | the scheduler's running jobs: `id`, `type`, `policies`, `step`/`max_steps` for an arm |
-| `ledger` | `{job id: queued / running / done / failed}`, derived for the tools that read one (`tools/progress_update.py`, `tools/viewer_manifest.py`); `done` means the files say it finished (the scheduler published them to `results` as it did) |
+| `ledger` | `{job id: queued / running / done / failed}`, derived for the tools that read one (`tools/viewer_manifest.py`): `done` when the id is on either results feed, `running` when either box's status lists it, `queued` for the rest on `ops` or claimed; actions and malformed specs from the daemon's own ledger |
+| `pool` | the shared queue's `unclaimed`, `held` (per box, each holding with `done`), `status_ages` and the `ops`/`claims` heads it was read at |
 | `site` | the last site build: `iso`, `ok`, `seconds`, `note` (the build's last line), `forced`. A failed build is also a line under `attention` |
 | `runtime`, `config_notes`, `disk_free_gb`, `head`, `load_avg` | the box |
 
-**The scheduler's state is the filesystem, and so is the daemon's memory of it.** An arm is finished
+**The scheduler's state is the filesystem, and the daemon remembers almost nothing.** An arm is finished
 when its `_evals.json` has reached the cap, a pass when its merged file exists, a failed pass leaves a
-`.failed-<id>` marker beside its spec (`tools/scheduler.py`). The daemon keeps one small `state.json`
-beside the ledger: the scheduler's pid and boot id, the queue it was started on, the ids it saw running
-and the ids it has published. **An id that leaves the scheduler's `running` list is published only if the
-files say it finished** — an arm at its cap in `_evals.json`, a pass with every arm's merged file, an eval
-spec with its `.done-`/`.failed-` marker — otherwise a scheduler dying mid-wave would publish half-trained
-arms as results and their batch, every id "published", would leave the queue for good. An
-unfinished one is forgotten and seen running again when the next scheduler resumes it. A reboot is
-detected by the boot id: the scheduler is gone, so the next
-poll starts a fresh one and every arm resumes from its checkpoint, every pass from its shard files. Old
-`interrupted` records and the boot-id check per job are gone with the per-job ledger.
+`.failed-<id>` marker beside its spec (`tools/scheduler.py`); the scheduler publishes each to the feed as it
+lands. The daemon keeps one small `state.json` beside the ledger: the scheduler's pid and boot id, and the
+`ops` and `claims` heads it was last started on. **A scheduler is started when none is alive and either
+head has moved, a hold was lifted, a trigger asked, or this box holds an unfinished wave with nothing
+running it** (backed off ten minutes after a failed exit). A scheduler that finds nothing to claim exits in
+seconds, so "did the queue change" needs no notion of a wave here. A reboot is detected by the boot id:
+the scheduler is gone, so the next poll starts a fresh one and every arm resumes from its checkpoint,
+every pass from its shard files.
 
 ## Tune it while it runs
 
@@ -273,8 +286,10 @@ detached with `setsid`, it carries on, and the daemon re-adopts it by pid on the
 **Every job on the box writes under `snek3/desktop/runs/`, gitignored, never `snek3/runs/`.**
 `launch.runs_dir(host)` is the one place the path is defined; it goes to the scheduler as
 `SNEK_RUNS_DIR` and from there to every arm and pass, and the scheduler publishes a finished job's files
-to `results` from the same place. The mirrored queue is beside it, `snek3/desktop/queue-local/`, also
-gitignored. So the box's checkout of master holds nothing under a path master tracks, and the laptop is
+to `results` from the same place. The scheduler's mirror of the waves this box holds is beside it,
+`snek3/desktop/queue-local/`, also gitignored; its claims worktree is `~/snek-bus/claims`, beside the
+status and results ones (`CLAIMS_WORKTREE`, `CLAIMS_BRANCH` and `BOX` in `host.env` override the
+defaults). So the box's checkout of master holds nothing under a path master tracks, and the laptop is
 free to commit every chart. A tool run by hand on the box (`tools.scheduler --reopen-window`,
 `tools.closeout`) needs `SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs` exported or it looks in the empty
 `runs/`.

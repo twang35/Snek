@@ -61,7 +61,8 @@ PYTHONPATH=. python -u -m tools.closeout <policy...> --shards 12  # a whole batc
 PYTHONPATH=. python -u -m tools.closeout <policy...> --pass hof5000 --shards 12  # its hof5000 re-measure; --pass hof30k after that
 PYTHONPATH=. python -u watch.py <policy> [step]         # a live window, follows the newest checkpoint
 PYTHONPATH=. python -u record_gif.py <policy|hof>       # -> gifs/, throwaway
-PYTHONPATH=. python -m tools.scheduler --queue logs/laptop-queue/   # the box's queue: waves, passes, window
+PYTHONPATH=. python -m tools.scheduler --shared --queue logs/laptop-queue/   # the shared queue: claim waves, run them, passes, window
+PYTHONPATH=. python -m tools.claims show                 # the pool: unclaimed work and each box's holdings
 PYTHONPATH=. python -m tools.scheduler --reopen-window   # a fresh chart window from the running scheduler
 ```
 
@@ -190,7 +191,7 @@ traps that break a run, and it costs nothing until it is invoked.
 |---|---|
 | [`progress-update`](skills/progress-update/SKILL.md) | what is running on both boxes, then the doc refresh. Read-only on processes |
 | [`laptop-run`](skills/laptop-run/SKILL.md) | start a training, a batch or a stage-B close-out here |
-| [`desktop-batch`](skills/desktop-batch/SKILL.md) | queue work on `the-claw-den`, and pause/retune it |
+| [`queue-batch`](skills/queue-batch/SKILL.md) | queue work on the shared queue both boxes pull from, pin it, release a stranded wave, pause/retune the desktop |
 | [`stop-run`](skills/stop-run/SKILL.md) | kill an arm or a wave on either box, and clean up its children |
 | [`desktop-deploy`](skills/desktop-deploy/SKILL.md) | get the box on new code |
 | [`mutation-test`](skills/mutation-test/SKILL.md) | prove the tests cover a change |
@@ -220,7 +221,9 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/shard.py` | one process measuring one slice. Resumable, and owns its output file |
 | `tools/eval_wave.py` | launches the shards and reads progress off their files. Does no per-episode work |
 | `tools/closeout.py` | **a batch's pass, one process: every arm's shards pooled under `--shards`**, each arm merged as it ends. `--pass hof5000` / `hof30k` for the two re-measures. What the desktop dispatches and what an agent types here |
-| `tools/scheduler.py` | **the scheduler, both boxes**: batches of desktop specs in waves of 8, each followed by its stage B, hof5000 and hof30k as `<batch>-stageb`, `<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...; an `eval` spec in a batch directory runs once after the waves. `--queue <dir>` runs every batch directory under it in name order, rescanning between batches, and exits when none has work. State is the filesystem: resumable, skips a pass every arm already has the file for, adopts a live arm rather than relaunching it, never a ninth trainer, marks a failed pass `.failed-<id>` beside its specs. **Owns the box's chart window and starts the wave's eval workers.** Publishes its status to `runs/.live/.status.json` and (laptop) the `laptop-status` branch; the desktop daemon folds that into `ops-status` as `at_a_glance.laptop_*`. `skills/laptop-run` has the commands |
+| `tools/scheduler.py` | **the scheduler, both boxes**: batches of desktop specs in waves of 8, each followed by its stage B, hof5000 and hof30k as `<batch>-stageb`, `<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...; an `eval` spec in a batch directory runs once after the waves. **`--shared --queue <dir>` is how both boxes run**: the directory is the mirror of the waves this box holds on the shared queue, and the scheduler claims the next free wave when nothing held is left, exiting when the pool has none for it. State is the filesystem: resumable, skips a pass every arm already has the file for, adopts a live arm rather than relaunching it, never a ninth trainer, marks a failed pass `.failed-<id>` beside its specs. **Owns the box's chart window and starts the wave's eval workers.** Publishes its status to `runs/.live/.status.json` and (laptop) the `laptop-status` branch; the desktop daemon folds that into `ops-status` as `at_a_glance.laptop_*`. `skills/laptop-run` has the commands |
+| `tools/claims.py` | **the shared queue**: both boxes pull waves from `ops`; a wave is claimed by pushing `claims/<batch>/w<N>.json` to the `claims` branch, and git's fast-forward check is the lock -- the loser of a race resets and takes the next wave. Wave numbers are global per batch, a spec's `box` pins it, an eval spec needs its checkpoints on the claiming box, no expiry: a stranded claim is an `attention` line and a human's `release`. `show`, `release`, `seed`. Design: `plans/archive/shared-queue.md` |
+| `tools/batch_state.py` | a batch wave by wave across both boxes, from the shared queue's view: which box holds each wave, trained, measuring, closed, unclaimed. What the progress update's state lines read |
 | `tools/window.py` | the scheduler's window: open on a launch, close on exit, reopen on request, kill a stale predecessor. The only opener |
 | `tools/eval_queue.py` | the stage-A work queue: who writes what, claiming by rename, and why no arm can deadlock on a worker |
 | `tools/eval_worker.py` | one process draining that queue for every arm on the box, in streamed rounds |

@@ -1,6 +1,9 @@
 # One queue for both boxes — design proposal (2026-09-05)
 
-Status: **approved 2026-09-05 evening, decisions 1-6 and 8 taken (section 6); 7 open.** Section 0 is the
+Status: **built 2026-09-06** (decision 7: rsync). `tools/claims.py`, `tools/batch_state.py`, the scheduler's
+`--shared`, the daemon without its mirror, `progress_update` over both feeds, the `box` column on the page,
+`queue-batch` in place of `desktop-batch` and `move-batch`. Section 8 is what the build changed from the plan.
+Section 0 is the
 problem, 1 is the mechanism and why it beats the alternatives, 2 is the design piece by piece, 3 is what
 changes in each file, 4 the migration, 5 the phasing, 6 the decisions, 7 what happens with one box or a
 late start.
@@ -255,3 +258,14 @@ Both work, and nothing in the design assumes two boxes are up.
 
 "Unclaimed" is purely *not in any claim*: a finished wave is claimed, a running wave is claimed, and the
 claimant never needs to know whether the other box exists.
+
+## 8. As built (2026-09-06)
+
+| planned | built |
+|---|---|
+| `read(repo)` fetching and parsing | `read_specs` off the fetched `ops` ref, in **two git calls** for the whole directory (`gitbus.read_pending_jobs`: `ls-tree` + `cat-file --batch`); a `git show` per spec was ~a minute on the laptop, whose git carries a telemetry wrapper, and the scheduler reads this at every boundary |
+| the daemon shells out to `tools.claims show --json` for the pool | as planned, once per network cycle; the view also carries a **derived `ledger`** (done from the feeds, running from both statuses) because `tools/viewer_manifest.py` reads one for the page's pass states -- the block the earlier plan dropped is kept as a derived view, one implementation, in `claims.ledger` |
+| `batch_state.py` for the progress update | as planned; `progress_update` also imports finished jobs from **both** feeds (a job on a feed is finished by construction) and writes `runs/.live/boxes.json`, which `site_build` writes on the desktop from which feed carried the arm, for the page's `box` tag |
+| the mirror rewritten by the scheduler | `claims.mirror`, called from `SharedQueue.sync` at the top of every pass of `run_shared`; markers are kept, a spec no longer on `ops` is logged and not mirrored, and an arm live here that no claim covers is an `attention` line (`SharedQueue.unheld`), never killed |
+| a `gitbus` push variant | `push_fast_forward`: `'pushed'`, `'rejected'` (lost the race) or `'failed'`; on either non-success the store resets the worktree to the remote so it never drifts |
+| the migration's seed | `tools.claims seed <batch> <box> <waves>`, cutting waves as the scheduler did (`spec_order`, eight at a time); and `ops` pruned of every closed batch -- ~400 specs, each of which the pool would have offered |

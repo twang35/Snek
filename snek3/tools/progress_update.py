@@ -9,7 +9,7 @@ different each time:
 
 | step | what |
 |---|---|
-| sync | `git fetch` `results` and `ops-status`; save the ledger to `runs/.live/desktop/status.json` for the viewer's pass states; import every closed stage-B wave's files that `runs/` lacks; `rsync` the live batches' charts into `runs/` and their live JSON into the gitignored `runs/.live/desktop/` |
+| sync | `git fetch` both results feeds, both statuses, `ops` and `claims`; save the desktop's status with the shared queue's derived ledger to `runs/.live/desktop/status.json` for the viewer's pass states, and which box trained each arm to `runs/.live/boxes.json`; import every finished job's files that `runs/` lacks from either feed; `rsync` the live desktop batches' charts into `runs/` and their live JSON into the gitignored `runs/.live/desktop/` |
 | the site | not here: the desktop daemon builds the `site` branch from both boxes' results feeds on every network cycle (`tools/site_build.py`); `ssh the-claw-den 'Snek/snek3/desktop/trigger'` builds it now |
 | tables | one canonical per-batch table: knob value **read from the spec's env on `ops`**, rows, density, per-seed shares, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98 share, onset, plus the reference cell's row |
 | charts.md | regenerates the sections it owns (marked) — table, reading slot, every panel including the reference group — and can adopt a hand-written one |
@@ -33,7 +33,8 @@ import subprocess
 import sys
 
 from env import constants
-from tools import live_runs
+from tools import batch_state
+from tools import claims
 from tools import publish_pages
 from tools import viewer_manifest
 
@@ -62,28 +63,41 @@ def git(*args, check=True):
     return result.stdout
 
 
-def ledger():
-    """`status.json` off the freshly fetched `ops-status`."""
-    git('fetch', '-q', 'origin', 'ops-status', 'results', 'ops')
-    return json.loads(git('show', 'origin/ops-status:status.json'))
+FEEDS = dict(claims.FEEDS)          # box -> results branch
 
 
-def results_tree():
-    return git('ls-tree', '-r', '--name-only', 'origin/results').splitlines()
+def read_bus():
+    """One fetch of everything the update reads, then `{'status', 'view'}`: the desktop's `status.json`
+    off `ops-status` (both boxes' lines, since the daemon folds the laptop's in) and the shared queue's
+    view (`tools.claims.gather`: specs, claims, both feeds' published ids, both statuses' running ids)."""
+    git('fetch', '-q', 'origin', 'ops-status', 'ops')
+    for branch in ('claims', 'laptop-status') + tuple(FEEDS.values()):
+        git('fetch', '-q', 'origin', branch, check=False)
+    status = json.loads(git('show', 'origin/ops-status:status.json'))
+    view = claims.gather(repo=REPO, fetch=False)
+    return {'status': status, 'view': view}
 
 
-def import_closed_waves(status, tree, runs_dir=None):
-    """Copies every done job's files that `runs/` does not have yet -- an arm's at its cap, a pass's merged
-    files, an eval spec's -- from the desktop's `results` feed. Returns the count. Since 2026-09-05 the
-    scheduler publishes an arm's `_evals.json` with the arm rather than with each pass, so arm jobs are
-    imported too; a hof pass is a measurement like a stage-B wave."""
+def feed_trees():
+    """`[(feed, path)]` for every file on either results feed."""
+    out = []
+    for feed in FEEDS.values():
+        for path in git('ls-tree', '-r', '--name-only', 'origin/' + feed, check=False).splitlines():
+            out.append((feed, path))
+    return out
+
+
+def import_closed_waves(trees, runs_dir=None):
+    """Copies every published job's files that `runs/` does not have yet -- an arm's at its cap, a pass's
+    merged files, an eval spec's -- from either feed. Returns the count. A job on a feed is finished by
+    construction: the scheduler publishes an arm at its cap and a pass with its merged files, nothing
+    earlier. Pre-rename jobs (`p2-hof5000` is b5's) stay on `results` by design -- results.md, "Where the
+    raw rows are"."""
     runs_dir = runs_dir or constants.RUNS_DIR
-    # Pre-rename jobs (`p2-hof5000` is b5's) stay on `results` by design — results.md, "Where the raw rows are".
-    done = {job for job, state in status['ledger'].items() if state == 'done' and not re.match(r'p\d+-', job)}
     copied = 0
-    for path in tree:
+    for feed, path in trees:
         parts = path.split('/')
-        if len(parts) != 3 or parts[0] != 'results' or parts[1] not in done:
+        if len(parts) != 3 or parts[0] != 'results' or re.match(r'p\d+-', parts[1]) or not re.match(r'^b\d+', parts[1]):
             continue
         if SHARD.search(parts[2]):          # a shard's partial rows; the merged file is what runs/ keeps
             continue
@@ -91,19 +105,24 @@ def import_closed_waves(status, tree, runs_dir=None):
         if os.path.exists(target):
             continue
         with open(target, 'wb') as handle:
-            handle.write(subprocess.run(['git', 'show', 'origin/results:' + path], cwd=REPO,
+            handle.write(subprocess.run(['git', 'show', 'origin/{0}:{1}'.format(feed, path)], cwd=REPO,
                                         capture_output=True, check=True).stdout)
         copied += 1
     return copied
 
 
-def live_batches(status):
-    """Batches with an arm running or queued — the ones whose charts only the box has."""
-    out = set()
-    for job, state in status['ledger'].items():
-        if state in ('running', 'queued') and 'stageb' not in job and 'hof' not in job:
-            out.add(viewer_manifest.batch_of(job))
-    return sorted(out)
+def live_batches(view):
+    """Batches with anything still to do on either box -- the ones whose newest charts only a box has."""
+    return batch_state.live_batches(view)
+
+
+def desktop_live_batches(view):
+    """Of those, the ones with a wave held by the desktop that is not closed: what `pull_live_charts` rsyncs."""
+    out = []
+    for name in batch_state.live_batches(view):
+        if any(w['box'] == 'desktop' and w['state'] != 'closed' for w in batch_state.batch(view, name)['waves']):
+            out.append(name)
+    return out
 
 
 def pull_live_charts(batches, runs_dir=None):
@@ -139,15 +158,28 @@ def pull_live_charts(batches, runs_dir=None):
     return True, 'live charts and measurements pulled for ' + ', '.join(batches)
 
 
-def save_desktop_status(status, runs_dir=None):
-    """Keeps the ledger just fetched at `runs/.live/desktop/status.json`, where `tools.viewer_manifest`
-    reads it to mark each arm's passes running, queued or still to come. Gitignored with the rest of
-    `.live/`, and never in `runs/` itself, so `drop_superseded_snapshots` leaves it alone."""
+def save_desktop_status(status, runs_dir=None, view=None):
+    """Keeps the status just fetched at `runs/.live/desktop/status.json`, where `tools.viewer_manifest`
+    reads it to mark each arm's passes running, queued or still to come; its `ledger` is the shared
+    queue's derived one when a `view` is given (done from the feeds, running from both statuses). Also
+    writes which box trained each arm (`runs/.live/boxes.json`). Gitignored with the rest of `.live/`,
+    and never in `runs/` itself, so `drop_superseded_snapshots` leaves it alone."""
     runs_dir = runs_dir or constants.RUNS_DIR
     path = os.path.join(runs_dir, viewer_manifest.DESKTOP_STATUS)
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    payload = dict(status)
+    if view is not None:
+        payload['ledger'] = dict(status.get('ledger') or {}, **(view.get('ledger') or {}))
+        # the laptop's running jobs too, so a laptop arm's stage A reads `running` on the page
+        payload['running'] = list(status.get('running') or []) + [
+            {'id': job_id, 'type': 'train' if job_id in (view.get('specs') or {}) else 'eval', 'policy': job_id,
+             'policies': [job_id]} for job_id, box in (view.get('running') or {}).items()
+            if box == 'laptop' and job_id not in {j.get('id') for j in status.get('running') or []}]
+        viewer_manifest.write_boxes(runs_dir, {job_id: box for job_id, box in (view.get('published') or {}).items()
+                                               if re.match(r'^b\d+[a-z]+-', job_id) and '-stageb' not in job_id
+                                               and '-hof' not in job_id})
     with open(path, 'w') as handle:
-        json.dump(status, handle)
+        json.dump(payload, handle)
     return path
 
 
@@ -441,32 +473,29 @@ def insert_results_skeleton(text, table, title, facts):
 
 
 # ------------------------------------------------------------------------------------------ status
-def batch_state(status, batch):
-    """running / queued / done counts for a batch's training arms and its stage-B waves."""
-    arms = collections.Counter()
-    waves = collections.Counter()
-    for job, state in status['ledger'].items():
-        if viewer_manifest.batch_of(job) != batch or 'hof' in job:
-            continue
-        (waves if 'stageb' in job else arms)[state] += 1
-    return arms, waves
+def batch_counts(view, batch):
+    """running / queued / done counts for a batch's training arms and its stage-B waves, across both boxes."""
+    return batch_state.counts(view, batch)
 
 
 def wave_close_times(batch):
-    """When each of the batch's stage-B waves landed on `results`, ascending."""
-    out = git('log', '--format=%ct %s', 'origin/results')
+    """When each of the batch's stage-B waves landed on either feed, ascending."""
     times = {}
-    for line in out.splitlines():
-        ts, _, subject = line.partition(' ')
-        match = re.match(r'results for ({0}-stageb\S*)'.format(re.escape(batch)), subject)
-        if match:
-            times[match.group(1)] = min(int(ts), times.get(match.group(1), 1 << 62))
+    for feed in FEEDS.values():
+        out = git('log', '--format=%ct %s', 'origin/' + feed, check=False)
+        for line in out.splitlines():
+            ts, _, subject = line.partition(' ')
+            match = re.match(r'results for ({0}-stageb\S*)'.format(re.escape(batch)), subject)
+            if match:
+                times[match.group(1)] = min(int(ts), times.get(match.group(1), 1 << 62))
     return sorted(times.values())
 
 
-def eta(status, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS):
-    """(remaining waves, seconds per wave, finish datetime) for a batch still training."""
-    arms, _ = batch_state(status, batch)
+def eta(view, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS):
+    """(remaining waves, seconds per wave, finish datetime) for a batch still training. With two boxes
+    pulling, the remaining waves are what is left to claim plus what is claimed and untrained; the
+    cadence is the batch's own wave-close spacing on either feed."""
+    arms, _ = batch_counts(view, batch)
     remaining = -(-(arms['queued'] + arms['running']) // WAVE_ARMS)
     closes = wave_close_times(batch)
     gaps = [b - a for a, b in zip(closes, closes[1:])]
@@ -475,52 +504,20 @@ def eta(status, batch, now=None, fallback_seconds=DEFAULT_WAVE_SECONDS):
     return remaining, per_wave, now + datetime.timedelta(seconds=remaining * per_wave)
 
 
-def state_line(status, batch):
-    """One line on where a batch stands on the box, with an ETA while it trains."""
-    arms, waves = batch_state(status, batch)
-    total = sum(arms.values())
-    if not total:
-        glance = (status or {}).get('at_a_glance') or {}
-        for line in list(glance.get('laptop_running') or []) + list(glance.get('laptop_queued') or []):
-            if line.split(' | ')[0].strip() == batch:      # the laptop's scheduler still has it
-                return 'In flight on the laptop: ' + line
-        return laptop_state_line(batch)
-    if not (arms['running'] or arms['queued']):
-        return 'Closed: all {0} arms trained, stage B {1}'.format(
-            total, 'done for every wave' if not (waves['running'] or waves['queued']) else
-            '{0} wave(s) still measuring'.format(waves['running'] + waves['queued']))
-    remaining, per_wave, finish = eta(status, batch)
-    return ('In flight: {0} of {1} arms trained, {2} running, {3} queued; stage B {4} wave(s) done; '
-            '{5} training wave(s) left at ~{6:.1f} h each -> ~{7:%Y-%m-%d %H:%M}').format(
-                arms['done'], total, arms['running'], arms['queued'], waves['done'], remaining, per_wave / 3600, finish)
-
-
-def laptop_state_line(batch, runs_dir=None):
-    """A batch the desktop ledger does not know: read its state off `runs/` and the live pid files.
-    Closed when every arm at its cap has a stage-B file; in flight while an arm trains or a close-out
-    still owes a file."""
-    runs_dir = runs_dir or constants.RUNS_DIR
-    arms = sorted(re.sub(r'_evals\.json$', '', os.path.basename(p))
-                  for p in glob.glob(os.path.join(runs_dir, batch + '*_evals.json'))
-                  if viewer_manifest.batch_of(os.path.basename(p)) == batch and '_checkpoint_evals' not in p)
-    if not arms:
-        return 'Not on the desktop ledger, and no arm of it in runs/'
-    envs = spec_envs(arms)
-    live = {policy for policy, _pid in live_runs.live(runs_dir, prune=False)}
-    at_cap = measured = 0
-    for arm in arms:
-        with open(os.path.join(runs_dir, arm + '_evals.json')) as handle:
-            step = (json.load(handle).get('summary') or {}).get('step') or 0
-        cap = envs.get(arm, {}).get('_max_steps')
-        if arm not in live and (cap is None or step >= cap):
-            at_cap += 1
-        if os.path.exists(os.path.join(runs_dir, arm + '_checkpoint_evals.json')):
-            measured += 1
-    running = len([a for a in arms if a in live])
-    if at_cap == len(arms) and measured == len(arms):
-        return 'Closed: all {0} arms trained on the laptop, stage B done for every wave'.format(len(arms))
-    return ('In flight on the laptop: {0} of {1} arms trained, {2} running; {3} of {1} have their stage-B file'
-            .format(at_cap, len(arms), running, measured))
+def state_line(view, batch, status=None):
+    """One line on where a batch stands across both boxes, wave by wave, with an ETA while it trains."""
+    percent = {}
+    for job in (status or {}).get('running') or []:
+        if job.get('step') and job.get('max_steps'):
+            percent[job['id']] = 100.0 * job['step'] / job['max_steps']
+    text = batch_state.line(view, batch, percent=percent)
+    if text.startswith('In flight'):
+        arms, _ = batch_counts(view, batch)
+        if arms['queued'] or arms['running']:
+            remaining, per_wave, finish = eta(view, batch)
+            text += '; {0} training wave(s) left at ~{1:.1f} h each -> ~{2:%Y-%m-%d %H:%M}'.format(
+                remaining, per_wave / 3600, finish)
+    return text
 
 
 def running_arms(status):
@@ -539,15 +536,15 @@ def main(argv=None):
     lines = []
     say = lines.append
 
-    status = None
+    status, view = None, None
     if not args.no_sync:
-        status = ledger()
-        save_desktop_status(status)
-        copied = import_closed_waves(status, results_tree())
-        live = live_batches(status)
-        ok, msg = pull_live_charts(live)
+        bus = read_bus()
+        status, view = bus['status'], bus['view']
+        save_desktop_status(status, view=view)
+        copied = import_closed_waves(feed_trees())
+        ok, msg = pull_live_charts(desktop_live_batches(view))
         dropped = drop_superseded_snapshots()
-        say('sync: {0} closed-wave files imported, {1} live snapshots superseded; {2}'.format(copied, dropped, msg))
+        say('sync: {0} finished-job files imported, {1} live snapshots superseded; {2}'.format(copied, dropped, msg))
     # The site is not built here: the desktop daemon builds the `site` branch from both boxes' results
     # feeds on every network cycle (`tools/site_build.py`); `desktop/trigger` builds it now.
     manifest = viewer_manifest.build()
@@ -560,7 +557,7 @@ def main(argv=None):
     adopt = set(a for a in args.adopt.split(',') if a)
     hand_written = set(re.findall(r'^## Batch (\S+) ', charts, re.M)) - owned      # b8: prose, not a table
     batches = [b for b in args.batches.split(',') if b] or sorted(
-        owned | adopt | (set(refs) - hand_written) | (set(live_batches(status)) if status else set()),
+        owned | adopt | (set(refs) - hand_written) | (set(live_batches(view)) if view else set()),
         key=lambda b: int(re.sub(r'\D', '', b) or 0))
     batches = [b for b in batches if any(a['batch'] == b for a in manifest['arms'])]
 
@@ -573,8 +570,12 @@ def main(argv=None):
                                                                       100.0 * step / cap, elapsed / 60))
             else:
                 say('  {0} {1:.0f} min'.format(job, elapsed / 60))
-        if status['at_a_glance'].get('attention'):
-            say('  ATTENTION: {0}'.format(status['at_a_glance']['attention']))
+        glance = status['at_a_glance']
+        say('laptop {0}: {1}'.format(glance.get('laptop_iso'), '; '.join(glance.get('laptop_running') or []) or 'idle'))
+        for line in glance.get('pool') or []:
+            say('  pool: ' + line)
+        if glance.get('attention'):
+            say('  ATTENTION: {0}'.format(glance['attention']))
 
     for batch in batches:
         arms = [a['policy'] for a in manifest['arms'] if a['batch'] == batch]
@@ -583,7 +584,7 @@ def main(argv=None):
         table = batch_table(batch, manifest, envs, ref, envs)
         say('')
         say('=== {0}: {1} arms, knob {2}'.format(batch, len(arms), table['key']))
-        where = state_line(status, batch) if status else 'Desktop state not read (--no-sync)'
+        where = state_line(view, batch, status) if view else 'Bus not read (--no-sync)'
         say(where)
         say(group_table_md(table))
         top = sorted(((r['perfect_percent'], a['policy'], r['step']) for a in table['arms']
@@ -597,16 +598,16 @@ def main(argv=None):
             title = '{0} — the `{1}` sweep, {2} values x {3} seeds, {4}'.format(
                 batch, knob_label(table['key']), sum(1 for g in table['groups'] if not g['reference']),
                 max((g['n'] for g in table['groups'] if not g['reference']), default=0), cap)
-            if status and not closed:
-                arm_states = batch_state(status, batch)[0]
-                if sum(arm_states.values()):        # a laptop batch is not on the ledger; its line says where it is
+            if view and not closed:
+                arm_states = batch_counts(view, batch)[0]
+                if sum(arm_states.values()):
                     title += ' ({0} of {1} arms in)'.format(arm_states['done'], sum(arm_states.values()))
             status_line = ('**{0}** as of {1}. Reference group marked. Regenerated by `tools/progress_update.py`; '
                            'only the reading block is hand-written.').format(
                                where, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
             charts = update_charts_md(charts, table, 'Batch ' + title, status_line, adopt=batch in adopt)
             if closed:
-                facts = ('Closed on the desktop; every arm has its stage-B measurement. One knob off the reference cell '
+                facts = ('Closed on both boxes\' feeds; every arm has its stage-B measurement. One knob off the reference cell '
                          '(`{0}`, marked in the table). Numbers by `tools/progress_update.py`.').format(
                              ', '.join(ref.get('arms', [])) or 'none named')
                 results, added = insert_results_skeleton(results, table, 'Batch ' + title + ', closed {0}'.format(

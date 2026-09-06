@@ -21,8 +21,9 @@ PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -m tools.progress_update
 ps -Ao pid=,etime=,command= | grep -E '[t]rain\.py|[c]loseout|[t]ools\.shard'   # laptop cross-check; status.json's laptop_running / laptop_queued (from the queue driver, as of laptop_iso) is the first read
 ```
 
-The tool, in order: fetches `results`, `ops-status` and `ops`; imports every finished job's files
-that `runs/` lacks (an arm at its cap, a pass's merged files); `rsync`s the live batches' charts into
+The tool, in order: fetches both results feeds, both statuses, `ops` and `claims`; imports every finished
+job's files that `runs/` lacks from either feed (an arm at its cap, a pass's merged files); `rsync`s the
+desktop's live batches' charts into
 `runs/` and their live `_evals.json` and `_checkpoint_evals.json` into the gitignored `runs/.live/desktop/`,
 which the tables read only for an arm with no close-out file yet (off-LAN this fails and the digest says
 so — carry on, and say so in the summary); regenerates the `charts.md` sections it owns; inserts a
@@ -33,8 +34,8 @@ the desktop rebuilds the `site` branch from both boxes' results feeds every netw
 | digest line | what it is |
 |---|---|
 | `sync:` | what moved. A nonzero "imported" means an arm or a wave finished since the last update |
-| `desktop <iso>:` | `at_a_glance` from a **fresh** fetch, plus each running job's step and % |
-| `=== bN:` … `In flight`/`Closed` | the batch's ledger state, with an ETA from its own wave cadence while it trains |
+| `desktop <iso>:` / `laptop <iso>:` | both boxes' `at_a_glance` lines from a **fresh** fetch, each running desktop job's step and %, then `pool:` -- the shared queue's unclaimed work and each box's holdings |
+| `=== bN:` … `In flight`/`Closed` | the batch wave by wave across both boxes (`tools/batch_state.py`: which box holds each wave, trained, measuring, unclaimed), with an ETA from its own wave cadence while it trains |
 | the table | the canonical per-batch table — knob value from the spec, rows, density, per-seed share, `hof5000` candidates, best row, best30, sef, drawdown, stage-A ≥98%, and the **reference cell's row in bold at its knob value** |
 | `top rows:` | the five best stage-B rows in the batch |
 | `prediction for <value>:` | what the spec said would happen, for every cell with rows — read each against its row |

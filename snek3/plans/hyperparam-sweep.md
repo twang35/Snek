@@ -529,8 +529,8 @@ on the laptop, run while the desktop trains the next one.
   to be live; a silently ignored knob costs four arms. b9's two smokes ran 2026-09-01 and both
   reached the trainer.
 - **Specs come from the manifest, not by hand.** `tools/sweep_specs.py <batch> --out <dir>` writes
-  them into the `ops` worktree and validates each against `parse_job`; the `desktop-batch` skill does
-  the push. A design change is made in the JSON so the specs follow.
+  them into the `ops` worktree and validates each against `parse_job`; the `queue-batch` skill does
+  the push, and since 2026-09-06 either box may claim the waves (`plans/archive/shared-queue.md`). A design change is made in the JSON so the specs follow.
 - **Every arm's `notes` field carries the prediction for its cell**, copied from the manifest, so the
   reader of the spec knows what the arm was expected to do without opening this file.
 - **A batch closes when its stage B has landed and readouts 1–5 and 7 are in `results.md`**, per seed

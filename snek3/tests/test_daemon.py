@@ -6,8 +6,10 @@ here. It also runs on **base** python on the box, before the conda env exists, w
 stdlib-only and why these tests must not reach for numpy or torch either (the two tests that import
 `tools.scheduler` and `tools.closeout` are the deliberate exception, and say why).
 
-Since 2026-09-05 the daemon schedules nothing itself: it mirrors `ops` into a local queue for
-`tools/scheduler.py`, starts that once, and publishes what it finishes (`plans/scheduler.md`).
+Since 2026-09-05 the daemon schedules nothing itself (`plans/archive/scheduler.md`), and since 2026-09-06
+it mirrors nothing either: both boxes pull waves from the one queue on `ops` by claiming them
+(`tools/claims.py`, `plans/archive/shared-queue.md`); the daemon starts a scheduler when `ops` or `claims` move
+and publishes the pool it reads through `tools.claims show --json`.
 
 Three things here are silent when broken and each costs a night:
 
@@ -719,13 +721,10 @@ def test_the_laptop_status_branch_is_fetched_apart_from_the_three_the_box_needs(
 # --- actions: deploy and restart over the bus -------------------------------------------------------
 
 
-
-# --- the daemon over the scheduler ------------------------------------------------------------------
-#
-# What is pinned: the specs on `ops` land in the local queue in the scheduler's shape and leave it when
-# dequeued; the scheduler is started once per change of the queue and adopted, never doubled; a pause is
-# a marker the scheduler sees; a job the scheduler finishes is published to `results`; status.json says
-# what the scheduler says, with the daemon's own attention lines and a derived `ledger` for the tools.
+# --- the daemon over the shared queue -----------------------------------------------------------------
+# Since 2026-09-06 the daemon mirrors nothing: `tools/claims.py` runs the queue on `ops`, the scheduler
+# (`--shared`) mirrors the waves this box holds and claims the next, and the daemon starts a scheduler
+# when `ops` or `claims` moved, reads the pool through `tools.claims show --json`, and publishes it.
 
 class FakeScheduler(object):
     def __init__(self, pid):
@@ -745,13 +744,24 @@ class Spawns(object):
         return FakeScheduler(self.pid), '/var/snek/logs/scheduler-x.log'
 
 
+POOL = {'lines': ['b21 training | 24 arms unclaimed', 'laptop holds b20-w1 (8 arms, running)'],
+        'unclaimed': [{'batch': 'b21', 'phase': 'training', 'ids': ['b21a-x'], 'pins': {}, 'priority': 220}],
+        'held': {'laptop': [{'id': 'b20-w1', 'batch': 'b20', 'kind': 'wave', 'wave': 1, 'arms': ['b20a-x'],
+                             'done': False, 'running': True}]},
+        'attention': [], 'ledger': {'b21a-x': 'queued', 'b20a-x': 'running', 'b7-hof30k': 'done'},
+        'heads': {'ops': 'o1', 'claims': 'c1'}, 'status_ages': {'laptop': 30.0, 'desktop': None}}
+
+
 class Commands(object):
-    """Stands in for `subprocess.run` inside the daemon: heads in sequence, a diff, a deploy result."""
+    """Stands in for `subprocess.run` inside the daemon: heads in sequence, a diff, a deploy result, the
+    site build, and the pool read (`tools.claims show --json`)."""
 
     def __init__(self, heads=('aaaaaaaaaaaa', 'bbbbbbbbbbbb'), changed='snek3/desktop/daemon/daemon.py',
-                 deploy_rc=0, deploy_out='HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; kept 0 pictures\n'):
+                 deploy_rc=0, deploy_out='HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; kept 0 pictures\n', pool=None):
         self.heads, self.changed, self.deploy_rc, self.deploy_out = list(heads), changed, deploy_rc, deploy_out
         self.calls, self.site_calls, self.site_rc = [], [], 0
+        self.pool_calls, self.pool_rc = [], 0
+        self.pool = dict(POOL) if pool is None else pool
 
     def __call__(self, argv, **kwargs):
         self.calls.append(argv)
@@ -765,21 +775,27 @@ class Commands(object):
         elif 'tools.site_build' in argv:
             self.site_calls.append((argv, kwargs.get('env') or {}))
             result.returncode, result.stdout = self.site_rc, 'site: 3 arms, 5 charts; pushed\n'
+        elif 'tools.claims' in argv:
+            self.pool_calls.append((argv, kwargs.get('env') or {}))
+            result.returncode, result.stdout, result.stderr = self.pool_rc, json.dumps(self.pool), 'boom'
         else:
             raise AssertionError('unexpected command {0}'.format(argv))
         return result
 
 
 class Bus(object):
-    """The git bus as the daemon sees it: specs on ops, a runtime, what was published where."""
+    """The git bus as the daemon sees it: specs on ops, a runtime, the heads, what was published where."""
 
     def __init__(self, monkeypatch, specs, runtime_text='{}', laptop=''):
         self.specs, self.runtime_text, self.laptop = list(specs), runtime_text, laptop
         self.status, self.results = [], []
+        self.heads = {'origin/ops': 'ops-1', 'origin/claims': 'claims-1'}
         g = daemon_module.gitbus
         monkeypatch.setattr(g, 'fetch', lambda host: None)
+        monkeypatch.setattr(g, 'fetch_branch', lambda repo, remote, branch: True)
         monkeypatch.setattr(g, 'fetch_laptop_status', lambda host: None)
         monkeypatch.setattr(g, 'push_unpushed', lambda host: [])
+        monkeypatch.setattr(g, 'ref_head', lambda repo, ref: self.heads.get(ref))
         monkeypatch.setattr(g, 'read_runtime_text', lambda host: self.runtime_text)
         monkeypatch.setattr(g, 'read_laptop_status', lambda host: self.laptop)
         monkeypatch.setattr(g, 'publish_status', lambda host, text: self.status.append(json.loads(text)) or True)
@@ -789,7 +805,7 @@ class Bus(object):
                             lambda host: [(s['id'] + '.json', json.dumps(s)) for s in self.specs])
 
 
-def _box(tmp_path, monkeypatch, specs, ledger=None, runtime_text='{}', laptop=''):
+def _box(tmp_path, monkeypatch, specs, ledger=None, runtime_text='{}', laptop='', pool=None):
     bus = Bus(monkeypatch, specs, runtime_text, laptop)
     host = dict(HOST, SNEK_DIR=str(tmp_path / 'snek3'), REPO_PATH=str(tmp_path),
                 LEDGER_PATH=str(tmp_path / 'var' / 'ledger.json'), LOG_DIR=str(tmp_path / 'var' / 'logs'))
@@ -798,7 +814,7 @@ def _box(tmp_path, monkeypatch, specs, ledger=None, runtime_text='{}', laptop=''
         json.dump(ledger or {}, handle)
     monkeypatch.setattr(daemon_module, '_disk_free_gb', lambda path: 500.0)
     daemon = daemon_module.Daemon(host)
-    daemon.run_command = Commands()
+    daemon.run_command = Commands(pool=pool)
     daemon.spawn = Spawns()
     return daemon, bus
 
@@ -810,12 +826,6 @@ def _train_spec(policy, **extra):
     return body
 
 
-def _queue_files(daemon):
-    root = launch.queue_dir(daemon.host)
-    return sorted(os.path.relpath(os.path.join(folder, name), root)
-                  for folder, _, names in os.walk(root) for name in names)
-
-
 def _scheduler_status(daemon, running=(), queued_ids=(), attention=(), glance=None):
     """What the scheduler writes to runs/.live/.status.json while it runs."""
     path = os.path.join(daemon.runs_dir(), daemon_module.STATUS_RELATIVE)
@@ -823,65 +833,25 @@ def _scheduler_status(daemon, running=(), queued_ids=(), attention=(), glance=No
     payload = {'iso': '2026-09-05T12:00:00', 'pid': daemon.state.get('scheduler_pid'),
                'running': list(running), 'queued_ids': list(queued_ids),
                'at_a_glance': glance or {'running': ['b1 | x | training 50% (2 arms)'],
-                                         'queued': [], 'attention': list(attention)}}
+                                         'queued': [], 'attention': list(attention), 'pool': ['stale pool line']}}
     with open(path, 'w') as handle:
         json.dump(payload, handle)
 
 
-def _finished_arm(daemon, policy, step=10):
-    """The arm's `_evals.json` at its cap (`_train_spec`'s max_steps is 10)."""
-    runs = daemon.runs_dir()
-    os.makedirs(runs, exist_ok=True)
-    with open(os.path.join(runs, policy + '_evals.json'), 'w') as handle:
-        json.dump({'summary': {'step': step}}, handle)
-
-
-def test_the_ops_queue_is_mirrored_into_the_schedulers_queue_by_batch(tmp_path, monkeypatch):
-    daemon, bus = _box(tmp_path, monkeypatch, [
-        _train_spec('b1a-x'), _train_spec('b1b-x'), _train_spec('b2a-y'),
-        {'project': 'snek3', 'id': 'b1-hof5000', 'type': 'eval', 'policies': ['b1a-x', 'b1b-x'],
-         'eval_args': ['--pass', 'hof5000']}])
+def test_the_daemon_mirrors_nothing_and_starts_the_shared_scheduler(tmp_path, monkeypatch):
+    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x'), _train_spec('b2a-y')])
     daemon.poll_once(git=True)
-    assert _queue_files(daemon) == ['b1/b1-hof5000.json', 'b1/b1a-x.json', 'b1/b1b-x.json', 'b2/b2a-y.json']
-    with open(os.path.join(launch.queue_dir(daemon.host), 'b1', 'b1a-x.json')) as handle:
-        assert json.load(handle) == launch.materialise(parse_job(json.dumps(_train_spec('b1a-x'))))
-    # dequeued on ops: gone here, and the scheduler's own markers are left alone
-    open(os.path.join(launch.queue_dir(daemon.host), 'b1', '.done-b1a-x'), 'w').close()
-    bus.specs = [s for s in bus.specs if s['id'] != 'b2a-y']
-    daemon.poll_once(git=True)
-    assert _queue_files(daemon) == ['b1/.done-b1a-x', 'b1/b1-hof5000.json', 'b1/b1a-x.json', 'b1/b1b-x.json']
+    assert len(daemon.spawn.calls) == 1 and daemon.state['scheduler_pid'] == 9001
+    assert not os.path.exists(launch.queue_dir(daemon.host)), 'the scheduler mirrors its own claims'
+    assert 'specs' not in daemon.state and 'published' not in daemon.state
+    argv = launch.scheduler_command(daemon.host, daemon.runtime)
+    assert '--shared' in argv and argv[argv.index('--queue') + 1] == launch.queue_dir(daemon.host)
+    env = launch.scheduler_env(daemon.host, daemon.runtime)
+    assert env['SNEK_BOX'] == 'desktop' and env['SNEK_CLAIMS_BRANCH'] == 'claims'
+    assert env['SNEK_CLAIMS_WORKTREE'] == '/wt/claims', 'beside the status and results worktrees'
 
 
-def test_a_batch_with_every_job_published_is_not_mirrored_but_a_batch_with_one_left_is_mirrored_whole(tmp_path, monkeypatch):
-    """`ops` still carries every finished spec, and a finished batch whose files are not in the
-    box's runs directory would be retrained. A half-done batch keeps its done arms so wave numbering
-    -- and the pass ids already on `results` -- stay the same."""
-    ledger = {job_id: {'state': 'done', 'type': 'train', 'finished': 1.0}
-              for job_id in ('b7a-x', 'b7b-x', 'b15a-e', 'b15b-e')}
-    ledger['b7-stageb'] = {'state': 'done', 'type': 'eval', 'finished': 1.0}
-    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b7a-x'), _train_spec('b7b-x'),
-                                               _train_spec('b15a-e'), _train_spec('b15b-e'), _train_spec('b15c-e')],
-                       ledger=ledger)
-    daemon.poll_once(git=True)
-    assert _queue_files(daemon) == ['b15/b15a-e.json', 'b15/b15b-e.json', 'b15/b15c-e.json']
-    assert bus.status[-1]['ledger']['b7a-x'] == 'done' and bus.status[-1]['ledger']['b7-stageb'] == 'done'
-
-
-def test_a_malformed_spec_is_recorded_once_and_the_rest_of_the_queue_goes_on(tmp_path, monkeypatch):
-    daemon, bus = _box(tmp_path, monkeypatch, [
-        {'project': 'snek2', 'id': 'b46a-old', 'type': 'train', 'policy': 'b46a-old'},   # the stale snek2 spec
-        _train_spec('b1a-x', max_steps=None),                                            # no cap
-        _train_spec('b1b-x')])
-    daemon.poll_once(git=True)
-    assert _queue_files(daemon) == ['b1/b1b-x.json']
-    assert daemon.ledger['b46a-old']['state'] == 'failed' and daemon.ledger['b1a-x']['state'] == 'failed'
-    assert daemon.ledger['b1a-x']['error'].startswith('b1a-x: a train spec needs max_steps')
-    lines = bus.status[-1]['at_a_glance']['attention']
-    assert any('b46a-old is malformed' in line for line in lines)
-    assert bus.status[-1]['ledger']['b1a-x'] == 'failed'
-
-
-def test_the_scheduler_is_started_once_per_queue_change_and_adopted_meanwhile(tmp_path, monkeypatch):
+def test_the_scheduler_is_started_when_ops_or_claims_move_and_adopted_meanwhile(tmp_path, monkeypatch):
     daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
     daemon.poll_once(git=True)
     assert len(daemon.spawn.calls) == 1 and daemon.state['scheduler_pid'] == 9001
@@ -889,23 +859,48 @@ def test_the_scheduler_is_started_once_per_queue_change_and_adopted_meanwhile(tm
     daemon.poll_once(git=True)
     daemon.poll_once(git=False)
     assert len(daemon.spawn.calls) == 1, 'alive: never a second one'
-    _finished_arm(daemon, 'b1a-x')
-    daemon.scheduler.returncode = 0             # it finished the queue and exited
+    daemon.scheduler.returncode = 0             # nothing left to claim; it exited
     daemon.poll_once(git=True)
-    assert len(daemon.spawn.calls) == 1, 'same queue, nothing new to do: not restarted'
+    assert len(daemon.spawn.calls) == 1, 'same heads, nothing new to look at: not restarted'
     assert bus.status[-1]['scheduler']['alive'] is False and bus.status[-1]['scheduler']['last_exit'] == 0
-    bus.specs.append(_train_spec('b2a-y'))
+    bus.heads['origin/claims'] = 'claims-2'     # the laptop claimed or released a wave
     daemon.poll_once(git=True)
-    assert len(daemon.spawn.calls) == 2 and daemon.state['scheduler_pid'] == 9002, 'a new spec starts it'
+    assert len(daemon.spawn.calls) == 2 and daemon.state['scheduler_pid'] == 9002, 'a moved head starts it'
+    daemon.scheduler.returncode = 0
+    bus.heads['origin/ops'] = 'ops-2'           # a spec pushed
+    daemon.poll_once(git=True)
+    assert len(daemon.spawn.calls) == 3
 
 
-def test_a_trigger_starts_the_scheduler_even_when_the_queue_did_not_change(tmp_path, monkeypatch):
+def test_a_trigger_starts_the_scheduler_even_when_nothing_moved(tmp_path, monkeypatch):
     daemon, _ = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
     daemon.poll_once(git=True)
     daemon.scheduler.returncode = 1              # crashed
     daemon.poll_once(git=True)
     assert len(daemon.spawn.calls) == 1, 'a failed exit is not retried on its own inside the backoff'
     daemon.poll_once(git=True, forced=True)
+    assert len(daemon.spawn.calls) == 2
+
+
+def test_this_boxs_unfinished_holding_with_no_scheduler_starts_one_after_the_backoff(tmp_path, monkeypatch):
+    """A wave this box claimed and has not finished, with no scheduler running it -- a crash, a kill --
+    is work pending and nothing running it, whatever the heads say."""
+    pool = dict(POOL, held={'desktop': [{'id': 'b21-w2', 'batch': 'b21', 'kind': 'wave', 'wave': 2,
+                                         'arms': ['b21i-x'], 'done': False, 'running': False}]})
+    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b21i-x')], pool=pool)
+    daemon.poll_once(git=True)
+    daemon.scheduler.returncode = -9
+    daemon.poll_once(git=True)
+    assert len(daemon.spawn.calls) == 1, 'inside the backoff, not yet'
+    assert any('the scheduler exited -9' in line for line in bus.status[-1]['at_a_glance']['attention'])
+    daemon.state['spawned'] -= daemon_module.RESPAWN_BACKOFF_SECONDS
+    daemon.poll_once(git=False)
+    assert len(daemon.spawn.calls) == 2, 'work held here and nothing running it: a scheduler is started'
+    # a finished holding is not work pending
+    daemon.scheduler.returncode = 0
+    daemon.run_command.pool = dict(POOL, held={'desktop': [dict(pool['held']['desktop'][0], done=True)]})
+    daemon.state['spawned'] -= daemon_module.RESPAWN_BACKOFF_SECONDS
+    daemon.poll_once(git=True)
     assert len(daemon.spawn.calls) == 2
 
 
@@ -916,15 +911,17 @@ def test_a_daemon_restart_adopts_the_scheduler_by_pid_and_a_reboot_forgets_it(tm
     alive = {9001}
     monkeypatch.setattr(launch, 'pid_alive', lambda pid: pid in alive)
     again = daemon_module.Daemon(daemon.host)
+    again.run_command = Commands()
     again.spawn = Spawns()
     again.poll_once(git=True)
     assert again.spawn.calls == [] and again.state['scheduler_pid'] == 9001
     monkeypatch.setattr(daemon_module, 'boot_id', lambda: 'a-different-boot')
     rebooted = daemon_module.Daemon(daemon.host)
+    rebooted.run_command = Commands()
     rebooted.spawn = Spawns()
     assert rebooted.state['scheduler_pid'] is None
     rebooted.poll_once(git=True)
-    assert len(rebooted.spawn.calls) == 1, 'after a reboot the queue is resumed by a fresh scheduler'
+    assert len(rebooted.spawn.calls) == 1, 'after a reboot a fresh scheduler resumes what this box holds'
 
 
 def test_a_pause_is_a_marker_the_scheduler_reads_and_no_scheduler_is_started_under_it(tmp_path, monkeypatch):
@@ -932,9 +929,9 @@ def test_a_pause_is_a_marker_the_scheduler_reads_and_no_scheduler_is_started_und
     daemon.poll_once(git=True)
     hold = os.path.join(daemon.runs_dir(), daemon_module.HOLD_RELATIVE)
     assert os.path.exists(hold) and daemon.spawn.calls == []
-    assert bus.status[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
-    assert bus.status[-1]['at_a_glance']['queued'][1:] == ['b1 training | x (1 arm)']
-    assert bus.status[-1]['ledger'] == {'b1a-x': 'queued'}
+    assert bus.status[-1]['at_a_glance']['queued'] == ['** queue paused: nothing new will start. Set "paused": false '
+                                                       'in runtime.json on ops to resume']
+    assert bus.status[-1]['at_a_glance']['pool'] == POOL['lines'], 'the pool is shown even while paused'
     bus.runtime_text = '{}'
     daemon.poll_once(git=True)
     assert not os.path.exists(hold) and len(daemon.spawn.calls) == 1, 'lifting the hold starts it'
@@ -947,33 +944,48 @@ def test_the_runtime_knobs_at_spawn_are_the_ones_the_scheduler_gets(tmp_path, mo
     assert daemon.spawn.calls[0]['max_trainers'] == 6 and daemon.spawn.calls[0]['eval_shards'] == 10
 
 
-def test_a_job_the_scheduler_finished_is_recorded_done_and_the_daemon_publishes_no_files(tmp_path, monkeypatch):
-    """The scheduler publishes its own finished work (`tools/results_feed.py`); the daemon only records
-    which jobs the files say are finished, for the ledger and the mirrored queue."""
-    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x'), _train_spec('b1b-x')])
+def test_the_pool_is_read_every_network_cycle_and_published_whole(tmp_path, monkeypatch):
+    """`tools.claims show --json` on the env python, once per network cycle, never on the local half; its
+    lines, attention and derived ledger reach `status.json`, and its holdings block rides along."""
+    pool = dict(POOL, attention=['** laptop holds b20-w1 but its status is 3.1h old; if it is not coming back, '
+                                 '`python -m tools.claims release <id>` returns the work to the pool'])
+    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b21a-x')], pool=pool)
     daemon.poll_once(git=True)
-    runs = daemon.runs_dir()
-    os.makedirs(runs)
-    for name in ('b1a-x.png', 'b1a-x.md', 'b1a-x_checkpoint_evals.json', 'b1b-x.png', 'b1ab-other.png'):
-        open(os.path.join(runs, name), 'w').close()
-    _finished_arm(daemon, 'b1a-x')
-    _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']},
-                                       {'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x']}])
+    assert len(daemon.run_command.pool_calls) == 1
+    argv, env = daemon.run_command.pool_calls[0]
+    assert argv == ['/py', '-m', 'tools.claims', 'show', '--json']
+    assert env['PYTHONPATH'] == daemon.host['SNEK_DIR'] and env['SNEK_BOX'] == 'desktop'
+    status = bus.status[-1]
+    assert status['at_a_glance']['pool'] == POOL['lines']
+    assert status['at_a_glance']['attention'] == pool['attention']
+    assert status['ledger'] == POOL['ledger']
+    assert status['pool']['held'] == POOL['held'] and status['pool']['heads'] == POOL['heads']
     daemon.poll_once(git=False)
-    assert daemon.state['published'] == {} and set(daemon.state['running']) == {'b1a-x', 'b1b-x'}
-    _scheduler_status(daemon, running=[{'id': 'b1b-x', 'type': 'train', 'policy': 'b1b-x', 'policies': ['b1b-x']},
-                                       {'id': 'b1-stageb', 'type': 'eval', 'policies': ['b1a-x']}],
-                      queued_ids=['b1-hof5000'])
+    assert len(daemon.run_command.pool_calls) == 1, 'the local half does not read the bus'
+
+
+def test_a_pool_read_failure_keeps_the_last_view_and_says_so(tmp_path, monkeypatch):
+    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b21a-x')])
     daemon.poll_once(git=True)
-    assert list(daemon.state['published']) == ['b1a-x']
-    assert bus.results == [], 'the daemon pushes no files: the scheduler did'
-    assert bus.status[-1]['ledger'] == {'b1a-x': 'done', 'b1b-x': 'running', 'b1-stageb': 'running',
-                                        'b1-hof5000': 'queued'}
-    assert bus.status[-1]['running'][1]['id'] == 'b1-stageb'
-    _finished_arm(daemon, 'b1b-x')
-    _scheduler_status(daemon, running=[], queued_ids=[])
-    daemon.poll_once(git=False)
-    assert sorted(daemon.state['published']) == ['b1-stageb', 'b1a-x', 'b1b-x']
+    daemon.run_command.pool_rc = 1
+    daemon.poll_once(git=True)
+    assert bus.status[-1]['at_a_glance']['pool'] == POOL['lines'], 'the last view stands'
+    assert any('could not read the shared queue' in line for line in bus.status[-1]['at_a_glance']['attention'])
+    daemon.run_command.pool_rc = 0
+    daemon.poll_once(git=True)
+    assert not any('could not read' in line for line in bus.status[-1]['at_a_glance']['attention'])
+
+
+def test_a_malformed_spec_is_recorded_once_and_the_rest_of_the_queue_goes_on(tmp_path, monkeypatch):
+    daemon, bus = _box(tmp_path, monkeypatch, [
+        {'project': 'snek2', 'id': 'b46a-old', 'type': 'train', 'policy': 'b46a-old'},   # the stale snek2 spec
+        _train_spec('b1b-x')])
+    daemon.poll_once(git=True)
+    assert daemon.ledger['b46a-old']['state'] == 'failed'
+    lines = bus.status[-1]['at_a_glance']['attention']
+    assert any('b46a-old is malformed' in line for line in lines)
+    assert bus.status[-1]['ledger']['b46a-old'] == 'failed'
+    assert len(daemon.spawn.calls) == 1, 'the good spec still gets a scheduler'
 
 
 def test_every_network_cycle_builds_the_site_and_a_trigger_forces_it(tmp_path, monkeypatch):
@@ -995,19 +1007,6 @@ def test_every_network_cycle_builds_the_site_and_a_trigger_forces_it(tmp_path, m
     assert any('site build failed' in line for line in bus.status[-1]['at_a_glance']['attention'])
 
 
-def test_a_job_seen_running_before_a_restart_is_still_recorded_done_after_it(tmp_path, monkeypatch):
-    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
-    daemon.poll_once(git=True)
-    _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
-    daemon.poll_once(git=False)
-    _finished_arm(daemon, 'b1a-x')
-    monkeypatch.setattr(launch, 'pid_alive', lambda pid: False)     # scheduler and daemon both gone
-    again = daemon_module.Daemon(daemon.host)
-    again.spawn = Spawns()
-    again.poll_once(git=False)
-    assert list(again.state['published']) == ['b1a-x']
-
-
 def test_status_carries_the_schedulers_glance_its_attention_and_the_laptop(tmp_path, monkeypatch):
     laptop = json.dumps({'iso': '2026-09-05T11:00:00', 'at_a_glance': {'running': ['b16 | kl | training 3% (8 arms)'],
                                                                         'queued': [], 'attention': []}})
@@ -1019,8 +1018,8 @@ def test_status_carries_the_schedulers_glance_its_attention_and_the_laptop(tmp_p
     glance = bus.status[-1]['at_a_glance']
     assert glance['running'] == ['b1 | x | training 50% (2 arms)']
     assert glance['attention'] == ['** b1-stageb failed (exit 1); marked, not retried']
+    assert glance['pool'] == POOL['lines'], "the daemon's own read of the pool, not the scheduler's last event"
     assert glance['laptop_running'] == ['b16 | kl | training 3% (8 arms)'] and glance['laptop_iso'] == '2026-09-05T11:00:00'
-    assert bus.status[-1]['ledger']['b1-stageb'] == 'failed'
     assert bus.status[-1]['scheduler']['status_iso'] == '2026-09-05T12:00:00'
     assert 'counts' not in bus.status[-1] and bus.status[-1]['head'] in ('aaaaaaaaaaaa', 'bbbbbbbbbbbb')
 
@@ -1032,19 +1031,9 @@ def test_a_stale_status_file_from_a_dead_scheduler_is_not_shown_as_running(tmp_p
     daemon.scheduler.returncode = -9
     daemon.poll_once(git=True)
     assert bus.status[-1]['at_a_glance']['running'] == [] and bus.status[-1]['running'] == []
-    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x (1 arm)'], 'the arm is short of its cap'
+    assert bus.status[-1]['at_a_glance']['queued'] == [], 'what is queued is the pool, shown under pool'
+    assert bus.status[-1]['at_a_glance']['pool'] == POOL['lines']
     assert any('the scheduler exited -9' in line for line in bus.status[-1]['at_a_glance']['attention'])
-
-
-def test_an_eval_the_old_daemon_already_ran_gets_a_done_marker_so_the_scheduler_skips_it(tmp_path, monkeypatch):
-    ledger = {'b1-hof5000': {'state': 'done', 'type': 'eval', 'finished': 1.0},
-              'b1a-x': {'state': 'done', 'type': 'train', 'finished': 1.0}}
-    daemon, bus = _box(tmp_path, monkeypatch, [
-        {'project': 'snek3', 'id': 'b1-hof5000', 'type': 'eval', 'policies': ['b1a-x'], 'eval_args': ['--pass', 'hof5000']},
-        _train_spec('b1a-x'), _train_spec('b1b-x')], ledger=ledger)     # b1b-x keeps the batch live
-    daemon.poll_once(git=True)
-    assert os.path.exists(os.path.join(launch.queue_dir(daemon.host), 'b1', '.done-b1-hof5000'))
-    assert bus.status[-1]['ledger']['b1-hof5000'] == 'done' and bus.status[-1]['ledger']['b1a-x'] == 'done'
 
 
 # --- actions: deploy and restart over the bus -------------------------------------------------------
@@ -1055,9 +1044,24 @@ def test_deploy_and_restart_are_job_types_that_take_no_work_fields():
     assert parse_job(json.dumps({'project': 'snek3', 'id': 'r1', 'type': 'restart'})).category == 'action'
     assert parse_job(json.dumps({'project': 'snek3', 'id': 'd2', 'type': 'deploy', 'restart': True})).restart is True
     for bad in ({'type': 'deploy', 'restart': 'yes'}, {'type': 'restart', 'restart': True},
-                {'type': 'deploy', 'policy': 'x'}, {'type': 'restart', 'env': {'A': '1'}}):
+                {'type': 'deploy', 'policy': 'x'}, {'type': 'restart', 'env': {'A': '1'}},
+                {'type': 'deploy', 'box': 'laptop'}):
         with pytest.raises(JobError):
             parse_job(json.dumps(dict({'project': 'snek3', 'id': 'a'}, **bad)))
+
+
+def test_a_spec_may_be_pinned_to_a_box_and_the_pin_reaches_the_scheduler():
+    job = parse_job(json.dumps({'project': 'snek3', 'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x',
+                                'max_steps': 10, 'box': 'laptop'}))
+    assert job.box == 'laptop' and launch.materialise(job)['box'] == 'laptop'
+    assert 'box' not in launch.materialise(parse_job(json.dumps(
+        {'project': 'snek3', 'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'max_steps': 10})))
+    eval_job = parse_job(json.dumps({'project': 'snek3', 'id': 'b1-hof', 'type': 'eval', 'policies': ['b1a-x'],
+                                     'box': 'desktop'}))
+    assert launch.materialise(eval_job)['box'] == 'desktop'
+    with pytest.raises(JobError):
+        parse_job(json.dumps({'project': 'snek3', 'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x',
+                              'max_steps': 10, 'box': 'the-claw-den'}))
 
 
 def test_a_deploy_that_changes_the_daemon_merges_records_publishes_and_stops_for_systemd(tmp_path, monkeypatch):
@@ -1074,7 +1078,6 @@ def test_a_deploy_that_changes_the_daemon_merges_records_publishes_and_stops_for
     assert record['output'] == ['HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; kept 0 pictures']
     assert daemon.stop and 'deploy-1' in daemon.restart_requested
     assert daemon.spawn.calls == [], 'the poll ended at the restart'
-    assert _queue_files(daemon) == ['b1/b1a-x.json'], 'actions never reach the scheduler'
     assert bus.status[-1]['ledger']['deploy-1'] == 'done'
     assert bus.status[-1]['head'] == 'bbbbbbbbbbbb'
     assert commands.calls[1][-2:] == ['-m', 'daemon.deploy']
@@ -1122,80 +1125,3 @@ def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated
     again.spawn = Spawns()
     again.poll_once(git=True)
     assert not again.stop and again.restart_requested is None
-
-
-def test_a_dead_schedulers_unfinished_arm_is_not_recorded_done_and_its_batch_is_resumed(tmp_path, monkeypatch):
-    """2026-09-05: a scheduler death mid-arm published the arm as a result, every id of its batch was
-    then "published", the batch left the mirrored queue for good and no scheduler was started."""
-    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
-    daemon.poll_once(git=True)
-    _finished_arm(daemon, 'b1a-x', step=3)                       # 3 of 10: mid-training
-    _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
-    daemon.poll_once(git=False)
-    daemon.scheduler.returncode = -9                               # OOM, kill -9, a reboot
-    daemon.poll_once(git=True)
-    assert daemon.state['published'] == {}, 'an arm short of its cap is not a result'
-    assert 'b1a-x' not in daemon.state['running'], 'forgotten until the next scheduler shows it running'
-    daemon.poll_once(git=True)
-    assert 'b1a-x' in daemon.state['specs'], 'the batch stays in the queue'
-    assert bus.status[-1]['at_a_glance']['queued'] == ['b1 training | x (1 arm)']
-    assert len(daemon.spawn.calls) == 1, 'inside the backoff, not yet'
-    daemon.state['spawned'] -= daemon_module.RESPAWN_BACKOFF_SECONDS
-    daemon.poll_once(git=False)
-    assert len(daemon.spawn.calls) == 2, 'work pending and nothing running it: a scheduler is started'
-    # the same for a crashed arm under a live scheduler: not a result, resumed by the next scheduler
-    _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
-    daemon.poll_once(git=False)
-    _scheduler_status(daemon, running=[])
-    daemon.poll_once(git=False)
-    assert daemon.state['published'] == {}
-    _finished_arm(daemon, 'b1a-x')
-    _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
-    daemon.poll_once(git=False)
-    _scheduler_status(daemon, running=[])
-    daemon.poll_once(git=False)
-    assert list(daemon.state['published']) == ['b1a-x'], 'at its cap it is'
-
-
-def test_a_pass_is_a_result_only_with_every_arms_merged_file(tmp_path, monkeypatch):
-    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x'), _train_spec('b1b-x')])
-    daemon.poll_once(git=True)
-    runs = daemon.runs_dir()
-    os.makedirs(runs, exist_ok=True)
-    pass_job = {'id': 'b1-hof5000', 'type': 'eval', 'policies': ['b1a-x', 'b1b-x']}
-    _scheduler_status(daemon, running=[pass_job])
-    daemon.poll_once(git=False)
-    open(os.path.join(runs, 'b1a-x_checkpoint_evals_hof5000.json'), 'w').close()
-    _scheduler_status(daemon, running=[])
-    daemon.poll_once(git=False)
-    assert daemon.state['published'] == {}, 'one arm\'s file is a pass in progress'
-    _scheduler_status(daemon, running=[pass_job])
-    daemon.poll_once(git=False)
-    open(os.path.join(runs, 'b1b-x_checkpoint_evals_hof5000.json'), 'w').close()
-    _scheduler_status(daemon, running=[])
-    daemon.poll_once(git=False)
-    assert list(daemon.state['published']) == ['b1-hof5000']
-
-
-def test_a_live_schedulers_stale_status_is_no_information(tmp_path, monkeypatch):
-    """A new scheduler that has not written yet leaves the previous one's file: nothing is published
-    off it, and nothing is forgotten either."""
-    daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')])
-    daemon.poll_once(git=True)
-    _finished_arm(daemon, 'b1a-x')
-    _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
-    daemon.poll_once(git=False)
-    path = os.path.join(daemon.runs_dir(), daemon_module.STATUS_RELATIVE)
-    with open(path) as handle:
-        stale = json.load(handle)
-    stale['pid'], stale['running'] = 1, []
-    with open(path, 'w') as handle:
-        json.dump(stale, handle)
-    daemon.poll_once(git=False)
-    assert daemon.state['published'] == {} and 'b1a-x' in daemon.state['running']
-
-
-def test_the_pass_file_labels_are_the_close_outs():
-    from tools import closeout
-    assert daemon_module.PASS_FILE_LABELS == {name: closeout.PASSES[name]['label'] for name in daemon_module.PASS_FILE_LABELS}
-    assert set(daemon_module.PASS_FILE_LABELS) == set(closeout.CHAIN)

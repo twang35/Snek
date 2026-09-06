@@ -31,6 +31,7 @@ import time
 from desktop.daemon import gitbus
 from env import constants
 from tools import publish_pages
+from tools import live_runs
 from tools import viewer_manifest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -135,6 +136,29 @@ def prune_build_dir(build_dir):
     return removed
 
 
+FEED_BOXES = {'results': 'desktop', 'laptop-results': 'laptop'}
+
+
+def place_boxes(repo, remote, feeds, runs_dir, build_dir):
+    """Which box each arm ran on, for the manifest: the feed that carries the arm's own job directory
+    names the box, and an arm live in this box's registry is this box's (`SNEK_BOX`). Written to
+    `build_dir/.live/boxes.json` (`viewer_manifest.BOXES_PATH`)."""
+    mapping = {}
+    for feed in feeds:
+        head = _rev(repo, '{0}/{1}'.format(remote, feed))
+        if head is None:
+            continue
+        for line in _git(['ls-tree', '--name-only', head, 'results/'], cwd=repo).splitlines():
+            name = line.strip().split('/')[-1]
+            if name and is_arm_file(name) and not SHARD.search(name) and '-stageb' not in name and '-hof' not in name:
+                mapping[name] = FEED_BOXES.get(feed, feed)
+    here = os.environ.get('SNEK_BOX') or 'laptop'
+    for policy, _pid in live_runs.live(runs_dir, prune=False) if os.path.isdir(runs_dir) else []:
+        mapping.setdefault(policy, here)
+    viewer_manifest.write_boxes(build_dir, mapping)
+    return mapping
+
+
 def place_status(repo, remote, build_dir):
     """The desktop's published status, for the manifest's pass states. Missing is fine."""
     text = _git(['show', '{0}/{1}:status.json'.format(remote, STATUS_BRANCH)], cwd=repo, check=False)
@@ -172,6 +196,7 @@ def build(repo=REPO, remote=REMOTE, branch=BRANCH, worktree=WORKTREE, feeds=FEED
     overlaid = overlay_runs(runs_dir, build_dir)
     pruned = prune_build_dir(build_dir)
     place_status(repo, remote, build_dir)
+    place_boxes(repo, remote, feeds, runs_dir, build_dir)
     with open(state_path, 'w') as handle:
         json.dump(state, handle)
     if not (force or flattened or overlaid or pruned):

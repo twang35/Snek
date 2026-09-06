@@ -4,11 +4,19 @@
 scheduler the laptop runs — and publishes what the scheduler does. One cycle:
 
 1. fetch `origin`; re-read `runtime.json` (clamped; a bad config keeps the last good one)
-2. run any `deploy`/`restart` action on `ops`; mirror every other spec into the local queue directory
-   the scheduler reads (`<batch>/<id>.json`), dropping specs no longer on `ops`
-3. relay `paused`/`drain` as the scheduler's hold marker; start the scheduler if it is not running and
-   the queue has changed; publish to `results` every job the scheduler has finished since the last poll
-4. publish `status.json` to `ops-status`: the scheduler's own status, the box's extras, the laptop's lines
+2. run any `deploy`/`restart` action on `ops`
+3. relay `paused`/`drain` as the scheduler's hold marker; read the shared queue's pool
+   (`tools.claims show --json`, on the env python -- the daemon imports nothing from the project); start
+   the scheduler if none is running and `ops` or `claims` moved since the last start
+4. publish `status.json` to `ops-status`: the scheduler's own status, the pool, the box's extras, the
+   laptop's lines
+
+**Since 2026-09-06 the daemon mirrors nothing and decides nothing about what the box runs.** Both boxes
+pull waves from the one queue on `ops` by claiming them on the `claims` branch (`tools/claims.py`,
+`plans/archive/shared-queue.md`); the scheduler mirrors the waves this box holds into its own queue directory,
+claims the next when it has nothing left, and exits when the pool has nothing for it. The daemon's
+"is there work" is therefore "did `ops` or `claims` move" -- a scheduler that finds nothing to claim
+exits in seconds -- plus the box's own unfinished holdings, which the pool view names.
 
 The loop body is wrapped so a bad job, a transient git error or a malformed config can never kill the
 daemon — in normal operation the box has no ssh backstop, so **staying up is the first requirement.**
@@ -19,9 +27,8 @@ which case the next spawn resumes every arm from its checkpoint and every pass f
 because the scheduler's state is the filesystem (`tools/scheduler.py`). That is the whole recovery.
 
 What the daemon remembers is one small file, `state.json` beside the ledger: the scheduler's pid and
-boot, the queue signature it was last started on, the jobs it saw running, and the ids it has
-published. The ledger file stays for actions and malformed specs, and as the archive of the 400 jobs
-the daemon ran before this change.
+boot, and the heads of `ops` and `claims` it was last started on. The ledger file stays for actions and
+malformed specs, and as the archive of the 400 jobs the daemon ran before 2026-09-05.
 """
 
 import json
@@ -43,11 +50,10 @@ PHASE_NAMES = {'stageb': 'stage B', 'hof5000': 'hof5000', 'hof30k': 'hof30k'}
 # path; the daemon cannot import it (base python) and pins it here.
 STATUS_RELATIVE = os.path.join('.live', '.status.json')
 HOLD_RELATIVE = os.path.join('.live', '.paused')
-# The merged file each pass of the chain writes per arm, `<policy>_checkpoint_evals[_<label>].json`:
-# `tools/closeout.py`'s `PASSES[...]['label']`, pinned equal by a test. What says a pass is finished.
-PASS_FILE_LABELS = {'stageb': None, 'hof5000': 'hof5000', 'hof30k': 'hof30k'}
 # A scheduler that exits with work pending is not relaunched sooner than this unless a trigger asks.
 RESPAWN_BACKOFF_SECONDS = 600
+# `tools.claims show --json` is a few fetches and a read; well past this it is stuck, not slow.
+POOL_TIMEOUT = 300
 
 # A site build is a manifest walk and a megabyte of copies; well past this it is stuck, not slow.
 SITE_BUILD_TIMEOUT = 900
@@ -77,10 +83,10 @@ class Daemon(object):
         self.config_notes = []
         self.ledger = self._load_json(self.host['LEDGER_PATH'])
         self.state = self._load_json(state_path(host))
-        self.state.setdefault('published', {})
-        self.state.setdefault('running', {})       # id -> policies, as last seen in the scheduler's status
-        self.state.setdefault('specs', {})         # id -> materialised spec, for publishing after the fact
-        self._seed_published_from_ledger()
+        for stale in ('published', 'running', 'specs', 'seeded'):      # the mirror's memory, gone with it
+            self.state.pop(stale, None)
+        self.pool = {}                 # the shared queue as `tools.claims show --json` last read it
+        self.pool_error = None
         self._unpushed = []        # branches with local-only commits, surfaced in status.json
         self._last_git = 0.0       # when the loop last *attempted* its network half. 0 so the first cycle does one
         self._last_spawn_failed = 0.0
@@ -115,15 +121,8 @@ class Daemon(object):
     def _save_state(self):
         self._save_json(state_path(self.host), self.state)
 
-    def _seed_published_from_ledger(self):
-        """Once: every job the old daemon finished counts as published, so the derived `ledger` view
-        keeps saying `done` for them and no eval spec still on `ops` is run a second time."""
-        if self.state.get('seeded'):
-            return
-        for job_id, record in self.ledger.items():
-            if record.get('state') == 'done' and record.get('type') in ('train', 'eval', 'smoke', 'benchmark'):
-                self.state['published'].setdefault(job_id, record.get('finished') or 0)
-        self.state['seeded'] = True
+    def box(self):
+        return self.host.get('BOX') or 'desktop'
 
     def runs_dir(self):
         return launch.runs_dir(self.host)
@@ -169,9 +168,19 @@ class Daemon(object):
             self.state['spawn_signature'] = None
         self._save_state()
 
-    def _queue_signature(self, specs):
-        return json.dumps(sorted((job_id, json.dumps(spec, sort_keys=True))
-                                 for job_id, spec in specs.items()))
+    def _queue_signature(self):
+        """What "the queue changed" means now: the heads of `ops` and `claims`. Either moving -- a spec
+        pushed, a wave claimed or released by either box -- is a reason to let a scheduler look."""
+        remote = self.host['GIT_REMOTE']
+        return json.dumps([gitbus.ref_head(self.host['REPO_PATH'], '{0}/{1}'.format(remote, self.host['OPS_BRANCH'])),
+                           gitbus.ref_head(self.host['REPO_PATH'], '{0}/{1}'.format(remote, self._claims_branch()))])
+
+    def _claims_branch(self):
+        return self.host.get('CLAIMS_BRANCH') or 'claims'
+
+    def _held_open(self):
+        """This box's claims the pool view says are not finished: work pending here."""
+        return [h for h in (self.pool.get('held') or {}).get(self.box(), []) if not h.get('done')]
 
     def _held(self):
         return bool(self.runtime.get('paused') or self.runtime.get('drain'))
@@ -192,7 +201,7 @@ class Daemon(object):
         """Starts the scheduler when there is a reason to: the queue changed since it last ran, a hold
         was lifted, or a trigger asked. Never while one is alive, never under a hold, never below the
         disk floor, and after a failed exit not for `RESPAWN_BACKOFF_SECONDS`."""
-        if self.scheduler_alive() or self._held() or not self.state.get('specs'):
+        if self.scheduler_alive() or self._held():
             self.state['was_held'] = self._held()
             return False
         free = _disk_free_gb(self.host['REPO_PATH'])
@@ -205,12 +214,12 @@ class Daemon(object):
         self.state['was_held'] = False
         since_spawn = time.time() - (self.state.get('spawned') or 0)
         recently_failed = self.state.get('last_exit') not in (None, 0) and since_spawn < RESPAWN_BACKOFF_SECONDS
-        # Work left and nothing running it -- an arm short of its cap in the mirrored queue, or a scheduler
+        # Work left and nothing running it -- a wave this box holds that is not finished, or a scheduler
         # that exited non-zero -- is a reason to start one too, not only a changed queue: before 2026-09-05
         # a scheduler that died (crash, OOM, a kill) left its batch idle until a trigger or a new spec.
         # Backed off like a failed exit, so a scheduler that cannot make progress costs one start per
         # `RESPAWN_BACKOFF_SECONDS`, never a loop.
-        needed = ((bool(self._idle_queue()) or self.state.get('last_exit') not in (None, 0))
+        needed = ((bool(self._held_open()) or self.state.get('last_exit') not in (None, 0))
                   and since_spawn >= RESPAWN_BACKOFF_SECONDS)
         if not (changed or lifted or forced or needed) or (recently_failed and not forced):
             return False
@@ -228,85 +237,49 @@ class Daemon(object):
 
     # ------------------------------------------------------------------ specs
 
-    def _mirror_specs(self):
-        """Every work spec on `ops`, written into the scheduler's queue; every id no longer there, removed.
-
-        Malformed specs are recorded `failed` in the ledger, once. A spec is rewritten only when its
-        content changed, so a queue whose files do not move gives the scheduler a stable signature.
-        An eval spec the old daemon already ran gets its `.done-<id>` marker here, so the scheduler
-        never measures it again.
-        """
-        specs, actions, marked = {}, [], False
+    def _actions(self):
+        """The `deploy`/`restart` actions on `ops`. Malformed specs are recorded `failed` in the ledger,
+        once, so a bad commit shows under `attention` and stops nothing; work specs are the scheduler's
+        (`tools/claims.py` reads them off the same ref) and are not looked at here."""
+        actions, marked = [], False
         for name, text in gitbus.read_pending_jobs(self.host):
             try:
                 job = parse_job(text, name)
-                spec = launch.materialise(job)
-            except (JobError, ValueError) as error:
+            except JobError as error:
                 job_id = name[:-5] if name.endswith('.json') else name
                 if self.ledger.get(job_id, {}).get('state') != 'failed':
                     self.ledger[job_id] = {'state': 'failed', 'type': 'unknown',
                                            'error': str(error), 'finished': time.time()}
                     marked = True
                 continue
-            if spec is None:
+            if job.category == 'action':
                 actions.append(job)
-                continue
-            specs[job.id] = spec
         if marked:
             self._save_ledger()
-        specs = self._batches_with_work(specs)
-        root = launch.queue_dir(self.host)
-        os.makedirs(root, exist_ok=True)
-        present = {}
-        for batch in sorted(os.listdir(root)):
-            folder = os.path.join(root, batch)
-            if not os.path.isdir(folder):
-                continue
-            for name in os.listdir(folder):
-                if name.endswith('.json') and not name.startswith('.'):
-                    present[name[:-5]] = os.path.join(folder, name)
-        for job_id, spec in specs.items():
-            folder = os.path.join(root, batch_of(job_id))
-            path = os.path.join(folder, job_id + '.json')
-            text = json.dumps(spec, indent=1, sort_keys=True)
-            os.makedirs(folder, exist_ok=True)
-            current = present.pop(job_id, None)
-            if current and current != path:
-                os.remove(current)                 # a batch renamed; one home per spec
-            try:
-                with open(path) as handle:
-                    unchanged = handle.read() == text
-            except OSError:
-                unchanged = False
-            if not unchanged:
-                with open(path, 'w') as handle:
-                    handle.write(text)
-            if spec['type'] == 'eval' and job_id in self.state['published']:
-                marker = os.path.join(folder, '.done-' + job_id)
-                if not os.path.exists(marker):
-                    with open(marker, 'w') as handle:
-                        handle.write('published before the scheduler; not run again\n')
-        for job_id, path in present.items():       # dequeued on ops: gone here too
-            try:
-                os.remove(path)
-            except OSError:
-                pass
-        self.state['specs'] = specs
-        return specs, actions
+        return actions
 
-    def _batches_with_work(self, specs):
-        """Only the batches that still have a job to run, but **every spec of those batches**.
-
-        `ops` never forgets a spec: every arm of b7-b13 is still in `queue/pending/`, finished for
-        days. The scheduler decides an arm is finished from its `_evals.json` in the runs directory,
-        and a batch whose files predate `desktop/runs/` (2026-09-03) has none there — mirroring it
-        would retrain it. So a batch with every job published is not mirrored at all. A batch with
-        one job left is mirrored whole, finished arms included, so the scheduler's waves line up with
-        the ones already measured and their pass ids (`b15-stageb-w3`) mean the same wave.
-        """
-        published = self.state['published']
-        live = {batch_of(job_id) for job_id in specs if job_id not in published}
-        return {job_id: spec for job_id, spec in specs.items() if batch_of(job_id) in live}
+    def _read_pool(self):
+        """The shared queue's view, from `tools.claims show --json` on the env python: unclaimed work,
+        each box's holdings (and whether they are finished), the lines and attention for the status, and
+        the derived `ledger` the viewer reads. It fetches `ops`, `claims`, both feeds and both statuses
+        itself. A failure keeps the last view and says so in `config_notes`."""
+        argv = [self.host['PYTHON_BIN'], '-m', 'tools.claims', 'show', '--json']
+        env = dict(os.environ, **launch.scheduler_env(self.host, self.runtime))
+        env['PYTHONPATH'] = self.host['SNEK_DIR']
+        try:
+            result = self.run_command(argv, cwd=self.host['SNEK_DIR'], env=env, text=True,
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=POOL_TIMEOUT)
+            if result.returncode != 0:
+                raise RuntimeError('exit {0}: {1}'.format(result.returncode, (result.stderr or '').strip()[-300:]))
+            view = json.loads(result.stdout or '{}')
+            if not isinstance(view, dict):
+                raise RuntimeError('not a JSON object')
+        except (OSError, ValueError, subprocess.SubprocessError, RuntimeError) as error:
+            self.pool_error = 'could not read the shared queue ({0}); showing the last view'.format(error)
+            return self.pool
+        self.pool_error = None
+        self.pool = view
+        return view
 
     # -------------------------------------------------------------------- loop
 
@@ -338,13 +311,13 @@ class Daemon(object):
             gitbus.fetch_laptop_status(self.host)
             self._unpushed = gitbus.push_unpushed(self.host)
         self._apply_runtime()
-        specs, actions = self._mirror_specs()
-        self._run_actions(actions)
+        self._run_actions(self._actions())
         if self.stop:
             return
         self._relay_hold()
-        self._track_finished()
-        self._maybe_spawn(self._queue_signature(specs), forced=forced)
+        if git:
+            self._read_pool()           # fetches `claims` and the feeds too; the signature reads them after
+        self._maybe_spawn(self._queue_signature(), forced=forced)
         self._save_state()
         if git:
             self._build_site(forced=forced)
@@ -431,60 +404,6 @@ class Daemon(object):
 
     # ------------------------------------------------------------- results
 
-    def _track_finished(self):
-        """Records every job the scheduler has finished since the last poll; the scheduler itself
-        published its files (`tools/results_feed.py`), so this is bookkeeping only.
-
-        A job is finished when it was in the scheduler's `running` list and no longer is (and is not
-        queued) **and the files say it finished** -- an arm at its cap, a pass with every arm's merged
-        file, an eval spec with its marker. A dead scheduler's arms (2026-09-05: recorded mid-training,
-        and their batch, every id now "done", dropped from the queue for good) and a crashed arm are
-        forgotten here and seen running again when the next scheduler resumes them. What is recorded
-        under `state['published']` is what keeps a finished batch out of the mirrored queue and shows
-        as `done` in the ledger.
-        """
-        status = self._scheduler_status()
-        alive = self.scheduler_alive()
-        if alive and status.get('pid') != self.state.get('scheduler_pid'):
-            return                  # a live scheduler that has not written its status yet: no information
-        now_running = {}
-        if alive:
-            for job in status.get('running') or []:
-                if job.get('id'):
-                    now_running[job['id']] = [str(name) for name in (job.get('policies') or [job.get('policy')]) if name]
-        queued = set(status.get('queued_ids') or []) if alive else set()
-        for job_id, policies in list(self.state['running'].items()):
-            if job_id in now_running or job_id in queued:
-                continue
-            if self._finished(job_id, policies):
-                self.state['published'][job_id] = time.time()
-            else:
-                sys.stderr.write('{0} left the scheduler unfinished; not recorded, will be resumed\n'.format(job_id))
-            del self.state['running'][job_id]
-        self.state['running'].update(now_running)
-
-    def _finished(self, job_id, policies):
-        """Whether the files say `job_id` is done. Unknown -- a spec no longer on ops, an id of no
-        known shape -- counts as done, which is the pre-2026-09-05 rule and publishes what there is."""
-        runs = self.runs_dir()
-        pass_name = pass_of(job_id)
-        if pass_name:
-            label = PASS_FILE_LABELS[pass_name]
-            return all(os.path.exists(os.path.join(
-                runs, '{0}_checkpoint_evals{1}.json'.format(policy, '_' + label if label else '')))
-                for policy in policies)
-        spec = self.state.get('specs', {}).get(job_id)
-        if spec is None:
-            return True
-        if spec['type'] == 'eval':
-            folder = os.path.join(launch.queue_dir(self.host), batch_of(job_id))
-            return any(os.path.exists(os.path.join(folder, prefix + job_id)) for prefix in ('.done-', '.failed-'))
-        try:
-            with open(os.path.join(runs, spec['policy'] + '_evals.json')) as handle:
-                return int(json.load(handle)['summary']['step']) >= int(spec['max_steps'])
-        except (OSError, KeyError, TypeError, ValueError):
-            return False
-
     def _build_site(self, forced=False):
         """Rebuilds the GitHub Pages viewer from both boxes' results feeds and this box's live charts
         (`tools/site_build.py`, on the env python, as the scheduler is run) and snapshot-pushes the
@@ -509,63 +428,11 @@ class Daemon(object):
         if rc != 0:
             sys.stderr.write('site build failed (rc {0}): {1}\n'.format(rc, out[-2000:]))
 
-    def _failed_ids(self, status):
-        """Ids the scheduler's attention lines name as failed passes."""
-        failed = []
-        for line in (status.get('at_a_glance') or {}).get('attention') or []:
-            match = re.match(r'\*\* (\S+) failed', str(line))
-            if match:
-                failed.append(match.group(1))
-        return failed
-
-    def _idle_queue(self):
-        """The queued job dicts when no scheduler is running: every mirrored arm short of its cap.
-
-        Passes are not forecast here — the scheduler is what knows a wave's passes, and it says so in
-        its own status the moment it runs. This keeps a paused or idle box's queue visible.
-        """
-        runs = self.runs_dir()
-        queued = []
-        for job_id, spec in sorted(self.state.get('specs', {}).items()):
-            if spec['type'] != 'train':
-                continue
-            try:
-                with open(os.path.join(runs, spec['policy'] + '_evals.json')) as handle:
-                    step = int(json.load(handle)['summary']['step'])
-            except (OSError, KeyError, TypeError, ValueError):
-                step = None
-            if step is not None and step >= int(spec['max_steps']):
-                continue
-            queued.append({'id': job_id, 'type': 'train', 'policy': spec['policy'],
-                           'policies': [spec['policy']], 'label': spec.get('label', ''),
-                           'step': step, 'max_steps': spec['max_steps']})
-        return queued
-
-    def _ledger_view(self, status, alive):
-        """`id -> state`, for the tools that read one: `done` for what is published, `running` and
-        `queued` from the scheduler, `failed` for a pass it marked. Not for a human, who reads
-        `at_a_glance` (user, 2026-09-05)."""
-        view = {}
-        for job_id, record in self.ledger.items():          # actions, malformed specs, the old archive
-            if record.get('state') in TERMINAL:
-                view[job_id] = record['state']
-        for job_id in self.state['published']:
-            view[job_id] = 'done'
-        if alive:
-            for job_id in status.get('queued_ids') or []:
-                view[job_id] = 'queued'
-            for job in status.get('running') or []:
-                if job.get('id'):
-                    view[job['id']] = 'running'
-        else:
-            for job in self._idle_queue():
-                view.setdefault(job['id'], 'queued')
-        for job_id in self._failed_ids(status):
-            view[job_id] = 'failed'
-        return view
-
     def _attention(self, status):
         lines = []
+        if self.pool_error:
+            lines.append('** ' + self.pool_error)
+        lines.extend(str(line) for line in self.pool.get('attention') or [])
         for branch in self._unpushed:
             lines.append('** {0} has local-only commit(s): results are on the box but not on '
                          'github. Retried every network cycle.'.format(branch))
@@ -595,8 +462,10 @@ class Daemon(object):
             glance = dict(status.get('at_a_glance') or {})
             running = list(status.get('running') or [])
         else:
-            glance = build_at_a_glance([], self._idle_queue(), {})
+            glance = build_at_a_glance([], [], {})
             running = []
+        # The pool is the daemon's own read (this network cycle), fresher than the scheduler's last event.
+        glance['pool'] = list(self.pool.get('lines') or glance.get('pool') or [])
         glance['attention'] = self._attention(status)
         notice = hold_notice([flag for flag in HOLD_FLAGS if self.runtime.get(flag)])
         if notice:
@@ -613,7 +482,11 @@ class Daemon(object):
             'runtime': self.runtime,
             'config_notes': self.config_notes,
             'running': running,
-            'ledger': self._ledger_view(status, alive),
+            # Derived, for `tools/viewer_manifest.py`'s pass states: done from the feeds, running from the
+            # statuses, queued for the rest (`tools.claims.ledger`). Actions and malformed specs from ours.
+            'ledger': dict({job_id: record['state'] for job_id, record in self.ledger.items()
+                            if record.get('state') in TERMINAL}, **(self.pool.get('ledger') or {})),
+            'pool': {key: self.pool.get(key) for key in ('unclaimed', 'held', 'status_ages', 'heads')},
             'disk_free_gb': _disk_free_gb(self.host['REPO_PATH']),
             'head': self._head(),
             'site': self.site,

@@ -31,6 +31,9 @@
   .st-queued { color:#7ab8ff; border-color:#7ab8ff; }
   .st-pending { color:#e6b422; border-color:#e6b422; }
   .st-none, .st-upstream { color:var(--dim); border-color:#444; }
+  .cell .cap .box { font-size:10px; padding:0 4px; border-radius:3px; border:1px solid #444; color:var(--dim); }
+  .cell .cap .box-laptop { border-color:#7ab8ff55; color:#7ab8ff; }
+  .cell .cap .box-desktop { border-color:#4c995; color:#4c9; }
   .cell.missing .st { display:inline-block; margin-top:.4em; }
   .group-start { box-shadow: inset 3px 0 0 var(--hi); }
   .reference { box-shadow: inset 3px 0 0 #e6b422; }
@@ -184,6 +187,9 @@
   }
   function cap(a) {
     var parts = ['<b>' + a.policy + '</b>', badge(a)];
+    // Which box trained the arm: a batch can span both (one queue, waves claimed by either box), and
+    // the two boxes' steps/s differ enough that a split batch's stage-A traces would read as an effect.
+    if (a.box) parts.push('<span class="box box-' + a.box + '">' + a.box + '</span>');
     if (state.mode === 'k') {
       parts.push('<span>rows <em>' + fmt(a.hof30k_rows) + '</em></span>');
       parts.push('<span>mean /30k <em>' + fmt(a.hof30k_mean) + '</em></span>');

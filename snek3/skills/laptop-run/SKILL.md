@@ -1,6 +1,6 @@
 ---
 name: laptop-run
-description: Start a snek3 training, a batch of arms, or a stage-B close-out on the laptop. Use for "train X here", "launch this batch locally", "run stage B on the laptop", "smoke test the trainer". For the desktop box use desktop-batch instead.
+description: Start a snek3 training, a batch of arms, or a stage-B close-out on the laptop. Use for "train X here", "launch this batch locally", "run stage B on the laptop", "smoke test the trainer". To queue a batch for either box use queue-batch.
 ---
 
 # Launch on the laptop
@@ -23,13 +23,12 @@ Run from `snek3/`.
 
 ## Launch through the queue, not by hand
 
-**Arms are launched by dropping their specs into `logs/laptop-queue/<batch>/` and starting the
-scheduler** ("Queueing batches here" below) — for a batch dequeued from the desktop *and* for arms written
-for the laptop: write the specs (`queue/examples/` on `ops` has the shape; `tools.sweep_specs` writes a
-batch's) and queue them. The scheduler is what publishes the laptop's state to the `laptop-status` branch,
-which the desktop folds into `ops-status` as `laptop_running` / `laptop_queued`, so an arm started with
-a bare `train.py` is invisible to every status read. The bare command below is for a
-smoke or a one-off check, not for an arm anyone will read about later.
+**Arms are queued on the shared queue (`queue-batch`: specs on `ops`, pinned `"box": "laptop"` if they
+must run here) and the laptop's scheduler claims and runs them** ("The laptop's scheduler" below). The
+scheduler is what publishes the laptop's state to the `laptop-status` branch, which the desktop folds
+into `ops-status` as `laptop_running` / `laptop_queued`, so an arm started with a bare `train.py` is
+invisible to every status read and to the other box's claims. The bare command below is for a smoke or
+a one-off check, not for an arm anyone will read about later.
 
 ## Train (one-off only)
 
@@ -57,60 +56,49 @@ set** — `SNEK_CHASE_SAFE_*`, `SNEK_FREE_SPACE_*`, `SNEK_FOOD_DISTANCE_REWARD`,
 before the trainer's config exists. That is exactly the set a shaping experiment is about.
 `reward config:` is the line that covers them.
 
-## A whole batch of desktop specs
-
-To run a batch here that was written for the desktop -- dequeued from `ops` to shorten the box's
-queue -- do not launch the arms by hand. `tools.scheduler` takes the
-daemon's own `queue/pending/*.json` specs and runs them the way the daemon would: waves of 8, each
-arm with the spec's `env` and `max_steps`, each wave followed by its own `tools.closeout` named
-`<batch>-stageb`, `-w2`, ... and then the wave's
-`hof5000` and `hof30k` passes over the same arms (`<batch>-hof5000`, `<batch>-hof30k`, `-w2`, ...),
-each only if the pass before it exited 0. It skips an arm already at its cap, waits for an arm
-already live here instead of relaunching it, and never puts a ninth trainer on the box.
-`--no-hof` stops after stage B; `--no-stage-b` trains only.
+## The laptop's scheduler
 
 ```
-mkdir -p logs/<batch>specs && for f in $(git ls-tree --name-only origin/ops snek3/desktop/queue/pending/ | grep '/<batch>[a-z]'); do
-    git show "origin/ops:$f" > logs/<batch>specs/$(basename $f); done
-PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.scheduler logs/<batch>specs/ \
-    > logs/<batch>-batch.log 2>&1 &
-```
-
-Rerunning the same command after a kill or a reboot is the recovery procedure: finished arms are
-skipped, and so is any pass whose merged file every arm of the wave already has -- a shard resumes
-only from its own shard files and the merge deletes them, so without that skip a rerun would
-re-measure a finished wave's stage B from scratch. Then check the config of one arm per wave with the
-two greps above, as for any launch.
-
-### Queueing batches here: `--queue`, not a daemon
-
-```
-mkdir -p logs/laptop-queue/<batch> && for f in $(git ls-tree --name-only origin/ops snek3/desktop/queue/pending/ | grep '/<batch>[a-z]'); do
-    git show "origin/ops:$f" > logs/laptop-queue/<batch>/$(basename $f); done
-ps -Ao pid=,command= | grep '[t]ools.scheduler' | grep -v 'zsh -c'    # a scheduler already up? then you are done
-PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.scheduler --queue logs/laptop-queue/ \
+ps -Ao pid=,command= | grep '[t]ools.scheduler' | grep -v 'zsh -c'    # one up already? then you are done
+PYTHONPATH=. nohup /opt/miniconda3/envs/snek3/bin/python -u -m tools.scheduler --shared --queue logs/laptop-queue/ \
     > logs/laptop-queue.log 2>&1 &                                       # only if none is
 ```
 
-Each subdirectory of `logs/laptop-queue/` is a batch. The scheduler publishes what it is doing to the
-`laptop-status` branch on every launch, exit and pass, every ten minutes while it waits, and once more,
-empty, as it exits (`--no-status` turns that off, for a smoke); read it with the desktop's
-`git fetch origin ops-status && git show origin/ops-status:status.json` under `laptop_running` /
-`laptop_queued`. The scheduler runs the batches in priority order -- the lowest `priority` any of a batch's specs
-carries, then name; specs within a batch by priority then id -- one at a
-time with waves and all three passes, **rescans the directory between batches** so a batch dropped in
-while another runs is picked up next, and exits when nothing there has work left. So queueing a batch
-while the scheduler is up is just the first two lines; while it is down, all four. It is not a daemon:
-nothing runs while there is no work. A batch that still reports work after it has run once -- a failed
-pass -- is left alone rather than looped on, and the log says so.
+**`--shared` is the shared queue** (`tools/claims.py`, `plans/archive/shared-queue.md`): the scheduler
+fetches `ops` and `claims`, mirrors the waves this box holds into `logs/laptop-queue/<batch>/` (each spec
+carrying its `_wave`), runs them the way the desktop does -- waves of 8, each followed by its own
+`tools.closeout` as `<batch>-stageb`, `-w2`, ... and then the wave's `hof5000` and `hof30k` over the same
+arms, each only if the pass before it exited 0 -- and **claims the next free wave, or eval spec, only when
+nothing it holds is left to run**. It exits when the pool has nothing this box may take. **The laptop takes
+part exactly while its scheduler is up**: it is not a daemon, nothing runs while there is no work, and a
+batch pushed to `ops` while it is down waits for the desktop or for the next start of this command.
+`--no-hof` stops after stage B; `--no-stage-b` trains only.
 
-`--after <pid>` still works on either form: the running process keeps its batch, the queue starts when
-it exits. **A killed scheduler leaves its arms training** (their own session) and the next scheduler
-adopts them through `runs/.live/`; a pass it was running finishes and merges on its own.
+Rerunning the same command after a kill or a reboot is the recovery procedure: the mirror is rewritten
+from the claims, finished arms are skipped, and so is any pass whose merged file every arm of the wave
+already has -- a shard resumes only from its own shard files and the merge deletes them, so without that
+skip a rerun would re-measure a finished wave's stage B from scratch. **A killed scheduler leaves its arms
+training** (their own session) and the next scheduler adopts them through `runs/.live/`; a pass it was
+running finishes and merges on its own. Then check the config of one arm per wave with the two greps
+above, as for any launch.
 
-**An eval spec in a batch directory runs too**, once, after the batch's waves — a hand hof pass, a
-`one` re-measure — as the `tools.closeout` command it spells, and with the window on its charts. That
-is how a hand pass gets a window now; a `tools.closeout` typed at the shell gets none.
+The scheduler publishes what it is doing to the `laptop-status` branch on every launch, exit, claim and
+pass, every ten minutes while it waits, and once more, empty, as it exits (`--no-status` turns that off,
+for a smoke); read it with `git fetch origin ops-status && git show origin/ops-status:status.json` under
+`laptop_running` / `laptop_queued`, and the shared queue under `at_a_glance.pool`. `--after <pid>` still
+works: the running process keeps its batch, the queue starts when it exits. A batch that still reports
+work after it has run once -- a failed pass -- is left alone rather than looped on, and the log says so.
+
+**An arm training here that no claim covers** (a released wave, a bare launch of a spec on `ops`) is named
+under `attention` and left alone: a sync never kills a trainer, and it is never published from here.
+
+**`tools.scheduler <spec files or dirs>` and `--queue` without `--shared` still work** for a directory of
+specs nobody else should see -- a smoke batch -- and run it as one box's own queue, nothing claimed.
+
+**An eval spec runs too**, once, after its batch's waves — a hand hof pass, a `one` re-measure — as the
+`tools.closeout` command it spells, and with the window on its charts. That is how a hand pass gets a
+window; a `tools.closeout` typed at the shell gets none. Queue it on `ops` (`queue-batch`); this box
+claims it only if it holds every one of its policies' checkpoints.
 
 ## Stage B
 

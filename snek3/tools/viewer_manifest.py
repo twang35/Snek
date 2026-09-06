@@ -88,6 +88,11 @@ def drawdown(evals, below):
 
 LIVE_SUBDIR = os.path.join('.live', 'desktop')
 DESKTOP_STATUS = os.path.join(LIVE_SUBDIR, 'status.json')
+# Which box trained each arm (`{policy: 'desktop' | 'laptop'}`), written beside the status by whoever
+# builds the manifest's runs directory -- `tools/site_build.py` from which feed carried the arm,
+# `tools/progress_update.py` the same -- since a batch can span both boxes wave by wave
+# (`tools/claims.py`) and the two boxes' steps/s differ enough to read as an effect.
+BOXES_PATH = os.path.join('.live', 'boxes.json')
 # The pass each view shows, its file label, and the desktop job id suffix the daemon gives that pass.
 PASSES = {'b': (None, '-stageb'), 'h': ('hof5000', '-hof5000'), 'k': ('hof30k', '-hof30k')}
 STATES = ('done', 'running', 'queued', 'pending', 'none', 'upstream')
@@ -102,6 +107,22 @@ def shard_files(runs_dir, policy, label=None):
     exact = re.compile(re.escape(stem) + r'-s(\d+)of(\d+)\.json$')
     return sorted(p for p in glob.glob(os.path.join(runs_dir, stem + '-s*of*.json'))
                   if exact.search(os.path.basename(p)))
+
+
+def boxes(runs_dir):
+    """`{policy: box}` from `runs/.live/boxes.json`, or {} when nobody has written one."""
+    data = _read(os.path.join(runs_dir, BOXES_PATH)) or {}
+    return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+
+
+def write_boxes(runs_dir, mapping):
+    """Writes `{policy: box}` where `boxes` reads it. Atomic, so a manifest build mid-write reads whole."""
+    path = os.path.join(runs_dir, BOXES_PATH)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + '.partial', 'w') as handle:
+        json.dump(dict(sorted(mapping.items())), handle)
+    os.replace(path + '.partial', path)
+    return path
 
 
 def desktop_ledger(runs_dir):
@@ -179,17 +200,19 @@ def _read(path):
         return json.load(handle)
 
 
-def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset()):
+def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxes=None):
     """The manifest row for one arm, or None if it has no chart to show. `desktop` is
-    `desktop_ledger(runs_dir)` and `laptop_live` the policies training on this box; `build` passes
-    both so they are read once per manifest rather than once per arm."""
+    `desktop_ledger(runs_dir)`, `laptop_live` the policies training on this box and `arm_boxes` the
+    `boxes(runs_dir)` mapping; `build` passes all three so they are read once per manifest rather than
+    once per arm."""
     png = os.path.join(runs_dir, policy + '.png')
     if not os.path.exists(png):
         return None
     desktop = desktop if desktop is not None else desktop_ledger(runs_dir)
+    arm_boxes = arm_boxes if arm_boxes is not None else boxes(runs_dir)
     batch = batch_of(policy)
     record = {'policy': policy, 'batch': batch, 'knob': knob_of(policy),
-              'seed': seed_of(policy),
+              'seed': seed_of(policy), 'box': arm_boxes.get(policy),
               'stage_b_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals.png')),
               'hof_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof5000.png')),
               'hof30k_png': os.path.exists(os.path.join(runs_dir, policy + '_checkpoint_evals_hof30k.png'))}
@@ -275,7 +298,8 @@ def build(runs_dir=None, references_path=None):
                       if '_' not in os.path.basename(p))
     desktop = desktop_ledger(runs_dir)
     laptop_live = frozenset(policy for policy, _pid in live_runs.live(runs_dir, prune=False))
-    arms = [rec for rec in (arm_record(p, runs_dir, desktop, laptop_live) for p in policies) if rec]
+    arm_boxes = boxes(runs_dir)
+    arms = [rec for rec in (arm_record(p, runs_dir, desktop, laptop_live, arm_boxes) for p in policies) if rec]
     known = {a['policy'] for a in arms}
     refs = {batch: {'arms': [a for a in ref.get('arms', []) if a in known], 'label': ref.get('label', ''),
                     'after': ref.get('after')}

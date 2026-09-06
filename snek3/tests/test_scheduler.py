@@ -497,7 +497,7 @@ def test_the_queue_publishes_both_boxes_shape_on_every_event_and_empty_when_it_e
     assert 'b1 | x | hof30k (2 arms) | ~1m left' in running_lines
     assert 'b2 | y -- wave 1 of 1 | training 100% (1 arm)' in running_lines
     last = published.statuses[-1]
-    assert last['at_a_glance'] == {'running': [], 'queued': [], 'attention': [], 'remaining': None}
+    assert last['at_a_glance'] == {'running': [], 'queued': [], 'attention': [], 'remaining': None, 'pool': []}
     assert last['box'] == 'laptop' and last['iso'] and last['running'] == []
 
 
@@ -1216,3 +1216,117 @@ def test_a_batch_with_arms_live_here_runs_first_whatever_its_priority(tmp_path, 
     _, queued, _ = reporter.jobs(None)
     arms = [job['id'] for job in queued if job['type'] == 'train']
     assert arms == ['b20a-lanes32-seed1', 'b20b-lanes32-seed2', 'b18a-gc0-seed1'], 'the status lists the live wave first too'
+
+
+# ---------------------------------------------------------------- the shared queue
+
+def test_waves_are_numbered_by_their_claims_and_the_pass_ids_follow(box):
+    """A spec carrying `_wave` (the mirror of a shared-queue claim) belongs to that wave whatever box
+    numbered it; specs without one are chunked after. The pass ids are the wave numbers'."""
+    numbered = [dict(spec('b21i-x-seed1'), _wave=3), dict(spec('b21j-x-seed2'), _wave=3),
+                dict(spec('b21q-x-seed1'), _wave=5)]
+    assert [(n, [s['id'] for s in arms]) for n, arms in scheduler.waves(numbered, 8)] == [
+        (3, ['b21i-x-seed1', 'b21j-x-seed2']), (5, ['b21q-x-seed1'])]
+    mixed = numbered + [spec('b21z-x-seed4')]
+    assert [n for n, _ in scheduler.waves(mixed, 8)] == [3, 5, 6], 'an unnumbered spec is chunked after the last claim'
+    assert [n for n, _ in scheduler.waves([spec('a'), spec('b'), spec('c')], 2)] == [1, 2], 'the bare form as before'
+    calls = FinishingCalls(box['runs'])
+    d = driver(numbered[:2], box, calls, wave=8)
+    d.run()
+    labels = live_runs.durations(box['runs'])
+    assert [labels[p][0]['label'] for p in PASSES] == ['b21-stageb-w3', 'b21-hof5000-w3', 'b21-hof30k-w3']
+    _, queued = driver([dict(spec('b21r-x-seed2'), _wave=5)], box, calls, wave=8).jobs()
+    assert queued[0]['wave'] == 5 and queued[1]['id'] == 'b21-stageb-w5'
+
+
+class FakeShared(object):
+    """Stands in for `scheduler.SharedQueue`: `sync` mirrors whatever claims this box holds so far,
+    `claim_next` hands out the scripted records one at a time and records what it was asked."""
+
+    def __init__(self, queue_dir, specs, upcoming, box='laptop'):
+        self.queue_dir, self.specs, self.upcoming, self.box = queue_dir, specs, list(upcoming), box
+        self.held, self.syncs, self.asked = [], 0, []
+        self.warnings = []
+
+    def sync(self):
+        self.syncs += 1
+        from tools import claims
+        claims.mirror(self.queue_dir, self.specs, self.held, log=lambda m: None)
+
+    def unheld(self):
+        return list(self.warnings)
+
+    def lines(self):
+        return ['pool: {0} left'.format(len(self.upcoming))]
+
+    def claim_next(self, wave_size):
+        self.asked.append(wave_size)
+        if not self.upcoming:
+            return None
+        record = self.upcoming.pop(0)
+        self.held.append(record)
+        return record
+
+
+def test_run_shared_runs_what_it_holds_then_claims_the_next_wave_until_the_pool_is_empty(tmp_path, box):
+    from tools import claims
+    queue = str(tmp_path / 'mirror')
+    specs = {p: spec(p) for p in ('b21a-x-seed1', 'b21b-x-seed2', 'b21c-x-seed3', 'b18a-y-seed1')}
+    upcoming = [claims.wave_record('b21', 2, 'laptop', ['b21a-x-seed1', 'b21b-x-seed2']),   # w1 is the desktop's
+                claims.wave_record('b21', 3, 'laptop', ['b21c-x-seed3']),
+                claims.wave_record('b18', 1, 'laptop', ['b18a-y-seed1'])]
+    shared = FakeShared(queue, specs, upcoming)
+    calls = FinishingCalls(box['runs'])
+    published = Published()
+    make = lambda specs: driver(specs, box, calls, wave=2)
+    reporter = scheduler.Reporter(published, queue_dir=queue, make_driver=make, pool=shared.lines, extra=shared.unheld)
+    code = scheduler.run_shared(queue, make, shared, 2, reporter=reporter)
+    assert code == 0
+    trained = [e[1] for e in calls.events if e[0] == 'train']
+    assert trained == ['b21a-x-seed1', 'b21b-x-seed2', 'b21c-x-seed3', 'b18a-y-seed1']
+    passes = [entry['label'] for entry in live_runs.durations(box['runs'])['stageb']]
+    assert passes == ['b21-stageb-w2', 'b21-stageb-w3', 'b18-stageb'], 'numbered by the claims, not by position'
+    assert shared.asked == [2, 2, 2, 2], 'a claim only when nothing held is left to run, and once more to find the pool empty'
+    assert shared.syncs == 7, 'a sync at the top of every pass of the loop: one per run, one per claim'
+    assert published.glance(0)['pool'] == ['pool: 2 left'] and published.statuses[-1]['at_a_glance']['running'] == []
+    with open(os.path.join(queue, 'b21', 'b21c-x-seed3.json')) as handle:
+        assert json.load(handle)['_wave'] == 3
+
+
+def test_run_shared_leaves_a_failed_pass_alone_and_still_claims_the_next_wave(tmp_path, box):
+    from tools import claims
+    queue = str(tmp_path / 'mirror')
+    specs = {p: spec(p) for p in ('b21a-x-seed1', 'b18a-y-seed1')}
+    shared = FakeShared(queue, specs, [claims.wave_record('b21', 1, 'laptop', ['b21a-x-seed1']),
+                                       claims.wave_record('b18', 1, 'laptop', ['b18a-y-seed1'])])
+    calls = FinishingCalls(box['runs'], codes={'hof5000': 1})
+    make = lambda specs: driver(specs, box, calls, wave=2)
+    code = scheduler.run_shared(queue, make, shared, 2)
+    assert code == 1
+    assert [e[1] for e in calls.events if e[0] == 'train'] == ['b21a-x-seed1', 'b18a-y-seed1']
+    assert os.path.exists(os.path.join(queue, 'b21', '.failed-b21-hof5000')), 'marked, and the loop went on to b18'
+
+
+def test_an_arm_training_here_that_no_claim_covers_is_named_and_left_alone(tmp_path, box, monkeypatch):
+    from tools import claims
+    queue = str(tmp_path / 'mirror')
+    specs = {p: spec(p) for p in ('b21a-x-seed1', 'b21b-x-seed2')}
+    live_runs.register('b21b-x-seed2', 4242, box['runs'])
+    monkeypatch.setattr(live_runs, 'alive', lambda pid: pid == 4242)
+    monkeypatch.setattr(live_runs, 'zombie', lambda pid: False)
+
+    class Store(object):
+        repo, remote = '/nowhere', 'origin'
+        records = [claims.wave_record('b21', 1, 'laptop', ['b21a-x-seed1'])]
+
+        def sync(self):
+            return 'head'
+    monkeypatch.setattr(scheduler.gitbus, 'fetch_branch', lambda repo, remote, branch: True)
+    shared = scheduler.SharedQueue(Store(), 'laptop', queue, runs_dir=box['runs'],
+                                   read_specs=lambda: (specs, []), log=lambda m: None)
+    shared.sync()
+    assert shared.mirrored == {'b21a-x-seed1'}
+    lines = shared.unheld()
+    assert len(lines) == 1 and 'b21b-x-seed2 is training here (pid 4242) but this box holds no claim' in lines[0]
+    assert shared.lines() == ['b21 training | 1 arm unclaimed', 'laptop holds b21-w1 (1 arm)']
+    assert os.path.exists(os.path.join(box['runs'], '.live', 'b21b-x-seed2')), 'a sync never kills a trainer'

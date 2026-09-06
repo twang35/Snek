@@ -75,9 +75,9 @@ touch a run. The scheduler reopens it at its next launch; `PYTHONPATH=. python -
 
 ## 2. Desktop `the-claw-den`
 
-**Pause the queue first, or the freed slot refills within one poll (30 s).** Set `paused: true` in
+**Pause the queue first, or the scheduler relaunches the arm inside its wave.** Set `paused: true` in
 `snek3/desktop/config/runtime.json` on the `ops` branch, push, and `trigger` — see the
-`desktop-batch` skill. Then:
+`queue-batch` skill. Then:
 
 ```
 ssh the-claw-den "ps -Ao pid=,etime=,command= | grep '[t]rain.py'"
@@ -88,11 +88,27 @@ Unpause when the box should take work again. Do not restart the daemon to stop a
 launched detached with `setsid` and `KillMode=process`, so a restart leaves them running and the
 daemon re-adopts them by pid.
 
-**Expect the killed job in `attention` as `failed`.** The daemon reads the negative return code, so a
-hand-killed job records `failed` (`rc=-9`), is **not** retried, and does not auto-queue its stage B.
-That is the right outcome and it is visible rather than silent — but **to run it again you must delete
-its ledger record**, or the id counts as already measured. Say so in your report; do not leave a
-`failed` line in `attention` unexplained.
+**A killed arm short of its cap is relaunched by its scheduler**, up to three times inside its wave,
+resuming from `resume.pt` -- unless the box is paused, in which case the relaunch waits for the hold to
+lift. So "stop an arm for good" is: pause, kill, and then either remove its spec from `ops` (the
+`queue-batch` worktree) or release its wave (below) before unpausing. A close-out killed by hand is
+relaunched twice and then marked `.failed-<label>` beside the batch's specs in the box's queue mirror;
+delete the marker to retry. Say which you did in your report.
+
+## 2b. The wave's claim
+
+**A wave belongs to the box that claimed it** (`tools/claims.py`), and the claim outlives its processes:
+the box resumes the wave at its next scheduler start. Stopping the processes is therefore not stopping the
+work unless you also decide what happens to the claim:
+
+| you want | do |
+|---|---|
+| the wave to resume here later (a deploy, a reboot) | nothing: the next scheduler on this box adopts or relaunches its arms |
+| the wave to run on the other box instead | kill its arms here, then `PYTHONPATH=. python -m tools.claims release <batch>-w<N>`: the arms return to the pool unclaimed, the other box claims them as a fresh wave (numbered past this one), and **they retrain from scratch** -- a box cannot resume another's checkpoints |
+| the arms never to run again | kill them, remove their specs from `ops` (`queue-batch`), release the wave |
+
+`PYTHONPATH=. python -m tools.claims show` prints who holds what. A claim whose box has gone quiet is
+also named under `attention` after two hours (`queue-batch`, "Pin, unpin, release").
 
 ## 3. After stopping
 

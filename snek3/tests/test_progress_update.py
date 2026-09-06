@@ -1,4 +1,4 @@
-"""tools/progress_update.py: the tables, the doc surgery and the ledger reading, on synthetic data."""
+"""tools/progress_update.py: the tables, the doc surgery and the shared-queue reading, on synthetic data."""
 
 import datetime
 import json
@@ -138,32 +138,52 @@ def test_results_skeleton_is_inserted_once_above_the_first_batch():
     assert added and more.index(pu.END_MARK.format('b21')) < more.index(pu.MARK.format('b20'))
 
 
-STATUS = {'ledger': {'b20aa-k1-seed1': 'done', 'b20ab-k1-seed2': 'done', 'b20ac-k2-seed1': 'running',
-                     'b20ad-k2-seed2': 'queued', 'b20-stageb-w1': 'done', 'b20-hof30k': 'running',
-                     'b19zz-ref-seed1': 'done'}}
+def _view(specs, records, published=(), running=None):
+    """A `tools.claims.gather` view on dicts: specs on ops, claims, published ids, running ids."""
+    return {'specs': {s['id']: s for s in specs}, 'records': list(records), 'published': {p: 'desktop' for p in published},
+            'running': dict(running or {}), 'ledger': {}}
 
 
-def test_batch_state_counts_arms_and_waves_and_ignores_hof_jobs():
-    arms, waves = pu.batch_state(STATUS, 'b20')
-    assert dict(arms) == {'done': 2, 'running': 1, 'queued': 1} and dict(waves) == {'done': 1}
+def _train(policy):
+    return {'id': policy, 'type': 'train', 'policy': policy, 'max_steps': 10, 'priority': 100}
+
+
+B20 = ['b20aa-k1-seed1', 'b20ab-k1-seed2', 'b20ac-k2-seed1', 'b20ad-k2-seed2']
+VIEW = _view([_train(p) for p in B20 + ['b19zz-ref-seed1']],
+             [{'kind': 'wave', 'batch': 'b20', 'wave': 1, 'box': 'desktop', 'arms': B20[:2]},
+              {'kind': 'wave', 'batch': 'b20', 'wave': 2, 'box': 'laptop', 'arms': B20[2:3]},
+              {'kind': 'wave', 'batch': 'b19', 'wave': 1, 'box': 'laptop', 'arms': ['b19zz-ref-seed1']}],
+             published=B20[:2] + ['b20-stageb', 'b20-hof5000', 'b20-hof30k', 'b19zz-ref-seed1', 'b19-stageb',
+                                  'b19-hof5000', 'b19-hof30k'],
+             running={B20[2]: 'laptop'})
+
+
+def test_batch_counts_span_both_boxes_and_count_the_unclaimed_as_queued():
+    arms, waves = pu.batch_counts(VIEW, 'b20')
+    assert dict(arms) == {'done': 2, 'running': 1, 'queued': 1} and dict(waves) == {'done': 1, 'queued': 1}
 
 
 def test_eta_uses_the_fallback_cadence_when_no_wave_has_closed(monkeypatch):
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [])
     now = datetime.datetime(2026, 9, 3, 12, 0)
-    remaining, per_wave, finish = pu.eta(STATUS, 'b20', now=now, fallback_seconds=3600)
+    remaining, per_wave, finish = pu.eta(VIEW, 'b20', now=now, fallback_seconds=3600)
     assert remaining == 1 and per_wave == 3600 and finish == now + datetime.timedelta(hours=1)
     monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [0, 7200, 14400])
-    assert pu.eta(STATUS, 'b20', now=now)[1] == 7200
+    assert pu.eta(VIEW, 'b20', now=now)[1] == 7200
 
 
-def test_live_batches_are_those_with_an_arm_running_or_queued():
-    assert pu.live_batches(STATUS) == ['b20']
+def test_live_batches_are_those_with_anything_left_on_either_box():
+    assert pu.live_batches(VIEW) == ['b20']
+    assert pu.desktop_live_batches(VIEW) == [], 'b20 has nothing open on the desktop; its w1 is closed'
 
 
-def test_state_line_reads_closed_or_in_flight():
-    assert pu.state_line(STATUS, 'b19').startswith('Closed: all 1 arms')
-    assert pu.state_line({'ledger': {}}, 'b20').startswith('Not on the desktop ledger')
+def test_state_line_reads_wave_by_wave_across_the_boxes(monkeypatch):
+    monkeypatch.setattr(pu, 'wave_close_times', lambda batch: [])
+    assert pu.state_line(VIEW, 'b19').startswith('Closed: w1 laptop closed')
+    line = pu.state_line(VIEW, 'b20', {'running': [{'id': B20[2], 'step': 4, 'max_steps': 10}]})
+    assert line.startswith('In flight: w1 desktop closed, w2 laptop training (0 of 1 at cap, live at 40%), 1 arm unclaimed; ')
+    assert '1 training wave(s) left' in line
+    assert pu.state_line(_view([], []), 'b99').startswith('b99: not on ops')
 
 
 def test_import_skips_shard_files_and_existing_ones(tmp_path, monkeypatch):
@@ -174,12 +194,13 @@ def test_import_skips_shard_files_and_existing_ones(tmp_path, monkeypatch):
     tree = ['results/b20-stageb-w1/b20aa-k1-seed1.png', 'results/b20-stageb-w1/b20aa-k1-seed1_checkpoint_evals.json',
             'results/b20-stageb-w1/b20aa-k1-seed1_checkpoint_evals-s1of4.json',
             'results/b20aa-k1-seed1/b20aa-k1-seed1_evals.json',          # the arm's own job: imported too
-            'results/b20ab-k1-seed2/b20ab-k1-seed2_evals.json']          # still running: not
-    ledger = {'b20-stageb-w1': 'done', 'b20aa-k1-seed1': 'done', 'b20ab-k1-seed2': 'running'}
-    copied = pu.import_closed_waves({'ledger': ledger}, tree, str(tmp_path))
-    assert copied == 2 and (tmp_path / 'b20aa-k1-seed1_checkpoint_evals.json').exists()
-    assert (tmp_path / 'b20aa-k1-seed1_evals.json').exists() and not (tmp_path / 'b20ab-k1-seed2_evals.json').exists()
+            'results/b20ab-k1-seed2/b20ab-k1-seed2_evals.json']          # on the laptop's feed
+    copied = pu.import_closed_waves([('results', p) for p in tree[:4]] + [('laptop-results', tree[4])], str(tmp_path))
+    assert copied == 3 and (tmp_path / 'b20aa-k1-seed1_checkpoint_evals.json').exists()
+    assert (tmp_path / 'b20aa-k1-seed1_evals.json').exists() and (tmp_path / 'b20ab-k1-seed2_evals.json').exists(), \
+        'a job on a feed is finished by construction, whichever feed'
     assert not (tmp_path / 'b20aa-k1-seed1_checkpoint_evals-s1of4.json').exists()
+    assert any('origin/laptop-results:' in argv[2] for argv in calls)
 
 
 def test_import_takes_a_done_hof_pass_too(tmp_path, monkeypatch):
@@ -189,9 +210,8 @@ def test_import_takes_a_done_hof_pass_too(tmp_path, monkeypatch):
             'results/b11-hof30k/b11ae-lr1e4-seed1_checkpoint_evals_hof5000-s1of8.json',
             'results/b11-hof5000/b11ae-lr1e4-seed1_checkpoint_evals_hof5000.json']
     tree.append('results/p2-hof5000/p2a-ep8-seed1_checkpoint_evals_hof5000.json')   # b5 under its old name: stays on results
-    ledger = {'b11-hof30k': 'done', 'b11-hof5000': 'running', 'p2-hof5000': 'done'}
-    copied = pu.import_closed_waves({'ledger': ledger}, tree, str(tmp_path))
-    assert copied == 1 and (tmp_path / 'b11ae-lr1e4-seed1_checkpoint_evals_hof30k.json').exists()
+    copied = pu.import_closed_waves([('results', p) for p in tree], str(tmp_path))
+    assert copied == 2 and (tmp_path / 'b11ae-lr1e4-seed1_checkpoint_evals_hof30k.json').exists()
     assert not (tmp_path / 'p2a-ep8-seed1_checkpoint_evals_hof5000.json').exists()
 
 
@@ -217,27 +237,15 @@ def test_read_spec_falls_back_to_a_local_scheduler_spec(tmp_path, monkeypatch):
     assert pu.spec_notes('b13aa-mb32-seed1') == 'Prediction: slow'
 
 
-def test_laptop_state_line_closes_only_when_every_arm_is_at_cap_and_measured(tmp_path, monkeypatch):
-    monkeypatch.setattr(pu, 'spec_envs', lambda arms: {a: {'_max_steps': 100} for a in arms})
-    monkeypatch.setattr(pu.live_runs, 'live', lambda runs_dir, prune: [])
-    for arm, step in (('b13aa-mb32-seed1', 100), ('b13ab-mb32-seed2', 100)):
-        (tmp_path / (arm + '_evals.json')).write_text(json.dumps({'summary': {'step': step}}))
-    (tmp_path / 'b13aa-mb32-seed1_checkpoint_evals.json').write_text('{}')
-    assert pu.laptop_state_line('b13', str(tmp_path)).startswith('In flight on the laptop: 2 of 2 arms trained, 0 running; 1 of 2')
-    (tmp_path / 'b13ab-mb32-seed2_checkpoint_evals.json').write_text('{}')
-    assert pu.laptop_state_line('b13', str(tmp_path)).startswith('Closed: all 2 arms trained on the laptop')
-    monkeypatch.setattr(pu.live_runs, 'live', lambda runs_dir, prune: [('b13ab-mb32-seed2', 1)])
-    assert '1 running' in pu.laptop_state_line('b13', str(tmp_path))
-    assert pu.laptop_state_line('b99', str(tmp_path)).startswith('Not on the desktop ledger')
-
-
 def test_save_desktop_status_lands_where_the_manifest_reads_it(tmp_path):
     from tools import progress_update, viewer_manifest
     path = progress_update.save_desktop_status({'iso': 'now', 'ledger': {'b9-hof30k': 'queued'}, 'running': []},
-                                               runs_dir=str(tmp_path))
+                                               runs_dir=str(tmp_path), view=dict(VIEW, ledger={'b20ac-k2-seed1': 'running'}))
     assert path == str(tmp_path / viewer_manifest.DESKTOP_STATUS)
     ledger = viewer_manifest.desktop_ledger(str(tmp_path))
-    assert ledger['iso'] == 'now' and ledger['jobs'] == {'b9-hof30k': 'queued'}
+    assert ledger['iso'] == 'now' and ledger['jobs'] == {'b9-hof30k': 'queued', 'b20ac-k2-seed1': 'running'}
+    assert ledger['running']['a'] == {'b20ac-k2-seed1'}, "the laptop's running arm reaches the viewer too"
+    assert viewer_manifest.boxes(str(tmp_path)) == {p: 'desktop' for p in B20[:2] + ['b19zz-ref-seed1']}
     # nothing in runs/ shares its name, so the superseded-snapshot sweep leaves it alone
     assert progress_update.drop_superseded_snapshots(str(tmp_path)) == 0 and os.path.exists(path)
 

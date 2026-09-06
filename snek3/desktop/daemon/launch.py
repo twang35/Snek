@@ -2,7 +2,7 @@
 
 **The daemon launches one thing: `tools.scheduler`** (2026-09-05). Before that it launched every
 trainer and every close-out itself, which meant a second copy of the wave barrier, the chain, the
-launch env and the close-out argv beside the laptop's — and two schedulers drift (`plans/scheduler.md`
+launch env and the close-out argv beside the laptop's — and two schedulers drift (`plans/archive/scheduler.md`
 §0). Now the daemon writes the specs it reads off `ops` into a local queue directory in the shape the
 scheduler reads on the laptop (`<queue>/<batch>/<id>.json`), and the scheduler does the rest: waves,
 passes, the chart window, the eval workers.
@@ -33,8 +33,9 @@ BASE_ENV = {'PYTHONPATH': '.'}
 DISPLAY_ENV_KEYS = ('DISPLAY', 'XAUTHORITY')
 
 RUNS_SUBDIR = os.path.join('desktop', 'runs')
-# The local queue the scheduler reads: one directory per batch, one spec per file, mirrored from
-# `ops` by `daemon.py` every poll. Gitignored, like `desktop/runs`.
+# The local queue the scheduler reads: one directory per batch, one spec per file -- the scheduler's
+# own mirror of the waves this box holds on the shared queue (`tools/claims.py`). Gitignored, like
+# `desktop/runs`.
 QUEUE_SUBDIR = os.path.join('desktop', 'queue-local')
 
 # Type defaults the old `build_command` applied. A smoke scores ~0, so the checkpoint gate would write
@@ -70,6 +71,8 @@ def materialise(job):
         spec = {'project': job.project, 'id': job.id, 'type': 'eval', 'policies': list(job.policies),
                 'label': job.label, 'notes': job.notes, 'eval_args': list(job.eval_args),
                 'priority': job.priority}
+        if job.box:
+            spec['box'] = job.box
         if job.selector:
             spec['selector'] = job.selector
         if job.episodes:
@@ -92,14 +95,17 @@ def materialise(job):
         env.setdefault('SNEK_EVAL_QUEUE', '0')
     if max_steps is None:
         raise ValueError('{0}: a train spec needs max_steps'.format(job.id))
-    return {'project': job.project, 'id': job.id, 'type': 'train', 'policy': policy,
+    spec = {'project': job.project, 'id': job.id, 'type': 'train', 'policy': policy,
             'max_steps': int(max_steps), 'env': env, 'label': job.label, 'notes': job.notes,
             'priority': job.priority}
+    if job.box:
+        spec['box'] = job.box
+    return spec
 
 
 def scheduler_command(host, runtime):
     """The scheduler's argv: the runtime knobs as flags. Pure, so the spelling is testable."""
-    argv = [host['PYTHON_BIN'], '-u', '-m', 'tools.scheduler', '--queue', queue_dir(host),
+    argv = [host['PYTHON_BIN'], '-u', '-m', 'tools.scheduler', '--shared', '--queue', queue_dir(host),
             '--wave', str(runtime['max_trainers']), '--max-trainers', str(runtime['max_trainers']),
             '--shards', str(runtime['eval_shards']), '--no-status']
     if not runtime.get('auto_stage_b', True):
@@ -114,6 +120,13 @@ def scheduler_env(host, runtime):
     # The scheduler publishes what it finishes to this box's results branch (`tools/results_feed.py`).
     env['SNEK_RESULTS_BRANCH'] = host['RESULTS_BRANCH']
     env['SNEK_RESULTS_WORKTREE'] = host['RESULTS_WORKTREE']
+    # The shared queue (`tools/claims.py`): which box this is, and where its claims worktree lives.
+    # Optional `host.env` keys with defaults, like `LAPTOP_STATUS_BRANCH`, so a deploy never needs a
+    # hand edit on the box to start.
+    env['SNEK_BOX'] = host.get('BOX') or 'desktop'
+    env['SNEK_CLAIMS_BRANCH'] = host.get('CLAIMS_BRANCH') or 'claims'
+    env['SNEK_CLAIMS_WORKTREE'] = host.get('CLAIMS_WORKTREE') or os.path.join(
+        os.path.dirname(host['STATUS_WORKTREE']), 'claims')
     if runtime.get('torch_threads', 0) > 0:
         env['SNEK_TORCH_THREADS'] = str(runtime['torch_threads'])
     if runtime.get('omp_num_threads', 0) > 0:

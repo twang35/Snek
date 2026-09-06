@@ -46,7 +46,7 @@ the next one with no restart. **A change to `tools/scheduler.py` or `tools/windo
 when the scheduler is next started**, since the running scheduler is the old code -- and **a pause does not
 restart it**: a paused scheduler blocks inside its wait loop and never exits, and lifting the hold starts a
 new one only if none is alive.
-The procedure is: set `"paused": true` on `ops` (`desktop-batch`), wait until `status.json`'s `running` is
+The procedure is: set `"paused": true` on `ops` (`queue-batch`), wait until `status.json`'s `running` is
 empty (the wave's arms and its pass have finished), then kill the scheduler **by the pid `status.json`
 names** -- `ssh the-claw-den 'kill <scheduler.pid>'`, never a pattern -- and set `"paused": false`. The
 daemon sees the hold lifted with no scheduler alive and starts one on the new code; its arms are untouched
