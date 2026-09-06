@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b20a-lanes32-seed1",
+  "b20b-lanes32-seed2",
+  "b20c-lanes32-seed3",
+  "b20d-lanes32-seed4",
+  "b20e-lanes64-seed1",
+  "b20f-lanes64-seed2",
+  "b20g-lanes64-seed3",
+  "b20h-lanes64-seed4"
+ ],
+ "batch": "b20",
+ "box": "laptop",
+ "claimed_iso": "2026-09-05T23:44:06",
+ "claimed_ts": 1788677046.291552,
+ "kind": "wave",
+ "wave": 1
+}
