@@ -1,0 +1,15 @@
+{
+  "project": "snek3",
+  "id": "b7-hof30k-confirm",
+  "type": "eval",
+  "policies": [
+    "b7av-fc100x100-seed2"
+  ],
+  "eval_args": [
+    "--pass",
+    "hof30k"
+  ],
+  "priority": 15,
+  "label": "b7 hof30k confirm: b7av at 30,000 episodes (the one hof5000 row >=99); the chain runs the per-wave passes",
+  "notes": "Why this spec exists at all: the daemon mirrors a batch to its scheduler only while one of its specs is unpublished, and b7 closed before the hof30k pass joined the chain, so nothing else makes the scheduler look at b7 again. With this spec pending the whole batch is mirrored, the arms read finished from the _evals.json rsynced into desktop/runs 2026-09-05 21:48 (stage-B and hof5000 files rsynced alongside, all 32 arms), and the chain itself runs b7-hof30k, -w2, -w3, -w4 over the four waves -- those are the files the site wants. This spec then re-measures the single candidate, b7av-fc100x100-seed2, minutes of work; its id is deliberately not a chain pass label so the ledger keeps the two apart. b7's hof5000 (32 arms, 774 rows, run by hand on the laptop) and every other b7 file were published to laptop-results 21:50 so the reference cell b7aa-b7ad shows on the site."
+}
