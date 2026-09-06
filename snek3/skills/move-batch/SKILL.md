@@ -55,6 +55,14 @@ b18 off and b21 on: the printout still listed b18 and not b21 while `queue-local
 Only the training specs exist on `ops`; the batch's stage B and hof passes are queued by the chain
 when a training finishes, so they vanish with the specs and nothing else needs removing.
 
+**Check the batch's `priority` against what is already in the laptop queue before the driver rescans.**
+The scheduler runs batches lowest priority first (`tools/scheduler.py`, since 2026-09-05), and a batch
+keeps the numbers it was given for the *desktop's* order. b18 arrived at 200-202 beside b20's 220-221,
+so a scheduler restarted mid-wave picked b18 over the b20 wave that was live, and b20's eight arms
+trained on with no scheduler watching them until the numbers were raised to 240-242 and the scheduler
+restarted (2026-09-05 22:18). Edit the `priority` of every spec of the moved batch so it sorts after
+the batch that should finish first, in the same order among themselves, before it lands in the queue.
+
 Then make sure a laptop driver is up, and start one if not — the `laptop-run` skill, "Queueing
 batches here". A running driver rescans `logs/laptop-queue/` between batches and picks the new
 directory up in name order; nothing else to do, and the batch shows under `laptop_queued` in
@@ -77,7 +85,8 @@ ssh the-claw-den 'ls Snek/snek3/desktop/queue-local/'$B' | grep -c json'   # the
 ```
 
 Validate the specs with the daemon's parser first if anything in them was edited (`desktop-batch`,
-section 1). The batch's chart-viewer reference entry is per batch, not per box, and stays.
+section 1). The same priority check applies in this direction: a batch that ran at the laptop's numbers
+sorts among the desktop's by those same numbers. The batch's chart-viewer reference entry is per batch, not per box, and stays.
 
 ## Afterwards
 
