@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b18a-gc0-seed1",
+  "b18b-gc0-seed2",
+  "b18c-gc0-seed3",
+  "b18d-gc0-seed4",
+  "b18e-gc01-seed1",
+  "b18f-gc01-seed2",
+  "b18g-gc01-seed3",
+  "b18h-gc01-seed4"
+ ],
+ "batch": "b18",
+ "box": "laptop",
+ "claimed_iso": "2026-09-06T07:55:13",
+ "claimed_ts": 1788706513.438551,
+ "kind": "wave",
+ "wave": 1
+}
