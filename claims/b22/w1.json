@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b22a-g999-seed1",
+  "b22b-g999-seed2",
+  "b22c-g999-seed3",
+  "b22d-g999-seed4",
+  "b22e-g999roll512-seed1",
+  "b22f-g999roll512-seed2",
+  "b22g-g999roll512-seed3",
+  "b22h-g999roll512-seed4"
+ ],
+ "batch": "b22",
+ "box": "desktop",
+ "claimed_iso": "2026-09-06T15:03:10",
+ "claimed_ts": 1788732190.425241,
+ "kind": "wave",
+ "wave": 1
+}
