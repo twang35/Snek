@@ -198,12 +198,44 @@ def drop_superseded_snapshots(runs_dir=None):
 LOCAL_SPECS = os.path.join(SNEK3, 'logs')     # `logs/<batch>specs/*.json`, or `logs/laptop-queue/<batch>/*.json`
 
 
+_OPS_SPECS = None      # `{policy: spec text}` of everything under `origin/ops:` pending, read once per process
+
+
+def ops_specs():
+    """Every pending spec on `origin/ops` in one git process: `ls-tree` for the paths, then one
+    `cat-file --batch` for the blobs. Was one `git show` per arm — 540 processes at ~0.19 s each through
+    the laptop's git wrapper, 106 s of a 158 s run (measured 2026-09-06). Cached for the process; a
+    failed read caches `{}` so the per-arm local fallback still runs."""
+    global _OPS_SPECS
+    if _OPS_SPECS is not None:
+        return _OPS_SPECS
+    _OPS_SPECS = {}
+    listing = subprocess.run(['git', 'ls-tree', '-r', '--name-only', 'origin/ops', '--', PENDING],
+                             cwd=REPO, capture_output=True, text=True)
+    paths = [p for p in listing.stdout.splitlines() if p.endswith('.json')] if listing.returncode == 0 else []
+    if not paths:
+        return _OPS_SPECS
+    batch = subprocess.run(['git', 'cat-file', '--batch'], cwd=REPO, capture_output=True, text=True,
+                           input=''.join('origin/ops:{0}\n'.format(p) for p in paths))
+    if batch.returncode != 0:
+        return _OPS_SPECS
+    out, i = batch.stdout, 0
+    for path in paths:
+        nl = out.index('\n', i)
+        header = out[i:nl].split()
+        i = nl + 1
+        if len(header) == 3:                  # `<sha> blob <size>`; a missing object is `<name> missing`
+            size = int(header[2])
+            _OPS_SPECS[os.path.basename(path)[:-5]] = out[i:i + size]
+            i += size + 1                     # the blob, then the newline cat-file appends
+    return _OPS_SPECS
+
+
 def read_spec(policy):
-    """The arm's spec: from `ops` pending, else from a local `logs/*/<policy>.json` (a batch `scheduler`
-    ran after it was dequeued from the desktop — b13, 2026-09-03). None when neither has it."""
-    result = subprocess.run(['git', 'show', 'origin/ops:{0}{1}.json'.format(PENDING, policy)],
-                            cwd=REPO, capture_output=True, text=True)
-    text = result.stdout if result.returncode == 0 else None
+    """The arm's spec: from `ops` pending (`ops_specs`, one git read for all of them), else from a local
+    `logs/*/<policy>.json` (a batch `scheduler` ran after it was dequeued from the desktop — b13,
+    2026-09-03). None when neither has it."""
+    text = ops_specs().get(policy)
     if text is None:
         for path in sorted(glob.glob(os.path.join(LOCAL_SPECS, '*', policy + '.json'))
                            + glob.glob(os.path.join(LOCAL_SPECS, '*', '*', policy + '.json'))):

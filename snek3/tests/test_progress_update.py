@@ -228,6 +228,7 @@ def test_superseded_snapshots_are_dropped_once_the_close_out_file_is_in_runs(tmp
 def test_read_spec_falls_back_to_a_local_scheduler_spec(tmp_path, monkeypatch):
     # b13 was dequeued from ops and run by scheduler from logs/b13specs/; the tool must still find its knob.
     monkeypatch.setattr(pu, 'LOCAL_SPECS', str(tmp_path))
+    monkeypatch.setattr(pu, '_OPS_SPECS', None)
     monkeypatch.setattr(pu.subprocess, 'run', lambda argv, **kw: type('R', (), {'returncode': 128, 'stdout': ''})())
     assert pu.read_spec('b13aa-mb32-seed1') is None
     (tmp_path / 'b13specs').mkdir()
@@ -235,6 +236,41 @@ def test_read_spec_falls_back_to_a_local_scheduler_spec(tmp_path, monkeypatch):
         {'env': {'SNEK_PPO_MINIBATCH': '32'}, 'max_steps': 100, 'notes': 'Prediction: slow'}))
     assert pu.spec_envs(['b13aa-mb32-seed1']) == {'b13aa-mb32-seed1': {'SNEK_PPO_MINIBATCH': '32', '_max_steps': 100}}
     assert pu.spec_notes('b13aa-mb32-seed1') == 'Prediction: slow'
+
+
+def test_ops_specs_reads_every_pending_spec_in_one_cat_file_batch(monkeypatch):
+    # One `ls-tree` and one `cat-file --batch` for all arms, not a `git show` per arm (540 processes, 106 s).
+    specs = {'b30aa-x-seed1': json.dumps({'env': {'SNEK_X': '1'}, 'notes': 'Prediction: fast'}),
+             'b30ab-x-seed2': json.dumps({'env': {'SNEK_X': '2'}})}
+    calls = []
+
+    def run(argv, **kw):
+        calls.append(argv[1])
+        if argv[1] == 'ls-tree':
+            out = ''.join('snek3/desktop/queue/pending/{0}.json\n'.format(p) for p in specs) + 'snek3/desktop/queue/pending/README.md\n'
+        else:
+            assert argv[1:3] == ['cat-file', '--batch']
+            assert kw['input'].splitlines() == ['origin/ops:snek3/desktop/queue/pending/{0}.json'.format(p) for p in specs]
+            out = ''.join('{0} blob {1}\n{2}\n'.format('a' * 40, len(t), t) for t in specs.values())
+        return type('R', (), {'returncode': 0, 'stdout': out})()
+
+    monkeypatch.setattr(pu, '_OPS_SPECS', None)
+    monkeypatch.setattr(pu.subprocess, 'run', run)
+    assert pu.spec_envs(list(specs)) == {'b30aa-x-seed1': {'SNEK_X': '1', '_max_steps': None},
+                                         'b30ab-x-seed2': {'SNEK_X': '2', '_max_steps': None}}
+    assert pu.spec_notes('b30aa-x-seed1') == 'Prediction: fast'
+    assert pu.read_spec('b30zz-x-seed9') is None
+    assert calls == ['ls-tree', 'cat-file']            # every read after the first is served from the cache
+
+
+def test_ops_specs_skips_a_missing_blob(monkeypatch):
+    def run(argv, **kw):
+        if argv[1] == 'ls-tree':
+            return type('R', (), {'returncode': 0, 'stdout': 'snek3/desktop/queue/pending/a-x-seed1.json\nsnek3/desktop/queue/pending/b-x-seed1.json\n'})()
+        return type('R', (), {'returncode': 0, 'stdout': 'origin/ops:snek3/desktop/queue/pending/a-x-seed1.json missing\n' + 'b' * 40 + ' blob 2\n{}\n'})()
+    monkeypatch.setattr(pu, '_OPS_SPECS', None)
+    monkeypatch.setattr(pu.subprocess, 'run', run)
+    assert pu.ops_specs() == {'b-x-seed1': '{}'}
 
 
 def test_save_desktop_status_lands_where_the_manifest_reads_it(tmp_path):

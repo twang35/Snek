@@ -98,15 +98,18 @@ PASSES = {'b': (None, '-stageb'), 'h': ('hof5000', '-hof5000'), 'k': ('hof30k', 
 STATES = ('done', 'running', 'queued', 'pending', 'none', 'upstream')
 
 
-def shard_files(runs_dir, policy, label=None):
+def shard_files(runs_dir, policy, label=None, names=None):
     """The shard files of a pass in flight — `<policy>_checkpoint_evals[_<label>]-s<i>of<n>.json`.
     Same rule as `tools.results.shard_paths`, which is pinned to `constants.RUNS_DIR` and so cannot
     serve a manifest built from another directory. The regex keeps `_hof5000-s1of8` out of the
-    unlabelled pass's list."""
+    unlabelled pass's list. `names` is the directory's listing when the caller already has one: `build`
+    lists `runs/` once and passes it, because a glob per arm per pass listed the 4,400-file directory
+    1,800 times a build (14 s of 39, measured 2026-09-06)."""
     stem = policy + '_checkpoint_evals' + ('_' + label if label else '')
     exact = re.compile(re.escape(stem) + r'-s(\d+)of(\d+)\.json$')
-    return sorted(p for p in glob.glob(os.path.join(runs_dir, stem + '-s*of*.json'))
-                  if exact.search(os.path.basename(p)))
+    if names is None:
+        names = os.listdir(runs_dir) if os.path.isdir(runs_dir) else []
+    return sorted(os.path.join(runs_dir, n) for n in names if exact.search(n))
 
 
 def boxes(runs_dir):
@@ -200,11 +203,11 @@ def _read(path):
         return json.load(handle)
 
 
-def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxes=None):
+def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxes=None, names=None):
     """The manifest row for one arm, or None if it has no chart to show. `desktop` is
     `desktop_ledger(runs_dir)`, `laptop_live` the policies training on this box and `arm_boxes` the
-    `boxes(runs_dir)` mapping; `build` passes all three so they are read once per manifest rather than
-    once per arm."""
+    `boxes(runs_dir)` mapping, `names` the runs directory's listing; `build` passes all four so they are
+    read once per manifest rather than once per arm."""
     png = os.path.join(runs_dir, policy + '.png')
     if not os.path.exists(png):
         return None
@@ -273,7 +276,7 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
     record['status'] = {'a': stage_a_state}
     for kind, (label, suffix) in PASSES.items():
         have = {'b': stage_b, 'h': hof, 'k': h30}[kind] is not None
-        record['status'][kind] = pass_state(have, bool(shard_files(runs_dir, policy, label)), candidates[kind],
+        record['status'][kind] = pass_state(have, bool(shard_files(runs_dir, policy, label, names)), candidates[kind],
                                             policy in running[kind],
                                             ledger_pass_state(jobs, batch, suffix))
     # A pass whose upstream found nothing will never run either: say `none`, not `upstream`.
@@ -299,7 +302,8 @@ def build(runs_dir=None, references_path=None):
     desktop = desktop_ledger(runs_dir)
     laptop_live = frozenset(policy for policy, _pid in live_runs.live(runs_dir, prune=False))
     arm_boxes = boxes(runs_dir)
-    arms = [rec for rec in (arm_record(p, runs_dir, desktop, laptop_live, arm_boxes) for p in policies) if rec]
+    names = os.listdir(runs_dir) if os.path.isdir(runs_dir) else []
+    arms = [rec for rec in (arm_record(p, runs_dir, desktop, laptop_live, arm_boxes, names) for p in policies) if rec]
     known = {a['policy'] for a in arms}
     refs = {batch: {'arms': [a for a in ref.get('arms', []) if a in known], 'label': ref.get('label', ''),
                     'after': ref.get('after')}

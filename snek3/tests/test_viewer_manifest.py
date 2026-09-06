@@ -131,6 +131,10 @@ def test_shard_files_keep_labelled_passes_apart(tmp_path):
     assert len(vm.shard_files(str(tmp_path), 'b30aa-x-seed1')) == 2
     assert len(vm.shard_files(str(tmp_path), 'b30aa-x-seed1', 'hof5000')) == 1
     assert vm.shard_files(str(tmp_path), 'b30aa-x-seed1', 'hof30k') == []
+    # `build` lists the directory once and hands the names in; the answer is the same as globbing.
+    names = os.listdir(str(tmp_path))
+    assert vm.shard_files(str(tmp_path), 'b30aa-x-seed1', names=names) == vm.shard_files(str(tmp_path), 'b30aa-x-seed1')
+    assert vm.shard_files(str(tmp_path), 'b30aa-x-seed1', 'hof5000', names=['unrelated.json']) == []
 
 
 def test_status_follows_the_files_when_nothing_is_live(tmp_path):
