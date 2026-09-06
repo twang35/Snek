@@ -73,14 +73,22 @@ def test_both_feeds_are_flattened_the_local_runs_win_and_the_site_is_one_snapsho
         'results/b1a-x-seed1/b1a-x-seed1.png': b'\x89PNG desktop', 'results/b1a-x-seed1/b1a-x-seed1_evals.json': _evals(10),
         'results/b1-stageb/b1a-x-seed1_checkpoint_evals.json': json.dumps({'rows': []}).encode(),
         'results/b1-stageb/b1a-x-seed1_checkpoint_evals-s1of2.json': b'shard',
-        'results/b1-stageb/b1a-x-seed1_checkpoint_evals.png': b'\x89PNG stageb'}, 'desktop wave')
+        'results/b1-stageb/b1a-x-seed1_checkpoint_evals.png': b'\x89PNG stageb',
+        # the shared branch's other eras and odd jobs: snek2's arms, a smoke, a worker sweep, an old p-name
+        'results/b46-closeout-w2/b46b-c51softtgtseed1.png': b'\x89PNG snek2',
+        'results/smoke-3/smoke.png': b'\x89PNG smoke', 'results/sw1w4-a/sw1w4-a.png': b'\x89PNG sweep',
+        'results/p1c-fc200x100ep8-seed3/p1c-fc200x100ep8-seed3.png': b'\x89PNG old name'}, 'desktop wave')
     _commit_feed(world['remote'], 'laptop-results', {
         'results/b2a-y-seed1/b2a-y-seed1.png': b'\x89PNG laptop', 'results/b2a-y-seed1/b2a-y-seed1_evals.json': _evals(10)}, 'laptop arm')
     # this box (the desktop) has a newer picture of its own arm
     with open(os.path.join(world['runs'], 'b1a-x-seed1.png'), 'wb') as handle:
         handle.write(world['png'])
     result, lines = _build(world)
-    assert result['built'] and result['pushed'] is True and result['arms'] == 2
+    assert result['built'] and result['pushed'] is True and result['arms'] == 2, 'the two snek3 arms, nothing else'
+    for name in ('b46b-c51softtgtseed1.png', 'smoke.png', 'sw1w4-a.png', 'p1c-fc200x100ep8-seed3.png'):
+        assert not os.path.exists(os.path.join(world['build'], name)), name
+    # a stray file an earlier build left is pruned on the next one
+    open(os.path.join(world['build'], 'b47a-oldsnek2seed1.png'), 'wb').write(b'x')
     assert not os.path.exists(os.path.join(world['build'], 'b1a-x-seed1_checkpoint_evals-s1of2.json')), 'shards stay out'
     with open(os.path.join(world['worktree'], 'charts', 'b1a-x-seed1.png'), 'rb') as handle:
         assert handle.read() == world['png'], 'the local copy, newer, wins over the feed'
@@ -90,7 +98,9 @@ def test_both_feeds_are_flattened_the_local_runs_win_and_the_site_is_one_snapsho
     with open(os.path.join(world['worktree'], 'manifest.js')) as handle:
         assert 'charts/' in handle.read()
     assert _git(['rev-list', '--count', 'origin/site'], world['repo']) == '1', 'a snapshot: one commit'
-    # nothing moved: skipped, no push
+    # the stray file is pruned, which is a build; then nothing moved: skipped, no push
+    result, lines = _build(world)
+    assert result['built'] and not os.path.exists(os.path.join(world['build'], 'b47a-oldsnek2seed1.png'))
     result, lines = _build(world)
     assert not result['built'] and 'skipped' in lines[-1]
     # a new laptop wave: only its files are read from the feed (incremental), and the branch is still one commit

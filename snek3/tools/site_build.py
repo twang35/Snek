@@ -8,7 +8,7 @@ on the box is the same writer with the same worktree and lease. Pages serves bra
 
 | step | what |
 |---|---|
-| feeds | `git fetch` `results`, `laptop-results` and `ops-status`; each feed's tree is flattened into the build directory -- `results/<job-id>/<file>` becomes `<file>` -- incrementally, by `git diff --name-only` since the commit last flattened (`.feeds.json` beside the files) |
+| feeds | `git fetch` `results`, `laptop-results` and `ops-status`; each feed's tree is flattened into the build directory -- `results/<job-id>/<file>` becomes `<file>` -- incrementally, by `git diff --name-only` since the commit last flattened (`.feeds.json` beside the files). **Only snek3 arms' files** (`b<n><letters>-<what>-seed<N>`): `results` is shared with snek2's era and holds its arms, smoke and sweep jobs, and the old p-names of b3-b6 |
 | this box | every file in `SNEK_RUNS_DIR` newer than the build directory's copy is copied over it: the box's own live pictures and measurements win over the feeds' |
 | status | `origin/ops-status:status.json` lands at `.live/desktop/status.json`, so the manifest knows which pass is running or queued |
 | site | `viewer_manifest.build(build_dir)` and `publish_pages.publish(...)` into the `site` worktree: `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` |
@@ -41,6 +41,17 @@ WORKTREE = os.environ.get('SNEK_SITE_WORKTREE', os.path.expanduser('~/.snek3-lap
 FEEDS = ('results', 'laptop-results')
 STATUS_BRANCH = 'ops-status'
 SHARD = re.compile(r'-s\d+of\d+\.json$|\.partial')
+# A snek3 arm: `b<n><letters>-<what>-seed<N>`. The `results` branch is shared with snek2's era (b22-b47,
+# named `b46a-c51batch512seed1`), and holds smoke and worker-sweep jobs and the p0-p2 copies of b3-b6
+# under their old names; none of those are the viewer's (2026-09-05: 45 batches showed where 17 belonged).
+ARM = re.compile(r'^b\d+[a-z]+-.+-seed\d+$')
+
+
+def is_arm_file(name):
+    """Whether a runs-style file name belongs to a snek3 arm: `<policy>.png`, `<policy>_evals.json`, ..."""
+    stem = name.split('_', 1)[0]
+    stem = stem[:-len('.png')] if stem.endswith('.png') else stem[:-len('.md')] if stem.endswith('.md') else stem
+    return bool(ARM.match(stem))
 FEEDS_STATE = '.feeds.json'
 
 
@@ -69,7 +80,8 @@ def flatten_feed(repo, remote, feed, build_dir, since):
         return head, 0
     else:
         listing = _git(['ls-tree', '-r', '--name-only', head], cwd=repo)
-    paths = [p for p in listing.splitlines() if p.count('/') == 2 and p.startswith('results/') and not SHARD.search(p)]
+    paths = [p for p in listing.splitlines() if p.count('/') == 2 and p.startswith('results/')
+             and not SHARD.search(p) and is_arm_file(p.split('/')[2])]
     written = 0
     for path in sorted(paths, key=lambda p: ('-stageb' in p or '-hof' in p, p)):
         target = os.path.join(build_dir, path.split('/')[2])
@@ -87,7 +99,7 @@ def overlay_runs(runs_dir, build_dir):
     if not os.path.isdir(runs_dir):
         return 0
     for entry in os.scandir(runs_dir):
-        if not entry.is_file() or entry.name.startswith('.') or SHARD.search(entry.name):
+        if not entry.is_file() or entry.name.startswith('.') or SHARD.search(entry.name) or not is_arm_file(entry.name):
             continue
         target = os.path.join(build_dir, entry.name)
         source_stat = entry.stat()
@@ -98,6 +110,17 @@ def overlay_runs(runs_dir, build_dir):
         shutil.copy2(entry.path, target)
         copied += 1
     return copied
+
+
+def prune_build_dir(build_dir):
+    """Removes files that are not a snek3 arm's from the build directory -- what an earlier, unfiltered
+    flatten left, or a feed's stray file. Returns the count."""
+    removed = 0
+    for entry in os.scandir(build_dir):
+        if entry.is_file() and not entry.name.startswith('.') and (SHARD.search(entry.name) or not is_arm_file(entry.name)):
+            os.remove(entry.path)
+            removed += 1
+    return removed
 
 
 def place_status(repo, remote, build_dir):
@@ -135,10 +158,11 @@ def build(repo=REPO, remote=REMOTE, branch=BRANCH, worktree=WORKTREE, feeds=FEED
         if head:
             state[feed] = head
     overlaid = overlay_runs(runs_dir, build_dir)
+    pruned = prune_build_dir(build_dir)
     place_status(repo, remote, build_dir)
     with open(state_path, 'w') as handle:
         json.dump(state, handle)
-    if not (force or flattened or overlaid):
+    if not (force or flattened or overlaid or pruned):
         log('site: nothing moved since the last build; skipped')
         return {'built': False, 'pushed': None, 'flattened': 0, 'overlaid': 0}
     manifest = viewer_manifest.build(build_dir)
