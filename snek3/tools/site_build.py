@@ -203,7 +203,7 @@ def build(repo=REPO, remote=REMOTE, branch=BRANCH, worktree=WORKTREE, feeds=FEED
         log('site: nothing moved since the last build; skipped')
         return {'built': False, 'pushed': None, 'flattened': 0, 'overlaid': 0}
     manifest = viewer_manifest.build(build_dir)
-    copied, removed, total = publish_pages.publish(runs_dir=build_dir, viewer_dir=viewer_dir, docs_dir=worktree,
+    copied, removed, total = publish_pages.publish(runs_dir=build_dir, viewer_dir=viewer_dir, site_dir=worktree,
                                                    manifest=manifest)
     gitbus.clear_stale_locks(worktree)
     _git(['add', '-A'], cwd=worktree)

@@ -1,4 +1,4 @@
-"""`docs/` is rebuilt from `viewer/` and `runs/`: the page, a manifest pointing at `charts/`, exactly
+"""The site directory is rebuilt from `viewer/` and `runs/`: the page, a manifest pointing at `charts/`, exactly
 the charts the manifest refers to, and nothing stale."""
 
 import json

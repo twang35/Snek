@@ -18,10 +18,11 @@ publishes every finished arm and pass to its own results branch (`results`, `lap
 `snek3/tools/results_feed.py`), and the desktop daemon rebuilds the site from both feeds plus its own
 live charts on every network cycle (`snek3/tools/site_build.py`), pushing one snapshot commit to `site`
 — so the page is current within ten minutes of a wave closing on either box, and
-`ssh the-claw-den 'Snek/snek3/desktop/trigger'` rebuilds it now. `docs/` at the repository root is a
-local build, gitignored; nothing under it is committed, and the pictures live only on `site` (every one
-redraws from the JSON master keeps). Edit `snek3/viewer/index.html` and deploy; the next build carries
-it. The live page is https://twang35.github.io/Snek/ ; the design is
+`ssh the-claw-den 'Snek/snek3/desktop/trigger'` rebuilds it now. There is no local build of the site
+(the root `docs/` one was removed 2026-09-06); the pictures live only on `site` (every one redraws from
+the JSON master keeps). To see the page locally, `cd snek3 && PYTHONPATH=. python -m tools.viewer_manifest`
+and open `snek3/viewer/index.html`, which reads `../runs/` directly. Edit that file and deploy; the next
+build carries it. The live page is https://twang35.github.io/Snek/ ; the design is
 [`snek3/plans/archive/site-publish.md`](snek3/plans/archive/site-publish.md).
 
 **`README.md` is for humans and stays barebones** — the eras, a sentence each, a gif each. Anything

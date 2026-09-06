@@ -78,6 +78,5 @@ __pycache__/
 # runs/ path is exactly what makes `git merge --ff-only` abort a deploy.
 /snek3/runs/.evalq/
 
-# the Pages site is the `site` branch, built by the desktop (snek3/tools/site_build.py); a local build lands here
-/docs/
+# the Pages site is the `site` branch, built by the desktop (snek3/tools/site_build.py); the local manifest is regenerated
 /snek3/viewer/manifest.js

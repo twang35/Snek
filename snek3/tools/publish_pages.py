@@ -1,8 +1,9 @@
 """Builds the GitHub Pages site -- `index.html`, `manifest.js`, `charts/*.png`, `.nojekyll` -- from `viewer/` and a runs directory.
-    PYTHONPATH=. python -m tools.publish_pages          # -> ../docs/ (gitignored), a local build from runs/
 Pages serves the **`site` branch**, which `tools/site_build.py` builds on the desktop from both boxes'
-results feeds and pushes as a snapshot; `publish(runs_dir, viewer_dir, docs_dir, manifest)` is the one
-function both use. Until 2026-09-05 the site was `master`'s `/docs`, committed by the progress update.
+results feeds and pushes as a snapshot; `publish(runs_dir, viewer_dir, site_dir, manifest)` is the writer,
+a library function with no default target. Until 2026-09-05 the site was `master`'s `/docs`, committed by
+the progress update; that local build is gone -- to see the page locally, regenerate the manifest with
+`python -m tools.viewer_manifest` and open `viewer/index.html`, which reads `../runs/` directly.
 | in the site | from |
 |---|---|
 | `index.html` | `viewer/index.html`, byte for byte |
@@ -15,14 +16,11 @@ nothing.
 """
 import os
 import shutil
-import sys
 
 from env import constants
 from tools import viewer_manifest
 
-REPO_ROOT = os.path.dirname(constants.ROOT)
 VIEWER_DIR = os.path.join(constants.ROOT, 'viewer')
-DOCS_DIR = os.path.join(REPO_ROOT, 'docs')
 CHARTS_SUBDIR = 'charts'
 SITE_URL = 'https://twang35.github.io/Snek/'
 SITE_CHARTS_URL = SITE_URL + CHARTS_SUBDIR + '/'      # where the docs link a picture: the site, not master
@@ -50,19 +48,17 @@ def _same(src, dst):
     return a.st_size == b.st_size and int(a.st_mtime) == int(b.st_mtime)
 
 
-def publish(runs_dir=None, viewer_dir=None, docs_dir=None, manifest=None):
-    """Rewrites `docs_dir` from the sources. Returns `(copied, removed, total)` chart counts."""
-    runs_dir = runs_dir or constants.RUNS_DIR
+def publish(runs_dir, viewer_dir, site_dir, manifest=None):
+    """Rewrites `site_dir` from the sources. Returns `(copied, removed, total)` chart counts."""
     viewer_dir = viewer_dir or VIEWER_DIR
-    docs_dir = docs_dir or DOCS_DIR
     manifest = manifest or viewer_manifest.build(runs_dir)
-    charts_dir = os.path.join(docs_dir, CHARTS_SUBDIR)
+    charts_dir = os.path.join(site_dir, CHARTS_SUBDIR)
     os.makedirs(charts_dir, exist_ok=True)
 
-    shutil.copyfile(os.path.join(viewer_dir, 'index.html'), os.path.join(docs_dir, 'index.html'))
-    with open(os.path.join(docs_dir, 'manifest.js'), 'w') as handle:
+    shutil.copyfile(os.path.join(viewer_dir, 'index.html'), os.path.join(site_dir, 'index.html'))
+    with open(os.path.join(site_dir, 'manifest.js'), 'w') as handle:
         handle.write(viewer_manifest.render(manifest, charts_dir=CHARTS_SUBDIR + '/'))
-    open(os.path.join(docs_dir, '.nojekyll'), 'a').close()
+    open(os.path.join(site_dir, '.nojekyll'), 'a').close()
 
     wanted = chart_files(manifest)
     copied = 0
@@ -78,17 +74,3 @@ def publish(runs_dir=None, viewer_dir=None, docs_dir=None, manifest=None):
             removed += 1
     return copied, removed, len(wanted)
 
-
-def main(argv=None):
-    manifest = viewer_manifest.build()
-    # The source viewer's own manifest, so the page works opened from `viewer/` too.
-    with open(viewer_manifest.MANIFEST_PATH, 'w') as handle:
-        handle.write(viewer_manifest.render(manifest))
-    copied, removed, total = publish(manifest=manifest)
-    print('{0}: {1} arms -> {2}: {3} charts ({4} copied, {5} removed)'.format(
-        manifest['generated'], len(manifest['arms']), os.path.relpath(DOCS_DIR), total, copied, removed))
-    return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())
