@@ -154,5 +154,27 @@
     "label": "reference: b7 fc (320,) cell, lambda 0.98, shaping 0.1, gate 75 -- the base b15-b21 were generated from",
     "after": "shape005",
     "value": "0.1"
+  },
+  "b22": {
+    "arms": [
+      "b9bw-lam99-seed1",
+      "b9bx-lam99-seed2",
+      "b9by-lam99-seed3",
+      "b9bz-lam99-seed4"
+    ],
+    "label": "reference: b9 lambda 0.99 cell (gamma 0.99, rollout 128) -- the base of the corner-grid ladder",
+    "knob": "name",
+    "value": "base"
+  },
+  "b23": {
+    "arms": [
+      "b22e-g999roll512-seed1",
+      "b22f-g999roll512-seed2",
+      "b22g-g999roll512-seed3",
+      "b22h-g999roll512-seed4"
+    ],
+    "label": "reference: b22's g999roll512 cell, the rung below (gamma 0.999, lambda 0.99, rollout 512, huber, no anneal)",
+    "knob": "name",
+    "value": "base"
   }
 }
