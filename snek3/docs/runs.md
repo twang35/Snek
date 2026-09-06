@@ -6,6 +6,46 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b18 (gradient clip) closed with its hof passes at 13:34; both boxes are idle and the shared queue is empty. The
+one-knob sweeps at λ 0.98 — b15 through b21 — are all closed. Next is the corner grid, and its spec is the user's
+call.** As of 2026-09-06 14:00:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| laptop | — | idle since b18's wave 3 closed at 13:34; no trainer, close-out or shard process up | **free** |
+| desktop | — | idle since b18's wave 2 closed; nothing unclaimed on the pool | **free** |
+
+**What closed.** b18: **the gradient-norm clip is a no-op from off to 5.0** — every cell inside the base's noise on
+density (16.7-19.5% against 17.3) and best30; clipping off reads the base's density to the decimal and is more stable,
+so the base's collapses are policy-level, not rare huge gradients. The more useful result is the calibration: 0 and
+5.0 are both effectively no clip and differ by 3.8 pp on the share of evals below 80%, **so that column's noise at n=4
+is ~4 pp** — which puts b21's "a little more stable" and most of b20's lanes-as-stability-lever reading inside the noise.
+Best at depth `b18t-gc2-seed4` @11452416 and `b18h-gc01-seed4` @11976704, both 98.9 /30,000, below the HOF. Verdict in
+[`results.md`](results.md), table in [`charts.md`](charts.md), finding under `## Established` in
+[`findings.md`](findings.md).
+
+**Next: the corner grid.** What survived the λ 0.98 sweeps, all against b7's base: a clip anneal held at the floor for
+the last 10M (b17, +6-7 pp density), `lranneal` to zero (b17, +6 pp), the `mse` value loss (b19, +5 pp and 0.97% of
+evals below 80%, the one stability result outside the ~4 pp floor). Within noise and dropped or left at the base:
+entropy 0.01 (b15), target KL off (b16), lanes 128 (b20; 512 lanes is at the edge of the floor, a stability lever only
+if a cheap one is wanted), shaping (b21; off is the simplest config at no cost), gradient clip 0.5 (b18). b14's rollout
+512 (+11 pp) is on the λ 0.99 side of the split, and the corner grid is where the two sets meet. Both boxes are free for
+it now; a 24-arm batch across both is ~5 h of training plus passes.
+
+**Tooling.** `tools/progress_update.py` runs in 37 s instead of 170: every pending spec is read from `ops` in one
+`git cat-file --batch` rather than one `git show` per arm (540 processes through the laptop's git wrapper), and the
+manifest lists `runs/` once instead of a glob per arm per pass. What remains is the 1.4 GB stage-B JSON parse (~25 s);
+an mtime-keyed cache of the per-arm records would take it under 15 s if wanted.
+
+**Housekeeping.** `runs/b7*_checkpoint_evals_hof30k.json` (32 files, one `.png`) were written on the laptop at 08:06
+today and are on neither feed — a hof30k pass over b7's 32 arms, with one candidate: `b7av-fc100x100-seed2` @4096000,
+**99.0 /30,000 [98.9, 99.1]** on seed 7, from a checkpoint at 4.1M steps, below the HOF's 99.30 third place. b7 is
+closed, so they are committed with b18's archive.
+`runs/b16bg-kl04-seed1_checkpoint_evals-s*of12.json` (12 files) are stray per-shard files from a stage-B pass that later
+merged; untracked, harmless, not committed.
+
+## b21 closed and b18 on its last stage B, as it read at 2026-09-06 12:35 (superseded)
+
 **b21 (shaping) closed with its hof passes; b18 (gradient clip) is on its last wave's stage B on the laptop and closes
 mid-afternoon; the desktop is idle and the shared queue holds nothing else.** As of 2026-09-06 12:35:
 

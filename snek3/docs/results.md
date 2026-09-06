@@ -22,6 +22,56 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b18 -->
+## Batch b18 — the `gradient_clipping` sweep, 6 values x 4 seeds, 50M, closed 2026-09-06
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b7aa-fc320-seed1, b7ab-fc320-seed2, b7ac-fc320-seed3, b7ad-fc320-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| gradient_clipping | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| 0 | 4,370 | 17.3% | 16.4 18.0 14.8 19.7 | 69 | 99.6 | 97.90 (97.7-98.3) | 93.3 | 0.23% | 3.71% | 22.0% |
+| 0.1 | 4,241 | 19.1% | 15.9 12.6 12.0 32.4 | 84 | 99.8 | 98.17 (97.8-98.6) | 92.0 | 0.18% | 4.59% | 21.7% |
+| 0.25 | 4,285 | 16.7% | 9.7 14.0 18.6 22.8 | 71 | 99.8 | 98.05 (97.6-98.5) | 92.4 | 0.07% | 4.18% | 21.7% |
+| **0.5** (reference) | 4,003 | 17.3% | 18.5 19.0 16.5 15.1 | 50 | 99.6 | 97.75 (97.7-97.8) | 90.9 | 0.29% | 6.18% | 20.4% |
+| 1.0 | 3,935 | 16.7% | 16.5 14.9 22.3 12.9 | 63 | 99.8 | 97.80 (97.7-98.0) | 91.0 | 0.05% | 5.5% | 19.5% |
+| 2.0 | 4,570 | 19.5% | 18.7 20.5 16.0 22.3 | 101 | 99.8 | 98.05 (97.9-98.2) | 93.3 | 0.18% | 3.21% | 24.6% |
+| 5.0 | 4,050 | 16.8% | 12.4 23.1 17.8 13.1 | 54 | 99.6 | 98.03 (97.7-98.4) | 89.4 | 0.45% | 7.54% | 20.9% |
+
+<!-- reading -->
+Read against the bold reference, b7's λ 0.98 cell `b7aa`-`b7ad` (17.3% density, best30 97.75, 6.2% of evals below 80%), which b15-b21 were generated from. **The gradient-norm clip is a no-op at this base from off to 5.0.** Density is inside the reference's noise at every cell (16.7-19.5% against 17.3), best30 spans 97.80-98.17 with the base at the bottom of the range, and no cell's best row beats 99.8. **The null check answered the spec's question**: clipping *off* (`gc0`) reads 17.3%, the base's density to the decimal, with 3.7% of evals below 80% against 6.2 — so the base's collapses are not rare huge gradients, they are policy-level, the prediction's second branch. 0.1 ("slower, steadier") is neither: its stage-A density is 21.7 against 20.4 and its 19.1% is one seed, `b18h` at 32.4% with the batch's best best30 (98.6), over three at 12-16%. 2.0 is the batch's densest and most stable cell (19.5%, 3.21% below 80%, 101 `hof5000` candidates) and 5.0 its least stable (7.54%, `b18v` 1.75% below 50%) — and since 0 and 5.0 are both effectively off, **their 3.8 pp spread on the below-80% column is that column's noise floor at n=4**, which also brackets b21's "every cell a little more stable" and b20's 256-512 lanes reading as a stability lever: differences of that size are not evidence. At depth the batch's best are `b18t-gc2-seed4` @11452416 and `b18h-gc01-seed4` @11976704, both **98.9 /30,000 [98.8, 99.0]**, below the HOF's 99.30 third place and both from checkpoints near 11-12M, as `b17cl`'s HOF entry was. The clip stays at 0.5 and leaves the grid; with it the one-knob sweeps at λ 0.98 (b15-b21) are done.
+<!-- /reading -->
+
+### Every arm
+
+| arm | gradient_clipping | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b18a-gc0-seed1` | 0 | 1074 | 16.4% | 16 | 99.6 | 97.8 @28.9M | 94.2 | 0.17% |
+| `b18b-gc0-seed2` | 0 | 1123 | 18.0% | 21 | 99.4 | 97.8 @22.8M | 91.0 | 0.28% |
+| `b18c-gc0-seed3` | 0 | 1059 | 14.8% | 6 | 99.2 | 97.7 @42.6M | 94.0 | 0.47% |
+| `b18d-gc0-seed4` | 0 | 1114 | 19.7% | 26 | 99.4 | 98.3 @25.3M | 94.1 | 0.0% |
+| `b18e-gc01-seed1` | 0.1 | 950 | 15.9% | 14 | 99.8 | 98.1 @25.1M | 93.2 | 0.1% |
+| `b18f-gc01-seed2` | 0.1 | 931 | 12.6% | 11 | 99.4 | 98.2 @10.9M | 90.5 | 0.57% |
+| `b18g-gc01-seed3` | 0.1 | 1083 | 12.0% | 8 | 99.2 | 97.8 @32.5M | 92.1 | 0.0% |
+| `b18h-gc01-seed4` | 0.1 | 1277 | 32.4% | 51 | 99.8 | 98.6 @45.5M | 92.1 | 0.27% |
+| `b18i-gc025-seed1` | 0.25 | 949 | 9.7% | 6 | 99.4 | 97.6 @36.3M | 93.1 | 0.34% |
+| `b18j-gc025-seed2` | 0.25 | 1035 | 14.0% | 17 | 99.8 | 97.7 @29.8M | 93.4 | 0.1% |
+| `b18k-gc025-seed3` | 0.25 | 1049 | 18.6% | 22 | 99.2 | 98.5 @46.2M | 92.3 | 0.03% |
+| `b18l-gc025-seed4` | 0.25 | 1252 | 22.8% | 26 | 99.4 | 98.4 @23.9M | 90.7 | 0.03% |
+| `b18m-gc1-seed1` | 1.0 | 915 | 16.5% | 19 | 99.8 | 97.7 @37.0M | 91.1 | 0.03% |
+| `b18n-gc1-seed2` | 1.0 | 930 | 14.9% | 11 | 99.4 | 97.8 @41.7M | 88.9 | 0.07% |
+| `b18o-gc1-seed3` | 1.0 | 1059 | 22.3% | 25 | 99.6 | 98.0 @42.5M | 90.0 | 0.03% |
+| `b18p-gc1-seed4` | 1.0 | 1031 | 12.9% | 8 | 99.2 | 97.7 @30.2M | 94.2 | 0.13% |
+| `b18q-gc2-seed1` | 2.0 | 1223 | 18.7% | 32 | 99.8 | 98.2 @22.6M | 94.8 | 0.13% |
+| `b18r-gc2-seed2` | 2.0 | 1078 | 20.5% | 26 | 99.6 | 97.9 @26.3M | 91.1 | 0.41% |
+| `b18s-gc2-seed3` | 2.0 | 1047 | 16.0% | 14 | 99.4 | 97.9 @20.5M | 93.1 | 0.24% |
+| `b18t-gc2-seed4` | 2.0 | 1222 | 22.3% | 29 | 99.8 | 98.2 @46.8M | 94.1 | 0.07% |
+| `b18u-gc5-seed1` | 5.0 | 872 | 12.4% | 8 | 99.2 | 98.0 @39.5M | 86.6 | 0.49% |
+| `b18v-gc5-seed2` | 5.0 | 1060 | 23.1% | 22 | 99.6 | 98.4 @39.2M | 90.4 | 1.75% |
+| `b18w-gc5-seed3` | 5.0 | 1096 | 17.8% | 12 | 99.2 | 98.0 @39.5M | 89.6 | 0.4% |
+| `b18x-gc5-seed4` | 5.0 | 1022 | 13.1% | 12 | 99.4 | 97.7 @33.8M | 91.1 | 0.2% |
+
+<!-- /progress_update: batch b18 -->
+
 <!-- progress_update: batch b21 -->
 ## Batch b21 — the `chase_safe_shaping` sweep, 6 values x 4 seeds, 50M, closed 2026-09-06
 

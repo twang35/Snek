@@ -17,6 +17,25 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The gradient-norm clip is a no-op from off to 5.0, so the base's collapses are policy-level, not rare huge gradients; and two effectively-off cells put the noise floor of the stability column at ~4 pp
+
+**Measured 2026-09-06 on b18's 24 arms (both boxes)** — 6 values x 4 seeds at 50M, b7's base at λ 0.98 (the reference 0.5):
+
+| clip | 0 (off) | 0.1 | 0.25 | **0.5** (ref) | 1.0 | 2.0 | 5.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ≥98%/500 density | 17.3 | 19.1 | 16.7 | **17.3%** | 16.7 | 19.5 | 16.8 |
+| best30 | 97.90 | 98.17 | 98.05 | 97.75 | 97.80 | 98.05 | 98.03 |
+| evals < 80% | 3.7% | 4.6 | 4.2 | 6.2 | 5.5 | **3.2** | **7.5** |
+| stage-A ≥98% | 22.0 | 21.7 | 21.7 | 20.4 | 19.5 | 24.6 | 20.9 |
+
+Every cell is inside the reference's noise on density and best row. Clipping off reads the base's density to the decimal
+and is *more* stable, so whatever collapses the base is not a rare huge gradient. **The calibration matters more than
+the knob**: 0 and 5.0 are both effectively no clip, and they differ by 3.8 pp on the share of evals below 80% (3.7
+against 7.5) — that spread is the column's noise at n=4. It brackets b21's "every cell a little more stable than the
+base" (3.6-4.9 against 6.2) and b20's 256-512 lanes reading as a stability lever (3.9 and 2.2 against 6.2): the 512-lane
+cell sits at the edge of that floor, the rest inside it. **A stability claim at this base needs a gap of ~4 pp or
+more, or more seeds.** The clip stays at 0.5 and leaves the grid; the one-knob sweeps at λ 0.98 (b15-b21) are done.
+
 ### The chase-safe shaping is a no-op for PPO: dose 0 to 0.2 and gate 0 to 85 are all within noise of the base
 
 **Measured 2026-09-06 on b21's 24 arms (both boxes)** — 3 doses and 3 gates x 4 seeds at 50M, b7's base at λ 0.98 (the
