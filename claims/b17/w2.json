@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b17ai-clip015-seed1",
+  "b17aj-clip015-seed2",
+  "b17ak-clip015-seed3",
+  "b17al-clip015-seed4",
+  "b17am-clip03-seed1",
+  "b17an-clip03-seed2",
+  "b17ao-clip03-seed3",
+  "b17ap-clip03-seed4"
+ ],
+ "batch": "b17",
+ "box": "desktop",
+ "claimed_iso": "2026-09-05T23:43:08",
+ "claimed_ts": 1788676988.6594272,
+ "kind": "wave",
+ "wave": 2
+}
