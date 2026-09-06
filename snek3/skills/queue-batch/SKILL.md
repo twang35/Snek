@@ -56,8 +56,11 @@ per type.
 *are* the protocol. **An eval spec is claimed only by a box that holds every one of its policies'
 checkpoints** (`savedPolicies/<arm>/`), and only once none of its arms is an unclaimed training spec.
 A hand eval over a batch that was split across the boxes is therefore claimable by neither until the
-missing checkpoints are rsynced to one of them (the `hof-remeasure` skill's step 2); the pool line says
-`needs checkpoints`. Give it an id that is not a chain pass label (`b7-hof30k-confirm`, not `b7-hof30k`).
+missing checkpoints are rsynced to one of them (the `hof-remeasure` skill's step 2). **The pool line does
+not say why**: it reads `b21 eval | b21-hof30k-confirm unclaimed` on both boxes for as long as neither
+can take it, so an eval spec sitting unclaimed past a wave boundary on a box that is otherwise idle means
+the checkpoints -- `ls savedPolicies/` on each box is the check. Give it an id that is not a chain pass
+label (`b7-hof30k-confirm`, not `b7-hof30k`).
 
 A malformed spec is skipped and named under `attention`, never raised into either scheduler — so a bad
 commit cannot stop a box, but it also will not tell you until after the push. **Validate first with the
