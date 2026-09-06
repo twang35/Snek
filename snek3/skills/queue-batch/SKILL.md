@@ -57,7 +57,7 @@ per type.
 checkpoints** (`savedPolicies/<arm>/`), and only once none of its arms is an unclaimed training spec.
 A hand eval over a batch that was split across the boxes is therefore claimable by neither until the
 missing checkpoints are rsynced to one of them (the `hof-remeasure` skill's step 2). **The pool line does
-not say why**: it reads `b21 eval | b21-hof30k-confirm unclaimed` on both boxes for as long as neither
+not say why**: it reads `b21 eval | b21-hof30k-confirm` on both boxes for as long as neither
 can take it, so an eval spec sitting unclaimed past a wave boundary on a box that is otherwise idle means
 the checkpoints -- `ls savedPolicies/` on each box is the check. Give it an id that is not a chain pass
 label (`b7-hof30k-confirm`, not `b7-hof30k`).
@@ -114,7 +114,7 @@ git fetch origin ops-status && git show origin/ops-status:status.json
 
 **The fetch is mandatory** — without it you read an old local ref whose embedded timestamp looks like a
 dead daemon. `at_a_glance.pool` is the shared queue: what is unclaimed, by batch, and what each box holds
-(`laptop holds b21-w2 (8 arms, running)`); `running`/`queued` are the desktop's own, `laptop_running`/
+(`b18 training | 16/24 arms`; `laptop holds b21-w2 (8 arms, running)`); `desktop_running`/`desktop_queued` are the desktop's own, `laptop_running`/
 `laptop_queued` the laptop's, `attention` anything needing a human. A batch pushed while both boxes are
 busy shows under `pool` until a wave boundary on one of them: that is normal, not stuck. Nothing needs
 restarting. `PYTHONPATH=. python -m tools.claims show` prints the same pool from the laptop.

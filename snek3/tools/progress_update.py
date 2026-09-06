@@ -575,7 +575,7 @@ def main(argv=None):
 
     if status:
         say('')
-        say('desktop {0}: {1}'.format(status['iso'], '; '.join(status['at_a_glance']['running']) or 'idle'))
+        say('desktop {0}: {1}'.format(status['iso'], '; '.join(status['at_a_glance'].get('desktop_running') or []) or 'idle'))
         for job, step, cap, elapsed in running_arms(status):
             if cap:
                 say('  {0} {1:.1f}M/{2:.1f}M {3:.0f}% {4:.0f} min'.format(job, step / 1e6, cap / 1e6,

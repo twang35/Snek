@@ -464,12 +464,19 @@ class Daemon(object):
         else:
             glance = build_at_a_glance([], [], {})
             running = []
-        # The pool is the daemon's own read (this network cycle), fresher than the scheduler's last event.
-        glance['pool'] = list(self.pool.get('lines') or glance.get('pool') or [])
-        glance['attention'] = self._attention(status)
+        queued = list(glance.get('queued') or [])
         notice = hold_notice([flag for flag in HOLD_FLAGS if self.runtime.get(flag)])
         if notice:
-            glance['queued'] = [notice] + [line for line in glance.get('queued', []) if not line.startswith('** queue')]
+            queued = [notice] + [line for line in queued if not line.startswith('** queue')]
+        # The published block, in reading order: the shared queue first (the daemon's own read this
+        # network cycle, fresher than the scheduler's last event), then this box's lines under its own
+        # name -- `desktop_running` beside `laptop_running`, never a bare `running` that a reader has to
+        # know is the desktop's (user, 2026-09-06) -- then what needs a human, then the box's total.
+        glance = {'pool': list(self.pool.get('lines') or glance.get('pool') or []),
+                  'desktop_running': list(glance.get('running') or []),
+                  'desktop_queued': queued,
+                  'attention': self._attention(status),
+                  'desktop_remaining': glance.get('remaining')}
         payload = {
             'iso': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'ts': time.time(),

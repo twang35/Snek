@@ -95,13 +95,15 @@ def _print_glance(host):
         return
     print('at {0}  scheduler={1}'.format(status.get('iso'), status.get('scheduler')))
     glance = status.get('at_a_glance') or {}
-    # {'running': [str], 'queued': [str], 'attention': [str]} — a hold notice arrives as the first
-    # `queued` line, and anything needing a human arrives under `attention`.
-    for key in ('running', 'queued', 'attention'):
+    # `pool` first, then the box's own `desktop_running` / `desktop_queued` (a hold notice arrives as the
+    # first queued line) and `attention` for anything needing a human, then `desktop_remaining`.
+    for line in glance.get('pool') or []:
+        print('  pool: {0}'.format(line))
+    for key in ('desktop_running', 'desktop_queued', 'attention'):
         for line in glance.get(key) or []:
-            print('  {0}: {1}'.format(key, line))
-    if glance.get('remaining'):
-        print('  remaining: {0}'.format(glance['remaining']))
+            print('  {0}: {1}'.format(key.replace('desktop_', ''), line))
+    if glance.get('desktop_remaining'):
+        print('  remaining: {0}'.format(glance['desktop_remaining']))
     # The laptop's lines, folded in from `laptop-status` -- with the laptop's own timestamp, because
     # that is what tells an idle laptop (empty, recent) from a dead driver (lines, hours old).
     if 'laptop_iso' in glance:

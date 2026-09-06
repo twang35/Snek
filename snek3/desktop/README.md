@@ -72,9 +72,11 @@ are removed from `queue/pending/` when the batch closes (the progress update), n
 git fetch origin ops-status && git show origin/ops-status:status.json
 ```
 
-`at_a_glance.running` / `queued` / `attention` are the box; `laptop_running` / `laptop_queued` are the
-laptop's scheduler, as of `laptop_iso` (the laptop's own clock); **`pool` is the shared queue** -- what is
-unclaimed, by batch, and what each box holds (`laptop holds b21-w2 (8 arms, running)`), the daemon's own
+`at_a_glance` reads in this order: **`pool` is the shared queue**, then `desktop_running` / `desktop_queued` /
+`attention` / `desktop_remaining` are the box, and `laptop_running` / `laptop_queued` / `laptop_remaining` are the
+laptop's scheduler, as of `laptop_iso` (the laptop's own clock). The pool is what is unclaimed, by batch
+(`b18 training | 16/24 arms`, the count out of the batch's arms on `ops`), and what each box holds
+(`laptop holds b21-w2 (8 arms, running)`), the daemon's own
 read each network cycle (`tools.claims show --json`). The laptop scheduler's last publish before it exits
 is **empty**, so empty lists mean an idle laptop, and lines under a `laptop_iso` hours old mean it died —
 the two are meant to read differently; a claim held by a box whose status is two hours old is a line under
@@ -182,7 +184,7 @@ the wave's specs, before it launches the arms — so a wave never trains against
 
 `status.json`'s queue shows a batch's owed passes as **one line**, `b16 evals | … (8 arms) | ~1.1h`;
 the running line names the pass that is running and what is left of it (`| ~40m left`). The time
-estimates -- and `at_a_glance.remaining`, the box's total with the clock time it clears -- are
+estimates -- and `at_a_glance.desktop_remaining`, the box's total with the clock time it clears -- are
 `tools/eta.py`'s: a queued arm at the wall rate of the batch's finished arms (`arch.json` to
 `_evals.json` mtime), a running arm at its recent loop rate plus the overhead it has shown, a pass at
 the box's own median for that pass (`runs/.live/.durations.json`, written by the scheduler). Both boxes

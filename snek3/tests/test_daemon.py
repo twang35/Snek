@@ -744,7 +744,7 @@ class Spawns(object):
         return FakeScheduler(self.pid), '/var/snek/logs/scheduler-x.log'
 
 
-POOL = {'lines': ['b21 training | 24 arms unclaimed', 'laptop holds b20-w1 (8 arms, running)'],
+POOL = {'lines': ['b21 training | 24/24 arms', 'laptop holds b20-w1 (8 arms, running)'],
         'unclaimed': [{'batch': 'b21', 'phase': 'training', 'ids': ['b21a-x'], 'pins': {}, 'priority': 220}],
         'held': {'laptop': [{'id': 'b20-w1', 'batch': 'b20', 'kind': 'wave', 'wave': 1, 'arms': ['b20a-x'],
                              'done': False, 'running': True}]},
@@ -929,8 +929,8 @@ def test_a_pause_is_a_marker_the_scheduler_reads_and_no_scheduler_is_started_und
     daemon.poll_once(git=True)
     hold = os.path.join(daemon.runs_dir(), daemon_module.HOLD_RELATIVE)
     assert os.path.exists(hold) and daemon.spawn.calls == []
-    assert bus.status[-1]['at_a_glance']['queued'] == ['** queue paused: nothing new will start. Set "paused": false '
-                                                       'in runtime.json on ops to resume']
+    assert bus.status[-1]['at_a_glance']['desktop_queued'] == ['** queue paused: nothing new will start. Set "paused": false '
+                                                               'in runtime.json on ops to resume']
     assert bus.status[-1]['at_a_glance']['pool'] == POOL['lines'], 'the pool is shown even while paused'
     bus.runtime_text = '{}'
     daemon.poll_once(git=True)
@@ -1016,7 +1016,11 @@ def test_status_carries_the_schedulers_glance_its_attention_and_the_laptop(tmp_p
                       attention=['** b1-stageb failed (exit 1); marked, not retried'])
     daemon.poll_once(git=True)
     glance = bus.status[-1]['at_a_glance']
-    assert glance['running'] == ['b1 | x | training 50% (2 arms)']
+    assert list(glance) == ['pool', 'desktop_running', 'desktop_queued', 'attention', 'desktop_remaining',
+                            'laptop_running', 'laptop_queued', 'laptop_remaining', 'laptop_iso'], \
+        'the pool first, then each box under its own name (user, 2026-09-06)'
+    assert glance['desktop_running'] == ['b1 | x | training 50% (2 arms)']
+    assert 'running' not in glance and 'queued' not in glance and 'remaining' not in glance
     assert glance['attention'] == ['** b1-stageb failed (exit 1); marked, not retried']
     assert glance['pool'] == POOL['lines'], "the daemon's own read of the pool, not the scheduler's last event"
     assert glance['laptop_running'] == ['b16 | kl | training 3% (8 arms)'] and glance['laptop_iso'] == '2026-09-05T11:00:00'
@@ -1030,8 +1034,8 @@ def test_a_stale_status_file_from_a_dead_scheduler_is_not_shown_as_running(tmp_p
     _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}])
     daemon.scheduler.returncode = -9
     daemon.poll_once(git=True)
-    assert bus.status[-1]['at_a_glance']['running'] == [] and bus.status[-1]['running'] == []
-    assert bus.status[-1]['at_a_glance']['queued'] == [], 'what is queued is the pool, shown under pool'
+    assert bus.status[-1]['at_a_glance']['desktop_running'] == [] and bus.status[-1]['running'] == []
+    assert bus.status[-1]['at_a_glance']['desktop_queued'] == [], 'what is queued is the pool, shown under pool'
     assert bus.status[-1]['at_a_glance']['pool'] == POOL['lines']
     assert any('the scheduler exited -9' in line for line in bus.status[-1]['at_a_glance']['attention'])
 
@@ -1119,7 +1123,7 @@ def test_a_restart_action_runs_even_under_a_pause_and_a_done_one_is_not_repeated
                        runtime_text='{"paused": true}')
     daemon.poll_once(git=True)
     assert daemon.stop and daemon.ledger['restart-1']['state'] == 'done'
-    assert bus.status[-1]['at_a_glance']['queued'][0].startswith('** queue paused')
+    assert bus.status[-1]['at_a_glance']['desktop_queued'][0].startswith('** queue paused')
     again = daemon_module.Daemon(daemon.host)
     again.run_command = Commands()
     again.spawn = Spawns()

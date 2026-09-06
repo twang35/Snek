@@ -337,11 +337,14 @@ def pool_view(specs, records, published=frozenset(), running=None, status_ages=N
         if entry['pins']:
             pin = ' | pinned ' + ', '.join('{0} {1}'.format(box, n) if n != count else box
                                             for box, n in sorted(entry['pins'].items()))
+        # A line that names a batch and no box is unclaimed work by construction, so the word is dropped;
+        # the count is out of the batch's training specs on ops, claimed or not (`16/24 arms`).
         if entry['phase'] == 'training':
-            lines.append('{0} training | {1} arm{2} unclaimed{3}'.format(
-                entry['batch'], count, '' if count == 1 else 's', pin))
+            total = sum(1 for spec in specs.values()
+                        if batch_of(spec['id']) == entry['batch'] and spec.get('type', 'train') == 'train')
+            lines.append('{0} training | {1}/{2} arms{3}'.format(entry['batch'], count, total, pin))
         else:
-            lines.append('{0} eval | {1} unclaimed{2}'.format(entry['batch'], ', '.join(entry['ids']), pin))
+            lines.append('{0} eval | {1}{2}'.format(entry['batch'], ', '.join(entry['ids']), pin))
     for box in sorted(held):
         open_ones = [h for h in held[box] if not h['done']]
         if open_ones:

@@ -66,7 +66,7 @@ def test_a_released_wave_number_is_never_reused_and_its_arms_go_back_to_the_pool
     # a tombstone holds nothing in the pool view and is nothing to mirror
     view = claims.pool_view(specs, released)
     assert [h['id'] for h in view['held']['laptop']] == [] if 'laptop' in view['held'] else True
-    assert view['lines'] == ['b21 training | 8 arms unclaimed', 'desktop holds b21-w1 (8 arms)']
+    assert view['lines'] == ['b21 training | 8/16 arms', 'desktop holds b21-w1 (8 arms)']
     # with every live claim gone but the tombstones the numbering still continues
     record = claims.next_claim(specs, [dict(held[0], kind='released', arms=[]), tombstone], 'desktop', 8)
     assert record['wave'] == 3 and record['arms'] == arms[:8]
@@ -127,9 +127,10 @@ def test_the_pool_view_lists_unclaimed_work_by_batch_each_boxs_open_holdings_and
     published = set(arms[:8]) | {'b21-stageb', 'b21-hof5000', 'b21-hof30k'}
     view = claims.pool_view(specs, records, published=published, running={arms[9]: 'laptop'},
                             status_ages={'laptop': 3 * 3600, 'desktop': 10.0})
-    assert view['lines'] == ['b7 eval | b7-hof30k-confirm unclaimed | pinned laptop',
-                             'b18 training | 8 arms unclaimed',
-                             'laptop holds b21-w2 (8 arms, running)']
+    assert view['lines'] == ['b7 eval | b7-hof30k-confirm | pinned laptop',
+                             'b18 training | 8/8 arms',
+                             'laptop holds b21-w2 (8 arms, running)'], \
+        'a line naming a batch and no box is unclaimed by construction; the count is out of the batch on ops'
     assert view['held']['desktop'][0]['done'] is True and view['held']['laptop'][0]['done'] is False
     assert view['attention'] == ['** laptop holds b21-w2 but its status is 3.0h old; if it is not coming back, '
                                  '`python -m tools.claims release <id>` returns the work to the pool']
@@ -318,7 +319,7 @@ def test_gather_reads_the_pool_from_the_refs(bus):
     desktop = bus['stores']['desktop']
     claims.claim_next(desktop, 'desktop', 8, read_specs=_read(desktop), log=lambda m: None)
     view = claims.gather(repo=desktop.repo, remote='origin', store=desktop)
-    assert view['lines'] == ['b21 training | 8 arms unclaimed', 'b18 training | 8 arms unclaimed',
+    assert view['lines'] == ['b21 training | 8/16 arms', 'b18 training | 8/8 arms',
                              'desktop holds b21-w1 (8 arms)']
     assert view['heads']['claims'] == desktop.head and view['heads']['ops']
     assert view['published'] == {} and view['running'] == {}
