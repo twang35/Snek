@@ -1096,7 +1096,7 @@ b5 "better agent" batch: b4 must hold the network at 320 to stay seed-matched ag
 | **DQN b2, 4 seeds pooled** | 18M | 1,135 | 99.2% | 5 | 0.44% | ~7-8 h (16 cores) |
 
 **PPO's record-region density is 11.6x DQN's** — 95 checkpoints at ≥98%/500 against 5 — which is the
-metric [`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison. The best *single*
+metric [`../plans/archive/ppo.md`](../plans/archive/ppo.md) §10 pre-registered for this comparison. The best *single*
 checkpoint is a tie at 99.2%, and PPO's got there on **5.05M** transitions against b2's 18M.
 
 **The honest depth, and it is the number to quote.** `b3j-lr5e4` @9,469,952 measured **99.0%/500** —
@@ -1157,7 +1157,7 @@ is the endgame this task has always been about.
 ## The PPO gate arm
 
 **`ppo-smoke` — the phase-6b gate, not a batch arm.** 508k transitions at
-[`../plans/ppo.md`](../plans/ppo.md) §7's untuned defaults, on the laptop, 2026-08-29. Kept because it
+[`../plans/archive/ppo.md`](../plans/archive/ppo.md) §7's untuned defaults, on the laptop, 2026-08-29. Kept because it
 is the first PPO measurement in this project and the DQN comparison below is the reason 6c exists;
 it is deliberately outside the p-series and nothing should be seed-matched against it.
 

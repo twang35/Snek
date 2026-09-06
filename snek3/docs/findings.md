@@ -650,7 +650,7 @@ food-distance term, fc 320):
 
 **The best single checkpoint is a tie at 99.2%, and PPO's got there on 5.05M transitions against b2's
 18M.** Where the two genuinely differ is the *density* of record-region checkpoints — the metric
-[`../plans/ppo.md`](../plans/ppo.md) §10 pre-registered for this comparison — where PPO is **11.6x**
+[`../plans/archive/ppo.md`](../plans/archive/ppo.md) §10 pre-registered for this comparison — where PPO is **11.6x**
 ahead: 95 checkpoints at ≥98%/500 against 5.
 
 That is not a claim that PPO is the better algorithm here, and the counter-evidence is in the same
@@ -932,7 +932,7 @@ branch that forgot to watch (15 h on the eval slot, 2026-09-03), the stand-by lo
 zombie check. Now the scheduler spawns one viewer, holds its `Popen`, writes the panels into its own
 status file, and closes it on exit; the viewer follows that file and exits if its parent is gone. The
 flock, the registry read, the pid watch and the stand-by loop are deleted, and so is the second slot:
-one window shows a wave's charts and then the pass's. Design and decisions: `plans/scheduler.md`.
+one window shows a wave's charts and then the pass's. Design and decisions: `plans/archive/scheduler.md`.
 
 **Panels are sticky within a wave**, added 2026-08-29 at the user's request and for the right reason:
 a batch is read as a batch, so with one arm left of four the other three are most of the answer. That
@@ -1144,7 +1144,7 @@ measured on the same arm at the same time.
 is a step delta over a real-time delta, so it includes stage A — while `runs/<arm>_evals.json`'s
 `steps_per_second` excludes it. The two differ by 3x on a healthy arm and neither is labelled.
 
-**This corrects the plan and this file's own arithmetic.** [`../plans/pytorch-port.md`](../plans/pytorch-port.md)
+**This corrects the plan and this file's own arithmetic.** [`../plans/archive/pytorch-port.md`](../plans/archive/pytorch-port.md)
 §6 estimated stage A at 1.85 h from snek2's ~45 episodes/s and concluded "an arm is ~2 h and stage A
 is ~90% of it". The 90% share was right and the total was not: stage A alone is ~5.3 h.
 
@@ -1186,7 +1186,7 @@ the seven other layouts. What replaced it is at the top of `Established`.
 
 ### b6 leads b5 on record density — a 500-episode reading that 5,000 episodes erased
 
-Published as "12.8% against 9.6%" in `results.md`, this file and `plans/ppo.md` §6e. Re-measured at
+Published as "12.8% against 9.6%" in `results.md`, this file and `plans/archive/ppo.md` §6e. Re-measured at
 5,000 episodes the two batches have identical means (97.80), ≥98 rates within 0.1 pp, and b5 ahead on
 champion-level rows (29 vs 20) and on the top checkpoint (99.20 vs 99.10). The b4 half of the same
 comparison survived. See `Established`.

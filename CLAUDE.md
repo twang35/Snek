@@ -7,7 +7,7 @@ instructions; **this file is only what is true of the whole repository.**
 |---|---|---|
 | `theSchlong/`, `theSchlongCardinalDirs/`, `theSchmid/`, `theSchlort/`, `baddieStuff/`, `humanPlayer/` | the originals | kept as-is for posterity. Do not edit |
 | [`snek2/`](snek2/) | TensorFlow + TF-Agents, batches 1-47 | **frozen 2026-08-28.** Runnable for A/B, not edited. Its manual is [`snek2/CLAUDE.md`](snek2/CLAUDE.md) |
-| [`snek3/`](snek3/) | PyTorch | **active.** Its manual is [`snek3/CLAUDE.md`](snek3/CLAUDE.md), its design [`snek3/plans/pytorch-port.md`](snek3/plans/pytorch-port.md) |
+| [`snek3/`](snek3/) | PyTorch | **active.** Its manual is [`snek3/CLAUDE.md`](snek3/CLAUDE.md), its design [`snek3/plans/archive/pytorch-port.md`](snek3/plans/archive/pytorch-port.md) |
 
 **Work in `snek3/`.** snek2 is copied *from*, never edited — code duplication between the two is
 deliberate. If a rule you need is missing from `snek3/CLAUDE.md`, it may be in `snek2/CLAUDE.md`
@@ -22,7 +22,7 @@ live charts on every network cycle (`snek3/tools/site_build.py`), pushing one sn
 local build, gitignored; nothing under it is committed, and the pictures live only on `site` (every one
 redraws from the JSON master keeps). Edit `snek3/viewer/index.html` and deploy; the next build carries
 it. The live page is https://twang35.github.io/Snek/ ; the design is
-[`snek3/plans/site-publish.md`](snek3/plans/site-publish.md).
+[`snek3/plans/archive/site-publish.md`](snek3/plans/archive/site-publish.md).
 
 **`README.md` is for humans and stays barebones** — the eras, a sentence each, a gif each. Anything
 an agent needs belongs here or in an era's own manual, not there. The two sections below are what an
@@ -81,7 +81,7 @@ The rules, all of them, and each is the scheduler's alone:
 processes that each knew only about themselves could not answer the lifecycle questions — who closes it,
 who replaces it, whether one is already up — and every gap grew a rule. The process that knows what is
 running is the scheduler, so the window is its. The design and the incident list are
-[`snek3/plans/scheduler.md`](snek3/plans/scheduler.md); the mechanism is
+[`snek3/plans/archive/scheduler.md`](snek3/plans/archive/scheduler.md); the mechanism is
 [`snek3/tools/window.py`](snek3/tools/window.py). **Do not give the window back to the arms, and do not
 add a second opener.**
 

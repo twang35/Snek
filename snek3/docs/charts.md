@@ -24,7 +24,7 @@ through, 8 at a time. Only a live arm's JSON waits for the `results` branch at c
 every arm of the wave it is training and, during a pass, every arm's stage-B chart. Nothing launches it
 by hand and no training opens one: the scheduler opens it at a launch and closes it when it exits. To
 replace it now: `PYTHONPATH=. python -m tools.scheduler --reopen-window`. Killing it or closing it is
-free — no training reads it, waits on it, or reopens it ([`../plans/scheduler.md`](../plans/scheduler.md)
+free — no training reads it, waits on it, or reopens it ([`../plans/archive/scheduler.md`](../plans/archive/scheduler.md)
 on why the arms stopped opening it, and [`findings.md`](findings.md) on the three attempts before that).
 
 <!-- progress_update: batch b19 -->
@@ -1759,7 +1759,7 @@ step 508k transitions · trailing score 62.5 · avg score 79.55/500 eps · perfe
 entropy 1.086 → 0.27 · clip fraction 0.03
 
 Score climbs monotonically to ~80 and then flattens while the perfect rate sits near 1% — the shape
-[`../plans/ppo.md`](../plans/ppo.md) §8 predicted for a short GAE horizon against a win ~950 moves
+[`../plans/archive/ppo.md`](../plans/archive/ppo.md) §8 predicted for a short GAE horizon against a win ~950 moves
 away, though at this budget it is equally just an untuned learning rate. `clip_fraction` 0.03 says the
 update is not being constrained, so the rate is the first thing b3 moves.
 

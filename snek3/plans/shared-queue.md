@@ -182,7 +182,7 @@ Instead:
 | `tools/progress_update.py` | use `batch_state`; import and close times from both feeds; delete `laptop_state_line` | ±100 |
 | `tools/viewer_manifest.py` | `box` per arm | +15 |
 | `tests/` | `next_claim` cases (pin, eligibility, numbering, order); the race against a local bare `origin` with two worktrees pushing on the same parent; the mirror; the daemon's spawn rule; `batch_state` | ~400 |
-| skills, `desktop/README.md`, `CLAUDE.md`, `plans/scheduler.md` | 2.7, the branch table, the one-writer exception, the two-hosts section | docs |
+| skills, `desktop/README.md`, `CLAUDE.md`, `plans/archive/scheduler.md` | 2.7, the branch table, the one-writer exception, the two-hosts section | docs |
 
 ## 4. Migration
 

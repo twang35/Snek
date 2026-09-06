@@ -4,7 +4,7 @@ The active era. Read the repository's [`../CLAUDE.md`](../CLAUDE.md) first for t
 rules, the conda envs, the git workflow and the two compute hosts; this file is what is true of
 snek3 specifically.
 
-**The design is [`plans/pytorch-port.md`](plans/pytorch-port.md).** It carries the decisions, the
+**The design is [`plans/archive/pytorch-port.md`](plans/archive/pytorch-port.md).** It carries the decisions, the
 measurements behind them, and the phase gates. Read it before proposing a change to the structure.
 
 **snek2 is frozen.** Copy from it freely — that is what it is for — but never edit it, and never
@@ -95,7 +95,7 @@ ways to see a game, and they run in their own processes so they cost training no
 **It opens no window.** The box's one chart window is the **scheduler's** (`tools/scheduler.py`, via
 `tools/window.py`): opened when it launches a wave or a pass, pointed at the wave's charts and then the
 pass's through the scheduler's own status file, closed when it exits. Why the arms must not open one
-again is in the root [`../CLAUDE.md`](../CLAUDE.md) and [`plans/scheduler.md`](plans/scheduler.md).
+again is in the root [`../CLAUDE.md`](../CLAUDE.md) and [`plans/archive/scheduler.md`](plans/archive/scheduler.md).
 `SNEK_CHART_WINDOW=0` turns it off (which is what the test suite and every benchmark do).
 
 ## The eval protocol is one stage

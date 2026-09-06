@@ -3,7 +3,7 @@
 Identical to snek2's, deliberately — same board, same actions, same rewards, same 30-value
 observation, same era marker `b09c616`. That is what lets a snek2 champion's weights convert straight
 across and gives the port a real correctness gate before any training code exists
-([`../plans/pytorch-port.md`](../plans/pytorch-port.md) §10).
+([`../plans/archive/pytorch-port.md`](../plans/archive/pytorch-port.md) §10).
 
 **Changing anything here changes the MDP.** Bump `env.constants.OBS_ERA` whenever the observation's
 *meaning* changes, even at constant length — see [`invariants.md`](invariants.md) invariant 3 for what

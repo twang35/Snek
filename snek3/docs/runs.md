@@ -36,7 +36,7 @@ collapses; the 0.2→0.02 anneal matches the base on density with better stabili
 22.2% density at 0.97% of evals below 80% (base 17.3% at 6.2%) — the most stable cell at this base, and denser;
 noadvnorm is as stable and 4 pp short.
 
-**Infrastructure today.** The desktop's `runner` is `daemon` ([`../plans/rename-runner-to-daemon.md`](../plans/rename-runner-to-daemon.md));
+**Infrastructure today.** The desktop's `runner` is `daemon` ([`../plans/archive/rename-runner-to-daemon.md`](../plans/archive/rename-runner-to-daemon.md));
 the desktop scheduler restarted on the new code at 13:59 with b17 wave 3 adopted mid-training. `tools/progress_update.py`
 now tables every batch in `references.json` (b16 had closed without ever being tabled), separates an anneal cell from the
 fixed value it starts at, names the cells of a switches batch, and reads a laptop batch's state from the laptop's own
@@ -665,7 +665,7 @@ queued, which is worth more than the schedule was.
    b29-vs-b41 process-noise gap is noise, not a port regression — snek2 ran that config three times
    precisely to have the yardstick.
 2. **Phase 6 — `ppo/`.** The reason snek3 exists, and the design is
-   [`../plans/ppo.md`](../plans/ppo.md). **Phases 6a, 6b and 6c are all closed** — the algorithm seam
+   [`../plans/archive/ppo.md`](../plans/archive/ppo.md). **Phases 6a, 6b and 6c are all closed** — the algorithm seam
    is in `train.py` with three fixed-seed DQN arms byte-identical across it, `ppo/` is written and
    tested (122 fixtures, 14 of 14 mutants killed), and batch b3 has run 15 arms. Deployed to the
    desktop 2026-08-29 once b2's stage-B wave published. **6d — batch b4 — is next**, at **18M**
@@ -716,7 +716,7 @@ One line per idea, with a prior. A design that is settled enough to implement ge
 
 | idea | prior |
 |---|---|
-| **PPO** | [`../plans/ppo.md`](../plans/ppo.md) — **phases 6a and 6b closed 2026-08-29; batch b3 is next.** No longer a backlog item. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
+| **PPO** | [`../plans/archive/ppo.md`](../plans/archive/ppo.md) — **phases 6a and 6b closed 2026-08-29; batch b3 is next.** No longer a backlog item. The reason snek3 exists. On-policy and wide, so it is the algorithm that actually exploits a 196k env-steps/s vectorised env, where DQN's replay ratio caps the loop at ~4,000 steps/s |
 | **Batched or asynchronous self-eval** | **the next change. 8.1 h an arm becomes ~2.3 h, measured.** The win is keeping the lanes full, so a queue drained by streaming workers gets it; the drained shape is the whole cost and cutting episodes does not touch it. Cost is a lag on the epsilon schedule — **bound it**, do not let queue depth set it |
 | **Replay ratio < 1** | ~~the only way past ~4,000 agent steps/s~~ **do not use this to reproduce snek2.** Ratio 1.0 already matches snek2's 1 gradient step per transition; lowering it makes snek3 *less* data-efficient than snek2 ever was. It remains a real dynamics knob, worth 2x at batch 512, but it is not a comparability fix — `SNEK_MAX_STEPS` is |
 | **Drop observation indices 10/12/14** | ~1.5x on the observation build. Region enumeration is 33% of the connectivity cost and those three indices are its only consumers. Batch 45 reached 99% with them in, so this is a cost question |

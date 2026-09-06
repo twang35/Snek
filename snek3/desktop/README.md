@@ -6,7 +6,7 @@ specs on `ops` into a local queue, starts `tools/scheduler.py` — the same sche
 that queue, and publishes what the scheduler finishes. It talks to the laptop only through four
 single-writer git branches. That decoupling is the design's best property: the bus works from anywhere,
 `ssh` is a convenience, and the daemon cannot be broken by a change to the trainer or the scheduler.
-The design and its decisions are [`../plans/scheduler.md`](../plans/scheduler.md).
+The design and its decisions are [`../plans/archive/scheduler.md`](../plans/archive/scheduler.md).
 
 **snek3's daemon owns the box**, but the two eras share the `ops` branch, which is why every spec carries a required `project` field.
 
@@ -241,7 +241,7 @@ ssh the-claw-den 'cd Snek/snek3 && SNEK_RUNS_DIR=~/Snek/snek3/desktop/runs SNEK_
 Nobody else pushes to `site`. If the laptop's feed is behind (a push failed there), republish from the
 laptop with `tools.results_feed <job-id> <files>` and trigger; if the build is broken, fix `site_build`,
 deploy and trigger -- the page is stale meanwhile, by design. `SITE_BRANCH` and `SITE_WORKTREE` in
-`host.env` override the defaults (`site`, beside `STATUS_WORKTREE`). Design: `plans/site-publish.md`.
+`host.env` override the defaults (`site`, beside `STATUS_WORKTREE`). Design: `plans/archive/site-publish.md`.
 
 ## Set the box up
 

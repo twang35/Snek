@@ -14,7 +14,7 @@ PYTHONPATH=. python -m pytest -q                          # the suite
 ```
 
 **Status: phase 0.** The environment and the measurement engine; no learning code yet. The plan and
-its gates are [`plans/pytorch-port.md`](plans/pytorch-port.md).
+its gates are [`plans/archive/pytorch-port.md`](plans/archive/pytorch-port.md).
 
 ## What is where
 

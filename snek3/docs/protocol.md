@@ -1,6 +1,6 @@
 # Protocol — how a run is measured and judged
 
-**Stage B is built as of phase 2** ([`../plans/pytorch-port.md`](../plans/pytorch-port.md) §6).
+**Stage B is built as of phase 2** ([`../plans/archive/pytorch-port.md`](../plans/archive/pytorch-port.md) §6).
 Stage A arrives with the trainer in phase 3, so the columns below that name it are still a
 specification.
 
