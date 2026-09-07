@@ -41,6 +41,7 @@
   .cfg i { display:inline-block; width:10px; height:10px; vertical-align:-1px; margin-right:.4em; border-radius:2px; }
   .cfg code { color:var(--fg); }
   .cfg .dim { color:var(--dim); }
+  .cfg .on { outline:1px solid var(--fg); outline-offset:2px; border-radius:2px; }
   #tip { position:fixed; pointer-events:none; background:#000; color:#fff; border:1px solid #444; border-radius:4px; padding:.3em .5em; font-size:12px; display:none; z-index:9; max-width:28em; white-space:pre-line; }
   table { border-collapse:collapse; margin:.4em 0 1em; font-size:12px; }
   th, td { border:1px solid var(--line); padding:.25em .5em; text-align:left; white-space:nowrap; }
@@ -285,20 +286,22 @@
   function configNote(main, b, col) {
     var cells = cellsOf(b), ref = refOf(b), ctrl = (ref && ref.env) || b.control_value || {};
     var t = document.createElement('table'); t.className = 'cfg'; var h = '';
+    // In the cell view the cell on screen is outlined, so the reader sees where in the sweep they are.
+    var on = function (c) { return state.view === 'cell' && c.slug === state.cell ? ' on' : ''; };
     var single = cells.filter(function (c) { return Object.keys(c.env || {}).length === 1; });
     var multi = cells.filter(function (c) { return Object.keys(c.env || {}).length !== 1; });
     var byKey = {};
     single.forEach(function (c) { var k = Object.keys(c.env)[0]; (byKey[k] = byKey[k] || []).push(c); });
     Object.keys(byKey).forEach(function (k, ki) {
-      var items = byKey[k].map(function (c) { return { v: c.env[k], html: '<span class="k" data-c="' + c.slug + '" style="color:' + (col[c.slug] || 'inherit') + '">' + c.env[k] + '</span>' }; });
-      if (ctrl[k] !== undefined) items.push({ v: ctrl[k], html: '<b class="k" data-c="' + (ref ? ref.slug : '') + '" title="reference">' + ctrl[k] + '</b>' });
+      var items = byKey[k].map(function (c) { return { v: c.env[k], html: '<span class="k' + on(c) + '" data-c="' + c.slug + '" style="color:' + (col[c.slug] || 'inherit') + '">' + c.env[k] + '</span>' }; });
+      if (ctrl[k] !== undefined) items.push({ v: ctrl[k], html: '<b class="k' + (ref ? on(ref) : '') + '" data-c="' + (ref ? ref.slug : '') + '" title="reference">' + ctrl[k] + '</b>' });
       // Value order where the values are numbers, so the reference lands in its place in the sweep.
       if (items.every(function (it) { return isFinite(parseFloat(it.v)); })) items.sort(function (a, b) { return parseFloat(a.v) - parseFloat(b.v); });
       h += '<tr><td><code>' + k + '</code> ∈ ' + items.map(function (it) { return it.html; }).join(', ')
         + (ki === 0 ? ' <span class="dim" title="' + seedsText(cells) + '">(bold = reference' + (ref ? '' : ', ' + (b.reference_label || 'an earlier batch')) + ')</span>' : '') + '</td></tr>';
     });
     if (multi.length) h += '<tr><td style="white-space:normal">' + multi.map(function (c) {
-      return '<span class="k" data-c="' + c.slug + '"><i style="background:' + (col[c.slug] || '#888') + '"></i>' + c.label + '</span> ' + envText(c.env);
+      return '<span class="k' + on(c) + '" data-c="' + c.slug + '"><i style="background:' + (col[c.slug] || '#888') + '"></i>' + c.label + ' ' + envText(c.env) + '</span>';
     }).join(' &nbsp;·&nbsp; ') + '</td></tr>';
     t.innerHTML = h;
     t.querySelectorAll('.k[data-c]').forEach(function (e) { if (e.getAttribute('data-c')) e.addEventListener('click', function () { state.view = 'cell'; state.cell = e.getAttribute('data-c'); render(); }); });
