@@ -165,8 +165,8 @@ spells, and a pass the arm already has the file for is skipped.
 | pass | id | selects | episodes | seed | writes |
 |---|---|---|---|---:|---|
 | stage B | `<batch>-stageb` | `screen:97` — every checkpoint at ≥97/100 in stage A | 500 | 0 | `runs/<arm>_checkpoint_evals.json` |
-| hof5000 | `<batch>-hof5000` | `above:99` — stage-B rows at ≥99/500 | 5,000 | 0 | `…_checkpoint_evals_hof5000.json` |
-| hof30k | `<batch>-hof30k` | `above:99:hof5000` — hof5000 rows at ≥99/5,000 | 30,000 | 7 | `…_checkpoint_evals_hof30k.json` |
+| hof5000 | `<batch>-hof5000` | `above:99.2` — stage-B rows at ≥99.2/500 | 5,000 | 0 | `…_checkpoint_evals_hof5000.json` |
+| hof30k | `<batch>-hof30k` | `above:99.2:hof5000` — hof5000 rows at ≥99.2/5,000 | 30,000 | 7 | `…_checkpoint_evals_hof30k.json` |
 
 **The numbers are in neither the daemon nor the scheduler.** They are `tools/closeout.py`'s `PASSES`;
 the scheduler passes the name and the close-out's preset does the rest — snek2's daemon carried five

@@ -38,6 +38,7 @@ import sys
 import threading
 import time
 
+from tools import eta
 from tools import eval_wave
 from tools import stage_b_chart
 
@@ -47,11 +48,12 @@ REDRAW_SECONDS = 20
 
 # **The protocol's passes, by name — the one place their numbers live.** Every batch gets all three,
 # in this order, and each selects from the pass before it: stage B screens every checkpoint at
-# >=97/100 in stage A and measures it at 500; `hof5000` takes the rows at >=99/500 to 5,000; `hof30k`
-# takes the rows at >=99/5,000 to 30,000 on seed 7, a seed no selecting pass used, so a row there is a
-# confirmed rate rather than a selected high. The labels are the files: `runs/<arm>_checkpoint_evals
-# [_<label>].json`, so a pass never overwrites the one it read from — omitting `hof5000`'s label
-# would replace the 500-episode file `above:99` selects from with 5,000-episode rows.
+# >=97/100 in stage A and measures it at 500; `hof5000` takes the rows at >=99.2/500 to 5,000; `hof30k`
+# takes the rows at >=99.2/5,000 to 30,000 on seed 7, a seed no selecting pass used, so a row there is a
+# confirmed rate rather than a selected high. The cut is `eta.HOF_THRESHOLD`, with why it is 99.2. The
+# labels are the files: `runs/<arm>_checkpoint_evals[_<label>].json`, so a pass never overwrites the
+# one it read from — omitting `hof5000`'s label would replace the 500-episode file `above:99.2`
+# selects from with 5,000-episode rows.
 #
 # `--pass <name>` is how both boxes ask for one: the desktop daemon dispatches
 # `tools.closeout <arms> --pass hof5000` and carries none of these numbers (see
@@ -59,8 +61,8 @@ REDRAW_SECONDS = 20
 # `stageb` is the close-out's own defaults, so a command that names no pass is unchanged.
 PASSES = {
     'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0},
-    'hof5000': {'selector': 'above:99', 'episodes': 5000, 'label': 'hof5000', 'seed': 0},
-    'hof30k': {'selector': 'above:99:hof5000', 'episodes': 30000, 'label': 'hof30k', 'seed': 7},
+    'hof5000': {'selector': 'above:{0:g}'.format(eta.HOF_THRESHOLD), 'episodes': 5000, 'label': 'hof5000', 'seed': 0},
+    'hof30k': {'selector': 'above:{0:g}:hof5000'.format(eta.HOF_THRESHOLD), 'episodes': 30000, 'label': 'hof30k', 'seed': 7},
 }
 # The chain, in the order the passes run. `FOLLOW_ON[pass]` is what a finished pass earns.
 CHAIN = ('stageb', 'hof5000', 'hof30k')
@@ -72,7 +74,7 @@ def pass_settings(name, selector=None, episodes=None, label=None, seed=None):
 
     Explicit means "the caller typed it": `None` is the not-given value for every field, including
     `label`, whose preset for stage B *is* None — so a caller cannot un-label a hof pass by accident,
-    and the hand-typed `--selector above:99 --episodes 5000 --label hof5000` still spells the same
+    and the hand-typed `--selector above:99.2 --episodes 5000 --label hof5000` still spells the same
     pass `--pass hof5000` does.
     """
     if name not in PASSES:

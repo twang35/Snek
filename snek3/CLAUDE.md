@@ -110,7 +110,7 @@ again is in the root [`../CLAUDE.md`](../CLAUDE.md) and [`plans/archive/schedule
 tiered selection, no screen/confirm split and no min-achievable gate — so **every row in every result
 file is full length and directly comparable**, which was not true of snek2's files. `min_achievable`
 is absent, not null with a number to check. What follows stage B is not a stage: the `hof5000` pass
-takes every row at ≥99/500 to 5,000 episodes, and `hof30k` takes every hof5000 row at ≥99/5,000 to
+takes every row at ≥99.2/500 to 5,000 episodes, and `hof30k` takes every hof5000 row at ≥99.2/5,000 to
 30,000 on seed 7, a seed no selecting pass used — each a separately labelled file beside the
 stage-B one, never in place of it. **Every batch gets all three automatically**: the
 desktop daemon and `tools/scheduler.py` both run `tools.closeout <arms> --pass hof5000` then

@@ -62,10 +62,19 @@ DEFAULT_PASS_SECONDS_PER_ARM = {'stageb': 55 * 60 / 8.0, 'hof5000': 9.5 * 60 / 8
 # ledger over b18-b25 (12 shards), 2026-09-07 -- stage B 0.14-0.40 s/row at 500 episodes, hof5000
 # 1.5-4.8 at 5,000, hof30k 22-90 at 30,000 (a per-arm floor dominates when a wave selects a handful).
 DEFAULT_PASS_SECONDS_PER_CHECKPOINT = {'stageb': 0.35, 'hof5000': 3.7, 'hof30k': 30.0}
+# The hall-of-fame cut, as a percent: what a stage-B row needs over 500 episodes to reach `hof5000`,
+# and a hof5000 row over 5,000 to reach `hof30k`. `closeout.PASSES` spells its selectors from this.
+# 99.2 (user, 2026-09-07; 99 before): the lowest rate over 500 episodes whose 95% Wilson interval
+# reaches the record, 99.65%/30,000 (496/500 has an upper bound of 99.69%, 495 falls short), so what
+# is dropped could not have placed. At 99 a 200M-step ladder-top arm put 811 rows into hof5000 and
+# 252 into hof30k; at 99.2 the same passes carry roughly a fifth of that. Over 5,000 the same test
+# gives 99.5; 99.2 there keeps the interval's whole reach with a margin, at a few dozen rows a batch.
+HOF_THRESHOLD = 99.2
 # Which file each pass's selector reads and the threshold it applies: `(label of the input pass,
 # threshold)`, with None the arm's stage-A `_evals.json`. Spelled here rather than read from
-# `closeout.PASSES` so this module imports no torch (the daemon reads it too).
-PASS_INPUTS = {'stageb': (None, 97.0), 'hof5000': ('', 99.0), 'hof30k': ('hof5000', 99.0)}
+# `closeout.PASSES` so this module imports no torch (the daemon reads it too); `closeout` imports
+# the cut from here and a test holds the two in step.
+PASS_INPUTS = {'stageb': (None, 97.0), 'hof5000': ('', HOF_THRESHOLD), 'hof30k': ('hof5000', HOF_THRESHOLD)}
 # A running pass is never shown as less than this: its estimate is a median, and half of them run over.
 MIN_RUNNING_PASS_SECONDS = 60.0
 

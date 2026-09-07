@@ -184,7 +184,7 @@ def test_a_pass_measures_what_its_selector_picks_from_the_file_before_it(tmp_pat
                              {'step': 3, 'perfect_percent': 100}, {'step': 4}]}, handle)
     assert eta.selected_checkpoints('stageb', 'a', runs) == 2
     assert eta.selected_checkpoints('hof5000', 'a', runs) is None            # no stage-B file yet
-    _stage_b(runs, 'a', None, [99.0, 98.8, 99.4])
+    _stage_b(runs, 'a', None, [99.2, 99.0, 99.4])                          # the cut is 99.2: 99.0 is out
     assert eta.selected_checkpoints('hof5000', 'a', runs) == 2
     assert eta.pass_checkpoints('stageb', ['a'], runs) == 3                  # merged: its rows, not the screen
     assert eta.pass_checkpoints('hof5000', ['a', 'b'], runs) is None         # b's input is not there
@@ -193,7 +193,7 @@ def test_a_pass_measures_what_its_selector_picks_from_the_file_before_it(tmp_pat
     assert eta.pass_checkpoints('hof5000', ['a', 'b'], runs) == 3
     assert eta.pass_checkpoints('hof30k', ['a'], runs) is None
     assert eta.pass_checkpoints('stageb', ['a'], runs, pending={'a'}) is None   # still training: unknown
-    _stage_b(runs, 'a', 'hof5000', [99.0, 99.0, 50.0])
+    _stage_b(runs, 'a', 'hof5000', [99.2, 99.6, 50.0])
     assert eta.pass_checkpoints('hof30k', ['a'], runs) == 2
     assert eta.selected_checkpoints('smoke', 'a', runs) is None
 

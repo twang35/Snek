@@ -252,8 +252,18 @@ def test_a_redraw_failure_does_not_fail_the_arm(monkeypatch, waves):
 def test_the_chain_is_three_passes_each_selecting_from_the_one_before():
     assert closeout.CHAIN == ('stageb', 'hof5000', 'hof30k')
     assert closeout.FOLLOW_ON == {'stageb': 'hof5000', 'hof5000': 'hof30k'}
-    assert closeout.PASSES['hof5000']['selector'] == 'above:99'
-    assert closeout.PASSES['hof30k']['selector'] == 'above:99:hof5000', 'reads the hof5000 file'
+    assert closeout.PASSES['hof5000']['selector'] == 'above:99.2'
+    assert closeout.PASSES['hof30k']['selector'] == 'above:99.2:hof5000', 'reads the hof5000 file'
+
+
+def test_the_hof_cut_is_one_number_and_the_estimator_reads_the_same_one():
+    """99.2 (2026-09-07): the lowest rate over 500 whose Wilson interval reaches the 99.65% record.
+    `tools/eta.py` counts a pass's checkpoints with the same cut, so the two cannot drift."""
+    from tools import eta, step_selectors
+    assert eta.HOF_THRESHOLD == 99.2
+    for name in ('hof5000', 'hof30k'):
+        kind, (threshold, label) = step_selectors.parse(closeout.PASSES[name]['selector'])
+        assert kind == 'above' and (label or '', threshold) == eta.PASS_INPUTS[name]
 
 
 def test_stage_b_is_the_default_pass_and_the_close_outs_own_defaults():
@@ -266,11 +276,11 @@ def test_stage_b_is_the_default_pass_and_the_close_outs_own_defaults():
 
 def test_a_hof_pass_is_labelled_so_it_never_overwrites_what_it_selected_from():
     """The output path is `runs/<arm>_checkpoint_evals[_<label>].json`; unlabelled, the 5,000-episode
-    rows would replace the 500-episode file `above:99` reads. The hof-remeasure skill calls omitting
+    rows would replace the 500-episode file `above:99.2` reads. The hof-remeasure skill calls omitting
     the label 'destroying the input'; the preset makes it impossible to omit."""
-    assert closeout.pass_settings('hof5000') == {'selector': 'above:99', 'episodes': 5000,
+    assert closeout.pass_settings('hof5000') == {'selector': 'above:99.2', 'episodes': 5000,
                                                  'label': 'hof5000', 'seed': 0}
-    assert closeout.pass_settings('hof30k') == {'selector': 'above:99:hof5000', 'episodes': 30000,
+    assert closeout.pass_settings('hof30k') == {'selector': 'above:99.2:hof5000', 'episodes': 30000,
                                                 'label': 'hof30k', 'seed': 7}
 
 
@@ -291,7 +301,7 @@ def test_main_hands_the_pass_to_run(monkeypatch):
         return 0
     monkeypatch.setattr(closeout, 'run', run)
     assert closeout.main(['b1a', 'b1b', '--pass', 'hof30k', '--shards', '12']) == 0
-    assert seen == {'policies': ['b1a', 'b1b'], 'selector': 'above:99:hof5000', 'episodes': 30000,
+    assert seen == {'policies': ['b1a', 'b1b'], 'selector': 'above:99.2:hof5000', 'episodes': 30000,
                     'shards': 12, 'label': 'hof30k', 'seed': 7}
     closeout.main(['b1a'])
     assert (seen['selector'], seen['episodes'], seen['label'], seen['seed']) == ('screen', 500, None, 0)

@@ -9,7 +9,7 @@ description: Re-measure a batch's stage-B winners at 5,000 episodes — the hof5
 wave's stage B — the desktop daemon and `tools.scheduler` chain `tools.closeout <arms> --pass
 hof5000` then `--pass hof30k`, and a batch that finished under the chain needs nothing from this skill.
 Use it for a batch measured before that date, a driver started before it, or a re-run; `--pass hof5000`
-is the shorthand for the `--selector above:99 --episodes 5000 --label hof5000` below and the
+is the shorthand for the `--selector above:99.2 --episodes 5000 --label hof5000` below and the
 desktop's own spec is `tools/closeout.py`'s `PASSES`.
 
 Stage B measures every screened checkpoint at 500 episodes. **A 500-episode maximum is a selected
@@ -84,7 +84,7 @@ import glob, os
 from tools import step_selectors as sel
 for f in sorted(glob.glob('runs/<batch>?-*_checkpoint_evals.json')):
     arm = os.path.basename(f).split('_checkpoint')[0]
-    steps, desc = sel.resolve(os.path.join('savedPolicies', arm), 'above:99', arm)
+    steps, desc = sel.resolve(os.path.join('savedPolicies', arm), 'above:99.2', arm)
     print(arm, len(steps), desc)"
 ```
 
@@ -94,13 +94,13 @@ Its signature is `resolve(policy_dir, token, policy)` — three arguments, `poli
 
 ```
 PYTHONPATH=. /opt/miniconda3/envs/snek3/bin/python -u -m tools.closeout <arm...> \
-    --selector above:99 --episodes 5000 --label hof5000 --shards 12 \
+    --selector above:99.2 --episodes 5000 --label hof5000 --shards 12 \
     > logs/<batch>-hof5000.log 2>&1 &
 ```
 
 **‡ `--label hof5000` is not cosmetic and omitting it destroys the input.** The output path is
 `runs/<arm>_checkpoint_evals[_<label>].json`, so with no label this pass overwrites the 500-episode
-close-out — which is the file `above:99` reads. You would lose the selection, the comparison
+close-out — which is the file `above:99.2` reads. You would lose the selection, the comparison
 baseline and any chance of repeating the pass, and the wreckage looks like a normal short result file.
 
 Call the env python directly, never `conda run` — it buffers a backgrounded log for 90+ seconds.
