@@ -12,7 +12,19 @@ better approach altogether. The answer is in section 2; the rest is what it cost
 | purpose | **fewer zigzags, and through them a higher perfect rate.** Not aliasing loops; section 3 is written for that |
 | convention | the new inputs are *descriptive*, not "1 is good"; `docs/environment.md` says so |
 | `ended_by` | goes into the stage-B row permanently, alongside this work |
-| implementation | **not yet.** The plan is agreed; the build waits for a go |
+| order | **investigation first, as a gate.** Phase 1 is sections 3 and 3b; nothing in section 4 is built until phase 1 has said how the best checkpoints die |
+| now | **hold.** The laptop is running other work (2026-09-07), so no traces yet; phase 1 starts when a box is free |
+
+**Two predictions, registered before the data.** The user expects the best checkpoints to die mostly by
+**starving**; this plan's first draft assumed **collisions**. Phase 1 is designed to say which, and
+the answer decides the feature: history addresses the traps a snake builds for itself, and does
+nothing for a snake that cannot get to its food.
+
+| if phase 1 finds | then |
+|---|---|
+| mostly forced collisions, with zigzag-laid walls | build section 4, run section 5 |
+| mostly forced collisions, walls laid straight | zigzag is not the mechanism; history is the wrong feature. Write it up, stop |
+| mostly food-inaccessible deaths (starves and sealed-food collisions, below) | a different problem — waiting for the tail to free the food. History does not help; the plan closes and a new one opens |
 
 ## 0. The one-line recommendation
 
@@ -130,12 +142,30 @@ the body. If zigzagging is the mechanism, that number is high and the matched-fi
 the wall was laid by long straight runs, zigzagging is not what kills this policy and history is the
 wrong feature — a finding worth as much as the other outcome.
 
-Starves get the same trace but a different question, since nothing traps the head: is the snake
+**Three kinds of death, not two.** A collision is not always a trap. If the food sits sealed in a
+pocket of its own — index 29 at 0, or more generally the region the fatal move enters holds the food
+and no way out — then eating it and dying the next step is a *choice*: nothing forced the snake in,
+and had it declined it would have circled until the starve budget ran out. That death is a starve
+with a different ending, and counting it as a collision would credit the wrong mechanism. So the
+outcome split is:
+
+| category | test on the replay | root cause |
+|---|---|---|
+| **forced collision** | at the point of no return the alternative that kept the tail reachable did **not** contain the food; the snake walled itself in | path planning — the case history could help |
+| **sealed-food collision** | the fatal pocket contains the food, or the fatal move (or one within a few steps of it) eats; the safe alternative would have meant not eating | food inaccessible — the snake traded its life for the meal |
+| **starve** | 500 steps without eating | food inaccessible — it declined the trade, or never found a way |
+
+Sealed-food collisions and starves are then reported **together as "food inaccessible"** against
+forced collisions, since that is the split the user's prediction and this plan's disagree on. Within
+food-inaccessible, keep the sub-split: how often the snake takes the fatal meal versus waits it out is
+its own finding about the reward, since death costs -5 and the food pays +1.
+
+Starves get the same trace but a different question, since nothing trapped the head: is the snake
 circling (a repeated `(head, head_dir)` cycle — the aliasing case of the first draft) or reaching but
 never entering the food's region? Those are two different features, and neither is move history
 unless the cycle is four moves long.
 
-**What gets produced:** one table — deaths by cause, with the pre-trap reversal rate, the fatal-wall
+**What gets produced:** one table — deaths by the three categories above, with the pre-trap reversal rate, the fatal-wall
 reversal rate, and the matched-fill perfect-game rate beside them — and a **contact sheet** of the
 failures: the final 200 steps of each as one still, head path coloured by time, wall segments marked,
 so the numbers can be checked by eye on the dozens of games there are. `record_gif.py` and
