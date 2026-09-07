@@ -351,11 +351,13 @@
 
   // ---- view: cell (four seeds across, metrics down)
   function viewCell(main) {
-    var b = batch(), ref = refOf(b), cells = cellsOf(b), w = parseInt(state.smooth, 10) || 1;
+    // The cell view cycles every cell including the reference, in value order, so the reference is seen
+    // in its place in the sweep (b9: 0.97, 0.98 reference, 0.99).
+    var b = batch(), ref = refOf(b), cells = b.cells, w = parseInt(state.smooth, 10) || 1;
     var cell = cells.filter(function (c) { return c.slug === state.cell; })[0] || cells[0]; state.cell = cell.slug;
     var keys = renderMetrics(TRACE_ROWS, TRACE_DEFAULT);
     var st = cell.stats;
-    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + ' = ' + cell.label + '</h2><p class="sub">Each seed (blue) over the reference\'s seeds (grey). Click a panel for the arm\'s chart. ' + (cell.prediction ? 'Prediction: <b>' + cell.prediction + '</b>. ' : '') +
+    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + ' = ' + cell.label + (cell.reference ? ' <span class="dim">reference</span>' : '') + '</h2><p class="sub">' + (cell.reference ? 'The reference\'s own seeds (blue). ' : 'Each seed (blue) over the reference\'s seeds (grey). ') + 'Click a panel for the arm\'s chart. ' + (cell.prediction ? 'Prediction: <b>' + cell.prediction + '</b>. ' : '') +
       'density ' + fmt(st.density98.median, 1) + '% (' + st.density98.values.map(function (v) { return fmt(v, 1); }).join(' ') + ')' + (st.density98.p !== null ? ', p=' + st.density98.p : '') +
       ' · best30 ' + fmt(st.best30.median, 2) + ' · evals&lt;80 ' + fmt(st.drawdown80.median, 2) + '% · hof5000 best ' + fmt(st.hof_best.median, 1) + ' · hof30k best ' + fmt(st.hof30k_best.max, 1) + '</p>';
     configNote(main, b, colours(b));
@@ -371,7 +373,7 @@
       var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1];
       var xs = key === 'stage_b' ? sbsteps : steps;
       var all = [], refSeries = [];
-      if (ref && state.ref === '1') ref.arms.forEach(function (rp) { var ys = smoothed(medianOver([rp], key), key === 'stage_b' ? 1 : w); refSeries.push(ys); ys.forEach(function (v) { if (v !== null) all.push(v); }); });
+      if (ref && state.ref === '1' && !cell.reference) ref.arms.forEach(function (rp) { var ys = smoothed(medianOver([rp], key), key === 'stage_b' ? 1 : w); refSeries.push(ys); ys.forEach(function (v) { if (v !== null) all.push(v); }); });
       var own = arms.map(function (p) { var ys = smoothed(medianOver([p], key), key === 'stage_b' ? 1 : w); ys.forEach(function (v) { if (v !== null) all.push(v); }); return ys; });
       var dom = extent(all, 0.05, LOG[key]); if (key === 'perfect' || key === 'perfect_min' || key === 'stage_b') dom = [Math.max(0, dom[0]), Math.min(100, Math.max(dom[1], 1))];
       arms.forEach(function (p, ci) {
@@ -533,8 +535,8 @@
     $('batch').value = b.batch;
     document.querySelectorAll('header button[data-view]').forEach(function (bt) { bt.className = bt.getAttribute('data-view') === state.view ? 'on' : ''; });
     var cp = $('cellpick'); cp.innerHTML = '';
-    cellsOf(b).forEach(function (c) { var o = document.createElement('option'); o.value = c.slug; o.textContent = c.label; cp.appendChild(o); });
-    if (state.cell && cellsOf(b).some(function (c) { return c.slug === state.cell; })) cp.value = state.cell; else state.cell = state.view === 'cell' ? cellsOf(b)[0].slug : state.cell;
+    b.cells.forEach(function (c) { var o = document.createElement('option'); o.value = c.slug; o.textContent = c.label + (c.reference ? ' (reference)' : ''); cp.appendChild(o); });
+    if (state.cell && b.cells.some(function (c) { return c.slug === state.cell; })) cp.value = state.cell; else state.cell = state.view === 'cell' ? cellsOf(b)[0].slug : state.cell;
     $('cellpick-l').style.display = state.view === 'cell' ? '' : 'none';
     $('smooth-l').style.display = state.view === 'traces' || state.view === 'cell' ? '' : 'none';
     $('smooth').value = state.smooth; $('ref').checked = state.ref === '1';
@@ -544,7 +546,7 @@
     writeHash();
   }
   function moveBatch(d) { var i = S.batches.map(function (b) { return b.batch; }).indexOf(state.batch); state.batch = S.batches[Math.max(0, Math.min(S.batches.length - 1, i + d))].batch; state.hidden = {}; render(); }
-  function moveCell(d) { var cs = cellsOf(batch()), i = cs.map(function (c) { return c.slug; }).indexOf(state.cell); state.cell = cs[Math.max(0, Math.min(cs.length - 1, i + d))].slug; render(); }
+  function moveCell(d) { var cs = batch().cells, i = cs.map(function (c) { return c.slug; }).indexOf(state.cell); state.cell = cs[Math.max(0, Math.min(cs.length - 1, i + d))].slug; render(); }
   $('batch').addEventListener('change', function () { state.batch = this.value; state.hidden = {}; this.blur(); render(); });
   $('cellpick').addEventListener('change', function () { state.cell = this.value; this.blur(); render(); });
   $('smooth').addEventListener('change', function () { state.smooth = this.value; this.blur(); render(); });
