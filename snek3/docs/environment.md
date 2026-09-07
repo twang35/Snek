@@ -63,24 +63,61 @@ compass directions.
 **1 means good or safe throughout.** New blocks go on the end, never in the middle — the order is
 chronological rather than logical and that is deliberate.
 
-Five things about specific indices are worth knowing before touching any of them:
+## What the record checkpoints actually read — measured 2026-09-07
+
+Three HOF checkpoints (`b10ck` @30523392, `b17cl` @11386880, `b9ch` @47251456), each played greedy
+for 2,000 episodes (seed 1) with one feature block replaced by its mean over real play — so the
+number is *information lost*, not distribution shock. Zeroing was measured too and is worse for
+every near-constant input, which is the shock. Noise at this depth is about ±0.35 pp. Script:
+`tools/feature_audit.py` (`analyse`, then `ablate` and `ablate_phase`).
+
+| block | perfect % with the block blanked (baseline 99.75 / 99.4 / 98.95) | verdict |
+|---|---|---|
+| 0,2,4 food is-closer | 0 / 0 / 0 | essential |
+| 9,11,13 tail reachable | 0 / 0.2 / 0 | essential |
+| 15-17 chase-safe | 0 / 2 / 13 | essential |
+| 6-8 move is safe | 98.8 / 83.5 / 57 | large |
+| 22 board fill | **98.4** / 1.6 / 41.5 | large for two arms, **near-irrelevant to the record holder** |
+| 21 starve budget | **0** / 98.6 / 98.8 | **the record holder's clock**; minor for the others |
+| 23-25 hugging | 95 / 71 / 59 | real, and larger than hypothesised |
+| 26-28 not a tail-chase | 92.5 / 75.5 / 86 | real, though nonzero in only 0.6% of states |
+| 1,3,5 food 1/(dist+1) | 99.45 / 95.9 / 95.7 | minor; `b10ck` does not need it |
+| 10,12,14 lg(open regions) | 99.2 / 97.9 / 94.3 | minor, and the only expensive block |
+| **18-20 this move wins** | **99.7 / 99.4 / 99.35** | **nothing**, all three arms |
+| **29 room around food** | **99.5 / 99.4 / 99.3** | **nothing**, all three arms |
+
+Blanking a block only at fill ≥ 0.8 shows where the value sits: late, the blocks that still cost are
+tail-reach (62-74), chase-safe (71-87), and for the two fill-readers, fill (93 / 78); the region
+counts cost 0.5 pp late for `b10ck` and 1.75 for `b9ch`; the win flags and index 29 cost nothing in
+either phase. Endgame decisions are also the most robust: at fill ≥ 0.95, shuffling any single input
+flips under 1% of `argmax` choices, against 5-19% early.
+
+What follows for the individual indices:
 
 - **Indices 6-8 are the only place legality is stated.** A *fatal* move reads 1 at indices 26-28,
   because that flag only asks "is this the tail's cell".
-- **Index 22 (board fill) is rank 1 of 30 by saliency in every snek2 arm measured**, and it is how
-  the winning policies actually learn to finish.
-- **Indices 18-20 are nonzero in 0.000-0.025% of states** and are not meaningfully trained. Never
-  credit an endgame result to them.
-- **Index 29 sits at 1 in ~99.95% of states**, so it is nearly a constant — the same hazard.
+- **Index 22 (board fill) is rank 1 of 30 by gradient saliency in every arm measured, snek2 and
+  snek3 — and saliency is the wrong instrument here.** `b17cl` collapses without it (1.6%) and `b9ch`
+  halves, but the record holder `b10ck` (γ 1.00) loses 1.35 pp and reads the **starve budget**
+  instead: blank index 21 and it scores 0.0. Its episodes are 3x longer than the other two (3,200
+  steps against ~1,150) — it stalls until the budget forces a meal. Undiscounted training found a
+  different clock.
+- **Indices 18-20 are nonzero in 0.00-0.06% of states and carry nothing.** Blanking them changes no
+  arm's rate; forcing the flag to 1 at length 99 moves that action's logit by +1 to +10 against a
+  decision margin of 18-37, so it could not change a decision even where it fires. They cost 6 µs of
+  a ~10 ms observation build, so the waste is three untrained inputs, not compute. Never credit an
+  endgame result to them.
+- **Index 29 sits at 1 in 99.75% of states and carries nothing either.** Mean-substitution is free
+  for all three; *zeroing* it drops `b10ck` to 53.7% — the net uses the constant as a bias, which is
+  the hazard a near-constant input is.
 - **Indices 10, 12 and 14 are the only consumers of region *enumeration***, which is 33% of the
-  connectivity cost. A two-flood shortcut is exactly equal to the reference for the other
-  connectivity indices over all 18,053 parity states, so dropping 10/12/14 is a cheap, well-posed
-  ablation worth ~1.5x on the observation. Batch 45 reached 99% with them in, so it is a cost
-  question, not a correctness one.
+  connectivity cost, and connectivity (9-17) is ~93% of the observation build; every other block is
+  under 3% (hugging ~3%, index 29 <1%, the rest negligible). They are worth 0.5 / 1.5 / 4.6 pp to
+  nets trained with them, so dropping them is a retrain-and-measure question with a known upper
+  bound on the loss and ~1.5x on the observation as the prize.
 
-Indices 23-25, 26-28 and 29 are **unvalidated** — hypotheses about what a feature enables, carried
-across because the record-holding policies were trained with them, not because any of them has a
-measured effect.
+Indices 23-25 and 26-28 were carried across as unvalidated hypotheses; the table validates both.
+Index 29 was carried across on the same footing and no measurement has validated it.
 
 ## Two implementations, and one is the reference
 
