@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b26i-pen0001-seed9",
+  "b26j-pen0001-seed10",
+  "b26k-pen0001-seed11",
+  "b26l-pen0001-seed12",
+  "b26m-pen0-seed13",
+  "b26n-pen0-seed14",
+  "b26o-pen0-seed15",
+  "b26p-pen0-seed16"
+ ],
+ "batch": "b26",
+ "box": "desktop",
+ "claimed_iso": "2026-09-07T15:46:09",
+ "claimed_ts": 1788821169.8339458,
+ "kind": "wave",
+ "wave": 2
+}
