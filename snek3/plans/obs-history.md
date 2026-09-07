@@ -1,6 +1,7 @@
 # Short-term memory: showing the policy its last four moves
 
-**Written 2026-09-07, revised the same day after review. Not started.** The question asked was: give
+**Written 2026-09-07, revised the same day after review. Phase 1 ran the same day and closed the
+plan: see "Phase 1 result" below.** The question asked was: give
 snek a view of its last four moves, cheaper than four one-hot triples (12 inputs), and is there a
 better approach altogether. The answer is in section 2; the rest is what it costs and how to test it.
 
@@ -12,8 +13,9 @@ better approach altogether. The answer is in section 2; the rest is what it cost
 | purpose | **fewer zigzags, and through them a higher perfect rate.** Not aliasing loops; section 3 is written for that |
 | convention | the new inputs are *descriptive*, not "1 is good"; `docs/environment.md` says so |
 | `ended_by` | goes into the stage-B row permanently, alongside this work |
+| **phase 1 result** | **the best checkpoints starve; they do not collide.** 257 of 280 failures across b17cl and b10ck at 30,000 games each are starves, nearly all an exact closed loop of the snake following itself while the food sits reachable. History cannot break a loop of period 8-98, and the policy is confident on every lap. **Sections 4-5 are not built.** The measurement and its numbers: `docs/findings.md`, "The best checkpoints fail by starving in a closed loop"; pictures `charts/deaths/` |
 | order | **investigation first, as a gate.** Phase 1 is sections 3 and 3b; nothing in section 4 is built until phase 1 has said how the best checkpoints die |
-| now | **hold.** The laptop is running other work (2026-09-07), so no traces yet; phase 1 starts when a box is free |
+| now | **closed.** What phase 1 points at is a reward change (starve −0.5 against death −5, no per-step cost) and the starve-budget input's compression — a new plan, not this one |
 
 **Two predictions, registered before the data.** The user expects the best checkpoints to die mostly by
 **starving**; this plan's first draft assumed **collisions**. Phase 1 is designed to say which, and
@@ -24,7 +26,7 @@ nothing for a snake that cannot get to its food.
 |---|---|
 | mostly forced collisions, with zigzag-laid walls | build section 4, run section 5 |
 | mostly forced collisions, walls laid straight | zigzag is not the mechanism; history is the wrong feature. Write it up, stop |
-| mostly food-inaccessible deaths (starves and sealed-food collisions, below) | a different problem — waiting for the tail to free the food. History does not help; the plan closes and a new one opens |
+| mostly food-inaccessible deaths (starves and sealed-food collisions, below) | a different problem — waiting for the tail to free the food. History does not help; the plan closes and a new one opens. **← this is what phase 1 found: 96% and 87%** |
 
 ## 0. The one-line recommendation
 
@@ -173,6 +175,43 @@ so the numbers can be checked by eye on the dozens of games there are. `record_g
 
 `ended_by` and the three path measures then go into the stage-B row permanently, so the close-out of
 every future batch carries them.
+
+## Phase 1 result (2026-09-07)
+
+Both HOF leaders, 30,000 episodes each, every failure replayed (`tools/death_trace.py`,
+`tools/death_analyze.py`, `tools/death_sheet.py`; the contact sheets are
+[`../charts/deaths/b17cl-30k-s11-failures.png`](../charts/deaths/b17cl-30k-s11-failures.png) and
+[`../charts/deaths/b10ck-30k-s11-failures.png`](../charts/deaths/b10ck-30k-s11-failures.png)).
+
+| | b17cl | b10ck |
+|---|---:|---:|
+| failures / 30,000 | 153 | 127 |
+| **starved** | **147** | **110** |
+| sealed-food collision | 5 | 17 |
+| forced collision | 1 | 0 |
+| starves that are an exact `(cell, heading)` cycle | 127 | 70 |
+| … with period = length + 1 (the snake one gap behind its own tail) | 32 | 37 |
+| safe approach existed on this share of starve-window steps | 26% | 15% |
+| logit margin over the declined safe approach, median | 2.5 | 3.0 |
+| argmax changed by forcing the starve-budget input to 0 | 1.7% | 6.1% |
+| pre-window reversal rate minus matched-fill control | +2 pp | +3 pp |
+
+What the pictures show: a serpentine or ring **around an empty room with the food inside**, orbiting
+(b10ck's shape), and the endgame loop **past a food sealed in a one- or two-cell pocket** beside the
+path (both). The snake is confident in the loop, the food is reachable, and the observation repeats
+exactly every lap except for a starve-budget value compressed into the top of its range.
+
+**Verdict on this plan:** zigzags are not what kills these policies, and a four-move history cannot
+break a loop whose period is the snake's length. Not built. The "tail-chasing local optimum" that
+indices 26-28 were added to price is real and is *the* failure mode — but that block only fires when
+the head lands on the cell the tail vacates this step (period = length), and the dominant loop runs one
+cell behind (period = length + 1), which it does not see.
+
+**Where a new plan starts:** the reward. Starving costs −0.5, a death −5, and there is no per-step
+cost, so an uncertain approach is worse in expectation than an orbit — the loop is what the reward
+asks for. Candidates, in order: a starve penalty of the same order as a death; a per-step cost; a
+linear rather than lg-compressed starve-budget input (or steps-since-food). All three are judged on
+the same trace tooling: the starve count falls and the sealed-food count does not rise.
 
 ## 4. The build, if section 3 says go
 

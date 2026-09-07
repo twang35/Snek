@@ -17,6 +17,60 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The best checkpoints fail by starving in a closed loop, not by colliding: 96% of b17cl's and 87% of b10ck's failures are a tail-following circuit orbiting reachable food, and the policy is confident in every lap
+
+**Measured 2026-09-07 on the two top HOF entries, 30,000 fresh episodes each at seed 11**, every
+episode's action and food sequence kept so each failure replays exactly (`tools/death_trace.py`,
+`tools/death_analyze.py`; pictures `charts/deaths/`). The plan this answers is
+`plans/obs-history.md`, whose phase 1 registered two predictions — the user's "they starve" against
+the draft's "they collide" — and **the user's is right, by a wide margin**.
+
+| checkpoint | perfect | failures | **starved** | collision, food-driven | collision, forced |
+|---|---:|---:|---:|---:|---:|
+| `b17cl` (99.50%/30k confirmed) | 29,847 | 153 | **147** | 5 | 1 |
+| `b10ck` (99.65%/30k confirmed) | 29,873 | 127 | **110** | 17 | 0 |
+
+**What a starve is.** The head falls into an exact cycle in `(cell, heading)` in 127/147 and 70/110
+cases, and the cycle's period is the snake's length plus a small constant — **the snake is a closed
+circuit following itself round**, one gap cell ahead of the head in the commonest case (period
+= length + 1: 32 and 37 of the cycles). The remaining starves are near-cycles that drift. The contact
+sheets show two shapes: a serpentine or ring **around an empty room with the food inside it**
+(b10ck's signature, and its endgame: 54 of 110 at score 90-93), and the endgame loop **past a food
+sealed in a one- or two-cell pocket** beside the path (b10ck 62/110 with the food's region ≤ 2 cells;
+b17cl 27/147). b17cl also starves mid-game — 32 at score 50-59, 9 at score under 10 with a
+length-5 snake circling an empty board — while b10ck never does before 60.
+
+**The food is reachable and the snake declines it, confidently.** In every one of the 257 starve
+windows there were steps at which some action was chase-safe (head, food and tail in one region,
+indices 15-17); a *safe approach* — chase-safe, legal, and closer to the food — existed on 26%
+(b17cl) and 15% (b10ck) of window steps. Where one existed and was not taken, the policy's logit
+margin over it was a median 2.5 (b17cl) and 3.0 (b10ck), within 0.5 on only 9% and 4% of those
+steps, and the softmax probability of the loop-continuing action was a median 0.93-0.95. **These are
+not marginal decisions that a small extra input would flip.**
+
+**The starve-budget input does not reach the decision.** Index 21 is lg-compressed, so it reads 0.63
+with a tenth of the budget left and never falls below 0.11; forcing it to 0 on every starve-window
+observation changes the argmax on 1.7% (b17cl) and 6.1% (b10ck) of steps. The policy is nearly
+blind to how long it has gone without eating.
+
+**Collisions are almost all food-driven.** 22 of the 23 deaths entered a region holding the food, or
+ate inside the trap, or both — the sealed-food case the plan split out: the snake takes the meal
+and dies in the pocket. b10ck's recurring trap sizes 9, 5, 13 and 17 are dead-end pockets it fills
+completely. One forced collision in 60,000 games. **Deaths from path planning are not the problem.**
+
+**Zigzagging is not the mechanism.** The 200 steps before a starve window carry a reversal rate 2 pp
+(b17cl) and 3 pp (b10ck) above perfect games at the same board fill — real but small, and the
+mechanism above does not run through it. Four moves of history cannot break a loop of period 8-98:
+the augmented observation repeats with the same period. So the move-history feature is the wrong
+lever for this failure, and `plans/obs-history.md` closes on that.
+
+**What this points at instead**, for a new plan: the reward makes the loop rational — starving costs
+−0.5 against −5 for a death and no per-step cost, so under any uncertainty about the approach, orbiting
+is the safer bet; a starve penalty of the same order as a death, or a per-step cost, changes that
+calculation directly. And the budget input's compression hides the urgency it exists to convey.
+Both are testable on the same trace tooling: a fix that works turns the starve count down and the
+sealed-food count no worse.
+
 ### The corner-grid ladder: γ 0.999 on λ 0.99 adds density and drawdown, rollout 512 trades one for the other, and the `mse` value loss on top nearly doubles density and removes the collapses
 
 **Measured 2026-09-06 on b22 (desktop) and b23 (laptop), 2 cells x 4 seeds each at 50M** — a ladder on b9's λ 0.99 cell,
