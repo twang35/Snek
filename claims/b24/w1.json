@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b24a-hzanneal50-seed1",
+  "b24b-hzanneal50-seed2",
+  "b24c-hzanneal50-seed3",
+  "b24d-hzanneal50-seed4",
+  "b24e-hzanneal50-seed5",
+  "b24f-hzanneal50-seed6",
+  "b24g-hzanneal50-seed7",
+  "b24h-hzanneal50-seed8"
+ ],
+ "batch": "b24",
+ "box": "desktop",
+ "claimed_iso": "2026-09-07T01:22:22",
+ "claimed_ts": 1788769342.998566,
+ "kind": "wave",
+ "wave": 1
+}
