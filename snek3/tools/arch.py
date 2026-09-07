@@ -118,10 +118,13 @@ def assert_restorable(policy_dir, obs_len, obs_era, num_actions):
         problems.append('obs_len {0} != env {1} (the observation changed length)'.format(
             arch['obs_len'], obs_len))
     if arch['obs_era'] != str(obs_era):
-        problems.append(
-            'obs_era {0!r} != env {1!r}. The observation is the same length but its indices no '
-            'longer mean the same thing, so these weights would load cleanly and play badly'.format(
-                arch['obs_era'], obs_era))
+        if arch['obs_len'] == int(obs_len):
+            why = ('The observation is the same length but its indices no longer mean the same '
+                   'thing, so these weights would load cleanly and play badly')
+        else:
+            why = ('This checkpoint was trained on an earlier observation layout; it can only be '
+                   'measured from a checkout of that era')
+        problems.append('obs_era {0!r} != env {1!r}. {2}'.format(arch['obs_era'], obs_era, why))
     if problems:
         raise ArchMismatch('{0} does not match this environment: {1}'.format(
             arch_path(policy_dir), '; '.join(problems)))
