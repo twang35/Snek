@@ -6,6 +6,33 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b22 and b23 — the first two rung pairs of the corner-grid ladder — closed with all their passes; both boxes are idle
+and the shared queue is empty. The user is holding off on queueing more for now.** As of 2026-09-06 18:25:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | — | b22 (γ 0.999 on λ 0.99; + rollout 512) closed with hof5000/hof30k, imported 18:20; nothing unclaimed | **free** |
+| laptop | — | b23 (+ `mse`; + clip hold) trained in 44 min at T 512's quarter-rate stage A, closed with its passes by ~17:45; scheduler exited on the empty pool | **free** |
+
+**What closed.** **The `mse` value loss on γ 0.999 / λ 0.99 / rollout 512 reads 61.6% density (49.8-78.1 per seed) against
+32.7 for the rung below, every seed separated, with the collapses gone (0.48% of evals below 50 against 3.54)** — the
+largest single step this project has measured; the clip hold on top reads 64.4% and 0.0% below 50, inside the mse cell's
+noise on density. γ 0.999 on λ 0.99 alone reads 36.3% with four times the base's drawdown; rollout 512 on top of it costs
+density and buys stability. Nothing beats the HOF's 99.65 at 30,000 (the mse cells top out at 99.2) but they produce ≥99
+/30k checkpoints in bulk: 64 in one wave. Verdicts in [`results.md`](results.md), readings in [`charts.md`](charts.md),
+finding under `## Established` in [`findings.md`](findings.md).
+
+**Next, when the user says so.** Run the ladder backwards to find what `mse` needs under it — `mse` + γ 0.999 without
+rollout 512, and `mse` on λ 0.99 alone — then 8 seeds of the best rung at a longer cap for a champion attempt. An
+optimizer batch was discussed (AdamW / RMSprop against Adam) and needs an `SNEK_PPO_OPTIMIZER` knob first; PPO already
+trains with Adam. Shaping off and `lranneal` are the remaining unstacked levers.
+
+**Tooling.** The sweep analysis landed (`e2de52473`): `tools/sweep_analysis.py` reduces b9-b21 to `viewer/sweep.json`,
+`docs/sweep.md` is the report, `viewer/sweep.html` the page. b22/b23 are not in the sweep manifest, so the reducer does
+not yet cover them; adding the ladder to `plans/hyperparam-sweep.json` (or a second manifest) is the next tooling step.
+
+## Both boxes idle after b18, as it read at 2026-09-06 14:00 (superseded)
+
 **b18 (gradient clip) closed with its hof passes at 13:34; both boxes are idle and the shared queue is empty. The
 one-knob sweeps at λ 0.98 — b15 through b21 — are all closed. Next is the corner grid, and its spec is the user's
 call.** As of 2026-09-06 14:00:

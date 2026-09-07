@@ -17,6 +17,29 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The corner-grid ladder: γ 0.999 on λ 0.99 adds density and drawdown, rollout 512 trades one for the other, and the `mse` value loss on top nearly doubles density and removes the collapses
+
+**Measured 2026-09-06 on b22 (desktop) and b23 (laptop), 2 cells x 4 seeds each at 50M** — a ladder on b9's λ 0.99 cell,
+each rung one lever on the rung below (`plans/sweep-analysis.md`; pictures in `docs/sweep.md`'s tooling):
+
+| rung | cell | ≥98%/500 density (per seed) | best30 | evals < 50 | evals < 80 | hof30k rows / ≥99 / best |
+|---|---|---|---:|---:|---:|---|
+| 0 | **b9 λ 0.99** (ref) | **27.3%** (24.1-31.4) | 98.33 | 0.77% | 6.43% | 3 / 0 / 98.8 |
+| 1 | + γ 0.999 | 36.3 (25.3-44.6) | 98.70 | 3.59 | 8.04 | 26 / 11 / 99.1 |
+| 2 | + rollout 512 | 32.7 (27.6-36.2) | 98.35 | 3.54 | 4.98 | 1 / 1 / 99.1 |
+| 3 | + `mse` value loss | **61.6** (49.8-78.1) | 98.92 | **0.48** | **1.52** | 47 / 28 / 99.2 |
+| 4 | + clip 0.2→0.001 held from 80% | 64.4 (48.2-80.9) | 98.95 | **0.0** | 1.4 | 78 / 36 / 99.2 |
+
+Three things. **The horizon gains partly add and so do their drawdowns**: γ 0.999 on λ 0.99 reads above both parents
+(30.7 and 27.3%) and quadruples the share of evals below 50 — the direction of γ 1.0's regime. **Rollout 512 does not
+stack on γ 0.999**: b14's +12 pp was on γ 0.99; here it costs density and buys stability, the b4 pattern in a mild form.
+**The `mse` value loss is the lever**: +29 pp on every seed (p = 0.029) *and* the collapses gone, where b19 had read it
+at +5 pp and "most stable" on b7's base — so the horizon knobs' density was there all along and the Huber critic was
+collapsing it. The clip hold adds nothing on density at n=4 and takes the last collapses out. At depth nothing beats the
+HOF's 99.65: the mse rungs make ≥99 /30,000 checkpoints in bulk (64 in one wave against ~12 from all of b9-b21), not a
+taller peak. Not settled: `mse` without rollout 512, or without γ 0.999 (does the interaction need both), and 8 seeds at
+a longer cap.
+
 ### The gradient-norm clip is a no-op from off to 5.0, so the base's collapses are policy-level, not rare huge gradients; and two effectively-off cells put the noise floor of the stability column at ~4 pp
 
 **Measured 2026-09-06 on b18's 24 arms (both boxes)** — 6 values x 4 seeds at 50M, b7's base at λ 0.98 (the reference 0.5):

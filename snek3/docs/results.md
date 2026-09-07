@@ -22,6 +22,66 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b23 -->
+## Batch b23 — the `knob` sweep, 2 values x 4 seeds, 50M, closed 2026-09-06
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b22e-g999roll512-seed1, b22f-g999roll512-seed2, b22g-g999roll512-seed3, b22h-g999roll512-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| g999roll512mse | 2,275 | 61.6% | 49.8 60.0 56.4 78.1 | 315 | 100.0 | 98.92 (98.4-99.2) | 93.2 | 0.48% | 1.52% | 59.8% |
+| g999roll512msehold | 2,204 | 64.4% | 65.6 61.2 48.2 80.9 | 395 | 100.0 | 98.95 (98.4-99.3) | 90.3 | 0.0% | 1.4% | 58.2% |
+| **base** (reference) | 1,805 | 32.7% | 27.6 32.8 36.2 34.1 | 75 | 99.6 | 98.35 (98.1-98.6) | 87.8 | 3.54% | 4.98% | 41.4% |
+
+<!-- reading -->
+Read against the bold reference, b22's `g999roll512` cell (32.7% density, best30 98.35, 3.54% of evals below 50, 4.98% below 80), the rung below in the ladder. **Rung 3, + the `mse` value loss, is the largest single step this project has measured**: 61.6% density against 32.7 — every seed (49.8-78.1) above every reference seed (27.6-36.2), Mann-Whitney p = 0.029 — with best30 98.92 (98.4-99.2), stage-A ≥98 share 59.8% against 41.4, and the drawdowns γ 0.999 and λ 0.99 had added gone: 0.48% of evals below 50 against 3.54, 1.52% below 80 against 4.98. At depth it is 315 `hof5000` rows at mean 98.55 (105 at ≥98.73, 47 at ≥99) and 47 rows at 30,000 episodes, 28 of them at ≥99, the best 99.2 three times on `b23d` @24-28M — the reference cell had one 30k row and b9's whole λ 0.99 cell none at 99. **Rung 4, + the clip anneal 0.2 → 0.001 held for the last 10M, adds nothing on density at n=4** (64.4%, 48.2-80.9, inside rung 3's spread) and takes the last of the collapses out: 0.0% below 50 on three of four seeds, 1.4% below 80. Its `hof5000` pass is the richest of any cell measured (395 rows, mean 98.60, 162 at ≥98.73, 78 at ≥99) and its 30k pass has 78 rows, 36 at ≥99, best 99.2 (`b23e` @47.3M). **Nothing here beats the HOF's 99.65 at 30,000**: the two mse cells top out at 99.2, below the fourth-place 99.30 — what they do is produce ≥99 /30k checkpoints in bulk (64 in one 8-arm wave, against a dozen from the entire b9-b21 sweep) rather than a taller peak. Falsified: the spec's "the late stage-B density lift on top of rung 3" for the hold — the lift b17 measured on b7's base does not repeat on a base that already has few late collapses. Not settled: whether `mse`'s gain needs γ 0.999 and rollout 512 under it (it read +5 pp on b7's base in b19, +29 pp here — an interaction, or the horizon's density finally held by a critic that does not collapse it), which is the next rung to run backwards; and 8 seeds at a longer cap for a champion attempt. Both cells ran on the laptop in one wave, 44 minutes of training at T 512's quarter-rate stage A.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b23a-g999roll512mse-seed1` | g999roll512mse | 558 | 49.8% | 36 | 99.6 | 98.4 @26.0M | 94.4 | 0.41% |
+| `b23b-g999roll512mse-seed2` | g999roll512mse | 572 | 60.0% | 69 | 99.8 | 99.1 @15.9M | 93.8 | 0.55% |
+| `b23c-g999roll512mse-seed3` | g999roll512mse | 528 | 56.4% | 53 | 99.8 | 99.0 @34.8M | 93.2 | 0.0% |
+| `b23d-g999roll512mse-seed4` | g999roll512mse | 617 | 78.1% | 157 | 100.0 | 99.2 @46.5M | 91.6 | 1.12% |
+| `b23e-g999roll512msehold-seed1` | g999roll512msehold | 524 | 65.6% | 150 | 100.0 | 99.3 @34.7M | 91.1 | 0.0% |
+| `b23f-g999roll512msehold-seed2` | g999roll512msehold | 552 | 61.2% | 78 | 99.8 | 98.8 @12.5M | 90.0 | 0.0% |
+| `b23g-g999roll512msehold-seed3` | g999roll512msehold | 537 | 48.2% | 27 | 99.4 | 98.4 @44.8M | 93.1 | 0.14% |
+| `b23h-g999roll512msehold-seed4` | g999roll512msehold | 591 | 80.9% | 140 | 99.8 | 99.3 @23.1M | 86.9 | 0.0% |
+
+<!-- /progress_update: batch b23 -->
+
+<!-- progress_update: batch b22 -->
+## Batch b22 — the `knob` sweep, 2 values x 4 seeds, 50M, closed 2026-09-06
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b9bw-lam99-seed1, b9bx-lam99-seed2, b9by-lam99-seed3, b9bz-lam99-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| g999 | 6,530 | 36.3% | 44.6 28.5 25.3 44.3 | 386 | 99.8 | 98.70 (98.3-98.9) | 89.1 | 3.59% | 8.04% | 38.4% |
+| g999roll512 | 1,805 | 32.7% | 27.6 32.8 36.2 34.1 | 75 | 99.6 | 98.35 (98.1-98.6) | 87.8 | 3.54% | 4.98% | 41.4% |
+| **base** (reference) | 5,173 | 27.3% | 27.2 24.1 31.4 26.0 | 138 | 100.0 | 98.33 (98.3-98.4) | 90.6 | 0.77% | 6.43% | 28.9% |
+
+<!-- reading -->
+Read against the bold reference, b9's λ 0.99 cell `b9bw`-`b9bz` (27.3% density, best30 98.33, 0.77% of evals below 50, 6.43% below 80) — the base of the corner-grid ladder (`plans/sweep-analysis.md`, `docs/sweep.md`). **Rung 1, γ 0.999 on λ 0.99, adds density and adds drawdown.** 36.3% against 27.3 (per-seed 25.3-44.6 over 24.1-31.4, a lean, not a separation) — above both parents (b10's γ 0.999 at 30.7% on λ 0.98, b9's λ 0.99 at 27.3 on γ 0.99), so the two horizon gains partly add through the shared 1/(1−γλ) — with best30 98.70 (98.3-98.9) and 386 `hof5000` candidates against 138. The price is the collapse column: 3.59% of evals below 50 against 0.77, 8.0% below 80 against 6.4 — a fifth of the way to γ 1.0's regime, exactly the risk the spec named. At depth the cell holds 26 rows at 30,000 episodes, 11 of them at ≥99 and the best 99.1 (`b22a` @40.5M, `b22d` @44.4M), where the reference had three rows and none at 99. **Rung 2, + rollout 512, does not add on top of rung 1**: 32.7% (27.6-36.2), *below* rung 1 on every readout but stability, where it halves the share below 80 (8.0 → 5.0) and leaves the share below 50 where it was (3.5%). Its 1,805 rows are a quarter of rung 1's because a checkpoint lands every 65,536 transitions at T 512, so the shares are the comparison; 75 `hof5000` candidates, one row at 30,000 (99.1). The prediction "the densest cell measured so far" is falsified: b14's +12 pp for rollout 512 was measured on γ 0.99, and on γ 0.999 the longer rollout trades density for stability instead. Not settled at n=4: whether rung 1's extra density survives at 8 seeds, and whether γ 0.999 alone (no rollout change) is the better base for the stabilisers in b23 — b23 was built on rung 2. Both cells ran on the desktop in one wave.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b22a-g999-seed1` | g999 | 1789 | 44.6% | 177 | 99.8 | 98.9 @36.8M | 89.4 | 4.82% |
+| `b22b-g999-seed2` | g999 | 1451 | 28.5% | 33 | 99.6 | 98.7 @40.5M | 90.9 | 2.71% |
+| `b22c-g999-seed3` | g999 | 1564 | 25.3% | 34 | 99.6 | 98.3 @29.1M | 87.0 | 3.27% |
+| `b22d-g999-seed4` | g999 | 1726 | 44.3% | 142 | 99.8 | 98.9 @43.9M | 89.0 | 3.92% |
+| `b22e-g999roll512-seed1` | g999roll512 | 431 | 27.6% | 6 | 99.6 | 98.3 @32.5M | 85.3 | 3.67% |
+| `b22f-g999roll512-seed2` | g999roll512 | 470 | 32.8% | 23 | 99.6 | 98.4 @39.8M | 89.1 | 4.17% |
+| `b22g-g999roll512-seed3` | g999roll512 | 450 | 36.2% | 28 | 99.4 | 98.6 @40.4M | 86.9 | 3.42% |
+| `b22h-g999roll512-seed4` | g999roll512 | 454 | 34.1% | 18 | 99.4 | 98.1 @31.0M | 89.8 | 2.39% |
+
+<!-- /progress_update: batch b22 -->
+
 <!-- progress_update: batch b18 -->
 ## Batch b18 — the `gradient_clipping` sweep, 6 values x 4 seeds, 50M, closed 2026-09-06
 
