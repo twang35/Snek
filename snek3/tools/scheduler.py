@@ -696,8 +696,9 @@ class Driver(object):
         return self.runs_dir or constants.RUNS_DIR
 
     def _publish(self, job_id, paths):
-        """Pushes a finished job's files to this box's results feed, if there is one. Never raises."""
-        if self.results is not None:
+        """Pushes a finished job's files to this box's results feed, if there is one and there are files
+        (a failed pass that merged no arm has none). Never raises."""
+        if self.results is not None and paths:
             self.results.publish(job_id, paths)
 
     def run_pass(self, pass_name, number, arms):
@@ -725,8 +726,12 @@ class Driver(object):
             live_runs.record_duration(pass_name, seconds, self.runs_dir, arms=len(arms), label=label,
                                       checkpoints=eta.pass_checkpoints(pass_name, policies, self.runs_dir))
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
-        if code == 0:
-            self._publish(label, results_feed.pass_files([spec['policy'] for spec in arms], pass_name, self._runs_dir()))
+        # Whatever the exit: a pass merges each arm's file as that arm ends, and a merged file is final
+        # for its arm, so the arms a failed pass did finish are published rather than kept off the site
+        # until someone re-runs the pass. `pass_files` lists only merged files that exist, never shards.
+        # 2026-09-07: b25's hof30k failed on its fourth arm (the observation changed under it) and the
+        # three arms it had merged sat on the laptop, invisible, for an hour.
+        self._publish(label, results_feed.pass_files([spec['policy'] for spec in arms], pass_name, self._runs_dir()))
         self._report()
         return code
 

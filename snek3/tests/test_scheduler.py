@@ -1161,11 +1161,22 @@ def test_the_driver_publishes_an_arm_at_its_cap_and_each_pass_its_merged_files(t
     assert d2.results is None and d2.run() == 0
 
 
-def test_a_failed_pass_publishes_nothing(box):
+def test_a_failed_pass_publishes_the_arms_it_merged_and_nothing_when_it_merged_none(box):
+    """A merged file is final for its arm whatever became of the pass, so it goes to the feed (2026-09-07:
+    b25's hof30k failed on arm four and the three merged arms stayed off the site). A pass that merged no
+    arm has no file to publish, and the feed is not called with an empty list."""
     specs = [spec('b14a-roll32-seed1')]
     feed = FakeFeed()
     assert driver(specs, box, Calls(codes={'stageb': 1}), wave=1, results=feed).run() == 1
     assert [job for job, _ in feed.published] == ['b14a-roll32-seed1']
+    # the same failure after the pass had merged the arm: its file is published under the pass's id
+    box2 = {'runs': box['runs'] + '-2', 'logs': box['logs']}
+    os.makedirs(box2['runs'])
+    feed2 = FakeFeed()
+    calls = FinishingCalls(box2['runs'], codes={'stageb': 1})
+    assert driver(specs, box2, calls, wave=1, results=feed2).run() == 1
+    assert [job for job, _ in feed2.published] == ['b14a-roll32-seed1', 'b14-stageb']
+    assert dict(feed2.published)['b14-stageb'] == ['b14a-roll32-seed1_checkpoint_evals.json']
 
 
 def test_specs_sort_by_priority_then_id_and_a_missing_priority_is_100(tmp_path):
