@@ -22,6 +22,64 @@ whose published artifacts are history, and the daemon's ledger, whose keys are t
 waves actually ran under. Looking for an arm's desktop artifacts, search the old name.
 
 
+<!-- progress_update: batch b25 -->
+## Batch b25 — the `knob` sweep, 1 values x 8 seeds, 200M, closed 2026-09-07
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b23e-g999roll512msehold-seed1, b23f-g999roll512msehold-seed2, b23g-g999roll512msehold-seed3, b23h-g999roll512msehold-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| laddertop | 20,942 | 77.5% | 80.5 64.3 81.0 77.5 72.1 82.8 77.4 83.0 | 5626 | 100.0 | 99.34 (99.1-99.6) | 97.5 | 0.01% | 0.45% | 72.7% |
+| **base** (reference) | 2,204 | 64.4% | 65.6 61.2 48.2 80.9 | 395 | 100.0 | 98.95 (98.4-99.3) | 90.3 | 0.0% | 1.4% | 58.2% |
+
+<!-- reading -->
+Read against the bold reference, b23's `g999roll512msehold` cell — the same config (γ 0.999, λ 0.99, T 512, `mse`, clip 0.2 → 0.001 held from 80%) at 50M and 4 seeds; b25 is that ladder top at 200M and 8 seeds, the first champion attempt on it. **The longer cap paid on every column**: 77.5% density (64.3-83.0 per seed, seven of eight above the reference's best seed) against 64.4, best30 99.34 (99.1-99.6) against 98.95, stage-A ≥98 share 72.7% against 58.2, `sef` 97.5 against 90.3, and the collapses stayed gone — 0.01% of evals below 50, 0.45% below 80 against 1.4. The `hof5000` pass took 5,626 candidates (at the 99 cut this batch ran under; 721 clear the 99.2 cut set on 2026-09-07) and every arm's best 5,000-episode row is 99.2-99.8: `b25a` @106.2M at 99.8, `b25h` @121.3M at 99.6 with 362 rows at ≥99.2, `b25f` @68.2M at 99.5. **At 30,000 episodes, `b25a` @106168320 reads 99.60 [99.52-99.67]** — level with the HOF's second place (99.55) and inside the record's interval (99.65, [99.6-99.7]), the first checkpoint outside the γ 1.00 cell to get there; `b25c` reads 99.3 and `b25b` 99.1. **The 30k pass covers only three of eight arms**: it failed on `b25d` at 15:03 when the observation changed from 30 to 26 values under it (era `obs26-20260907`, commit `b1259c912`) and the remaining arms' 30-value checkpoints no longer load in the current environment; `b25h`, `b25f` and `b25e` are the unmeasured arms with the most to show, and the pass is the other agent's to finish under the old era. The spec's predictions held: fewer evals below 80 than b24 (0.45 against 0.83), a ≥99.3 /30k check (99.6). Not settled: whether a fresh 30,000 on `b25a` @106168320 confirms 99.6 (the `hof-promote` gate), and what the five unmeasured arms hold at depth.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b25a-laddertop-seed1` | laddertop | 2645 | 80.5% | 811 | 100.0 | 99.5 @184.1M | 96.6 | 1.72% |
+| `b25b-laddertop-seed2` | laddertop | 2453 | 64.3% | 324 | 100.0 | 99.1 @36.0M | 96.7 | 1.5% |
+| `b25c-laddertop-seed3` | laddertop | 2626 | 81.0% | 939 | 100.0 | 99.5 @188.9M | 96.9 | 0.0% |
+| `b25d-laddertop-seed4` | laddertop | 2613 | 77.5% | 570 | 100.0 | 99.3 @141.2M | 98.2 | 0.0% |
+| `b25e-laddertop-seed5` | laddertop | 2531 | 72.1% | 527 | 100.0 | 99.3 @127.1M | 97.5 | 0.03% |
+| `b25f-laddertop-seed6` | laddertop | 2731 | 82.8% | 770 | 100.0 | 99.2 @156.8M | 98.8 | 0.0% |
+| `b25g-laddertop-seed7` | laddertop | 2627 | 77.4% | 589 | 100.0 | 99.2 @109.2M | 96.6 | 1.69% |
+| `b25h-laddertop-seed8` | laddertop | 2716 | 83.0% | 1096 | 100.0 | 99.6 @183.0M | 98.4 | 0.0% |
+
+<!-- /progress_update: batch b25 -->
+
+<!-- progress_update: batch b24 -->
+## Batch b24 — the `knob` sweep, 1 values x 8 seeds, 200M, closed 2026-09-07
+
+Closed on both boxes' feeds; every arm has its stage-B measurement. One knob off the reference cell (`b23e-g999roll512msehold-seed1, b23f-g999roll512msehold-seed2, b23g-g999roll512msehold-seed3, b23h-g999roll512msehold-seed4`, marked in the table). Numbers by `tools/progress_update.py`.
+
+| knob | rows | ≥98%/500 | per-seed share | ≥99 (`hof5000` cands) | best row | best30 (mean, range) | sef | drawdown < 50% | < 80% | stage-A ≥98% |
+|---|---:|---:|---|---:|---:|---|---:|---:|---:|---:|
+| hzanneal50 | 34,789 | 60.5% | 54.8 69.9 62.1 63.1 56.9 55.0 60.1 61.0 | 6277 | 100.0 | 99.30 (99.1-99.5) | 97.8 | 0.0% | 0.83% | 56.3% |
+| **base** (reference) | 2,204 | 64.4% | 65.6 61.2 48.2 80.9 | 395 | 100.0 | 98.95 (98.4-99.3) | 90.3 | 0.0% | 1.4% | 58.2% |
+
+<!-- reading -->
+Read against the same bold reference as b25 (b23's ladder top at 50M); b24 is the user's horizon-anneal config at 200M and 8 seeds — γ 0.99 → 0.999 and λ 0.95 → 0.999 annealed over the first half on the existing ramp, entropy 0.01 → 0.001, `huber` value loss, minibatch 512, lr 2.5e-4, T 256 — so the two 200M batches are the ladder top against an anneal that reaches the same horizon by a different road. **It arrives lower on density and level on the peak**: 60.5% (54.8-69.9) against b25's 77.5 and the reference's 64.4, best30 99.30 (99.1-99.5) against 99.34, stage-A ≥98 share 56.3% against 72.7, and twice b25's evals below 80 (0.83% against 0.45, still under the reference's 1.4). T 256 screens twice the checkpoints (34,789 rows against 20,942), so its `hof5000` pass took 6,277 candidates — the largest this project has run — with per-arm bests 99.2-99.6 (`b24a` @195.3M, `b24b` @141.1M and `b24d` @166.9M at 99.6; `b24d` has 242 rows at ≥99.2, `b24b` 167). At 30,000 episodes `b24a` @196706304 reads 99.5 and `b24b` @141197312 99.4 — the first ties the HOF's third place, neither reaches 99.65. **The 30k pass covers two of eight arms** for the same reason as b25's: it failed on `b24c` after the observation change and the six remaining arms cannot load in the 26-value environment; `b24d` is the unmeasured arm with the most at ≥99.2. Against the spec: "earlier onset than b25, then a denser but less stable second half" — less stable held (0.83 against 0.45 below 80), denser did not (60.5 against 77.5); "best30 close" held (99.30 against 99.34). Verdict: the anneal is a working 200M config that matches the ladder top's peak and trails it on density and stability; the ladder top is the one to carry forward.
+<!-- /reading -->
+
+### Every arm
+
+| arm | knob | rows | ≥98%/500 | ≥99 | best row | best30 @step | sef | drawdown < 50% |
+|---|---:|---:|---:|---:|---:|---|---:|---:|
+| `b24a-hzanneal50-seed1` | hzanneal50 | 4200 | 54.8% | 625 | 100.0 | 99.3 @194.5M | 98.0 | 0.0% |
+| `b24b-hzanneal50-seed2` | hzanneal50 | 4555 | 69.9% | 1265 | 100.0 | 99.5 @120.1M | 97.9 | 0.0% |
+| `b24c-hzanneal50-seed3` | hzanneal50 | 4301 | 62.1% | 806 | 100.0 | 99.3 @128.9M | 97.6 | 0.0% |
+| `b24d-hzanneal50-seed4` | hzanneal50 | 4282 | 63.1% | 1065 | 100.0 | 99.5 @183.1M | 98.0 | 0.0% |
+| `b24e-hzanneal50-seed5` | hzanneal50 | 4249 | 56.9% | 592 | 100.0 | 99.1 @157.6M | 97.9 | 0.0% |
+| `b24f-hzanneal50-seed6` | hzanneal50 | 4205 | 55.0% | 627 | 100.0 | 99.3 @171.5M | 98.1 | 0.0% |
+| `b24g-hzanneal50-seed7` | hzanneal50 | 4375 | 60.1% | 613 | 100.0 | 99.3 @160.2M | 96.3 | 0.0% |
+| `b24h-hzanneal50-seed8` | hzanneal50 | 4622 | 61.0% | 684 | 100.0 | 99.1 @129.7M | 98.3 | 0.0% |
+
+<!-- /progress_update: batch b24 -->
+
 <!-- progress_update: batch b23 -->
 ## Batch b23 — the `knob` sweep, 2 values x 4 seeds, 50M, closed 2026-09-06
 

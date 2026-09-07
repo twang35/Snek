@@ -6,6 +6,37 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b24 and b25 — the two 200M champion attempts — closed on stage B and hof5000; both 30k passes broke off part-way
+when the observation changed to 26 values, and the other agent's obs26 work owns finishing them. b26, the step-penalty
+sweep and the first batch of the new era, is in flight on both boxes.** As of 2026-09-07 16:30:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b26 w2 (`pen0001`, `pen0`, 4 seeds each, 50M) | training at 85%, stage B queued behind it | training ~16:40, stage B and hof passes ~1.5 h after |
+| laptop | b26 w1 (`pen01`, `pen001`) | stage B running (~20 min left), hof5000 then hof30k queued | passes ~18:00 |
+
+**What closed.** **b25, the ladder top (γ 0.999, λ 0.99, T 512, `mse`, clip held) at 200M x 8: 77.5% density (64.3-83.0)
+against 64.4 for the same config at 50M, best30 99.34, 0.45% of evals below 80 — and `b25a` @106168320 reads 99.60
+[99.52-99.67] at 30,000 episodes, level with the HOF's second place and inside the record's interval.** b24, the
+horizon anneal at 200M x 8, matches it on the peak (best30 99.30, `b24a` 99.5 /30k) and trails on density (60.5%) and
+stability (0.83% below 80). Both batches' `hof30k` passes cover only the first arms (b25: a-c; b24: a-b) — the pass failed
+on the next arm at 15:03 when `env/constants.py` moved to `OBS_LEN 26` / era `obs26-20260907` (commit `b1259c912`) and the
+30-value checkpoints no longer load; the failed markers are `.failed-b25-hof30k` in `logs/laptop-queue/b25/` and
+`.failed-b24-hof30k` in the desktop's `queue-local/b24/`. The five unmeasured b25 arms include `b25h` (362 rows ≥99.2,
+best 99.6 /5000) and `b25f` (99.5 /5000). Verdicts in [`results.md`](results.md), readings in [`charts.md`](charts.md).
+
+**Next.** A fresh 30,000 on `b25a` @106168320 to confirm 99.6 for the HOF (`hof-promote`), once the old-era eval path
+exists; the remaining `hof30k` arms of b24/b25 the same way. b26's four cells read against its own `pen0` control when
+its stage B is in. The hof cut moved to 99.2 today (`eta.HOF_THRESHOLD`; the lowest rate over 500 whose interval reaches
+the record) so later passes carry a fifth of the rows b24/b25's did.
+
+**Tooling today.** The status estimates count checkpoints, not arms (`tools/eta.py`): a queued pass at the box's
+seconds per checkpoint over what its selector will pick, a running pass from its own progress — b25's hof5000 had read
+"~1m left" for five hours. A pass now publishes the arms it merged whatever its exit, so a failed pass no longer keeps
+finished arms off the site.
+
+## Both boxes idle after b22/b23, as it read at 2026-09-06 18:25 (superseded)
+
 **b22 and b23 — the first two rung pairs of the corner-grid ladder — closed with all their passes; both boxes are idle
 and the shared queue is empty. The user is holding off on queueing more for now.** As of 2026-09-06 18:25:
 

@@ -17,6 +17,23 @@ snek3.
 **Newest first.** A new finding goes directly under this heading, above the one before it, so the
 top of the section is the most recent thing learned. Same rule in `Falsified` below.
 
+### The ladder top holds at 200M and 8 seeds — 77.5% density, best30 99.34, and a 99.6 /30,000 checkpoint outside the γ 1.00 cell; the horizon anneal reaches the same peak lower on density
+
+**Measured 2026-09-07, batches b25 and b24, 200M steps x 8 seeds each**, against b23's ladder-top cell at 50M
+(n=4). b25 — γ 0.999, λ 0.99, T 512, `mse`, clip 0.2 → 0.001 held from 80% — reads 77.5% of its stage-B rows at
+≥98/500 (64.3-83.0 per seed) against 64.4 at 50M, best30 99.34 (99.1-99.6) against 98.95, 0.45% of evals below 80
+against 1.4, so **the longer cap improves every column rather than trading density for a peak**, and the collapse-free
+character of the `mse` rungs survives four times the steps. At depth, `b25a` @106168320 is **99.60 [99.52-99.67] over
+30,000 episodes** — level with the HOF's second place (99.55, a γ 1.00 checkpoint) and inside the record's interval
+(99.65 [99.6-99.7]); every record before it came from the γ 1.00 cell whose deployed policy collapses and recovers for
+its whole run, and this one comes from a config with 0.01% of evals below 50. It is a candidate, not an entry: the HOF
+gate is a fresh 30,000, and the arm's five unmeasured siblings (the 30k pass broke off on the observation change) include
+`b25h` with 362 rows at ≥99.2 /5,000. b24, the horizon anneal (γ 0.99 → 0.999 and λ 0.95 → 0.999 over the first half,
+`huber`, T 256, minibatch 512) at the same cap and seeds, matches the peak — best30 99.30, `b24a` 99.5 /30k — at 60.5%
+density and 0.83% below 80: **a different road to the same horizon arrives at the same peak and a lower plateau**,
+which says the peak at 200M is set by the horizon reached and the plateau by how it was reached. Details in
+`results.md` (b24, b25).
+
 ### The best checkpoints fail by starving in a closed loop, not by colliding: 96% of b17cl's and 87% of b10ck's failures are a tail-following circuit orbiting reachable food, and the policy is confident in every lap
 
 **Measured 2026-09-07 on the two top HOF entries, 30,000 fresh episodes each at seed 11**, every
