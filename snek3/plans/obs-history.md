@@ -97,6 +97,50 @@ That tells us two things the sweep needs — whether the champion zigzags at all
 where the hypothesis says the damage is done (the crowded endgame) or in the open early board where it
 costs nothing. It is also the baseline the treatment arms are read against.
 
+### 3b. The failures: was there a zigzag in the last 200 steps before death?
+
+Zigzagging does not kill by itself, so the question that matters is the converse: **when a strong
+checkpoint does die, was a zigzag involved?** Three things make this answerable, and two make it easy
+to answer wrongly.
+
+**Finding deaths is not the hard part.** At 98.7% perfect, 5,000 episodes hold ~65 failures and the
+vectorised engine plays that in minutes; 20,000 episodes give ~250, which is enough for every
+comparison below. **Reproducing them is free**, because the measured policy is the argmax and the
+game is deterministic given its food sequence: record `(seed, food cells in order, actions)` for every
+episode that ends in `died` or `starved`, and each one replays exactly to any step, board and all.
+That is a small trace hook in `vectorized/engine.py` writing failures only — perfect games are kept as
+the summary measures of section 3, not as traces.
+
+**The two ways to get it wrong:**
+
+| trap | why | the control |
+|---|---|---|
+| **the endgame is crowded** | turn density rises with board fill in *every* game, so "the last 200 steps before death had many reversals" is true of the last 200 steps of a perfect game too | compare each death window against windows from perfect games **at the same board fill**, not against the early board |
+| **the death itself is a turn** | the last few moves into a dead end are forced turns, and a 200-step window ending at death is dominated by the trap, not by what caused it | split the window at the **point of no return** (below) and ask the zigzag question of the steps *before* it |
+
+**The point of no return.** For a collision death, replay the episode and walk back from the last step
+to the last one at which the chosen move still left the head able to reach the tail — index 9-14's
+`can reach tail` for the action taken, or a flood fill on the replayed board. Everything after it is
+the trap closing; everything before it is where the trap was *built*. Then the sharp version of the
+question: **the pocket that killed the snake is walled by its own body; which body segments form that
+wall, and what turns laid them down?** Segment *k* behind the head was placed *k* steps ago, so the
+wall's segments index straight into the action sequence, and the answer is a number: the reversal rate
+of the moves that built the fatal wall, against the reversal rate of the moves that built the rest of
+the body. If zigzagging is the mechanism, that number is high and the matched-fill control is not. If
+the wall was laid by long straight runs, zigzagging is not what kills this policy and history is the
+wrong feature — a finding worth as much as the other outcome.
+
+Starves get the same trace but a different question, since nothing traps the head: is the snake
+circling (a repeated `(head, head_dir)` cycle — the aliasing case of the first draft) or reaching but
+never entering the food's region? Those are two different features, and neither is move history
+unless the cycle is four moves long.
+
+**What gets produced:** one table — deaths by cause, with the pre-trap reversal rate, the fatal-wall
+reversal rate, and the matched-fill perfect-game rate beside them — and a **contact sheet** of the
+failures: the final 200 steps of each as one still, head path coloured by time, wall segments marked,
+so the numbers can be checked by eye on the dozens of games there are. `record_gif.py` and
+`Game.snapshot` already do the replay and the drawing; the sheet is a layout on top of them.
+
 `ended_by` and the three path measures then go into the stage-B row permanently, so the close-out of
 every future batch carries them.
 
@@ -146,6 +190,9 @@ The review settled the purpose, the encoding, the convention and `ended_by` (top
 
 - **The zigzag threshold.** `k = 2` for a reversal is the natural definition; whether `k = 3` or a
   run-length view says something different is for the diagnostic to show.
+- **How many failures are enough.** Section 3b assumes ~250 from 20,000 episodes; if the fatal-wall
+  measure separates cleanly at 60 the run can stop early, and if it does not separate at 250 the
+  answer is "no".
 - **The turn-penalty arm** (section 5): run it beside the depth sweep, or hold it for a later batch.
 - **Endgame-only history.** If the diagnostic shows zigzags only matter late, a cheaper variant gates
   the block on board fill. Premature until the diagnostic runs.
