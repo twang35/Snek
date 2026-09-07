@@ -104,6 +104,13 @@ def build_config(tuned):
         # at 0.95 and gamma 0.9975, 33.6 at 0.98 and gamma 0.99, 50 at 0.99, 100 at 1.0. See
         # `rollout.py`: none of them reaches the +100, which is why the critic carries it.
         'ppo_gae_lambda': tuned('PPO_GAE_LAMBDA', 0.99),
+        # The horizon anneals (2026-09-07, batch b24): lambda and gamma ramp to these over the anneal
+        # fraction, same spelling as the three ramps below. Read at the step a rollout *begins*, so
+        # the GAE of that rollout and its shaping discount use one value. `PPO_` on the discount's
+        # anneal although `SNEK_DISCOUNT` itself is shared: DQN has no ramp for it, and a knob DQN
+        # would silently ignore must not share a name DQN reads.
+        'ppo_gae_lambda_final': _optional_float(tuned('PPO_GAE_LAMBDA_FINAL', '', str)),
+        'ppo_discount_final': _optional_float(tuned('PPO_DISCOUNT_FINAL', '', str)),
         'ppo_entropy_coef': tuned('PPO_ENTROPY_COEF', 0.01),
         # Absent means "no anneal", which is b4's setting. `tuned` needs a sentinel rather than None
         # because it casts, so an empty string is the spelling for absent.
@@ -112,7 +119,7 @@ def build_config(tuned):
         'ppo_learning_rate': tuned('PPO_LEARNING_RATE', 3e-4),
         # Its anneal. 0 is allowed: the tail of the run then learns nothing, which is the intent.
         'ppo_learning_rate_final': _optional_float(tuned('PPO_LEARNING_RATE_FINAL', '', str)),
-        # How much of the cap the three ramps span. 1.0 is the whole run (every anneal before
+        # How much of the cap every ramp spans. 1.0 is the whole run (every anneal before
         # 2026-09-03); 0.8 reaches every `_FINAL` at 80% of SNEK_MAX_STEPS and holds it to the end.
         'ppo_anneal_fraction': tuned('PPO_ANNEAL_FRACTION', 1.0),
         'ppo_adam_epsilon': tuned('PPO_ADAM_EPSILON', 1e-7),
@@ -150,6 +157,14 @@ def build_config(tuned):
     if not 0.0 <= config['ppo_gae_lambda'] <= 1.0:
         raise ValueError('SNEK_PPO_GAE_LAMBDA={0} is not in [0, 1]'.format(
             config['ppo_gae_lambda']))
+    final_lambda = config['ppo_gae_lambda_final']
+    if final_lambda is not None and not 0.0 <= final_lambda <= 1.0:
+        raise ValueError('SNEK_PPO_GAE_LAMBDA_FINAL={0} is not in [0, 1]'.format(final_lambda))
+    final_discount = config['ppo_discount_final']
+    if final_discount is not None and not 0.0 < final_discount <= 1.0:
+        raise ValueError('SNEK_PPO_DISCOUNT_FINAL={0} is outside (0, 1]. A discount of 0 makes '
+                         'every value target the immediate reward; 1 is the undiscounted '
+                         'regime b10 measured.'.format(final_discount))
     return config
 
 
@@ -169,6 +184,13 @@ def reportable(config):
     out = dict(config)
     out['ppo_horizon'] = round(rollout_module.horizon(config['discount'],
                                                      config['ppo_gae_lambda']), 1)
+    if config.get('ppo_gae_lambda_final') is not None or config.get('ppo_discount_final') is not None:
+        # The horizon the anneal lands on, beside the one it starts from.
+        final_discount = config['ppo_discount_final']
+        final_lambda = config['ppo_gae_lambda_final']
+        out['ppo_horizon_final'] = round(rollout_module.horizon(
+            config['discount'] if final_discount is None else final_discount,
+            config['ppo_gae_lambda'] if final_lambda is None else final_lambda), 1)
     out['ppo_transitions_per_rollout'] = config['collect_envs'] * config['ppo_rollout']
     return out
 
@@ -232,11 +254,22 @@ class PpoAlgo(object):
         unlike a DQN step where a terminal transition emits a whole n-step window. That equality is
         the whole reason a PPO step count can be read against a snek2 one.
         """
+        fraction = self.config['ppo_anneal_fraction']
+        # The horizon knobs are read at the step the rollout *begins*, before collecting: the shaping
+        # reward is discounted as it is banked and GAE runs at the end of the same rollout, so both
+        # see one gamma. Constant unless a `_FINAL` is set. The env's `shaping_discount` is the agent's
+        # gamma (`dqn/algo.py` on why), so it moves with it.
+        self.agent.discount = schedules.discount_for(
+            self.step, self.config['max_steps'], self.config['discount'],
+            self.config['ppo_discount_final'], fraction)
+        self.collector.vec.shaping_discount = self.agent.discount
+        self.agent.gae_lambda = schedules.gae_lambda_for(
+            self.step, self.config['max_steps'], self.config['ppo_gae_lambda'],
+            self.config['ppo_gae_lambda_final'], fraction)
         transitions = self.collector.collect()
         self.step += transitions
         # Read before the update rather than after, so the coefficient the epochs use is the one this
         # rollout's step number implies. Constant at b4's settings, where `final` is absent.
-        fraction = self.config['ppo_anneal_fraction']
         self.agent.entropy_coef = schedules.entropy_coef_for(
             self.step, self.config['max_steps'], self.config['ppo_entropy_coef'],
             self.config['ppo_entropy_coef_final'], fraction)
@@ -271,7 +304,10 @@ class PpoAlgo(object):
                  'stopped_early': metrics.get('stopped_early'),
                  # The two ramped knobs, so an annealed arm's rows say what it ran under at that step.
                  'clip': round(float(self.agent.clip), 5),
-                 'learning_rate': self.agent.learning_rate()}
+                 'learning_rate': self.agent.learning_rate(),
+                 # And the two horizon knobs, for the same reason, as the last rollout used them.
+                 'discount': round(float(self.agent.discount), 6),
+                 'gae_lambda': round(float(self.agent.gae_lambda), 6)}
         block.update(self.collector.snapshot())
         return {'entropy_coef': round(float(self.agent.entropy_coef), 6), 'ppo': block}
 

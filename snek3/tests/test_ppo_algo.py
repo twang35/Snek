@@ -513,3 +513,67 @@ def test_a_negative_learning_rate_final_is_refused(monkeypatch):
     monkeypatch.setenv('SNEK_PPO_LEARNING_RATE_FINAL', '-1e-5')
     with pytest.raises(ValueError, match='SNEK_PPO_LEARNING_RATE_FINAL'):
         train.build_config()
+
+
+# --- the horizon anneals -----------------------------------------------------------------------------
+#
+# `SNEK_PPO_GAE_LAMBDA_FINAL` and `SNEK_PPO_DISCOUNT_FINAL` (2026-09-07, batch b24): lambda and gamma
+# ramp on the same `ramped` and the same anneal fraction as the other three. Read at the step a
+# rollout *begins*, and the env's shaping discount follows gamma.
+
+def test_absent_horizon_finals_leave_lambda_and_gamma_constant(monkeypatch):
+    algo, config = built(monkeypatch)
+    assert config['ppo_gae_lambda_final'] is None and config['ppo_discount_final'] is None
+    for _ in range(3):
+        algo.advance()
+    assert algo.agent.gae_lambda == config['ppo_gae_lambda']
+    assert algo.agent.discount == config['discount']
+    assert algo.collector.vec.shaping_discount == config['discount']
+    assert 'ppo_horizon_final' not in ppo_algo.reportable(config)
+
+
+def test_lambda_and_gamma_ramp_from_the_step_the_rollout_begins_at(monkeypatch):
+    monkeypatch.setenv('SNEK_PPO_GAE_LAMBDA', '0.95')
+    monkeypatch.setenv('SNEK_PPO_GAE_LAMBDA_FINAL', '0.999')
+    monkeypatch.setenv('SNEK_DISCOUNT', '0.99')
+    monkeypatch.setenv('SNEK_PPO_DISCOUNT_FINAL', '0.999')
+    monkeypatch.setenv('SNEK_PPO_ANNEAL_FRACTION', '0.5')
+    algo, config = built(monkeypatch, max_steps=8 * 32)   # 8 rollouts of 32; the ramp spans 4
+    seen = []
+    for _ in range(8):
+        before = algo.step
+        algo.advance()
+        seen.append((before, algo.agent.gae_lambda, algo.agent.discount,
+                     algo.collector.vec.shaping_discount))
+    for before, lam, gamma, shaping in seen:
+        fraction = min(1.0, before / (0.5 * config['max_steps']))
+        assert lam == pytest.approx(0.95 + fraction * (0.999 - 0.95))
+        assert gamma == pytest.approx(0.99 + fraction * (0.999 - 0.99))
+        assert shaping == gamma                          # the env discounts shaping at the agent's gamma
+    assert seen[0][1] == 0.95 and seen[0][2] == 0.99     # the first rollout runs at the start values
+    assert seen[4][1] == pytest.approx(0.999) and seen[4][2] == pytest.approx(0.999)
+    assert all(lam == pytest.approx(0.999) for _, lam, _, _ in seen[4:])   # held, not overshot
+    row = algo.fields()['ppo']
+    assert row['gae_lambda'] == pytest.approx(0.999) and row['discount'] == pytest.approx(0.999)
+    report = ppo_algo.reportable(config)
+    assert report['ppo_horizon'] == pytest.approx(1 / (1 - 0.99 * 0.95), abs=0.1)
+    assert report['ppo_horizon_final'] == pytest.approx(1 / (1 - 0.999 * 0.999), abs=0.1)
+
+
+def test_the_horizon_ramps_are_the_same_function_as_the_other_three():
+    for f in (ppo_schedules.gae_lambda_for, ppo_schedules.discount_for):
+        assert f(0, 100, 0.95, 0.999) == 0.95
+        assert f(40, 100, 1.0, 0.0, 0.8) == 0.5
+        assert f(90, 100, 1.0, 0.0, 0.8) == 0.0
+        assert f(50, 100, 0.95) == 0.95
+
+
+@pytest.mark.parametrize('knob, value', [('SNEK_PPO_GAE_LAMBDA_FINAL', '1.5'),
+                                         ('SNEK_PPO_GAE_LAMBDA_FINAL', '-0.1'),
+                                         ('SNEK_PPO_DISCOUNT_FINAL', '0'),
+                                         ('SNEK_PPO_DISCOUNT_FINAL', '1.01')])
+def test_a_horizon_final_outside_its_interval_is_refused(knob, value, monkeypatch):
+    monkeypatch.setenv('SNEK_ALGO', 'ppo')
+    monkeypatch.setenv(knob, value)
+    with pytest.raises(ValueError, match=knob):
+        train.build_config()

@@ -176,5 +176,27 @@
     "label": "reference: b22's g999roll512 cell, the rung below (gamma 0.999, lambda 0.99, rollout 512, huber, no anneal)",
     "knob": "name",
     "value": "base"
+  },
+  "b24": {
+    "arms": [
+      "b23e-g999roll512msehold-seed1",
+      "b23f-g999roll512msehold-seed2",
+      "b23g-g999roll512msehold-seed3",
+      "b23h-g999roll512msehold-seed4"
+    ],
+    "label": "reference: b23's g999roll512msehold cell at 50M (gamma 0.999, lambda 0.99, T 512, mse, clip 0.2->0.001 held from 80%) -- the ladder's top rung, which b25 runs at 200M",
+    "knob": "name",
+    "value": "base"
+  },
+  "b25": {
+    "arms": [
+      "b23e-g999roll512msehold-seed1",
+      "b23f-g999roll512msehold-seed2",
+      "b23g-g999roll512msehold-seed3",
+      "b23h-g999roll512msehold-seed4"
+    ],
+    "label": "reference: b23's g999roll512msehold cell at 50M -- the same config b25 runs at 200M and 8 seeds",
+    "knob": "name",
+    "value": "base"
   }
 }

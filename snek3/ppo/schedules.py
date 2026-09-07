@@ -24,8 +24,8 @@ def ramped(step, max_steps, initial, final=None, fraction=1.0):
 
     `fraction` is `SNEK_PPO_ANNEAL_FRACTION` (2026-09-03, for b17's hold cells): 1.0 ramps over the
     whole cap; 0.8 reaches `final` at 80% of `SNEK_MAX_STEPS` and holds it for the last 20%, so the
-    endgame is trained at the floor rather than still descending toward it. One knob for all three
-    ramps, because a cell that anneals two of them wants them to land together.
+    endgame is trained at the floor rather than still descending toward it. One knob for every
+    ramp, because a cell that anneals two of them wants them to land together.
 
     The one ramp every PPO schedule uses — the entropy coefficient, and since 2026-09-01 the clip and
     the learning rate (`SNEK_PPO_CLIP_FINAL`, `SNEK_PPO_LEARNING_RATE_FINAL`, the PPO paper's Atari
@@ -65,4 +65,16 @@ def clip_for(step, max_steps, initial, final=None, fraction=1.0):
 def learning_rate_for(step, max_steps, initial, final=None, fraction=1.0):
     """Adam's step size at `step`. `final` may be 0: the last stretch then takes no gradient steps,
     which is the Atari recipe's intent, and a resumed arm past its cap stays at the floor."""
+    return ramped(step, max_steps, initial, final, fraction)
+
+
+def gae_lambda_for(step, max_steps, initial, final=None, fraction=1.0):
+    """GAE's lambda at `step` (`SNEK_PPO_GAE_LAMBDA_FINAL`, 2026-09-07, batch b24). Read at the step a
+    rollout begins, so the whole rollout's advantages use one value. `final` stays in [0, 1]."""
+    return ramped(step, max_steps, initial, final, fraction)
+
+
+def discount_for(step, max_steps, initial, final=None, fraction=1.0):
+    """Gamma at `step` (`SNEK_PPO_DISCOUNT_FINAL`). Same rule as lambda's: read once per rollout, and
+    the env's shaping discount follows it, since that is the agent's gamma too. `final` in (0, 1]."""
     return ramped(step, max_steps, initial, final, fraction)
