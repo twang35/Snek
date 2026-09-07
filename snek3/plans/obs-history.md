@@ -1,9 +1,18 @@
 # Short-term memory: showing the policy its last four moves
 
-**Written 2026-09-07, for discussion.** Nothing here is built. The question asked was: give snek a
-view of its last four moves, cheaper than four one-hot triples (12 inputs), and is there a better
-approach altogether. The answer this plan argues for is in section 2; the rest is what it costs and
-how to test it.
+**Written 2026-09-07, revised the same day after review. Not started.** The question asked was: give
+snek a view of its last four moves, cheaper than four one-hot triples (12 inputs), and is there a
+better approach altogether. The answer is in section 2; the rest is what it costs and how to test it.
+
+**Decided in review (2026-09-07):**
+
+| decision | |
+|---|---|
+| encoding | option B — two bits per move, read off the body, `SNEK_OBS_HISTORY` gates the block |
+| purpose | **fewer zigzags, and through them a higher perfect rate.** Not aliasing loops; section 3 is written for that |
+| convention | the new inputs are *descriptive*, not "1 is good"; `docs/environment.md` says so |
+| `ended_by` | goes into the stage-B row permanently, alongside this work |
+| implementation | **not yet.** The plan is agreed; the build waits for a go |
 
 ## 0. The one-line recommendation
 
@@ -54,25 +63,42 @@ reachable state, so this is purely an implementation choice — and the derived 
 no snapshot field, no parity trap, and no vectorised buffer to keep in step with autoreset. It is also
 the honest description of the feature: it is a *body-shape* feature, not memory.
 
-## 3. What the feature is for, and what to measure before trusting it
+## 3. What the feature is for: zigzags
 
-A history of moves helps a memoryless policy in exactly one way: **it breaks observation aliasing.**
-When the 30 values are identical around a cycle the policy makes the same choice at each lap and
-circles until the starve budget runs out. Four moves of history make the laps distinguishable only
-when the cycle is short, and any effect shows up as **fewer starve deaths**, not fewer collisions.
+The motivation is **zigzagging** — the snake alternating left and right turns through open space
+rather than travelling straight or along an edge. The hypothesis, the same one indices 23-25 were
+added on, is that a zigzag carves the free space into pockets that are harder to fill later, and that
+the cost lands at the end of the game as a missed perfect. A memoryless policy cannot see that it is
+zigzagging: each step's 30 values describe the board ahead, and a left after a right looks the same as
+a left after a left. Four moves of history are exactly what makes the pattern visible to it.
 
-**The evals do not currently record how a game ended.** A stage-B row carries scores and the perfect
-rate; `VecEnv.step`'s `info` carries `died / starved / perfect` per game, and `vectorized/engine.py`
-drops it. So the first step, before any observation change, is a read-only diagnostic:
+Two consequences for how this is judged:
 
-1. Play the current best checkpoint (b25's ladder top) for 5,000 episodes and split the endings:
-   perfect, wall/body collision, starve. Also count **repeated `(head, head_dir, obs)` states within
-   an episode** as a direct measure of aliasing loops.
-2. **If starve deaths are near zero, history cannot move the number** and the plan stops here with
-   that finding written into `docs/findings.md`. If they are a meaningful share of the losses, go on.
+- **The headline metric is the perfect rate, the same as every batch.** History is *enabling*: it lets
+  the policy tell a zigzag from a straight run, and nothing else rewards one over the other. If the
+  perfect rate does not move, the feature failed, however the paths look.
+- **The mechanism check is a zigzag measure, taken from the same games.** Without it a gain cannot be
+  attributed to straighter paths rather than to noise or to something else the extra inputs enable.
 
-This also decides whether to carry `ended_by` into the stage-B row permanently. It costs nothing and
-would have answered this question already.
+The measure, computed from the action sequence of each eval episode:
+
+| measure | definition |
+|---|---|
+| turn density | turns per step |
+| **reversal rate** | a left within *k* steps of a right or vice versa, per step; `k = 2` is the zigzag proper |
+| mean straight run | steps between turns |
+
+**The evals do not currently record any of this, nor how a game ended.** A stage-B row carries scores
+and the perfect rate; `VecEnv.step`'s `info` carries `died / starved / perfect` per game and
+`vectorized/engine.py` drops it; the actions are never kept. So the first step, before any observation
+change, is a read-only diagnostic on b25's ladder top over 5,000 episodes: the three measures above,
+split by outcome (perfect / collision / starve), and the reversal rate **as a function of board fill**.
+That tells us two things the sweep needs — whether the champion zigzags at all, and whether it does so
+where the hypothesis says the damage is done (the crowded endgame) or in the open early board where it
+costs nothing. It is also the baseline the treatment arms are read against.
+
+`ended_by` and the three path measures then go into the stage-B row permanently, so the close-out of
+every future batch carries them.
 
 ## 4. The build, if section 3 says go
 
@@ -100,19 +126,26 @@ One knob, dense, four seeds, on the b25 base — the protocol every sweep here h
 | | 4 | 38 |
 | | 8 | 46 |
 
-Judged on the b25 numbers (true rate at depth, drawdowns), plus the section-3 death split at the
-close-out so an improvement can be attributed to fewer starves rather than assumed. Depth is the real
+Judged on the b25 numbers (true rate at depth, drawdowns), plus the section-3 path measures at the
+close-out, so an improvement can be attributed to straighter paths rather than assumed — and so a
+*flat* perfect rate with a *falling* reversal rate is read as "it stopped zigzagging and that was not
+the problem", which is a finding too.
+
+**One optional fifth arm, worth discussing:** the other lever for fewer zigzags is a small per-turn
+penalty in the reward, which needs no observation change and no new era. Running it beside the history
+arms would say whether the policy needs to *see* its zigzags or merely to be charged for them. It is a
+reward change, so it is a different knob and does not belong in the depth sweep proper; it is listed
+here so the comparison is not forgotten. Depth is the real
 unknown; the encoding is not, which is why the encoding is fixed and the depth is swept. If depth 4
 or 8 wins, the follow-up ablation is option D — replace the eight bits with net rotation and turn
 count and see whether the summary keeps the gain.
 
-## 6. Open questions for the discussion
+## 6. Open questions
 
-- **Is aliasing the failure mode you have seen?** Section 3 measures it, but if the motivation is
-  something else — smoother paths, fewer zigzags in the endgame — the feature is the same but the
-  metric is not, and the plan should say which.
-- **Convention.** Every existing input reads "1 is good or safe". These eight are descriptive, not
-  evaluative. Fine, but it should be written down in `environment.md` so the next reader does not
-  hunt for the polarity.
-- **Should `ended_by` go into the stage-B row regardless?** Recommended yes; it is one field and it
-  would have shortcut this whole discussion.
+The review settled the purpose, the encoding, the convention and `ended_by` (top of file). Left open:
+
+- **The zigzag threshold.** `k = 2` for a reversal is the natural definition; whether `k = 3` or a
+  run-length view says something different is for the diagnostic to show.
+- **The turn-penalty arm** (section 5): run it beside the depth sweep, or hold it for a later batch.
+- **Endgame-only history.** If the diagnostic shows zigzags only matter late, a cheaper variant gates
+  the block on board fill. Premature until the diagnostic runs.
