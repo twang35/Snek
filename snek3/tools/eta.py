@@ -16,10 +16,25 @@ its remaining steps at its recent row rate (PPO slows as the games get longer --
 start, 20k at the end -- so the whole-life rate would read low), plus the overhead it has shown so
 far scaled to the steps left.
 
-**Passes have no rate file**, so the scheduler records each one it finishes -- seconds and arms -- in
+**A pass costs what its selector picked, not how many arms it covers.** The scheduler records each
+pass it finishes -- seconds, arms and the checkpoints its merged files hold -- in
 `runs/.live/.durations.json` (`tools/live_runs.py`), and a pass is estimated at that ledger's median
-seconds per arm times the wave's arms. Per box by construction (the desktop's 16 shards and the
-laptop's 12 give different times); before a box has run one, `DEFAULT_PASS_SECONDS_PER_ARM`.
+seconds per checkpoint times the checkpoints the pass will measure, which its selector's input file
+already says before it starts (`selected_checkpoints`): stage B reads the arm's stage-A rows above the
+screen, hof5000 the stage-B rows above 99, hof30k the hof5000 rows above 99. Per box by construction
+(the desktop's 16 shards and the laptop's 12 give different times); before a box has run one,
+`DEFAULT_PASS_SECONDS_PER_CHECKPOINT`. Only when the input file is not there yet (a hof5000 queued
+behind a stage B still running) does the estimate fall back to the ledger's seconds per arm.
+
+Why per checkpoint (2026-09-07): b19's arms put ~20 checkpoints each into hof5000 and b25's, ladder-top
+arms at 200M steps that spend most of their life above 99%, put 811. The per-arm median said 12
+minutes for a pass that took five hours, and `running_pass_seconds` then sat at its floor for the
+rest of the pass: `~1m left` for four hours and fifty minutes.
+
+**A running pass is estimated from its own progress.** Every arm's merged file, and the shard files
+of the arm in flight, say how many checkpoints are measured so far (`pass_progress`); what is left is
+the rest at the pass's own seconds per checkpoint so far. Before its first row the ledger estimate
+less the elapsed time stands in.
 
 Every function returns None rather than guess when it has nothing, and `build_at_a_glance` leaves a
 line without an estimate as it was.
@@ -28,6 +43,7 @@ line without an estimate as it was.
 import glob
 import json
 import os
+import re
 import statistics
 
 from env import constants
@@ -39,8 +55,17 @@ RECENT_ARMS = 8
 # An arm younger than this has no wall rate worth reading.
 MIN_WALL_SECONDS = 60.0
 # Before this box has measured a pass of its own. b16 on the laptop, 2026-09-05, 8-arm waves at 12
-# shards: stage B 55 m, hof5000 9.5 m, hof30k 4.5 m.
+# shards: stage B 55 m, hof5000 9.5 m, hof30k 4.5 m. Used only when the pass's checkpoint count is
+# not yet knowable (its selector's input file is not written).
 DEFAULT_PASS_SECONDS_PER_ARM = {'stageb': 55 * 60 / 8.0, 'hof5000': 9.5 * 60 / 8.0, 'hof30k': 4.5 * 60 / 8.0}
+# Seconds per selected checkpoint before this box has measured a pass of its own: the laptop's
+# ledger over b18-b25 (12 shards), 2026-09-07 -- stage B 0.14-0.40 s/row at 500 episodes, hof5000
+# 1.5-4.8 at 5,000, hof30k 22-90 at 30,000 (a per-arm floor dominates when a wave selects a handful).
+DEFAULT_PASS_SECONDS_PER_CHECKPOINT = {'stageb': 0.35, 'hof5000': 3.7, 'hof30k': 30.0}
+# Which file each pass's selector reads and the threshold it applies: `(label of the input pass,
+# threshold)`, with None the arm's stage-A `_evals.json`. Spelled here rather than read from
+# `closeout.PASSES` so this module imports no torch (the daemon reads it too).
+PASS_INPUTS = {'stageb': (None, 97.0), 'hof5000': ('', 99.0), 'hof30k': ('hof5000', 99.0)}
 # A running pass is never shown as less than this: its estimate is a median, and half of them run over.
 MIN_RUNNING_PASS_SECONDS = 60.0
 
@@ -170,19 +195,140 @@ def running_arm_seconds(policy, step, max_steps, runs_dir=None, policy_dir=None,
     return seconds
 
 
-def pass_seconds(kind, arms, runs_dir=None):
-    """Seconds a pass of `kind` over `arms` arms takes on this box: the ledger's median per arm, or the
-    default per arm, times the arms. None for a kind neither knows."""
+def stage_b_path(policy, label, runs_dir=None):
+    """`runs/<arm>_checkpoint_evals[_<label>].json`, the merged file of the pass labelled `label`
+    ('' or None for the main stage-B pass)."""
+    name = '{0}_checkpoint_evals{1}.json'.format(policy, '_' + label if label else '')
+    return os.path.join(runs_dir or constants.RUNS_DIR, name)
+
+
+def _pass_rows(path):
+    """The rows of a stage-B file (merged or one shard), `[]` when it is absent or unreadable."""
+    try:
+        with open(path) as handle:
+            loaded = json.load(handle)
+        return [row for row in loaded.get('rows') or [] if isinstance(row, dict)]
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def _shard_paths(policy, label, runs_dir=None):
+    stem = stage_b_path(policy, label, runs_dir)[:-len('.json')]
+    exact = re.compile(re.escape(os.path.basename(stem)) + r'-s(\d+)of(\d+)\.json$')
+    return [path for path in glob.glob(stem + '-s*of*.json') if exact.search(os.path.basename(path))]
+
+
+def selected_checkpoints(kind, policy, runs_dir=None):
+    """How many checkpoints the pass `kind` will measure for `policy`: the rows of its selector's input
+    file at or above the threshold. None when that file is not there yet, or for a kind not in
+    `PASS_INPUTS`. For an arm still training, stage B's count is the count so far."""
+    if kind not in PASS_INPUTS:
+        return None
+    label, threshold = PASS_INPUTS[kind]
+    path = evals_path(policy, runs_dir) if label is None else stage_b_path(policy, label, runs_dir)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as handle:
+            loaded = json.load(handle)
+        rows = loaded.get('evals' if label is None else 'rows') or []
+    except (OSError, ValueError, AttributeError):
+        return None
+    return sum(1 for row in rows if isinstance(row, dict) and row.get('perfect_percent') is not None
+               and float(row['perfect_percent']) >= threshold)
+
+
+def known_checkpoints(kind, policies, runs_dir=None, pending=()):
+    """`(checkpoints, unknown_arms)`: the checkpoints the pass over `policies` will measure for the arms
+    whose count is knowable -- an arm's merged file counts exactly when it already exists, else its
+    selector's input file -- and how many arms have neither yet. An arm in `pending` is still
+    training: its stage-A file holds only the rows so far, so its count is unknown rather than an
+    undercount (at launch it would read 0)."""
+    total, unknown = 0, 0
+    for policy in policies:
+        merged = stage_b_path(policy, _pass_label(kind), runs_dir)
+        if policy not in pending and os.path.exists(merged):
+            total += len(_pass_rows(merged))
+            continue
+        count = None if policy in pending else selected_checkpoints(kind, policy, runs_dir)
+        if count is None:
+            unknown += 1
+        else:
+            total += count
+    return total, unknown
+
+
+def pass_checkpoints(kind, policies, runs_dir=None, pending=()):
+    """The checkpoints a pass over `policies` will measure, or None when any arm's is not knowable yet
+    (`known_checkpoints`)."""
+    total, unknown = known_checkpoints(kind, policies, runs_dir, pending)
+    return None if unknown else total
+
+
+def _pass_label(kind):
+    """The label the pass `kind` writes under: '' for stage B (its file is the unlabelled one)."""
+    return '' if kind == 'stageb' else kind
+
+
+def pass_progress(kind, policies, runs_dir=None):
+    """`(done, total)` checkpoints of a pass in flight: an arm's merged file when it has one, its shard
+    files' rows while it is being measured, nothing before its turn. None when `total` is unknown."""
+    total = pass_checkpoints(kind, policies, runs_dir)
+    if total is None:
+        return None
+    done = 0
+    for policy in policies:
+        merged = stage_b_path(policy, _pass_label(kind), runs_dir)
+        if os.path.exists(merged):
+            done += len(_pass_rows(merged))
+        else:
+            done += sum(len(_pass_rows(path)) for path in _shard_paths(policy, _pass_label(kind), runs_dir))
+    return done, total
+
+
+def _per_arm(kind, entries):
+    by_arm = [entry for entry in entries if entry.get('arms')]
+    if by_arm:
+        return statistics.median(entry['seconds'] / entry['arms'] for entry in by_arm)
+    return DEFAULT_PASS_SECONDS_PER_ARM.get(kind)
+
+
+def _per_checkpoint(kind, entries):
+    measured = [entry for entry in entries if entry.get('checkpoints')]
+    if measured:
+        return statistics.median(entry['seconds'] / entry['checkpoints'] for entry in measured)
+    return DEFAULT_PASS_SECONDS_PER_CHECKPOINT.get(kind)
+
+
+def pass_seconds(kind, arms, runs_dir=None, checkpoints=None, unknown_arms=0):
+    """Seconds a pass of `kind` takes on this box. With `checkpoints` (what its selector picked,
+    `known_checkpoints`): the ledger's median seconds per checkpoint, else the default per checkpoint,
+    times the checkpoints -- plus, for the `unknown_arms` whose count is not knowable yet, the median
+    per arm times each. Without `checkpoints`: the median per arm, else the default per arm, times
+    `arms`. None for a kind neither knows."""
     entries = [entry for entry in live_runs.durations(runs_dir).get(kind) or []
-               if isinstance(entry, dict) and entry.get('seconds') and entry.get('arms')]
-    if entries:
-        per_arm = statistics.median(entry['seconds'] / entry['arms'] for entry in entries)
-    else:
-        per_arm = DEFAULT_PASS_SECONDS_PER_ARM.get(kind)
+               if isinstance(entry, dict) and entry.get('seconds')]
+    per_arm = _per_arm(kind, entries)
+    if checkpoints is not None:
+        per_checkpoint = _per_checkpoint(kind, entries)
+        if per_checkpoint is not None:
+            seconds = per_checkpoint * max(0, int(checkpoints))
+            if unknown_arms and per_arm is not None:
+                seconds += per_arm * int(unknown_arms)
+            return seconds
     return None if per_arm is None else per_arm * max(1, int(arms))
 
 
-def running_pass_seconds(kind, arms, elapsed, runs_dir=None):
-    """What is left of a pass that has run `elapsed` seconds, never below `MIN_RUNNING_PASS_SECONDS`."""
-    total = pass_seconds(kind, arms, runs_dir)
+def running_pass_seconds(kind, arms, elapsed, runs_dir=None, policies=None):
+    """What is left of a pass that has run `elapsed` seconds, never below `MIN_RUNNING_PASS_SECONDS`.
+
+    With `policies`, from the pass's own progress: the checkpoints not yet measured at the seconds per
+    checkpoint it has shown so far. Before its first measured checkpoint, or when its total is not
+    knowable, the ledger's estimate for its checkpoints (else its arms) less `elapsed`."""
+    progress = pass_progress(kind, policies, runs_dir) if policies else None
+    if progress is not None:
+        done, total = progress
+        if done > 0 and elapsed > 0:
+            return max(MIN_RUNNING_PASS_SECONDS, (total - done) * float(elapsed) / done)
+    total = pass_seconds(kind, arms, runs_dir, checkpoints=progress[1] if progress else None)
     return None if total is None else max(MIN_RUNNING_PASS_SECONDS, total - float(elapsed))

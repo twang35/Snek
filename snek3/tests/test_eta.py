@@ -166,6 +166,75 @@ def test_a_pass_is_the_ledgers_median_per_arm_times_the_arms_and_the_default_bef
     assert eta.running_pass_seconds('stageb', 8, 5000.0, runs) == eta.MIN_RUNNING_PASS_SECONDS
 
 
+def _stage_b(runs, policy, label, percents, shard=None):
+    """A stage-B file (or one shard) with one row per percent."""
+    name = '{0}_checkpoint_evals{1}{2}.json'.format(policy, '_' + label if label else '',
+                                                    '-s{0}of12'.format(shard) if shard else '')
+    with open(os.path.join(runs, name), 'w') as handle:
+        json.dump({'rows': [{'step': i, 'perfect_percent': p} for i, p in enumerate(percents)]}, handle)
+
+
+def test_a_pass_measures_what_its_selector_picks_from_the_file_before_it(tmp_path):
+    """stage B counts the stage-A rows at the screen, hof5000 the stage-B rows at 99, hof30k the hof5000
+    rows at 99; an arm whose merged file exists counts exactly; a missing input file is None, not 0.
+    b25a put 811 checkpoints into hof5000 where b19a put 20 (2026-09-07)."""
+    runs = str(tmp_path)
+    with open(os.path.join(runs, 'a_evals.json'), 'w') as handle:
+        json.dump({'evals': [{'step': 1, 'perfect_percent': 97}, {'step': 2, 'perfect_percent': 96.9},
+                             {'step': 3, 'perfect_percent': 100}, {'step': 4}]}, handle)
+    assert eta.selected_checkpoints('stageb', 'a', runs) == 2
+    assert eta.selected_checkpoints('hof5000', 'a', runs) is None            # no stage-B file yet
+    _stage_b(runs, 'a', None, [99.0, 98.8, 99.4])
+    assert eta.selected_checkpoints('hof5000', 'a', runs) == 2
+    assert eta.pass_checkpoints('stageb', ['a'], runs) == 3                  # merged: its rows, not the screen
+    assert eta.pass_checkpoints('hof5000', ['a', 'b'], runs) is None         # b's input is not there
+    assert eta.known_checkpoints('hof5000', ['a', 'b'], runs) == (2, 1)      # a's 2, b unknown
+    _stage_b(runs, 'b', None, [99.9])
+    assert eta.pass_checkpoints('hof5000', ['a', 'b'], runs) == 3
+    assert eta.pass_checkpoints('hof30k', ['a'], runs) is None
+    assert eta.pass_checkpoints('stageb', ['a'], runs, pending={'a'}) is None   # still training: unknown
+    _stage_b(runs, 'a', 'hof5000', [99.0, 99.0, 50.0])
+    assert eta.pass_checkpoints('hof30k', ['a'], runs) == 2
+    assert eta.selected_checkpoints('smoke', 'a', runs) is None
+
+
+def test_a_pass_is_estimated_per_checkpoint_when_its_count_is_known_and_per_arm_when_not(tmp_path):
+    runs = str(tmp_path)
+    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100) == 370.0            # the default per checkpoint
+    assert eta.pass_seconds('hof5000', 8, runs) == 9.5 * 60                          # unknown: per arm
+    live_runs.record_duration('hof5000', 800.0, runs, arms=8, checkpoints=200)      # 4 s per checkpoint
+    live_runs.record_duration('hof5000', 1200.0, runs, arms=8, checkpoints=200)     # 6
+    live_runs.record_duration('hof5000', 400.0, runs, arms=8)                       # no count: per arm only
+    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100) == 500.0           # median 5 x 100
+    assert eta.pass_seconds('hof5000', 8, runs) == 800.0                            # median 100 per arm x 8
+    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=0) == 0.0               # nothing selected
+    # 5 arms known at 100 checkpoints, 3 arms not yet knowable: 5 x 100 + 3 x 100 per arm
+    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100, unknown_arms=3) == 800.0
+
+
+def test_a_running_pass_is_estimated_from_its_own_progress(tmp_path):
+    """Two arms done (10 and 20 rows) and the third's shards at 10 of its 30, 4,000 s in: 40 of the
+    pass's 60 checkpoints at 100 s each leaves 2,000 s -- whatever the ledger says. Before its first
+    row the ledger estimate less elapsed stands in, and never below the floor."""
+    runs = str(tmp_path)
+    for policy, rows in (('a', 10), ('b', 20), ('c', 30)):
+        _stage_b(runs, policy, None, [99.5] * rows)
+    _stage_b(runs, 'a', 'hof5000', [99.0] * 10)
+    _stage_b(runs, 'b', 'hof5000', [99.0] * 20)
+    _stage_b(runs, 'c', 'hof5000', [99.0] * 4, shard=1)
+    _stage_b(runs, 'c', 'hof5000', [99.0] * 6, shard=2)
+    assert eta.pass_progress('hof5000', ['a', 'b', 'c'], runs) == (40, 60)
+    live_runs.record_duration('hof5000', 60.0, runs, arms=8, checkpoints=60)        # 1 s per checkpoint
+    assert eta.running_pass_seconds('hof5000', 3, 4000.0, runs, policies=['a', 'b', 'c']) == 2000.0
+    assert eta.running_pass_seconds('hof5000', 3, 4000.0, runs) == eta.MIN_RUNNING_PASS_SECONDS
+    # nothing measured yet: the ledger's per-checkpoint estimate (200 x 1 s) less the 10 s elapsed
+    _stage_b(runs, 'd', None, [99.5] * 200)
+    assert eta.running_pass_seconds('hof5000', 1, 10.0, runs, policies=['d']) == 190.0
+    assert eta.running_pass_seconds('hof5000', 1, 199.0, runs, policies=['d']) == eta.MIN_RUNNING_PASS_SECONDS
+    # its total unknowable (no input file): the per-arm ledger stands in
+    assert eta.running_pass_seconds('stageb', 1, 0.0, runs, policies=['e']) == 55 * 60 / 8.0
+
+
 def test_the_ledger_keeps_the_last_entries_per_kind_and_shrugs_at_a_bad_file(tmp_path):
     runs = str(tmp_path)
     for i in range(live_runs.DURATIONS_KEEP + 3):

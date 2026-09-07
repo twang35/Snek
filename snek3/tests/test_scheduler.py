@@ -458,7 +458,8 @@ class FinishingCalls(Calls):
         code = Calls.call(self, argv, **kwargs)
         pass_name, arms, _ = self.events[-1]
         for policy in arms:
-            open(scheduler.pass_file(policy, pass_name, self.runs), 'w').close()
+            with open(scheduler.pass_file(policy, pass_name, self.runs), 'w') as handle:
+                json.dump({'rows': [{'step': 1, 'perfect_percent': 99.0}]}, handle)     # one checkpoint per arm
         return code
 
 
@@ -485,15 +486,19 @@ def test_the_queue_publishes_both_boxes_shape_on_every_event_and_empty_when_it_e
 
     first = published.glance(0)
     assert first['running'] == ['b1 | x -- wave 1 of 1 | training 100% (2 arms)']
-    # the passes carry the default estimate (no ledger yet: 69 min per 8 arms); the arm has no wall
-    # rate to read in a fresh box, so its line has none
-    assert first['queued'] == ['b1 evals | x (2 arms) | ~17m',
+    # the passes carry the default estimate: the arms are at their cap with no stage-A row at the
+    # screen, so stage B measures nothing, and hof5000 and hof30k (no stage-B file yet) read the
+    # default per arm (no ledger yet: 9.5 m and 4.5 m per 8 arms). The arm has no wall rate to read
+    # in a fresh box, so its line has none
+    assert first['queued'] == ['b1 evals | x (2 arms) | ~4m',
                                'b2 training | y -- wave 1 of 1 (1 arm)',
                                'b2 evals | y (1 arm) | ~9m']
     running_lines = [line for status in published.statuses for line in status['at_a_glance']['running']]
-    # each running pass says what is left of it, from the default estimate on a box with no ledger
-    assert 'b1 | x | stage B (2 arms) | ~14m left' in running_lines
-    assert 'b1 | x | hof5000 (2 arms) | ~2m left' in running_lines
+    # each running pass says what is left of it, from the default estimate on a box with no ledger:
+    # stage B over no screened row, hof5000 over the one row per arm stage B wrote, hof30k over the
+    # same -- seconds each, so every line reads the floor
+    assert 'b1 | x | stage B (2 arms) | ~1m left' in running_lines
+    assert 'b1 | x | hof5000 (2 arms) | ~1m left' in running_lines
     assert 'b1 | x | hof30k (2 arms) | ~1m left' in running_lines
     assert 'b2 | y -- wave 1 of 1 | training 100% (1 arm)' in running_lines
     last = published.statuses[-1]
@@ -1053,12 +1058,16 @@ def test_a_finished_pass_goes_in_the_durations_ledger_and_a_failed_one_does_not(
     ledger = live_runs.durations(box['runs'])
     assert [entry['label'] for entry in ledger['stageb']] == ['b13-stageb']
     assert ledger['stageb'][0]['arms'] == 2 and ledger['stageb'][0]['seconds'] > 0
+    # with the checkpoints its merged files hold, the unit a pass's cost is in (`tools/eta.py`)
+    assert ledger['stageb'][0]['checkpoints'] == 2
     assert 'hof5000' not in ledger and 'hof30k' not in ledger
 
 
 def test_a_running_pass_says_what_is_left_of_it_and_a_queued_arm_is_estimated_at_the_batchs_rate(box, monkeypatch):
-    """The running pass's estimate is the ledger's median less the time it has run; the queued arm's
-    is its cap at the wall rate of the batch's finished arm (`arch.json` to `_evals.json`)."""
+    """The running pass's estimate, before it has measured a checkpoint, is the ledger's seconds per
+    checkpoint over the one its arm screened, less the time it has run; the queued arm's is its cap at
+    the wall rate of the batch's finished arm (`arch.json` to `_evals.json`); the queued pass over that
+    still-untrained arm falls back to the ledger's seconds per arm."""
     from tools import eta as eta_module
     policies = os.path.join(box['runs'], 'policies')
     monkeypatch.setattr(eta_module.constants, 'POLICY_DIR', policies)
@@ -1072,9 +1081,9 @@ def test_a_running_pass_says_what_is_left_of_it_and_a_queued_arm_is_estimated_at
     os.utime(arch, (1000.0, 1000.0))
     evals = os.path.join(box['runs'], done['policy'] + '_evals.json')
     with open(evals, 'w') as handle:
-        json.dump({'summary': {'step': 100}, 'evals': [{'step': 100, 'steps_per_second': 1.0}]}, handle)
+        json.dump({'summary': {'step': 100}, 'evals': [{'step': 100, 'steps_per_second': 1.0, 'perfect_percent': 99}]}, handle)
     os.utime(evals, (2000.0, 2000.0))
-    live_runs.record_duration('stageb', 400.0, box['runs'], arms=1)
+    live_runs.record_duration('stageb', 400.0, box['runs'], arms=1, checkpoints=1)
     d = driver([done, todo], box, Calls(), wave=1, clock=lambda: 5000.0)
     d.active_pass = ('stageb', 1, [done])
     d._pass_started = 4900.0                          # 100 s into a 400-s pass

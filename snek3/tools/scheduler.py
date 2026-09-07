@@ -423,6 +423,7 @@ class Driver(object):
         # For the time estimates (`tools/eta.py`): when the pass or eval in flight started, so its
         # line says what is left rather than the whole.
         self._pass_started = None
+        self._pass_label = None
 
     # ---- what is running and what is owed, in the daemon's job-dict shape
 
@@ -441,11 +442,11 @@ class Driver(object):
         if self.active_pass is not None:
             pass_name, _, arms = self.active_pass
             running.append(dict(pass_job(self.batch, *self.active_pass),
-                                eta_seconds=self._running_pass_seconds(pass_name, len(arms))))
+                                eta_seconds=self._running_pass_seconds(pass_name, [spec['policy'] for spec in arms])))
         if self.active_eval is not None:
             running.append(dict(eval_job(self.active_eval),
                                 eta_seconds=self._running_pass_seconds(eval_pass(self.active_eval),
-                                                                       len(self.active_eval['policies']))))
+                                                                       self.active_eval['policies'])))
         live_policies = {spec['policy'] for spec, _ in self.live}
         queued = []
         for number, arms in waves(self.specs, self.wave):
@@ -463,11 +464,13 @@ class Driver(object):
                 if self.active_pass is not None and self.active_pass[:2] == (pass_name, number):
                     continue
                 queued.append(dict(pass_job(self.batch, pass_name, number, arms),
-                                   eta_seconds=eta.pass_seconds(pass_name, len(arms), self.runs_dir)))
+                                   eta_seconds=self._queued_pass_seconds(
+                                       pass_name, [spec['policy'] for spec in arms],
+                                       pending={spec['policy'] for spec in arms if not finished(spec, self.runs_dir)})))
         for spec in self.evals:
             if not self._eval_done(spec) and spec is not self.active_eval:
-                queued.append(dict(eval_job(spec), eta_seconds=eta.pass_seconds(
-                    eval_pass(spec), len(spec['policies']), self.runs_dir)))
+                queued.append(dict(eval_job(spec),
+                                   eta_seconds=self._queued_pass_seconds(eval_pass(spec), spec['policies'])))
         return running, queued
 
     def _reference_rate(self):
@@ -476,9 +479,25 @@ class Driver(object):
         done = [spec['policy'] for spec in self.specs if finished(spec, self.runs_dir)]
         return eta.reference_rate(done, self.runs_dir)
 
-    def _running_pass_seconds(self, kind, arms):
-        elapsed = 0.0 if self._pass_started is None else max(0.0, self.clock() - self._pass_started)
-        return eta.running_pass_seconds(kind, arms, elapsed, self.runs_dir)
+    def _queued_pass_seconds(self, kind, policies, pending=()):
+        """A queued pass's estimate: at this box's seconds per checkpoint over what its selector will
+        pick, when its input files are written and its arms are trained (`pending` names those that
+        are not); else per arm (`tools/eta.py`)."""
+        checkpoints, unknown = eta.known_checkpoints(kind, policies, self.runs_dir, pending)
+        return eta.pass_seconds(kind, len(policies), self.runs_dir, checkpoints=checkpoints, unknown_arms=unknown)
+
+    def _running_pass_seconds(self, kind, policies):
+        """What is left of the pass in flight, from its own progress -- checkpoints measured so far over
+        the time it has run. Its start is `_pass_started`, or for a pass adopted from a predecessor
+        scheduler the mtime of its registry entry, written when that scheduler launched it."""
+        started = self._pass_started
+        if started is None and self._pass_label is not None:
+            try:
+                started = os.stat(live_runs.path_for(live_runs.pass_entry(self._pass_label), self.runs_dir)).st_mtime
+            except OSError:
+                started = None
+        elapsed = 0.0 if started is None else max(0.0, self.clock() - started)
+        return eta.running_pass_seconds(kind, len(policies), elapsed, self.runs_dir, policies=policies)
 
     def attention(self):
         """One line per failed pass, so a marker is never silent: the queue skips it, this names it."""
@@ -690,18 +709,21 @@ class Driver(object):
             argv += ['--pass', pass_name]
         argv += ['--shards', str(self.shards)]
         self.active_pass = (pass_name, number, list(arms))
-        self._pass_started = self.clock()
+        self._pass_started, self._pass_label = self.clock(), label
         self._show(pass_panels([spec['policy'] for spec in arms], closeout.PASSES[pass_name]['label'],
                                self.runs_dir))
         code = self._run_closeout(argv, label, expected=[pass_file(spec['policy'], pass_name, self.runs_dir)
                                                           for spec in arms])
         self.active_pass = None
         # Not recorded when the pass was adopted from a predecessor (`_pass_started` cleared): this
-        # scheduler saw only its tail, and a tail in the ledger would read as a fast pass.
+        # scheduler saw only its tail, and a tail in the ledger would read as a fast pass. Recorded
+        # with the checkpoints its merged files hold: the pass's cost is per checkpoint (`tools/eta.py`).
         seconds = None if self._pass_started is None else self.clock() - self._pass_started
-        self._pass_started = None
+        self._pass_started, self._pass_label = None, None
         if code == 0 and seconds is not None and seconds > 0:
-            live_runs.record_duration(pass_name, seconds, self.runs_dir, arms=len(arms), label=label)
+            policies = [spec['policy'] for spec in arms]
+            live_runs.record_duration(pass_name, seconds, self.runs_dir, arms=len(arms), label=label,
+                                      checkpoints=eta.pass_checkpoints(pass_name, policies, self.runs_dir))
         _log('wave {0}: {1} exited {2}'.format(number, pass_name, code))
         if code == 0:
             self._publish(label, results_feed.pass_files([spec['policy'] for spec in arms], pass_name, self._runs_dir()))
@@ -787,10 +809,10 @@ class Driver(object):
             self._wait_while_held('eval {0}'.format(spec['id']))
             _log('eval {0}: {1}'.format(spec['id'], ' '.join(spec['policies'])))
             self.active_eval = spec
-            self._pass_started = self.clock()
+            self._pass_started, self._pass_label = self.clock(), spec['id']
             self._show(pass_panels(spec['policies'], eval_label(spec), self.runs_dir))
             code = self._run_closeout(eval_argv(spec, self.python, self.shards), spec['id'])
-            self.active_eval, self._pass_started = None, None
+            self.active_eval, self._pass_started, self._pass_label = None, None, None
             _log('eval {0} exited {1}'.format(spec['id'], code))
             if spec.get('_dir'):
                 mark(spec['_dir'], ('done-' if code == 0 else 'failed-') + spec['id'], 'exit {0}'.format(code))
