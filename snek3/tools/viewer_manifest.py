@@ -18,11 +18,14 @@ the page and the tables cannot disagree:
 | `hof30k_rows`, `hof30k_mean`, `hof30k_best`, `hof30k_best_step` | the `hof30k` pass (30,000 episodes, seed 7): rows, mean, max and where it is |
 | `hof_99` | `hof5000` rows at >=99 /5,000 — the `hof30k` candidate cut |
 | `status` | `{a, b, h, k}`: one word per view, see `pass_state` — so the page can say whether a missing panel is a pass still to come or one that found nothing |
+| `status_box` | `{a, b, h, k}`: the box a running or queued view is on (`desktop`, `laptop`, or None when unknown or unclaimed), so the caption names the right box |
 
-The status of a pass is read off the files, plus two liveness sources: the laptop's own `.live/` pid
-registry (`tools/live_runs.py`) and a snapshot of the desktop's `status.json` that `tools/progress_update.py`
-saves at `runs/.live/desktop/status.json` on every sync. Both are optional — with neither, every pass is
-`done`, `pending`, `none` or `upstream`, which is still right about what the files say.
+The status of a pass is read off the files, plus three liveness sources: the laptop's own `.live/` pid
+registry (`tools/live_runs.py`), this box's scheduler status (`runs/.live/.status.json`), and a snapshot
+of the desktop's published `status.json` — which carries both boxes' running jobs, each tagged `box` — that
+`tools/progress_update.py` saves at `runs/.live/desktop/status.json` on every sync. All are optional —
+with none, every pass is `done`, `pending`, `none` or `upstream`, which is still right about what the
+files say.
 
 The output is JavaScript rather than JSON — `window.SNEK_MANIFEST = {...}` — because a `<script src>`
 loads from `file://` and `fetch()` does not, and the page has to work opened from disk as well as from
@@ -128,20 +131,38 @@ def write_boxes(runs_dir, mapping):
     return path
 
 
-def desktop_ledger(runs_dir):
-    """What the desktop was doing when the progress update last looked: `{'iso', 'jobs', 'running'}`
-    — `jobs` is the ledger (`{job id: 'queued'|'running'|'done'|'failed'}`), `running` maps each view
-    to the policies a running job of that kind covers. Empty when no snapshot has been saved."""
-    status = _read(os.path.join(runs_dir, DESKTOP_STATUS)) or {}
-    running = {'a': set(), 'b': set(), 'h': set(), 'k': set()}
-    for job in status.get('running') or []:
-        policies = set(job.get('policies') or ([job['policy']] if job.get('policy') else []))
-        job_id = job.get('id') or ''
-        kind = 'a' if job.get('type') == 'train' else next(
-            (k for k, (_label, suffix) in PASSES.items() if job_id.endswith(suffix)), None)
-        if kind:
-            running[kind] |= policies
-    return {'iso': status.get('iso'), 'jobs': status.get('ledger') or {}, 'running': running}
+def ledger_snapshot(runs_dir):
+    """What both boxes were doing when last looked: `{'iso', 'jobs', 'running', 'job_boxes'}`.
+
+    Two sources, merged: the desktop's published `status.json` snapshot (`runs/.live/desktop/`), whose
+    `running` list carries both boxes' jobs since 2026-09-07, each tagged `box`; and this box's own
+    scheduler status (`runs/.live/.status.json`), so the local viewer is right without a snapshot. `jobs`
+    is the ledger (`{job id: 'queued'|'running'|'done'|'failed'}`), `running` maps each view to
+    `{policy: box}` for the policies a running job of that kind covers, and `job_boxes` maps each
+    running job id to its box. Empty when neither file exists."""
+    desktop = _read(os.path.join(runs_dir, DESKTOP_STATUS)) or {}
+    local = _read(live_runs.status_path(runs_dir)) or {}
+    running = {'a': {}, 'b': {}, 'h': {}, 'k': {}}
+    job_boxes = {}
+    for source, default_box in ((desktop, 'desktop'), (local, local.get('box'))):
+        for job in source.get('running') or []:
+            policies = set(job.get('policies') or ([job['policy']] if job.get('policy') else []))
+            job_id = job.get('id') or ''
+            box = job.get('box') or default_box
+            kind = 'a' if job.get('type') == 'train' else next(
+                (k for k, (_label, suffix) in PASSES.items() if job_id.endswith(suffix)), None)
+            if kind:
+                running[kind].update({p: box for p in policies})
+            if job_id:
+                job_boxes[job_id] = box
+    return {'iso': desktop.get('iso'), 'jobs': desktop.get('ledger') or {}, 'running': running,
+            'job_boxes': job_boxes}
+
+
+def running_pass_box(job_boxes, batch, suffix):
+    """The box whose running job is the batch's pass (any wave), or None."""
+    pattern = re.compile(re.escape(batch + suffix) + r'(-w\d+)?$')
+    return next((box for job_id, box in job_boxes.items() if pattern.match(job_id)), None)
 
 
 def ledger_pass_state(jobs, batch, suffix):
@@ -167,8 +188,8 @@ def pass_state(have_file, have_shards, candidates, in_running_job, ledger_state)
     | state | meaning |
     |---|---|
     | `done` | the pass's file exists |
-    | `running` | shard files exist, or a running desktop job names the arm |
-    | `queued` | the desktop ledger has the batch's pass queued (or running, but not yet on this arm) |
+    | `running` | shard files exist, or a running job on either box names the arm |
+    | `queued` | the ledger has the batch's pass queued (or running, but not yet on this arm) |
     | `pending` | nothing has run and the arm has candidates for it |
     | `none` | nothing has run and the arm has no candidates — a panel will never appear |
     | `upstream` | the pass it selects from has not happened yet |
@@ -205,13 +226,13 @@ def _read(path):
 
 def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxes=None, names=None):
     """The manifest row for one arm, or None if it has no chart to show. `desktop` is
-    `desktop_ledger(runs_dir)`, `laptop_live` the policies training on this box and `arm_boxes` the
+    `ledger_snapshot(runs_dir)`, `laptop_live` the policies training on this box and `arm_boxes` the
     `boxes(runs_dir)` mapping, `names` the runs directory's listing; `build` passes all four so they are
     read once per manifest rather than once per arm."""
     png = os.path.join(runs_dir, policy + '.png')
     if not os.path.exists(png):
         return None
-    desktop = desktop if desktop is not None else desktop_ledger(runs_dir)
+    desktop = desktop if desktop is not None else ledger_snapshot(runs_dir)
     arm_boxes = arm_boxes if arm_boxes is not None else boxes(runs_dir)
     batch = batch_of(policy)
     record = {'policy': policy, 'batch': batch, 'knob': knob_of(policy),
@@ -274,11 +295,15 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
                   'h': sum(s >= 99 for s in scores) if stage_b is not None else None,
                   'k': record['hof_99']}
     record['status'] = {'a': stage_a_state}
+    # Which box a running or queued view is on, per view (None when unknown or unclaimed), so the caption
+    # can say "queued on the laptop" rather than assuming the desktop.
+    record['status_box'] = {'a': running['a'].get(policy) or record['box']}
     for kind, (label, suffix) in PASSES.items():
         have = {'b': stage_b, 'h': hof, 'k': h30}[kind] is not None
         record['status'][kind] = pass_state(have, bool(shard_files(runs_dir, policy, label, names)), candidates[kind],
                                             policy in running[kind],
                                             ledger_pass_state(jobs, batch, suffix))
+        record['status_box'][kind] = running[kind].get(policy) or running_pass_box(desktop['job_boxes'], batch, suffix)
     # A pass whose upstream found nothing will never run either: say `none`, not `upstream`.
     for kind, before in (('h', 'b'), ('k', 'h')):
         if record['status'][kind] == 'upstream' and record['status'][before] == 'none':
@@ -299,7 +324,7 @@ def build(runs_dir=None, references_path=None):
     # `_checkpoint_evals_hof5000`, `_eval_progress`) has one. So the stem decides.
     policies = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(runs_dir, '*.png'))
                       if '_' not in os.path.basename(p))
-    desktop = desktop_ledger(runs_dir)
+    desktop = ledger_snapshot(runs_dir)
     laptop_live = frozenset(policy for policy, _pid in live_runs.live(runs_dir, prune=False))
     arm_boxes = boxes(runs_dir)
     names = os.listdir(runs_dir) if os.path.isdir(runs_dir) else []

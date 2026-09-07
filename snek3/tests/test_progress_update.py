@@ -278,9 +278,9 @@ def test_save_desktop_status_lands_where_the_manifest_reads_it(tmp_path):
     path = progress_update.save_desktop_status({'iso': 'now', 'ledger': {'b9-hof30k': 'queued'}, 'running': []},
                                                runs_dir=str(tmp_path), view=dict(VIEW, ledger={'b20ac-k2-seed1': 'running'}))
     assert path == str(tmp_path / viewer_manifest.DESKTOP_STATUS)
-    ledger = viewer_manifest.desktop_ledger(str(tmp_path))
+    ledger = viewer_manifest.ledger_snapshot(str(tmp_path))
     assert ledger['iso'] == 'now' and ledger['jobs'] == {'b9-hof30k': 'queued', 'b20ac-k2-seed1': 'running'}
-    assert ledger['running']['a'] == {'b20ac-k2-seed1'}, "the laptop's running arm reaches the viewer too"
+    assert ledger['running']['a'] == {'b20ac-k2-seed1': 'laptop'}, "the laptop's running arm reaches the viewer too, with its box"
     assert viewer_manifest.boxes(str(tmp_path)) == {p: 'desktop' for p in B20[:2] + ['b19zz-ref-seed1']}
     # nothing in runs/ shares its name, so the superseded-snapshot sweep leaves it alone
     assert progress_update.drop_superseded_snapshots(str(tmp_path)) == 0 and os.path.exists(path)

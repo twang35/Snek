@@ -1009,7 +1009,8 @@ def test_every_network_cycle_builds_the_site_and_a_trigger_forces_it(tmp_path, m
 
 def test_status_carries_the_schedulers_glance_its_attention_and_the_laptop(tmp_path, monkeypatch):
     laptop = json.dumps({'iso': '2026-09-05T11:00:00', 'at_a_glance': {'running': ['b16 | kl | training 3% (8 arms)'],
-                                                                        'queued': [], 'attention': []}})
+                                                                        'queued': [], 'attention': []},
+                         'running': [{'id': 'b16a-kl', 'type': 'train', 'policy': 'b16a-kl', 'policies': ['b16a-kl']}]})
     daemon, bus = _box(tmp_path, monkeypatch, [_train_spec('b1a-x')], laptop=laptop)
     daemon.poll_once(git=True)
     _scheduler_status(daemon, running=[{'id': 'b1a-x', 'type': 'train', 'policy': 'b1a-x', 'policies': ['b1a-x']}],
@@ -1026,6 +1027,15 @@ def test_status_carries_the_schedulers_glance_its_attention_and_the_laptop(tmp_p
     assert glance['laptop_running'] == ['b16 | kl | training 3% (8 arms)'] and glance['laptop_iso'] == '2026-09-05T11:00:00'
     assert bus.status[-1]['scheduler']['status_iso'] == '2026-09-05T12:00:00'
     assert 'counts' not in bus.status[-1] and bus.status[-1]['head'] in ('aaaaaaaaaaaa', 'bbbbbbbbbbbb')
+    # `running` is both boxes' jobs, each tagged, so the viewer can say which box a pass is on (2026-09-07)
+    assert [(j['id'], j['box']) for j in bus.status[-1]['running']] == [('b1a-x', 'desktop'), ('b16a-kl', 'laptop')]
+
+
+def test_laptop_running_jobs_tolerates_no_status_and_junk():
+    for text in ('', 'not json', '[]', json.dumps({'running': 'oops'})):
+        assert daemon_module.laptop_running_jobs(text) == []
+    assert daemon_module.laptop_running_jobs(json.dumps({'running': [{'id': 'b2-stageb', 'type': 'eval'}]})) == \
+        [{'id': 'b2-stageb', 'type': 'eval', 'box': 'laptop'}]
 
 
 def test_a_stale_status_file_from_a_dead_scheduler_is_not_shown_as_running(tmp_path, monkeypatch):

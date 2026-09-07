@@ -477,18 +477,22 @@ class Daemon(object):
                   'desktop_queued': queued,
                   'attention': self._attention(status),
                   'desktop_remaining': glance.get('remaining')}
+        laptop_text = gitbus.read_laptop_status(self.host)
         payload = {
             'iso': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'ts': time.time(),
             'project': 'snek3',
-            'at_a_glance': with_laptop(glance, gitbus.read_laptop_status(self.host)),
+            'at_a_glance': with_laptop(glance, laptop_text),
             'scheduler': {'alive': alive, 'pid': self.state.get('scheduler_pid'),
                           'spawned': self.state.get('spawned'), 'last_exit': self.state.get('last_exit'),
                           'log': self.state.get('scheduler_log'),
                           'status_iso': status.get('iso')},
             'runtime': self.runtime,
             'config_notes': self.config_notes,
-            'running': running,
+            # Both boxes' running jobs, each tagged with its box, so `tools/viewer_manifest.py` can say
+            # which arms a pass has reached and where. Before 2026-09-07 this was the desktop's alone,
+            # and a pass running on the laptop read as "queued on the desktop" on the site.
+            'running': [dict(job, box='desktop') for job in running] + laptop_running_jobs(laptop_text),
             # Derived, for `tools/viewer_manifest.py`'s pass states: done from the feeds, running from the
             # statuses, queued for the rest (`tools.claims.ledger`). Actions and malformed specs from ours.
             'ledger': dict({job_id: record['state'] for job_id, record in self.ledger.items()
@@ -815,6 +819,18 @@ def with_laptop(glance, laptop_status_text):
     out['laptop_remaining'] = str(remaining) if remaining is not None else None
     out['laptop_iso'] = status.get('iso')
     return out
+
+
+def laptop_running_jobs(laptop_status_text):
+    """The laptop's running job dicts from its published `status.json`, each with `box: 'laptop'`, for
+    the payload's `running` list. Unparseable or absent text gives [], never an error."""
+    try:
+        status = json.loads(laptop_status_text or '')
+    except ValueError:
+        return []
+    if not isinstance(status, dict):
+        return []
+    return [dict(job, box='laptop') for job in (status.get('running') or []) if isinstance(job, dict)]
 
 
 BOOT_ID_PATH = '/proc/sys/kernel/random/boot_id'

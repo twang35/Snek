@@ -173,7 +173,7 @@ def save_desktop_status(status, runs_dir=None, view=None):
         # the laptop's running jobs too, so a laptop arm's stage A reads `running` on the page
         payload['running'] = list(status.get('running') or []) + [
             {'id': job_id, 'type': 'train' if job_id in (view.get('specs') or {}) else 'eval', 'policy': job_id,
-             'policies': [job_id]} for job_id, box in (view.get('running') or {}).items()
+             'policies': [job_id], 'box': box} for job_id, box in (view.get('running') or {}).items()
             if box == 'laptop' and job_id not in {j.get('id') for j in status.get('running') or []}]
         viewer_manifest.write_boxes(runs_dir, {job_id: box for job_id, box in (view.get('published') or {}).items()
                                                if re.match(r'^b\d+[a-z]+-', job_id) and '-stageb' not in job_id

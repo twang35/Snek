@@ -169,8 +169,8 @@ def test_status_reads_the_desktop_ledger_snapshot(tmp_path):
     _arm(runs, 'b33ab-x-seed2', evals=[90, 99])                     # same batch, later wave
     (live / 'status.json').write_text(json.dumps({
         'iso': '2026-09-04T12:00:00',
-        'running': [{'id': 'b33-stageb', 'type': 'eval', 'policies': ['b33aa-x-seed1']},
-                    {'id': 'b31-hof5000', 'type': 'eval', 'policies': ['b31ab-x-seed2']}],
+        'running': [{'id': 'b33-stageb', 'type': 'eval', 'policies': ['b33aa-x-seed1']},          # untagged: the desktop's
+                    {'id': 'b31-hof5000', 'type': 'eval', 'policies': ['b31ab-x-seed2'], 'box': 'laptop'}],
         'ledger': {'b31-hof5000': 'running', 'b31-hof30k': 'queued', 'b32aa-x-seed1': 'running',
                    'b32ab-x-seed2': 'queued', 'b33-stageb': 'running', 'b33aa-x-seed1': 'done',
                    'b33ab-x-seed2': 'done'}}))
@@ -183,6 +183,12 @@ def test_status_reads_the_desktop_ledger_snapshot(tmp_path):
     assert by['b32ab-x-seed2']['status']['a'] == 'queued'
     assert by['b33aa-x-seed1']['status']['b'] == 'running'
     assert by['b33ab-x-seed2']['status']['b'] == 'queued'
+    # Which box: a running job names its arms' box; a queued arm of a running pass is on that pass's box;
+    # a pass queued in the pool and claimed by nobody has none. b25 on 2026-09-07 read "queued on the
+    # desktop" while its hof5000 ran on the laptop, because the caption assumed the desktop.
+    assert by['b31ab-x-seed2']['status_box']['h'] == 'laptop'
+    assert by['b31aa-x-seed1']['status_box'] == {'a': None, 'b': None, 'h': 'laptop', 'k': None}
+    assert by['b33aa-x-seed1']['status_box']['b'] == 'desktop' and by['b33ab-x-seed2']['status_box']['b'] == 'desktop'
     assert vm.build(runs)['arms'][0]['status']                         # and without a snapshot nothing breaks
     (live / 'status.json').unlink()
     assert vm.build(runs)['desktop_iso'] is None
@@ -198,3 +204,20 @@ def test_the_desktop_ledger_is_read_across_every_wave_of_a_pass():
     assert vm.ledger_pass_state({'b15-hof5000': 'done'}, 'b15', '-hof5000') == 'done'
     assert vm.ledger_pass_state(jobs, 'b15', '-hof30k') is None
     assert vm.ledger_pass_state(jobs, 'b1', '-stageb') is None, 'b15 is not a wave of b1'
+
+
+def test_this_boxs_own_scheduler_status_counts_too(tmp_path):
+    """The laptop's local viewer has no desktop snapshot until a progress update syncs one; its own
+    scheduler's `.live/.status.json` says what it is running right now."""
+    from tools import live_runs
+    runs = str(tmp_path)
+    _arm(runs, 'b25aa-x-seed1', evals=[90, 99], rows=[99.5])
+    _arm(runs, 'b25ab-x-seed2', evals=[90, 99], rows=[99.5])
+    path = live_runs.status_path(runs)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    _write(path, {'iso': 'now', 'box': 'laptop',
+                  'running': [{'id': 'b25-hof5000', 'type': 'eval', 'policies': ['b25aa-x-seed1']}]})
+    by = {a['policy']: a for a in vm.build(runs)['arms']}
+    assert by['b25aa-x-seed1']['status']['h'] == 'running' and by['b25aa-x-seed1']['status_box']['h'] == 'laptop'
+    # the other arm is not in a running job and no ledger has the pass: what the files say, pending
+    assert by['b25ab-x-seed2']['status']['h'] == 'pending' and by['b25ab-x-seed2']['status_box']['h'] == 'laptop'

@@ -104,7 +104,7 @@ the hold notice, and the laptop's lines. Underneath:
 | key | means |
 |---|---|
 | `scheduler` | `alive`, `pid`, `spawned`, `last_exit`, `log`, and `status_iso` — the scheduler's own timestamp |
-| `running` | the scheduler's running jobs: `id`, `type`, `policies`, `step`/`max_steps` for an arm |
+| `running` | both boxes' running jobs, each tagged `box` (`desktop` or `laptop`, the laptop's folded in from `laptop-status`): `id`, `type`, `policies`, `step`/`max_steps` for an arm. What `tools/viewer_manifest.py` reads to say which arms a pass has reached and on which box |
 | `ledger` | `{job id: queued / running / done / failed}`, derived for the tools that read one (`tools/viewer_manifest.py`): `done` when the id is on either results feed, `running` when either box's status lists it, `queued` for the rest on `ops` or claimed; actions and malformed specs from the daemon's own ledger |
 | `pool` | the shared queue's `unclaimed`, `held` (per box, each holding with `done`), `status_ages` and the `ops`/`claims` heads it was read at |
 | `site` | the last site build: `iso`, `ok`, `seconds`, `note` (the build's last line), `forced`. A failed build is also a line under `attention` |

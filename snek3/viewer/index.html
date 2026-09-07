@@ -79,7 +79,7 @@
   </div>
 </header>
 <div class="grid" id="grid"></div>
-<p class="help"><kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by four arms · <kbd>a</kbd>/<kbd>b</kbd>/<kbd>h</kbd>/<kbd>k</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. Each caption says where the view's pass stands for that arm — complete, in progress, queued on the desktop, not yet run, or never (nothing qualified) — as of the manifest's timestamp. The URL carries the view, so it can be linked.</p>
+<p class="help"><kbd>j</kbd> <kbd>k</kbd> or <kbd>←</kbd> <kbd>→</kbd> page · <kbd>⇧j</kbd> <kbd>⇧k</kbd> or <kbd>⇧←</kbd> <kbd>⇧→</kbd> slide by four arms · <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> stage A, stage B, hof5000 or hof30k · <kbd>c</kbd> 8 or 4 per page · <kbd>s</kbd> next sort · <kbd>n</kbd>/<kbd>p</kbd> next (newer) or previous (older) batch · click a chart to zoom, <kbd>Esc</kbd> to close. A green edge marks the first arm of each knob value. Each caption says where the view's pass stands for that arm — complete, in progress or queued (and on which box), not yet run, or never (nothing qualified) — as of the manifest's timestamp. The URL carries the view, so it can be linked.</p>
 <div id="lightbox"><img alt=""><div class="cap"></div></div>
 
 <script src="manifest.js"></script>
@@ -167,11 +167,13 @@
   function stateOf(a) { return (a.status || {})[state.mode] || null; }
   // How many checkpoints the view's pass would measure for this arm (its candidate cut).
   function candidates(a) { return state.mode === 'h' ? a.cands99 : state.mode === 'k' ? a.hof_99 : null; }
+  // " on the desktop" / " on the laptop" from the manifest's `status_box`, or nothing when it does not know.
+  function boxText(a) { var b = (a.status_box || {})[state.mode]; return b ? ' on the ' + b : ''; }
   function stateText(a) {
     var st = stateOf(a), m = state.mode, n = candidates(a);
     if (st === 'done') return m === 'a' ? 'training complete' : PASS[m] + ' complete';
-    if (st === 'running') return m === 'a' ? 'training' : PASS[m] + ' in progress';
-    if (st === 'queued') return PASS[m] + ' queued on the desktop' + (n ? ' — ' + n + ' at ' + CUT[m] : '');
+    if (st === 'running') return (m === 'a' ? 'training' : PASS[m] + ' in progress') + boxText(a);
+    if (st === 'queued') return PASS[m] + ' queued' + boxText(a) + (n ? ' — ' + n + ' at ' + CUT[m] : '');
     if (st === 'pending') return m === 'b' ? 'stage B not yet run' : PASS[m] + ' not yet run — ' + n + ' at ' + CUT[m];
     if (st === 'none') return n === null || n === undefined ? 'never — nothing qualified upstream' : 'never — 0 rows at ' + CUT[m];
     if (st === 'upstream') return m === 'b' ? 'still training' : m === 'h' ? 'no stage B yet' : 'no hof5000 pass yet';
@@ -283,15 +285,19 @@
     if (i < 0 || j < 0 || j >= names.length) return;
     state.batch = names[j]; state.start = 0; render();
   }
+  // 1-4 pick the view: stage A, stage B, hof5000, hof30k (user, 2026-09-07; the letters clashed with j/k paging).
+  var MODE_KEYS = { '1': 'a', '2': 'b', '3': 'h', '4': 'k' };
   document.addEventListener('keydown', function (e) {
     if (e.target.tagName === 'SELECT') return;
     if (e.key === 'Escape') return unzoom();
     if ($('lightbox').style.display === 'flex') return;
-    if (e.key === 'ArrowRight') { move(e.shiftKey ? 4 : PAGE); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft') { move(e.shiftKey ? -4 : -PAGE); e.preventDefault(); }
+    // j / k page left / right like the arrows (vim order: j back, k forward); shift slides by four arms.
+    var key = e.key.toLowerCase();
+    if (e.key === 'ArrowRight' || key === 'k') { move(e.shiftKey ? 4 : PAGE); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || key === 'j') { move(e.shiftKey ? -4 : -PAGE); e.preventDefault(); }
     else if (e.key === 'Home') { state.start = 0; render(); }
     else if (e.key === 'End') { state.start = Math.max(0, current.length - PAGE); render(); }
-    else if (e.key === 'a' || e.key === 'b' || e.key === 'h' || e.key === 'k') { state.mode = e.key; render(); }
+    else if (MODE_KEYS[e.key]) { state.mode = MODE_KEYS[e.key]; render(); }
     else if (e.key === 'c') { state.per = state.per === '4' ? '8' : '4'; render(); }
     else if (e.key === 's') { state.sort = SORTS[(SORTS.indexOf(state.sort) + 1) % SORTS.length]; state.start = 0; render(); }
     else if (e.key === 'n') stepBatch(1);
