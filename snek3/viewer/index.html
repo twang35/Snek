@@ -277,10 +277,11 @@
   $('last').addEventListener('click', function () { state.start = Math.max(0, current.length - PAGE); render(); });
   $('lightbox').addEventListener('click', unzoom);
   // n / p step the batch picker. `names` is newest first, so "next" is the newer batch (one index up),
-  // "previous" the older, wrapping at both ends.
+  // "previous" the older. Stops at the ends, no wrap.
   function stepBatch(dir) {
-    var i = names.indexOf(state.batch); if (i < 0 || names.length < 2) return;
-    state.batch = names[(i - dir + names.length) % names.length]; state.start = 0; render();
+    var i = names.indexOf(state.batch), j = i - dir;
+    if (i < 0 || j < 0 || j >= names.length) return;
+    state.batch = names[j]; state.start = 0; render();
   }
   document.addEventListener('keydown', function (e) {
     if (e.target.tagName === 'SELECT') return;
