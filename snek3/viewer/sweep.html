@@ -34,6 +34,13 @@
   .legend i { display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:.35em; border-radius:2px; }
   .legend span.ref i { height:5px; }
   .legend span.dim { opacity:.35; }
+  .cfg { margin:.2em 0 .8em; border-collapse:collapse; font-size:12px; }
+  .cfg td, .cfg th { padding:.1em .9em .1em 0; text-align:left; vertical-align:top; white-space:nowrap; }
+  .cfg th { color:var(--dim); font-weight:normal; }
+  .cfg .k { cursor:pointer; }
+  .cfg i { display:inline-block; width:10px; height:10px; vertical-align:-1px; margin-right:.4em; border-radius:2px; }
+  .cfg code { color:var(--fg); }
+  .cfg .dim { color:var(--dim); }
   #tip { position:fixed; pointer-events:none; background:#000; color:#fff; border:1px solid #444; border-radius:4px; padding:.3em .5em; font-size:12px; display:none; z-index:9; max-width:28em; white-space:pre-line; }
   table { border-collapse:collapse; margin:.4em 0 1em; font-size:12px; }
   th, td { border:1px solid var(--line); padding:.25em .5em; text-align:left; white-space:nowrap; }
@@ -77,7 +84,7 @@
   var RAMP = ['#cde2fb', '#b7d3f6', '#9ec5f4', '#86b6ef', '#6da7ec', '#5598e7', '#3987e5', '#2a78d6', '#256abf', '#1c5cab', '#184f95'];
   var CATEGORICAL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
   var METRIC = {}; S.metrics.forEach(function (m) { METRIC[m.key] = m; });
-  var CURVE_DEFAULT = ['density98', 'hof_best', 'hof30k_best', 'best30', 'stage_a_98', 'drawdown80', 'drawdown50', 'onset90_m', 'ev_late', 'kl_p99', 'entropy_end'];
+  var CURVE_DEFAULT = ['density98', 'hof_best', 'hof30k_best', 'best30', 'stage_a_98', 'onset90_m', 'ev_late', 'value_loss_late', 'kl_p99', 'entropy_end'];
   var TRACE_ROWS = [['perfect', 'perfect rate /100, bin mean'], ['perfect_min', 'worst eval in bin'], ['score', 'average score'],
                     ['stage_b', 'stage-B rows ≥98 /500, share per 2.5M'], ['value_loss', 'value loss (log)'], ['ev', 'explained variance'],
                     ['kl', 'approx KL (log)'], ['clipfrac', 'clip fraction'], ['entropy', 'entropy']];
@@ -220,6 +227,7 @@
     var b = batch(), ref = refOf(b), cells = b.cells, col = colours(b);
     var keys = renderMetrics(S.metrics.map(function (m) { return [m.key, m.label]; }), CURVE_DEFAULT);
     main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + '</h2><p class="sub">Cells in value order, evenly spaced. Four seeds as dots, their median as the line; the reference <b>' + (ref ? ref.label : '–') + '</b> hollow orange, its seed range the band. Expected: <b>' + (b.expected_optimum || '–') + '</b>. ' + (b.reference_label || '') + '</p>';
+    configNote(main, b, col);
     var W = Math.min(1100, main.clientWidth - 4), L = 170, R = 16, PH = 92, gap = 14, top = 8, bottomAxis = 64;
     var H = top + keys.length * (PH + gap) + bottomAxis;
     var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
@@ -266,6 +274,36 @@
   }
 
   // ---- view: traces
+  // What differs between the arms of a batch, under the title of every per-batch view. One line per swept
+  // env key when each cell moves a single key (b9: `SNEK_PPO_GAE_LAMBDA ∈ 0.0, 0.5, ...`), the reference's
+  // value bold and each value a link to its cell; one row per cell when cells combine keys (b17's anneals).
+  function envText(env) { return Object.keys(env || {}).map(function (k) { return '<code>' + k + '=' + env[k] + '</code>'; }).join(' '); }
+  function seedsText(cells) {
+    var counts = cells.map(function (c) { return c.arms.length; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    return counts.length === 1 ? cells.length + ' cells × ' + counts[0] + ' seeds' : cells.length + ' cells, ' + cells.map(function (c) { return c.label + ':' + c.arms.length; }).join(' ') + ' seeds';
+  }
+  function configNote(main, b, col) {
+    var cells = cellsOf(b), ref = refOf(b), ctrl = (ref && ref.env) || b.control_value || {};
+    var t = document.createElement('table'); t.className = 'cfg'; var h = '';
+    var single = cells.filter(function (c) { return Object.keys(c.env || {}).length === 1; });
+    var multi = cells.filter(function (c) { return Object.keys(c.env || {}).length !== 1; });
+    var byKey = {};
+    single.forEach(function (c) { var k = Object.keys(c.env)[0]; (byKey[k] = byKey[k] || []).push(c); });
+    Object.keys(byKey).forEach(function (k, ki) {
+      var items = byKey[k].map(function (c) { return { v: c.env[k], html: '<span class="k" data-c="' + c.slug + '" style="color:' + (col[c.slug] || 'inherit') + '">' + c.env[k] + '</span>' }; });
+      if (ctrl[k] !== undefined) items.push({ v: ctrl[k], html: '<b class="k" data-c="' + (ref ? ref.slug : '') + '" title="reference">' + ctrl[k] + '</b>' });
+      // Value order where the values are numbers, so the reference lands in its place in the sweep.
+      if (items.every(function (it) { return isFinite(parseFloat(it.v)); })) items.sort(function (a, b) { return parseFloat(a.v) - parseFloat(b.v); });
+      h += '<tr><td><code>' + k + '</code> ∈ ' + items.map(function (it) { return it.html; }).join(', ')
+        + (ki === 0 ? ' <span class="dim" title="' + seedsText(cells) + '">(bold = reference' + (ref ? '' : ', ' + (b.reference_label || 'an earlier batch')) + ')</span>' : '') + '</td></tr>';
+    });
+    if (multi.length) h += '<tr><td style="white-space:normal">' + multi.map(function (c) {
+      return '<span class="k" data-c="' + c.slug + '"><i style="background:' + (col[c.slug] || '#888') + '"></i>' + c.label + '</span> ' + envText(c.env);
+    }).join(' &nbsp;·&nbsp; ') + '</td></tr>';
+    t.innerHTML = h;
+    t.querySelectorAll('.k[data-c]').forEach(function (e) { if (e.getAttribute('data-c')) e.addEventListener('click', function () { state.view = 'cell'; state.cell = e.getAttribute('data-c'); render(); }); });
+    main.appendChild(t);
+  }
   function legend(main, b, col, ref) {
     var lg = document.createElement('div'); lg.className = 'legend';
     if (ref) { var r = document.createElement('span'); r.className = 'ref'; r.innerHTML = '<i style="background:' + REF + '"></i>reference ' + ref.label; lg.appendChild(r); }
@@ -282,6 +320,7 @@
     var b = batch(), ref = refOf(b), col = colours(b), w = parseInt(state.smooth, 10) || 1;
     var keys = renderMetrics(TRACE_ROWS, TRACE_DEFAULT);
     main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + '</h2><p class="sub">Each cell as its seed-median per 250k transitions' + (w > 1 ? ', smoothed over ' + w + ' bins' : '') + '; ordered cells run light → dark. Click a trace for that cell\'s seeds.</p>';
+    configNote(main, b, col);
     legend(main, b, col, ref);
     var W = Math.min(1100, main.clientWidth - 4), L = 170, R = 16, PH = 110, gap = 12, top = 8, H = top + keys.length * (PH + gap) + 26;
     var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
@@ -319,6 +358,7 @@
     main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + ' = ' + cell.label + '</h2><p class="sub">Each seed (blue) over the reference\'s seeds (grey). Click a panel for the arm\'s chart. ' + (cell.prediction ? 'Prediction: <b>' + cell.prediction + '</b>. ' : '') +
       'density ' + fmt(st.density98.median, 1) + '% (' + st.density98.values.map(function (v) { return fmt(v, 1); }).join(' ') + ')' + (st.density98.p !== null ? ', p=' + st.density98.p : '') +
       ' · best30 ' + fmt(st.best30.median, 2) + ' · evals&lt;80 ' + fmt(st.drawdown80.median, 2) + '% · hof5000 best ' + fmt(st.hof_best.median, 1) + ' · hof30k best ' + fmt(st.hof30k_best.max, 1) + '</p>';
+    configNote(main, b, colours(b));
     var arms = cell.arms, n = Math.max(1, arms.length);
     var W = Math.min(1300, main.clientWidth - 4), L = 150, R = 10, colgap = 10, PH = 96, gap = 12, top = 22;
     var cw = (W - L - R - colgap * (n - 1)) / n, H = top + keys.length * (PH + gap) + 22;
@@ -371,12 +411,32 @@
     });
     return rows;
   }
+  // The levers view spans every batch, so its note is one row per knob: the env key(s) swept and the values.
+  function sweepNote(main) {
+    var t = document.createElement('table'); t.className = 'cfg';
+    var h = '<tr><th>batch</th><th>knob</th><th>swept</th></tr>';
+    S.batches.forEach(function (b) {
+      var byKey = {};
+      b.cells.forEach(function (c) { Object.keys(c.env || {}).forEach(function (k) { (byKey[k] = byKey[k] || []).push(c.env[k]); }); });
+      var ctrl = b.control_value || {};
+      var swept = Object.keys(byKey).map(function (k) {
+        var vals = byKey[k].filter(function (v, i, a) { return a.indexOf(v) === i; });
+        return '<code>' + k + '</code> ∈ ' + vals.map(function (v) { return v === ctrl[k] ? '<b>' + v + '</b>' : v; }).join(', ');
+      }).join('<br>');
+      h += '<tr><td class="k" data-b="' + b.batch + '">' + b.batch + '</td><td>' + b.knob + '</td><td style="white-space:normal">' + swept + '</td></tr>';
+    });
+    t.innerHTML = h;
+    t.querySelectorAll('td.k').forEach(function (td) { td.addEventListener('click', function () { state.batch = td.getAttribute('data-b'); state.view = 'curve'; state.hidden = {}; render(); }); });
+    var note = document.createElement('p'); note.className = 'sub'; note.textContent = 'Bold = the reference\u2019s value. Click a batch for its curve.';
+    main.appendChild(t); main.appendChild(note);
+  }
   function viewLevers(main) {
     $('metrics').style.display = 'none';
     var rows = peaks();
     var sortKey = 'density98';
     rows.sort(function (a, b) { var x = (a.metrics[sortKey] || {}).delta, y = (b.metrics[sortKey] || {}).delta; return (y === null || y === undefined ? -1e9 : y) - (x === null || x === undefined ? -1e9 : x); });
     main.innerHTML = '<h2>The levers — every knob\'s best cell against its reference</h2><p class="sub">Each row: the knob\'s winning cell as its delta from the reference\'s median — four seeds (dots), their median (hollow), the reference\'s own seed range (orange band) as the noise a win must clear. Sorted by the density delta. Click a row to open that cell.</p>';
+    sweepNote(main);
     var LM = ['density98', 'drawdown80', 'hof_best', 'best30'];
     var W = Math.min(1200, main.clientWidth - 4), L = 250, R = 12, RH = 30, top = 28, gapx = 22;
     var pw = (W - L - R - gapx * (LM.length - 1)) / LM.length, H = top + rows.length * RH + 30;
@@ -438,6 +498,7 @@
     $('metrics').style.display = 'none';
     var b = batch();
     main.innerHTML = '<h2>Every arm of the sweep</h2><p class="sub">Does the critic\'s fit predict the record region, and does the KL tail predict collapses? All arms grey; the selected batch <b>' + b.batch + '</b> in blue; reference arms hollow orange. Hover for the arm; click for its cell.</p>';
+    configNote(main, b, colours(b));
     var pairs = [['ev_late', 'density98'], ['kl_p99', 'drawdown80'], ['entropy_end', 'density98'], ['onset90_m', 'density98']];
     var W = Math.min(1200, main.clientWidth - 4), pw = (W - 30) / 2, ph = 300;
     var svg = el('svg', { width: W, height: ph * 2 + 40, viewBox: '0 0 ' + W + ' ' + (ph * 2 + 40) }, main);
