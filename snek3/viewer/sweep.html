@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snek sweep</title>
+<style>
+  /* Same chrome as index.html; chart colours are the dataviz reference palette's dark steps. */
+  :root { --bg:#111; --panel:#1a1a19; --fg:#ddd; --ink:#fff; --dim:#898781; --line:#2c2c2a; --axis:#383835; --hi:#4c9;
+          --blue:#3987e5; --orange:#d95926; --refgrey:#9a9890; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.4 -apple-system, system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:.5em 1.1em; align-items:center; padding:.5em .8em; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:2; }
+  header label { color:var(--dim); white-space:nowrap; }
+  select, button { background:#222; color:var(--fg); border:1px solid #444; border-radius:4px; padding:.2em .5em; font:inherit; }
+  button:hover { border-color:var(--hi); cursor:pointer; }
+  button.on { border-color:var(--hi); color:var(--hi); }
+  #summary { color:var(--dim); margin-left:auto; }
+  #metrics { display:flex; flex-wrap:wrap; gap:.2em .6em; padding:.4em .8em; border-bottom:1px solid var(--line); color:var(--dim); }
+  #metrics label { white-space:nowrap; cursor:pointer; }
+  #metrics input { vertical-align:-1px; }
+  main { padding:.6em .8em; }
+  h2 { font-size:14px; font-weight:600; color:var(--ink); margin:.4em 0 .2em; }
+  .sub { color:var(--dim); margin:0 0 .6em; }
+  .sub b { color:var(--fg); font-weight:normal; }
+  svg { display:block; background:var(--panel); border:1px solid var(--line); border-radius:4px; max-width:100%; }
+  svg text { fill:var(--dim); font:10px -apple-system, system-ui, sans-serif; }
+  svg text.t { fill:var(--fg); font-size:10.5px; }
+  svg text.k { fill:var(--ink); font-size:11px; }
+  svg .grid { stroke:var(--line); stroke-width:1; }
+  svg .ax { stroke:var(--axis); stroke-width:1; }
+  svg .hit { cursor:pointer; }
+  .legend { display:flex; flex-wrap:wrap; gap:.2em .9em; margin:.4em 0 .6em; color:var(--fg); }
+  .legend span { white-space:nowrap; cursor:pointer; }
+  .legend i { display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:.35em; border-radius:2px; }
+  .legend span.ref i { height:5px; }
+  .legend span.dim { opacity:.35; }
+  #tip { position:fixed; pointer-events:none; background:#000; color:#fff; border:1px solid #444; border-radius:4px; padding:.3em .5em; font-size:12px; display:none; z-index:9; max-width:28em; white-space:pre-line; }
+  table { border-collapse:collapse; margin:.4em 0 1em; font-size:12px; }
+  th, td { border:1px solid var(--line); padding:.25em .5em; text-align:left; white-space:nowrap; }
+  th { color:var(--dim); font-weight:normal; }
+  td.c { text-align:center; cursor:pointer; }
+  td.c b { color:var(--ink); font-weight:600; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .help { color:var(--dim); padding:.4em .8em 1em; }
+  kbd { background:#222; border:1px solid #444; border-radius:3px; padding:0 .3em; font:inherit; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none; flex-direction:column; align-items:center; justify-content:center; gap:.6em; padding:1vh 1vw; box-sizing:border-box; z-index:5; cursor:zoom-out; }
+  #lightbox img { width:98vw; height:calc(98vh - 2.4em); object-fit:contain; background:#fff; }
+  #lightbox .cap { color:#fff; }
+  a { color:var(--hi); }
+</style>
+</head>
+<body>
+<header>
+  <label>batch <select id="batch"></select></label>
+  <label>view
+    <button data-view="curve" title="1">curve</button><button data-view="traces" title="2">traces</button><button data-view="cell" title="3">cell</button><button data-view="levers" title="4">levers</button><button data-view="scatter" title="5">scatter</button>
+  </label>
+  <label id="cellpick-l">cell <select id="cellpick"></select></label>
+  <label id="smooth-l">smooth <select id="smooth"><option value="1">250k bin</option><option value="2">500k</option><option value="4">1M</option></select></label>
+  <label><input type="checkbox" id="ref" checked> reference</label>
+  <span id="summary"></span>
+</header>
+<div id="metrics"></div>
+<main id="main"></main>
+<p class="help"><kbd>←</kbd> <kbd>→</kbd> or <kbd>p</kbd> <kbd>n</kbd> batch (older / newer, stops at the ends) · <kbd>↑</kbd> <kbd>↓</kbd> cell (cell view) · <kbd>1</kbd>–<kbd>5</kbd> views · <kbd>r</kbd> reference on/off · hover a mark for the arm and its number · click a cell's dot or trace to open that cell; click a seed's panel in the cell view to open the arm's chart · a legend entry toggles its cell. Data: <code>viewer/sweep.js</code> from <code>python -m tools.sweep_analysis reduce</code>; the same numbers as <code>docs/sweep.md</code>. The URL carries the view.</p>
+<div id="tip"></div>
+<div id="lightbox"><img alt=""><div class="cap"></div></div>
+
+<script src="sweep.js"></script>
+<script>
+(function () {
+  var S = window.SNEK_SWEEP;
+  var $ = function (id) { return document.getElementById(id); };
+  if (!S) { $('main').innerHTML = '<p class="sub">No <code>sweep.js</code> beside this page. Run <code>cd snek3 && PYTHONPATH=. python -m tools.sweep_analysis reduce</code>.</p>'; return; }
+  var BLUE = '#3987e5', ORANGE = '#d95926', REF = '#9a9890', SURFACE = '#1a1a19';
+  // the blue ramp on the dark surface: steps 100..600 (no darker than 600 on dark)
+  var RAMP = ['#cde2fb', '#b7d3f6', '#9ec5f4', '#86b6ef', '#6da7ec', '#5598e7', '#3987e5', '#2a78d6', '#256abf', '#1c5cab', '#184f95'];
+  var CATEGORICAL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+  var METRIC = {}; S.metrics.forEach(function (m) { METRIC[m.key] = m; });
+  var CURVE_DEFAULT = ['density98', 'hof_best', 'hof30k_best', 'best30', 'stage_a_98', 'drawdown80', 'drawdown50', 'onset90_m', 'ev_late', 'kl_p99', 'entropy_end'];
+  var TRACE_ROWS = [['perfect', 'perfect rate /100, bin mean'], ['perfect_min', 'worst eval in bin'], ['score', 'average score'],
+                    ['stage_b', 'stage-B rows ≥98 /500, share per 2.5M'], ['value_loss', 'value loss (log)'], ['ev', 'explained variance'],
+                    ['kl', 'approx KL (log)'], ['clipfrac', 'clip fraction'], ['entropy', 'entropy']];
+  var LOG = { value_loss: true, kl: true, kl_p99: true, kl_late: true };
+  var TRACE_DEFAULT = TRACE_ROWS.map(function (r) { return r[0]; });
+
+  // ---- state in the hash
+  var state = { batch: S.batches[S.batches.length - 1].batch, view: 'curve', cell: null, smooth: '1', ref: '1', m: null, hidden: {} };
+  function readHash() {
+    location.hash.replace(/^#/, '').split('&').forEach(function (kv) {
+      var p = kv.split('='); if (p.length !== 2) return;
+      if (p[0] === 'hidden') state.hidden = {}; else if (p[0] in state) state[p[0]] = decodeURIComponent(p[1]);
+    });
+  }
+  function writeHash() {
+    var h = 'batch=' + state.batch + '&view=' + state.view + (state.cell ? '&cell=' + state.cell : '') + '&smooth=' + state.smooth + '&ref=' + state.ref + (state.m ? '&m=' + encodeURIComponent(state.m) : '');
+    if (location.hash.replace(/^#/, '') !== h) history.replaceState(null, '', '#' + h);
+  }
+  function batch() { return S.batches.filter(function (b) { return b.batch === state.batch; })[0] || S.batches[0]; }
+  function cellsOf(b) { return b.cells.filter(function (c) { return !c.reference; }); }
+  function refOf(b) { return b.cells.filter(function (c) { return c.reference; })[0] || null; }
+  function selectedMetrics(defaults) { return state.m ? state.m.split(',').filter(function (k) { return k; }) : defaults; }
+
+  S.batches.forEach(function (b) {
+    var o = document.createElement('option'); o.value = b.batch; o.textContent = b.batch + ' — ' + b.knob; $('batch').appendChild(o);
+  });
+
+  // ---- colours: the ramp by axis position when the cells are ordered, categorical for switches
+  function colours(b) {
+    var cells = cellsOf(b), ordered = cells.some(function (c) { return c.value !== null; }) || cells.length > CATEGORICAL.length;
+    var out = {};
+    cells.forEach(function (c, i) {
+      if (ordered) { var t = cells.length > 1 ? i / (cells.length - 1) : 1; out[c.slug] = RAMP[Math.round(t * (RAMP.length - 1))]; }
+      else out[c.slug] = CATEGORICAL[i % CATEGORICAL.length];
+    });
+    return out;
+  }
+
+  // ---- svg helpers
+  var NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e); return e;
+  }
+  function text(parent, x, y, s, attrs) { var t = el('text', Object.assign({ x: x, y: y }, attrs || {}), parent); t.textContent = s; return t; }
+  function fmt(v, d) { if (v === null || v === undefined || isNaN(v)) return '–'; if (d !== undefined) return Number(v).toFixed(d); var a = Math.abs(v); return a >= 100 ? v.toFixed(1) : a >= 10 ? v.toFixed(2) : a >= 0.1 ? v.toFixed(3) : v.toPrecision(3); }
+  function extent(values, pad, positive) {
+    var lo = Infinity, hi = -Infinity;
+    values.forEach(function (v) { if (v === null || v === undefined || isNaN(v) || (positive && v <= 0)) return; if (v < lo) lo = v; if (v > hi) hi = v; });
+    if (lo === Infinity) return positive ? [0.1, 1] : [0, 1];
+    if (lo === hi) { lo -= Math.abs(lo) * 0.1 || 1; hi += Math.abs(hi) * 0.1 || 1; }
+    pad = pad === undefined ? 0.08 : pad;
+    if (positive) {     // a log axis: pad in log space, so the floor stays above zero
+      var a = Math.log10(lo), b = Math.log10(hi), q = (b - a) * pad || 0.1; return [Math.pow(10, a - q), Math.pow(10, b + q)];
+    }
+    var p = (hi - lo) * pad; return [lo - p, hi + p];
+  }
+  function ticks(lo, hi, n) {
+    var span = hi - lo, step = Math.pow(10, Math.floor(Math.log10(span / n))), err = span / n / step;
+    step *= err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+    var out = [], v = Math.ceil(lo / step) * step; for (; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10)); return out;
+  }
+  function logTicks(lo, hi) { var out = []; for (var e = Math.floor(lo); e <= Math.ceil(hi); e++) if (e >= lo - 1e-9 && e <= hi + 1e-9) out.push(e); return out; }
+  // A panel: axes, y grid and ticks, a title on the left. Returns {g, x, y} mapping data -> pixels.
+  function panel(svg, box, ydom, opts) {
+    opts = opts || {};
+    var g = el('g', {}, svg);
+    var log = !!opts.log;
+    var d0 = log ? Math.log10(Math.max(ydom[0], 1e-9)) : ydom[0], d1 = log ? Math.log10(Math.max(ydom[1], 1e-9)) : ydom[1];
+    if (d1 - d0 < 1e-9) d1 = d0 + 1;
+    var y = function (v) { if (v === null || v === undefined || isNaN(v) || (log && v <= 0)) return null; var t = log ? Math.log10(v) : v; return box.y + box.h - (t - d0) / (d1 - d0) * box.h; };
+    var x = function (v) { return box.x + (v - opts.xdom[0]) / (opts.xdom[1] - opts.xdom[0]) * box.w; };
+    (log ? logTicks(d0, d1) : ticks(d0, d1, Math.max(2, Math.round(box.h / 28)))).forEach(function (t) {
+      var yy = y(log ? Math.pow(10, t) : t); if (yy === null || yy < box.y - 1 || yy > box.y + box.h + 1) return;
+      el('line', { x1: box.x, x2: box.x + box.w, y1: yy, y2: yy, 'class': 'grid' }, g);
+      text(g, box.x - 4, yy + 3, log ? '1e' + t : fmt(t, undefined), { 'text-anchor': 'end' });
+    });
+    el('line', { x1: box.x, x2: box.x, y1: box.y, y2: box.y + box.h, 'class': 'ax' }, g);
+    el('line', { x1: box.x, x2: box.x + box.w, y1: box.y + box.h, y2: box.y + box.h, 'class': 'ax' }, g);
+    if (opts.title) text(g, opts.titleX === undefined ? 6 : opts.titleX, box.y + 11, opts.title, { 'class': 't' });
+    return { g: g, x: x, y: y, box: box };
+  }
+  var tip = $('tip');
+  function hover(node, textFn) {
+    node.addEventListener('mousemove', function (e) { tip.textContent = textFn(); tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; });
+    node.addEventListener('mouseleave', function () { tip.style.display = 'none'; });
+  }
+  function smoothed(values, w) {
+    if (w <= 1) return values;
+    var out = [], acc = 0, n = 0, q = [];
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i]; q.push(v); if (v !== null) { acc += v; n++; }
+      if (q.length > w) { var d = q.shift(); if (d !== null) { acc -= d; n--; } }
+      out.push(n ? acc / n : null);
+    }
+    return out;
+  }
+  function medianOver(arms, key) {
+    if (!arms.length) return null;
+    if (key === 'stage_b') {
+      var n = S.arms[arms[0]].stage_b.rows.length, out = [];
+      for (var i = 0; i < n; i++) { var r = 0, h = 0; arms.forEach(function (p) { r += S.arms[p].stage_b.rows[i]; h += S.arms[p].stage_b.rows98[i]; }); out.push(r ? 100 * h / r : null); }
+      return out;
+    }
+    var len = S.arms[arms[0]].trace[key].length, res = [];
+    for (var j = 0; j < len; j++) {
+      var vs = []; arms.forEach(function (p) { var v = S.arms[p].trace[key][j]; if (v !== null && v !== undefined) vs.push(v); });
+      if (!vs.length) { res.push(null); continue; }
+      vs.sort(function (a, b) { return a - b; }); var m = vs.length >> 1; res.push(vs.length % 2 ? vs[m] : (vs[m - 1] + vs[m]) / 2);
+    }
+    return res;
+  }
+  function polyline(P, xs, ys, attrs) {
+    var d = '', pen = false;
+    for (var i = 0; i < xs.length; i++) {
+      var yy = P.y(ys[i]); if (yy === null) { pen = false; continue; }
+      d += (pen ? 'L' : 'M') + P.x(xs[i]).toFixed(1) + ',' + yy.toFixed(1); pen = true;
+    }
+    return el('path', Object.assign({ d: d, fill: 'none', 'stroke-linejoin': 'round' }, attrs), P.g);
+  }
+
+  // ---- metric checklist (curve and traces)
+  function renderMetrics(all, defaults) {
+    var box = $('metrics'); box.innerHTML = ''; var chosen = selectedMetrics(defaults);
+    all.forEach(function (it) {
+      var l = document.createElement('label'), i = document.createElement('input'); i.type = 'checkbox'; i.checked = chosen.indexOf(it[0]) >= 0;
+      i.addEventListener('change', function () {
+        var now = all.map(function (a) { return a[0]; }).filter(function (k) { return k === it[0] ? i.checked : chosen.indexOf(k) >= 0; });
+        state.m = now.join(','); render();
+      });
+      l.appendChild(i); l.appendChild(document.createTextNode(' ' + it[1])); box.appendChild(l);
+    });
+    box.style.display = '';
+    return chosen;
+  }
+
+  // ---- view: curve
+  function viewCurve(main) {
+    var b = batch(), ref = refOf(b), cells = b.cells, col = colours(b);
+    var keys = renderMetrics(S.metrics.map(function (m) { return [m.key, m.label]; }), CURVE_DEFAULT);
+    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + '</h2><p class="sub">Cells in value order, evenly spaced. Four seeds as dots, their median as the line; the reference <b>' + (ref ? ref.label : '–') + '</b> hollow orange, its seed range the band. Expected: <b>' + (b.expected_optimum || '–') + '</b>. ' + (b.reference_label || '') + '</p>';
+    var W = Math.min(1100, main.clientWidth - 4), L = 170, R = 16, PH = 92, gap = 14, top = 8, bottomAxis = 64;
+    var H = top + keys.length * (PH + gap) + bottomAxis;
+    var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
+    var xdom = [-0.6, cells.length - 0.4];
+    keys.forEach(function (key, ki) {
+      var m = METRIC[key], vals = [];
+      cells.forEach(function (c) { c.stats[key].values.forEach(function (v) { if (v !== null) vals.push(v); }); });
+      var P = panel(svg, { x: L, y: top + ki * (PH + gap), w: W - L - R, h: PH }, extent(vals, 0.08, LOG[key]), { xdom: xdom, log: LOG[key], title: m.label + (m.unit && m.unit !== 'M' ? ' (' + m.unit + ')' : '') + (key === 'value_loss_late' && !b.value_loss_comparable ? ' — not comparable here' : '') });
+      if (ref && state.ref === '1') {
+        var rs = ref.stats[key];
+        if (rs.min !== null) {
+          var y0 = P.y(rs.max), y1 = P.y(rs.min);
+          el('rect', { x: P.box.x, y: Math.min(y0, y1), width: P.box.w, height: Math.abs(y1 - y0), fill: ORANGE, opacity: 0.12 }, P.g);
+          el('line', { x1: P.box.x, x2: P.box.x + P.box.w, y1: P.y(rs.median), y2: P.y(rs.median), stroke: ORANGE, 'stroke-width': 1, opacity: 0.8 }, P.g);
+        }
+      }
+      var mx = [], my = [];
+      cells.forEach(function (c) {
+        var st = c.stats[key];
+        if (!c.reference && st.median !== null && key !== 'hof30k_best') { mx.push(c.x); my.push(st.median); }
+        st.values.forEach(function (v, si) {
+          if (v === null) return;
+          var arm = c.arms[si];
+          var dot = el('circle', { cx: P.x(c.x), cy: P.y(v), r: 3.2, fill: c.reference ? SURFACE : BLUE, stroke: c.reference ? ORANGE : BLUE, 'stroke-width': 1.2, 'class': 'hit' }, P.g);
+          hover(dot, function () { return arm + '\n' + m.label + ': ' + fmt(v) + (st.p !== null ? '\ncell median ' + fmt(st.median) + ', p vs reference ' + st.p : ''); });
+          dot.addEventListener('click', function () { state.view = 'cell'; state.cell = c.slug; render(); });
+        });
+        if (!st.n && (key === 'hof30k_best' || key === 'hof_best' || key === 'onset90_m' || key === 'step98_m')) {
+          var tk = el('line', { x1: P.x(c.x), x2: P.x(c.x), y1: P.box.y + P.box.h - 6, y2: P.box.y + P.box.h, stroke: REF, 'stroke-width': 1.2, 'class': 'hit' }, P.g);
+          hover(tk, function () { return c.label + ': no rows / not reached'; });
+        }
+      });
+      if (mx.length > 1) polyline(P, mx, my, { stroke: BLUE, 'stroke-width': 1.8 });
+    });
+    // x axis labels once, at the bottom
+    var ax = el('g', {}, svg), yb = top + keys.length * (PH + gap) - gap + 4;
+    cells.forEach(function (c) {
+      var x = L + (c.x - xdom[0]) / (xdom[1] - xdom[0]) * (W - L - R);
+      var t = text(ax, x, yb + 12, c.label, { 'text-anchor': cells.length > 9 ? 'end' : 'middle', transform: cells.length > 9 ? 'rotate(-35 ' + x + ' ' + (yb + 12) + ')' : null, 'class': c.reference ? 'k' : 't', 'style': 'cursor:pointer' });
+      t.addEventListener('click', function () { if (!c.reference) { state.view = 'cell'; state.cell = c.slug; render(); } });
+      hover(t, function () { return c.slug + (c.prediction ? '\n' + c.prediction : ''); });
+    });
+    text(ax, L + (W - L - R) / 2, H - 6, b.knob + ' — cells in value order', { 'text-anchor': 'middle', 'class': 't' });
+  }
+
+  // ---- view: traces
+  function legend(main, b, col, ref) {
+    var lg = document.createElement('div'); lg.className = 'legend';
+    if (ref) { var r = document.createElement('span'); r.className = 'ref'; r.innerHTML = '<i style="background:' + REF + '"></i>reference ' + ref.label; lg.appendChild(r); }
+    cellsOf(b).forEach(function (c) {
+      var s = document.createElement('span'); s.innerHTML = '<i style="background:' + col[c.slug] + '"></i>' + c.label; if (state.hidden[c.slug]) s.className = 'dim';
+      s.addEventListener('click', function () { state.hidden[c.slug] = !state.hidden[c.slug]; render(); });
+      s.addEventListener('dblclick', function () { state.view = 'cell'; state.cell = c.slug; render(); });
+      hover(s, function () { return c.slug + ' — ' + c.arms.length + ' arms' + (c.prediction ? '\n' + c.prediction : ''); });
+      lg.appendChild(s);
+    });
+    main.appendChild(lg);
+  }
+  function viewTraces(main) {
+    var b = batch(), ref = refOf(b), col = colours(b), w = parseInt(state.smooth, 10) || 1;
+    var keys = renderMetrics(TRACE_ROWS, TRACE_DEFAULT);
+    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + '</h2><p class="sub">Each cell as its seed-median per 250k transitions' + (w > 1 ? ', smoothed over ' + w + ' bins' : '') + '; ordered cells run light → dark. Click a trace for that cell\'s seeds.</p>';
+    legend(main, b, col, ref);
+    var W = Math.min(1100, main.clientWidth - 4), L = 170, R = 16, PH = 110, gap = 12, top = 8, H = top + keys.length * (PH + gap) + 26;
+    var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
+    var steps = S.arms[Object.keys(S.arms)[0]].trace.steps.map(function (s) { return s / 1e6; });
+    var sbsteps = S.arms[Object.keys(S.arms)[0]].stage_b.steps.map(function (s) { return s / 1e6; });
+    var xdom = [0, S.horizon / 1e6];
+    keys.forEach(function (key, ki) {
+      var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1];
+      var xs = key === 'stage_b' ? sbsteps : steps;
+      var series = [];
+      if (ref && state.ref === '1' && ref.arms.length) series.push({ cell: ref, ys: smoothed(medianOver(ref.arms, key), key === 'stage_b' ? 1 : w), colour: REF, width: 3 });
+      cellsOf(b).forEach(function (c) { if (!state.hidden[c.slug] && c.arms.length) series.push({ cell: c, ys: smoothed(medianOver(c.arms, key), key === 'stage_b' ? 1 : w), colour: col[c.slug], width: 1.4 }); });
+      var all = []; series.forEach(function (s) { s.ys.forEach(function (v) { if (v !== null) all.push(v); }); });
+      var dom = extent(all, 0.05, LOG[key]); if (key === 'perfect' || key === 'perfect_min' || key === 'stage_b') dom = [Math.max(0, dom[0]), Math.min(100, Math.max(dom[1], 1))];
+      var P = panel(svg, { x: L, y: top + ki * (PH + gap), w: W - L - R, h: PH }, dom, { xdom: xdom, log: LOG[key], title: label });
+      series.forEach(function (s) {
+        var path = polyline(P, xs, s.ys, { stroke: s.colour, 'stroke-width': s.width, 'class': 'hit', opacity: s.cell.reference ? 0.85 : 1 });
+        hover(path, function () { return s.cell.label + (s.cell.reference ? ' (reference)' : '') + ' — ' + s.cell.arms.length + ' arms'; });
+        path.addEventListener('mouseenter', function () { path.setAttribute('stroke-width', s.width + 1.5); });
+        path.addEventListener('mouseleave', function () { path.setAttribute('stroke-width', s.width); });
+        path.addEventListener('click', function () { if (!s.cell.reference) { state.view = 'cell'; state.cell = s.cell.slug; render(); } });
+      });
+    });
+    var ax = el('g', {}, svg), yb = H - 8;
+    ticks(0, xdom[1], 6).forEach(function (t) { var x = L + t / xdom[1] * (W - L - R); text(ax, x, yb, t + 'M', { 'text-anchor': 'middle' }); });
+    text(ax, L + (W - L - R) / 2, yb, '', {});
+  }
+
+  // ---- view: cell (four seeds across, metrics down)
+  function viewCell(main) {
+    var b = batch(), ref = refOf(b), cells = cellsOf(b), w = parseInt(state.smooth, 10) || 1;
+    var cell = cells.filter(function (c) { return c.slug === state.cell; })[0] || cells[0]; state.cell = cell.slug;
+    var keys = renderMetrics(TRACE_ROWS, TRACE_DEFAULT);
+    var st = cell.stats;
+    main.innerHTML = '<h2>' + b.batch + ' — ' + b.knob + ' = ' + cell.label + '</h2><p class="sub">Each seed (blue) over the reference\'s seeds (grey). Click a panel for the arm\'s chart. ' + (cell.prediction ? 'Prediction: <b>' + cell.prediction + '</b>. ' : '') +
+      'density ' + fmt(st.density98.median, 1) + '% (' + st.density98.values.map(function (v) { return fmt(v, 1); }).join(' ') + ')' + (st.density98.p !== null ? ', p=' + st.density98.p : '') +
+      ' · best30 ' + fmt(st.best30.median, 2) + ' · evals&lt;80 ' + fmt(st.drawdown80.median, 2) + '% · hof5000 best ' + fmt(st.hof_best.median, 1) + ' · hof30k best ' + fmt(st.hof30k_best.max, 1) + '</p>';
+    var arms = cell.arms, n = Math.max(1, arms.length);
+    var W = Math.min(1300, main.clientWidth - 4), L = 150, R = 10, colgap = 10, PH = 96, gap = 12, top = 22;
+    var cw = (W - L - R - colgap * (n - 1)) / n, H = top + keys.length * (PH + gap) + 22;
+    var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
+    var steps = S.arms[Object.keys(S.arms)[0]].trace.steps.map(function (s) { return s / 1e6; });
+    var sbsteps = S.arms[Object.keys(S.arms)[0]].stage_b.steps.map(function (s) { return s / 1e6; });
+    var xdom = [0, S.horizon / 1e6];
+    arms.forEach(function (p, ci) { var t = text(svg, L + ci * (cw + colgap) + cw / 2, 14, p, { 'text-anchor': 'middle', 'class': 'k', 'style': 'cursor:pointer' }); t.addEventListener('click', function () { zoom(p); }); });
+    keys.forEach(function (key, ki) {
+      var label = TRACE_ROWS.filter(function (r) { return r[0] === key; })[0][1];
+      var xs = key === 'stage_b' ? sbsteps : steps;
+      var all = [], refSeries = [];
+      if (ref && state.ref === '1') ref.arms.forEach(function (rp) { var ys = smoothed(medianOver([rp], key), key === 'stage_b' ? 1 : w); refSeries.push(ys); ys.forEach(function (v) { if (v !== null) all.push(v); }); });
+      var own = arms.map(function (p) { var ys = smoothed(medianOver([p], key), key === 'stage_b' ? 1 : w); ys.forEach(function (v) { if (v !== null) all.push(v); }); return ys; });
+      var dom = extent(all, 0.05, LOG[key]); if (key === 'perfect' || key === 'perfect_min' || key === 'stage_b') dom = [Math.max(0, dom[0]), Math.min(100, Math.max(dom[1], 1))];
+      arms.forEach(function (p, ci) {
+        var P = panel(svg, { x: L + ci * (cw + colgap), y: top + ki * (PH + gap), w: cw, h: PH }, dom, { xdom: xdom, log: LOG[key], title: ci === 0 ? label : null });
+        if (ci > 0) P.g.querySelectorAll('text').forEach(function (t) { t.remove(); });
+        refSeries.forEach(function (ys) { polyline(P, xs, ys, { stroke: REF, 'stroke-width': 1, opacity: 0.5 }); });
+        polyline(P, xs, own[ci], { stroke: BLUE, 'stroke-width': 1.4 });
+        var hit = el('rect', { x: P.box.x, y: P.box.y, width: P.box.w, height: P.box.h, fill: 'transparent', 'class': 'hit' }, P.g);
+        var sc = S.arms[p].scalars;
+        hover(hit, function () { return p + '\nbest30 ' + fmt(sc.best30, 1) + ' @' + fmt((sc.best30_step || 0) / 1e6, 1) + 'M · density ' + fmt(sc.density98, 1) + '% of ' + sc.rows + ' rows · evals<80 ' + fmt(sc.drawdown80, 2) + '% · onset90 ' + fmt(sc.onset90_m, 1) + 'M\nlate: ev ' + fmt(sc.ev_late, 3) + ' · value loss ' + fmt(sc.value_loss_late, 2) + ' · KL p99 ' + fmt(sc.kl_p99) + ' · entropy ' + fmt(sc.entropy_end, 3) + '\nclick: the arm\'s chart'; });
+        hit.addEventListener('click', function () { zoom(p); });
+      });
+    });
+    var ax = el('g', {}, svg);
+    arms.forEach(function (p, ci) { ticks(0, xdom[1], 4).forEach(function (t) { text(ax, L + ci * (cw + colgap) + t / xdom[1] * cw, H - 6, t + 'M', { 'text-anchor': 'middle' }); }); });
+  }
+
+  // ---- view: levers (+ peaks table), batch-independent
+  function peaks() {
+    var rows = [];
+    S.batches.forEach(function (b) {
+      var ref = refOf(b), row = { batch: b, metrics: {} };
+      S.metrics.forEach(function (m) {
+        if (m.higher === null || (m.key === 'value_loss_late' && !b.value_loss_comparable)) return;
+        var cands = cellsOf(b).filter(function (c) { return c.stats[m.key].median !== null; });
+        if (!cands.length) return;
+        var win = cands.reduce(function (a, c) { return (m.higher ? c.stats[m.key].median > a.stats[m.key].median : c.stats[m.key].median < a.stats[m.key].median) ? c : a; });
+        var st = win.stats[m.key], e = { cell: win, median: st.median, p: st.p, delta: null, outside: null, ref: null };
+        if (ref && ref.stats[m.key].median !== null) {
+          var rs = ref.stats[m.key]; e.ref = rs; e.delta = st.median - rs.median;
+          var span = rs.max - rs.min, d = m.higher ? st.median - rs.max : rs.min - st.median;
+          e.outside = span > 0 ? d / span : (d > 0 ? 1 : 0);
+        }
+        row.metrics[m.key] = e;
+      });
+      rows.push(row);
+    });
+    return rows;
+  }
+  function viewLevers(main) {
+    $('metrics').style.display = 'none';
+    var rows = peaks();
+    var sortKey = 'density98';
+    rows.sort(function (a, b) { var x = (a.metrics[sortKey] || {}).delta, y = (b.metrics[sortKey] || {}).delta; return (y === null || y === undefined ? -1e9 : y) - (x === null || x === undefined ? -1e9 : x); });
+    main.innerHTML = '<h2>The levers — every knob\'s best cell against its reference</h2><p class="sub">Each row: the knob\'s winning cell as its delta from the reference\'s median — four seeds (dots), their median (hollow), the reference\'s own seed range (orange band) as the noise a win must clear. Sorted by the density delta. Click a row to open that cell.</p>';
+    var LM = ['density98', 'drawdown80', 'hof_best', 'best30'];
+    var W = Math.min(1200, main.clientWidth - 4), L = 250, R = 12, RH = 30, top = 28, gapx = 22;
+    var pw = (W - L - R - gapx * (LM.length - 1)) / LM.length, H = top + rows.length * RH + 30;
+    var svg = el('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H }, main);
+    rows.forEach(function (r, ri) {
+      var t = text(svg, L - 8, top + ri * RH + RH / 2 + 4, r.batch.batch + ' ' + r.batch.knob.slice(0, 36), { 'text-anchor': 'end', 'class': 't', 'style': 'cursor:pointer' });
+      t.addEventListener('click', function () { var e = r.metrics[sortKey]; state.batch = r.batch.batch; state.view = 'cell'; state.cell = e ? e.cell.slug : null; render(); });
+    });
+    LM.forEach(function (key, mi) {
+      var m = METRIC[key], x0 = L + mi * (pw + gapx), vals = [];
+      rows.forEach(function (r) { var e = r.metrics[key]; if (!e || !e.ref) return; e.cell.stats[key].values.forEach(function (v) { if (v !== null) vals.push(v - e.ref.median); }); vals.push(e.ref.min - e.ref.median, e.ref.max - e.ref.median); });
+      var dom = extent(vals, 0.12); dom[1] += (dom[1] - dom[0]) * 0.28;
+      var x = function (v) { return x0 + (v - dom[0]) / (dom[1] - dom[0]) * pw; };
+      text(svg, x0, 12, m.label + (m.unit ? ' (' + m.unit + ')' : '') + ' — delta', { 'class': 't' });
+      ticks(dom[0], dom[1], 4).forEach(function (tk) { el('line', { x1: x(tk), x2: x(tk), y1: top - 4, y2: top + rows.length * RH, 'class': 'grid' }, svg); text(svg, x(tk), H - 10, fmt(tk), { 'text-anchor': 'middle' }); });
+      el('line', { x1: x(0), x2: x(0), y1: top - 4, y2: top + rows.length * RH, 'class': 'ax', stroke: '#555' }, svg);
+      rows.forEach(function (r, ri) {
+        var e = r.metrics[key]; if (!e || !e.ref) return;
+        var yy = top + ri * RH + RH / 2, g = el('g', { 'class': 'hit' }, svg);
+        el('line', { x1: x(e.ref.min - e.ref.median), x2: x(e.ref.max - e.ref.median), y1: yy, y2: yy, stroke: ORANGE, 'stroke-width': 7, opacity: 0.22 }, g);
+        var ds = e.cell.stats[key].values.filter(function (v) { return v !== null; }).map(function (v) { return v - e.ref.median; });
+        el('line', { x1: x(Math.min.apply(null, ds)), x2: x(Math.max.apply(null, ds)), y1: yy, y2: yy, stroke: BLUE, 'stroke-width': 1.6 }, g);
+        ds.forEach(function (v) { el('circle', { cx: x(v), cy: yy, r: 2.6, fill: BLUE }, g); });
+        el('circle', { cx: x(e.delta), cy: yy, r: 4.5, fill: SURFACE, stroke: BLUE, 'stroke-width': 1.6 }, g);
+        text(g, x(Math.max.apply(null, ds)) + 6, yy + 3.5, e.cell.label, { 'class': 't' });
+        hover(g, function () { return r.batch.batch + ' ' + e.cell.label + ' — ' + m.label + '\ncell median ' + fmt(e.median) + ' vs reference ' + fmt(e.ref.median) + ' (' + (e.delta >= 0 ? '+' : '') + fmt(e.delta) + ')' + (e.p !== null ? '\nMann-Whitney p = ' + e.p + (e.p <= 0.03 ? ' — every seed past every reference seed' : '') : ''); });
+        g.addEventListener('click', function () { state.batch = r.batch.batch; state.view = 'cell'; state.cell = e.cell.slug; render(); });
+      });
+    });
+    // the peaks table
+    var PK = ['density98', 'hof_best', 'hof30k_best', 'best30', 'stage_a_98', 'drawdown80', 'drawdown50', 'onset90_m', 'ev_late', 'kl_p99', 'entropy_end'];
+    var h = '<h2>Where each metric peaked, per knob</h2><p class="sub">The winning cell per metric; shaded by how far its median sits outside the reference\'s seed range, in units of that range (grey = inside). <b>Bold</b> = every seed past every reference seed (p = 0.029). Click a cell to open it.</p>';
+    h += '<div style="overflow-x:auto"><table><tr><th>knob</th>' + PK.map(function (k) { return '<th>' + METRIC[k].label + '</th>'; }).join('') + '</tr>';
+    var rows2 = peaks();
+    rows2.forEach(function (r) {
+      h += '<tr><td>' + r.batch.batch + ' ' + r.batch.knob.slice(0, 40) + '</td>';
+      PK.forEach(function (k) {
+        var e = r.metrics[k]; if (!e) { h += '<td class="c">–</td>'; return; }
+        var lvl = e.outside === null || e.outside <= 0 ? 0 : Math.min(5, 1 + Math.floor(e.outside * 2));
+        var bg = lvl === 0 ? '#2a2a28' : ['', '#1c3a5c', '#1c4f80', '#1f63a6', '#2a78d6', '#3987e5'][lvl];
+        var ttl = 'median ' + fmt(e.median) + (e.ref ? ' vs ref ' + fmt(e.ref.median) + ' (' + (e.delta >= 0 ? '+' : '') + fmt(e.delta) + ')' : '') + (e.p !== null ? ', p=' + e.p : '');
+        h += '<td class="c" style="background:' + bg + '" title="' + ttl + '" data-b="' + r.batch.batch + '" data-c="' + e.cell.slug + '">' + (e.p !== null && e.p <= 0.03 ? '<b>' + e.cell.label + '</b>' : e.cell.label) + '</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</table></div>';
+    var div = document.createElement('div'); div.innerHTML = h; main.appendChild(div);
+    div.querySelectorAll('td.c[data-b]').forEach(function (td) { td.addEventListener('click', function () { state.batch = td.getAttribute('data-b'); state.view = 'cell'; state.cell = td.getAttribute('data-c'); render(); }); });
+  }
+
+  // ---- view: scatter, every arm
+  function spearman(xs, ys) {
+    function ranks(v) { var idx = v.map(function (_, i) { return i; }).sort(function (a, b) { return v[a] - v[b]; }), r = new Array(v.length), i = 0; while (i < idx.length) { var j = i; while (j + 1 < idx.length && v[idx[j + 1]] === v[idx[i]]) j++; for (var k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1; i = j + 1; } return r; }
+    var rx = ranks(xs), ry = ranks(ys), mx = rx.reduce(function (a, b) { return a + b; }, 0) / rx.length, my = ry.reduce(function (a, b) { return a + b; }, 0) / ry.length, num = 0, dx = 0, dy = 0;
+    for (var i = 0; i < rx.length; i++) { num += (rx[i] - mx) * (ry[i] - my); dx += (rx[i] - mx) * (rx[i] - mx); dy += (ry[i] - my) * (ry[i] - my); }
+    return dx && dy ? num / Math.sqrt(dx * dy) : NaN;
+  }
+  function viewScatter(main) {
+    $('metrics').style.display = 'none';
+    var b = batch();
+    main.innerHTML = '<h2>Every arm of the sweep</h2><p class="sub">Does the critic\'s fit predict the record region, and does the KL tail predict collapses? All arms grey; the selected batch <b>' + b.batch + '</b> in blue; reference arms hollow orange. Hover for the arm; click for its cell.</p>';
+    var pairs = [['ev_late', 'density98'], ['kl_p99', 'drawdown80'], ['entropy_end', 'density98'], ['onset90_m', 'density98']];
+    var W = Math.min(1200, main.clientWidth - 4), pw = (W - 30) / 2, ph = 300;
+    var svg = el('svg', { width: W, height: ph * 2 + 40, viewBox: '0 0 ' + W + ' ' + (ph * 2 + 40) }, main);
+    var refArms = {}; S.batches.forEach(function (bb) { bb.reference_arms.forEach(function (p) { refArms[p] = true; }); });
+    pairs.forEach(function (pr, pi) {
+      var xk = pr[0], yk = pr[1], pts = [];
+      Object.keys(S.arms).forEach(function (p) { var a = S.arms[p], x = a.scalars[xk], y = a.scalars[yk]; if (x === null || y === null || x === undefined || y === undefined) return; pts.push({ p: p, x: x, y: y, a: a }); });
+      var rho = spearman(pts.map(function (q) { return q.x; }), pts.map(function (q) { return q.y; }));
+      var box = { x: (pi % 2) * (pw + 20) + 56, y: Math.floor(pi / 2) * (ph + 20) + 30, w: pw - 60, h: ph - 56 };
+      var lx = !!LOG[xk];
+      var xdom = extent(pts.map(function (q) { return q.x; }), 0.04, lx), ydom = extent(pts.map(function (q) { return q.y; }), 0.04);
+      var xd = lx ? [Math.log10(Math.max(xdom[0], 1e-9)), Math.log10(Math.max(xdom[1], 1e-9))] : xdom;
+      var P = panel(svg, box, ydom, { xdom: xd, titleX: box.x - 44, title: METRIC[yk].label + ' against ' + METRIC[xk].label + ' — ' + pts.length + ' arms, Spearman ρ = ' + rho.toFixed(2) });
+      (lx ? logTicks(xd[0], xd[1]) : ticks(xd[0], xd[1], 6)).forEach(function (t) { var xx = P.x(t); if (xx < box.x || xx > box.x + box.w) return; text(P.g, xx, box.y + box.h + 12, lx ? '1e' + t : fmt(t), { 'text-anchor': 'middle' }); });
+      text(P.g, box.x + box.w / 2, box.y + box.h + 24, METRIC[xk].label, { 'text-anchor': 'middle', 'class': 't' });
+      pts.forEach(function (q) {
+        var mine = q.a.batch === b.batch, isRef = refArms[q.p];
+        var c = el('circle', { cx: P.x(lx ? Math.log10(Math.max(q.x, 1e-9)) : q.x), cy: P.y(q.y), r: isRef ? 4 : 2.6, fill: isRef ? SURFACE : mine ? BLUE : '#555', stroke: isRef ? ORANGE : 'none', 'stroke-width': 1.2, opacity: mine || isRef ? 0.95 : 0.5, 'class': 'hit' }, P.g);
+        hover(c, function () { return q.p + '\n' + METRIC[xk].label + ' ' + fmt(q.x) + ' · ' + METRIC[yk].label + ' ' + fmt(q.y); });
+        c.addEventListener('click', function () { if (!isRef) { state.batch = q.a.batch; state.view = 'cell'; state.cell = q.a.cell; render(); } });
+      });
+    });
+  }
+
+  // ---- lightbox: the arm's existing chart
+  function zoom(policy) { var lb = $('lightbox'); lb.querySelector('img').src = '../runs/' + policy + '.png'; lb.querySelector('.cap').textContent = policy + ' — stage A (runs/' + policy + '.png)'; lb.style.display = 'flex'; }
+  $('lightbox').addEventListener('click', function () { $('lightbox').style.display = 'none'; });
+
+  // ---- render
+  function render() {
+    var b = batch(); state.batch = b.batch;
+    $('batch').value = b.batch;
+    document.querySelectorAll('header button[data-view]').forEach(function (bt) { bt.className = bt.getAttribute('data-view') === state.view ? 'on' : ''; });
+    var cp = $('cellpick'); cp.innerHTML = '';
+    cellsOf(b).forEach(function (c) { var o = document.createElement('option'); o.value = c.slug; o.textContent = c.label; cp.appendChild(o); });
+    if (state.cell && cellsOf(b).some(function (c) { return c.slug === state.cell; })) cp.value = state.cell; else state.cell = state.view === 'cell' ? cellsOf(b)[0].slug : state.cell;
+    $('cellpick-l').style.display = state.view === 'cell' ? '' : 'none';
+    $('smooth-l').style.display = state.view === 'traces' || state.view === 'cell' ? '' : 'none';
+    $('smooth').value = state.smooth; $('ref').checked = state.ref === '1';
+    $('summary').textContent = 'reduced ' + (S.generated || '?').replace('T', ' ') + ' · ' + Object.keys(S.arms).length + ' arms · bins ' + (S.bin / 1e3) + 'k';
+    var main = $('main'); tip.style.display = 'none';
+    ({ curve: viewCurve, traces: viewTraces, cell: viewCell, levers: viewLevers, scatter: viewScatter }[state.view] || viewCurve)(main);
+    writeHash();
+  }
+  function moveBatch(d) { var i = S.batches.map(function (b) { return b.batch; }).indexOf(state.batch); state.batch = S.batches[Math.max(0, Math.min(S.batches.length - 1, i + d))].batch; state.hidden = {}; render(); }
+  function moveCell(d) { var cs = cellsOf(batch()), i = cs.map(function (c) { return c.slug; }).indexOf(state.cell); state.cell = cs[Math.max(0, Math.min(cs.length - 1, i + d))].slug; render(); }
+  $('batch').addEventListener('change', function () { state.batch = this.value; state.hidden = {}; this.blur(); render(); });
+  $('cellpick').addEventListener('change', function () { state.cell = this.value; this.blur(); render(); });
+  $('smooth').addEventListener('change', function () { state.smooth = this.value; this.blur(); render(); });
+  $('ref').addEventListener('change', function () { state.ref = this.checked ? '1' : '0'; render(); });
+  document.querySelectorAll('header button[data-view]').forEach(function (bt) { bt.addEventListener('click', function () { state.view = bt.getAttribute('data-view'); state.m = null; render(); }); });
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+    if (e.key === 'Escape') { $('lightbox').style.display = 'none'; return; }
+    if (e.key === 'ArrowRight' || e.key === 'n') { moveBatch(1); e.preventDefault(); }   // batches run in manifest order, b9 first: n = newer
+    else if (e.key === 'ArrowLeft' || e.key === 'p') { moveBatch(-1); e.preventDefault(); }
+    else if (e.key === 'ArrowDown' && state.view === 'cell') { moveCell(1); e.preventDefault(); }
+    else if (e.key === 'ArrowUp' && state.view === 'cell') { moveCell(-1); e.preventDefault(); }
+    else if (e.key >= '1' && e.key <= '5') { state.view = ['curve', 'traces', 'cell', 'levers', 'scatter'][+e.key - 1]; state.m = null; render(); }
+    else if (e.key === 'r') { state.ref = state.ref === '1' ? '0' : '1'; render(); }
+  });
+  window.addEventListener('hashchange', function () { readHash(); render(); });
+  window.addEventListener('resize', render);
+  readHash(); render();
+})();
+</script>
+</body>
+</html>

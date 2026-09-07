@@ -32,7 +32,7 @@ reason.
 | `desktop/` | the git-bus job queue. stdlib only, imports nothing from this project | no | no |
 | `skills/` | the procedures an agent runs often: launching, queueing, stopping, progress updates. Markdown only | | |
 | `docs/` | the investigation | | |
-| `viewer/` | the chart viewer's source, `index.html` (`manifest.js` beside it is a local build, gitignored). The desktop builds the GitHub Pages `site` branch from it and both boxes' results feeds (`tools/site_build.py`). No server | | |
+| `viewer/` | the chart viewer's source, `index.html` (`manifest.js` beside it is a local build, gitignored), and the sweep page `sweep.html` (`sweep.js` likewise, from `tools.sweep_analysis reduce`). The desktop builds the GitHub Pages `site` branch from it and both boxes' results feeds (`tools/site_build.py`). No server | | |
 | `plans/` | designs | | |
 | `tests/` | | | |
 
@@ -210,6 +210,7 @@ the next session does not hit it — [`skills/README.md`](skills/README.md).
 | [`docs/environment.md`](docs/environment.md) | the game, the observation vector, the reward terms |
 | [`docs/invariants.md`](docs/invariants.md) | the nine |
 | [`docs/charts.md`](docs/charts.md) | one graph per arm, linked straight from `runs/` |
+| [`docs/sweep.md`](docs/sweep.md) | the b9-b21 sweep as pictures: each knob's curve and traces, the levers, the peaks table, the diagnostics. Interactive twin: `viewer/sweep.html` |
 | [`docs/running.md`](docs/running.md) | every `SNEK_*` knob and what it does |
 
 The tools behind those entry points, in the order a measurement passes through them:
@@ -234,6 +235,7 @@ The tools behind those entry points, in the order a measurement passes through t
 | `tools/stage_b_chart.py` | a stage-B pass as a picture and a text block: where the record region is |
 | `tools/chart_viewer.py` | a live grid of chart PNGs; `--follow` draws what the scheduler's status file names. Reads, never writes, never trains |
 | `tools/viewer_manifest.py` | `viewer/manifest.js`: every arm reduced to the docs tables' numbers, for the web viewer |
+| `tools/sweep_analysis.py` | **the sweep's reducer**: b9-b21 (`plans/hyperparam-sweep.json`) reduced to `viewer/sweep.json` / `sweep.js` -- per arm the docs numbers plus onset, the late `ppo` diagnostics, binned traces (with the per-bin min, so a one-eval collapse survives), stage-B density over time, hof rows; per cell the four seeds against the reference with an exact Mann-Whitney. `reduce`, `figures`, `peaks`. Read by `viewer/sweep.html` and by `tools/sweep_figures.py`, which draws `charts/sweep/` for `docs/sweep.md` |
 | `tools/publish_pages.py` | writes a site — `index.html`, `manifest.js`, `charts/` — from `viewer/` and a runs directory into a target it is given (no default, no local build); `tools/site_build.py` calls it on the desktop to build the `site` branch from both boxes' results feeds, every network cycle. `tools/results_feed.py` is what the scheduler publishes each finished arm and pass through, to `results` (desktop) or `laptop-results` |
 | `tools/live_runs.py` | which trainings are running here, stated by the trainings. A pid per arm; beside them the scheduler's `.status.json`, `.reopen-window` and `.durations.json` (how long each pass took here) |
 | `tools/eta.py` | the time estimates on `status.json`'s lines and its `remaining` total: a queued arm at the batch's finished arms' wall rate, a running arm at its recent rate plus its overhead, a pass at the box's median for that pass |

@@ -1,6 +1,6 @@
 # Reading the sweep — the analysis plan
 
-**Written 2026-09-06, after b18 closed the one-knob sweep.** b9–b21 are done: 13 batches, 116 cells,
+**Written 2026-09-06, after b18 closed the one-knob sweep; built the same day** — `tools/sweep_analysis.py`, `tools/sweep_figures.py`, `viewer/sweep.html`, `docs/sweep.md`, `charts/sweep/`. Decisions taken at build time: b3–b8 stay out (not part of the sweep); the traces overlay cells, with the arm view one click away. b9–b21 are done: 13 batches, 116 cells,
 464 arms, every arm at 50M with its stage B, `hof5000` and `hof30k` files in `runs/`. What exists so
 far is one table per batch in `results.md` and a paragraph of reading, and one PNG per arm. What does
 not exist is a **picture of any knob's curve**, a **cross-batch view** of which knobs are levers, or

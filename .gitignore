@@ -80,3 +80,8 @@ __pycache__/
 
 # the Pages site is the `site` branch, built by the desktop (snek3/tools/site_build.py); the local manifest is regenerated
 /snek3/viewer/manifest.js
+
+# The sweep analysis's reduced data (tools/sweep_analysis.py reduce), read by viewer/sweep.html and by the figure
+# renderer; ~7 MB and regenerated from runs/ in twenty seconds. The figures it draws are committed under snek3/charts/sweep/.
+/snek3/viewer/sweep.js
+/snek3/viewer/sweep.json
