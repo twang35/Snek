@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b25a-laddertop-seed1",
+  "b25b-laddertop-seed2",
+  "b25c-laddertop-seed3",
+  "b25d-laddertop-seed4",
+  "b25e-laddertop-seed5",
+  "b25f-laddertop-seed6",
+  "b25g-laddertop-seed7",
+  "b25h-laddertop-seed8"
+ ],
+ "batch": "b25",
+ "box": "laptop",
+ "claimed_iso": "2026-09-07T01:23:04",
+ "claimed_ts": 1788769384.968204,
+ "kind": "wave",
+ "wave": 1
+}
