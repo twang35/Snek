@@ -72,16 +72,19 @@ CURRENT_DIRECTION_MAPS = {
 }
 
 # ----------------------------------------------------------------- observation
-OBS_LEN = 30
+OBS_LEN = 26
 
 # **Bump this whenever the vector's *meaning* changes, even at constant length.** A checkpoint
 # restores whenever the length matches and nothing checks the values still mean what they meant:
 # snek2 repurposed two indices at constant length on 2026-08-02 and every hall-of-fame checkpoint
 # restored silently and played like a beginner, 90.3% to scoring 0, 0, 1.
 #
-# `b09c616` is the snek2 commit this layout comes from, kept verbatim so a converted snek2
-# champion's `arch.json` matches. See docs/environment.md for the index layout.
-OBS_ERA = 'b09c616'
+# `b09c616` was the snek2 commit the 30-value layout came from, kept verbatim so a converted snek2
+# champion's `arch.json` matched. `obs26-20260907` dropped two blocks from it -- `perfect_game_move`
+# (18-20, nonzero in <0.03% of states) and `food_space` (29, at 1 in ~99.95%) -- after
+# `docs/findings.md`'s death analysis found neither doing anything; every checkpoint from before,
+# the snek2 champion included, stops loading. See docs/environment.md for the index layout.
+OBS_ERA = 'obs26-20260907'
 
 # The observation's blocks, in order, as `(name, width)`. The sum is the vector length and each
 # entry's offset is its index range — so this table *is* the layout in docs/environment.md.
@@ -102,13 +105,14 @@ OBS_BLOCKS = (
     ('body_and_wall', 3),        # 6-8    is the move safe. The only place legality is stated
     ('head_with_tail_groups', 6),  # 9-14 [can reach tail, lg(open regions)] per action
     ('safe_to_chase_food', 3),   # 15-17  head, food and tail in one region
-    ('perfect_game_move', 3),    # 18-20  nonzero in <0.03% of states; not meaningfully trained
-    ('starve_budget', 1),        # 21
-    ('board_fill', 1),           # 22     rank 1 of 30 by saliency in every snek2 arm measured
-    ('hugging_wall', 3),         # 23-25
-    ('not_following_tail', 3),   # 26-28  a *fatal* move also reads 1 here
-    ('food_space', 1),           # 29     sits at 1 in ~99.95% of states
+    ('starve_budget', 1),        # 18
+    ('board_fill', 1),           # 19     rank 1 by saliency in every snek2 arm measured
+    ('hugging_wall', 3),         # 20-22
+    ('not_following_tail', 3),   # 23-25  a *fatal* move also reads 1 here
 )
+# Removed 2026-09-07 (era `obs26-20260907`): `perfect_game_move` (was 18-20) and `food_space` (was
+# 29). Both sat at a constant in >99.9% of states, and the death analysis in docs/findings.md found
+# the best checkpoints' failures ran through neither.
 
 
 def observation_length():
@@ -162,6 +166,14 @@ ZERO_OBS_INDICES = _parse_zero_obs(os.environ.get('SNEK_ZERO_OBS'))
 FOOD_REWARD = 1.0
 DEATH_REWARD = -5.0
 STARVE_REWARD = -0.5
+
+# Subtracted on **every** step, terminal ones included, so a longer game is a worse one at equal
+# score. 0 by default (every batch through b25 ran without it); batch b26 sweeps it, on the finding
+# that the best checkpoints fail by orbiting reachable food until they starve -- a loop the reward
+# made rational when a step was free and a starve cost a tenth of a death (docs/findings.md,
+# 2026-09-07). Printed on the `reward config:` line; the vectorised env reads it through
+# `vectorized/config.py`.
+STEP_PENALTY = _num('STEP_PENALTY', 0.0)
 
 # **Coupled to DISCOUNT and not independently tunable.** A terminal reward is a potential: with
 # `k` steps per meal, progress only raises value when `W > 1/(1 - gamma^k)`, which is 34-58 at

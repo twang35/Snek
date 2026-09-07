@@ -5,7 +5,7 @@ the wave can read exact progress off the files. **A restarted shard skips what i
 resumed file is identical to an uninterrupted one rather than merely similar — snek2 lost 192 rows
 and 7,534 episodes in one incident for want of this.
 
-The nets are tiny (`30 -> 4 -> 3`) and untrained, so the policies die quickly and a whole shard runs
+The nets are tiny (`OBS_LEN -> 4 -> 3`) and untrained, so the policies die quickly and a whole shard runs
 in a second. The observation length and action count have to be real, because the real env is driven.
 """
 
@@ -24,10 +24,11 @@ from tools import shard
 def policy(tmp_path):
     """A policy directory with six checkpoints of a tiny untrained net."""
     directory = str(tmp_path / 'policy')
-    arch = arch_tools.build_arch([4], 3, 30, __import__('env.constants', fromlist=['x']).OBS_ERA)
+    constants = __import__('env.constants', fromlist=['x'])
+    arch = arch_tools.build_arch([4], 3, constants.OBS_LEN, constants.OBS_ERA)
     arch_tools.write_arch(directory, arch)
     for step in range(1000, 7000, 1000):
-        checkpoints.save(directory, step, network.QNet(30, [4], 3))
+        checkpoints.save(directory, step, network.QNet(constants.OBS_LEN, [4], 3))
     return directory
 
 
@@ -121,7 +122,7 @@ def test_the_net_pool_is_reused_rather_than_grown(tmp_path, policy):
     Not about memory — a net is 45 KB — but about the pool actually working: if it never handed one
     back, a 3,000-checkpoint arm would allocate 3,000 identical modules.
     """
-    pool = shard._NetPool(arch_tools.build_arch([4], 3, 30, 'x'))
+    pool = shard._NetPool(arch_tools.build_arch([4], 3, 26, 'x'))
     first = pool.take()
     pool.give_back(first)
     assert pool.take() is first

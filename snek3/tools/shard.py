@@ -13,7 +13,7 @@ than merely similar.
 
 **One net per resident checkpoint, pooled.** `engine.measure_stream` keeps several checkpoints live
 at once to keep the batch full — that is what `max_live` is — so a single net cannot serve them. A
-`30 -> 320 -> 3` net is 45 KB, so the pool costs nothing; it exists to avoid re-allocating one per
+`26 -> 320 -> 3` net is ~37 KB, so the pool costs nothing; it exists to avoid re-allocating one per
 checkpoint, which on a 3,000-checkpoint arm is 3,000 allocations of the same shape.
 """
 
@@ -59,7 +59,7 @@ def measure_slice(policy_dir, steps, episodes, out_path, policy=None, width=None
     """
     # One thread. A wave runs 4-16 of these at once, and torch defaults to one thread per core each,
     # so the processes oversubscribe the box and every one of them slows down. The matmul here is
-    # (512, 30) x (30, 320), which a single thread saturates anyway.
+    # (512, 26) x (26, 320), which a single thread saturates anyway.
     torch.set_num_threads(1)
 
     policy = policy if policy is not None else policy_dir

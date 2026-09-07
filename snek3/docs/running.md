@@ -41,7 +41,7 @@ everything read through `tuned()`, in `train.py` and in the algorithm's module a
 one function, which is why the split cost the grep nothing. The reward and shaping knobs are read by
 `env/constants.py` **at import**, before the trainer's config exists, so they print no override line
 — `SNEK_CHASE_SAFE_SHAPING`, `SNEK_CHASE_SAFE_GATE`, `SNEK_FREE_SPACE_*`,
-`SNEK_FOOD_DISTANCE_REWARD`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`. For those, grep
+`SNEK_FOOD_DISTANCE_REWARD`, `SNEK_STEP_PENALTY`, `SNEK_PERFECT_GAME_REWARD`, `SNEK_ZERO_OBS`. For those, grep
 **`reward config:`**, one line printed at startup from `vectorized/config.describe()`. Before it
 existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` on the desktop.
 
@@ -55,7 +55,7 @@ existed, b2's shaping dose had to be confirmed by reading `/proc/<pid>/environ` 
 | `SNEK_MAX_STEPS` | 10,000,000 | **absolute**, not "run this many more" — `global_step` is restored on resume. An arm at its cap prints so and exits after its opening eval. **Counted steps, not game moves**: at the default `fork_branches=4` a DQN step is four moves, and every eval row carries `transitions` for that reason |
 | `SNEK_MIN_CHECKPOINT_SCORE` | 40 | below this no checkpoint is written, so a short smoke run writes none and cannot resume. Set 0 to test resume |
 | `SNEK_DEBUG` | 0 | verbose logging. For debugging, not status |
-| `SNEK_TORCH_THREADS` | 1 | **measured 1.4x faster than one-per-core**: a 30 -> 320 -> 3 net has no op large enough to amortise a fork-join. Compounds when four arms share the laptop |
+| `SNEK_TORCH_THREADS` | 1 | **measured 1.4x faster than one-per-core**: a 26 -> 320 -> 3 net has no op large enough to amortise a fork-join. Compounds when four arms share the laptop |
 | `SNEK_CHART_WINDOW` | 1 | 0 opens no window. Read by the **scheduler** (`tools/window.py`), which is the only thing that opens one; the test suite sets it, and `runtime.json`'s `viewer: false` sets it for the desktop's scheduler |
 | `SNEK_CHART_WINDOW_SCALE` | 1.0 | fraction of the screen the window fills. There is one window per box, so the default is the whole screen, subject to the caps in the next row |
 | `SNEK_CHART_WINDOW_MAX_PX` | unset | hard ceiling on window width in logical pixels, on either box. Unset leaves the window bounded by the screen and by the charts — **a panel is never drawn wider than its source PNG** (730 px training, 1000 px eval), so a window with little in it opens small rather than upscaling to fill the display |
@@ -149,7 +149,7 @@ step no checkpoint exists at is the one thing the protocol cannot tolerate.
 
 ### Rewards and shaping
 
-`SNEK_PERFECT_GAME_REWARD` (100), `SNEK_FOOD_DISTANCE_REWARD` (0.001),
+`SNEK_PERFECT_GAME_REWARD` (100), `SNEK_FOOD_DISTANCE_REWARD` (0.001), `SNEK_STEP_PENALTY` (0, subtracted on every step -- b26's knob),
 `SNEK_CHASE_SAFE_SHAPING` + `SNEK_CHASE_SAFE_GATE` (0, 85),
 `SNEK_FREE_SPACE_SHAPING` + `SNEK_FREE_SPACE_GATE` (0, 85).
 

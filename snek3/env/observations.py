@@ -29,24 +29,25 @@ def get_observations(old_grid,
                      current_step,
                      last_food_step,
                      snake_len):
-    """Builds the 30-value observation vector. Layout, in order:
+    """Builds the 26-value observation vector. Layout, in order:
 
     idx      values  what
     0-5      6       food: [is closer, 1/(distance+1)] per action
     6-8      3       is the move safe (not body or wall)
     9-14     6       [can still reach tail, lg(open regions) scaled to [0, 1]] per action
     15-17    3       is it safe to chase the food (head, food and tail in one region)
-    18-20    3       does the move win the game
-    21       1       starve budget left, lg-compressed to [0, 1]
-    22       1       fraction of the board the snake fills
-    23-25    3       is the post-move head hugging a wall or body on its left or right
-    26-28    3       is the move NOT a tail-chase (0 = it lands on the cell the tail is vacating)
-    29       1       room around the food: 1 roomy or no food, 0.5 a two-cell pocket, 0 sealed in
+    18       1       starve budget left, lg-compressed to [0, 1]
+    19       1       fraction of the board the snake fills
+    20-22    3       is the post-move head hugging a wall or body on its left or right
+    23-25    3       is the move NOT a tail-chase (0 = it lands on the cell the tail is vacating)
 
     Anything "per action" is ordered by ACTIONS — left, right, forward — as relative turns
-    from the current heading, not compass directions. Index 29 is not per action: it describes
-    the board, and is the same whichever move is taken. Keep this in step with
+    from the current heading, not compass directions. Keep this in step with
     env.scalar_env.observation_spec(), which sums the same counts.
+
+    Two blocks were removed on 2026-09-07 (era `obs26-20260907`): "does the move win the game"
+    (was 18-20, nonzero in under 0.03% of states) and "room around the food" (was 29, at 1 in
+    ~99.95%). The death analysis in ../docs/findings.md found neither in the failure mechanism.
 
     **New blocks go on the end, never in the middle.** Several frozen diagnostic scripts index
     this vector by hardcoded position to answer questions about past runs, and inserting a block
@@ -90,10 +91,6 @@ def get_observations(old_grid,
     # share the flood fill.
     observations.extend(food_chase_values)
 
-    # 3 values, one per action: 1 if the move eats the last food and fills the board. All zero
-    # unless the snake is exactly one food short, so this fires on the final move of a game.
-    observations.extend(perfect_game_obs(old_grid, head_pos, head_move_dir, snake_len))
-
     # 2 values: how much of the starve budget is left, lg-compressed and scaled to [0, 1], and
     # how much of the board the snake fills, linear. The second is the only signal for how far
     # through the game this is. These used to be one entangled value that went flat from length
@@ -120,18 +117,9 @@ def get_observations(old_grid,
     # free space the snake still needs - see following_tail_obs. Unvalidated.
     observations.extend(following_tail_obs(head_pos, tail_pos, head_move_dir))
 
-    # 1 value, not per action: how much room the food has - 0 when it is sealed into its own cell,
-    # 0.5 when it has exactly one open neighbour, 1 for anything roomier or when there is no food.
-    # 1 is safe, per the project convention. The intent is to let a policy recognise food it cannot
-    # simply approach, because taking it needs the snake's own tail to vacate a cell first - push a
-    # bubble of space round to it. Note this makes the input 1 in ~99.97% of states, so it is very
-    # nearly a constant; see food_space_obs for why that is a hazard worth remembering rather than
-    # a learning problem. Unvalidated.
-    observations.extend(food_space_obs(old_grid, current_food))
-
     # Ablation, applied last so the indices it names are the ones in the layout above rather than
     # whatever position a block happened to occupy while being built. Empty unless SNEK_ZERO_OBS is
-    # set, and then it costs one pass over a 30-element list - see ZERO_OBS_INDICES for why an
+    # set, and then it costs one pass over a 26-element list - see ZERO_OBS_INDICES for why an
     # ablation zeroes rather than deletes.
     for index in ZERO_OBS_INDICES:
         if 0 <= index < len(observations):
@@ -176,24 +164,6 @@ def food_observations(grid, head_pos, current_food, head_move_dir):
     return observations
 
 
-# Returns 1 for perfect game in each action
-def perfect_game_obs(old_grid, head_pos, head_move_dir, snek_len):
-    # if not one away from perfect game return 0s
-    if snek_len != PERFECT_SCORE - 1:
-        return [0, 0, 0]
-
-    observations = []
-    for action in ACTIONS:
-        new_head_pos = get_relative_pos(action, head_pos, head_move_dir)
-        grid_value = get_grid_value(new_head_pos, old_grid)
-        if grid_value == 1:
-            # on top of food
-            observations.extend([1])
-        else:
-            observations.extend([0])
-    return observations
-
-
 # Returns 1 for no collision, 0 for collision in each action
 # Reverse to help snek learn what is safe
 def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
@@ -207,75 +177,6 @@ def body_and_wall_collisions(grid, head_pos, tail_pos, head_move_dir):
             observations.extend([0])
 
     return observations
-
-
-def food_space_obs(grid, current_food):
-    """One value: how much room the food has. 1 is safe, 0 is sealed in.
-
-    | region holding the food | value |
-    |---|---|
-    | anything roomier than two cells, or no food at all | 1 |
-    | the food plus exactly one open cell | 0.5 |
-    | the food's cell alone, sealed in | 0 |
-
-    Not per-action — this is a property of the board, and the same for all three moves. It is the
-    first single-value observation to describe the food rather than the snake.
-
-    The hypothesis is that stuck food needs a different plan. Food sealed into a one- or two-cell
-    pocket cannot be taken by approaching it: the snake has to wait, or travel elsewhere, until
-    its own tail vacates a cell and opens the pocket up — push a bubble of space round to it. The
-    existing food observations cannot express that. `food_observations` reports direction and
-    distance, which point straight at a meal that is unreachable, and `safe_to_chase_food` goes to
-    0 for an unreachable one without distinguishing "sealed in a single cell" from "reachable but
-    the way out is bad". Unvalidated: a hypothesis about what the feature lets a policy express.
-
-    **1 is safe**, matching the rest of the vector. The direction itself is free — the first layer
-    can absorb a complemented input by flipping a weight — but it means the common case is 1.
-
-    **That is a hazard worth knowing.** The value is 1 in 99.97% of random-play states and still
-    ~90% at snake length 50, so this input acts much like a second bias: gradient on nearly every
-    sample, information on very few. It is the shape of the `game_over` trap this project was
-    already bitten by (see ../CLAUDE.md). **If this index is ever repurposed, do not assume its
-    weights were meaningfully trained.**
-
-    **Decided locally rather than with a flood fill**, which is exact here and much cheaper: a
-    one-cell region means no open orthogonal neighbour, a two-cell region means exactly one whose
-    only open neighbour is the food, and anything larger fails both tests — at most eight lookups.
-    `count_groups` is ~46% of an observation's cost and already runs three times per step, so a
-    fourth call would have made this the most expensive input in the vector.
-    `test_food_space_matches_a_real_flood_fill` checks the two agree over random boards.
-
-    "Open" is grid value 0 or 1 — empty or food — matching count_groups. The head (2) is not open,
-    so food tucked against the head reads as sealed on that side, which is correct: the head does
-    not vacate the way the tail does.
-    """
-    # No food means nothing is stuck, so 1 rather than 0 — which keeps the polarity honest even
-    # though it cannot matter in practice: there is no food only once the board is full, and that
-    # is a terminal state no policy ever acts on.
-    if current_food == 'no food':
-        return [1]
-    food_pos = current_food.position
-    open_neighbours = [(food_pos[0] + offset[0], food_pos[1] + offset[1])
-                       for offset in NEIGHBOUR_OFFSETS
-                       if get_grid_value((food_pos[0] + offset[0], food_pos[1] + offset[1]),
-                                         grid) in (0, 1)]
-    if not open_neighbours:
-        return [0]
-    if len(open_neighbours) > 1:
-        return [1]
-
-    # Exactly one open neighbour, so the region is {food, neighbour} unless that neighbour opens
-    # onto something else. Comparing against the food's own cell as a tuple because `position`
-    # is not guaranteed to be one.
-    neighbour = open_neighbours[0]
-    food_cell = tuple(food_pos)
-    for offset in NEIGHBOUR_OFFSETS:
-        beyond = (neighbour[0] + offset[0], neighbour[1] + offset[1])
-        if beyond != food_cell and get_grid_value(beyond, grid) in (0, 1):
-            return [1]
-    return [0.5]
-
-
 def following_tail_obs(head_pos, tail_pos, head_move_dir):
     """0 per action when the move puts the head on the cell the tail is vacating; 1 otherwise.
 

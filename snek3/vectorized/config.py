@@ -60,6 +60,7 @@ DEATH_REWARD = _c.DEATH_REWARD
 STARVE_REWARD = _c.STARVE_REWARD
 PERFECT_GAME_REWARD = _c.PERFECT_GAME_REWARD
 FOOD_DISTANCE_REWARD = _c.FOOD_DISTANCE_REWARD
+STEP_PENALTY = _c.STEP_PENALTY
 
 CHASE_SAFE_SHAPING = _c.CHASE_SAFE_SHAPING
 CHASE_SAFE_GATE = _c.CHASE_SAFE_GATE
@@ -91,7 +92,7 @@ def describe():
     checkpoint can legitimately produce different `avg_reward`.
     """
     return ('grid {0}x{0}, max score {1}, food {2}, death {3}, starve {4}, perfect {5}, '
-            'dist {6}, chase_safe c={7} gate={8}, free_space c={9} gate={10}'.format(
+            'step {11}, dist {6}, chase_safe c={7} gate={8}, free_space c={9} gate={10}'.format(
                 PLAY, MAX_POSSIBLE_SCORE, FOOD_REWARD, DEATH_REWARD, STARVE_REWARD,
                 PERFECT_GAME_REWARD, FOOD_DISTANCE_REWARD, CHASE_SAFE_SHAPING, CHASE_SAFE_GATE,
-                FREE_SPACE_SHAPING, FREE_SPACE_GATE))
+                FREE_SPACE_SHAPING, FREE_SPACE_GATE, STEP_PENALTY))

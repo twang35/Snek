@@ -198,5 +198,16 @@
     "label": "reference: b23's g999roll512msehold cell at 50M -- the same config b25 runs at 200M and 8 seeds",
     "knob": "name",
     "value": "base"
+  },
+  "b26": {
+    "arms": [
+      "b24a-hzanneal50-seed1",
+      "b24b-hzanneal50-seed2",
+      "b24c-hzanneal50-seed3",
+      "b24d-hzanneal50-seed4"
+    ],
+    "label": "reference: b24's hzanneal50 cell -- the same config with no step penalty, but the 30-value observation era and a 200M cap, so a loose reference only; b26's own pen0 cell is the control for the 26-value observation",
+    "after": "pen0",
+    "value": "0"
   }
 }

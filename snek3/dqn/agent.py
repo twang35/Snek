@@ -2,7 +2,7 @@
 
 The seam every algorithm in this project sits on, so `train.py` needs to know nothing about DQN:
 
-    agent.act(obs, epsilon, guided)  -> actions        # (n, 30) -> (n,)
+    agent.act(obs, epsilon, guided)  -> actions        # (n, OBS_LEN) -> (n,)
     agent.update(batch, indexes, weights) -> metrics   # one optimisation step
     agent.policy_fn                  -> callable       # greedy, for engine.measure
     agent.state_dict() / load_state_dict()
@@ -100,7 +100,7 @@ def build_adam(parameters, learning_rate, epsilon):
 
     **Bit-identical, and that is the reason it can be turned on without re-running anything.** The
     fused path is the same update arithmetic in a single kernel rather than ~40 ops over four tiny
-    tensors; on this net (30 -> 320 -> 3, 10,560 parameters) the per-op dispatch *is* the cost, so a
+    tensors; on this net (26 -> 320 -> 3, 9,283 parameters; 30 -> 320 -> 3 was 10,560) the per-op dispatch *is* the cost, so a
     whole `forward + backward + step` fell from **240.7 us to 162.1 us** — 19% off the learn step,
     which is 12M gradient steps of an arm. Verified over 2,000 steps from a fixed seed: **max
     absolute parameter difference 0.0**, so a seeded arm reproduces exactly as before.

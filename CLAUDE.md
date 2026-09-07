@@ -34,7 +34,7 @@ agent needs instead.
 | era | headline | env | train |
 |---|---|---|---|
 | snek2 | TensorFlow + TF-Agents, batches 1-47, peaking at a **98.7% perfect-game rate**. **Frozen 2026-08-28** — runnable for A/B against snek3, not developed further | `snek` | `cd snek2 && python snek2.py <policy_name>` |
-| snek3 | PyTorch, the active one. Same game and same 30-value observation as snek2, so a snek2 champion's weights convert straight across; a clean-slate implementation of everything else | `snek3` | `cd snek3 && PYTHONPATH=. python -u train.py <policy_name>` |
+| snek3 | PyTorch, the active one. Same game as snek2; the observation was snek2's 30 values until 2026-09-07 and is 26 since (era `obs26-20260907`, `snek3/docs/environment.md`), so a snek2 champion converted under the old era but no longer loads; a clean-slate implementation of everything else | `snek3` | `cd snek3 && PYTHONPATH=. python -u train.py <policy_name>` |
 
 The argument is the policy name, and in both eras it doubles as the checkpoint directory under
 `savedPolicies/<policy_name>/` and as the prefix for the run's own graph and report in `runs/`, so

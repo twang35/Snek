@@ -78,7 +78,7 @@ def test_a_matching_arch_is_restorable(tmp_path):
     assert returned['fc_layer_params'] == [320]
 
 
-@pytest.mark.parametrize('field,value', [('obs_len', 26),
+@pytest.mark.parametrize('field,value', [('obs_len', 27),
                                          ('obs_era', 'something-else'),
                                          ('num_actions', 4)])
 def test_each_environment_field_refuses_on_its_own(tmp_path, field, value):

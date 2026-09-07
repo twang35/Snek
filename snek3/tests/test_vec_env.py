@@ -404,3 +404,21 @@ def test_copy_rows_refuses_mismatched_lane_counts():
     env.reset_all()
     with pytest.raises(ValueError, match='one destination per source'):
         env.copy_rows([0, 1], [2])
+
+
+def test_step_penalty_is_subtracted_from_an_ordinary_move(monkeypatch):
+    """A plain forward move with the food ahead pays exactly the step penalty and nothing else.
+
+    The food is placed straight ahead so the distance term cannot fire (the move is closer), the
+    shaping terms are off by default, and the move neither eats nor ends the game -- so the reward is
+    the penalty alone. 0 by default, which the first assertion pins so a default change is deliberate.
+    """
+    assert C.STEP_PENALTY == 0.0
+    monkeypatch.setattr(C, 'STEP_PENALTY', 0.25)
+    env = V.VecSnake(1, seed=0)
+    head = int(env.body[0, env.hp[0]])
+    env.reset_all(forced_food=np.array([head + 3], np.int64))       # three cells to the right
+    _, reward, done, info = env.step(np.array([2]), autoreset=False)  # forward
+    assert not done[0] and not info['ate'][0]
+    assert reward[0] == -0.25
+    assert 'step 0.25' in C.describe()

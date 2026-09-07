@@ -447,8 +447,7 @@ def test_the_chase_safe_observation_is_zero_on_the_eating_move_of_the_coil():
     to whether the tail is still reachable *after* the meal, and it is not: the head lands walled in
     by its own body, so `can reach tail` (obs[9]) is 0 and the safe-to-chase flag follows it to 0.
     The policy is told "this meal traps you", not "go eat". The other two moves read 0 as well — one
-    is a wall, the other follows the vacating tail and cannot reach the food — and index 29 confirms
-    the food is sealed with no open neighbour.
+    is a wall, the other follows the vacating tail and cannot reach the food.
 
     The obs[6] = 1 assertion is what makes this bite: the 0 is not the trivial 0 of an unreachable
     food, it is the flag correctly calling a reachable meal a trap.
@@ -463,7 +462,6 @@ def test_the_chase_safe_observation_is_zero_on_the_eating_move_of_the_coil():
         assert float(obs[9 + 2 * eat]) == 0.0, 'after eating, the head cannot reach its own tail'
         assert float(obs[15 + eat]) == 0.0, 'so chasing this food is not safe'
         assert [float(obs[15 + i]) for i in range(3)] == [0.0, 0.0, 0.0], 'no move here is a safe chase'
-        assert float(obs[29]) == 0.0, 'the food is sealed in, with no open neighbour'
     finally:
         restore()
 
@@ -819,4 +817,26 @@ def test_the_two_shaping_terms_add():
         assert not finished
         assert abs(reward - 2 * 0.1 * (GAMMA - 1.0)) < 1e-12, reward
     finally:
+        restore()
+
+
+def test_step_penalty_is_subtracted_from_an_ordinary_move_in_the_reference():
+    """The scalar `Game` pays the step penalty on a plain move, matching `VecSnake`'s test.
+
+    Distance shaping is forced to 0 by `build_chase_game`, the shaping terms are off, and seed 7's
+    first food is not on the cell ahead of the start, so the opening forward move's reward is the
+    penalty alone. Patched on the game module, which binds its own copy via `from env.constants import *`.
+    """
+    module = build_chase_game(0.0)
+    saved = module.STEP_PENALTY
+    module.STEP_PENALTY = 0.25
+    try:
+        random.seed(7)
+        game = module.Game(display=False)
+        game.reset()
+        finished, reward = game.step('forward')
+        assert not finished and game.current_score == 0
+        assert reward == -0.25
+    finally:
+        module.STEP_PENALTY = saved
         restore()

@@ -56,10 +56,14 @@ or it will not load.
 The order is chronological rather than logical, and that is deliberate: diagnostic scripts index the
 vector by hardcoded position, so inserting a block silently repoints every one of them.
 
-Two caveats on the newest blocks. A *fatal* move reads 1 at indices 26-28 — the flag only asks "is
-this the tail's cell", so combine it with 6-8, which are the only place legality is stated. And index
-29 sits at 1 in **99.95%** of states, so it is nearly a constant and **its weights are not
-meaningfully trained** — the same shape as the `game_over` trap in invariant 3.
+One caveat on the newest block. A *fatal* move reads 1 at indices 23-25 — the flag only asks "is
+this the tail's cell", so combine it with 6-8, which are the only place legality is stated.
+
+Blocks can also be *removed*, and that is the other reason the era exists. On 2026-09-07 the
+perfect-game triple (old 18-20) and the food-room value (old 29) — both near-constants whose weights
+were never meaningfully trained, the `game_over` shape of invariant 3 — were dropped and the vector
+went from 30 to 26 (`OBS_ERA` `b09c616` → `obs26-20260907`). Every earlier checkpoint fails to load
+by width, which is the loud failure; the era bump is what would catch a later change at 26.
 
 **Not every block is a per-action triple.** Food-space, starve and board-fill are single values, so
 never assume index arithmetic in threes.

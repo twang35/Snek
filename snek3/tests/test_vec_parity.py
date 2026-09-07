@@ -661,3 +661,20 @@ def test_the_unmutated_env_is_clean_on_the_same_short_runs():
     that reported mismatches unconditionally.
     """
     assert _run_under_mutant(lambda: None) == 0
+
+
+def test_step_penalty_parity():
+    """`STEP_PENALTY` is subtracted on every transition in both engines, terminal steps included.
+
+    Forced on the same way as the shaping terms, and worth its own run rather than a line in theirs:
+    the scalar reference applies it after every terminal branch and the vectorised one after the
+    outcome assignments, so an implementation that skipped it on a death or a meal in one engine
+    only would disagree on exactly the steps a short run rarely reaches -- hence the endgame board.
+    """
+    for label, kwargs in (('growth', {'seed': 15}),
+                          ('endgame', {'seed': 16,
+                                       'board': lambda r: _coiled_snapshot(r, 88)})):
+        run = _with_shaping({'STEP_PENALTY': 0.01}, kwargs)
+        assert run.reward_mismatches == [], (
+            '{0}: the step penalty disagreed on {1} of {2} steps; first: {3}'.format(
+                label, len(run.reward_mismatches), run.steps, run.reward_mismatches[0]))

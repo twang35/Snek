@@ -494,6 +494,8 @@ class VecSnake:
         reward[died] = C.DEATH_REWARD
         reward[perfect] = C.PERFECT_GAME_REWARD
         reward[starved] = C.STARVE_REWARD
+        # A per-step cost on every transition, terminal ones included. 0 unless SNEK_STEP_PENALTY.
+        reward -= C.STEP_PENALTY
 
         # --- replacement food. Only a step that ate has none, and such a step cannot have died.
         needs_food = ate & (~perfect)
@@ -609,7 +611,7 @@ class VecSnake:
     # ---------------------------------------------------------- observation
 
     def observe(self, groups_mode='full'):
-        """The 30-value observation for every game. Layout is `env.observations.get_observations`'.
+        """The 26-value observation for every game. Layout is `env.observations.get_observations`'.
 
         `groups_mode` exists for benchmarking only: 'full' is the real observation, 'fast' skips
         region enumeration (so indices 10/12/14 read 0 while 9/11/13 and 15-17 stay exact), and
@@ -659,16 +661,13 @@ class VecSnake:
         obs[:, 10:15:2] = groups
         obs[:, 15:18] = chase
 
-        # --- 18-20: does this move win. Zero unless the snake is exactly one food short, so this
-        #     fires only on the final move of a game — nonzero in 0.000-0.025% of states.
-        obs[:, 18:21] = eats & (length == C.PERFECT_SCORE - 1)[:, None]
-
-        # --- 21-22: starve budget left (lg-compressed), and board fill (linear)
+        # --- 18-19: starve budget left (lg-compressed), and board fill (linear). (18-20 used to be
+        #     "does this move win", removed 2026-09-07 with index 29 -- era `obs26-20260907`.)
         remaining = np.maximum(0, self.starve_budget() - (self.step_count - self.last_food_step))
-        obs[:, 21] = np.log2(remaining + 1.0) / C.STARVE_OBS_SCALE
-        obs[:, 22] = length / C.PERFECT_SCORE
+        obs[:, 18] = np.log2(remaining + 1.0) / C.STARVE_OBS_SCALE
+        obs[:, 19] = length / C.PERFECT_SCORE
 
-        # --- 23-25: is the post-move head hugging a wall or body on its left or right. Checked
+        # --- 20-22: is the post-move head hugging a wall or body on its left or right. Checked
         #     against the board *after* the move, so the cell the tail vacates reads as open — which
         #     only matters in a tight coil. 0 for a fatal move.
         left_dir = TURN[new_dir][:, :, 0]
@@ -678,26 +677,11 @@ class VecSnake:
         vacates = ~eats
         left_open = open_[r2, left_pos] | ((left_pos == tail[:, None]) & vacates)
         right_open = open_[r2, right_pos] | ((right_pos == tail[:, None]) & vacates)
-        obs[:, 23:26] = legal & ((~left_open) | (~right_open))
+        obs[:, 20:23] = legal & ((~left_open) | (~right_open))
 
-        # --- 26-28: the move does NOT land on the cell the tail is vacating. 1 is good, and a fatal
+        # --- 23-25: the move does NOT land on the cell the tail is vacating. 1 is good, and a fatal
         #     move also reads 1 — the flag only asks "is this the tail's cell". Combine with 6-8.
-        obs[:, 26:29] = ~is_tail
-
-        # --- 29: room around the food. 0 sealed in, 0.5 a two-cell pocket, 1 roomier or no food.
-        #     Decided locally rather than with a fourth flood fill, which is exact here: one open
-        #     neighbour whose only other opening is the food itself means the region is two cells.
-        nb = food_safe[:, None] + NB[None, :]
-        open_nb = open_[r2, nb]
-        n_open = open_nb.sum(axis=1)
-        pick = np.argmax(open_nb, axis=1)
-        neighbour = nb[rows, pick]
-        beyond = neighbour[:, None] + NB[None, :]
-        # Subtract one for the food's own cell, which is always among the neighbour's open cells.
-        beyond_open = open_[r2, beyond].sum(axis=1) - 1
-        space = np.where(n_open == 0, 0.0,
-                         np.where(n_open > 1, 1.0, np.where(beyond_open > 0, 1.0, 0.5)))
-        obs[:, 29] = np.where(has_food, space, 1.0)
+        obs[:, 23:26] = ~is_tail
 
         # Ablation applied last, so the indices it names are the ones in the layout above.
         for index in C.ZERO_OBS_INDICES:

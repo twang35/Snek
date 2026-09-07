@@ -581,6 +581,8 @@ class Game:
             self.finished = True
             self.starved = True
             reward = STARVE_REWARD
+        # A per-step cost on every transition, terminal ones included. 0 unless SNEK_STEP_PENALTY.
+        reward -= STEP_PENALTY
 
         # Distance shaping, and only for an ordinary move. Skipped when this step ate,
         # because `old_moves_to_food` measures the food that was just consumed while

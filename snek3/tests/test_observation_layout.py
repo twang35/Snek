@@ -113,19 +113,30 @@ def test_observation_vector_length_does_not_depend_on_the_board():
         assert len(get_observations(**board())) == spec_length(), name
 
 
-def test_the_vector_is_thirty_values():
-    # A deliberate tripwire, not redundancy with the equalities above: adding a block is supposed to
-    # fail here so `OBS_LEN`, `OBS_BLOCKS`, `OBS_ERA` and the layout table in docs/environment.md
-    # all get updated in the same pass.
-    assert spec_length() == 30
+def test_the_vector_is_twenty_six_values():
+    # A deliberate tripwire, not redundancy with the equalities above: adding or removing a block is
+    # supposed to fail here so `OBS_LEN`, `OBS_BLOCKS`, `OBS_ERA` and the layout table in
+    # docs/environment.md all get updated in the same pass. 30 until 2026-09-07, when the
+    # perfect-game triple (18-20) and the food-room value (29) were removed.
+    assert spec_length() == 26
 
 
-def test_following_tail_block_sits_at_26_to_28():
+def test_following_tail_block_sits_at_23_to_25():
     # The literal indices, pinned: an insertion in the middle of the vector must fail here rather
     # than silently repointing anything that reads this vector by position.
     # 1 is good, so the tail-chasing action is the 0.
-    assert get_observations(**coiled_snake())[26:29] == [0, 1, 1], 'tail left of the head'
-    assert get_observations(**straight_snake())[26:29] == [1, 1, 1], 'tail directly behind'
+    assert get_observations(**coiled_snake())[23:26] == [0, 1, 1], 'tail left of the head'
+    assert get_observations(**straight_snake())[23:26] == [1, 1, 1], 'tail directly behind'
+
+
+def test_the_removed_blocks_are_gone():
+    # `perfect_game_move` and `food_space` were removed on 2026-09-07 (era `obs26-20260907`). A
+    # block table that grew them back at constant era would restore every era-`obs26` checkpoint
+    # onto inputs that mean something else -- the invariant-3 trap.
+    from env import constants
+    names = [name for name, _ in constants.OBS_BLOCKS]
+    assert 'perfect_game_move' not in names and 'food_space' not in names
+    assert constants.OBS_ERA != 'b09c616', 'the 30-value era marker must not name a 26-value vector'
 
 
 def test_each_block_sits_where_the_layout_table_says():
@@ -136,7 +147,7 @@ def test_each_block_sits_where_the_layout_table_says():
     passed. `wall_runner()` exists to break that coincidence.
     """
     from env import scalar_env
-    from env.observations import following_tail_obs, food_space_obs, group_obs
+    from env.observations import following_tail_obs, group_obs
 
     ranges = scalar_env.block_ranges()
     for name, board in BOARDS:
@@ -147,7 +158,6 @@ def test_each_block_sits_where_the_layout_table_says():
                                    fixture['current_food'])
         following = following_tail_obs(fixture['head_pos'], fixture['tail_pos'],
                                        fixture['head_move_dir'])
-        food_space = food_space_obs(fixture['old_grid'], fixture['current_food'])
 
         def block(key):
             first, stop = ranges[key]
@@ -155,13 +165,12 @@ def test_each_block_sits_where_the_layout_table_says():
 
         assert block('hugging_wall') == wall_hug, (name, 'hugging-wall moved', values)
         assert block('not_following_tail') == following, (name, 'following-tail moved', values)
-        assert block('food_space') == food_space, (name, 'food-space moved', values)
         assert block('board_fill') == [fixture['snake_len'] / PERFECT_SCORE], (
             name, 'board-fill moved', values)
 
     # The fixture is only worth anything if some board separates the two three-wide blocks.
     separating = [name for name, board in BOARDS
-                  if get_observations(**board())[23:26] != get_observations(**board())[26:29]]
+                  if get_observations(**board())[20:23] != get_observations(**board())[23:26]]
     assert separating, 'no board here distinguishes hugging-wall from following-tail'
 
 
@@ -172,44 +181,3 @@ def test_observation_values_stay_in_range():
         values = get_observations(**board())
         assert all(0.0 <= float(v) <= 1.0 for v in values), (
             name, [round(float(v), 3) for v in values if not 0.0 <= float(v) <= 1.0])
-
-
-def test_food_space_is_a_single_value_not_a_per_action_triple():
-    # The only single-value observation about the food, and the only block since the starve/length
-    # pair that is not one value per action. A future edit making it per-action would take the
-    # vector to 32 and invalidate every checkpoint, so it is pinned explicitly.
-    from env.observations import food_space_obs
-
-    assert len(food_space_obs(open_board(), FakeFood((7, 7)))) == 1
-
-
-def test_food_space_reads_low_when_the_food_is_sealed_in():
-    """End to end through `get_observations`, so this also covers the food being handed through.
-
-    Food at (7, 5) with room below it, so the three-cell case has somewhere to extend into. (7, 8)
-    is the last interior row and (7, 9) is already wall, which is why a pocket built against the
-    bottom edge cannot be opened into a third cell.
-    """
-    def board_with(body, food=(7, 5)):
-        fixture = straight_snake()
-        grid = fixture['old_grid']
-        for x, y in body:
-            grid[y + 1][x + 1] = 3
-        grid[food[1] + 1][food[0] + 1] = 1
-        fixture['current_food'] = FakeFood(food)
-        return fixture
-
-    # Sealed alone: all four neighbours are body. 1 is safe, so this is the 0.
-    sealed = board_with([(6, 5), (8, 5), (7, 4), (7, 6)])
-    assert get_observations(**sealed)[29] == 0
-
-    # A two-cell pocket. Opening one of those four is not enough on its own — that cell connects
-    # onward to the rest of the board — so the pocket only exists once (7, 6)'s own other
-    # neighbours are closed too. That is exactly the distinction a naive "count the food's open
-    # neighbours" implementation misses.
-    pocket = board_with([(6, 5), (8, 5), (7, 4), (6, 6), (8, 6), (7, 7)])
-    assert get_observations(**pocket)[29] == 0.5
-
-    # Let the pocket open onto a third cell and it stops counting as cramped.
-    roomy = board_with([(6, 5), (8, 5), (7, 4), (6, 6), (8, 6)])
-    assert get_observations(**roomy)[29] == 1

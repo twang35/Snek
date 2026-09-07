@@ -3,7 +3,7 @@
 The same seam shape `dqn/agent.py` sits on, with three methods instead of two because a rollout needs
 the value and the log-prob at collect time:
 
-    agent.act(obs)      -> (actions, log_probs, values)   # (n, 30) -> three (n,)
+    agent.act(obs)      -> (actions, log_probs, values)   # (n, OBS_LEN) -> three (n,)
     agent.values(obs)   -> (n,)                           # V only, for GAE's bootstrap
     agent.update(rollout) -> metrics                      # every epoch, every minibatch
     agent.policy_fn     -> callable                       # greedy, for engine.measure

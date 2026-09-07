@@ -43,7 +43,7 @@ removes the trap instead of guarding against it. `env/constants.py` holds no
 pygame objects for the same reason — that is what `env/render.py` is for.
 
 **`vectorized/` sees torch through one function and nothing else.** The engine's seam is a plain
-callable of shape `(m, 30) float32 -> (m,) int64`, which is what lets the whole measurement stack be
+callable of shape `(m, OBS_LEN) float32 -> (m,) int64` (26 values since 2026-09-07), which is what lets the whole measurement stack be
 tested against a hand-written heuristic with no framework imported. Do not thread a tensor through
 `vectorized/`. `tools/checkpoints.py` and `tools/restore.py` do import torch — they read and write
 weights — and that costs nothing, because nothing in the measurement loop calls them.
@@ -66,7 +66,7 @@ PYTHONPATH=. python -m tools.claims show                 # the pool: unclaimed w
 PYTHONPATH=. python -m tools.scheduler --reopen-window   # a fresh chart window from the running scheduler
 ```
 
-**The snek2 champion converts in one command**, and is the reference policy for any A/B:
+**The snek2 champion converted in one command** and was the reference policy for any A/B **until the 2026-09-07 observation change** (30 -> 26 values, era `obs26-20260907`); the importer now refuses it by width, and it converts only under a checkout of the `b09c616` era:
 
 ```
 PYTHONPATH=. python tools/import_tf_checkpoint.py \
