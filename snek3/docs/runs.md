@@ -6,6 +6,33 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b27, the move-history batch (`SNEK_OBS_HISTORY` 0 / 4 / 8 on b26's `pen01` base, 100M, 8 seeds a cell), is in flight
+on both boxes — and its depth-4 cell is reading 93.8% stage-B density against the control's 49.2 with one arm still to
+measure.** As of 2026-09-07 23:30:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b27 w3 (`hist8`, seeds 17-24) | training, just launched (0%) | training ~02:00, stage B and hof passes ~04:00 |
+| laptop | b27 w2 (`hist4`, seeds 9-16) | stage B running, 7 of 8 arms merged (~15 min left); hof5000 then hof30k queued, the hof5000 estimated ~12 h at this density | passes into tomorrow morning |
+
+**What is in.** `hist0` (w1, desktop) closed with every pass: 49.2% density (33.0-64.7) against 46.3 for the same
+config at 50M (b26's `pen01`), best30 99.08, 99.4 /30k at best (`b27e` @52.4M, 44 rows ≥99.2 at 30,000) — the longer cap
+alone bought little. **`hist4` (w2, laptop), seven arms into stage B: 93.8% density (91.0-95.7), best30 99.76 (99.6-99.9),
+stage-A ≥98 share 84.3% against 47.2, 12,314 `hof5000` candidates at the 99 column** — every seed far above every control
+seed, onset unchanged. The plan (`plans/obs-history.md`) predicted no effect on the perfect rate; that prediction is
+falsified on the stage-A and stage-B evidence, pending the close. `hist8` says whether more history helps further or the
+gain is all in the first four moves. Readings in [`charts.md`](charts.md); the finding is written when the batch closes.
+
+**Watch.** `hist4`'s hof5000 pass will be the widest yet — ~1,300-1,700 rows ≥99.2 per arm — so the estimate of ~12 h
+is real, not the old floor; the 99.2 cut set today is what keeps it from being two days. If the pass is worth trimming,
+`eta.HOF_THRESHOLD` is the one knob.
+
+**Open from earlier today.** b24/b25's `hof30k` passes cover only their first arms; `b25a` @106168320 at 99.6 /30k
+awaits a fresh 30,000 under the old era. b26's step-penalty curve has not turned (0.02, 0.05 next) and a death trace
+of `b26b` @38.9M against a control would test the starvation-loop mechanism.
+
+## b26 closed, both boxes idle, as it read at 2026-09-07 18:30 (superseded)
+
 **b26, the step-penalty sweep and the first batch of the 26-value observation era, closed on both boxes with every
 pass; the shared queue is empty and both boxes are idle.** As of 2026-09-07 18:30:
 
