@@ -205,11 +205,22 @@ def test_a_pass_is_estimated_per_checkpoint_when_its_count_is_known_and_per_arm_
     live_runs.record_duration('hof5000', 800.0, runs, arms=8, checkpoints=200)      # 4 s per checkpoint
     live_runs.record_duration('hof5000', 1200.0, runs, arms=8, checkpoints=200)     # 6
     live_runs.record_duration('hof5000', 400.0, runs, arms=8)                       # no count: per arm only
-    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100) == 500.0           # median 5 x 100
+    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100) == 500.0           # pooled 2000/400 = 5 x 100
     assert eta.pass_seconds('hof5000', 8, runs) == 800.0                            # median 100 per arm x 8
     assert eta.pass_seconds('hof5000', 8, runs, checkpoints=0) == 0.0               # nothing selected
     # 5 arms known at 100 checkpoints, 3 arms not yet knowable: 5 x 100 + 3 x 100 per arm
     assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100, unknown_arms=3) == 800.0
+    # A 2-row pass is startup plus one row's wall time: 200 s for 2 rows is 100 s a row, and as a median
+    # of per-pass rates it would have become the box's rate (b26's 2-row hof30k put hist4's queued pass
+    # at 195 h, 2026-09-08). Pooled, its 2 rows barely move the 400 measured: 2200/402.
+    live_runs.record_duration('hof5000', 200.0, runs, arms=8, checkpoints=2)
+    assert eta.pass_seconds('hof5000', 8, runs, checkpoints=100) == pytest.approx(2200.0 / 402 * 100)
+    # And alone, that 2-row pass is not a rate at all: below MIN_LEDGER_CHECKPOINTS the default stands.
+    alone = str(tmp_path / 'alone')
+    live_runs.record_duration('hof30k', 360.0, alone, arms=8, checkpoints=2)
+    assert eta.pass_seconds('hof30k', 8, alone, checkpoints=1000) == 30.0 * 1000
+    live_runs.record_duration('hof30k', 1000.0, alone, arms=8, checkpoints=eta.MIN_LEDGER_CHECKPOINTS)
+    assert eta.pass_seconds('hof30k', 8, alone, checkpoints=1000) == pytest.approx(1360.0 / 52 * 1000)
 
 
 def test_a_running_pass_is_estimated_from_its_own_progress(tmp_path):

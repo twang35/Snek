@@ -18,10 +18,10 @@ far scaled to the steps left.
 
 **A pass costs what its selector picked, not how many arms it covers.** The scheduler records each
 pass it finishes -- seconds, arms and the checkpoints its merged files hold -- in
-`runs/.live/.durations.json` (`tools/live_runs.py`), and a pass is estimated at that ledger's median
-seconds per checkpoint times the checkpoints the pass will measure, which its selector's input file
+`runs/.live/.durations.json` (`tools/live_runs.py`), and a pass is estimated at that ledger's pooled
+seconds per checkpoint (every pass's seconds over every pass's checkpoints) times the checkpoints the pass will measure, which its selector's input file
 already says before it starts (`selected_checkpoints`): stage B reads the arm's stage-A rows above the
-screen, hof5000 the stage-B rows above 99, hof30k the hof5000 rows above 99. Per box by construction
+screen, hof5000 the stage-B rows above 99.2, hof30k the hof5000 rows above 99.6. Per box by construction
 (the desktop's 16 shards and the laptop's 12 give different times); before a box has run one,
 `DEFAULT_PASS_SECONDS_PER_CHECKPOINT`. Only when the input file is not there yet (a hof5000 queued
 behind a stage B still running) does the estimate fall back to the ledger's seconds per arm.
@@ -62,6 +62,9 @@ DEFAULT_PASS_SECONDS_PER_ARM = {'stageb': 55 * 60 / 8.0, 'hof5000': 9.5 * 60 / 8
 # ledger over b18-b25 (12 shards), 2026-09-07 -- stage B 0.14-0.40 s/row at 500 episodes, hof5000
 # 1.5-4.8 at 5,000, hof30k 22-90 at 30,000 (a per-arm floor dominates when a wave selects a handful).
 DEFAULT_PASS_SECONDS_PER_CHECKPOINT = {'stageb': 0.35, 'hof5000': 3.7, 'hof30k': 30.0}
+# The ledger's per-checkpoint rate is trusted once its measured passes hold this many checkpoints
+# between them; fewer is a handful of rows timing the pass's startup (`_per_checkpoint`).
+MIN_LEDGER_CHECKPOINTS = 50
 # The hall-of-fame cuts, as percents: what a stage-B row needs over 500 episodes to reach `hof5000`,
 # and what a hof5000 row needs over 5,000 to reach `hof30k`. `closeout.PASSES` spells its selectors
 # from these.
@@ -308,9 +311,17 @@ def _per_arm(kind, entries):
 
 
 def _per_checkpoint(kind, entries):
+    """The box's seconds per checkpoint for `kind`: every measured pass's seconds pooled over every
+    measured pass's checkpoints, not a median of per-pass rates. A pass that selected a handful of
+    rows is startup plus one row's wall time spread over that handful -- the laptop's one hof30k entry
+    with a count, b26's 2 rows in 0.1 h, read 102 s per row against the 22 s a full 12-shard pass
+    does, and put hist4's queued hof30k at 195 h (2026-09-08). Pooling weights a pass by its rows, so
+    the small ones cannot set the rate -- and until the ledger holds `MIN_LEDGER_CHECKPOINTS` of them
+    the default stands, since pooling one small pass is that pass."""
     measured = [entry for entry in entries if entry.get('checkpoints')]
-    if measured:
-        return statistics.median(entry['seconds'] / entry['checkpoints'] for entry in measured)
+    checkpoints = sum(entry['checkpoints'] for entry in measured)
+    if checkpoints >= MIN_LEDGER_CHECKPOINTS:
+        return sum(entry['seconds'] for entry in measured) / checkpoints
     return DEFAULT_PASS_SECONDS_PER_CHECKPOINT.get(kind)
 
 
