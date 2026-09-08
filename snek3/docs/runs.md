@@ -6,6 +6,39 @@ goes directly under `## Established` in [`findings.md`](findings.md).
 
 ## Now
 
+**b27, the move-history batch, has every arm through stage B, `hist4`'s 5,000-episode pass closed, `hist8`'s an hour out —
+and both history depths read ~94-95% stage-B density against the control's 49.2, `hist8` a small step above `hist4` on
+every density and stability column and level with it on the peaks.** As of 2026-09-08 11:00:
+
+| box | batch | state | ETA |
+|---|---|---|---|
+| desktop | b27 w3 (`hist8`, seeds 17-24) | hof5000 running, 6 of 8 arms merged, ~1.1 h left; hof30k queued behind it (~1,950 rows at the 99.6 gate, ~9.5 h at the box's 17.6 s a row) | 30k results ~22:00 |
+| laptop | b27 w2 (`hist4`, seeds 9-16) | hof5000 closed 10:36, all 8 arms on `laptop-results` and the site; hof30k queued but **paused** — `runs/.live/.paused` (10:01) holds it | ~8 h from the unpause (~1,320 rows at 22 s a row) |
+
+b28 (pinned desktop) waits behind b27 w3 in the pool.
+
+**What is in.** Stage B for all 24 arms: `hist0` 49.2% (33.0-64.7), `hist4` 93.6 (91.0-95.7), `hist8` 95.4 (94.3-95.7);
+stage-A ≥98 share 47.2 / 84.3 / 85.4; best30 99.08 / 99.76 / 99.79; onset the same. At 5,000 episodes `hist4` puts 169
+rows an arm through the new 99.6 gate and `hist8` 246 (six arms in), with the same top: a 99.9 best in each and ~12 rows an
+arm at ≥99.8. `hist8`'s worst seed (94.3) sits above six of `hist4`'s eight. The plan's prediction of no effect on the
+perfect rate is falsified; the finding is written when the batch closes. Readings in [`charts.md`](charts.md).
+
+**Changed today.** The `hof30k` gate is 99.6 /5,000, from 99.2 (`eta.HOF30K_THRESHOLD`; the hof5000 gate stays 99.2
+/500 as `eta.HOF_THRESHOLD`): over the 1,392 b24-b27 rows with both readings nothing below 99.6 /5k ever read 99.6 /30k,
+and 99.5 no longer places. Deployed to the desktop before either 30k pass launched. `hist0`'s 30k pass (124 rows) ran under
+the old gate and is not comparable in row count.
+
+**Watch.** The scheduler's status lines overcount both 30k passes (223 h laptop, 39 h desktop) until each scheduler restarts
+on the new code: the queued-line row count comes from the running scheduler's copy of the old cut, and the laptop's per-row
+rate from a single 2-row ledger entry — the pooled-rate fix to `tools/eta.py` is in the working tree, uncommitted. The
+laptop's `.failed-b25-hof30k` marker stands (`logs/laptop-queue/b25/`); b25's `hof30k` files for seeds 4-8 arrived from the
+desktop and are committed with this update.
+
+**Open from earlier.** `b25a` @106168320 at 99.6 /30k awaits a fresh 30,000 under the old era; b26's step-penalty curve has
+not turned (0.02, 0.05 next); a hist16 arm is the obvious next cell once b27 closes.
+
+## b27 w1 closed, w2 in stage B, w3 launched, as it read at 2026-09-07 23:30 (superseded)
+
 **b27, the move-history batch (`SNEK_OBS_HISTORY` 0 / 4 / 8 on b26's `pen01` base, 100M, 8 seeds a cell), is in flight
 on both boxes — and its depth-4 cell is reading 93.8% stage-B density against the control's 49.2 with one arm still to
 measure.** As of 2026-09-07 23:30:
