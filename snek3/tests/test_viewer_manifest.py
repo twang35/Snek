@@ -183,12 +183,13 @@ def test_status_reads_the_desktop_ledger_snapshot(tmp_path):
     assert by['b32ab-x-seed2']['status']['a'] == 'queued'
     assert by['b33aa-x-seed1']['status']['b'] == 'running'
     assert by['b33ab-x-seed2']['status']['b'] == 'queued'
-    # Which box: a running job names its arms' box; a queued arm of a running pass is on that pass's box;
-    # a pass queued in the pool and claimed by nobody has none. b25 on 2026-09-07 read "queued on the
-    # desktop" while its hof5000 ran on the laptop, because the caption assumed the desktop.
+    # Which box: a running job names its arms' box; a queued arm's pass will run where its wave was
+    # claimed, which is the arm's own box (none is recorded in this fixture); never another wave's box.
+    # b25 on 2026-09-07 read "queued on the desktop" while its hof5000 ran on the laptop, because the
+    # caption assumed the desktop.
     assert by['b31ab-x-seed2']['status_box']['h'] == 'laptop'
-    assert by['b31aa-x-seed1']['status_box'] == {'a': None, 'b': None, 'h': 'laptop', 'k': None}
-    assert by['b33aa-x-seed1']['status_box']['b'] == 'desktop' and by['b33ab-x-seed2']['status_box']['b'] == 'desktop'
+    assert by['b31aa-x-seed1']['status_box'] == {'a': None, 'b': None, 'h': None, 'k': None}
+    assert by['b33aa-x-seed1']['status_box']['b'] == 'desktop' and by['b33ab-x-seed2']['status_box']['b'] is None
     assert vm.build(runs)['arms'][0]['status']                         # and without a snapshot nothing breaks
     (live / 'status.json').unlink()
     assert vm.build(runs)['desktop_iso'] is None
@@ -219,5 +220,30 @@ def test_this_boxs_own_scheduler_status_counts_too(tmp_path):
                   'running': [{'id': 'b25-hof5000', 'type': 'eval', 'policies': ['b25aa-x-seed1']}]})
     by = {a['policy']: a for a in vm.build(runs)['arms']}
     assert by['b25aa-x-seed1']['status']['h'] == 'running' and by['b25aa-x-seed1']['status_box']['h'] == 'laptop'
-    # the other arm is not in a running job and no ledger has the pass: what the files say, pending
-    assert by['b25ab-x-seed2']['status']['h'] == 'pending' and by['b25ab-x-seed2']['status_box']['h'] == 'laptop'
+    # the other arm is not in a running job and no ledger has the pass: what the files say, pending -- and
+    # its box is its own (none recorded here), not the running job's, which may be another wave's
+    assert by['b25ab-x-seed2']['status']['h'] == 'pending' and by['b25ab-x-seed2']['status_box']['h'] is None
+
+
+def test_two_waves_of_one_pass_running_on_two_boxes_each_name_their_own(tmp_path):
+    """b27, 2026-09-08: wave 2's hof5000 ran on the laptop while wave 3's ran on the desktop, and the
+    page said "queued on the desktop" for wave 2's arms. The job ids carry the wave (`-w2`, `-w3`), which
+    the kind detection matched with `endswith` and so missed every wave after the first; the arms then
+    fell through to a cross-wave guess that returned the first matching job's box."""
+    runs = str(tmp_path)
+    live = tmp_path / '.live' / 'desktop'
+    live.mkdir(parents=True)
+    for arm in ('b27i-x-seed9', 'b27q-x-seed17', 'b27y-x-seed25'):
+        _arm(runs, arm, evals=[90, 99], rows=[99.5])
+    vm.write_boxes(runs, {'b27i-x-seed9': 'laptop', 'b27q-x-seed17': 'desktop', 'b27y-x-seed25': 'laptop'})
+    (live / 'status.json').write_text(json.dumps({
+        'iso': '2026-09-08T09:49:06',
+        'running': [{'id': 'b27-hof5000-w3', 'type': 'eval', 'policies': ['b27q-x-seed17'], 'box': 'desktop'},
+                    {'id': 'b27-hof5000-w2', 'type': 'eval', 'policies': ['b27i-x-seed9'], 'box': 'laptop'}],
+        'ledger': {'b27-hof5000': 'done', 'b27-hof5000-w2': 'running', 'b27-hof5000-w3': 'running',
+                   'b27-hof5000-w4': 'queued'}}))
+    by = {a['policy']: a for a in vm.build(runs)['arms']}
+    assert by['b27i-x-seed9']['status']['h'] == 'running' and by['b27i-x-seed9']['status_box']['h'] == 'laptop'
+    assert by['b27q-x-seed17']['status']['h'] == 'running' and by['b27q-x-seed17']['status_box']['h'] == 'desktop'
+    # A wave whose pass is still queued: on the box that holds the wave, i.e. the arm's own.
+    assert by['b27y-x-seed25']['status']['h'] == 'queued' and by['b27y-x-seed25']['status_box']['h'] == 'laptop'

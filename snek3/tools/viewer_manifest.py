@@ -149,8 +149,12 @@ def ledger_snapshot(runs_dir):
             policies = set(job.get('policies') or ([job['policy']] if job.get('policy') else []))
             job_id = job.get('id') or ''
             box = job.get('box') or default_box
+            # A pass job is `<batch><suffix>` for wave 1 and `<batch><suffix>-wN` after, so the suffix
+            # is matched with the wave allowed for: `endswith` saw only wave 1, and every later wave's
+            # arms fell through to the cross-wave guess below (b27 on 2026-09-08: wave 2's hof5000 ran
+            # on the laptop and the page said "queued on the desktop", wave 3's box).
             kind = 'a' if job.get('type') == 'train' else next(
-                (k for k, (_label, suffix) in PASSES.items() if job_id.endswith(suffix)), None)
+                (k for k, (_label, suffix) in PASSES.items() if _PASS_JOB(suffix).match(job_id)), None)
             if kind:
                 running[kind].update({p: box for p in policies})
             if job_id:
@@ -159,10 +163,11 @@ def ledger_snapshot(runs_dir):
             'job_boxes': job_boxes}
 
 
-def running_pass_box(job_boxes, batch, suffix):
-    """The box whose running job is the batch's pass (any wave), or None."""
-    pattern = re.compile(re.escape(batch + suffix) + r'(-w\d+)?$')
-    return next((box for job_id, box in job_boxes.items() if pattern.match(job_id)), None)
+def _PASS_JOB(suffix, batch=''):
+    """The job ids of a pass: `<batch><suffix>` for wave 1, `<batch><suffix>-wN` after. With no batch,
+    any batch's."""
+    head = re.escape(batch + suffix) if batch else r'.*' + re.escape(suffix)
+    return re.compile(head + r'(-w\d+)?$')
 
 
 def ledger_pass_state(jobs, batch, suffix):
@@ -303,7 +308,11 @@ def arm_record(policy, runs_dir, desktop=None, laptop_live=frozenset(), arm_boxe
         record['status'][kind] = pass_state(have, bool(shard_files(runs_dir, policy, label, names)), candidates[kind],
                                             policy in running[kind],
                                             ledger_pass_state(jobs, batch, suffix))
-        record['status_box'][kind] = running[kind].get(policy) or running_pass_box(desktop['job_boxes'], batch, suffix)
+        # A running job names its arms' box. Otherwise a queued pass runs where the arm's wave was
+        # claimed, which is the box the arm trained on -- never another wave's running job, whose box
+        # can differ (b27's waves 2 and 3 ran their hof5000 on the laptop and the desktop at once).
+        state = record['status'][kind]
+        record['status_box'][kind] = running[kind].get(policy) or (record['box'] if state in ('queued', 'pending') else None)
     # A pass whose upstream found nothing will never run either: say `none`, not `upstream`.
     for kind, before in (('h', 'b'), ('k', 'h')):
         if record['status'][kind] == 'upstream' and record['status'][before] == 'none':
