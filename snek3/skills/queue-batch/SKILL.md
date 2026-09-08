@@ -146,3 +146,11 @@ it says so in `status.json`.
 `paused` / `drain`: the desktop finishes what is running and claims nothing new. Set one before killing a
 desktop job (`stop-run`) or the freed slot refills within one poll. On the laptop the hold is
 `touch runs/.live/.paused`, and its scheduler claims nothing while the file exists.
+
+**A pause holds a chain pass *after* its skip checks, so a `.failed-<label>` marker written during the pause
+does not stop that pass** (2026-09-08: b27 wave 2's hof30k was marked skipped and moved to the desktop while
+the laptop sat paused on it; removing the pause launched it anyway, and the scheduler relaunched it once when
+it was killed). The scheduler checks `pass_done` and the failed marker, *then* waits out the pause. To move
+a pass another box will run: write the marker, then stop the laptop's scheduler (SIGTERM; it leaves a running
+pass behind as an orphan, so kill that close-out and its `pgrep -P` children by pid too) rather than unpausing
+it, and start a fresh scheduler when the laptop should work again.
