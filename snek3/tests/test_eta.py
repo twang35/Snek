@@ -193,8 +193,8 @@ def test_a_pass_measures_what_its_selector_picks_from_the_file_before_it(tmp_pat
     assert eta.pass_checkpoints('hof5000', ['a', 'b'], runs) == 3
     assert eta.pass_checkpoints('hof30k', ['a'], runs) is None
     assert eta.pass_checkpoints('stageb', ['a'], runs, pending={'a'}) is None   # still training: unknown
-    _stage_b(runs, 'a', 'hof5000', [99.2, 99.6, 50.0])
-    assert eta.pass_checkpoints('hof30k', ['a'], runs) == 2
+    _stage_b(runs, 'a', 'hof5000', [99.2, 99.6, 50.0])                     # the hof30k cut is 99.6: 99.2 is out
+    assert eta.pass_checkpoints('hof30k', ['a'], runs) == 1
     assert eta.selected_checkpoints('smoke', 'a', runs) is None
 
 

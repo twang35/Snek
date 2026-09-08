@@ -49,9 +49,9 @@ REDRAW_SECONDS = 20
 # **The protocol's passes, by name — the one place their numbers live.** Every batch gets all three,
 # in this order, and each selects from the pass before it: stage B screens every checkpoint at
 # >=97/100 in stage A and measures it at 500; `hof5000` takes the rows at >=99.2/500 to 5,000; `hof30k`
-# takes the rows at >=99.2/5,000 to 30,000 on seed 7, a seed no selecting pass used, so a row there is a
-# confirmed rate rather than a selected high. The cut is `eta.HOF_THRESHOLD`, with why it is 99.2. The
-# labels are the files: `runs/<arm>_checkpoint_evals[_<label>].json`, so a pass never overwrites the
+# takes the rows at >=99.6/5,000 to 30,000 on seed 7, a seed no selecting pass used, so a row there is a
+# confirmed rate rather than a selected high. The cuts are `eta.HOF_THRESHOLD` and `eta.HOF30K_THRESHOLD`,
+# with why they are 99.2 and 99.6. The labels are the files: `runs/<arm>_checkpoint_evals[_<label>].json`, so a pass never overwrites the
 # one it read from — omitting `hof5000`'s label would replace the 500-episode file `above:99.2`
 # selects from with 5,000-episode rows.
 #
@@ -62,7 +62,7 @@ REDRAW_SECONDS = 20
 PASSES = {
     'stageb': {'selector': 'screen', 'episodes': 500, 'label': None, 'seed': 0},
     'hof5000': {'selector': 'above:{0:g}'.format(eta.HOF_THRESHOLD), 'episodes': 5000, 'label': 'hof5000', 'seed': 0},
-    'hof30k': {'selector': 'above:{0:g}:hof5000'.format(eta.HOF_THRESHOLD), 'episodes': 30000, 'label': 'hof30k', 'seed': 7},
+    'hof30k': {'selector': 'above:{0:g}:hof5000'.format(eta.HOF30K_THRESHOLD), 'episodes': 30000, 'label': 'hof30k', 'seed': 7},
 }
 # The chain, in the order the passes run. `FOLLOW_ON[pass]` is what a finished pass earns.
 CHAIN = ('stageb', 'hof5000', 'hof30k')

@@ -62,19 +62,24 @@ DEFAULT_PASS_SECONDS_PER_ARM = {'stageb': 55 * 60 / 8.0, 'hof5000': 9.5 * 60 / 8
 # ledger over b18-b25 (12 shards), 2026-09-07 -- stage B 0.14-0.40 s/row at 500 episodes, hof5000
 # 1.5-4.8 at 5,000, hof30k 22-90 at 30,000 (a per-arm floor dominates when a wave selects a handful).
 DEFAULT_PASS_SECONDS_PER_CHECKPOINT = {'stageb': 0.35, 'hof5000': 3.7, 'hof30k': 30.0}
-# The hall-of-fame cut, as a percent: what a stage-B row needs over 500 episodes to reach `hof5000`,
-# and a hof5000 row over 5,000 to reach `hof30k`. `closeout.PASSES` spells its selectors from this.
-# 99.2 (user, 2026-09-07; 99 before): the lowest rate over 500 episodes whose 95% Wilson interval
-# reaches the record, 99.65%/30,000 (496/500 has an upper bound of 99.69%, 495 falls short), so what
-# is dropped could not have placed. At 99 a 200M-step ladder-top arm put 811 rows into hof5000 and
-# 252 into hof30k; at 99.2 the same passes carry roughly a fifth of that. Over 5,000 the same test
-# gives 99.5; 99.2 there keeps the interval's whole reach with a margin, at a few dozen rows a batch.
+# The hall-of-fame cuts, as percents: what a stage-B row needs over 500 episodes to reach `hof5000`,
+# and what a hof5000 row needs over 5,000 to reach `hof30k`. `closeout.PASSES` spells its selectors
+# from these.
+# 99.2 for hof5000 (user, 2026-09-07; 99 before): the lowest rate over 500 episodes whose 95% Wilson
+# interval reaches the record, 99.65%/30,000 (496/500 has an upper bound of 99.69%, 495 falls short),
+# so what is dropped could not have placed. The 500-episode reading is too noisy to cut harder: the
+# ten checkpoints that ever read >=99.5/30k entered stage B between 99.0 and 99.8.
+# 99.6 for hof30k (user, 2026-09-08; 99.2 before): over the 1,392 rows of b24-b27 with both a 5,000
+# and a 30,000 reading, nothing below 99.6/5,000 ever read 99.6/30,000, and 99.5 no longer places.
+# The 99.2-99.3 band was 54% of the rows sent and topped out at 99.4; a 30k row costs 5.3x a 5k one,
+# and the move-history arms (b27) put ~7,500 rows a cell through the old cut (195 h on the laptop).
 HOF_THRESHOLD = 99.2
+HOF30K_THRESHOLD = 99.6
 # Which file each pass's selector reads and the threshold it applies: `(label of the input pass,
 # threshold)`, with None the arm's stage-A `_evals.json`. Spelled here rather than read from
 # `closeout.PASSES` so this module imports no torch (the daemon reads it too); `closeout` imports
 # the cut from here and a test holds the two in step.
-PASS_INPUTS = {'stageb': (None, 97.0), 'hof5000': ('', HOF_THRESHOLD), 'hof30k': ('hof5000', HOF_THRESHOLD)}
+PASS_INPUTS = {'stageb': (None, 97.0), 'hof5000': ('', HOF_THRESHOLD), 'hof30k': ('hof5000', HOF30K_THRESHOLD)}
 # A running pass is never shown as less than this: its estimate is a median, and half of them run over.
 MIN_RUNNING_PASS_SECONDS = 60.0
 
