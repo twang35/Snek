@@ -1,0 +1,18 @@
+{
+ "arms": [
+  "b27a-hist0-seed1",
+  "b27b-hist0-seed2",
+  "b27c-hist0-seed3",
+  "b27d-hist0-seed4",
+  "b27e-hist0-seed5",
+  "b27f-hist0-seed6",
+  "b27g-hist0-seed7",
+  "b27h-hist0-seed8"
+ ],
+ "batch": "b27",
+ "box": "desktop",
+ "claimed_iso": "2026-09-07T18:57:32",
+ "claimed_ts": 1788832652.707451,
+ "kind": "wave",
+ "wave": 1
+}
